@@ -1155,10 +1155,10 @@ per-frame total                              14 176 B                   1 367 B
 `#sentImages` after a hundred frames             100                         1
 ```
 
-**The left column is measured and the right is not, yet.** The probe ran two frames on the
-arm that shipped; the hundred-frame row is that rate, and the block-as-identity column is
-arithmetic over the row diff — a byte-identical grid costs nothing to write — until
-`placementIdOf` exists and the same probe reports it (F987, owed at the code commit).
+**Both columns are measured**, the second by the same probe re-run against the built arm
+(`out/f987-anim-bytes-after.ts`): one placement id across the two frames, byte-identical
+placeholders, 1 367 B a frame, and one entry in the record after a hundred frames. The
+hundred-frame figure on the left is the shipped arm's rate rather than a hundred-frame run.
 
 **So the placement's identity is the block's, and the picture is what is cached at it.**
 `placementIdOf(block, scope)` in `image/kitty.ts` is the one derivation, and the renderer's

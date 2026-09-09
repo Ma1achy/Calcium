@@ -175,6 +175,24 @@ export type RenderContext = Readonly<{
    */
   frames?: Readonly<Record<string, number>>;
   /**
+   * The scope an image's placement is identified within (C09 I66, F987).
+   *
+   * **Written by L4 beside `frames`**, and it is the transcript entry's id: a
+   * block id is unique within a document (C04 I14) and nothing makes it unique
+   * across the transcript, so a placement keyed by block id alone would let the
+   * second `/svg` replace the first's picture behind the first's placeholders.
+   *
+   * **Absent is the picture's identity**, exactly as before — a caller that scopes
+   * nothing gets the safe and dear id. It must be absent on **both** sides or
+   * present on both: a scoped seam against an unscoped frame places an image
+   * nobody transmitted, and the converse transmits at an id nothing addresses.
+   * Both draw nothing, which is why T4.58's control constructs that pair.
+   *
+   * `measure` does not receive it (I8): a placement id is appearance and the box
+   * it addresses is geometry, and the box is a function of the block and the width.
+   */
+  placementScope?: string;
+  /**
    * The reader's overrides of `Series.hidden`, by plot block id and then by
    * series index (C04 I99, C12 I116, C22 I78).
    *

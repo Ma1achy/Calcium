@@ -38,7 +38,7 @@ import {
   type Pixels,
 } from "../../src/presentation/image/index.js";
 import { transmitAnimation, transmitRgba } from "../../src/presentation/image/kitty.js";
-import { transmitImage } from "../../src/shell/transmit-image.js";
+import { transmitImage, type SentImages } from "../../src/shell/transmit-image.js";
 import { Frames } from "../../src/shell/frames.js";
 import { b } from "../../src/shell/builders/index.js";
 import type { Image } from "../../src/data/viewmodel/index.js";
@@ -447,17 +447,17 @@ describe("C09 I39 — the kitty arm uploads once and the terminal animates", () 
   it("IF10 (C09 I39): `transmitImage` sends a GIF as its frames, once, and a PNG as its bytes", () => {
     const gif = b.image({ id: "g", data: A, height: 3, alt: "red then green" });
     const png = b.image({ id: "p", data: rgbPng64(8, 8, () => [255, 0, 0]), height: 3, alt: "red" });
-    const sent = new Set<string>();
+    const sent: SentImages = new Map();
     const first = transmitImage([gif, png], KITTY_CAPS, sent, 80);
     expect(first, "the GIF goes as frames").toContain("a=f,");
     expect(first, "never as `f=100`, which kitty would fail to decode").not.toMatch(/f=100[^]*a=f/u);
     expect(first, "the PNG goes as its bytes").toContain("f=100");
     expect(transmitImage([gif, png], KITTY_CAPS, sent, 80), "and neither goes twice").toBe("");
-    expect(transmitImage([gif], FULL_CAPS, new Set(), 80), "nothing at all off the protocol arm").toBe("");
+    expect(transmitImage([gif], FULL_CAPS, new Map<number, string>(), 80), "nothing at all off the protocol arm").toBe("");
 
     // An overlay composites into every frame and the frame count is unchanged.
     const over = b.image({ id: "o", data: A, height: 3, alt: "overlaid", overlay: { values: [[0, 1], [1, 0]], colormap: "viridis" } });
-    const withOverlay = transmitImage([over], KITTY_CAPS, new Set(), 80);
+    const withOverlay = transmitImage([over], KITTY_CAPS, new Map<number, string>(), 80);
     expect(withOverlay.split("a=f,").length - 1).toBe(1);
   });
 });

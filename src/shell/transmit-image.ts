@@ -24,7 +24,7 @@
  * Property 3 is why the arm survives either answer. The first real-terminal test
  * is where it is checked, beside the plane-16 width guarantee.
  */
-import { imageId, imageKey, payload, transmit, transmitAnimation, transmitRgba } from "../presentation/image/kitty.js";
+import { imageKey, payload, placementIdOf, transmit, transmitAnimation, transmitRgba } from "../presentation/image/kitty.js";
 import { compositeOverlay } from "../presentation/image/overlay.js";
 import { decodeImage } from "../presentation/image/index.js";
 import { imageCells } from "../presentation/blocks/kinds/image.js";
@@ -33,13 +33,32 @@ import type { TerminalCapabilities } from "../terminal/capabilities.js";
 import type { Probe } from "../data/viewmodel/index.js";
 
 /**
- * Which digests this session has already sent.
+ * What picture is currently at each placement (C09 I66, F987).
  *
- * **Session-scoped and never document-scoped**, because the id space belongs to
- * the terminal: an entry evicted from the transcript does not un-send its image,
- * and a document redrawn does not need to re-send one.
+ * **A map and not a set, and keyed by the placement rather than by the picture.**
+ * A set of digests answered *has this picture been sent*, which is the wrong
+ * question at a stable placement: the picture is what changes there. `get(id) ===
+ * key` is the whole condition — a transmission is owed where the key differs (a
+ * new frame, an overlay change) and skipped where it does not.
+ *
+ * **Bounded by the document rather than by the session**, which the set was not:
+ * a hundred frames of one block left a hundred digests in it and a hundred images
+ * resident in the terminal. `transmitFrame` releases every placement whose block
+ * is no longer in the document, so what the terminal holds is one image per
+ * placement transmitted and not since replaced. *Document* is the transcript and
+ * not the viewport, so a scroll releases nothing and re-transmits nothing.
  */
-export type SentImages = Set<string>;
+export type SentImages = Map<number, string>;
+
+/**
+ * One scope's blocks — a transcript entry, as the frame hands it over.
+ *
+ * The scope is optional here because a caller may legitimately have none, and an
+ * absent one is the picture's identity (`placementIdOf`). It is **not** a default
+ * the shell may take: a scoped seam against an unscoped frame places an image
+ * nobody transmitted.
+ */
+export type PlacementGroup = Readonly<{ scope?: string; blocks: readonly Block[] }>;
 
 /** Every image in a block tree, in the order they will be placed. */
 function imagesIn(block: Block, out: Image[]): void {
@@ -99,6 +118,17 @@ export function transmitImage(
   width: number,
   /** C28's seam (I30) — `imageCells` decodes, and the decode map has no cap. */
   probe?: Probe,
+  /**
+   * The scope these blocks' placements are identified within (C09 I66) — the
+   * transcript entry's id, and absent for a caller that has none.
+   */
+  scope?: string,
+  /**
+   * Every placement this frame addressed, for `transmitFrame`'s release sweep.
+   * A single-group caller passes nothing and nothing is released: the sweep is
+   * the frame seam's, because only the frame sees the whole document.
+   */
+  live?: Set<number>,
 ): string {
   if (!transmits(capabilities)) return "";
   const found: Image[] = [];
@@ -110,8 +140,13 @@ export function transmitImage(
     // alone means two blocks of one image with different overlays transmit once
     // and both draw the first — the wrong picture rather than none.
     const key = imageKey(image);
-    if (sent.has(key)) continue;
-    sent.add(key);
+    // **The placement is where the picture goes and the key is what is there**
+    // (C09 I66). Two derivations of one id agree only while both are pure
+    // functions of the same block, so both sides take it from `placementIdOf`.
+    const id = placementIdOf(image, scope);
+    live?.add(id);
+    if (sent.get(id) === key) continue;
+    sent.set(id, key);
     const bytes = Uint8Array.from(Buffer.from(image.data, "base64"));
     // **The declared cell box is the placement's, and now it is computed the
     // same way** (F380). `imageCells` is the renderer's own function, called
@@ -131,7 +166,7 @@ export function transmitImage(
     // at all — the terminal's reads formats ours refuses (C09 §8b G7).
     const isPng = image.data.startsWith("iVBORw0KGgo");
     if (image.overlay === undefined && isPng) {
-      out += transmit(imageId(key), payload(bytes), box.cols, box.rows);
+      out += transmit(id, payload(bytes), box.cols, box.rows);
       continue;
     }
     // **Every other case needs pixels, and this is the only place they exist
@@ -148,7 +183,7 @@ export function transmitImage(
     // reader gets on every rasterising arm either way.
     const decoded = decodeImage(bytes);
     if (!decoded.ok) {
-      out += transmit(imageId(key), payload(bytes), box.cols, box.rows);
+      out += transmit(id, payload(bytes), box.cols, box.rows);
       continue;
     }
     const overlay = image.overlay;
@@ -156,14 +191,47 @@ export function transmitImage(
       overlay === undefined ? px : compositeOverlay(px, overlay);
     out +=
       decoded.animation === undefined
-        ? transmitRgba(imageId(key), composite(decoded.pixels), box.cols, box.rows)
+        ? transmitRgba(id, composite(decoded.pixels), box.cols, box.rows)
         : transmitAnimation(
-            imageId(key),
+            id,
             decoded.animation.frames.map(composite),
             decoded.animation.delays,
             box.cols,
             box.rows,
           );
   }
+  return out;
+}
+
+/**
+ * A frame's transmissions, and the release sweep that bounds the record.
+ *
+ * **One call per frame over every scope**, because the sweep needs the whole
+ * document: a placement is released when its block is no longer anywhere in it,
+ * and a seam that saw one entry could not tell that from a block that moved.
+ *
+ * **The release is on the frame after**, which is what makes C04 §3g.2's T5 hold
+ * — an entry evicted while its image is on screen keeps its picture for the last
+ * frame that draws it, because the placement rows go with the entry and the sweep
+ * runs against the document that no longer holds it.
+ */
+export function transmitFrame(
+  groups: readonly PlacementGroup[],
+  capabilities: TerminalCapabilities,
+  sent: SentImages,
+  width: number,
+  probe?: Probe,
+): string {
+  // **The guard is the sweep's as well as the transmission's.** A terminal that
+  // does not speak the protocol has no placements, so there is nothing to
+  // release — and sweeping a frame that transmitted nothing would empty the
+  // record rather than leave it alone.
+  if (!transmits(capabilities)) return ""; // the frame seam's guard (C09 I66)
+  const live = new Set<number>();
+  let out = "";
+  for (const group of groups) {
+    out += transmitImage(group.blocks, capabilities, sent, width, probe, group.scope, live);
+  }
+  for (const id of [...sent.keys()]) if (!live.has(id)) sent.delete(id);
   return out;
 }

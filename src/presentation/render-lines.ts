@@ -47,6 +47,11 @@ export type RenderOptions = Readonly<{
   cameras?: RenderContext["cameras"];
   /** Per-image frame indices (C04 I93, C22 I77). Absent is frame 0. */
   frames?: RenderContext["frames"];
+  /**
+   * The scope a placement is identified within (C09 I66). Absent is the
+   * picture's identity, and it must be absent on the seam too.
+   */
+  placementScope?: RenderContext["placementScope"];
   /** Per-plot series overrides (C04 I99, C22 I78). Absent is each block's own `hidden`. */
   seriesVisibility?: RenderContext["seriesVisibility"];
   /**
@@ -83,6 +88,7 @@ export function renderToLines(
     ...(options.cursorPositions === undefined ? {} : { cursorPositions: options.cursorPositions }),
     ...(options.cameras === undefined ? {} : { cameras: options.cameras }),
     ...(options.frames === undefined ? {} : { frames: options.frames }),
+    ...(options.placementScope === undefined ? {} : { placementScope: options.placementScope }),
     ...(options.seriesVisibility === undefined ? {} : { seriesVisibility: options.seriesVisibility }),
     ...(options.scratch === undefined ? {} : { scratch: options.scratch }),
     tick: options.tick ?? 0,
@@ -136,6 +142,7 @@ export function renderSequenceToLines(
     ...(options.cursorPositions === undefined ? {} : { cursorPositions: options.cursorPositions }),
     ...(options.cameras === undefined ? {} : { cameras: options.cameras }),
     ...(options.frames === undefined ? {} : { frames: options.frames }),
+    ...(options.placementScope === undefined ? {} : { placementScope: options.placementScope }),
     ...(options.seriesVisibility === undefined ? {} : { seriesVisibility: options.seriesVisibility }),
     ...(options.scratch === undefined ? {} : { scratch: options.scratch }),
     tick: options.tick ?? 0,

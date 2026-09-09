@@ -18,7 +18,7 @@ import {
   type Decoded,
   type Pixels,
 } from "../../image/index.js";
-import { imageId, imageKey, placementRows } from "../../image/kitty.js";
+import { placementIdOf, placementRows } from "../../image/kitty.js";
 import { overlayColour, overlayField } from "../../image/overlay.js";
 import { paint, type Span } from "../paint.js";
 import { statusDefinition } from "./status.js";
@@ -208,7 +208,7 @@ export const imageDefinition: BlockDefinition<Image> = {
     // avoid, and the one a reader cannot diagnose.
     const placed =
       ctx.capabilities.imageProtocol === "kitty"
-        ? placementRows(imageId(imageKey(block)), cols, rows)
+        ? placementRows(placementIdOf(block, ctx.placementScope), cols, rows)
         : null;
     if (placed !== null && "rows" in placed) {
       // **The overlay is not here at `kitty` and that is the whole ruling**

@@ -136,6 +136,34 @@ export function imageKey(block: Image): string {
     : digestOf(`${block.digest}\u0000${JSON.stringify(block.overlay)}`);
 }
 
+/**
+ * **The placement's identity, which is not the picture's** (C09 I66, F987).
+ *
+ * `imageKey` answers *has this picture been sent*. This answers *where does this
+ * picture go* — and the two are different questions, because the id returned here
+ * is written into the foreground colour of **every** placeholder cell as well as
+ * into the transmission's `i=`. An identity that moves with the picture moves the
+ * whole grid with it: measured at 40×10, a frame of an animation cost 12 809 B of
+ * placeholders against 1 367 B of picture, and left a digest in the sent record
+ * per frame.
+ *
+ * **With a scope the id is a function of `(scope, block id)` alone**, so two frames
+ * of one block share it and the placeholders are byte-identical, which the row diff
+ * skips. **The scope is the entry** and not the document: C04 I14 makes a block id
+ * unique within a document and nothing makes it unique across the transcript, so
+ * `img-${file}` in two entries would otherwise collide and the second would replace
+ * the first's picture behind the first's placeholders — the wrong picture rather
+ * than none, which is what this arm exists to avoid.
+ *
+ * **With no scope it falls back to the picture's identity**, unchanged. A caller
+ * that scopes nothing — `renderToLines` in a test, the terminal probe's build, the
+ * catalogue — gets the safe and dear id rather than a block-keyed one, because the
+ * block's is only safe inside a scope.
+ */
+export function placementIdOf(block: Image, scope?: string): number {
+  return scope === undefined ? imageId(imageKey(block)) : imageId(`${scope}\u0000${block.id}`);
+}
+
 /** The largest escape kitty accepts for a direct transmission, in bytes. */
 const CHUNK = 4096; // cells-ok — a byte count
 

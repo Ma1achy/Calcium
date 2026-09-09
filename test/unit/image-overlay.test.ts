@@ -13,7 +13,7 @@ import { b } from "../../src/shell/builders/index.js";
 import { samplesScale, type Sample } from "../../src/shell/builders/samples.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
-import { transmitImage } from "../../src/shell/transmit-image.js";
+import { transmitImage, type SentImages } from "../../src/shell/transmit-image.js";
 import { imageKey, imageId, PLACEHOLDER } from "../../src/presentation/image/kitty.js";
 import { compositeOverlay, overlayColour, overlayField } from "../../src/presentation/image/overlay.js";
 import { decodePng } from "../../src/presentation/image/index.js";
@@ -141,7 +141,7 @@ describe("IO — the overlay, per arm", () => {
     expect(imageKey(over), "the picture is not").not.toBe(imageKey(flipped));
     expect(imageKey(plain), "and an image with no overlay is keyed by its data").toBe(plain.digest);
 
-    const sent = new Set<string>();
+    const sent: SentImages = new Map();
     const bytes = transmitImage([over, flipped], KITTY, sent, 80);
     expect([...bytes.matchAll(new RegExp(`${ESC}_G[^;]*a=T`, "gu"))], "two pictures, two transmissions").toHaveLength(2);
     expect(sent.size).toBe(2);
@@ -149,7 +149,7 @@ describe("IO — the overlay, per arm", () => {
   });
 
   it("IO6 (C04 §3h.2): the composited arm sends raw pixels, chunked, with the overlay in them", () => {
-    const bytes = transmitImage([over], KITTY, new Set<string>(), 80);
+    const bytes = transmitImage([over], KITTY, new Map<number, string>(), 80);
     expect(bytes, "raw RGBA rather than a re-encoded PNG").toContain("f=32");
     expect(bytes, "with the source dimensions, which f=32 requires").toContain("s=64,v=32");
     expect(bytes, "deflated through the codec's own zlib").toContain("o=z");
@@ -163,7 +163,7 @@ describe("IO — the overlay, per arm", () => {
       expect(esc.length + 2, "no escape exceeds the limit").toBeLessThanOrEqual(4096);
     }
     // An image with no overlay still goes as PNG, which is the cheaper path.
-    expect(transmitImage([plain], KITTY, new Set<string>(), 80), "unchanged where there is nothing to blend").toContain("f=100");
+    expect(transmitImage([plain], KITTY, new Map<number, string>(), 80), "unchanged where there is nothing to blend").toContain("f=100");
   });
 
   it("IO7 (C04 §3h.2): the composite blends toward the map and leaves the buffer alone", () => {

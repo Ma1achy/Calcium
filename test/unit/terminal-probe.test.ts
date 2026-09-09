@@ -27,7 +27,7 @@ describe("tools/terminal-probe/build.mjs — the bytes it captures", () => {
     // the intent rather than with the code. `transmitImage` is called for real
     // and its output used verbatim except for one token.
     expect(BUILD).toContain('import { transmitImage } from "../../dist/shell/transmit-image.js"');
-    expect(BUILD).toContain("const real = transmitImage([block], KITTY, new Set(), WIDTH);");
+    expect(BUILD).toContain("const real = transmitImage([block], KITTY, new Map(), WIDTH);");
     // **Against `dist/`, because a probe built from `src/` is not what ships**
     // and a stale build gives a wrong negative nothing revisits.
     expect(BUILD.includes('from "../../src/')).toBe(false);

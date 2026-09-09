@@ -30,7 +30,7 @@ import { isUsable } from "../terminal/capabilities.js";
 import { usageText } from "./usage.js";
 import { compose, type Composed } from "./frame.js";
 import { commandRows, type PaintDeps } from "./paint.js";
-import { transmitImage, transmits, type SentImages } from "./transmit-image.js";
+import { transmitFrame, transmits, type SentImages } from "./transmit-image.js";
 import { composeFrame } from "./render-frame.js";
 import { createProfiler, DEFAULT_TIER, isRecording, isSpanning } from "./profiling/recorder.js";
 import { createInspector, createResourceProbe, type CaptureIo } from "./profiling/node.js";
@@ -290,7 +290,7 @@ class Session implements TuiInstance {
    * from the transcript does not un-send its image, and a document redrawn does
    * not need to re-send one.
    */
-  readonly #sentImages: SentImages = new Set<string>();
+  readonly #sentImages: SentImages = new Map<number, string>();
 
   /**
    * C03's spinner counter, and **the one thing F227 was about**.
@@ -856,8 +856,12 @@ class Session implements TuiInstance {
     // thousand entries, for nothing, on every terminal that does not.
     const bytes =
       (transmits(graph.capabilities)
-        ? transmitImage(
-            graph.transcript.entries.flatMap((e) => e.doc.blocks),
+        ? transmitFrame(
+            // **One group per entry, because the placement's scope is the entry**
+            // (C09 I66). The `flatMap` that stood here lost the only thing that
+            // makes a block id unique, and the seam and `visibleRows`' context
+            // take the scope together or neither does.
+            graph.transcript.entries.map((e) => ({ scope: e.id, blocks: e.doc.blocks })),
             graph.capabilities,
             this.#sentImages,
             // The frame's width — the declared cell box is a render-time fact
@@ -1510,6 +1514,9 @@ function visibleRows(
           // C04 I93). `Frames` in `shell/`, advanced on the wake above, keyed by
           // `framesKey` — the three halves I71 says land together.
           frames: graph.frames.forEntry(entry.id),
+          // The placement scope, beside `frames` and for the same reason: it is
+          // the entry, and the seam is handed the same id (C09 I66, F987).
+          placementScope: entry.id,
           // **The reader's series overrides, with their writer and their axis**
           // (C22 I78, C12 I116). `toggleSeriesBlock` in `construct.ts` writes
           // it from the plot's own digits, the store joins the eviction

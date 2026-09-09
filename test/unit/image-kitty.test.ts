@@ -16,7 +16,15 @@
 import { describe, expect, it } from "vitest";
 import { Box, Text, renderToString } from "ink";
 import { createElement } from "react";
-import { imageId, placementRows, transmit, MAX_PLACEHOLDER_SPAN, PLACEHOLDER } from "../../src/presentation/image/kitty.js";
+import {
+  imageId,
+  imageKey,
+  placementIdOf,
+  placementRows,
+  transmit,
+  MAX_PLACEHOLDER_SPAN,
+  PLACEHOLDER,
+} from "../../src/presentation/image/kitty.js";
 import { imageCells } from "../../src/presentation/blocks/kinds/image.js";
 import { digestOf, type Image } from "../../src/data/viewmodel/index.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
@@ -24,7 +32,7 @@ import { renderToLines } from "../../src/presentation/render-lines.js";
 import { DARK_THEME, FULL_CAPS } from "../support/render.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 import { ONE_PER_KIND } from "../support/blocks.js";
-import { transmitImage, transmits } from "../../src/shell/transmit-image.js";
+import { transmitImage, transmits, type SentImages } from "../../src/shell/transmit-image.js";
 import { readFileSync } from "node:fs";
 
 /**
@@ -36,6 +44,7 @@ import { readFileSync } from "node:fs";
 const strip = (src: string): string =>
   src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 import { b } from "../../src/shell/builders/index.js";
+import { rgbPng64 } from "../support/png.js";
 
 const ESC = String.fromCharCode(27);
 const KITTY_CAPS = { ...FULL_CAPS, imageProtocol: "kitty" as const };
@@ -178,7 +187,7 @@ describe("IK — the kitty arm, as properties", () => {
     // placeholders spanning 56 columns addressed an image declared one column
     // wide, and nothing drew. Revert the width to a literal and this fails.
     const wide = { ...block, height: 14 } as Image;
-    const out = transmitImage([wide], KITTY_CAPS, new Set<string>(), 120);
+    const out = transmitImage([wide], KITTY_CAPS, new Map<number, string>(), 120);
     const box = imageCells(wide, 120);
     expect(box.cols, "the fixture must be wider than one cell").toBeGreaterThan(1);
     expect(out, "the escape declares the placement's columns").toContain(`,c=${String(box.cols)},`);
@@ -187,7 +196,7 @@ describe("IK — the kitty arm, as properties", () => {
     // **And it moves with the width**, which is what makes it a computation
     // rather than a second constant.
     // A width narrow enough that the clamp bites, so the two boxes differ.
-    const narrow = transmitImage([wide], KITTY_CAPS, new Set<string>(), 8);
+    const narrow = transmitImage([wide], KITTY_CAPS, new Map<number, string>(), 8);
     const small = imageCells(wide, 8);
     expect(small.cols, "the narrow width must clamp").toBeLessThan(box.cols);
     expect(narrow).toContain(`,c=${String(small.cols)},`);
@@ -221,7 +230,7 @@ describe("IK — the kitty arm, as properties", () => {
   });
 
   it("IK7 (C09 §4c): the seam transmits once per digest, and only at kitty", () => {
-    const sent = new Set<string>();
+    const sent: SentImages = new Map();
     const twice = [block, { ...block, id: "other" } as Image];
     const first = transmitImage(twice, KITTY_CAPS, sent, 80);
     const count = [...first.matchAll(new RegExp(`${ESC}_G`, "gu"))].length;
@@ -232,7 +241,7 @@ describe("IK — the kitty arm, as properties", () => {
     expect(transmitImage(twice, KITTY_CAPS, sent, 80), "a second frame owes nothing").toBe("");
 
     // And at every other protocol there is nothing to send.
-    expect(transmitImage(twice, FULL_CAPS, new Set<string>(), 80), "no protocol, no payload").toBe("");
+    expect(transmitImage(twice, FULL_CAPS, new Map<number, string>(), 80), "no protocol, no payload").toBe("");
   });
 
   it("IK8 (C09 §4c): the seam reaches an image nested inside a container", () => {
@@ -240,7 +249,7 @@ describe("IK — the kitty arm, as properties", () => {
     // and the animation walk read, which is the third mechanism that turns on
     // that name (C04 I73).
     const wrapped = b.mosaic({ height: 4, areas: "AB", children: [block, b.raw("x")] });
-    const out = transmitImage([wrapped], KITTY_CAPS, new Set<string>(), 80);
+    const out = transmitImage([wrapped], KITTY_CAPS, new Map<number, string>(), 80);
     expect(out, "an image inside a mosaic still transmits").toContain(`${ESC}_G`);
     expect(out).toContain(`i=${String(imageId(block.digest))}`);
   });
@@ -273,7 +282,53 @@ describe("IK — the kitty arm, as properties", () => {
     const caller = strip(readFileSync("src/shell/session.ts", "utf8"));
     expect(
       caller,
-      "the flatMap is inside the guard, not before it",
-    ).toMatch(/transmits\(graph\.capabilities\)[^;]{0,200}transmitImage\(\s*graph\.transcript\.entries\.flatMap/);
+      "the per-entry map is inside the guard, not before it",
+    ).toMatch(
+      /transmits\(graph\.capabilities\)[^;]{0,400}transmitFrame\(\s*graph\.transcript\.entries\.map\(\(e\) => \(\{ scope: e\.id/,
+    );
+  });
+});
+
+describe("C09 §4c — the placement's identity is not the picture's (I66)", () => {
+  it("T1.41 (I66): with a scope the id is a function of (scope, block id) alone, and without one it is the picture's", () => {
+    // **The whole ruling in one function.** A placement id that moves with the
+    // picture moves 400 placeholder cells with it, because the id is written
+    // into every cell's foreground colour (F987).
+    const png = (r: number) => rgbPng64(8, 8, () => [r, 0, 0]);
+    const one = b.image({ id: "anim", data: png(10), height: 4, alt: "one" });
+    const two = b.image({ id: "anim", data: png(200), height: 4, alt: "two" });
+    const overlaid = b.image({
+      id: "anim",
+      data: png(10),
+      height: 4,
+      alt: "three",
+      overlay: { values: [[1]], colormap: "viridis" },
+    });
+    expect(one.digest, "the fixture responds: two frames are two pictures").not.toBe(two.digest);
+
+    // Two frames of one block, and the overlay does not move it either: the
+    // scope and the block id are the whole input.
+    expect(placementIdOf(one, "e1")).toBe(placementIdOf(two, "e1"));
+    expect(placementIdOf(one, "e1")).toBe(placementIdOf(overlaid, "e1"));
+    // A second scope, or a second block id, is a second placement.
+    expect(placementIdOf(one, "e2")).not.toBe(placementIdOf(one, "e1"));
+    const other = b.image({ id: "other", data: png(10), height: 4, alt: "o" });
+    expect(placementIdOf(other, "e1")).not.toBe(placementIdOf(one, "e1"));
+
+    // Every answer is a kitty id: never 0, which the terminal reads as
+    // *unspecified* and would allocate for itself.
+    for (const scope of ["e1", "e2", "", " ", "entry-3"]) {
+      const id = placementIdOf(one, scope);
+      expect(id, `scope ${JSON.stringify(scope)}`).toBeGreaterThanOrEqual(1);
+      expect(id).toBeLessThanOrEqual(0xff_ff_ff);
+    }
+
+    // **With no scope it is the picture's, unchanged** — the safe and dear id
+    // for a caller that has no scope to be unique within.
+    expect(placementIdOf(one)).toBe(imageId(imageKey(one)));
+    expect(placementIdOf(overlaid)).toBe(imageId(imageKey(overlaid)));
+    expect(placementIdOf(one), "and the two arms are different questions").not.toBe(
+      placementIdOf(one, "e1"),
+    );
   });
 });
