@@ -86,7 +86,7 @@ describe("C22 §13a — the document view", () => {
   const content = (): readonly Block[] => overlays.stack[0]?.content ?? [];
   const ids = (): readonly string[] => content().map((x) => x.id);
 
-  it("T4.30 (C22 I45): the fixture measures what this file assumes it measures", () => {
+  it("T4.66 (C22 I45): the fixture measures what this file assumes it measures", () => {
     // **The control, and it is not ceremony.** Every row below is stated in
     // blocks-per-region, which is only meaningful if a block is three rows and
     // the region is six. Measured here so that a change to `b.panel`'s border or
@@ -105,7 +105,7 @@ describe("C22 §13a — the document view", () => {
     ).toBeGreaterThan(REGION.height);
   });
 
-  it("T4.31 (C22 I45): open pushes a view before the document exists, and fill replaces it", () => {
+  it("T4.67 (C22 I45): open pushes a view before the document exists, and fill replaces it", () => {
     expect(view.open("/watch api")).toBeNull();
     // Step 3's slot: something is on screen before the transport is invoked.
     expect(overlays.stack).toHaveLength(1);
@@ -118,14 +118,14 @@ describe("C22 §13a — the document view", () => {
     expect(view.openFor).toBe("/watch api");
   });
 
-  it("T4.32 (C15 I1): a second open is refused, and the refusal names the command", () => {
+  it("T4.68 (C15 I1): a second open is refused, and the refusal names the command", () => {
     expect(view.open("/watch api")).toBeNull();
     const refusal = view.open("/watch db");
     expect(refusal, "a refusal, not a throw — C23 has to report it").toContain("/watch db");
     expect(overlays.stack, "and the first view is untouched").toHaveLength(1);
   });
 
-  it("T4.33 (C22 I46): the window falls on block boundaries and move walks it", () => {
+  it("T4.69 (C22 I46): the window falls on block boundaries and move walks it", () => {
     view.open("/watch api");
     view.fill(docOf([chunk("a", "one"), chunk("b", "two"), chunk("c", "three")]));
 
@@ -139,7 +139,7 @@ describe("C22 §13a — the document view", () => {
     expect(ids()).toEqual(["a", "b"]);
   });
 
-  it("T4.34 (C22 I46): putBlock is total — an unknown id is false, never a throw", () => {
+  it("T4.70 (C22 I46): putBlock is total — an unknown id is false, never a throw", () => {
     view.open("/watch api");
     view.fill(docOf([chunk("a", "one")]));
     expect(() => view.putBlock("nosuch", chunk("nosuch", "x"))).not.toThrow();
@@ -147,7 +147,7 @@ describe("C22 §13a — the document view", () => {
     expect(ids(), "and nothing was written").toEqual(["a"]);
   });
 
-  it("T4.35 (C22 §13a): a block scrolled out of the window is still there to be patched", () => {
+  it("T4.71 (C22 §13a): a block scrolled out of the window is still there to be patched", () => {
     // **The interaction this file exists for**, and it exists only because
     // block-boundary windowing and the refresh driver were put together. The
     // layer holds a window; the owner holds the document. A part scrolled out of
@@ -174,7 +174,7 @@ describe("C22 §13a — the document view", () => {
     ).toBe("refreshed");
   });
 
-  it("T4.40 (C22 I47): a block taller than the region is unscrollable, and says so", () => {
+  it("T4.76 (C22 I47): a block taller than the region is unscrollable, and says so", () => {
     // **The fixture is shown to be the trap before anything is asserted about
     // the remedy.** Without these two lines the row passes against a view that
     // scrolls perfectly well and happens to emit a notice — and it is the
@@ -194,7 +194,7 @@ describe("C22 §13a — the document view", () => {
     expect(ids()).toEqual(["document-view-truncated", "big"]);
   });
 
-  it("T4.41 (C22 I47): the count is what the reader cannot reach, wrap included", () => {
+  it("T4.77 (C22 I47): the count is what the reader cannot reach, wrap included", () => {
     view.open("/watch api");
     view.fill(docOf([tall("big", 12)]));
 
@@ -216,7 +216,7 @@ describe("C22 §13a — the document view", () => {
     expect(indicator.kind === "notice" ? indicator.glyph : undefined).toBeDefined();
   });
 
-  it("T4.42 (C22 I47): more blocks below is not truncation, and gets no indicator", () => {
+  it("T4.78 (C22 I47): more blocks below is not truncation, and gets no indicator", () => {
     // The wolf-crying arm. `n` reaches these, so an indicator here would train
     // the reader to ignore the one case it matters for.
     view.open("/watch api");
@@ -225,7 +225,7 @@ describe("C22 §13a — the document view", () => {
     expect(view.move("down"), "and this one genuinely scrolls").toBe(true);
   });
 
-  it("T4.43 (C22 I48): a ViewPatch appends, which putBlock cannot do", () => {
+  it("T4.79 (C22 I48): a ViewPatch appends, which putBlock cannot do", () => {
     // **The seam, and the fixture shows why `putBlock` was not enough.** A
     // stream's first patch is an `append` against a document that does not hold
     // the block, which is precisely the case `putBlock` refuses.
@@ -238,7 +238,7 @@ describe("C22 §13a — the document view", () => {
     expect(ids()).toEqual(["line-0", "line-1"]);
   });
 
-  it("T4.44 (C22 I48): it goes through C04's applyPatch, so C04 I14 is enforced here too", () => {
+  it("T4.80 (C22 I48): it goes through C04's applyPatch, so C04 I14 is enforced here too", () => {
     // Not a second patch model: a duplicate id is refused by the same function
     // C13 calls, with the same reason, rather than by a rule this file invented.
     view.open("/logs api");
@@ -254,7 +254,7 @@ describe("C22 §13a — the document view", () => {
     expect(ids(), "and nothing was written").toEqual(["a"]);
   });
 
-  it("T4.45 (C22 I48): a patch after the pop is refused, never thrown", () => {
+  it("T4.81 (C22 I48): a patch after the pop is refused, never thrown", () => {
     // Walk A4. The abort is cooperative, so a patch may be in flight when the
     // pop runs; a throw would abandon the streaming loop mid-iteration with the
     // subscription still registered — C13's `settle(id, doc)` hazard.
@@ -269,8 +269,8 @@ describe("C22 §13a — the document view", () => {
     expect(outcome).toEqual({ ok: false, reason: "closed" });
   });
 
-  it("T4.46 (C22 I48): a replace reaches a block the window is not showing", () => {
-    // The same property T4.35 holds for `putBlock`: the owner holds the
+  it("T4.82 (C22 I48): a replace reaches a block the window is not showing", () => {
+    // The same property T4.71 holds for `putBlock`: the owner holds the
     // document and the layer holds a window, so a patch addresses the document.
     view.open("/logs api");
     view.fill(docOf([chunk("a", "one"), chunk("b", "two"), chunk("c", "three")]));
@@ -282,7 +282,7 @@ describe("C22 §13a — the document view", () => {
     expect(back?.kind === "panel" ? back.title : null).toBe("patched");
   });
 
-  it("T4.47 (C22 I48): an append holds the bottom, so a follow follows", () => {
+  it("T4.83 (C22 I48): an append holds the bottom, so a follow follows", () => {
     // **Found by reading a frame, not by either walk artefact.** A stopped
     // container's follow showed twenty-six lines of start-up and no sign that
     // anything had happened since — the new output and the terminal notice were
@@ -297,7 +297,7 @@ describe("C22 §13a — the document view", () => {
     expect(ids(), "the window moved with the append").toContain("d");
   });
 
-  it("T4.48 (C22 I48): a reader who scrolled up is left alone", () => {
+  it("T4.84 (C22 I48): a reader who scrolled up is left alone", () => {
     // The other half, and it is the same defect reversed: a window that moves
     // under someone reading is as wrong as one that never moves.
     view.open("/logs api");
@@ -310,7 +310,7 @@ describe("C22 §13a — the document view", () => {
     expect(ids()[0]).toBe("a");
   });
 
-  it("T4.36 (C22 I45): pop closes the view and leaves nothing behind", () => {
+  it("T4.72 (C22 I45): pop closes the view and leaves nothing behind", () => {
     view.open("/watch api");
     view.fill(docOf([chunk("a", "one")]));
     const before = redraws;
@@ -439,7 +439,7 @@ describe("C22 §13a — a live part hosted by a pushed view", () => {
       },
     ]);
 
-  it("T4.37 (C24 I12, gap 7): a live part in a pushed view ticks, and the frame shows it", async () => {
+  it("T4.73 (C24 I12, gap 7): a live part in a pushed view ticks, and the frame shows it", async () => {
     const h = wired();
     h.view.open("/watch api");
     h.view.fill(docOf([chunk("cpu", "loading"), chunk("b", "two")]));
@@ -461,7 +461,7 @@ describe("C22 §13a — a live part hosted by a pushed view", () => {
     expect(child?.kind === "raw" ? child.text : null).toBe("tick 1");
   });
 
-  it("T4.38 (C22 I46): release at the pop stops the parts, before any later fetch would", async () => {
+  it("T4.74 (C22 I46): release at the pop stops the parts, before any later fetch would", async () => {
     const h = wired();
     h.view.open("/watch api");
     h.view.fill(docOf([chunk("cpu", "loading")]));
@@ -478,8 +478,8 @@ describe("C22 §13a — a live part hosted by a pushed view", () => {
     expect(h.fetches, "and nothing survived the pop").toBe(ticked);
   });
 
-  it("T4.39 (C22 §13a): a part scrolled out of the window keeps ticking", async () => {
-    // T4.35 through the real driver. The layer holds two of three blocks, so
+  it("T4.75 (C22 §13a): a part scrolled out of the window keeps ticking", async () => {
+    // T4.71 through the real driver. The layer holds two of three blocks, so
     // after two `down`s the part is off-window — and it must still be fetching,
     // because the seam asks the owner and the owner holds the document.
     //

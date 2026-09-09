@@ -153,6 +153,21 @@ const tui = createTui({
   // cast. Every internal caller passes a literal, which is why no producer
   // could have met it. FINDINGS F53.
   capabilities: depthOverride(),
+  // **`counters`, because it is the lowest tier at which `/profile` opens — not
+  // because this app wants figures** (C28 §3, C28 T4.1, C23 I68). The verb is
+  // the framework's seventh and it draws C28's view only where a recorder
+  // exists: `tier: "off"` and no `profile` at all build one session and hold
+  // no recorder — C28 T4.1 asserts the two write identical bytes — so the verb
+  // refuses there with a notice naming this field, which is what this app did
+  // before this line (FINDINGS F953, F962). `counters` is the first recording
+  // tier: an integer per seam, measured at nil against `off` in C28 §3a's
+  // table. Opening the view raises to `spans` only while it is up and restores
+  // on close (C28 I50), and the counters survive that raise, so the overview
+  // opens on this session's frames and bytes rather than on zeros that are
+  // true of nothing (C28 I44). Measured on this app through a PTY, five
+  // spawns each way: the greeting's wall-clock is a median of 935 ms without
+  // this line and 862 ms with it, the two ranges overlapping (F962).
+  profile: { tier: "counters" },
   // Keyed by the verb, and a sub-verb's key is its whole name — the space is
   // part of it, not a separator this side of C18.
   adapters: {

@@ -370,8 +370,8 @@ The instances, in the order they happened:
 | the test | what it called | what it did not cover |
 |---|---|---|
 | C23's `T4.21` | `driver.declare({kind:"view"})` directly | that anything reaches the view arm — its own comment says so, and FINDINGS F20 filed it |
-| `document-view.test.ts` T4.37–T4.39 | `driver.declare` directly, one branch after filing F20 | `declareLiveInView`; disabling it left all ten rows green |
-| `T4.38` | `driver.release(host)` directly | `keys.ts`'s `viewPop`; deleting `releaseView()` from it changed nothing |
+| `document-view.test.ts` T4.73–T4.75 | `driver.declare` directly, one branch after filing F20 | `declareLiveInView`; disabling it left all ten rows green |
+| `T4.74` | `driver.release(host)` directly | `keys.ts`'s `viewPop`; deleting `releaseView()` from it changed nothing |
 | — | — | and the *order* inside `viewPop`, which no row saw until one asserted it |
 
 The second is the instructive one: **F20 was filed against exactly this shape,

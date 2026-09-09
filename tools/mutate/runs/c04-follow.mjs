@@ -39,7 +39,7 @@ const MUTATIONS = [
     file: VIEW,
     from: "        offset: followTail(at.offset, lastOffset(at), lastOffset(grown)),",
     to: "        offset: followTail(at.offset, lastOffset(grown), lastOffset(grown)),",
-    expect: "T4.47",
+    expect: "T4.83",
   },
   {
     // The store's copy of the same defect: the snap decided from where the

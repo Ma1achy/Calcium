@@ -678,7 +678,7 @@ describe("C22 §3 step 12 — the read loop", () => {
   });
 
   it("T1.4h4 (C22 I46): Esc on a document view releases its parts, and before the dismiss", () => {
-    // **The wiring, not the mechanism.** T4.38 asserts that `release` stops a
+    // **The wiring, not the mechanism.** T4.74 asserts that `release` stops a
     // view's parts, by calling `release`. Removing `deps.releaseView()` from
     // `viewPop` leaves that row green — the mechanism still works and nothing
     // reaches it, which is the third instance in this branch of a test that
