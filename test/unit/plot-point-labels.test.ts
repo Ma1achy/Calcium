@@ -178,10 +178,21 @@ describe("TL13 (C12 I55): a name is text, so it survives every alphabet", () => 
     for (const ch of rows.join("")) expect(ch.codePointAt(0) ?? 0, ch).toBeLessThan(128);
   });
 
-  it("a wide codepoint leaves the row exactly as wide", () => {
+  it("a wide codepoint leaves every row exactly as wide — the label's row included", () => {
     const rows = at([null, "図表", null, null, null, null, null, null]);
     expect(rows.join("\n")).toContain("図表");
-    for (const r of rows.filter((x) => /[│|]$/u.test(x))) expect(cells(r, "narrow"), r).toBe(70);
+    // **Every row but the caption, by position rather than by content.** This
+    // filtered on `/[│|]$/` — rows ending in the frame's edge — and the one row
+    // the fixture was written for was the one row the filter skipped: with the
+    // merge reading the overlay by code point, `図表`'s row ran two cells past
+    // the width and ended in the clamp's `…`, so it never matched, and the row
+    // was green for as long as the defect was (F977, C12 I119; T1.138 reads
+    // the same fixture). The caption is the last row and is 69 with or without
+    // labels — Ink trims its trailing blank — so it is set aside by index.
+    const area = rows.slice(0, -1);
+    expect(area.length).toBeGreaterThan(4); // cells-ok — a row count
+    for (const r of area) expect(cells(r, "narrow"), r).toBe(70);
+    expect(cells(rows[rows.length - 1] ?? "", "narrow"), "the caption").toBeLessThanOrEqual(70); // cells-ok — a row index
   });
 });
 

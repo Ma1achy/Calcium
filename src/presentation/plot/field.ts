@@ -25,6 +25,7 @@
 import type { Plot, Series, VectorSeries } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import type { Span } from "../blocks/paint.js";
+import { rowCells, type AmbiguousWidth } from "../text.js";
 import type { ColourRef, ColourValue, Style } from "../theme/types.js";
 import type { Colormap } from "../theme/colormap.js";
 import { ansi256Hex, nearestAnsi256, overChannels } from "../theme/colormap.js";
@@ -290,9 +291,15 @@ export function mergeFieldLayers(
   layers: readonly FieldLayer[],
   row: number,
   width: number,
+  ambiguous: AmbiguousWidth,
 ): { glyphs: string; owners: readonly (number | null)[] } {
   let glyphs = "";
   const owners: (number | null)[] = [];
+  // **Each layer's row as cells, once** (C12 I119, F981). The spread per
+  // column this replaced was the width squared; no text reaches this merge —
+  // every field form refuses `pointLabels` (F976) — so the hoist is the
+  // cost's alone and nothing else here changes.
+  const rows = layers.map((l) => rowCells(l.glyphRows[row] ?? "", ambiguous));
 
   for (let x = 0; x < width; x += 1) {
     let cell = " ";
@@ -301,7 +308,7 @@ export function mergeFieldLayers(
     let allBraille = true;
 
     for (let i = 0; i < layers.length; i += 1) { // cells-ok — a layer count
-      const candidate = [...(layers[i]!.glyphRows[row] ?? "")][x] ?? " ";
+      const candidate = rows[i]![x] ?? " ";
       if (isBlank(candidate)) continue;
       const dots = brailleBits(candidate);
       if (owner === null) {

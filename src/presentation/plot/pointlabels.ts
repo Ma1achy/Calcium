@@ -149,6 +149,10 @@ export function pointLabelRows(
     }
   }
 
+  // **Joined, and the merge derives the cells back** (C12 I119). A `Layer`'s
+  // rows are strings, and `rowCells` is this join's inverse — a cluster at its
+  // first cell, `""` behind a wide one — so the cells laid out here are the
+  // cells `mergedRow` reads. It read the string by code point until F977.
   return text.map((rows, i) =>
     allSeries[i]?.pointLabels === undefined
       ? blankRows(areaWidth, areaRows)

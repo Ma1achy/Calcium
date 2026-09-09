@@ -727,38 +727,48 @@ describe("C28 I30 — a component's own phases, and the gauge that makes them a 
       "and the box is the axis it does have",
     ).toBeGreaterThan(3);
 
-    // **The half the gauge cannot reach.** Equal cells is not equal work: a
-    // renderer could visit all 20 000 samples per cell and produce this table
-    // unchanged. So the cost is compared too — at the *same* multiplier on each
-    // axis, which is what the second draft got wrong by putting 3.3× the height
-    // against 10× the samples and reading the two raw ratios against each other.
-    //
-    // Six cold runs of the interleaved shape, 10× on each axis: height moved
-    // the area 4.7–8.9× and the samples 1.6–2.7×, height winning within every
-    // run by **2.16× at the closest**. The margin asserted is 1.5, so the worst
-    // observed run clears it by 44 %.
-    const [base, tall, dense] = areasInterleaved(
-      [
-        [200, 4],
-        [200, 40],
-        [2000, 4],
-      ],
-      15,
-    ) as readonly [number, number, number];
-    const byHeight = tall / Math.max(base, Number.EPSILON);
-    const bySamples = dense / Math.max(base, Number.EPSILON);
+    // **The split, asserted on the frame's tree rather than on a clock** (F983).
+    // A ratio between the two axes stood here — ten times the height had to
+    // move the area 1.5× harder than ten times the samples — and it was carried
+    // by the merge, not the raster: `mergedRow` spread every layer's row per
+    // column, a cost quadratic in the width and linear in the rows, so the
+    // height axis read 4.7–8.9× against the samples' 1.6–2.7×. F981 made the
+    // merge linear and the margin went with it — 4.5–6.0× against 2.1–2.6× in
+    // its own process, six runs, and **3.9× against 4.0× under the suite's own
+    // load**, where the row failed. A ratio between two axes that measures a
+    // third thing is not retuned. What it guarded — the phases collapsing into
+    // one — is exact on the tree: `plot.area` holds neither `plot.layout` nor
+    // `plot.furniture`, and the three are siblings.
+    type Node = NonNullable<ProfileReport["worst"][number]["tree"]>;
+    const kept = ((): Node | undefined => {
+      const prof = createProfiler({ tier: "spans", worst: 1 }, { elapsed: () => Number(process.hrtime.bigint()) / 1e6, node: "v22.0.0", cpus: 4 });
+      const registry = instrumented(prof);
+      const doc = [b.plot({ id: "p", form: "line", height: 4, axes: true, series: [{ values: Array.from({ length: 200 }, (_, i) => Math.sin(i / 9) * 50 + 50), label: "s" }] })];
+      prof.beginFrame("input");
+      renderSequenceToLines(registry, doc, 100, { theme: DARK_THEME, capabilities: FULL_CAPS, probe: prof.asProbe() });
+      prof.endFrame("frame");
+      return prof.report().worst[0]?.tree;
+    })();
+    expect(kept, "the frame keeps its tree").toBeDefined();
+    const find = (n: Node, name: string): Node | undefined =>
+      n.name === name ? n : n.children.map((c) => find(c, name)).find((x) => x !== undefined);
+    const descendants = (n: Node): readonly string[] => n.children.flatMap((c) => [c.name, ...descendants(c)]);
+    const parentOf = (n: Node, name: string): Node | undefined =>
+      n.children.some((c) => c.name === name) ? n : n.children.map((c) => parentOf(c, name)).find((x) => x !== undefined);
+    const area = find(kept!, "plot.area");
+    expect(area, "plot.area is on the tree").toBeDefined();
+    expect(descendants(area!).filter((n) => n === "plot.layout" || n === "plot.furniture"), "no phase nests inside the area").toEqual([]);
+    expect(parentOf(kept!, "plot.layout"), "layout and area are siblings").toBe(parentOf(kept!, "plot.area"));
+    expect(parentOf(kept!, "plot.furniture"), "and so is the furniture").toBe(parentOf(kept!, "plot.area"));
 
-    expect(
-      byHeight,
-      `at 10× each: height ${byHeight.toFixed(1)}× against samples ${bySamples.toFixed(1)}×`,
-    ).toBeGreaterThan(bySamples * 1.5);
-
-    // **A third assertion stood here and was removed rather than retuned.** It
-    // read `bySamples > 1.2` — the samples are not free either — and failed one
-    // run in five at 1.108. Retuning it would have been wrong whatever the
-    // number: it asserts the renderer is *worse* than flat in the sample count,
-    // so a downsampler that got better at ignoring the series would fail it.
-    // What it was guarding — that the renderer reads the series at all — is
-    // already exact, in T1.41's `plot.samples` gauge.
+    // **Equal cells is still not equal work**, and this is the half a clock has
+    // to answer: a renderer could visit all 20 000 samples per cell and leave
+    // the gauge table unchanged. At 700 cells that renderer reads the area at
+    // fifty times or more for a hundred times the samples; one linear pass over
+    // the series read 4.9–6.5× before F981 and 9.8–12.4× after, six runs each,
+    // in its own process. The bound is wide enough that the direction load can
+    // move it — the base cannot get faster — does not reach it.
+    const [base, dense] = areasInterleaved([[200, 4], [20000, 4]], 15) as readonly [number, number];
+    expect(dense / Math.max(base, Number.EPSILON), `100× the data: ${(dense / base).toFixed(1)}× the area`).toBeLessThan(40);
   });
 });

@@ -23,7 +23,7 @@
 import type { AmbiguousWidth } from "../text.js";
 import type { ReactElement } from "react";
 import { paint, rows, slot, tone, type Span } from "../blocks/paint.js";
-import { cells, fitStyled, truncate } from "../text.js";
+import { cells, fitStyled, rowCells, truncate } from "../text.js";
 import { SGR_RESET } from "../../terminal/escapes.js";
 
 import { AXIS_GUTTER, FRAME_RIGHT, plotAreaRows, plotHeight } from "./height.js";
@@ -149,6 +149,11 @@ const MIN_AREA = 4;
 
 /** A rasterised series and the colour it carries. */
 type Layer = Readonly<{
+  /**
+   * One row per area row, one glyph per cell — or, for a `"label"`, a label
+   * writer's joined cell array, whose wide clusters are followed by `""`
+   * (I118). The merge derives the cells back with `rowCells` (I119).
+   */
   glyphRows: readonly string[];
   ref: ColourRef;
   /**
@@ -435,45 +440,6 @@ function markedSpans(
   );
 }
 
-/**
- * Gridlines under a row of data spans (C12 I26, C12 I23).
- *
- * **Behind, never over.** A gridline drawn on top of a series is a series with a
- * hole in it, and at one cell per sample the hole *is* the sample. So the grid
- * supplies only the cells the data left blank — which is `mergedRow`'s own
- * first-non-blank rule, one layer further down.
- */
-function behind(
-  grid: string,
-  spans: readonly Span[],
-  ctx: RenderContext,
-): readonly Span[] {
-  if (grid.trim() === "") return spans;
-  const muted = tone("muted", ctx.theme, ctx.capabilities);
-  const out: Span[] = [];
-  let x = 0; // cells-ok — a column index
-  for (const span of spans) {
-    let run = "";
-    for (const ch of span.text) {
-      // **U+2800 is a blank too**, and it is the one a braille raster emits — a
-      // check for `" "` alone found no empty cells in a dot-grid row and the
-      // gridlines never appeared, on a style whose whole difference is that they
-      // do. The braille blank is a printing character that looks empty, which is
-      // the same trap the ink mask in `refdiff` had to be told about.
-      const empty = ch === " " || ch === "\u2800";
-      run += empty ? (grid[x] ?? " ") : ch; // cells-ok — a column index
-      x += 1; // cells-ok — a column index
-    }
-    // A run that was entirely blank now carries only gridline, so it takes the
-    // muted style rather than the layer's colour.
-    const wasBlank = span.text.replace(/[ \u2800]/gu, "") === "";
-    out.push(wasBlank && run.trim() !== ""
-      ? { text: run, style: muted }
-      : span.style === undefined ? { text: run } : { text: run, style: span.style });
-  }
-  return out;
-}
-
 /** Braille is `U+2800 + bits`, which is what makes the union below an OR. */
 const BRAILLE_BASE = 0x2800;
 const BRAILLE_TOP = 0x28ff;
@@ -485,7 +451,8 @@ function brailleBits(ch: string): number | null {
 }
 
 /**
- * Layers to one row of spans — **per dot where the vocabulary allows it** (C12 I40, §3u).
+ * Layers to one row of spans — **per dot where the vocabulary allows it**, with
+ * the gridlines behind (C12 I40, I119, I26, §3u).
  *
  * This took the whole cell to the first layer that inked it, and every figure
  * that composites is folded to braille *before* it arrives, so the second
@@ -506,6 +473,28 @@ function brailleBits(ch: string): number | null {
  * is a ruling — labels over polygons over frame — that a dot count would
  * overturn wherever the frame happened to be denser.
  *
+ * **A layer meets the merge as cells** (I119, F981). A label's row is a joined
+ * cell array — a cluster in one cell, `""` in the cells a wide one occupies
+ * after it (I118) — and this read every layer at column `x` as `[...row][x]`,
+ * a code-point index into a string that no longer carried the cells: a
+ * three-member family was five columns to that walk and two to the terminal,
+ * two CJK ideographs two and four, so every cell after a name on its row
+ * drifted, three left or two right, and the row came out short or clamped
+ * (F977). Each row is derived once by `rowCells` before the column loop —
+ * which also retires a whole-row spread per column, the width squared — and
+ * a `""` cell is the cluster before it: it goes to that layer, nothing is
+ * OR-ed or substituted into it, and the run receives nothing for it.
+ *
+ * **The gridlines are folded in** (I26, I23). Behind, never over: a gridline
+ * drawn on top of a series is a series with a hole in it, and at one cell per
+ * sample the hole *is* the sample. So `grid` supplies only the cells the data
+ * left blank — the first-non-blank rule one layer further down — and a run no
+ * layer inked that took a gridline is styled muted, while a gridline landing
+ * in a styled run keeps the run's colour. This was `behind()`, a second walk
+ * over the finished spans stepping one code point per cell, which read its
+ * gridline at the drifted column whenever a name held a cluster; one walk now,
+ * and the cell index is the only index.
+ *
  * At `colourDepth: 1` this path is not taken at all — the plot stacks (I6).
  */
 function mergedRow(
@@ -513,27 +502,49 @@ function mergedRow(
   rowIndex: number,
   layout: Layout,
   ctx: RenderContext,
+  /**
+   * The gridline row laid behind the data — `gridRow`'s string with the cross
+   * and the cursor over it (§3ad) — or nothing, which is every arm without
+   * furniture in the area: the pie, the radar, the stacked strips.
+   */
+  grid: string | null = null,
 ): readonly Span[] {
   const spans: Span[] = [];
   let turns = 0; // cells-ok — a contested-cell count
   let run = "";
   let runRef: ColourRef | null = null;
+  // **Whether the run took a gridline into a blank cell.** A run with no ref
+  // is blank by construction — a cell nobody inked is `" "` — so *wholly blank
+  // and holding a gridline* is *no ref and gridded*: `behind()`'s
+  // `wasBlank && run.trim() !== ""`, said in the merge's own terms.
+  let gridded = false;
+  // Indexed by cell. Every glyph the furniture draws is one cell — ASCII at
+  // `wide` (C09 §4) — so a code-point split is the cell array.
+  const gridCells = grid !== null && grid.trim() !== "" ? [...grid] : null;
+  const muted = gridCells === null ? null : tone("muted", ctx.theme, ctx.capabilities);
 
   const flush = (): void => {
     if (run === "") return;
     spans.push(
       runRef === null
-        ? { text: run }
+        ? gridded && muted !== null ? { text: run, style: muted } : { text: run }
         : { text: run, style: slot(runRef, ctx.theme, ctx.capabilities) },
     );
     run = "";
+    gridded = false;
   };
+
+  // Every layer's row as cells, once per row (I119) — the docstring says why.
+  const rows = layers.map((l) => rowCells(l.glyphRows[rowIndex] ?? "", ctx.capabilities.ambiguousWidth));
 
   for (let x = 0; x < layout.areaWidth; x += 1) {
     let cell = " ";
     let cellRef: ColourRef | null = null;
     let cellKind: Layer["kind"] | null = null;
     let bits = 0;
+    // A continuation cell — `""`, the second cell of a wide cluster — which
+    // the cluster before it already carries (I119).
+    let continuation = false;
     /**
      * The `"curve"` layers contending for this cell, in layer order (I44).
      *
@@ -543,8 +554,19 @@ function mergedRow(
      * nobody reads again.
      */
     const peers: { ref: ColourRef; ink: number }[] = [];
-    for (const layer of layers) {
-      const candidate = [...(layer.glyphRows[rowIndex] ?? "")][x] ?? " ";
+    for (const [i, layer] of layers.entries()) { // cells-ok — a layer index
+      const candidate = rows[i]![x] ?? " ";
+      if (candidate === "") {
+        // **Not blank: the cluster before it owns this cell** (I119). It goes
+        // to that layer and ends the cell as a letter would; under a cell an
+        // upper layer inked it contributes nothing, as any occluded candidate
+        // does (I44).
+        if (cellRef !== null) continue;
+        cellRef = layer.ref;
+        cellKind = layer.kind;
+        continuation = true;
+        break;
+      }
       if (isBlank(candidate)) continue;
       const dots = brailleBits(candidate);
       if (cellRef === null) {
@@ -595,6 +617,19 @@ function mergedRow(
     if (cellRef !== runRef) {
       flush();
       runRef = cellRef;
+    }
+    // Nothing for a continuation cell: the cluster already carries the cells
+    // it measures, and a gridline may not land inside a glyph.
+    if (continuation) continue;
+    if (gridCells !== null && (cell === " " || cell === "\u2800")) {
+      // **U+2800 is a blank too**, and it is the one a braille raster emits — a
+      // check for `" "` alone found no empty cells in a dot-grid row and the
+      // gridlines never appeared, on a style whose whole difference is that they
+      // do. The braille blank is a printing character that looks empty, which is
+      // the same trap the ink mask in `refdiff` had to be told about.
+      const under = gridCells[x] ?? " ";
+      if (under !== " ") gridded = true;
+      cell = under;
     }
     run += cell;
   }
@@ -753,7 +788,7 @@ function cursorColumn(block: Plot, cursorIdx: number, areaWidth: number): number
 }
 
 /**
- * A blank area row with the cursor's column dashed, for `behind()` (C12 I37).
+ * A blank area row with the cursor's column dashed, for `mergedRow`'s `grid` (C12 I37).
  *
  * **Behind the data and never over it.** `dashedVertical` is already the slot
  * for a reference line drawn beside data, and its own comment gives the reason:
@@ -769,7 +804,7 @@ function cursorRule(column: number | null, layout: Layout, ctx: RenderContext): 
     x === column ? g.dashedVertical : " ").join(""); // cells-ok — a column index
 }
 
-/** First non-blank of two reference rows, so `behind()` takes one string. */
+/** First non-blank of two reference rows, so `mergedRow` takes one `grid` string. */
 function overlay(over: string, under: string): string {
   if (under === "") return over;
   if (over.trim() === "") return under;
@@ -1254,7 +1289,11 @@ function overlaidRows(
     plotRow(
       i,
       byRow.get(i) ?? "",
-      behind(
+      mergedRow(
+        layers,
+        i,
+        withRight,
+        ctx,
         // **The cross over the grid over the cursor.** The cross shares the
         // grid's alphabet and they agree in the cells they share — the grid
         // draws where a value is written and zero is a value — so the order
@@ -1264,8 +1303,6 @@ function overlaidRows(
           crossRow(withRight, i, zeroRow, zeroColumn, ctx),
           overlay(gridRow(withRight, gridTicks, ctx, byRow.has(i)), cursor),
         ),
-        mergedRow(layers, i, withRight, ctx),
-        ctx,
       ),
       withRight,
       ctx,
@@ -1808,7 +1845,7 @@ function stackedForm(
     plotRow(
       i,
       byRow.get(i) ?? "",
-      behind(gridRow(layout, ticks, ctx, byRow.has(i)), mergedRow(layers, i, layout, ctx), ctx),
+      mergedRow(layers, i, layout, ctx, gridRow(layout, ticks, ctx, byRow.has(i))),
       layout,
       ctx,
     ),

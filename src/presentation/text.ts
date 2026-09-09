@@ -1039,6 +1039,95 @@ export function clusterEnds(text: string): readonly number[] {
 }
 
 /**
+ * A row as the cells the terminal draws it in — the inverse of a label
+ * writer's join, for a merge that reads a row by cell (C12 I119, F981).
+ *
+ * Each grapheme cluster sits at its first cell and `""` fills the cells a wide
+ * one occupies after it, which is the array `chargrid.ts`'s `write` builds
+ * (C12 I118) before its rows are joined into a layer's strings. A cluster that
+ * measures nothing is appended to the cell before it — the one that owns the
+ * cluster it follows, past any `""`, so a mark after a wide glyph rides on the
+ * glyph and the glyph's second cell stays what the merge reads as its own —
+ * or dropped at the head, where no cell precedes it. C12's `mergedRow` read
+ * every layer at column `x` as `[...row][x]`, a code-point index into a string
+ * that no longer carried the cells: a three-member family emoji was five
+ * columns to that walk and two to the terminal, two CJK ideographs two and
+ * four, so every cell after a name on its row drifted and the gridlines with
+ * it (F977). The measure is `cells()` per cluster — the writer's own — so the
+ * two cannot disagree about a cell.
+ *
+ * **The fast set is a checked claim, not a table** (I63). A row whose every
+ * code unit is printable ASCII is one cell per unit on every path, which is
+ * the equality `cells` proves; and at `narrow`, a row of arrows, box drawing,
+ * block elements or braille, or of sextants (one surrogate pair each) —
+ * `CELL_PER_UNIT_RANGES` — is one cell per unit or pair too. Those are the
+ * alphabets every rasterised layer is drawn in, so a curve's row is split
+ * without a segmenter; a label's row, holding a name, walks the clusters. The
+ * three BMP ranges are East-Asian Ambiguous in part (braille is Neutral), which
+ * is why the set is admitted at `narrow` only — at `wide` a box-drawing glyph
+ * measures two (I65) and the row takes the cluster walk, where `glyphs()` has
+ * already fallen the furniture back to ASCII (C09 §4). C09 T1.40 asserts every
+ * member of the set measures one cell at the mode it is admitted in and is not
+ * zero-width, so a table revision that made one of them wide or combining fails
+ * that row rather than a frame.
+ */
+export function rowCells(text: string, ambiguous: AmbiguousWidth): readonly string[] {
+  if (text === "") return [];
+  const out: string[] = [];
+  if (cellPerUnit(text, ambiguous)) {
+    let i = 0;
+    while (i < text.length) { // cells-ok — a code-unit cursor
+      const c = text.charCodeAt(i);
+      const units = c >= 0xd800 && c <= 0xdbff ? 2 : 1;
+      out.push(text.slice(i, i + units));
+      i += units; // cells-ok — past the unit or the pair, in code units
+    }
+    return out;
+  }
+  for (const cluster of graphemes(text)) {
+    const w = cells(cluster, ambiguous);
+    if (w === 0) {
+      let at = out.length - 1; // cells-ok — the cell before this cluster
+      while (at > 0 && out[at] === "") at -= 1; // cells-ok — back past a continuation
+      if (at >= 0) out[at] = `${out[at] ?? ""}${cluster}`;
+      continue;
+    }
+    out.push(cluster);
+    for (let k = 1; k < w; k += 1) out.push("");
+  }
+  return out;
+}
+
+/**
+ * The alphabets a rasterised layer is drawn in — arrows, box drawing and block
+ * elements, braille, and the sextants of Symbols for Legacy Computing — as
+ * `[lo, hi]` pairs, flat and ascending like the tables below. One cell per
+ * code point at `narrow`, and `rowCells` splits a row of them without a
+ * segmenter. Exported so C09 T1.40 checks the claim against `cells()` rather
+ * than restating the list.
+ */
+export const CELL_PER_UNIT_RANGES: readonly number[] = [
+  0x2190, 0x21ff, 0x2500, 0x259f, 0x2800, 0x28ff, 0x1fb00, 0x1fbff,
+];
+
+/** Whether every code unit of `text` is a cell of its own — printable ASCII at either mode, the set above at `narrow`. */
+function cellPerUnit(text: string, ambiguous: AmbiguousWidth): boolean {
+  let i = 0;
+  while (i < text.length) { // cells-ok — a code-unit cursor
+    const c = text.charCodeAt(i);
+    if (isPlain(c)) {
+      i += 1; // cells-ok — a code-unit cursor
+      continue;
+    }
+    if (ambiguous !== "narrow") return false;
+    const cp = text.codePointAt(i) as number;
+    if (!inRanges(cp, CELL_PER_UNIT_RANGES)) return false;
+    i += cp > 0xffff ? 2 : 1; // cells-ok — past the code point, in code units
+  }
+  return true;
+}
+
+/**
  * A cluster that cannot fit the line at all, substituted rather than dropped (I19).
  *
  * A cluster is at most two cells, so this fires only at a usable width of 1 —

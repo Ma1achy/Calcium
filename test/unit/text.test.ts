@@ -6,12 +6,15 @@
 // and the reason this file tests it apart from any block.
 import { describe, expect, it } from "vitest";
 import {
+  CELL_PER_UNIT_RANGES,
   cells,
   clusterWidth,
   displayCells,
   expandTabs,
   fitStyled,
+  graphemes,
   hardWrapCells,
+  rowCells,
   sliceCells,
   stripControl,
   truncate,
@@ -926,5 +929,110 @@ describe("cells — a cluster measures as the terminal advances (C09 §5, I65)",
     expect(displayCells(styled)).toBe(5);
     expect(sliceCells(styled, 0, 2)).toBe(`${RED}a\u0903${SGR_RESET}${SGR_RESET}`);
     expect(sliceCells(styled, 3, 5)).toBe("\u0915\u093f");
+  });
+});
+
+/**
+ * C09 T1.40 — a row as the cells the terminal draws it in (C09 §5, I63, I65).
+ *
+ * `rowCells` is the inverse of a label writer's join, for C12's merge, which
+ * read a joined cell array by code point and put a family at five columns
+ * (F977, C12 I119). Two claims: the function equals the cluster walk on a
+ * corpus that reaches both of its arms, and the fast set it splits without a
+ * segmenter is a **checked** set — every member measures one cell at the mode
+ * it is admitted in — so a table revision that made one of them wide or
+ * combining fails here rather than in a frame.
+ */
+describe("rowCells — a row as cells, and the fast set is a checked claim (C09 §5, I63, I65)", () => {
+  const FAMILY = "\u{1F468}\u200d\u{1F469}\u200d\u{1F467}";
+  const KEYCAP = "1\ufe0f\u20e3";
+
+  /**
+   * The reference — `graphemes` and `cells`, the writer's own walk (C12 I118):
+   * a cluster at its first cell, `""` behind a wide one, a cluster measuring
+   * nothing on the cell that owns the cluster before it or dropped at the head.
+   */
+  const walk = (text: string, ambiguous: "narrow" | "wide"): readonly string[] => {
+    const out: string[] = [];
+    for (const cluster of graphemes(text)) {
+      const w = cells(cluster, ambiguous);
+      if (w === 0) {
+        let at = out.length - 1; // cells-ok — a cell index
+        while (at > 0 && out[at] === "") at -= 1; // cells-ok — a cell index
+        if (at >= 0) out[at] = `${out[at] ?? ""}${cluster}`;
+        continue;
+      }
+      out.push(cluster);
+      for (let k = 1; k < w; k += 1) out.push("");
+    }
+    return out;
+  };
+
+  it("T1.40 (I63, I65): rowCells equals the cluster walk over a corpus reaching both arms, at narrow and at wide", () => {
+    // **Both arms**: rows the per-unit split answers alone — ASCII at either
+    // mode; braille, box drawing, blocks, arrows and a sextant pair at
+    // narrow — and rows that walk the clusters: a family, a keycap, `図表`,
+    // `aः`, a decomposed `é`, a lone leading mark, a lone joiner, and the
+    // fast alphabets at wide, where box drawing measures two (I65).
+    const corpus = [
+      "", "abc def", "\u2801\u2802\u2800\u28ff", "\u256d\u2500\u2500\u256e\u2502", "\u2581\u2584\u2588",
+      "\u2192\u2197\u2191", "\u{1FB00}\u{1FB3B}", FAMILY, KEYCAP, "図表", "a\u0903", "e\u0301",
+      "\u0301ab", "\u200d", "a\u200db", "a\u200bb", "図\u200bx", "日本x", "\u2500a図", " \u2500 x ",
+    ];
+    for (const ambiguous of ["narrow", "wide"] as const) {
+      for (const row of corpus) {
+        expect(rowCells(row, ambiguous), `${JSON.stringify(row)} at ${ambiguous}`).toEqual(walk(row, ambiguous));
+      }
+    }
+    // **The shapes, as literal cells** — the reference is a table where the
+    // walk above could be wrong in the same way as the function.
+    expect(rowCells("abc", "narrow")).toEqual(["a", "b", "c"]);
+    expect(rowCells("\u256d\u2500", "narrow"), "box drawing, one per cell at narrow").toEqual(["\u256d", "\u2500"]);
+    expect(rowCells("\u256d\u2500", "wide"), "and two at wide, where the plot has already fallen back to ASCII").toEqual(["\u256d", "", "\u2500", ""]);
+    expect(rowCells("\u2801\u2800", "wide"), "braille is Neutral: one at wide too").toEqual(["\u2801", "\u2800"]);
+    expect(rowCells("\u{1FB00}\u{1FB3B}", "narrow"), "a sextant is one pair, one cell").toEqual(["\u{1FB00}", "\u{1FB3B}"]);
+    expect(rowCells(FAMILY, "narrow")).toEqual([FAMILY, ""]);
+    expect(rowCells(KEYCAP, "narrow")).toEqual([KEYCAP, ""]);
+    expect(rowCells("図表", "narrow")).toEqual(["図", "", "表", ""]);
+    expect(rowCells("a\u0903", "narrow"), "a spacing mark: one cluster of two cells (I65)").toEqual(["a\u0903", ""]);
+    expect(rowCells("e\u0301", "narrow")).toEqual(["e\u0301"]);
+    expect(rowCells("\u0301ab", "narrow"), "a lone leading mark owns no cell").toEqual(["a", "b"]);
+    expect(rowCells("\u200d", "narrow"), "a lone joiner owns no cell").toEqual([]);
+    expect(rowCells("a\u200bb", "narrow"), "a zero-width cluster rides on the cell before it").toEqual(["a\u200b", "b"]);
+    expect(rowCells("図\u200bx", "narrow"), "past a continuation, on the cell that owns the glyph").toEqual(["図\u200b", "", "x"]);
+    expect(rowCells("\u2500a図", "narrow"), "one glyph outside the set sends the row to the walk").toEqual(["\u2500", "a", "図", ""]);
+    // The count is the width, on both arms.
+    for (const row of corpus) expect(rowCells(row, "narrow").length, JSON.stringify(row)).toBe(cells(row, "narrow")); // cells-ok — a cell count against the measure
+  });
+
+  it("T1.40 (I63, I65): every member of the fast set measures one cell at the mode it is admitted in, and is not zero-width", () => {
+    // **Derived from the ranges the function reads**, not restated: the set is
+    // admitted at `narrow` — its BMP ranges are Ambiguous in part — and
+    // printable ASCII at either mode. A member measuring two or none here is a
+    // member the per-unit split would put in the wrong cell, and this row
+    // fails before any frame does (C12 T6.100 constructs the widened set).
+    expect(CELL_PER_UNIT_RANGES.length % 2, "flat [lo, hi] pairs").toBe(0); // cells-ok — a pair count
+    let members = 0; // cells-ok — a code-point count
+    for (let i = 0; i < CELL_PER_UNIT_RANGES.length; i += 2) { // cells-ok — a pair index
+      const lo = CELL_PER_UNIT_RANGES[i]!;
+      const hi = CELL_PER_UNIT_RANGES[i + 1]!;
+      expect(lo <= hi, `pair ${String(i / 2)} ascending`).toBe(true);
+      for (let cp = lo; cp <= hi; cp += 1) {
+        const ch = String.fromCodePoint(cp);
+        expect(cells(ch, "narrow"), `U+${cp.toString(16)} at narrow`).toBe(1);
+        expect(rowCells(ch, "narrow"), `U+${cp.toString(16)} as a row`).toEqual([ch]);
+        members += 1;
+      }
+    }
+    expect(members, "the set was read at all — four ranges, 784 code points").toBe(784); // cells-ok — a code-point count
+    for (let cp = 0x20; cp <= 0x7e; cp += 1) {
+      const ch = String.fromCharCode(cp);
+      expect(cells(ch, "narrow"), `ASCII U+${cp.toString(16)}`).toBe(1);
+      expect(cells(ch, "wide"), `ASCII U+${cp.toString(16)} at wide`).toBe(1);
+    }
+    // The control: a wide code point and a combining mark are what the check
+    // refuses, so the assertion above is not one every code point satisfies.
+    expect(cells("日", "narrow")).toBe(2);
+    expect(cells("\u0301", "narrow")).toBe(0);
   });
 });
