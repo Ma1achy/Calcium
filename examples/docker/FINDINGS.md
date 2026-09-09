@@ -33879,3 +33879,653 @@ three times to point at it (F936). The old P11 list had *a regex `.replace` per 
 function away — that was found by reading, fixed, and now measures 0.3 ms — while the much larger
 per-row pass beside it was never looked at, because reading finds what looks expensive and
 measuring finds what is.
+## F938 — the quadratic cursor had two sites and a third mechanism, and the rule is what closes it ★★★★☆
+
+F937 named one line. Replacing it needed three changes, and the two it did not name were found by
+the instruments beside the fix rather than by reading.
+
+**The second site.** `sliceCells` — `presentation/text.ts:283` — held the same read,
+`const ch = [...text.slice(i)][0] ?? ""`, on the walk that takes the tail window `composite` needs
+of every row (`[left + width, columns)`), so the cursor walks the whole row to reach it. Same
+allocation, same order of cost, one function down from the line the finding quoted. Grepping
+`src/` for the class — `[...x][0]`, `[...x.slice(i)][0]`, `Array.from(x)[0]` — returns exactly
+these two; the other spreads of a slice in the tree (`paint.ts:299`, `manifest/parse.ts:349`)
+build a longer array literal and read none of it by index, and `clusterCells`'s `[...cluster]` is
+one bounded cluster read whole by `points.some`.
+
+**The read that replaces it is the same read.** `String.fromCodePoint(text.codePointAt(i))`
+yields what the string iterator yielded at every code-point boundary the walk can reach — a
+surrogate pair is one code point from both, a lone surrogate comes back as itself from both, and
+`fromCodePoint` throws only above U+10FFFF, which `codePointAt` never yields. Measured over a
+corpus with astral pairs, combining marks and lone surrogates in both halves: identical; and the
+probe that pins every output of both functions on the F939 shapes below is byte-identical before
+and after. **The step is unchanged too**: one code point, not one cluster, `i += ch.length`.
+
+**The third instance, which the bench found after the spread had gone.** With both spreads
+replaced, an unstyled 400-cell row still cost **15.7×** its cost at 50 where the styled row beside
+it cost 7.9×. The walk asks *is there an escape at the cursor* by setting `lastIndex` on
+`sgrPattern()`'s `g` regex and calling `exec` — and a `g` regex answers *where is the next escape
+anywhere after the cursor*, which on a row with no escape is a scan to the end, once per
+character. A colour change every twenty cells bounded it on the styled rows, which is why the
+first bench did not see it and why the finding could not have. A sticky regex built from the same
+source (`new RegExp(sgrPattern().source, "y")`, so the escape byte stays in `escapes.ts`) answers
+the question the code asks; the callers' `m.index === i` check is kept and is now always true.
+
+**Before and after**, ms per call, best of three 20 ms batches, same machine, same hour
+(`out/fit-bench3.ts`, run through `tsx` against `src/`; F937's table was taken against `dist/`
+on a quieter day, so compare ratios and not absolutes — F936):
+
+| cells | fitStyled, one short | fitStyled, one over | fitStyled, plain row | sliceCells, tail |
+|---|---|---|---|---|
+| 50 | 0.0267 → **0.0015** | 0.0382 → **0.0014** | 0.0203 → **0.0014** | 0.0327 → **0.0013** |
+| 100 | 0.1506 → **0.0026** | 0.1083 → **0.0026** | 0.0583 → **0.0026** | 0.0977 → **0.0024** |
+| 200 | 0.5926 → **0.0049** | 0.3463 → **0.0049** | 0.2199 → **0.0048** | 0.4005 → **0.0045** |
+| 400 | 1.1181 → **0.0095** | 0.4979 → **0.0094** | 0.4797 → **0.0087** | 0.6929 → **0.0082** |
+
+At 400 cells that is 118×, 53×, 55× and 85× less work per row, and the four columns now agree with
+each other to within a microsecond — the plain row costing the same as the styled one is what says
+the third mechanism is gone. From 50 to 400 every column now grows between **6.2× and 6.7×**
+against a linear 8×, the difference being the per-call floor. The already-`width` fast path is
+unchanged (0.0003 → 0.0017 ms from 50 to 400), so the pad path — the ordinary case — went from
+**172×** the fast path at 400 cells (0.4979 against 0.0029) to **5.5×** (0.0094 against 0.0017).
+
+**The rule, because a timing row cannot be the only guard.** SS60 forbids the first element of a
+spread or of `Array.from` — `[...x][0]`, `[...x].at(0)`, `Array.from(x)[0]` — anywhere in `src/`,
+with no allow list: after the fix nothing matches. It fired on both sites before the fix and on
+nothing else. **Its stated blind spot** is the same idiom across two statements
+(`const points = [...s]; points[0]`, which `clusterCells` does legitimately), a `for…of` that
+breaks after its first iteration, a spread of a `slice` never indexed, and any scan of the
+remainder by another mechanism — the third instance above is exactly that, and the rule's comment
+says so. Its fabrications are the shipped line copied from `text.ts:203`, the two other spellings,
+and a control of three spreads the tree holds that must not fire. C09 I60 is the claim the rule is
+the mechanical form of; T3.77 and T3.78 are the measurement beside it, each operand a batch of at
+least 20 ms so a `0.00` cannot make the ratio (F8), the bound at 24× between linear's 8× and the
+**48.3× and 48.5×** the two rows measured on the unfixed code. TRIAGE group 12 is the reason the
+scan is the durable half and the rows are the record.
+
+**What would falsify this**: a row in a real frame whose fitting cost does not fall by the table's
+factor — `make profile`'s `transcript` span, which was 53 % of frame work, is the number to read
+when the machine is quiet, and it is deliberately not read here (F929). And a spelling of the same
+read that SS60 does not see, which the comment lists rather than claims away.
+
+**Measured whole-frame after it landed**, `make profile` on the quiet machine, the same scripted session,
+34 frames: **278 ms of frame work where the run that found F937 had about 613** (`assemble` self 358.2 ms
+was 58.4% of it). `react` is 152 ms in both runs — 151.9 then, 152.2 now; React and Yoga were not touched, so it
+is the control that says the two runs are comparable — and it is now the largest span at 54.7% where it was
+29.0%. `transcript` self went from 54.3% and 52.5% of two runs to **25.3%**, 70.3 ms, and `visible`
+under it from 5.2% to 9.7%, 27.0 ms, because the rows it fits are now cheap and what it does around
+them is not. That 70 ms is 2 ms a frame with nothing under it but `visible`, which is the shape F936
+named — one span holding a quarter of the work and not divisible — and it is the next question, not
+this one. `assemble` 0.3 ms, `composite` 0.2, `based` 0.2; the p95 frame is 23.55 ms against the 16 ms
+row, crossed by the scenario's one 95 ms patch frame, which is the report's M-T6 and unchanged by this.
+
+## F939 — the cursor steps by code point and the measurer counts by cluster, and four emoji shapes fall between them ★★★★☆
+
+Walking `fitStyled` and `sliceCells` by hand before replacing their read — one code point per
+step, `cells(ch)` asked of each — turned up a disagreement F937's fix had to preserve rather than
+mend. `cells()` asks the segmenter, so a cluster is measured whole; the walk asks each code point,
+so a cluster whose width is not the sum of its parts is counted wrong. Measured (the probe is
+`out/cursor-probe.ts`; T3.79 is the row):
+
+| cluster | `displayCells` | the walk's sum |
+|---|---|---|
+| a ZWJ family `👨‍👩‍👧‍👦` | 2 | 2 + 0 + 2 + 0 + 2 + 0 + 2 = **8** |
+| `⚠️` (U+26A0 U+FE0F) | 2 | 1 + 0 = **1** |
+| a flag `🇬🇧` | 2 | 2 + 2 = **4** |
+| a skin-toned hand `👍🏽` | 2 | 2 + 2 = **4** |
+
+**What that does to a row, in the function every frame row goes through.** A 14-cell row holding
+one family — `abc 👨‍👩‍👧‍👦 defghij` — fitted to **20** comes back **unpadded**: the walk believes it
+is already 20, so `" ".repeat(width - used)` is empty and six cells of the previous frame show
+through, which is the failure §5a was written about for `cells()` and escapes. Fitted to **15**,
+a row that fits with a cell to spare is **cut to nine cells**: `abc 👨‍👩‍👧‍👦 de`, five characters
+gone. `⚠️x` fitted to 2 comes back **three cells wide**, which is the wrap that scrolls the
+alternate screen — the one hazard C01 and C02 both name and I1 exists for. A flag fitted to 2
+comes back as **its first regional indicator alone**, a letter-in-a-box glyph, which is I9's halved
+glyph under another name. And `sliceCells` over `x👨‍👩‍👧‍👦y` at `[2, 4)` yields a joiner between two
+blanks.
+
+**Reachable, not latent.** Every frame row passes through `exact()` → `fitStyled`, rows arrive
+from Ink short of the terminal width (F937), and the emoji in question are what far-side text
+carries — a `⚠️` in a log line, a flag in a locale column. The over-count fires on the ordinary
+pad path with no cut in sight: a row that needs six spaces gets none.
+
+**Why nothing saw it.** Every existing row of `fitStyled`'s callers uses ASCII, CJK or
+single-code-point emoji — all additive — and I20's composition law holds for the family row it
+does test (`x👨‍👩‍👧‍👦y`), because the law is arithmetic over pieces and the pieces are each wrong by
+the same amount. `fitStyled` had no row of its own at all until T1.30. The instrument that found
+it was the by-hand walk, scheduled because the read was about to change: asking what
+`cells(ch)` answers per code point for the clusters T1.13 already lists.
+
+**Preserved here, deliberately, and recorded rather than fixed.** F938's brief was to replace the
+read and keep the step, and a fix that moved any of these outputs would have been a change to the
+walk hiding inside a change to its cost — so T3.79 pins all of them as they stand, in T3.76's form,
+and fails the day a cluster cursor lands. **The remedy** is a cursor that steps by grapheme: the
+segmenter yields each cluster with its `index`, an SGR sequence is ASCII and so never joins a
+cluster, and the walk stays linear. It changes the pieces I20 composes (T1.16c's family row among
+them) and possibly golden frames holding a family or a flag, which is why it is owed as its own
+change. `truncate` already steps by cluster and gets every one of these right (T3.5); the two
+styled-line walks were written from the other end and did not.
+
+**What would falsify this**: a terminal that draws a ZWJ family as four glyphs, a flag as two
+letters, or `⚠️` in one cell — then the walk's sum is the width that terminal draws and the
+measurer is the one that is wrong. The measurer's answers are C09 T1.13's and are asserted against
+the property, so that falsification would have to move T1.13 first.
+
+## F940 — a child's height was answered three and four times per frame, and the refusal on record was about a different cache ★★★★☆
+
+`make profile` on the default chrome read `pills#chrome.header.left` at **3.0** registry
+calls per frame and `pills#chrome.footer.left` at **4.0**, against C28 I31's floor of two
+for a rendered block — one measure and one render. Counted rather than timed, with a
+counting `raw` definition under `defaults: false`, the mechanism is three asks of one
+`(block, width)` inside one registry call: the `group`'s `measure` asks the child through
+`measureChild`, its `render`'s placements ask again (C04 I103), and the child's own `render`
+commits its height a third time (C09 I11). The footer's fourth is a second registry call —
+`compose` measures `footerRows` through `measureSequence` before `paint` renders the same
+blocks (C22 I82). A `panel` rendered once measured each child **four** times; `scroll`
+asked for its content height, its ranges and its drawn total in turn. No height could tell
+any of this apart, because `measure` is pure (C09 I2) and the third answer equals the
+first; the count was the only instrument that saw it, which is what C28 I31 keeps `calls`
+beside `frames` for.
+
+**The remedy is a memo whose lifetime is the call, and the ruling is the lifetime.** Every
+public member of the registry opens a `Map<Block, {width, rows}>` if none is open and the
+outermost drops it on return — on the throw path too, or a loud sink's throw would leave it
+open for the next call to read (C09 T3.80). The child seam reads it before reaching the
+`measure` property, and the height commit reads it before measuring. Keyed on the block
+object, never its id (T3.82); valid for one width (T3.81); `ok` answers only, because the
+render-time ask carries the fitted request (C09 I34) and a memoised fault would leave every
+report at `rows: 0` (T1.35). After it: header pills **2.0**, footer pills **3.0**, header
+group 1.0, footer group 2.0 — asserted as exact multiples of `frames` in a real profiled
+session (C22 T4.64), with the footer's one-more named as `compose`'s call rather than
+tolerated as a ceiling.
+
+**F914 refused exactly this class, and its refusal was right about a cache it was not
+offered.** Its three grounds: C11 I11 rules `planColumns` pure and unmemoised with T6.15 as
+the revert row; the whole class is under 7 ms of 265 (F886); and *a cache in the
+measurement path is where correctness defects live*. The first is about a kind memoising a
+plan on `(columns, width)` across calls — a memo that outlives the document that made it
+and is stale the moment the document changes. A memo that is `null` between calls has no
+document to be stale against; the block it holds is the block the caller is still holding.
+The second is true and beside the point: the cost was never the finding, the count was, and
+a profiler whose `calls` column reads 3.0 at the floor cannot distinguish a chrome that
+recomputes from one that does not. The third is the one that survives, and it is why the
+memo's lifetime is the whole of the ruling and why C09 §6 says so in the state-machine
+section rather than in a kind. C09 I61, T1.32–T1.35, T3.80–T3.82, T6.106–T6.107.
+
+**The reads belong to the seam, not to the property, and that decided where the memo
+sits.** C28's `instrumentRegistry` wraps the `measure` property; a memo *inside* `measure`
+would dedupe the work and leave `calls` at 3.0, because the hit would still pass through the
+wrapped function. The seam (`#measureChild`) answers a hit without touching the property,
+so the profiler's `calls` column counts the questions the registry had to answer. The
+mutation pass pins the two halves separately: the commit's read removed fails the C09
+counts; the seam's read removed alone fails nothing in C09 and only C22 T4.64, because the
+commit still dedupes the definition while every ask reaches the wrapped property. That is
+the row the C09 file cannot write, and why the C22 file has it.
+
+**Falsified by** a kind whose `measure` legitimately answers differently for the same block
+object at the same width within one call — which C09 I2 forbids — or by a public member that
+mutates a block between two asks of it inside one call, which would make the first answer
+stale; no member does, and the blocks are frozen (C04). **Not fixed here**: the repeat beside
+`#form` (F942), and the two `paintDeps(frame)` constructions per frame in `render-frame.ts`,
+which is not this round's file.
+
+TRIAGE: 10 · a claim carried without a record — F914's *measured once* premise and the
+refusal it justified, re-measured.
+
+**Measured after the memo landed**, same `make profile` run as F938's closing figures: `pills#chrome.header.left`
+**2.0** calls per frame where it was 3.0 and `pills#chrome.footer.left` **3.0** where it was 4.0, the footer
+one more than the header exactly as C22 T4.64 asserts, and `group#chrome.footer` 2.0. What remains is the
+two registry calls a frame makes — `compose`'s `measureSequence` and `paint`'s `render` — and I61 bounds the
+memo at the call on purpose, because the cross-call version is the cache F914 refused. So the report's
+`<-- measured more than once per frame` marker now flags what the spec allows: its threshold is 1.0 a frame
+and the spec's is once a call. A reader meeting the marker on the chrome needs I61 beside it, and the
+marker's own figure for *how many calls a frame made* is the number that would let it tell the two apart —
+C28 work, recorded here rather than done.
+
+## F941 — C28 T1.61 asserted the two layouts on purpose, and a row asserting a disagreement is green for exactly as long as the defect is ★★★☆☆
+
+`paint()` and `cursorFor()` each laid the overlays out — `placedLayers(deps)` at both call
+sites, one wrapper so that `spans.overlays.count` would count both. T1.61 asserted
+`2 × frames` and said why: *two per frame is the defect P11 names; the row is here so that a
+call site reaching `deps.overlays()` directly cannot go unnoticed either way.* That is the
+shape F855 and F856 recorded for T2.28b: a row that watches the remedy rather than the
+condition. It is green while the defect holds, and it would have been green with a third
+call site too, because the third would have had to reach the thunk directly to be counted
+at all — the row watched the wrapper's count and the wrapper was the thing anyone would use.
+
+**Two layouts of one frame can only agree or be a defect.** They are taken of the same
+region against the same overlay set, in the same synchronous frame, so the second is either
+the first again or a stack that changed between them — and the defect it could be is a
+cursor placed from a layout the rows were not composited from: a menu drawn with the cursor
+at the prompt (C22 §6a). C22 T1.59 constructs it with a thunk that answers a cursor-bearing
+layer first and nothing second; with one layout the rows carry the layer and the cursor is
+the layer's, with two they disagree.
+
+**The change**: `placedLayers` is exported; `paint` and `cursorFor` take the layout as an
+optional third argument and lay out for themselves only when handed nothing (C22 I96,
+T1.58). `render-frame.ts` is the caller and is not this round's file; the four-line change
+it needs — one `paintDeps(frame)`, one `placedLayers(painting)`, both handed down — is in the
+round's report, and **T1.61 is red until it lands**: it now asserts `frames` and reads
+`2 × frames`, which is spec-first arriving as a red row on purpose and for a different
+reason than the one it replaced. MG25 and SS48 are why the layout is an argument rather than
+a change of return type: `paint(` is confined to two files and every export must have a
+consumer in `src/`, so the shape that keeps both is the one that adds a parameter.
+
+**One thing the brief had wrong and the file had right**: T1.61 lives in
+`test/unit/profiler-budget.test.ts`, not `test/unit/profiler.test.ts`; C28's tier table
+does not name the file, so nothing checks where a row lives. Also stale by this change,
+and not this round's to edit: `tools/mutate/runs/c28-profiler.mjs`'s `WRAPPER-BYPASSED`
+anchors on `  const placed = placedLayers(deps);` in `paint.ts`, which no longer exists;
+`registry-probe.ts`'s comment that the wrapped properties *are also exactly what the
+registry hands down as `measureChild`*, which is now true of a miss and false of a hit;
+and `profiler-recorder.test.ts:9`'s `overlays` count 6, sum 6, max 1.
+
+**Falsified by** a frame path that legitimately needs two layouts of one frame — none does;
+a layout is a pure function of the region and the stack, and the stack does not change
+inside a frame.
+
+**Landed the same day, and the landing broke a row.** `render-frame.ts` builds `paintDeps(frame)`
+once, lays out once and hands both to `paint()` and `cursorFor()`; T1.61 is green at `frames`, and
+the three stale sites named above — `WRAPPER-BYPASSED`'s anchor, `registry-probe.ts`'s comment and
+`profiler-recorder.test.ts:9`'s count — are corrected with it. The first full `make test` after it
+had one red row of 5 841: C22 T4.11f, which substitutes a `paintDeps` that throws a `FrameError`
+and asserts the fallback. The old site had `deps.paintDeps(frame)` inside the `try` as `paint()`'s
+argument; the rewrite lifted it out to share the value, so the throw escaped `composeFrame`. Back
+inside the `try`, and the lift is `p11-residue.mjs`'s sixth mutation, against T4.11f — a row
+written for C22 I34 caught a defect against C22 I56, because its substitution happens to be the
+fabricated violation of both.
+
+TRIAGE: 11 · a gate that passes without checking.
+
+## F942 — the cap's two measures are two questions, and the repeat P11 read there is one line up ★★★☆☆
+
+P11 listed `registry.ts`'s `#form` as measuring twice — `total` at one line and `shown`
+four lines below — and read it as repeated work. It is not. `total` is measured of the
+resolved block and decides whether a form exists; `shown` is measured of the block `window`
+returned and is what the marker prints as on screen (`… 3 of 5 rows`). Two blocks, two
+questions, and the second is taken only when the first exceeded the cap, so a block within
+the cap pays for one. Ruled in C09 §2b and I62, with a comment at the site; T3.83 asserts
+that a within-cap block windows nobody in either half and that an over-cap block's marker
+names the window's rows first and the block's second, which is the assertion that fails when
+the second measure is asked of the block again (T6.108). If one wanted the second measure
+gone without changing a frame, C09 I26 provides it: `shown = cap + skipRows + dropRows` for
+every kind declaring `window`. It is measured rather than derived so the marker names what
+the form measures; the cost is one measure of a block already bounded at the cap.
+
+**The repeat exists, and it is adjacent.** F914 stated that *an uncapped block is measured
+once, because the second call is behind `total > cap`*. Counted with a windowable
+definition: a windowable block within the cap runs `definition.measure` **twice** per
+`registry.measure` and **three** times per `registry.render`; over the cap, **three** and
+**five**. The mechanism is that `#form` measures `total` and then `#measured` measures the
+form it returned — the same block at the same width, one line apart — and `render` calls
+`#form` a second time after `#measured` has already called it. F940's memo does not reach
+this: `#form` calls the definition directly, as it must, because it is deciding the block's
+form rather than answering a height. The remedy is the `Form` carrying the rows `#form`
+already counted and `#measured` reading them, and `render` reusing the form `#measured`
+resolved — a change to a private type and two call sites, none of it about the cap.
+**Not applied this round**, because the brief ruled this item a finding and not a fix, and
+because it touches the height commit that I11 and I34 rest on and wants its own by-hand walk
+(the fault path: a `Form` carrying rows from a measurer that later throws).
+
+**Falsified by** a kind whose `measure` answers differently for `#form`'s ask and
+`#measured`'s ask of the same block at the same width — I2 forbids it — or by a
+demonstration that `#measured`'s second measure is of a different block than `#form`'s
+first, which the counted call's arguments say it is not.
+
+TRIAGE: 10 · a claim carried without a record — F914's *measured once* was stated from the
+code's shape and not counted; counted, it is two and three.
+
+## F943 — two C22 rows exist in the suite, are cited by a third, and have no row in C22's table ★★☆☆☆
+
+`test/unit/profiler-seams.test.ts` holds `T1.56 (C22 I58, C28 I8)` and `T1.57 (C22 I93,
+C28 I30)`. C22 §9's tier-1 table runs T1.51–T1.55 and this round's T1.58–T1.59; it has no
+`T1.56` and no `T1.57`. T1.52's text cites T1.57 — *the first half of the invariant … is
+T1.57's, driven through a real graph* — so the table refers to a row it does not contain.
+Found while placing T1.58 after the last row and finding the last row was T1.55.
+
+Nothing checks the direction *test row → spec row*: SP9 asks whether an invariant is named
+by a test, and the tier tables are read by people. A row cited by another row reads as
+present. The two rows are real and green; what is missing is the record, which is where the
+next reader looks for what a row asserts before deciding whether to change it.
+
+**Falsified by** the rows being in C22 under a heading this grep did not reach —
+`grep -n "T1\.5[67]" docs/components/C22_composition_root.md` returns one line, T1.52's.
+
+TRIAGE: 7 · an artefact describes the world rather than being checked against it.
+
+## F944 — the ⌃c ladder pops a view and never tells its owner ★★★☆☆
+
+C16's Ctrl-C ladder answers a pushed view with `deps.popLayer()` — `router.ts`'s `pushedView` rung,
+which `construct.ts` wires to `stores.overlays.pop()` — and calls no owner. Every view owner in
+`src/shell/` (`patch-view.ts`, `document-view.ts`) keeps state beside the layer it pushed and exposes
+its own `pop()`, which `keys.ts`'s `viewPop` calls for `Esc`; the ladder does not, so `⌃c` leaves the
+layer gone and the owner's state standing.
+
+**Measured 2026-09-09 on the document view** (`out/f944-probe.test.ts`, a real `createOverlayManager`
+and a real `createDocumentView`): `open("/watch api")` → `openFor: "/watch api"`, stack
+`[document-view]`. Then `overlays.pop()` — the ladder's call — returned the layer; **stack `[]`, `top`
+`null`, and `openFor` still `"/watch api"`.** A `move("down")` afterwards returned `false` (its `update`
+finds no layer) and a second `open("/watch db")` was accepted, so the stale state lasts until the next
+open — during which `keys.ts`'s `onView` routes `n`/`p`/`g`/`G` to a view that is not there rather than
+to the patch view beneath, and `viewPop` calls `releaseView()` for nothing.
+
+**For the profiler's view the same shape is not a wrong answer for a while but a tier and a timer**:
+opening raises the tier to `spans` and arms a 1 Hz refresh, and a `⌃c` that reached only C15 would
+leave the tier raised for the rest of the session and the timer firing every second into an `update`
+that returns `false`. That is why the view's teardown runs from C15's change stream — `pop()` emits
+`pop` and `dismiss(id)` emits `dismiss`, each carrying the id, synchronously, before the call returns
+(C15 I25, a new invariant written from this) — and the owner's own `pop()` is one more caller of the
+same teardown rather than a second copy (C28 I50, T1.94, T4.6). **Not fixed for the other two owners
+here**: `document-view.ts` and `patch-view.ts` are outside this round's files and owe the same
+subscription; until they have it the measured stale `openFor` above stands.
+
+**What would falsify this**: a `⌃c` path that reaches an owner other than through the change stream —
+`grep -n 'popLayer' src/shell/construct.ts src/interaction/router/router.ts` showing the rung calling
+anything but `overlays.pop()` — or the probe above returning `openFor: null` after the pop.
+
+**Closed the same day, for the other two owners.** `document-view.ts` and `patch-view.ts` subscribe at
+construction and clear their state on the change carrying their id, as the profiler's view does; C22 T4.65
+and C25 T2.15 drive the manager's `pop()` rather than the owner's, because the owner's own `pop()` always
+tore down and the other caller was the one measured. The probe above now returns `openFor: null`.
+
+## F945 — `paneTitle` was published with no consumer anywhere, and MG24 could not see it ★★☆☆☆
+
+`src/index.ts` re-exports `profilePane`, `paneTitle` and `PANES` from `src/shell/profiling/panes.ts`
+so a consumer can draw a pane of its own. **At HEAD before this round, `paneTitle` had two
+occurrences in the whole tree — its definition and that re-export** (`git grep -n paneTitle HEAD -- src
+test tools examples`): no caller in `src/`, none in `test/`, none in `tools/`, none in `examples/`, for
+the whole of its life. The `/profile` verb C28 §3 named as the surface that would use it did not exist
+(F946).
+
+**MG24 could not see it because a root re-export of a function is not an interface member.** MG24's
+`UNCONSUMED_MEMBERS` walks published `interface`/`type` members and asks who reads each; a bare function
+on the root is outside its subject, so an export nothing consumes — the CLAUDE.md *never* — sat under
+the rule written against it. The view is now its first consumer (`src/shell/profile-view.ts` draws
+`profiler · <paneTitle(pane)>` as the layer's header), and C24 I33 is the sentence that says a published
+pane helper has to have one: *the pane exports that were published for a consumer drawing its own are
+what the framework's own view draws with, through the same exports* (C24 T1.11).
+
+**What would falsify this**: a consumer of `paneTitle` at the HEAD before this round that the grep
+above did not reach — a `.mts`/`.mjs` importer outside `src`, `test`, `tools`, `examples` — or an MG24
+report listing `paneTitle` among its unconsumed members.
+
+## F946 — C28 §3 named a raiser, `/profile`, that no spec specified ★★☆☆☆
+
+C28 §3 at HEAD: *A tier is raised by `TuiConfig.profile`, by `/profile`, or by opening the view.* Three
+raisers. **The second does not exist anywhere but in that sentence**: C23 §2 lists the six shipped
+local verbs and `grep -c '/profile' docs/components/C23_execution_pipeline.md` at HEAD is **0**;
+`FRAMEWORK_TOOLS` in `src/data/manifest/framework.ts` declares six rows and none is `profile`; no
+handler, no manifest row, no test names it. The third raiser — the view — had no spec either (I50 is
+new), so §3 named three mechanisms of which one was real.
+
+*Ask where a settled claim is written down*: the answer for `/profile` as a tier-raising verb was *a
+sentence in another component's §3*. It read as a ruling because it sat in a list beside a real one.
+**Rewritten this round**: §3 now says there is no third raiser — the verb opens the view and the view
+raises, once, and restores (I50) — and the verb is specified where the other locals are, C23 §2, with
+I68 and I69 and rows T1.64–T1.66 (`test/unit/local-profile.test.ts`).
+
+**What would falsify this**: a row at HEAD before this round asserting anything about `/profile`, or a
+commit in `git log -S'/profile' -- docs src` older than the §3 sentence that specifies the verb.
+
+**Closed the same day.** The row is in `FRAMEWORK_TOOLS` with `pane` an optional `enum` over the four
+names; `execution.ts` hands the root's view to `shippedHandlers`, `HandlerDeps.profileView` is required
+and the transitional conditional is gone (C23 §2, T4.66, T4.67). The L0 copy of C28's `PANES` is held
+equal by C23 T1.67, because `framework.ts` may not import the shell and a list copied by hand is F935's
+shape waiting to happen.
+
+## F947 — the overview pane is taller than the region it is shown in, and C15 clips it in silence ★★★☆☆
+
+The profiler's panes were written for a consumer drawing its own surface, with no region in view.
+**Measured 2026-09-09 at width 80 through C09's `measureSequence`** (`out/measure-header.mts`,
+`out/measure-panes.mts`): the overview with the view's one-row header is **20 rows in six blocks on an
+empty ring**, **26 rows in nine blocks at twelve frames**, and **28 rows** at twelve frames with three
+spans and a counter recorded; the harness's `FRAME.overlayRegion` is **24 rows**. `frame`,
+`distribution` and `memory` fit (5, 10 and 4 rows at twelve frames) — the pane a reader opens first is
+the one that does not.
+
+**C15 I8 clips what does not fit and draws nothing to say so.** A view handing the whole pane to C15 is
+therefore correct at every assertion on the blocks and wrong on the screen — the cache table and the
+overhead estimate, the two blocks at the bottom, would be the ones a reader never sees, with no
+indication they exist. That is group 8's shape, absence indistinguishable from failure, with the
+framework's own instrument as the surface.
+
+**Fixed in the view, not in the pane**: `profile-view.ts` windows at block boundaries through the same
+`measureSequence`, pages on `g`/`G`/`PgUp`/`PgDn`, and shows a single block taller than the region
+under a notice that counts the hidden rows (C28 I51, T1.98, T3.14). The projection is
+`document-view.ts`'s written a second time — recorded in C28 §3c rather than extracted, because the
+shared home would be a file this round does not own. A resize under an open view is re-windowed on the
+next tick, so the clip C15 makes meanwhile lasts at most `VIEW_REFRESH_MS` (§9b S8, T3.14) — the one
+cost of not redrawing on resize, and recorded as one.
+
+**What would falsify this**: `measureSequence(profilePane(report, "overview", caps), 80)` at or below
+24 for a report with frames — T1.98 asserts the excess against a region of eight before it asserts
+anything else, so a pane that shrank to fit would fail the fixture check rather than pass the row.
+
+## F948 — the third Status line, fifteen hours after the round that named the class ★★☆☆☆
+
+C28's header table read *Spec'd 2026-09-06, unbuilt*. Measured at HEAD: `src/shell/profiling/` holds
+15 files and 4270 lines, landed in `b62b64df` (2026-09-07 00:09) with its `COMPONENT_SOURCES` row —
+`C28: "src/shell/profiling/recorder.ts"` — following in `716f7905` the same day; 48 invariants, all 48
+cited, 204 citations across sixteen test files and six more in the tier-5 fixture. The line had not
+been touched since `1e2f0141` (2026-09-06), the commit that wrote it.
+
+**F891 was committed fifteen hours after the code landed** — `e38819e1` at 15:45 on the same day —
+and corrected C26 and C27's lines while walking past C28's, one directory over, in the finding that
+named the class. Third instance (C26 *design only*, C27 *unbuilt*, C28 *unbuilt*), and the second of
+the plain form: a line that was true when written and was never re-read.
+
+**Is a check over the class buildable? For this form, yes, and it is cheap.** `COMPONENT_SOURCES`
+already names the file whose existence means a component runs, and TD3's implemented-predicate already
+reads it. The rule: for every row whose path is implemented, the `**Status**` row of
+`docs/components/Cnn_*.md` must not match `/unbuilt|design only|not built/i`. Fabricated violation:
+C28's line as it stood until this round. Cost: one line read per spec, and it fires on the commit that
+makes the path real — which is exactly the commit whose author is thinking about the code and not the
+header.
+
+**Its blind spot is the other half of F891.** A Status line that says something other than *unbuilt*
+and is still wrong passes it — C26's was a **conjunction** whose first word was `Draft` and two of
+whose three clauses had decayed, and no word in it is on the list. A line saying **Built** with the
+wrong figures passes it too, and nothing checks a figure in prose (F935); the corrected lines carry
+line counts and citation counts that are true today and will not be true for long. And a component
+with no `COMPONENT_SOURCES` row — C26, by design — is invisible to it by construction, for the same
+reason TD1–TD6 cannot see C26's deferrals. The rule catches the form that has now happened twice and
+cannot catch the form that happened once; the second is the load-bearing one, because it is the one
+that reads as a considered judgement.
+
+Not built this round — the enforcement rules are another lane's files. It would sit beside TD1–TD6 in
+`tools/enforce/todo-expiry.mjs`, which already holds both the map and the predicate.
+
+## F949 — F929's `0 rows` was the harness reading `1 failed | 5 passed` as no counter at all ★★★☆☆
+
+F929 narrowed, after six runs, to: `tools/instruments.mjs` reports **0 rows** for `tools/profile.mjs`
+when its child is *starved* under load, and the harness cannot tell that from a genuine divergence. The
+half it asked for was a run under deliberate load. Both halves were measured, and the premise is wrong
+in both directions.
+
+**The reader, first.** The runner's counter for a vitest fixture was `/Tests\s+(\d+) passed/` — digits
+straight after the word. vitest 4.1.10 writes three shapes of that line, captured from real runs and
+fed through the runner's own two steps (strip the SGR escapes, match):
+
+| the summary line vitest wrote | what the runner read |
+|---|---|
+| `Tests  15 passed \| 1 todo (16)` | 15 rows |
+| `Tests  1 failed \| 1 passed (2)` | **0 rows** |
+| `Tests  no tests` (the file did not load) | 0 rows |
+
+So a fixture that ran six rows and failed one printed `Tests  1 failed | 5 passed (6)` and was reported
+as `0 rows ← reported no rows at all`. **The runs with something to report were exactly the runs
+reported as empty.** F929's arithmetic says the same thing and was read the other way: the red runs
+counted **556** rows against the green **562** — six short, not one. A starved child that got through
+five rows would have shown five; a reader that lost the counter shows zero. And the runner dumps the
+last twenty-five lines of a failing fixture's output, which is where F929 got T5.1b's assertion text
+from — the `Tests  1 failed | 5 passed (6)` line was in the same block, a few lines below the
+assertion it quoted. *A finding's own example is checked by nothing.*
+
+**Then the load.** Twelve `yes > /dev/null` loops on the eleven-core container took the load average
+from 0.8 to 16–17; `node tools/instruments.mjs` was run alone, once, 2026-09-08 23:51:40Z to
+23:56:10Z: **44 instruments, 562 rows, all green**, `tools/profile.mjs` **6 rows ok**. Under a load the
+machine never sees in a gate chain, the child was not starved and no profiler row diverged. So the
+`0 rows` was not starvation, and the contention F929 blamed does not reproduce the divergence either —
+what T1.83 and T5.1b diverged on, three times after a `make e2e`, is still group 12's open question.
+This closes F929's *reading*, not its row. **A fourth instance the next day**: 2026-09-09, T1.83 red
+inside a full gate chain's `make e2e` — 1 of 124, the only red row in the tier — and green alone on
+the same `dist/` twelve minutes later, seven of seven. The chain is the only regime that has ever
+produced it, and the loaded run above is the only regime that has ever been tried and did not.
+
+**The fix, in the harness rather than the row.** `readCounter` reads the failed count beside the passed
+count and reports their sum as the rows that ran — a `todo` did not run and is not a row, `no tests`
+is not a counter — and `stateOf` names five states from the counter and the exit status together:
+`ok`, `diverged` (a counter with failures, whatever the exit), `did not run` (non-zero exit, no
+counter: the child died before its first row), `no rows` (exit 0, no counter: the vacuous fixture the
+runner was written against) and `errored after its rows` (every row green under a non-zero exit). The
+summary line names the tally. The runner went behind a main guard so the reader could have a fixture
+at all — `test/unit/instruments.test.ts`, IN1–IN7, whose IN7 spawns the installed vitest over a
+two-row file with one failure and reads the real line, because the other six are bytes from one
+version and the shape is vitest's to change. `maxBuffer` is set to 64 MiB, since a summary sheared off
+by the 1 MiB default would now read as `did not run`, the wrong one of the five. The old reader is the
+first mutation in `tools/mutate/runs/instruments-starved.mjs` — F929's regex put back — with the
+python counter as the control.
+
+**What would falsify this**: a red `make instruments` whose `tools/profile.mjs` block ends in a vitest
+summary and whose row still reads `0 rows`; or a summary shape the installed vitest writes that
+`readCounter` returns `null` for, which is the line IN7 exists to fail on.
+
+## F950 — I47's list of what the regime carries, and the number of the row that guards it, both drifted from the artefact ★★☆☆☆
+
+C28 I47 ends: *what the recording carries about the regime is only what is true at construction —
+node, initial `columns` and `rows`, and the environment.* The regime line `src/shell/config.ts:272`
+writes `t`, `node`, `tier`, `name`, `binary` and `env`. The size was never on it — the writer's own
+comment says *no size here, C01 owns the terminal's dimensions* — and since `dc79ab21` (2026-09-08)
+the initial size is a `geometry` line of its own, deliberately, because a size replayed as a resize is
+a resize the session never had (F912). `tier`, `name` and `binary` joined for F912's other reason:
+the chrome draws them, so they reach a frame. Three of the line's six keys are not in the list, and
+two of the list's four items are not on the line.
+
+**The rule holds exactly and the enumeration beside it does not**, which is F935's shape — a figure
+kept beside an invariant outliving the invariant's subject — with a list in place of a figure. It
+matters here because the list is what a reader writes the guarding row from: a key-set assertion
+copied from I47 would fail against every recording ever made. T6.16 was written from the artefact
+instead, and its equality over the six keys is now the thing a seventh member has to argue with.
+
+**The row's number had drifted too.** §10 carried it as `T6.16b` from `4b4916e2` while the tier-6
+file's todo, added in the same commit, said `T6.16`; there was never a `T6.16` or a `T6.16a` in the
+spec, so the test's citation resolved against nothing and nothing said so — SP9 resolves invariants,
+not row numbers. Renamed to `T6.16` in §10 this round, with where it lives.
+
+Not fixed here: I47's sentence is in §8, another lane's this round. The edit it wants is the six keys in
+place of the four items, and a clause saying the initial size travels as the `geometry` line.
+
+## F951 — nineteen rows in the document view's contract file resolve against other rows or against nothing ★★☆☆☆
+
+`test/contract/document-view.test.ts` numbers its rows T4.30–T4.48 under `describe("C22 §13a — the
+document view")`. Checked against C22's tables while placing T4.65: **T4.30–T4.37 exist in the spec and
+are other rows** — the spec's T4.30 is `⌥v` entering copy mode, T4.31 is `⌃c` leaving it — and
+**T4.38–T4.48 exist in no table at all**. Eleven citations resolve against nothing and eight against a
+row about a different subject; SP9 resolves invariants and not row numbers, so nothing said so, and the
+rows' `(C22 I48)` citations kept SP9 green throughout.
+
+F943's shape, two files over: a row in the suite with no row in the table, found by placing a new row
+after what the table said was the last one. F950's T6.16b is the same class with one member. The
+document-view file is the largest instance so far, and it was written in one round, which is how a
+whole block of numbers can be minted against a table nobody reopened.
+
+**Not renumbered here.** Nineteen rows across two describes, some cited from C22's prose (§13a names
+several by number), is a re-map that wants its own commit with the prose read against it; T4.65 was
+placed after C22's real last row rather than after the file's, so the drift does not grow by one.
+
+**What would falsify this**: `grep -c "T4.4[0-8]" docs/components/C22_composition_root.md` returning
+anything but 0, or the spec's T4.30 turning out to be the fixture control rather than `⌥v`.
+
+## F952 — a mutation that survived the memo had been surviving all along: the clamp it removes cannot bind ★★☆☆☆
+
+Running every mutation run the registry memo (F940) touched, `c14-cap.mjs`'s `MARKER-ROW-WINDOWED`
+survived — `Math.min(localTo, contentRows)` replaced by `localTo` in `windowSequence`, expected to fail
+T1.20 through a piece measuring one row too many. The first reading was the one worth fearing: a second
+defect masking the first, the memo answering a re-measure from its map where the window had asked a new
+question. Measured instead, by hand, with the registry swapped: **against HEAD's registry, 16 of 16
+green; against the memoised one, 16 of 16 green; HEAD's registry unmutated, 16 of 16.** The memo changed
+nothing here. The mutation was vacuous before the round began.
+
+**Why it cannot fail.** The definition's window is taken over the *form's* block —
+`windowable(stripCapped(source), …)` where `source` is what `#form` returned, already windowed to
+exactly `cap` rows — so a `localTo` past `contentRows` is clamped by the block's own length before the
+`Math.min` is reached. The mutation and the line it targets landed in one commit (`2864ae86`), so either
+the run was recorded without a pass or a later change killed it silently; nothing dates it, because
+`make all` does not run the passes and the anchor sweep checks that an anchor *resolves*, not that its
+mutation *fails* (its own header says so).
+
+Recorded in the run as `expect: "(none — expected to survive)"` with the reason, the convention
+`quadratic-cursor.mjs` set for `STICKY-OFF`, and the run's exit code made honest for every other row.
+The clamp is left as it stands: a guard nothing constrains is not a defect, and a mutation with no
+row that sees it is the record that says so.
+
+**What would falsify this**: a `source` that is not the form's block reaching that line — then
+`Math.min` binds, the mutation fails T1.20 again, and the `expect` must be put back.
+
+## F953 — the framework's seventh verb shadowed a `profile` both examples already declared, and nothing before the proof gate could see it ★★★★☆
+
+`/profile` joined C05 §3's list as the seventh verb Calcium ships, and C05 I6 makes a duplicate against
+that list a parse error rather than a last-wins — so both reference apps stopped starting. Each had
+declared its own `profile` in the profiler's spec-first round, as the app-side placeholder for a report
+the framework did not yet draw. `examples/docker/src/manifest/profiling.ts` was a local verb with no
+handler and its own file, headed *the one family that is not docker's*; `examples/plots/src/manifest.ts`
+had a row with a real handler, `profileBlocks`, drawing the panes into the transcript as a document, and
+plots' `main.ts` sets `profile: { tier: "spans" }` so its figures are live. The refusal is the one I6
+promises and it names the remedy: `construction failed at step registries: tools[7].name: "profile" is a
+verb Calcium ships (C05 §3) — choose another name, or the framework's handler for it becomes
+unreachable`.
+
+**Where it showed, and where it did not.** The framework's 5 841 rows were green on every gate that ran
+them, because no row in `src/` or `test/` holds an app's manifest. docker-tui's suite went nine of 299 red
+in the proof gate — every row of `test/completion.test.ts`, each failing at `the app's manifest must
+parse`, and 290 green because nothing else in that suite constructs the manifest. plots is in no gate
+but `make test`'s example loop, and that loop never ran: the recipe is `npm run test` and then the loop
+under `set -e`, `npm run test` was red on C22 T4.11f (F941), so a red row in the framework hid two red
+apps. CI's `make test` would have found plots once T4.11f was green, after the push. Run by hand, both
+of its PTY rows failed at construction — *the terminal received nothing at all*, 907 bytes of a stack
+trace where a greeting was expected.
+
+**Two remedies, because the two stubs were not the same thing.** docker's had no handler and never had:
+it is removed, its file with it, and the framework's verb serves the app — refusing, since docker-tui
+does not set `TuiConfig.profile`, with the `warn` notice C23 I68 names. plots' had a handler, and what
+that handler does is the shape C23 I69 refuses *for the framework's own verb* — a report frozen into the
+transcript as a document — and exactly what C24 I33 says the pane exports are published for: a consumer
+drawing its own from `profilePane`. It is the only such consumer in the tree, so it stays and is renamed
+`/report`, with its summary saying which is which. Measured after: docker 22 files, 315 of 315; plots 17
+of 17 and `tsc --noEmit` clean.
+
+**The class.** Adding a reserved name is a breaking change for every app that already uses it, and the
+check for that cannot live in the framework's suite. C05 §3 now says so beside the list, and says the
+check: a verb joins the seven with a grep of every manifest in the tree, not after. Two instances is the
+minimum for noticing a rule, not evidence for one — but the two here are every app in the tree.
+
+**What would falsify this**: `grep -rn 'name: "profile"' examples/` returning a row, or either example's
+suite red at construction after this commit. **Open beside it, not part of it**: whether the reference
+application should set `TuiConfig.profile` so `/profile` draws there rather than refusing — a roadmap
+question about the demo, not a defect.
+
+## F954 — the verb count was written in nineteen places, and the round that moved it reached the seven in the file that owns it and none of the twelve outside ★★☆☆☆
+
+*The framework's six* appeared in C05 §3 seven times, in three test files, and in twelve more places
+that are not C05's: C22 §2 twice, C22 I23, C22 T1.4m, C24 §3, a comment each in `construct.ts`,
+`shell/types.ts` and `parser/types.ts`, `parse.ts`'s three, and the docker example's `manifest.ts`
+header. The round that added `/profile`
+changed C05's seven and the tests — the file that owns the count and the rows that assert it — and
+left every one of the twelve at six. Each was true when written, none is load-bearing where it stands,
+and nothing reads them: the count is asserted once, in `test/unit/manifest.test.ts`, against
+`FRAMEWORK_TOOLS`, and would have gone red had C05 been left behind instead.
+
+**F680's class, from the other side.** F680 was one count restated against three authorities; this is
+one authority and twelve echoes, and the echoes are what a reader meets first — C22 §2 is where a
+manifest's construction is explained, and it now said *six* beside a §3 that says *seven*. The
+`grep -rn "framework's six"` that finds them took a second; what had never happened was running it.
+
+**Closed by removing the number rather than updating it.** The twelve now say *the framework's verbs*
+with a pointer to C05 §3, so the next verb changes one file and the test that holds it to account.
+Two `six`es stay because they are not this count — C22 §3d's six completion *sources* and C09's six
+framework-authored *characters* (C09 commitment 19) — and one stays because it quotes what a
+sentence used to say. The docker example's header was corrected under F953 in the same round.
+
+**What would falsify this**: `grep -rn "framework's six\|Calcium's six" docs/ src/ examples/*/src`
+returning a line about verbs.

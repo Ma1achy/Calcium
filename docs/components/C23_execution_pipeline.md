@@ -124,7 +124,7 @@ rather than a second mechanism here.** The layer is pushed with
 it takes a key. See I36 for why that flag is `false` on a layer the user can
 plainly escape.
 
-Calcium ships handlers for the concerns it owns — `/help` renders from the manifest (C16 §6, so documentation cannot drift), `/clear` empties C13, `/theme` switches C10, `/history` reads C20, `/debug` reads an entry's invocation record, `/exit` calls `C22.stop`. An app registers its own alongside them.
+Calcium ships handlers for the concerns it owns — `/help` renders from the manifest (C16 §6, so documentation cannot drift), `/clear` empties C13, `/theme` switches C10, `/history` reads C20, `/debug` reads an entry's invocation record, `/exit` calls `C22.stop`, and `/profile` opens C28's view (below). An app registers its own alongside them.
 
 **The six are rows in every manifest (C05 §3), and that is what makes them reachable.** C18 classifies `local` from the manifest, so a handler for a verb the manifest does not declare is one nothing can ever route to — which is exactly what I27's reconciliation reports. Registering the handlers without the rows was tried and failed construction on all six, correctly.
 
@@ -146,6 +146,54 @@ Renders a `keyValue` of `argv`, `transport`, `origin`, `exitCode`, `durationMs` 
 **It is a local command and not an action, and that is the whole design.** An action originating from a frozen entry is refused (I18), and inspecting an *older* entry is the entire point — an inspect action would be refused on every entry worth inspecting. Reading an entry's `meta` is not firing an action: nothing re-runs, nothing reaches the far side, and the stale-data footgun I18 exists to prevent does not arise. D5 is untouched.
 
 This is also what distinguishes `/debug` from `{ } json`, which several surfaces offer. `{ } json` **re-runs** the command with `--json` — honest, and what the command says, but on a `--watch` or a changing cluster it returns different data than the block it was opened from. `/debug` describes the entry in front of you.
+
+#### `/profile` — the profiler's view
+
+```
+/profile              open the profiler view on its `overview` pane
+/profile <pane>       open it on `overview`, `frame`, `distribution` or `memory`
+```
+
+**It opens a view and appends a notice; it never appends the report** (I68, I69). The panes are
+C28's (`profilePane`, C28 §3c), drawn in a `kind: "view"` layer the view refreshes on a timer, and
+the entry this verb appends says which pane opened and nothing more. A document holding the panes
+would freeze one report into the transcript's record and be stale on the next frame — I18's
+stale-data shape with the framework's own figures — and the entry sits under the view anyway, read
+after `Esc`.
+
+**Three arms, and each answers through the local route rather than throwing** (I2). With no profiler
+configured — a session built without `TuiConfig.profile`, which is every session that did not ask
+(C28 T4.1) — the handler answers a `warn` notice naming `TuiConfig.profile` and opens nothing; there
+is no recorder whose tier could be raised, and C28 §3's *a tier is raised by `/profile`* was a
+sentence with no mechanism behind it (F946). With a pane that is not one of C28's `PANES`,
+validation fails, the handler runs with `args` empty (a local verb is not gated on validation), and
+it answers a usage notice naming the four and the token typed — `/theme`'s arm, one verb over. With
+another layer up, it answers the view's own refusal string, *close what is open*, as `document-view`
+does (C15 I1's refusal is a throw, and a handler is nowhere to report one).
+
+**The pane comes from `ctx.args`, never from `argv[0]`** (C22 I66), for `/theme`'s reason: C05
+parsed and enum-checked it, and a second reader of one fact drifts from the first. `argv[0]` is read
+on the failure arm alone, to quote the token.
+
+**The handler reaches the view through `HandlerDeps`, the way `/exit` reaches `stop`**, and the view
+is C22's to build: it holds the overlay manager, the scheduler's commit, the profiler and the
+terminal's capabilities, all of which are the root's. `LocalContext.profile` — the report — stays a
+function, because a consumer's own handler reading it is the case that seam was published for (C28
+§4); opening the framework's view is not a consumer's operation and does not join the published
+context.
+
+**The seventh row, and the reconciliation that holds it.** `/profile` is a framework verb: its row is
+in `FRAMEWORK_TOOLS` (C05 §3) with `pane` as an optional `enum` whose four values are C28's `PANES`
+written at L0 — the manifest may not import the shell, so T1.67 holds the two lists equal — and
+`execution.ts` hands the root's view to `shippedHandlers`. I27 refuses a handler with no row and a row
+with no handler, in either order, so `HandlerDeps.profileView` is required and the view arrives
+whether or not a recorder does; with none it refuses through the route (T4.67). The handler was
+included only when a view was handed in for the one round in which the row and the call site were
+outside the files being edited, so that a tree with neither was exactly the six; T4.66 and T4.67 went
+live when the row landed and that conditional went with it.
+
+Inside the view, `n`/`p` switch panes, `g`/`G` and the page keys move the window, `Esc` closes and
+the ⌃c ladder pops it — C16's `pushedView` bindings, none new (C28 §3c).
 
 ---
 
@@ -1045,6 +1093,8 @@ Per submission.
 - **I65** — **A width change tells the child and the emulator the same number, computed once, from one signal.** Not an order: the child's repaint reaches the emulator through the write queue, so it cannot arrive between the two calls however they are sequenced, and an ordering claim here constrains nothing. What can be wrong is the figure — the region's width where the body's belongs, or two computations that disagree by `BODY_INDENT` — and a child wrapping at a column the grid does not have puts every line after the first in the wrong place.
 - **I66** — **The shell route registers a cancel, and the screen survives it.** The ladder's first rung signals the child's group and the card settles `cancelled` holding what it had drawn.
 - **I67** — **Every write is awaited before the final snapshot, and a settled terminal block carries no cursor, and what it keeps is decided by the screen flag: the scrollback in `lines` mode, the grid in `grid` mode.** Two artefacts, and the flag the child itself set says which one it left behind.
+- **I68** — **`/profile [pane]` opens C28's view through the local route, and every refusal is a document on that route rather than a throw**: a `warn` notice naming `TuiConfig.profile` when no profiler exists, a usage notice naming C28's four panes and the token typed when the pane is not one of them, and the view's own *close what is open* when another layer is up. The pane is read from `ctx.args` and never from `argv[0]`, except to quote the token on the failure arm (C22 I66). The view is reached through `HandlerDeps`, as `/exit` reaches `stop`, and `LocalContext.profile` stays the report and only the report.
+- **I69** — **What `/profile` appends is a notice naming the pane, never the panes.** The report is drawn in the view and refreshed there; a document carrying it would freeze one report into the transcript's record and read as current on every later frame, which is I18's stale-data shape with the framework's own figures inside it.
 
 
 ## 8. Commitments
@@ -1107,6 +1157,8 @@ Per submission.
 55. **Failure is a box under a kept head, and one file composes notices** (I61). F406's class closed by a scan widened to the builder call rather than by twelve repairs.
 56. **A parent's head is written by nobody** (I62). Derived from the children in start order, wall clock for its own figure, and never the sum.
 57. **A command's output is a screen, live** (I63, I64, I66, I67). One arm chosen and kept, one snapshot per frame, a cancel that works, and a settled block that keeps what the child left rather than what the route captured.
+58. **`/profile` opens the profiler's view, and refuses in a document** (I68). No profiler, an unknown pane and an occupied stack each answer through the route the verb came in on.
+59. **The transcript records that the view opened, not what it showed** (I69). The figures live where they are refreshed.
 
 ---
 
@@ -1951,6 +2003,10 @@ Fake transport, fake stores.
 - **T1.61** (C23 I24): no `raw` block with empty or newline-only text is composed in `execution.ts` or `refresh.ts`, with a control showing the pattern fires on one. **The rule has teeth in one direction only** — C23 may not *add* rhythm — so the positive half is asserted too: `gapBefore` is set where documents are composed, in the local handlers, and nowhere in the routing, which is the division the invariant describes.
 - **T1.62** (C23 I23): `/debug`'s body reaches no transport — asserted on a **reach** (`deps.transport`, `.invoke(`, `.stream(`, `.submit(`) rather than on the noun, because the handler reads `entry.doc.meta` and prints `transport` as a row label, which is the one thing I23 says it *should* do. A `/debug` that re-invoked would produce a document agreeing with itself and disagreeing with the entry it claims to describe, and every assertion about its contents would pass.
 - **T1.63** (C23 I13): MG23 is run over the real `src/shell` tree and reports nothing. Its fabricated violation is asserted in `enforce-rules.test.ts`; what is owed here is that the rule is **live on the tree**, because a rule that fires on a fabrication and is scoped to nothing reports zero for both reasons.
+- **T1.64** (I68): `shippedHandlers` with a view handed in whose `open` refuses naming `TuiConfig.profile` → `/profile` answers a `warn` notice carrying that name, and the view's `open` was called once with `overview`; `shippedHandlers` with **no** view handed in → the map holds the six and no `profile` key, so a tree without the manifest row registers nothing I27 would refuse. **Both arms**, because the transitional conditional is a birthday clause and this is the row that watches it.
+- **T1.65** (I68, C22 I66): `/profile frame` with `args: { pane: "frame" }` → the view opened on `frame` and the notice names it; `/profile foo` with `args` empty and `argv: ["foo"]` → a usage notice naming all four of C28's `PANES` and the token `foo`, and the view's `open` was not called. **The pane is asserted to come from `args`**: a handler reading `argv[0]` passes the first arm and is caught by the second only because the usage text quotes the token — so the row also feeds `argv: ["memory"]` with `args: { pane: "frame" }` and expects `frame`.
+- **T1.66** (I69): the document `/profile` appends holds one `notice` and no block whose id is one of the panes' — no `ov-`, `fr-`, `di-` or `me-` prefixed id and no `plot` — asserted over the document's block tree rather than its length, because a notice wrapping a panel of plots is one block too.
+- **T1.67** (I68, C05 §3): `FRAMEWORK_TOOLS`' `profile` row is `local`, takes one optional `enum` argument named `pane`, and its `values` equal C28's `PANES` member for member; and the seven names are the six and `profile`. The L0 copy of an L4 list, held equal by the only file that may import both.
 ### Tier 2 — contract / interface
 
 - **T2.1** (I2): a fault injected at each of the eight stages in §5 → a document is appended and the session survives, eight times.
@@ -2095,6 +2151,8 @@ Fake transport, fake stores.
 - **T4.64** (I65, with C27): a width change mid-run → the child's `resize` spy records the width it was given, the settled block's `cols` records the emulator's, and the two are the same number and equal to the body's inner width. **Two spies, because one cannot see an agreement**: the first version of this row watched only the child, and every ordering mutation survived it.
 - **T4.65** (I63, I67, with C21, C27): the same byte script on both arms → both settle with the **same** screen: the same lines, the same mode, the colours the bytes carried, and neither with a cursor.
   **The colour difference is not the framework's and cannot be asserted here.** `env` is computed once above the arm choice and one emulator parses both, so nothing in this route treats the arms differently about colour — a real child calls `isatty` and decides. With a fake on both sides the fixture would supply exactly the behaviour under test, so that claim is **T5.6's**, where a real `node-pty` makes it a fact a fake cannot have (F923).
+- **T4.66** (I68, I27, with C05, C22): a real pipeline over a manifest carrying the framework's rows, `pipeline.submit("/profile frame")` → the view is open on `frame`, the transcript gained one entry whose blocks are a notice and nothing of the panes, and `seal()` accepted the seven. Constructing the harness is the I27 half: `seal()` runs inside it and refuses a row without a handler or a handler without a row, so a red T4.66 with no assertion reached is the reconciliation refusing.
+- **T4.67** (I68, with C22): the same pipeline built from a session with no `profile` → `/profile` appends the refusal notice naming `TuiConfig.profile`, the stack is empty afterwards, and `seal()` accepted the seven — the handler exists whether or not a recorder does, and refuses rather than vanishing. The refusal is the view's own string, so a session that grows a recorder later changes nothing here.
 - **T3.55b** (I52): `elapsedNeeded` refuses a `null` panel, a non-`status` block, and a `retrying` box — **the arms the sweep cannot reach**, since the caller has just checked the block is a loading `status`. §8a-bis B3's ruling asked directly.
 - **T3.55c** (I52, F234): the comparison is the **rendered figure** and never the clock — nothing under a second, nothing across 1000→1900 ms, a write at 2000, and `1m 40s` → `1m 41s` past ninety-nine. The range where a clock comparison and a figure comparison disagree, which is the mutation that survived the first pass.
 - **T3.56** (I52): the elapsed figure advances while the first fetch is in flight, driven through `declare` and the sweep rather than by calling the writer — a row that reached in and computed a duration would pass on the day nothing armed a timer, which is F227 one layer up.

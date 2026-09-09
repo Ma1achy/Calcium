@@ -290,6 +290,20 @@ kind with no `window` has no capped form (C14 I26), so `plot` is exactly as atom
 and a block within the cap is returned **by reference**, so nothing downstream can observe the
 cap on a block it does not touch.
 
+**The cap's two measures are two questions, not one asked twice** (I62). `total` is the block's
+own rows, and it decides whether there is a form at all; `shown` is the *window's* rows, and it is
+what the marker prints as on screen. They are measures of two different blocks — the resolved
+block and the block `window` returned — and the second is taken only when the first exceeded the
+cap, so a block within the cap pays for one. P11 listed the pair as repeated work and it is not
+(F942). What *is* derivable is `shown` alone: I26 makes `shown = cap + skipRows + dropRows` for
+every kind declaring `window`, so the second measure could be replaced by that identity without
+changing a frame. It is measured rather than derived so that the marker names what the form
+measures, and the cost is one measure of a block already bounded at the cap. **The repeat that
+does exist sits beside this pair and is not it**: the registry measures the form again when it
+commits the height — once more per `measure` for a windowable block within the cap, twice more
+for one over it — and that is recorded as F942's second half rather than ruled on here, because
+its remedy is the `Form` carrying the rows `#form` already counted and nothing about the cap.
+
 **`capped` is view state on `lineRange`'s argument** (I25a, C04 I82): written by the registry,
 read by the registry, refused from a far side. It is attached *after* the definition's window
 and re-attached by `windowSequence` when a window reaches the marker row, because a window may
@@ -1682,6 +1696,38 @@ is stated as a law rather than as three cases because the failure it prevents is
 arithmetic: three pieces that each measure right and together measure `columns +
 1` put the frame one cell into the next row.
 
+**The walk is by code point, and it costs what one read costs (I60).** Both
+functions move a cursor over the row's code units. At each position an SGR
+sequence is copied through whole, and otherwise **one code point** is read in
+place — `codePointAt` at the cursor, advanced by that code point's one or two
+units — and asked its width. Nothing on the walk copies, slices or spreads the
+remainder of the row, so what one character costs does not depend on how many
+follow it. The read that shipped did: `[...text.slice(i)][0]` copied everything
+after the cursor and then built an array of every remaining code point to yield
+one, on every character of every row of every frame — 3× the flat read at 40
+cells and 1081× at 400 (F937), and 53 % of all frame work, because `exact()` fits
+every row through `fitStyled` and nothing about it ever failed. It sat at two
+sites, not the one the finding named; `sliceCells` walks the same row to reach
+the tail window `composite` takes (F938). SS60 is the rule that keeps a spread's
+first element out of `src/`, and T3.77 and T3.78 measure the walk at 400 cells
+against 50 with a 20 ms floor under each operand, so the clock's resolution
+cannot manufacture the ratio (F8).
+
+**A code point is not a cluster, and the measurer counts clusters** (F939).
+`cells()` asks the segmenter, so a ZWJ family is 2 cells and `⚠️` is 2; the walk
+asks each code point, so the family is 2 + 0 + 2 + 0 + 2 + 0 + 2 = 8 and `⚠️` is
+1 + 0 = 1, a flag is 2 + 2 and a skin-toned hand 2 + 2. Measured: a 14-cell row
+holding one family, fitted to 20, is padded by **nothing** — the walk believes it
+is already 20 — so six cells of the previous frame show through; fitted to 15 it
+is **cut** to 9. `⚠️x` fitted to 2 comes back 3 cells wide, which is the wrap
+that scrolls the alternate screen; a flag fitted to 2 comes back as its first
+regional indicator, which is I9's halved glyph under another name. The walk is
+kept as it stands here, because the read was replaced and the step was not, and
+T3.79 is the record of what it does. What corrects it is a cursor that steps by
+cluster — the segmenter yields each cluster with its offset, so the walk stays
+linear — and that changes the pieces I20 composes, so it is owed as its own
+change and not as a rider on this one.
+
 ---
 
 ## 6. Registry state machine
@@ -1692,6 +1738,25 @@ arithmetic: three pieces that each measure right and together measure `columns +
 | **sealed** | throw (T3.2) | no-op (T3.3) | works (T1.3) |
 
 Sealing matches C05's manifest store and C07's adapter registry. A kind registered mid-session would let a block measured before registration differ from the same block measured after — drift that only appears on scrollback.
+
+**One more piece of state, and its lifetime is the call (I61).** Every public member — `measure`,
+`render`, `width`, `measureSequence`, `renderSequence`, `elementsOf`, `elementsIn`,
+`windowSequence`, `windowChild` — opens a memo of the heights answered so far if none is open, and
+the outermost one drops it on return, on the throw path too. Every ask made through the child
+seam (`measureChild`, I7) and every height the registry commits for itself before drawing (I11)
+reads it first, keyed on the block **object** and valid for one width. So a container's `measure`,
+its `render`'s placements and the child's own `render` committing its height are one measure and
+two reads, and two calls are two measures. Not a row in the table above, because it has no state a
+caller can observe: between calls it is `null`, a `measure` inside a `render` answers what a
+`measure` outside one answers, and a kind sees the seam it always saw. **This is not the cache
+F914 refused.** That was a memo across `measure` and `render` on C11 I11's ground — a plan keyed
+on `(columns, width)` outlives the document that made it, and a cache in the measurement path is
+where correctness defects live. A memo that cannot outlive the call that filled it has no document
+to be stale against. What it has is the count, and the count was the finding: with each ask
+answered afresh, `pills#chrome.header.left` read **3.0** registry calls per frame and
+`pills#chrome.footer.left` **4.0** (F940), where one measure and one render is the floor C28 I31
+reads a rendered block against — and no height could tell the two apart, because `measure` is pure
+(I2) and a child measured three times gives the same number three times.
 
 ---
 
@@ -1963,7 +2028,9 @@ the same overrun in smaller form.
 - **I57** — **`RAMP_EXTENT.terminal` is `"none"` and `ANIMATES.terminal` is `false`.** A ramp over a child's screen would repaint the child's colours with the application's, which is the inversion of C04 §3i's whole argument; and the block redraws when the child writes, on C23's cadence, not on a tick.
 - **I58** — **`RenderContext.windowChild` is the render-side slice seam, as `measureChild` is the render-side height seam (I7).** `windowChild(block, width, from, to)` returns the kind's `Windowed` or **`null`**, and a container that gets `null` renders the child whole. `null` has two causes and they are one rule: the kind declares no `window` (I27), or the slice it returned costs slack. **A container cannot pay slack.** `windowSequence` can — `session.ts` renders the window and drops the surplus rows itself — and a child inside an Ink tree has no equivalent, so a slice with `skipRows` or `dropRows` non-zero is refused rather than drawn with its overhang. Supplied by the registry and overwritten unconditionally, exactly as the other two are (§2), so a caller cannot hand a kind a window function of its own.
 - **I59** — **A container that declares a bound applies it to every child it can slice, and its rendered rows equal its measured rows.** This is I1 for the case its corpus never held: a `scroll` of `height: h` draws `h` interior rows plus C04 I49's residue row whatever its children measure, **including one child taller than `h`**. The children it cannot slice are the kinds declaring no `window`, and that set is compared by equality rather than membership — a kind gaining a window must move the list, and a new unsliceable kind must fail the row rather than join a subset quietly. **The overrun that remains is recorded rather than asserted correct**: a `plot` taller than the interior is drawn whole, C12 I1 makes that permanent, and a producer putting one in a smaller box has asked for something the box cannot give (F855).
-
+- **I60** — **`fitStyled` and `sliceCells` cost time linear in the row's length.** The cursor reads the one code point at its position (`codePointAt`) and advances by that code point's code units; nothing on the walk copies, slices or spreads the remainder of the row, so what one character costs does not depend on how many follow it. The read that shipped did — `[...text.slice(i)][0]`, a copy of the rest of the row and an array of every remaining code point to yield one — and every row of every frame paid it at both sites: 3× the flat read at 40 cells, 1081× at 400, 53 % of frame work (F937, F938). SS60 is the mechanical form; T3.77 and T3.78 are the measurement, each operand a batch of at least 20 ms so the clock's floor cannot produce the ratio, and the bound at 24× sits between the 8× a linear walk gives and the 48× the shipped spread measured in the row (§5a).
+- **I61** — **A `(block, width)` is answered once per registry call.** Every public member opens a memo of the heights answered so far, or joins the one already open, and the outermost drops it when it returns — on the throw path too. Every ask through the child seam (`measureChild`, I7) and every height the registry commits before drawing (I11) reads the memo before it reaches `measure`, so a container asking a child's height in `measure` and again in `render`, and the child's own `render` committing it, are one measure and two reads. **The lifetime is the call, not the frame and not the session**: between calls the memo is `null`, no answer can meet a block from a later document, and no kind can see it (I2 holds of definitions exactly as before; the memo is the registry's, as I33's floor is). Only an `ok` answer is kept — a throwing measurer is asked again on every ask, because the render-time ask carries the fitted request (I34) and a memoised fault would leave every report at `rows: 0`. Keyed on the block object, never its id: two blocks sharing an id are two questions, and one block at two widths is two. **The bound is the call, so a caller making two calls is measured twice** — `compose`'s `measureSequence` on the footer and `paint`'s `render` of it are two (C22 I82), and the footer's children measure exactly once more per frame than the header's (→ C22 T4.64). This is not the cross-call cache F914 refused on C11 I11's ground, which could outlive its document; measured on the default chrome before this held, `pills#chrome.header.left` was at 3.0 calls per frame and `pills#chrome.footer.left` at 4.0 (F940).
+- **I62** — **The cap's two measures are two questions.** The registry measures the resolved block for `total`, which decides whether a form exists, and the window for `shown`, which the marker prints; they are measures of two different blocks and the second is taken only when the first exceeded the cap. Neither is a repeat of the other. `shown` is the one that could be derived — I26 makes it `cap + skipRows + dropRows` — and it is measured instead so the marker names what the form measures (→ §2b; F942).
 
 ## 8. Commitments
 
@@ -2025,6 +2092,7 @@ the same overrun in smaller form.
 49. **A head's separator is a slot** (I49). The composer takes capabilities and joins with `glyphs(caps).separator`; the literal `·` it carried was non-ASCII at the ASCII arm and two cells at `wide` (F828).
 52. **A child's screen is drawn as it was written** (I55, I56, I57). One row per line, no wrap, no strip, no ramp and no tick — every mechanism this component applies to its own text is withheld from a screen someone else laid out.
 53. **A box bounds what it paints, not only what it measures** (I58, I59). The slice seam exists on the render context beside the height seam; a container takes an exact slice or keeps the child whole; and the kinds it cannot bound are a list held by equality rather than a silence.
+54. **The registry answers a height once per call, and the cap asks two questions** (I61, I62). The memo lives for one public member's duration and no longer, so it cannot be the cache F914 refused; the second measure under the cap is of a different block, so it is not the repeat P11 read it as.
 
 ---
 
@@ -2169,6 +2237,12 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.28** (I53): each effect's `t'` at `tick = 0` equals the static table; `shimmer`'s band centre moves one cell per tick and wraps at `n + 3`; `wave` at `tick = n` equals `tick = 0`; `breathe` is 1 at tick 5 and 0 at tick 15; `pulse` flips at tick 5 and returns at 10; `heartbeat` follows its envelope over twelve ticks and repeats; `rampCadenceMs()` is `spinnerIntervalMs()` by identity of value, and a comment-stripped scan of `blocks/ramp.ts` finds no millisecond literal.
 - **T1.19** (I9, C04 I89, C04 I90): the tone-and-value half of §5's *Runs* — `runsOf` copies `tone` and `value` onto the run and `sliceRuns`, `runLines` and `wrapRuns` carry them; `wrapCellsParts` with an atom never breaks strictly inside it — a space inside the atom is skipped, a full row with no outside break point breaks at the atom's start when something precedes it, and an atom wider than the row is broken as text **and drops nothing**, since a cluster-boundary cut is not a break space (`"aaa bbb ccc"` at 7 valued whole is `aaa bbb` / `" ccc"`, F593); a row that fills exactly and is followed by a space breaks **at that space** whether or not it has an earlier break point (F590, F591), and the plain answer for `"aa bb cc dd"` at 5 is two rows where the valued one is three; `wrapRuns` derives the atoms from `value` alone, so a bold run is not one. Asserted on the row texts and starts, beside the plain wrapper's answer for the same string.
 - **T1.29** (I55): a `terminal` of 40 lines measures 40; with `dropped: 12` it measures 41; a line of 200 characters at width 80 still measures one row.
+- **T1.30** (I9, §5a): `fitStyled`'s four answers, pinned for the first time — the function every frame row goes through had rows in every caller's suite and none of its own. A row already `width` is returned as given with no bytes added, styled or not; a shorter row is padded to exactly `width` and gains no reset, because a pad is not a cut; a longer plain row is cut and gains no reset; a longer styled row is cut and closed with the reset it was handed. A double-width glyph straddling the cut is dropped and its cell blanked, and the blank counts as a cut, so a styled row closes. Escapes are copied through whole and cost no cells.
+- **T1.31** (I60, I20, §5a): the cursor steps one code point in both walks — an astral character is two code units and one step, on the cut path and the pad path and in a window; a combining mark is its own zero-width step and so stays with its base at the cut (`éxy` at 1 is `é`); a lone surrogate is one step of one cell, exactly as the string iterator walked it before the read was replaced. Then over a corpus whose clusters are additive — ASCII, CJK, single-code-point emoji, decomposed marks, a styled mix — `fitStyled` measures exactly `width` at every width from 0 to two past the row, `sliceCells` measures exactly `b − a` at every `a ≤ b`, and neither output ever holds a lone surrogate. **The fabricated violation is `i += 1`**: the low half of every astral pair re-enters the walk as a one-cell character of its own and lands in the output, which the surrogate check and the exact outputs both see.
+- **T1.32** (I61): a `row` group of two counting `raw` children rendered through the registry → each child's `measure` ran **once** and its `render` once; the frame is two rows whether it ran once or four times, which is why the count is the row. **The control is the kind alone**: `groupDefinition.measure` then `.render` with a counting seam asks `a, b, a, b` (C04 I103), so the once is the registry's and the fixture is shown to move when the seam does not dedupe.
+- **T1.33** (I61): the same count over every container — `panel`, `group` in both directions with a `gapBefore`, a `scroll` two rows high over three children (the residue row and the slice path, where `render` asks for the content's height, its ranges and its drawn total), a `mosaic` — each child measured once, every child that reaches the box drawn once (the `scroll` draws two of its three), and the rendered rows equal `measure` (I1) — for every container but that `scroll`, whose `raw` children declare no `window` and so over-draw by I59's recorded overrun (T3.76, F855), a property of the fixture and not of the count. `mosaic` measures no child in `measure` (C04 I71) and is the control that a once is not a zero.
+- **T1.34** (I61): `elementsIn` over a column group → each child measured once, where the placements and the row cursor each asked.
+- **T1.35** (I61): two `measure` calls on one group measure its children twice — the memo is dropped between calls, and this is the row that says *once per call* rather than *once*. A child whose measurer throws is asked again on every ask, so the render-time fault carries `rows > 0` (I34) and the error text is drawn.
 
 ### Tier 2 — contract / interface
 
@@ -2286,6 +2360,13 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T3.74** (I56): the cursor cell is `inverse` at 24-bit, 8-bit, 4-bit, 1-bit and ASCII — five arms, one assertion each, and at 1-bit it is the only mark distinguishing the cell.
 - **T3.75** (I59, §6b): the corpus's `scroll` fixtures include one whose child is taller than its interior, so T2.1's sweep sees the case — asserted on the corpus itself, because the sweep agreed for as long as no fixture had the property (F855). Two children and not one: a box whose only over-tall child is also its only child cannot tell *slice the child* from *draw the first child only*.
 - **T3.76** (I59, §6b): an atomic child taller than the box still over-draws, and the row carries the number — a `plot` of height 8 in a box of 2 measures 3 and paints 9. **The record, and T2.126 is the watch**: F856's lesson is that a row asserting a disagreement stays green for exactly as long as the defect does, so what stops this one growing is the equality-compared list of kinds, not this row.
+- **T3.77** (I60, §5a): `fitStyled`'s cost per call at 400 cells against 50, on the pad path F937 named as the ordinary case — a row one cell short of `width`, styled every twenty cells as the profiling fixture is — is under 24×. Each operand is the best of three batches, each batch running until at least 20 ms has elapsed, so a clock reading `0.00` cannot make the ratio (F8, TRIAGE group 12); the control is that the longer row costs more at all. Linear is 8×; the shipped spread measured **48.3×** in this row (0.5202 ms against 0.0108) and 42× on the bench, and the bound is three times linear. **The durable check is SS60, not this row**: a cost has no failing case, and a timing row is the kind of gate group 12 is made of, so this is the measurement beside the rule and the rule is what a restored spread meets first.
+- **T3.78** (I60, §5a): the same for `sliceCells` over the tail window `composite` takes — cells `[10, n)`, so the cursor walks the whole row to reach it — which is the second site F937 did not name. The shipped spread measured **48.5×** in this row (0.5013 ms against 0.0103) and 21× on the bench; the bound is 24×.
+- **T3.79** (§5a, F939): **the record, in T3.76's form** — the code-point walk against the cluster measurer, pinned as it stands. Four cluster shapes, measured and walked: a ZWJ family 2 and 8, `⚠️` 2 and 1, a regional-indicator pair 2 and 4, a skin-toned hand 2 and 4. And what each does to a row: a 14-cell row holding one family, fitted to 15, comes back as `abc 👨‍👩‍👧‍👦 de` at 9 cells, and fitted to 20 comes back unpadded at 14; `⚠️x` fitted to 2 comes back 3 cells wide; a flag fitted to 2 comes back as its first regional indicator alone; `sliceCells` over `x👨‍👩‍👧‍👦y` at `[2, 4)` yields a joiner between two blanks. A cluster cursor fails every assertion here and the row is rewritten to the cluster answer; until then a change to the read that moved any of them is a change to the walk, which is what F938's replacement had to not be.
+- **T3.80** (I61): a loud sink's throw escaping `render` closes the memo — the next `measure` measures again rather than reading the aborted call's answer. The fabricated violation is opening the memo without a `finally`.
+- **T3.81** (I61, C04 I101): a centred child narrower than its cell is measured at the cell's width and then rendered at its own — two widths are two questions, so the memo answers neither from the other, and the asks are `a@39, a@5`.
+- **T3.82** (I61): two distinct blocks sharing an id are two questions — four measures, both ids — and one object asked twice is one; the key is the object, never the id.
+- **T3.83** (I62): a windowable block within the cap is windowed by nobody in `measure` or in `render`; one over the cap is windowed once, measures `cap + 1`, draws `cap + 1` rows and the marker reads `3 of 5 rows` — the first figure the window's measure and the second the block's, which is what says the two measures were of two blocks.
 
 ### Tier 4 — integration
 
@@ -2358,6 +2439,11 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.101** (I57): setting `ANIMATES.terminal` true → T2.122 fails and the block repaints on a tick nobody asked for.
 - **T6.102** (I58): returning the slice when it costs slack → T2.124's sweep fails at `patch`, and a box painting a windowed `code` draws the leading rows the residual said to drop.
 - **T6.103** (I59): rendering every overlapping child whole again → T2.125 paints 31 rows in a 7-row box and T3.75's fixture is what makes the sweep say so, which is F855 exactly as it shipped.
+- **T6.104** (I60): restoring `[...text.slice(i)][0]` at the `fitStyled` site → SS60 fires on the line under `make enforce` and T3.77 fails (48× on the unfixed code, against a bound of 24) while T3.78 and T3.79 stay green; restoring it at the `sliceCells` site → SS60 fires on that line and T3.78 fails while T3.77 stays green, which is why the two sites have a row each. Spelling the read `Array.from(text.slice(i))[0]` or `[...text.slice(i)].at(0)` → SS60 fires on either, which is what its second and third fabrications show; the allocation is the same one. **Turning the sticky escape match back into a forward search** (`sgrPattern()` in place of `sgrAt()`) → **nothing fails**: all 41 rows of the two text files stay green, because the timing rows walk styled rows where a colour change every twenty cells bounds the scan, and the bench's plain-row column (15.7× against 7.9× at 400 cells over 50) is the only instrument that sees it. Recorded as the survivor it is (F938) rather than given a row that would be a third timing assertion under contention.
+- **T6.105** (I60, I20): advancing the cursor by one code unit (`i += 1`) in `fitStyled` → T1.31 fails on a lone surrogate in the output and on `a👍bc` fitted to 4 coming back as `a👍\udc4d`, and T3.79 fails on every family row; in `sliceCells` → T1.31 fails and **nothing else does**. **T1.16c stays green under both**, measured rather than assumed — the composition law is arithmetic over pieces that are each wrong by the same amount, which is F939's own mechanism and the reason T1.31 asserts the outputs and a surrogate check rather than a sum. The other rows that stay green say the step and the read are separate claims: every assertion of T1.30 passes with `i += 1`, because none of its rows holds an astral character. Closing every cut with the reset (`if (cut)` for `if (cut && styled)`) → T1.30 fails on the plain cut and T1.31 on `a👍bc`.
+- **T6.106** (I61): the height commit reading the memo removed (`#measured` measuring unconditionally) → T1.32 counts `a, b, a, b` and T1.33 fails on every container. **The seam's read removed alone fails nothing in this file**, because the commit's read still dedupes the definition call — and C22 T4.64 reads 3.0 on the header pills, because the profiler wraps the property the seam bypasses; that is why the C22 row exists.
+- **T6.107** (I61): the memo outliving the call (the outermost member not dropping it) → T1.35's second `measure` counts nothing and T3.80 reads the aborted call's answer.
+- **T6.108** (I62): `shown` measured of the resolved block rather than the window → T3.83's marker reads `5 of 5 rows`.
 
 ---
 

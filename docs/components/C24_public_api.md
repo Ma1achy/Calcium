@@ -148,7 +148,7 @@ exported here wants checking against that question rather than the one it was
 written to answer.
 `TuiConfig.manifest` was typed `Manifest | string` and **neither arm could be
 used**: an author cannot produce a `Manifest`, because `appTools` and the
-framework's six verbs are both derived by `parseManifest` (C05 §3), and the
+framework's own verbs are both derived by `parseManifest` (C05 §3), and the
 string arm passed a file's contents to a function requiring a record with no
 `JSON.parse` between them, so it had never run.
 
@@ -202,6 +202,13 @@ A consumer never constructs, inspects or drives any of them. If one is ever need
 | `ExecutionWrites.setRetained` | C22 session state | **Drop.** `SessionSnapshot` already carries the readable half of the session; the writable half is the shell driving itself, and a consumer that could write it could contradict the shell. |
 
 None of the three moves the export list, and all three stay in `UNCONSUMED_MEMBERS` naming their owner — this ruling says they are not public, not that they are finished.
+
+**The profiler's view is interior on the same argument** (I33). `ProfileView` is opened by `/profile`
+at the prompt and driven by C16's `pushedView` keys; a consumer constructs neither the overlay
+manager it pushes into nor the scheduler it commits through, so a published constructor would hand
+over two of the eleven above with an extra step. What a consumer drawing its own pane needs is already
+here — `profilePane`, `paneTitle`, `PANES`, `GlyphCaps` — and the framework's view draws with exactly
+those (C28 §3c).
 
 ### What a producer is told, and what stays interior
 
@@ -1071,6 +1078,7 @@ the renderer's, and the reason has to say so on its own rather than by counting 
 - **I30** — **A published builder constructs every block kind, and every member of a kind, that the published types declare — except a value only the framework can compute.** I29's dual, and it fails in the same silent direction: the type is exported, the member resolves, and the gap appears only when a consumer tries to set it. **The exception is `who computes`, not `who holds`** — a value the framework *hands* a consumer, as `renderError` hands `err`, `retryInMs` and `attempt`, is relayed rather than claimed, and relaying it is not the thing MG27 refuses. Derived members stay underivable: `state` follows from whether a countdown is present, and `height` is C23's frame read, so neither is a parameter. **Three instances, and each had been recorded as owed its own commit**, which is how a queue nobody drains gets made: `status` had no builder at all, `b.plot` omitted eight of `Plot`'s 58 — four of them a form's only datum, so four forms were unconstructible and three reduced — and `FigureBuilder.setFacets` set a field the published function could not. **Checked by MG27 in both directions**, which is why the rule can be widened safely: an omission needs a reason keyed `Kind.field`, and an entry whose builder now sets the field is itself a violation, so the reasons cannot outlive their subject. **Stated blind spot**: MG27 is per *member* and this rule is also about *kinds*, and a kind with no builder has no member row to be missing — `status` was invisible to it for that reason, and what found it was writing a consumer that needed one.
 - **I31** — **`@fmx/calcium/profiling` publishes types, `Tier`, and nothing that runs.** No recorder, no probe, no capture: a consumer imports it to *read* a report, and everything that produces one is reached through `createTui`. An entry point that ships behaviour nothing on the runtime surface can reach is a second way in (→ C22 I93).
 - **I32** — **`ChromeContext.lastFrame` carries the previous frame's `work` and its name says so.** The figure is composition alone and never `work + wait`: the wait is time before the frame began, so a sum grows while the session is idle (C28 I4). It reports the last **completed** frame whatever its `outcome` — `report()` filters fallbacks out of `timeline` and `worst` because those are projections over frames that drew, and this is the most recent measurement rather than a projection; a session repeatedly falling back would otherwise hold a drawn frame's figure on screen indefinitely. It clears with the ring on a tier change, because a figure from the tier before is one nothing is maintaining. The current frame's total cannot be known while composing it, so a member named for the current frame would hold a number it cannot have — the shape this repository keeps finding. It is `undefined` at tier `off` and for the first frame of a session, and a chrome that draws it says which frame it is describing.
+- **I33** — **The profiler's view is opened at the prompt and never constructed by a consumer: no `ProfileView`, `createProfileView` or layer id joins the published surface, and the pane exports that were published for a consumer drawing its own — `profilePane`, `paneTitle`, `PANES`, `GlyphCaps` — are what the framework's own view draws with, through the same exports.** `paneTitle` was published with no consumer anywhere in the tree, tools or examples for the whole of its life, and MG24 could not see it because a root re-export of a function is not an interface member (F945); the view is its first consumer, and this invariant is what says a published pane helper has to have one.
 ---
 
 ## 10. Commitments
@@ -1106,6 +1114,7 @@ the renderer's, and the reason has to say so on its own rather than by counting 
 29. A published builder constructs every kind and member the published types declare, except a value only the framework can compute — and the test is who computes it, not who holds it (I30, §4b, §8d, MG27).
 30. **A fourth entry point, for types a consumer reads rather than behaviour they run** (I31). `profiling` ships because the profiler ships; it holds no recorder, so importing it cannot start one.
 31. **The context carries the *last* frame's cost, and the member is named for it** (I32). A frame's total is unknowable while it is being composed, so the honest member is the one that says which frame it describes.
+32. **The profiler's view is a verb's, not a consumer's** (I33). Nothing that opens it is published; what was published to draw a pane is what the framework draws its own with.
 
 ---
 
@@ -1116,6 +1125,7 @@ the renderer's, and the reason has to say so on its own rather than by counting 
 - **T1.9** (I31): every runtime value exported from `@fmx/calcium/profiling` → two frozen lookup tables and nothing callable; importing the module constructs no recorder, registers no timer and touches no process figure. Asserted on the module's own exports rather than on a written list, because a list is satisfied by the list. **The two tables are the operations a report's reader has that a type cannot give them**: `TIER_RANK` compares two tiers, and `PHASE_GROUP` groups a span into `compute` / `draw` / `output` / `input` / `far side` — which is the *is it computing or drawing* question, unanswerable from `spans` alone because a `Record<SpanName, Histogram>` carries no grouping. A frozen table starts nothing, which is the whole of why either is here.
 - **T1.10** (I32): at the recorder — `undefined` before any frame; the first frame's `work` after one; the **first** frame's figure after the second, so a member filled with the frame in flight reads a number that frame cannot have; the last completed frame's whatever its `outcome`, because a projection over drawn frames would hold a stale figure through a run of fallbacks; and `undefined` again after a tier change, which clears it with the ring. **The four clauses are four states and only one is reachable from a session** — a driven session has composed several frames before anything can read a footer, so *the first frame's is undefined* cannot be constructed there.
 - **T1.10b** (I32): a real session at `off` and at `counters` → the footer carries no cost cell; at `spans` it carries one, and the label says which frame it describes. **The wiring, which T1.10 cannot see**: `ComposeDeps.lastFrame` is optional, so a fixture omitting it answers `undefined` at every tier and a row built on one passes on the day nothing is wired.
+- **T1.11** (I33): `src/shell/profile-view.ts` imports `profilePane`, `paneTitle` and `PANES` from `profiling/panes.ts` — read from the file, so each of the three published pane exports has an in-tree consumer — and the root's export list resolves neither `createProfileView` nor `ProfileView` nor `PROFILE_VIEW_ID`. **The first half is the row**: a published function with no consumer is what MG24 cannot see, and `paneTitle` had none (F945). Written in `test/unit/profile-view.test.ts`, beside the consumer it is about.
 
 - **T1.1**: each builder produces a block passing `validateBlock` — twenty cases.
 - **T1.2**: an omitted id is generated and unique within a document; a supplied one is preserved.

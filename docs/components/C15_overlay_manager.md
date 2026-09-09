@@ -109,6 +109,23 @@ This is I8's argument one field over. C19 knows its longest candidate and a conf
 
 C19 knows which row its menu is anchored to and is already subscribed to what moves it. The same call is what moves an anchored layer when the viewport scrolls: `update(id, { placement })`, one seam for both.
 
+### How a removal reaches its owner
+
+**Every removal emits one change naming the layer's id, synchronously, before the removing call
+returns** (I25): `pop()` emits `pop`, `dismiss(id)` emits `dismiss` with its reason, and the
+disposable `push` returned is `dismiss` under another name. `pop()` on a non-dismissable top and
+`dismiss` of an unknown id remove nothing and emit nothing. There is no removal path that emits
+nothing, and that is what makes the stream the owner's seam rather than a courtesy.
+
+**It matters because the manager is not always called by the owner.** C16's ⌃c ladder answers a
+pushed view with `pop()` (`router.ts`'s `pushedView` rung) and never learns who raised it; the owner
+that holds state about the layer — an offset, a remembered profiler tier, a timer — learns nothing
+unless it subscribed. Measured 2026-09-09 (F944): after the ladder's `pop()`, `document-view.ts`'s
+`openFor` still names its command over an empty stack, and `keys.ts` reads `openFor` to decide which
+owner a view key belongs to. C28's view subscribes at construction and runs its teardown from the
+change carrying its id, so `Esc`, the ladder and its own `pop()` all reach the same line
+(C28 §3c, C28 I50). The other two owners have the same subscription since F944 was measured — `document-view.ts` (C22 T4.65) and `patch-view.ts` (C25 T2.15) — so every pushed view in `src/shell/` now tears down from this stream, and the ladder reaches all three without knowing any.
+
 ---
 
 ## 2a. The peek — a layer that takes no keys
@@ -398,6 +415,7 @@ Pushing a view while overlays exist is rejected rather than reordered: it means 
 - **I22** — **A `peek` is anchored**, and `push` and `update` refuse a centred or `fill` one. Its meaning is *beside the thing it describes*; the other two placements are a confirm's and a view's.
 - **I23** — Every `overlay` sorts above every `peek`, and every `peek` above every `view`, regardless of push order. I2 is this invariant's `overlay`/`view` half.
 - **I24** — **A call's approval is an `overlay` of the confirm host's shape — the invocation, an optional consequence line, and the choices as the host's own table — composed by C23 and placed here; it takes the keys as every confirm does, and a subagent's transcript opens as a `view` and never as an expansion** (§2b, → C23 I60, C26 I23).
+- **I25** — **Every removal of a layer emits exactly one change carrying that layer's id, synchronously, before the removing call returns** — `pop` from `pop()`, `dismiss` with its reason from `dismiss(id)` and from the push's disposable — and a call that removes nothing emits nothing. An owner holding state about a layer can therefore run its teardown from the subscription alone, whichever caller removed the layer; C16's ⌃c ladder is the caller that never asks an owner, and this is the only way it reaches one (§2, → C28 I50).
 
 ---
 
@@ -426,6 +444,7 @@ Pushing a view while overlays exist is rejected rather than reordered: it means 
 21. A peek is anchored, and both entry points refuse one that is not (I22).
 22. Overlays sort above peeks, peeks above views (I23, I2).
 23. Approval is the confirm layer with a call's content, and a subagent is a pushed view (I24).
+24. A removal reaches the owner through the change stream, synchronously and exactly once, whoever called it (I25).
 
 ---
 
@@ -459,6 +478,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.14** (I16): a layer declaring `width: 40` in a 120-cell region → `Placed.width` 40, and its content was measured at 40, not 120. The height differs from the region-width measurement, which is the point.
 - **T1.15** (I16, I6): a `centred` layer of width 40 in a 120-cell region → `left` 40. Odd remainders round down, deterministically (T3.12).
 - **T1.27** (I24, §2b): `approvalPrompt`'s options pushed through the confirm host produce a layer of kind `overlay` whose blocks are the invocation notice, the `warn` consequence when supplied and none when not, and the host's 3-column choice table with `always allow` as an ordinary row; `activeTarget` answers `overlay` while it is up; resolving *deny* pops it and the entry beneath reads `denied`.
+- **T1.28** (I25): a view whose owner holds state, popped by a **non-owner** calling `pop()` → the owner's subscriber saw one `pop` change carrying the view's id **before `pop()` returned**, and the owner's state is gone by the time the caller reads it; `dismiss(id)` on the same view → one `dismiss`; `dismiss` of an id not on the stack → no change at all. Written against C28's view in `test/unit/profile-view.test.ts`, because that is the owner whose state is a profiler tier and a timer — the two things a stale owner costs the most.
 
 ### Tier 2 — contract / interface
 
@@ -549,6 +569,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.21** (§2a): the emitter not reconciling on the next focus move → T4.11's second row fails, and the detail of row `a` sits beside row `b`.
 - **T6.17** (I20): moving the width check into `confirm.ts` — where it lived as a comment — → T1.21 and T1.22 both fail. **The revert that reads as a tidy-up**: the comment was correct, was written after the defect, and constrained exactly one caller. The second centred layer in the tree (`clearConfirmLayer`, C20) declares no width at all.
 - **T6.22** (I24): the approval pushed as a `peek` → T1.27's `activeTarget` assertion fails and `⏎` reaches the transcript instead of the choice; the consequence line drawn when none was supplied → T1.27's block count fails.
+- **T6.23** (I25): emitting the removal change on a microtask rather than before the call returns → T1.28's *before `pop()` returned* fails, and C28's view answers `pane` for one turn after the ladder has already popped it; removing the `pop` emission → T1.28 and C28 T4.6 fail, and the tier stays raised for the session.
 
 ---
 
