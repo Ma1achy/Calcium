@@ -36249,3 +36249,182 @@ no other frame in the corpus.
 
 **What would falsify this**: a caption row whose other captions move with a family or `図表`; a
 `[...x][i]` in `src/` that `make enforce` passes.
+## F986 — nineteen rows read against HEAD: fifteen were already closed, one refusal had been written down and never read back, and 680 of 975 rows carry no status at all ★★★☆☆
+
+**A triage row's status is written where the finding is; the work that closes it is written
+somewhere else.** That is the deferral shape from CLAUDE.md — the condition here, the satisfier
+there, nobody holding either half looking at the other — arriving in a status column instead of a
+code comment. A row goes stale the moment its work lands, and nothing in the tree says so.
+
+Nineteen rows carrying an **Open** marker or none, resolved one at a time against HEAD by finding
+the commit, the invariant or the later finding that answers each:
+
+| row | verdict | what holds it now |
+|---|---|---|
+| F83 | closed | `5f5a9ecf` — MG24 learns the difference between implementing a member and calling one |
+| F84 | closed | `b82557d0`, recorded as F99 — the walk covers `export type` |
+| F147 | closed | `edcb6579` — the default terminal is the one a user has |
+| F172 | closed | `3ac95376`, C10 I30 — an unknown family throws `ThemeError` at resolve time |
+| F189 | closed | `aa6ebbfd`, recorded as F529, C04 I81 — scales that move samples |
+| F192 | closed | `87dd8c8f` and `7bd4f4ae`, recorded as F319 — I8's subject is a row |
+| F212 | closed | `03fbb32b` and `cdb9a5f4`, recorded as F216, C12 I54 — the alphabet is the terminal's |
+| F247 | closed | C09 §4c carries the measurement, taken on Ghostty 2026-08-31 |
+| F286 | closed | `38968e64`, `0e8381b0`, `8cdd7f23`, recorded as F295 — the three members widened and consumed |
+| F289 | closed | `7e103f5a` and `de200ed0` — the role table the rung table promised |
+| F293 | closed | `1b99f0c3`, cited by F830 — the degradation pass, in three places |
+| F937 | closed | F938 and SS60 — the quadratic cursor at both sites, with the rule that keeps it out |
+| F951 | closed | the nineteen rows are C22 T4.66–T4.85 in §9 |
+| F957 | closed | C09 I64 at F969 — the corner is ruled and measured over 201 104 escapes |
+| F969 | closed | F976 and F978 — both residues, the per-cell writers and the merge |
+| F169 | **refused** | `bd40c70a`, and the refusal is written at `tools/roadmap-status.mjs:46-67` |
+| F181 | partly | the builder half owed |
+| F418 | partly | closed for the identification (C02 I11, commitment 14); the tmux passthrough axis stands |
+| F163 | open | golden frames do not go through the painter |
+
+**Fifteen of nineteen were closed before this pass began**, and the sixteenth was a refusal whose
+reasons had been written down twice and read back never. Four rows of nineteen carry work: two
+halves and one whole.
+
+**The structural half is larger than the stale half.** 680 of 975 rows carry no status marker of
+any kind — not *open*, not *closed*, nothing — so a reader counting open work by eye counts the
+markers that happen to exist and the group headings, and both are computed from the subset that
+was ever annotated. The headings are the visible symptom: group 1 says *14 open, 5 closed* over
+19 rows of which 6 carry a marker; group 11 says *140 closed, 129 open* over 362.
+
+**This is the sixth blind spot's own instrument turned on the register that records it** (F58,
+F66, F92, F161). Every one of those asked *where is this claim written down* about a claim in a
+plan or a body of prose. A status column is the same question with the answer pre-filled: the row
+**is** the record, so the marker reads as the finding's own verdict rather than as a note someone
+took on a day that has passed.
+
+**The remedy is not a gate.** Matching *this row is open* against *the work exists at HEAD* is
+prose against a tree — the citation-resolves-against-the-wrong-thing class the audit argues
+against automating (`docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass). What is cheap and what
+this pass used: **resolve the row before building on it**, the same habit the deferral rule
+carries, and write the closing commit into the row when the work lands rather than leaving the
+marker to be re-read by someone else later.
+
+**What would falsify this**: a row whose *open* marker is stale in the other direction — the work
+recorded as landed and reverted since. None of the nineteen was.
+
+## F987 — the placement identity was the picture's, so an animated image rewrote all 400 placeholder cells every frame and left a digest in the sent set per frame: 14 176 B where 1 367 B is owed ★★★☆☆
+
+**Two identities, both right, one member doing both jobs.** `imageKey` is the picture's — the
+digest with the overlay folded in (C04 I74) — and it is the right key for *has this picture been
+sent*. It is the wrong key for *where does this picture go*, because the id it hashes into is
+also the id written into the foreground colour of **every placeholder cell** (`placeholderCell`),
+so an identity that moves with the picture moves the whole grid.
+
+Measured before anything changed, `out/f987-anim-bytes-before.ts` — one block `plot-anim`, two
+320×160 PNGs differing by one in the red channel, at width 40:
+
+```
+box 40x10                              (400 placeholder cells)
+block id      plot-anim == plot-anim   same
+digest        0df59874… vs 5bc075f9…   DIFFERENT
+imageId       3899434 vs 7273350       DIFFERENT
+placeholders identical across frames?   no
+transmission per frame   1 367 B       (PNG 986 B)
+placement per frame     12 809 B
+per-frame total         14 176 B
+`#sentImages` after two frames   2 entries
+```
+
+The transmission is the part that must be paid — the picture changed. The 12 809 B is the part
+that must not: the block did not move, and the row diff would have skipped a byte-identical grid.
+**Nine tenths of the frame is the identity churning**, and the set grows by one digest a frame for
+as long as the animation runs, each digest an image the terminal is still holding.
+
+**The ruling is C09 I66**: the placement's identity is the block's within its entry, and the
+picture is what is cached at the placement. `placementIdOf(block, scope)` is the one derivation —
+F421 counted four sites deriving the id independently, agreeing only because each computed the
+same pure function of the same block.
+
+### The walk — both artefact shapes, because the component has state and structure
+
+CLAUDE.md's rule, and this component needed both halves: a table for the rules that meet at rest,
+a trace for the ones that meet because something happened. The table is where the scope came from
+and no sequence could have reached it.
+
+**S — structural, two rules holding at once**
+
+| | the two rules | what falls out |
+|---|---|---|
+| **S1** | a block id is unique *within a document* (C04 I14) · the placement id addresses a terminal-wide id space | **the scope is the entry.** `img-${file}` and `${block.id}-svg` repeat on every invocation in the examples, so a placement keyed by block id alone lets the second `/svg` replace the first's picture behind the first's placeholders — the wrong picture rather than none |
+| **S2** | the picture is the digest with the overlay folded in · two blocks may hold one image | two blocks of one picture are **two placements and two transmissions**: one per duplicate block, where the shipped arm paid one per frame |
+| **S3** | the cache skips a transmission on a key it holds · the key at a placement is now stable | the cache is a **map, not a set** — `get(id) === key`, never `has(id)`. A `has` at a stable placement sends nothing when the picture changes, which is the defect inverted |
+| **S4** | the renderer derives the id from the block · the seam derives the id from the block | two derivations agree only while both are pure functions of the same block. **One function**, or a scope on one side silently disagrees with the other |
+| **S5** | the id lives in every placeholder cell's foreground colour · the frame is written as a row diff | identity churn is **O(cells) bytes a frame** and the diff can only skip what is byte-identical. This is the 12 809 B |
+| **S6** | at `kitty` the overlay is composited into the pixels before transmission · `digest` is the data's | the cache key is `imageKey` and not `digest`, or an overlay change at a stable placement transmits nothing and draws the picture underneath |
+| **S7** | the seam takes the scope from its group · the renderer takes it from `RenderContext` | **the two land together or neither does.** A scoped seam against an unscoped frame places an image nobody transmitted; the converse transmits at an id nothing addresses. Both draw nothing, and T4.58's control is that half-landed pair |
+| **S8** | a caller may supply no scope at all · a block id is only unique inside one | the fallback is the **picture's** identity and not the block's — `renderToLines` in a test, `tools/terminal-probe/build.mjs`, the catalogue. The block's is safe only inside a scope |
+
+**A — the sequence trace, a placement in flight**
+
+| | sequence | ruling |
+|---|---|---|
+| **A1** | transmit → the same block arrives with a new digest | re-transmit at **the same id**; the placeholders are byte-identical and the row diff skips them. This is the animation case and the whole of the 12 809 B |
+| **A2** | transmit → the block leaves the document → it returns | released by the sweep on the frame after it leaves, so the return re-transmits. C04 §3g.2's T1, **ruled there and built here**: the table said *released with the last block holding it* and nothing ever released anything |
+| **A3** | two entries, one block id, two pictures | two scopes, two ids, both drawn — S1 as a sequence |
+| **A4** | an entry evicted while its image is on screen | the placement rows go with the entry and the release happens on the frame **after**, so the last frame drawn is never missing its image (C04 §3g.2 T5) |
+| **A5** | a resume into the same terminal | the entry ids repeat, so the placement ids do; re-transmitting is idempotent because `a=T` replaces at that id — the cost is one transmission and never a wrong picture |
+| **A6** | a scroll | *document* is the transcript and not the viewport, so nothing is released and nothing re-transmits — the shipped arm's one good property, kept |
+| **A7** | an overlay changes and the digest does not | the key at the placement differs, so it re-transmits there — S6 as a sequence |
+
+**And the rejection path, which neither shape indexes.** `placementRows` refuses a span past the
+diacritic encoding and the renderer falls to the dither (C09 I38). The transmission has already
+been written for that block in the same frame: bytes sent for a picture nothing addresses. It is
+one wasted transmission rather than one a frame, because the cache holds the placement either
+way — but the seam cannot see the refusal, so the waste is structural and is recorded here rather
+than fixed. Its expiry is the third diacritic, the same symbol `placementRows` bounds itself by.
+
+**Two protocol readings this rests on, stated as unmeasured.** That `a=T` at a live id replaces
+the picture — asserted five times in this repository and measured never — and that a replaced
+GIF's `a=T` discards the frames its earlier `a=f`s uploaded. `tools/terminal-probe`'s pair at
+`i=911` is the instrument for the first and has not been read in front of a terminal. A refusal
+on either reverses the ruling rather than patching it.
+
+**Owed at the code commit**: the after column. That a byte-identical grid costs nothing is
+arithmetic over the row diff and not a measurement, and the same probe reports it once
+`placementIdOf` exists.
+
+**What would falsify this**: a terminal that redraws a placement when the image at its id is
+replaced; two entries whose ids repeat across a session, which would put S1 back one level up.
+## F990 — a mutation run rots where nobody looks: 181 runs, one gate that runs none of them, and a weekly sweep that ranks every survivor against a debt list compared by equality ★★☆☆☆
+
+**F952's class, closed by an instrument.** A run with no row that can see its mutation reads
+exactly like a run whose rows catch it — both print nothing and both leave the tree as they found
+it — and the only thing that tells them apart is running the pass. `tools/mutate/runs/` holds
+**181** of them and no gate ran any: `make all` builds, checks, enforces, tests and proves, and a
+mutation pass is a thing a person remembers to do. F980 is what that costs — two runs found rotted
+at once, one of them exiting 1 on three disposed survivors since F243 — and the anchors debt list
+already carried **35 stale anchors across 16 runs**, two of them controls, which is a run that
+cannot fail.
+
+**`tools/mutate/sweep.mjs`** runs every run serially against a snapshot of `src/` and
+`tools/enforce/`, restores between runs, and gives each a verdict:
+
+- **green** — the pass exited 0.
+- **known-stale** — every miss it reported is on `KNOWN_STALE`, and the list is **compared by
+  equality** so an entry that stops being stale is a violation rather than a subset that quietly
+  holds (SP9's own rule against its exemption list, and the reason a cleared entry cannot outlive its reason unread).
+- **red** — anything else, and the sweep exits 1 naming the runs.
+
+**Sharded round-robin rather than by directory order**, because runs are not equal in cost and a
+contiguous split puts the four expensive ones in one shard: `--shard 1/6` takes 31 of 181. The
+weekly CI job (`mutation-sweep.yml`, Sunday 03:00 UTC, and on dispatch with an `--only` filter)
+runs the six shards in parallel; `make mutate SHARD=k/n ONLY=substr` is the same driver locally.
+
+**The driver is tested as a pure function of its inputs, which is what an instrument owes.**
+`plan()` equals the directory; the shards partition it at n = 1 and n = 6; `--only` filters before
+sharding rather than after, so a filtered sweep is not one shard of a different set; the debt
+list's total equals what the anchors sweep prints; and the reader counts a synthetic report — the
+one place a fabricated input is the whole point, since a reader written before its subject measures
+its own guess (F297).
+
+**Its blind spot, stated**: a run that exits 0 having caught nothing is green here. The sweep
+watches whether a pass still *runs*, not whether its rows still *see* — that is the anchors
+sweep's job, and the two are separate instruments on purpose.
+
+**What would falsify this**: a red the sweep reports that a hand-run pass does not reproduce, which
+would mean the snapshot-and-restore is the subject rather than the run.
