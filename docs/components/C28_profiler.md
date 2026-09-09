@@ -310,17 +310,58 @@ with no terminal is the one arm a real terminal must never get. The pane is draw
 `profiler.report()`, which is a pull — nothing tells the view a report changed, which is why the
 cadence below is a timer and not an event.
 
-**A window on block boundaries, measured through the registry.** The overview measures **28 rows at
-80 and at 120 columns** against a 12-frame fixture holding no counters table and no cache rows —
-over the 24-row region the test harness has and near the 25 a 30-row terminal leaves — so a pane is
-not a screen's worth by construction, and C15 clips what does not fit without drawing anything to say
-so (C15 I8; F947). The view holds an offset in blocks, takes blocks from it while the registry's
+**A window on block boundaries, measured through the registry.** A pane is not a screen's worth by
+construction — `frame` puts a table of up to twenty elements under a plot, and the overview as first
+built was 40 rows at twelve frames against the 24-row region the test harness has (the figure below)
+— and C15 clips what does not fit without drawing anything to say so (C15 I8; F947). The view holds
+an offset in blocks, takes blocks from it while the registry's
 `measureSequence` of the candidate sequence fits the region, and always shows at least one; a single
 block taller than the region is shown under a notice saying how many rows are hidden. The same
 `measureSequence` C15 places with, for `document-view.ts`'s reason: a window measured by anything else
 is C09 I1's divergence with a whole view behind it. The projection is `document-view.ts`'s, written a
 second time, and that duplication is recorded here rather than resolved: extracting it is an edit to
 a file this round does not own.
+
+**The overview fits the region it opens in** (I52; F947, F959, F960). The pane a reader opens first
+is the one that has to fit without paging, and the number it has to fit is **23 rows at 80 columns:
+a 24-row terminal, minus the view's one-row header**. Every other pane pages. **The figure F947
+carried was the instrument's, not the pane's**: 26 rows at twelve frames and 28 with spans and a
+counter were measured through a registry with no `plot` and no `table` registered, where both kinds
+fall to `raw` and a plot measures as the wrapped lines of its own JSON. Through the registry
+`construct.ts` builds, the same pane was **40 rows at twelve frames and 51 with spans, a counter and
+two caches**, at 80 and at 120 columns alike, and the view's own rows windowed the JSON rather than
+the plot (F959). The bar plot of commits against frames was also wrong in the direction no fixture
+reached: its `height` grew by one per commit reason while a grouped bar draws two rows per reason,
+so at the type's five reasons it drew six rows and put `stream` and `spinner` — the reasons
+coalescing is about — behind a `+4 more` marker (F960).
+
+**The walk, by hand, before the cut** — every block the overview draws, its rows at 80 columns on
+four reports, and where each row went. Through `measureSequence` with `tableDefinition` and
+`plotDefinition` registered; *E* is an empty ring, *T* twelve frames, *F* twelve frames with three
+spans, a counter and two caches, *R* twenty frames spread over every `CommitReason` with the same.
+Rows include the block's own `gapBefore`.
+
+| block | before: E / T / F | after: E / T / F / R | where the rows went |
+|---|---|---|---|
+| the view's header rule | 2 / 2 / 2 | 1 / 1 / 1 / 1 | the gap before the first block drew a blank first row on every page; off |
+| `ov-cap-regime` rule | 2 / 2 / 2 | — | the kv's own rows carry the qualifiers the caption named |
+| `ov-regime` kv | 7 / 7 / 7 | 4 / 4 / 4 / 4 | `tier`, `frames`, `elapsed` are one `regime` row; `histogram`, `excluded`, `dropped` stay — T1.96 and T4.9 read `excluded` |
+| `ov-no-frames` notice | 2 / — / — | 2 / — / — / — | unchanged |
+| `ov-cap-lat` rule | — / 2 / 2 | — / 1 / 1 / 1 | gap off; the sentence shortened so it is not truncated at 80 |
+| `ov-latency` plot | — / 10 / 10 | — / 7 / 7 / 7 | four categories in four area rows; the two spare rows drew nothing. Three rows of furniture stay: the lid, the axis rule and the x-labels |
+| `ov-cap-coal` rule | — / 2 / 2 | — | the table's header row names the columns |
+| `ov-coalesce` | — / 8 (plot) / 8 (plot) | — / 2 / 2 / 6 (table) | one row per reason, and *saved* — the difference the caption told the reader to take — as a column |
+| `ov-cap-counters` + `ov-counters` | — / — / 2 + 3 | — | moved to `frame` as `fr-cap-counters` + `fr-counters`; no type bounds the row count |
+| `ov-cap-oh` rule | 2 / 2 / 2 | — | the `own cost` label and *an estimate* in the value carry it |
+| `ov-oh` kv | 5 / 5 / 5 | 2 / 2 / 2 / 2 | spans, clock and the estimate on one row; the async store on the other. Every I34 figure is still there |
+| `ov-cap-cache` + `ov-cache` | — / — / 2 + 4 | — | moved to `frame` as `fr-cap-cache` + `fr-cache`; no type bounds the row count |
+| `ov-elsewhere` notice | — | — / — / 1 / 1 | new: one row naming how many counters and caches are on `frame`, drawn only when there are any |
+| **header and pane** | **20 / 40 / 51** | **9 / 17 / 18 / 22** | budget 24; the pane alone is 8 / 16 / 17 / 21 against 23 |
+
+The same table at 120 columns differs only where a notice stops wrapping. **What the walk ruled and
+the measurement then checked**: the *after* column was written from the block heights before the
+code was, and T1.100 asserts the four totals rather than the bound alone, so the table cannot
+outlive its measurement (F935).
 
 **When it redraws** (I51). On the injected timer — `Ambient.schedule`, the seam the sampler already
 uses (§4) — every `VIEW_REFRESH_MS = 1000` ms, which is the sampler's default cadence
@@ -338,8 +379,9 @@ tier on neither side, and a view opened at `spans` does not call `setTier("spans
 on the recorder's *unchanged tier* short-circuit one component away (`recorder.ts`'s `setTier`).
 Where it did raise, the raise resets the ring (I18) and the pane opens on the *no frame has been
 recorded yet* notice rather than a zero plot (I23); the integer counters survive the reset — `resetRing`
-clears the histograms, the rings and the trees and leaves `counters` — so the overview's counters
-table shows the session so far beside a latency plot that says nothing has been measured. The restore
+clears the histograms, the rings and the trees and leaves `counters` — so the `frame` pane's counters
+table shows the session so far and the overview names the count and points there (I52), beside a
+latency notice that says nothing has been measured. The restore
 resets again, so the spans watched are gone with the tier that recorded them.
 
 **Closing reaches the owner through C15's change stream, whichever caller removed the layer**
@@ -551,7 +593,7 @@ histograms describes neither, and the report states the point at which it was re
 - **I11** — Below tier `spans` the report **omits** `spans` and `latency` rather than emitting zeroed histograms.
 - **I12** — A frame is `selfInflicted` only if every commit that raised it came from the profiler; self-inflicted frames are excluded from the histograms and `excluded.selfInflicted` reports how many.
 - **I13** — A loop-delay figure travels with the `resolutionMs` it was sampled at, and no consumer presents its p50 as a delay.
-- **I14** — **Replaying a recording produces frames byte-identical to the ones the recording was taken from**, and the comparison is over the `frame` events' subsequence: a `frame` is the recording's *expected output*, never one of the inputs replayed back in. **§5's *every clock and `elapsed` read* is load-bearing and was not when it was written.** In July the only clock reading that reached a frame was the wall-clock time of day; C24 I32 put `last 1.2ms` in the default footer, so a frame now contains a **duration**, and the obvious robust-looking implementation — pin the replayed clocks to the event stream, so a read between two events returns the earlier one's stamp — produces a footer reading `last <0.1ms` on every frame and a divergence on every recording taken from a real session. **Positional replay is what the spec ruled and it is the stronger reading**: read *n* returns the value read *n* returned, so a duration in a frame is reproduced rather than flattened. It is brittle against a code change that alters the read order, and that is correct — a recording is a within-build determinism gate and not an artefact meant to outlive its build (F908).
+- **I14** — **Replaying a recording produces frames byte-identical to the ones the recording was taken from**, and the comparison is over the `frame` events' subsequence: a `frame` is the recording's *expected output*, never one of the inputs replayed back in. **§5's *every clock and `elapsed` read* is load-bearing and was not when it was written.** In July the only clock reading that reached a frame was the wall-clock time of day; C24 I32 put `last 1.2ms` in the default footer, so a frame now contains a **duration**, and the obvious robust-looking implementation — pin the replayed clocks to the event stream, so a read between two events returns the earlier one's stamp — produces a footer reading `last <0.1ms` on every frame and a divergence on every recording taken from a real session. **Positional replay is what the spec ruled and it is the stronger reading**: read *n* returns the value read *n* returned, so a duration in a frame is reproduced rather than flattened. It is brittle against a code change that alters the read order, and that is correct — a recording is a within-build determinism gate and not an artefact meant to outlive its build (F908). **And positional replay requires every stand-in to consume the clock reads the tap it replaces makes**: C06 reads the wall clock twice per invocation — before it spawns and for `durationMs` — so a stand-in that serves the recorded value and reads nothing is served every later value two reads stale, and the header's second hand lands one frame behind whenever a wall-clock second boundary falls in the gap between two of the session's own reads (F963). Parity is asserted by count, not assumed from the frames (T5.1c).
 
   **Three things a replay must be handed and one it must not.** The regime carries `tier`, `name`, `binary` and `env`, and **every one of them decides what a frame contains** — the tier because C24 I32's cost cell is absent below `spans`, the other three because the chrome draws them. A replay that hard-codes any of them diverges on a frame that is correct on both sides; `binary` did so at byte 43 and `tier` at frame 1 (F912). The one it must not be handed is the capability verdict (I47).
 
@@ -595,6 +637,7 @@ histograms describes neither, and the report states the point at which it was re
 - **I49** — **Every commit the view raises runs inside `profiler.own`, and the commit seam reads the bracket rather than the call site.** The view brackets `overlays.update` and the commit together, on the timer and on a key alike, so a frame raised only by the view is `selfInflicted` and excluded (I12) and a frame the reader or the far side also raised is not. The seam in `construct.ts` passes `false` for what it knows and knows nothing of a view; removing the bracket leaves every figure the view draws inflated by the cost of drawing it, which is the reading I12 exists to end.
 - **I50** — **Opening the view raises the tier to `spans` only when it is below, remembers the tier it found, and closing calls `setTier` only when opening did — from C15's change stream, so the restore reaches the owner whether `Esc`, the ⌃c ladder's `pop()` or the owner's own `pop()` removed the layer.** A second `open` while open is refused and does not overwrite the remembered tier. `dispose()` at `stop()` stops the timer and leaves the tier: the profiler is disposed before the graph's cleanup runs, so `setTier` is then a no-op (§7), and against a live one a restore would reset a ring nobody has read (I18, I38). With no profiler configured there is nothing to raise and the verb is refused (C23 I68).
 - **I51** — **The view redraws on the injected timer and on a key, never per frame, and what it draws is a block-boundary window of `profilePane(report, pane, caps)` measured through the registry with the terminal's capabilities.** One layer id, updated in place; a redraw after the layer has left the stack changes nothing, because `update` on an unknown id is `false` and raises no commit (C15 I14). A pane taller than the region pages rather than being cut in silence, and a single block taller than the region is shown under a notice that says how many rows are hidden (C15 I8).
+- **I52** — **The overview measures at most 23 rows at 80 columns for every report — a 24-row terminal minus the view's one-row header — through the registry that draws it, and meets the number by density and by moving, never by dropping a figure.** The pane a reader opens first is the one that must fit without paging; I51 pages the rest. Its blocks are bounded by closed sets — four regime rows, four latency categories in four area rows, one coalescing row per `CommitReason`, two rows of the instrument's own cost — and the two blocks no type bounds, the counters table and the cache table, are drawn on `frame`, whose subject they are and which pages already, with one overview row naming how many of each are there. Every figure the overview carried is on the overview or on `frame`. **The bound is the budget, and the measurement is beside it**: the largest report the type allows — every commit reason, spans, counters, caches — measures 21 pane rows, 22 with the header (§3c's table), so a block that grows past the budget fails T1.100 before it reaches a screen. Measured through a registry with `tableDefinition` and `plotDefinition` registered, because the harness's default has neither and measures a plot as its JSON, which is how a 40-row pane was recorded as 26 (F947, F959, F960).
 
 ---
 
@@ -632,6 +675,7 @@ histograms describes neither, and the report states the point at which it was re
 30. **The view is the profiler's own frame, and says so.** Every redraw is bracketed, so what the reader watches is never counted as what the framework cost. (I49)
 31. **A look costs the reader nothing their tier was recording.** Raised only when below, restored only when raised, and restored from the change stream so every way of closing reaches the owner. (I50)
 32. **The view is a window that redraws on a clock and a key, never on a frame.** (I51)
+33. **The first pane fits.** The overview is 23 rows or fewer at 80 columns for every report — the region minus the header — by density and by moving what no type bounds to the pane that owns it, never by dropping a figure. (I52)
 
 ---
 
@@ -705,12 +749,14 @@ reported, and the owner draws the indicator).
 |---|---|---|---|
 | B1 | `/profile` with no profiler configured | R-b × a session built without one | refused through the local route with a notice naming `TuiConfig.profile`; nothing pushed, no tier to touch, and not a throw (C23 I2). → C23 I68, T1.97 |
 | B2 | open at a tier already at or above `spans` | R-b × R-c | **no `setTier` call on either side.** The naive *restore what was remembered* calls `setTier("spans")` on close and is saved by the recorder's short-circuit — a guard one component away that the view must not lean on. → I50, T1.93 |
-| B3 | open at `counters` | R-b × R-c × R-k | the raise resets the ring and the pane opens on the *no frame recorded yet* notice, never a zero plot; `resetRing` leaves `counters`, so the counters table shows the session so far. Close resets again — the spans watched go with the tier that recorded them. → T1.16d, T1.93 |
+| B3 | open at `counters` | R-b × R-c × R-k | the raise resets the ring and the pane opens on the *no frame recorded yet* notice, never a zero plot; `resetRing` leaves `counters`, so the `frame` pane's counters table shows the session so far and the overview names the count (I52). Close resets again — the spans watched go with the tier that recorded them. → T1.16d, T1.93 |
 | B4 | open while another layer is up | R-a | refused with a string naming what is open; the stack untouched; `top !== null` checked, never caught. Reachable from the keyboard only by a handler run while a peek is up (a peek is never `top`), and always programmatically. → T1.99 |
 | B5 | a pane taller than the region | R-o × the window | block-boundary window through `measureSequence`, at least one block; a single block taller than the region is shown under a hidden-rows notice — the document view's I47 shape **without its *n/p move by block* clause**, because here `n`/`p` switch panes and the sentence would be false. → I51, T1.98 |
 | B6 | `/profile foo` | R-l × an `enum` argument | validation fails, the handler runs with `args` empty, and answers a usage notice naming the four panes and the token typed; nothing opens. → C23 I68, T1.65 |
 | B7 | the terminal's capabilities against `profilePane`'s ASCII default | R-n | the view hands `detection.capabilities` whole; under `unicode: "ascii"` the separator is the ASCII arm and under a unicode terminal it is `·`, never the default regardless of terminal. → I51, T1.96, T4.9 |
 | B8 | `/profile frame` typed at an open view | R-m | unreachable — the prompt has no keys while a view is top — so pane switching needs a key inside the view, and the only honest slot is the `pushedView` unit key `n`/`p`. → §3c |
+| B9 | the overview against a 24-row region | R-o × I52's budget × the two tables no type bounds | the budget is 23 rows — the region minus the header — and it is met for **every** report rather than for a fixture. The counters and cache tables are the only blocks whose rows no type bounds; a cap with an *N of M* marker drops the figures a reader opened the pane for, and a move to `frame` keeps them, so they move and the overview says where and how many. **What the ruling leaves behind**: a reader who opened the view at `counters` sees the pointer and not the table, and `frame` at that tier draws the tables under its *raise the tier* notice — the tables are counts and exist below `spans` (I44). → I52, T1.100 |
+| B10 | the coalescing plot's `height` against its rows | a grouped bar × `Math.max(4, rs.length + 2)` | two bars per reason under a height of one per reason: right at one reason, which is what every fixture had, and at the type's five reasons the plot drew six rows and put `stream` and `spinner` behind a `+4 more` marker — the coalescing figure hidden for exactly the reasons coalescing is about (F960). A table with one row per reason replaces it, bounded by the union, and *the difference is what coalescing saved* becomes a `saved` column rather than an instruction to subtract. → I52, T1.100 |
 
 **The sequence trace — event-mediated.**
 
@@ -733,7 +779,11 @@ tier), B2 (a restore on an unchanged tier leaning on another component's guard),
 calls an owner) and S5 (a restore at `stop()` racing the report) each ruled a line the obvious
 implementation gets wrong while every single-rule assertion about it passes. S4 is also the one that
 produced a finding about the two owners that already existed (F944), and B5 is the one that measured
-the pane against the region and found it did not fit (F947).
+the pane against the region and found it did not fit (F947). **B9 and B10 came from F947's second
+pass**, when the pane was re-measured through the registry that draws it: the first found that the
+recorded height was an instrument's (F959), and the second that the coalescing plot hid two reasons
+at the set's full size (F960) — a defect proportional to a small count, which no fixture with one
+reason could reach.
 
 ---
 
@@ -778,7 +828,7 @@ machine noise closes, on a runner measured at 2.7× this host's timings (F809). 
 - **T1.15d** (I17): a `heap` capture at a 64-byte cap → `bytes` is 64 and `droppedBytes` is over a million, asserted apart because their sum is the snapshot's size however the split falls. `heap` is the kind whose bytes come off a stream rather than a `JSON.stringify`, so it is where the cap has to hold against something the component did not size. The row was first written to reach `capped`'s no-room branch and could not: `getHeapSnapshot()` yields **one chunk of 5 193 967 bytes**, so the sink is written once per capture for every kind and the branch was unreachable — and redundant with the overrun arm, which computes the same thing at `room === 0` (F878).
 - **T1.16** (I23): a report at tier `spans` with **nothing recorded** → each of the four panes draws a notice and **no plot at all**. Asserted over the whole of `PANES`, because the two panes that were right were right by accident: `frame` and `memory` had no tier-shaped field to reach for, so they asked about data, and a row naming the pane that broke would have been satisfied by the accident and blind to the next pane written from the same template (F895). The fixture asserts its own emptiness first — a setup that quietly recorded a frame makes every assertion here vacuous.
 - **T1.16b** (I23): the same report's notices, by text, in both directions → at a spanning tier no notice says *raise the tier* or *the tier is below*, and at `counters` some notice still says both. **Counting notices is the assertion the third instance passes**: `frame` guards on the data, takes the right branch, and printed the tier's sentence into it — *raise the tier to `spans`* to a reader already on `spans`. The `counters` arm is what stops the repair being *delete the sentence*, since below a spanning tier the tier is the true answer.
-- **T1.16c** (I23): its control — six recorded frames at `spans` → `overview` draws `ov-latency` and `ov-coalesce`, `frame` draws `fr-spans`, `distribution` draws `di-quantiles`, `di-spans` and `di-worst`. A guard widened until it refuses everything passes both rows above perfectly; the ids are named rather than counted, because a pane drawing one plot where it owes two satisfies a count and is missing the answer.
+- **T1.16c** (I23): its control — six recorded frames at `spans` → `overview` draws `ov-latency` and draws `ov-coalesce` as a **table** (I52 turned the plot into one, and the row asserts the kind so a plot coming back is seen), `frame` draws `fr-spans`, `distribution` draws `di-quantiles`, `di-spans` and `di-worst`. A guard widened until it refuses everything passes both rows above perfectly; the ids are named rather than counted, because a pane drawing one plot where it owes two satisfies a count and is missing the answer.
 - **T1.16d** (I23, I50): the view opened at `counters` → the tier is `spans` while it is open; `pop()` → the tier is `counters` again, not `off`, and `setTier` was called exactly twice, once each way. **Live since the drawing round.** It was deferred on the view for as long as `profilePane` had no caller in `src/` outside `profiling/`, and the marker it carried named that as a symbol rather than a component — this half was bundled with T1.16 under a single *not deferred on a component* marker that was true of neither, and N subjects need N blockers.
 - **T1.18** (I36): a route whose transport takes 40 ms and whose adapt takes 5 → `spans.transport` is 40 and `spans.adapt` is 5, and their groups are `far side` and `compute`. One number covering both is the reading the split exists to end: a slow far side and a slow adapter want opposite remedies, and only one of them is this framework's to apply.
 - **T1.19** (I36, I33): two live parts fetching concurrently, one 10 ms and one 30 → `livefetch` has `count` 2, `max` 30 and `sum` 40, and neither node is the other's child. This is the case the single-pointer shape recorded as nothing, with no error.
@@ -849,8 +899,10 @@ machine noise closes, on a runner measured at 2.7× this host's timings (F809). 
 - **T1.95** (I51): the timer, held rather than waited for → nothing changes between ticks; each tick emits exactly one `content` change on the view's id and one `stream` commit inside the bracket; after `pop()` the disposable has been called and a tick that was armed does not fire. **The last clause is what a generation guard hides**: a timer disarmed by disposal fires nothing, and a row counting changes after `pop()` is what shows the disposal was the mechanism rather than a check inside the callback.
 - **T1.96** (I51, C09 I49): the same report opened under `unicode: "ascii"` and under a unicode terminal → the layer's regime row carries the ASCII separator in the first and `·` in the second, and each equals `profilePane(report, pane, caps)` for the caps handed in. **Never the default**: `profilePane`'s ASCII fallback is for a caller with no terminal, and a view has one (F828).
 - **T1.97** (I50, C23 I68): a view built with no profiler → `open` returns a refusal naming `TuiConfig.profile`, pushes nothing, and emits no change. The verb's arm over it is C23 T1.64.
-- **T1.98** (I51, C15 I8): the overview over a region of eight rows — header and pane together are six blocks and taller than eight even on an empty ring, which the row asserts before anything else — → the layer holds the blocks that fit and no more, measured through the same `measureSequence`, and one more block would not fit; `pageDown` moves the window to the block after the last one shown and `top` returns; a region of one row over the two-row header → that block alone, under a notice saying how many rows are hidden and not saying *n/p move by block*; `n` switches pane and resets the offset to 0. Asserted on the layer's content, because a window that fits is indistinguishable from one C15 clipped unless the blocks are counted.
+- **T1.98** (I51, C15 I8): the overview over a region of eight rows — header and pane together are taller than eight even on an empty ring (nine rows in four blocks, through the registry that draws them), which the row asserts before anything else — → the layer holds the blocks that fit and no more, measured through the same `measureSequence`, and one more block would not fit; on that ring the tail from the second block fits a page, so `pageDown` clamps to the last offset whose tail still fills the region and a second `pageDown` is `false`; over the largest report the type allows (T1.100's, three pages at eight rows) `pageDown` moves the window to the block after the last one shown and `top` returns; a region of one row → the one-row header fits alone and no notice is drawn (I52 took the gap that made it two), and `pageDown` to the four-row regime block → that block alone, under a notice saying how many rows are hidden and not saying *n/p move by block*; `n` switches pane and resets the offset to 0. Asserted on the layer's content, because a window that fits is indistinguishable from one C15 clipped unless the blocks are counted.
 - **T1.99** (I50, C15 I1): `open` while open → a refusal naming the profiler view, one `push` in the change log, and **the close restores to the tier found by the first open**, not to `spans`. The second clause is the row: a remembered tier overwritten by the second raise restores wrongly and nothing about the refusal shows it (§9b S7).
+- **T1.100** (I52): four reports — an empty ring; twelve frames; twelve frames with three spans, a counter and two caches; twenty frames over every `CommitReason` with the same — each measured through `measureSequence` with `tableDefinition` and `plotDefinition` registered, at 80 and at 120 columns → the overview is at most 23 rows and the header with it at most 24, and through the view at a 24-row region every block of the pane is on the layer with none windowed off. **The four totals are asserted, not only the bound**: 9, 17, 18 and 22 rows with the header at 80, so §3c's table cannot outlive its measurement (F935). **The fixture responds**: the largest report's overview holds five coalescing rows and the latency plot; `frame`'s `fr-counters` and `fr-cache` name every counter and every cache the report holds, so the ceiling is met by moving and not by dropping; and the overview's one-row notice names both counts. **The harness's registry has no `plot`** — measured through it the same twelve-frame pane is 26 rows and reads as fitting, which is why the row builds its own (F959).
+- **T1.101** (I14): the header's clock masked on the chrome's own bytes — `\x1b[38;5;241m09:39:14\x1b[39m` against the same frame reading `:15` → `masked` 2 and identical; a four-digit `109:39:14` and a trailing-digit `09:39:145` stay unmasked and diverge. T1.87 fed a sentence with a space before the digits, which `\b` accepts; the chrome's `m` is a word character it does not, and the member matched nothing the header ever drew (F964).
 
 ### Tier 2 — contract
 
@@ -902,7 +954,8 @@ machine noise closes, on a runner measured at 2.7× this host's timings (F809). 
 ### Tier 5 — e2e
 
 - **T5.1** (I14): a recorded PTY session that types, submits, streams, scrolls and resizes → replayed, the frames are **byte-identical** to the recording's, over every frame it holds. The recording is asserted whole (`truncated` false) and the drive's own counters beside it — `stalled` 0, `exhaustedAt` null — because the frames came out byte-identical over six of eight while all eight waits stalled, and a stall is a 500 ms pause, which is what the sleep-driven driver did anyway (F912).
-- **T5.1b** (I14): the same session recorded at `counters` → identical **with nothing masked**. The control for T5.1's mask: below `spans` no cell's value comes from a clock the inputs do not fix, so if identity needed the mask here the mask would be excusing something other than what it names.
+- **T5.1b** (I14): the same session recorded at `counters` → identical, with **no cost cell** in any recorded frame — below `spans` `CLOCK_DERIVED[0]` matches nothing, which is the control for T5.1's mask — and `masked > 0`, because the header's time-of-day is drawn at every tier and is what the mask excuses, on both sides. The row's first form said *nothing masked* and was green for exactly as long as the header member of `CLOCK_DERIVED` was dead (F964).
+- **T5.1c** (I14): recorded with a 1 000 ms pause between the answer and the resize, so that a wall-clock second boundary always falls between the answer frame's last read and the resize repaint's header read → `consumed.wall === recorded.wall`, and identical. Without a transport stand-in that reads the clock where C06 does the row is red on every run — 52 consumed against 54 recorded, diverged at the resize repaint's header (F963). The pause *is* the window, which is why the row takes it as a knob rather than waiting on a race.
 - **T5.2** (I14): the same recording replayed twice → the two runs' frames are identical to each other.
 - **T5.3** (I37, A01 Appendix B): `make profile` against `dist/` through the public surface → all six Appendix B rows — **four measured and two refused** — with the verdict and the regime beside them. This row said *three* until the appendix was actually filled; four are answerable from a report and the count was written before anything computed it.
 - **T5.4** (I8): the T5.1 recording replayed twice → the **whole** `misses` map is equal across the two runs, and no cache reports a `nothing-changed`. `misses` is `cache → reason → count`, and this row read it as `reason → count` for as long as it existed — `misses["nothing-changed"]` asks for a cache by that name and is `undefined` on every run (F913). Determinism over the map holds whatever the counts are; the absence is the substantive half, and it is an absence rather than a zero because the recorder omits a reason that never fired (I13). On a replayed input this is deterministic, which is the only regime in which asserting it is honest (D2).

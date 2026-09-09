@@ -190,7 +190,9 @@ This is a structural interaction rather than an oversight, which is why it survi
 
 ```typescript
 type ProfileOptions = Readonly<{
-  tier?: Tier;              // "off" | "counters" | "spans" | "alloc" | "deep"; default "off"
+  tier?: Tier;              // "off" | "counters" | "spans" | "alloc" | "deep"
+                            // default "counters" — the recorder's DEFAULT_TIER, read by the root's
+                            // gate rather than restated; an absent `profile` is "off" (C28 T4.1, F967)
   elapsed?: () => number;   // monotonic, sub-millisecond; default performance.now
   probe?: ResourceProbe;    // default the one file allowed to read the process (C28 I21)
   ring?: number;            // frames held; default 512
@@ -2556,6 +2558,26 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T4.63** (I84, I85; C23 I57; §6l.6 rows 16–19): **frame read.** A session holding a muted `continuation` notice and a settled card whose body is a `table` with a default gap → both `⎿` at column 2; the card's hook row carries the table's header and not a blank; exactly one blank row between the two entries and one above the upper rule.
 - **T4.64** (C09 I61, I86; C28 I31): **the wiring row.** A real session at tier `spans` → `pills#chrome.header.left` and `.right` at exactly `2 × frames` registry calls — one measure and one render — and the header `group` at `frames`; the footer `group` at `2 × frames` and its pills at `3 × frames`, one more each, and the one is `compose`'s `measureSequence` (I82), a registry call of its own and therefore a memo of its own. Asserted as exactly one more rather than as a ceiling, so the row says where the extra ask lives instead of tolerating it. Before C09 I61 the header pills read 3.0 and the footer's 4.0 (F940). C09's own rows count definition calls and cannot see the property C28 wraps, so the memo read at the child seam removed alone fails here and nowhere else.
 - **T4.65** (C15 I25, §13a): a real `createOverlayManager` and `createDocumentView`, `open("/watch api")`, then the manager's `pop()` — the ladder's call, not the owner's — → `openFor` is `null` before `pop()` returns, `move("down")` is `false`, the owner's own `pop()` returns `false` having nothing to dismiss, and `open("/watch db")` is accepted with exactly one layer on the stack. F944 measured every one of those the other way round.
+- **T4.66** (I45): the fixture measures what `document-view.test.ts` assumes it measures — a block is three rows, two fill an eight-row region as a sequence, and a third does not.
+- **T4.67** (I45): open pushes a view before the document exists, and fill replaces it.
+- **T4.68** (C15 I1): a second open is refused, and the refusal names the command.
+- **T4.69** (I46): the window falls on block boundaries and move walks it.
+- **T4.70** (I46): `putBlock` is total — an unknown id is false, never a throw.
+- **T4.71** (§13a): a block scrolled out of the window is still there to be patched.
+- **T4.72** (I45): pop closes the view and leaves nothing behind.
+- **T4.73** (C24 I12, gap 7): a live part in a pushed view ticks, and the frame shows it.
+- **T4.74** (I46): release at the pop stops the parts, before any later fetch would.
+- **T4.75** (§13a): a part scrolled out of the window keeps ticking.
+- **T4.76** (I47): a block taller than the region is unscrollable, and says so.
+- **T4.77** (I47): the count is what the reader cannot reach, wrap included.
+- **T4.78** (I47): more blocks below is not truncation, and gets no indicator.
+- **T4.79** (I48): a `ViewPatch` appends, which `putBlock` cannot do.
+- **T4.80** (I48): it goes through C04's `applyPatch`, so C04 I14 is enforced here too.
+- **T4.81** (I48): a patch after the pop is refused, never thrown.
+- **T4.82** (I48): a replace reaches a block the window is not showing.
+- **T4.83** (I48): an append holds the bottom, so a follow follows.
+- **T4.84** (I48): a reader who scrolled up is left alone.
+- **T4.85** (§2c, C28 I1): `profile: {}` builds a recorder at `counters` and `tier: "off"` builds none — the recorder's `DEFAULT_TIER`, read by the root rather than restated (F967).
 - **T4.17d** (I58, C10 I11): `/theme light` → a render. **Its own session, because focus is stateful**: written as a fourth step of T4.17 it failed against working code, since after two `↓` the keys are going to the live block and the command never reached the prompt. `light` and not `dark` because the session starts dark and `setVariant` is correctly a no-op for the active variant (C10 T3.6) — the first draft failed on that too. Both are the fixture not responding to the thing under test, and the number each produced was indistinguishable from a key that omits the theme.
 - **T4.17e** (I71): the **key axis alone** — the camera store is nudged directly and the entry renders twice, and both renders happen. It goes deliberately **around** the binding, so the row can only be about the key.
 - **T4.17f** (I71): the **writer alone** — a key press moves the store, asserted on the store and rendering nothing. Its control is a nudge of zero, which must leave the key unchanged: a key that distinguished *moved by nothing* from *never touched* would miss on every frame while every correctness assertion still passed (`focusKey`'s own warning, and `ScrollOffsets.key`'s zeros clause).

@@ -34529,3 +34529,669 @@ sentence used to say. The docker example's header was corrected under F953 in th
 
 **What would falsify this**: `grep -rn "framework's six\|Calcium's six" docs/ src/ examples/*/src`
 returning a line about verbs.
+
+## F961 — F951's nineteen rows are T4.66–T4.84, and the prose the finding said cited them cited one other row ★★☆☆☆
+
+`test/contract/document-view.test.ts`'s T4.30–T4.48 are T4.66–T4.84 — old plus thirty-six, so the
+block keeps the order it was minted in — after C22's real last tier-4 row, T4.65. Nineteen rows in
+C22 §12's tier-4 table now say what each asserts, in the row's own form with C22's invariants bare
+and C15 I1 and C24 I12 qualified. The two in-file comments naming a row moved with it (T4.35 → T4.71,
+twice), and three citations outside the file: `test/unit/session-keys.test.ts`'s *T4.38 asserts that
+`release` stops a view's parts* (→ T4.74), `test/support/README.md`'s table rows *T4.37–T4.39* and
+*T4.38* (→ T4.73–T4.75, T4.74), and `tools/mutate/runs/c04-follow.mjs`'s `expect: "T4.47"` (→ T4.83).
+The last is load-bearing rather than a comment: `mutate.mjs` matches `expect` as a substring of
+vitest's output and `anchors.mjs` requires the row to exist in a file the run runs, so a stale number
+there reads as a mutation nothing caught. Every anchor asserted once; the diff read after. 44 of 44
+green across the file and `session-keys`; SP7 over C22 clean and `testRowsOf` sees all nineteen.
+
+**F951 said C22 §13a "names several by number", and it names one.** Going to the record before moving
+anything: the only `T4.` citation in §13a's 316 lines is T4.65, the row placed when F951 was written,
+and C22's I45–I48 cite no row at all. Every citation of T4.30–T4.37 inside C22 — the copy-mode rows
+T4.30–T4.32c with T6.91 and T6.92, the theme row T4.34 with T6.67, the spinner rows T4.35–T4.37 with
+T6.71 and T6.72 — is about those subjects and stays. So the re-map moved no prose in the spec, which
+is the opposite of the cost F951 gave for deferring it; the deferral was right and its stated reason
+was not. The brief's `grep -rn "T4\.[34][0-9]"` over `test/`, `tools/`, `docs/` and this file gave
+some 207 hits before the re-map, 25 of them the document view's — 21 in the file itself, the four
+above outside it. The 182 that remain are other components' T4.3x/T4.4x — C23's running card, C13's
+persistence, C16's copy mode, C22's own theme and spinner rows, C26's plot focus — ten catalogue logs,
+and this file's older findings, F951 included as the record; every one stays.
+
+**The class, measured and not fixed** (`out/rows-without-table.mjs`, resolving each file through SP3's
+own `OWNERS` and `TOPICS`; `ownerOf` is not exported, so its eight lines are copied and cited). Of
+3 269 numbered `it()` titles in 240 files, **956 sit in files the owner map does not own** —
+`document-view`, `session-keys`, `running-card`, `local-profile`, `session-mouse` and their kind, none
+of which is a `TOPICS` basename — so by the map alone 2 313 rows resolve and **274** name a number
+absent from their component's spec. Resolving an unowned file through the first `Cnn` its title cites
+reaches 3 177 rows, and **450** are in no table: C04 58, C09 55, C22 47, C12 47, C23 30, C26 26, C16 19,
+C10 17, C24 17, C13 17, C01 14, C02 14, C05 12, C06 12, C25 11, C17 9, C18 9, C15 8, C28 5, C14 5, C03 4,
+C11 3, C07 1, C21 1, C27 1, and 8 under a synthetic `C99`. The document view was 11 of the 461 before
+this commit; its eight rows numbered against other subjects never counted, because the probe asks
+whether a number is *declared* and cannot tell a right row from a wrong one — F951's second shape,
+and why the count under-reads. **Nineteen rows in owned files are absent from the owner's table and
+present in the table of the component the title cites**: C10's `theme.test.ts` holds C22's T4.27–T4.29
+and T4.34, C22's `session.test.ts` holds C16's T4.9b, C01's `lifecycle` and C03's `frame-scheduler`
+hold C22's T4.21 and T4.9, C11's `table.test.ts` holds C26's T1.42 and T1.43. The list is in
+`out/probe-after.txt`. One reading this commit changed: `session.test.ts:1199`'s `T4.68 (C16 §5c C1)`
+is C16's row in a C22-owned file, and C22 now declares a T4.68 of its own — *a second open is
+refused* — so the bare number resolves against C22's table by the map and against C16's by the
+citation. The brief's per-component rule makes that no collision, and a reader holding the number
+without the citation meets two rows.
+
+**Not an enforce rule, and the numbers say why not yet.** 450 is a debt an equality-compared list
+could carry, but a third of the corpus is unattributable by the map SP3 already uses, and a rule over
+the cited-component fallback would have called the document view's eight wrongly-numbered rows
+*covered*. The map is the thing to widen first.
+
+**What would falsify this**: `grep -c "T4\.\(6[6-9]\|7[0-9]\|8[0-4]\)" docs/components/C22_composition_root.md`
+returning anything but 19, or a `T4.3x`/`T4.4x` citation whose subject is the document view surviving
+under `test/`, `tools/` or `docs/`.
+
+## F962 — docker-tui sets `profile: { tier: "counters" }`, the lowest tier at which `/profile` opens; the greeting did not slow and the view drew ★★☆☆☆
+
+F953 left it open: whether the reference application should set `TuiConfig.profile` so the
+framework's seventh verb draws there rather than refusing. It should, and the tier is decided by the
+record. **`off` cannot be the answer, because at `off` there is no recorder**: `session.ts` builds one
+only when the field is present *and* `isRecording(tier)`, C28 T4.1 asserts that a session at
+`tier: "off"` writes the same bytes as one with no `profile` at all, and C28 §3 says a session holding
+no recorder has `/profile` refused through the local route (C23 I68). So the cheapest tier at which
+the verb opens is the first recording one, `counters` — an integer per seam, which C28 §3a's table
+measures in one row with `off` at ~20 µs per pass, *nil, inside the baseline's own noise*. C28 I50
+then makes the cost of a look the reader's own: opening raises to `spans` only while the view is up
+and restores on close, and the counters survive the raise, so the overview opens on the session's
+frames and bytes (C28 I44) rather than on the zeros `off` would hand a view it cannot open anyway.
+The sentence that decided it is T4.1's: *`tier: "off"` rather than `profile: undefined` … the same
+object to the runtime anyway*.
+
+**Measured through a PTY** (`out/profile-drive.test.ts`; `interactivePty` at 100×30, `LANG=C.UTF-8`,
+`COLORTERM=truecolor`; five spawns each way, spawn → first frame carrying `❯`): **935 ms median
+without the option (841–1077) and 862 ms with it (790–1149)**. The ranges overlap and the difference
+has the wrong sign for a cost, so the line is free at the resolution a greeting has. Typed `/profile`
+once with the option in place, the view opened on the overview; its first rows as the painter read
+them, trimmed on the right:
+
+```
+── profiler · overview ─────────────────────────────────────────────────── 1/4
+
+── regime — and what these figures cannot say ──────────────────────────────
+
+tier       spans
+frames     7
+elapsed    6156 ms
+histogram  log-linear, +/-1.6% relative
+excluded   2 self-inflicted · 0 fallback
+dropped    0 frames past the ring
+
+── latency · work is the framework's efficiency, wait is its policy — never summed ──
+
+    ┌───────────────────────────────────────────────────────────┐
+p50 ┤█████████████████████████████████████████                  │ █ work
+p95 ┤█████████████████████████████████████████████████████████  │ █ wait
+```
+
+`tier spans` is I50 doing what it says while the view is up; `excluded 2 self-inflicted` is the
+view's own redraws (C28 I12); the footer read `last 20.0ms`, the cost cell C24 I32 puts there at
+`spans` and nowhere below it. `Esc` left `⏺ profile` / `⎿ profiler: overview` in the transcript and
+nothing of the panes (C23 I69), and `/exit` returned 0. Without the option the same keystrokes
+answered `▲ no profiler to show — this session was built without \`TuiConfig.profile\``, I68's notice
+verbatim. docker's suite: 22 files, 315 of 315, before and after; `tsc --noEmit` clean. The README
+enumerates the app's verbs and says nothing of the framework's or of profiling, so it is unchanged.
+This closes F953's residue.
+
+**Read the frame, not only the numbers — two things beside the row's point.** The greeting's body was
+blank in both captured spawns: the container has no `docker` on `PATH`, `fetchSnapshot`'s two
+`run("docker", …)` reject, `dashboardBlocks` rejects with them, and `session.ts` catches and drops a
+greeting that fails — by design, T3.10 and T3.11, *a welcome that could not reach its far side is not
+a startup fault*. From docker-tui's chair that is an empty landing screen with no notice until the
+first verb, which is *ask who sees the refusal* and not this finding's to rule. And the prompt row
+after `/profile` read `❯ [0 q`, the footer after `Esc` `…/drive[6 q`: those are `DECSCUSR` —
+`escapes.ts`'s `\x1b[0 q` reset and the steady beam this app asks for in `cursor.targets.prompt`
+(C22 I63) — painted as text, because `test/support/pty.ts`'s `COMPLETE_ESCAPE` matches
+`\[[0-9;?]*[a-zA-Z]` and a space intermediate is in none of those classes, so the walk drops the
+`ESC` and paints the rest. The framework's own tier-5 sessions declare no cursor target and never
+write the sequence after the first frame, which is why every e2e row reading `promptRow` is green;
+the second consumer of the cursor field is the first thing to write it mid-session, and the harness
+was written before its subject. It wants a row and a number of its own, in a file this round does not
+own.
+
+**Residue.** C22 §2c's `ProfileOptions` comment reads `tier?: Tier; … default "off"`, and
+`session.ts:427` and `config.ts:278` read `profile?.tier ?? "counters"`: `profile: {}` builds a
+recorder at `counters`, and the spec says it builds none. Absent and `off` agree; the empty object is
+where the two disagree, and that is a ruling for C22's owner rather than a comment in an example.
+
+**What would falsify this**: `grep -n 'profile: {' examples/docker/src/main.ts` returning nothing,
+`/profile` in docker-tui answering the `TuiConfig.profile` notice, or a re-run of the drive putting
+the with-option median more than a spawn's spread above the without.
+
+## F959 — F947's height was the instrument's: a registry with no `plot` measured the overview at 26 rows, and through the one that draws it the pane is 40 ★★★☆☆
+
+The figures F947 carried — 20 rows on an empty ring, 26 at twelve frames, 28 with spans and a
+counter — came from `out/measure-header.mts` and `out/measure-panes.mts`, which measured through
+`createBlockRegistry()` bare. C09's defaults do not include `table`, `plot` or `patch`: C11, C12 and
+C25 register them through the public `register`, and `construct.ts` does exactly that. An
+unregistered kind falls to `raw` with `text: JSON.stringify(block)` (C09 I10), so a plot measures as
+the wrapped lines of its own JSON — four rows where the plot draws ten. **Re-measured 2026-09-09
+through a registry with `tableDefinition` and `plotDefinition` registered** (`out/f947-measure.mts`):
+the same overview is **40 rows at twelve frames and 51 with spans, a counter and two caches**, at 80
+and at 120 columns alike. The empty ring's 20 was right, because that pane holds no plot — which is
+the shape to watch for: an instrument that agrees on the degenerate input and disagrees everywhere
+else.
+
+**The view's own rows measured the same JSON.** `test/support/overlay.ts`'s `registry` is
+`measurable({ capabilities: FULL_CAPS }).registry` with no definitions, so T1.98 and T3.14 windowed a
+pane whose plots were JSON and asserted windows on it — green, and about a frame the view never
+draws. Production was right the whole time: the view takes `measureSequence` from the graph's
+registry (C28 I51). The rows now build their own with both kinds registered, and T1.100 keeps the
+bare one as a control: the twelve-frame pane is shorter through it than through the registry that
+draws it, and the empty ring agrees through both.
+
+**A third row the numbers did not show and the frame did**: the view's header rule took the
+builder's default `gapBefore`, so the first row of every page of every pane was blank — a one-row
+rule measuring 2, drawn as an empty line 1. Off under I52; it was one of the rows the overview had to
+find. *Measure what you render* (MEMORY): every gate here compares bytes, and a defect stable across
+runs is invisible to all of them; this one was stable across two probes and three test rows.
+
+**What would falsify this**: `createBlockRegistry()` with nothing registered measuring
+`profilePane(twelve, "overview")` at the height a registry with `plotDefinition` measures it; or the
+empty-ring pane, which holds no plot, disagreeing between the two.
+
+## F960 — the coalescing plot's height grew by one per reason and its rows by two, so at the type's five reasons it hid the two that coalescing is about ★★★☆☆
+
+`ov-coalesce` was a grouped horizontal bar — `commits` and `frames` per `CommitReason` — with
+`height: Math.max(4, rs.length + 2)`. A grouped bar draws one row per series per category, two per
+reason; the height grew by one. At one reason, which is what every fixture in the suite recorded,
+four area rows held two bars and the plot read as right. **Rendered 2026-09-09 with twenty frames over
+all five reasons** (`out/f947-reasons.mts`): seven area rows hold `input`, `completion` and `resize`
+— six bars — and the seventh reads `+4 more · stream · commits · stream · frames ·…`. `stream` and
+`spinner` are the reasons the tick commits (`session.ts`: `stream` when something animates, `spinner`
+otherwise), which is where coalescing does its work, and they were the two behind the marker. A
+defect proportional to a small count (MEMORY): correct for the fixture's *n*, wrong at the type's,
+and no arithmetic over one reason could reach it — the walk that found it was indexed by the set's
+full size, not by the fixture.
+
+**Replaced by a table under I52** — one row per reason, `commits`, `frames` and `saved by
+coalescing` as columns — because the union bounds the rows where the plot's height did not, and the
+caption's *the difference is what coalescing saved* was an instruction to the reader that the column
+now performs: `stream 8 · 4 · 4` in T1.100's fixture. Six rows at five reasons against the plot's
+eleven, and T1.16c asserts the kind so a plot coming back is seen.
+
+**What would falsify this**: a grouped `bar` whose measured height held two rows per category at
+`rs.length + 2`; or C12 growing a plot's height from its series, which C12 I1 forbids and is why the
+fix is in the pane and not in the renderer.
+
+## F966 — the PTY harness paints `DECSCUSR` as text, because its escape matcher has no intermediate byte ★★☆☆☆
+
+`test/support/pty.ts` paints what a program writes into the rows a reader would see (F149), and its
+`COMPLETE_ESCAPE` — the boundary test `feed` uses, "the same alternatives the walk matches, anchored" —
+accepts a CSI as `\[[0-9;?]*[a-zA-Z]`: parameters, then a final letter. The CSI grammar has an
+intermediate class between them, `0x20–0x2F`, and `DECSCUSR` uses it: the cursor's shape is
+`ESC [ Ps SP q`, `\x1b[6 q` for a beam and `\x1b[0 q` for the reset, which C01 writes as `escapes.ts`'s
+one *setting*. The matcher stops at the space, the walk paints ` q` — and F962's drive of docker-tui
+read the prompt row as `❯ [0 q` after `/profile`, three characters of escape sequence sitting where
+the cursor is.
+
+**Why the framework's own tier-5 rows never saw it.** They write the shape at start and release only,
+and the painter's rows are read between; docker-tui changes the beam at the prompt, mid-session, so
+the sequence lands in a row that gets asserted. A harness that has only ever been shown one encoding
+reports the other as text (*a matcher that sees one encoding*), and the finding is in the reader, not
+the file.
+
+**The fix is the general CSI grammar** — parameters `[0-9;?]*`, intermediates `[ -/]*`, final `[@-~]` —
+in both places the comment above `COMPLETE_ESCAPE` says must agree, with a row that feeds `\x1b[6 q`
+and asserts the painted row is unchanged. Recorded from F962's residue; the file is another lane's while
+this is written, so the fix lands in the serial phase or is owed.
+
+**What would falsify this**: `COMPLETE_ESCAPE.test("\x1b[0 q")` returning `true` at HEAD, or a painted
+row from a session that wrote the beam reading clean.
+
+**Closed in the serial phase, and there were three copies, not two.** The boundary test, the walk's
+token in `painter` and `trackWrap`'s stripper each held the same alternation and each had the same
+gap; they are built from one `ESCAPE_ALTERNATIVES` now, with the general CSI grammar. The parameter
+class was short as well: the kitty keyboard protocol's `CSI > 3 u` and `CSI < u` (C01's
+`KITTY_KEYBOARD`) carry a private byte `[0-9;?]` did not name, and would have painted as `>3u` and
+`<u` — unseen for the same reason as the beam, written at start and release only. PS16 feeds the
+beam and the protocol's pair and asserts the painted row is clean; `pty-screen.mjs` restores the
+narrow class as a mutation and PS16 fails.
+
+## F967 — C22 §2c said an omitted tier is `off`, two sites in the root said `counters`, and the default lived nowhere the spec could read ★★☆☆☆
+
+F962's residue. `docs/components/C22_composition_root.md` §2c lists `tier?: Tier; // …; default "off"`,
+under a heading that says *one field, off by default*. `session.ts`'s gate read
+`this.config.profile?.tier ?? "counters"` and `config.ts`'s regime line read the same expression, so
+`profile: {}` built a recorder, started the loop monitor and wrote `tier: "counters"` into a recording —
+while the spec said it would build nothing. `resolveConfig` leaves `profile` unresolved *on purpose*,
+its comment says: every member has a default and the recorder is where they are applied, so the root
+holds no second copy. The recorder applied `opts.tier ?? "counters"`; the root held two copies of it
+anyway, because the gate needs the tier before a recorder exists to decide whether to build one.
+
+**Ruled for the code.** An empty options object is a caller asking for a profiler, and `counters` is the
+tier C28 §3a measures at nil beside `off`; a `profile: {}` that built nothing would be a configuration
+that does nothing in silence, which is the shape every other default in §2 argues against. What was
+wrong in the code was the default living twice. It lives once: `DEFAULT_TIER` is exported from the
+recorder beside `isRecording`, the recorder applies it, and the gate and the regime line read it. C22
+§2c's listing now says so, and *absent is off* stays C28 T4.1's — decided by the gate, not by the
+default.
+
+**The row is where an application sees it**: C22 T4.85 drives `/emit` through a real session three times
+— `profile: {}`, `profile: { tier: "off" }`, and absent — and reads `LocalContext.profile` in the
+handler, present exactly when a recorder exists (C22 I93), with `regime.tier` off the report.
+`{}` → present at `counters`; `off` → absent; absent → absent. Broken by hand: `DEFAULT_TIER` set to
+`spans` fails the row on the tier, so it sees the recorder's default and not a restatement of it.
+
+**Why nothing saw it**: no row constructed `profile: {}`. C28 T4.1 compares *absent* with `off` and
+with `spans`; the case between them — present and empty — was the one the spec and the code disagreed
+about, and it is the one an application writing `profile: {}` to "turn it on" would hit first.
+
+**What would falsify this**: a C28 sentence ruling that an options object without a tier records
+nothing — then the recorder's default is the wrong one and T4.85 flips with it.
+
+## F955 — the transcript's 60 µs a row was one glyph: the gutter's `│` sent every ASCII row through the segmenter ★★★★☆
+
+F938 left `transcript` at 70.3 ms of self time over 34 frames, a quarter of frame work, 2 ms a
+frame with nothing under it but `visible` — and its own bench put a fitted row at 1.5–9.5 µs where
+2 ms over some 49 rows is 60 µs a row. The difference was not in the walk the bench measured; it
+was in the rows. (One correction to how the figure was read, recorded so nobody re-derives it: the
+span histograms report **self** time per span, C28 I32, so `transcript`'s `sum` is already net of
+`visible` — a first reading here subtracted `visible` again and got a figure smaller than the
+truth by 27 ms.)
+
+**The instrument was a histogram of the rows themselves**, not a guess about them. The built
+`dist/presentation/text.js` was instrumented in place — the built output and not `src/`, so no
+other agent's run could see it — with counters on `cells`, `displayCells`, `fitStyled`,
+`sliceCells`, `stripControl` and the segmenter, and a per-call key of *path × non-ASCII count ×
+SGR count × length* with one sample row per key, printed at exit under `node tools/profile.mjs`
+after a clean build (`out/instrument-dist-text.py`, `out/probe-f955-hist.txt`):
+
+| shape (path · non-ASCII · SGR · length) | calls | total ms | µs/call | `cells()`/call | segmenter/call | glyphs |
+|---|---|---|---|---|---|---|
+| pad · 1–3 · 17+ · 81–160 | 1122 | 68.2 | **60.8** | 143 | 3 | `│` × 1122 |
+| pad · 1–3 · 5–16 · 161+ | 165 | 14.3 | 86.8 | 201 | 3 | `│` × 165 |
+| pad · 1–3 · 5–16 · 81–160 | 99 | 5.1 | 51.7 | 102 | 3 | `│` × 99 |
+| pad · 1–3 · 17+ · 161+ | 33 | 3.0 | 90.7 | 201 | 3 | `│` × 33 |
+| already · ASCII · 5–16 · 161+ | 67 | 0.4 | 6.0 | 2 | 0 | — |
+| pad · 1–3 · 0 · 1–20 | 22 | 0.3 | 14.2 | 12 | 3 | `❯` × 22 |
+
+1554 `fitStyled` calls in the run, every one on the pad path or already at width and **none cut**;
+347,573 `cells()` calls of which 343,072 took the printable-ASCII path — one per code point of the
+walk — and 4,793 segmenter calls, three per row (one is the probe's own classification; the real
+two are below). **Every patch row carries exactly one code unit outside `[0x20, 0x7e]`: the
+gutter's `│`.** That one glyph makes `cells()`'s fast path miss for the whole 141-cell row, so
+`displayCells` sends the row through `stripControl`, `GRAPHEMES.segment` and `clusterCells`'s
+spread once per cluster — a segment object per ASCII character, for characters that are one cell
+each by construction — and the walk then asks `cells()` of each of the 141 code points and pays a
+second segmenter call for the glyph. Attributed on a 200-cell row of that shape, per call
+(`out/attrib-bench.ts`): `replace(sgr)` 0.2 µs, `stripControl` 1.2, **the segmenter's iteration
+43.0**, its per-cluster spread +0.6, and a `charCodeAt` loop over the same units 0.5. The
+segmenter costs about 200 ns per cluster, and the row had 140 clusters that could not have been
+anything but one cell.
+
+**The fix is that the measurer walks as the cursors do, and none of the three asks the segmenter
+for a character that cannot be extended** (C09 I63). A run of printable ASCII is counted by its
+length; `plainRun` leaves a run's last character to the segmenter only when the unit after it is
+a non-control outside ASCII — the only thing that could extend that character, and a control
+breaks a cluster on both sides, so a run ending at an escape or a tab is whole and costs nothing.
+Otherwise the one cluster at the cursor is asked of `Intl.Segmenter`'s `containing`, which was
+measured linear before it was relied on — per call, ms, 50 → 400 cells, beside the iterator that
+segments the whole string (`out/containing-probe.mjs`): CJK 0.0062 → 0.0409 against 0.0062 →
+0.0400, a row of families 0.0067 → 0.0479 against 0.0069 → 0.0460, ASCII 0.0107 → 0.0786 against
+0.0102 → 0.0761 — between 6.6× and 7.4× where linear is 8×. `displayCells` counts a row of
+printable ASCII and escapes in one scan of its code units and allocates nothing; anything else
+falls through to the stripped measure, so the two paths can only agree. `clusterCells` tests for
+U+FE0F with `includes` rather than spreading the cluster into an array, which it did once per
+cluster of every measured string. And the same walk is what closes F939: the piece is a cluster,
+so a family, `⚠️`, a flag and a skin-toned hand fit as the measurer counts them.
+
+**Before and after**, ms per call, best of three 20 ms batches, `out/fit-bench4.ts` through `tsx`
+against `src/`, same machine, same hour. *styled* is F938's row (a colour change every twenty
+cells), *gutter* is the transcript's row (one `│` among ASCII), *warn* has a `⚠️` every twenty
+cells, *cjk* is all double-width:
+
+| shape · cells | `displayCells` | `fitStyled`, pad | `sliceCells`, tail |
+|---|---|---|---|
+| styled · 50 | 0.0003 → 0.0003 | 0.0013 → **0.0006** | 0.0012 → **0.0004** |
+| styled · 200 | 0.0008 → 0.0008 | 0.0044 → **0.0016** | 0.0042 → **0.0010** |
+| styled · 400 | 0.0015 → 0.0015 | 0.0086 → **0.0030** | 0.0083 → **0.0017** |
+| plain · 200 | 0.0004 → 0.0006 | 0.0038 → **0.0008** | 0.0038 → **0.0004** |
+| plain · 400 | 0.0006 → 0.0009 | 0.0070 → **0.0014** | 0.0073 → **0.0007** |
+| gutter · 50 | 0.0118 → **0.0017** | 0.0143 → **0.0031** | 0.0033 → **0.0014** |
+| gutter · 200 | 0.0479 → **0.0028** | 0.0537 → **0.0044** | 0.0065 → **0.0017** |
+| gutter · 400 | 0.0945 → **0.0046** | 0.1029 → **0.0061** | 0.0111 → **0.0019** |
+| warn · 200 | 0.0496 → **0.0086** | 0.0849 → **0.0167** | 0.0419 → **0.0070** |
+| warn · 400 | 0.0951 → **0.0166** | 0.1848 → **0.0294** | 0.0859 → **0.0131** |
+| cjk · 200 | 0.0261 → 0.0251 | 0.1516 → **0.0516** | 0.1267 → **0.0259** |
+| cjk · 400 | 0.0478 → 0.0504 | 0.3660 → **0.1003** | 0.2765 → **0.0505** |
+
+The gutter row is 12× cheaper to fit at 200 cells and 17× cheaper to measure; the styled row F938
+optimised is 2.7× cheaper again, because the walk takes a run of ASCII as a substring rather than
+a character at a time; and the CJK row, where every cluster must reach the segmenter, is 3.6×
+cheaper because the walk no longer builds a segmenter per code point. Two cells moved the other
+way and are recorded: a *plain* row's `displayCells` at 400 cells went from 0.0006 to 0.0009 ms,
+the scan's escape test costing 0.3 µs the `replace` did not, and `cjk`'s measure is unchanged
+within noise because nothing about it could be — every one of its clusters reaches the segmenter
+either way.
+
+**Whole-frame, `make profile` on the same scripted session, clean build, quiet machine, 34
+frames both times** (`out/profile-f955-before.json`, `out/profile-f955-after.json`):
+
+| span | before | after |
+|---|---|---|
+| `transcript` self, 34 frames | **69.16 ms** (p50 1.92 ms a frame) | **13.81 ms** (p50 0.34) |
+| `transcript`'s share of frame work | 22.9 % | **6.1 %** |
+| `visible` self | 27.31 ms | 22.15 ms |
+| `react` self (the control — untouched) | 153.35 ms | 140.87 ms |
+| frame work, 34 frames | 301.4 ms | **225.2 ms** |
+| median frame | 5.25 ms | **3.33 ms** |
+| p95 frame | 24.06 ms | 22.02 ms (still crossed; M-T6's 95 ms patch frame) |
+
+`transcript` went from the second-largest span to a twentieth of `react`. What its 13.8 ms still
+holds is about 8 µs a row: the gutter row's fall-through in `displayCells` still pays `replace` and
+`stripControl`'s `for…of` (1.4 µs at 200 cells, in `data/text.ts`, not touched here), two
+`containing` calls — the glyph, and the space before it that `plainRun` gives up because the next
+unit is not ASCII — and the span itself. A pre-check that skips `stripControl` when no code unit
+lies in the C0, DEL or C1 ranges would take most of that and would restate the filter's rule one
+file over; left as residue rather than done twice.
+
+**What would falsify this**: a profiled session whose rows carry no glyph at all should now show
+`transcript` at the styled row's cost, about 1.6 µs a row at 200 cells; and a row shape on which
+the new measurer and the old disagree — which is what the differential probe that landed the walk
+was for, and it found two things, neither a disagreement of this kind (F956, F957). T3.85 pins
+the ratio the histogram is about: a 200-cell row holding one glyph against a 200-cell CJK row,
+2.8× before and 12× after, bound at 6, each operand a batch of at least 20 ms so the clock's floor
+cannot produce it.
+
+## F956 — the code-point walk dropped a combining mark at a window's right edge, and no width could see it ★★★☆☆
+
+The cluster cursor was landed against a differential probe rather than against the suite alone
+(`out/diff-probe.ts`): HEAD's `text.ts` and the new one, imported side by side, over seeded random
+rows built from atoms that are whole clusters and join with no neighbour, so that an escape between
+two atoms is never inside a cluster. On 6,000 such rows `cells` and `displayCells` agreed on every
+one, `fitStyled` agreed byte for byte on **79,416 of 79,416** outputs — and `sliceCells` differed on
+**1,912 of 530,208**, every one of them the same shape:
+
+```
+sliceCells("…aé…", 0, 2)     HEAD  "ae"        new  "aé"
+```
+
+The per-cell loop took the `e` at cell 1, then met the mark — zero cells, belonging to the cell it
+had just taken — and broke on `used >= end` before copying it. The base survived without its
+accent, in the first piece of every composite that put a window's right edge on a decomposed
+character.
+
+**Why nothing saw it.** `ae` measures 2 exactly as `aé` does. The composition law holds; the
+width property holds; T1.31's corpus has decomposed marks and every one of its windows measured
+`b − a`. The only instrument that can see a dropped zero-width piece is a byte comparison against
+an answer known to be right — a collision is a dropped input, and a width is a collision by
+design. `fitStyled` never had the defect, because its cut test is `used + w > width` and a
+zero-width piece never exceeds anything; the two walks were written from opposite ends and only
+one of them checked the edge before the piece.
+
+**Reachable**: a far-side row in NFD — anything from a filesystem that stores decomposed names, or
+a tool that emits them — under a composite overlay whose left edge lands after a marked letter.
+Fixed by construction rather than by a check: a cluster is one piece (C09 I63), so the mark is
+never a separate step at all. T1.36 pins `[0, 2)` over `aéb` as three code units and two
+cells, styled and plain.
+
+**What would falsify this**: a terminal that draws a lone combining mark after a cut as a cell of
+its own — then the dropped mark was a correct cut, and the measurer's zero is what is wrong. T1.13
+is where that would have to move first.
+
+## F957 — a Prepend is a fifth non-additive shape, and an escape inside a cluster is the corner the walk does not resolve ★★★☆☆
+
+Two things the same probe (F956) turned up that F939 did not list.
+
+**A Prepend joins the character after it.** U+0600 ARABIC NUMBER SIGN is `Grapheme_Cluster_Break=
+Prepend`, and UAX #29's GB9b puts it in one cluster with whatever follows: `cells("؀1")` is
+**1** — the cluster's width is its base's — where the code-point walk summed 1 + 1 and
+`fitStyled("؀1", 2)` came back unpadded, believing itself two cells wide. F939's four shapes
+were emoji; this one is a number sign in Arabic, Syriac and Kaithi text, which is far-side text of
+exactly the kind the measurer sees. The property behind all five is the same — a cluster's width is
+not the sum of its parts — and the cluster cursor handles it by construction. T1.36 pins the
+measure and the walk (`fitStyled("؀1x", 1)` keeps the cluster whole).
+
+**An escape inside a cluster is the one piece the walk does not resolve as the measurer does.**
+The walk segments the row with its escapes in place; `displayCells` strips them first. Wherever an
+SGR sits *inside* what would be one cluster, the two disagree by the width of the split — and the
+old walk disagreed by exactly the same amount, so this is recorded, not introduced. Eight cases,
+each fitted to 6 (`displayCells` of the row; then what the fitted row measures, HEAD and new):
+
+| the escape sits | `displayCells` | fitted row measures | bytes |
+|---|---|---|---|
+| after a Prepend, before a digit | 1 | 5 · 5 | same |
+| between a base and its combining mark | 2 | 6 · 6 | same |
+| between a base and a spacing mark | 1 | 5 · 5 | same |
+| between the halves of a surrogate pair | 2 | 6 · 6 | same |
+| between a pictograph and a joiner | 2 | 4 · 4 | same |
+| between a joiner and a pictograph | 2 | 4 · 4 | same |
+| between the halves of a flag | 2 | 4 · 4 | same |
+| between a base and U+FE0F | 2 | 7 · 7 | same |
+
+Only the second is harmless — a combining mark is zero cells either way, so `x ESC[31m U+0301 y`
+fits to 4 as `x ESC[31m U+0301 y` and two blanks, and measures 4 — and it is the only one a
+framework path could plausibly produce. **What the walk does there is the tail rule**: an escape's
+final `m` is a letter, and the segmenter puts a mark placed directly after an escape in one cluster
+with it; the cluster found then begins before the cursor, and the piece taken is its tail from the
+cursor — the mark alone — so the escape is never inside a piece and never repeated. Removing the
+rule emits the `m` twice (the TAIL-OFF mutation; T1.36 sees it).
+
+**Why it is a corner and not a path**: C04 I84 keeps a renderer from painting an escape inside a
+cluster — `clusterEnds` exists so that a span boundary lands on one — and far-side text carries no
+ESC at all after C07's strip. Resolving it anyway would mean either measuring the row twice or
+mapping cluster boundaries from the stripped string back onto the styled one, on every row of every
+frame, for a case the layer above forbids. Recorded in T1.36 and C09 §5a with the eight cases.
+
+**What would falsify this**: a framework path that splits a cluster with an escape — a `runsOf`
+boundary inside a keycap, a ramp painting per code point rather than per cluster. Grepping for
+split runs is the check; C09 §5's runs section is where the rule lives.
+
+## F958 — two mutations written to be quadratic were linear, because a V8 slice is a view and `containing` is lazy ★★☆☆☆
+
+The mutation pass on the cluster cursor (`tools/mutate/runs/quadratic-cursor.mjs`, every row
+applied by hand from a good copy and restored) indicted two of its own mutations before it
+indicted anything else.
+
+**FIT-REMAINDER and SLICE-REMAINDER, as first written**, replaced the one-cluster ask
+`clusterAt(segments, i)` with `GRAPHEMES.segment(text.slice(i))` and `containing(0)` — the
+remainder of the row re-segmented per cluster, which reads as F937's quadratic by the mechanism
+SS60 cannot see, and was written to fail T3.84's 50-against-400 ratio on a CJK row. **Both
+survived: 252 of 252 rows green.** And they were right to. `String.prototype.slice` returns a
+sliced string in V8 — a view onto the parent, no copy — for anything longer than a dozen units;
+`segment()` holds the string and does nothing; `containing(0)` scans one cluster. The spelling is
+linear. A fabricated violation can be vacuous, and this one was: it named a mechanism and did not
+have it.
+
+**The spelling that is quadratic materialises the remainder**: `graphemes(text.slice(i))[0]`,
+every cluster after the cursor built into an array to read the first. No spread is written, so
+SS60 is silent; T3.84 fails at both sites (1 failed, 251 passed, each time) while T3.77, T3.78 and
+T3.79 stay green, because their rows never reach the cluster arm. That is now the mutation, with
+the vacuous first spelling recorded beside it, and F938's blind-spot sentence — *any scan of the
+remainder by another mechanism* — has a measured instance of a scan that is not one.
+
+**Two more things the pass changed.** T6.105 said T1.16c stays green under the code-unit step in
+`sliceCells`, and it did under the code-point walk; under the cluster walk it fails — with the
+tail rule, the next ask finds the cluster the cursor is inside and emits its remainder as a piece
+of its own width, so the pieces are no longer each wrong by the same amount and the composition
+law sees it. The row is corrected, not the test. And the code-point step put back at `fitStyled`'s
+cluster arm fails T3.85 as well as T3.79: a code-point read is cheaper than `containing`, so the
+CJK row that must reach the segmenter gets cheaper and its ratio against the gutter row falls
+under the bound. That is the row's sensitivity — it measures how cheap the cluster arm is, not
+only how expensive the run arm is not — and it is stated in the row rather than left for the
+next survivor to explain. Sixteen mutations, fifteen kills, one listed survivor (the forward
+search, whose reason moved and is recorded in T6.104).
+
+**What would falsify this**: a V8 release that copies on `slice` — then the first spelling is
+quadratic after all and would fail T3.84, which is the row that would notice.
+
+## F963 — the profiler's replay was two wall-clock reads behind its recording, and the row was red whenever a second boundary fell in the gap ★★★★☆
+
+T1.83 red three times and T5.1b once, only inside a full `make e2e` or a `make instruments`
+straight after one; green alone seven of seven on the same `dist/` every time; not reproduced
+under twelve `yes` loops (F929, F949). The first assertion was `expect(out.identical).toBe(true)`
+and every red run left one line — *expected false to be true* — so the four instances carried no
+verdict at all. This round put the verdict into the assertion first (F965) and then went looking.
+
+**The regime was never "after the other eighteen".** `--no-file-parallelism` runs the files in the
+order of vitest's cached durations (`node_modules/.vite/vitest/<hash>/results.json`): frame-scheduler
+76 s, transport 67 s, view-model 29 s, mouse 23 s, then profiler — fifth, in every chain logged this
+round and in `out/gate-e2e.log` before it. And it reproduced **outside a chain, twice, with the
+verdict this time**:
+
+| run | what ran | result | the figures |
+|---|---|---|---|
+| 1 | full `test/e2e`, no build, 09:28 | green 19 files · 121 rows · 287.7 s | profiler fifth, 7/7, `answer` 87–127 ms; another lane's `vitest run out/profile-drive.test.ts` was alive at the start |
+| 2 | the same, 09:46 | green 19 · 121 · 281.4 s | profiler fifth, 7/7, identical on every verdict |
+| alone ×2 | `profiler.test.ts` alone, 09:26 and 09:36 | 7/7 and 7/7 | `stalled 0`, `exhaustedAt null`, `masked 14` at `spans`, 0 at `counters` |
+| probe control, 09:39 | one recording with the real far side, replayed | **diverged at frame 6** | header `09:39:14` recorded, `09:39:13` replayed; frame 7 174 B recorded, 322 B replayed; wall reads 54 recorded, **52** consumed |
+| alone 3, 09:53 | the file alone | **T5.1b red** (`counters`) | frame 6 `09:53:28` against `09:53:27`; frame 7 25 B against 173 B; `consumed wall=52`, recorded 54; `stalled 0`, `exhaustedAt null` |
+| loop ×10, 09:4x | ten recordings alone | 10/10 identical | 2 of 46 recordings diverged this session at the harness's 200 ms pause |
+| slow far side | `CALCIUM_FARSIDE` → a 250 ms wrapper | identical | the same eight frames: nothing wakes below the readout's one-second tick |
+| matrix | stale transport, 1 000 ms pause ×3 | **diverged 3/3 at frame 6** | 52 against 54 every time |
+| matrix | parity transport, 1 000 ms ×3 and 200 ms ×3 | identical 6/6 | **54 against 54** every time |
+
+**The cause is a read-count asymmetry between two transports in one build.** C06's subprocess
+transport reads the session's wall clock — `construct.ts:3019` hands it `{ now: config.clock }` —
+before it spawns (`subprocess.ts:95`) and once more for `durationMs` when the child has answered
+(`:126`, `:160`; the stream path reads at `:174` and again before yielding its terminal patch).
+`replayTransport` in `src/testing/replay.ts` served the recorded value and read nothing. The clocks
+are positional (I14, F908): read *n* is served what read *n* returned. So from the first invoke on,
+every replayed read was served the value the live session had taken **two reads earlier**.
+
+The per-frame read map, from `CALCIUM_REPLAY_TRACE`'s wall stamps: frames 0–2 take 3, 2 and 2
+reads; the 15-byte input takes 28 (the decoder stamps each byte); the echo frame's tail 3; frame 4
+three; the answer frame four; the resize repaint three; the `^D` frame four — 52. The header's read
+is the *second* of a frame's cluster. Served two behind, the resize repaint's header got the answer
+frame's **last** read: on a quiet machine ~30 ms earlier than the live header's (the harness's
+≤20 ms poll, C03's 16 ms resize window, the render). A wall-clock second boundary in those thirty
+milliseconds is `:27` on one side and `:28` on the other — 2 in 46 recordings here, and the window
+is a gap between two of *the session's own* reads, so it widens with whatever slows the session
+between one frame and the next, which a busy gate chain does and twelve `yes` loops barely do
+(F949's one loaded run of six recordings had roughly a 0.8 chance of coming up green). The `^D`
+frame cannot diverge this way: its two input-path reads precede the header's, so two behind still
+lands inside the `^D` moment — which is why frame 7 was never the first difference in 46 recordings
+and the flake had exactly one address.
+
+**Why the mask did not absorb it, and would not have helped**: the header member of
+`CLOCK_DERIVED` has never matched a chrome frame (F964). Had it, frame 6 would have compared equal
+and the same recording would have diverged at frame 7 instead — the replay's own second flipping
+one frame late and redrawing the header row where the recording drew a footer-only frame. *The mask
+reaches the bytes and not the decision to draw them* is F912's sentence, and this is its second
+instance.
+
+**Ruled out, each by a counter rather than an argument.** Stalls: `stalled 0` on every verdict,
+red or green. Clock exhaustion: `exhaustedAt null`, `overrun.wall 0`. Event order: the recorded and
+replayed timelines agree token for token on every red verdict up to frame 7's size. Leftovers:
+`fixture processes alive: none` on both natural reds (one stray `tsx out/probe-i92.mts`, another
+lane's, 0 % CPU, 1.6 days old, was in the container throughout). The recording differing: eight
+frames of the same sizes and `answer` 84–159 ms in every recording. A timer-drawn frame while the
+far side is slow: the 250 ms far side above — the transcript head's glyph is not an animating block.
+
+**The fix is parity, and it is asserted.** `replayTransport(rec, clock)` reads the wall clock where
+C06 does — once before serving, and once more after a microtask, so that the frame the key handler
+writes inline lands between the two reads as it does live; for a stream, once at the start and once
+before the last recorded value. The fixture counts positions consumed at the seam that serves them
+and reports `consumed` beside `recorded` in the verdict — the mirror cannot count these, because a
+supplied transport never sees the session's wrapped clock. **T5.1c** records with a 1 000 ms pause
+between the answer and the resize, so the boundary falls in the window on every run, and asserts
+`consumed.wall === recorded.wall` and identical: red on today's `dist/` (52 ≠ 54, diverged at 6),
+green 6 of 6 through the probe against the same `dist/` with the new transport, and it lands with a
+build. `record()` takes the pause as a knob because the pause *is* the window.
+
+**Not fixed, stated.** The live session records one mono read more per second of session than the
+replay consumes — 2904 against 2903 at a 200 ms pause, 2905 at 1 000 ms — a periodic reader on the
+live side (the profiler's sampler, `recorder.ts:274`, is the candidate). Its only frame-reaching
+consumer is C24 I32's masked cell, so it is reported in the verdict and not asserted; it is the mono
+half of this finding waiting for a consumer. **Two more, stated and not fixed**: the transcript head's
+duration figure (`deps.clock() − startedAt`) is wall-derived and unmasked — invisible below one second,
+and a far-side call of a second or more would diverge under any residual misalignment; and C06 measures
+`durationMs` on the wall clock where a duration belongs on `elapsed`, which is a C06 design question
+rather than a replay one — parity would then need mirroring on mono as well. The header mask's reach
+into a document's own `"12:00:01"` is pre-existing and unchanged.
+
+**What would falsify this**: a T5.1c verdict with `consumed.wall === recorded.wall` that still
+diverges at the resize repaint's header; or a recording whose live and replayed wall counts agree
+while the two second hands do not.
+
+## F964 — `CLOCK_DERIVED`'s header-clock member never matched a chrome frame: `\b` cannot follow an SGR's `m` ★★★☆☆
+
+The second member of `CLOCK_DERIVED` (`src/shell/profiling/replay.ts`) is
+`/\b[0-2]\d:[0-5]\d:[0-5]\d\b/gu`. The chrome writes the clock as
+`\x1b[38;5;241m09:39:14\x1b[39m`, and `m` is a word character, so there is no boundary before the
+first digit and the pattern matches nothing the header ever draws. Measured: `masked` is **14** on
+every `spans` replay — seven `last N.Nms` cells on two sides, and nothing else — and **0** at
+`counters`. The row that narrowed this pattern (F912; `test/unit/profiler-gauges.test.ts:517`) fed
+`at 23:27:10`, a sentence with a space before the digits, and the tier-5 row asserts the *set* fired
+(`masked > 0`), which its first member satisfies alone. *Assert the set, not its first member.*
+
+**T5.1b was true because the member was dead.** It asserts *nothing masked* at `counters` and its
+spec text says *below `spans` no cell's value comes from a clock the inputs do not fix*; the header's
+time-of-day is drawn at every tier, so a working mask makes T5.1b red — and should, on the sentence,
+not on the code. And the frame-6 divergence in F963 is the value this mask exists to excuse.
+
+**The patch** (orchestrator's, `src/shell/profiling/replay.ts`): replace the member with
+`/(?<![\d:])[0-2]\d:[0-5]\d:[0-5]\d(?![\d:])/gu`. Measured on bytes: the chrome's cell 1 (was 0),
+`at 23:27:10` 1, `took 12:30 to build` 0, `109:39:14` 0, `09:39:145` 0, and a log line's
+`"12:00:01"` 1 on both patterns — the pre-existing reach into a document's own timestamps, unchanged
+and still the stated blind spot. **T1.101** (`test/unit/profiler-gauges.test.ts`, beside T1.87, the row it
+corrects — T1.86 was already C28's elision row) feeds the chrome's bytes to `compareFrames` and is red until the patch. T5.1b then wants to
+say what it means: no `last` cell in the recorded frames (`CLOCK_DERIVED[0]` matches none of them)
+and `masked > 0` — the header's clock, on both sides.
+
+**What would falsify this**: a `spans` replay after the patch still reporting `masked` 14.
+
+## F965 — what the red row could not say, and three things it says now that were never true ★★☆☆☆
+
+**The instrument first.** Four red instances and the sum of their evidence was *expected false to be
+true*: the fixture printed its verdict to a stderr the reporter dropped, and the recording sat in a
+`mkdtemp` directory nobody could name. `explain()` now carries, in the assertion message of every
+replay row: both paths (the recording is kept), `formatReplay` and `formatDrive` over the verdict,
+the clock counts — recorded, consumed, mirrored, overrun — the harness's own timings, every PTY read
+after the submit as `+ms:bytes`, both event orders with frame sizes, and on a red row the load and
+any fixture or far-side process still alive. `CALCIUM_VERDICT_LOG` appends one JSON line per replay
+so a green row leaves its figures too. The message was shown red by an inverted probe copy before
+the first long run, and it is what F963's two natural reproductions were read from.
+
+**Three things measured on the way that the file used to assume.**
+
+1. **`^D` never ended a recording.** C16 I16 makes `^D` at an empty prompt open a confirm rather
+   than exit; measured, the fixture session is still there 15 s later with the prompt drawn. Every
+   recording ever taken ended by the harness's kill, and its `end` line is the exit listener's —
+   F912's design, doing exactly what it was built for. `took.exit` reads `killed` on every run and
+   stays, because it is the field that changes the day the harness answers the confirm.
+2. **The far side was never the slow part.** `answer` (submit to the frame holding the twentieth
+   row) was 84–159 ms across 46 recordings; the far side's spawn is 14–28 ms; and a far side made
+   250 ms slow through `CALCIUM_FARSIDE` changed nothing, because the head's spinner glyph is not an
+   animating block and the first timer-drawn frame is the readout's, a second out.
+3. **The order was the cache's.** Profiler ran fifth of nineteen in every chain here, not last; the
+   long files before it are what makes a chain slow and the window in F963 wide.
+
+**Three instruments left in the harness for the next one of these**: `CALCIUM_REPLAY_TRACE`
+(fixture: wall-clock stamps on every frame write, invoke, answer, input, resize, and every wall
+read with its index and the value served), `CALCIUM_FARSIDE` (fixture: any executable as the
+subprocess far side), and `InteractivePty.reads` (pty.ts: the arrival time and size of every read).
+The probes that used them are under `out/t183-*`.
+
+**What would falsify this**: a red profiler row whose failure text is one line.
+
+## F968 — a mutation survived T2.42 for as long as the row's children were one row each: the forced-zero guard is observable only through a child that straddles a held offset ★★☆☆☆
+
+`c04-follow.mjs`'s *a collapsed box is not forced to offset zero* disables `offsetOf`'s
+`if (interior === 0) return 0;` and expects T2.42 to fail. It survived this round's pass — and
+survives on the committed tree before any of this round's changes, so it has been surviving since
+the run was written on 2026-09-05. The mutation's comment said the residue would read *N above,
+0 below*; it does not, because I104 fixed the collapsed text by state (F826) and the offset no
+longer reaches it. What the guard still governs is the child window: with an interior of 0 the
+filter keeps any child that straddles the offset, and a child the slice cannot cut — a container
+has no `window` — is kept whole. T2.42's children were single-row `raw` blocks, which no offset
+can straddle, so in that row the guard had nothing to be wrong about.
+
+Measured: a collapsed box holding a three-row column group and a held offset of 1 draws `r1 r2 r3`
+above its own fold with the guard disabled, and `⋯ +5 more` with it. The case is in T2.42; the
+mutation is caught; the run's comment names the mechanism it tests, and C04 §3c S2 names the
+observable rather than the line.
+
+Two things about method. A mutation written against a comment — *the fold pointing the wrong way*
+— rather than a measured output tests the comment's belief, and outlives the code the belief was
+about. And a row whose fixtures are the degenerate shape, one row per child, satisfies a straddling
+rule vacuously: *a probe at the extremes runs once*, arriving in a fixture rather than a probe. The
+run passed clean when written, and nothing re-ran it until another lane renamed an expectation in
+it and the serial phase put it in the pass list.
+
+**What would falsify this**: the mutation surviving T2.42 with the group child in place.
