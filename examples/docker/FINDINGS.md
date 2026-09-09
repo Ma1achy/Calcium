@@ -36384,9 +36384,11 @@ GIF's `a=T` discards the frames its earlier `a=f`s uploaded. `tools/terminal-pro
 `i=911` is the instrument for the first and has not been read in front of a terminal. A refusal
 on either reverses the ruling rather than patching it.
 
-**Owed at the code commit**: the after column. That a byte-identical grid costs nothing is
-arithmetic over the row diff and not a measurement, and the same probe reports it once
-`placementIdOf` exists.
+**Measured after, by the same probe** (`out/f987-anim-bytes-after.ts`): one placement id
+across both frames, placeholders byte-identical, **1 367 B a frame against 14 176**, and
+**one entry in the record after a hundred frames**. The prediction was arithmetic over the
+row diff and it held exactly, which is worth saying because the arithmetic was the part
+nobody had run.
 
 **What would falsify this**: a terminal that redraws a placement when the image at its id is
 replaced; two entries whose ids repeat across a session, which would put S1 back one level up.
@@ -36428,3 +36430,75 @@ sweep's job, and the two are separate instruments on purpose.
 
 **What would falsify this**: a red the sweep reports that a hand-run pass does not reproduce, which
 would mean the snapshot-and-restore is the subject rather than the run.
+## F991 — the whole register read against HEAD: 355 rows resolved, 33 of them still open, and every heading count was computed over the subset that had ever been annotated ★★★★☆
+
+**F986 was nineteen rows and this is the rest.** Five readers over the fourteen groups and the
+singles, one verdict per row, each resolved by finding the commit, the invariant, the rule or the
+later finding that answers it — never by reading the row's own prose.
+
+| | rows |
+|---|---|
+| resolved this pass | 355 |
+| of those, already closed at HEAD | 296 |
+| refused, with the refusal already written down | 7 |
+| partly — a half landed and a residue named | 25 |
+| genuinely open | 27 |
+
+**The register as a whole, counted rather than claimed:**
+
+| | rows |
+|---|---|
+| carrying a closed verdict | 607 |
+| carrying an open one | 36 |
+| carrying no verdict at all | 335 |
+
+**Every heading was wrong and all in one direction.** Group 1 said *14 open, 5 closed* over 19
+rows and holds 20, of which 4 are open. Group 2 said *16 open, 41 closed* over 79. Group 11 said
+*140 closed, 129 open* over 269 entries and holds 363. Group 14 said 32 and holds 36. The
+mechanism is the same every time: **a heading is computed over the rows that were annotated, and
+a row is annotated when someone happens to look at it** — so the count describes the reading and
+not the register. The ranking table's own disposition cell had said as much about itself since
+F741, and stayed out by 66 because it named the discrepancy instead of recounting.
+
+**The nine most useful corrections are the ones where the row was wrong about *what* closed it.**
+A stale marker costs a reading; a wrong closer costs a wrong belief:
+
+- **F342** is closed by C12 I73 and I75. F349 is the corpus-wide instrument F342 *asked for*, not
+  its closer, and the row invited the substitution.
+- **F316** is closed by AD8 at `f2c941e7`. F337 is a sibling — three instruments the gradient
+  tripped — and reads as the closer because it is adjacent and later.
+- **F135** is closed by F15's containment, which F135's own body asks for and which nothing in the
+  row records.
+- **F23 and F129 are one gap**, not two findings: the local route cannot open a view because
+  `isViewInvocation` is read only on the `app` route, and `execution.ts` says so in a comment whose
+  own argument depends on it.
+- **F593 is cited for F642's subject** in `src/presentation/text.ts` and again in C09's T1.19,
+  where the example is verbatim F642's. F593 is another lane's `tsc` record. F642 has no citation
+  anywhere.
+- **F726**'s row ends *Open* and opens *closed and corrected by F732*; **F537**'s says *requested
+  of C04's owner* and C04 I76 rules it; **F79** and **F86** read open here and CLOSED in
+  `CALCIUM_FIX_PLAN.md`. A row that disagrees with another document is the cheapest of these to
+  find and the least likely to be looked for.
+- **F873** said *C26 and C27 still open*; C27's row landed at `2314f0bb` and C26 is the only entry
+  left, with its reason.
+
+**Twenty-seven open, and they are small.** Fifteen are an hour: a missing export (F505), a
+`node --check` (F354), a barrel line with one consumer (F625), two commitments numbered 41 (F664),
+a collision guard one line away from its sibling (F375), an absent-versus-wrong-type split (F153).
+Six are a session. Three are a design — widening `Block` (F405), MG24 resolving by symbol (F218),
+and the seam that would carry a block's chosen arm back to the shell (F624), which is refused on
+the record rather than owed.
+
+**What this pass cannot do, stated.** 335 rows still carry no verdict, and they are concentrated
+in the three artefact groups — 85 in group 7, 66 in group 9, 67 in group 10 — where a row is
+usually a reading rather than a repair, and *closed* is not always the right word for it. Nothing
+here counts those as closed and nothing should: the heading now says *with no verdict*, which is
+the honest third column and the one the old headings did not have.
+
+**The remedy is where F986 left it and no further.** No gate resolves prose against a tree. What
+changed is that a row now carries the commit that answers it, so the next reader inherits the
+resolution rather than the question.
+
+**What would falsify this**: a row marked closed here whose work is not at HEAD. Each verdict names
+a commit, an invariant or a file, and any one of them can be checked in a minute — which is the
+property the old markers did not have.
