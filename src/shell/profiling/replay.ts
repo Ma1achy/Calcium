@@ -249,7 +249,16 @@ export const CLOCK_DERIVED: readonly RegExp[] = Object.freeze([
   // truncated one can. That is a narrower failure than masking real content:
   // a mask that swallows a document's own text hides divergences everywhere,
   // and this one only fails to excuse a frame in one regime.
-  /\b[0-2]\d:[0-5]\d:[0-5]\d\b/gu,
+  //
+  // **Lookarounds rather than `\b`, because the chrome writes the digits
+  // straight after an SGR's `m`** — `\x1b[38;5;241m09:39:14\x1b[39m` — and `m`
+  // is a word character, so `\b` found no boundary there and this member
+  // matched nothing the header ever drew: `masked` read 14 on every `spans`
+  // replay, seven `last` cells on two sides, and the row that narrowed the
+  // pattern fed a sentence with a space before the digits (F964). What the
+  // lookarounds refuse is a digit or a colon on either side, which is what
+  // kept `109:39:14` and `09:39:145` out of the `\b` form too.
+  /(?<![\d:])[0-2]\d:[0-5]\d:[0-5]\d(?![\d:])/gu,
 ]);
 
 export type ReplayResult = Readonly<{

@@ -177,6 +177,17 @@ const results = runPass({
       // PS10 — a two-character write into a ten-cell row leaves two cells.
       expect: "PS10",
     },
+    {
+      // **F966's state, restored.** The CSI grammar without its intermediate
+      // class and with a parameter class short of the private bytes. The three
+      // copies drifted together, which is why there is one source to mutate.
+      name: "the CSI grammar loses its intermediate class and its private parameter bytes",
+      file: FILE,
+      from: "String.raw`\\[[0-?]*[ -/]*[@-~]|",
+      to: "String.raw`\\[[0-9;?]*[a-zA-Z]|",
+      // PS16 — the beam paints ` q` and the keyboard protocol paints `>3u`.
+      expect: "PS16",
+    },
   ],
 });
 

@@ -77,6 +77,12 @@ describe("tools/mutate/anchors.mjs", () => {
 
     expect(r.ok).toBe(false);
     expect(r.out).toContain("fake.mjs");
+    // **And the anchor itself**, because a count that says one is missing sends
+    // the reader to a second tool to learn which: the C28 run's 119 anchors, on
+    // the day the header mask moved and an earlier mutation still named it.
+    expect(r.out, "names the file and the anchor's head").toContain(
+      'src/data/viewmodel/tree.ts · "export function hasChildren(b: Block): b is ContainerBlock {"',
+    );
   });
 
   it("MA3: the debt list does not travel to a foreign directory", () => {

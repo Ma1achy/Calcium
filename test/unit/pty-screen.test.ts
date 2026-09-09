@@ -264,4 +264,26 @@ describe("PS · the harness's screen", () => {
     expect(overrun(["日本"], 3)).toEqual(["0: 4"]);
     expect(overrun(["abc"], 3)).toEqual([]);
   });
+
+  it("PS16 (F966): a CSI with an intermediate byte or a private parameter moves nothing and paints nothing", () => {
+    // **The matcher had seen one encoding.** It accepted a CSI as parameters
+    // then a final letter, and the grammar has an intermediate class between
+    // them: `DECSCUSR` — `ESC [ 6 SP q`, the beam C01 sets at the prompt —
+    // stopped that matcher at the space, so the walk painted ` q` where the
+    // cursor was and F962's drive of docker-tui read the prompt row as
+    // `> [0 q`. The framework's own rows never saw it because they write the
+    // shape at start and release only, and read the rows between.
+    const rows = rowsOf(`${HOME}${ESC}[6 q> ${ESC}[0 qtyped`, 1);
+    expect(rows[0], "the shape sequences leave no text behind").toBe("> typed");
+
+    // The boundary test agrees: the whole sequence is ready, and its head
+    // without the final byte is still arriving.
+    expect(atEscapeBoundary(`${HOME}row${ESC}[6 q`).partial).toBe("");
+    expect(atEscapeBoundary(`${HOME}row${ESC}[6 `).partial).toBe(`${ESC}[6 `);
+
+    // And the parameter class: the kitty keyboard protocol's `CSI > 3 u` and
+    // `CSI < u` carry a private byte the old class did not name, and would
+    // have painted as `>3u` and `<u` for the same reason.
+    expect(rowsOf(`${HOME}${ESC}[>3ua${ESC}[<ub`, 1)[0], "private parameters are consumed whole").toBe("ab");
+  });
 });

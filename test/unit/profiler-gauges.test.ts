@@ -532,4 +532,32 @@ describe("record and replay", () => {
     expect(differs.identical, "a duration is content, and content is compared").toBe(false);
     expect(differs.divergence?.at, "named at its frame").toBe(1);
   });
+
+  it("T1.101 (C28 I14): the header's clock is masked on the chrome's own bytes, where an SGR's `m` precedes the digits", () => {
+    // **`CLOCK_DERIVED`'s header member never fired.** It was
+    // `\b[0-2]\d:[0-5]\d:[0-5]\d\b`, and the chrome writes the clock as
+    // `\x1b[38;5;241m09:39:14\x1b[39m` — `m` is a word character, so there is
+    // no boundary before the first digit. `masked` read 14 on every `spans`
+    // replay, which is seven `last` cells on two sides and nothing else, and 0
+    // at `counters`, which T5.1b asserted as *nothing masked* and which was
+    // true only because the member was dead (F964). T1.87 above fed
+    // `at 23:27:10`, a sentence with a space before the digits, which `\b`
+    // accepts; this row feeds the bytes the chrome writes.
+    const frame = (clock: string): string =>
+      `\u001b[?25l\u001b[H\u001b[38;5;241mprism\u001b[39m  \u001b[38;5;241m${clock}\u001b[39m`;
+    const out = compareFrames(recording([frame("09:39:14")]), [Buffer.from(frame("09:39:15"))]);
+    expect(out.masked, "one clock cell on each side").toBe(2);
+    expect(out.identical, "so a second hand is not a divergence").toBe(true);
+
+    // The control: digits that are part of something longer stay unmasked on
+    // the chrome's bytes as well as in prose — a four-digit head and a trailing
+    // digit, which the lookarounds refuse where `\b` also did.
+    for (const longer of ["109:39:14", "09:39:145"]) {
+      const kept = compareFrames(recording([frame(longer)]), [
+        Buffer.from(frame(longer.replace("14", "15"))),
+      ]);
+      expect(kept.masked, `${longer} is not a clock`).toBe(0);
+      expect(kept.identical, `${longer} diverges`).toBe(false);
+    }
+  });
 });

@@ -94,8 +94,29 @@ export function replayStdout(rec: Recording): NodeJS.WriteStream & {
  * queue across verbs would hand a `run` the answer a `status` produced the
  * moment two calls interleave, which is a divergence with a plausible cause and
  * a wrong one.
+ *
+ * **And it reads the clock where C06 does** (I14, F963). The subprocess
+ * transport reads `clock.now()` before it spawns and again for `durationMs`
+ * once the child has answered — two wall reads per invocation, and the same
+ * pair around a stream. A stand-in that served the recorded value and read
+ * nothing left every later positional read two places behind: the resize
+ * repaint's header was handed the answer frame's *last* stamp, some thirty
+ * milliseconds before the one the live session read, and a wall-clock second
+ * boundary in that gap put `:13` on one side and `:14` on the other — on a
+ * quiet machine, once in twenty-five recordings, and oftener as the machine
+ * slows, which is why the row was red only inside a full tier run. The value
+ * already carries its `durationMs`; these reads are taken for their position
+ * and the figure is discarded. The `await` between them is load-bearing: on the
+ * live side the answer is a later turn, so the frame the key handler writes
+ * inline lands between the two reads, and it has to land there here.
+ *
+ * **Clock-read parity is asserted, not assumed** — T5.1c compares the wall
+ * positions the replay consumed with the reads the recording holds (counted at
+ * the seam that serves them, since these reads bypass the session's own clock
+ * and the mirror never sees them), so the next tap whose stand-in reads
+ * differently is a red row and not a flake.
  */
-export function replayTransport(rec: Recording): TransportRouter {
+export function replayTransport(rec: Recording, clock: () => number): TransportRouter {
   const byVerb = new Map<string, unknown[]>();
   for (const e of rec.drive) {
     if (e.t !== "far") continue;
@@ -107,12 +128,27 @@ export function replayTransport(rec: Recording): TransportRouter {
   return {
     for(verb: string) {
       return {
-        invoke: (_inv: Invocation): Promise<RawResult> => Promise.resolve(take(verb) as RawResult),
+        invoke: async (_inv: Invocation): Promise<RawResult> => {
+          const started = clock();
+          const value = take(verb) as RawResult;
+          await Promise.resolve();
+          void (clock() - started);
+          return value;
+        },
         stream: (_inv: Invocation): AsyncIterable<RawPatch> => ({
           async *[Symbol.asyncIterator]() {
+            const started = clock();
             for (;;) {
               const next = take(verb);
               if (next === undefined) return;
+              // C06 takes `durationMs` **before** it yields its terminal patch,
+              // so the end read precedes the last recorded value rather than
+              // following the consumer's last turn — a `finally` after the loop
+              // would land it one frame late. A recording truncated mid-stream
+              // has no terminal patch and its live side never took this read;
+              // the comparison there is a prefix (I15) and parity is asserted
+              // on whole recordings only.
+              if ((byVerb.get(verb)?.length ?? 0) === 0) void (clock() - started);
               yield next as RawPatch;
             }
           },

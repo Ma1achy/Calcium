@@ -15,19 +15,51 @@
 //
 // Generated from the spec's own §10 rows, so the two cannot drift apart by
 // transcription; a row edited here and not there is a diff a reader can see.
-import { execFileSync } from "node:child_process";
-
-import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { execFileSync, spawnSync } from "node:child_process";
+import { appendFileSync, mkdtempSync, readFileSync } from "node:fs";
+import { loadavg, tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import { interactivePty } from "../support/pty.js";
-import { parseRecording } from "../../src/testing/replay.js";
+import {
+  CLOCK_DERIVED,
+  type DriveOutcome,
+  formatDrive,
+  formatReplay,
+  parseRecording,
+  type Recording,
+  type ReplayResult,
+} from "../../src/testing/replay.js";
 
 const FIXTURE = "node test/support/fixture.mjs";
+
+/**
+ * A recording, with what the harness measured while taking it.
+ *
+ * **The timings are the harness's clock and nothing in the recording carries
+ * them** — a recorded event has a sequence number and no stamp, so how long the
+ * far side took is unrecoverable from the file. They are here because the rows
+ * below go red only inside a full tier run and green alone on the same `dist/`
+ * (F929, F949), and the first question about such a run is what was slow.
+ */
+type Recorded = Readonly<{
+  path: string;
+  took: Readonly<{
+    /** Spawn to the first prompt. */
+    prompt: number;
+    /** Submitting `/ps --limit 20` to the frame holding its last row. */
+    answer: number;
+    /** `^D` to the session being gone, or `null` when the harness had to kill it. */
+    exit: number | null;
+    /**
+     * Every PTY read after the submit, as `+ms:bytes` — when the echo, the
+     * frame drawn while waiting, and the answer each reached the terminal.
+     */
+    reads: string;
+  }>;
+}>;
 
 /**
  * One recorded session: type, submit, stream, scroll, resize.
@@ -36,21 +68,54 @@ const FIXTURE = "node test/support/fixture.mjs";
  * C28 I14 asserts is that the pipeline is a function of its inputs — and a fake
  * terminal supplies inputs the real one would not.
  */
-async function record(tier = "spans"): Promise<string> {
+async function record(
+  opts: { readonly tier?: string; readonly pause?: number } = {},
+): Promise<Recorded> {
+  const tier = opts.tier ?? "spans";
+  // **The pause between the answer and the resize is a knob because it is the
+  // window** (F963). Every positional wall read the replay makes after the far
+  // side's answer is served the value the live session read two positions
+  // earlier, for as long as the replay transport reads nothing where C06 reads
+  // twice; the resize repaint's header is then served the answer frame's last
+  // stamp, taken `pause` ago. At 200 ms a wall-clock second boundary lands in
+  // the gap one recording in thirty; at 1 000 ms it lands in every one.
+  const pause = opts.pause ?? 200;
   const path = join(mkdtempSync(join(tmpdir(), "calcium-rec-")), "session.ndjson");
   const pty = interactivePty(`${FIXTURE} session subprocess`, {
     cols: 100,
     rows: 30,
     env: { CALCIUM_RECORD: path, CALCIUM_RECORD_TIER: tier },
   });
+  const t0 = Date.now();
+  let prompt = 0;
+  let answer = 0;
+  let exit: number | null = null;
+  let submittedAt = t0;
   try {
     await pty.waitFor(/\u276f/u, 20_000);
+    prompt = Date.now() - t0;
     pty.type("/ps --limit 20\r");
+    submittedAt = Date.now();
     await pty.waitForFrame((f) => f.join("\n").includes("0000019"), 30_000);
+    answer = Date.now() - submittedAt;
+    await new Promise((r) => setTimeout(r, pause));
     pty.resize(90, 26);
     await new Promise((r) => setTimeout(r, 200));
     pty.type("\u0004");
+    const closed = Date.now();
     await new Promise((r) => setTimeout(r, 600));
+    // A one-millisecond probe: resolved if `^D` had already ended the session,
+    // rejected if the kill below is what ends it. **Measured: it never has.**
+    // C16 I16 makes `^D` at an empty prompt *open a confirm* rather than exit,
+    // so the keystroke draws one frame and the session waits (15 s, measured)
+    // for an answer nobody types; every recording ends by the kill and its
+    // `end` line is the exit listener's (F912). Kept because the day the
+    // harness answers the confirm the recording's shape changes, and this is
+    // the field that would say so.
+    exit = await pty.done(1).then(
+      () => Date.now() - closed,
+      () => null,
+    );
   } finally {
     // **Kill, then wait for the process to be gone.** `kill()` is
     // fire-and-forget: it delivers the signal and returns, and the recording's
@@ -62,8 +127,32 @@ async function record(tier = "spans"): Promise<string> {
     pty.kill();
     await pty.done(20_000).catch(() => 0);
   }
-  return path;
+  const reads = pty.reads
+    .filter((r) => r.at >= submittedAt)
+    .map((r) => `+${String(r.at - submittedAt)}:${String(r.bytes)}`)
+    .join(" ");
+  return { path, took: { prompt, answer, exit, reads } };
 }
+
+/**
+ * The fixture's verdict line: the comparison's fields, the drive's, and the
+ * paths — `mirror` is the replay's own recording, which is the other half of
+ * every comparison below.
+ */
+type Verdict = ReplayResult &
+  DriveOutcome &
+  Readonly<{
+    frameHash: string;
+    frames: number;
+    mirror: string;
+    overrun: Readonly<{ wall: number; mono: number }>;
+    /** Positional clock reads the replay consumed, snapshotted when the drive finished. */
+    consumed: Readonly<{ wall: number; mono: number }>;
+    /** The recording's clock arrays' lengths — what `consumed` is compared with. */
+    recorded: Readonly<{ wall: number; mono: number }>;
+    misses: Readonly<Record<string, Readonly<Record<string, number>>>> | null;
+    queries: Readonly<{ writes: number; frames: number }>;
+  }>;
 
 /**
  * Run one replay and read its verdict.
@@ -71,23 +160,7 @@ async function record(tier = "spans"): Promise<string> {
  * The verdict goes to **stderr** because stdout is the replay's own captured
  * stream; a verdict written into it would be inside the thing being compared.
  */
-function replay(
-  path: string,
-  envOverride: string | null = null,
-): {
-  identical: boolean;
-  compared: number;
-  divergence: unknown;
-  frameHash: string;
-  frames: number;
-  masked: number;
-  elided: boolean;
-  stalled: number;
-  delivered: number;
-  exhaustedAt: number | null;
-  misses: Readonly<Record<string, Readonly<Record<string, number>>>> | null;
-  queries: Readonly<{ writes: number; frames: number }>;
-} {
+function replay(path: string, envOverride: string | null = null): Verdict {
   const res = spawnSync("node", ["test/support/fixture.mjs", "replay", path], {
     encoding: "utf8",
     timeout: 60_000,
@@ -95,9 +168,113 @@ function replay(
   });
   const last = res.stderr.trim().split("\n").at(-1) ?? "";
   try {
-    return JSON.parse(last) as ReturnType<typeof replay>;
+    return JSON.parse(last) as Verdict;
   } catch {
     throw new Error(`replay produced no verdict — stderr was:\n${res.stderr}`);
+  }
+}
+
+/**
+ * A recording's event order, one token per event, frames by their size.
+ *
+ * **This is the instrument that broke F912**: four of its five divergences were
+ * invisible in the frames — an extra `resize`, a missing `end` — and visible
+ * the moment the two orders were read side by side. A frame whose only content
+ * is a spinner glyph is a dozen bytes; a repaint is thousands; which one sits
+ * between two inputs is the question, and a byte count answers it.
+ */
+function timeline(rec: Recording): string {
+  const parts: string[] = [];
+  for (const e of rec.timeline) {
+    if (e.t === "frame") parts.push(`frame:${String(Buffer.from(e.b64, "base64").length)}`);
+    else if (e.t === "input")
+      parts.push(`input:${JSON.stringify(Buffer.from(e.b64, "base64").toString("utf8"))}`);
+    else if (e.t === "resize") parts.push(`resize:${String(e.columns)}x${String(e.rows)}`);
+    else parts.push(`far:${e.verb}`);
+  }
+  parts.push(
+    rec.truncated ? `(truncated open=${String(rec.open)} torn=${String(rec.torn)})` : "end",
+  );
+  return parts.join(" ");
+}
+
+/**
+ * Everything a red replay row can say about itself, as the assertion message.
+ *
+ * **The first assertion used to be `expect(out.identical).toBe(true)` and the
+ * failure carried nothing** — four times the row was red only inside a full
+ * `make e2e`, green alone every time, and each red run left one line: *expected
+ * false to be true* (F929, F949). The verdict was printed by the fixture, to a
+ * stderr the reporter dropped, and the recording sat in a temp directory nobody
+ * could name. So: the paths, `formatReplay` and `formatDrive` over the verdict,
+ * both event orders, the clock counts, the harness's own timings, and — only
+ * when something is wrong — the machine: load, and any fixture process an
+ * earlier file left behind, since the sequential run is the regime that fails.
+ *
+ * Every call also appends one JSON line to `CALCIUM_VERDICT_LOG` when that
+ * names a file, so a green row leaves its figures too. A red row beside a
+ * hundred green ones is only readable against what the green ones measured.
+ */
+function explain(row: string, recd: Recorded, out: Verdict): string {
+  const rec = parseRecording(readFileSync(recd.path, "utf8"));
+  const back = parseRecording(readFileSync(out.mirror, "utf8"));
+  const wrong = !out.identical || out.stalled > 0 || out.exhaustedAt !== null;
+  const machine = wrong
+    ? [
+        `load ${loadavg()
+          .map((l) => l.toFixed(2))
+          .join(" ")}`,
+        `fixture processes alive: ${strays()}`,
+      ]
+    : [];
+  const lines = [
+    `${row} · recording ${recd.path}`,
+    `mirror ${out.mirror}`,
+    ...formatReplay(out),
+    ...formatDrive(out),
+    `clock reads recorded wall=${String(rec.wall.length)} mono=${String(rec.mono.length)} · ` +
+      `consumed wall=${String(out.consumed.wall)} mono=${String(out.consumed.mono)} · ` +
+      `mirrored wall=${String(back.wall.length)} mono=${String(back.mono.length)} · ` +
+      `overrun wall=${String(out.overrun.wall)} mono=${String(out.overrun.mono)}`,
+    `took prompt=${String(recd.took.prompt)}ms answer=${String(recd.took.answer)}ms ` +
+      `exit=${recd.took.exit === null ? "killed" : `${String(recd.took.exit)}ms`}`,
+    `reads after submit  ${recd.took.reads}`,
+    `recorded  ${timeline(rec)}`,
+    `replayed  ${timeline(back)}`,
+    ...machine,
+  ];
+  const log = process.env["CALCIUM_VERDICT_LOG"];
+  if (log !== undefined && log !== "") {
+    const { divergence, ...rest } = out;
+    appendFileSync(
+      log,
+      `${JSON.stringify({
+        at: new Date().toISOString(),
+        row,
+        ...rest,
+        divergenceAt: divergence?.at ?? null,
+        recording: recd.path,
+        took: recd.took,
+        recorded: timeline(rec),
+        replayed: timeline(back),
+        load: loadavg(),
+      })}\n`,
+    );
+  }
+  return lines.join("\n");
+}
+
+/** Fixture or far-side processes alive right now, with their age — an earlier file's leftovers. */
+function strays(): string {
+  try {
+    const ps = execFileSync("ps", ["-eo", "pid,etimes,pcpu,args"], { encoding: "utf8" });
+    const rows = ps
+      .split("\n")
+      .filter((l) => /fixture\.mjs|farside\.mjs|emitter\.mjs/u.test(l))
+      .map((l) => l.trim());
+    return rows.length === 0 ? "none" : `\n    ${rows.join("\n    ")}`;
+  } catch (e) {
+    return `unreadable (${String(e)})`;
   }
 }
 
@@ -105,8 +282,8 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
   it(
     "T5.1 (C28 I14): a recorded PTY session replays byte-identically, whole",
     async () => {
-      const path = await record();
-      const rec = parseRecording(readFileSync(path, "utf8"));
+      const recd = await record();
+      const rec = parseRecording(readFileSync(recd.path, "utf8"));
 
       // **The fixture is shown to respond before it is asserted against.** A
       // recording with no frames replays as identical to a replay with no
@@ -125,28 +302,29 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
       // now (F912), and this row is what says so.
       expect(rec.truncated, "and ended cleanly, tail flushed").toBe(false);
 
-      const out = replay(path);
-      expect(out.compared, "over the frames the recording holds").toBeGreaterThan(3);
-      expect(out.compared, "all of them").toBe(rec.frames.length);
+      const out = replay(recd.path);
+      const why = explain("T5.1", recd, out);
+      expect(out.compared, `over the frames the recording holds\n${why}`).toBeGreaterThan(3);
+      expect(out.compared, `all of them\n${why}`).toBe(rec.frames.length);
       // **The drive was paced by the recording, not slept through** (F912). A
       // stall means an event went out against a state the recording never held,
       // so every later frame is the harness's answer rather than the subject's
       // — and the first driver stalled all eight while still producing six
       // byte-identical frames, which is why this is asserted and not inferred.
-      expect(out.stalled, "with every recorded frame drawn before the next event").toBe(0);
-      expect(out.delivered, "and every input and resize delivered").toBeGreaterThan(2);
+      expect(out.stalled, `with every recorded frame drawn before the next event\n${why}`).toBe(0);
+      expect(out.delivered, `and every input and resize delivered\n${why}`).toBeGreaterThan(2);
       // The clock is an input, and it lasted: a replay reading past the end of
       // the recorded stream gets the last value repeated, which stops durations
       // moving and changes which frames get drawn at all.
-      expect(out.exhaustedAt, "the recorded clock outlasted the session").toBeNull();
+      expect(out.exhaustedAt, `the recorded clock outlasted the session\n${why}`).toBeNull();
 
-      expect(out.divergence, "no frame differs").toBeNull();
-      expect(out.identical, "so the pipeline is a function of its inputs").toBe(true);
+      expect(out.divergence, `no frame differs\n${why}`).toBeNull();
+      expect(out.identical, `so the pipeline is a function of its inputs\n${why}`).toBe(true);
       // **The mask is asserted to have fired** (F911). Byte-identity here is
       // modulo the cells drawn from a clock rather than from the inputs — C24
       // I32's `last N.Nms` — and a mask that matched nothing would make the row
       // a claim about a comparison that never happened.
-      expect(out.masked, "and the clock-derived mask fired").toBeGreaterThan(0);
+      expect(out.masked, `and the clock-derived mask fired\n${why}`).toBeGreaterThan(0);
     },
     120_000,
   );
@@ -164,12 +342,25 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
       // along, so a session recorded at `counters` was replayed by one drawing
       // a cost cell it never had — a recorded field with no reader, which is
       // how `binary` diverged at byte 43 as well (F912).
-      const path = await record("counters");
-      const out = replay(path);
-      expect(out.identical, "identical").toBe(true);
-      expect(out.masked, "with nothing excused").toBe(0);
-      expect(out.compared, "over the whole session").toBeGreaterThan(3);
-      expect(out.stalled, "and paced, not slept").toBe(0);
+      const recd = await record({ tier: "counters" });
+      const out = replay(recd.path);
+      const why = explain("T5.1b", recd, out);
+      expect(out.identical, `identical\n${why}`).toBe(true);
+      // **What "nothing masked" meant, and what it means.** Below `spans` the
+      // cost cell is absent — no recorded frame holds a `last N.Nms` — and that
+      // absence is the control for T5.1's mask. The header's time-of-day is
+      // drawn at every tier, so it is masked here too: `masked` is not zero, it
+      // is the header's clock on both sides. The row said zero, and was green,
+      // for exactly as long as that member of `CLOCK_DERIVED` was dead (F964).
+      const rec = parseRecording(readFileSync(recd.path, "utf8"));
+      const cost = new RegExp(CLOCK_DERIVED[0]?.source ?? "$^", "u");
+      expect(
+        rec.frames.some((f) => cost.test(Buffer.from(f).toString("utf8"))),
+        "no cost cell in any recorded frame below spans",
+      ).toBe(false);
+      expect(out.masked, `and the header's clock is what was excused\n${why}`).toBeGreaterThan(0);
+      expect(out.compared, `over the whole session\n${why}`).toBeGreaterThan(3);
+      expect(out.stalled, `and paced, not slept\n${why}`).toBe(0);
     },
     120_000,
   );
@@ -181,16 +372,17 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
       // recorded capability record is the obvious saving and it takes C02 out
       // of the gate entirely: both runs would trust one answer, so a detector
       // returning nonsense replays byte-identically.
-      const path = await record();
-      const out = replay(path);
-      expect(out.identical, "the recorded environment replays identically").toBe(true);
+      const recd = await record();
+      const out = replay(recd.path);
+      const why = explain("T1.83", recd, out);
+      expect(out.identical, `the recorded environment replays identically\n${why}`).toBe(true);
 
       // **The fabricated violation, run rather than described.** If the verdict
       // were replayed, changing the environment under it would change nothing.
       // `TERM=dumb` gives a stronger answer than a divergence: C02 finds no
       // alternate screen and C22 gate 3b refuses to start at all, which no
       // replayed verdict could produce.
-      const dumb = spawnSync("node", ["test/support/fixture.mjs", "replay", path], {
+      const dumb = spawnSync("node", ["test/support/fixture.mjs", "replay", recd.path], {
         encoding: "utf8",
         timeout: 60_000,
         env: { ...process.env, CALCIUM_REPLAY_ENV: JSON.stringify({ TERM: "dumb" }) },
@@ -201,7 +393,7 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
       // And a change C02 survives still reaches the frames: 16 colours where
       // the recording drew 256, so the bytes differ rather than the session
       // refusing.
-      const plain = replay(path, JSON.stringify({ TERM: "xterm", COLORTERM: "" }));
+      const plain = replay(recd.path, JSON.stringify({ TERM: "xterm", COLORTERM: "" }));
       expect(plain.identical, "a narrower terminal draws different bytes").toBe(false);
 
       // **Where the queries are, measured rather than assumed.** This fixture's
@@ -226,7 +418,7 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
       // detector that ran: a tier-6 row asserting the *absence* of a field on
       // `Recording` is what TypeScript already checks, and passes identically
       // with the field present under another name.
-      const path = await record();
+      const recd = await record();
 
       // **Half one — what the recording carries.** The regime line as bytes on
       // disk, not through `parseRecording`, whose type would drop a member it
@@ -235,7 +427,7 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
       // and a verdict recorded as `caps` or `detected` is the same revert. The
       // six keys are the detector's input and the app's identity — nothing
       // detection answers — and a seventh is reviewed against C28 I47 by failing here.
-      const lines = readFileSync(path, "utf8")
+      const lines = readFileSync(recd.path, "utf8")
         .split("\n")
         .filter((l) => l.trim() !== "")
         .map((l) => JSON.parse(l) as Record<string, unknown>);
@@ -258,16 +450,58 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
       // 16 colours where the recording drew 256 (T1.83 measured the
       // divergence). Under the revert both replays draw from the recorded
       // verdict and hash equal, whatever environment they are handed.
-      const same = replay(path);
-      const fewer = replay(path, JSON.stringify({ TERM: "xterm", COLORTERM: "" }));
-      expect(same.frames, "the first replay drew the session").toBeGreaterThan(3);
+      const same = replay(recd.path);
+      const fewer = replay(recd.path, JSON.stringify({ TERM: "xterm", COLORTERM: "" }));
+      const why = explain("T6.16", recd, same);
+      expect(same.frames, `the first replay drew the session\n${why}`).toBeGreaterThan(3);
       expect(fewer.frames, "and so did the second").toBeGreaterThan(3);
       expect(fewer.frameHash, "two environments, two byte streams").not.toBe(same.frameHash);
       // The control that gives the inequality its meaning: the recorded
       // environment still replays identically, so the difference above is the
       // environment's and not a replay disagreeing with itself. If this is the
       // only red line, it is T5.1's divergence and not this row's revert.
-      expect(same.identical, "and the recorded environment still replays identically").toBe(true);
+      expect(same.identical, `and the recorded environment still replays identically\n${why}`).toBe(
+        true,
+      );
+    },
+    120_000,
+  );
+
+  it(
+    "T5.1c (C28 I14): the replay consumes exactly the recorded clock reads — a transport stand-in reads the clock where the live one does",
+    async () => {
+      // **Read parity, as a count, because a positional clock is only as good
+      // as an alignment nothing checked.** C06's subprocess transport reads the
+      // wall clock before it spawns and again for `durationMs`; the replay's
+      // stand-in served the recorded value and read nothing, so every later
+      // read was two places behind and the resize repaint's header was handed
+      // the answer frame's last stamp. When a wall-clock second boundary fell
+      // in that gap — ~30 ms on a quiet machine, wider on a busy one — the
+      // header read `:13` on one side and `:14` on the other, and the mask
+      // covers a value, not the decision to redraw a row (F963). Four red runs
+      // inside a full tier, green alone every time, and this count is the
+      // difference: 52 reads consumed against 54 recorded.
+      //
+      // **The window is widened to a second so the race is not a race.** With
+      // a 1 000 ms pause between the answer and the resize, a wall-clock second
+      // boundary always falls between the answer frame's last read and the
+      // resize repaint's header read — so a replay two positions behind draws
+      // the previous second in that header on every run, and one in step draws
+      // the same second on every run.
+      const recd = await record({ pause: 1_000 });
+      const out = replay(recd.path);
+      const why = explain("T5.1c", recd, out);
+      expect(out.consumed.wall, `wall positions consumed equal wall reads recorded\n${why}`).toBe(
+        out.recorded.wall,
+      );
+      // **Mono is reported and not asserted here.** The live session's `^D`
+      // handling takes one mono read more than the replay's in some recordings
+      // and not others — a read in the stop path that lands before or after the
+      // `end` line by timing — and it is masked in effect: the only cell it
+      // reaches is C24 I32's `last N.Nms`.
+      expect(out.identical, `so the header's second hand agrees, deterministically\n${why}`).toBe(
+        true,
+      );
     },
     120_000,
   );
@@ -275,15 +509,16 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
   it(
     "T5.2 (C28 I14): the same recording replayed twice gives the same frames",
     async () => {
-      const path = await record();
-      const a = replay(path);
-      const b = replay(path);
+      const recd = await record();
+      const a = replay(recd.path);
+      const b = replay(recd.path);
+      const why = `${explain("T5.2", recd, a)}\n${explain("T5.2", recd, b)}`;
       // **Two replays against each other, not each against the recording.**
       // T5.1 already compares to the recording; what this adds is that the
       // replay is itself deterministic, which is what makes a timing figure
       // taken from one comparable to a figure taken from the other.
-      expect(a.frameHash, "run one").toBe(b.frameHash);
-      expect(a.compared, "over the same count").toBe(b.compared);
+      expect(a.frameHash, `run one\n${why}`).toBe(b.frameHash);
+      expect(a.compared, `over the same count\n${why}`).toBe(b.compared);
     },
     120_000,
   );
@@ -346,9 +581,10 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
       // live session's miss count depends on what the far side did and when, so
       // a row asserting zero against one is asserting the machine. Replayed,
       // the inputs are fixed, so the count is a property of the code.
-      const path = await record();
-      const a = replay(path);
-      const b = replay(path);
+      const recd = await record();
+      const a = replay(recd.path);
+      const b = replay(recd.path);
+      const why = explain("T5.4", recd, a);
 
       // **`misses` is `cache → reason → count`, and the first draft read it as
       // `reason → count`** — so `misses["nothing-changed"]` was `undefined` on
@@ -363,7 +599,7 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
       // ruling is that a live session's miss counts depend on what the far side
       // did and when; replayed, the inputs are fixed, so the whole map is a
       // property of the code.
-      expect(a.misses, "two replays of one recording give the same miss counts").toStrictEqual(
+      expect(a.misses, `two replays of one recording give the same miss counts\n${why}`).toStrictEqual(
         b.misses,
       );
 

@@ -1144,8 +1144,8 @@ const results = runPass({
     {
       name: "CLOCK-MASK-WIDE: the mask takes an HH:MM as well, and eats a duration",
       file: REPLAY,
-      from: "  /\\b[0-2]\\d:[0-5]\\d:[0-5]\\d\\b/gu,",
-      to: "  /\\b[0-2]\\d:[0-5]\\d(?::[0-5]\\d)?\\b/gu,",
+      from: "  /(?<![\\d:])[0-2]\\d:[0-5]\\d:[0-5]\\d(?![\\d:])/gu,",
+      to: "  /(?<![\\d:])[0-2]\\d:[0-5]\\d(?::[0-5]\\d)?(?![\\d:])/gu,",
       expect: "T1.87",
     },
     {
@@ -1199,6 +1199,16 @@ const results = runPass({
       from: "  startSampler();\n  if (spanning()) contexts.enable();",
       to: "  startSampler();\n  contexts.enable();",
       expect: "T1.38",
+    },
+    {
+      // **F964's member, restored.** A word boundary before the digits, which
+      // the chrome's SGR `m` never yields — a mask that matched nothing the
+      // header drew, and a T5.1b green for exactly as long as it stayed dead.
+      name: "HEADER-MASK-WORD-BOUNDARY: the header-clock mask asks for a boundary an SGR's `m` never gives",
+      file: REPLAY,
+      from: "  /(?<![\\d:])[0-2]\\d:[0-5]\\d:[0-5]\\d(?![\\d:])/gu,",
+      to: "  /\\b[0-2]\\d:[0-5]\\d:[0-5]\\d\\b/gu,",
+      expect: "T1.101",
     },
   ],
 });

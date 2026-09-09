@@ -378,6 +378,10 @@ let expectations = 0;
 /** Expectations naming a row no test path of their own run contains. */
 const unreachable = [];
 const missing = {};
+// **And which** — a count that says one is missing sends the reader to a second
+// tool to learn which one (the C28 run, 119 anchors, on the day the header mask
+// moved). The file and the head of the anchor, per run.
+const missingWhat = {};
 /** Anchors matching more than once — see the note in the loop below (F219). */
 const ambiguous = [];
 const ambiguousBy = {};
@@ -448,7 +452,10 @@ for (const run of runs) {
     // something that should have one.
     const hits = body.split(from).length - 1;
     if (hits === 1) continue;
-    if (hits === 0) missing[run] = (missing[run] ?? 0) + 1;
+    if (hits === 0) {
+      missing[run] = (missing[run] ?? 0) + 1;
+      (missingWhat[run] ??= []).push(`${file} · ${JSON.stringify(from).slice(0, 88)}`);
+    }
     else {
       ambiguousBy[run] = (ambiguousBy[run] ?? 0) + 1;
       ambiguous.push(`${run}: an anchor matches ${String(hits)}x in ${file} — replace() takes the first`);
@@ -514,10 +521,11 @@ for (const [run, names] of Object.entries(OWN ? CROSS_TIER : {})) {
 
 // The equality arm, both directions.
 const LIST = OWN ? KNOWN_STALE : {};
+const named = (run) => (missingWhat[run] ?? []).map((a) => `\n      ${a}`).join("");
 for (const [run, n] of Object.entries(missing)) {
   const known = LIST[run];
-  if (known === undefined) problems.push(`${run}: ${String(n)} anchor(s) missing and it is not on the list`);
-  else if (known !== n) problems.push(`${run}: ${String(n)} anchor(s) missing, the list says ${String(known)}`);
+  if (known === undefined) problems.push(`${run}: ${String(n)} anchor(s) missing and it is not on the list${named(run)}`);
+  else if (known !== n) problems.push(`${run}: ${String(n)} anchor(s) missing, the list says ${String(known)}${named(run)}`);
 }
 for (const [run, n] of Object.entries(LIST)) {
   if (missing[run] === undefined) {
