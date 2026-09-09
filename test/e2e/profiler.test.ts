@@ -215,6 +215,64 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
   );
 
   it(
+    "T6.16 (C28 I47): recording the verdict on `Recording` and handing it to the replay instead of re-deriving it → T1.83 fails, and this row names both halves",
+    async () => {
+      // **The revert**: a `capabilities` member on the regime line, written by
+      // the recorder and passed to `createTui` by the replay in place of `env`.
+      // It is the obvious saving — the detector's answer is right there — and it
+      // takes C02 out of the gate: both runs trust one recorded answer, so a
+      // detector returning nonsense replays byte-identically. **Here rather
+      // than in test/revert/**, because the revert is only observable against a
+      // detector that ran: a tier-6 row asserting the *absence* of a field on
+      // `Recording` is what TypeScript already checks, and passes identically
+      // with the field present under another name.
+      const path = await record();
+
+      // **Half one — what the recording carries.** The regime line as bytes on
+      // disk, not through `parseRecording`, whose type would drop a member it
+      // does not declare. Compared by equality rather than by absence: a row
+      // asserting `capabilities` is missing sees only the spelling it guessed,
+      // and a verdict recorded as `caps` or `detected` is the same revert. The
+      // six keys are the detector's input and the app's identity — nothing
+      // detection answers — and a seventh is reviewed against C28 I47 by failing here.
+      const lines = readFileSync(path, "utf8")
+        .split("\n")
+        .filter((l) => l.trim() !== "")
+        .map((l) => JSON.parse(l) as Record<string, unknown>);
+      const regimes = lines.filter((e) => e["t"] === "regime");
+      expect(regimes, "one session, one regime line").toHaveLength(1);
+      expect(Object.keys(regimes[0] ?? {}).sort(), "construction-time facts, and no verdict").toEqual([
+        "binary",
+        "env",
+        "name",
+        "node",
+        "t",
+        "tier",
+      ]);
+      const env = regimes[0]?.["env"] as Record<string, string>;
+      expect(env["TERM"], "the input C02 reads — the PTY's own TERM").toBe("xterm-256color");
+
+      // **Half two — what the replay does with it.** One recording, two
+      // environments handed to the replay, two byte streams: the second run's
+      // frames come from a detector that read `TERM=xterm` with no `COLORTERM`,
+      // 16 colours where the recording drew 256 (T1.83 measured the
+      // divergence). Under the revert both replays draw from the recorded
+      // verdict and hash equal, whatever environment they are handed.
+      const same = replay(path);
+      const fewer = replay(path, JSON.stringify({ TERM: "xterm", COLORTERM: "" }));
+      expect(same.frames, "the first replay drew the session").toBeGreaterThan(3);
+      expect(fewer.frames, "and so did the second").toBeGreaterThan(3);
+      expect(fewer.frameHash, "two environments, two byte streams").not.toBe(same.frameHash);
+      // The control that gives the inequality its meaning: the recorded
+      // environment still replays identically, so the difference above is the
+      // environment's and not a replay disagreeing with itself. If this is the
+      // only red line, it is T5.1's divergence and not this row's revert.
+      expect(same.identical, "and the recorded environment still replays identically").toBe(true);
+    },
+    120_000,
+  );
+
+  it(
     "T5.2 (C28 I14): the same recording replayed twice gives the same frames",
     async () => {
       const path = await record();

@@ -436,18 +436,12 @@ describe("C28 — profiler, tier 6 spec-first rows", () => {
     expect(r.divergence, "which is not a disagreement").toBeNull();
     expect(r.identical, "so a longer replay of a prefix still passes").toBe(true);
   });
-  // **Reframed rather than converted, and the residue is named** (F919). Its
-  // blocker was `src/shell/profiling/replay.ts`, which now exists — so the
-  // deferral has expired and the row still cannot be written *here*. T1.83 is a
-  // tier-5 row: it re-derives the capabilities from a real PTY's replies, and
-  // the revert — recording the verdict and handing it back — is only observable
-  // against a detector that ran. A tier-6 row asserting the *absence* of a
-  // capabilities field on `Recording` is what a unit file could hold, and it is
-  // the assert-the-artefact-not-a-proxy shape this repo has already been wrong
-  // about: the field's absence is structural and TypeScript checks it, so the
-  // row would be vacuous. What is owed is the tier-5 revert, and it is owed by
-  // the e2e file rather than by this one.
-  it.todo(
-    "T6.16 (C28 I47): recording the capability verdict and replaying it → T1.83 fails — not deferred on a component: the blocker was replay.ts and it is met; what remains is that T1.83 is tier 5, so the revert belongs in test/e2e/profiler.test.ts and not here",
-  );
+  // **T6.16 (C28 I47) lives in `test/e2e/profiler.test.ts`, beside the T1.83
+  // it names** (C28 §10). Its blocker — `src/shell/profiling/replay.ts` — exists;
+  // what kept it out of this file is the tier. The revert, recording the
+  // capability verdict and handing it to the replay, is only observable against
+  // a detector that ran, and a unit row asserting the *absence* of a field on
+  // `Recording` is what TypeScript already checks — so the row reads the regime
+  // line on disk by key-set equality and replays one recording under two
+  // environments, both of which need a PTY.
 });
