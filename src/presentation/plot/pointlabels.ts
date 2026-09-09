@@ -33,8 +33,13 @@
  * series puts many samples in one column; labelling each would stack strings at
  * one x with nothing to tell them apart. The first labelled sample in a column
  * wins, which is the same *first placed* rule one scale down.
+ *
+ * **The name is laid in by `chargrid.ts`'s shared writer** (C12 I118, §3n),
+ * cluster by cluster. This file carried a private copy of the loop, one code
+ * point per cell, until F976.
  */
 import { cells } from "../text.js";
+import { write } from "./chargrid.js";
 import { columnsOf, finiteSamples, rowOf, type Facing, type Range } from "./scale.js";
 import type { Series } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
@@ -158,21 +163,4 @@ function firstOwner(row: readonly (Owner | null)[], from: number, len: number): 
     if (o !== null && o !== undefined) return o;
   }
   return null;
-}
-
-/**
- * Lay `body` into a row from `at`, one codepoint per its own cell width.
- *
- * A two-cell character writes itself and leaves `""` behind it, so the cell it
- * occupies is not one the fill can walk into — the same continuation the
- * treemap's names needed and the same reason (§3n, C12 T1.104).
- */
-function write(row: string[], at: number, body: string, ambiguous: "narrow" | "wide"): void {
-  let col = at; // cells-ok — a column position
-  for (const ch of body) {
-    row[col] = ch;
-    const w = cells(ch, ambiguous);
-    for (let k = 1; k < w; k += 1) row[col + k] = ""; // cells-ok — a cell count
-    col += w;
-  }
 }

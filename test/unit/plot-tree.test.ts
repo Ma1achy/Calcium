@@ -19,7 +19,8 @@ import { validateDocument } from "../../src/data/viewmodel/validate.js";
 import { b } from "../../src/shell/builders/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { TREE_LAYOUTS, type TreeLayoutName } from "../../src/presentation/plot/tree.js";
-import { cells } from "../../src/presentation/text.js";
+import { write } from "../../src/presentation/plot/chargrid.js";
+import { cells, graphemes } from "../../src/presentation/text.js";
 import { FULL_CAPS, measurable } from "../support/render.js";
 import { ALL_FORMS } from "../support/plot-forms.js";
 
@@ -305,6 +306,120 @@ describe("TR11 (C12 I57, §3n): a wide codepoint is measured with `cells()`", ()
       for (const r of frame(cjk, 5, 20, { treeLayout: layout })) {
         expect(r.length, `${layout}: ${r}`).toBeLessThanOrEqual(20); // cells-ok — a cell count
       }
+    }
+  });
+});
+
+describe("T1.130 (C12 I118, C09 I64): the shared writer places a cluster whole, in the cells it measures", () => {
+  // **The six shapes C09 T2.129 feeds**, spelled in escapes so an editor's
+  // normalisation cannot compose the decomposed one back unread.
+  const NFD = "café";
+  const KEYCAP = "1️⃣";
+  const FLAG = "\u{1F1EC}\u{1F1E7}";
+  const FAMILY = "\u{1F468}‍\u{1F469}‍\u{1F467}";
+  const PREPEND = "؀1";
+  const SPACING = "aः";
+  const SHAPES = [NFD, KEYCAP, FLAG, FAMILY, PREPEND, SPACING] as const;
+
+  it("each cluster lands whole in one cell, the wide ones leave `\"\"` behind, and the column advances by `cells()` of the cluster", () => {
+    for (const shape of SHAPES) {
+      for (const cluster of graphemes(shape)) {
+        // **The width is the measurer's answer, not a literal.** C09 is
+        // re-founding `cells()` for the spacing mark beside this row; whichever
+        // number it settles on, the row asserts the writer *agrees* with it.
+        const w = cells(cluster, "narrow");
+        expect(w, JSON.stringify(cluster)).toBeGreaterThan(0);
+        const row = new Array<string>(8).fill(" ");
+        write(row, 2, cluster, "narrow");
+        // **The whole row**: blanks before, the cluster at 2, `""` for every
+        // cell it measures past the first, blanks after — and nothing else
+        // moved. A per-code-point writer leaves a bare `1` here for the keycap
+        // and a single face for the family.
+        expect(row, JSON.stringify(cluster)).toEqual([
+          " ", " ", cluster, ...new Array<string>(w - 1).fill(""), ...new Array<string>(6 - w).fill(" "),
+        ]);
+        // The advance, read off the cell the next cluster lands in.
+        const two = new Array<string>(8).fill(" ");
+        write(two, 2, `${cluster}x`, "narrow");
+        expect(two, `${JSON.stringify(cluster)} then x`).toEqual([
+          " ", " ", cluster, ...new Array<string>(w - 1).fill(""), "x", ...new Array<string>(5 - w).fill(" "),
+        ]);
+      }
+    }
+  });
+
+  it("the six shapes as one label read back as the label, one cell per cluster, the row exactly its measure", () => {
+    const body = SHAPES.join(" ");
+    const width = cells(body, "narrow") + 2;
+    const row = new Array<string>(width).fill(" ");
+    write(row, 1, body, "narrow");
+    // Three assertions that do not share the writer's arithmetic: the cells
+    // joined are the label (a dropped selector, joiner or mark changes the
+    // string), the occupied cells count the clusters (a split cluster occupies
+    // more), and the joined row measures the row's length (a missing `""`
+    // measures more).
+    expect(row.join("")).toBe(` ${body} `);
+    expect(row.filter((c) => c !== " " && c !== "")).toEqual(graphemes(body).filter((c) => c !== " "));
+    expect(cells(row.join(""), "narrow")).toBe(width);
+  });
+
+  it("a lone leading mark or a bare joiner is dropped and the column does not move; a body that is only one writes nothing", () => {
+    // **Two cases, because two mutations.** A zero-width cluster given a cell
+    // of its own moves the column, which the leading-mark row sees; the guard
+    // simply removed writes the mark into the cell and leaves the column, so
+    // the next cluster overwrites it and only a body with no next cluster can
+    // tell (C12 T6.96).
+    const mark = new Array<string>(6).fill(" ");
+    write(mark, 1, "́ab", "narrow");
+    expect(mark).toEqual([" ", "a", "b", " ", " ", " "]);
+    const joiner = new Array<string>(6).fill(" ");
+    write(joiner, 1, "‍ab", "narrow");
+    expect(joiner).toEqual([" ", "a", "b", " ", " ", " "]);
+    const onlyMark = new Array<string>(6).fill(" ");
+    write(onlyMark, 1, "́", "narrow");
+    expect(onlyMark).toEqual([" ", " ", " ", " ", " ", " "]);
+    const onlyJoiner = new Array<string>(6).fill(" ");
+    write(onlyJoiner, 3, "‍", "narrow");
+    expect(onlyJoiner).toEqual([" ", " ", " ", " ", " ", " "]);
+  });
+
+  it("nothing is written past the row's end, and a start outside the row writes nothing", () => {
+    const row = new Array<string>(5).fill(" ");
+    write(row, 3, "abcd", "narrow");
+    expect(row).toEqual([" ", " ", " ", "a", "b"]);
+    // A wide cluster whose continuation would fall past the end keeps the
+    // row's length — the cell is not appended.
+    const wide = new Array<string>(4).fill(" ");
+    write(wide, 3, "図", "narrow");
+    expect(wide).toEqual([" ", " ", " ", "図"]);
+    const past = new Array<string>(4).fill(" ");
+    write(past, 4, "ab", "narrow");
+    expect(past).toEqual([" ", " ", " ", " "]);
+    const negative = new Array<string>(4).fill(" ");
+    write(negative, -1, "ab", "narrow");
+    expect(negative).toEqual([" ", " ", " ", " "]);
+  });
+
+  it("a `(string | undefined)` row — the treemap's grid and the sankey's line — takes the cluster and its continuation and keeps `undefined` elsewhere", () => {
+    const row = new Array<string | undefined>(6).fill(undefined);
+    write(row, 1, FAMILY, "narrow");
+    expect(row).toEqual([undefined, FAMILY, "", undefined, undefined, undefined]);
+  });
+
+  it("`tree` through the public render: a family, a keycap and a decomposed name reach the frame whole in every layout", () => {
+    const shaped: HierarchyNode = {
+      label: `root ${KEYCAP}`,
+      children: [{ label: FAMILY, children: [{ label: "leaf" }] }, { label: `x ${NFD}` }],
+    };
+    for (const layout of TREE_LAYOUTS) {
+      const f = frame(shaped, 7, 40, { treeLayout: layout });
+      // **Compared in NFC**, as C09 T2.129 compares: composing a cluster is not
+      // splitting one, and a dropped joiner or selector fails in either form.
+      const shown = f.join("\n").normalize("NFC");
+      for (const [name, shape] of [["KEYCAP", KEYCAP], ["FAMILY", FAMILY], ["NFD", NFD]] as const) {
+        expect(shown.includes(shape.normalize("NFC")), `${layout}: ${name} whole`).toBe(true);
+      }
+      for (const r of f) expect(cells(r, "narrow"), `${layout}: ${r}`).toBeLessThanOrEqual(40); // cells-ok — a cell count
     }
   });
 });

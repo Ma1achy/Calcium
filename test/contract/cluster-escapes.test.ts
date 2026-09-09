@@ -17,8 +17,9 @@
 // frame as a base *without* its mark rather than as a hit — the painter rows
 // therefore read bytes before Ink where a painter offers them (T2.128, T2.132)
 // and compare the visible row to its source where it does not (T2.130,
-// T2.131). And four label writers keep no cluster whole at all (F969), so
-// their no-hit answer in T2.129 is a record and not a claim.
+// T2.131). Four label writers kept no cluster whole at all when this file was
+// first run (F969) — T2.129's `NOT_WHOLE` is the record of that, and it is
+// empty since the four went through one cluster writer (C12 I118, F976).
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -245,19 +246,18 @@ describe("C09 §5a — the painters keep the promise (C09 I64)", () => {
       "plot-graph": { ...P.graph, graph: { nodes: [{ id: NFD }, { id: KEYCAP }, { id: FLAG }, { id: FAMILY }], edges: [{ from: NFD, to: KEYCAP }, { from: KEYCAP, to: FLAG }, { from: FLAG, to: FAMILY }, { from: NFD, to: FAMILY }] } },
       "plot-sankey": { ...P.sankey, graph: { nodes: [{ id: NFD }, { id: KEYCAP }, { id: FLAG }, { id: FAMILY }], edges: [{ from: NFD, to: FLAG, weight: 5 }, { from: KEYCAP, to: FAMILY, weight: 3 }, { from: NFD, to: FAMILY, weight: 2 }] } },
     };
-    // **The shapes that do not arrive whole, by kind** (F969): treemap, tree,
-    // graph and sankey write one code point per cell and drop the zero-width
-    // ones, so a family arrives as three faces, a keycap as a bare digit, and
-    // in the treemap `café` as `cafe`. They paint no escape inside a cluster
-    // because no cluster survives to be split, and that is a record, not a
-    // claim. Compared by equality, so a writer fixed must leave this list and
-    // a new one must join it.
-    const NOT_WHOLE: Readonly<Record<string, readonly string[]>> = {
-      "plot-treemap": ["NFD", "KEYCAP", "FAMILY"],
-      "plot-tree": ["KEYCAP", "FAMILY"],
-      "plot-graph": ["KEYCAP", "FAMILY"],
-      "plot-sankey": ["KEYCAP", "FAMILY"],
-    };
+    // **The shapes that do not arrive whole, by kind — none** (F969, F976).
+    // When this row was first run the list read treemap `NFD KEYCAP FAMILY`
+    // and tree, graph and sankey `KEYCAP FAMILY`: the four wrote one code
+    // point per cell, advancing by `cells()` of the code point, so a
+    // zero-width piece was overwritten by what followed — a family as three
+    // faces, a keycap as a bare digit, and in the treemap `café` as `cafe`.
+    // They painted no escape inside a cluster because no cluster survived to
+    // be split, which is why the record sat here rather than in a hit. The
+    // four now write through `chargrid.ts`'s one cluster writer (C12 I118,
+    // C12 T1.130–T1.134), and the list is empty. Compared by equality, so a
+    // new writer losing a shape must join it.
+    const NOT_WHOLE: Readonly<Record<string, readonly string[]>> = {};
     const missing: Record<string, readonly string[]> = {};
 
     for (const [name, spec] of Object.entries(cases)) {
@@ -274,9 +274,9 @@ describe("C09 §5a — the painters keep the promise (C09 I64)", () => {
       // because Ink composes a row it wraps — `wrap-ansi` normalises before it
       // cuts — and composing a cluster is not splitting one; a dropped mark or
       // joiner fails the comparison in either form. Ink wraps `raw` here at
-      // all because `aः` measures 1 to `cells()` and 2 to `string-width`, so
-      // a row padded to the width is one cell over by Ink's measure (F969,
-      // open — a width finding, not a boundary one).
+      // all because of the spacing mark's width — `aः` to `cells()` against
+      // `string-width` — and that ruling is C09 I65's (F978), measured by
+      // C09 T2.133; this row does not measure it.
       const shown = frame(b, 80, FULL_CAPS).map(visible).join("\n").normalize("NFC");
       const lost = carried.filter(([, shape]) => !shown.includes(shape.normalize("NFC"))).map(([label]) => label);
       if (lost.length > 0) missing[name] = lost;

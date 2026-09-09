@@ -34,6 +34,7 @@ import {
   positionDomainOf, proportionDecisions, sharesOf, valueAxisOf, WAFFLE_ROWS,
 } from "./figure.js";
 import { treeArea } from "./tree.js";
+import { write } from "./chargrid.js";
 import { graphArea } from "./graph.js";
 import { sankeyArea, type SankeyCell } from "./sankey.js";
 import { curveRows, isBlank } from "./curve.js";
@@ -2090,8 +2091,8 @@ function treemapRows(block: Plot, width: number, ctx: RenderContext): readonly s
   }
 
   // The names, written into cells their own tile still owns. `undefined` is
-  // *no label here*; `""` is the second cell of a wide codepoint and emits
-  // nothing, so a two-cell character cannot leave a hole the fill walks into.
+  // *no label here*; `""` is the cell behind a wide cluster and emits nothing,
+  // so a two-cell character cannot leave a hole the fill walks into.
   const ambiguous = ctx.capabilities.ambiguousWidth;
   const named: (string | undefined)[][] =
     Array.from({ length: areaRows }, () => new Array<string | undefined>(width).fill(undefined));
@@ -2101,13 +2102,10 @@ function treemapRows(block: Plot, width: number, ctx: RenderContext): readonly s
     const text = ` ${t.label} `;
     const at = ownRun(grid, t.index, cells(text, ambiguous), areaRows, width); // cells-ok — a tile index
     if (at === null) continue;
-    let col = at.col; // cells-ok — a column position
-    for (const ch of text) {
-      named[at.row]![col] = ch;
-      const w = cells(ch, ambiguous);
-      for (let k = 1; k < w; k += 1) named[at.row]![col + k] = ""; // cells-ok — a cell count
-      col += w;
-    }
+    // **Cluster by cluster, through the one writer** (C12 I118, §3n). This was
+    // a private loop over code points, and `café` decomposed reached the tile
+    // as `cafe` (F969, F976).
+    write(named[at.row]!, at.col, text, ambiguous);
   }
 
   const out = grid.map((row, r) => {

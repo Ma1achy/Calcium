@@ -11,6 +11,8 @@ import { columnsOf, finiteSamples, rowOf, seriesRange, FACING_DEFAULT } from "..
 import { curveRows } from "../../src/presentation/plot/curve.js";
 import { createGrid, drawLine, foldBraille, setDot } from "../../src/presentation/plot/raster.js";
 import { sparkline } from "../../src/presentation/plot/sparkline.js";
+import { grid, paint, setMask, write } from "../../src/presentation/plot/chargrid.js";
+import { LINE_LEFT, LINE_RIGHT } from "../../src/presentation/plot/linedraw.js";
 import { stripHeights } from "../../src/presentation/plot/strips.js";
 import { lossCurve, plotOf } from "../support/blocks.js";
 import { ASCII_CAPS, FULL_CAPS, MONO_CAPS, measurable, visible } from "../support/render.js";
@@ -360,6 +362,109 @@ describe("C12 tier 6 — fail-on-revert", () => {
     expect(strip.trim().length, "the strip is drawn").toBeGreaterThan(0); // cells-ok — a cell count
     const flat = new Set(["\u2801", "\u2808", "\u2809", " "]);
     expect([...strip].some((c) => !flat.has(c)), "and it is jittered, not a rug").toBe(true);
+  });
+
+  it("T6.95 (I118): the writer returned to one code point per cell → T1.130 fails on the keycap, and C09 T2.129's NOT_WHOLE gains the four kinds", () => {
+    // **The revert, verbatim**: `chargrid.ts`'s `write` as it shipped, which is
+    // also the loop the treemap, the sankey and `pointlabels.ts` each carried
+    // (F969). A zero-width piece is written and the column does not move, so
+    // the piece after it overwrites it.
+    const perCodePoint = (row: string[], at: number, body: string): void => {
+      let col = at; // cells-ok — a column position
+      for (const ch of body) {
+        if (col < 0 || col >= row.length) break; // cells-ok — a column position
+        row[col] = ch;
+        const w = cells(ch, "narrow");
+        for (let k = 1; k < w; k += 1) if (col + k < row.length) row[col + k] = ""; // cells-ok — a cell count
+        col += w;
+      }
+    };
+    const KEYCAP = "1️⃣";
+    const FAMILY = "\u{1F468}‍\u{1F469}‍\u{1F467}";
+    // T1.130's assertion against the revert: the keycap's cell holds a bare
+    // digit, and the family occupies three cells with a face in each.
+    const keycap = new Array<string>(6).fill(" ");
+    perCodePoint(keycap, 1, KEYCAP);
+    expect(keycap[1]).toBe("1");
+    expect(keycap).not.toEqual([" ", KEYCAP, "", " ", " ", " "]);
+    const family = new Array<string>(8).fill(" ");
+    perCodePoint(family, 1, FAMILY);
+    expect(family.filter((c) => c !== " " && c !== "")).toHaveLength(3); // cells-ok — a cell count
+    expect(family.join("")).not.toContain(FAMILY);
+    // The writer as it is: one cell, the cluster whole.
+    const whole = new Array<string>(6).fill(" ");
+    write(whole, 1, KEYCAP, "narrow");
+    expect(whole).toEqual([" ", KEYCAP, "", " ", " ", " "]);
+  });
+
+  it("T6.96 (I118): the zero-width drop removed → T1.130's mark-only body fails; a zero-width cluster given a cell → its leading-mark case fails", () => {
+    // **Two reverts of one guard, and the leading-mark case sees only the
+    // second.** Without `if (w === 0) continue` the mark is written into the
+    // cell and the column stays, so the next cluster overwrites it — a leading
+    // mark vanishes exactly as it does with the guard, and only a body that is
+    // nothing but a mark shows the difference. Giving the cluster a cell of its
+    // own (`Math.max(1, w)`, the shape F970's scatter3 mutation restores) moves
+    // the column, and that is what the leading-mark case sees.
+    const unguarded = (row: string[], at: number, body: string): void => {
+      let col = at; // cells-ok — a column position
+      for (const cluster of body) {
+        const w = cells(cluster, "narrow");
+        row[col] = cluster;
+        col += w;
+      }
+    };
+    const own = (row: string[], at: number, body: string): void => {
+      let col = at; // cells-ok — a column position
+      for (const cluster of body) {
+        const w = Math.max(1, cells(cluster, "narrow"));
+        row[col] = cluster;
+        col += w;
+      }
+    };
+    const leading = new Array<string>(5).fill(" ");
+    unguarded(leading, 1, "́ab");
+    expect(leading, "the guard's removal is invisible to a leading mark").toEqual([" ", "a", "b", " ", " "]);
+    const only = new Array<string>(5).fill(" ");
+    unguarded(only, 1, "́");
+    expect(only, "and visible to a body that is only one").toEqual([" ", "́", " ", " ", " "]);
+    const shifted = new Array<string>(5).fill(" ");
+    own(shifted, 1, "́ab");
+    expect(shifted, "a cell of its own moves the column").toEqual([" ", "́", "a", "b", " "]);
+    // The writer as it is, on both.
+    const a = new Array<string>(5).fill(" ");
+    write(a, 1, "́ab", "narrow");
+    expect(a).toEqual([" ", "a", "b", " ", " "]);
+    const b = new Array<string>(5).fill(" ");
+    write(b, 1, "́", "narrow");
+    expect(b).toEqual([" ", " ", " ", " ", " "]);
+  });
+
+  it("T6.97 (I118, I57): the continuation cells left unfilled → TR11 fails, and an edge is drawn into the second half of a glyph", () => {
+    // **The state constructed**: a wide cluster written with no `""` behind it,
+    // on a grid whose mask carries an edge under the glyph's second cell. `paint`
+    // resolves a mask bit only where the text left the cell blank, so the edge
+    // appears between the halves of `図` — the row reads one cell wider than
+    // its cell count, which is TR11's column arithmetic failing and TM5's width
+    // assertion with it.
+    const noFill = (row: string[], at: number, body: string): void => {
+      let col = at; // cells-ok — a column position
+      for (const cluster of body) {
+        row[col] = cluster;
+        col += cells(cluster, "narrow");
+      }
+    };
+    const reverted = grid(1, 4);
+    setMask(reverted, 0, 2, LINE_LEFT | LINE_RIGHT);
+    noFill(reverted.text[0]!, 1, "図");
+    const drawn = paint(reverted, "rounded", FULL_CAPS)[0]!;
+    expect(drawn.startsWith(" 図")).toBe(true);
+    expect(cells(drawn, "narrow"), "an edge glyph inside the glyph's cells").toBe(4);
+    // The writer as it is: the continuation is `""`, which is not blank to
+    // `paint`, so the mask bit under it is never resolved.
+    const kept = grid(1, 4);
+    setMask(kept, 0, 2, LINE_LEFT | LINE_RIGHT);
+    write(kept.text[0]!, 1, "図", "narrow");
+    expect(paint(kept, "rounded", FULL_CAPS)[0]).toBe(" 図");
   });
 
   it("T6.13 (I15): three unconditional y-labels → T3.2 renders outside its rows", () => {

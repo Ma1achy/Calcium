@@ -34,6 +34,7 @@ import type { Graph } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { assertPictureGlyph, type ColourRef } from "../theme/index.js";
 import { cells } from "../text.js";
+import { write } from "./chargrid.js";
 import { graphLayers } from "./graph.js";
 import { refOf } from "./marks.js";
 
@@ -466,13 +467,10 @@ export function sankeyArea(
       let taken = false;
       for (let c = col; c < col + w; c += 1) if (line[c] !== undefined) taken = true; // cells-ok — a column position
       if (taken) continue;
-      let c = col; // cells-ok — a column position
-      for (const ch of label) {
-        line[c] = ch;
-        const cw = cells(ch, caps.ambiguousWidth);
-        for (let j = 1; j < cw; j += 1) line[c + j] = ""; // cells-ok — a cell count
-        c += cw;
-      }
+      // **Cluster by cluster, through the one writer** (C12 I118, §3n). This
+      // was a private loop over code points, and a keycap reached the frame as
+      // a bare digit (F969, F976).
+      write(line, col, label, caps.ambiguousWidth);
     }
   }
 

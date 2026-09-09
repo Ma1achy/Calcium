@@ -77,13 +77,16 @@ const results = runPass({
       expect: "SK4",
     },
     {
-      // **K3 — the fit test removed.** `rate-limiter` is written under
-      // `upstream-service` at 40 columns and the row reads both names.
+      // **K3 — the fit test removed.** SK5's `long-labels` fixture stopped
+      // seeing this (F980): its middle name is dropped by the overlap guard
+      // before the fit test runs, so the frames agree either way. SK12's
+      // thirty-cell first name has nothing in its way but the fit test, and
+      // without it is written across the middle bar.
       name: "a label is written wherever its bar is",
       file: SANKEY,
       from: "      if (col < lo || col + w > hi) continue;",
       to: "      if (false) continue;",
-      expect: "SK5",
+      expect: "SK12",
     },
     {
       // **K3 the other way — inner-first.** The middle name survives and the

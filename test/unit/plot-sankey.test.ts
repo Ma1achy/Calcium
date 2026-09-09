@@ -250,12 +250,54 @@ describe("SK — the sankey, one geometry and two painters (C12 I110, I111)", ()
     }
   });
 
+  it("T1.132 (C12 I118, C12 I110): a family and a keycap as node names — whole in `sankeyArea`'s cells and in the frame", () => {
+    const KEYCAP = "1️⃣";
+    const FAMILY = "\u{1F468}‍\u{1F469}‍\u{1F467}";
+    const g = graph([FAMILY, "b", KEYCAP, "y"], [[FAMILY, KEYCAP, 5], ["b", "y", 3], [FAMILY, "y", 2]]);
+    // **Read before Ink**: the label's cell holds the whole cluster and the
+    // cell after it is the continuation. The loop this replaced wrote one code
+    // point per cell, so the keycap's cell held `1` and the family's three
+    // cells held a face each (F969, F976).
+    const area = sankeyArea(g, 9, 80, FULL_CAPS);
+    for (const [name, shape] of [["FAMILY", FAMILY], ["KEYCAP", KEYCAP]] as const) {
+      const hits = area.rows.flatMap((row) => row.flatMap((c, i) => (c.text === shape ? [{ row, i }] : [])));
+      expect(hits, `${name} in exactly one cell`).toHaveLength(1); // cells-ok — a hit count
+      const { row, i } = hits[0]!;
+      expect(row[i + 1]?.text, `${name}'s continuation`).toBe("");
+    }
+    // And through the public render, compared in NFC as C09 T2.129 compares.
+    const shown = frame(g, 80, FULL_CAPS).map(strip).join("\n").normalize("NFC");
+    expect(shown).toContain(FAMILY.normalize("NFC"));
+    expect(shown).toContain(KEYCAP.normalize("NFC"));
+  });
+
   // **The builder's gate, and the row runs the day the builder admits the
   // form.** `b.plot` refuses `graph` off `form: "graph"` (C04 I69) and was not
   // widened when `sankey` took the member on `graph`'s rule (C04 I92); the
   // validator admits it and T2.38 asserts so. The two gates disagree today, the
   // fix belongs to `src/shell/builders/index.ts`, and this is `todo` rather than
   // red so that it flips to a running row — not a passing skip — on its own.
+  it("SK12 (C12 I110 K3): a label longer than its gap is dropped whole, and the fit test is the only guard that sees it", () => {
+    // **SK5's fixture stopped seeing the fit test** (F980). At 40 columns the
+    // `long-labels` middle name is right-placed at 22 and the sink's name,
+    // written before it outside-in, is left-placed at 22 — so the overlap
+    // guard drops the middle name whether the fit test runs or not, and the
+    // frames with and without it are byte-identical. Here the first name is
+    // thirty cells against a gap of seventeen, and nothing else is written in
+    // its way: the fit test alone decides, and without it the name is written
+    // across the middle bar and takes the middle label's cells.
+    const g = graph(["authentication-gateway-service", "b", "c"], [["authentication-gateway-service", "b", 3], ["b", "c", 3]]);
+    const narrow = frame(g, 40, FULL_CAPS, 7).map(strip);
+    const wide = frame(g, 80, FULL_CAPS, 7).map(strip).join("\n");
+    expect(wide, "the fixture responds: at 80 the name fits its gap").toContain("authentication-gateway-service");
+    expect(narrow.join("\n"), "dropped whole").not.toContain("authentication");
+    expect(narrow.join("\n"), "and never cut").not.toMatch(/[…~]/u);
+    expect(narrow.join("\n"), "the middle label keeps its cells").toMatch(/█▒b▒/u);
+    // The middle bar stands in every row: a name written wherever its bar is
+    // would put a letter in column 20.
+    for (const line of narrow) expect([...line][20], line).toBe("█"); // cells-ok — a column index into single-cell glyphs
+  });
+
   const spec = { id: "s", form: "sankey", height: 9, series: [], graph: DEFAULT } as unknown as Parameters<typeof b.plot>[0];
   const builderAdmits = ((): boolean => {
     try {
