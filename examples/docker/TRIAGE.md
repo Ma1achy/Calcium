@@ -42,7 +42,7 @@ type change.
 | **11** | [A gate that passes without checking](#11) | 362 | **16** | — | **114 closed · 120 open** of 235 keyed — the heading was out by 66 and this row's count column by 1, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
 | **12** | [**A time-based assertion under contention**](#12) | 9 | **3** | — | **new at F80** · Calcium's own suite · **F877 is the first that repairs an instrument rather than recording a reading** |
 | **13** | [Text the framework emits](#13) | 7 | **4** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
-| **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 34 | **14 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
+| **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 36 | **13 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
 | — | [Singles](#singles) | 84 | 1 each | — | see each · **F176 is the one to read twice**: the instrument had the evidence in a committed snapshot and the reading step was skipped |
 
 **Four groups are new since F55** — 9, 10, 12, and F81's arrival in 4. Group 9 is the one
@@ -1938,7 +1938,7 @@ already made — folding it in is cheaper than making a second one.
 **F796** — the command row and the header say one thing twice — `❯ /tail web.log` over `⏺ tail(web.log)`; ruled in C23 §3: the far side's call over the user's line
 
 <a id="14"></a>
-## 14 · A constant, a channel or a rule that outlived its configuration — **30** · new at F492
+## 14 · A constant, a channel or a rule that outlived its configuration — **32** · new at F492
 
 **The mechanism, in one sentence: a decision that was correct for every configuration that
 existed, kept after another one arrived.** Not a mistake at the time and not a mistake anyone
@@ -2010,7 +2010,11 @@ written as one. Every member reads as deliberate, which is why none was found by
 
 **F981** — **a layer meets the merge as cells, and the gridline pass is the merge.** `rowCells` in `text.ts` inverts the label writer's join where the width lives — each cluster at its first cell, `""` behind a wide one, a fast set of one-cell-per-unit ranges checked against the tables by C09 T1.40 — and `mergedRow` derives every layer's row once and reads it by cell index where it had spread the whole row per column and indexed by code point; `behind()` is folded in per cell with its two rules kept, so every frame without a wide or multi-code-point label is byte-identical (407 goldens, no snapshot written). The family row at 40 reads 40 where it read 37, `図表`'s keeps the frame's edge; the definition's render at 200 columns 7.70 → 2.91 ms, the width ratio 3.06 → 1.69. TL13 asserts every row now. C12 I119, commitment 119, T1.135–T1.138, T6.98–T6.100; `c12-label-merge.mjs`. F977 closed. **Closed.**
 
-**F982** — **the radar's category labels are a sixth writer, one code point per slot, read by code point on both arms.** Found by F981's check of which layers carry text: `circle.ts`'s `labelRows` writes a category one code point per cell and `radarQuadFigure` reads the row by code point, so on a six-category radar at 60 columns a family label moves `east`, which shares its row, three cells left over the disc's glyphs on both arms, `図表` two right on the braille arm, and the line arm's row runs to the width and clamps. C12 I118 named five writers and the radar is not among them; the fix is the radar's — `write` for the slots and `rowCells` for the read. **Open.**
+**F982** — **the radar's category labels are a sixth writer, one code point per slot, read by code point on both arms.** Found by F981's check of which layers carry text: `circle.ts`'s `labelRows` writes a category one code point per cell and `radarQuadFigure` reads the row by code point, so on a six-category radar at 60 columns a family label moves `east`, which shares its row, three cells left over the disc's glyphs on both arms, `図表` two right on the braille arm, and the line arm's row runs to the width and clamps. C12 I118 named five writers and the radar is not among them; the fix is the radar's — `write` for the slots and `rowCells` for the read. **Closed** (F984).
+
+**F984** — **the radar's labels through the one writer and its line arm reading cells: F982 closed, both arms the control's row cell for cell.** `labelRows` calls `chargrid.ts`'s `write` and `radarQuadFigure` derives its label row through `rowCells` once per row; on the frame F982 measured, the row a family or `図表` shares with `east` reads 45 cells on both arms with `east` at its column, where it read 42 and 47, and 60 into the clamp. C12 I118's list grows and I119 names the arm; T1.139, T1.140, T6.101, T6.102; `c12-radar-captions.mjs`. **Closed.**
+
+**F985** — **both x-axis caption writers had the radar's shape, and SS61 closes the class.** Found by sweeping every spread in `plot/` for F982's shape: `xAxis`'s `place` and `xTickRow` placed a caption by `cells()` and wrote `[...text]` one code point per cell, one of them under a `cells-ok` mark, so with a family at the left the centre and right captions sat three cells left of ticks that had not moved, and with `図表` two right into the clamp. Both go through `write`; the tick-label arm cannot show it, a formatted number being ASCII, and its restoration is the run's expected survivor. SS61 — a string spread read at any index but SS60's first, in `src/`, no exceptions — fires on the three shipped lines and states the two-statement shape as its blind spot; corpus after the fix, nothing in `src/`. T1.141 (XA10), T6.103, T6.104. **Closed.**
 
 <a id="singles"></a>
 

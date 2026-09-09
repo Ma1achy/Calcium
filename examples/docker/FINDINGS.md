@@ -34387,6 +34387,13 @@ by the 1 MiB default would now read as `did not run`, the wrong one of the five.
 first mutation in `tools/mutate/runs/instruments-starved.mjs` — F929's regex put back — with the
 python counter as the control.
 
+**A fifth tier-5 divergence inside a full chain, on a different row (2026-09-09).** C28 T5.1d — *a far
+side slower than the readout's wake* — red inside the chain that carried F984 and F985 (*the wake
+drew the running head with its figure*, expected true), green on the same `dist/` when `make e2e`
+ran alone: 19 files, 123 passed, 3 todo. The shape of the four T1.83 readings — a timing row
+measuring the host under the chain's load — and recorded here so the next red has a record to
+check against rather than a session to spend.
+
 **What would falsify this**: a red `make instruments` whose `tools/profile.mjs` block ends in a vitest
 summary and whose row still reads `0 rows`; or a summary shape the installed vitest writes that
 `readCounter` returns `null` for, which is the line IN7 exists to fail on.
@@ -36119,3 +36126,126 @@ here so the next one has something to be compared with.
 **What would falsify this**: ONE-PHASE surviving the rewritten row, which would mean the tree does
 not carry the nesting the row reads; or the 100× bound failing on a quiet machine, which would
 mean a per-sample cost this entry did not measure.
+
+## F984 — the radar's labels through the one writer and its line arm reading cells: F982 closed, and the row a family shares with `east` is the control's cell for cell on both arms ★★☆☆☆
+
+**F982, closed.** C12 I118's writer list and I119's arm sentence, commitments 118 and 119, §3n's
+*the other defect* paragraph, §3w's *the label row is read as cells*, §3u's *Not claimed*
+re-pointed; C09 §5's `rowCells` paragraph; C12 T1.139, T1.140, T6.101, T6.102;
+`tools/mutate/runs/c12-radar-captions.mjs`.
+
+**The frame, before and after.** F982's probe re-run on the tree before the change and after it
+(`out/f984-probe-radar-before.log`, `out/f984-probe-radar-after.log`): a six-category radar, one
+series, 60 columns, the row the sixth category shares with `east`, the sixth `west`, a family and
+`図表`. Cells of the row, and the column `east` starts in:
+
+| arm | sixth | before | after |
+|---|---|---|---|
+| braille | `west` | 45 · `east` at 41 | 45 · 41 |
+| braille | family | 42 · `east` at 38 | 45 · 41 |
+| braille | `図表` | 47 · `east` at 43 | 45 · 41 |
+| line | `west` | 45 · 41 | 45 · 41 |
+| line | family | 42 · 38 | 45 · 41 |
+| line | `図表` | 60 · 45, and `…` at the end | 45 · 41 |
+
+**Two lines, as F982 said.** `labelRows` lays each name in through `chargrid.ts`'s `write` — a
+cluster in the cells it measures, `""` behind a wide one, which the join drops — so the row keeps
+its count; the braille arm was fixed by that alone, because its rows were already reaching the
+merge as cells (I119). `radarQuadFigure` derives its label row through `rowCells` once, above the
+column loop, and indexes the array by cell; a `""` is the name's cell, so no quadrant is drawn
+under it and it appends nothing to the run. That is the line arm's half, and it is I119's rule on
+an arm that has no merge to meet.
+
+**The rows compare against a control of the shape's width**, not against a number. `ab` beside
+the family and the keycap, `west` beside `図表`: with the same width the placement is the same, so
+the row outside the name's slot is the control's cell for cell, `east` at its column, the row's
+width the control's — and the rows read the frame through the cluster walk, `graphemes` and
+`cells`, never by string index, because a string index is the defect. A responds row shows the
+comparison has teeth: names of different widths move their own start.
+
+**The pass.** Four mutations caught by their named rows — the writer restored to one code point
+per slot (T1.139), the read restored to one code point per column (T1.140), the continuation
+cell treated as unnamed so 表 gets a quadrant of its own (T1.140), the captions' writer restored
+(T1.141) — the rule mutated from three sides (F985), one expected survivor with its reason
+(F985). The control writes nothing.
+
+**What would falsify this**: a radar whose shared row differs from the control's outside the
+name's slot with a family or `図表` as a category, on either arm.
+
+## F985 — both x-axis caption writers had the radar's shape, one under a `cells-ok` mark: a family caption puts the centre and right captions three cells left of ticks that did not move, and `図表` runs the row into the clamp — closed, and SS61 keeps a code-point index off a cell row ★★☆☆☆
+
+**Found by the sweep, not by a frame.** After F982 named a *sixth* writer, every `[...` spread in
+`src/presentation/plot/` was listed and classified rather than the sixth fixed alone:
+
+| site | what it is | verdict |
+|---|---|---|
+| `axes.ts:670` `[...text].forEach((ch, i) => { row[start + i] = ch; })` in `xAxis`'s `place` | a caption placed by `cells()`, written per code point | **F982's shape** |
+| `axes.ts:867` the same line in `xTickRow`, under `// cells-ok — a column position` | a tick label placed by `cells()`, written per code point | **F982's shape** |
+| `circle.ts:675` `const chars = [...text]` … `chars[k]` | the radar's writer | F982 |
+| `circle.ts:815` `[...(labels[cy] ?? "")][cx]` | the radar's line-arm read | F982 |
+| `definition.ts:119` `ownedSpans`, `:523` the grid string, `:902` `lastInkRow`; `glyph-row.ts:320` `punch`; `field.ts:436` `for (const ch of span.text)` | raster rows read by code point | one cell per code point at `narrow`, by C09 T1.40's set — not this class |
+| the rest | array copies | not strings |
+
+**The frame** (`out/f985-probe-xaxis-before.log`, `-after.log`): a line plot at 56 with the
+gutter, `xLabels` of three, the row's cells, the rule's tick columns, and the cell each caption
+starts in — before → after:
+
+| captions | cells | ticks | `mid` starts | `end` starts |
+|---|---|---|---|---|
+| `ab` · `mid` · `end` (control) | 55 | 5 29 54 | 28 | 52 |
+| family · `mid` · `end` | 52 → 55 | 5 29 54 | 25 → 28 | 49 → 52 |
+| `abcd` · `mid` · `end` (control) | 55 | 5 29 54 | 28 | 52 |
+| `図表` · `mid` · `end` | 56 → 55 | 5 29 54 | 30 → 28 | clamped `e…` → 52 |
+| `start` · family · `end` | 52 → 55 | 5 29 54 | — | 49 → 52 |
+| `start` · `図表` · `end` | 56 → 55 | 5 29 54 | — | clamped → 52 |
+
+The ticks never moved: `place` records where the cells said a caption landed, and the cells were
+right. The text under them was three cells left or two right, so the mark under `mid` pointed at a
+blank cell, and with `図表` the row reached the width and the frame's clamp cut `end` to `e…`.
+
+**The mechanism is F982's exactly**, and it was in two functions because the tick loop was
+written as *the same three clamps `xAxis` applies to its three captions* — a copy that carried
+the writer with the clamps. Both now call `chargrid.ts`'s `write`. The tick-label arm cannot show
+the change: a formatted number is ASCII, no tick label carries a cluster of more than one code
+point, so no row has an input that separates the two writers. It goes through the writer to close
+the class rather than because a frame showed it, and its restoration is the run's **expected
+survivor**, with that reason beside it — the record that the frame cannot show it, rather than a
+mutation left out because it would survive.
+
+**The mark on line 867 was true and excused the wrong thing.** `// cells-ok — a column position`
+is about `row[start + i]`'s index, which *is* a column position; the spread beside it is what
+made the index a code-point index. The mark was written for the `.length` scan and read by a
+reader as *this line has been thought about*, and the sentence it carries is correct — which is
+the shape CLAUDE.md records under *a correct sentence justifying the wrong decision*. T6.104
+scans both shipped lines with their marks on and asserts the marks excuse nothing.
+
+**SS61 — the class's mechanical form** (A03 §4). A string spread, or `Array.from`, read at a
+cell index — `[...x][i]`, `[...x].at(i)`, `[...x].forEach((ch, i) …)`, `[...x].map((ch, i) …)`,
+`i` anything but SS60's `0`, so the two stay disjoint — over `src/` with no exceptions. Corpus
+measured after the fix: nothing matches anywhere in `src/`; the two prose mentions of
+`[...row][x]` are comment lines `lineFires` skips. Three fabrications: the radar's read with its
+nested index, the caption writer's `forEach`, and `Array.from(row).at(col)` at a file outside
+`presentation/` so the scope is shown to be `src/`. The control is silent on `[0]`, on the
+two-statement shape, on a spread into a longer literal, and on `Array.from({ length }, (_, i) …)`,
+which every grid in `plot/` is built with. **Of the eight lines the class has produced, the rule
+reaches four** — every reader (F977, F982) and both `forEach` writers (F985) — and states the
+other four's shape as its blind spot: the two-statement `const chars = [...text]` (the radar
+writer's own, and the shape the three raster reads legitimately hold) and a `for…of` with a
+counter (F976's four). It cannot tell a raster row from a label row, because what separates them
+— whether the operand was placed by `cells()` — is not textual. It fires on an array spread mapped
+with an index, whose remedy is to drop the copy. Mutated from three sides in
+`c12-radar-captions.mjs`: the index arm narrowed to `[0]`, the `forEach` arm dropped, the
+citation retargeted — each caught by the fabrication that copies the shipped line.
+
+**Two baseline frames moved, and the corpus had recorded the overhang.** `heatmap-captions-left-wide-40w`
+and `-60w` — the heatmap's caption row at the `wide` ambiguous mode, where `…` measures two cells.
+The row went from `      epoc…  epoc…     now`, 28 cells, to `      epoc… epoc…    now`, 26: the
+gutter's six and the grid's twenty, which is the area the captions are placed across. The old
+writer reserved two cells for `…` and wrote one code point into one of them, so each truncated
+caption left a blank slot behind it and `now` ended two cells past the grid's edge — and the
+golden held that row through review and commit, because a snapshot records and does not check.
+Read row by row before regenerating (`out/f985-golden-read.ts`), 2 of 407 moved, both this row,
+no other frame in the corpus.
+
+**What would falsify this**: a caption row whose other captions move with a family or `図表`; a
+`[...x][i]` in `src/` that `make enforce` passes.
