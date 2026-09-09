@@ -167,6 +167,18 @@ describe("C04 I98 — the collapsed form is the residue row and nothing else", (
     expect(lines([folded], 40, undefined, ASCII_CAPS)).toEqual(["~ +5 more"]);
     // S2: a held offset does not move a fold — the residue is the fold's statement.
     expect(lines([folded], 40, { s: 3 })).toEqual(["⋯ +5 more"]);
+    // **And the state in which the forced zero is observable** (F968): a held
+    // offset inside a multi-row child the slice cannot cut. With an interior of
+    // 0 the window keeps whatever straddles the offset, and a child with no
+    // `window` — a group — is kept whole, so a collapsed box would draw three
+    // rows above its own fold. Forced to zero, nothing straddles row 0. The row
+    // as first written had single-row children only, which no offset can
+    // straddle, and the guard's mutation survived it.
+    const tall = box([{ kind: "group", id: "g", direction: "column", children: rows(3) } as Block, ...rows(2, 4)], {
+      follow: true,
+      collapsed: true,
+    });
+    expect(lines([tall], 40, { s: 1 })).toEqual(["⋯ +5 more"]);
     // Expanded again it is an ordinary follow box.
     const open = box(rows(5), { follow: true, collapsed: false });
     expect(scrollDefinition.measure(open, 40, measureChild)).toBe(3);

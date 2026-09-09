@@ -83,8 +83,11 @@ const MUTATIONS = [
     expect: "T2.42",
   },
   {
-    // S2 undone: a collapsed follow box resolves its offset to the content, so
-    // the residue reads *N above, 0 below* — the fold pointing the wrong way.
+    // S2 undone: a collapsed box resolves a held offset, and the window then
+    // keeps a multi-row child that straddles it; a child the slice cannot cut
+    // is kept whole, so the box draws rows above its own fold. The residue
+    // text is C04 I104's and does not move — this survived T2.42 for as long as
+    // the row's children were one row each (F968).
     name: "a collapsed box is not forced to offset zero",
     file: CONTAINERS,
     from: "  if (interior === 0) return 0;",
