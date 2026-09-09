@@ -33,11 +33,15 @@ export function grid(rows: number, columns: number): Grid {
  * measures (C12 I118, §3n).
  *
  * **The one writer.** The treemap's names, `tree`'s and `graph`'s labels, the
- * sankey's node labels and the point labels all come through here. Four
- * private copies of this loop wrote one *code point* per cell, advancing by
- * `cells()` of the code point, so a zero-width piece was written and then
- * overwritten by the piece after it: a family `👨‍👩‍👧` arrived as three faces, a
- * keycap `1️⃣` as a bare digit, and `café` decomposed as `cafe` (F969, F976).
+ * sankey's node labels, the point labels, the radar's category labels and the
+ * x axis's captions and tick labels all come through here. Four private
+ * copies of this loop wrote one *code point* per cell, advancing by `cells()`
+ * of the code point, so a zero-width piece was written and then overwritten
+ * by the piece after it: a family `👨‍👩‍👧` arrived as three faces, a keycap `1️⃣`
+ * as a bare digit, and `café` decomposed as `cafe` (F969, F976). Three more
+ * placed by `cells()` and then wrote one code point per *slot*, so a family
+ * overran its reservation by three and `図表` left two blank inside its own,
+ * and every label sharing the row moved (F982, F985).
  *
  * **A cluster owns the cells it measures.** It is written whole into the cell
  * where it starts, and the cells after that one up to its width are `""` —

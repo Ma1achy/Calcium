@@ -85,6 +85,7 @@ const RULE_INVARIANTS: Readonly<Record<string, string>> = {
   SS9: "C20 I11 · C20 I12 · C20 T2.4",
   MG23: "C23 §2 · C23 I14 · A02 Seam 4",
   SS60: "C09 I60 · C09 T3.77",
+  SS61: "C12 I119 · C12 T1.140",
 };
 
 /**
@@ -176,6 +177,28 @@ const FABRICATED: readonly Fabrication[] = [
     rule: "SS60",
     file: "src/shell/paint.ts",
     source: "const first = [...row].at(0) ?? \" \";",
+  },
+  {
+    // **Copied from `circle.ts:815` as it shipped** (F982), per commitment 14a:
+    // the radar line arm's read of its label row by code point, with the
+    // nested index the lazy bound has to reach past.
+    rule: "SS61",
+    file: "src/presentation/plot/circle.ts",
+    source: 'const label = [...(labels[cy] ?? "")][cx];',
+  },
+  {
+    // **Copied from `axes.ts:867` as it shipped** (F985): the caption writer's
+    // shape — placed by `cells()`, then written one code point per cell.
+    rule: "SS61",
+    file: "src/presentation/plot/axes.ts",
+    source: "[...text].forEach((ch, i) => { row[start + i] = ch; });",
+  },
+  {
+    // And `.at(i)` over `Array.from`, at a file outside `presentation/` so the
+    // scope is shown to be `src/` and not the directory the findings named.
+    rule: "SS61",
+    file: "src/shell/paint.ts",
+    source: "const glyph = Array.from(row).at(col) ?? \" \";",
   },
   {
     // SS40's own violation, and the reason it is not SS23 widened. The same
@@ -1726,6 +1749,41 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       (v) => v.rule === "SS60",
     );
     expect(fired).toHaveLength(1);
+  });
+
+  it("SS61 fires on a code-point index and is silent at zero, across two statements, and on a spread read whole", () => {
+    // **The control, which is what says the rule is about the index and not
+    // about spreads.** SS60's own subject (`[0]`, so one rule per line and
+    // the two stay disjoint); the two-statement shape, which is the rule's
+    // stated blind spot — the radar writer's own (F982) and what three raster
+    // reads legitimately hold; a spread into a longer literal; and
+    // `Array.from` with a mapper whose second parameter is an index, which
+    // is the idiom every grid in `plot/` is built with.
+    const read = (f: string): string =>
+      f === "src/presentation/a.ts"
+        ? "  const ch = [...text.slice(i)][0] ?? \"\";\n"
+        : f === "src/presentation/b.ts"
+          ? "  const chars = [...text];\n  for (let k = 0; k < chars.length; k += 1) slots[row]![start + k] = chars[k]!;\n"
+          : f === "src/presentation/c.ts"
+            ? "  return placement === \"above\" ? [...horizontal, ...top] : top;\n"
+            : f === "src/presentation/d.ts"
+              ? "  const slots = Array.from({ length: n }, (_, i) => i * 2);\n"
+              : "";
+    const files = ["src/presentation/a.ts", "src/presentation/b.ts", "src/presentation/c.ts", "src/presentation/d.ts"];
+    expect(
+      checkSourceScans(files, read).filter((v) => v.rule === "SS61"),
+      "a spread indexed at zero, across two statements, or not indexed at all is not this rule's subject",
+    ).toEqual([]);
+
+    // And live against the same reader: the two shipped lines, one per file,
+    // the reader's with its nested index and the writer's with its `forEach`.
+    const fired = checkSourceScans(
+      ["src/presentation/e.ts", "src/presentation/f.ts"],
+      (f) => (f === "src/presentation/e.ts"
+        ? "      const label = [...(labels[cy] ?? \"\")][cx]; // cells-ok — a cell column\n"
+        : "    [...text].forEach((ch, i) => { row[start + i] = ch; }); // cells-ok — a column position\n"),
+    ).filter((v) => v.rule === "SS61");
+    expect(fired.map((v) => v.file), "a `cells-ok` mark does not excuse it — the mark is about the index, and the spread is the defect").toEqual(["src/presentation/e.ts:1", "src/presentation/f.ts:1"]);
   });
 
   it("SS51's vocabulary list equals `ramp.ts`'s, both directions", () => {

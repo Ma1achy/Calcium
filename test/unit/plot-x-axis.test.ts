@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { block } from "../../src/data/viewmodel/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { FULL_CAPS, measurable } from "../support/render.js";
+import { cells, rowCells } from "../../src/presentation/text.js";
 
 const kit = (caps = FULL_CAPS) => measurable({ definitions: [plotDefinition], capabilities: caps });
 const plain = (l: string): string => l.replace(/\x1b\[[0-9;]*m/gu, "");
@@ -206,4 +207,56 @@ describe("XA9 (C12 I41): the axis costs no height", () => {
       }), 50).length; // cells-ok — a row count
     expect(of({ xMin: 0, xMax: 60 })).toBe(of({}));
   });
+});
+
+describe("XA10 · T1.141 (C12 I118): a caption is laid in whole, in the cells it measures, and the ticks stay under their captions", () => {
+  // `xAxis` placed a caption by `cells()` and wrote `[...text]` one code
+  // point per cell (F985): a family took five cells of a two-cell
+  // reservation, `図表` two of four, and the captions after it came out
+  // three cells left or two right of the ticks recorded for them. Read by
+  // cells — `rowCells`, the writer's join inverted — and never by string
+  // index, against the same three captions with an ASCII word of the shape's
+  // width in its place.
+  const FAMILY = "\u{1F468}\u200d\u{1F469}\u200d\u{1F467}";
+  const KEYCAP = "1\uFE0F\u20E3";
+  const BASE: readonly [string, string, string] = ["start", "mid", "end"];
+  const read = (labels: readonly [string, string, string]): { ticks: readonly number[]; row: string; byCell: readonly string[]; width: number } => {
+    const { rule, labels: row } = axisRows({ xLabels: [...labels] });
+    const ticks = rowCells(rule, "narrow").flatMap((c, i) => (c === "┬" ? [i] : [])); // cells-ok — a cell index
+    return { ticks, row, byCell: rowCells(row, "narrow"), width: cells(row, "narrow") };
+  };
+  const startOf = (byCell: readonly string[], name: string): number => {
+    const parts = rowCells(name, "narrow");
+    for (let at = 0; at + parts.length <= byCell.length; at += 1) { // cells-ok — a cell index
+      if (parts.every((p, k) => byCell[at + k] === p)) return at;
+    }
+    return -1; // cells-ok — a sentinel
+  };
+
+  it.each([["a family", FAMILY, "ab"], ["図表", "図表", "wxyz"], ["a keycap", KEYCAP, "ab"]])(
+    "%s at the left, then at the centre, beside an ASCII caption of its width",
+    (_name, shape, control) => {
+      for (const at of [0, 1]) {
+        const shaped = BASE.map((l, i) => (i === at ? shape : l)) as [string, string, string];
+        const plain = BASE.map((l, i) => (i === at ? control : l)) as [string, string, string];
+        const s = read(shaped);
+        const p = read(plain);
+        expect(s.row, "the caption reaches the row whole").toContain(shape);
+        expect(s.width, "the row measures what the control's does").toBe(p.width);
+        expect(s.ticks, "the ticks are the control's").toEqual(p.ticks);
+        for (const [i, other] of BASE.entries()) {
+          if (i === at) continue;
+          expect(startOf(s.byCell, other), `${other} starts where it starts beside ${control}`).toBe(startOf(p.byCell, other));
+        }
+        // XA4's anchor rule, by cells: the left caption starts on its tick,
+        // the centre straddles it, the right ends on it.
+        const [l, c, r] = shaped;
+        expect(s.ticks).toEqual([
+          startOf(s.byCell, l),
+          startOf(s.byCell, c) + Math.floor((cells(c, "narrow") - 1) / 2), // cells-ok — a cell position
+          startOf(s.byCell, r) + cells(r, "narrow") - 1, // cells-ok — a cell position
+        ]);
+      }
+    },
+  );
 });

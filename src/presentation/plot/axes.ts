@@ -9,6 +9,7 @@
 import { normalisedOf } from "../../data/viewmodel/range.js";
 import type { AmbiguousWidth } from "../text.js";
 import { cells, truncate } from "../text.js";
+import { write } from "./chargrid.js";
 import type { Plot, ScaleType } from "../../data/viewmodel/index.js";
 import type { Range } from "./scale.js";
 import { rowOf, FACING_DEFAULT, type Facing } from "./scale.js";
@@ -667,9 +668,11 @@ export function xAxis(
     const wide = cells(text, caps.ambiguousWidth);
     const start = Math.max(free, Math.min(ideal, w - wide));
     if (start + wide > w) return; // no room with its gap — dropped, not butted
-    [...text].forEach((ch, i) => {
-      row[start + i] = ch;
-    });
+    // **Through the one writer** (C12 I118). `[...text]` one code point per
+    // cell after placing by `cells()` put a family caption in five cells of a
+    // two-cell reservation and `図表` in two of four, so the captions after it
+    // sat three cells left or two right of the ticks placed for them (F985).
+    write(row, start, text, caps.ambiguousWidth);
     tickColumns.push(start + anchor(wide));
     free = start + wide + 1;
   };
@@ -864,7 +867,9 @@ export function xTickRow(
     // label pushed right to clear its neighbour is describing where it now is;
     // a mark left behind at the value's column points at a label that moved.
     const anchor = start + Math.floor((wide - 1) / 2); // cells-ok — a column position
-    [...text].forEach((ch, i) => { row[start + i] = ch; }); // cells-ok — a column position
+    // The same writer as the captions' (C12 I118, F985): a formatted number is
+    // ASCII today, and the row it goes into is a cell row like any other.
+    write(row, start, text, caps.ambiguousWidth);
     tickColumns.push(anchor);
     free = start + wide + 1; // cells-ok — a column position
   }

@@ -167,6 +167,34 @@ export const SCANS = [
     scope: "src/", allow: [],
     why: "the first element of a spread allocates the whole iterable to read one — a code point is read with codePointAt at the cursor, a first member with .values().next()" },
 
+  // SS61 is SS60's other half: not the first element but *any* — a string
+  // spread indexed as though a code point were a cell. Three readers and two
+  // writers had the shape. `mergedRow` read every layer at column `x` as
+  // `[...row][x]` (F977); the radar's line arm read its label row as
+  // `[...(labels[cy] ?? "")][cx]` (F982); both x-axis caption writers laid
+  // text in with `[...text].forEach((ch, i) => { row[start + i] = ch; })`
+  // after placing it by `cells()` (F985). A family is five code points in two
+  // cells and `図表` two in four, so every cell after the name moved three
+  // left or two right, and the ticks placed for the neighbours stayed where
+  // the cells said. A cell row is read through `rowCells` and written through
+  // `chargrid.ts`'s `write`, which is where the width lives (C09 I65). Corpus
+  // measured after the fix: nothing matches anywhere in `src/`.
+  //
+  // **Stated blind spot**: the same read across two statements — `const chars
+  // = [...text]; … chars[k]` — which is the shape the radar's *writer* had
+  // (F982), the shape the four F976 writers' `for (const ch of text)` loops
+  // had, and also the shape three raster reads legitimately hold
+  // (`ownedSpans`, `lastInkRow`, the box plot's `punch`), where every code
+  // point is one cell at `narrow` by C09 T1.40's set. The rule cannot tell a
+  // raster row from a label row: what separates them is whether the operand
+  // was placed by `cells()`, and that is not textual. And it fires on an
+  // array spread mapped with an index — `[...rows].map((r, i) => …)` — whose
+  // remedy is to drop the copy rather than to allow the line.
+  { id: "SS61", spec: "C12 I119 · C12 T1.140",
+    pattern: /(?:\[\.\.\.[^;\n]*?\]|Array\.from\([^;\n]*?\))\s*(?:\[(?!0\])|\.at\((?!0\))|\.(?:forEach|map)\(\s*\(\s*\w+\s*,\s*\w+)/,
+    scope: "src/", allow: [],
+    why: "a code-point index is not a cell column — a cluster is one cell or two and a joiner none; a cell row is read through rowCells and written through chargrid's write" },
+
   { id: "SS4", spec: "C13 I9 · C13 T2.2 · C14 T2.4",
     pattern: /\b(?:Date\.now|new Date|performance\.now|process\.hrtime|Date)\b/,
     scope: "src/viewport/", allow: [],
