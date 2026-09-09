@@ -9,6 +9,7 @@ import {
   cells,
   displayCells,
   expandTabs,
+  fitStyled,
   hardWrapCells,
   sliceCells,
   stripControl,
@@ -309,6 +310,85 @@ describe("sliceCells (C09 §5a, I20)", () => {
     expect(sliceCells("abc", 1, 99)).toBe("bc");
     expect(sliceCells("abc", 5, 9)).toBe("");
     expect(sliceCells("abc", 2, 2)).toBe("");
+  });
+});
+
+describe("fitStyled (C09 §5a)", () => {
+  // The function every row of every frame goes through (`exact()` in
+  // `shell/paint.ts`), and until F937 it had no row of its own: every caller's
+  // suite exercised it and none pinned its four answers, so a change to the walk
+  // had nothing to fail against but golden frames.
+  const RED = "\u001b[31m";
+  const SGR = /\u001b\[[0-9;]*m/g;
+
+  /** A UTF-16 half with no partner beside it — the thing a code-unit step makes. */
+  const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
+
+  it("T1.30 (I9, §5a): the four answers — untouched, padded, cut plain, cut and closed", () => {
+    // Already `width`: returned as given, styled or not, with no bytes added.
+    expect(fitStyled("abc", 3, SGR_RESET)).toBe("abc");
+    expect(fitStyled(`${RED}abc${SGR_RESET}`, 3, SGR_RESET)).toBe(`${RED}abc${SGR_RESET}`);
+
+    // Short: padded with spaces to exactly `width`, and a pad is not a cut, so
+    // even a styled row gains no reset beyond the ones it carried.
+    expect(fitStyled("ab", 4, SGR_RESET)).toBe("ab  ");
+    expect(fitStyled(`${RED}ab${SGR_RESET}`, 4, SGR_RESET)).toBe(`${RED}ab${SGR_RESET}  `);
+
+    // Long and plain: cut, and no reset — four bytes on every plain row of every
+    // frame would have every golden asserting the reset rather than the row.
+    expect(fitStyled("abcdef", 3, SGR_RESET)).toBe("abc");
+
+    // Long and styled: cut and closed with the reset it was handed, so the
+    // colour cannot bleed into the rows below.
+    expect(fitStyled(`${RED}abcdef${SGR_RESET}`, 3, SGR_RESET)).toBe(`${RED}abc${SGR_RESET}`);
+
+    // A double-width glyph straddling the cut is dropped and its cell blanked,
+    // never halved (I9) — and the blank counts as a cut, so a styled row closes.
+    expect(fitStyled("a日b", 2, SGR_RESET)).toBe("a ");
+    expect(fitStyled("a日b", 3, SGR_RESET)).toBe("a日");
+    expect(fitStyled(`${RED}a日b`, 2, SGR_RESET)).toBe(`${RED}a${SGR_RESET} `);
+
+    // Escapes are copied through whole and cost no cells.
+    const fitted = fitStyled(`${RED}a${SGR_RESET}b`, 5, SGR_RESET);
+    expect(displayCells(fitted)).toBe(5);
+    expect(fitted.match(SGR)).toEqual([RED, SGR_RESET]);
+  });
+
+  it("T1.31 (I60, I20, §5a): the cursor steps one code point, in both walks", () => {
+    // **The step is a code point, not a code unit and not a cluster.** An
+    // astral character is two UTF-16 units and one step; a combining mark is
+    // its own zero-width step, so it stays with its base at the cut; a lone
+    // surrogate is one one-cell step, exactly as the string iterator walked it
+    // before the read was replaced (F938). The fabricated violation is
+    // `i += 1`: the low half of every astral pair then re-enters the walk as a
+    // character of its own, one cell wide, and lands in the output.
+    expect(fitStyled("a\u{1F44D}bc", 4, SGR_RESET), "cut after an astral pair").toBe("a\u{1F44D}b");
+    expect(fitStyled("\u{1F44D}", 4, SGR_RESET), "padded after an astral pair").toBe("\u{1F44D}  ");
+    expect(fitStyled("e\u0301xy", 1, SGR_RESET), "the mark stays with its base").toBe("e\u0301");
+    expect(fitStyled("\ud83dxy", 2, SGR_RESET), "a lone surrogate is one step of one cell").toBe("\ud83dx");
+    expect(sliceCells("a\u{1F44D}bc", 1, 4), "a window over an astral pair").toBe("\u{1F44D}b");
+    expect(sliceCells("a\u{1F44D}bc", 3, 4), "a window after one").toBe("b");
+
+    // And over a corpus whose clusters are additive — every cluster's width is
+    // the sum of its code points' — both walks hit `width` exactly and never
+    // manufacture a lone surrogate. (The non-additive clusters are T3.79's
+    // record, F939.)
+    const corpus = ["plain ascii", "日本語のテキスト", "a\u{1F44D}b\u{1F600}c", "e\u0301 o\u0308 u\u0300", `${RED}x\u{1F44D}${SGR_RESET}y\u{1F600}`];
+    for (const line of corpus) {
+      const whole = displayCells(line);
+      for (let w = 0; w <= whole + 2; w += 1) {
+        const fitted = fitStyled(line, w, SGR_RESET);
+        expect(displayCells(fitted), `fitStyled(${JSON.stringify(line)}, ${String(w)})`).toBe(w);
+        expect(LONE_SURROGATE.test(fitted), `a lone surrogate in fitStyled(${JSON.stringify(line)}, ${String(w)})`).toBe(false);
+      }
+      for (let a = 0; a <= whole; a += 1) {
+        for (let b = a; b <= whole; b += 1) {
+          const window = sliceCells(line, a, b);
+          expect(displayCells(window), `sliceCells(${JSON.stringify(line)}, ${String(a)}, ${String(b)})`).toBe(b - a);
+          expect(LONE_SURROGATE.test(window), `a lone surrogate in sliceCells(${JSON.stringify(line)}, ${String(a)}, ${String(b)})`).toBe(false);
+        }
+      }
+    }
   });
 });
 

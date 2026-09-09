@@ -84,6 +84,7 @@ const RULE_INVARIANTS: Readonly<Record<string, string>> = {
   MG17: "C19 I12 · C19 T2.5",
   SS9: "C20 I11 · C20 I12 · C20 T2.4",
   MG23: "C23 §2 · C23 I14 · A02 Seam 4",
+  SS60: "C09 I60 · C09 T3.77",
 };
 
 /**
@@ -150,6 +151,31 @@ const FABRICATED: readonly Fabrication[] = [
     rule: "SS59",
     file: "src/shell/profiling/node.ts",
     source: 'performance.mark("frame");',
+  },
+  {
+    // **Copied from `text.ts:203` as it shipped** (F937), per commitment 14a:
+    // the cursor's read of one code point from the remainder of a row, on every
+    // character of every row of every frame. Fabricated at the file that held
+    // it, because SS60's allow list is empty and the rule has to fire there.
+    rule: "SS60",
+    file: "src/presentation/text.ts",
+    source: 'const ch = [...text.slice(i)][0] ?? "";',
+  },
+  {
+    // The same read spelled without a spread. No call site to copy — the tree
+    // never wrote it — so this is the rule's own alternative, and the row that
+    // proves the scan is not the spread's regex tested against itself is the
+    // control below, which is silent on a spread the code reads whole.
+    rule: "SS60",
+    file: "src/presentation/text.ts",
+    source: "const ch = Array.from(text.slice(i))[0] ?? \"\";",
+  },
+  {
+    // And `.at(0)`, the third spelling, at a file outside `presentation/` so
+    // the scope is shown to be `src/` and not the one file the finding named.
+    rule: "SS60",
+    file: "src/shell/paint.ts",
+    source: "const first = [...row].at(0) ?? \" \";",
   },
   {
     // SS40's own violation, and the reason it is not SS23 widened. The same
@@ -1668,6 +1694,38 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     if (owed !== undefined) {
       expect(fired[0]!.spec, `${rule} is ${owed}'s mechanical form`).toBe(owed);
     }
+  });
+
+  it("SS60 fires on the cursor's read and is silent on a spread the code reads whole", () => {
+    // **The control, which is what says the pattern is about the read and not
+    // about spreads.** Three spreads the tree legitimately holds, each of which
+    // a looser pattern would report: a spread of a slice into a longer literal
+    // (`paint.ts:299`, copied), a spread of a single cluster whose array is
+    // then read whole (`clusterCells`, copied — the rule's stated blind spot,
+    // and the reason it is a blind spot rather than a violation), and two
+    // statements on one line where the second indexes something else, which is
+    // what the `[^;\n]` bound is for.
+    const read = (f: string): string =>
+      f === "src/presentation/a.ts"
+        ? "    return { rows: [...rows.slice(0, cap - 1), elision], first: 0, offset: 0, count: cap - 1 };\n"
+        : f === "src/presentation/b.ts"
+          ? "  const points = [...cluster];\n  const base = points[0]?.codePointAt(0);\n"
+          : f === "src/presentation/c.ts"
+            ? "  const all = [...xs]; const c = grid[0][0];\n"
+            : "";
+    const files = ["src/presentation/a.ts", "src/presentation/b.ts", "src/presentation/c.ts"];
+    expect(
+      checkSourceScans(files, read).filter((v) => v.rule === "SS60"),
+      "a spread that is not indexed at zero within its own statement is not this rule's subject",
+    ).toEqual([]);
+
+    // And the rule is live against the same reader: the shipped line, with a
+    // nested index inside the spread so the lazy bound is shown to reach past
+    // an inner `]`.
+    const fired = checkSourceScans(["src/presentation/d.ts"], () => "  const ch = [...rows[i].slice(j)][0] ?? \"\";\n").filter(
+      (v) => v.rule === "SS60",
+    );
+    expect(fired).toHaveLength(1);
   });
 
   it("SS51's vocabulary list equals `ramp.ts`'s, both directions", () => {

@@ -165,6 +165,50 @@ export function displayCells(text: string, ambiguous: AmbiguousWidth = "narrow")
 }
 
 /**
+ * The one code point at code-unit offset `i`, read in place — the cursor's step
+ * in `fitStyled` and `sliceCells` (C09 I60), or `""` past the end.
+ *
+ * **`[...text.slice(i)][0]` answered the same string and allocated the rest of
+ * the row to do it** (F937, F938): a copy of everything after the cursor and
+ * then an array of every remaining code point, to read one, on every character
+ * of every row of every frame. Quadratic in the row — 3× this read at 40 cells,
+ * 1081× at 400 — and 53 % of all frame work, in a function whose tests all
+ * passed because a cost has no failing case. SS60 is what keeps the spread out.
+ *
+ * Same answer in every case the walk can reach: a surrogate pair is one code
+ * point from both, and a lone surrogate comes back as itself from both —
+ * `String.fromCodePoint` throws only above U+10FFFF, and `codePointAt` never
+ * yields that. The caller advances by `.length`, which is 1 or 2.
+ */
+function pointAt(text: string, i: number): string {
+  const cp = text.codePointAt(i);
+  return cp === undefined ? "" : String.fromCodePoint(cp);
+}
+
+/**
+ * `sgrPattern` as a **sticky** regex — a match at `lastIndex` or nothing — for
+ * the same two cursors (C09 I60).
+ *
+ * **The third instance of the class, found by the bench beside the other two
+ * and not by the finding** (F938). The walk asks *is there an escape at the
+ * cursor* by setting `lastIndex` and calling `exec`, and a `g` regex answers a
+ * different question: *where is the next escape anywhere after the cursor*. On a
+ * row with no escape at all that is a scan to the end of the row, once per
+ * character — the spread's cost again, by another mechanism, and the one SS60's
+ * comment says it cannot see. Measured after the spread went: an unstyled row
+ * still cost 15.7× at 400 cells against 50, where the styled row beside it cost
+ * 7.9×, because a colour change every twenty cells bounded the scan and no
+ * change at all did not.
+ *
+ * Built from `sgrPattern`'s source rather than written, so the escape byte stays
+ * in the one file C01 I1 allows it (SS14); the callers' `m.index === i` check is
+ * kept, and is now always true when `m` is not null.
+ */
+function sgrAt(): RegExp {
+  return new RegExp(sgrPattern().source, "y");
+}
+
+/**
  * Pad or truncate to exactly `width` display cells, preserving escapes.
  *
  * Escapes are copied through and cost nothing; a grapheme that would straddle
@@ -180,7 +224,7 @@ export function fitStyled(
 ): string {
   if (displayCells(text, ambiguous) === width) return text;
 
-  const sgr = sgrPattern();
+  const sgr = sgrAt();
   let out = "";
   let used = 0;
   let cut = false;
@@ -200,7 +244,9 @@ export function fitStyled(
       continue;
     }
 
-    const ch = [...text.slice(i)][0] ?? "";
+    // One code point, read in place; the step is a code point and not a
+    // cluster, which is §5a's other half (F939, T3.79).
+    const ch = pointAt(text, i);
     if (ch === "") break;
     const w = cells(ch, ambiguous);
     if (used + w > width) {
@@ -254,7 +300,7 @@ export function sliceCells(
   const end = Math.max(start, Math.floor(to));
   if (end === start) return "";
 
-  const sgr = sgrPattern();
+  const sgr = sgrAt();
   // The style in effect at `start`, accumulated across everything skipped. A
   // reset in the prefix clears it, so the tail opens with what the terminal
   // would actually have been showing rather than with every escape ever seen.
@@ -280,7 +326,9 @@ export function sliceCells(
       continue;
     }
 
-    const ch = [...text.slice(i)][0] ?? "";
+    // The same read as `fitStyled`'s, for the same reason (F938): the second
+    // site F937 did not name, on the tail window `composite` takes of every row.
+    const ch = pointAt(text, i);
     if (ch === "") break;
     const w = cells(ch, ambiguous);
 

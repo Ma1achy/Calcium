@@ -138,6 +138,35 @@ export const SCANS = [
     scope: "src/", allow: [],
     why: "nothing under src/ writes the user-timing buffer, node.ts included — it is unbounded and reading it costs 449 µs at 10 000 entries, so the profiler is not exempt from the leak it exists to find" },
 
+  // The first element of a spread — `[...x][0]` — is the whole iterable
+  // allocated to read one member, and it is quadratic the moment `x` is the
+  // remainder of something being walked. `presentation/text.ts` held it twice:
+  // `const ch = [...text.slice(i)][0] ?? ""`, a cursor's read of one code point
+  // from the rest of a row, on every character of every row of every frame —
+  // 53 % of frame work, 3× the flat `codePointAt` read at 40 cells and 1081× at
+  // 400 (F937, F938). Correct, green under every test of both functions, and
+  // found only by measuring: a cost has no failing case, which is why the
+  // durable check is a scan and not a timing row — a timing row is what TRIAGE
+  // group 12 is made of, and C09 T3.77 carries one anyway, with a 20 ms floor
+  // under each operand and a bound midway between linear and quadratic.
+  //
+  // `Array.from(x)[0]` and `.at(0)` are the same read in other spellings. The
+  // `[^;\n]` bound keeps the spread inside one statement, so `[...xs]; b[0][0]`
+  // on one line does not fire.
+  //
+  // **Stated blind spot: the idiom written across two statements** — `const
+  // points = [...s]; points[0]` — which `clusterCells` does over one cluster and
+  // legitimately, because it goes on to read the array whole (`points.some`).
+  // A `for…of` that breaks after its first iteration, and a spread of a
+  // `slice` that is never indexed, are the same allocation and are not seen
+  // either. And the rule is about the *read*: a second per-character scan of
+  // the remainder by some other means is the same order of cost by a different
+  // mechanism and is not this pattern's subject.
+  { id: "SS60", spec: "C09 I60 · C09 T3.77",
+    pattern: /(?:\[\.\.\.[^;\n]*?\]|Array\.from\([^;\n]*?\))\s*(?:\[0\]|\.at\(0\))/,
+    scope: "src/", allow: [],
+    why: "the first element of a spread allocates the whole iterable to read one — a code point is read with codePointAt at the cursor, a first member with .values().next()" },
+
   { id: "SS4", spec: "C13 I9 · C13 T2.2 · C14 T2.4",
     pattern: /\b(?:Date\.now|new Date|performance\.now|process\.hrtime|Date)\b/,
     scope: "src/viewport/", allow: [],
