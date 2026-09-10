@@ -186,28 +186,43 @@ describe("C23 — the shell route as a live screen, spec-first rows", () => {
     expect(patches, "frames arrived while it ran").toBeGreaterThan(0);
     expect(patches, "far fewer than one per line").toBeLessThan(50);
 
-    // **Wait for the artefact, not for the route** (F812's set, 2026-09-10).
-    // `settled` waits for the guard to be taken and released, which is the route
-    // finishing — and the patch carrying the child's last chunk can land a turn
-    // after that. On the runner it twice did: the blocks serialised to
-    // `[{"kind":"scroll",…}]` with no `200` in them, and the assertion said *the
-    // tail is the last line the child wrote*, which is a claim about coalescing
-    // where the fact was a poll that stopped one turn early.
+    // **Wait for the artefact, not for the route** (F812's set) — and report what
+    // the wait saw, because the first version of this wait was founded on a
+    // diagnosis the wait itself falsified (F1096).
     //
-    // A bounded wait rather than a longer sleep: it costs nothing when the patch
-    // has already landed, and when it has not the row still fails on the same
-    // assertion with the same sentence — a race turned into a wait, not a bound
-    // widened until it passes.
-    const tail = async (): Promise<string> => {
-      const deadline = Date.now() + 5_000;
-      let text = JSON.stringify(h.transcript.entries[0]?.doc.blocks);
-      while (!text.includes("200") && Date.now() < deadline) {
-        await new Promise((r) => void setTimeout(r, 25));
-        text = JSON.stringify(h.transcript.entries[0]?.doc.blocks);
-      }
-      return text;
-    };
-    expect(await tail(), "and the tail is the last line the child wrote").toContain("200");
+    // That version said *the patch carrying the child's last chunk lands a turn
+    // after `settled` returns*, and waited five seconds for it. On `main` the row
+    // then failed having **used the whole five seconds**, with the block holding
+    // lines 1 to 34 of 200 and the JSON complete rather than truncated. A poll
+    // cannot fix a feed that has stopped, so the repair was right to exist and
+    // wrong about why: it turned a race-shaped guess into a measurement, which is
+    // the only reason the number above is known.
+    //
+    // **`grew` is the figure that separates the two remaining readings**, and no
+    // sample so far can answer it: a first reading of 34 and a last of 34 is a
+    // feed that stopped, and 12 rising to 34 is a feed that is merely slow. They
+    // want opposite repairs — the first a drain the route does not perform, the
+    // second a longer wait — so the row reports it rather than choosing. It is
+    // green in the devcontainer every time, including with `settled`'s phase-one
+    // budget starved to zero, so this machine cannot produce either reading.
+    const lines = (): number =>
+      JSON.stringify(h.transcript.entries[0]?.doc.blocks).match(/\{"text":"\d+"\}/gu)?.length ?? 0;
+
+    const tailStart = Date.now();
+    const firstLines = lines();
+    const tailDeadline = tailStart + 5_000;
+    let tailText = JSON.stringify(h.transcript.entries[0]?.doc.blocks);
+    while (!tailText.includes('"200"') && Date.now() < tailDeadline) {
+      await new Promise((r) => void setTimeout(r, 25));
+      tailText = JSON.stringify(h.transcript.entries[0]?.doc.blocks);
+    }
+    const tailWaited = Date.now() - tailStart;
+    const lastLines = lines();
+    const verdict =
+      `${firstLines} → ${lastLines} numbered lines of 200 in ${tailWaited} ms, ${patches} patches, ` +
+      `grew by ${lastLines - firstLines}`;
+
+    expect(tailText, `and the tail is the last line the child wrote · ${verdict}`).toContain('"200"');
 
     // The cancel arm, on a child that will not stop on its own.
     const c = pipelineHarness({
