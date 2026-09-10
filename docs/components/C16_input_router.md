@@ -150,9 +150,100 @@ The third row is the live-binding class again, and it is the one a user meets: a
 
 **I30 — a mouse event carries every bit the terminal sent; nothing is masked.** The decoder names each bit and interprets none of them: what a shift-click *does* is §4's and the keymap's. `press` is the final byte and is the release; no second field restates it, because two fields that must agree are a place for two readers to disagree. Horizontal wheel and buttons 8–11 are carried for the same reason the modifiers are — a bit the decoder drops is one no lane above it can put back. **Bits 0–1 reading `3` outside the wheel and 128 ranges is `none`**, the value mode 1003 sends for a pointer moving with no button held (C01 I21), and not `button3` — a name for a button that was not pressed, which every consumer comparing against `button0` would have treated as a second button. `none` is a string so that `startsWith("wheel")` and `!== "button0"` stay true of it without a consumer changing, which is I30's own reason applied to the shape.
 
-**xterm 398 has been measured, under Xvfb (F808, C01 §5)**: `Cb` came back `35` for a rest, `32` for a drag and `0` with `M`/`m` around a press and release — the layout below as *ctlseqs* states it, from its own implementation. **No other emulator has been measured.** The container this was measured in has no Ghostty, kitty or WezTerm; the bit layout is *ctlseqs*' and the four sequences are the decoder's. Which emulators send `66`/`67` for a horizontal wheel and `32` under 1002 is an owed check, recorded here rather than assumed.
+**xterm 398 has been measured, under Xvfb (F808, C01 §5)**: `Cb` came back `35` for a rest, `32` for a drag and `0` with `M`/`m` around a press and release — the layout above as *ctlseqs* states it, from its own implementation.
+
+**And kitty 0.41.1 beside it (F1039, F1044, T5.9/T5.10)**, which closes the owed check this paragraph used to record as open. `apt-cache policy` in the devcontainer: kitty `0.41.1-2+deb13u2` and xterm `398-1` are installed; **Ghostty and WezTerm have no candidate in Debian trixie** and would each be a third-party repository or a source build and a change to `.devcontainer/`; **iTerm2 is macOS-only and cannot run in this container, ever** — that one is a **permanent limit rather than a deferral**, and its row expires on a macOS runner or never. So the count is two of five measured, two owed, one unpayable here.
+
+kitty agrees with xterm on both questions and disagrees on one nobody had asked. The wheel is `64 65 66 67` on both — `WHEEL_DIRECTIONS` indexed by `Cb & 3`, confirmed against a wire. 1003 reports rests and 1002 does not, on both, and releasing 1003 leaves nothing behind, on both. But **xterm reports the horizontal wheel twice and kitty once**: `66M 66m 67M 67m` against `66M 67M`, byte-identical over two runs each. Nothing masks the finals, so one horizontal notch is two `wheelLeft` events on xterm and one on kitty. Latent — `construct.ts` acts on `wheelUp`/`wheelDown` only — and the day a horizontal wheel is bound it scrolls twice as far on xterm, which is the kind of thing that gets diagnosed as a scroll-speed constant.
+
+**Two emulators is a pair, not a survey, and both are xterm-lineage in their SGR encoding.** They agree because they implement the same document; agreement between them is evidence that the decoder reads *ctlseqs* correctly and not that every terminal encodes this way. The one place they differ is the one place the document does not say.
 
 **The test rows assert the whole event, not one field.** T1.3k–T1.3n each `toEqual` the full record, because a row asserting `button` alone is satisfied by a decoder that still drops the modifiers — the shipped line passes every `button`-only row for the shift-click. Two mutations, both caught, in `tools/mutate/runs/c16-mouse-decode.mjs`: `code === 64` restored (T1.3k dies) and `& 3` masking the modifiers back out (T1.3l dies).
+
+---
+
+## 2a. String-terminated replies — the arm the ladder was missing
+
+**Three arms decoded an escape sequence and there are four kinds** (F1035, F1043). `ESC [` is CSI and `ESC O` is SS3; everything else fell to the Meta arm, which is right for `ESC a` and wrong for the five introducers ECMA-48 gives a **control string**: DCS `ESC P`, SOS `ESC X`, OSC `ESC ]`, PM `ESC ^`, APC `ESC _`. A control string runs until `ST` — `ESC \` — and, where the sequence admits it, until `BEL`. The Meta arm takes two bytes of one and emits a key, and the payload types itself into the prompt behind it.
+
+**Measured 2026-09-10: eight replies captured verbatim from two emulators under Xvfb and pushed through the built decoder** (`test/support/x-emulator.ts`, the harness T5.8 uses), with three CSI shapes beside them as the control — those three are F1035's, and T5.8 locates the first of them in a live kitty capture:
+
+| reply | terminator | at HEAD |
+|---|---|---|
+| `CSI ? 2026 ; 2 $ y` — DECRQM, kitty | — | **0 events** |
+| `CSI ? 0 u` — keyboard flags | — | **0 events** |
+| `CSI ? 62 ; c` — DA1 | — | **0 events** |
+| `OSC 11 ; rgb:ffff/ffff/ffff` — XTerm(398) | `BEL` | 23 events, `Alt-]` … **`Ctrl-G`** |
+| `OSC 10 ; rgb:0000/0000/0000` — XTerm(398) | `BEL` | 23 events, `Alt-]` … **`Ctrl-G`** |
+| `OSC 4 ; 1 ; rgb:cdcd/0000/0000` — XTerm(398) | `BEL` | 24 events, `Alt-]` … **`Ctrl-G`** |
+| `OSC 11 ; rgb:0000/0000/0000` — kitty 0.41.1 | `ESC \` | 23 events, `Alt-]` … `Alt-\` |
+| `DCS > \| XTerm(398) ST` — XTVERSION | `ESC \` | 14 events, opening `Alt-P` |
+| `DCS > \| kitty(0.41.1) ST` — XTVERSION | `ESC \` | 17 events, opening `Alt-P` |
+| `APC _ G i=31;OK ST` — the graphics reply | `ESC \` | 10 events, opening `Alt-_` |
+| `APC _ G i=31;EBADPNG:Not a PNG file ST` | `ESC \` | 30 events, opening `Alt-_` |
+
+**164 events from eight replies, and the right number is none.** The CSI rows are the control and they are the reason this reads as a *shape* problem rather than a protocol one: the same three questions asked in a CSI-shaped form are already consumed correctly, so what decides whether a terminal's answer is safe to receive is the shape of the reply and not what was asked.
+
+**Both terminator forms occur, and which one arrives is not a property of the terminal.** XTerm 398 **mirrors the query**: three OSC queries terminated with `BEL` came back `BEL`-terminated, while its XTVERSION — a DCS reply, which has no `BEL` form — came back `ST`-terminated in the same capture. kitty 0.41.1 answers `ST` whatever it is asked. So an arm that reads one form is wrong on one of the two emulators installed here, and the `BEL` form closes with **`Ctrl-G`** rather than `Alt-\` — readline's `abort`, and the likeliest of the four synthetic shortcuts to be bound by a consumer.
+
+**`BEL` closes an OSC and nothing else.** DCS, SOS, PM and APC carry arbitrary payloads — kitty's graphics data is base64 and its error text is prose — and a `BEL` inside one of those is payload. That is what both emulators did in the capture above and it is what xterm's *ctlseqs* says; the narrower rule is the one that cannot eat a reply in half.
+
+**F1035 named APC, DCS and OSC; the class is five.** SOS and PM were reached the same way — `ESC X hello ST` decodes to seven events and `ESC ^ hello ST` to seven — and no terminal in this container sends either. They are in the arm because the arm is over the introducer set and not over the protocols that happen to have been queried; a set named for its first member becomes a membership rule.
+
+**This is a blocker on asking, and §2b is why that sentence is not the whole status.** Nothing in `src/` sends a query today — greppable at HEAD 2026-09-10: no `$p`, no `CSI c`, no `CSI ? u`, no `XTVERSION`, no `a=q`, and `src/presentation/image/kitty.ts` transmits at `q=2`, which suppresses every reply. F1035 read that as *a blocker on asking rather than a live defect*, and §2b measures the half that is live with nothing asked at all.
+
+### The classification table — structural, at rest
+
+Indexed by the cells where two rules both hold with no event in between. The subject is the byte after `ESC`, which is where the arms compete. A row governed by one rule is a restatement and is left out.
+
+| | the two rules that meet | ruling |
+|---|---|---|
+| **a** | *`ESC` + printable is Meta* (§2, T1.1) meets *`P X ] ^ _` open a control string* | the string arm precedes the Meta arm. Five cells, not three: the Meta arm is the fallback and every introducer has to be taken out of it by name |
+| **b** | *`ESC \` closes a control string* meets *`ESC \` is `Alt-\`* | **`Alt-\` stays.** A terminator with no opener is not a string and there is no state that says one is open — the same disposition as T3.5's end marker with no start, and the arm holds no state to answer differently |
+| **c** | *a string is consumed whole* meets *`ESC O` and `ESC [` are already arms* | untouched. `ESC P` is not a CSI prefix and `CSI_FINAL` never sees a string's bytes; the two scans do not overlap |
+| **d** | *`BEL` closes an OSC* meets *`\x07` is `Ctrl-G`* | inside an OSC, the terminator; outside, the key. No conflict, because the arm only reads `\x07` while it is scanning — and only for `]`, so a `BEL` in a DCS or APC payload stays payload (row above) |
+| **e** | *scan to the terminator* meets *`ESC` inside a control string is illegal except as `ST`* (ECMA-48 §8.3.14) | a stray `ESC` ends the string as **malformed** and the bytes up to it are consumed; the `ESC` decodes on its own. `test/support/pty.ts`'s `ESCAPE_ALTERNATIVES` is the same ruling already in this repository — `\][^]*(?:\|\\)` — reached by asking who had solved it before ruling it |
+| **f** | *`return 0` means not yet decidable* (§2's convention) meets *a control string has no bounded length* | **the arm needs a cap and the CSI arm does not.** `CSI_FINAL` matches any letter, so an unterminated CSI ends on the next typed character — measured: `ESC [ 1 ; 2` then `hello` emits `e l l o`, the `h` taken as the final. A control string has no such bound, so an introducer with no terminator would hold every later keystroke in `pending` for the rest of the session. **This hazard is created by the arm, not fixed by it**: at HEAD the same bytes emit keys immediately and nothing wedges |
+| **g** | *the cap fires* meets *the bytes might be typing* | at the cap the arm no longer knows the bytes are a reply, so it **discards the introducer and decodes on** — the SS3 arm's malformed disposition (T3.13), and the one recovery that cannot swallow what the reader typed. The tail decodes as keys, which is exactly what HEAD does, so the cap is bounded by no-worse-than-today in the direction it can be wrong |
+| **h** | *the arm consumes and emits nothing* meets *`q=1` reports a graphics error* | **the arm makes a reply harmless, not readable.** A reply *channel* is C02's — §8's Phase 1B — and reading one here would put terminal state in the decoder. This is the same answer the CSI arm has given all along: `synchronisedUpdate`'s reply is consumed and nobody learns anything from it either |
+| **i** | *a control string is consumed* meets *a bracketed paste is buffering* | buffered as payload, not consumed — §2b, and it is the rule the CSI arm already has for T3.2's reason: between the markers the terminal has said the bytes are content |
+
+### The sequence trace — event-mediated
+
+| | sequence | what is left behind, and the ruling |
+|---|---|---|
+| **1** | `ESC _ G i = 3 1 ;` (chunk 1) → `O K ESC \` (chunk 2) | nothing, then nothing: `return 0` holds the partial in `pending` and the second chunk completes it. The same convention CSI uses (T3.13, T3.14) and the reason the arm needs no state of its own. At HEAD chunk 1 emits **seven** keys, so a split reply is currently worse than an unsplit one — the `Alt-_` fires before the terminal has finished speaking |
+| **2** | `ESC` alone → 60 ms elapse → `_ G i=1;OK ESC \` | `escape`, then the payload as keys. **Unavoidable and stated**: past the 50 ms window the decoder has already answered, and the same is true of a CSI reply split at the same place. A terminal that pauses mid-reply for longer than a keystroke is indistinguishable from a reader who pressed `Esc` |
+| **3** | `ESC ] 0 ; t` → `reset()` → `i t l e ESC \` | the tail decodes as itself — `i`, `t`, `l`, `e`, `Alt-\`. I18 discards `pending` and the arm keeps nothing outside it, so a suspension mid-reply costs the reply and not the next sequence |
+| **4** | heuristic accumulating five characters → an OSC reply arrives → five more | five keys, the reply consumed, then a fresh window. §7's escape cell already rules this — *an escape means the run was typing* — and the arm inherits it by calling `flushHeuristic` where the CSI arm does. The reply is not typing, and the alternative is a paste event with a terminal's answer inside it |
+| **5** | `ESC ] 11 ; r g b` → `ESC [ A` | row **e**: the string ends malformed at the stray `ESC` and `up` decodes. At HEAD this is seven keys **and** `up`, so the arrow arrives either way and the seven are the whole difference |
+| **6** | paste start → payload holding `ESC ] 8 ; ; url ESC \` → paste end | one `paste`, no keys — §2b. At HEAD: four keys **before** the paste event, and the payload arrives with the `]` and the `\` missing |
+
+### What the walk found before the code
+
+**(f) is the one nothing else reaches**, and it is the shape the walk exists for: a hazard the *fix* introduces. Every row of the classification table above except **f** and **g** is about a byte that already arrives; those two are about a byte that never does, and they were reachable only by asking what `return 0` means for a scan with no bound — the convention and the absence of a terminator are each correct alone. **(b)** is the rejection path the walk is told to ask about: a bare `ESC \` is not a string and the arm must be written so that deciding *not* to claim a byte leaves no state. **(e)** was ruled by grepping for a prior solution rather than by deriving one, and the prior solution is in this repository. And **(h)** is the ruling that names an operation and checks it exists first: *report the error to the caller* has no seam here, so the arm does not promise one.
+
+**The rule is I32** (§8), and its one sentence is *a control string is consumed whole and emits nothing* — exactly as the CSI arm emits nothing for a DECRQM reply.
+
+## 2b. I12 held on one ESC arm of four
+
+**F1045, and it is what makes §2a live rather than owed.** I12 says bytes buffered during a paste are never dispatched as individual keys. `decodeCsi` checks `paste.mode` and appends the whole sequence to the buffer; **the SS3 arm, the Meta arm and the lone-`ESC` window do not**, so a bracketed paste whose payload holds an escape sequence dispatches keys out of it — and the payload reaches the consumer with bytes missing.
+
+Measured 2026-09-10, one `push` per row, `bracketedPaste: true`:
+
+| pasted payload | at HEAD | I12 |
+|---|---|---|
+| `red ESC [ 31 m text ESC [ 0 m` | one `paste`, `"red [31mtext[0m"` | **held** — the CSI arm buffers |
+| `a ESC O A b` | `up`, then `paste "ab"` | broken — SS3 |
+| `a ESC z b` | `Alt-z`, then `paste "ab"` | broken — Meta |
+| `see ESC ] 8 ; ; http://x ESC \ here ESC ] 8 ; ; ESC \ ok` | `Alt-]`, `Alt-\`, `Alt-]`, `Alt-\`, then `paste "see 8;;http://xhere8;; ok"` | broken — the string introducers, four keys, and `]` and `\` gone from the payload |
+| `abc` then a trailing `ESC`, then 60 ms | `escape` at `poll()` | broken — the disambiguation window |
+
+**A pasted OSC-8 hyperlink is not a contrived input.** `ls --hyperlink=auto`, `gh`, `delta` and any terminal-aware pager emit them; a `PS1` line carries `OSC 0`. So the hole §2a is about is reachable **with no query sent by anything**, which is the half F1035's *blocker on asking* could not see — it was measured from the reply side, and the paste side needs no terminal to answer.
+
+**The keys arrive before the paste event**, which is the part that makes it more than a lost byte: the arms emit synchronously while the surrounding text is still accumulating, so a consumer sees `Alt-]` first and the paste second, and C17 I5's one-undo-unit rule is applied to a payload two keystrokes have already been taken out of.
+
+The fix is one check, not four: the buffering branch moves out of `decodeCsi` into a helper every ESC arm calls before it emits, and the lone-`ESC` window returns *not yet decidable* while buffering rather than answering — the 1 s paste timeout (T3.4) is the backstop that already exists for a paste that stops arriving. **A reimplemented rule keeps its birthday clauses**, so the CSI arm calls the helper too rather than keeping its own copy.
 
 ---
 
@@ -850,7 +941,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I9** — C16 reads no ambient clock; timing is injected.
 - **I10** — The keymap is data; duplicate `(target, key)` bindings fail at construction.
 - **I11** — C16 never calls the frame scheduler. L4 commits.
-- **I12** — Bytes buffered during a paste are never dispatched as individual keys.
+- **I12** — Bytes buffered during a paste are never dispatched as individual keys. **It held on one ESC arm of four** (§2b, F1045): `decodeCsi` checked `paste.mode` and the SS3 arm, the Meta arm and the lone-`ESC` window did not, so a pasted OSC-8 hyperlink dispatched four bindable keys **before** the paste event and reached the consumer with `]` and `\` missing from its payload. The check belongs to the arms jointly, in one helper each calls — a second copy is how the CSI arm came to be the only one that had it.
 - **I13** — C16 imports nothing from `terminal/`; raw mode is C01's and decoding is data-in.
 - **I14** — No chord support beyond modifiers. Terminals send no key-up event, so a two-key chord cannot be distinguished from two keystrokes without a timeout, and a timeout would make the same input mean different things at different typing speeds.
 - **I15** — `activeTarget` is pure over its inputs.
@@ -876,6 +967,8 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I30** — **A mouse event carries every bit the terminal sent; nothing is masked.** SGR 1006's `Cb` is a bit field (§2's table): button in bits 0–1, shift 4, meta 8, ctrl 16, motion 32, wheel 64 with bits 0–1 selecting up/down/left/right, buttons 8–11 at 128; press or release is the final byte. The decoder names each bit and interprets none — what a modified click or a drag *does* is §4's. A masked bit is one no consumer can recover: ctrl-wheel-up decoded as `wheelDown` and a drag as a stream of clicks, and both read as correct events to everything above.
 
 - **I31** — **A pointer gesture reaches only states a key reaches, through the same calls** (§4a). A click on an element is `enterLiveBlock`/`focusRow` on that entry and address — the settled entry included; a click on the focused element in `navigate` is `rowActivate` and in `interact` is nothing; a drag **and a shift-click** are `extendRow` within the focused entry and nothing across entries; a wheel inside a `scroll`'s box moves that box's offset and elsewhere the transcript's; a click on chrome is `focusPrompt`; a release, a horizontal wheel, a second button and a `meta`- or `ctrl`-modified click do nothing and are unconsumed. Resolution is one `find` over the list the keyboard walks, after the entry's chrome rows are subtracted and a `scroll`'s offset is added, and the deepest level wins. `StoredFocus` therefore has no pointer-only value, and the table above is the whole of what the pointer can do.
+
+- **I32** — **A control string is consumed whole and emits nothing** (§2a, F1043). The five ECMA-48 introducers — DCS `ESC P`, SOS `ESC X`, OSC `ESC ]`, PM `ESC ^`, APC `ESC _` — run to `ST` (`ESC \`), and an OSC also to `BEL`; a stray `ESC` inside one ends it as malformed and decodes on its own; an incomplete one is *not yet decidable* and waits, bounded by a byte cap past which the **introducer** is discarded and decoding continues from the payload. It emits no event, exactly as the CSI arm emits none for a DECRQM reply: the arm makes a terminal's answer **harmless**, and making it **readable** is a reply channel C02 owns (C02 §8) and this component must not grow — a ruling that names an operation checks the operation exists, and there is no seam here to report a graphics error through. Without the arm the Meta arm claims the introducer and emits a bindable key — `Alt-_`, `Alt-P`, `Alt-]`, and `Ctrl-G` where the terminator is `BEL` — with the payload typed into the prompt between them: **164 events from eight real replies** captured from XTerm(398) and kitty 0.41.1, and the first of each is a keystroke a keymap can bind. The cap is the arm's own hazard rather than a defect it repairs: at HEAD the same bytes decode as keys at once and nothing wedges, and an unterminated CSI is bounded by `CSI_FINAL` where a control string is bounded by nothing.
 
 **And a question outranks rungs 1 and 2, which is the one place newest-first is not enough on its own.** A local verb awaiting `ctx.ask` is `inFlight` for the whole time its question is on screen, so `⌃c` was taken by the cancel rung and the question never saw it — two rungs with a claim, and the older one higher. Ruling A's own argument decides it: `Esc` and `⌃c` collapse *because* declining and cancelling produce the same outcome, and when two paths produce the same outcome the one that leaves a record is the one to keep. Cancellation discards the entry; declining settles one saying nothing changed. **Found by a frame-read and reachable by nothing else** — the container was untouched and the layer was gone, which is everything a test asserts, and the frame showed that the submitted line had disappeared. The suite agreed throughout, because every harness reported `inFlight: null` and that is the one arrangement where both readings agree.
 
@@ -914,6 +1007,8 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 28. `CSI Z` decodes as `⇧tab`, bare form only (I17, §2).
 29. An SGR mouse event carries button, shift, meta, ctrl, motion and press/release as the terminal sent them; the wheel has four directions and buttons 8–11 have names (I30, §2).
 30. The pointer is a gesture table onto the key effects — click focuses, click-again activates, drag extends, wheel scrolls the box under it or else the transcript, chrome returns to the prompt — resolved by one find over the list the keyboard walks, and it can reach no state a key cannot (I31, §4a). A region row becomes an entry in C14 and nowhere else (→ C14 I19).
+31. A terminal's string-terminated answer is consumed and emits nothing — all five ECMA-48 introducers, at `ST` and at `BEL` where the sequence admits it — so a reply is harmless rather than bindable, and reading one is a channel C02 owns (I32, §2a).
+32. Every ESC arm answers to I12: while a bracketed paste buffers, a sequence is payload and the lone-`ESC` window is *not yet decidable* rather than an `escape` key. One check called by four arms, not four copies (I12, §2b).
 
 ---
 
@@ -944,6 +1039,8 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.3m** (I30, §2): a drag — `CSI < 0;1;1 M`, `CSI < 32;2;1 M`, `CSI < 0;3;1 m` — is press, **motion**, release, each a full record; the middle one is `press: true, motion: true` and not a second click.
 - **T1.3r** (I30, §2; C01 I21): `CSI < 35;42;4 M` — 32 + 3, a 1003 motion with nothing held — decodes to the **whole** record `{button: "none", motion: true, press: true}` at row 3, col 41; `39` carries `shift` beside it; `3` alone, no motion bit, is still `none` — the bits are named, not interpreted. The controls: `34` is `button2` with `motion`, and `67` (64 + 3) stays `wheelRight` and `131` stays `button11` — `3` in bits 0–1 is `none` only outside the wheel and 128 ranges.
 - **T1.3n** (I30, §2): `66` and `67` are `wheelLeft` and `wheelRight`, `128`–`131` are `button8`–`button11`, and `130` and `2` are **different** buttons — the 128 bit is read, not folded onto bits 0–1.
+- **T1.3t** (I32, §2a): the **eight real replies** captured from XTerm(398) and kitty 0.41.1 each decode to **zero events** — three CSI as the control, and the five string-terminated ones the arm exists for, at both terminators. Asserted as `[]` per reply and as a total, because a row asserting *no `Alt-_`* is satisfied by a decoder that emits the payload and drops the introducer. All five introducers beside them — `ESC P`, `ESC X`, `ESC ]`, `ESC ^`, `ESC _` — since the class is the introducer set and not the three protocols that happened to be queried.
+- **T1.3u** (I32, §2a row **b**): a bare `ESC \` with no opener is still `{name: "\\", meta: true}`, and a bare `BEL` is still `Ctrl-G`. The rejection path: the arm declines the byte and leaves no state, which the following `ESC _ … ST` in the same feed proves by decoding to nothing.
 - **T1.4**: `CSI 200~` enters buffering.
 - **T1.5** (I12): bytes during buffering emit no key events.
 - **T1.6** (I6): `CSI 201~` emits exactly one `paste` carrying the buffered text.
@@ -1007,6 +1104,8 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T3.15**: a handler that throws → contained; the event is treated as unconsumed and the session survives.
 - **T3.16**: dispatch with an empty handler set → returns false, no throw.
 - **T3.17**: focus target changes between two keystrokes → the second goes to the new target with no stale routing.
+- **T3.18** (I32, §2a trace 1 and rows **e**, **f**, **g**): the arm's four edges in one test — a reply **split across two chunks** emits nothing on the first and nothing on the second; a **stray `ESC`** inside a payload ends the string and the `CSI A` after it decodes as `up`; an **unterminated** introducer holds its bytes rather than emitting them, and past the cap the introducer alone is discarded and the payload decodes as keys. The last is the positive control for the third: a fixture that only ever feeds a terminated string proves the scan exists and not that it is bounded, and the bound is the arm's own hazard rather than a defect it repairs.
+- **T3.19** (I12, §2b, F1045): a bracketed paste whose payload holds an **OSC-8 hyperlink** emits **one** `paste` and no keys, and the payload keeps its `]` and `\`. Beside it in the same test: an SS3 in a payload, an `ESC` + printable in a payload, and a **trailing lone `ESC`** followed by a 60 ms elapse — the three arms that broke I12 and the window that broke it at `poll()`. The CSI arm is the control, because it is the one that already held and a helper applied to three arms of four passes every row about the other three.
 
 ### Tier 4 — integration
 
@@ -1055,7 +1154,8 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T5.5**: a session under `bracketedPaste: false` → the heuristic works, and the notice appears once.
 - **T5.6** (I31, §4a row 1): **the mouse through a PTY — bytes in, frame out, no fake decoder.** The shell under `node-pty` with the detected record (mouse on), two `/ps --mine` entries of two rows each; the first capture is checked for `1002h` and `1006h` **before** any byte is written (F759 — an instrument written before its subject), then the SGR bytes `CSI < 0 ; COL ; ROW M` for the **first** entry's **second** row are written and the highlight is read back from `styledFrame`: that row's pen changes and the other three rows' pens do not. Every other test of this path fed the decoder from a string; this one feeds the process.
 - **T5.7** (I31, §4a row i): `CSI < 64 ; COL ; ROW M` over a notice — prose, no box — moves the transcript by `WHEEL_ROWS`: the line under the pointer is three rows lower afterwards and no longer where it was. The transcript is made taller than the region first, and the row asserts the frame moved by the constant rather than that it moved.
-- **T5.9** (C01 I21, I30; F808): **the mouse modes, answered by xterm under Xvfb.** `1003h` alone reports rests (`Cb` 35) and drags (32); `1002h` alone reports the drag and no rest; `1002h` then `1003h` then `1003l` leaves only the typed control byte in the second capture — one tracking mode, the later select wins, either release clears it. The rest byte decodes to `button: "none"`. Skips by name without xterm, Xvfb and xdotool.
+- **T5.9** (C01 I21, I30; F808, F1039, F1044): **the mouse modes, answered by two emulators under Xvfb.** `1003h` alone reports rests (`Cb` 35) and drags (32); `1002h` alone reports the drag and no rest; `1002h` then `1003h` then `1003l` leaves only the typed control byte in the second capture — one tracking mode, the later select wins, either release clears it. The rest byte decodes to `button: "none"`. **The three arms that carry F800 are run on kitty 0.41.1 as well as XTerm(398), and none of them needs the drag**; `drags > 0` stays on xterm alone, because the same `xdotool` gesture that gives xterm `0M 32M 32M 0m` gives kitty press-and-release at every position and no button-1 motion — a **harness** defect, not a terminal one, and left undiagnosed it reads as *kitty does not report drags* (F1039). Skips by name without the emulator, Xvfb and xdotool.
+- **T5.10** (I30, §2; F753, F1039, F1044): **the wheel bit table, on both emulators.** Four `xdotool click` buttons 4–7 under `1003h`+`1006h`: `Cb` comes back `64 65 66 67` in that order on XTerm(398) and on kitty 0.41.1, which is `WHEEL_DIRECTIONS` indexed by `Cb & 3` — the array's order confirmed against a wire rather than against *ctlseqs*. **The press/release asymmetry is its own assertion, not a tolerance**: `66m` and `67m` are present on xterm and absent on kitty, byte-identical over two runs each, so one horizontal notch is two `wheelLeft` events on xterm and one on kitty. A row phrased as *at least the four presses* is satisfied by either terminal and would have recorded nothing. **The emulator set is compared by equality** — `["kitty", "xterm"]` — so a third emulator arriving in the container is a failure that names itself rather than a quietly shorter loop.
 - **T5.8** (I31, C02 I10): **the control.** The same session with `mouse` forced **off** through the fixture (`FORCE_MOUSE=0`, the same override path `FORCE_DEPTH` takes, so the *lifecycle's* record is what is forced): the first capture carries no `1002h`, and the same click and wheel bytes leave `styledFrame` byte-identical — the decoder consumes them (`decode.ts:512`) and nothing downstream sees a gesture.
 
 ### Tier 6 — fail-on-revert
@@ -1094,6 +1194,23 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.9f** (I30): restoring `code === 64` as the only wheel-up → T1.3k fails, and ctrl-scroll-up scrolls down. Masking the modifiers back out with `& 3` → T1.3l fails. Dropping the motion bit → T1.3m fails and a drag is a stream of clicks. All three in `tools/mutate/runs/c16-mouse-decode.mjs`.
 - **T6.9h** (I31, F759): the decoder's row translation `Number(y) - 1` → `Number(y)` → T5.6 highlights the row *below* the pointer, and every fake-decoder row still passes because the fake never went through the translation. `WHEEL_DIRECTIONS` with its first pair swapped → T5.7 moves the wrong way. **A mutation that survives, and the finding is the survivor**: dropping the decoder's `capabilities.mouse` gate alone leaves T5.8 green, because `routeMouse` has a second gate over the same record — two guards over one condition, and either alone is invisible to every row. Anchors in `tools/mutate/runs/c16-mouse-pty.mjs`; each run by hand on 2026-09-05.
 - **T6.9i** (I31, §4a hover and legend rows): the hover arm calling `land()` before `aim()` — hover moves focus — → T4.72's focus arm fails and T4.72c's cursor stays off the prompt row; `legendHitAt`'s column origin off by the swatch's width → T4.73 fails on the second entry and T1.129's swatch arm with it; the decoder folding `3` onto `button3` → T1.3r fails and T4.72 with it, since `pointerEffect` records a second button and does nothing; the arming machine disarming on every mouse event → T3.8d fails. `tools/mutate/runs/c01-hover-legend.mjs`, run by hand on 2026-09-05.
+- **T6.9j** (I32, I12): **the string arm and I12's four arms, run by hand on 2026-09-10 — twelve mutations, twelve killed, and one of them only after the row that should have caught it was repaired.**
+
+  | mutation | dies |
+  |---|---|
+  | `]` dropped from the introducer set | T1.3t on both OSC replies — the Meta arm claims them again |
+  | the `BEL` clause removed, scanning for `ST` only | T1.3t **— see below** |
+  | `BEL` taken as a terminator for **every** introducer | T1.3t's row d, on the `BEL` inside an APC payload |
+  | `ESC \` added to the introducer set — a bare `ST` as a zero-length string | T1.3u; `Alt-\` stops existing |
+  | an incomplete string consumed instead of held | T3.18's split-chunk arm; half a reply is swallowed and the other half typed |
+  | the buffering helper removed from any one of the four arms | T3.19, on that arm alone — which is why the row carries all four in one test with the CSI arm as its control |
+  | `WHEEL_DIRECTIONS` with its first pair swapped | T1.3k, T5.7 **and** T5.10's decoder arm |
+  | `MEASURED` shortened to one emulator | T5.9's set row, before a capture runs |
+
+  **The `BEL` mutation survived, and the finding is what it indicted.** It was predicted to die on XTerm's three `BEL`-terminated replies, and it did not: with the clause gone the arm scans past the `BEL`, finds no `ST`, holds the whole reply in `pending` under the cap — **and emits nothing**, which is what every row asserted. `toEqual([])` is the same green for *consumed* and for *still waiting*, so a row about a reply owes an assertion that **the decoder is still reading afterwards**, and T1.3t now feeds a key after each of the eight and asserts it decodes. Nothing in a green run could have shown this.
+
+  **And a second sentence of this spec was wrong before the pass ran.** This row predicted that taking `BEL` as a universal terminator would *survive*, because neither emulator sends a `BEL` inside a payload. It dies — on T1.3t's row d, which feeds a fabricated `ESC _ … BEL … ST` for exactly that reason. The prediction was written from the captures and the row was written from the rule, and the row is the one that was right.
+- **T6.9k** (I30, F1044): the emulator loop in T5.10 written as *for each emulator present* rather than against the set `["kitty", "xterm"]` compared by equality → nothing fails, and the row silently becomes a one-emulator row the day an install breaks. **Structural guard, no failing test**, and it is the reason the set is asserted before the loop runs: a shorter loop and a passing loop are the same green. The press/release asymmetry phrased as a tolerance — *at least four `M` finals* — → the xterm/kitty difference stops being measured and both terminals satisfy it.
 - **T6.9g** (I31): the pointer's `find` by rows alone, ignoring cols → T4.63 fails and the second chip is unreachable. `focusRow` with `liveId` in place of the hit entry → T4.62 fails, the settled entry's probe never sees focus, and T4.64's refusal is not reached. The click-again branch dropped → T4.64 fails and a row can be reached and never acted on, which is F21 for the pointer. The chrome subtraction dropped → T4.62b fails one row low. The offset translation dropped → T4.66b focuses the first child. The frame's bottom alignment ignored — C14 asked from the region's top — → T4.62c fails on the painted frame and every graph-level click row with it, because a short transcript's rows are ten rows lower than the viewport says (§4a row l). The wheel test restored to `wheelUp || wheelDown` → T1.3o fails and a horizontal wheel is a click. All in `tools/mutate/runs/c16-mouse-wiring.mjs`, with the wheel line as the control; each was run by hand on 2026-09-05 and every one killed the row it names.
 
 ---

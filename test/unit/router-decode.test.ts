@@ -610,3 +610,13 @@ describe("C16 §2 — reset across a suspension", () => {
 });
 
 const HEURISTIC_ELAPSE = 30;
+
+// C16 I32's rows land with the arm, in the commit after this one. The spec
+// commits alone so its diff is readable without the implementation beside it,
+// and SP9 wants an invariant paired the day it is declared — so this is the
+// pairing, and it expires the moment `decodeString` exists.
+describe("C16 §2a — the control-string arm", () => {
+  it.todo(
+    "T1.3t (C16 I32, §2a): eight replies captured from XTerm(398) and kitty 0.41.1 decode to zero events across all five ECMA-48 introducers and both terminator forms, and a key fed after each still decodes — not deferred on a component: the rows land with `decodeString` in the commit that follows this spec",
+  );
+});
