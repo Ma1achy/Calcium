@@ -49,8 +49,31 @@ TRUE = {**UTF8, "COLORTERM": "truecolor"}
 # 3.0 s (probe: cast frames at 0.9 s, then 3.0 s), so 1.5 s typed into the F813
 # window on every shot — `/ps` never echoed, and `s3-live`'s command sat in the
 # prompt unsubmitted. The same probe typing at 4.0 s drew the table by 7 s. This
-# is the weaker fix the call-site note names, moved by a measurement; F813 still
-# owes the mechanism, and the frame is what says whether this number holds.
+# is the weaker fix the call-site note names, moved by a measurement.
+#
+# **F813's mechanism is settled and it is F158's** (F1024). Eighteen captures at
+# 120x40 through `bin/docker-tui.js`, typing `/config` at four moments: the diff
+# is in the byte stream in *every* one, including the shots whose final frame has
+# no sign of it, and three PageUps find it as the transcript's **first** entry
+# with the banner below. So the verb's result is not lost — the greeting appended
+# after it, and a ~33-row entry in a 35-row region puts everything before it off
+# the top while the append holds the viewport at the tail.
+#
+# `TuiConfig.greeting` is async, `session.ts` does not await it, and nothing
+# orders it against a submission: measured, the greeting lands at 2.58-4.47 s and
+# the verb at `TYPE_AT + ~2.5 s`, once only 152 ms apart. The prediction that the
+# final frame holds the result exactly when the greeting landed first is **12 of
+# 12** over the runs with no keys after the Enter.
+#
+# **So this number is still the weaker fix, and now it is weaker for a stated
+# reason**: it does not order the two, it only makes one of them likely to win.
+# The fix is C22 §4 step 7 reserving the greeting's entry *before* awaiting its
+# producer and settling into it — C23 I3's shape, one route over. Until that
+# lands, the frame is what says whether this number holds.
+#
+# The addendum's other symptom — `/ps` never echoing, a command sitting in the
+# prompt unsubmitted — did **not** reproduce in any of the eighteen and is not
+# covered by the above. If it recurs it is an input-path finding, not this one.
 TYPE_AT_DEFAULT = 4.0
 TYPE_AT: dict[str, float] = {
     # The comparison runs two `docker inspect`s and the greeting is still

@@ -74,8 +74,19 @@ export type ViewRefresh = Readonly<{
    * what the reference app did: one part's fetch accumulated and its sibling's
    * did not, so sharing the fetch between them would have stopped the ring
    * silently. A source layer without this has no consumer in the app F91 names.
+   *
+   * **Three parameters, and the third is `renderError`'s widening applied to the
+   * fold** (C23 §3c, F1023). `attempts` is the settlements that produced this
+   * version — `1` on a clean poll, `1 + n` after `n` transport failures — and it
+   * exists because the fold runs once per *version* while a version exists only
+   * when a fetch resolved. Without it an app whose accumulator is its fold, as
+   * the rule above requires, has no way to count a poll that failed at the
+   * transport. Additive, so an implementation taking two is unchanged.
    */
-  derive: Readonly<{ key: string; compute: (data: unknown, prev: unknown) => unknown }> | null;
+  derive: Readonly<{
+    key: string;
+    compute: (data: unknown, prev: unknown, attempts: number) => unknown;
+  }> | null;
   fetch: () => Promise<unknown>;
   /**
    * Separate from `fetch`, and that is A02 §7 rule 2 rather than tidiness.
@@ -548,6 +559,19 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     failures: number;
     inFlight: boolean;
     version: number;
+    /**
+     * **The settlements that produced this version, counted from the last one**
+     * (C23 I47, F1023). One on a clean poll; `1 + n` after `n` transport
+     * failures. It is the fold's third argument and it is why a failed attempt
+     * is countable at all.
+     *
+     * **Not `failures`, which is a different quantity with the same source.**
+     * `failures` is the *live* consecutive count — reset the instant a fetch
+     * resolves, read by the backoff and by the error arm, and therefore always
+     * `0` by the time any part renders a success. This is its total captured
+     * *before* the reset, so it survives into the arm that can accumulate.
+     */
+    attempts: number;
     data: unknown;
     /** One-shots are done after one attempt, whichever way it went (rule 3). */
     done: boolean;
@@ -591,6 +615,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     failures: 0,
     inFlight: false,
     version: 0,
+    attempts: 0,
     data: undefined,
     done: true,
     retired: true,
@@ -785,6 +810,19 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
    * A throwing `compute` propagates to the caller, which renders the error arm.
    * Nothing is stored, so **the version is not consumed** — a fold that threw has
    * not advanced, and the next one starts from the same `prev`.
+   *
+   * **The third argument is how a failed attempt becomes countable** (F1023).
+   * The fold runs once per *version*, and a version exists only when a fetch
+   * resolved, so a poll that failed at the transport reaches the error arm and
+   * never reaches here — and an app whose fold is its only accumulator cannot
+   * count it. `src.attempts` is the settlements that produced this version, so
+   * the fold learns *how many tries this reading cost* without ever being handed
+   * a second shape in `data`.
+   *
+   * **Read from the source rather than passed in**, because `folds` memoises by
+   * version and the count has to travel with the version it belongs to: a
+   * parameter would be taken from whichever part happened to render first, and
+   * a second part hitting the memo would never see it.
    */
   const derivedFor = (
     src: Source,
@@ -792,7 +830,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
   ): unknown => {
     const held = src.folds.get(derive.key);
     if (held !== undefined && held.version === src.version) return held.value;
-    const value = derive.compute(src.data, held?.value);
+    const value = derive.compute(src.data, held?.value, src.attempts);
     src.folds.set(derive.key, { version: src.version, value });
     return value;
   };
@@ -860,6 +898,12 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
           // failure would make a source that lost its readers poll *more slowly*
           // when they come back.
           if (src.retired || src.parts.size === 0) return;
+          // **Captured before the reset, which is the whole of why the fold can
+          // see a failed attempt** (I47, F1023). `failures` is the live
+          // consecutive count and the next line clears it, so every arm that
+          // renders a success reads `0` — the quantity was destroyed one
+          // statement before the only consumer that could accumulate it.
+          src.attempts = src.failures + 1;
           src.failures = 0;
           src.version += 1;
           src.data = data;
@@ -1474,6 +1518,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
             failures: 0,
             inFlight: false,
             version: 0,
+            attempts: 0,
             data: undefined,
             done: false,
             retired: false,

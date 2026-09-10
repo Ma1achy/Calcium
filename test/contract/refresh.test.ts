@@ -833,6 +833,86 @@ describe("C23 §3c — one source behind several parts", () => {
     expect(shown(h, id, "b"), "and both parts read the same one").toBe("1,2,3");
   });
 
+  it("T1.41b (I47, F1023): the fold is told how many settlements produced the version it folds", async () => {
+    // **Two of this section's own rules overlap into a hole.** *Anything that
+    // accumulates belongs in a derivation* and *the fold runs once per source
+    // version*, and a version exists only when a fetch resolved — so the one
+    // place an accumulator is safe under sharing is the one place a transport
+    // failure never reaches. An app reporting a stall as *N attempts, M
+    // readings* could not count the poll that failed.
+    const h = harness();
+    let outcome: "ok" | "down" = "ok";
+    let reading = 0;
+    // Every entry into the fold, as (data, attempts). Recorded rather than
+    // summed: a total cannot tell one entry saying 3 from three saying 1.
+    const entries: [number, number][] = [];
+    const id = h.transcript.append(
+      docWith([panel("a", "a", raw("a-c", "…")), panel("b", "b", raw("b-c", "…"))]),
+      { streaming: true },
+    );
+    const ring = {
+      key: "ring",
+      compute: (data: unknown, prev: unknown, attempts: number): unknown => {
+        entries.push([data as number, attempts]);
+        return [...((prev as number[] | undefined) ?? []), attempts];
+      },
+    };
+    const poll = (): Promise<unknown> => {
+      if (outcome === "down") return Promise.reject(new Error("down"));
+      reading += 1;
+      return Promise.resolve(reading);
+    };
+
+    h.driver.declare({ kind: "entry", id }, [
+      part({
+        id: "a",
+        source: "stats",
+        derive: ring,
+        fetch: poll,
+        render: (d) => raw("a-c", (d as number[]).join(",")),
+      }),
+      part({
+        id: "b",
+        source: "stats",
+        derive: ring,
+        fetch: poll,
+        render: (d) => raw("b-c", (d as number[]).join(",")),
+      }),
+    ]);
+
+    // A clean poll first, so the row can tell *the count exists* from *the count
+    // is one*.
+    await h.tick();
+    expect(entries, "a clean poll costs one settlement").toStrictEqual([[1, 1]]);
+
+    // **Two failures and then a success, not one.** `1 + n` and a bare *did the
+    // previous poll fail* agree at n = 1, so a single failure cannot separate
+    // the count from a boolean.
+    outcome = "down";
+    await h.tick(60_000);
+    await h.tick(120_000);
+    expect(entries, "a failed poll never reaches the fold — that is the mechanism").toHaveLength(1);
+    expect(shown(h, id, "a"), "it reaches the error arm instead").toBe("err:down:120000");
+
+    outcome = "ok";
+    await h.tick(240_000);
+    expect(entries, "and the reading that follows costs three").toStrictEqual([
+      [1, 1],
+      [2, 3],
+    ]);
+
+    // **A control on the widening, not a discriminator — and the difference was
+    // measured** (T6.45b). This arm was first written as *a count passed in as a
+    // parameter rather than read from the source would fail here*; that mutation
+    // was run and **survived**, because the only value a call site has to pass
+    // is `src.attempts`, so the sentence named a distinction nothing can
+    // violate. What the arm does hold is that the third parameter did not cost
+    // I47 its shared fold: two parts, one entry per version.
+    expect(shown(h, id, "a"), "the accumulation").toBe("1,3");
+    expect(shown(h, id, "b"), "and the sibling reads the same fold").toBe("1,3");
+    expect(entries, "one entry per version, whatever the part count").toHaveLength(2);
+  });
+
   it("T1.42 (I45, §8c C3): release-then-declare at settlement keeps the fold", async () => {
     // **The assertion is the history and not the current value.** A source
     // destroyed between the release and the declare renders a perfectly correct

@@ -675,6 +675,71 @@ describe("C05 validate", () => {
     expect(parsed.value.tools.find((t) => t.name === "ps")?.view).toBeUndefined();
   });
 
+  it("T1.23 (I20, I24): view is refused with local, on the tool and on a flag, and the two controls say which field the refusal reads", () => {
+    // **The defect this closes was invisible to every other row in this file**
+    // (F1022, closing F23 and F129). `view` with `interactive` and `view` with
+    // `oneShot` both fail at parse, so a suite indexed by *does an inert
+    // declaration fail* tested the two arms that had a refusal and agreed. The
+    // pair below parsed, sealed, validated and ran, and the only symptom was a
+    // transcript entry where a view had been declared — C18 classifies on
+    // `tool.local` first and `isViewInvocation` is read on the `app` route and
+    // nowhere else, so nothing between the manifest and the frame said so.
+    const findGuide = (source: Record<string, unknown>): Record<string, unknown> =>
+      (source["tools"] as Record<string, unknown>[]).find((t) => t["name"] === "guide")!;
+
+    const REFUSAL =
+      'tools[7].view: "guide" is local and declares view — a local verb is handled ' +
+      "in-process and never reaches the route that opens one, so the declaration is " +
+      "inert; a local verb that wants a view pushes it from its handler, as `/profile` does";
+
+    // The tool-level pair — F23's form.
+    const toolView = raw();
+    findGuide(toolView)["view"] = true;
+    expect(errorsOf(parseManifest(toolView))).toContain(REFUSAL);
+
+    // The flag-level pair — F129's form, and I24's rule: a cross-field refusal
+    // reads *every* declaration of each field it names. A rule that read only
+    // `tool.view` would pass the row above and repeat F118 here.
+    const flagView = raw();
+    findGuide(flagView)["flags"] = [
+      { name: "wide", type: "bool", view: true, summary: "open it as a view" },
+    ];
+    expect(errorsOf(parseManifest(flagView))).toContain(REFUSAL);
+
+    // **Control 1 — the same declaration on a spawned tool parses.** Without it
+    // the two rows above pass against a parser that refuses every `view`, which
+    // is the state T1.20's `streams` arm exists to prevent one axis over.
+    const spawned = raw();
+    const tools = spawned["tools"] as Record<string, unknown>[];
+    const edit = tools.find((t) => t["name"] === "edit")!;
+    delete edit["interactive"];
+    edit["flags"] = [];
+    edit["view"] = true;
+    const okSpawned = parseManifest(spawned);
+    expect(okSpawned.ok, errorsOf(okSpawned).join("\n")).toBe(true);
+    if (okSpawned.ok) {
+      expect(okSpawned.value.tools.find((t) => t.name === "edit")?.view).toBe(true);
+    }
+
+    // **Control 2 — the untouched fixture draws no such error**, so the corpus
+    // the rule resolves against is non-empty and `guide` is a `local` tool
+    // whether or not this row edits it. A fabricated violation whose control is
+    // missing cannot tell a firing rule from an empty corpus.
+    expect(errorsOf(parseManifest(raw())).filter((m) => m.includes("is local and declares view"))).toHaveLength(0);
+
+    // **Control 3 — the axes are independent, and this is the row that makes
+    // the rule about the tier rather than about flags on local verbs.** A
+    // `shellOnly` switch on the same local tool parses: I21 is transmission and
+    // I20 is the tier, and a refusal reading the wrong field would fail here
+    // while passing everything above it (§8a row 18).
+    const shellOnly = raw();
+    findGuide(shellOnly)["flags"] = [
+      { name: "wide", type: "bool", shellOnly: true, summary: "widen the output" },
+    ];
+    const okShellOnly = parseManifest(shellOnly);
+    expect(okShellOnly.ok, errorsOf(okShellOnly).join("\n")).toBe(true);
+  });
+
   it("T1.18 (I17): a conflict is reported once, whichever side declares it", () => {
     // One-directional is how an app ordinarily writes it, and deduplicating by
     // name order dropped exactly those. Mutual is one mistake, so it stays one
