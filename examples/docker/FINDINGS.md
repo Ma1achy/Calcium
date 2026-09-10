@@ -45740,3 +45740,86 @@ the entry. A count carried into a sentence is a claim, whoever is carrying it.
   by the same grep over the same three files.
 - **The anchorage signal being gated after all.** Its own line says *reported not
   gated*, and the build is green with thirty-five adrift.
+
+## F1093 — a budget written to widen a five-second default became a narrowing when the default went to thirty ★★★★
+
+| | |
+|---|---|
+| **Surface** | `test/contract/plot.test.ts:122` (C12 T2.1, I2) |
+| **Reached for** | the first pull-request CI this branch has had, which F1086 and the merge made possible |
+| **Verdict** | **open** |
+
+### The row and the number
+
+C12 T2.1 sweeps twelve fuzz corpora across every width from 1 to 200 through
+three rasteriser entry points, one corpus being a hundred thousand points. It
+carries the only hand-written row timeout in the tree, and a comment defending
+it:
+
+> **An explicit budget, because 3.2 s against a 5 s default is not a margin.**
+> … Left at the default it passed on a quiet machine and timed out on a busy
+> one, which is the shape of a test that gets its timeout raised by someone who
+> does not know what it measures. **Twenty seconds says the seconds are
+> expected.**
+
+Every sentence of that is right, and the number it produced is now doing the
+opposite of what it was written for.
+
+### `vitest.config.ts` set `testTimeout: 30_000` on 2026-08-22
+
+So the explicit budget stopped being a **widening of five** and became a
+**narrowing of thirty** — a third off the limit the row would otherwise have
+had, in a file whose comment says the row exists because the default was too
+small. Measured:
+
+| | |
+|---|---|
+| the row, in the devcontainer | **6 936 ms** |
+| the row, on the runner | **20 960 ms** |
+| its explicit budget | 20 000 |
+| the global it overrides | 30 000 |
+
+**It would have passed on the default it was written to escape.** The failure is
+the override, not the runner and not the row.
+
+### The population is exactly one
+
+Swept over `test/` for every explicit row timeout: dozens, almost all in tier 5
+where a real PTY needs its own budget, and every one of them is at or above the
+global — 30 000, 45 000, 60 000, 90 000, 120 000, 360 000. Four candidates that
+looked sub-global on a first pass are not row timeouts at all: two are arguments
+to `waitForFrame`, one to `elapsedNeeded`, one an assertion bound.
+
+**`plot.test.ts:122` is the only explicit row timeout in the repository below the
+global**, which is what makes this a record rather than a campaign.
+
+### The class, and it is the third instance in one day
+
+F967's shape — a file restating another file's default is a copy that goes stale
+in one commit — and the two before it were both prose. `budget.ts`'s headroom
+table said *vitest's 5 s default* and was labelled under F1088; this file's
+comment says the same thing and **acts on it**. A sentence that has gone stale
+misleads a reader. A *number* that has gone stale fails the build, on the one
+machine that was not available to disagree when it was written.
+
+**And the direction is the surprise.** An override is read as *more room*. This
+one is less, and nothing about the syntax says so — `20_000` beside a comment
+about a five-second default reads as generous at every glance.
+
+### Remedy
+
+`CORPUS_BUDGET_MS`, which is what the row is: a corpus sweep, in `budget.ts`'s
+own taxonomy, sized at sixty seconds against a runner figure of twenty-one. The
+number leaves the file, so the next change to the regime moves it once. The
+comment keeps its argument — *the seconds are expected* — and gains the
+measurement that the argument was missing.
+
+### What would falsify this
+
+- **A second sub-global override.** Swept; there is none.
+- **Tier 5 running under a different global**, which would make its numbers
+  widenings against something smaller. One `testTimeout` in the repository, in
+  `vitest.config.ts`.
+- **The row being genuinely slower than it should be.** 6.9 s locally against a
+  documented 3.2 s, and the difference is this branch's own additions to the
+  corpus; the runner figure is 3.0× the local one, which is the regime.
