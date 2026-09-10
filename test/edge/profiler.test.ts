@@ -20,6 +20,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
+import { toNdjson } from "../../src/shell/profiling/export.js";
 import { createResourceProbe } from "../../src/shell/profiling/node.js";
 import { profilePane } from "../../src/shell/profiling/panes.js";
 import type { ProfileReport, ResourceSample, Tier } from "../../src/shell/profiling/types.js";
@@ -331,15 +332,17 @@ describe("C28 — profiler, tier 3 spec-first rows", () => {
     expect(r.latency?.work.count, "no work figure took it").toBe(0);
     expect(r.excluded.fallback, "and the exclusion is counted rather than silent").toBe(1);
 
-    // **C28 I6's second clause is recorded and cannot be read** (F899). The record
-    // in the ring carries `outcome: "fallback"`; `report()` builds `timeline`
-    // and `worst` from `drawn`, which is filtered to `outcome === "frame"`, so
-    // the frame that gave up appears in no projection and the only published
-    // trace of it is the count above. The row asserts the absence rather than
-    // stepping over it, so the day a projection carries it this fails and gets
-    // rewritten.
-    expect(r.timeline.map((f) => f.outcome), "no fallback reaches the timeline").toEqual([]);
-    expect(r.worst.map((f) => f.outcome), "nor the worst list").toEqual([]);
+    // **C28 I6 asks for exclusion from the durations and nothing else** (I54,
+    // F1020). The record in the ring carries `outcome: "fallback"` and reaches
+    // the session's series with it; `worst` is the durations population and is
+    // empty here, because the only frame this session had is the one that gave
+    // up. Until F1020 both came off one filtered list, and the two lines below
+    // were `[]` and `[]` — a row asserting the defect, green for exactly as
+    // long as the defect lived.
+    expect(r.timeline.map((f) => f.outcome), "the frame that gave up is on the series").toEqual([
+      "fallback",
+    ]);
+    expect(r.worst.map((f) => f.outcome), "and out of the durations projection").toEqual([]);
 
     // Neither span is still open: both have a real self time, and neither was
     // handed the frame's tail by `freezeTree`.
@@ -349,6 +352,95 @@ describe("C28 — profiler, tier 3 spec-first rows", () => {
     expect(spans?.paint?.count, "the inner closed").toBe(1);
     expect(spans?.paint?.max, "at its own duration, 9 − 5").toBe(4);
     expect(spans?.compose?.max, "self time, so the inner is not counted twice").toBe(5);
+  });
+
+  it("T3.15 (C28 I54): the series filters by cause, the durations by cause and outcome", () => {
+    // **Three arms, each a cell of C28 §9c**, and the third could not exist
+    // before the ruling: `FrameRecord.outcome` had two declared values and one
+    // realised one on every published surface, so there was nothing for a row
+    // to disagree with (F899, F1020).
+
+    // --- Q1: the ring against the filter -----------------------------------
+    //
+    // **The bound is spent on the fallback either way**, which is the cost of
+    // the old projection nobody had stated. A ring of one, a slow frame, then
+    // a frame that gives up: the fallback takes the slot and evicts the frame
+    // that drew. Measured at HEAD before this landed — `timeline` `[]`,
+    // `frames` 2, `dropped.frames` 1 — three figures no reader can reconcile,
+    // because 2 − 1 is 1 and the series was empty.
+    const c1 = clock();
+    const ring = createProfiler({ tier: "spans", ring: 1 }, { elapsed: c1.now });
+    c1.at(0); ring.beginFrame("input"); c1.at(40); ring.endFrame("frame");
+    c1.at(50); ring.beginFrame("resize"); c1.at(51); ring.endFrame("fallback");
+    const r1 = ring.report();
+
+    expect(r1.timeline.map((f) => [f.seq, f.outcome]), "the slot's occupant is on the series")
+      .toEqual([[2, "fallback"]]);
+    expect(r1.frames, "both reached the terminal").toBe(2);
+    expect(r1.dropped.frames, "and the bound discarded the one it evicted").toBe(1);
+    // `frames − dropped === timeline.length` closes now and did not before.
+    expect(r1.frames - r1.dropped.frames, "which the series accounts for").toBe(r1.timeline.length);
+
+    // **The durations are untouched by any of it** (C28 I6). The 40 ms frame
+    // gone from the ring and its measurement is not: a histogram is not a
+    // window.
+    expect(r1.worst, "a fallback is never in the durations projection").toEqual([]);
+    expect(r1.latency?.work.count, "one frame composed").toBe(1);
+    expect(r1.latency?.work.max, "and the cheap failure did not flatter it").toBe(40);
+
+    // **What the ruling leaves behind, asserted rather than described** (§9c
+    // Q2). `worst` is where C28 I32 retains a tree and a fallback is never in
+    // it — giving up is cheap — so the frame reaches the series with its
+    // `spans` and **without its structure**. Retaining every fallback's tree is
+    // the unbounded retention I32 exists to refuse, and the session that keeps
+    // falling back is the one that would do it. Absence of the member, in
+    // T1.35's form: a present `undefined` is a different type under
+    // `exactOptionalPropertyTypes` and a different reading to a consumer.
+    expect("tree" in (r1.timeline[0] ?? {}), "no tree member at all on the fallback").toBe(false);
+    expect(r1.timeline[0]?.spans, "and its per-phase self times are there").toBeDefined();
+
+    // --- P4: the cause decides, and the outcome is never asked --------------
+    //
+    // A fallback the profiler's own redraw raised is the instrument's frame,
+    // not the session's, so it is on no series (C28 I12, C28 I34). And
+    // **ladder rather than a partition** — the recorder tests `fallback` first
+    // — so it is counted under `fallback` and not under `selfInflicted`. That
+    // is why *every frame in `excluded.fallback` is on `timeline`* is not the
+    // invariant: it is false in exactly this cell.
+    const c2 = clock();
+    const own = createProfiler({ tier: "spans" }, { elapsed: c2.now });
+    c2.at(0); own.commit("input", true);
+    c2.at(1); own.beginFrame("input"); c2.at(2); own.endFrame("fallback");
+    const r2 = own.report();
+    expect(r2.timeline, "the instrument's own frame is on no series").toEqual([]);
+    expect(r2.excluded, "and the ladder's first arm took it").toEqual({
+      selfInflicted: 0,
+      fallback: 1,
+    });
+
+    // **The control, and it is what makes the arm above an assertion.** The
+    // same fallback with no own commit *is* on the series, so a filter that
+    // dropped the outcome test and kept nothing else passes the arm above and
+    // fails here — and one that kept the outcome test fails the arm above.
+    const c3 = clock();
+    const theirs = createProfiler({ tier: "spans" }, { elapsed: c3.now });
+    c3.at(0); theirs.commit("input", false);
+    c3.at(1); theirs.beginFrame("input"); c3.at(2); theirs.endFrame("fallback");
+    expect(theirs.report().timeline.map((f) => f.outcome), "the reader's is").toEqual(["fallback"]);
+
+    // --- Q5: the value is observable ---------------------------------------
+    //
+    // `toNdjson` has published an `outcome` column for its whole life and the
+    // column held one value in every session that ever ran, because the filter
+    // ran first. This is the line that could not be written before.
+    const lines = toNdjson(r1).split("\n").filter((l) => l !== "");
+    expect(lines.length, "one line per frame on the series").toBe(1);
+    expect(
+      (JSON.parse(lines[0] ?? "{}") as { outcome: string }).outcome,
+      "and the published column has a second value at last",
+    ).toBe("fallback");
+
+    ring.dispose(); own.dispose(); theirs.dispose();
   });
 
   it("T3.8 (C28 I22): every operation after dispose, and the one that throws throws about dispose", () => {
@@ -591,8 +683,4 @@ describe("C28 — profiler, tier 3 spec-first rows", () => {
     expect(calls, "the profiler called it once").toBe(1);
   });
 
-});
-
-describe("C28 §9c — two filters for two projections (I54)", () => {
-  it.todo("T3.15 (C28 I54, §9c): `timeline` filters by cause and the durations filter by cause and outcome, so a fallback frame is a point in the series and not a sample in a mean — `excluded` and `timeline` are never summable, and the ring bound is spent on a fallback either way — not deferred on a component: it lands with the recorder in the next commit");
 });

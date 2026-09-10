@@ -298,11 +298,12 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
    * composing that frame take*, which is `work` alone.
    *
    * **Any outcome, including `fallback`.** `report()` filters fallbacks out of
-   * `timeline` and `worst` because those are projections over frames that drew
-   * (F899); this is not a projection, it is the most recent measurement. A
-   * session repeatedly falling back would otherwise hold the last *drawn*
-   * frame's figure on screen indefinitely, presenting a stale number as the
-   * present one.
+   * `worst` and the durations, because those are projections over the frames
+   * that *composed* (I6) — `timeline` carries them, because it is the series of
+   * what happened rather than of what it cost (I54). This is neither: it is the
+   * most recent measurement. A session repeatedly falling back would otherwise
+   * hold the last *drawn* frame's figure on screen indefinitely, presenting a
+   * stale number as the present one.
    */
   let lastWork: number | undefined;
 
@@ -656,7 +657,25 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
 
     report(): ProfileReport {
       const held = frames.toArray();
-      const drawn = held.filter((f) => f.outcome === "frame" && !f.selfInflicted);
+      // **Two filters, because the two projections answer two questions**
+      // (I54, F899). `series` is *what happened* — every frame the session's
+      // reader caused, in commit order, whatever its outcome — and `drawn` is
+      // *what it cost*, which is the population I6 keeps a fallback out of.
+      // Both drop the self-inflicted frame, because the axis the two share is
+      // **who caused it** and the profiler's own redraw is the instrument's,
+      // not the session's (I12, I34).
+      //
+      // One list served both until F1020, and the cost was not only that the
+      // interesting frame vanished. The ring's bound is spent on a fallback
+      // either way, so a ring of one holding a fallback published an **empty**
+      // `timeline` for a session that drew two frames — `frames` 2,
+      // `dropped.frames` 1, `timeline.length` 0, three figures no reader can
+      // reconcile (§9c Q1). And `FrameRecord.outcome` was a published member
+      // whose non-`frame` value nothing could observe: `toNdjson` has emitted
+      // an `outcome` column for its whole life and the column held one value
+      // in every session that ever ran.
+      const series = held.filter((f) => !f.selfInflicted);
+      const drawn = series.filter((f) => f.outcome === "frame");
       const worst = [...drawn].sort((a, b) => b.work - a.work).slice(0, worstKeep);
       const worstSeqs = new Set(worst.map((f) => f.seq));
       // Trees only on the worst — see `FrameRecord.tree`. Stripped here rather
@@ -694,7 +713,7 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
             }
           : {}),
         byReason: Object.freeze(snapshotAll(byReason)),
-        timeline: Object.freeze(drawn.map(strip)),
+        timeline: Object.freeze(series.map(strip)),
         worst: Object.freeze(worst),
         nodes: nodes.snapshot(),
         byKind: Object.freeze(snapshotAll(byKind)),

@@ -248,6 +248,16 @@ export type FrameRecord = Readonly<{
    * and this is what is in it.
    */
   tree?: TreeNode;
+  /**
+   * Whether composition produced a frame or gave up (C28 I6, I54).
+   *
+   * **Observable on `timeline` and on `toNdjson`'s `outcome` column**, and on
+   * neither until F1020: `report()` built both projections from one list
+   * filtered to `"frame"`, so the member had two declared values and one
+   * realised one in every session that had ever run. `worst` is still the
+   * durations population and every record in it says `"frame"` by
+   * construction.
+   */
   outcome: FrameOutcome;
   selfInflicted: boolean;
   at: number;
@@ -415,11 +425,29 @@ export type ProfileReport = Readonly<{
   latency?: Readonly<{ work: Histogram; wait: Histogram }>;
   byReason: Readonly<Partial<Record<CommitReason, Histogram>>>;
   /**
-   * Every retained frame in commit order — the ring's drawn contents.
+   * Every retained frame the session's reader caused, in commit order,
+   * **whatever its `outcome`** (C28 I54).
    *
-   * `worst` is the same set sorted by cost and truncated, so a consumer wanting
-   * a series or a histogram must not take it from `worst`: a top-N sorted
-   * descending is a monotone staircase whatever the session did.
+   * **Not the durations population, and that is the whole distinction.** This
+   * series says *what happened*; `latency`, `byReason` and `worst` say *what it
+   * cost*, and I6 keeps the frame that gave up out of those alone. A fallback
+   * is where composition failed, which is the frame a reader opens a profiler
+   * to find — and while one filter served both, `FrameRecord.outcome` was a
+   * published member whose non-`frame` value no consumer could observe (F899,
+   * F1020). Filter on `outcome` here; take a duration from `latency`.
+   *
+   * A self-inflicted frame is on neither, because the axis the two filters
+   * share is *who caused the frame* and the profiler's own redraw is the
+   * instrument's (C28 I12, I34).
+   *
+   * **Never summable with `excluded`**: that counts for the session's life and
+   * this is a window on a bounded ring a tier change resets, so a frame in
+   * `excluded.fallback` need not be here — and a self-inflicted fallback is
+   * counted there and never is (C28 §9c P4).
+   *
+   * `worst` is the *durations* population sorted by cost and truncated, so a
+   * consumer wanting a series or a histogram must not take it from `worst`: a
+   * top-N sorted descending is a monotone staircase whatever the session did.
    */
   timeline: readonly FrameRecord[];
   worst: readonly FrameRecord[];

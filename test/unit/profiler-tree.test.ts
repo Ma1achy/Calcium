@@ -398,6 +398,19 @@ describe("C28 I32 — a tree per frame, retained only for the worst", () => {
     expect(worst.length, "worst: 1 keeps one").toBe(1);
     expect(worst[0]?.work, "the 50 ms frame, not the 1 ms one").toBe(50);
     expect(worst[0]?.tree?.name, "the kept frame has its tree").toBeDefined();
+
+    // **The half this row is named for and did not assert** (F1020). Every
+    // line above is about the frame that *was* retained; the bound is a claim
+    // about the one that was not, and the row's own comment says so. Measured:
+    // `strip` returning every record with its tree — the retention gone
+    // entirely — left this row green, and the only thing that failed was a
+    // tier-3 row about a different invariant. A comment describing an
+    // assertion is not the assertion.
+    const series = prof.report().timeline;
+    expect(series.length, "both frames are on the series (C28 I54)").toBe(2);
+    const ordinary = series.find((f) => f.work === 1);
+    expect(ordinary, "the 1 ms frame among them").toBeDefined();
+    expect("tree" in (ordinary ?? {}), "and it carries no tree member at all").toBe(false);
   });
 
   it("T1.36 (C28 I32): the retained tree nests, and Σ self over it is the frame's work", () => {

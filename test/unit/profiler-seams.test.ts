@@ -1120,9 +1120,11 @@ describe("C24 — the public surface", () => {
     expect(p.lastFrame(), "and it is the frame before, not the one just ended, once more").toBe(3);
 
     // A fallback frame is still the most recent measurement. `report()` filters
-    // fallbacks out of `timeline` and `worst` because those are projections over
-    // frames that drew (F899); this is not a projection. Holding the last
-    // *drawn* frame's figure through a run of fallbacks is F900's stopped clock.
+    // fallbacks out of `worst` and the durations, because those are projections
+    // over the frames that *composed* (C28 I6) — the series carries them (I54,
+    // F1020) — and this is neither: it is the last measurement, not a
+    // projection. Holding the last *drawn* frame's figure through a run of
+    // fallbacks is F900's stopped clock.
     t = 30;
     p.beginFrame("resize");
     t = 31.5;

@@ -14,6 +14,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
+import { toNdjson } from "../../src/shell/profiling/export.js";
 import { createResourceProbe } from "../../src/shell/profiling/node.js";
 import { profilePane } from "../../src/shell/profiling/panes.js";
 import { compareFrames, parseRecording } from "../../src/shell/profiling/replay.js";
@@ -435,6 +436,61 @@ describe("C28 — profiler, tier 6 spec-first rows", () => {
     expect(r.surplus, "and the two beyond it, counted rather than judged").toBe(2);
     expect(r.divergence, "which is not a disagreement").toBeNull();
     expect(r.identical, "so a longer replay of a prefix still passes").toBe(true);
+  });
+
+  it("T6.19 (C28 I54): one filter for both projections drops the frame that gave up", () => {
+    // **The revert**: build `timeline` from `drawn` again —
+    //
+    //     const drawn = held.filter((f) => f.outcome === "frame" && !f.selfInflicted);
+    //     …
+    //     timeline: Object.freeze(drawn.map(strip)),
+    //
+    // one list, one filter, I6's exclusion applied once instead of twice. It
+    // reads as a simplification and it is what shipped, because a fallback
+    // really is *not a frame that composed* and the durations really must not
+    // hold it. What the collapse loses is that `timeline` was never a
+    // durations projection: it is the session's per-frame series, and I6 asks
+    // only for exclusion from the histograms.
+    //
+    // **The revert is invisible to every other row in the suite** — no
+    // assertion anywhere disagrees with it — which is exactly how it shipped
+    // and stayed. `FrameRecord.outcome` goes back to a published member with
+    // two declared values and one realised one on every surface, and a member
+    // nothing can observe is a member no test can catch being wrong (F899).
+    let now = 0;
+    const p = createProfiler({ tier: "spans", ring: 1 }, { elapsed: () => now });
+
+    now = 0; p.beginFrame("input"); now = 40; p.endFrame("frame");     // slow, and drew
+    now = 50; p.beginFrame("resize"); now = 51; p.endFrame("fallback"); // cheap, and gave up
+
+    const r = p.report();
+
+    // **The arithmetic is the assertion, not the presence.** The ring's bound
+    // is spent on the fallback either way: it took the only slot and evicted
+    // the frame that drew. Under the revert this reads `frames` 2,
+    // `dropped.frames` 1 and an **empty** series — three published figures a
+    // reader cannot reconcile, for a session that put two frames on a
+    // terminal.
+    expect(r.frames, "two frames reached the terminal").toBe(2);
+    expect(r.dropped.frames, "the bound discarded one of them").toBe(1);
+    expect(r.frames - r.dropped.frames, "and the series accounts for the rest").toBe(
+      r.timeline.length,
+    );
+    expect(r.timeline.map((f) => f.outcome), "which is the one that gave up").toEqual(["fallback"]);
+
+    // C28 I6 is untouched by any of it, which is the half the revert is
+    // about: the durations still hold the frame that composed, and only it.
+    expect(r.worst, "the durations projection is still filtered").toEqual([]);
+    expect(r.latency?.work.max, "and still describes the 40 ms frame").toBe(40);
+
+    // The published column, which is where the member becomes observable.
+    const lines = toNdjson(r).split("\n").filter((l) => l !== "");
+    expect(
+      lines.map((l) => (JSON.parse(l) as { outcome: string }).outcome),
+      "an `outcome` column that held one value in every session that ever ran",
+    ).toEqual(["fallback"]);
+
+    p.dispose();
   });
   // **T6.16 (C28 I47) lives in `test/e2e/profiler.test.ts`, beside the T1.83
   // it names** (C28 §10). Its blocker — `src/shell/profiling/replay.ts` — exists;
