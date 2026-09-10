@@ -1,8 +1,34 @@
 name: ci
 
 on:
+  # **Every branch, and A04 §6's table is what says so** (F1086). This read
+  # `branches: [main]` for as long as the file has existed, so a push to a
+  # feature branch fired *nothing* — not the fast chain, and not `enforce`,
+  # which §6 singles out as staying on every push because it costs five
+  # seconds. `gh run list` on the branch carrying the whole profiler arc
+  # returned no runs at all.
+  #
+  # **The guards below are the evidence the filter was the mistake.** `full`,
+  # `proof` and `degraded` each test for a pull request, `main` or a tag —
+  # a distinction whose only purpose is to hold the expensive tier back on a
+  # *branch push*, which could not occur. `fast` has no guard at all, because
+  # on the design as written it is precisely what a branch push runs. Two
+  # records agreed with each other and the four lines above them decided.
+  #
+  # **The cost, named rather than discovered**: with both events live, a push
+  # to a branch that has an open pull request runs `fast` twice, once per
+  # event. That is the split §6 describes and it is two minutes; trimming
+  # superseded runs with a `concurrency` group is a different change.
+  #
+  # **`branches: ["**"]` and not a deleted line.** The first draft of this fix
+  # removed the `branches:` key and left `tags:`, which reads as *no branch
+  # filter* and means the opposite: a filter key under `push` narrows the event
+  # to that key alone, so the workflow would have fired on **tags only** and
+  # branch pushes would have gone from firing nothing to still firing nothing,
+  # under a comment saying they now fire. `"**"` matches every branch including
+  # the ones with a slash in the name.
   push:
-    branches: [main]
+    branches: ["**"]
     tags: ["v*"]
   pull_request:
 
