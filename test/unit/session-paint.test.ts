@@ -797,4 +797,12 @@ describe("C22 §4a — one overlay layout per frame, shared by the rows and the 
     expect(footerLeft.calls, "the header's two plus compose's one").toBe(3 * footerLeft.frames);
     expect(footerRight.calls, "the header's two plus compose's one").toBe(3 * footerRight.frames);
   });
+
+  // The spec's I97 and T1.46b land in this commit; the row itself lands in the
+  // next one, with `chrome.ts` and the nineteen golden frames it moves. Nothing
+  // is waited on here — the code exists and is one commit behind the sentence
+  // that describes it, which is what spec-first means.
+  it.todo(
+    "T1.46b (C22 I86, I97, §6l.6 J, F1029, F1072): every chip names its tone, and the name is not the binary's ink — not deferred on a component",
+  );
 });

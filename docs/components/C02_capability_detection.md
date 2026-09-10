@@ -347,12 +347,36 @@ and the failure path is distinguishable from the success path. Both `TERM` and `
 are matched because a `ghostty` inside `tmux` reports `TERM=screen-256color` while
 `TERM_PROGRAM` survives.
 
-**WezTerm and Konsole are owed and deliberately not claimed.** Both are widely said to implement
-the protocol and **neither has been measured here**, and a false positive is worse than a false
-negative: placeholders addressing an image the terminal never received draw *nothing*, which is
-C09 §4c's loud failure arriving through a detection table. The expiry is cheap and named — run
-`tools/terminal-probe/probe.py` in the terminal and read the verdict — so this is a deferral with
-an instrument rather than a deferral with a hope.
+**Two more records since, and the second is the one that makes the first mean anything** (F1060,
+F1071). kitty 0.41.1 answers `OK` for all seven cases and `EBADPNG:bad adaptive filter value` for
+the corrupt control. XTerm 398, which speaks no graphics protocol at all, answers `NO RESPONSE` to
+every one and falls through this table to `none`. **Records that agree with a table say nothing on
+their own**: with agreeing records only, a reader firing on *measured ahead of the table* is
+indistinguishable from one that also fires on *the table claims what the terminal refused*, and
+XTerm is the terminal that exercises the second arm. The two terminals name the same failure
+differently, which is why nothing matches on the error text.
+
+**WezTerm and Windows Terminal are owed and deliberately not claimed.** Both are widely said to
+implement the protocol and **neither has been measured here**, and a false positive is worse than a
+false negative: placeholders addressing an image the terminal never received draw *nothing*, which
+is C09 §4c's loud failure arriving through a detection table.
+
+**This sentence named Konsole until F1071, and `TerminalName` never had a `konsole` member.** The
+two unmeasured `none` rows are `wezterm` and `windowsterminal`; `konsole` appears in `src/` only in
+a `COLORFGBG` comment about an unrelated rule, and `capabilities.test.ts` T1.7's `KONSOLE_VERSION`
+row is an *unidentified* terminal falling through. Recorded rather than quietly corrected, because
+the shape is the reusable part: **a spec naming a terminal the code cannot name is a deferral owed
+to nobody**, and it survived twenty-five components because *WezTerm and X are owed* reads as
+complete whatever X is. Checking the pair finds it; checking the sentence does not.
+
+**The expiry is a row that goes red, not a reader who remembers** (F1071). Run the probe in one of
+them with no argument and the report lands in `tools/terminal-probe/results/`, where
+`terminal-probe.test.ts` TP7 reads every record there back through `detectCapabilities` and fails —
+naming the file — when a recorded verdict disagrees with this table. Until that row existed this
+paragraph said *run the probe and read the verdict* while nothing read the verdict: an instrument,
+an output file, and no reader, which is a deferral with a hope wearing a tool's clothes. **What it
+still does not check is the rest of the report** — TP7 reads one line, so a terminal answering `OK`
+to the 1×1 query and then refusing real transmissions would pass it.
 
 **Which rules the `dumb` gate applies to.** `TERM = dumb` gates every rule derived from `TERM` — `colourDepth`, `bracketedPaste`, `mouse`, `altScreen`. It does **not** gate rules derived from `TERM_PROGRAM` — `synchronisedUpdate` and `imageProtocol` — or from `COLORFGBG` — `backgroundPolarity` — because those describe the emulator, and `TERM=dumb` is a statement about terminfo. The case that makes this matter is an override of `altScreen: true` under `TERM=dumb` (T1.9): the user has said detection is wrong about their terminal, and iTerm2 supports synchronised update whatever `TERM` claims. Gating it would give them an alt screen that tears.
 
