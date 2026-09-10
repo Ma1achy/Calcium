@@ -185,8 +185,29 @@ describe("C23 — the shell route as a live screen, spec-first rows", () => {
     // the kernel coalesces — so the row asserts what the *screen* holds as well.
     expect(patches, "frames arrived while it ran").toBeGreaterThan(0);
     expect(patches, "far fewer than one per line").toBeLessThan(50);
-    const text = JSON.stringify(h.transcript.entries[0]?.doc.blocks);
-    expect(text, "and the tail is the last line the child wrote").toContain("200");
+
+    // **Wait for the artefact, not for the route** (F812's set, 2026-09-10).
+    // `settled` waits for the guard to be taken and released, which is the route
+    // finishing — and the patch carrying the child's last chunk can land a turn
+    // after that. On the runner it twice did: the blocks serialised to
+    // `[{"kind":"scroll",…}]` with no `200` in them, and the assertion said *the
+    // tail is the last line the child wrote*, which is a claim about coalescing
+    // where the fact was a poll that stopped one turn early.
+    //
+    // A bounded wait rather than a longer sleep: it costs nothing when the patch
+    // has already landed, and when it has not the row still fails on the same
+    // assertion with the same sentence — a race turned into a wait, not a bound
+    // widened until it passes.
+    const tail = async (): Promise<string> => {
+      const deadline = Date.now() + 5_000;
+      let text = JSON.stringify(h.transcript.entries[0]?.doc.blocks);
+      while (!text.includes("200") && Date.now() < deadline) {
+        await new Promise((r) => void setTimeout(r, 25));
+        text = JSON.stringify(h.transcript.entries[0]?.doc.blocks);
+      }
+      return text;
+    };
+    expect(await tail(), "and the tail is the last line the child wrote").toContain("200");
 
     // The cancel arm, on a child that will not stop on its own.
     const c = pipelineHarness({

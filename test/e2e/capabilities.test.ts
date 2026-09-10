@@ -210,6 +210,30 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
         },
       });
       expect(a, "the control byte arrived, so the capture read").toContain("k");
+
+      // **A stray modifier is a fact about the X session, and it must not be
+      // read as a protocol claim** (F812). Twice on the runner a lone Esc came
+      // back as `CSI 27;2 u` — key 27 with Shift — before the drive had pressed
+      // Shift, and once as a bare `\x1b` followed by a release in the new mode,
+      // which is the keyboard mode not yet live when the first key went in. The
+      // assertion below then said *a lone Esc is `CSI 27 u`*, which describes
+      // the wrong thing in both cases: nothing about kitty's protocol was
+      // wrong.
+      //
+      // So the reading comes first and names the session. It cannot make a
+      // flaky row green; what it stops is a red run being read as a defect in
+      // the subject, which is the whole of F1094's lesson applied to a
+      // different sentinel.
+      const strayEsc = /\x1b\[27;(\d+)/u.exec(a);
+      expect(
+        strayEsc === null ? "1" : strayEsc[1],
+        "Esc reached kitty with a modifier held — the harness's clear did not take, and this is the X session rather than the protocol (F812)",
+      ).toBe("1");
+      expect(
+        a.startsWith("\x1b\x1b") ? "the mode was not live when the first key arrived" : "live",
+        "the first key was sent before kitty entered the keyboard mode (F812)",
+      ).toBe("live");
+
       expect(a, "a lone Esc is `CSI 27 u` — not a prefix").toContain("\x1b[27u");
       expect(a, "its release carries `:3`").toContain("\x1b[27;1:3u");
       expect(a, "Shift-Enter is `CSI 13;2 u`").toContain("\x1b[13;2u");
