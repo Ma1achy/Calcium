@@ -825,4 +825,8 @@ describe("C04 required fields report absence and wrong type differently", () => 
     expect(found).toHaveLength(42);
     expect(found.filter((at) => EXEMPT.includes(at)), "the exemption is reached").toEqual(EXEMPT);
   });
+
+  it.todo(
+    "T1.42 (C04 I119, F405): a document holding a kind the framework has never heard of validates and its fields survive the round trip — not deferred on a component, because the runtime half has shipped since F1; this commit rules the type-level half and the next one builds it",
+  );
 });

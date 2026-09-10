@@ -536,4 +536,8 @@ describe("liveParts — what `b.live` declared (C24 I24, F28)", () => {
     const plain = docOf([b.notice.ok("fine")]);
     expect(liveParts(plain)).toEqual([]);
   });
+
+  it.todo(
+    "T2.22 (C24 I35, F405): `expectDocument(doc, [definition])` measures a registered kind at its declared height, and without the argument the same document measures one row — not deferred on a component, because `expectDocument` and `TuiConfig.blocks` both exist; the parameter is what this commit rules",
+  );
 });
