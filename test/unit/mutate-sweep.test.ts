@@ -173,7 +173,7 @@ describe("MS7: a red run prints the tail of its own log (F1097)", () => {
 
   it("MS7c: it reads each run's own log, at the path the sweep wrote it to", () => {
     const seen: string[] = [];
-    redTails([{ run: "a.mjs" }, { run: "b.mjs" }], "somewhere", (f) => {
+    redTails([{ run: "a.mjs" }, { run: "b.mjs" }], "somewhere", (f: string) => {
       seen.push(f);
       return "x";
     });
