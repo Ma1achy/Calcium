@@ -44540,7 +44540,92 @@ Appearing is weaker than being checked, so 14 is a floor rather than the answer.
 Two are exactly the shape that started this — `offsets?: readonly number[]` and
 `totals?: readonly boolean[]`, declared, reachable from `b.plot`, ungated — and
 one is worse: **`facets?: readonly Plot[]` holds child plots**, so every rule in
-the file stops at the first nesting.
+the file stops at the first nesting. `childBlocksOf` has arms for containers and
+for a table's row detail, and none for `facets`; that half is confirmed at the
+source rather than inferred.
+
+### Re-measured behaviourally, and the proxy was wrong in both directions
+
+Appearing in the file is a proxy, and the honest question is whether **any** form
+refuses a wrong value. Driving five wrong values at every member across all
+forty-eight members of `PlotForm`, over `ONE_PER_FORM` — whose forty-eight
+fixtures were first shown to validate clean, or the corpus cannot answer:
+
+| | |
+|---|---|
+| optional `Plot` members probed | 66 |
+| refused by at least one form | 46 |
+| **refused by no form** | **20** |
+
+`xLabels xMin xMax xFormat yMin yMax emptyMessage categories quartiles offsets
+totals startDate bands facets segments xScale yScale camera bandwidth axisStyle3`
+
+Wrong **low** by six, and wrong in the other direction too: `axes` appears
+nowhere in the fourteen and is refused, so the file count both missed members
+that appear and would have counted one that is checked.
+
+### Three ways a check reads as present, and each defeats a different proxy
+
+The twenty are not one kind. Naming them is the reusable part, because each is
+invisible to a different reader:
+
+| | how it reads | the instance |
+|---|---|---|
+| **absent** | fails a grep | most of the twenty |
+| **read, then skipped** | passes a grep | `yMin`, `yMax` |
+| **gated behind a sibling** | passes a grep and carries a detailed refusal | `startDate` |
+
+`plotAxisCrossErrors` is the second. It is the only function that touches
+`yMin`, three guards deep behind `axisCross` being present, being `"zero"`, and
+the form honouring it — and then the line that touches the type is
+`if (typeof lo !== "number" || typeof hi !== "number") return;`, which uses the
+type check to **skip** rather than to refuse. From a grep that is
+indistinguishable from a type check, and it is the opposite of one.
+
+`plotCalendarErrors` is the third. `startDate` has a check, and a good one — the
+message names `YYYY-MM-DD`, the optional time parts, the refused zone offset and
+the leap rule — behind `if (unit === undefined) return;` at the top of the
+function. Measured: `form: "calendar"` with `startDate: 12345` and no
+`calendarUnit` is **accepted**; add `calendarUnit: "day"` and the same document
+is refused. The check is real and unreachable without its sibling.
+
+### What a wrong value does, which is what makes this a hole and not untidiness
+
+One form per member, one wrong value each, rendered at width 60:
+
+| | count | members |
+|---|---|---|
+| escaped containment | **0** | — |
+| contained fault, an ERROR card | 3 | `yMin` `yMax` `categories` |
+| **drew a different frame, silently** | **7** | `xLabels` `xMin` `xMax` `quartiles` `totals` `bands` `facets` |
+| inert at that form and value | 10 | the rest |
+
+The seven are the finding. Containment catches the three that crash and says
+nothing about the seven that lie — *containment is not correctness*, arriving on
+the document boundary rather than on a renderer.
+
+### The frame, read
+
+`yMin` and `yMax` are also unconstrained **relative to each other**: no rule
+anywhere says the low edge is below the high one. `yMin: 6, yMax: 0` on a `line`
+is accepted, and it does not draw an inverted axis — it draws a collapsed one:
+
+```
+  ┌────────────────────────────────────┐
+6 ┤                                    │
+  │                                    │
+6 ┤╶──────────────────────────────────╴│
+  │                                    │
+6 ┤                                    │
+  └┬────────┬────────┬───────┬────────┬┘
+   0        1        2       3        4
+```
+
+Three identical gutter labels and the data flattened to a straight line through
+the middle, with the real series — `1 3 2 5 4` — nowhere in it. Arithmetically
+self-consistent, and describing a different document than the one it holds. The
+same block with `yMin: "x"` becomes a visible ERROR card, so the **mistyped**
+value is the loud one and the **swapped** value is the silent one.
 
 ### Why it is invisible
 
@@ -44670,3 +44755,107 @@ Exact, load-free, and a stronger claim than any duration — a duration says the
 The timing is still measured and still reported in the message, and the control the row
 always had — that the CJK row costs more at all — still gates. What no longer gates is
 the quotient.
+
+## F1085 — MG31 states its blind spot and asserts the corpus does not reach it; it had for twenty-five days ★★★★
+
+| | |
+|---|---|
+| **Surface** | `tools/enforce/module-graph.mjs` `checkPlotUnions`, against `Plot` in `types.ts` |
+| **Reached for** | F1082's behavioural sweep, asking which `Plot` members survive a wrong value |
+| **Verdict** | **open** — the rule is right, the sentence that bounds it is false, and the member it hides is unchecked |
+
+### The sentence
+
+MG31's doc comment ends with a stated blind spot, which is the shape CLAUDE.md
+asks for — *rule, fabricated violation, and known limits*:
+
+> **The blind spot, stated because an unrecorded one reads as strength**: […]
+> the parse is textual: a member written across two lines, or a union built by
+> reference rather than by literals, is invisible to it. **Both forms are absent
+> from `Plot` today** and the corpus count below is what a reader checks that
+> against.
+
+The first half is true and is the rule's real limit. The bolded half is a claim
+about the corpus, and it is false.
+
+### What the corpus holds
+
+Brace-matching `Plot`'s body and matching both escape forms over its top-level
+members:
+
+| | |
+|---|---|
+| members written across two lines | 0 |
+| **members declaring a union by reference** | **one — `xFormat`** |
+
+```ts
+  xFormat?: Plot["yFormat"];
+```
+
+An indexed access, not a literal union, so MG31's `MEMBER` pattern does not
+match it, `PLOT_UNIONS` has no `xFormat` entry, and `plotUnionErrors` loops a
+table that has never heard of it. `yFormat` — the member it is declared from —
+is in the table and is refused. The two are the same union and only one of them
+is a gate.
+
+### The dates, because *stale* and *false when written* are different findings
+
+| | commit | date |
+|---|---|---|
+| `xFormat?: Plot["yFormat"]` lands | `c839d514` | 2026-08-16 |
+| MG31 and this sentence land | `b0d5f3ae` | 2026-09-10 |
+
+Twenty-five days. The sentence was not overtaken by a later change; the
+counterexample was in the file the rule reads, and had been for most of a month,
+when the claim that there was none was written down.
+
+### Why a blind-spot statement is the worst place for an unmeasured claim
+
+*State a rule's blind spot* is one of this repo's instruments, and it has three
+parts: the rule, a fabricated violation, and the known limits. The first two are
+executable and the third is prose — nothing resolves it, which is the same
+asymmetry that put the *ask where a settled claim is written down* habit in
+CLAUDE.md.
+
+But the failure here is narrower than *the limits went unchecked*, and it is
+worth separating. **Naming a limit is a claim about the rule, and review can
+check it. Claiming the corpus does not reach the limit is a claim about the
+corpus, and only a measurement can.** The second sentence is the one a reader
+uses to decide the first does not matter — it converts a stated gap into a
+stated non-issue, and it is what stopped anyone looking for `xFormat`.
+
+It is also *a negative claim inverts a resolver's verdict*, one level up: **there
+is no such member** reads most convincingly on the day it stops being true,
+because the rule is green either way. Cost of the check: one grep over the same
+body the rule already brace-matches.
+
+### The consequence, measured
+
+`validateDocument` accepts `xFormat: "__unlikely__"` on a clean `line` plot.
+Rendered, it draws the same frame as the clean block — so it is silent at the
+boundary and silent on the screen, and the first thing that would notice is a
+formatter falling through to a default.
+
+### What would falsify this
+
+- **`xFormat` refused somewhere else.** Measured across all forty-eight forms in
+  F1082's sweep: no form refuses it.
+- **A second by-reference member, caught.** There is exactly one, and it is not
+  caught — so the sentence is wrong for the reason stated rather than by accident.
+- **The multi-line form present too.** It is not; that half of the sentence is
+  true, which is what makes the bolded half readable as verified.
+
+### The remedy, and it is not only the instance
+
+Adding `xFormat` to `PLOT_UNIONS` closes the member and leaves the sentence
+false. MG31 resolving `member?: Plot["other"];` against the referent closes the
+**form**, and then the sentence has one clause instead of two. What is left of
+the blind spot — the multi-line member — is stated as a count the rule takes
+itself rather than a claim a reader has to trust.
+
+### Blind spot
+
+The widened rule still reads text. A member whose type is a named alias with a
+non-literal arm — `xScale?: ScaleType`, where `ScaleType` admits `{ log: number }` —
+is outside its subject by construction and stays outside it; that member is one
+of F1082's twenty and is closed there, by a check, not by this gate.
