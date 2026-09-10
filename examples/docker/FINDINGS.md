@@ -46554,105 +46554,133 @@ cannot reproduce.
 
 ---
 
-## F1098 — the profiler's headline table says `measured` on a column its own seam documents as counting questions ★★★★
+## F1098 — the element count sums two operations, and the ratio built on it is labelled *measured* ★★★★
 
 | | |
 |---|---|
-| **Surface** | `tools/profile.mjs:290` · `src/shell/profiling/registry-probe.ts:14` · `src/presentation/blocks/registry.ts`'s height memo |
+| **Surface** | `src/shell/profiling/recorder.ts:439` · `tree.ts:109` · `tools/profile.mjs:290` · `src/shell/profiling/types.ts:458` · C28 I31 |
 | **Reached for** | closing P11's last item, the one the round's plan said the instrumentation would find |
 | **Verdict** | **open** |
 
-### Two sentences about one column
+### The two lines that produce it
 
-The seam that produces it:
+```ts
+const measured = (block, width) => { using _s = prof.element(block.kind, block.id); … };
+const rendered = (block, ctx)   => { using _s = prof.element(block.kind, block.id); … };
+```
 
-> `measureChild` … reads the call's height memo first and reaches `this.measure`
-> only on a miss — so a wrapper installed here is entered for every child that
-> had to be **answered**, at every depth, and the `calls` column counts
-> **questions rather than reads** (F940).
-
-The report that prints it:
+`element(kind, id)` opens a span named `${kind}#${id}` and nothing else, so both
+wrappers increment one counter. `NodeStat.calls` is **measure-opens plus
+render-opens**, and `tools/profile.mjs` divides it by `frames` and prints
 
 ```js
 per > 1.05 ? " <-- measured more than once per frame" : ""
 ```
 
-**A question the memo answers costs nothing and still counts.** So an element
-that is measured exactly once and asked twice is reported as *measured more than
-once per frame*.
+### Measured — a counter per operation, over the same 35-frame session
 
-### Measured, by tallying the memo
+| element | measure-opens | render-opens | `calls` | frames | printed | flagged |
+|---|---|---|---|---|---|---|
+| `group#chrome.footer` | 35 | 35 | 70 | 35 | 2.0 | yes |
+| `pills#chrome.footer.left` | **70** | 35 | 105 | 35 | 3.0 | yes |
+| `pills#chrome.footer.right` | **70** | 35 | 105 | 35 | 3.0 | yes |
+| `group#chrome.header` | **0** | 35 | 35 | 35 | 1.0 | no |
+| `pills#chrome.header.left` | 35 | 35 | 70 | 35 | 2.0 | yes |
+| `pills#chrome.header.right` | 35 | 35 | 70 | 35 | 2.0 | yes |
+| `table#profile-table` | 67 | **0** | 67 | 33 | 2.0 | yes |
+| `plot#profile-plot` | 67 | **0** | 67 | 33 | 2.0 | yes |
+| `patch#profile-patch` | 68 | 1 | 69 | 33 | 2.1 | yes |
 
-`#measured` instrumented by hand to separate a hit from a real measure, over the
-same 35-frame session the report describes:
+**A block that is both measured and rendered has a floor of 2.0**, so the marker
+fires on eight of the nine rows and carries no information. The two rows that
+genuinely *are* measured twice inside a frame — the footer's pills — read 3.0,
+one step above a floor the table never states.
 
-| element | real measures | memo hits | the report says | actually measured |
-|---|---|---|---|---|
-| `pills#chrome.header.left` | 35 | 35 | **2.0 ← flagged** | **1.0** |
-| `pills#chrome.header.right` | 35 | 35 | **2.0 ← flagged** | **1.0** |
-| `pills#chrome.footer.left` | 70 | 35 | **3.0 ← flagged** | 2.0 |
-| `pills#chrome.footer.right` | 70 | 35 | **3.0 ← flagged** | 2.0 |
-| `group#chrome.footer` | 70 | 0 | 2.0 | 2.0 |
-| `group#chrome.header` | 35 | 0 | 1.0 | 1.0 |
-| `table#profile-table` | 67 | 0 | 2.0 | 2.0 |
+### The invariant's own sentence is the false one
 
-**The header's pills are flagged and are measured once.** Every overstatement is
-exactly the memo's hit count, which is the arithmetic saying the two columns are
-the two different quantities the seam already said they were.
+C28 I31: *`calls` is kept beside `frames` so a node recomputed **within** one
+frame is distinguishable from one measured once per frame.*
 
-### What it cost, and the cost is the reason this is worth a number
+`group#chrome.header` is 0 measures and 35 renders and reads 1.0.
+`pills#chrome.header.left` is 35 and 35 and reads 2.0. Applying I31's sentence to
+the second gives *recomputed within one frame*, and it was measured once. **The
+distinguishing power the invariant claims does not exist**, and no constant
+threshold restores it, because the floor is a property of the node: 1 for the
+header group, 2 for the header pills, 3 for the footer pills.
 
-C28's plan carries a defect list for the round's last phase, and its second row
-reads *a `group` measures every child **3×***. The report flags exactly that
-shape, so the row reads as still open.
+### It is F892's symptom arriving from a second merge
 
-**It is not.** F940's memo fixed it, and the *before* figures are written in
-`registry.ts`'s own header:
+I42 records F892 — two transcript entries sharing a block id became one row, so
+`calls / frames` summed two numerators over one denominator, and *the ratio the
+formatter labels* measured more than once per frame *goes 2.3 to 5.3, a
+recomputation named at a node where there is none.* That was repaired by keying
+on the pair.
 
-> Measured before this existed, on the default chrome: `pills#chrome.header.left`
-> at **3.0** calls per frame and `pills#chrome.footer.left` at **4.0** (F940).
+**The same false reading survived the repair, from a different merge.** F892
+merged two *entries*; this merges two *operations*. The formatter's sentence is
+quoted inside I42 as the thing the fix made true, and it was still false. The
+class is **a ratio whose numerator is a union**, and the cheap check is to ask
+what populations the numerator unions before reading the quotient — a question
+neither merge answers from the quotient alone, because both produce a plausible
+small integer.
 
-**The flagged number and the fixed number are the same number.** The report
-prints 2.0 and 3.0 where the pre-fix reading was 3.0 and 4.0 — one lower, in the
-same units, under a caption that says *measured* — so a reader chasing the plan's
-row finds a table that appears to confirm it and goes looking for the defect in
-`containers.ts`. That is the whole of this session's last hour.
+### What the filing got wrong, and how a hand tally confirmed it anyway
 
-### And the residual 2× is a ruling, not an oversight
+This was filed against the **height memo**: *a question the memo answers costs
+nothing and still counts.* It does not count. `registry.ts`'s own header says so
+in six words — **A hit never reaches the `measure` property** — and the probe
+above confirms it: the header pills' second open is a *render*.
 
-Widening the memo from the call to the frame would take the footer group and the
-table to 1.0. That is what F914 refused, on C11 I11's ground, and `registry.ts`
-says so in the same header:
+The wrong reading came from one gloss. Two files carry the same phrase:
 
-> **The lifetime is the call, and that is the whole of the ruling.** F914 refused
-> *a cache across `measure` and `render`* … a kind's plan memoised on `(columns,
-> width)` outlives the document that made it and is where correctness defects
-> live.
+| file | the sentence |
+|---|---|
+| `registry.ts:231` | a hit never reaches the `measure` property … the `calls` column counts the questions the registry had to answer **and not the ones it read back** |
+| `registry-probe.ts:14` | entered for every child that had to be *answered* … the `calls` column counts **questions rather than reads** |
 
-So the two real measures per frame are the footer's height pass and the paint
-pass, in two public calls, and collapsing them is a refused change rather than an
-unfixed one. **P11's seven are all resolved**: six by repairs with records in the
-code, and the seventh by a memo whose own header carries the before and after.
+The first is unambiguous. The second admits both readings — *questions in place
+of reads*, and *questions, reads included* — and the filing took the wrong one.
+Then the hand tally agreed with it, because in this session 35 renders and 35
+memo hits are the same number: **a tally confirms a wrong mechanism whenever the
+two populations happen to be the same size**, and the tally is the instrument
+that is supposed to catch exactly that. What separated them was a counter that
+names the operation, which is also the remedy.
 
 ### Remedy
 
-**The word, not the count.** The count is right and is the one worth keeping — an
-ask is work the registry had to route, at every depth, even when the answer was
-free — so the column becomes `asks`, the marker `asked more than once per frame`,
-and a line under the table says what an ask is and that a memo hit is one.
+**Split the count; do not rename the column.** `element(kind, id, op)` with `op` a
+required `"measure" | "render"`; `NodeStat` carries `measures` and `renders` with
+`calls` their sum, which is the seam-entry figure `panes.ts` already describes
+correctly. The printed ratio becomes `measures / frames`, which is the figure I31
+has always claimed to publish. Under it this session flags the footer's two pills
+and nothing else — compose's `measureSequence` of `footerRows` before the paint
+pass, which C22 I82 names and `session-paint.test.ts` already asserts.
 
-**Stated blind spot, and it is why the count cannot simply become measures.** The
-registry must not learn a profiler exists — MG1 makes `src/shell/profiling/` rank
-4 and the decoration is what keeps `src/presentation/` unchanged — so the memo's
-hit is invisible from outside by construction. Reporting real measures would need
-a seam from the registry to the probe, which is a design change and not a label.
-The report can say what it counts; it cannot count the other thing.
+Renaming the column to `asks` was this finding's first remedy and is refused: it
+makes the table honest and leaves it unable to answer the question the invariant
+says the column exists for.
+
+### The three places that already had it right
+
+The fact is written correctly in the tree and falsified only in the summary,
+which is F86/F89/F92's mechanism on a fourth artefact:
+
+- `registry.ts:231` — *a hit never reaches the `measure` property.*
+- `panes.ts:378` — *above 1 means the element was measured **or rendered** more
+  than once inside a single frame.*
+- `session-paint.test.ts:787` — `toBe(2 * headerLeft.frames)`, message *one
+  measure and one render per frame*.
+
+Three correct statements, one per file, and none of them is the caption a reader
+of `make profile` sees. **Read the abstract against its own section before
+reading the section against the code.**
 
 ### What would falsify this
 
-- **The column counting reads after all.** `registry-probe.ts`'s header says
-  otherwise, and the hand tally agrees with it to the hit.
-- **The pre-fix figures being something else.** `registry.ts`'s memo header
-  records 3.0 and 4.0 and cites F940.
-- **The residual 2× being collapsible.** It is two public calls in one frame, and
-  the ruling that forbids sharing across them is F914's, quoted above.
+- **The two opens being one operation.** The probe counted them apart:
+  `group#chrome.header` is 0 / 35 and `table#profile-table` is 67 / 0, which no
+  single-operation seam can produce.
+- **The floor being 1.** `session-paint.test.ts` has asserted `2 * frames` for
+  the header pills since it was written.
+- **`measures / frames` being flat, and so no better than `calls / frames`.** It
+  is 1.0 for the header pair against 2.0 for the footer pair in the same session.
