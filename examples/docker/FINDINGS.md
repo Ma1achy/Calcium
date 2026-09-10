@@ -42122,3 +42122,347 @@ fixtures written*, and F427's sibling lesson — a fixture must be shown to resp
 under test before it is asserted against — applies with force here, because a patch fixture
 with no hunk header and no gutter would satisfy the identity trivially. The exemption map
 closes the *set*; it says nothing about the shape of what replaces an entry.
+
+## F1043 — a terminal's answer arrived as a keystroke, and the arm the ladder was missing is five introducers wide, not three ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/interaction/router/decode.ts` — `STRING_INTRODUCERS`, `STRING_MAX_BYTES`, `decodeString` · `docs/components/C16_input_router.md` §2a, I32, commitment 31 · T1.3t, T1.3u, T3.18, T5.8 |
+| **Reached for** | F1035's *the fix is a string-sequence arm in C16's `decode.ts`* — itself F414's blocker named as a symbol, **an APC arm** |
+| **Verdict** | Landed, and the symbol was three names short. The hole is **five** ECMA-48 introducers, **two** terminator forms, and one of the two closes with `Ctrl-G` |
+
+### The measurement, re-derived rather than trusted
+
+Eight replies captured verbatim from the two emulators in this container under Xvfb on
+2026-09-10 and pushed through the built decoder. The pre-arm figures were reproduced by
+emptying `STRING_INTRODUCERS` — the same state as before the arm, and said so rather than
+left to read as a `git stash` measurement.
+
+| reply | terminator | at HEAD | with the arm |
+|---|---|---|---|
+| `CSI ?2026;2$y` · `CSI ?0u` · `CSI ?62;c` — the control | — | **0** | 0 |
+| `OSC 11;rgb:ffff/ffff/ffff` — XTerm(398) | `BEL` | 23, opening `Alt-]`, closing **`Ctrl-G`** | 0 |
+| `OSC 10;rgb:0000/0000/0000` — XTerm(398) | `BEL` | 23 | 0 |
+| `OSC 4;1;rgb:cdcd/0000/0000` — XTerm(398) | `BEL` | 24 | 0 |
+| `DCS >\|XTerm(398) ST` — XTVERSION | `ESC \` | 14, opening `Alt-P` | 0 |
+| `OSC 11;rgb:0000/0000/0000` — kitty 0.41.1 | `ESC \` | 23, closing `Alt-\` | 0 |
+| `DCS >\|kitty(0.41.1) ST` — XTVERSION | `ESC \` | 17 | 0 |
+| `APC _Gi=31;OK ST` | `ESC \` | 10, opening `Alt-_` | 0 |
+| `APC _Gi=31;EBADPNG:Not a PNG file ST` | `ESC \` | 30 | 0 |
+
+**164 events → 0**, the restore md5 checked both ways.
+
+### Three things F1035 does not have, and every one changes the arm
+
+**Both terminator forms occur, and which one you get is not the terminal's property.**
+F1035's captures were all `ST`, so the shape read as *strings end at `ST`*. XTerm 398
+**mirrors the query's terminator**: three `BEL`-terminated OSC queries came back
+`BEL`-terminated while its `XTVERSION` — a DCS reply, which has no `BEL` form — came back
+`ST`-terminated **in the same capture**. kitty answers `ST` whatever it is asked. An arm
+reading one form is wrong on one of the two emulators installed here.
+
+The first pass at that measurement **measured the harness**: `captureFromEmulator` hands
+`enter` to `printf`, which reads an `ST`'s `\` as an escaped backslash and swallows the
+`ESC` after it, so only the first of four queries ever left the shell. The second pass uses
+`BEL`-terminated queries, which carry no backslash and dodge it.
+
+**The `BEL` form closes with `Ctrl-G`, not `Alt-\`.** F1035 named `Alt-_` opening and
+`Alt-\` closing. `Ctrl-G` is readline's `abort` and is by some way the likeliest of the four
+to be bound by a consumer.
+
+**The class is five introducers, not three.** F1035 found the hole through APC, DCS and OSC
+because those are the protocols something happened to query. ECMA-48 gives five — `ESC P`
+DCS, `ESC X` SOS, `ESC ]` OSC, `ESC ^` PM, `ESC _` APC — and `ESC X hello ST` decodes to
+seven events at HEAD exactly as the other three do. **A set named for its first members
+becomes a membership rule**, which is F856's shape arriving in a protocol table.
+
+### What the walk found before the code
+
+Both artefact shapes, because the decoder has structure — which arm claims a byte at rest —
+**and** state: the paste buffer, the heuristic window, the `ESC` window, split chunks. C16
+§2a carries the classification table (rows a–i) and the sequence trace (1–6). The four rows
+that were not restatements:
+
+- **Row f — the hazard the fix creates, which is why the ruling is not just *add an arm*.**
+  `return 0` means *not yet decidable*. An unterminated `CSI` is bounded by `CSI_FINAL`
+  (measured: `ESC [ 1 ; 2` then `hello` emits `e l l o`, the `h` taken as the final); a
+  control string is bounded by nothing, so without a cap an introducer whose terminator never
+  arrives holds every later keystroke for the rest of the session. At HEAD the same bytes
+  decode as keys at once and nothing wedges. **A hazard created by a fix is a shape neither
+  artefact indexes** — both index the accepted paths — and only *check what the ruling leaves
+  behind* reaches it.
+- **Row g — what the cap does when it fires**, and the argument is direction, not odds.
+  Discard the **introducer** and let the payload decode on, which is the SS3 arm's
+  disposition and the only recovery that cannot swallow what the reader typed. The cap is
+  **256**: too small truncates a reply and its tail types in, which is exactly HEAD's
+  behaviour and therefore bounded by no-worse-than-today; too large loses keystrokes
+  **silently**, which reads as a hung application. The longest reply measured is 30 bytes,
+  so 256 is 8.5×. The cap is the backstop and not the usual recovery — a stray `ESC` ends the
+  string as malformed, and every escape sequence supplies one, a paste's own `CSI 201~` end
+  marker included.
+- **Row b — the rejection path.** A bare `ESC \` with no opener is not a string and stays
+  `Alt-\`; the arm declines the byte and must leave nothing behind. T1.3u asserts that by
+  decoding a real string in the same feed immediately afterwards.
+- **Row h — the ruling that checked its operation exists first.** The arm makes a reply
+  **harmless**, not **readable**. Reading one is a reply *channel*, which is C02 §8's, and
+  there is no seam here to report a graphics error through — so the arm does not promise one.
+  It is the same answer the `CSI` arm has given a DECRQM reply since it was written.
+
+### The mutation table, and the survivor is the finding
+
+Twelve run by hand, restore md5 checked after each: **twelve killed**, one only after the row
+it indicted was repaired.
+
+With the `BEL` clause removed the arm scans past the `BEL`, finds no `ST`, holds the reply
+under the cap — **and emits nothing**, which is what every row asserted. `toEqual([])` is the
+same green for *consumed* and for *still waiting*, so **a row about a reply owes an assertion
+that the decoder is still reading afterwards**. T1.3t now feeds a key after each of the
+eleven, and the mutation dies.
+
+**And it indicted a sentence of the spec written an hour earlier.** T6.9j predicted that
+taking `BEL` as a universal terminator would *survive*, because neither emulator sends a
+`BEL` inside a payload. It dies — on T1.3t's row d, a fabricated `ESC _ … BEL … ST` written
+from the rule rather than from the captures. The prediction was written from the captures;
+the row was right. Both corrections are in the spec.
+
+### The blocker, measured rather than believed
+
+A `q=1` transmission with a valid-base64 non-PNG payload, sent to real kitty:
+
+```
+kitty answered:  ESC_Gi=31;EBADPNG:Not a PNG file ESC\
+decoded events:  0
+next key:        ["a"]
+```
+
+### What would falsify this
+
+A terminal whose OSC reply terminator is neither `BEL` nor `ST`. A legitimate reply longer
+than 256 bytes **arriving split across chunks** — the cap is checked against what is
+buffered, so a long *terminated* reply in one chunk is consumed whole (asserted in T3.18)
+while the same reply in twenty-six 10-byte chunks is truncated. Nothing in `src/` asks a
+question today, so nothing can provoke it, and whoever sends the first query owns that
+number. And a consumer that needs to **read** a reply, which this arm deliberately does not
+provide.
+
+### Blind spot
+
+`BEL`-for-OSC-only is held by a fabricated row and not by a capture. Neither emulator sends
+a `BEL` inside a DCS or APC payload, so T1.3t row d writes one by hand. That is the correct
+remedy — the alternative is inventing a capture — but it is a rule the corpus does not
+exercise.
+
+## F1044 — the second emulator was installed and the spec still said none had been measured; it agrees on everything asked and disagrees on one thing nobody had ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `test/e2e/mouse.test.ts` T5.9, T5.10 · `test/support/x-emulator.ts` — `installedPrograms` · `docs/components/C16_input_router.md` §2 |
+| **Reached for** | F1039's measured rows, which could not land because the file was another lane's; F753's `WHEEL_DIRECTIONS` and F800's `HOVER_MODE_PAIR` residues, both marked *Partly* and both counting as done |
+| **Verdict** | Two gated rows on both emulators. C16 §2 carried *"No other emulator has been measured… the container has no Ghostty, kitty or WezTerm"* while kitty 0.41.1 was installed — **a stale claim inside the spec**, corrected with the census |
+
+**T5.9** now loops over `["kitty", "xterm"]` with F800's three arms on both: 1003 alone
+reports rests, 1002 alone reports none, and after `1003l` phase b holds only the control
+byte. Each emulator's own rest byte decodes to `button: "none"`, so C16 I30 has a second wire
+behind it. 38.1 s.
+
+**The drag arm stays on xterm and the row says why.** The same `xdotool` gesture that gives
+xterm `0M 32M 32M 0m` gives kitty a press and a release at every position and never a
+button-1 motion. That is a **harness** defect and not a terminal one — the window is fine and
+the moves are reported, the button is not held during them — and left undiagnosed it reads as
+*kitty does not report drags*. F1039's attempted repair, holding Shift to suppress
+`--clearmodifiers`, collapsed the gesture on **both** emulators to a single `35M`, so it
+settles nothing and is recorded rather than retried.
+
+**T5.10** is new. `Cb` comes back `64 65 66 67` in that order on both, which is
+`WHEEL_DIRECTIONS` indexed by `Cb & 3` confirmed against a wire rather than against
+*ctlseqs*. The press/release asymmetry is **its own assertion and not a tolerance**:
+
+```
+xterm  64M 65M 66M 66m 67M 67m
+kitty  64M 65M 66M 67M
+```
+
+asserted as `["66m","67m"]` for xterm and `[]` for kitty. A row phrased as *at least the four
+presses* is satisfied by both and records nothing. The drive runs in **both** capture phases,
+so the two runs the byte-identity claim needs cost no extra Xvfb: phase b's sequence is
+asserted equal to phase a's. 12.7 s.
+
+**The set is compared by equality, twice.**
+`installedPrograms(["xterm","kitty","ghostty","wezterm"])` must equal `["kitty","xterm"]`
+*before any capture runs*, so a Ghostty arriving in `.devcontainer/` is a failure that names
+itself; and the emulators actually driven are asserted equal to the declared set afterwards,
+so a loop that skips one fails rather than passing shorter. Mutating `MEASURED` to
+`["xterm"]` kills the row.
+
+**iTerm2 is recorded as a permanent limit, not a deferral.** It is macOS-only and can never
+run in this container, so it is *not* in the probe list: a deferral names a condition
+something can watch, and there is nothing here that could ever satisfy this one. Its row
+expires on a macOS runner or never. Ghostty and WezTerm are the two genuine deferrals — no
+candidate in Debian trixie, so either is a third-party repository or a source build and a
+change to `.devcontainer/`. The whole census is in the file as a table, so the remainder is
+counted rather than excluded.
+
+### Blind spot
+
+Two emulators is a pair and not a table, and both are xterm-lineage in their SGR encoding.
+They agree because they implement the same document; agreement is evidence the decoder reads
+*ctlseqs* correctly, **not** that every terminal encodes this way. The one place they differ
+— the horizontal wheel's release — is the one place the document does not say.
+
+### What would falsify this
+
+A kitty build reporting `Cb=32` under the same drive, which would mean the harness rather
+than kitty. An xterm build that stops emitting `66m`/`67m`, which the two identical phases
+make unlikely but do not exclude across versions. And a non-xterm-lineage terminal
+disagreeing with both tables, which is what the two owed emulators are for.
+
+## F1045 — I12 held on one ESC arm of four, so a pasted hyperlink dispatched four bindable keys and lost two bytes of its payload ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/interaction/router/decode.ts` — `bufferPayload` · `docs/components/C16_input_router.md` §2b, I12, commitment 32 · T3.19 |
+| **Reached for** | Nothing. It came out of the classification table's row **i**, asking what the *new* arm should do while a paste buffers — and the answer turned out to be a question the three existing arms had already got wrong |
+| **Verdict** | A different mechanism against a different invariant, **live at HEAD with no query sent**, which retires F1035's *"a blocker on asking rather than a live defect"* |
+
+I12: *bytes buffered during a paste are never dispatched as individual keys.* `decodeCsi`
+checked `paste.mode` and appended the whole sequence to the buffer. The SS3 arm, the Meta arm
+and the lone-`ESC` disambiguation window did not. Measured with one `push` per row,
+`bracketedPaste: true`:
+
+| pasted payload | at HEAD | I12 | with the fix |
+|---|---|---|---|
+| `red ESC[31m text ESC[0m` | one paste, `"red [31mtext[0m"` | **held** — the control | unchanged |
+| `a ESC O A b` | `up`, then paste `"ab"` | broken | one paste, `"aOAb"` |
+| `a ESC z b` | `Alt-z`, then paste `"ab"` | broken | one paste, `"azb"` |
+| `see ESC]8;;http://x ESC\ here ESC]8;; ESC\ ok` | **`Alt-]`, `Alt-\`, `Alt-]`, `Alt-\`**, then paste `"see 8;;http://xhere8;; ok"` | broken | one paste, payload intact |
+| `abc`, trailing `ESC`, 60 ms | `escape` at `poll()` | broken | held; the end marker completes the paste |
+
+**A pasted OSC-8 hyperlink is not a contrived input.** `ls --hyperlink=auto`, `gh`, `delta`
+and any terminal-aware pager emit them; a `PS1` line carries `OSC 0`. So the hole F1043 is
+about is reachable **with nothing asking a terminal anything** — F1035 measured it from the
+reply side, and the paste side needs no terminal to answer. The `]` and the `\` are gone from
+the payload because the Meta arm consumed them before they reached the buffer, and the four
+keys arrive **before** the paste event, so C17 I5's one-undo-unit rule is applied to a payload
+two keystrokes have already been taken out of.
+
+**Why this is a finding and not a paragraph of F1043.** Different mechanism — a missing
+`paste.mode` check, not a missing arm. Different subject — two arms that already shipped,
+plus the `ESC` window, which is not an arm at all. Different invariant — I12, which exists and
+was being violated, against I32, which did not exist. It would still be a defect if the string
+arm were never built.
+
+**The fix is one check, not four.** The buffering branch moved out of `decodeCsi` into
+`bufferPayload`, which every ESC arm calls before it emits — the `CSI` arm included, because
+**a reimplemented rule keeps its birthday clauses** and a second copy is exactly how the `CSI`
+arm came to be the only one that had it. The lone-`ESC` window returns *not yet decidable*
+while buffering rather than answering; T3.4's existing 1 s paste timeout is the backstop.
+
+Four mutations, one per arm, each killing T3.19 **on that arm alone** — which is why the row
+carries all four in one test with the `CSI` arm as its control. **A helper applied to three
+arms of four passes every row about the other three.**
+
+### What would falsify this
+
+A terminal that does not wrap pasted content containing escape sequences in bracketed-paste
+markers, which would move these bytes onto the heuristic path where the same three arms behave
+the same way — measured: an OSC-8 in a typed run splits it and emits `Alt-]`. And a consumer
+that *wants* a sequence inside a paste dispatched as keys, which nothing does and I12 forbids.
+
+## F1061 — a commit message is a deferral site, and it is the only one with no reader ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `7070929b`'s body · `ce3eea37`'s body · `test/golden/svg-baseline/` — six files |
+| **Reached for** | Nothing. A lane ran the golden suite for another purpose and found it red; the six failures read as *the plot lane's* until the commit that moved them was found |
+| **Verdict** | **Two of three candidates over 122 commits**, and the third is the control that makes the rule discriminating rather than universal. Both instances are this session's own |
+
+`CLAUDE.md` already carries the rule — *a deferral names a condition and nothing
+watches it* — with three kinds and a table of instances: a code comment, a roadmap row, a
+chain of citations. **A commit message is a fourth kind and it fails harder than the other
+three**, because the other three live in files a reader opens and a grep reaches. A commit
+body is append-only, is never opened again, and is invisible to *grep from the satisfier* —
+the habit that found two of the first three instances — because the satisfier here is a
+regenerated file, not a symbol.
+
+### The measurement
+
+122 commits on the branch, swept for forward-looking language in the body:
+
+| commit | the line | home outside the message | cost |
+|---|---|---|---|
+| `7070929b` | *Six of 244 SVG goldens move and are not regenerated here.* | **none** | the golden gate red for **four commits** |
+| `ce3eea37` | *Recorded, not repaired — the remedy is `transmitFrame` receiving the layout* | **none** | filed as F1062 an hour later |
+| `aa27561e` | *Not repaired the other way: that moves every layout and contradicts step 8* | **T1.25**, which pins it as a decision | none — this is the shape that works |
+
+**The third is the control and it is what the rule turns on.** It is not a deferral at all:
+the decision is pinned by a row, so the message is describing a watch rather than standing in
+for one. **The distinguishing property is not the wording — all three read the same — it is
+whether anything outside the message holds the claim.**
+
+### Why the commit message is the worst of the four sites
+
+The other three kinds are found by reading the artefact that carries them. A code comment is
+read by whoever edits the function. A roadmap row is read when the entry is picked up. A
+chain of citations is read by anyone resolving one of its links. **A commit body is read once,
+by its author, at the moment it is least useful** — the work is done and the next command is
+`git push`.
+
+And the golden instance shows the second half: **the deferral was honest and specific**, it
+named the count, the total and the artefact, and it still cost four commits of a red gate,
+because being specific is not the same as being *reachable*. The gate said `regenerate with
+npx tsx tools/svg-baseline.mjs` in its own failure message the whole time. Nobody ran it,
+because nothing failed that anyone was watching.
+
+### The remedy, and it is not a rule
+
+Both instances are repaired: the six baselines are regenerated in the commit carrying this
+entry, and the residue is filed as **F1062**. The habit is one line — **a deferral that
+appears in a commit message has to exist somewhere else first**, in the ledger, in a roadmap
+row, or as a test row that pins it — and the message may then describe it. A gate is not
+proposed: the wording is prose, the control above reads identically to the two instances, and
+matching *this sentence defers something* against *something else holds it* is the
+citation-resolves-against-the-wrong-thing class `docs/COMMITMENT_INVARIANT_AUDIT.md` argues
+against automating.
+
+### Blind spot
+
+The sweep is one branch and one pattern. A deferral phrased without any of the eleven matched
+forms — *the wide case is future work*, say — is not counted, and the count of three
+candidates is a floor rather than a total. What the sweep does establish is the ratio at the
+sites it did find, which is the figure the habit rests on.
+
+## F1062 — the gather takes the run's width and the seam takes the frame's, and only a 298-column terminal can tell them apart ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/transmit-image.ts` — the `c=`/`r=` box · `src/shell/session.ts` — `visibleRows` · C22 §6j.4 |
+| **Reached for** | F1026's repair, which fixed one half of the pair and recorded the other in a commit message with no home — F1061's second instance |
+| **Verdict** | **Open**, and latent rather than live: the two computations disagree only above 297 columns, which is where `placementRows` refuses |
+
+F1026 moved the gather so `visibleRows` measures each image **at the run's width**, which is
+right and is what made the 32-cell-at-80-columns case correct. The transmission seam still
+computes its `c=`/`r=` box at the **frame's** width, and a card's body renders at
+`width − 4` (C22 §6j.4). So the two halves of one decision are taken against two different
+widths.
+
+**Nothing can observe it today.** The disagreement matters only when one of the two crosses
+297 and the other does not, and a card-nested image that wide needs a terminal at least 302
+columns across. Measured over the 770 width-and-shape combinations F1026's sweep used, the
+column axis is reachable at 298, 400 and 600 and nowhere below.
+
+**Recorded as open rather than repaired, and the reason is that the remedy is a seam and not
+a line.** `transmitFrame` receives the *document*; to agree with the gather it needs the
+*layout*, which is a different argument from a different producer. That is a change to what
+C22 hands the transmitter, and it wants a ruling in the spec before it wants code.
+
+### What would falsify this
+
+A card that does not inset its body — then both halves take the same width and there is no
+pair. And a `placementRows` cap that moves: the disagreement is bounded above by the refusal,
+so raising the cap widens the window rather than the defect.
+
+### Blind spot
+
+The width is the axis measured. `rows` is the other half of the same box and the gather and
+the seam may disagree there too; F1026's sweep did not vary the block's declared height
+against a card, so that half is unmeasured rather than measured-and-clear.
