@@ -331,6 +331,12 @@ describe("C22 §3 — construction order", () => {
       resized: () => undefined,
     producerContext: () => producerContext(),
     greeting: () => undefined,
+    // **The reservation, and the stub must not answer for it** (C22 I99). A
+    // fake returning an id would let a row assert an order this pipeline never
+    // arranged; `null` is the seam's own degradation and `greeting` appends,
+    // which is what these rows measured before I99 and still measure.
+    reserveGreeting: () => null,
+    abandonGreeting: () => undefined,
       dispose: () => undefined,
       };
     };
@@ -494,6 +500,12 @@ describe("C22 §3 — construction order", () => {
       resized: () => undefined,
     producerContext: () => producerContext(),
     greeting: () => undefined,
+    // **The reservation, and the stub must not answer for it** (C22 I99). A
+    // fake returning an id would let a row assert an order this pipeline never
+    // arranged; `null` is the seam's own degradation and `greeting` appends,
+    // which is what these rows measured before I99 and still measure.
+    reserveGreeting: () => null,
+    abandonGreeting: () => undefined,
       dispose: () => undefined,
           };
         },
@@ -728,6 +740,12 @@ describe("C22 §3 — construction order", () => {
       resized: () => undefined,
     producerContext: () => producerContext(),
     greeting: () => undefined,
+    // **The reservation, and the stub must not answer for it** (C22 I99). A
+    // fake returning an id would let a row assert an order this pipeline never
+    // arranged; `null` is the seam's own degradation and `greeting` appends,
+    // which is what these rows measured before I99 and still measure.
+    reserveGreeting: () => null,
+    abandonGreeting: () => undefined,
       dispose: () => undefined,
       }),
     });

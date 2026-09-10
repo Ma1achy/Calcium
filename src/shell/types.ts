@@ -274,7 +274,30 @@ export interface Pipeline {
    * chrome — so `/clear` removes it, it scrolls away, and a `b.live` part inside
    * it is driven because it took the route every other document takes (C23 I33a).
    */
-  greeting(doc: ViewDocument): void;
+  greeting(doc: ViewDocument, into?: string | null): void;
+  /**
+   * §4 step 7's **slot**, taken before the producer is awaited (I99).
+   *
+   * **The greeting occupies the slot the session opened at, not the slot its
+   * producer resolves into** (F158, F1024). An `async` greeting appends
+   * whenever its far side answers — measured at 2.58–4.47 s over eighteen PTY
+   * captures — which is long enough for a verb submitted meanwhile to settle
+   * first and be scrolled off by a banner landing under it.
+   *
+   * Returns the id `greeting` settles into, or `null` when the append itself
+   * failed. `null` is the degradation and it is the behaviour that shipped
+   * before this seam existed: `greeting(doc, null)` appends.
+   */
+  reserveGreeting(): string | null;
+  /**
+   * The reserved slot released without a document (I99).
+   *
+   * **A rejected producer must not leave the slot streaming**, because C13
+   * never evicts a streaming entry (C13 I6) and an unsettled reservation would
+   * sit under the cap for the life of the process. `null` is a no-op, so the
+   * caller's `catch` needs no guard of its own.
+   */
+  abandonGreeting(into: string | null): void;
   /**
    * Stops §3b's timers. Called at C22 §8 **step 1**, where `stopping` is set.
    *

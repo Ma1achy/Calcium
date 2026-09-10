@@ -80,6 +80,12 @@ type Scripted = Readonly<{
 
 const blocks = createBlockRegistry();
 
+/** What a greeting producer returns, for C22 I99's three rows. */
+const GREETING = { schema: "tui.view/1" as const, command: "", status: "ok" as const,
+      blocks: [{ kind: "raw" as const, id: "greet", text: "welcome aboard" }],
+      meta: { verb: null, adapter: "none", exitCode: 0, durationMs: 0, truncated: false,
+        argv: [] as readonly string[], stderr: "", transport: "local" as const, origin: "action" as const } };
+
 function harness(script: Scripted = {}) {
   const transcript = createTranscriptStore();
   const overlays = createOverlayManager({ registry: blocks });
@@ -929,6 +935,61 @@ describe("C23 §2 — the seven routes", () => {
 
     expect(h.pipeline.faults.join("\n")).toContain("refused while stopping");
     expect(h.transcript.entries, "and nothing was appended after shutdown began").toHaveLength(0);
+  });
+
+  it("T3.72 (C22 I99, F158, F1024): the reservation is filled, not appended beside", async () => {
+    // **The id is the control.** Asserting one entry holding the greeting is
+    // green for a pipeline that appended and cleared, and green for one that
+    // never reserved at all; asserting that the entry's id is the one
+    // `reserveGreeting` handed back is green only for the seam that filled it.
+    const h = harness();
+    const slot = h.pipeline.reserveGreeting();
+    expect(slot, "the slot was taken").toBeTypeOf("string");
+    expect(h.transcript.entries, "and it is on the transcript at once").toHaveLength(1);
+    expect(h.transcript.entries[0]?.streaming, "unsettled, or `settle` refuses it (C13 \u00a72)").toBe(true);
+
+    h.pipeline.greeting(GREETING, slot);
+    await settled(h.pipeline);
+
+    expect(h.transcript.entries, "one entry, not two").toHaveLength(1);
+    expect(h.transcript.entries[0]?.id, "and it is the slot").toBe(slot);
+    expect(h.transcript.entries[0]?.streaming, "settled by the fill").toBe(false);
+    expect(
+      h.transcript.entries[0]?.doc.blocks.map((b) => (b.kind === "raw" ? b.text : b.kind)),
+      "holding what the producer returned",
+    ).toEqual(["welcome aboard"]);
+  });
+
+  it("T3.73 (C22 I99): an abandoned slot is settled, empty and evictable", async () => {
+    // C13 never evicts a streaming entry (C13 I6), so a reservation left alone
+    // outlives the cap for the life of the process. Released and abandoned
+    // differ in exactly one flag, which is why this row is the only place the
+    // release clause can fail.
+    const h = harness();
+    const slot = h.pipeline.reserveGreeting();
+    h.pipeline.abandonGreeting(slot);
+    await settled(h.pipeline);
+
+    expect(h.transcript.entries, "the entry is still there").toHaveLength(1);
+    expect(h.transcript.entries[0]?.streaming, "and no longer streaming").toBe(false);
+    expect(h.transcript.entries[0]?.doc.blocks, "and still draws nothing").toEqual([]);
+  });
+
+  it("T3.74 (C22 I99): a slot the user cleared is gone, and the greeting appends", async () => {
+    // `settle` answers `unknown` and the call site acts on it. Before C22 I99
+    // the outcome was discarded, so the greeting would have vanished with no
+    // refusal anywhere — the failure a returned `PatchOutcome` exists to make
+    // impossible and that this call site was not reading.
+    const h = harness();
+    const slot = h.pipeline.reserveGreeting();
+    h.transcript.clear();
+    expect(h.transcript.entries, "the slot is gone").toHaveLength(0);
+
+    h.pipeline.greeting(GREETING, slot);
+    await settled(h.pipeline);
+
+    expect(h.transcript.entries, "and the greeting appended rather than vanishing").toHaveLength(1);
+    expect(h.transcript.entries[0]?.id, "as a new entry, because the old id no longer exists").not.toBe(slot);
   });
 
   it("T3.38 (§5a): when the notice cannot land either, the collection still has it", async () => {

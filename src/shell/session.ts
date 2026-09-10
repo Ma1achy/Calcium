@@ -654,6 +654,12 @@ class Session implements TuiInstance {
      */
     const greeting = this.config.greeting;
     if (greeting !== undefined) {
+      // **The slot is taken here and filled later** (I99, F158, F1024). This is
+      // the line that orders the greeting against every submission: the
+      // reservation is appended now, synchronously, before anything can be
+      // typed, and the document that arrives 2.58–4.47 s later settles into it.
+      // Nothing below waits on the producer and nothing needs to.
+      const slot = graph.pipeline.reserveGreeting();
       void (async () => {
         try {
           // **The context comes from the pipeline, not from here** (C22 I53).
@@ -661,10 +667,18 @@ class Session implements TuiInstance {
           // and could assemble a second one; one builder is the point.
           graph.pipeline.greeting(
             await greeting(graph.pipeline.producerContext()),
+            slot,
           );
         } catch {
           // Contained. The prompt is already usable and the session is running;
           // a welcome that could not reach its far side is not a startup fault.
+          //
+          // **And the slot is released** (I99). Left alone it stays streaming,
+          // and C13 never evicts a streaming entry — an empty reservation would
+          // sit under the cap for the life of the process. Settled it is
+          // invisible and evictable, which is what I44 now says instead of
+          // *produces no entry*.
+          graph.pipeline.abandonGreeting(slot);
         }
       })();
     }

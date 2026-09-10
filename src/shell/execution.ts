@@ -333,6 +333,16 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    */
   type Settle = Readonly<{ line: string; into: EntryId | null }>;
 
+  /**
+   * A slot reserved before its document existed (C22 I99).
+   *
+   * **Deliberately not a `Settle`.** `route` takes one, and every submission it
+   * routes has a line: I29 records the line as typed at settlement, on every
+   * terminal path. A lineless arm inside `Settle` would be a second way for a
+   * submission to enter no history, which is the defect I29 exists to forbid.
+   */
+  type IntoSlot = Readonly<{ line?: undefined; into: EntryId }>;
+
   /** A submission routed as it was typed — the ordinary case. */
   const now = (line: string): Settle => ({ line, into: null });
 
@@ -357,7 +367,16 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
      * The submission this settles, when it settles one (I29). Absent at the four
      * sites that are not submissions — the same test that always gated history.
      */
-    settle?: Settle,
+    settle?: Settle | IntoSlot,
+    /**
+     * How the entry is appended, when it is appended.
+     *
+     * **Here rather than at the call site**, because this is the one place a
+     * document reaches the transcript and *how* is part of that. C22 I99's
+     * reservation is the only caller that needs it: a slot must be streaming or
+     * `settle` will refuse to fill it (C13 §2).
+     */
+    opts?: Parameters<typeof deps.transcript.append>[1],
   ): string | null => {
     const line = settle?.line;
     let id: string | null = null;
@@ -366,10 +385,21 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // has its entry; appending here would put a row on screen when it was
       // typed and a second when it ran.
       if (settle?.into != null) {
-        deps.transcript.settle(settle.into, doc);
-        id = settle.into;
+        const outcome = deps.transcript.settle(settle.into, doc);
+        // **The refusal is read, and this is the first caller that could see
+        // one** (C22 I99). `unknown` is a `/clear` between the reserve and the
+        // settle: the slot the user emptied is gone, and a document settled
+        // into it would vanish with no refusal anywhere — so it appends.
+        //
+        // `settled` is left exactly as it was. A route settling twice is a
+        // caller bug this change did not measure, and appending there would
+        // put a second copy on screen for one submission.
+        id =
+          outcome.ok || outcome.reason !== "unknown"
+            ? settle.into
+            : deps.transcript.append(doc, opts);
       } else {
-        id = deps.transcript.append(doc);
+        id = deps.transcript.append(doc, opts);
       }
       declareLive(id, doc.blocks);
       if (line !== undefined) recordHistory(line, doc);
@@ -2280,7 +2310,42 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     // C22 §4 step 7 (C22 I44). Through `appendAndCommit` like everything else,
     // which is what drives a live part in it and what lets `/clear` remove it.
     // No `line`: nothing was typed, so nothing enters history (I29).
-    greeting: (doc) => void appendAndCommit(doc),
+    greeting: (doc, into) => void appendAndCommit(doc, into == null ? undefined : { into }),
+
+    /**
+     * C22 I99 — the slot, taken before the producer is awaited.
+     *
+     * **Streaming**, because that is what unsettled means (C13 §2) and `settle`
+     * refuses an entry that has already settled. **Empty**, because the
+     * reservation must draw nothing: `commandRows("")` is no rows at all and
+     * `measureSequence([])` is zero, with C22 I85 ruling that an entry holding
+     * no blocks reserves no blank either. `origin: "action"` because the app
+     * did this and the user did not — it is only ever read on a reservation the
+     * producer then abandoned.
+     */
+    reserveGreeting: () =>
+      appendAndCommit(compose({ command: "", blocks: [], meta: { origin: "action" } }), undefined, {
+        streaming: true,
+      }),
+
+    /**
+     * C22 I99 — the slot released without a document, when the producer threw.
+     *
+     * **A bare settle, and it is not the second way in that C13 §3 argues
+     * against**: with no document `rev` does not move, so C14's
+     * `(entryId, rev, width)` slot is still describing what it holds. What
+     * moves is `streaming`, which is the whole point — C13 never evicts a
+     * streaming entry (C13 I6), so a reservation left alone outlives the cap.
+     *
+     * The outcome is not read because there is nothing to recover: `unknown` is
+     * a `/clear` that already removed the slot, and `settled` cannot arise —
+     * this runs only where the producer rejected and nothing filled it.
+     */
+    abandonGreeting: (into) => {
+      if (into === null) return;
+      deps.transcript.settle(into);
+      deps.scheduler.commit("input");
+    },
     dispose: () => void refresh.dispose(),
 
     /**

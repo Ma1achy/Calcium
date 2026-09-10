@@ -613,9 +613,45 @@ describe("C22 §4 step 7 — the greeting (I44)", () => {
     expect(stdout.chunks.join(""), "and said nothing about it").not.toContain("far side is down");
   });
 
-  it.todo(
-    "T3.40 (C22 I99, F158, F1024): a greeting resolving after a submission has settled is still the transcript's first entry — not deferred on a component, because C22 §4 step 7 and C23's append path both exist; the reservation seam is what this commit rules and the next one builds",
-  );
+  it("T3.40 (I99, F158, F1024): a greeting resolving after a submission still sits above it", async () => {
+    // **The finding's own word is *above*, so the row reads row indices off the
+    // frame.** An assertion about `entries.length` is green for the defect too
+    // — both entries exist either way, and F1024's eighteen captures found the
+    // result in the byte stream on every losing run. What was wrong was where
+    // it ended up.
+    //
+    // Sixty rows so both fit: the subject is the order, and a height that
+    // scrolls one of them off turns a wrong order into a missing needle and the
+    // row would fail for a reason it did not choose.
+    const later: { resolve?: (d: ReturnType<typeof doc>) => void } = {};
+    const stdin = fakeStdin();
+    const { screen } = await buildSession(
+      {
+        stdin: stdin as never,
+        greeting: () => new Promise<ReturnType<typeof doc>>((resolve) => {
+          later.resolve = resolve;
+        }),
+      },
+      { columns: 100, rows: 60 },
+    );
+    await settle();
+
+    // The submission settles first — which is the losing order, measured 12 of
+    // 12 against the final frame before the slot was reserved.
+    stdin.emit("/help\r");
+    await settle();
+
+    expect(later.resolve, "the producer was called").toBeTypeOf("function");
+    later.resolve?.(doc("welcome aboard"));
+    await settle();
+
+    const rows = screen().rows;
+    const greetAt = rows.findIndex((r) => r.includes("welcome aboard"));
+    const helpAt = rows.findIndex((r) => r.includes("/help"));
+    expect(greetAt, "the greeting drew").toBeGreaterThanOrEqual(0);
+    expect(helpAt, "the result drew").toBeGreaterThanOrEqual(0);
+    expect(greetAt, "and the greeting is above the result it opened before").toBeLessThan(helpAt);
+  });
 
   it("T4.x (C23 I37, C16 I26, F21): `enter` on a focused row reaches the dispatcher", async () => {
     // **The mutation that matters is removing the wiring and watching a real
