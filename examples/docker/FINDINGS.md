@@ -46084,3 +46084,110 @@ table.**
 - **The sweep reaching an ImageMagick row**, which would make the sixth instance
   a defect rather than a false comment. `grep -rln image-protocol tools/mutate/runs/`
   is empty.
+
+---
+
+## F1096 — the wait was right to exist and wrong about why, and it is the wait that says so ★★★★
+
+| | |
+|---|---|
+| **Surface** | `test/e2e/emulator.test.ts` T5.21 · `test/support/execution.ts`'s `settled` |
+| **Reached for** | `main`'s own CI run after the merge — the fifth `full` sample on this head |
+| **Verdict** | **open** |
+
+### The repair, and the sentence it rested on
+
+`d2e57aaa` put a five-second poll under T5.21's tail assertion, on this premise:
+
+> `settled` waits for the guard to be taken and released, which is the route
+> finishing — and **the patch carrying the child's last chunk can land a turn
+> after that**.
+
+A race. Reasonable, unmeasured, and consistent with two runner samples that had
+shown the blocks serialised with no `200` in them.
+
+### What the runner said with the poll in place
+
+```
+× T5.21 … 5043ms
+AssertionError: and the tail is the last line the child wrote:
+  expected '[{"kind":"scroll","id":"term-scroll-2…' to contain '200'
+```
+
+**5043 ms against a 5 000 ms deadline** — the poll ran to its end. And the
+received value is not truncated by the logger; it closes properly:
+
+```
+…{"text":"33"},{"text":"34"}]}],"follow":true}]
+```
+
+**Lines 1 to 34 of 200, and the JSON is complete.** Five seconds of polling
+moved it nowhere.
+
+### Which falsifies the premise the poll was written from
+
+A patch landing *a turn late* is fixed by waiting a turn. A feed that delivers 34
+lines and stops is not fixed by waiting at all, and five seconds is a long way
+past a turn. **The repair was right to exist and wrong about why** — and the only
+reason the distinction is known is that the repair itself produced the figure.
+
+This is `a fix that changes nothing indicts the diagnosis` with the sign
+reversed: the fix changed something, and what it changed was the evidence.
+
+### Two readings remain, they want opposite repairs, and no sample separates them
+
+| reading | what `first → last` would look like | the repair it wants |
+|---|---|---|
+| the feed **stops** | 34 → 34, grew by 0 | a drain the route does not perform before it releases the guard |
+| the feed is **slow** | 12 → 34, grew by 22 | a longer wait, which is the bound this row already widened once |
+
+Every sample so far reports only the final state, which both readings produce.
+So the row now reports the pair rather than choosing, and the next runner sample
+carries its own diagnosis:
+
+```
+and the tail is the last line the child wrote · 200 → 200 numbered lines of 200
+in 5010 ms, 1 patches, grew by 0
+```
+
+That is the local reading, driven with a value that cannot arrive. Two things in
+it are worth keeping. **The transcript is already complete before the poll
+begins** — `first` is 200, so locally the wait has never once been load-bearing.
+And **one patch**: the whole two hundred lines arrive in a single patch here, so
+a runner holding 34 may be holding one short chunk rather than a sequence that
+stalled.
+
+### This machine cannot produce either reading
+
+Green in the devcontainer every time, at 876 ms. Including with `settled`'s
+phase-one budget — twenty milliseconds for the route to take the guard, on a
+runner measured at 2.7× to 4.1× this container — **starved to zero**, which was
+the obvious candidate and is not it: the poll underneath covers for an early
+`settled` locally, so the mutation cannot separate them here either.
+
+Same shape as F1087, F1093 and F1094: a fact about the machine, discoverable
+only on the machine that was never allowed to disagree. The difference is that
+those three were repaired from the runner's own message and this one is not,
+because the message named a state rather than a mechanism.
+
+### Remedy
+
+**No bound is widened.** The row keeps its five seconds and gains the two
+figures that separate the readings, so the next red is a diagnosis rather than a
+repetition — `a red row carries its verdict`, applied before the next red rather
+than after it.
+
+The comment in the row is corrected in the same edit: a premise that has been
+falsified must not stay in the file as the reason for the code beneath it, which
+is the whole of `ask where a settled claim is written down` pointed at a claim of
+my own.
+
+### What would falsify this
+
+- **The received value being truncated by the log.** It is not: `"follow":true}]`
+  closes the array, and 645 bytes reached the log where the cap is far higher.
+- **The row being slow rather than stopped**, which is one of the two readings
+  and is what the new figures are for.
+- **`settled` returning early being the whole of it.** Starved to zero locally,
+  the row is green — which does not clear it, and is why it is a reading rather
+  than a conclusion.
