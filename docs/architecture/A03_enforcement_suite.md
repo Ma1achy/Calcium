@@ -590,8 +590,9 @@ The suite governs the source. **SP1 governs the documents the source is written 
 | SP10 | A mnemonic test-row label — `SK10`, `HZ4` — is unique **within one document**; reuse across specs is legitimate and not gated | `docs/components/` | A03 §2 · A03 §7a |
 | SP11 | A commitment's number is unique within its spec; the duplicates outstanding are a debt list compared **by equality** | `docs/components/` | A03 §2 · A03 §7a |
 | SP12 | The register's **open set** — every keyed row whose current disposition reads *open* or *partly* — is a list compared **by equality**; rows stating no disposition are counted and reported, not gated | `examples/docker/TRIAGE.md` | A03 §2 · A03 §7a |
+| SP13 | A spec's commitment numbers **ascend in document order**; the descents outstanding are a debt list compared **by equality** | `docs/components/` | A03 §2 · A03 §7a |
 
-They run in `make enforce` and their fire-tests are `test/unit/enforce-commitments.test.ts`, and SP12's reader tests are `test/unit/enforce-open-set.test.ts`.
+They run in `make enforce` and their fire-tests are `test/unit/enforce-commitments.test.ts` — SP13's included, beside the parser it shares with SP1 and SP11 — and SP12's reader tests are `test/unit/enforce-open-set.test.ts`.
 
 **A rule's fabrication lives in `enforce-commitments.test.ts`, and the meta-row that checks this reads only that file.** SP12 landed with its reader tested in a file of its own, and the row asserting *every SP rule has a fabrication in the file that owns the parser* went red — correctly, and only because it was scoped to one file, so a fabrication elsewhere is invisible to it rather than merely elsewhere. SP12 also landed without a `carriers` entry, which the same suite's equality arm caught. Both are recorded here because the commit had been verified in a worktree against `tsc` and `enforce` and **neither reads a test file**; running the suite is what spoke. FINDINGS F1041.
 
@@ -713,17 +714,40 @@ a renumber costs.
 
 **Its blind spot is the lettered commitment, and the limit is shared rather than forked.**
 `commitmentsOf` matches a line opening `n.`, so a spec writing `14a.` declares a commitment neither
-SP11 nor **SP1** can see: 22 of them across C01, C14, C22 and C23, C22 holding sixteen. Reading
+SP11 nor **SP1** can see: 22 of them across C01, C14, C22 and C23, C22 holding eighteen — the figure read *sixteen* beside a correct total of 22, and 2 + 1 + 18 + 1 is the count (F1067). Reading
 them through a second, wider pattern inside SP11 is what one-reader-per-corpus forbids — two
 readers of one corpus disagree eventually, and the one that disagrees quietly is the one nothing
 asserts against. Widening the shared pattern is the remedy, measured at 942 commitments against
 920 with zero new SP1 violations, and it is a change to SP1's subject rather than to this rule's.
 
-**And order is not gated, which is a ruling with a figure behind it.** SP2 asks invariants to be
-numbered 1..n *in order*; SP11 asks only that a number name one thing. Eleven of twenty-eight
-specs declare their commitments out of order today, C04 and C12 at 102 and 109 items — so the
-ordering half is a renumber of two of the largest documents in the project and every citation of
-every number that moves, against a defect that still locates its commitment. A duplicate does not.
+**Order was refused here and is SP13's now, and the refusal was wrong in both directions.** The
+sentence this replaces read *order is not gated, and that is a ruling with a figure behind it —
+eleven of twenty-eight specs declare their commitments out of order today*. Re-measured at
+`c7b2504d`, the commit that wrote it, the corpus gives **nine** specs by descent and **ten** by
+exact `1..n`; neither reading is eleven, and the count was the whole of the argument, because the
+argument is about how much repair the rule would demand. **And the reason beside it is true about
+a different decision**: *a renumber of two of the largest documents in the project and every
+citation of every number that moves* is a reason to refuse the **repair**, not the **check** —
+which SP11 itself shows, in the same function, by gating a defect it also could not repair and
+carrying the residue as a debt list. The asymmetry between the two halves of one numbered list
+was never argued; it was inherited from how much work each half looked like. What the gap cost is
+measured: between that commit and SP13, the corpus went from 32 descents to 34 with
+`npm run enforce` green throughout — C10 acquired `34>33`, C28 acquired `35>34`, and C02's
+`15>14` widened to `16>14` (F1066). C10 and C28 are renumbered in SP13's own commit, taking the
+list to 28 across seven specs; both had their commitment numbers cited by nothing in the tree,
+which is why they were repaired and the other seven listed.
+
+**SP13's stated limits, and the first is shared rather than its own.** A lettered commitment is
+invisible to it for the reason above, and C22's `14a…14f` run is out of order in a way no SP rule
+can see. It gates **ascent and not `1..n`**, so a gap passes — C04 declares no commitment 80, the
+corpus's only one — and uniqueness stays SP11's; copying SP2's `diagnose` wholesale would have
+brought four arms across, two of them belonging to another rule or to a reader that cannot see
+their subject. The debt key is the descending **pair** rather than a position, so repairing one
+descent can change a neighbouring pair that is still a descent and that edit reports twice, once
+fresh and once cleared. And **the three specs it cannot help are entangled**: C04's, C16's and
+C22's descents *are* SP11's duplicate runs seen from the other side, so the two debt lists cannot
+be paid down independently. Outside the scope, measured: 1 of 15 surface specs is disordered
+(S10) and 0 of 4 architecture documents.
 
 **SP2 is a check that existed as a habit rather than a mechanism**, which is the same class as SS3 (§2) approached from the other side: not a rule written down and never built, but a rule performed reliably and never written down. Ordering was verified by ad-hoc script while the specs were written and caught every time. When the habit stopped, the drift resumed — twenty of twenty-five specs, C04 declaring `…17, 22, 23, 24, 25, 26, 27, 28, 19, 29, 18, 20, 20a, 33, 32, 31, 30, 21` — and nothing went red, because nothing was missing and no citation dangled. The list had simply stopped locating anything.
 
@@ -838,6 +862,7 @@ Each check names, on failure: the rule, the file, the line, and the spec that de
 17. **A spec's invariants are numbered 1..n, in order** (SP2, §7a). The numbers are what a citation resolves against, so a list that has stopped ascending has stopped locating anything — and this one drifted for twenty specs because it was a habit rather than a mechanism (§2). A lettered variant sits beside its base, because adjacency is the whole of what the letter says.
 18. **Every invariant reference resolves, everywhere, not only in the specs** (SP3, §7a). SP1 stops at `docs/components/`; the eleven hundred bare references in `src/`, `test/` and the other documents were resolved by nothing. **The rule states where it stops**: it proves a reference resolves against its owner, not that the owner is the intended one, and a qualified reference is preferred wherever a file's owner is not obvious from its path.
 19. **A commitment's number locates one commitment** (SP11, §7a). SP1 resolves every commitment's citation and never counts, so the failure SP2 exists to prevent was unwatched one list over — twelve duplicates across five specs, each reading as backed because nothing is missing and nothing dangles. **The rule was ruled once already and deferred to "the commit that implements it"** (F225), which is commitment 14b applied correctly to a commit that never came: the same document re-acquired three duplicates and they were rediscovered from scratch (F664, F998) — and F225's *C09 is the only spec in the tree with duplicates* was false when written, at twelve numbers across four specs against the four in one it saw. The outstanding nine are a debt list compared by equality; the remedy is a renumber of the second occurrence, and the work is the citations.
+20. **A spec's commitment numbers ascend in document order** (SP13, §7a). SP2's argument for the invariants, applied to the list beside them and refused once on a figure that was wrong when it was written — nine specs against a recorded eleven, and a reason that was about the renumber rather than about the check. Three commitments went in out of order while the refusal stood, with `make enforce` green on all three (F1066). **A refusal is a ruling and its figure is the ruling**: this one was re-measured at the commit that wrote it rather than at HEAD, which is the only reading that can tell a corpus that drifted from a claim that was never true.
 
 ---
 

@@ -41,6 +41,8 @@ import {
   mnemonicRowsOf,
   checkMnemonicRowIds,
   checkCommitmentNumbers,
+  checkCommitmentOrder,
+  descentsOf,
   SPEC_RULES,
 } from "../../tools/enforce/commitments.mjs";
 
@@ -783,13 +785,37 @@ describe("A03 SP10 — a mnemonic test-row label is unique within its spec", () 
       SP10: "checkMnemonicRowIds",
       SP11: "checkCommitmentNumbers",
       SP12: "checkOpenSet",
+      SP13: "checkCommitmentOrder",
     };
 
     // Equality, so a rule added to `SPEC_RULES` without a carrier fails here
     // rather than being invisible to the loop below.
     expect([...SPEC_RULES].sort()).toEqual(Object.keys(carriers).sort());
 
-    const runner = readFileSync("tools/enforce/index.mjs", "utf8");
+    // **Comments stripped first, because the row measured the prose.** The
+    // match was over the whole file, and every carrier in this map is *named*
+    // in a comment beside its call — so commenting the call out left the token
+    // in place and the row stayed green. Measured by mutating SP13's call site
+    // two ways: deleting the line fails this row, and turning it into
+    // `// ...checkCommitmentOrder(specs),` fails **nothing**. Commenting a call
+    // out is how a gate is switched off in practice, which makes it the one
+    // form the row most needed to see (F1069).
+    //
+    // *Stated limit*: it strips `//` lines and `/* … */` spans and nothing else,
+    // so a call inside a string or a template literal would still count. There
+    // are none in `index.mjs`, and the arm below asserts the stripping is not
+    // eating the file.
+    const runner = readFileSync("tools/enforce/index.mjs", "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .split("\n")
+      .filter((l) => !l.trimStart().startsWith("//"))
+      .join("\n");
+
+    // The stripper's own vacuity: an over-eager filter empties the corpus and
+    // every `toMatch` below then fails for the wrong reason — which reads as
+    // thirteen unwired rules rather than as a broken reader.
+    expect(runner.length, "the stripped runner is still most of the file").toBeGreaterThan(4000);
+
     for (const [rule, fn] of Object.entries(carriers)) {
       expect(runner, `${rule}: the gate never calls ${fn}`).toMatch(new RegExp(`\\b${fn}\\(`));
     }
@@ -952,6 +978,154 @@ describe("A03 SP11 — a commitment's number is unique within its spec", () => {
   });
 });
 
+// --- SP13 — a spec's commitment numbers ascend in document order -----------
+
+describe("A03 SP13 — a spec's commitments ascend in document order", () => {
+  it("SP13: the real corpus matches the descent list exactly, and it is a corpus", () => {
+    // SP11's three halves, for the other question about the same list. A reader
+    // that stopped matching finds no descents and exits 0 exactly as an
+    // ascending corpus does, so the corpus is asserted before it is asserted
+    // clean.
+    const files = specFiles();
+    expect(files.length).toBe(28);
+
+    const total = files.reduce((n, f) => n + commitmentsOf(f).length, 0);
+    expect(total, "935 commitments at the last count; the parser must still see them").toBeGreaterThan(900);
+
+    expect(checkCommitmentOrder(files), "run `make enforce` for the detail").toEqual([]);
+  });
+
+  it("SP13: fires on F1066's own shape, in a file it happened in", () => {
+    // **The fabricated violation is the instance, over the real corpus rather
+    // than a fixture** (A03 commitment 14a). C10 acquired `34>33` while the
+    // ordering half stood refused — commitments 33 and 34 written high-first at
+    // the end of the list, `npm run enforce` green with both in the file. The
+    // repair swapped the two numbers; this puts them back, in a scratch copy
+    // read through the injected reader and never on disk.
+    const target = "docs/components/C10_theme_resolution.md";
+    const original = readFileSync(target, "utf8");
+    expect(original, "the anchor the replacement below depends on").toContain(
+      "\n33. **A palette authored for hue",
+    );
+    const mutated = original
+      .replace("\n33. **A palette authored for hue", "\n34. **A palette authored for hue")
+      .replace("\n34. **A colour the theme did not choose", "\n33. **A colour the theme did not choose");
+    expect(mutated, "a fabrication that changed nothing is not a fabrication").not.toBe(original);
+
+    const violations = checkCommitmentOrder(specFiles(), (f) =>
+      f === target ? mutated : readFileSync(f, "utf8"),
+    );
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.rule).toBe("SP13");
+    expect(violations[0]?.file).toBe(target);
+    expect(violations[0]?.message).toContain("C10 34>33");
+    expect(violations[0]?.message).toContain("out of document order and not on the list");
+  });
+
+  it("SP13: the descent list may only shrink — a repaired descent still listed fails", () => {
+    // The direction a subset check cannot see, and the one that let the refusal
+    // this rule replaces outlive its own figure. `C03 9>8` is a descent no spec
+    // has; the list claiming it must fail rather than being quietly ignored.
+    const stale = checkCommitmentOrder(specFiles(), (f) => readFileSync(f, "utf8"), [
+      ...descentList(),
+      "C03 9>8",
+    ]);
+
+    expect(stale).toHaveLength(1);
+    expect(stale[0]?.rule).toBe("SP13");
+    expect(stale[0]?.file, "the fault is in the list, so the message points at the list").toBe(
+      "tools/enforce/commitments.mjs",
+    );
+    expect(stale[0]?.message).toContain("C03 9>8");
+    expect(stale[0]?.message).toContain("no longer there");
+  });
+
+  it("SP13: the outstanding twenty-eight are real, so the empty verdict is not the list's doing", () => {
+    // **A gate phrased over a corpus inherits its blind spots, and an exemption
+    // list is the blind spot you write yourself.** With the list emptied the
+    // rule must report the seven specs the tree still holds — if it reported
+    // none, the green above would be the list agreeing with a reader that sees
+    // nothing rather than with a corpus that ascends.
+    const violations = checkCommitmentOrder(specFiles(), (f) => readFileSync(f, "utf8"), []);
+
+    expect(violations.map((v) => (v.file.split("/").pop() ?? "").slice(0, 3))).toEqual([
+      "C01", "C02", "C04", "C09", "C12", "C16", "C22",
+    ]);
+    expect(violations.reduce((n, v) => n + descentsOf(v.file).length, 0)).toBe(28);
+  });
+
+  it("SP13: ascent is not 1..n — a gap passes and belongs to nobody", () => {
+    // **The stated limit, asserted rather than described.** C04 declares no
+    // commitment 80 and this rule is silent about it, deliberately: uniqueness
+    // is SP11's and gaps are owned by nothing. A rule that took SP2's `diagnose`
+    // wholesale would report all three from one reader, two of them in another
+    // rule's family.
+    const FILE = "docs/components/C99_x.md";
+    const source = [
+      "# C99 — fabricated",
+      "",
+      "## Commitments",
+      "",
+      "1. First (I1).",
+      "5. Fifth, with three numbers missing under it (I1).",
+      "6. Sixth (I1).",
+      "",
+      "---",
+      "",
+    ].join("\n");
+    const read = at(source, FILE);
+
+    expect(descentsOf(FILE, read), "nothing steps backwards").toEqual([]);
+    expect(checkCommitmentOrder([FILE], read, []), "so the gap is not this rule's").toEqual([]);
+  });
+
+  it("SP13: a lettered commitment is invisible, as it is to SP11 and SP1", () => {
+    // **The blind spot that bites hardest here.** `commitmentsOf` matches a line
+    // opening `n.`, so C22's `14a, 14b, 14c, 14d, 14e, 14i, 14j, 14k, 14h, 14g,
+    // 14f` is read as no commitments at all and the spec looks better ordered
+    // than it is. Widening the shared pattern changes SP1's subject and lands
+    // under its own finding — the ruling SP11 already made for this reader.
+    const FILE = "docs/components/C99_x.md";
+    const source = [
+      "# C99 — fabricated",
+      "",
+      "## Commitments",
+      "",
+      "1. First (I1).",
+      "1c. A variant declared before its siblings (I1).",
+      "1b. And out of order with them (I1).",
+      "2. Second (I1).",
+      "",
+      "---",
+      "",
+    ].join("\n");
+    const read = at(source, FILE);
+
+    expect(commitmentsOf(FILE, read).map((c) => c.n), "only the unlettered lines are read").toEqual([1, 2]);
+    expect(checkCommitmentOrder([FILE], read, []), "so `1c, 1b` passes").toEqual([]);
+
+    // The live instance, so the limit expires the day the pattern widens.
+    const lettered = readFileSync("docs/components/C22_composition_root.md", "utf8")
+      .split("\n")
+      .filter((l) => /^\d+[a-z]\./.test(l));
+    // **Eighteen, and the record said sixteen.** SP11's docstring and A03 §7a
+    // both wrote *C22 holding sixteen* beside a correct total of 22 — which is
+    // 2 + 1 + 18 + 1 across C01, C14, C22 and C23, so the total and the part
+    // never agreed. Both are corrected in the commit that adds this row.
+    expect(lettered.length, "C22's eighteen lettered commitments, seen by no SP rule").toBe(18);
+  });
+});
+
+/** The rule's own debt list, read back from the module the gate runs. */
+function descentList(): string[] {
+  // Read rather than duplicated: a second copy of twenty-eight keys in the test
+  // is a second reader of the same corpus, which is what `sectionLines`' note
+  // forbids one file over. The default list is what `checkCommitmentOrder` uses
+  // when none is passed, so the tree's own descents are exactly it.
+  return specFiles().flatMap((f) => descentsOf(f).map((d) => d.key));
+}
+
 // --- SP3 — every reference resolves ---------------------------------------
 
 describe("A03 SP3 — invariant references resolve outside the specs too", () => {
@@ -1066,18 +1240,35 @@ describe("A03 SP3 — invariant references resolve outside the specs too", () =>
     // only reason it was found — a fabrication that quietly starts passing for
     // the same reason would read as a clean gate. FINDINGS F1041.
     //
-    // Translated to `I14` — C01's number for the same rule after the renumber,
-    // and absent from C02 — so the fixture is still the real defect and not an
-    // invented one. It expires again the day C02 declares an I14, which is the
-    // limit and is why the number is stated here rather than derived.
+    // **It expired a second time on the same day, and the row's own limit is
+    // the reason.** The comment here said *it expires again the day C02
+    // declares an I14, which is the limit and is why the number is stated here
+    // rather than derived* — and C02 declared I14 that same day, 2026-09-10,
+    // in the session that wrote the sentence. A stated limit names a condition
+    // and nothing watches it; two instances of one class inside one day is the
+    // argument for closing the class rather than the instance (F1068).
+    //
+    // So the number is **derived**: the lowest `I n` C02 does not declare,
+    // asserted absent before it is used, so no spec edit two components away
+    // can disarm the fabrication again. What is copied from the real call site
+    // is the *shape* — a bare number in a C02-owned file, resolving against C02
+    // and failing — which is what A03 commitment 14a asks for. The digit was
+    // never the defect; C01 owning the rule is the story and C02 lacking the
+    // number is the mechanism.
+    const c02 = invariantsOf("docs/components/C02_capability_detection.md");
+    let n = 1;
+    while (c02.has(`I${String(n)}`)) n += 1;
+    const id = `I${String(n)}`;
+    expect(c02.has(id), "the fabrication is vacuous unless C02 lacks the number").toBe(false);
+
     const read = at(
-      "    // I14, and the reason it is stated as \"aborts before first paint\".\n",
+      `    // ${id}, and the reason it is stated as "aborts before first paint".\n`,
       "test/integration/capabilities.test.ts",
     );
     const { violations } = checkReferences(["test/integration/capabilities.test.ts"], read, {});
 
     expect(violations).toHaveLength(1);
-    expect(violations[0]?.message).toContain("cites C02 I14 (bare, by owner)");
+    expect(violations[0]?.message).toContain(`cites C02 ${id} (bare, by owner)`);
   });
 
   it("SP3 fires: a bare reference in a file nothing owns", () => {
@@ -1567,6 +1758,55 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
     // that a scope or regex regression cannot slip beneath it.
     expect(v.citations, "citations resolved — the rule saw its subject").toBeGreaterThan(200);
     expect(v.map((x) => x.message), "SP5").toEqual([]);
+  });
+
+  it("SP5 fires: a citation in `tools/`, which the walk added and the filter dropped", () => {
+    // **A fabricated violation for the *scope*, not for the rule** — the thing
+    // this family has now got wrong four times and could not have caught, since
+    // a walk that adds 645 files and a filter that removes them reports exactly
+    // what a correct scope reports. `tools/` and `test/` were added to the walk
+    // with five sentences of justification and `CITED_FROM` was not touched, so
+    // 2 688 citations across 423 files stayed outside a rule whose comment said
+    // they were inside. Widened before this row was written, and measured
+    // first: zero pre-existing violations in the 645 (F1069).
+    //
+    // The real corpus and the real walk, with one file's *text* replaced — so
+    // the row is about the scope predicate and nothing else. Injecting `files`
+    // would answer the question by assuming it, which is how the state above
+    // survived a round.
+    // **The sentinel is derived, and the widening is why it has to be.** This
+    // file is now inside SP5's own corpus, so a five-digit finding id written
+    // out in this source is a citation SP5 reads and cannot resolve — a
+    // permanent violation created by the fixture rather than by the tree.
+    // Measured: hard-coded, the gate went to 19 violations, three of them this
+    // row's own text and its own comment. Built from the ledger's maximum the
+    // number exists only in memory, which is the convention the SP6 row already
+    // carries for the other reason. **A number is never written out in a file
+    // this rule reads**, which is a limit on how the fixture may be phrased and
+    // not on the rule.
+    const ledger = readFileSync("examples/docker/FINDINGS.md", "utf8");
+    const next =
+      Math.max(0, ...[...ledger.matchAll(/^## F(\d+)/gmu)].map((m) => Number(m[1]))) + 1; // cells-ok — a finding number
+    const id = `F${String(next)}`;
+    expect(ledger, "the fabricated id has to be one the ledger does not have").not.toContain(`## ${id} `);
+
+    const target = "tools/enforce/commitments.mjs";
+    const v = checkFindings({
+      read: (f: string) => (f === target ? `// see FINDINGS ${id} for why.\n` : readFileSync(f, "utf8")),
+    });
+
+    const fired = v.filter((x) => x.file.startsWith(`${target}:`));
+    expect(fired, `${target} is outside SP5's corpus`).toHaveLength(1);
+    expect(fired[0]?.rule).toBe("SP5");
+    expect(fired[0]?.message).toContain(id);
+
+    // The other half of the same scope, so one directory landing does not read
+    // as both.
+    const t2 = "test/unit/enforce-rules.test.ts";
+    const v2 = checkFindings({
+      read: (f: string) => (f === t2 ? `// ${id}.\n` : readFileSync(f, "utf8")),
+    });
+    expect(v2.filter((x) => x.file.startsWith(`${t2}:`)), `${t2} is outside SP5's corpus`).toHaveLength(1);
   });
 
   it("SP5 fires: a citation past the end of the ledger", () => {

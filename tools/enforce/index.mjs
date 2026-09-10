@@ -32,6 +32,7 @@ import {
   checkTestRowIds,
   checkMnemonicRowIds,
   checkCommitmentNumbers,
+  checkCommitmentOrder,
   checkReferences,
   checkSectionReferences,
   checkSeamFour,
@@ -210,6 +211,12 @@ const violations = [
   // row to "the commit that implements it"; nothing watched that condition and
   // the same document re-acquired three (F998).
   ...checkCommitmentNumbers(specs),
+  // SP13 — and the other half of the same list, refused once on a figure that
+  // was wrong when it was written. Nine specs, not eleven, and the reason beside
+  // it was about the repair rather than the check — which SP11's own debt list
+  // shows are separable. Three commitments went in out of order with this gate
+  // green while the refusal stood (F1066).
+  ...checkCommitmentOrder(specs),
   // SP4 — Seam 4 and its owners agree, both directions. The only artefact
   // several components write to and none owns, wrong at every one that touched
   // it, because every row exists twice and nothing compared the copies.

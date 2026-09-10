@@ -99,6 +99,25 @@ export declare function checkCommitmentNumbers(
   exempt?: readonly string[],
 ): Violation[];
 
+/** Where a spec's commitment numbers step backwards, keyed `C04 20>17`. */
+export declare function descentsOf(
+  file: string,
+  readFile?: (file: string) => string,
+): { key: string; line: number }[];
+
+/**
+ * SP13 — a spec's commitment numbers ascend in document order.
+ *
+ * `exempt` is the descent list, exposed for the same three arms SP11's is: the
+ * default is the tree's outstanding twenty-eight, an empty list shows they are
+ * real, and an entry naming a repaired descent must fail.
+ */
+export declare function checkCommitmentOrder(
+  files: readonly string[],
+  readFile?: (file: string) => string,
+  exempt?: readonly string[],
+): Violation[];
+
 export declare const OWNERS: readonly Readonly<{ path: string; spec: string }>[];
 export declare const TOPICS: Readonly<Record<string, string>>;
 export declare const REFERENCE_EXCEPTIONS: Readonly<Record<string, string>>;

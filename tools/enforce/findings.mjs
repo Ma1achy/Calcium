@@ -56,11 +56,29 @@ const LEDGER = "examples/docker/FINDINGS.md";
  * directories to `examples/docker`; F84 is the same sentence about MG24. A
  * document written tomorrow at the root is covered on the day it is written
  * rather than on the day someone remembers this list exists.
+ *
+ * **The fourth time, and it is the one with a mechanism missing rather than a
+ * place missing.** `tools/` and `test/` were added to the walk below with five
+ * sentences of justification — *they hold 2 462 finding citations, 19% of the
+ * repository's* — and this list was not touched, so `inCitedScope` filtered
+ * every one of them straight back out three lines later. **645 files and 2 688
+ * citations walked and dropped**, with the rule's own comment reading as though
+ * the widening had landed. Measured before applying it, exactly as that comment
+ * says was done: **zero pre-existing violations** in the 645, and the only
+ * difference on the day is the round's own unfiled numbers — 3 violations
+ * against 11, all eight of them F1066–F1069 awaiting the ledger (F1069).
+ *
+ * A step can name an effect and have no mechanism, and the justification being
+ * correct is why nobody looked. The corpus assertion that would have caught it
+ * is a fabricated violation for the *scope* rather than for the rule, and the
+ * fire-test now carries one.
  */
 const CITED_FROM = [
   "examples/docker/",
   "docs/",
   "src/",
+  "tools/",
+  "test/",
 ];
 
 /**
@@ -274,6 +292,15 @@ export function checkFindings(io) {
         // fabrication sentinels, and the sentinels were derived from the
         // ledger's maximum rather than exempted, so the corpus has no
         // exceptions to name. FINDINGS F1047, F1041.
+        //
+        // **And for one round this walk was the whole of the widening.**
+        // `CITED_FROM` was not touched, so `inCitedScope` below dropped all 645
+        // files these two lines add — the measurement above was made, written
+        // down, and never reached the predicate that decides. Both halves are
+        // in now, and the scope has a fabricated violation of its own in the
+        // fire-tests, because nothing here could have told the two states
+        // apart: a walk that adds files and a filter that removes them reports
+        // exactly what a correct scope reports (F1069).
         ...walk("tools"),
         ...walk("test"),
         // The root's own documents, not recursed — `walk` would descend into
