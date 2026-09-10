@@ -21,6 +21,7 @@ import {
   SVG_FONT_SIZE,
 } from "../../src/presentation/plot/svg.js";
 import { rowOf, FACING_DEFAULT } from "../../src/presentation/plot/scale.js";
+import { xTickRow } from "../../src/presentation/plot/axes.js";
 import { normalisedOf } from "../../src/data/viewmodel/range.js";
 import { decodePng } from "../../src/presentation/image/index.js";
 import { COLORMAPS, sample as sampleMap } from "../../src/presentation/theme/colormap.js";
@@ -1209,6 +1210,49 @@ describe("RC — the callout displaces the label it lands on (C12 I114, §3ak.50
     });
 
   /**
+   * Every `<text>`, in **page** coordinates — a nested `<svg x= y=>` translates
+   * its children (C12 §3ak.50i, F1025).
+   *
+   * **`texts` above reads the document flat and two frames in the corpus are
+   * not flat.** `pairplot-default` and `smallmultiples-default` are the facet
+   * arm's output: four `<svg x="0|160|320|480" viewBox="0 0 160 320">` panels,
+   * each with its own coordinate system. A reader that regexes `<text x=` out of
+   * the bytes collapses all four onto the first, so one gutter label in four
+   * panels 160 px apart reads as **four texts at one point** — which is what
+   * F733's residue recorded as *identical texts at identical coordinates*, 84 of
+   * its 124 pairs, a class with zero instances.
+   *
+   * **`RC8` found the same defect from the other side and excluded the frames by
+   * name**, which is the instance rather than the class: the two nested frames
+   * then sat outside every band rule in this file. Resolved here instead, and
+   * `RC8` reads through it — 848 frames swept where the exclusion swept 840.
+   */
+  const pageTexts = (svg: string): ReturnType<typeof texts> => {
+    const out: ReturnType<typeof texts>[number][] = [];
+    let dx = 0;
+    let dy = 0;
+    const stack: { dx: number; dy: number }[] = [];
+    for (const m of svg.matchAll(/<svg\s([^>]*?)\/?>|<\/svg>|<text ([^>]*)>([^<]*)<\/text>/gu)) {
+      if (m[0].startsWith("</svg")) {
+        const p = stack.pop();
+        if (p !== undefined) { dx = p.dx; dy = p.dy; }
+        continue;
+      }
+      if (m[0].startsWith("<svg")) {
+        stack.push({ dx, dy });
+        const a = m[1] ?? "";
+        dx += Number(/(?:^| )x="([-\d.]+)"/u.exec(a)?.[1] ?? "0");
+        dy += Number(/(?:^| )y="([-\d.]+)"/u.exec(a)?.[1] ?? "0");
+        continue;
+      }
+      const one = texts(m[0])[0];
+      if (one === undefined) continue;
+      out.push({ ...one, x: one.x + dx, y: one.y + dy, left: one.left + dx, right: one.right + dx });
+    }
+    return out;
+  };
+
+  /**
    * A callout is a **start**-anchored text in a series' own colour; a value
    * label is drawn in the theme's `label` slot. Read off the document rather
    * than off the block, because what is on the page is the subject.
@@ -1541,13 +1585,19 @@ describe("RC — the callout displaces the label it lands on (C12 I114, §3ak.50
    * pairs at **0.00 px** in `smallmultiples` and `pairplot` — a facet is a
    * nested `<svg x="…">` with its own coordinate system, so every facet
    * collapsed onto the first. And grouping every label-ink text by `x` swept
-   * the abscissa's captions in with the ordinate's. So: facet documents are
-   * excluded by name, and each side is the one x its value labels share —
-   * smallest for the `end`-anchored gutter, largest for the `start`-anchored
-   * one, which is where the emitter puts them.
+   * the abscissa's captions in with the ordinate's. So each side is the one x
+   * its value labels share — smallest for the `end`-anchored gutter, largest
+   * for the `start`-anchored one, which is where the emitter puts them.
+   *
+   * **The first correction was to exclude the facet documents by name, and that
+   * was the instance rather than the class** (§3ak.50i, F1025). The two nested
+   * frames then sat outside every band rule in this file, while F733's residue
+   * carried the same un-resolved reading of the same two frames as a finding.
+   * It reads through `pageTexts` now: 848 frames swept where the exclusion
+   * swept 840, and still **0** pairs.
    */
   const gutterColumns = (svg: string): readonly (readonly ReturnType<typeof texts>[number][])[] => {
-    const ls = texts(svg).filter((t) => t.fill === LABEL_INK && !t.clipped && t.text !== "");
+    const ls = pageTexts(svg).filter((t) => t.fill === LABEL_INK && !t.clipped && t.text !== "");
     const out: (readonly ReturnType<typeof texts>[number][])[] = [];
     for (const [anchorKind, pick] of [["end", Math.min], ["start", Math.max]] as const) {
       const side = ls.filter((t) => t.anchor === anchorKind);
@@ -1577,7 +1627,7 @@ describe("RC — the callout displaces the label it lands on (C12 I114, §3ak.50
           const { cursor, ...rest } = spec as Record<string, unknown>;
           void cursor;
           const svg = plotToSvg(vmBlock({ kind: "plot", id: "cat", ...rest } as unknown as Plot), THEME, canvas);
-          if (svg === null || /<svg x="/u.test(svg)) continue;
+          if (svg === null) continue;
           swept += 1; // cells-ok — a frame count
           for (const col of gutterColumns(svg)) {
             for (let i = 1; i < col.length; i += 1) { // cells-ok — a label count
@@ -1591,7 +1641,7 @@ describe("RC — the callout displaces the label it lands on (C12 I114, §3ak.50
       }
     }
     // The corpus is shown to be a corpus before its emptiness means anything.
-    expect(swept, "frames swept").toBeGreaterThan(800); // cells-ok — a frame count
+    expect(swept, "frames swept").toBe(848); // cells-ok — a frame count
     expect(bad, "two value labels on one side never paint the same band").toEqual([]);
   });
 
@@ -1635,6 +1685,180 @@ describe("RC — the callout displaces the label it lands on (C12 I114, §3ak.50
     // 20 baselines, and counting elements bakes that coincidence in.
     expect(rules.size, "a horizontal rule per tick, not per surviving label").toBe(20); // cells-ok — a tick count
     expect(drawn(80)[0], "and five of the twenty carry a reading").toHaveLength(5); // cells-ok — a label count
+  });
+
+  /**
+   * Every baseline two or more label-ink texts share, in page coordinates.
+   *
+   * **`RC8` is a column rule and this is the row one** (§3ak.50i). The abscissa
+   * writes along a baseline, so a pitch down a column cannot see it however many
+   * canvases it sweeps — the same relationship `RC1` has to `RC8`, one axis over.
+   */
+  const baselines = (svg: string): readonly (readonly ReturnType<typeof texts>[number][])[] => {
+    const by = new Map<number, ReturnType<typeof texts>[number][]>();
+    for (const t of pageTexts(svg)) {
+      if (t.fill !== LABEL_INK || t.clipped || t.text === "") continue;
+      by.set(t.y, [...(by.get(t.y) ?? []), t]);
+    }
+    return [...by.values()]
+      .filter((r) => r.length > 1) // cells-ok — a label count
+      .map((r) => [...r].sort((a, b) => a.left - b.left));
+  };
+
+  /** The captions the numeric abscissa emitter drew, left to right. */
+  const abscissa = (svg: string): readonly ReturnType<typeof texts>[number][] => {
+    const rows = [...baselines(svg)].sort((a, b) => (b[0]?.y ?? 0) - (a[0]?.y ?? 0));
+    return rows.find((r) => r.some((t) => t.anchor === "middle")) ?? [];
+  };
+
+  it("RC10 (C12 I123, §3ak.50i): no two abscissa captions paint the same band, over the catalogue at two canvases", () => {
+    // **The row `RC8` could not be, and the sweep that was supposed to find it
+    // was reading a nested document flat.** F732's residue held 10 of these —
+    // `31` painted through `30` as one unreadable glyph on both candlesticks and
+    // `29` through `25` in all four facets of `pairplot` and `smallmultiples` —
+    // and every one was inside its own `viewBox`, in a golden that agreed with
+    // it, and outside `RC1` (callout against label) and `RC8` (a column's pitch)
+    // alike. **A golden records; it does not check.**
+    //
+    // **The corpus is shown to exercise the rule, not merely to be non-empty.**
+    // A row asserting *no overprint* is satisfied by an emitter that draws no
+    // captions and by a corpus where no two ticks are ever close — so the
+    // control below is that the rule **bit**: at least one frame has a caption
+    // the abut rule dropped, which is `positionAxisAt`'s appended maximum. That
+    // is the fabricated violation's other half; the mutation is
+    // `c12-svg-abscissa-row.mjs`.
+    const bad: string[] = [];
+    let swept = 0; // cells-ok — a frame count
+    let dropped = 0; // cells-ok — a frame count
+    for (const canvas of [SVG_DEFAULT_LAYOUT, svgLayout(640, 200)]) {
+      for (const [form, variants] of Object.entries(CATALOGUE_FORMS)) {
+        for (const [variant, spec] of Object.entries(variants)) {
+          const { cursor, ...rest } = spec as Record<string, unknown>;
+          void cursor;
+          const svg = plotToSvg(vmBlock({ kind: "plot", id: "cat", ...rest } as unknown as Plot), THEME, canvas);
+          if (svg === null) continue;
+          swept += 1; // cells-ok — a frame count
+          for (const row of baselines(svg)) {
+            for (let i = 1; i < row.length; i += 1) { // cells-ok — a label count
+              const a = row[i - 1]!;
+              const b = row[i]!;
+              if (b.left < a.right - 1e-3) {
+                bad.push(`${form}/${variant} at ${String(canvas.height)}px: "${a.text}"@${a.x.toFixed(2)} over "${b.text}"@${b.x.toFixed(2)} by ${(a.right - b.left).toFixed(2)}px`);
+              }
+            }
+          }
+          // the rule bit here if the last drawn caption is not the axis's own maximum
+          const row = abscissa(svg);
+          if (row.length > 1 && row.every((t) => t.anchor !== "end")) dropped += 1; // cells-ok — a frame count
+        }
+      }
+    }
+    expect(swept, "frames swept").toBe(424); // cells-ok — a frame count
+    expect(dropped, "and the abut rule bit on some of them, or this row asserts nothing") // cells-ok — a frame count
+      .toBeGreaterThan(0);
+    expect(bad, "two texts on one baseline never paint the same band").toEqual([]);
+  });
+
+  it("RC11 (C12 I123, §3ak.50i): the appended maximum is what goes, its rule stays, and a flipped axis clamps the other way", () => {
+    // **The half that would make `RC10` the wrong rule.** `RC10` is satisfied by
+    // an abscissa that draws nothing, so this asserts the **set** — which
+    // captions survive, by value — and that the one that goes is
+    // `positionAxisAt`'s appended domain maximum rather than a niced tick.
+    const candle = vmBlock({
+      kind: "plot", id: "rc11", form: "line", height: 12, axes: true, plotStyle: "candlestick",
+      series: [],
+      ohlc: Array.from({ length: 32 }, (_v, i) => {
+        const o = 50 + 20 * Math.sin(i / 4);
+        return { open: o, high: o + 6, low: o - 6, close: o + (i % 2 === 0 ? 3 : -3) };
+      }),
+    } as unknown as Plot);
+    const drawn = plotToSvg(candle, THEME, SVG_DEFAULT_LAYOUT) ?? "";
+    expect(abscissa(drawn).map((t) => t.text), "the niced ticks stand and the appended maximum goes")
+      .toEqual(["0", "5", "10", "15", "20", "25", "30"]);
+    // **And the terminal arm is where the rule comes from, not this row's
+    // invention**: `xTickRow` packs the same `positionAxisAt` output and drops
+    // the same caption. A rule this arm holds and its mirror does not is the
+    // disagreement §3ak exists to prevent.
+    expect(abscissa(drawn).map((t) => t.text).join(" "))
+      .toBe(xTickRow({ min: 0, max: 31 }, 74, undefined, { unicode: "full", ambiguousWidth: "narrow" }).text.trim().split(/\s+/u).join(" "));
+
+    // **What the decision leaves behind** (C12 I114's `RC4`, one writer over): the
+    // dropped caption keeps its gridline, so the figure's geometry does not move
+    // with its readings.
+    //
+    // **Both counts, because each alone is satisfied by the mutation the other
+    // catches.** `RC9`'s correction one axis over says count distinct baselines
+    // rather than elements — the frame's own edges are lines and the extreme
+    // ticks sit on them. But the caption this rule drops is `positionAxisAt`'s
+    // appended maximum, which lands **exactly on `box.right`**, so its rule
+    // coincides with the frame's right edge and the *distinct* count cannot see
+    // it go: moving the `gridded` push below the abut check left 8 distinct x
+    // and killed nothing. The element count does see it — 10 becoming 9 — and
+    // the distinct count is what says the geometry did not move. Measured, by
+    // running that mutation and watching the first form of this row survive it.
+    const verticals = (svg: string): readonly string[] =>
+      [...svg.matchAll(/<line x1="([-\d.]+)" y1="([-\d.]+)" x2="\1" y2="([-\d.]+)"/gu)]
+        .filter((m) => m[2] !== m[3]).map((m) => m[1] ?? "");
+    const grid = plotToSvg({ ...candle, plotFrame: "grid" } as unknown as Plot, THEME, SVG_DEFAULT_LAYOUT) ?? "";
+    expect(new Set(verticals(grid)).size, "a rule at every tick, the dropped caption's included")
+      .toBe(8); // cells-ok — a tick count
+    expect(verticals(grid).length, "eight ticks' rules and the frame's two edges, each its own element")
+      .toBe(10); // cells-ok — a gridline count
+    expect(abscissa(grid), "and one fewer caption than there are ticks").toHaveLength(7); // cells-ok — a label count
+
+    // **A second fixture at a pitch the rule can be over-eager at, because the
+    // first cannot see over-suppression** (F728's shape, `RC3`'s reason). The
+    // candlestick's niced ticks are 64 px apart and 15 px wide, so a clearance
+    // widened to twice the advance reaches no neighbour and this row survived
+    // it. Over `0 … 100000` the same canvas takes **11** ticks at ~50 px pitch
+    // with 39–47 px labels: the appended maximum still goes and nothing else
+    // does, and the same widening thins the row to alternate readings —
+    // `0 10000 30000 50000 70000 90000` — which is also *a refusal reserves
+    // nothing* (C12 I120) drawn.
+    const dense = vmBlock({
+      kind: "plot", id: "rc11d", form: "line", height: 12, axes: true, legend: false,
+      xMin: 0, xMax: 100000,
+      series: [{ label: "a", values: Array.from({ length: 40 }, (_v, i) => 50 + 40 * Math.sin(i / 5)) }],
+    } as unknown as Plot);
+    const denseSvg = plotToSvg(dense, THEME, SVG_DEFAULT_LAYOUT) ?? "";
+    expect(abscissa(denseSvg).map((t) => t.text), "ten of eleven, and the one that goes is the appended maximum")
+      .toEqual(["0", "10000", "20000", "30000", "40000", "50000", "60000", "70000", "80000", "90000"]);
+    const denseGrid = plotToSvg({ ...dense, plotFrame: "grid" } as unknown as Plot, THEME, SVG_DEFAULT_LAYOUT) ?? "";
+    expect(verticals(denseGrid).length, "eleven ticks' rules and the frame's two edges")
+      .toBe(13); // cells-ok — a gridline count
+
+    // **The anchor is the edge the tick lands on and never its index.** On
+    // `origin: "bottom-right"` the position reads `facing` and the anchor read
+    // `i`, so the axis maximum — last by index, **leftmost** on the page —
+    // anchored `end` at `box.left` and grew into the gutter: `49` painting
+    // across the value label `0` 14.84 px away, in a golden that agreed.
+    const flipped = plotToSvg(vmBlock({
+      kind: "plot", id: "rc11f", form: "line", height: 11, axes: true, origin: "bottom-right",
+      series: [{ label: "alpha", values: Array.from({ length: 50 }, (_v, i) => 50 + 45 * Math.sin(i / 6)) }],
+    } as unknown as Plot), THEME, SVG_DEFAULT_LAYOUT) ?? "";
+    const row = abscissa(flipped);
+    expect(row.map((t) => t.text), "the captions descend across the page, the axis being reversed")
+      .toEqual(["49", "40", "30", "20", "10", "0"]);
+    expect(row[0]?.anchor, "the leftmost caption grows right off its tick").toBe("start");
+    expect(row[row.length - 1]?.anchor, "and the rightmost grows left off its").toBe("end");
+    // **And the gutter is clear of it — the corner pair F733 recorded.** The
+    // ordinate's bottom label sits a third of a glyph above the abscissa's
+    // baseline, so the two are 8 px apart and share a band: with the maximum
+    // anchored `end` at `box.left` this frame drew `0` at [76.18, 83.60] and
+    // `49` at [74.76, 89.60], and no row in the file indexed the pair.
+    const caption = row[0]?.y ?? NaN;
+    const clash = pageTexts(flipped).filter((t) =>
+      t.fill === LABEL_INK && !t.clipped && t.y !== caption
+      && Math.abs(t.y - caption) < SVG_FONT_SIZE
+      && row.some((c) => t.left < c.right - 1e-3 && c.left < t.right - 1e-3));
+    expect(clash.map((t) => `"${t.text}"@${t.x.toFixed(2)},${t.y.toFixed(0)}`),
+      "and nothing else on the page paints the abscissa's band").toEqual([]);
+    // The control: the ordinate's bottom label **is** within a band of it, so
+    // the filter above resolves against a text rather than against nothing.
+    expect(pageTexts(flipped).filter((t) =>
+      t.fill === LABEL_INK && !t.clipped && t.y !== caption && Math.abs(t.y - caption) < SVG_FONT_SIZE).length,
+    "and the gutter's last label is in that band, so the check is not vacuous") // cells-ok — a label count
+      .toBeGreaterThan(0);
   });
 });
 
@@ -2736,8 +2960,4 @@ describe("SK11 — the sankey node label reads against what it is drawn on (C12 
     const svg = sankeySvg("default", DARK_THEME);
     expect(svg.match(/text-anchor="end"/gu)?.length, "the last layer's labels still flip").toBe(2);
   });
-});
-
-describe("C12 §3ak.50i — the abscissa's abut rule (I123)", () => {
-  it.todo("RC10 (C12 I123, §3ak.50i): the abscissa reserves the cell its last caption needs, so the domain maximum appended after the niced ticks cannot overprint it — a row rule, so a collision at a different baseline is outside it and RC11 is what sees the anchor — not deferred on a component: it lands with svg.ts in the next commit");
 });
