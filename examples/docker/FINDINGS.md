@@ -45516,3 +45516,102 @@ That test survives the figure being wrong, and it is the thing a future reader
 needs — a budget in seconds would only have gone stale again. Whether
 `instruments` clears that bar is left open in the spec as a live question with
 its own cost argument, which is a different change from this one.
+
+## F1091 — the ratio that has to separate two from four spans 1.38 to 3.06, and the noise scales with the operand ★★★
+
+| | |
+|---|---|
+| **Surface** | `test/edge/editor.test.ts:96` (C17 T3.15) |
+| **Reached for** | a red `make all` on a tree whose only changes were register and spec prose |
+| **Verdict** | **open** |
+
+### The assertion and its headroom
+
+T3.15's linearity claim is `big.ms / small.ms < 3`, and the row's own comment
+says why that number: *linear is 2 and quadratic is 4; the bound sits at 3, in
+the middle, which is right.* One unit of headroom either side.
+
+Five runs of the row alone, in the devcontainer:
+
+```
+2.38   2.35   1.38   1.84   2.13
+```
+
+**A spread of a whole unit**, all green, on an instrument that must resolve one
+unit. Inside a full `make all` the record reads 2.14 green and 3.06 red, and the
+row's comment already carries 3.03 and 3.17 red before that — *inside the noise,
+not outside the budget*, repaired twice: a minimum of five, then a minimum of
+three over fresh editors once F1014's memo made the repeats cache hits.
+
+### What both repairs missed
+
+**The noise is not the machine being busy.** In the red run the two halves moved
+in opposite directions:
+
+| | solo range | the red run |
+|---|---|---|
+| small walk | 252–360 ms | **328 ms** — inside it |
+| big walk | 496–611 ms | **1004 ms** — nearly double |
+
+A busy machine slows both and the ratio survives. **This perturbation lands on
+the larger operand only**, because twice the text is twice the allocation and
+the big walk pays a collection the small one does not. A minimum over N cannot
+remove a cost that every one of the N big readings pays.
+
+### F1084's class, entered from the other side
+
+F1084 was a ratio whose **denominator was a fixed floor**, so any additive cost
+compressed it toward one. This one has both operands scaling with the input, and
+what defeats it is that **the noise scales with them too**. Two different ways to
+lose a ratio, one rule: *a ratio is an instrument only when its noise is common
+to both operands* — which is a stronger test than F1084's *both operands scale
+with the load*, and it absorbs it.
+
+### The repair is F1084's too
+
+Measure the thing the ratio was a proxy for. The walk calls `drawAs` exactly
+once per cluster — `layout.ts:123`, the only site — and `layout.ts` exports
+`displayRows(text, width, gutter, drawAs)`. A counting `drawAs` that returns its
+input unchanged reports the inner loop's trip count:
+
+```
+big:  visits=1000032  graphemes=1000032  equal=true
+half: visits= 500016  graphemes= 500016  equal=true
+```
+
+Exact, load-free, and a stronger claim than any duration: **one visit per
+cluster**, where a re-walk is 2n.
+
+### The fabricated violation fires and the duration does not
+
+A second `drawAs?.(cluster)` ahead of the real one:
+
+```
+big:  visits=2000064  graphemes=1000032  equal=false   walk 667 ms
+                                          clean:        walk 668 ms
+```
+
+**Twice the visits, and the duration does not move** — the doubled work is a
+trivial call, so no timing could see it while the count is exact. That is the
+argument that the count is a *different* instrument rather than a cheaper proxy
+for the same one, and it is why the timing keeps no assertion.
+
+### Its blind spot, stated
+
+The count is over **iterations**. A change that makes each step O(rows) — a copy
+of the rows array per cluster, say — is quadratic and invisible here, and the
+timing that would have moved is now evidence rather than an assertion. Nothing
+in the suite reaches that class. Naming it is the whole of the remedy available:
+the alternative is keeping a bound that has been red three times and green by
+luck, which detects nothing and reports constantly.
+
+### What would falsify this
+
+- **The red being a one-off.** Three reds on record — 3.03, 3.17, 3.06 — and
+  five solo runs spanning 1.38 to 2.38.
+- **The machine being loaded in general.** The small walk stayed inside its solo
+  range in the red run; only the big one moved.
+- **`drawAs` being called elsewhere in the walk.** One site, `layout.ts:123`.
+- **The count being a tautology against `graphemes`.** Both sides use the same
+  segmenter, and the doubled call still fails it — so the assertion is about
+  the loop's trip count, not about the segmentation.
