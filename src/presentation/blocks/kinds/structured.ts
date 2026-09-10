@@ -465,21 +465,37 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
             ...(marked > 0
               ? [
                   {
+                    // **The one `pad` on this row that keeps the default, and it
+                    // keeps it for a reason rather than by omission**: the markers
+                    // are ASCII (` ~+-`), one cell at both conventions, so the
+                    // convention has no subject here (F1042).
                     text: pad(CHANGE_MARKERS[entry.change ?? "unchanged"], marked),
                     style: tone("muted", ctx.theme, ctx.capabilities),
                   },
                 ]
               : []),
             {
+              // **Cut at the session's convention, so padded at it too** (I68,
+              // F1042). Every `pad` on this row carries far-side text and the
+              // convention was dropped at all three, so at `wide` each column
+              // started late and `clampSpans` took the difference out of the
+              // last one: measured at 44 cells, `9°C ±2` came back as `9°C ±…`
+              // with the row still totalling 44 — the shape no width assertion
+              // can see.
               text: pad(
                 truncate(stripControl(entry.field), fieldWidth, ctx.capabilities),
                 fieldWidth,
+                ctx.capabilities.ambiguousWidth,
               ),
               style: tone("muted", ctx.theme, ctx.capabilities),
             },
             { text: " ".repeat(COLUMN_GAP) },
             {
-              text: pad(truncate(stripControl(entry.a), column, ctx.capabilities), column),
+              text: pad(
+                truncate(stripControl(entry.a), column, ctx.capabilities),
+                column,
+                ctx.capabilities.ambiguousWidth,
+              ),
               style: tone("default", ctx.theme, ctx.capabilities),
             },
             { text: " ".repeat(COLUMN_GAP) },
@@ -491,6 +507,7 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
                 markFor(entry.verdict, judged, ctx) +
                   truncate(stripControl(entry.b), Math.max(1, column - judged), ctx.capabilities),
                 column,
+                ctx.capabilities.ambiguousWidth,
               ),
               style: tone(verdictTone(entry.verdict), ctx.theme, ctx.capabilities),
             },

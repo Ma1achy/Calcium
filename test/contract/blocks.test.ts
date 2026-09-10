@@ -17,6 +17,7 @@ import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable, visible } f
 import { cells, hasEmojiForm, TEXT_PRESENTATION } from "../../src/presentation/text.js";
 import { SPINNER_SETS } from "../../src/presentation/blocks/glyphs.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
+import { fit } from "../../src/presentation/blocks/paint.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
 import { Text } from "ink";
 import { createElement } from "react";
@@ -108,6 +109,42 @@ describe("C09 contract — measurement", () => {
         const measured = kit.measure(block, width);
         expect(Number.isInteger(measured), `${block.id} at ${width}`).toBe(true);
         expect(measured, `${block.id} at ${width}`).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
+  it("T1.43 (C09 I68): `fit` pads at the convention it cut at, and the fixture is shown to respond first", () => {
+    // **The character decides whether this row can fail.** `µ` (U+00B5) is not
+    // in the Ambiguous class, so a fixture built on it measures the same at
+    // both conventions and a mutation dropping the convention survives it. The
+    // table is asserted before anything rests on it (F1042).
+    const moves = ["°", "Δ", "±", "→", "α"];
+    const still = ["µ", "a", "3", " "];
+    for (const ch of moves) {
+      expect([cells(ch, "narrow"), cells(ch, "wide")], `${ch} must move`).toEqual([1, 2]);
+    }
+    for (const ch of still) {
+      expect([cells(ch, "narrow"), cells(ch, "wide")], `${ch} must not`).toEqual([1, 1]);
+    }
+
+    // **`fit` returns exactly `width` cells at the convention it was given.**
+    // The narrow arm is the control: it was always right and must stay right.
+    const texts = [
+      "Δ drift 3°C above the ±threshold",
+      "plain ascii with no ambiguity at all",
+      "°",
+      "",
+      "µs only, which cannot move",
+    ];
+    for (const ambiguousWidth of ["narrow", "wide"] as const) {
+      const caps = { ...FULL_CAPS, ambiguousWidth };
+      for (const text of texts) {
+        for (const width of [1, 4, 12, 20, 24, 30, 36, 40, 80]) {
+          expect(
+            cells(fit(text, width, caps), ambiguousWidth),
+            `fit(${JSON.stringify(text)}, ${String(width)}, ${ambiguousWidth})`,
+          ).toBe(width);
+        }
       }
     }
   });
@@ -597,8 +634,4 @@ describe("C09 contract — the slice seam", () => {
     expect(kit.window(lines("plain", 6), 40, 2, 5)?.skipRows, "while the same kind, unfloored, slices").toBe(0);
     expect(kit.registry.windowChild(lines("plain", 6), 40, 2, 5), "and the seam takes it").not.toBeNull();
   });
-});
-
-describe("C09 §3 — a fit that carries the width convention it cuts at (I68)", () => {
-  it.todo("T2.41 (C09 I68, §3): `fit` pads at the same ambiguous-width convention it truncates at, so a bordered block draws its declared width — the marker `truncate` appends is itself Ambiguous, so the defect needs no ambiguous input, only a message long enough to be cut — not deferred on a component: it lands with the pad sites in the next commit");
 });
