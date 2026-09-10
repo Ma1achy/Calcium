@@ -519,7 +519,7 @@ test rather than as its steps: the sequence is what the invariants do not constr
 - **T3.12** (I11): 1,000 sequential edits → the stack holds 200 units, the oldest discarded; the most recent edit is always undoable.
 - **T3.13**: `setText` from history → one undo unit; undo restores the prior buffer including cursor.
 - **T3.14**: a paste containing `\n` → inserted as structure, still one undo unit.
-- **T3.15**: a 1 MB paste → completes within budget; `displayRows` stays linear.
+- **T3.15**: a 1 MB paste → completes within budget; `displayRows` stays linear — **counted, not timed**. The walk calls `drawAs` once per cluster, so a counting `drawAs` reports the inner loop's trip count and the row asserts one visit per cluster: exact and load-free, where the duration ratio it replaces spanned 1.38 to 3.06 against a bound of 3 and was red three times. The durations stay printed as evidence with the resolution control and carry no assertion. Blind spot: a step that becomes O(rows) is quadratic and invisible to a count of iterations (F1091, F1084).
 - **T3.16**: a lone surrogate or invalid UTF-8 in a paste → replaced, never crashing the segmenter.
 - **T3.17**: `killTo("bufferStart")` from the middle then `yank` at the end → text order preserved.
 
