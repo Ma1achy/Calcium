@@ -959,15 +959,26 @@ class Session implements TuiInstance {
     const bytes =
       (transmits(graph.capabilities)
         ? transmitFrame(
-            // **One group per entry, because the placement's scope is the entry**
-            // (C09 I66). The `flatMap` that stood here lost the only thing that
-            // makes a block id unique, and the seam and `visibleRows`' context
-            // take the scope together or neither does.
-            graph.transcript.entries.map((e) => ({ scope: e.id, blocks: e.doc.blocks })),
+            // **One group per layout run, because that is where the width is**
+            // (C22 I98, F1062). The scope is still the entry — the `flatMap`
+            // that once stood here lost the only thing that makes a block id
+            // unique, and the seam and `visibleRows`' context take the scope
+            // together or neither does — but an entry is *two* runs when it is a
+            // card, at two widths, and the seam was taking the frame's for both.
+            // `entryLayout` is the same function `visibleRows` renders through,
+            // so the two cannot compute different numbers rather than agreeing
+            // to. It partitions blocks and no run is measured here, which is why
+            // this is affordable over every entry rather than the visible ones.
+            graph.transcript.entries.flatMap((e) =>
+              entryLayout(e.doc.blocks, graph.lifecycle.size().columns)
+                .filter((run) => !run.blank)
+                .map((run) => ({ scope: e.id, blocks: run.blocks, width: run.width })),
+            ),
             graph.capabilities,
             this.#sentImages,
-            // The frame's width — the declared cell box is a render-time fact
-            // and was a hardcoded `1` (F380).
+            // The frame's width, still — the fallback for a group declaring none,
+            // and the declared cell box is a render-time fact that was a
+            // hardcoded `1` before F380.
             graph.lifecycle.size().columns,
             graph.probe,
           )

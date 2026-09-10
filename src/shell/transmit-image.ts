@@ -58,7 +58,16 @@ export type SentImages = Map<number, string>;
  * the shell may take: a scoped seam against an unscoped frame places an image
  * nobody transmitted.
  */
-export type PlacementGroup = Readonly<{ scope?: string; blocks: readonly Block[] }>;
+/**
+ * One run of one entry, at the width its blocks render at (C22 I98).
+ *
+ * **`width` is the layout's and not the frame's** (F1062). A card's body renders
+ * four cells in, so an entry is two runs at two widths and a single number
+ * beside the document cannot describe it. Optional because a caller holding no
+ * layout has nothing to declare; `transmitFrame`'s own `width` is what it falls
+ * back to, which is what every caller did before this field existed.
+ */
+export type PlacementGroup = Readonly<{ scope?: string; blocks: readonly Block[]; width?: number }>;
 
 /** Every image in a block tree, in the order they will be placed. */
 function imagesIn(block: Block, out: Image[]): void {
@@ -245,7 +254,12 @@ export function transmitFrame(
   const live = new Set<number>();
   let out = "";
   for (const group of groups) {
-    out += transmitImage(group.blocks, capabilities, sent, width, probe, group.scope, live);
+    // **The run's width where there is one** (C22 I98, F1062). Both halves of the
+    // box move with it: at 80 columns a card-nested picture was declared 80 cells
+    // wide and addressed across 76, so its right 5% was never drawn; between 298
+    // and 301 `placesAtProtocol` refused here while the renderer placed, and the
+    // placeholders addressed a transmission that never happened.
+    out += transmitImage(group.blocks, capabilities, sent, group.width ?? width, probe, group.scope, live);
   }
   for (const id of [...sent.keys()]) if (!live.has(id)) sent.delete(id);
   return out;

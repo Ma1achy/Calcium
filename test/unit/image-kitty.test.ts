@@ -27,13 +27,14 @@ import {
   PLACEHOLDER,
 } from "../../src/presentation/image/kitty.js";
 import { imageCells, placesAtProtocol } from "../../src/presentation/blocks/kinds/image.js";
-import { digestOf, type Image } from "../../src/data/viewmodel/index.js";
+import { digestOf, type Block, type Image } from "../../src/data/viewmodel/index.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
 import { DARK_THEME, FULL_CAPS } from "../support/render.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 import { ONE_PER_KIND } from "../support/blocks.js";
-import { transmitImage, transmits, type SentImages } from "../../src/shell/transmit-image.js";
+import { transmitFrame, transmitImage, transmits, type SentImages } from "../../src/shell/transmit-image.js";
+import { entryLayout } from "../../src/shell/entry-layout.js";
 import { readFileSync } from "node:fs";
 
 /**
@@ -374,18 +375,89 @@ describe("IK — the kitty arm, as properties", () => {
       caller,
       "the per-entry map is inside the guard, not before it",
     ).toMatch(
-      /transmits\(graph\.capabilities\)[^;]{0,400}transmitFrame\(\s*graph\.transcript\.entries\.map\(\(e\) => \(\{ scope: e\.id/,
+      /transmits\(graph\.capabilities\)[^;]{0,400}transmitFrame\(\s*graph\.transcript\.entries\.flatMap\(\(e\) =>/,
+    );
+
+    // **And the group's width comes from the layout, not from the frame**
+    // (C22 I98, F1062). T1.60 below shows the seam honours a declared width;
+    // only this can show the caller declares one, and declares the run's. A
+    // behavioural row here would need a whole session, and the property it
+    // would assert is one line of construction.
+    expect(caller, "the groups are built from entryLayout's runs").toMatch(
+      /entryLayout\(e\.doc\.blocks[^;]{0,300}width: run\.width/,
     );
   });
 });
 
-// C22's §6j.4 ruling, I98, commitment 68 and T1.60 land in this commit; the row
-// lands in the next one, with the seam and the call site it asserts. Nothing is
-// waited on — the code is one commit behind the sentence that describes it.
 describe("C22 §6j.4 — the seam takes the layout's width (I98)", () => {
-  it.todo(
-    "T1.60 (C22 I98, §6j.4, F1062): the declared box is the run's width, and a card transmits where the frame's width would refuse — not deferred on a component",
-  );
+  // A picture far wider than any terminal, so `imageCells` clamps to the width
+  // it is given and the two numbers cannot coincide by accident.
+  // **Built from the shared fixture and re-digested, not typed out.** A
+  // hand-written `{ kind: "image", data, height }` has no `digest`, and
+  // `imageKey` then returns `undefined` for it — which equals what an empty
+  // `sent` map returns, so the seam `continue`s and emits **nothing**. Every
+  // assertion below would have been made against `""`, and the first draft was.
+  const wideData = rgbPng64(2000, 100, () => [10, 20, 30]);
+  const wide = { ...block, data: wideData, digest: digestOf(wideData), height: 8 } as Image;
+  const card = [{ kind: "notice", glyph: "step", text: "run" }, wide] as readonly Block[];
+
+  const groupsFor = (width: number): { scope?: string; blocks: readonly Block[]; width?: number }[] =>
+    entryLayout(card, width)
+      .filter((run) => !run.blank)
+      .map((run) => ({ scope: "e1", blocks: run.blocks, width: run.width }));
+
+  it("T1.60 (C22 I98, §6j.4, F1062): the declared box is the run's width, and a card transmits where the frame's width would refuse", () => {
+    // **The fixture responds to the thing under test before anything is asserted
+    // against it.** A card is two runs at two widths; if it were one, every
+    // assertion below would pass against a seam that had not changed.
+    const runs = groupsFor(80);
+    expect(runs.map((r) => r.width), "a card is two runs, and the body is inset").toEqual([80, 76]);
+    // And it transmits at all before any box is read off it: a fixture with no
+    // digest emits `""` and satisfies every `not.toContain` below.
+    expect(
+      transmitFrame(runs, KITTY_CAPS, new Map<number, string>(), 80).length,
+      "the fixture transmits something",
+    ).toBeGreaterThan(0);
+
+    // **The ordinary width, which is where this was filed as latent and is not.**
+    // The seam declared `c=80` for a picture the renderer addresses across 76
+    // cells, so the right 5% of the image was drawn into a placement nothing
+    // pointed at. Both numbers are computed by `imageCells`; only the width
+    // handed to it moved.
+    const out = transmitFrame(runs, KITTY_CAPS, new Map<number, string>(), 80);
+    const body = imageCells(wide, 76);
+    const frame = imageCells(wide, 80);
+    expect(frame.cols, "the two boxes must differ or the row asserts nothing").not.toBe(body.cols);
+    expect(out, "the run's box, not the frame's").toContain(`,c=${String(body.cols)},`);
+    expect(out, "and the frame's is absent").not.toContain(`,c=${String(frame.cols)},`);
+
+    // **The refusal half, in the four-column window where the two arms
+    // disagree.** At a frame width of 300 the frame's box is 300 cells — past
+    // `MAX_PLACEHOLDER_SPAN` — so the seam refused and emitted nothing, while
+    // the renderer placed at the run's 296 and drew placeholders addressing a
+    // transmission that never happened.
+    expect(placesAtProtocol(wide, KITTY_CAPS, 300), "the frame's width refuses").toBe(false);
+    expect(placesAtProtocol(wide, KITTY_CAPS, 296), "the run's does not").toBe(true);
+    const at300 = transmitFrame(groupsFor(300), KITTY_CAPS, new Map<number, string>(), 300);
+    expect(at300, "the picture the renderer will place is transmitted").toContain(
+      `,c=${String(imageCells(wide, 296).cols)},`,
+    );
+
+    // The control: a document that is not a card is one run at the frame's
+    // width, so nothing about it moves.
+    const plain = transmitFrame(
+      [{ scope: "e2", blocks: [wide], width: 80 }],
+      KITTY_CAPS,
+      new Map<number, string>(),
+      80,
+    );
+    expect(plain, "a non-card transmits exactly as it did").toContain(`,c=${String(frame.cols)},`);
+
+    // And a group that declares no width still takes the frame's, which is the
+    // shape every caller had before the field existed.
+    const legacy = transmitFrame([{ scope: "e3", blocks: [wide] }], KITTY_CAPS, new Map<number, string>(), 80);
+    expect(legacy, "the parameter is the fallback").toContain(`,c=${String(frame.cols)},`);
+  });
 });
 
 describe("C09 §4c — the placement's identity is not the picture's (I66)", () => {
