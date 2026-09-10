@@ -42807,11 +42807,22 @@ worktree** and not the tree: a row that writes into `out/`, which a fresh worktr
 have, and two rows shelling to `git ls-files`, which does not answer the same way from a
 detached checkout whose `.git` is a file pointer. Both pass in the main tree.
 
-So the verification worktree is wrong in **both** directions — it adds files the runner
-collects and removes conditions rows depend on — and the honest reading of a failure inside
-one is *check it in the main tree first*. That is the same instrument-manufactures-evidence
-class as the collection defect above, in the opposite direction, and it is why the six were
-triaged by re-running rather than by diagnosing.
+**Re-derived before this was left standing, and the first draft of this paragraph was
+wrong.** It said the worktree *removes conditions rows depend on*, as though that were
+inherent. Both artefacts are **setup**, and both have a one-line fix:
+
+- the missing `out/` is a directory the worktree does not carry, so `mkdir` it;
+- the git failure is a **host path inside a container**. A worktree created on the host
+  writes `gitdir: /Users/…/tui-kit/.git/worktrees/<name>` into its `.git` file, and that
+  path does not exist inside the container, so every shell-out to git answers *fatal: not a
+  git repository: (null)*. Rewriting that pointer and its reverse to `/workspace/…` makes
+  git answer — 4 101 files — and both rows pass.
+
+With both applied the **whole chain** runs green in a worktree: check, enforce, audit,
+instruments, test, golden, e2e and proof. So the honest reading is not *a worktree is
+unreliable*; it is **a worktree needs two setup steps, and without them it fails in a way
+that reads as the commit's fault**. A fix that changes nothing indicts the diagnosis, and
+this one changed six failures into zero.
 
 ### What would falsify this
 
