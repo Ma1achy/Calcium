@@ -6,11 +6,11 @@
  * here measures anything the planner did not already account for.
  *
  * **`cells()` and never `.length`** (C09 I6, A03 SS23). The planner and the
- * renderer must agree to the cell, and `fit` is where truncation and padding meet
- * in one place so they cannot disagree.
+ * renderer must agree to the cell, and `fitAt` is where truncation and padding
+ * meet in one place so they cannot disagree.
  */
 import { glyphFor, glyphs } from "../blocks/glyphs.js";
-import { fit, padStart, paintRuns, tone, type Span } from "../blocks/paint.js";
+import { pad, padStart, paintRuns, tone, type Span } from "../blocks/paint.js";
 import { runsOf, runsText, sliceRuns } from "../runs.js";
 import { sparkline, valueBar } from "../plot/index.js";
 import { cells, stripControl, truncate, truncateParts } from "../text.js";
@@ -24,11 +24,45 @@ function gapSpan(gap: number): Span {
 }
 
 /**
+ * Exactly `width` cells **at the session's convention** — truncated if long,
+ * padded if short (I21).
+ *
+ * **This is C09's `fit` with the one argument it cannot take.** `fit`'s parameter
+ * is `Pick<TerminalCapabilities, "unicode">`, so it cannot ask about
+ * `ambiguousWidth`; it forwards the record it is handed to `truncate` — which
+ * reads the field structurally and cuts at the session's convention — and then
+ * calls `pad` with no convention at all, whose default is `"narrow"`. The two
+ * halves of the one function that exists to make truncation and padding agree
+ * therefore measure differently, and the disagreement is one cell per Ambiguous
+ * character at `ambiguousWidth: "wide"`.
+ *
+ * It reaches a frame here and nowhere else in C11, because a column label is
+ * far-side text: `Δt`, `°C`, `µs`, `±`, a box rule in a heading. `rowSpans`
+ * below already pads at `ctx.capabilities.ambiguousWidth`, so an over-padded
+ * header is a header that starts its columns one cell to the right of every row
+ * beneath it — one frame, two answers to where a column starts (F1019).
+ *
+ * The right form is already in the tree three components over: C12's
+ * `furniture.ts` and `circle.ts` write `pad(truncate(text, w, caps), w,
+ * ambiguous)` at every site. This is that expression, named once for C11's three
+ * callers. Widening `fit` itself is C09's to do and closes the class — its third
+ * caller is `blocks/kinds/status.ts`.
+ */
+function fitAt(text: string, width: number, ctx: RenderContext): string {
+  return pad(truncate(text, width, ctx.capabilities), width, ctx.capabilities.ambiguousWidth);
+}
+
+/**
  * The header row: labels, dim, with the sort indicator on the active column.
  *
  * The indicator is appended inside the column's planned width (C11 §4), so a
  * label that no longer fits truncates rather than pushing the row wider than the
  * plan. The columns beneath it are the authority on where each column starts.
+ *
+ * **And the indicator is not the only way a header can widen** (I21). §4's
+ * sentence names it because an indicator is the thing C11 appends; the padding
+ * is the thing C11 completes, and a pad measured at a convention the row beneath
+ * does not use widens the column for the header alone. Both go through `fitAt`.
  */
 export function headerSpans(
   block: Table,
@@ -52,8 +86,12 @@ export function headerSpans(
 
     const text =
       column?.align === "right"
-        ? padStart(truncate(label + indicator, planned.width, ctx.capabilities), planned.width)
-        : fit(label + indicator, planned.width, ctx.capabilities);
+        ? padStart(
+            truncate(label + indicator, planned.width, ctx.capabilities),
+            planned.width,
+            ctx.capabilities.ambiguousWidth,
+          )
+        : fitAt(label + indicator, planned.width, ctx);
 
     spans.push({ text, style: dim });
   });
@@ -91,8 +129,15 @@ export function rowSpans(
       const marker = options.expandable
         ? glyphFor(row.expanded === true ? "collapse" : "expand", ctx.capabilities)
         : "";
+      // `fitAt` and not `fit` for the reason above, even though the internal
+      // glyph table cannot reach it today: `glyphFor` collapses `expand` and
+      // `collapse` to `>` and `v` at `ambiguousWidth: "wide"` (C09 I48), so the
+      // marker is one cell under both conventions and the two padders agree.
+      // Stated rather than relied on — the day a token leaves `AMBIGUOUS_TOKENS`
+      // this is a two-cell glyph in a one-cell column, and the site that decides
+      // that is in a different component (I21).
       spans.push({
-        text: fit(marker, planned.width, ctx.capabilities),
+        text: fitAt(marker, planned.width, ctx),
         style: tone("dim", ctx.theme, ctx.capabilities),
       });
       return;

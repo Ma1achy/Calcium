@@ -3,9 +3,10 @@ import { describe, expect, it } from "vitest";
 import { planColumns, tableDefinition } from "../../src/presentation/table/index.js";
 import { psColumns, psTable } from "../support/blocks.js";
 import { ASCII_CAPS, FULL_CAPS, measurable, visible } from "../support/render.js";
-import { cells } from "../../src/presentation/text.js";
+import { cells, sliceCells } from "../../src/presentation/text.js";
 import { validateDocument } from "../../src/data/viewmodel/index.js";
 import { doc } from "../support/blocks.js";
+import type { AmbiguousWidth } from "../../src/presentation/text.js";
 import type { Block, ColumnDef, Table } from "../../src/data/viewmodel/index.js";
 
 // The cap (C14 I24) raised: T3.9 and T3.16 are about the table's own arithmetic at 3 001 and 10 001 rows.
@@ -283,6 +284,113 @@ describe("C11 tier 3 — edges", () => {
     expect(line).toContain("yes");
     expect(line).not.toContain("▸");
   });
+
+  /**
+   * **The frame, not the total** (I21, F1019).
+   *
+   * F701 read this table's rows and not its widths and found the two halves a
+   * count is blind to; this is the half that survived the width tables being
+   * derived from the property. Every line here is exactly 44 cells before the
+   * fix and after it — `clampSpans` sees to that — so an assertion about a row's
+   * width, or about the sum of the plan, passes in both worlds. What moves is
+   * **where inside the row a column starts**, and only on the header.
+   *
+   * The mechanism: `fit` truncates at the session's convention and pads at
+   * `"narrow"` unconditionally, because its parameter is
+   * `Pick<TerminalCapabilities, "unicode">` and it cannot ask. `rowSpans` pads at
+   * `ctx.capabilities.ambiguousWidth`. So at `ambiguousWidth: "wide"` a header
+   * label carrying an Ambiguous character — `Δ` `°` `µ` `±`, and every box rule —
+   * is padded one cell too far per character, and the columns to its right begin
+   * later in the header than in the rows beneath it. Measured before the fix:
+   * `note` began at cell **36** on the header and **34** on both body rows.
+   *
+   * **The second arm is the control**, and it is what keeps this row from being
+   * a claim about tables in general: with ASCII labels over the same data at the
+   * same width and the same convention, the offsets are identical before and
+   * after. The subject is the label, not the renderer.
+   */
+  it("T3.20 (I21): every row of a frame begins each column at the same cell, header included", () => {
+    const columnsOf = (dt: string, rate: string): readonly ColumnDef[] => [
+      { key: "name", label: "name", align: "left", priority: 90, minWidth: 12, sortable: true },
+      { key: "dt", label: dt, align: "left", priority: 80, minWidth: 8, sortable: true },
+      { key: "rate", label: rate, align: "right", priority: 70, minWidth: 8, sortable: true },
+      { key: "note", label: "note", align: "left", priority: 60, minWidth: 10, sortable: false },
+    ];
+    const rows = [
+      { id: "r1", cells: { name: { text: "alpha" }, dt: { text: "12" }, rate: { text: "20" }, note: { text: "ok" } } },
+      { id: "r2", cells: { name: { text: "beta" }, dt: { text: "13" }, rate: { text: "21" }, note: { text: "no" } } },
+    ];
+    const WIDTH = 44;
+
+    /**
+     * The cell each left-aligned column's ink begins at, read off the drawn row.
+     *
+     * Left-aligned only: a right-aligned column legitimately starts its ink at
+     * a different cell on every row, because the ink is as long as the value.
+     * The column's *extent* is the plan's on every row either way, which is what
+     * makes the extent the thing to slice by and the ink the thing to compare.
+     */
+    const inkStarts = (line: string, extents: readonly (readonly [number, number])[], amb: AmbiguousWidth): readonly number[] =>
+      extents.map(([from, to]) => {
+        const slice = sliceCells(line, from, to, amb);
+        return from + (slice.length - slice.trimStart().length); // cells-ok — leading spaces, one cell each
+      });
+
+    // **`°C` and not `µs`, and the difference is the whole fixture.** U+00B5 is
+    // *not* East-Asian Ambiguous — the property's run is U+00B0..U+00B4 — so a
+    // `µ` measures one cell under both conventions and a right-aligned label
+    // carrying it exercises nothing. The first draft of this row used it, and
+    // the `padStart` site was covered by a character that cannot move: the
+    // mutation that drops its convention argument survived. U+00B0 is Ambiguous
+    // and both sites are reached (`test/support/README.md`'s rule, on a fixture
+    // that has to be shown to respond before it is asserted against).
+    for (const [arm, dt, rate] of [["Ambiguous labels", "Δt", "°C"], ["ASCII labels", "dt", "oC"]] as const) {
+      const columns = columnsOf(dt, rate);
+      const block: Table = { kind: "table", id: "t", columns, rows };
+      const plan = planColumns(columns, WIDTH);
+      expect(plan.dropped, `${arm}: the fixture must plan all four columns`).toEqual([]);
+
+      // The plan's extents, cumulative — the offsets every row is held to.
+      const extents: (readonly [number, number])[] = [];
+      let at = 0;
+      for (const column of plan.visible) {
+        extents.push([at, at + column.width]);
+        at += column.width + plan.gap;
+      }
+      expect(at - plan.gap, `${arm}: the fixture must fill the width exactly`).toBe(WIDTH);
+
+      // Left-aligned columns only — `rate` is right-aligned and its ink moves
+      // with its value by design.
+      const left = extents.filter((_, i) => columns[i]?.align !== "right");
+
+      for (const amb of ["narrow", "wide"] as const) {
+        const reg = measurable({
+          definitions: [tableDefinition],
+          capabilities: { ...FULL_CAPS, ambiguousWidth: amb },
+        });
+        const lines = reg.renderToLines(block, WIDTH).map(visible);
+        expect(lines.length, `${arm} at ${amb}: header and two rows`).toBe(3); // cells-ok
+
+        // **As one set, not a row at a time.** A header compared against the
+        // first body row alone is an assertion two lines could both be wrong in.
+        expect(
+          lines.map((line) => inkStarts(line, left, amb)),
+          `${arm} at ${amb}: the header and both rows start the left-aligned columns at the same cells`,
+        ).toEqual(lines.map(() => [0, 14, 34]));
+
+        // And the whole extent, so a column that begins in the right place and
+        // holds the wrong text is not read as agreement.
+        expect(
+          lines.map((line) => extents.map(([from, to]) => sliceCells(line, from, to, amb).trim())),
+          `${arm} at ${amb}: each column's extent holds that column's text`,
+        ).toEqual([
+          ["name", dt, rate, "note"],
+          ["alpha", "12", "20", "ok"],
+          ["beta", "13", "21", "no"],
+        ]);
+      }
+    }
+  });
 });
 
 /** The rows a dropped-column `keyValue` occupies at this width. */
@@ -305,8 +413,4 @@ describe("C11 tier 3 — ascii parity", () => {
       }
     }
   });
-});
-
-describe("C11 §4 — a column starts at one cell per frame (I21)", () => {
-  it.todo("T3.20 (C11 I21, §4): every row of a frame begins each column at the same cell, the header included, at both ambiguous-width conventions — asserted as ink offsets per row rather than as a width total, because every line measured 44 cells before and after and no total could see it — not deferred on a component: it lands with fitAt in the next commit");
 });
