@@ -43614,3 +43614,83 @@ as a citation because it cannot tell a citation from a disclaimer.
 This is F1040's precedent applied to the other cause. F1040 was spent and folded; this one was never
 spent at all, and the two want the same record for the same reason: **a finding number is a name in a
 namespace every document shares.**
+
+## F1075 — the contract has one consumer, it lives where the producer's typecheck cannot read it, and the gate that would have read it shares a name with one that does not ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `examples/plots/test/plots.test.ts:466` · `src/shell/builders/types.ts:283` · `Makefile:41` and the root `package.json`'s `check` script · this session's own verification chain |
+| **Reached for** | nothing — `make all` was run for the first time this round and failed at its first target |
+| **Verdict** | **Closed as a defect, and the second half is the finding**: `make check` had been red for **23 commits** while a chain reported `check=0`, because the chain ran `npm run check` and the two are different corpora with one name |
+
+### The break
+
+`derive.compute` is declared `(data: unknown, prev: unknown, attempts: number) => unknown`.
+`examples/plots/test/plots.test.ts` called it with two arguments:
+
+```
+test/plots.test.ts(466,80): error TS2554: Expected 3 arguments, but got 2.
+```
+
+**The whole tree has two callers.** `src/shell/refresh.ts:833` is the framework's own; the line
+above is the other, and it is the only consumer of this contract anywhere. It sits in a workspace
+with its own `tsconfig`, so the root `npx tsc --noEmit` — which returns **0** at the same commit —
+cannot see it.
+
+**The declaration's own note is a correct sentence justifying the wrong scope.** It reads
+*"Additive, so every existing fold compiles unchanged"*, and that is true: a fold is an
+implementation, and TypeScript lets an implementation take fewer parameters than its type. It says
+nothing about a **caller**, which must supply all three. This is F84's class — review checks whether
+a justification is true, and this one is — and the question that reaches it is *does this sentence
+constrain the decision it is attached to*.
+
+### The gate, which is the half worth keeping
+
+`make check` and `npm run check` are not the same gate:
+
+| | what it runs |
+|---|---|
+| `npm run check` | `tsc --noEmit && eslint .` — the root `tsconfig` only |
+| `make check` | that, plus `npm run build`, plus `npm run check` in **every** directory under `examples/` with a `package.json` |
+
+The Makefile comment on that loop already says why it is a directory sweep rather than a list —
+*discovered, not listed*, F150's third site. It was right about the population and the population
+was never read, because the chain that verifies a commit ran the npm script.
+
+**Measured, both ends.** `make check` exits 2 at HEAD and exits 2 at `a5c747d0`, in a fresh
+detached worktree with the container's own git pointers — so the worktree is not masking anything
+and never was. The chain that recorded *build=0, check=0, enforce=0, instruments=0, test=0,
+golden=0, e2e=0, proof=0, audit=0* at `a5c747d0` was reporting the root script's exit under the
+gate's name.
+
+**`make test` has the same shape** — `npm run test` plus the same loop over `examples/*`. So the
+substitution costs two of the nine gates their consumer half, and the consumers are exactly where a
+widened contract shows up: *a consumer finds variance a producer cannot*, and here the producer's
+typecheck is structurally unable to.
+
+**And CI never covered for it.** `.github/workflows/ci.yml` runs `make check`, with a comment saying
+so — *includes both examples' own `check` scripts (F150)* — but `gh run list` shows no run on this
+branch at all; the most recent runs are 2026-09-08 on `feat/pushed-surface-input`. The gate existed,
+was correct, was named in three places, and was run by nothing.
+
+### What the shape is
+
+This is *a gate that exists and is not run*, arriving through a **name collision** rather than
+through a missing row. Every previous instance was a gate nobody had wired up. Here it is wired up
+three times over — Makefile target, CI step, and the comment explaining the population — and the
+thing that defeated all three is that a shorter command with the same name does most of the job.
+`npm run check` is not wrong; it is a subset that reports the same green.
+
+**The two-word test that catches it:** the target's recipe is more than `npm run <its own name>`.
+That is true of `check` and `test` and of nothing else in `all`.
+
+### What would falsify this
+
+- A reading under which the example workspaces are deliberately outside the verification chain.
+  The Makefile comment and the CI comment both argue the opposite, and both cite F150.
+- `attempts` at the fixed call site is `0` because the test renders each part once against a fresh
+  value with no fold held — the first tick, which is what `refresh.ts` passes on a source's first
+  resolution. If a future reading wants the parameter exercised rather than defaulted, that is a
+  row this file does not have and the fix would be a second case, not a different literal.
+- The 23-commit figure is the distance from `43a58fd9` to HEAD. It is the age of the *break*, not
+  of the substitution, which is older and undated.

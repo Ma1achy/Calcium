@@ -463,7 +463,15 @@ describe("every command composes a document the transcript would accept", () => 
           rendered += 1;
           continue;
         }
-        const data = part.spec.derive === undefined ? value : part.spec.derive.compute(value, undefined);
+        // `undefined` prev and `0` attempts is the first tick: no fold held and
+        // nothing has failed yet, which is what `refresh.ts:833` passes on the
+        // first resolution of a source. The third argument arrived when the
+        // declaration caught up with the runtime, and the note attached to it —
+        // *additive, so every existing fold compiles unchanged* — is true about
+        // a fold and says nothing about a **caller**, which must supply all
+        // three. This line is the caller, and it is in a workspace the root
+        // `tsc` does not reach (F1075).
+        const data = part.spec.derive === undefined ? value : part.spec.derive.compute(value, undefined, 0);
         try {
           expectDocument(as(d.command, [...d.blocks, part.spec.render(data, ctx)])).isValid();
           rendered += 1;
