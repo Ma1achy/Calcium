@@ -46551,3 +46551,108 @@ cannot reproduce.
   the tree clean and 90 mutations caught, and the runner killed it at the bound.
 - **The per-run logs being printed somewhere.** `sweep.mjs` writes them and no
   line reads them back; the job log carries the summary line alone.
+
+---
+
+## F1098 — the profiler's headline table says `measured` on a column its own seam documents as counting questions ★★★★
+
+| | |
+|---|---|
+| **Surface** | `tools/profile.mjs:290` · `src/shell/profiling/registry-probe.ts:14` · `src/presentation/blocks/registry.ts`'s height memo |
+| **Reached for** | closing P11's last item, the one the round's plan said the instrumentation would find |
+| **Verdict** | **open** |
+
+### Two sentences about one column
+
+The seam that produces it:
+
+> `measureChild` … reads the call's height memo first and reaches `this.measure`
+> only on a miss — so a wrapper installed here is entered for every child that
+> had to be **answered**, at every depth, and the `calls` column counts
+> **questions rather than reads** (F940).
+
+The report that prints it:
+
+```js
+per > 1.05 ? " <-- measured more than once per frame" : ""
+```
+
+**A question the memo answers costs nothing and still counts.** So an element
+that is measured exactly once and asked twice is reported as *measured more than
+once per frame*.
+
+### Measured, by tallying the memo
+
+`#measured` instrumented by hand to separate a hit from a real measure, over the
+same 35-frame session the report describes:
+
+| element | real measures | memo hits | the report says | actually measured |
+|---|---|---|---|---|
+| `pills#chrome.header.left` | 35 | 35 | **2.0 ← flagged** | **1.0** |
+| `pills#chrome.header.right` | 35 | 35 | **2.0 ← flagged** | **1.0** |
+| `pills#chrome.footer.left` | 70 | 35 | **3.0 ← flagged** | 2.0 |
+| `pills#chrome.footer.right` | 70 | 35 | **3.0 ← flagged** | 2.0 |
+| `group#chrome.footer` | 70 | 0 | 2.0 | 2.0 |
+| `group#chrome.header` | 35 | 0 | 1.0 | 1.0 |
+| `table#profile-table` | 67 | 0 | 2.0 | 2.0 |
+
+**The header's pills are flagged and are measured once.** Every overstatement is
+exactly the memo's hit count, which is the arithmetic saying the two columns are
+the two different quantities the seam already said they were.
+
+### What it cost, and the cost is the reason this is worth a number
+
+C28's plan carries a defect list for the round's last phase, and its second row
+reads *a `group` measures every child **3×***. The report flags exactly that
+shape, so the row reads as still open.
+
+**It is not.** F940's memo fixed it, and the *before* figures are written in
+`registry.ts`'s own header:
+
+> Measured before this existed, on the default chrome: `pills#chrome.header.left`
+> at **3.0** calls per frame and `pills#chrome.footer.left` at **4.0** (F940).
+
+**The flagged number and the fixed number are the same number.** The report
+prints 2.0 and 3.0 where the pre-fix reading was 3.0 and 4.0 — one lower, in the
+same units, under a caption that says *measured* — so a reader chasing the plan's
+row finds a table that appears to confirm it and goes looking for the defect in
+`containers.ts`. That is the whole of this session's last hour.
+
+### And the residual 2× is a ruling, not an oversight
+
+Widening the memo from the call to the frame would take the footer group and the
+table to 1.0. That is what F914 refused, on C11 I11's ground, and `registry.ts`
+says so in the same header:
+
+> **The lifetime is the call, and that is the whole of the ruling.** F914 refused
+> *a cache across `measure` and `render`* … a kind's plan memoised on `(columns,
+> width)` outlives the document that made it and is where correctness defects
+> live.
+
+So the two real measures per frame are the footer's height pass and the paint
+pass, in two public calls, and collapsing them is a refused change rather than an
+unfixed one. **P11's seven are all resolved**: six by repairs with records in the
+code, and the seventh by a memo whose own header carries the before and after.
+
+### Remedy
+
+**The word, not the count.** The count is right and is the one worth keeping — an
+ask is work the registry had to route, at every depth, even when the answer was
+free — so the column becomes `asks`, the marker `asked more than once per frame`,
+and a line under the table says what an ask is and that a memo hit is one.
+
+**Stated blind spot, and it is why the count cannot simply become measures.** The
+registry must not learn a profiler exists — MG1 makes `src/shell/profiling/` rank
+4 and the decoration is what keeps `src/presentation/` unchanged — so the memo's
+hit is invisible from outside by construction. Reporting real measures would need
+a seam from the registry to the probe, which is a design change and not a label.
+The report can say what it counts; it cannot count the other thing.
+
+### What would falsify this
+
+- **The column counting reads after all.** `registry-probe.ts`'s header says
+  otherwise, and the hand tally agrees with it to the hit.
+- **The pre-fix figures being something else.** `registry.ts`'s memo header
+  records 3.0 and 4.0 and cites F940.
+- **The residual 2× being collapsible.** It is two public calls in one frame, and
+  the ruling that forbids sharing across them is F914's, quoted above.
