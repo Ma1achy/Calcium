@@ -2595,35 +2595,45 @@ assumed.
 ##### The buffer stays a string, and that is the finding
 
 The tempting move is a structured buffer — an array of `string | ChipRef`. **It is not one
-component's change, it is four**, because `editor.text` leaves C17 as a plain string at seven
+component's change, it is four**, because `editor.text` leaves C17 as a plain string at nine
 sites and every one of them would need its own answer:
 
 | reader | what it does with the string |
 |---|---|
-| `shell/construct.ts:2523` | `pipeline?.submit(stores.editor.resolved)` — **C23 takes a string**, and `resolved` is declared `readonly resolved: string` |
-| `shell/keys.ts:293`, `:563` | `contextAt(text, cursor, manifest)` — C19 completes against it |
-| `shell/keys.ts:612`, `:800` | `history.previous(text)`, `searchOpen(text)` — **C20 stores strings** |
-| `shell/session.ts:549`, `:579` | `selectionSpans(text, …)` — C09's wash |
-| `shell/construct.ts:1576` | `promptHasText` |
+| `shell/construct.ts:2525` | `pipeline?.submit(stores.editor.resolved)` — **C23 takes a string**, and `resolved` is declared `readonly resolved: string` |
+| `shell/keys.ts:382`, `:652` | `contextAt(text, cursor, manifest)` — C19 completes against it |
+| `shell/keys.ts:486` | `const before = deps.editor.text`, then `setText` — an **edit round-trip** through a plain string |
+| `shell/keys.ts:701`, `:977` | `history.previous(text)`, `searchOpen(text)` — **C20 stores strings** |
+| `shell/session.ts:1242` | `selectionSpans(text, …)` — C09's wash |
+| `shell/session.ts:1282` | `contextAt(text, cursor, …)` inside `completion.ghost(…)` — C19 again, from the shell (`:579` when this was written) |
+| `shell/construct.ts:3010` | `promptHasText` |
+
+**The count read *seven* until 2026-09-10 and the population has never been seven.** Measured
+at `437aaa79`, the commit that wrote this table: nine reader sites, of which the table listed
+eight and the prose above it said seven. Nine again today — **the population never moved; the
+count was wrong on the day and the citations drifted around it.** The member that has never
+been in the table is `keys.ts:486` (`:397` then), which reads the buffer and writes it back
+through `setText` — an **edit round-trip**, so a sentinel plus a side map has to survive a
+write and not only a read. That is the strongest row here and it was the missing one. F1092.
 
 A structured buffer makes C19, C20, C22 and C23 all take a new shape before a single chip is
-drawn. A sentinel grapheme plus a side map is **C17-local**, and the seven readers keep working
+drawn. A sentinel grapheme plus a side map is **C17-local**, and the nine readers keep working
 on the day the chip exists — which is what makes the first version reversible.
 
 ##### The table lists readers of `text`, and three of them read an INDEX with it
 
-**Found going to place the sentinel, 2026-08-15, and it moves the design.** The seven-reader
+**Found going to place the sentinel, 2026-08-15, and it moves the design.** The reader
 table above is a list of *what consumes the string*, and it is the wrong axis for the question
-it was answering. **Three of the seven pass a buffer index alongside it**:
+it was answering. **Four of the nine pass a buffer index alongside it**:
 
 ```
-keys.ts:293    contextAt(editor.text, editor.cursor, manifest)
-keys.ts:563    contextAt(editor.text, editor.cursor, manifest)
-session.ts:579 contextAt(editor.text, editor.cursor, manifest)   — the ghost
-session.ts:549 selectionSpans(editor.text, sel.anchor, sel.head, …)
+keys.ts:382     contextAt(editor.text, editor.cursor, manifest)
+keys.ts:652     contextAt(editor.text, editor.cursor, manifest)
+session.ts:1282 contextAt(editor.text, editor.cursor, manifest)   — the ghost
+session.ts:1242 selectionSpans(editor.text, sel.anchor, sel.head, …)
 ```
 
-**So the obvious implementation of *the seven readers keep working* does not work.** The
+**So the obvious implementation of *the nine readers keep working* does not work.** The
 tempting move is to have the `text` getter **resolve** chips to their content — every reader
 sees a plain string, nothing else changes, and the sentinel never escapes. It is wrong for a
 reason the table cannot show: `cursor`, `anchor` and `head` are indices into the **raw** buffer,
@@ -2631,7 +2641,7 @@ and the moment a chip precedes one of them the pair disagrees. Completion would 
 wrong offset and the selection wash would paint the wrong run — **both silently, and both only
 in a frame.**
 
-**So resolution is at the submission site and nowhere else** (`construct.ts:2523`), and the
+**So resolution is at the submission site and nowhere else** (`construct.ts:2525`), and the
 sentinel is therefore visible to `contextAt`, `selectionSpans` and C20. Each has to tolerate it,
 and each tolerates it differently:
 

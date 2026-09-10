@@ -45632,3 +45632,111 @@ makes the case for the change better than any argument does.
 walks and two segmentations where the minimum over three cost six walks. A third
 of the pressure F1088 put on `CORPUS_BUDGET_MS` handed back by the row that
 caused it.
+
+## F1092 — an evidence table of nine readers: eight cited, all eight wrong, one that never resolved, and the gate saw the line that landed on whitespace ★★★★
+
+| | |
+|---|---|
+| **Surface** | `CALCIUM_ROADMAP.md` entry 30's reader table · `tools/roadmap-status.mjs`'s body-citation arm |
+| **Reached for** | `make instruments` red after merging `main`, with exactly one problem |
+| **Verdict** | **open** |
+
+### One problem reported
+
+Merging `main` shifted `src/shell/construct.ts` by twenty lines and `session.ts`
+by nine. `make instruments` went red with a single line:
+
+```
+body: shell/construct.ts:1576 is blank
+```
+
+Going to fix that one citation is where the finding is.
+
+### All eight are wrong, and the population was never what the prose said
+
+Entry 30 argues that a structured buffer is *four components' change* because
+`editor.text` leaves C17 as a plain string at a list of sites. Measured at
+`437aaa79`, the commit that wrote the table on 2026-08-15:
+
+| | |
+|---|---|
+| reader sites actually in the tree | **nine** |
+| sites the table listed | **eight** |
+| sites the prose above it claimed | **seven** |
+
+Three numbers, no two of them equal, in one screen of one document. And the
+population **has not moved** — nine sites then, nine now. The count was wrong on
+the day and the citations drifted around it.
+
+**The member that has never been in the table is the strongest row.**
+`keys.ts:397`, now `:486`, is `const before = deps.editor.text` followed by
+`deps.editor.setText(…)` — an **edit round-trip**. Every other reader consumes
+the string; this one reads it and writes it back, so a sentinel plus a side map
+has to survive a *write*. The entry's whole question is whether the sentinel
+design is C17-local, and the row that bears hardest on it was the one nobody
+listed.
+
+### And one citation that never resolved at any commit
+
+`shell/construct.ts:2523` is cited twice — the table row and the prose sentence
+*resolution is at the submission site and nowhere else*. On the day it was
+written `construct.ts` was **1659 lines long**, and the submission site was at
+**1215**, reading `stores.editor.text` rather than `stores.editor.resolved`.
+Swept over every commit that has touched the file since: the line
+`pipeline?.submit(stores.editor.resolved)` has been at 2525 since it appeared
+and has **never once been at 2523**.
+
+So this is not drift. It is a citation that was false when written, carried for
+twenty-six days, and load-bearing in a sentence about where resolution happens.
+
+### Why the gate reported one of eight
+
+`roadmap-status.mjs` says what it does, in its own output:
+
+> **body citations** · 73 `path:line` citations outside the evidence table,
+> checked for the file existing and the line being **non-blank only**
+
+**Non-blank is satisfied by every wrong line that is non-blank.** `:1576` landed
+on whitespace and was caught; `:2523` lands on a comment two lines above its
+subject and passes; the six in `keys.ts` and `session.ts` land in the middle of
+other functions and pass. *Containment is not correctness*, with the containment
+being *the line has characters on it*.
+
+**The sibling signal already measures the real thing and is not gated:**
+
+> **citation anchorage** · 39/74 line citations carry one of their own cell's
+> symbols within 6 lines — adrift: … and 29 more (F904, reported not gated)
+
+So the instrument for this exists, has run every build, and reports **thirty-five
+adrift** into a line nobody treats as a verdict.
+
+### Why it is not simply switched on, which is the residue
+
+Gating anchorage today turns the build red on thirty-five rows across the
+roadmap, most of them in entries nobody is working on. That is a repair campaign
+rather than a merge. What lands here is entry 30's table — nine rows with the
+lines they resolve to, the count corrected in all four places it appears, and
+the missing member named — plus this record. **The thirty-five are the residue
+and they are named rather than closed.**
+
+### The step that found it, and it is not the gate
+
+The gate produced one line about whitespace. What produced the rest was
+**resolving each cited claim against HEAD before trusting the row** — the
+seventh pass's own method, and the reason the count came out at nine rather than
+being copied forward as seven.
+
+**And it caught a claim of my own in the same hour.** The first repair of this
+table asserted *seven when this was written, nine now, and the two arrivals* —
+an inference, written without measuring, and false: both "arrivals" were readers
+on the day and one of them had simply never been listed. The correction is in
+the entry. A count carried into a sentence is a claim, whoever is carrying it.
+
+### What would falsify this
+
+- **`construct.ts:2523` having resolved at some commit.** Swept over every
+  commit touching the file since 2026-08-14: zero matches at that line.
+- **The population having grown from seven.** Nine at `437aaa79`, nine at HEAD,
+  by the same grep over the same three files.
+- **The anchorage signal being gated after all.** Its own line says *reported not
+  gated*, and the build is green with thirty-five adrift.
