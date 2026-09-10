@@ -44373,3 +44373,102 @@ and removing it from that list fails the row. The reader must be
 `keyedRows`' own — first line per id, across the whole document — or a group
 walk double-counts an id mentioned twice; measured with that reader the groups
 sum to 1071 against 12 ids keyed before the first heading.
+
+## F1081 — two assertions in one row raced on one knob, in opposite directions ★★★☆
+
+| | |
+|---|---|
+| **Surface** | `test/e2e/profiler.test.ts` T5.1d, and `docs/components/C28_profiler.md` §10's row for it |
+| **Reached for** | `make instruments` red on T5.1d after the F405 round, blocking six commits |
+| **Verdict** | **closed** — the sleep widened to two wake periods, the settled figure read from the frame, and the wake looked for where F974 says it sits |
+
+### The two timelines
+
+The row records behind a far side sleeping 1 200 ms so the readout's
+one-second wake draws a frame while the call is in flight, and asserts that
+frame is in the recording. Green and red, from the row's own `timeline`:
+
+```
+green  … input:"/ps --limit 20\r" frame:431 frame:184 frame:476 far:ps frame:3827 …
+red    … input:"/ps --limit 20\r" frame:431 frame:184           far:ps frame:3985 …
+```
+
+`frame:476` is the wake. The read log dates it: **+1085 ms** after the submit,
+against an answer at **+1307**. A **222 ms** margin on a 1 000 ms periodic wake,
+and the row has one of them inside the call.
+
+### The load reading is falsified, not merely unconfirmed
+
+F929 recorded two profiler rows going red the same way and said what would
+settle it: *a run under deliberate load with the profiler file isolated*. Run —
+fourteen busy loops on eleven cores, six runs, load to 19.9:
+
+| load 1m | answer | wake at | margin |
+|---|---|---|---|
+| 2.5 | 1 327 | +1 085 | 222 |
+| 9.5 | 1 664 | +1 240 | 414 |
+| 14.2 | 1 593 | +1 150 | 435 |
+| 18.5 | 1 959 | +1 543 | 372 |
+| 17.8 | 1 737 | +1 209 | 519 |
+| 19.1 | 1 649 | +1 191 | 452 |
+| 19.9 | 1 867 | +1 348 | 503 |
+
+Seven green, and **the margin grows with load** — the far side's answer path
+slows faster than a timer does. *A busy machine loses the wake* is the obvious
+reading and the measurement rejects it.
+
+### What the same runs did show: the other race
+
+At load 18.5 the answer reached **1 959 ms**. The row's second assertion is a
+literal — `" · 1s · 20 rows"` — and `elapsed()` floors, so **41 ms** more and
+the settled head draws `2s` and that assertion fails instead. It has never
+failed, so nobody has ever looked at its headroom.
+
+**Two races on one knob, pulling opposite ways.** `farSideDelayMs` is the only
+lever: raising it buys the wake its margin and spends the settled figure's.
+Which is why widening alone would have been a repair that moves the failure
+rather than ending it — and the half being spent was invisible, because it was
+still green.
+
+### Fixed
+
+- **2 500 ms**, so two wake periods land inside the call rather than one and a
+  fifth. Losing one leaves the other, and the last is ~1 500 ms ahead of the
+  answer instead of 222.
+- **The settled figure read out of the frame**, `/· (\d+)s · 20 rows/`, so which
+  second it falls in stops being a claim about the harness's arithmetic. The
+  `CLOCK_DERIVED` mask loop then runs over the string the frame actually drew
+  rather than over a literal that can drift from it, which is the stronger
+  subject as well as the unraceable one.
+- **The wake looked for among the frames recorded before the `far` line.**
+  F974's claim is *a frame sits in the recording ahead of the `far` line*;
+  `frames.some` over every frame was a proxy that happens to be equivalent
+  here. `far` is recorded when the answer arrives, which the green read log
+  settles: the wake at +1085 precedes it and the echo frames at +42 and +50 do
+  not.
+
+### What is recorded and not diagnosed
+
+The repair holds under a late timer, under an unlucky phase and under two
+commits folded into one frame. It does not reach the one hypothesis still
+standing: `armParts` arms the readout's wake only while
+`deps.visible({ kind: "entry", id })` is true, so an entry not yet visible at
+registration arms **no timer at all** and waits on `visibilityChanged` to
+re-arm — which would put the first wake a full second after that notification
+rather than after the call started. Unreproduced in seven runs. The next reader
+starts there.
+
+### The red left one line that could say none of this
+
+The row's three assertions before the replay carry `timeline(rec)`, which is an
+event order with **no times in it**. `explain` — the message F929 and F949
+built for precisely this, carrying `took`, the PTY read log, both timelines,
+the clock counts, the load and any stray fixture process — takes a verdict, so
+it is unreachable until after `replay()` has run. The three assertions whose
+subject *is* timing got the one message in the file with no clock in it, and
+the row that went red was one of them.
+
+`harness()` extracted from `explain`, so both use one source for the timing
+lines, and the pre-replay messages are built only in the failing branch — a
+green run spawns no `ps`.
+
