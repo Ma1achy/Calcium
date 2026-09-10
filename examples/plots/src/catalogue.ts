@@ -1,23 +1,30 @@
 /**
  * Every form `PlotForm` declares, built through `b.plot`.
  *
- * **The four that cannot be built are entries here, not omissions** (F377). A
- * catalogue that silently skips what it cannot construct reports 42 of 42 and
+ * **A form that cannot be built is an entry here, not an omission** (F377). A
+ * catalogue that silently skips what it cannot construct reports *n* of *n* and
  * reads as complete — the shape F313 caught in the contact sheet and F350 in
- * the corpus. So `gantt`, `waterfall`, `pairplot` and `smallmultiples` are
- * `refused`, each naming the field the published builder does not declare, and
- * the count a reader sees is **46**.
+ * the corpus. So a form whose only datum `b.plot` does not declare gets an entry
+ * naming the missing field, drawn as a notice and **counted in the total**.
  *
- * Measured rather than assumed: 39 forms build in full, 3 build reduced —
- * `bar` without `layout`, `histogram` without `layout`/`binning`, `line`
- * without `xScale`/`emptyMessage` — and 4 not at all.
+ * **Measured 2026-09-10: 48 forms, 76 variants, and `refusals()` is empty.**
+ * The published builder takes all eight of F335's members now, so every form
+ * builds and the count on screen is 48 of 48.
+ *
+ * **This comment said 46, and four refused, for as long as that was false**
+ * (F1008). `gantt`, `waterfall`, `pairplot` and `smallmultiples` were the four,
+ * and the section that closes them is 380 lines down in this same file — so the
+ * head of the catalogue and its body disagreed, and the head is what a reader
+ * takes a premise from. The mechanism stays because the next form added to
+ * `PlotForm` before its builder is the reason to have it; `T-refuse` exercises
+ * it, and calls `refuse` rather than building the object by hand.
  */
 import { b } from "@fmx/calcium";
-import type { Block, Plot, Series } from "@fmx/calcium";
+import type { Block, Camera, PlotForm, Series } from "@fmx/calcium";
 import { CORES, STAGES, WIDTHS, budget, field, magnitudes, summaries, wave } from "./data.ts";
 import { mesh } from "./meshes.ts";
 
-export type PlotForm = Plot["form"];
+export type { PlotForm };
 
 /** A form the published builder cannot construct, and the reason (F335, F377). */
 export type Refusal = Readonly<{ refused: string; needs: string }>;
@@ -88,13 +95,26 @@ const rows = (n: number, phase: number, cols = 16): Series[] =>
   field(n, cols, phase).map((v, i) => s(v, CORES[i] ?? `row ${String(i + 1)}`));
 
 /**
- * `Camera` reached through the block that carries it, **because the published
- * surface does not name it** (F505). `@fmx/calcium` exports `Plot` and not
- * `Camera`, so a consumer writing anything typed over a camera — a helper, a
- * control, an orbit — has to index the block to get at it. Indexing works and
- * says the wrong thing: this is a type about a *view*, not about a plot.
+ * The framing a `plot3d` rung starts from — **a helper typed over `Camera`,
+ * which the surface now names** (F999, C24 I34).
+ *
+ * `...x` replaces an object rather than merging into it (F504), so a rung that
+ * sets only a `projection` would otherwise drop the entry's azimuth with it.
+ * That rule lived in an inline spread under three paragraphs of comment; it is a
+ * function now, which is the difference between a rule and a note about one.
+ *
+ * **What was here was `type PlotCamera = NonNullable<Plot["camera"]>`, and it
+ * had been dead since F509.** The alias existed because `@fmx/calcium` published
+ * `Plot` and not `Camera`, so the only way to name a camera was to index the
+ * block that carries a starting one — which compiles and says the wrong thing,
+ * since this is a type about a *view*. Its consumer was `cameraAt(phase, …)`,
+ * removed when the framework's own delta-timed orbit took over; the alias
+ * survived, carrying F505's justification for an export while nothing read it.
  */
-type PlotCamera = NonNullable<Plot["camera"]>;
+const startingCamera = (over?: Partial<Camera>): Partial<Camera> => ({
+  azimuth: Math.PI / 4,
+  ...(over ?? {}),
+});
 
 /**
  * Every form's own extras, on top of `form`, `height` and an id.
@@ -164,7 +184,7 @@ export const rungId = (form: PlotForm, name: string): string => `f-${form}-${nam
 /** The four facets both delegating forms show — one series each, named. */
 const FACET_KEYS = ["cpu", "mem", "io", "net"] as const;
 
-const refuse = (needs: string, what: string): Refusal => ({
+export const refuse = (needs: string, what: string): Refusal => ({
   refused: `\`${needs}\` is not declared on \`b.plot\` — ${what}`,
   needs,
 });
@@ -243,7 +263,7 @@ export const CATALOGUE: Readonly<Record<PlotForm, Entry>> = Object.freeze({
     // rate wrong. The rung's camera is now the framing the view starts from
     // rather than the only one it ever reaches — and the merge is still needed,
     // because `...x` still replaces an object.
-    camera: { azimuth: Math.PI / 4, ...(x?.camera ?? {}) },
+    camera: startingCamera(x?.camera),
   }) },
   sparkline: { says: "a shape, no furniture", at: (p, h, x) => plot("sparkline", Math.min(h, 1), {
     series: [s(wave(40, p, 5, 6, 10))], ...x }) },
@@ -378,8 +398,12 @@ export const CATALOGUE: Readonly<Record<PlotForm, Entry>> = Object.freeze({
   //
   // **`refuse` is kept** rather than deleted with its last caller: it is the
   // shape an entry takes when the surface cannot build a form, and the next form
-  // added to `PlotForm` before its builder is the reason to have it. Exercised by
-  // `T-refuse` so it is not a function nothing calls.
+  // added to `PlotForm` before its builder is the reason to have it.
+  //
+  // **And this comment claimed `T-refuse` exercised it when `T-refuse` built the
+  // object by hand** (F1008) — a helper kept alive by a sentence naming a caller
+  // that was not one, which is the same thing `noUnusedLocals` would have said
+  // out loud had the example tree set it. It is exported and called now.
   gantt: { says: "bars with a start per row", at: (p, h, x) => plot("gantt", h, {
     axes: true, categories: ["build", "test", "deploy", "monitor"],
     series: [s([5, 3, 2, 1 + (p % 3)])], offsets: [0, 5, 8, 10], ...x }) },

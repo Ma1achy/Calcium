@@ -15,7 +15,7 @@
  *   4. confirmed              → `ok`, and docker invoked exactly once
  */
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { createMutationHandler } from "../src/mutation.ts";
 import type { AskOptions, LocalContext } from "@fmx/calcium";
 

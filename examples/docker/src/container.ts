@@ -23,7 +23,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { b } from "@fmx/calcium";
-import type { AdapterDocument, Adapter, Block, ErrorLike, ViewDocument } from "@fmx/calcium";
+import type { AdapterDocument, Adapter, Block, ErrorLike } from "@fmx/calcium";
 import { BUSY, HOT, percent } from "./dashboard.ts";
 
 /**

@@ -108,8 +108,11 @@ const results = runPass({
       // A status box that says something failed and not what.
       name: "an empty status message is accepted",
       file: VALIDATE,
-      from: '    if (typeof b["message"] !== "string" || b["message"].trim() === "") {',
-      to: '    if (typeof b["message"] !== "string") {',
+      // Re-anchored when C04 I114 split the absent arm out (F995): the check
+      // this mutation defeats is now the `else if`, and its meaning is
+      // unchanged — an empty *supplied* message is accepted.
+      from: '    } else if (typeof b["message"] !== "string" || b["message"].trim() === "") {',
+      to: '    } else if (typeof b["message"] !== "string") {',
       expect: "T2.126",
     },
     {

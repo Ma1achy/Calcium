@@ -252,7 +252,7 @@ describe("C11 tier 4 — the table inside C09", () => {
     const registry = measurable({ definitions: [tableDefinition] });
     const report = checkMeasurement(registry, TABLE_CORPUS);
     expect(report.failures, formatReport(report)).toEqual([]);
-    // The corpus here is table-only, so the fourteen defaults are legitimately
+    // The corpus here is table-only, so the nineteen defaults are legitimately
     // uncovered; what must not be uncovered is the kind this suite is about. A
     // corpus that had stopped containing a table would otherwise pass having
     // measured nothing — the vacuity C09's own suite guards with the same call.

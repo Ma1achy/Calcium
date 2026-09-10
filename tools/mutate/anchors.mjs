@@ -25,6 +25,15 @@
 // meaning is the citation-resolves-against-the-wrong-invariant class, and
 // `docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass says why no mechanism for
 // that should be built. This checks only that the text is there to be replaced.
+//
+// **And that the run is a program at all** (F997). Every arm here reads the run
+// as *text*, and text resolves whether or not the file parses: a `const STACK`
+// declared twice in `c12-arm-seam.mjs` made the run die before its first
+// mutation while this sweep reported *1005 anchors · 937 expectations · no run
+// drifted from what the list says*. Every anchor did resolve and the sentence
+// was true. `parseErrorOf` is the one question a text sweep cannot answer for
+// itself, and it is asked first.
+import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 
 const ROOT = process.cwd();
@@ -152,6 +161,46 @@ const KNOWN_SILENT = {};
  * a file with no `runPass(` at all is not a run and is not checked, which is
  * what lets a mutations-only fixture through MA1.
  */
+/**
+ * Why node refuses to parse a run, or `null` when it parses (F997).
+ *
+ * **The question every other arm in this file assumes an answer to.** A `from:`
+ * is found by a regular expression and a tail is read by `lastIndexOf`, and
+ * both work perfectly on a file that is not a program — so a run with a
+ * duplicated `const` reports every anchor resolving, right up until someone
+ * spends the half hour and watches it die before its first mutation. **A green
+ * from this sweep is what licenses not spending that half hour**, which is why
+ * the cheap proxy owes the cheap question.
+ *
+ * `process.execPath` rather than `node`: the parse that counts is the one
+ * performed by the runtime that will run the pass, and a second binary on the
+ * PATH answers a question nobody asked.
+ *
+ * **No debt list, and the asymmetry is the reason.** A stale anchor is listed
+ * rather than repaired because re-anchoring without running the pass produces a
+ * mutation that applies and asserts nothing — a repair that reads as coverage.
+ * A syntax error has no such trap: the file cannot run at all, so there is
+ * nothing a repair could quietly invalidate, and the remedy is the line eslint
+ * has already printed. An entry here would be an excuse for a five-second fix.
+ *
+ * **The blind spots, stated.** This asks whether the file *parses*, not whether
+ * it *links*: a mistyped named import — `import { runPas } from "../mutate.mjs"`
+ * — is resolved when the module is instantiated, and no check short of running
+ * the module sees it. Nor does it reach a run that parses, links, and throws on
+ * its first statement, or one whose `to` does not parse — the harness reports
+ * that last one itself, as `DID NOT BUILD`. What closes the class is executing
+ * the run, and executing a run is the pass.
+ */
+function parseErrorOf(path) {
+  const r = spawnSync(process.execPath, ["--check", path], { encoding: "utf8" });
+  if (r.status === 0) return null;
+  // node prints `<path>:<line>`, the offending source, a caret, then the error.
+  const lines = `${r.stderr ?? ""}`.split("\n");
+  const at = /:(\d+)$/.exec(lines[0] ?? "");
+  const why = lines.find((l) => /^[A-Za-z]*Error: /.test(l))?.trim() ?? "node --check refused it";
+  return at === null ? why : `${why} (line ${at[1]})`;
+}
+
 function silenceOf(src) {
   const at = src.lastIndexOf("runPass(");
   if (at === -1) return null;
@@ -175,7 +224,11 @@ const KNOWN_STALE = {
   "c22-construct.mjs": 3,
   "c22-frame-session.mjs": 2,
   "c22-selection-wash.mjs": 1,
-  "c23-refresh.mjs": 10,
+  // `c23-refresh.mjs` was 10 and is gone (F1011): all ten were re-anchored and
+  // the pass runs 17 of 17 caught, control killed. Nine were one rework — the
+  // thing that polls is the source, not the part — and the tenth was a mutation
+  // whose subject `b.live` no longer has, so it went with it rather than being
+  // re-pointed at a nearby line it would have asserted nothing about.
 
   // **Six of these arrived at once, and none of them rotted that day** (F173).
   // They were stale already and the checker could not see them: it matched only
@@ -395,6 +448,10 @@ const unresolvable = [];
 const silent = {};
 /** Runs whose tail was read at all — the counter, so a reader matching nothing shows. */
 let tails = 0;
+/** Runs node refuses to parse (F997) — see `parseErrorOf`. */
+const unparseable = [];
+/** Runs handed to `node --check` — the control, on `tails`' argument. */
+let parsed = 0;
 
 // **Two roots, because a run cwds to the package it mutates.** The docker runs
 // address `src/ps.ts` and mean `examples/docker/src/ps.ts`; resolving against
@@ -404,6 +461,18 @@ const rootsFor = (file) => [`${ROOT}/${file}`, `${ROOT}/examples/docker/${file}`
 
 for (const run of runs) {
   const src = readFileSync(`${RUNS_AT}/${run}`, "utf8");
+  // **Can the run start?** (F997). Checked before the tail, on the tail's own
+  // argument one step earlier: a run that cannot report is a run whose anchors
+  // do not matter, and a run that cannot parse is a run whose *tail* does not
+  // matter either. Reported once and the file abandoned, because anchors read
+  // out of a file nothing will execute are noise stacked on the one thing that
+  // has to be fixed first.
+  parsed += 1;
+  const broken = parseErrorOf(`${RUNS_AT}/${run}`);
+  if (broken !== null) {
+    unparseable.push(`${run}: ${broken} — the run cannot start, so no anchor of its resolves against anything that will run (F997)`);
+    continue;
+  }
   // **Does the run say what it found?** (F768). Checked before the anchors,
   // because a run that cannot report is a run whose anchors do not matter.
   if (src.includes("runPass(")) {
@@ -470,16 +539,24 @@ for (const run of runs) {
 
 const runsWith = Object.keys(missing).length;
 const total = Object.values(missing).reduce((a, n) => a + n, 0);
+// **A clause rather than a rewrite.** `test/unit/mutate-sweep.test.ts` MS3 reads
+// the *last* line's total and the fixture reads `· n test paths ·` out of this
+// one, so every counter keeps its ` · ` neighbours and the new one is appended
+// to the family instead of resetting it.
 console.log(
-  `mutation anchors — ${String(runs.length)} runs · ${String(checked)} anchors · ` +
+  `mutation anchors — ${String(runs.length)} runs · ${String(parsed)} parsed · ` +
+    `${String(checked)} anchors · ` +
     `${String(suites)} test paths · ${String(expectations)} expectations · ` +
     `${String(tails)} tails · ` +
     `${String(total)} missing across ${String(runsWith)} run(s)` +
+    `${unparseable.length > 0 ? ` · ${String(unparseable.length)} unparseable` : ""}` +
     `${ambiguous.length > 0 ? ` · ${String(ambiguous.length)} ambiguous` : ""}` +
     `${Object.keys(silent).length > 0 ? ` · ${String(Object.keys(silent).length)} silent` : ""}`,
 );
 
-const problems = [...unresolvable, ...unreachable];
+// The parse arm leads, because it is the failure that makes the rest of the
+// report about a file nothing can run (F997).
+const problems = [...unparseable, ...unresolvable, ...unreachable];
 
 // **The silence arm** (F768), on the same equality terms as the others: a tail
 // that says nothing and is not on the list fails; one on the list for a

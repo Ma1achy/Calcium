@@ -5,16 +5,16 @@
 <line x1="486.4" y1="12.8" x2="486.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
 <line x1="89.6" y1="12.8" x2="486.4" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
 <text x="89.6" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">0</text>
-<text x="221.867" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">25</text>
-<text x="354.133" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">50</text>
-<text x="486.4" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">75</text>
-<rect x="89.6" y="18.916" width="21.163" height="18.347" fill="#e69f00"/>
-<rect x="89.6" y="49.493" width="37.035" height="18.347" fill="#e69f00"/>
-<rect x="89.6" y="80.071" width="111.104" height="18.347" fill="#e69f00"/>
-<rect x="89.6" y="110.649" width="132.267" height="18.347" fill="#e69f00"/>
-<rect x="89.6" y="141.227" width="185.173" height="18.347" fill="#e69f00"/>
-<rect x="89.6" y="171.804" width="269.824" height="18.347" fill="#e69f00"/>
-<rect x="89.6" y="202.382" width="164.011" height="18.347" fill="#e69f00"/>
-<rect x="89.6" y="232.96" width="84.651" height="18.347" fill="#e69f00"/>
-<rect x="89.6" y="263.538" width="52.907" height="18.347" fill="#e69f00"/>
+<text x="288" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">50</text>
+<text x="486.4" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">100</text>
+<rect x="89.6" y="18.304" width="23.808" height="16.512" fill="#e69f00"/>
+<rect x="89.6" y="45.824" width="43.648" height="16.512" fill="#e69f00"/>
+<rect x="89.6" y="73.344" width="119.04" height="16.512" fill="#e69f00"/>
+<rect x="89.6" y="100.864" width="170.624" height="16.512" fill="#e69f00"/>
+<rect x="89.6" y="128.384" width="226.176" height="16.512" fill="#e69f00"/>
+<rect x="89.6" y="155.904" width="309.504" height="16.512" fill="#e69f00"/>
+<rect x="89.6" y="183.424" width="150.784" height="16.512" fill="#e69f00"/>
+<rect x="89.6" y="210.944" width="87.296" height="16.512" fill="#e69f00"/>
+<rect x="89.6" y="238.464" width="51.584" height="16.512" fill="#e69f00"/>
+<rect x="89.6" y="265.984" width="7.936" height="16.512" fill="#e69f00"/>
 </svg>

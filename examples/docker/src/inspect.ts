@@ -12,30 +12,37 @@
  * nothing can cross.
  */
 
-import { cells } from "@fmx/calcium";
-import type { AdapterDocument, Adapter, Block, ViewDocument } from "@fmx/calcium";
+import type { AdapterDocument, Adapter, Block } from "@fmx/calcium";
 import { b } from "@fmx/calcium";
 import { str, type Row } from "./ndjson.ts";
 
 /**
- * The row budget a raw block is split down to.
+ * The row budget a raw block is split down to **when no region is given**.
  *
- * **The walk ruled *the region* and the code says otherwise.** `AdapterContext`
- * carries `width` and no height, `LocalContext` carries only `command`, and
- * reading the terminal is forbidden outside `terminal/lifecycle.ts` — so the
- * threshold the ruling named is unreachable from either place that builds a
- * document. FINDINGS F37.
+ * **The walk ruled *the region*, the code could not reach one, and it can now.**
+ * `ProducerContext.height` is `number | null` — non-null **iff** the document
+ * is bound by a region, which is a view invocation and nothing else, decided by
+ * C23 before the producer runs. `inspect` is declared `view: true`, so every
+ * `/inspect --raw` gets a real region and `splitRaw` is called with it.
  *
- * What is reachable is a **declared floor**, and the asymmetry is what makes it
- * defensible rather than the fixed constant the walk rejected: over-splitting
- * costs granularity, under-splitting strands rows a reader cannot reach. So a
- * floor is correct at every region above it and honest below, where I47's
- * indicator carries the residue.
+ * **This constant is the fallback, and it is still needed** — a transcript entry
+ * has no bound, so the ruling has no answer there and the declared floor is what
+ * is left. The asymmetry is what makes it defensible rather than the fixed
+ * constant the walk rejected: over-splitting costs granularity, under-splitting
+ * strands rows a reader cannot reach. A floor is correct at every region above
+ * it and honest below, where I47's indicator carries the residue.
  *
  * 21 is the region of a 24-row terminal — B04's smallest supported. Measured on
  * a real container: 114 blocks, **0 rows stranded at a 40-row terminal and 3 at
  * a 24-row one**, against 208 stranded by no split at all. The 3 are a leaf that
  * cannot be divided further, which is the floor the walk found (B2).
+ *
+ * **The premise above was false for thirty-four days** and read as a live
+ * constraint: *`AdapterContext` carries `width` and no height, `LocalContext`
+ * carries only `command`*. Both are `ProducerContext & …` now. F37 closed on the
+ * numbers and left the sentence; F1008 is the class, and CLAUDE.md carries this
+ * pair as the second of its three deferral instances — the condition written
+ * here, the thing that met it written in `src/data/adapters/types.ts`.
  */
 export const SPLIT_FLOOR = 21;
 
@@ -203,7 +210,12 @@ export function createInspectAdapter(): Adapter {
           failure !== "" || inspected === null
             ? [b.notice.error(failure)]
             : raw
-              ? splitRaw(inspected, ctx.width, ctx.measure)
+              // **The region where there is one, the declared floor where there
+              // is not** (F37's ruling, reachable since `ProducerContext.height`).
+              // `inspect` is `view: true`, so this is non-null on every real
+              // invocation and `SPLIT_FLOOR` is what a context without a bound
+              // falls back to rather than the ordinary case.
+              ? splitRaw(inspected, ctx.width, ctx.measure, ctx.height ?? SPLIT_FLOOR)
               : structuredBlocks(inspected),
         meta: { adapter: "inspect", truncated: false },
       };

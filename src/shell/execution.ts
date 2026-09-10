@@ -36,7 +36,7 @@ import type { ProducerContext } from "../data/adapters/types.js";
 import { overflowNotice, withOverflowNotice } from "../data/adapters/overflow.js";
 import { createEmulator } from "../data/emulator/emulator.js";
 import { BODY_INDENT } from "./entry-layout.js";
-import { isViewInvocation } from "../data/manifest/index.js";
+import { isViewInvocation, jsonFlagFor } from "../data/manifest/index.js";
 import type { ValidationResult } from "../data/manifest/index.js";
 import { b } from "./builders/index.js";
 import { liveDeclarations } from "./builders/live.js";
@@ -1143,10 +1143,16 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     try {
       const transport = deps.transport.for(verb);
       const streams = result.tool.streams ?? false;
+      // **The caller resolves it, so C06 never reads C05** (C05 I26, C06 I25,
+      // F1). `streams`' seam exactly, one field up.
+      const loaded = deps.manifest.manifest;
+      const jsonFlag =
+        loaded === null ? result.tool.jsonFlag : jsonFlagFor(loaded, result.tool);
       const invocation = {
         verb,
         argv: result.argv,
         streams,
+        ...(jsonFlag === undefined ? {} : { jsonFlag }),
         // 0 is unbounded, which is what a follow needs (C06 commitment 7).
         timeoutMs: streams ? 0 : DEFAULT_TIMEOUT_MS,
         signal: controller.signal,
@@ -1485,10 +1491,15 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // means a single document, which is the safe direction — a verb wrongly
       // streamed would hold a subscription nothing ends.
       const streams = result.tool.streams ?? false;
+      // The same resolution, from the same function (C05 I26, F1).
+      const loaded = deps.manifest.manifest;
+      const jsonFlag =
+        loaded === null ? result.tool.jsonFlag : jsonFlagFor(loaded, result.tool);
       const invocation = {
         verb,
         argv: result.argv,
         streams,
+        ...(jsonFlag === undefined ? {} : { jsonFlag }),
         // 0 is unbounded, which is what a live view needs (C06 commitment 7).
         timeoutMs: streams ? 0 : DEFAULT_TIMEOUT_MS,
         signal: controller.signal,
@@ -2201,6 +2212,12 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     // `origin: "refresh"`.** The other two patch, and a patch carries no `meta`.
     append: (text) =>
       void appendAndCommit(noticeDoc("", text, "info", { origin: "refresh" })),
+    // **The other channel, and it is the one every swallowed failure uses**
+    // (C23 I48, I70, §5a). A refused patch is a defect in what the shell built,
+    // reported where `resetFocus` and a throwing append are reported rather than
+    // as a `refresh` notice — and `contain` is what deduplicates it, so a part
+    // refusing on every tick says it once.
+    fault: contain,
     stopping: () => deps.session().stopping,
     // **A second seam, because the two hosts are different components.** §3b
     // commits that an entry and a pushed view are driven by *the same code*,

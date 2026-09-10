@@ -165,7 +165,7 @@ export function createFixtureHandler(opts: FixtureHandlerOptions): EmulatedHandl
   };
 
   const handler: FixtureHandler = (inv) => {
-    const argv = withJson(inv.argv);
+    const argv = withJson(inv.argv, inv.jsonFlag);
 
     // Before the routes, not inside them: B6 is a property of any far side, and
     // a fixture-backed session satisfies it like any other (I11). Answering it

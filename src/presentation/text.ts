@@ -937,7 +937,7 @@ export function wrapCellsParts(
         // pinned `" def"`. And a break strictly inside an atom is no break
         // (C04 I90), which is `breakPoint`'s own test at this position: an
         // unfittable atom is cut at a cluster boundary, and a cluster-boundary
-        // cut drops nothing (F593).
+        // cut drops nothing (F642).
         if (
           segment === " " &&
           !line.endsWith(" ") &&

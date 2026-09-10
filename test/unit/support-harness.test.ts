@@ -36,6 +36,7 @@ import {
   waitForGroupEmpty,
 } from "../support/process.js";
 import { fakeClock, harness } from "../support/fake-scheduler.js";
+import { buildGraph } from "../support/session.js";
 import {
   clockOf,
   fakeChild,
@@ -846,5 +847,54 @@ describe("test/support/history.ts — every option is asserted to take effect", 
   it("`fakeClock` never repeats, so a stamp names the append that produced it", () => {
     const clock = historyClock(1_000, 7);
     expect([clock(), clock(), clock()]).toEqual([1_000, 1_007, 1_014]);
+  });
+});
+
+// **The harness's own teardown, which nothing else can assert** (F1003).
+//
+// A constructed lifecycle attaches eight `process` handlers and only `release()`
+// drops them (C01 I3) — registration at construction is deliberate, because a
+// two-call API invites the ordering bug the design exists to prevent. Nothing in
+// `buildGraph` released, so the count climbed for the life of a file: measured at
+// **234 listeners after 29 rows** where a clean worker holds 2, and eight
+// `MaxListenersExceededWarning`s per worker to say so.
+//
+// **Two rows, because one cannot see it.** The teardown is an `afterEach`, so no
+// assertion inside the row that builds can observe it having run. The second row
+// is the observation, and it depends on declaration order — which is what vitest
+// gives without `sequence.shuffle`, and what the first row asserts is still true
+// by measuring the count it starts from.
+describe("test/support/session.ts — the sessions it builds are released", () => {
+  const EVENTS = [
+    "SIGINT",
+    "SIGTERM",
+    "SIGHUP",
+    "SIGWINCH",
+    "SIGTSTP",
+    "SIGCONT",
+    "uncaughtException",
+    "unhandledRejection",
+  ] as const;
+  const listeners = (): number => EVENTS.reduce((n, e) => n + process.listenerCount(e), 0);
+  let baseline = -1;
+
+  it("HT1 (F1003): building two graphs attaches sixteen process handlers", async () => {
+    baseline = listeners();
+    await buildGraph();
+    await buildGraph();
+    // **Eight each, and the number is the mechanism rather than a magic figure**:
+    // C01 registers one handler per member of `SIGNALS`, and the two that are not
+    // signals — `uncaughtException` and `unhandledRejection` — are the two whose
+    // handler calls `process.exit(1)`.
+    expect(listeners() - baseline, "eight per constructed lifecycle").toBe(16);
+  });
+
+  it("HT2 (F1003): and the next row starts where the last one began", () => {
+    // The revert: remove the `afterEach` from `test/support/session.ts` and this
+    // reads 16 higher. Before it existed the whole file climbed, so a stray
+    // rejection in any row ran every dead session's fatal path — each of which
+    // unwinds a finished test's fake terminal and exits the worker.
+    expect(baseline, "HT1 ran first and recorded it").toBeGreaterThanOrEqual(0);
+    expect(listeners(), "the harness gave the handlers back").toBe(baseline);
   });
 });

@@ -394,7 +394,10 @@ export function terminalDecisions(raw: readonly string[]): ArmDecisions {
   // implementation, one named parameter, and the same two floors on both arms.
   const ramp = rows.some((l) => terminalRamp(l));
   const keyRow = rows.find((l) => terminalRamp(l, 2));
-  const notice = rows.some((l) => saysWithheld(l));
+  // `axisCount` is folded in below — a dropped-category count is a withholding
+  // notice in the same sense `+N more` is, and the column exists to say which
+  // arm withheld.
+  const noticeRows = rows.some((l) => saysWithheld(l));
   const lines = rows.map(stripSgr);
 
   let bottom = -1;
@@ -477,7 +480,19 @@ export function terminalDecisions(raw: readonly string[]): ArmDecisions {
   // read as the abscissa.
   for (const l of below) if (isLegendRun(l)) legend = true;
   const xRow = below.find((l) => !RULE_ONLY.test(l) && l.trim() !== "" && !isLegendRun(l));
-  for (const x of xRow === undefined ? [] : xRow.trim().split(/\s{2,}/u)) {
+  // **The axis's own count is a notice, not a name** (C12 I8, F374). A vertical
+  // categorical figure drops a category name that cannot clear its neighbour and
+  // says so with a trailing `+N` in the label row itself, because it has no
+  // spare row to spend and C12 I1 forbids adding one. Read as a token it has a
+  // name's shape and nothing about `+3` distinguishes it from a category called
+  // `+3` — which is `keyReadings`' argument for cutting `WITHHELD` before it
+  // splits, arriving on the row below.
+  //
+  // Cut here rather than widened into `WITHHELD`, because that predicate runs
+  // over **every** row and a bare `+N` elsewhere on a frame is not this notice.
+  const xText = (xRow ?? "").trim().replace(/\s*\+\d+$/u, "");
+  const axisCount = /\s\+(\d+)$/u.test((xRow ?? "").trim());
+  for (const x of xText === "" ? [] : xText.split(/\s{2,}/u)) {
     if (x === "") continue;
     if (NUMERIC.test(x)) { numeric.push(x); continue; }
     // **A group of numbers separated by one space is still numbers** (F360,
@@ -496,7 +511,7 @@ export function terminalDecisions(raw: readonly string[]): ArmDecisions {
   return {
     drawn: true,
     ramp,
-    notice,
+    notice: noticeRows || axisCount,
     // **A count is not a reading, and this row carries two of them.** `100 · 56
     // older not shown` is a bound and a **column** count; `0.0038 100 3 bands`
     // is two bounds and a **band** count. Neither sits on the value scale, so

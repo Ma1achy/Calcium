@@ -226,6 +226,56 @@ describe("tools/mutate/anchors.mjs", () => {
     expect(r.ok, "the list is this repository's").toBe(false);
   });
 
+  it("MA8 (F997): a run node cannot parse fails, and the file that parses does not", () => {
+    // **The fabricated violation is the instance that produced the finding**,
+    // not a shape invented for the test (A03 commitment 14a). Three rows were
+    // being added to `c12-arm-seam.mjs` and a `const STACK` went in at line 84
+    // beside the one already at 88, so `node tools/mutate/runs/c12-arm-seam.mjs`
+    // died before its first mutation. This sweep said *1005 anchors · 937
+    // expectations · no run drifted from what the list says* — every anchor did
+    // resolve, and the sentence was true of a file that cannot start.
+    const parses = `const STACK = "src/presentation/blocks/plot3d.ts";\n${resolving}`;
+    const ok = run(runsDir("fake.mjs", parses));
+    expect(ok.ok, ok.out).toBe(true);
+    // **The control, and it is the whole of what makes the row above mean
+    // something**: a checker that never spawns reports every run clean, and
+    // exits 0 exactly as a clean sweep does. This says the corpus it read was
+    // not empty.
+    expect(ok.out, "the file was handed to node --check, not skipped").toMatch(/· 1 parsed ·/u);
+
+    const twice = parses.replace(
+      'const STACK = "src/presentation/blocks/plot3d.ts";',
+      'const STACK = "src/presentation/blocks/plot3d.ts";\nconst STACK = "src/presentation/blocks/plot3d.ts";',
+    );
+    expect(twice, "the replacement fired").not.toBe(parses);
+    const r = run(runsDir("fake.mjs", twice));
+    expect(r.ok, "a run that cannot start").toBe(false);
+    expect(r.out).toContain("fake.mjs");
+    expect(r.out, "the error node gave, and where").toContain(
+      "SyntaxError: Identifier 'STACK' has already been declared (line 2)",
+    );
+    expect(r.out, "and why a text sweep owes the question").toContain("the run cannot start");
+
+    // **And the file is abandoned rather than read on.** A stale anchor inside a
+    // run that cannot start is noise stacked on the one thing that has to be
+    // fixed first, and a report carrying both invites repairing the wrong one —
+    // which is `KNOWN_STALE`'s own hazard, a re-anchoring nobody ran.
+    const alsoStale = twice.replace(
+      "export function hasChildren(block: Block): block is ContainerBlock {",
+      "export function noSuchThing(): void {",
+    );
+    expect(alsoStale, "the replacement fired").not.toBe(twice);
+    const both = run(runsDir("fake.mjs", alsoStale));
+    expect(both.ok).toBe(false);
+    expect(both.out).toContain("has already been declared");
+    expect(both.out, "the parse error, and nothing about the anchor beneath it").toContain("1 problems.");
+
+    // **Blind spot, stated rather than tested away**: this asks whether the file
+    // parses, not whether it *links*. `import { runPas } from "../mutate.mjs"`
+    // parses, and the missing export is resolved at instantiation — nothing
+    // short of executing the module sees it, and executing a run is the pass.
+  });
+
   it("MA4 (the equality arm): the real tree matches the list exactly", () => {
     // **Both directions.** A new stale anchor fails because it is not on the
     // list; a repaired one fails because the list still claims it. The second is
@@ -235,8 +285,19 @@ describe("tools/mutate/anchors.mjs", () => {
 
     expect(r.ok, r.out).toBe(true);
     expect(r.out).toMatch(/known stale, and no run drifted/u);
-    // **And the counter, for the reason MA5b gives.** 184 test paths across 97
-    // runs; a scan reading none of them exits 0 exactly as a clean one does.
+    // **And the counter, for the reason MA5b gives.** A scan reading no test
+    // path exits 0 exactly as a clean one does.
     expect(r.out, "the real sweep read its subject").toMatch(/· \d{2,} test paths ·/u);
+    // MA8's control over the real corpus rather than a fixture: every run in the
+    // tree handed to `node --check`, all of them parsing. A fabricated directory
+    // proves the arm can fire; this proves it fires over the tree.
+    //
+    // **Both bounds are `\d{2,}` because the corpus grows every round**, and a
+    // figure written into an assertion goes stale in the direction that still
+    // passes. Measured **2026-09-09: 189 runs, 189 parsed, 479 test paths** —
+    // the same day two earlier figures in this block read 182 and 184, which is
+    // the argument for keeping the number in a comment with its date and out of
+    // the pattern.
+    expect(r.out, "every run in the tree was parsed").toMatch(/· \d{2,} parsed ·/u);
   });
 });

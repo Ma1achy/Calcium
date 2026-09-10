@@ -19,7 +19,7 @@
  * that would otherwise be found as a hang.
  */
 
-import { deepFreeze } from "../viewmodel/index.js";
+import { absentMessage, deepFreeze, wrongTypeMessage } from "../viewmodel/index.js";
 import {
   ARG_TYPES,
   MANIFEST_SCHEMA,
@@ -59,9 +59,18 @@ function takeString(
   at: string,
   { allowEmpty = false } = {},
 ): string | null {
+  // **Absent and wrong are two faults** (C04 I114, §5b, F995). This read
+  // *must be a string* for a key that was never written, which sends a reader
+  // to a value there is no value for — the same conflation C04's validator had
+  // and the same one `src/shell/config.ts` already ruled on in the other
+  // direction, for the config an app author types.
   const v = src[key];
+  if (v === undefined) {
+    fail(e, `${at}.${key}`, absentMessage(`"${key}"`, "a string"));
+    return null;
+  }
   if (typeof v !== "string") {
-    fail(e, `${at}.${key}`, `"${key}" must be a string`);
+    fail(e, `${at}.${key}`, wrongTypeMessage(`"${key}"`, "a string", v));
     return null;
   }
   if (!allowEmpty && v.length === 0) {
@@ -72,9 +81,14 @@ function takeString(
 }
 
 function takeBoolean(src: Record<string, unknown>, key: string, e: Errors, at: string): boolean | null {
+  // The same split, for the same reason (C04 I114, F995).
   const v = src[key];
+  if (v === undefined) {
+    fail(e, `${at}.${key}`, absentMessage(`"${key}"`, "a boolean"));
+    return null;
+  }
   if (typeof v !== "boolean") {
-    fail(e, `${at}.${key}`, `"${key}" must be a boolean`);
+    fail(e, `${at}.${key}`, wrongTypeMessage(`"${key}"`, "a boolean", v));
     return null;
   }
   return v;
@@ -94,6 +108,43 @@ function takeOptionalBoolean(
     return undefined;
   }
   return v;
+}
+
+/**
+ * An optional array of non-empty strings, kept **distinct from absent** (C05
+ * I26, F1).
+ *
+ * `takeStringArray` returns `undefined` on both an absent key and a malformed
+ * value, which is right where absent and empty mean the same thing and wrong
+ * for `jsonFlag`, whose three states are *inherit*, *append nothing* and *these
+ * tokens*. So this one answers `undefined` only for a key that is not there.
+ */
+function takeJsonFlag(
+  src: Record<string, unknown>,
+  e: Errors,
+  at: string,
+): readonly string[] | undefined {
+  const v = src["jsonFlag"];
+  if (v === undefined) return undefined;
+  if (!Array.isArray(v)) {
+    fail(e, `${at}.jsonFlag`, wrongTypeMessage('"jsonFlag"', "an array of strings", v));
+    return undefined;
+  }
+  const out: string[] = [];
+  for (const [i, item] of v.entries()) {
+    if (typeof item !== "string" || item.length === 0) {
+      fail(
+        e,
+        `${at}.jsonFlag[${String(i)}]`,
+        `"jsonFlag" holds a non-empty string per token, and [${String(i)}] is ` +
+          `${typeof item === "string" ? "empty" : "not a string"} — an empty token would be ` +
+          `spawned as a bare argument the far side cannot read`,
+      );
+      return undefined;
+    }
+    out.push(item);
+  }
+  return Object.freeze(out);
 }
 
 function takeStringArray(
@@ -457,6 +508,7 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
   const persist = takeOptionalBoolean(raw, "persist", e, at);
   const interactive = takeOptionalBoolean(raw, "interactive", e, at);
   const view = takeOptionalBoolean(raw, "view", e, at);
+  const jsonFlag = takeJsonFlag(raw, e, at);
 
   // **I23 — a flag's arm must differ from the tool's default.** An arm that
   // restates it decides nothing, which is A03 §2's vacuity class arriving in a
@@ -541,12 +593,26 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
     }
   }
 
+  // **I26 — a declaration that cannot take effect.** A local verb is never
+  // spawned, so its JSON tokens would be appended to nothing; the refusal is
+  // `interactive`'s above, for `interactive`'s reason — an author reading the
+  // manifest back would act on a field that does nothing.
+  if (local && jsonFlag !== undefined) {
+    fail(
+      e,
+      `${at}.jsonFlag`,
+      `"${name}" is local and declares jsonFlag — a local verb is handled ` +
+        `in-process and never spawned, so there is no argv for the tokens to join`,
+    );
+  }
+
   return {
     name,
     local,
     summary,
     args,
     flags,
+    ...(jsonFlag === undefined ? {} : { jsonFlag }),
     ...(streams === undefined ? {} : { streams }),
     ...(oneShot === undefined ? {} : { oneShot }),
     ...(hidden === undefined ? {} : { hidden }),
@@ -602,6 +668,10 @@ export function parseManifest(raw: unknown): Result<Manifest, readonly ManifestE
 
   const binary = takeString(raw, "binary", e, "");
   const version = takeString(raw, "version", e, "");
+  // Absent means `["--json"]`, resolved at the seam rather than defaulted here:
+  // a parser writing the default in would make *declared as `--json`* and *not
+  // declared* indistinguishable on the round trip (C05 I26, T2.7).
+  const jsonFlag = takeJsonFlag(raw, e, "");
 
   const rawTools = raw["tools"];
   const tools: ToolDef[] = [];
@@ -674,6 +744,11 @@ export function parseManifest(raw: unknown): Result<Manifest, readonly ManifestE
       // property holds exactly: parse re-derives the framework's verbs (C05 §3
       // holds the count; nothing here repeats it — F954).
       appTools: tools,
+      // Absent stays absent (C05 I26): a parser writing `["--json"]` in would
+      // make *declared as `--json`* and *not declared* the same value, and the
+      // round-trip property T2.7 asserts would then hold about a manifest the
+      // app did not write.
+      ...(jsonFlag === undefined ? {} : { jsonFlag }),
     }),
   };
 }

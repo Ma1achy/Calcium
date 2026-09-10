@@ -26,7 +26,7 @@ export {
 
 export { parseManifest, withThemeNames } from "./parse.js";
 
-export { findTool, isViewInvocation, visibleTools } from "./find.js";
+export { findTool, isViewInvocation, jsonFlagFor, visibleTools } from "./find.js";
 
 export { suggestName, validateInvocation } from "./validate.js";
 

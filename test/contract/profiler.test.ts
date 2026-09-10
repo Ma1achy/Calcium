@@ -45,7 +45,7 @@ const SAMPLE: ResourceSample = Object.freeze({
   cpuUser: 0, cpuSystem: 0,
   loopUtilisation: 0,
   loopDelayMax: 0, loopDelayP50: 0, loopDelayP99: 0,
-  loopDelayResolutionMs: 10,
+  loopDelayResolutionMs: 10, loopDelaySamples: 0,
   gc: Object.freeze({ minor: 0, major: 0, incremental: 0, weakcb: 0 }),
   gcPauseMs: 0,
   majorPageFaults: 0, involuntaryContextSwitches: 0,
@@ -54,8 +54,17 @@ const SAMPLE: ResourceSample = Object.freeze({
   suspended: false,
 });
 
-/** A probe reading off a scripted series, counting how often it was asked. */
-function scriptedProbe(heap: readonly number[]): ResourceProbe & { calls: () => number } {
+/**
+ * A probe reading off a scripted series, counting how often it was asked.
+ *
+ * `loop` overrides the delay fields, because `SAMPLE` carries
+ * `loopDelaySamples: 0` — an honest default, and one that means *no window has
+ * passed*. A row about what a delay figure carries needs a figure (F1005).
+ */
+function scriptedProbe(
+  heap: readonly number[],
+  loop?: Readonly<Partial<Pick<ResourceSample, "loopDelaySamples" | "loopDelayP50" | "loopDelayMax">>>,
+): ResourceProbe & { calls: () => number } {
   let i = 0;
   let calls = 0;
   return {
@@ -63,7 +72,7 @@ function scriptedProbe(heap: readonly number[]): ResourceProbe & { calls: () => 
       calls += 1;
       const at = i;
       i += 1;
-      return { ...SAMPLE, at, heapUsed: heap[Math.min(at, heap.length - 1)] ?? 0, suspended };
+      return { ...SAMPLE, ...loop, at, heapUsed: heap[Math.min(at, heap.length - 1)] ?? 0, suspended };
     },
     spaces: () => Object.freeze([]),
     dispose: () => {},
@@ -165,7 +174,14 @@ describe("C28 — profiler, tier 2", () => {
 
   it("T2.3 (C28 I13): the resolution travels with the delay figure", () => {
     const schedule = heldSchedule() as unknown as (fn: () => void, ms: number) => Disposable;
-    const probe = scriptedProbe([0]);
+    // **A window behind the figure, because a row about what a figure carries
+    // needs one** (F1005). This read `scriptedProbe([0])`, whose sample carries
+    // `loopDelaySamples: 0` — no observation at all — and the sweep below then
+    // passed on a pane drawing *0.00 ms at resolution 10 ms — a floor, not a
+    // reading* over a histogram that had never been written to. The row was
+    // green on precisely the state I13's second clause exists to refuse, which
+    // is the fixture-responds rule arriving in the fixture's own defaults.
+    const probe = scriptedProbe([0], { loopDelaySamples: 4, loopDelayP50: 0.004 });
     const prof = createProfiler(
       { tier: "spans", sampleMs: 1 },
       { elapsed: realElapsed, probe, schedule, node: process.version, cpus: 1 },
@@ -175,11 +191,16 @@ describe("C28 — profiler, tier 2", () => {
     const sample = prof.report().samples[0];
     expect(sample?.loopDelayResolutionMs, "the resolution is on the sample").toBe(10);
 
-    // **The second half, and the one the field exists for.** A p50 of 0 at a
-    // 10 ms resolution is *under 10 ms* and not *nothing*, so a figure printed
-    // alone reports a precision the histogram does not have. The invariant is
-    // not that nobody draws it — the memory pane does — but that the resolution
-    // and the qualifier travel with it wherever it is drawn.
+    // **The second half, and the one the field exists for.** A p50 of 0.004 ms
+    // over four observations is *under 10 ms* and not *nothing*, so a figure
+    // printed alone reports a precision the histogram does not have. The
+    // invariant is not that nobody draws it — the memory pane does — but that
+    // the resolution and the qualifier travel with it wherever it is drawn.
+    //
+    // **The two are told apart by the count, not by the value** (F1005). Zero
+    // samples and a genuine sub-floor reading are the same three numbers, and
+    // the sentence written for the second was being printed over the first
+    // until `loopDelaySamples` existed to separate them.
     //
     // **Asserted over every pane rather than the one that draws it**, because a
     // row naming `memory` passes on the day a second pane starts printing the

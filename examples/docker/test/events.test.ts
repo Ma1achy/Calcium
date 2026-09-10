@@ -12,7 +12,7 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import type { LocalDocument, Block, Events, Group, Notice, Panel, ViewDocument } from "@fmx/calcium";
+import type { LocalDocument, Block, Events, Group, Notice, Panel } from "@fmx/calcium";
 import {
   ACTIONS,
   CAP,

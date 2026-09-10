@@ -40,6 +40,7 @@ import {
   testRowsOf,
   mnemonicRowsOf,
   checkMnemonicRowIds,
+  checkCommitmentNumbers,
   SPEC_RULES,
 } from "../../tools/enforce/commitments.mjs";
 
@@ -780,6 +781,7 @@ describe("A03 SP10 — a mnemonic test-row label is unique within its spec", () 
       SP8: "checkSectionReferences",
       SP9: "checkInvariantCoverage",
       SP10: "checkMnemonicRowIds",
+      SP11: "checkCommitmentNumbers",
     };
 
     // Equality, so a rule added to `SPEC_RULES` without a carrier fails here
@@ -816,6 +818,136 @@ describe("A03 SP10 — a mnemonic test-row label is unique within its spec", () 
     const read = at(source, FILE);
     expect(mnemonicRowsOf(FILE, read)).toEqual(["SK10", "SK10"]);
     expect(checkMnemonicRowIds([FILE], read)[0]?.message).toContain("declares SK10 twice");
+  });
+});
+
+// --- SP11 — a commitment's number is unique within its spec ----------------
+
+describe("A03 SP11 — a commitment's number is unique within its spec", () => {
+  it("SP11: the real corpus matches the debt list exactly, and it is a corpus", () => {
+    // **Three halves, and the middle one is what a green line cannot say.** The
+    // rule is the third; the first two are that the parser still reads the
+    // commitments and that the list of outstanding duplicates is not empty by
+    // accident. A reader that stopped matching reports every spec unique and
+    // exits 0 exactly as a clean corpus does.
+    const files = specFiles();
+    expect(files.length).toBe(28);
+
+    const total = files.reduce((n, f) => n + commitmentsOf(f).length, 0);
+    expect(total, "920 commitments at the last count; the parser must still see them").toBeGreaterThan(900);
+
+    // The equality arm, both directions: a fresh duplicate fails because it is
+    // not on the list, and a repaired one fails because the list still claims
+    // it. The second is what a subset check would miss, and it is how F225's own
+    // ruling outlived its reason unread.
+    expect(checkCommitmentNumbers(files), "run `make enforce` for the detail").toEqual([]);
+  });
+
+  it("SP11: fires on F664's own shape, in the file it happened in", () => {
+    // **The fabricated violation is the instance, over the real corpus rather
+    // than a fixture** (A03 commitment 14a). C09 §8 declared 41, 42 and 43
+    // twice — the animated image against the run's tone, and the two after them
+    // — and `make enforce` was green with all six in the file. The repair
+    // renumbered the second occurrence to 59–61 on F225's remedy; this puts one
+    // of them back, in a scratch copy read through the injected reader and never
+    // on disk, and the rule must find it in the document it happened in.
+    const target = "docs/components/C09_block_library.md";
+    const original = readFileSync(target, "utf8");
+    expect(original, "the anchor the replacement below depends on").toContain(
+      "59. **A run's tone and value reach colour",
+    );
+    const mutated = original.replace(
+      "59. **A run's tone and value reach colour",
+      "41. **A run's tone and value reach colour",
+    );
+    expect(mutated, "a fabrication that changed nothing is not a fabrication").not.toBe(original);
+
+    const violations = checkCommitmentNumbers(specFiles(), (f) =>
+      f === target ? mutated : readFileSync(f, "utf8"),
+    );
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.rule).toBe("SP11");
+    expect(violations[0]?.message).toContain("C09 41");
+    expect(violations[0]?.message).toContain("declared twice and not on the list");
+  });
+
+  it("SP11: the debt list may only shrink — a repaired entry still listed fails", () => {
+    // `UNCITED_INVARIANTS`' terms, and the direction a subset check cannot see.
+    // The nine outstanding duplicates are C04's 17–20, C16's 21, C21's 6 and
+    // C22's 30–32; an entry naming a number that has become unique is a dead
+    // excuse, and a dead excuse reads exactly like a live one.
+    const clean = checkCommitmentNumbers(specFiles(), (f) => readFileSync(f, "utf8"), [
+      "C04 17", "C04 18", "C04 19", "C04 20",
+      "C16 21",
+      "C21 6",
+      "C22 30", "C22 31", "C22 32",
+      "C09 41",
+    ]);
+
+    expect(clean).toHaveLength(1);
+    expect(clean[0]?.rule).toBe("SP11");
+    expect(clean[0]?.file, "the fault is in the list, so the message points at the list").toBe(
+      "tools/enforce/commitments.mjs",
+    );
+    expect(clean[0]?.message).toContain("C09 41");
+    expect(clean[0]?.message).toContain("now unique");
+  });
+
+  it("SP11: the outstanding nine are real, so the empty verdict is not the list's doing", () => {
+    // **A gate phrased over a corpus inherits its blind spots, and an exemption
+    // list is the blind spot you write yourself.** With the list emptied the
+    // rule must report exactly the nine the tree still holds — if it reported
+    // none, the green above would be the list agreeing with a reader that sees
+    // nothing rather than with a corpus that is clean.
+    const violations = checkCommitmentNumbers(specFiles(), (f) => readFileSync(f, "utf8"), []);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain(
+      "C04 17, C04 18, C04 19, C04 20, C16 21, C21 6, C22 30, C22 31, C22 32",
+    );
+  });
+
+  it("SP11: a lettered commitment is outside the rule, and outside SP1 with it", () => {
+    // **The blind spot, asserted rather than described.** `commitmentsOf`
+    // matches a line opening `n.`, so `14a.` is not a commitment to this reader
+    // — and 22 of them are declared across C01, C14, C22 and C23, C22 holding
+    // sixteen. A second, wider pattern inside SP11 is what one-reader-per-corpus
+    // forbids: two readers of one corpus disagree eventually, and the one that
+    // disagrees quietly is the one nothing asserts against. Widening the shared
+    // pattern is the remedy and it changes **SP1's** subject, so it lands under
+    // its own finding.
+    const FILE = "docs/components/C99_x.md";
+    const source = [
+      "# C99 — fabricated",
+      "",
+      "## Commitments",
+      "",
+      "1. First (I1).",
+      "1a. A variant of the first (I1).",
+      "1a. And a second one under the same label (I1).",
+      "",
+      "---",
+      "",
+    ].join("\n");
+    const read = at(source, FILE);
+
+    expect(commitmentsOf(FILE, read).map((c) => c.n), "only the unlettered line is read").toEqual([1]);
+    expect(checkCommitmentNumbers([FILE], read, []), "so a duplicated 1a passes").toEqual([]);
+  });
+
+  it("SP11: uniqueness is within one document, as SP10 rules for a mnemonic", () => {
+    // C09 and C22 both declare a commitment 41 about different things, and both
+    // are correct: a commitment number means nothing without the spec in front
+    // of it, and every one of the ten citations in the tree writes one. A
+    // corpus-wide comparison would gate legitimate reuse and be switched off,
+    // which is §2's lesson about every rule in this family.
+    const A = "docs/components/C98_x.md";
+    const B = "docs/components/C99_x.md";
+    const source = ["# fabricated", "", "## Commitments", "", "1. One (I1).", "2. Two (I1).", "", "---", ""].join("\n");
+    const read = (f: string): string => (f === A || f === B ? source : readFileSync(f, "utf8"));
+
+    expect(checkCommitmentNumbers([A, B], read, [])).toEqual([]);
   });
 });
 
@@ -1190,12 +1322,27 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
   it("SP6 fires: a finding filed and keyed nowhere", () => {
     // The drift the rule exists to catch, and the direction that actually
     // happened: 55 of them.
+    //
+    // **The id is derived, and it was `F999` until the ledger reached F999.**
+    // A hard-coded fabrication expires the day its number becomes real: the
+    // appended heading was a *duplicate* of a finding that is filed and keyed,
+    // so the rule had nothing to complain about and the row failed while the
+    // gate was correct. That is the vacuous-fabrication class arriving in a
+    // control — `test/support/README.md` asks a fixture to be shown responding
+    // to the thing under test, and this one had stopped.
     const { ledger, triage } = inventoryIo();
+    const next = Math.max(
+      0,
+      ...[...ledger.matchAll(/^## F(\d+)/gmu)].map((m) => Number(m[1])),
+    ) + 1; // cells-ok — a finding number
+    const id = `F${String(next)}`;
+    expect(ledger, "the fabricated id has to be one the ledger does not have")
+      .not.toContain(`## ${id} `);
     const filed = checkTriageInventory(
-      io(`${ledger}\n\n## F999 — a fabricated finding\n\nbody.\n`, triage),
+      io(`${ledger}\n\n## ${id} — a fabricated finding\n\nbody.\n`, triage),
     );
 
-    expect(filed.map((x) => x.message).join(" "), "an unkeyed finding fails").toContain("F999");
+    expect(filed.map((x) => x.message).join(" "), "an unkeyed finding fails").toContain(id);
   });
 
   it("SP6 fires: a key removed, which also moves the sum", () => {

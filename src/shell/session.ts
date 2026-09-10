@@ -181,6 +181,34 @@ export function createTui<C extends TuiConfig>(
   return new Session(resolveConfig(config, ambient()));
 }
 
+/**
+ * How many debug lines one session keeps, and **which end it keeps** (F1001).
+ *
+ * The sink's loudest writer is C01's stdout redirect — anything written to the
+ * real stream while the shell holds the terminal — so a flood is a shape it has
+ * to survive: a library logging once a frame fills any buffer in seconds. The
+ * cap is small for `debug.retainPayloads`'s reason (C22 §2): a diagnostic mode
+ * that doubles memory is one nobody leaves on.
+ *
+ * **The first N, not the last N**, which is the half worth writing down. A ring
+ * keeping the most recent lines discards the one that started the trouble and
+ * retains a repeated symptom — and every one of the six narration sites fires
+ * once, at the moment of the failure, with whatever follows it being
+ * consequence. What is dropped is counted and said.
+ */
+const DEBUG_LINES = 200;
+
+/**
+ * The mark on a drained debug line.
+ *
+ * Step 3's other five sources are the framework's own voice; a line from this
+ * sink may be **foreign output** the redirect caught, so an unmarked drain would
+ * put an app's `console.log` on screen indistinguishable from a shell warning.
+ * The sink cannot tell the two apart — it is handed a string — so one mark
+ * covers both rather than a second channel the finding did not ask for.
+ */
+const DEBUG_PREFIX = "debug: ";
+
 /** One frozen empty array rather than a new one per paint (entry 23). */
 const EMPTY_SPANS: readonly CellSpan[] = Object.freeze([]);
 
@@ -358,6 +386,33 @@ class Session implements TuiInstance {
 
   #copyMode = false;
 
+  /**
+   * Where `ConstructDeps.debug` lands, and **it landed nowhere until now**
+   * (F1001, for F864).
+   *
+   * The chain was complete in every direction but this one. `debug?:` is
+   * declared on `ConstructDeps`, forwarded into C01 and C06's runner by
+   * `construct.ts`, and called from seven real sites — C01's stdout redirect,
+   * `beforeRelease threw`, `release: N sequence(s) failed`, `acquire failed
+   * midway`, the `SHELL=…` fallback and two `handoff failed to spawn` arms.
+   * Every hop compiled and every hop was correct on its own, because the
+   * parameter is optional at each of them; what was missing was an **argument at
+   * the one call site that starts the chain**, and `start()` below passed five
+   * deps and then six without ever passing this one. So both forwards took their
+   * `=== undefined` branch and all seven sites defaulted to a no-op in every
+   * real session.
+   *
+   * The first site is the one that cost something: output that would corrupt the
+   * alternate screen is caught, handed here, and was dropped.
+   *
+   * **Drained at step 3 of `stop()` and never before it**, for C01 I4's reason —
+   * a diagnostic written onto the alternate screen is discarded with the screen.
+   */
+  readonly #debug: string[] = [];
+
+  /** Lines the cap refused, reported rather than silently absent. */
+  #debugDropped = 0;
+
   constructor(private readonly config: ResolvedConfig) {}
 
   get session(): SessionSnapshot {
@@ -465,6 +520,13 @@ class Session implements TuiInstance {
         this.#render(reason);
       },
       frame: this.#frameQueries(),
+      // **The argument the chain was missing** (F1001, for F864). Not optional
+      // here on purpose: an optional parameter no caller supplies is exactly the
+      // state this closes, and nothing in the enforcement suite asks which ones
+      // those are.
+      debug: (line) => {
+        this.#recordDebug(line);
+      },
       onFatal: (err) => {
         // C01's only fatal case, and it has already unwound what it held
         // (C01 §3). Nothing runs after this.
@@ -741,6 +803,21 @@ class Session implements TuiInstance {
     // above, so the warning from a failed final append exists only now.
     for (const line of graph.diagnostics()) this.config.stdout.write(`${line}\n`);
 
+    // **The sixth channel, and it is the session's rather than the graph's**
+    // (F1001, for F864). `graph.diagnostics()` above is a pull over five
+    // component collections; this is a push from a sink C01 and C06 were handed
+    // and nothing ever read. It drains here for the same reason they do — the
+    // release has happened, so the primary screen is back and a line written
+    // now survives — and it is a separate statement rather than a sixth entry in
+    // that list because the list is a pull over things the graph holds and this
+    // is not one of them.
+    for (const line of this.#debug) this.config.stdout.write(`${DEBUG_PREFIX}${line}\n`);
+    if (this.#debugDropped > 0) {
+      this.config.stdout.write(
+        `${DEBUG_PREFIX}${String(this.#debugDropped)} further line(s) dropped at the ${String(DEBUG_LINES)}-line cap\n`,
+      );
+    }
+
     // 4 — the caller's code, returned rather than exited: the caller owns the
     // process, and a library that calls `process.exit` cannot be embedded.
     this.#state = "stopped";
@@ -760,6 +837,31 @@ class Session implements TuiInstance {
    * a short frame: `paint` refuses, and one row too few leaves the previous
    * frame showing through while one too many scrolls the alternate screen.
    */
+  /**
+   * One `debug` call, split into lines and capped (F1001).
+   *
+   * **A call is not a line.** Six of the seven writers hand over one sentence
+   * with no newline; C01's redirect hands over whatever chunk was written to
+   * `stdout`, which is `"a\nb\n"` for two `console.log`s in a row and `"x"` for
+   * a partial write. Splitting is what makes the cap count lines rather than
+   * calls, and it is what stops the drain below emitting a blank row per
+   * captured `console.log` — a trailing newline yields an empty tail on every
+   * one of them.
+   *
+   * An empty line is dropped rather than kept: it carries no diagnosis, and the
+   * cap is small enough that spending an entry on one is a line lost.
+   */
+  #recordDebug(chunk: string): void {
+    for (const line of chunk.split("\n")) {
+      if (line === "") continue;
+      if (this.#debug.length >= DEBUG_LINES) {
+        this.#debugDropped += 1;
+        continue;
+      }
+      this.#debug.push(line);
+    }
+  }
+
   #render(reason: CommitReason = "input"): void {
     const graph = this.#graph;
     if (graph === null || !graph.lifecycle.acquired) return;

@@ -87,7 +87,10 @@ export function createSubprocessTransport(opts: {
     ...(opts.env === undefined ? {} : { env: opts.env }),
   });
 
-  const spawnArgv = (inv: Invocation): readonly string[] => [binary, ...withJson(inv.argv)];
+  const spawnArgv = (inv: Invocation): readonly string[] => [
+    binary,
+    ...withJson(inv.argv, inv.jsonFlag),
+  ];
 
   return {
     async invoke(inv) {

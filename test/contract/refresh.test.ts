@@ -65,6 +65,15 @@ function harness() {
   let mono = 0;
   const timers: { fn: () => void; at: number; live: boolean }[] = [];
   const hidden = new Set<string>();
+  /**
+   * Where a swallowed failure goes (C23 I48, I70) — the pipeline's `contain` in
+   * production, and one line per call here.
+   *
+   * **Not deduplicated, deliberately.** `contain` deduplicates by message and a
+   * fake that did the same could not tell *reported once* from *reported on every
+   * tick*, which is half of what a stopped part is: the count is the assertion.
+   */
+  const faults: string[] = [];
 
   const driver = createRefreshDriver({
     transcript,
@@ -86,6 +95,7 @@ function harness() {
     // themselves; a fake that answered `false` would pause the whole file.
     visible: (host) => !hidden.has(keyOfHost(host)),
     append: () => undefined,
+    fault: (stage, cause) => void faults.push(`${stage}: ${String(cause)}`),
     stopping: () => false,
     updateView: (id, blockId, next) => {
       const content = views.get(id);
@@ -113,6 +123,7 @@ function harness() {
     commits,
     views,
     hidden,
+    faults,
     /**
      * Advance the wall clock alone — no timer fires and `elapsed` stands still.
      * The instrument for which axis a figure is taken from (C23 I52, I53, F973).
@@ -1536,5 +1547,262 @@ describe("C23 I53 — the running card's readout rides the one-second wake", () 
     h.transcript.clear();
     await h.tick(1_000);
     expect(wakeWithinASecond(h), "the readout is gone with the entry").toBe(false);
+  });
+});
+
+// C23 I70 / §8h — what a refused patch means, indexed by what the host holds.
+//
+// **A classification table produced these and not a trace.** Nothing happens
+// between the patch and its answer: the two rules that overlap in every row are
+// *a refused patch means the part is over* and *release is the host's, not the
+// part's* (I32), and both hold at rest. The old code answered `outcome.ok` and
+// had one disposition for three reasons, so every row below was a cell where two
+// correct statements overlapped and the wrong one won (F1002).
+describe("C23 I70 — a refused patch stops the part, not the host", () => {
+  /**
+   * A part whose rendered child takes the panel's own id — the shape a consumer
+   * writes by accident (F373), and the only one that makes C04 refuse a patch
+   * the shell composed.
+   *
+   * Tick one lands: the document holds `panel#a` and the patch replaces it.
+   * Tick two cannot: the panel now *contains* `raw#a`, so `a` appears twice and
+   * C04 I14 has no correct target.
+   */
+  const colliding = (id: string, fetch: () => Promise<unknown>): ViewRefresh =>
+    part({ id, intervalMs: 1_000, fetch, render: (data) => raw(id, String(data)) });
+
+  it("T3.65 (I70, §8h H4, H6): the host lives, the sibling polls on, and the fault carries C04's message", async () => {
+    const h = harness();
+    let bad = 0;
+    let good = 0;
+    const id = h.transcript.append(
+      docWith([panel("a", "bad", raw("a-c", "…")), panel("b", "good", raw("b-c", "…"))]),
+      { streaming: true },
+    );
+    h.driver.declare({ kind: "entry", id }, [
+      colliding("a", () => {
+        bad += 1;
+        return Promise.resolve(`v${String(bad)}`);
+      }),
+      part({
+        id: "b",
+        intervalMs: 1_000,
+        fetch: () => {
+          good += 1;
+          return Promise.resolve(`w${String(good)}`);
+        },
+      }),
+    ]);
+
+    for (let i = 0; i < 6; i += 1) await h.tick(1_000);
+
+    // **The sibling is the assertion, and it is why this is a table row.** Both
+    // parts stopped at 2 before the fix — the refusal released the *host*, so a
+    // part that could draw perfectly well was torn down by one that could not.
+    // The control is the same six ticks with no collision: 6 and 6.
+    expect(good, "the well-formed sibling keeps its cadence").toBe(6);
+    expect(bad, "and the part that cannot land stops rather than polling forever").toBe(2);
+    // **Frozen at the last patch that landed**, which is what a refused part looks
+    // like from the frame: a correct-looking figure with the right value in it and
+    // nothing saying it stopped five ticks ago. The fault is the only thing that says so.
+    expect(shown(h, id, "a"), "the first tick's value, still on screen at the sixth").toBe("v1");
+    expect(
+      h.transcript.entries.some((e) => e.id === id),
+      "the host was never released",
+    ).toBe(true);
+    // **One fault, not one per tick.** The part stops on the first refusal, so
+    // the count here is the mechanism rather than `contain`'s deduplication —
+    // the fake does not deduplicate, deliberately.
+    expect(h.faults, "the message applyPatch returned, at the one place that could report it").toEqual([
+      'live part "a": id "a" appears more than once in the document (C04 I14) — there is no correct block to act on',
+    ]);
+  });
+
+  it("T3.66 (I70, §8h H3): a part whose block the host no longer holds stops, and says nothing", async () => {
+    // **The other `reason: "patch"` cell, and it is not a defect.** The far side
+    // replaces the group holding the panel with a subtree that does not — the
+    // entry is alive, `applyPatch` refuses with `no block "a"`, and the part is
+    // over in exactly the way an evicted host's is. Reported would be wrong:
+    // C13 calls a stale reference ordinary, and this is one a level down.
+    const h = harness();
+    let a = 0;
+    let b = 0;
+    const id = h.transcript.append(
+      docWith([column("g", [panel("a", "a", raw("a-c", "…"))]), panel("b", "b", raw("b-c", "…"))]),
+      { streaming: true },
+    );
+    h.driver.declare({ kind: "entry", id }, [
+      part({ id: "a", intervalMs: 1_000, fetch: () => { a += 1; return Promise.resolve("x"); } }),
+      part({ id: "b", intervalMs: 1_000, fetch: () => { b += 1; return Promise.resolve("y"); } }),
+    ]);
+    await h.tick(1_000);
+    expect(a, "the control: it was running, and nested (F408)").toBe(1);
+
+    h.transcript.patch(id, { op: "replace", blockId: "g", block: column("g", [raw("z", "gone")]) }, "farSide");
+    for (let i = 0; i < 4; i += 1) await h.tick(1_000);
+
+    // **Two, not one**: the fetch precedes the patch, so the part polls once more
+    // before it discovers there is nothing to draw into. It is the tick after that
+    // never happens, and that is what stopping means here.
+    expect(a, "one further poll, and then it stops").toBe(2);
+    expect(b, "its sibling does not").toBe(5);
+    expect(h.faults, "and nothing is reported: absence is not failure").toEqual([]);
+  });
+
+  it("T3.67 (I70, §8h H2): a host that has gone still takes the whole host down", async () => {
+    // **The control for the ruling**, and the view arm is where it can be
+    // constructed: C15 answers one boolean, so `false` means the layer is gone
+    // and there is no second reading of it. Both parts must stop — a fix that
+    // simply stopped releasing would pass every row above and fail this one.
+    const h = harness();
+    let a = 0;
+    let b = 0;
+    h.views.set("v", [panel("a", "a", raw("a-c", "…")), panel("b", "b", raw("b-c", "…"))]);
+    h.driver.declare({ kind: "view", id: "v" }, [
+      part({ id: "a", intervalMs: 1_000, fetch: () => { a += 1; return Promise.resolve("x"); } }),
+      part({ id: "b", intervalMs: 1_000, fetch: () => { b += 1; return Promise.resolve("y"); } }),
+    ]);
+    await h.tick(1_000);
+    expect([a, b], "the control: both ran").toEqual([1, 1]);
+
+    h.views.delete("v");
+    for (let i = 0; i < 4; i += 1) await h.tick(1_000);
+    expect([a, b], "the layer went and both parts went with it").toEqual([2, 2]);
+    expect(h.faults, "a host that is gone is not a defect and is not reported").toEqual([]);
+  });
+
+  it("T3.69 (I70, I53, §8h H7): the running card on that entry keeps counting", async () => {
+    // **The mechanism one along, and no row about a part could see it.** `release`
+    // takes the entry's readout with it (I53), so before the ruling a part that
+    // could not land its patch also froze the elapsed figure on the card above it
+    // — two things stopping for one refusal, and the second attributable to
+    // nothing on screen.
+    const h = harness();
+    const id = h.transcript.append(
+      docWith([raw("step", "0s"), panel("a", "bad", raw("a-c", "…"))]),
+      { streaming: true },
+    );
+    h.driver.declare({ kind: "entry", id }, [
+      colliding("a", () => Promise.resolve("v")),
+    ]);
+    h.driver.readout(id, "step", (ms) => raw("step", `${String(Math.floor(ms / 1000))}s`));
+
+    for (let i = 0; i < 6; i += 1) await h.tick(1_000);
+
+    const step = h.transcript.entries.find((e) => e.id === id)?.doc.blocks.find((x) => x.id === "step");
+    expect(step?.kind === "raw" && step.text, "the card counted through the part's refusal").toBe("6s");
+    expect(h.faults.length, "and the refusal was still reported, once").toBe(1);
+  });
+
+  it("T3.70 (I53, §8h H8): a one-shot part does not stop its own card's counter", async () => {
+    // **No refusal anywhere in this row**, which is the point of it: the defect
+    // H7 named is older than the ruling that found it and reachable through a
+    // part that worked perfectly. A one-shot is `done` after one attempt (A02 §7
+    // rule 3), the sweep releases a host whose parts are all done, and `release`
+    // drops the entry's readout — so the card stopped counting while its command
+    // was still running.
+    //
+    // **Two controls, because one reading proves nothing about which of the three
+    // things on that entry stopped.** The same card with no live part and with a
+    // periodic one both reach 6s; the one-shot measured 2s.
+    const figure = (h: ReturnType<typeof harness>, id: string): string | false | undefined => {
+      const blk = h.transcript.entries.find((e) => e.id === id)?.doc.blocks.find((x) => x.id === "step");
+      return blk?.kind === "raw" && blk.text;
+    };
+    /** What the sweep armed for, relative to now — a second out, never zero. */
+    let armed: number | null = null;
+    const card = async (parts: readonly ViewRefresh[]): Promise<string | false | undefined> => {
+      const h = harness();
+      const blocks = parts.length === 0
+        ? [raw("step", "0s")]
+        : [raw("step", "0s"), panel("a", "a", raw("a-c", "…"))];
+      const id = h.transcript.append(docWith(blocks), { streaming: true });
+      if (parts.length > 0) h.driver.declare({ kind: "entry", id }, parts);
+      h.driver.readout(id, "step", (ms) => raw("step", `${String(Math.floor(ms / 1000))}s`));
+      for (let i = 0; i < 6; i += 1) await h.tick(1_000);
+      const next = h.nextTimer();
+      armed = next === null ? null : next - h.at();
+      return figure(h, id);
+    };
+
+    expect(await card([]), "the control: a card with nothing else on the entry").toBe("6s");
+    expect(await card([part({ id: "a", intervalMs: 1_000 })]), "the control: a periodic part").toBe("6s");
+    expect(await card([part({ id: "a", intervalMs: 0 })]), "and a one-shot no longer silences it").toBe("6s");
+    // **And the wake is the readout's second, not a zero-delay spin.** The sweep
+    // declines to release the host while the card runs, so the *arming* has to
+    // decline too — a predicate the two do not share schedules a timer for `now`
+    // on every pass, which is a busy loop wearing the shape of a fix.
+    expect(armed, "one second out, which is the readout's own wake").toBe(1_000);
+  });
+
+  it("T3.71 (I70, I52): a stopped part arms nothing — the wake goes with it", async () => {
+    // **The mutation pass asked for this row, and then corrected it.** Detaching a
+    // refused part from its source stops it being *rendered*; giving it the dead
+    // source is what makes every other loop agree that it is over. With the detach
+    // alone nothing observable changed in any row above — the symptom was a host
+    // left in the map, which is the leak class this file has met before.
+    //
+    // `armParts` is where it becomes visible, **and only with a second host in
+    // play**. A part with no `renderLoading` that has never succeeded arms the
+    // one-second wake so its loading box can count (I52), and `!p.source.done` is
+    // the clause that stops it doing so for ever. The first draft of this row had
+    // one host, so the arming loop returned at its *no sources, no readouts* guard
+    // and both trees armed nothing — a row that passed against the mutation it was
+    // written for. The slow sibling is what keeps the guard open.
+    const h = harness();
+    const dead = h.transcript.append(docWith([raw("body", "…")]), { streaming: true });
+    const alive = h.transcript.append(docWith([panel("s", "s", raw("s-c", "…"))]), {
+      streaming: true,
+    });
+    // Declared against a block the host does not hold: the patch comes back
+    // `no block "nope"`, which is §8h H3 — and `lastOk` is still null because the
+    // render threw before it could be set.
+    h.driver.declare({ kind: "entry", id: dead }, [
+      part({
+        id: "nope",
+        intervalMs: 1_000,
+        renderError: null,
+        render: () => {
+          throw new Error("no");
+        },
+      }),
+    ]);
+    // A minute away, so *a wake a second out* can only be the stopped part's.
+    h.driver.declare({ kind: "entry", id: alive }, [part({ id: "s", intervalMs: 60_000 })]);
+    await h.tick(1_000);
+    await h.tick(1_000);
+
+    expect(h.faults, "H3, so nothing is reported").toEqual([]);
+    const next = h.nextTimer();
+    const away = next === null ? null : next - h.at();
+    expect(away, "a stopped part arms no one-second wake").not.toBe(1_000);
+    expect(
+      away === null || away > 1_000,
+      `the next wake is the slow sibling's, not the stopped part's (armed ${String(away)}ms out)`,
+    ).toBe(true);
+  });
+
+  it("T3.68 (I70, §8h H5): the `settled` arm the old comment named cannot arrive here", async () => {
+    // **A fabricated violation for a sentence, not for a rule.** `put`'s comment
+    // justified releasing on *`unknown` and `settled`* — correct about the first
+    // and describing a state no caller can construct for the second, which is
+    // A03 §2's vacuity class in the comment recording the reasoning. C13 gates a
+    // settled entry on `origin: "farSide"`, and a part patches as `"shell"`.
+    const h = harness();
+    const id = h.transcript.append(docWith([panel("a", "a", raw("a-c", "…"))]), { streaming: true });
+    h.transcript.settle(id);
+
+    const asShell = h.transcript.patch(
+      id,
+      { op: "replace", blockId: "a", block: panel("a", "a", raw("a-c", "after")) },
+      "shell",
+    );
+    expect(asShell.ok, "the shell may speak about an entry it holds").toBe(true);
+    const asFarSide = h.transcript.patch(
+      id,
+      { op: "replace", blockId: "a", block: panel("a", "a", raw("a-c", "later")) },
+      "farSide",
+    );
+    expect(asFarSide.ok === false && asFarSide.reason, "and only the far side is refused").toBe("settled");
   });
 });

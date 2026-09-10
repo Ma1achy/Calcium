@@ -98,7 +98,16 @@ export { ACTION_KINDS, CAMERA_DEFAULT, COLORMAP_NAMES, GLYPH_REQUIRED_TONES, HAS
 
 export { BlockShapeError, block, cell, deepFreeze, descendants, document, rebuild } from "./construct.js";
 
-export { hierarchyFault, validateBlock, validateDocument, type Validity } from "./validate.js";
+// `absentMessage` and `wrongTypeMessage` travel because C05's parser checks required fields
+// too, and C04 I114 is one ruling rather than two copies of a sentence (F995).
+export {
+  absentMessage,
+  hierarchyFault,
+  validateBlock,
+  validateDocument,
+  wrongTypeMessage,
+  type Validity,
+} from "./validate.js";
 
 export { applyPatch } from "./patch.js";
 

@@ -988,7 +988,7 @@ class Registry implements BlockRegistry {
 }
 
 /**
- * The registry, with the fourteen default kinds unless asked otherwise.
+ * The registry, with the nineteen default kinds unless asked otherwise.
  *
  * `table`, `plot` and `patch` are **not** here. They register from C11, C12 and
  * C25 through this same public `register`, exactly as an app-defined kind

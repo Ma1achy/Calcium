@@ -192,6 +192,22 @@ export type ToolDef = Readonly<{
    * because S12's logs view is exactly that pair.
    */
   view?: boolean;
+  /**
+   * The tokens that ask **this verb** for machine-shaped output (C05 I26, F1).
+   *
+   * Overrides the manifest's, whole and never merged — one CLI is not uniform:
+   * `docker ps --format json` against `docker inspect --format '{{json .}}'`.
+   *
+   * **Three states, and `[]` is not absent.** Absent inherits the manifest's;
+   * `[]` appends nothing, for a verb that already emits JSON; a non-empty
+   * sequence is appended as it stands. A member where absent and empty meant
+   * the same thing could not express the middle one.
+   *
+   * Refused with `local` at parse, as `interactive` is: a local verb is never
+   * spawned, so the declaration cannot take effect and an author would act on
+   * it anyway.
+   */
+  jsonFlag?: readonly string[];
 }>;
 
 export type Manifest = Readonly<{
@@ -214,6 +230,21 @@ export type Manifest = Readonly<{
    * different in kind from `/ps` and a flat list hides that.
    */
   appTools: readonly ToolDef[];
+  /**
+   * How **this binary** is asked for machine-shaped output (C05 I26, F1).
+   *
+   * **Absent means `["--json"]`**, which is what the transport appended
+   * unconditionally before this member existed — so every manifest written
+   * without it is unchanged, and the change is additive rather than a
+   * migration.
+   *
+   * `--json` was a convention read as a fact. The framework's own demo target
+   * spells it `--format json`, so Calcium could not drive `docker` without a
+   * shim, and the party who knows is the app author — `interactive`'s and
+   * `persist`'s argument, with the difference that here the framework had
+   * already guessed.
+   */
+  jsonFlag?: readonly string[];
 }>;
 
 /**

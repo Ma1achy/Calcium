@@ -96,6 +96,25 @@ export function visibleTools(m: Manifest): readonly ToolDef[] {
  * settled before C23's step 3 appends anything, and a refused line never reaches
  * step 3 at all.
  */
+/**
+ * The tokens that ask this far side for JSON, resolved (C05 I26, C06 I25, F1).
+ *
+ * **Here rather than at the two call sites**, for `isViewInvocation`'s reason
+ * one paragraph up: two implementations of a resolution drift on exactly the
+ * case that matters, and this one has a case — the verb replaces the manifest's
+ * *whole*, never merging with it, because merging two token sequences has no
+ * meaning. C06 is handed the answer and never learns what a verb is.
+ *
+ * **Three states**: a verb's declaration wins; absent inherits the manifest's;
+ * a manifest with none resolves to `["--json"]`, which is what the transport
+ * appended unconditionally before the member existed. `[]` survives all three —
+ * it is a declaration of *no tokens*, and returning `undefined` for it would
+ * make a verb that already emits JSON inherit instead.
+ */
+export function jsonFlagFor(manifest: Manifest, tool: ToolDef): readonly string[] | undefined {
+  return tool.jsonFlag ?? manifest.jsonFlag;
+}
+
 export function isViewInvocation(
   tool: ToolDef,
   args: Readonly<Record<string, unknown>>,

@@ -6,6 +6,16 @@
     "moduleResolution": "nodenext",
     "types": ["node"],
     "strict": true,
+    // **`noUnusedLocals`, and deliberately not `noUnusedParameters`** (F1008).
+    // A dead *declaration* is the class this closes: the app's `width()` helper
+    // lost its last caller in `c4b2869d` and stood for thirty-four days, because
+    // the framework's `tsconfig.json` sets this and the examples' did not. An
+    // unused *parameter* is a different thing here — a handler is
+    // `(argv, ctx) => …` and reaching `ctx` means declaring `argv`, so the flag
+    // would ask eight handlers to write `_argv` and make the example read worse
+    // than the framework it demonstrates. Measured: 29 errors with both flags,
+    // all TS6133/TS6196; 8 of them were that signature.
+    "noUnusedLocals": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "noEmit": true,

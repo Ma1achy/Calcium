@@ -74,7 +74,7 @@ import { bubbleRows, scatterRows, stepRows } from "./scatter.js";
 import { plot3dRows } from "./scatter3.js";
 import { quartileRange } from "../../data/viewmodel/distribution.js";
 import { boxplotBand, boxplotColumn, bulletRow, forestRow, dumbbellRow, lagRow, timelineRow } from "./glyph-row.js";
-import { barColumn, barRow, lollipopRow, dotplotRow, stackedBarRow, funnelRow, ganttRow, waterfallRow, type BandRow } from "./categorical.js";
+import { barColumn, barRow, lollipopRow, dotplotRow, stackedBarRow, funnelRow, ganttRow, waterfallRow, type BandRow, type LabelClaim } from "./categorical.js";
 import { pairFor } from "./ramp.js";
 import { squareColumns } from "./aspect.js";
 import { waffleCells } from "./waffle.js";
@@ -1461,9 +1461,20 @@ function layoutFor(
   // One set of *labels* is drawn on both sides (I47); a callout is written only
   // on the right, so sizing the left column for it would waste the cells at
   // every width. Same content, two widths, one measurement each.
-  const right = sides.right // cells-ok — a cell width
-    ? Math.max(wanted, calloutWidth(block, caps.ambiguousWidth, stacked))
-    : 0;
+  //
+  // **And each of the two decides for itself whether it needs room** (C12 I122,
+  // F994). This was `sides.right ? max(wanted, calloutWidth(…)) : 0`, which
+  // makes a callout — *a name at the line's end* (I48) — conditional on the
+  // value scale being printed, a member it has nothing to do with (I47). The
+  // second arm never had the coupling: `rightRoom` takes the callout's reserve
+  // and the labels' reserve as two independent maxima, and **its own doc
+  // comment cites the expression above as the same thing in this arm's units**,
+  // which it was not. A sentence claiming parity with a mirror it does not
+  // match is what kept the two apart.
+  const right = Math.max( // cells-ok — a cell width
+    sides.right ? wanted : 0, // cells-ok — a cell width
+    calloutWidth(block, caps.ambiguousWidth, stacked),
+  );
   // **The frame's right edge is furniture and pays before the curve**, which is
   // the same rung it has always been: labels, then furniture, then the plot
   // area. A cell narrower is a curve; a cell narrower still is a `…`.
@@ -1473,6 +1484,9 @@ function layoutFor(
       gutter: left + AXIS_GUTTER,
       labelColumn: left,
       rightColumn: right,
+      // **The column may be the callout's alone** (C12 I122), so which axis was
+      // asked for is carried rather than inferred from the column's width.
+      rightLabels: sides.right,
       areaWidth: width - left - AXIS_GUTTER - rightGutterWidth(right),
       frame: true,
     };
@@ -1672,8 +1686,13 @@ function categoricalColumnForm(
    *
    * The *drawing* still uses the band's own `colWidth` — a five-column band
    * draws its raincloud five wide. Only the choice of figure is the chart's.
+   *
+   * `claim` is how a column asks for the cells its number wants (C12 I120,
+   * §6p). Granted or refused against **the composed row**, which is the only
+   * place two bands' numbers can be seen beside each other — a column builds
+   * once and can see no neighbour. Builders that write no number ignore it.
    */
-  columnBuilder: (categoryIndex: number, colWidth: number, rows: number, min: number, max: number, narrowest: number) => readonly string[],
+  columnBuilder: (categoryIndex: number, colWidth: number, rows: number, min: number, max: number, narrowest: number, claim: LabelClaim) => readonly string[],
   /**
    * The column's colour, where it is not the category's — **the parameter
    * `categoricalForm` already had** (C12 I42, §3v).
@@ -1708,7 +1727,19 @@ function categoricalColumnForm(
   const extra = layout.areaWidth - base * n; // cells-ok — a column width
   const widths = Array.from({ length: n }, (_, i) => base + (i < extra ? 1 : 0)); // cells-ok — a column width
 
-  const columns = widths.map((cw, i) => columnBuilder(i, cw, areaRows, range.min, range.max, base));
+  // **One claimer per composed row, and the columns are visited left to right**
+  // (C12 I120, §6p). A number sits on its own bar's top, so two of them on
+  // different rows never contend; a single edge for the whole area would drop
+  // labels that never met. `widths.map` is the ordering the fold needs, and the
+  // offset is what turns a column's own `start` into a claim on the row.
+  const claimers = Array.from({ length: areaRows }, () => labelClaimer()); // cells-ok — a row count
+  let offset = 0; // cells-ok — a column position
+  const columns = widths.map((cw, i) => {
+    const from = offset; // cells-ok — a column position
+    offset += cw; // cells-ok — a column width
+    return columnBuilder(i, cw, areaRows, range.min, range.max, base, (row, start, width) =>
+      claimers[row]?.(from + start, width) ?? true); // cells-ok — a column position
+  });
 
   // The value scale in the gutter, placed exactly as `overlaidRows` places it —
   // one implementation of *which row carries which label*, and the scale and the
@@ -1750,6 +1781,29 @@ function categoricalColumnForm(
 }
 
 /**
+ * The placer both of this arm's label rows share — **a cell of clearance, or the
+ * label is dropped** (C12 I120, §6p).
+ *
+ * Left to right, first placed wins, and a refusal **reserves nothing**: the next
+ * label is measured against the last one *kept*, so a run of contending labels
+ * degrades to alternate survivors rather than to its first alone. That is the
+ * difference between dropping and eliding, and it is the one cell of the walk
+ * the classification table could not reach (§6p.2 step 3).
+ *
+ * One claimer per row it places on. The numbers over the bands sit on their own
+ * bars' tops, so two on different rows never contend — a single edge for the
+ * whole plot area would drop labels that never met.
+ */
+function labelClaimer(): (start: number, width: number) => boolean {
+  let end = -1; // cells-ok — a column position, one past the last kept label
+  return (start, width) => {
+    if (start <= end) return false; // cells-ok — a column position
+    end = start + width; // cells-ok — a column position
+    return true;
+  };
+}
+
+/**
  * The category names under their columns, and the ones that would collide dropped.
  *
  * **`xLabels` is the wrong shape and cannot be made right.** It is a fixed
@@ -1774,17 +1828,80 @@ function columnLabels(
   widths: readonly number[],
   caps: RenderContext["capabilities"],
 ): { readonly row: string; readonly ticks: readonly number[] } {
+  const total = widths.reduce((a, w) => a + w, 0); // cells-ok — a cell width
+
+  // **One placement pass, over a stated tail reservation** (C12 I8, F374). The
+  // count is not known until the pass has run and the pass depends on the count,
+  // so this walks to a fixed point: reserving cells can only drop more names,
+  // which can only grow the count, which can only reserve more — monotonic, and
+  // bounded by the number of categories because each round drops at least one
+  // more or stops.
+  let reserved = 0; // cells-ok — a cell width
+  let placed = place(cats, widths, caps, total - reserved);
+  for (let round = 0; round <= cats.length; round += 1) { // cells-ok — a category count
+    const missing = cats.length - placed.ticks.length; // cells-ok — a category count
+    const want = missing === 0 ? 0 : cells(noticeFor(missing), caps.ambiguousWidth) + 1; // cells-ok — a cell width
+    if (want === reserved) break;
+    reserved = want;
+    placed = place(cats, widths, caps, total - reserved);
+  }
+
+  const missing = cats.length - placed.ticks.length; // cells-ok — a category count
+  if (missing === 0) return placed;
+
+  // Right-aligned in the cells the placer was told to leave: the names run left
+  // to right and the count is the last thing on the row, which is where a reader
+  // looks for *and the rest*.
+  const notice = noticeFor(missing);
+  const at = Math.max(cells(placed.row, caps.ambiguousWidth), total - cells(notice, caps.ambiguousWidth)); // cells-ok — a column position
+  const row = placed.row + " ".repeat(Math.max(0, at - cells(placed.row, caps.ambiguousWidth))) + notice; // cells-ok — a cell width
+  return { row, ticks: placed.ticks };
+}
+
+/**
+ * What the axis says about the names it could not draw (C12 I8).
+ *
+ * **The count and not the names**, which is the one place this arm departs from
+ * the horizontal one's `+N more · a · b`. There the notice takes a whole area
+ * row and has space to list; here the reason a name was dropped *is* that there
+ * is no width for it, and names strung along the axis read as more category
+ * labels — the mush `columnLabels` drops rather than truncates to avoid.
+ */
+function noticeFor(missing: number): string {
+  return `+${String(missing)}`; // cells-ok — a category count
+}
+
+/**
+ * One left-to-right placement pass, told how many cells it may use.
+ *
+ * `limit` is the whole area's width minus whatever the notice has reserved, and
+ * a label whose end would pass it is refused like any other contender — so the
+ * count that is about to be written cannot land on top of a name.
+ */
+function place(
+  cats: readonly string[],
+  widths: readonly number[],
+  caps: RenderContext["capabilities"],
+  limit: number,
+): { readonly row: string; readonly ticks: readonly number[] } {
   const ambiguous = caps.ambiguousWidth;
   let row = "";
   const ticks: number[] = [];
   let x = 0; // cells-ok — a column position
+  // **A cell of clearance and not merely no overlap** (C12 I120, F992). The
+  // guard here was `start >= cells(row)`, which forbids an overlap and permits
+  // exact adjacency — so `mon tue wed thu` in eighteen cells composed
+  // `montuewedthu`, four names read as one word. It is the same defect the
+  // value labels over the same figure had, in the writer cited as already
+  // holding the rule against it.
+  const claim = labelClaimer();
   for (const [i, w] of widths.entries()) {
     const name = cats[i] ?? "";
     const nw = cells(name, ambiguous);
     const centre = x + Math.floor(w / 2); // cells-ok — a column position
-    // Fits in its own column, and starts at or after where the row already ends.
+    // Fits in its own column, and clears the last name kept by a cell.
     const start = centre - Math.floor(nw / 2); // cells-ok — a column position
-    if (nw > 0 && nw <= w && start >= cells(row, ambiguous)) {
+    if (nw > 0 && nw <= w && start + nw <= limit && claim(start, nw)) { // cells-ok — a column position
       row += " ".repeat(start - cells(row, ambiguous)) + name;
       ticks.push(centre);
     }
@@ -2527,8 +2644,8 @@ const FORM_ROWS: Readonly<
         categories: cats.flatMap((c) => block.series.map((_sr, k) => (k === 0 ? c : ""))),
         series: [{ values: ordered }],
       };
-      return categoricalColumnForm(banded, width, ctx, (i, cw, rows, lo, hi) =>
-        barColumn(ordered[i] ?? null, lo, hi, cw, rows, ctx.capabilities, true, block.yFormat),
+      return categoricalColumnForm(banded, width, ctx, (i, cw, rows, lo, hi, _narrowest, claim) =>
+        barColumn(ordered[i] ?? null, lo, hi, cw, rows, ctx.capabilities, true, block.yFormat, claim),
         // Bands run category-major, so band `r` is series `r % n` — which is
         // what the legend names, and what the band's own index does not.
         (r) => slotOf(r % per), // cells-ok — a series index
@@ -2563,8 +2680,8 @@ const FORM_ROWS: Readonly<
     // the value scale instead of the names, the names run along the bottom, and
     // the eighths fill from the cell's bottom rather than its left.
     if (block.orientation === "vertical") {
-      return categoricalColumnForm(block, width, ctx, (i, cw, rows, lo, hi) =>
-        barColumn(block.series[0]?.values[i] ?? null, lo, hi, cw, rows, ctx.capabilities, true, block.yFormat),
+      return categoricalColumnForm(block, width, ctx, (i, cw, rows, lo, hi, _narrowest, claim) =>
+        barColumn(block.series[0]?.values[i] ?? null, lo, hi, cw, rows, ctx.capabilities, true, block.yFormat, claim),
       );
     }
     let ri = 0;

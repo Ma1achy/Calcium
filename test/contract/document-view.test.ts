@@ -16,7 +16,7 @@ import { b } from "../../src/shell/builders/index.js";
 import type { Block, ViewDocument } from "../../src/data/viewmodel/index.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { createOverlayManager } from "../../src/viewport/overlay/index.js";
-import { createRefreshDriver } from "../../src/shell/refresh.js";
+import { createRefreshDriver, type ViewRefresh } from "../../src/shell/refresh.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import {
   createDocumentView,
@@ -46,6 +46,17 @@ const chunk = (id: string, text: string): Block =>
 /** A block of exactly `rows` rows — C22 I47's subject, which `chunk` cannot be. */
 const tall = (id: string, rows: number): Block =>
   b.raw(Array.from({ length: rows }, (_, i) => `line ${String(i)}`).join("\n"), { id });
+
+/**
+ * A container holding one block — the shape `liveDeclarations` already walks
+ * into, and the one a dashboard has (S13 commitment 2: five panels in a group).
+ *
+ * `group` rather than `panel` because the nested block must not be reachable by
+ * any top-level scan: a `panel` is a container too, but a document whose only
+ * container is the block under test would let a row pass against a walk that
+ * descends exactly one level.
+ */
+const nest = (id: string, child: Block): Block => b.group("column", [child], { id });
 
 const docOf = (blocks: readonly Block[]): ViewDocument => ({
   schema: "tui.view/1",
@@ -171,6 +182,51 @@ describe("C22 §13a — the document view", () => {
     expect(
       back?.kind === "panel" ? back.title : null,
       "the tick that landed while it was out of view is on screen when it returns",
+    ).toBe("refreshed");
+  });
+
+  it("T4.86 (C22 I48, §13a): the read and the write reach a block inside a container, because all three resolve through C04's walk", () => {
+    // **The residue F1002 named, through a different door.** `patch` descends —
+    // it is `applyPatch`, and C04 resolves an id at any depth — while `blockAt`
+    // and `putBlock` scanned the top level. The pair is one question a step
+    // apart: a block the patch arm can address and the read arm cannot is a part
+    // that declares, renders and patches while every sweep that has to read it
+    // in place finds nothing.
+    view.open("/watch api");
+    view.fill(docOf([nest("wrap", chunk("cpu", "loading")), chunk("b", "two")]));
+
+    // **The fixture is shown to be the trap before anything is asserted about
+    // the remedy.** `cpu` is inside the container, so it is not a top-level
+    // block of the document at all — which is what makes a scan and a walk
+    // disagree here rather than agree by accident.
+    expect(ids(), "the container is what the document holds at the top level").toEqual([
+      "wrap",
+      "b",
+    ]);
+
+    // **The control, and it is the third member of the pair rather than a
+    // separate claim.** If this arm refused, the fixture would be wrong and
+    // nothing below would be about the walk.
+    expect(
+      view.patch({ op: "replace", blockId: "cpu", block: chunk("cpu", "patched") }).ok,
+      "the patch arm already descends — the id resolves in the held document",
+    ).toBe(true);
+
+    const read = view.blockAt("cpu");
+    expect(read, "and so does the read").not.toBeNull();
+    expect(
+      read !== null && read.kind === "panel" ? read.title : null,
+      "which finds what the patch just wrote, not a stale copy",
+    ).toBe("patched");
+
+    expect(view.putBlock("cpu", chunk("cpu", "refreshed")), "and so does the write").toBe(true);
+    // Read off the frame, not off the return: a write that answers `true` and
+    // reaches no container is the same silent no-op one level down.
+    const wrap = content().find((x) => x.id === "wrap");
+    const inner = wrap?.kind === "group" ? wrap.children[0] : null;
+    expect(
+      inner?.kind === "panel" ? inner.title : null,
+      "the container still holds it, with the new block in place",
     ).toBe("refreshed");
   });
 
@@ -479,6 +535,86 @@ describe("C22 §13a — a live part hosted by a pushed view", () => {
     expect(h.fetches, "and nothing survived the pop").toBe(ticked);
   });
 
+  it("T4.87 (C23 I70, C22 I48, §13a): a part inside a container keeps ticking, and its top-level sibling is not torn down with it", async () => {
+    // **F1002's disposition, reached from the other side.** `liveDeclarations`
+    // recurses, so a live panel in a `group` is declared; the view arm's `put`
+    // answers `hostGone` when `updateView` returns `false`, and `landed`
+    // releases the **host** for that. So a top-level scan in `putBlock` reports
+    // a present host as gone, and one part that cannot draw stops every part
+    // that can — which is the sibling measurement F1002 was written about,
+    // arriving through the walk rather than through the boolean.
+    const TICKS = 3;
+
+    const run = async (wrapped: boolean): Promise<Record<string, unknown>> => {
+      const h = wired();
+      const counts: Record<"cpu" | "mem", number> = { cpu: 0, mem: 0 };
+      const part = (id: "cpu" | "mem"): ViewRefresh => ({
+        id,
+        title: id,
+        intervalMs: SWEEP,
+        staleAfterMs: SWEEP * 2,
+        renderLoading: null,
+        source: null,
+        derive: null,
+        fetch: () => {
+          counts[id] += 1;
+          return Promise.resolve(`tick ${String(counts[id])}`);
+        },
+        render: (data) => b.raw(String(data), { id: `${id}-c` }),
+        renderError: (err) => b.raw(`err:${err.message}`, { id: `${id}-c` }),
+      });
+
+      // **`gapBefore` is what makes this row see the *read* as well as the
+      // write.** `livePanel` sets no gap, so `put` carries one only from the
+      // block it finds in place — and on the view arm that block comes back
+      // through `blockAt`. Without it the row is blind to a broken read: the
+      // driver would still write, and the frame would still show the tick.
+      const cpu = b.panel("loading", [b.raw("loading", { id: "cpu-c" })], {
+        id: "cpu",
+        gapBefore: true,
+      });
+      h.view.open("/watch api");
+      h.view.fill(docOf([wrapped ? nest("wrap", cpu) : cpu, chunk("mem", "loading")]));
+      h.driver.declare({ kind: "view", id: DOCUMENT_VIEW_ID }, [part("cpu"), part("mem")]);
+
+      expect(counts, "nothing has fetched before the first sweep").toEqual({ cpu: 0, mem: 0 });
+      for (let i = 0; i < TICKS; i += 1) await h.tick();
+
+      // Off the frame, not off the counters: a fetch that never reaches the
+      // block is a part that ticks and shows nothing.
+      const top = h.overlays.stack[0]?.content ?? [];
+      const holder = top.find((x) => x.id === (wrapped ? "wrap" : "cpu")) ?? null;
+      const panel =
+        holder !== null && holder.kind === "group" ? (holder.children[0] ?? null) : holder;
+      const child = panel !== null && panel.kind === "panel" ? (panel.children[0] ?? null) : null;
+      return {
+        ...counts,
+        shown: child !== null && child.kind === "raw" ? child.text : null,
+        // The read seam's own figure, and the only one here that a working
+        // write cannot supply.
+        gap: panel !== null && panel.kind === "panel" ? panel.gapBefore === true : null,
+      };
+    };
+
+    // **The reference is a run and not a number.** A change to the driver's
+    // cadence moves both arms together, and the claim this row makes is that
+    // wrapping the block in a container changes nothing — which a hard-coded
+    // figure would turn into a claim about the cadence instead.
+    const flat = await run(false);
+    expect(flat, "the control: the same two parts, neither of them nested").toEqual({
+      cpu: TICKS,
+      mem: TICKS,
+      shown: `tick ${String(TICKS)}`,
+      gap: true,
+    });
+
+    // **The whole set, because one figure says nothing about which of them
+    // stopped.** The sibling is the finding: `mem` is top-level, well-formed,
+    // and shares only a host with the part inside the container. Measured at
+    // HEAD this arm read `{cpu: 1, mem: 1}` against the control's `{3, 3}`.
+    expect(await run(true), "and the container changes nothing").toEqual(flat);
+  });
+
   it("T4.75 (C22 §13a): a part scrolled out of the window keeps ticking", async () => {
     // T4.71 through the real driver. The layer holds two of three blocks, so
     // after two `down`s the part is off-window — and it must still be fetching,
@@ -517,5 +653,3 @@ describe("C22 §13a — a live part hosted by a pushed view", () => {
     ).toBe(`tick ${String(h.fetches)}`);
   });
 });
-
-it.todo("T4.87 (C23 I70, C22 I48, §13a): a part inside a container keeps ticking, and its top-level sibling is not released — not deferred on a component: the row lands with C23 I70's implementation in this round's code commit");

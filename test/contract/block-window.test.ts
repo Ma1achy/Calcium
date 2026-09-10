@@ -13,8 +13,10 @@ import { checkMeasurement, formatReport } from "../../src/testing/measurement-co
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { measurable, visible } from "../support/render.js";
 import type { Block, TableRow } from "../../src/data/viewmodel/index.js";
-import type { BlockFault } from "../../src/presentation/blocks/index.js";
+import { DEFAULT_DEFINITIONS } from "../../src/presentation/blocks/index.js";
+import type { BlockDefinition, BlockFault } from "../../src/presentation/blocks/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
+import { patchDefinition } from "../../src/presentation/patch/index.js";
 import { ONE_PER_KIND } from "../support/blocks.js";
 
 const logs = (n: number): Block =>
@@ -195,6 +197,58 @@ const CORPUS: readonly Block[] = [
   raw(7),
   raw(7, { trailingNewline: true, blankAt: 3 }),
 ];
+
+/**
+ * **Which kinds divide** (C09 I25), each with the reason it can.
+ *
+ * The list exists because *every kind declares `window`* is not the rule and
+ * never will be — I27 makes `plot`'s refusal permanent — so the check cannot be
+ * an assertion over the registry. It is the shape the repo already uses for an
+ * exemption: the members are named, each carries its reason, and the two are
+ * **compared by equality** (T2.136) so neither a kind joining nor a reason
+ * outliving its kind can happen unread. `NOT_INSTRUMENTS` in `tools/instruments.mjs`
+ * is the precedent, and T2.111 below is the same instrument on the `width` seam.
+ *
+ * A reason here says what the window's units are and what travels pinned, because
+ * that is what a reader checking a new declaration needs (I25a).
+ */
+const DIVIDES: Readonly<Record<string, string>> = {
+  code: "source lines are the units, and `text` travels whole with `lineRange` pinned — a slice is a different parse, not a narrower column (I25a, F426)",
+  keyValue: "a row is a row, and `keyWidth` travels pinned, or a slice holding only short keys shifts every value sideways as the reader scrolls (I25a)",
+  logs: "a line is a row and nothing is derived from lines outside the slice, so the window is exact and needs no pin — the kind F424's 0.65 ms was measured on",
+  patch: "hunk lines are the units; the path and hunk headers the range misses are charged to `skipRows` (C25 I18) and the gutter travels pinned (C25 I21a)",
+  raw: "a line is a row, nothing is derived from outside the slice and no trailing-newline rule applies, so the window is a slice of the text with no pin",
+  table: "the units are not rows — a header, a row with its detail, the gap-plus-bar — so a range ending inside one keeps the whole unit and overhangs into `dropRows` (C11 §5a, F428)",
+  terminal: "a child's screen: a line is a row, and the `dropped` marker is content, so only a window opening at 0 keeps it and its count (§6b)",
+};
+
+/**
+ * **And which are kept whole**, each with the reason it declines (C09 I27).
+ *
+ * Three kinds of reason, and the third is why this half is written down at all:
+ * a height fixed by rule or by declaration, a height bounded in practice, and
+ * **a kind that divides in principle and has not been asked to** — `events`,
+ * `steps` and `comparison` are one row per item, which is `logs`' shape exactly.
+ * Those three are the standing F424 candidates, and naming them is what stops
+ * the cost being invisible until someone measures a frame.
+ */
+const KEPT_WHOLE: Readonly<Record<string, string>> = {
+  comparison: "`rows + 1`, so it divides in principle and does not — an unmeasured F424 candidate, kept named rather than kept quiet",
+  events: "one row per event, `logs`' shape exactly, so it divides in principle and does not — an unmeasured F424 candidate",
+  group: "a container: the sum or the max of its children, and a tall child is bounded by the registry's row cap rather than by a window (C14 I24)",
+  image: "one picture — `imageCells` derives the rows from the whole image at the width, so fewer rows is a different picture and not less of one",
+  mosaic: "`height` exactly: a declared grid of absolutely positioned cells, and every cell bounds its own child (C04 I71, I35)",
+  notice: "`ceil(cells(text) / w)` of one text — a handful of rows at any width, with no unit to divide into",
+  panel: "a container: `children + 2`, and the border is content a window would have to cut; a tall child is bounded by the row cap (C14 I24)",
+  pills: "one logical row that may wrap, so its rows are a consequence of the width rather than a list of units",
+  plot: "permanent, and the case I27 was written for: C12 I1 makes height a function of the block alone, so fewer series changes nothing and a smaller `height` rescales the curve",
+  progress: "one row — label, bar and percentage, with the bar taking the residual width",
+  rule: "one row — a label, an optional `meta`, and a fill to the width",
+  scroll: "a region whose height is declared cannot measure less without becoming a different box; it bounds its own content instead (C04 I47, I49)",
+  status: "a bordered box the registry draws rather than the definition, with two ladders on it and neither may change the row count (I27, §3a)",
+  steps: "one row per step, `logs`' shape again, so it divides in principle and does not — an unmeasured F424 candidate",
+  tip: "`ceil(cells(text) / w)` of one text, as `notice` — dim, with fill actions, and nothing to divide into",
+};
 
 describe("C09 §2a — a block reduced to a valid smaller block", () => {
   it("T2.14 (I26): measure(window) − skipRows === to − from, over every window", () => {
@@ -413,6 +467,69 @@ describe("C09 §2a — a block reduced to a valid smaller block", () => {
     const rw = r.window(raw(7), 100, 2, 4);
     expect((rw?.block as { text: string }).text, "two lines, as text").toBe("raw line 2 of 7\nraw line 3 of 7");
     expect(Object.keys(rw?.block ?? {}).sort(), "no pin on a raw window").toEqual(["id", "kind", "text"]);
+  });
+
+  it("T2.136 (C09 I25, I27): the kinds that divide are the named list, compared by equality in both directions", () => {
+    const kit = measurable({
+      definitions: [
+        tableDefinition,
+        plotDefinition as unknown as BlockDefinition<never>,
+        patchDefinition as unknown as BlockDefinition<never>,
+      ],
+    });
+
+    const kinds = [...kit.kinds].sort();
+    const divides = kinds.filter((k) => kit.registry.get(k)?.window !== undefined);
+    const keptWhole = kinds.filter((k) => kit.registry.get(k)?.window === undefined);
+
+    // **Asked of the registry, never of the tree** (F424). A glob of
+    // `src/presentation/blocks/kinds/` answered *one* where the artefact
+    // answered two; the same glob answers five today, and the registry answers
+    // seven — `patch`'s definition lives in `src/presentation/patch/` and
+    // `table`'s in `src/presentation/table/`, both divide, and a survey that
+    // walks a directory can see neither. Enumerating `DEFAULT_DEFINITIONS` and
+    // adding the exception you remember is the same shape one level up: it
+    // answers six, which is how F424's own disposition came to be short by
+    // `table` (F1009). This pair is the control, and it fails the day `patch`
+    // is folded into the defaults — at which point the glob would agree and
+    // the sentence above would be stale.
+    expect(
+      DEFAULT_DEFINITIONS.map((d) => d.kind),
+      "`patch` is registered through the public `register`, so a defaults glob cannot see it",
+    ).not.toContain("patch");
+    expect(divides, "and the registry can").toContain("patch");
+
+    // **The equality, and it is what makes this a list rather than an
+    // assertion.** `expect(a).toEqual(b)` on sorted arrays fails in both
+    // directions and the diff names which: a kind that *gained* `window` is an
+    // addition the list does not hold, and a listed kind that *lost* one — or
+    // that left the registry — is a reason with nothing behind it. A subset
+    // check in either direction lets one of those two through unread.
+    expect(
+      divides,
+      "the registry's divisible kinds against the named list — an addition here is a kind that gained `window` with no reason recorded; a removal is a reason outliving its kind",
+    ).toEqual(Object.keys(DIVIDES).sort());
+
+    // **The other half of the partition, because the interesting movement is in
+    // this direction.** Declining is silent by design — `windowSequence` keeps a
+    // non-declaring kind whole and pays for it out of `skipRows` — so a kind
+    // added to the registry without a `window` produces no error, no warning and
+    // no fault, only a slower frame. Measured on the two ends of that: painting
+    // the top forty rows of a 50 000-row `code` block took **913.79 ms** against
+    // **0.65 ms** for the same `logs`, a factor of **1 400**, with every
+    // assertion passing and the frame correct (F424). `code` took its window
+    // afterwards; the row that would have said so is this one.
+    expect(
+      keptWhole,
+      "and the kinds kept whole — a new kind lands here silently, and only this row asks it for a reason",
+    ).toEqual(Object.keys(KEPT_WHOLE).sort());
+
+    // **A reason is a sentence, not a key.** Without this an entry can be added
+    // to either list with `""` to make the equality pass, which is the list
+    // becoming an assertion again by the back door.
+    for (const [kind, reason] of [...Object.entries(DIVIDES), ...Object.entries(KEPT_WHOLE)]) {
+      expect(reason.length, `${kind} carries a reason`).toBeGreaterThan(20); // graphemes-ok
+    }
   });
 });
 

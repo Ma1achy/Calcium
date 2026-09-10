@@ -537,8 +537,18 @@ function memory(r: ProfileReport, sep: string): readonly Block[] {
     caption("gc, cpu and the loop — the p50 is the sampler's own resolution and is not a delay", "me-cap-gc"),
     b.kv(
       {
-        "loop delay max": `${ms(last.loopDelayMax)} ms`,
-        "loop delay p50": `${ms(last.loopDelayP50)} ms at resolution ${String(last.loopDelayResolutionMs)} ms — a floor, not a reading`,
+        // **A figure with no sample behind it is not presented** (I13, F1005).
+        // The resolution qualifies a measurement that fell under the floor; it
+        // cannot qualify one that was never taken, and a *maximum* of zero
+        // reads as a statement about the loop rather than about the instrument.
+        "loop delay max":
+          last.loopDelaySamples === 0
+            ? "— no window sampled yet"
+            : `${ms(last.loopDelayMax)} ms`,
+        "loop delay p50":
+          last.loopDelaySamples === 0
+            ? `— no window sampled yet, at resolution ${String(last.loopDelayResolutionMs)} ms`
+            : `${ms(last.loopDelayP50)} ms at resolution ${String(last.loopDelayResolutionMs)} ms — a floor, not a reading`,
         "gc pauses": `${ms(last.gcPauseMs)} ms total`,
         "gc by kind": `minor ${String(last.gc.minor)}${sep}major ${String(last.gc.major)}${sep}incremental ${String(last.gc.incremental)}${sep}weakcb ${String(last.gc.weakcb)}`,
         cpu: `${ms(last.cpuUser)} ms user${sep}${ms(last.cpuSystem)} ms system`,

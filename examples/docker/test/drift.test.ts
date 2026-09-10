@@ -16,7 +16,7 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import type { Block, Comparison, ComparisonRow, KeyValue, Notice } from "@fmx/calcium";
+import type { Block, Comparison, ComparisonRow, Notice } from "@fmx/calcium";
 import {
   FIELDS,
   compareRows,

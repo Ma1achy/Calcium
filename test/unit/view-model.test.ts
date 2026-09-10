@@ -16,7 +16,7 @@ import {
   type Table,
   type ViewDocument,
 } from "../../src/data/viewmodel/index.js";
-import { doc, ONE_PER_KIND, tableOf } from "../support/blocks.js";
+import { ALL_KINDS, doc, ONE_PER_KIND, tableOf } from "../support/blocks.js";
 import { b } from "../../src/shell/builders/index.js";
 
 /** The document used wherever a table needs to be patched. */
@@ -650,5 +650,97 @@ describe("C04 merge does not delete", () => {
     const after = unwrap(applyPatch(document, { op: "merge", blockId: "t", rows: [] }));
 
     expect(tableIn(after).rows).toBe(tableIn(document).rows);
+  });
+});
+
+// C04 §5b — absent is not the wrong type (I114, FINDINGS F995).
+//
+// The validator had one sentence for two faults: a `notice` with no `tone` and a
+// `notice` whose `tone` was `42` both reported `"tone" must be a string`. True
+// both times, and the first time it is the sentence that sends a reader to the
+// value they wrote when there is no value to look at.
+describe("C04 required fields report absence and wrong type differently", () => {
+  /** The errors naming `key`, whatever else the document is wrong about. */
+  function about(b: unknown, key: string): string[] {
+    const r = validateBlock(b);
+    return r.ok ? [] : r.error.filter((m) => m.includes(`"${key}"`));
+  }
+
+  it("T1.34 (I114): a missing required field and a wrongly typed one are two sentences", () => {
+    // A string field, which is the instance F995 measured.
+    expect(about({ kind: "notice", id: "n", text: "hi" }, "tone")).toEqual([
+      'block (notice): "tone" is required and absent — supply a string',
+    ]);
+    expect(about({ kind: "notice", id: "n", text: "hi", tone: 42 }, "tone")).toEqual([
+      'block (notice): "tone" must be a string, got a number',
+    ]);
+
+    // And an array field, because a split built into `requireString` alone would
+    // pass every assertion above and leave fifteen call sites conflated.
+    expect(about({ kind: "table", id: "t", columns: [] }, "rows")).toEqual([
+      'block (table): "rows" is required and absent — supply an array',
+    ]);
+    expect(about({ kind: "table", id: "t", columns: [], rows: 5 }, "rows")).toEqual([
+      'block (table): "rows" must be an array, got a number',
+    ]);
+
+    // The control. Without it every assertion above passes for a validator that
+    // refuses any notice and any table.
+    expect(
+      validateBlock({ kind: "notice", id: "n", text: "hi", tone: "info" }).ok,
+      "a well-formed notice is still accepted",
+    ).toBe(true);
+  });
+
+  // The class rather than the three instances F995 named. Driven by the corpus
+  // rather than by a list of fields: a kind that gains a required field joins
+  // this sweep by discovery, and reading `validate.ts` for a shared helper
+  // missed twelve sites that this found.
+  it("T2.127 (I114, §5b): every required field in the corpus splits the two faults", () => {
+    // A conditional requirement whose sentence names the *condition* — `form
+    // "line" requires a numeric "height"` — rather than a value, so it never
+    // sends a reader to something they did not write. By equality, so a second
+    // bespoke sentence cannot join it unread.
+    const EXEMPT = ["plot.height"];
+
+    const found: string[] = [];
+    const identical: string[] = [];
+    const readsAsWrongType: string[] = [];
+    const countsDiffered: string[] = [];
+
+    for (const kind of ALL_KINDS) {
+      const fixture = ONE_PER_KIND[kind] as unknown as Record<string, unknown>;
+      for (const key of Object.keys(fixture)) {
+        if (key === "kind" || key === "id") continue;
+        const { [key]: held, ...without } = fixture;
+        // A value of a plainly different type, so the wrong-type arm is the one
+        // that fires rather than a range or vocabulary check further down.
+        const sentinel = typeof held === "string" ? 42 : "calcium-sentinel";
+
+        const absent = about({ ...without, kind, id: fixture["id"] }, key);
+        if (absent.length === 0) continue; // optional here — no absent fault to split
+        const wrong = about({ ...fixture, [key]: sentinel }, key);
+
+        const at = `${kind}.${key}`;
+        found.push(at);
+        if (EXEMPT.includes(at)) continue;
+        if (absent.join(" ") === wrong.join(" ")) identical.push(at);
+        if (/must be (a |an |one of |")/u.test(absent.join(" "))) readsAsWrongType.push(at);
+        if (absent.length !== wrong.length) countsDiffered.push(at);
+      }
+    }
+
+    // The absent arm never claims a type of a value nobody wrote — F995 itself.
+    expect(readsAsWrongType, "an absent field reported as the wrong type").toEqual([]);
+    // And the two arms are two sentences, which is the half a message reading
+    // `is required and absent` for *both* would satisfy.
+    expect(identical, "one sentence still covering both faults").toEqual([]);
+    // §5b row 5: one push per fault either way, so no `errors.length` moves.
+    expect(countsDiffered, "the split changed how many errors a fault produces").toEqual([]);
+
+    // Non-vacuity, and the count by equality: without this the row passes on a
+    // corpus that reaches nothing.
+    expect(found).toHaveLength(42);
+    expect(found.filter((at) => EXEMPT.includes(at)), "the exemption is reached").toEqual(EXEMPT);
   });
 });

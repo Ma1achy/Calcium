@@ -121,11 +121,17 @@ describe("C28 — profiler, tier 3 spec-first rows", () => {
     // 10 ms resolution, which is to say under the instrument's own floor.
     //
     // I13's remedy is that the resolution **travels with** the figure, and it
-    // does; the spec row's wording asks for a different one — *the histogram is
-    // empty rather than zero-filled* — which is not built and is not what I13
-    // says. That discrepancy is F898 and is deliberately not resolved by
-    // conforming the row to the code: this asserts I13, and the wording is
-    // settled in the spec, not here.
+    // does. F898 held open which of two remedies it wanted — qualify, or omit —
+    // and F1005 rules **both, at different layers**: the recorder keeps the
+    // zero-filled histogram because that is what it holds, and the consumer
+    // prints nothing when `loopDelaySamples` is zero. A percentile under the
+    // floor is a statement about the instrument; a *maximum* of zero is an
+    // existence claim about the loop, and no resolution printed beside it
+    // qualifies that reading.
+    //
+    // So this row has two arms, and the interesting cell is the boundary: a
+    // floor reading and an absence are the same three numbers in the sample and
+    // must not be the same on the screen.
     const { createResourceProbe } = await import("../../src/shell/profiling/node.js");
     const probe = createResourceProbe();
     try {
@@ -143,6 +149,38 @@ describe("C28 — profiler, tier 3 spec-first rows", () => {
       // which is the reading I13 exists to prevent.
       expect(s.loopDelayResolutionMs, "and it is not zero, which would qualify nothing")
         .toBeGreaterThan(0);
+
+      // **The second arm** (F1005): the sample says how many delays are behind
+      // the figures, and with none behind them the pane prints no figure. The
+      // count is what separates a floor from an absence, and it is zero here for
+      // the same reason the figures are — no window has passed.
+      expect(s.loopDelaySamples, "no window, so no samples").toBe(0);
+      const empty = JSON.stringify(profilePane(reportWith([s]), "memory"));
+      // **The label and its value together, because the notice is on two rows.**
+      // The first draft read `toContain("— no window sampled yet")` and survived
+      // deleting the maximum's own branch: the p50's copy of the notice
+      // satisfied it. An assertion over a pane's whole text is a proxy for the
+      // row it means, and two rows carrying one sentence is where the proxy
+      // parts company with its subject.
+      expect(empty, "the maximum is the absence and not a figure").toContain(
+        '{"label":"loop delay max","value":"— no window sampled yet"}',
+      );
+      expect(empty, "and the p50 says so too, with the resolution").toContain(
+        '{"label":"loop delay p50","value":"— no window sampled yet, at resolution 10 ms"}',
+      );
+
+      // **And the control, which has to be a sample that did have a window.**
+      // Without it the assertion above is satisfied by a pane that never prints
+      // a maximum at all, which is the same green for the opposite defect.
+      const measured = { ...s, loopDelaySamples: 4, loopDelayMax: 12.5, loopDelayP50: 0.5 };
+      const drawn = JSON.stringify(profilePane(reportWith([measured]), "memory"));
+      expect(drawn, "a measured maximum is the figure").toContain(
+        '{"label":"loop delay max","value":"12.5 ms"}',
+      );
+      expect(drawn, "the p50 is the figure and its floor").toContain(
+        '"loop delay p50","value":"0.50 ms at resolution 10 ms — a floor, not a reading"',
+      );
+      expect(drawn, "and no row claims an absence").not.toContain("— no window sampled yet");
     } finally {
       probe.dispose();
     }

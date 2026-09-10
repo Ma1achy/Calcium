@@ -22,7 +22,7 @@ import { describe, expect, it } from "vitest";
 import { b, completeLocal } from "@fmx/calcium";
 import { expectDocument, liveParts, producerContext } from "@fmx/calcium/testing";
 import type { Block, ViewDocument, TerminalCapabilities } from "@fmx/calcium";
-import { CATALOGUE, everyVariant, FORMS, refusals, variantsOf } from "../src/catalogue.ts";
+import { CATALOGUE, everyVariant, FORMS, refusals, refuse, variantsOf } from "../src/catalogue.ts";
 import type { Entry } from "../src/catalogue.ts";
 import {
   adaptSample, compare, everyForm, faults, formFull, greetingDocument, barStyles, images, liveFor, monitor, mosaics, profileBlocks, rungs, spinners, unknown,
@@ -147,14 +147,24 @@ describe("the plot demo", () => {
     //
     // Exercised through the same branch `/all` and `/form` take, so it is live
     // code with a caller rather than an affordance nobody has run.
+    //
+    // **And it calls `refuse` rather than writing the object out** (F1008). The
+    // catalogue kept that helper on the strength of a comment saying this row
+    // exercised it, and this row built the refusal by hand — so the sentence
+    // was true of the *shape* and false of the *function*, and a helper with no
+    // caller stood behind it. Constructing the literal here also meant the row
+    // could not see the message drift, which is the half a shape assertion
+    // never covers.
     const entry: Entry = {
       says: "a form with no builder",
-      at: () => ({ refused: "`nothing` is not declared on `b.plot`", needs: "nothing" }),
+      at: () => refuse("nothing", "no builder yet"),
     };
     const drawn = entry.at(0, 8);
     expect("refused" in drawn, "the branch every composer takes").toBe(true);
     if (!("refused" in drawn)) throw new Error("unreachable");
     expect(drawn.needs).toBe("nothing");
+    expect(drawn.refused, "the sentence the notice draws, from the helper the catalogue keeps")
+      .toBe("`nothing` is not declared on `b.plot` — no builder yet");
   });
 
   it("the animated figure is the static one at a later phase", () => {

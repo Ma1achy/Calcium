@@ -45,7 +45,7 @@
 
 import { spawn } from "node:child_process";
 import { b } from "@fmx/calcium";
-import type { LocalDocument, Block, LocalContext, ViewDocument } from "@fmx/calcium";
+import type { LocalDocument, Block, LocalContext } from "@fmx/calcium";
 
 /** One build step, as buildkit reports it. */
 export type Step = {

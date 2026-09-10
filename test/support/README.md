@@ -39,6 +39,28 @@ fails if the parameter is ignored.** Not "the helper works" — that the *option
 reaches the thing it names. `test/unit/support-harness.test.ts` holds the
 non-PTY ones and `test/e2e/harness.test.ts` the two PTY runners.
 
+## A harness that constructs a process-global thing gives it back
+
+`session.ts` holds an `afterEach` that releases every graph and session it built.
+It is not a courtesy: a constructed lifecycle attaches **eight `process`
+handlers** and only `release()` drops them (C01 I3, and construction has side
+effects deliberately). Measured at HEAD, one file's worth of rows reached **234
+listeners** where a clean worker holds 2, and Node said so eight times per worker
+— the whole of the detection, and a warning about a threshold rather than a count.
+
+**The consequence is not the warning.** Two of the eight are `uncaughtException`
+and `unhandledRejection`, whose handler unwinds and calls `process.exit(1)`. One
+stray rejection therefore ran every dead session's fatal path and took the worker
+with it, attributed to whichever row was unlucky. `test/unit/lifecycle.test.ts`
+has held exactly this array and this hook since C01 was built; this is that
+sentence applied to the harness every other file constructs through, and
+`HT1`/`HT2` in `support-harness.test.ts` are what keep it (F1003).
+
+**A file that constructs outside this harness is outside the hook**, and one
+does: `test/unit/session-construct.test.ts` calls `constructGraph` from a local
+helper and still warns. Named here rather than implied, because the residue of a
+fix is the part nobody writes down.
+
 The rule exists because `runInPty` failed it. It accepted an `env` record and
 passed `name: "xterm-256color"` to node-pty unconditionally — and `name` *is* the
 child's TERM, winning over the env — so `env: { TERM: "dumb" }` was inert.

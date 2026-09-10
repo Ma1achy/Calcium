@@ -134,8 +134,13 @@ const results = runPass({
       // sweep needs — whose block is in the panel — so the driver resolves it at
       // the call now and the anchor follows. Re-run before re-anchoring, which is
       // this repository's rule.
-      from: "            if (put(part.host, part, errorArm(part)(shown, retryIn, src.failures))) any = true;",
-      to: "            if (put(part.host, part, errorArm(part)(shown, retryIn, 0))) any = true;",
+      //
+      // **Moved again by C23 I70's ruling**: `put` answers with four arms rather
+      // than a boolean, and every call site goes through `write(part, child)` so
+      // that an object cannot be read as a truth value. The subject of the
+      // mutation is unchanged — the attempt count the box is given.
+      from: "            if (write(part, errorArm(part)(shown, retryIn, src.failures))) any = true;",
+      to: "            if (write(part, errorArm(part)(shown, retryIn, 0))) any = true;",
       expect: "T1.40",
     },
   ],

@@ -23,7 +23,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { b } from "@fmx/calcium";
-import type { LocalDocument, Block, ComparisonRow, ViewDocument } from "@fmx/calcium";
+import type { LocalDocument, Block, ComparisonRow } from "@fmx/calcium";
 import type { Row } from "./ndjson.ts";
 
 import type { LocalContext } from "@fmx/calcium";

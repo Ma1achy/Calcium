@@ -80,9 +80,32 @@ export type {
 
 // --- blocks — the type a consumer returns -----------------------------------
 
+/**
+ * **`PlotForm` and `Camera` are here because a consumer aliased its way to both**
+ * (F999, C24 I34, §8e).
+ *
+ * `examples/plots` recovered each by indexing the block that carries it —
+ * `Plot["form"]` and `NonNullable<Plot["camera"]>` — and both spellings compile,
+ * which is what kept them invisible: inside this package every caller imports
+ * the declaration from `data/viewmodel` directly, so the gap exists only on the
+ * one surface a consumer can see.
+ *
+ * The two are on the list for different halves of one reason. A form is what a
+ * consumer switches on, and the alias came back into an app file under the
+ * framework's own name — the drift `LocalContext` was published to prevent. A
+ * camera is a **view**, which C04 I75 keeps off the block deliberately and
+ * `RenderContext.cameras` carries live, so naming it through `Plot` says the one
+ * thing the type is at pains not to be.
+ *
+ * Not the general case: fifty named types sit in a published member's type
+ * position unpublished, and most are a property of the single owner that names
+ * them, where indexing is the right spelling. The consumers' aliases are the
+ * population that picks these two out, and T2.21 is that population checked.
+ */
 export type {
   Action,
   Block,
+  Camera,
   Cell,
   Code,
   Comparison,
@@ -98,6 +121,7 @@ export type {
   Patch,
   Pills,
   Plot,
+  PlotForm,
   Progress,
   Raw,
   Rule,

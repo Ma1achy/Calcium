@@ -898,3 +898,42 @@ describe("C04 §3 both axes — the frames (I100–I103)", () => {
     expect(aligned).toEqual(own);
   });
 });
+
+// C04 §5b — the two cells the classification table rules on (I114, F995).
+describe("C04 absence, null, and the round trip", () => {
+  function about(b: unknown, key: string): string[] {
+    const r = validateBlock(b);
+    return r.ok ? [] : r.error.filter((m) => m.includes(`"${key}"`));
+  }
+
+  it("T3.80 (C04 I114, §5b): null is present and wrong; an explicit undefined is absent, and says so either side of a round trip", () => {
+    const notice = { kind: "notice", id: "n", text: "hi" };
+
+    // Row 2 — `null` is the spelling a far side reaches for when it means
+    // *nothing*, and I46a's gap is a reading inside a series, not a member
+    // nobody wrote. So it is present, and the sentence shows what arrived.
+    expect(about({ ...notice, tone: null }, "tone")).toEqual([
+      'block (notice): "tone" must be a string, got null',
+    ]);
+
+    // Row 1 — `=== undefined` rather than `key in b`. `JSON.stringify` drops a
+    // key whose value is `undefined`, so `in` would give one document two
+    // different sentences either side of the wire (§5a row 3).
+    const explicit = { ...notice, tone: undefined };
+    const roundTripped = JSON.parse(JSON.stringify(explicit)) as unknown;
+    const absent = 'block (notice): "tone" is required and absent — supply a string';
+
+    expect(about(explicit, "tone"), "an explicit undefined").toEqual([absent]);
+    expect(about(roundTripped, "tone"), "and its wire form").toEqual([absent]);
+    expect(about(notice, "tone"), "and a document that never had the key").toEqual([absent]);
+    expect(Object.hasOwn(explicit, "tone"), "the key is present, which is the cell").toBe(true);
+    expect(
+      Object.hasOwn(roundTripped as object, "tone"),
+      "and gone after the round trip, which is why `in` cannot be the test",
+    ).toBe(false);
+
+    // The control: without it the row passes against a validator that refuses
+    // every notice, and all three sentences above would be equally meaningless.
+    expect(validateBlock({ ...notice, tone: "info" }).ok).toBe(true);
+  });
+});

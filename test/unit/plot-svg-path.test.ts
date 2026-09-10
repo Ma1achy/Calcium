@@ -1532,6 +1532,110 @@ describe("RC — the callout displaces the label it lands on (C12 I114, §3ak.50
     expect(narrowLabels.length).toBeGreaterThan(0);
     expect(narrowLabels.map((t) => t.text)).toEqual(narrowLabels.map(() => expect.stringMatching(/^0\.00[01]…$/u)));
   });
+
+  /**
+   * The two gutter columns, read off the emitter's own anchors.
+   *
+   * **Two corrections to this reader, both of which manufactured evidence**
+   * (§3ak.50g). Taking `<text x=` out of the flattened document reported 30
+   * pairs at **0.00 px** in `smallmultiples` and `pairplot` — a facet is a
+   * nested `<svg x="…">` with its own coordinate system, so every facet
+   * collapsed onto the first. And grouping every label-ink text by `x` swept
+   * the abscissa's captions in with the ordinate's. So: facet documents are
+   * excluded by name, and each side is the one x its value labels share —
+   * smallest for the `end`-anchored gutter, largest for the `start`-anchored
+   * one, which is where the emitter puts them.
+   */
+  const gutterColumns = (svg: string): readonly (readonly ReturnType<typeof texts>[number][])[] => {
+    const ls = texts(svg).filter((t) => t.fill === LABEL_INK && !t.clipped && t.text !== "");
+    const out: (readonly ReturnType<typeof texts>[number][])[] = [];
+    for (const [anchorKind, pick] of [["end", Math.min], ["start", Math.max]] as const) {
+      const side = ls.filter((t) => t.anchor === anchorKind);
+      if (side.length < 2) continue; // cells-ok — a label count
+      const at = pick(...side.map((t) => t.x));
+      const col = side.filter((t) => t.x === at).sort((a, b) => a.y - b.y);
+      if (col.length > 1) out.push(col); // cells-ok — a label count
+    }
+    return out;
+  };
+
+  it("RC8 (C12 I121, §3ak.50g): no two same-side value labels paint the same band, over the catalogue at four canvases", () => {
+    // **Four canvases and not one, because at the shipped default the count is
+    // zero and the ceiling is the only reason** (F993). A row swept only at
+    // 640 × 320 would agree with a renderer holding no rule at all — measured
+    // before the rule, the same sweep found 0 pairs there, 2 at 240, 3 at 200,
+    // 3 at 160 and 4 at 120.
+    //
+    // **`RC1` cannot be widened into this.** It indexes *callout against
+    // label*, so label-against-label is outside its shape however many frames
+    // it sweeps, which is the whole of the finding.
+    const bad: string[] = [];
+    let swept = 0; // cells-ok — a frame count
+    for (const canvas of [SVG_DEFAULT_LAYOUT, svgLayout(640, 240), svgLayout(640, 200), svgLayout(640, 120)]) {
+      for (const [form, variants] of Object.entries(CATALOGUE_FORMS)) {
+        for (const [variant, spec] of Object.entries(variants)) {
+          const { cursor, ...rest } = spec as Record<string, unknown>;
+          void cursor;
+          const svg = plotToSvg(vmBlock({ kind: "plot", id: "cat", ...rest } as unknown as Plot), THEME, canvas);
+          if (svg === null || /<svg x="/u.test(svg)) continue;
+          swept += 1; // cells-ok — a frame count
+          for (const col of gutterColumns(svg)) {
+            for (let i = 1; i < col.length; i += 1) { // cells-ok — a label count
+              const pitch = col[i]!.y - col[i - 1]!.y;
+              if (pitch < SVG_FONT_SIZE) {
+                bad.push(`${form}/${variant} at ${String(canvas.height)}px: "${col[i - 1]!.text}"/"${col[i]!.text}" ${pitch.toFixed(2)}px`);
+              }
+            }
+          }
+        }
+      }
+    }
+    // The corpus is shown to be a corpus before its emptiness means anything.
+    expect(swept, "frames swept").toBeGreaterThan(800); // cells-ok — a frame count
+    expect(bad, "two value labels on one side never paint the same band").toEqual([]);
+  });
+
+  it("RC9 (C12 I121, §3ak.50g): the survivors are alternate ticks, and every tick keeps its rule", () => {
+    // **The half that would make it the wrong rule.** `RC8` is satisfied by
+    // emitting no value labels at all, so this asserts the **set**: at the
+    // default canvas all twenty ticks carry a label on both sides, and as the
+    // canvas shortens the survivors thin to every second, third and fourth —
+    // never to the first alone, which is what *a refusal reserves nothing*
+    // buys and where a placer that advanced its edge on a refusal fails.
+    const b = vmBlock({
+      kind: "plot", id: "rc9", form: "line", height: 40, axes: true, legend: false,
+      yAxis: "both", yFormat: "number",
+      series: [{ label: "alpha", values: Array.from({ length: 24 }, (_, i) => i * 4) }],
+    } as unknown as Plot);
+    const drawn = (h: number): readonly string[][] =>
+      gutterColumns(plotToSvg(b, THEME, svgLayout(640, h)) ?? "").map((c) => c.map((t) => t.text));
+
+    const full = drawn(320);
+    expect(full, "both gutters at the default canvas").toHaveLength(2);
+    for (const side of full) {
+      expect(side).toEqual(["95", "90", "85", "80", "75", "70", "65", "60", "55", "50", "45", "40", "35", "30", "25", "20", "15", "10", "5", "0"]);
+    }
+    // Every step down keeps the ends and thins the interior evenly.
+    for (const [h, expected] of [
+      [200, ["90", "80", "70", "60", "50", "40", "30", "20", "10", "0"]],
+      [120, ["90", "75", "60", "45", "30", "15", "0"]],
+      [80, ["80", "60", "40", "20", "0"]],
+    ] as const) {
+      for (const side of drawn(h)) expect(side, `${String(h)}px`).toEqual([...expected]);
+    }
+
+    // **What the decision leaves behind** (C12 I114's `RC4`, one writer over): the
+    // gridline of a suppressed label is still drawn, so the figure's geometry
+    // does not move with its readings.
+    const grid = plotToSvg({ ...b, plotFrame: "grid" } as unknown as Plot, THEME, svgLayout(640, 80)) ?? "";
+    const rules = new Set([...grid.matchAll(/<line x1="[\d.]+" y1="([\d.]+)" x2="[\d.]+" y2="\1"/gu)]
+      .map((m) => m[1]));
+    // Distinct baselines, because the frame's top and bottom edges are
+    // horizontal lines too and the extreme ticks sit on them: 22 elements at
+    // 20 baselines, and counting elements bakes that coincidence in.
+    expect(rules.size, "a horizontal rule per tick, not per surviving label").toBe(20); // cells-ok — a tick count
+    expect(drawn(80)[0], "and five of the twenty carry a reading").toHaveLength(5); // cells-ok — a label count
+  });
 });
 
 describe("G10 — a choice forced by cells", () => {
@@ -2633,5 +2737,3 @@ describe("SK11 — the sankey node label reads against what it is drawn on (C12 
     expect(svg.match(/text-anchor="end"/gu)?.length, "the last layer's labels still flip").toBe(2);
   });
 });
-
-it.todo("RC8 (C12 I121, §3ak.50g): no two same-side value labels paint the same band — not deferred on a component: the row lands with C12 I121's implementation in this round's code commit");

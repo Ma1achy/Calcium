@@ -44,7 +44,7 @@
  * a consumer, like everything else here.
  */
 import { hiddenRowsNotice } from "./documents.js";
-import { applyPatch } from "../data/viewmodel/index.js";
+import { applyPatch, descendants } from "../data/viewmodel/index.js";
 import type { Block, ErrorLike, ViewDocument, ViewPatch } from "../data/viewmodel/index.js";
 import type { Layer, OverlayManager } from "../viewport/overlay/index.js";
 import { b } from "./builders/index.js";
@@ -105,6 +105,10 @@ export interface DocumentView {
    * removed from the driver that called it. So both are assigned together or
    * neither is, and a failure is `false`. The driver's `false → release(host)`
    * covers the other side.
+   *
+   * **The block is addressed at any depth, through the same `applyPatch` that
+   * `patch` uses.** The contract differs from `patch`'s; the *resolution* must
+   * not, and it did — see `addressed`.
    */
   putBlock(blockId: string, next: Block): boolean;
   /**
@@ -129,7 +133,13 @@ export interface DocumentView {
    * would abandon the loop mid-iteration with the subscription still registered.
    */
   patch(view: ViewPatch): DocumentViewPatch;
-  /** The block the view currently holds for an id, so staleness can retitle. */
+  /**
+   * The block the view currently holds for an id, so staleness can retitle.
+   *
+   * **At any depth, and the pair with `putBlock` is why** — the driver reads
+   * here and writes there for one part, so a block one of them can reach and
+   * the other cannot is a part that ticks against nothing (F1002's residue).
+   */
   blockAt(blockId: string): Block | null;
   move(motion: DocumentViewMotion): boolean;
   /** `Esc`. Appends nothing — B03 §2, and there is no entry to touch (I45). */
@@ -180,6 +190,53 @@ export function createDocumentView(deps: DocumentViewDeps): DocumentView {
 
   const waiting = (command: string): readonly Block[] =>
     Object.freeze([b.spinner(`${command} — running`, { id: WAITING_ID })]);
+
+  /**
+   * The held blocks as the document `applyPatch` takes — **one builder, because
+   * two callers build it** (`putBlock` and `patch`).
+   *
+   * The command is carried so a `document` patch, which replaces the lot, cannot
+   * silently rename what the view is for. `meta` is `EMPTY_META` and never read.
+   */
+  const heldDoc = (at: State): ViewDocument => ({
+    schema: "tui.view/1",
+    command: at.command,
+    status: "ok",
+    blocks: at.blocks,
+    meta: EMPTY_META,
+  });
+
+  /**
+   * The block the held document addresses by `id`, **at any depth**.
+   *
+   * **This is the residue F1002 named, arriving through a different door.** The
+   * three ways into this owner are `patch`, `putBlock` and `blockAt`, and only
+   * the first descended: `applyPatch` resolves an id wherever it lives, while
+   * the other two scanned `state.blocks` with `.find` and `.some`. So a live
+   * panel inside a `group` — S13's dashboard, and what `liveDeclarations`
+   * already walks into to declare it — was declared, patched by the stream and
+   * invisible to the refresh driver's two seams. **Worse than a missed write**:
+   * the view arm reads `updateView` returning `false` as `hostGone`, and C23 I70's
+   * disposition for that is `release(host)`, so one part the walk could not
+   * reach tore down every sibling on the host. Measured at `{cpu: 1, mem: 1}`
+   * over three sweeps against a flat control's `{3, 3}` (T4.87).
+   *
+   * **Through C04's `descendants` rather than a walk written here**, which is
+   * the enforceable half. `tree.ts` is compiler-checked in both directions, so a
+   * fifth container kind cannot be added without this reaching it — and the same
+   * `childBlocks` answers `countId`, which is what `applyPatch` resolves an id
+   * through. The read and the write therefore agree because they ask one
+   * question, not because two enumerations happen to list the same four kinds
+   * today; six independent enumerations disagreeing is what `tree.ts` exists to
+   * have stopped.
+   */
+  const addressed = (blocks: readonly Block[], id: string): Block | null => {
+    for (const top of blocks) {
+      if (top.id === id) return top;
+      for (const nested of descendants(top)) if (nested.id === id) return nested;
+    }
+    return null;
+  };
 
   /**
    * The blocks that fit, from `offset`.
@@ -327,9 +384,16 @@ export function createDocumentView(deps: DocumentViewDeps): DocumentView {
     putBlock(blockId, next) {
       const at = state;
       if (at === null) return false;
-      if (!at.blocks.some((x) => x.id === blockId)) return false;
-      const blocks = at.blocks.map((x) => (x.id === blockId ? next : x));
-      const candidate: State = { ...at, blocks };
+      // **The same rewrite `patch` performs, and that is the point rather than a
+      // convenience** (I48's *no second answer to what a patch means*, pointed
+      // at the driver's arm). This was `at.blocks.map(…)` over the top level:
+      // it could not reach a block inside a container, and it replaced *every*
+      // top-level block sharing an id where C04 I14 says there is no correct
+      // target and `applyPatch` refuses. `applyPatch` is total in its type and
+      // never throws, so the contract above is unchanged — a refusal is `false`.
+      const rewritten = applyPatch(heldDoc(at), { op: "replace", blockId, block: next });
+      if (!rewritten.ok) return false;
+      const candidate: State = { ...at, blocks: rewritten.doc.blocks };
       // Reprojected into a local first — see the interface comment. Nothing is
       // assigned until the projection has succeeded.
       let content: readonly Block[];
@@ -349,16 +413,8 @@ export function createDocumentView(deps: DocumentViewDeps): DocumentView {
       const at = state;
       if (at === null) return { ok: false, reason: "closed" };
       // A whole `ViewDocument` is what `applyPatch` takes, and the view holds
-      // blocks and an offset. The command is carried so a `document` patch —
-      // which replaces the lot — cannot silently rename what the view is for.
-      const held: ViewDocument = {
-        schema: "tui.view/1",
-        command: at.command,
-        status: "ok",
-        blocks: at.blocks,
-        meta: EMPTY_META,
-      };
-      const result = applyPatch(held, view);
+      // blocks and an offset — built by `heldDoc`, which `putBlock` shares.
+      const result = applyPatch(heldDoc(at), view);
       if (!result.ok) return { ok: false, reason: "patch", error: result.error };
 
       /**
@@ -396,7 +452,7 @@ export function createDocumentView(deps: DocumentViewDeps): DocumentView {
     },
 
     blockAt(blockId) {
-      return state?.blocks.find((x) => x.id === blockId) ?? null;
+      return state === null ? null : addressed(state.blocks, blockId);
     },
 
     move(motion) {

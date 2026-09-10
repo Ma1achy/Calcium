@@ -112,23 +112,27 @@ describe("C04 contract", () => {
     // The failing directions, one per way an action can be wrong. Asserted
     // separately because a single "invalid" case passes for a check that only
     // ever looks at `kind`.
+    //
+    // **The three below omit the field**, so the sentence is the absent one
+    // (C04 I114, §5b): a field that was never written is not a field of the
+    // wrong type, and these rows asserted the second for the first until F995.
     const unknownKind = validateBlock(patchWith([{ kind: "viev", label: "x", target: "p1" }]));
     expect(unknownKind.ok).toBe(false);
     expect(unknownKind.ok ? [] : unknownKind.error.join(" ")).toMatch(/"kind" must be one of/);
 
     const noTarget = validateBlock(patchWith([{ kind: "view", label: "fullscreen" }]));
     expect(noTarget.ok).toBe(false);
-    expect(noTarget.ok ? [] : noTarget.error.join(" ")).toMatch(/"target" must be a string/);
+    expect(noTarget.ok ? [] : noTarget.error.join(" ")).toMatch(/"target" is required and absent — supply a string/u);
 
     const noLabel = validateBlock(patchWith([{ kind: "view", target: "p1" }]));
     expect(noLabel.ok).toBe(false);
-    expect(noLabel.ok ? [] : noLabel.error.join(" ")).toMatch(/"label" must be a string/);
+    expect(noLabel.ok ? [] : noLabel.error.join(" ")).toMatch(/"label" is required and absent — supply a string/u);
 
     // `open` carries `url` and not `target` — the row that shows the field is
     // the kind's rather than one name shared by all five.
     const openWrongField = validateBlock(patchWith([{ kind: "open", label: "docs", target: "p1" }]));
     expect(openWrongField.ok).toBe(false);
-    expect(openWrongField.ok ? [] : openWrongField.error.join(" ")).toMatch(/"url" must be a string/);
+    expect(openWrongField.ok ? [] : openWrongField.error.join(" ")).toMatch(/"url" is required and absent — supply a string/u);
 
     // Absent is legal, which is the control: without it every assertion above
     // passes for a validator that rejects any patch carrying the field.
@@ -342,7 +346,7 @@ describe("C04 contract", () => {
     expect(unknownKind.ok ? "" : unknownKind.error.join(" ")).toMatch(/\.action: "kind" must be one of/);
     const noField = validateBlock(notice({ kind: "fill", label: "retry" }));
     expect(noField.ok).toBe(false);
-    expect(noField.ok ? "" : noField.error.join(" ")).toMatch(/\.action: "command" must be a string/);
+    expect(noField.ok ? "" : noField.error.join(" ")).toMatch(/\.action: "command" is required and absent/u);
     const notObject = validateBlock(notice("retry"));
     expect(notObject.ok).toBe(false);
     expect(notObject.ok ? "" : notObject.error.join(" ")).toMatch(/\.action: must be an object/);

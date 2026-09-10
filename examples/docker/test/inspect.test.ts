@@ -126,6 +126,38 @@ describe("splitRaw", () => {
     // same blocks for both.
     expect(splitRaw(BIG, 120, measure, 8).length).toBeGreaterThan(splitRaw(BIG, 120, measure, 40).length);
   });
+
+  it("I7b (F37's ruling, F1008): the region is the floor where the context has one", () => {
+    // **The walk ruled *the region* and the code could not reach one.** It can:
+    // `ProducerContext.height` is non-null iff the document is bound, and
+    // `inspect` is declared `view: true`, so a real `/inspect --raw` always has
+    // a region and `SPLIT_FLOOR` is the fallback rather than the ordinary case.
+    //
+    // Asserted through `adapt` rather than through `splitRaw`, because the seam
+    // that was missing is the **call site** reading `ctx.height` — a row calling
+    // `splitRaw(…, 40)` directly passes on the day nothing threads the region.
+    const raws = (height: number | null): number => createInspectAdapter().adapt(
+      result({ stdoutRaw: JSON.stringify([BIG]), argv: ["docker", "inspect", "x"] }),
+      { ...ctxWith({ raw: true }), height },
+    ).blocks.length;
+
+    const bound = raws(40);
+    const unbound = raws(null);
+    // Measured 2026-09-10 on the 245-line probe at width 120, and the figures
+    // are read off the run rather than reasoned: **114 blocks at the 21-row
+    // fallback, 111 at 24, 103 at 40, 87 at 80** — and **114 for both** when the
+    // call site ignores `ctx.height`, which is what this row was watched failing
+    // at before it was trusted.
+
+    // A larger region splits less, and the fallback is what an unbound context
+    // gets. The two must differ, or the region is not reaching the split.
+    expect(bound, "a 40-row region splits less than the 21-row fallback")
+      .toBeLessThan(unbound);
+    // And the control: the fallback is `SPLIT_FLOOR` itself rather than some
+    // other number that happens to be smaller.
+    expect(unbound, "an unbound context takes the declared floor")
+      .toBe(splitRaw(BIG, 120, measure, SPLIT_FLOOR).length);
+  });
 });
 
 // ── The two modes, and the failure arms ─────────────────────────────────────

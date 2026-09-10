@@ -674,6 +674,139 @@ export function checkMnemonicRowIds(files, readFile = (f) => readFileSync(f, "ut
   return violations;
 }
 
+// --- SP11 — a commitment's number is unique within its spec -----------------
+//
+// **SP7's argument for the other numbered list on the page, and it was argued
+// for once already and not built** (F225, F998). SP1 resolves each commitment's
+// citation and never looks at its number; SP2 numbers the invariants; SP7 and
+// SP10 number the test rows. The commitments were the one list nothing counted.
+//
+// **F225 found it, fixed the instance, and deliberately deferred the rule.** C09
+// §8 was two lists — 1–21 and a restart at 11 running to 14 — so four numbers
+// named two commitments each, and one of the three citations into the collision
+// (`expect-document.ts`'s `C09 commitment 14`) resolved against neither
+// candidate. It was repaired by renumbering the second list to 22–25, and the
+// entry closes: *the row lands with its implementation and this entry is the
+// prose that goes ahead of it.* Nothing watched that condition. **The same
+// document re-acquired three duplicates** — 41, 42 and 43, two of them born in
+// one commit — and they were rediscovered from scratch, as F664, with no
+// reference to the entry that had already ruled the class.
+//
+// **Twelve duplicated numbers across five of twenty-eight specs on this rule's
+// first run** (2026-09-09): C04's 17–20, C09's 41–43, C16's 21, C21's 6 and
+// C22's 30–32. Every one reads as backed — nothing is missing and nothing
+// dangles, so SP1 and SP3 stay green — which is A03 §2's failure arriving at the
+// citation rather than at the rule, for the third family in this file.
+//
+// **Ten citations of a C09 commitment number exist across `docs/`, `src/`,
+// `test/`, `tools/` and `examples/`**, naming commitments 5, 11, 14, 19 and 35;
+// none names 41, 42 or 43. That is the measurement that made C09's repair a
+// three-line edit, and it is the measurement F225 could not make in its own
+// favour — its collision had a live citation in `src/`.
+
+/**
+ * Commitment numbers declared twice **today**, keyed `C04 17`, with the spec.
+ *
+ * **A debt list and not an exemption**, on `UNCITED_INVARIANTS`' terms: compared
+ * by equality in both directions, so an entry whose number becomes unique is a
+ * failure exactly as a new duplicate is. A subset check lets a dead entry
+ * outlive its reason unread, which is how F225's own ruling went unbuilt.
+ *
+ * **C09's three are absent because they were repaired rather than listed**, and
+ * the difference is ownership rather than difficulty: the lane that wrote this
+ * rule owns C09's commitment list and owns none of the other four. Each of these
+ * is a renumber of the second occurrence to the next free number at the end,
+ * which is F225's remedy, plus the citations of every number that moves — and
+ * *checking the citations* is the work, not the renumber. C04 and C22 are the
+ * two with hundreds of commitments and the most citations to walk.
+ */
+const DUPLICATE_COMMITMENTS = Object.freeze([
+  "C04 17", "C04 18", "C04 19", "C04 20",
+  "C16 21",
+  "C21 6",
+  "C22 30", "C22 31", "C22 32",
+]);
+
+/**
+ * SP11 — every commitment number locates one commitment (F225, F664, F998).
+ *
+ * **Its blind spot is the lettered commitment, and the limit is shared rather
+ * than forked.** `commitmentsOf` matches `^\d+\.`, so a spec writing `14a.`
+ * declares a commitment neither this rule nor SP1 can see — **22 of them across
+ * C01, C14, C22 and C23, measured 2026-09-09**, C22 holding sixteen. Reading
+ * them through a second, wider pattern here is what `sectionLines`' own note
+ * forbids: two readers of one corpus disagree eventually, and the one that
+ * disagrees quietly is the one nothing asserts against. Widening the shared
+ * pattern is the remedy and it is a change to **SP1's** subject — measured at
+ * 942 commitments against 920 with zero new SP1 violations — so it lands under
+ * its own finding, where the diff can be read for what it is.
+ *
+ * **Order is not gated, and that is a ruling with a figure behind it.** SP2 asks
+ * invariants to be numbered 1..n *in order*; this asks only that a number name
+ * one thing. **Eleven of twenty-eight specs declare their commitments out of
+ * order today**, C04 and C12 at 102 and 109 items — so the ordering half is a
+ * corpus-wide renumber of two of the largest documents in the project, and every
+ * citation of every number that moves. Uniqueness is the half with the instances
+ * behind it: a transposition still locates its commitment, and a duplicate does
+ * not.
+ *
+ * **And uniqueness is within one document.** C09 and C22 both declare a
+ * commitment 41 about different things, exactly as SP10 rules for `IF8`: a
+ * commitment number is meaningless without the spec in front of it, and every
+ * citation in the tree writes one.
+ */
+export function checkCommitmentNumbers(
+  files,
+  readFile = (f) => readFileSync(f, "utf8"),
+  exempt = DUPLICATE_COMMITMENTS,
+) {
+  const found = [];
+
+  for (const file of files) {
+    const id = (file.split("/").pop() ?? "").slice(0, 3);
+    // SP7's vacuity arm, and SP1 carries it for this same corpus: a document
+    // with no Commitments section produces no findings and looks compliant. The
+    // fire-test asserts the corpus size before asserting it is clean.
+    const numbers = commitmentsOf(file, readFile).map((c) => String(c.n));
+    for (const n of duplicatesIn(numbers)) found.push(`${id} ${n}`);
+  }
+
+  const listed = [...exempt].sort();
+  const seen = found.slice().sort();
+  const violations = [];
+  const fresh = seen.filter((x) => !listed.includes(x));
+  const cleared = listed.filter((x) => !seen.includes(x));
+
+  if (fresh.length > 0) {
+    violations.push({
+      rule: "SP11",
+      file: "docs/components",
+      spec: "A03 §2 · A03 §7a",
+      message:
+        `${String(fresh.length)} commitment number(s) declared twice and not on ` +
+        `the list — ${fresh.join(", ")}. A citation into a duplicated number ` +
+        `resolves to whichever commitment a reader meets first and neither ` +
+        `reading is wrong, while nothing is missing and nothing dangles. ` +
+        `Renumber the second occurrence to the next free number at the end of ` +
+        `its own list, and re-point every citation of it (F225's remedy).`,
+    });
+  }
+  if (cleared.length > 0) {
+    violations.push({
+      rule: "SP11",
+      file: "tools/enforce/commitments.mjs",
+      spec: "A03 §2 · A03 §7a",
+      message:
+        `${String(cleared.length)} entr(y/ies) on the debt list name a number ` +
+        `that is now unique — ${cleared.join(", ")}. The list is compared by ` +
+        `equality so it can only shrink; remove them. A subset check would let a ` +
+        `repaired entry outlive its reason unread.`,
+    });
+  }
+
+  return violations;
+}
+
 // --- SP4 — Seam 4 and its owners agree, both directions --------------------
 //
 // **The only artefact several components write to and none owns.** A02 Seam 4
@@ -1800,4 +1933,6 @@ export function checkReferences(
 // was green throughout, because the rule *was* implemented and running; the only
 // thing that could see the gap was the suite, and the suite is not what was run.
 // That is A03 §2's own subject reaching the list that enforces it.
-export const SPEC_RULES = ["SP1", "SP2", "SP3", "SP4", "SP5", "SP6", "SP7", "SP8", "SP9", "SP10"];
+export const SPEC_RULES = [
+  "SP1", "SP2", "SP3", "SP4", "SP5", "SP6", "SP7", "SP8", "SP9", "SP10", "SP11",
+];

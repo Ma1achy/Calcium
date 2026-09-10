@@ -14,10 +14,19 @@ import type { ProcessRunner } from "../process/types.js";
 
 export type Invocation = Readonly<{
   verb: string;
-  /** `["ps", "--mine"]` — `--json` is appended by the transport (I4), never typed. */
+  /** `["ps", "--mine"]` — the JSON tokens are appended by the transport (I4), never typed. */
   argv: readonly string[];
   /** From the manifest. C06 does not read C05; the caller does. */
   streams: boolean;
+  /**
+   * The tokens asking this far side for JSON (C06 I25, C05 I26, F1).
+   *
+   * `streams`' seam exactly, and for the same reason: the caller resolves the
+   * verb's declaration against the manifest's and hands over the answer, so a
+   * transport never learns what a verb is. Absent means `["--json"]`; `[]`
+   * means append nothing.
+   */
+  jsonFlag?: readonly string[];
   /** 0 = unbounded, which is what live views use (commitment 7). */
   timeoutMs: number;
   signal: AbortSignal;

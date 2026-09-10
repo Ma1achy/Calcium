@@ -86,6 +86,19 @@ export declare function checkMnemonicRowIds(
   readFile?: (file: string) => string,
 ): Violation[];
 
+/**
+ * SP11 — a commitment's number is unique within its spec.
+ *
+ * `exempt` is the debt list, exposed so the fire-test can drive both directions
+ * of the equality: the default is the tree's outstanding nine, an empty list
+ * shows the nine are real, and an entry naming a repaired number must fail.
+ */
+export declare function checkCommitmentNumbers(
+  files: readonly string[],
+  readFile?: (file: string) => string,
+  exempt?: readonly string[],
+): Violation[];
+
 export declare const OWNERS: readonly Readonly<{ path: string; spec: string }>[];
 export declare const TOPICS: Readonly<Record<string, string>>;
 export declare const REFERENCE_EXCEPTIONS: Readonly<Record<string, string>>;

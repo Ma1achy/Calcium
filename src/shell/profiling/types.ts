@@ -270,6 +270,17 @@ export type ResourceSample = Readonly<{
   /** The resolution travels with the figure (C28 I13). */
   loopDelayMax: number; loopDelayP50: number; loopDelayP99: number;
   loopDelayResolutionMs: number;
+  /**
+   * How many delays the histogram has actually recorded (C28 I13, F1005).
+   *
+   * **The resolution qualifies a figure that was measured and fell under the
+   * floor; it cannot qualify one that was never measured.** With no window
+   * behind it the histogram answers `max: 0` and two percentiles at 0.000511 ms
+   * — and a *maximum* of zero is an existence claim about the loop, not a floor
+   * reading about the instrument. So the count travels too, and a consumer with
+   * nothing behind a figure prints no figure.
+   */
+  loopDelaySamples: number;
   gc: Readonly<Record<GcKind, number>>;
   gcPauseMs: number;
   /**

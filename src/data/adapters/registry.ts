@@ -135,15 +135,41 @@ function messageOf(error: unknown): string {
 }
 
 /**
- * A muted notice recording that an adapter failed. Muted, not error: the
- * *command* may have succeeded, and what failed is the presentation.
+ * A muted notice recording why the registered adapter did not produce the
+ * document — **and the two subjects are two sentences** (C07 I23, §7a, F996).
+ *
+ * One sentence used to cover both, so a far side that never started reported
+ * *The adapter for "list" failed (Unexpected end of JSON input)* under a correct
+ * diagnosis of the real cause. The reader had been told the truth and was then
+ * sent to open the wrong file.
+ *
+ * **The discriminator is `stdoutRaw` and not the status.** F152 proposed
+ * suppressing the notice when the mapped outcome is an error, inferred from two
+ * instances that were both far-side failures with nothing on stdout; the two
+ * cells it did not measure break it in opposite directions. A command that
+ * succeeds *silently* is `ok` and still had nothing to adapt, and a command that
+ * fails while *emitting a payload* is `error` and its adapter genuinely choked
+ * on bytes it was given. A cancelled invocation is `partial`, which is the third
+ * direction. What decides it is whether there was anything to adapt.
+ *
+ * Whitespace counts as nothing: a far side that wrote a bare newline produced no
+ * more to render than one that wrote nothing (T3.21).
+ *
+ * Muted either way, because the *command* may have succeeded and what is being
+ * reported is the presentation.
  */
-function adapterFailureNotice(verb: string, detail: string): Block {
+function adapterFailureNotice(verb: string, detail: string, raw: RawResult): Block {
+  const nothingToAdapt = raw.stdoutRaw.trim() === "";
   return block({
     kind: "notice",
     id: "adapter-failed",
     tone: "muted",
-    text: `The adapter for "${verb}" failed (${detail}); showing the default rendering.`,
+    // The cause before the consequence, and no blame in either half. The order
+    // is load-bearing rather than stylistic: the reader's next action is
+    // decided by which layer the first clause names.
+    text: nothingToAdapt
+      ? `The command produced no output, so the "${verb}" adapter had nothing to render.`
+      : `The adapter for "${verb}" failed (${detail}); showing the default rendering.`,
   });
 }
 
@@ -308,7 +334,7 @@ export function createAdapterRegistry(
           return adaptThroughFallback(
             raw,
             ctx,
-            [adapterFailureNotice(ctx.verb ?? "?", messageOf(error))],
+            [adapterFailureNotice(ctx.verb ?? "?", messageOf(error), raw)],
             "fallback",
           );
         }

@@ -340,9 +340,25 @@ describe("C04 e2e — the drift tests", () => {
       // property being asserted. So the stream is read from the bottom, after
       // re-attaching, where the rows it wrote while nobody was looking are.
       for (let i = 0; i < 60; i += 1) pty.type(KEY.pageDown);
-      await pty.waitForFrame((f) => f.join("\n").includes("tail "), 20_000);
+      // **Waited for rather than asserted about** (F69, F1004). The claim here is
+      // that the stream kept writing while nobody was looking, and *how far* it
+      // got in a fixed window is a function of the machine: this row read
+      // `expected 4 to be greater than 6` on a contended runner and passed on the
+      // same commit four minutes later. A magnitude is the load's measurement
+      // wearing the invariant's name — so the row waits for the advance and then
+      // asserts what the wait established. A far side that died fails it by
+      // timing out, which is the failure this control exists to produce.
+      await pty.waitForFrame(
+        (f) =>
+          f.join("\n").includes("tail ") &&
+          Math.max(
+            0,
+            ...(f.join("\n").match(/tail (\d+)/g) ?? []).map((m) => Number(m.slice(5))),
+          ) > atDetach,
+        20_000,
+      );
       expect(streamedTo(), `the stream advanced past ${String(atDetach)} unseen`).toBeGreaterThan(
-        atDetach + 3,
+        atDetach,
       );
     } finally {
       pty.kill();

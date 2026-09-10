@@ -626,16 +626,112 @@ function checkAnnotations(
   }
 }
 
+// --- required fields: two faults, two sentences (C04 I114, §5b) -----------
+
+/**
+ * What arrived, as a type and never as a value (C04 I114, §5b row 3).
+ *
+ * The value is a far side's and unbounded — a `text` member holding four
+ * megabytes of the wrong thing would go into the error string whole — and an
+ * error is one terminal line. `typeof null` is `"object"`, which is the trap
+ * this exists to avoid: a message reading *got an object* for `null` names the
+ * wrong thing to look for.
+ */
+function describeType(v: unknown): string {
+  if (v === null) return "null";
+  if (isArray(v)) return "an array";
+  switch (typeof v) {
+    case "string":
+      return "a string";
+    case "number":
+      return "a number";
+    case "boolean":
+      return "a boolean";
+    case "function":
+      return "a function";
+    default:
+      return "an object";
+  }
+}
+
+/**
+ * **A required field that was never written** (C04 I114, §5b, F995).
+ *
+ * **Exported because C05's parser had the same conflation at its own required
+ * fields** (F995's residue, F1004's sibling in kind): one rule with two
+ * implementations is two rules the day one of them is corrected, and this is
+ * the sentence a reader is sent to act on. C04 I114 is the ruling; both
+ * validators call it.
+ *
+ * `want` is what to supply — `a string`, `an array`, `one of ok, error, …` —
+ * because a reader who omitted a key needs its type as much as its name, and
+ * *absent* on its own is half a sentence (§5b row 4).
+ *
+ * The sentence deliberately does not contain *must be a*: that is the wording
+ * that sent every reader to the value they had not written, and T2.127 asserts
+ * its absence rather than trusting this comment.
+ */
+export function absentMessage(subject: string, want: string): string {
+  return `${subject} is required and absent — supply ${want}`;
+}
+
+/**
+ * **A required field that was written and is the wrong thing** (C04 I114, §5b).
+ *
+ * Keeps the old lead, which was always correct about a value that arrived, and
+ * gains the type — the only part a reader cannot get by opening the line.
+ */
+export function wrongTypeMessage(subject: string, want: string, v: unknown): string {
+  return `${subject} must be ${want}, got ${describeType(v)}`;
+}
+
+/**
+ * The split, once, for every required field checked by a type predicate
+ * (C04 I114, §5b) — forty-one call sites at the time it was written.
+ *
+ * **Absence is `=== undefined` and never `key in b`** (§5b row 1). `in` gives
+ * one document two different sentences either side of `JSON.stringify`, because
+ * the round trip drops a key whose value is `undefined`; §5a row 3 already ruled
+ * that value unreachable through the framework, so this costs nothing and keeps
+ * the object and its wire form saying the same thing.
+ *
+ * `null` takes the wrong-type arm and is reported as `null` (§5b row 2): I46a's
+ * gap is a reading inside a series, not a member nobody wrote, and a far side
+ * that spells absence that way is shown its own bytes.
+ *
+ * One `push` per fault either way, so no `errors.length` moves (§5b row 5).
+ *
+ * **`subject` is composed by the caller and not from `key` here**, because the
+ * file already has two path conventions and this change is about the fault, not
+ * about the path: a block quotes its key after the path — `blocks[0] (notice):
+ * "tone"` — and the document's own fields are a dotted path — `meta.adapter`.
+ * Normalising them would move every message the split does not touch. It carries
+ * **no trailing colon**, because both arms continue it as a sentence and
+ * `meta.adapter: is required` does not read as one.
+ */
+function requireField(
+  b: Record<string, unknown>,
+  key: string,
+  ok: (v: unknown) => boolean,
+  want: string,
+  e: string[],
+  subject: string,
+): void {
+  const v = b[key];
+  if (v === undefined) e.push(absentMessage(subject, want));
+  else if (!ok(v)) e.push(wrongTypeMessage(subject, want, v));
+}
+
 // --- per-kind validation --------------------------------------------------
 
 type KindCheck = (b: Record<string, unknown>, e: string[], at: string) => void;
 
 function requireString(b: Record<string, unknown>, key: string, e: string[], at: string): void {
-  if (!isString(b[key])) e.push(`${at}: "${key}" must be a string`);
+  requireField(b, key, isString, "a string", e, `${at}: "${key}"`);
 }
 
 function requireArray(b: Record<string, unknown>, key: string, e: string[], at: string): void {
-  if (!isArray(b[key])) e.push(`${at}: "${key}" must be an array`);
+  requireField(b, key, isArray, "an array", e, `${at}: "${key}"`);
 }
 
 /**
@@ -724,13 +820,17 @@ function checkAction(raw: unknown, where: string, e: string[]): void {
     return;
   }
   const kind = raw["kind"];
+  if (kind === undefined) {
+    e.push(absentMessage(`${where}: "kind"`, `one of ${[...ACTION_KINDS].join(", ")}`));
+    return;
+  }
   if (!isString(kind) || !ACTION_KINDS.has(kind as Action["kind"])) {
     e.push(`${where}: "kind" must be one of ${[...ACTION_KINDS].join(", ")}`);
     return;
   }
-  if (!isString(raw["label"])) e.push(`${where}: "label" must be a string`);
+  requireString(raw as Record<string, unknown>, "label", e, where);
   const field = ACTION_FIELD[kind as Action["kind"]];
-  if (!isString(raw[field])) e.push(`${where}: "${field}" must be a string`);
+  requireString(raw as Record<string, unknown>, field, e, where);
 }
 
 /**
@@ -962,6 +1062,10 @@ function checkRamp(value: unknown, e: string[], where: string, onSpan: boolean):
     }
   }
   const fill = value["fill"];
+  if (fill === undefined) {
+    e.push(`${absentMessage(`${where}: "fill"`, `one of ${RAMP_FILLS.join(", ")}`)} (C04 I106)`);
+    return;
+  }
   if (typeof fill !== "string" || !RAMP_FILL_SET.has(fill)) {
     e.push(`${where}: "fill" must be one of ${RAMP_FILLS.join(", ")} (C04 I106)`);
     return;
@@ -1056,11 +1160,15 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
   },
   terminal: (b, e, at) => {
     const cols = b["cols"];
-    if (typeof cols !== "number" || !Number.isInteger(cols) || cols < 1) {
+    if (cols === undefined) {
+      e.push(`${absentMessage(`${at}: "cols"`, "a positive integer")} (C04 §3i) — the width the emulator painted to`);
+    } else if (typeof cols !== "number" || !Number.isInteger(cols) || cols < 1) {
       e.push(`${at}: "cols" must be a positive integer (C04 §3i) — the width the emulator painted to`);
     }
     const screen = b["screen"];
-    if (screen !== "lines" && screen !== "grid") {
+    if (screen === undefined) {
+      e.push(`${absentMessage(`${at}: "screen"`, `"lines" or "grid"`)} (C04 I113)`);
+    } else if (screen !== "lines" && screen !== "grid") {
       e.push(`${at}: "screen" must be "lines" or "grid" (C04 I113) — the alternate screen has no scrollback, and the flag is what says which artefact a settled block keeps`);
     }
     requireArray(b, "lines", e, at);
@@ -1211,14 +1319,24 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     // `error` box says something failed and not what — the same objection §3a's
     // three-row rung makes about dropping the rule — and a height the framework
     // guessed is silently wrong in a way nobody notices.
-    if (typeof b["message"] !== "string" || b["message"].trim() === "") {
+    if (b["message"] === undefined) {
+      e.push(
+        `${absentMessage(`${at}: "message"`, "a non-empty string")} (C04 I66) — a status box ` +
+          `with nothing in it reports that something happened and not what`,
+      );
+    } else if (typeof b["message"] !== "string" || b["message"].trim() === "") {
       e.push(
         `${at}: "message" must be a non-empty string (C04 I66) — a status box with ` +
           `nothing in it reports that something happened and not what`,
       );
     }
     const height = b["height"];
-    if (typeof height !== "number" || !Number.isInteger(height) || height < 1) {
+    if (height === undefined) {
+      e.push(
+        `${absentMessage(`${at}: "height"`, "a positive integer")} (C04 I66) — the box is ` +
+          `bound by the number \`measure\` committed and cannot choose its own`,
+      );
+    } else if (typeof height !== "number" || !Number.isInteger(height) || height < 1) {
       e.push(
         `${at}: "height" must be a positive integer (C04 I66) — the box is bound by ` +
           `the number \`measure\` committed and cannot choose its own`,
@@ -1277,7 +1395,9 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
       }
     }
     const form = b["form"];
-    if (typeof form !== "string" || !PLOT_FORMS.has(form)) {
+    if (form === undefined) {
+      e.push(absentMessage(`${at}: "form"`, `one of ${[...PLOT_FORMS].join(", ")}`));
+    } else if (typeof form !== "string" || !PLOT_FORMS.has(form)) {
       e.push(`${at}: "form" must be one of ${[...PLOT_FORMS].join(", ")}`);
     }
     // §3 — no default. The validator says so as well as the constructor,
@@ -1450,8 +1570,8 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
   },
   progress: (b, e, at) => {
     requireString(b, "label", e, at);
-    if (!isFiniteNumber(b["current"])) e.push(`${at}: "current" must be a finite number`);
-    if (!isFiniteNumber(b["total"])) e.push(`${at}: "total" must be a finite number`);
+    requireField(b, "current", isFiniteNumber, "a finite number", e, `${at}: "current"`);
+    requireField(b, "total", isFiniteNumber, "a finite number", e, `${at}: "total"`);
     // C04 I108 — the one block-level carrier, and the one place a colormap
     // backing is admitted: the bar's ink fills its cell and reads by area.
     if (b["ramp"] !== undefined) checkRamp(b["ramp"], e, `${at}.ramp`, false);
@@ -1512,7 +1632,9 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
   },
   group: (b, e, at) => {
     requireArray(b, "children", e, at);
-    if (b["direction"] !== "row" && b["direction"] !== "column") {
+    if (b["direction"] === undefined) {
+      e.push(absentMessage(`${at}: "direction"`, `"row" or "column"`));
+    } else if (b["direction"] !== "row" && b["direction"] !== "column") {
       e.push(`${at}: "direction" must be "row" or "column"`);
     }
     checkFlex(b, e, at);
@@ -1557,7 +1679,9 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
       );
     }
     const height = b["height"];
-    if (typeof height !== "number" || !Number.isInteger(height) || height < 1) {
+    if (height === undefined) {
+      e.push(`${absentMessage(`${at}: "height"`, "a positive integer")} (C04 I73)`);
+    } else if (typeof height !== "number" || !Number.isInteger(height) || height < 1) {
       e.push(`${at}: "height" must be a positive integer (C04 I73) — got ${JSON.stringify(height)}`);
     }
     const data = b["data"];
@@ -1573,8 +1697,13 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
         );
       }
     }
-    if (typeof b["digest"] !== "string" || b["digest"] === "") {
+    if (b["digest"] === undefined) {
       e.push(`${at}: "digest" is derived at construction and must be present (C04 I73)`);
+    } else if (typeof b["digest"] !== "string" || b["digest"] === "") {
+      e.push(
+        `${wrongTypeMessage(`${at}: "digest"`, "a non-empty string", b["digest"])} ` +
+          `(C04 I73) — it is derived at construction`,
+      );
     }
     // **The same refusal the builder throws** (C04 I74), from one function — the
     // mosaic's lesson, where a gate that landed on one side produced an
@@ -1595,7 +1724,13 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
   mosaic: (b, e, at) => {
     requireArray(b, "children", e, at);
     const height = b["height"];
-    if (typeof height !== "number" || !Number.isInteger(height) || height < 1) {
+    if (height === undefined) {
+      e.push(
+        `${absentMessage(`${at}: "height"`, "a positive integer")} (C04 I71) — a mosaic with ` +
+          `no declared height draws one blank row, because an absolutely positioned child ` +
+          `contributes nothing to its parent's content size`,
+      );
+    } else if (typeof height !== "number" || !Number.isInteger(height) || height < 1) {
       e.push(
         `${at}: "height" must be a positive integer (C04 I71) — got ${JSON.stringify(height)}; ` +
           `a mosaic with no declared height draws one blank row, because an absolutely ` +
@@ -1603,6 +1738,10 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
       );
     }
     const areas = b["areas"];
+    if (areas === undefined) {
+      e.push(`${absentMessage(`${at}: "areas"`, "a string")} (C04 I71)`);
+      return;
+    }
     if (typeof areas !== "string") {
       e.push(`${at}: "areas" must be a string (C04 I71) — got ${JSON.stringify(areas)}`);
       return;
@@ -1656,7 +1795,12 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
       );
     }
     const height = b["height"];
-    if (typeof height !== "number" || !Number.isInteger(height) || height < 1) {
+    if (height === undefined) {
+      e.push(
+        `${absentMessage(`${at}: "height"`, "a positive integer")} (C04 I47) — a box of zero ` +
+          `rows shows nothing and has no reading to fall back on`,
+      );
+    } else if (typeof height !== "number" || !Number.isInteger(height) || height < 1) {
       e.push(
         `${at}: "height" must be a positive integer (C04 I47) — got ${JSON.stringify(height)}; ` +
           `a box of zero rows shows nothing and has no reading to fall back on`,
@@ -2753,7 +2897,11 @@ function walkBlock(
 
   const kind = value["kind"];
   if (!isString(kind)) {
-    errors.push(`${at}: "kind" must be a string`);
+    errors.push(
+      kind === undefined
+        ? absentMessage(`${at}: "kind"`, "a string")
+        : wrongTypeMessage(`${at}: "kind"`, "a string", kind),
+    );
     return;
   }
   const where = `${at} (${kind})`;
@@ -2840,25 +2988,36 @@ function validateMeta(meta: unknown, errors: string[]): void {
     errors.push(`meta: must be an object`);
     return;
   }
-  if (!(meta["verb"] === null || isString(meta["verb"]))) {
-    errors.push(`meta.verb: must be a string or null`);
-  }
+  const m = (key: string): string => `meta.${key}`;
+  requireField(meta, "verb", (v) => v === null || isString(v), "a string or null", errors, m("verb"));
   for (const key of ["adapter", "stderr"]) {
-    if (!isString(meta[key])) errors.push(`meta.${key}: must be a string`);
+    requireField(meta, key, isString, "a string", errors, m(key));
   }
   for (const key of ["exitCode", "durationMs"]) {
-    if (!isFiniteNumber(meta[key])) errors.push(`meta.${key}: must be a finite number`);
+    requireField(meta, key, isFiniteNumber, "a finite number", errors, m(key));
   }
-  if (typeof meta["truncated"] !== "boolean") errors.push(`meta.truncated: must be a boolean`);
-  if (!isArray(meta["argv"]) || !meta["argv"].every(isString)) {
-    errors.push(`meta.argv: must be an array of strings`);
-  }
-  if (!isString(meta["transport"]) || !TRANSPORTS.has(meta["transport"])) {
+  requireField(meta, "truncated", (v) => typeof v === "boolean", "a boolean", errors, m("truncated"));
+  requireField(
+    meta,
+    "argv",
+    (v) => isArray(v) && v.every(isString),
+    "an array of strings",
+    errors,
+    m("argv"),
+  );
+  if (meta["transport"] === undefined) {
+    errors.push(absentMessage(m("transport"), `one of ${[...TRANSPORTS].join(", ")}`));
+  } else if (!isString(meta["transport"]) || !TRANSPORTS.has(meta["transport"])) {
     errors.push(`meta.transport: must be one of ${[...TRANSPORTS].join(", ")}`);
   }
   // I13 — required, and checked as such. A provenance field that can be absent
   // becomes a provenance field nobody trusts.
-  if (!isString(meta["origin"]) || !ORIGINS.has(meta["origin"])) {
+  if (meta["origin"] === undefined) {
+    errors.push(
+      `${absentMessage("meta.origin", `one of ${[...ORIGINS].join(", ")}`)} (C04 I13) — ` +
+        `it is not optional, and C23 sets it on every append`,
+    );
+  } else if (!isString(meta["origin"]) || !ORIGINS.has(meta["origin"])) {
     errors.push(
       `meta.origin: required, one of ${[...ORIGINS].join(", ")} (C04 I13) — ` +
         `it is not optional, and C23 sets it on every append`,
@@ -2895,10 +3054,12 @@ export function validateDocument(
     );
   }
 
-  if (!isString(doc["command"])) errors.push(`command: must be a string`);
+  requireField(doc, "command", isString, "a string", errors, "command");
 
   const status = doc["status"];
-  if (!isString(status) || !STATUSES.has(status)) {
+  if (status === undefined) {
+    errors.push(absentMessage("status", `one of ${[...STATUSES].join(", ")}`));
+  } else if (!isString(status) || !STATUSES.has(status)) {
     errors.push(`status: must be one of ${[...STATUSES].join(", ")}`);
   }
 
@@ -2911,15 +3072,17 @@ export function validateDocument(
   if (status !== "error" && hasError) {
     errors.push(`error: present on a non-error document (status "${String(status)}") (C04 I3)`);
   }
-  if (hasError && (!isRecord(doc["error"]) || !isString(doc["error"]["message"]))) {
-    errors.push(`error.message: the only required field on ErrorLike, and it must be a string`);
+  if (hasError && !isRecord(doc["error"])) {
+    errors.push(wrongTypeMessage("error", "an object", doc["error"]));
+  } else if (hasError && isRecord(doc["error"])) {
+    requireField(doc["error"], "message", isString, "a string", errors, "error.message");
   }
 
   validateMeta(doc["meta"], errors);
 
   const ids = new Map<string, number>();
   if (!isArray(doc["blocks"])) {
-    errors.push(`blocks: must be an array`);
+    requireField(doc, "blocks", isArray, "an array", errors, "blocks");
   } else {
     for (const [i, b] of doc["blocks"].entries()) {
       walkBlock(b, errors, ids, new Set(), `blocks[${i}]`, opts);

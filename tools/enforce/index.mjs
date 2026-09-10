@@ -31,6 +31,7 @@ import {
   checkOrdering,
   checkTestRowIds,
   checkMnemonicRowIds,
+  checkCommitmentNumbers,
   checkReferences,
   checkSectionReferences,
   checkSeamFour,
@@ -203,6 +204,11 @@ const violations = [
   // citation side of this was already exact and the definition side had no rule
   // at all (F635).
   ...checkMnemonicRowIds(specs),
+  // SP11 — and the same question for the numbered list SP1 reads and never
+  // counts. F225 ruled the class, repaired C09's four collisions and left the
+  // row to "the commit that implements it"; nothing watched that condition and
+  // the same document re-acquired three (F998).
+  ...checkCommitmentNumbers(specs),
   // SP4 — Seam 4 and its owners agree, both directions. The only artefact
   // several components write to and none owns, wrong at every one that touched
   // it, because every row exists twice and nothing compared the copies.

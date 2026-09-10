@@ -2078,6 +2078,14 @@ export function plotToSvg(
   // and `┊` at every position tick; **both ways**, and drawing one was half of
   // what the style means.
   const gridded = figure.frame === "grid";
+  // **The last baseline *emitted* on each side, which is this arm's abut rule**
+  // (C12 I121, §3ak.50g). `ticksFor` is a ceiling on the step's coarseness and
+  // never the number drawn — the terminal resolves the density afterwards in
+  // `yLabels` — and this arm read the ticks and drew a label for every one, on
+  // a canvas whose height it takes from its caller. **A refusal reserves
+  // nothing** (I120), so only a label actually written moves an edge: one the
+  // callout suppresses leaves the next label the room it would have had.
+  const lastLabelAt: Record<"left" | "right", number | null> = { left: null, right: null };
   if (axis !== null && rule !== undefined && label !== undefined) {
     for (const [i, tick] of axis.ticks.entries()) {
       // **The string is the figure's** (D5). `String(tick)` printed `1` where
@@ -2133,6 +2141,15 @@ export function plotToSvg(
         // a label, and suppressing one glyph more than the ruling asks changes
         // the figure's geometry while every text assertion agrees (→ `RC4`).
         if (side === "right" && calloutRows.some((r) => Math.abs(r - y) < SVG_FONT_SIZE)) continue;
+        // **A full em between baselines, and the tick keeps its rule either
+        // way** (C12 I121, §3ak.50g). The bound is I114's own, one writer over:
+        // a glyph's ink is inside its em box, so two baselines an em apart
+        // cannot overlap and anything closer may. **Both sides**, because
+        // I114's *never the left's* is about a callout displacing a label and
+        // says nothing about two labels displacing each other — a crowded left
+        // gutter smears exactly as a right one does.
+        const previous = lastLabelAt[side];
+        if (previous !== null && Math.abs(y - previous) < SVG_FONT_SIZE) continue;
         const at = side === "left" ? box.left - LABEL_GAP : box.right + LABEL_GAP;
         // **The left side is `end`-anchored too and had no clip at all**, so a
         // long value label ran off the viewBox rather than being cut inside a
@@ -2148,6 +2165,7 @@ export function plotToSvg(
           // to the canvas may be cut to nothing it collides with, and where a
           // legend sits beyond the column that is the band it collides with.
           : fitLabel(text, box.right + rightRoom(figure, layout) - at);
+        lastLabelAt[side] = y;
         parts.push(`<text x="${n(at)}" y="${n(y + SVG_FONT_SIZE / 3)}" ` +
           `text-anchor="${side === "left" ? "end" : "start"}" ` +
           `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${label}">` +

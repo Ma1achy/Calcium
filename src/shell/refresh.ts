@@ -313,6 +313,21 @@ export type RefreshDeps = Readonly<{
   producerContext: () => ProducerContext;
   /** Appends a document. The identity notice is the only §3b path that does. */
   append: (text: string) => void;
+  /**
+   * A swallowed failure, on C23's two channels (§5a, I48, I70).
+   *
+   * **Not `append`, and the difference is which reader is owed.** `append`
+   * writes a notice the session is meant to read *about itself* — the identity
+   * loop's, `origin: "refresh"`. This is a defect in what the shell built, so it
+   * goes where every other swallowed failure goes: an entry at the moment and an
+   * accumulation C22 §8 step 3 drains onto the restored primary screen. The
+   * pipeline's `contain` is the implementation, and it deduplicates by message,
+   * which is what makes a part refusing on every tick say it once.
+   *
+   * Required rather than optional, because a report a consumer can forget to
+   * wire is a report that is not made — the vacuity class in a dependency.
+   */
+  fault: (stage: string, cause: unknown) => void;
   stopping: () => boolean;
   /**
    * Replaces a part's block on a pushed view (C15 §2's `update`).
@@ -481,7 +496,14 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
   type Part = {
     readonly spec: ViewRefresh;
     readonly host: RefreshHost;
-    readonly source: Source;
+    /**
+     * **Mutable, and the one writer is `stopPart`** (C23 I70). A part that can
+     * no longer land a patch is detached from whatever it was polling and given
+     * the dead source `declare`'s refusal already uses — so it stops without a
+     * second teardown path, and the host's *is everything here finished* sweep
+     * reads `done` and releases through the one call I32 names.
+     */
+    source: Source;
     /**
      * When this part's box first appeared, for the elapsed counter (C23 I52).
      *
@@ -602,23 +624,133 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
   const errorArm = (part: Part): ((e: ErrorLike, r: number | null, a: number) => Block) =>
     part.spec.renderError ?? defaultErrorBlock(part.spec.id);
 
-  const put = (host: RefreshHost, part: Part, child: Block): boolean => {
+  /**
+   * What became of a part's patch — **four answers, because they have four
+   * different dispositions** (C23 I70, §8h, F1002).
+   *
+   * This was `boolean`, and `outcome.ok` was the whole of it. `PatchOutcome`'s
+   * arms answer two questions and the boolean carried only the first: *is the
+   * host gone* and *was the patch refused* are not one question, and the caller
+   * released a live host on the second — taking every sibling part on it and the
+   * entry's readout, and discarding the one sentence that said why.
+   */
+  type PutResult =
+    /** The patch landed. */
+    | Readonly<{ kind: "ok" }>
+    /** C13 has dropped the entry, or the layer has gone. Release the host (I33). */
+    | Readonly<{ kind: "hostGone" }>
+    /** The host lives and no longer holds this part's block. The part is over (§8h H3). */
+    | Readonly<{ kind: "partGone" }>
+    /** The host holds the block and the document refused the patch (§8h H4). */
+    | Readonly<{ kind: "refused"; error: ErrorLike }>;
+
+  /**
+   * Whether the entry still holds a block for this part.
+   *
+   * **The axis that separates §8h H3 from H4**, and it is asked of the host
+   * rather than read off `applyPatch`'s message: both arms come back as
+   * `reason: "patch"` and differ only in prose C04 composes, so discriminating on
+   * the text would keep a second copy of C04's rules in the component least able
+   * to notice when they change. `findBlock` is the walk `currentPanel` and the
+   * staleness sweep already use, so the two cannot drift.
+   */
+  const entryHolds = (id: EntryId, blockId: string): boolean => {
+    const entry = deps.transcript.entries.find((e) => e.id === id);
+    return entry !== undefined && findBlock(entry.doc.blocks, blockId) !== null;
+  };
+
+  const put = (host: RefreshHost, part: Part, child: Block): PutResult => {
     const existing = currentPanel(host, part);
     const base = livePanel(part.spec.id, titleOf(part), child);
     const panel: Block =
       existing?.gapBefore === true ? ({ ...base, gapBefore: true } as Block) : base;
-    if (host.kind === "view") return deps.updateView(host.id, part.spec.id, panel);
+    // **One boolean and one meaning on this arm** (§8h): C15 answers whether the
+    // layer is still there, and a view that cannot take a well-formed block is a
+    // state this seam cannot report — stated as the limit it is.
+    if (host.kind === "view") {
+      return deps.updateView(host.id, part.spec.id, panel) ? { kind: "ok" } : { kind: "hostGone" };
+    }
 
     const outcome = deps.transcript.patch(
       host.id,
       { op: "replace", blockId: part.spec.id, block: panel },
       "shell",
     );
-    // **`unknown` and `settled` are not failures** (C23 I21, §5). The host was
-    // evicted or finalised between arming and firing, so the part is over —
-    // backing off would be waiting to retry against something that is gone.
-    return outcome.ok;
+    if (outcome.ok) return { kind: "ok" };
+    // **`unknown` is not a failure** (C23 I21, §5): C13 dropped the entry between
+    // arming and firing, so the part is over and backing off would be retrying
+    // against something gone. `settled` never arrives — C13 gates a settled entry
+    // on `origin: "farSide"` and this patches as `"shell"` — and the comment that
+    // used to name it as one of two reasons for releasing described a state no
+    // caller can construct (§8h H5).
+    if (outcome.reason !== "patch") return { kind: "hostGone" };
+    return entryHolds(host.id, part.spec.id)
+      ? { kind: "refused", error: outcome.error }
+      : { kind: "partGone" };
   };
+
+  /**
+   * Stop one part without touching its host — **I43's disposition, reached a
+   * second way** (C23 I70).
+   *
+   * A refused declaration is already given a source that is `done`, referred to
+   * by nobody and never in `sources`; a part that cannot land a patch is in the
+   * same state and wants the same thing. Nothing here is a teardown: the host
+   * keeps its registration, `release` still reaches it, and the sweep's *every
+   * part done* check drops the host through the one call I32 names when this was
+   * the last thing polling on it.
+   */
+  const stopPart = (part: Part): void => {
+    part.source.parts.delete(part);
+    part.source = { ...deadSource(part.source.key, part.spec), parts: new Set<Part>() };
+  };
+
+  /**
+   * Act on a patch's answer, and say whether anything reached the screen.
+   *
+   * **One place, because four call sites agreeing by inspection is what I32 is
+   * about.** Before this the four disagreed: two released the host, one ignored
+   * the answer entirely and one counted it, so the same refusal meant three
+   * different things depending on which sweep saw it first.
+   */
+  const landed = (part: Part, result: PutResult): boolean => {
+    switch (result.kind) {
+      case "ok":
+        return true;
+      case "hostGone":
+        release(part.host);
+        return false;
+      case "partGone":
+        stopPart(part);
+        return false;
+      case "refused":
+        // **The part, never the host** (I70). And the report goes to the fault
+        // channel rather than into the panel, because the panel is reached by a
+        // patch and a patch is what was refused (§8h H4).
+        stopPart(part);
+        deps.fault(`live part "${part.spec.id}"`, result.error.message);
+        return false;
+    }
+  };
+
+  /**
+   * **The only way to patch a part**, and it is one function because `put`'s
+   * answer is an object.
+   *
+   * A four-armed result is the right shape and it has one hazard a boolean did
+   * not: `if (put(…))` still compiles and is **always true**. Three of the seven
+   * call sites were left that way by the change that introduced it — the
+   * staleness re-title, the loading counter and the declaration refusal — each
+   * committing a frame for a patch that may not have landed, and no row failed.
+   *
+   * **No row could have**, and that is the reason this is a joined function
+   * rather than a note. A refusal at those three is not constructible today: the
+   * only duplicate id a part can meet arrives from a patch that already landed,
+   * and the tick after that one stops the part before staleness, the loading
+   * counter or a declaration can look at it again. So the hazard is a compile-time
+   * one with no test that can hold it, and the remedy has to be the shape.
+   */
+  const write = (part: Part, child: Block): boolean => landed(part, put(part.host, part, child));
 
   /**
    * C23 I35 — the age lives in the title, and nowhere else does it fit.
@@ -686,14 +818,15 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
       // rather than a countdown to a retry that will not happen. The attempt
       // count is still the source's: the fetch that produced this data may well
       // have failed twice on the way.
-      put(part.host, part, errorArm(part)(shown, null, src.failures));
-      return true;
+      // **Through `landed`, like every other write** (I70). The box that reports a
+      // deterministic throw can itself be refused, and this used to return `true`
+      // whatever happened — a containment whose own report was dropped, and a
+      // part left ticking against a document that would refuse it every time.
+      return write(part, errorArm(part)(shown, null, src.failures));
     }
     part.lastOk = deps.elapsed();
     part.stale = false;
-    if (put(part.host, part, child)) return true;
-    release(part.host);
-    return false;
+    return write(part, child);
   };
 
   /**
@@ -749,8 +882,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
           // once rather than once per referrer.
           let any = false;
           for (const part of [...src.parts]) {
-            if (put(part.host, part, errorArm(part)(shown, retryIn, src.failures))) any = true;
-            else release(part.host);
+            if (write(part, errorArm(part)(shown, retryIn, src.failures))) any = true;
           }
           if (any) deps.commit("stream");
         },
@@ -809,7 +941,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
         if (mono - part.lastOk < part.spec.staleAfterMs) continue;
         part.stale = true;
         const current = currentChild(part.host, part);
-        if (current !== null && put(part.host, part, current)) deps.commit("stream");
+        if (current !== null && write(part, current)) deps.commit("stream");
       }
 
       if (now >= src.dueAt && anyoneLooking(src)) runSource(src);
@@ -843,7 +975,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
         const shown = currentChild(part.host, part);
         const since = mono - part.startedAt;
         if (!elapsedNeeded(shown, since)) continue;
-        if (put(part.host, part, { ...(shown as Status), elapsedMs: since })) ticked = true;
+        if (write(part, { ...(shown as Status), elapsedMs: since })) ticked = true;
       }
     }
 
@@ -873,7 +1005,9 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
         const remaining = Math.max(0, src.dueAt - now);
         const shown = currentChild(part.host, part);
         if (!retryNeeded(shown, remaining)) continue;
-        if (put(part.host, part, { ...(shown as Status), retryInMs: remaining })) counted = true;
+        // The same four answers as every other write (I70): this rewrites the
+        // part's panel through `put`, so a document that refuses one refuses this.
+        if (write(part, { ...(shown as Status), retryInMs: remaining })) counted = true;
       }
     }
     if (counted) deps.commit("stream");
@@ -919,7 +1053,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     // teardown path instead of through it — and I32's *five sites agreeing by
     // inspection* is exactly what that sentence is about.
     for (const entry of [...hosts.values()]) {
-      if (entry.parts.every((p) => p.source.done)) release(entry.host);
+      if (finished(entry)) release(entry.host);
     }
   };
 
@@ -985,6 +1119,27 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     { blockId: string; render: (elapsedMs: number, tick: number) => Block; startedAt: number; last: string }
   >();
 
+  /**
+   * Whether a host's registration has nothing left on it **and nothing else is
+   * using the entry** (C23 I53, I70).
+   *
+   * **The readout clause is the second half and it was missing.** I33's five
+   * triggers all mean *the entry is over*, and `release` drops the entry's
+   * running-card readout because of that. The sweep below calls the same
+   * function for something else entirely — *this host has nothing left to
+   * refresh* — and a card is still running while that is true. Measured: a card
+   * with a **one-shot** part froze its elapsed figure at 2s where the same card
+   * with no part at all, and with a periodic part, both reached 6s. The refusal
+   * ruling reaches it by a second door, since a stopped part is `done` too.
+   *
+   * The host is then released at settlement instead, through trigger 1, which is
+   * the same one call. What it costs is one map entry per running card until the
+   * card settles, and that is bounded by the cards on screen.
+   */
+  const finished = (entry: { host: RefreshHost; parts: Part[] }): boolean =>
+    entry.parts.every((p) => p.source.done) &&
+    !(entry.host.kind === "entry" && readouts.has(entry.host.id));
+
   const release = (host: RefreshHost): void => {
     // A released entry host takes its readout with it (I53) — the same five
     // triggers, through the same one path (I32).
@@ -1035,9 +1190,12 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
      * sweep ever runs again, and the host is never released — which is how a leak
      * with no symptom survives a green suite: a `done` source does not poll.
      */
+    // **Through the same predicate the sweep uses**, or the two disagree and the
+    // difference is a spin: a host the wake keeps arming for and the sweep
+    // declines to release schedules a zero-delay timer on every pass.
     const cleanup =
       [...sources.values()].some((s) => s.parts.size === 0) ||
-      [...hosts.values()].some((e) => e.parts.every((p) => p.source.done));
+      [...hosts.values()].some((e) => finished(e));
     for (const src of sources.values()) {
       if (src.parts.size === 0) continue;
       // **A paused source is not soonest** (C23 I46). Arming to an overdue source
@@ -1348,7 +1506,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
           // count and `1` is the honest number: this is the first and only time
           // it will be drawn (I43 — its source is `done` and referred to by
           // nobody).
-          if (put(part.host, part, errorArm(part)({ message }, null, 1))) any = true;
+          if (write(part, errorArm(part)({ message }, null, 1))) any = true;
         }
         if (any) deps.commit("stream");
       }

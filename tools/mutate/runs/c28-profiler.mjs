@@ -103,6 +103,26 @@ const results = runPass({
   },
   mutations: [
     {
+      // **The absence removed from the maximum** (C28 I13's second clause, F1005).
+      // A zero maximum with no window behind it reads as *nothing was ever
+      // delayed*, which is a claim about the loop the instrument cannot make.
+      name: "a maximum with no window behind it is drawn as a figure",
+      file: PANES,
+      from: "            ? \"— no window sampled yet\"\n            : `${ms(last.loopDelayMax)} ms`,",
+      to: "            ? `${ms(last.loopDelayMax)} ms`\n            : `${ms(last.loopDelayMax)} ms`,",
+      expect: "T3.3",
+    },
+    {
+      // **The count made a constant**, so a floor and an absence become the same
+      // state again — the defect this arm exists to separate, from the sampler's
+      // side rather than the pane's.
+      name: "the sample claims a window it never had",
+      file: NODE,
+      from: "        loopDelaySamples: loop.count,",
+      to: "        loopDelaySamples: 1,",
+      expect: "T3.3",
+    },
+    {
       // **The inclusive parent**, which is the shape the tree was built to
       // avoid: a `group` measures its children, so charging it their time makes
       // the outermost node the widest bar in every tree ever drawn — and every

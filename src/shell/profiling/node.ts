@@ -150,6 +150,10 @@ export function createResourceProbe(): ResourceProbe {
         loopDelayP50: loop.percentile(50) / 1e6,
         loopDelayP99: loop.percentile(99) / 1e6,
         loopDelayResolutionMs: RESOLUTION_MS,
+        // **The count, so a reader can tell a floor from an absence** (I13,
+        // F1005). Zero here means the histogram has had no window, and every
+        // figure beside it is the instrument's default rather than the loop's.
+        loopDelaySamples: loop.count,
         gc: Object.freeze({ ...gc }),
         gcPauseMs,
         majorPageFaults: usage.majorPageFault - usageBase.majorPageFault,

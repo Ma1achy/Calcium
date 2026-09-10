@@ -38,7 +38,26 @@ export const THEME: ResolvedTheme = loaded.value.current;
  * that reasoning about a ratio lost to reading the one in use.
  */
 const CELL_ASPECT = 2;
-/** Raster pixels per cell row; the width follows from the aspect above. */
+/**
+ * Raster pixels per cell row; the width follows from the aspect above.
+ *
+ * **A cell is about 28 pixels tall in the font these frames were read with**
+ * (DejaVu Sans Mono at 13pt under kitty), so this is near-native for the pixel
+ * arm and free for the dither, which averages down to its dot grid regardless.
+ *
+ * **The residue, stated**: the two arms want different *grounds* even though
+ * they can share a raster. The dither needs the figure's ground at zero to have
+ * any range left for the ink; kitty would rather have the SVG's own `#141414`,
+ * which matches the terminal. Normalising costs the pixel arm a marginally
+ * darker rectangle and buys the dither the whole picture, so it is applied to
+ * both — and a consumer who knows their protocol can do better, since
+ * `imageProtocol` is on the capabilities the framework already hands producers.
+ *
+ * **`PIXELS_PER_ROW` was a second declaration of this same 28** (F1008), forty
+ * lines down, carrying the paragraphs above and cited by the comment inside
+ * `imageOf` as the number in use — while `.resize` had always read `CELL_H`.
+ * Nothing called it, and the example tree did not set `noUnusedLocals`.
+ */
 const CELL_H = 28;
 const CELL_W = CELL_H / CELL_ASPECT;
 
@@ -108,23 +127,6 @@ function unpainted(svg: string): string {
  */
 const pngs = new Map<string, string>();
 
-/**
- * Raster rows per terminal row.
- *
- * **A cell is about 28 pixels tall in the font these frames were read with**
- * (DejaVu Sans Mono at 13pt under kitty), so this is near-native for the pixel
- * arm and free for the dither, which averages down to its dot grid regardless.
- *
- * **The residue, stated**: the two arms want different *grounds* even though
- * they can share a raster. The dither needs the figure's ground at zero to have
- * any range left for the ink; kitty would rather have the SVG's own `#141414`,
- * which matches the terminal. Normalising costs the pixel arm a marginally
- * darker rectangle and buys the dither the whole picture, so it is applied to
- * both — and a consumer who knows their protocol can do better, since
- * `imageProtocol` is on the capabilities the framework already hands producers.
- */
-const PIXELS_PER_ROW = 28;
-
 export async function imageOf(
   block: Block,
   cols: number,
@@ -161,8 +163,8 @@ export async function imageOf(
     // — 42, 41, 41, 41 inked cells of 784. So the resolution never mattered to
     // it, and the earlier belief that the downsample destroyed the stroke was
     // wrong: the ground was the whole of it. That leaves the size free to be
-    // whatever the pixel arm wants, and `PIXELS_PER_ROW` is near this font's
-    // cell height rather than a guess at a ratio.
+    // whatever the pixel arm wants, and `CELL_H` is near this font's cell
+    // height rather than a guess at a ratio.
     //
     // **And the ground is gone rather than darkened** — see `unpainted`. The SVG paints its own `#141414` — right for a browser
     // and matching the terminal theme — and an *ordered* dither maps luminance

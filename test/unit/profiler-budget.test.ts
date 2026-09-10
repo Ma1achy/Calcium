@@ -68,7 +68,7 @@ function sample(at: number, cpuMs: number): ProfileReport["samples"][number] {
     rss: 0, heapUsed: 0, heapTotal: 0, external: 0, arrayBuffers: 0, heapLimit: 0,
     cpuUser: cpuMs, cpuSystem: 0,
     loopUtilisation: 0,
-    loopDelayMax: 0, loopDelayP50: 0, loopDelayP99: 0, loopDelayResolutionMs: 1,
+    loopDelayMax: 0, loopDelayP50: 0, loopDelayP99: 0, loopDelayResolutionMs: 1, loopDelaySamples: 0,
     gc: { minor: 0, major: 0, incremental: 0, weakcb: 0 },
     gcPauseMs: 0,
     majorPageFaults: 0, involuntaryContextSwitches: 0,

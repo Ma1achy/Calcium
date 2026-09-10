@@ -27,7 +27,7 @@
  */
 
 import { b } from "@fmx/calcium";
-import type { LocalDocument, Block, EventLine, ViewDocument } from "@fmx/calcium";
+import type { LocalDocument, Block, EventLine } from "@fmx/calcium";
 import { parseNdjson, str } from "./ndjson.ts";
 import type { Row } from "./ndjson.ts";
 

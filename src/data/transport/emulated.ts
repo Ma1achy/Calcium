@@ -21,7 +21,7 @@ function isPatches(value: RawResult | AsyncIterable<RawPatch>): value is AsyncIt
 }
 
 export function createEmulatedTransport(handler: FixtureHandler): VerbTransport {
-  const argvOf = (inv: Invocation): readonly string[] => withJson(inv.argv);
+  const argvOf = (inv: Invocation): readonly string[] => withJson(inv.argv, inv.jsonFlag);
 
   const settled = (argv: readonly string[], over: Partial<RawResult> = {}): RawResult => ({
     argv,

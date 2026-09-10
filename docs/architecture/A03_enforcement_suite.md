@@ -586,6 +586,7 @@ The suite governs the source. **SP1 governs the documents the source is written 
 | SP8 | Every `§` reference resolves against the document that owns it — **reported, not gated** | `src/`, `test/`, `tools/`, `docs/` outside `notes/` | A02 §1 · A03 §7a |
 | SP9 | Every invariant is named by at least one test row; the uncited are an exemption list compared **by equality** | `docs/components/` against `test/**/*.ts` | A03 §7a · FINDINGS |
 | SP10 | A mnemonic test-row label — `SK10`, `HZ4` — is unique **within one document**; reuse across specs is legitimate and not gated | `docs/components/` | A03 §2 · A03 §7a |
+| SP11 | A commitment's number is unique within its spec; the duplicates outstanding are a debt list compared **by equality** | `docs/components/` | A03 §2 · A03 §7a |
 
 They run in `make enforce` and their fire-tests are `test/unit/enforce-commitments.test.ts`.
 
@@ -661,6 +662,55 @@ that form. **And there is no placeholder arm**: SP7 exempts `Tn.x` because a spe
 construction writes one, the mnemonic families have no such convention, and the corpus carries zero
 such rows — an exemption here would be a clause with nothing to be wrong about, which is §2's
 vacuity class installed inside the rule against it.
+
+**SP11 is the same question for the one numbered list on the page that nothing counted, and it
+had already been argued for and not built.** SP1 reads every commitment and resolves its citation;
+it never looks at the number. SP2 numbers the invariants, SP7 and SP10 the test rows. The
+commitments were the remainder.
+
+F225 found it, fixed the instance and deferred the rule. C09 §8 was two lists — 1–21 and a restart
+at 11 running to 14 — so four numbers named two commitments each, and one of the three citations
+into the collision, `expect-document.ts`'s `C09 commitment 14`, resolved against **neither**
+candidate: it is commitment 5. The entry closes *the row lands with its implementation and this
+entry is the prose that goes ahead of it*, which is this document's own commitment 14b applied
+correctly. **Nothing watched that condition.** The same document re-acquired three duplicates —
+41, 42 and 43, two of them born in one commit — and they were rediscovered from scratch as F664,
+with no reference to the entry that had already ruled the class. That is CLAUDE.md's deferral
+shape exactly: the condition is written where the deferral is, and the thing that would satisfy it
+is written somewhere else.
+
+**Twelve duplicated numbers across five of twenty-eight specs on the first run** (2026-09-09):
+C04's 17–20, C09's 41–43, C16's 21, C21's 6 and C22's 30–32. Every one reads as backed, because
+nothing is missing and nothing dangles — §2's failure arriving at the citation rather than at the
+rule, for the third family in this section.
+
+**And F225's own measurement was false when it was written, in its own favour, which is the other
+half of why the deferral cost what it did.** The entry reads *C09 is the only spec with duplicate
+commitment numbers — 25 commitments, 4 collisions, against 0 in every other spec that has a
+numbered list.* Run against the tree at the commit that landed it: C04 already declared 17–20
+twice, C16 declared 21 twice and C22 declared 30–32 twice. **Twelve numbers across four specs, of
+which the entry saw four across one** — only C21's arrived afterwards. So the argument for the rule
+was made from *this document is uniquely bad* while three others were already carrying the defect,
+and the rule it deferred would have found eight more numbers on the day it was owed. A claim that
+reads as a measurement, carried into a second document, and resolved against the tree by nobody. C09's are repaired, renumbered to 59–61 on F225's
+remedy; the other nine are a debt list compared by equality, because the renumber is not the work.
+**Ten citations of a C09 commitment number exist across `docs/`, `src/`, `test/`, `tools/` and
+`examples/`** — of commitments 5, 11, 14, 19 and 35, and none of 41–43 — and walking them is what
+a renumber costs.
+
+**Its blind spot is the lettered commitment, and the limit is shared rather than forked.**
+`commitmentsOf` matches a line opening `n.`, so a spec writing `14a.` declares a commitment neither
+SP11 nor **SP1** can see: 22 of them across C01, C14, C22 and C23, C22 holding sixteen. Reading
+them through a second, wider pattern inside SP11 is what one-reader-per-corpus forbids — two
+readers of one corpus disagree eventually, and the one that disagrees quietly is the one nothing
+asserts against. Widening the shared pattern is the remedy, measured at 942 commitments against
+920 with zero new SP1 violations, and it is a change to SP1's subject rather than to this rule's.
+
+**And order is not gated, which is a ruling with a figure behind it.** SP2 asks invariants to be
+numbered 1..n *in order*; SP11 asks only that a number name one thing. Eleven of twenty-eight
+specs declare their commitments out of order today, C04 and C12 at 102 and 109 items — so the
+ordering half is a renumber of two of the largest documents in the project and every citation of
+every number that moves, against a defect that still locates its commitment. A duplicate does not.
 
 **SP2 is a check that existed as a habit rather than a mechanism**, which is the same class as SS3 (§2) approached from the other side: not a rule written down and never built, but a rule performed reliably and never written down. Ordering was verified by ad-hoc script while the specs were written and caught every time. When the habit stopped, the drift resumed — twenty of twenty-five specs, C04 declaring `…17, 22, 23, 24, 25, 26, 27, 28, 19, 29, 18, 20, 20a, 33, 32, 31, 30, 21` — and nothing went red, because nothing was missing and no citation dangled. The list had simply stopped locating anything.
 
@@ -774,6 +824,7 @@ Each check names, on failure: the rule, the file, the line, and the spec that de
 16. **Every path the deferral map names exists** (TD3, §9a). A mapped file that is not there reports compliance because it cannot find what it was asked about, which is commitment 14's vacuity class inside the deferral machinery itself.
 17. **A spec's invariants are numbered 1..n, in order** (SP2, §7a). The numbers are what a citation resolves against, so a list that has stopped ascending has stopped locating anything — and this one drifted for twenty specs because it was a habit rather than a mechanism (§2). A lettered variant sits beside its base, because adjacency is the whole of what the letter says.
 18. **Every invariant reference resolves, everywhere, not only in the specs** (SP3, §7a). SP1 stops at `docs/components/`; the eleven hundred bare references in `src/`, `test/` and the other documents were resolved by nothing. **The rule states where it stops**: it proves a reference resolves against its owner, not that the owner is the intended one, and a qualified reference is preferred wherever a file's owner is not obvious from its path.
+19. **A commitment's number locates one commitment** (SP11, §7a). SP1 resolves every commitment's citation and never counts, so the failure SP2 exists to prevent was unwatched one list over — twelve duplicates across five specs, each reading as backed because nothing is missing and nothing dangles. **The rule was ruled once already and deferred to "the commit that implements it"** (F225), which is commitment 14b applied correctly to a commit that never came: the same document re-acquired three duplicates and they were rediscovered from scratch (F664, F998) — and F225's *C09 is the only spec in the tree with duplicates* was false when written, at twelve numbers across four specs against the four in one it saw. The outstanding nine are a debt list compared by equality; the remedy is a renumber of the second occurrence, and the work is the citations.
 
 ---
 
@@ -979,6 +1030,27 @@ fields to it. A rule that over-reports is not a rule anyone keeps.
 **Correction 1 — functions and classes, not every export.** A constant exported so a test asserts against the constant rather than a literal is exactly the noise the 55-hit measurement found. A function is *behaviour offered across a seam*, and behaviour is the thing that can have no consumer. 281 candidates rather than 376, and the seventeen constants leave with the distinction rather than with an exception apiece.
 
 **Correction 2 — occurrences, not files, and comments stripped.** Both halves are load-bearing and each was found by a false result. A function used inside its own module is consumed: `validateConfig` and `isFrozen` look unconsumed to a file-counting scan and are called one screen below their own declarations. And prose runs the other way — `backoffOf` is named in four comments and called in none, so a scan that counts comment mentions **reads the rule's own documentation as evidence the seam is wired**.
+
+**Two blind spots, measured 2026-09-09 rather than argued** (F1000). Both are recorded here
+because an unrecorded limit reads as strength, and because each has a number that says what
+closing it would cost.
+
+| the blind spot | what it would add |
+|---|---|
+| the declaration pattern reaches `export function`, `export function*`, `export async function`, `export class` | **7** `export const` and **3** `export type`/`interface` names with no second mention in `src/` |
+| a barrel's `export { … } from` line counts as a consumer | **37** functions and classes, **10** constants and **1** type are named nowhere else |
+
+**The first is deliberate and the second is not, and the second is the larger number.**
+Correction 1 above argues the constants out on their noise, and the measurement agrees — seven
+candidates against the 55-hit figure that founded the exclusion. But *consumed by a barrel* is
+not one thing: for `src/testing/` and `src/data/fixtures/` the barrel **is** the public surface
+and the consumer is a test or a consumer app, correctly outside the corpus. For a name that is
+re-exported and reaches no entry point, the re-export is the export excusing itself. MG25 cannot
+tell those apart, because it counts occurrences and both are one occurrence.
+
+**So this is stated and not closed**, and what would close it is the entry-point reachability
+MG27 already computes — not a wider pattern, which is the change the numbers make look
+attractive and which would add ten rows to a rule whose real gap is forty-eight.
 
 **That second half is not a refinement. It is what makes the rule correct at all**, and it generalises past this rule: **prose about a mechanism inflates every textual signal of its existence.** A producer with no consumer is documented *more* than a working one — it is the thing that needs explaining, so it accumulates comments in the exact proportion that it lacks calls. So the naïve count does not merely miss `backoffOf`; it reports it consumed **with the highest confidence in the tree**, and confidence and correctness point in opposite directions. Every grep-shaped tool counts comments by default, and every future rule here that counts textual occurrences inherits this.
 
