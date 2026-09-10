@@ -3474,11 +3474,42 @@ export function checkDevEntryIsolation(files, readFile = (f) => readFileSync(f, 
  * compares two declarations and says nothing about whether the table is *read*.
  * `plotUnionErrors` looping it is what makes an entry a check, and that is
  * asserted by T2.x's rows in `test/unit/` rather than here — a scan can see a
- * table and cannot see a loop over it. And the parse is textual: a member
- * written across two lines, or a union built by reference rather than by
- * literals, is invisible to it. Both forms are absent from `Plot` today and the
- * corpus count below is what a reader checks that against.
+ * table and cannot see a loop over it.
+ *
+ * **And the parse is textual, which is where this rule was wrong about itself**
+ * (F1085). The comment used to name two escapes a textual parse has — a member
+ * written across two lines, and a union built by reference — and then assert
+ * *both forms are absent from `Plot` today*. `xFormat?: Plot["yFormat"]` is the
+ * second form. It landed on 2026-08-16 and this sentence landed on 2026-09-10,
+ * so it was not overtaken: **it was false when written**, and the member it hid
+ * accepted any value while `yFormat`, the member it is declared from, was
+ * refused. `Plot["yFormat"]` is the file's convention rather than an accident,
+ * written three times — `BarSpec.format`, `AxisSpec3.format` and `Plot.xFormat`.
+ *
+ * So the by-reference form is now **resolved** rather than skipped, by
+ * `plotByReferenceMembers`, which the rule and its row share so the two cannot
+ * drift. What is left of the blind spot is the multi-line member, and the
+ * honest form of that clause is a count the rule takes rather than a claim a
+ * reader trusts: **naming a limit is a claim about the rule and review can
+ * check it; claiming the corpus does not reach the limit is a claim about the
+ * corpus, and only a measurement can.**
  */
+/**
+ * `Plot`'s members that declare a union **by reference** — `x?: Plot["y"];`.
+ *
+ * Exported so MG31 and T2.132 read the same corpus. A row that re-derives the
+ * pattern is a second implementation with the first one's birthday clauses, and
+ * the count is what stops the resolution arm passing by having nothing to
+ * resolve — which is exactly how the sentence it replaces was true and useless.
+ *
+ * Takes `Plot`'s body rather than the file, so the caller's brace-matching is
+ * the one thing that decides what "on `Plot`" means.
+ */
+export function plotByReferenceMembers(body) {
+  const BY_REF = /^ {2}(\w+)\?: Plot\["(\w+)"\];$/gmu;
+  return [...body.matchAll(BY_REF)].map((m) => ({ member: m[1], referent: m[2] }));
+}
+
 export function checkPlotUnions(files, readFile = (f) => readFileSync(f, "utf8")) {
   const TYPES = "src/data/viewmodel/types.ts";
   const VALIDATE = "src/data/viewmodel/validate.ts";
@@ -3500,6 +3531,21 @@ export function checkPlotUnions(files, readFile = (f) => readFileSync(f, "utf8")
   }
   if (declared.size === 0) return fail("`Plot` declares no string-literal union member, which it has 24 of — the member pattern has stopped matching and the rule is now vacuous over an empty set (C04 I118)");
 
+  // A member declared by reference carries the referent's values, so it is
+  // resolved into `declared` and then compared like any other (F1085). A
+  // referent that is not itself a union is reported rather than resolved: the
+  // reference would then name something this rule cannot check, which reads
+  // from the table's side exactly like a member that needs no entry.
+  const unresolved = [];
+  for (const { member, referent } of plotByReferenceMembers(body)) {
+    const values = declared.get(referent);
+    if (values === undefined) {
+      unresolved.push(`\`${member}\` is declared as \`Plot["${referent}"]\` and \`${referent}\` is not a string-literal union on \`Plot\` — the reference resolves to something this rule cannot check, and an unresolvable reference reads from the table's side exactly like a member needing no entry`);
+      continue;
+    }
+    declared.set(member, values);
+  }
+
   const table = readFile(VALIDATE);
   const tStart = table.indexOf("export const PLOT_UNIONS");
   if (tStart === -1) return fail("no `export const PLOT_UNIONS` in validate.ts — the table is the membership mechanism and a rule comparing against nothing agrees with everything (C04 I118)");
@@ -3512,7 +3558,7 @@ export function checkPlotUnions(files, readFile = (f) => readFileSync(f, "utf8")
   }
 
   const show = (vs) => vs.map((v) => (v === false ? "false" : `"${v}"`)).join(", ");
-  const problems = [];
+  const problems = [...unresolved];
   for (const [name, values] of declared) {
     const have = listed.get(name);
     if (have === undefined) {

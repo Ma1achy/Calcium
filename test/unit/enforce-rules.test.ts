@@ -36,6 +36,7 @@ import {
   checkExportedArguments,
   checkFunctionConsumers,
   checkPlotUnions,
+  plotByReferenceMembers,
   checkSpanNamesOpened,
   checkBuilderCoverage,
   checkSeamConsumers,
@@ -1918,7 +1919,53 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     expect(noTable[0]?.message).toContain("agrees with everything");
   });
 
-  it("T2.128 (MG31): the real tree is clean, and the corpus it read is 24 members", () => {
+  it("T2.132 (C04 I118, MG31, F1085): a member declaring its union by reference is resolved, not skipped", () => {
+    // **The form the rule's own comment said was absent.** `xFormat?:
+    // Plot["yFormat"]` had been in `Plot` for twenty-five days when the sentence
+    // asserting it was not landed, and the member accepted any value while the
+    // one it is declared from was refused.
+    const missing = runPlotUnions(plotTree(
+      '  yFormat?: "number" | "percent";\n  xFormat?: Plot["yFormat"];\n',
+      '  yFormat: Object.freeze(["number", "percent"]),\n',
+    ));
+    expect(missing).toHaveLength(1);
+    expect(missing[0]?.message, "the reference is carried to the table").toContain("`xFormat` is a union in the type and not in the table");
+
+    // The values are compared through the reference, so the entry cannot drift
+    // from the member it names.
+    const disagrees = runPlotUnions(plotTree(
+      '  yFormat?: "number" | "percent";\n  xFormat?: Plot["yFormat"];\n',
+      '  yFormat: Object.freeze(["number", "percent"]),\n  xFormat: Object.freeze(["number"]),\n',
+    ));
+    expect(disagrees).toHaveLength(1);
+    expect(disagrees[0]?.message).toContain("`xFormat` admits");
+
+    // **A reference to something that is not a union is reported rather than
+    // skipped**, because from the table's side an unresolvable reference reads
+    // exactly like a member needing no entry.
+    const unresolvable = runPlotUnions(plotTree(
+      '  yFormat?: "number" | "percent";\n  xFormat?: Plot["height"];\n',
+      '  yFormat: Object.freeze(["number", "percent"]),\n',
+    ));
+    expect(unresolvable).toHaveLength(1);
+    expect(unresolvable[0]?.message).toContain("`height` is not a string-literal union");
+
+    // The control: agreement through a reference is silent.
+    expect(runPlotUnions(plotTree(
+      '  yFormat?: "number" | "percent";\n  xFormat?: Plot["yFormat"];\n',
+      '  yFormat: Object.freeze(["number", "percent"]),\n  xFormat: Object.freeze(["number", "percent"]),\n',
+    ))).toEqual([]);
+
+    // **The corpus, counted rather than asserted absent** — which is the exact
+    // way the sentence this row replaces was true and useless. The arm cannot
+    // pass by having nothing to resolve.
+    const types = readFileSync("src/data/viewmodel/types.ts", "utf8");
+    const from = types.indexOf("export type Plot = Readonly<{");
+    const refs = plotByReferenceMembers(types.slice(from, types.indexOf("\n}>;", from)));
+    expect(refs, "Plot declares its unions by reference exactly once today").toEqual([{ member: "xFormat", referent: "yFormat" }]);
+  });
+
+  it("T2.128 (MG31): the real tree is clean, and the corpus it read is 25 members", () => {
     // **The population, because an exit status is the same bit for clean and
     // for did-not-run.** The rule reports nothing over the tree; the count is
     // what says it had something to report nothing about.
@@ -1926,7 +1973,7 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       "src/data/viewmodel/types.ts": readFileSync("src/data/viewmodel/types.ts", "utf8"),
       "src/data/viewmodel/validate.ts": readFileSync("src/data/viewmodel/validate.ts", "utf8"),
     })).toEqual([]);
-    expect(Object.keys(PLOT_UNIONS), "the class is 24, and the spec named five").toHaveLength(24);
+    expect(Object.keys(PLOT_UNIONS), "the class is 25, and the spec named five").toHaveLength(25);
   });
   it("MG30 fires: a SpanName member nothing opens", () => {
     // **The shape this rule exists for**: a member added to the union and never

@@ -181,6 +181,13 @@ export const PLOT_UNIONS: Readonly<Record<string, readonly (string | false)[]>> 
   yAxis: Object.freeze<readonly (string | false)[]>(["left", "right", "both", false]),
   yCallout: Object.freeze(["none", "last", "name", "both"]),
   yFormat: Object.freeze(["number", "fraction", "percent", "bytes", "duration"]),
+  // `xFormat?: Plot["yFormat"]` — declared by reference to the member above, and
+  // the values are duplicated here rather than aliased because MG31 compares
+  // this table to the declaration textually and an alias is invisible to it.
+  // The entry exists at all because the reference form was outside MG31's parse
+  // and its comment asserted the form was absent from `Plot`; it had been there
+  // for twenty-five days (F1085).
+  xFormat: Object.freeze(["number", "fraction", "percent", "bytes", "duration"]),
 });
 
 /**
@@ -687,8 +694,18 @@ function checkAnnotations(
     e.push(`${at}: "annotations" must be an array (C04 I52)`);
     return;
   }
-  for (const a of annotations) {
-    if (!isRecord(a)) continue;
+  for (const [i, a] of annotations.entries()) {
+    // **Skipping a non-record is the *read then skipped* shape** (C04 I120,
+    // F1082), and this is its third instance in this file after `yMin` and
+    // `startDate`. The loop reads every element and says nothing about the ones
+    // it cannot understand, which from a grep is a check over `annotations`.
+    if (!isRecord(a)) {
+      e.push(
+        `${at}: annotations[${String(i)}] is ${describeType(a)} — an annotation is a record ` +
+          `naming a kind and a position (C04 I52, C04 I120)`,
+      );
+      continue;
+    }
     const label = a["label"];
     if (label !== undefined && !isString(label)) {
       e.push(`${at}: annotation "label" must be a string (C04 I52)`);
@@ -1348,6 +1365,16 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
       if (!isFiniteNumber(spec["max"])) {
         e.push(`${at} row "${String(row["label"])}": "bar.max" must be a finite number (C04 I51)`);
       }
+      // **`format` is `Plot["yFormat"]` — the third member in this file to
+      // declare its union by reference** (C04 I120, F1085), and the one on a
+      // nested type, so MG31's subject does not reach it and never will. It is
+      // read: `bar.ts:77` hands it to `formatReadout`, whose final arm passes an
+      // unknown value to `formatValue`, so a wrong one prints a wrongly
+      // formatted number and says nothing — `matrixAnchor` falling through to
+      // `window` again (F1076).
+      if (spec["format"] !== undefined && !isKnownPlotValue("yFormat", spec["format"])) {
+        e.push(`${at} row "${String(row["label"])}": "bar.format" is outside its union (C04 I118, C04 I120)`);
+      }
       // **The pairing the type could not carry**, and the gate that does — the
       // same division I50c makes for a cell holding both a `spark` and a `bar`.
       // A narrower `bar` member would have broken `b.kv({ s: b.warn("x") })`,
@@ -1406,6 +1433,13 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
             }
             if (!isFiniteNumber(spec["max"])) {
               e.push(`${at} cell "${key}": "bar.max" must be a finite number (C04 I50c)`);
+            }
+            // The same `BarSpec`, so the same union (C04 I120, F1085). Two
+            // sites because the row's `bar` and the cell's are two readings of
+            // one type, which is the pairing the comment above the row's check
+            // already names.
+            if (spec["format"] !== undefined && !isKnownPlotValue("yFormat", spec["format"])) {
+              e.push(`${at} cell "${key}": "bar.format" is outside its union (C04 I118, C04 I120)`);
             }
           }
         }
@@ -1657,6 +1691,7 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
     plotOriginErrors(b, e, at, form);
     plotAxisCrossErrors(b, e, at, form);
     plotCalendarErrors(b, e, at, form);
+    plotMemberErrors(b, e, at);
   },
   progress: (b, e, at) => {
     requireString(b, "label", e, at);
@@ -2115,6 +2150,232 @@ function plotHorizonErrors(
  * both already treat a missing reading as no size, so a length rule here would
  * refuse a document the renderers draw correctly.
  */
+/**
+ * An optional member whose value is a scalar, checked for its type and nothing
+ * else (C04 I120).
+ *
+ * **Absent is legal and wrong is not**, which is the whole shape of I120: the
+ * twenty members it was written for were not unchecked because someone decided
+ * they should be, but because a rule per member is a rule someone has to
+ * remember and nothing counted the ones nobody did.
+ */
+function optionalMember(
+  b: Record<string, unknown>,
+  key: string,
+  ok: (v: unknown) => boolean,
+  want: string,
+  e: string[],
+  at: string,
+): void {
+  const v = b[key];
+  if (v === undefined || ok(v)) return;
+  e.push(`${at}: "${key}" is ${describeType(v)} — ${want} (C04 I120)`);
+}
+
+/** Every element of an optional array, by one predicate (C04 I120). */
+function optionalElements(
+  b: Record<string, unknown>,
+  key: string,
+  ok: (v: unknown) => boolean,
+  want: string,
+  e: string[],
+  at: string,
+): void {
+  const v = b[key];
+  if (v === undefined) return;
+  if (!isArray(v)) {
+    e.push(`${at}: "${key}" is ${describeType(v)} — an array of ${want} (C04 I120)`);
+    return;
+  }
+  for (const [i, el] of v.entries()) {
+    if (ok(el)) continue;
+    e.push(`${at}: ${key}[${String(i)}] is ${describeType(el)} — ${want} (C04 I120)`);
+  }
+}
+
+const SCALE_NAMES: ReadonlySet<string> = new Set(["linear", "log", "log2", "ln", "symlog", "time"]);
+
+/** `ScaleType` — six names, or `{ log: <base> }` (C04 I120). */
+function isScaleType(v: unknown): boolean {
+  if (isString(v)) return SCALE_NAMES.has(v);
+  return isRecord(v) && isFiniteNumber(v["log"]);
+}
+
+/** `QuartileSummary` — five required positions and seven optional members (C04 I120, I53). */
+function isQuartile(v: unknown): boolean {
+  if (!isRecord(v)) return false;
+  for (const k of ["min", "q1", "median", "q3", "max"]) {
+    if (!isFiniteNumber(v[k])) return false;
+  }
+  for (const k of ["mean", "centre", "lower", "upper", "weight"]) {
+    if (v[k] !== undefined && !isFiniteNumber(v[k])) return false;
+  }
+  if (v["pooled"] !== undefined && typeof v["pooled"] !== "boolean") return false;
+  const out = v["outliers"];
+  return out === undefined || (isArray(out) && out.every(isFiniteNumber));
+}
+
+/**
+ * `Light3` — two names or a direction (C04 I120, I76).
+ *
+ * A union with a non-literal arm, so it is outside `PLOT_UNIONS` by
+ * construction rather than by oversight: MG31's subject is a union of string
+ * literals and this one is not.
+ */
+function isLight3(v: unknown): boolean {
+  if (isString(v)) return v === "studio" || v === "headlight";
+  return isRecord(v) && isFiniteNumber(v["azimuth"]) && isFiniteNumber(v["elevation"]);
+}
+
+/**
+ * `origin3` — three names or a point (C04 I120, I77).
+ *
+ * **Its only refusal was a pair rule**, and that is why it was not among the
+ * twenty: the sweep asked whether any form refuses the member and
+ * `origin3` with `axes3` of anything but `"origin"` answers *yes*, about the
+ * co-occurrence rather than about the value. Satisfy the pair and the value was
+ * unchecked again — the *gated behind a sibling* shape a fourth time, and the
+ * reason a per-value table finds what an existential sweep cannot.
+ */
+function isOrigin3(v: unknown): boolean {
+  if (isString(v)) return v === "auto" || v === "min" || v === "centre";
+  return isRecord(v) && isFiniteNumber(v["x"]) && isFiniteNumber(v["y"]) && isFiniteNumber(v["z"]);
+}
+
+/** `Segment` — a label and a quantity, both required (C04 I120). */
+function isSegment(v: unknown): boolean {
+  return isRecord(v) && isString(v["label"]) && isFiniteNumber(v["value"]);
+}
+
+/** `Partial<Camera>` — three angles and a projection, each optional (C04 I120, I83). */
+function isCameraPart(v: unknown): boolean {
+  if (!isRecord(v)) return false;
+  for (const k of ["azimuth", "elevation", "distance"]) {
+    if (v[k] !== undefined && !isFiniteNumber(v[k])) return false;
+  }
+  const p = v["projection"];
+  return p === undefined || p === "perspective" || p === "orthographic";
+}
+
+/**
+ * One `AxisSpec3` (C04 I120).
+ *
+ * **Known limit, stated rather than left to be found**: `tone` is a `Tone`, a
+ * union this function does not resolve — the block-level tone members are
+ * checked by their own rules and a third copy here would be a reimplemented rule
+ * carrying this one's birthday clauses. What is checked is every member whose
+ * type this layer can decide alone.
+ */
+function isAxisSpec3(v: unknown): boolean {
+  if (!isRecord(v)) return false;
+  if (v["label"] !== undefined && !isString(v["label"])) return false;
+  for (const k of ["show", "arrow"]) {
+    if (v[k] !== undefined && typeof v[k] !== "boolean") return false;
+  }
+  const ticks = v["ticks"];
+  if (ticks !== undefined && typeof ticks !== "boolean" && !isFiniteNumber(ticks)) return false;
+  if (v["format"] !== undefined && !isKnownPlotValue("yFormat", v["format"])) return false;
+  const range = v["range"];
+  if (range === undefined) return true;
+  return isArray(range) && range.length === 2 && range.every(isFiniteNumber); // cells-ok — a tuple length
+}
+
+/**
+ * A declared edge and its partner, which no member rule can see (C04 I120).
+ *
+ * **The relation is the half that draws a lie.** A mistyped `yMin` faults and a
+ * reader sees an ERROR card; `yMin: 6, yMax: 0` is two well-typed numbers and
+ * draws a *collapsed* axis — three identical gutter captions with the series
+ * flattened to a straight line through the middle, arithmetically self-consistent
+ * and describing a different document than the one it holds. Equality is refused
+ * with the inversion because it draws the same frame: a range of no height has
+ * no room for a reading to sit anywhere in particular.
+ */
+function requireOrderedEdges(
+  b: Record<string, unknown>,
+  lo: string,
+  hi: string,
+  e: string[],
+  at: string,
+): void {
+  const a = b[lo];
+  const z = b[hi];
+  if (!isFiniteNumber(a) || !isFiniteNumber(z) || a < z) return;
+  e.push(
+    `${at}: "${lo}" is ${String(a)} and "${hi}" is ${String(z)} (C04 I120) — a declared range runs ` +
+      `upward, and one that does not draws every reading at the same place with the axis agreeing`,
+  );
+}
+
+/**
+ * The members `PLOT_UNIONS` does not reach, checked for their declared type
+ * (C04 I120, F1082).
+ *
+ * **Twenty of sixty-six were refused by no form**, measured by driving five
+ * wrong values at every optional member across all forty-eight forms. The
+ * measurement is behavioural rather than textual because a count of appearances
+ * in this file was wrong in *both* directions: six members that appear here were
+ * unchecked, and `axes`, which appears nowhere, is refused.
+ *
+ * **The three ways a check reads as present**, because each defeated a different
+ * reader and only one of them fails a grep. *Absent* is most of the twenty.
+ * *Read then skipped* is `yMin`, whose only reader was `plotAxisCrossErrors` —
+ * three guards deep, and then `if (typeof lo !== "number" …) return;`, the type
+ * check used to skip rather than to refuse. *Gated behind a sibling* is
+ * `startDate`, whose whole check sat under `plotCalendarErrors`' opening
+ * `if (unit === undefined) return;`, so a calendar carrying `startDate: 12345`
+ * and no `calendarUnit` was accepted and the same document with one was refused.
+ * That check is called from here too, so the sibling gates the *pair* rule and
+ * not the member's type.
+ *
+ * **What is deliberately not constrained**: `bands` and `bandwidth` are finite
+ * numbers and nothing more, because the renderer already clamps them —
+ * `Math.max(1, Math.floor(block.bands ?? 3))` — and a rule refusing a document
+ * the renderer draws correctly is the mistake T2.131 names about `sizes`' length.
+ */
+function plotMemberErrors(b: Record<string, unknown>, e: string[], at: string): void {
+  for (const k of ["xMin", "xMax", "yMin", "yMax", "bands", "bandwidth"]) {
+    optionalMember(b, k, isFiniteNumber, "a finite number", e, at);
+  }
+  requireOrderedEdges(b, "xMin", "xMax", e, at);
+  requireOrderedEdges(b, "yMin", "yMax", e, at);
+
+  optionalMember(b, "emptyMessage", isString, "a string", e, at);
+  optionalMember(b, "startDate", (v) => isString(v) && parseStartDate(v) !== null, "a date this can place — \"YYYY-MM-DD\", optionally \"THH\", \":MM\", \":SS\" and a trailing \"Z\"", e, at);
+
+  optionalElements(b, "categories", isString, "a string", e, at);
+  optionalElements(b, "totals", (v) => typeof v === "boolean", "a boolean", e, at);
+  optionalElements(b, "quartiles", isQuartile, "a five-number summary", e, at);
+  optionalElements(b, "segments", isSegment, "a label and a finite value", e, at);
+  optionalElements(b, "facets", isRecord, "a plot", e, at);
+  requireFiniteNumbers(b["offsets"], e, at, "offsets");
+
+  for (const k of ["xScale", "yScale"]) {
+    optionalMember(b, k, isScaleType, "one of \"linear\", \"log\", \"log2\", \"ln\", \"symlog\", \"time\", or { log: <base> }", e, at);
+  }
+  optionalMember(b, "camera", isCameraPart, "a camera's angles and projection", e, at);
+  optionalMember(b, "axes", (v) => typeof v === "boolean", "true or false", e, at);
+  optionalMember(b, "light3", isLight3, "\"studio\", \"headlight\", or an azimuth and an elevation", e, at);
+  optionalMember(b, "origin3", isOrigin3, "\"auto\", \"min\", \"centre\", or a point", e, at);
+
+  const labels = b["xLabels"];
+  if (labels !== undefined && !(isArray(labels) && labels.length === 3 && labels.every(isString))) { // cells-ok — a tuple length
+    e.push(`${at}: "xLabels" is not three strings (C04 I120) — the member is a fixed triple, left, middle and right`);
+  }
+
+  const style3 = b["axisStyle3"];
+  if (style3 !== undefined) {
+    if (!isRecord(style3)) {
+      e.push(`${at}: "axisStyle3" is ${describeType(style3)} — a record of x, y and z axis specifications (C04 I120)`);
+    } else {
+      for (const axis of ["x", "y", "z"]) {
+        if (style3[axis] === undefined || isAxisSpec3(style3[axis])) continue;
+        e.push(`${at}: axisStyle3.${axis} is not an axis specification (C04 I120)`);
+      }
+    }
+  }
+}
+
 function plotBubbleErrors(
   b: Record<string, unknown>,
   e: string[],
@@ -2954,6 +3215,13 @@ function childBlocksOf(b: Record<string, unknown>): readonly unknown[] {
   const kind = b["kind"];
   if (isContainerKind(kind)) {
     return isArray(b["children"]) ? b["children"] : [];
+  }
+  // A plot's facets are plots (C04 I120, F1082). They go through the whole walk
+  // rather than through a second copy of the plot rule, because every rule in
+  // this file stopped at the first nesting and the members are only the half
+  // that was measured — a facet carries an id, a kind and a form like any block.
+  if (kind === "plot" && isArray(b["facets"])) {
+    return b["facets"];
   }
   if (kind === "table" && isArray(b["rows"])) {
     const out: unknown[] = [];

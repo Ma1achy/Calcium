@@ -100,6 +100,11 @@ export declare function checkFunctionConsumers(
   allowed?: Readonly<Record<string, string>>,
 ): Violation[];
 
+/** `Plot`'s members declaring a union by reference — `x?: Plot["y"];` (C04 I118, F1085). */
+export declare function plotByReferenceMembers(
+  body: string,
+): { member: string; referent: string }[];
+
 /** MG31 — every string-literal union on `Plot` is in `PLOT_UNIONS` (C04 I118, F213). */
 export declare function checkPlotUnions(
   files: readonly string[],

@@ -28,9 +28,16 @@ describe("C04 I118 — Plot's string-literal unions", () => {
   it("T1.35 (C04 I118, F213): every union member refuses a value outside it, and the refusal names the member", () => {
     // **The corpus, before anything is asserted over it.** A loop that found
     // nothing satisfies every expectation inside it, and this one is the whole
-    // row: 24 members, which is the number the enumeration in C04's `colormap`
+    // row: 25 members, which is the number the enumeration in C04's `colormap`
     // clause put at five.
-    expect(Object.keys(PLOT_UNIONS), "the class is 24").toHaveLength(24);
+    //
+    // **24 until `xFormat` arrived, and it arrived from the other side of the
+    // gate** (F1085). `Plot` declares 24 unions as literals and a 25th by
+    // reference — `xFormat?: Plot["yFormat"]` — which MG31's parse could not see
+    // and whose comment asserted the form was absent from `Plot`. The two
+    // numbers are different things and both are held: 24 inline members, 25
+    // table entries.
+    expect(Object.keys(PLOT_UNIONS), "the class is 25").toHaveLength(25);
     const unchecked: string[] = [];
     for (const member of Object.keys(PLOT_UNIONS)) {
       // A value no union admits, and not a near-miss: `"vertial"` is the case
