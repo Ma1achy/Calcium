@@ -45386,9 +45386,99 @@ until it is merged.
 ### What would falsify this
 
 - **The sweep having run.** `gh run list --workflow mutation-sweep.yml` is a
-  404 naming the default branch; `gh workflow list --all` returns one workflow.
+  404 naming the default branch, and GitHub's own inventory agrees from the
+  other side: `gh api /repos/Ma1achy/Calcium/actions/workflows` reports
+  `total_count: 1`, holding `ci.yml` alone. Two independent readings — a
+  refusal and a census — and the file is pushed to `origin/feat/profiler` in
+  both.
 - **The file being on `main`.** `git ls-tree origin/main .github/workflows/`
   returns `ci.yml` alone.
 - **The repository being private**, which would revive the cost argument.
   `gh repo view --json isPrivate` → `false`.
 - **`billable` being absent rather than zero.** It is present, with `jobs: 5`.
+
+## F1090 — the branch-push row promises two minutes, names five stages, and the job runs seven in nine minutes ★★★
+
+| | |
+|---|---|
+| **Surface** | `docs/architecture/A04_repo_scaffolding.md` §6, the table's first row |
+| **Reached for** | the first green CI run this branch has ever had, which is F1086's closing measurement |
+| **Verdict** | **open** |
+
+### The row
+
+> \| Every push to a branch \| `install → check → enforce → audit → test` — **under two minutes** \|
+
+### The measurement, run 34497559553, `fast`, green
+
+| step | seconds |
+|---|---|
+| `actions/checkout` + `setup-node` + set-up | 5 |
+| `make install` | 16 |
+| `make enforce` | 10 |
+| `make check` | 7 |
+| **`make instruments`** | **151** |
+| `make audit` | 11 |
+| `make regime` | 2 |
+| `make test` | 333 |
+| post steps | 4 |
+| **whole job** | **539** |
+
+§6's five named stages come to **377 s — six minutes seventeen, 3.1× the
+promise**. The whole job is **539 s, 4.5×**. The red run before it brackets the
+figure rather than contradicting it: the same five stages were 294 s there, on a
+`make test` that failed.
+
+### Two of the seven stages are not in the arrow
+
+`make instruments` is **151 s — twenty-eight per cent of the job**, and more than
+`install`, `enforce`, `check` and `audit` put together. `make regime` is two.
+Neither has ever appeared in §6's stage list.
+
+Both joined `fast` in `7f399391` on 2026-08-12, whose subject is *"CI runs the
+seventh target, and a budget says which regime it was set in"* — a commit
+explicitly about adding a target to the job, which added it to the job and not
+to the table. The arrow is from the initial commit, 2026-07-28, and has never
+been edited. **Twenty-nine days out of date, and the record that moved was the
+one nobody reads for a budget.**
+
+### Where the two minutes came from
+
+Nowhere measured. It is F1088's class exactly — a figure sized on the only
+regime its author could see, on a branch where no runner could disagree —
+with one difference that makes it worse: F1088's figure was a constant, so a
+row could time out against it and did. **This one is prose in a table**, so
+nothing asserts it, nothing can go red, and the only thing that ever disagrees
+with it is a run nobody was getting.
+
+### Rearranging cannot reach it
+
+Moving `instruments` to `full` leaves 377 s. `make test` alone is 333 s and it
+is the gate — the thing the row exists to promise. **The two minutes was never
+available on a runner**, so the remedy is the measurement rather than a
+reshuffle, and the row should say what the stages cost. Whether `instruments`
+belongs in `fast` at all is a separate question with its own cost argument, and
+it is named here rather than folded in.
+
+### How it was found
+
+The paragraph two lines above this row was corrected an hour earlier, in the
+commit carrying F1089's spec half — the cost premise, measured against the API
+and rewritten. **The row underneath it was not read**, while the run that
+falsifies it was the one being waited on.
+
+*Read the abstract against its own section before reading the section against
+the code*: the instrument was pointed at the paragraph, and the claim was in the
+table beneath it. That is F86, F89 and F92's mechanism with the parts swapped —
+not a summary that dropped a body's condition, but a **correction that stopped
+at the sentence it came in for.**
+
+### What would falsify this
+
+- **The two minutes being about something other than the arrow.** The row is the
+  arrow and the figure, in one cell.
+- **The runner being unusually slow on the day.** `make regime` ran inside the
+  same job and reports the machine's own ratio; and the red run before it gives
+  294 s for the same five stages, so two runs bracket the figure.
+- **`make instruments` being new to the job.** `git log -S` puts it in `fast`
+  from 2026-08-12, twenty-nine days before this reading.
