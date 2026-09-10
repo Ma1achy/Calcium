@@ -21,6 +21,8 @@
 import { describe, expect, it } from "vitest";
 
 import { checkElements, formatElementReport } from "../../src/testing/navigation-conformance.js";
+import { fullRegistry } from "../../src/testing/expect-document.js";
+import { globSync, readFileSync } from "node:fs";
 import type { NavigableRegistry } from "../../src/testing/navigation-conformance.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
@@ -484,5 +486,137 @@ describe("C26 §5 — the lifted list, in both axes (C09 §2)", () => {
     // A `gapBefore` on a row-group child adds no row: the renderer ignores it.
     const gapped = rowGroup(a, block({ ...b, gapBefore: true }));
     expect(at(k.registry.elementsIn([gapped], 40), "b", "r1").rows).toEqual([1, 2]);
+  });
+});
+
+describe("C26 §7 — the scope stack, the one resolver, and the vocabulary with no inhabitant", () => {
+  const kit = fullRegistry();
+
+  it("T2.32 (C26 I1): the level vocabulary is three deep, and a level exists only where a kind reports one", () => {
+    /**
+     * **Read from the declaration and compared by equality**, because three
+     * levels plus the entry *is* the four-deep stack: a fourth value makes it
+     * five, and nothing else in the tree would say so.
+     */
+    const types = readFileSync("src/presentation/blocks/types.ts", "utf8");
+    const decl = types.slice(types.indexOf("export type NavElement"), types.indexOf("}>;", types.indexOf("export type NavElement")));
+    expect(decl.match(/^ {2}level: (.+);$/mu)?.[1], "entry · block · row · cell").toBe(
+      '"block" | "row" | "cell"',
+    );
+
+    /**
+     * **And measured over the shipped registry**, which is the half that makes
+     * *only where a declaration reports one* a fact rather than a promise. A
+     * kind that reported a row it had no elements for would give the keyboard a
+     * level to step into and nothing to land on.
+     */
+    const levelsOf = (b: unknown): readonly string[] =>
+      [...new Set(kit.elementsOf(b as never, 60).map((e) => e.level))].sort();
+
+    expect(levelsOf({ kind: "pills", id: "p", chips: [{ label: "one" }, { label: "two" }] }),
+      "chips are cells of one logical row, with no row above them").toEqual(["cell"]);
+    expect(levelsOf({
+      kind: "table", id: "t", columns: [{ key: "a", label: "A" }],
+      rows: [{ id: "r1", cells: { a: { text: "x" } } }, { id: "r2", cells: { a: { text: "y" } } }],
+    }), "and a table is rows, with no cell below them").toEqual(["row"]);
+
+    for (const atomic of [
+      { kind: "notice", id: "n", tone: "info", text: "hello" },
+      { kind: "tip", id: "ti", text: "hi" },
+      { kind: "rule", id: "ru" },
+      { kind: "keyValue", id: "k", rows: [{ label: "a", value: "1" }] },
+    ]) {
+      expect(levelsOf(atomic), `${atomic.kind} declares none and is atomic`).toEqual([]);
+    }
+
+    // **`block` has no inhabitant**, which §5 records as unbuilt — stated here
+    // so the day one arrives, this row is what says the record moved.
+    const declared = new Set(
+      [
+        { kind: "pills", id: "p", chips: [{ label: "one" }] },
+        { kind: "table", id: "t", columns: [{ key: "a", label: "A" }], rows: [{ id: "r1", cells: { a: { text: "x" } } }] },
+      ].flatMap((b) => levelsOf(b)),
+    );
+    expect([...declared].sort(), "two of the three levels are inhabited").toEqual(["cell", "row"]);
+  });
+
+  it("T2.33 (C26 I8): the keyboard and the pointer reach one resolver — there is no second source", () => {
+    /**
+     * **An absence claim about the tree**, which no assertion about a keystroke
+     * or a click can see: two resolvers agreeing on every case in the suite is
+     * exactly what a second source looks like, right up until the day they part.
+     */
+    const construct = readFileSync("src/shell/construct.ts", "utf8")
+      .replace(/\/\*[\s\S]*?\*\//gu, "")
+      .replace(/(^|[^:])\/\/.*$/gmu, "$1");
+
+    const callers = [...construct.matchAll(/elementsOfEntry\(/gu)];
+    expect(callers, "one call site, inside the closure both routes use").toHaveLength(1);
+
+    // Both named routes go through that closure rather than round it.
+    for (const route of ["liveElements", "focusedElements", "elementAt"]) {
+      expect(construct, `${route} is declared`).toMatch(new RegExp(`(?:const|function)\\s+${route}\\b`, "u"));
+    }
+    for (const [route, body] of [
+      ["liveElements", construct.slice(construct.indexOf("const liveElements"), construct.indexOf("const focusedEntryId"))],
+      ["elementAt", construct.slice(construct.indexOf("const elementAt ="), construct.indexOf("const elementAt =") + 2000)],
+    ] as const) {
+      expect(body, `${route} resolves through the shared closure`).toContain("elementsOf(");
+    }
+
+    // And nothing outside the shell builds one: `registry.elementsIn` — C09's
+    // pairing, the only producer of `{ blockId, element }` — has a single caller.
+    const inCallers = globSync("src/**/*.ts")
+      .filter((f) => !f.endsWith(".d.ts"))
+      .filter((f) => /\.elementsIn\(/u.test(readFileSync(f, "utf8")));
+    expect(inCallers, "one pairing, one caller").toEqual(["src/shell/entry-layout.ts"]);
+  });
+
+  it("T2.34 (C26 I11): resolution is a pull — a changed document is seen with nothing notified", () => {
+    const rowsOf = (ids: readonly string[]): unknown => ({
+      kind: "table", id: "t",
+      columns: [{ key: "a", label: "A" }],
+      rows: ids.map((id) => ({ id, cells: { a: { text: id } } })),
+    });
+
+    const before = kit.elementsOf(rowsOf(["r1", "r2"]) as never, 60).map((e) => e.id);
+    const after = kit.elementsOf(rowsOf(["r1", "r2", "r3"]) as never, 60).map((e) => e.id);
+    expect(after.length, "the new row is resolved").toBe(before.length + 1);
+
+    // **The failure this forbids is a cached list surviving a patch** — a click
+    // landing on the element that used to be at that row. Resolving the old
+    // block again after the new one returns the old answer, so nothing was kept.
+    expect(kit.elementsOf(rowsOf(["r1", "r2"]) as never, 60).map((e) => e.id), "and nothing was kept").toEqual(before);
+
+    // There is no registration API to call: a subscriber would be the second
+    // record of *what is on screen*, and C26 holds a location and nothing else.
+    const construct = readFileSync("src/shell/construct.ts", "utf8");
+    const closure = construct.slice(construct.indexOf("const liveElements"), construct.indexOf("const focusedEntryId"));
+    expect(closure, "the live list is computed, not stored").not.toMatch(/\bsubscribe\b|\bon[A-Z]\w*\(/u);
+  });
+
+  it("T2.35 (C26 I15): ArrowPolicy and EscapePolicy are in no source file, and this row expires when they are not", () => {
+    /**
+     * **A watch, not a coverage row.** §4 committed to checking the vocabulary
+     * against four kinds before adopting it and to recording the outcome either
+     * way; §4d records it: *not one value of either vocabulary has an inhabitant
+     * in the tree*. So I15's resolution shape is a mechanism looking for a
+     * policy to resolve, and a row asserting global → kind → override would be
+     * asserting over nothing — A03 §2's vacuity class, held open by a rule with
+     * no subject.
+     */
+    const sources = globSync("src/**/*.ts").filter((f) => !f.endsWith(".d.ts"));
+    expect(sources.length, "over a non-empty tree").toBeGreaterThan(100);
+    const naming = sources.filter((f) => /\b(?:ArrowPolicy|EscapePolicy)\b/u.test(readFileSync(f, "utf8")));
+    expect(naming, "when this fails, C26 I15 needs a row and this one goes").toEqual([]);
+
+    // And the half that is decided: *nothing is adopted* means no field, which
+    // is where a reader can check it.
+    const types = readFileSync("src/presentation/blocks/types.ts", "utf8");
+    const decl = types
+      .slice(types.indexOf("export type NavElement"), types.indexOf("}>;", types.indexOf("export type NavElement")))
+      .replace(/\/\*[\s\S]*?\*\//gu, "");
+    expect(decl, "no arrow field").not.toMatch(/^\s+arrow\??:/mu);
+    expect(decl, "no escape field").not.toMatch(/^\s+escape\??:/mu);
   });
 });

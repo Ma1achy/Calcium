@@ -10,6 +10,7 @@ import { curveRows } from "../../src/presentation/plot/curve.js";
 import { seriesRange, FACING_DEFAULT } from "../../src/presentation/plot/scale.js";
 import { sparkline } from "../../src/presentation/plot/sparkline.js";
 import { PLOT_CORPUS, lossCurve } from "../support/blocks.js";
+import { CORPUS_BUDGET_MS } from "../support/budget.js";
 import { ASCII_CAPS, FULL_CAPS, MONO_CAPS, measurable, visible } from "../support/render.js";
 import { checkAsciiParity, checkMeasurement, uncoveredKinds } from "../../src/testing/measurement-conformance.js";
 import { block, type Plot } from "../../src/data/viewmodel/index.js";
@@ -112,14 +113,28 @@ describe("C12 tier 2 — totality", () => {
       }
     }
   },
-  // **An explicit budget, because 3.2 s against a 5 s default is not a margin.**
-  // The sweep is 12 corpora × 200 widths × three rasteriser entry points, one of
-  // the corpora being a 100,000-point series — real work rather than slowness, and
-  // its cost is what makes I2 a claim about every width rather than a spot check.
-  // Left at the default it passed on a quiet machine and timed out on a busy one,
-  // which is the shape of a test that gets its timeout raised by someone who does
-  // not know what it measures. Twenty seconds says the seconds are expected.
-  20_000);
+  // **An explicit budget, and the argument for it is unchanged.** The sweep is
+  // 12 corpora × 200 widths × three rasteriser entry points, one of the corpora
+  // being a 100,000-point series — real work rather than slowness, and its cost
+  // is what makes I2 a claim about every width rather than a spot check. Left at
+  // whatever the default happens to be it passed on a quiet machine and timed
+  // out on a busy one, which is the shape of a test that gets its timeout raised
+  // by someone who does not know what it measures. The seconds are expected.
+  //
+  // **What changed is that the number stopped being a widening** (F1093). It read
+  // `20_000` under a comment about *a 5 s default*, and `vitest.config.ts` set
+  // `testTimeout: 30_000` on 2026-08-22 — so the override became a third *off*
+  // the limit this row would otherwise have had, in a file whose comment says the
+  // row exists because the default was too small. It is 6 936 ms here and
+  // **20 960 ms on the runner**, where it timed out against its own 20 000 and
+  // would have passed on the default it was written to escape. An override reads
+  // as more room at every glance, and nothing in the syntax says which way it
+  // goes.
+  //
+  // So the number leaves the file. `CORPUS_BUDGET_MS` is what this row is in
+  // `budget.ts`'s taxonomy — a corpus sweep, timed out rather than asserted —
+  // and the next change to the regime moves it once rather than once per site.
+  CORPUS_BUDGET_MS);
 
   it("T2.3 (I10): no row exceeds its width and no plot exceeds its declared rows", () => {
     const m = measurable({ definitions: [plotDefinition] as never });

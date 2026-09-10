@@ -18,7 +18,6 @@
 <text x="345.6" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">20</text>
 <text x="409.6" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">25</text>
 <text x="473.6" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">30</text>
-<text x="486.4" y="300" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">31</text>
 <rect x="498.4" y="15.2" width="9.6" height="9.6" fill="#87b86c"/>
 <text x="512" y="24.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">rising</text>
 <rect x="498.4" y="34.4" width="9.6" height="9.6" fill="#c62828"/>

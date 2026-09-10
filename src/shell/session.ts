@@ -13,7 +13,9 @@
  * and shutdown (§8, below).
  */
 
-import { appendFileSync } from "node:fs";
+import { availableParallelism } from "node:os";
+import { dirname } from "node:path";
+import { appendFileSync, closeSync, mkdirSync, openSync, writeSync } from "node:fs";
 import {
   appendFile,
   mkdir,
@@ -28,15 +30,18 @@ import { isUsable } from "../terminal/capabilities.js";
 import { usageText } from "./usage.js";
 import { compose, type Composed } from "./frame.js";
 import { commandRows, type PaintDeps } from "./paint.js";
-import { transmitImage, type SentImages } from "./transmit-image.js";
+import { transmitFrame, transmits, type SentImages } from "./transmit-image.js";
 import { composeFrame } from "./render-frame.js";
+import { createProfiler, DEFAULT_TIER, isRecording, isSpanning } from "./profiling/recorder.js";
+import { createInspector, createResourceProbe, type CaptureIo } from "./profiling/node.js";
+import type { CommitReason, Profiler } from "./profiling/types.js";
 import { focusKey } from "./render-cache.js";
 import { reserveNeeded } from "./block-faults.js";
 import { descendants } from "../data/viewmodel/index.js";
 import type { Block, Image, Plot } from "../data/viewmodel/index.js";
 import { entryLayout, renderEntryPieces, windowEntry } from "./entry-layout.js";
 import { animationIntervalOf } from "../presentation/blocks/index.js";
-import { framesOf } from "../presentation/blocks/kinds/image.js";
+import { framesOf, placesAtProtocol } from "../presentation/blocks/kinds/image.js";
 import type { FocusState } from "../presentation/blocks/index.js";
 import { contextAt } from "../interaction/completion/index.js";
 import { selectionSpans, type CellSpan } from "../interaction/editor/index.js";
@@ -91,6 +96,35 @@ const nodeFileSystem: FileSystem = {
 };
 
 /**
+ * Where a `deep` capture's bytes land. The same boundary argument as
+ * `nodeFileSystem` above, and a separate seam because the shapes differ: a
+ * capture is a stream of chunks with a cap on it, not a document.
+ *
+ * **A file descriptor and synchronous writes**, because the alternative at the
+ * measured sizes is worse in both directions. A 60 MB heap snapshot buffered
+ * into a string is 60 MB of the heap of a process the capture exists to
+ * examine; the same 60 MB through `appendFileSync` is one `open`/`close` pair
+ * per chunk. `writeSync` on a held descriptor is neither.
+ *
+ * **The directory needs no `.gitignore` of its own** (C28 I17): `.calcium/` is
+ * ignored by this repository's `.gitignore` and, for a consuming project,
+ * C22 I67 creates `stateDir` holding a `.gitignore` of `*` regardless of what
+ * that project ignores.
+ */
+const captureIo = (): CaptureIo => ({
+  open(path: string) {
+    mkdirSync(dirname(path), { recursive: true });
+    const fd = openSync(path, "w");
+    return {
+      write: (chunk: string): void => void writeSync(fd, chunk),
+      close: (): void => {
+        closeSync(fd);
+      },
+    };
+  },
+});
+
+/**
  * What the reader has to go and edit, for gate 3b's refusal (I61, F8).
  *
  * **Ordered from the omission outwards**, because the case that produced the
@@ -123,6 +157,11 @@ function unusableCause(env: Readonly<NodeJS.ProcessEnv>): string {
 function ambient(): Ambient {
   return {
     clock: () => Date.now(),
+    // **A second clock, and not a widening of the first** (C22 §2c). `clock` is
+    // wall-clock, is drawn as a time of day by the default chrome, and has
+    // millisecond resolution — it cannot measure a 0.3 ms paint. SS1's
+    // allow-list does not grow: this file was already its only entry.
+    elapsed: () => performance.now(),
     cwd: process.cwd(),
     fs: nodeFileSystem,
     schedule: (fn, ms) => {
@@ -142,6 +181,34 @@ export function createTui<C extends TuiConfig>(
   // cannot await.
   return new Session(resolveConfig(config, ambient()));
 }
+
+/**
+ * How many debug lines one session keeps, and **which end it keeps** (F1001).
+ *
+ * The sink's loudest writer is C01's stdout redirect — anything written to the
+ * real stream while the shell holds the terminal — so a flood is a shape it has
+ * to survive: a library logging once a frame fills any buffer in seconds. The
+ * cap is small for `debug.retainPayloads`'s reason (C22 §2): a diagnostic mode
+ * that doubles memory is one nobody leaves on.
+ *
+ * **The first N, not the last N**, which is the half worth writing down. A ring
+ * keeping the most recent lines discards the one that started the trouble and
+ * retains a repeated symptom — and every one of the six narration sites fires
+ * once, at the moment of the failure, with whatever follows it being
+ * consequence. What is dropped is counted and said.
+ */
+const DEBUG_LINES = 200;
+
+/**
+ * The mark on a drained debug line.
+ *
+ * Step 3's other five sources are the framework's own voice; a line from this
+ * sink may be **foreign output** the redirect caught, so an unmarked drain would
+ * put an app's `console.log` on screen indistinguishable from a shell warning.
+ * The sink cannot tell the two apart — it is handed a string — so one mark
+ * covers both rather than a second channel the finding did not ask for.
+ */
+const DEBUG_PREFIX = "debug: ";
 
 /** One frozen empty array rather than a new one per paint (entry 23). */
 const EMPTY_SPANS: readonly CellSpan[] = Object.freeze([]);
@@ -185,6 +252,21 @@ const NOTHING_ANIMATES: Animated = Object.freeze({
  * tunes at construction; the *reason* is what binds them, and that is asserted.
  */
 const ORBIT_MS = 33;
+
+/**
+ * The span a `null` profiler yields — one frozen object, so the `using` form
+ * reads the same on both arms and the unprofiled path allocates nothing.
+ */
+const NO_SPAN: Disposable = Object.freeze({ [Symbol.dispose]: () => undefined });
+
+/**
+ * The core count, read here because this is the file SS10's sibling rules allow
+ * an ambient read in. Reported in the regime, never used for a threshold — a
+ * budget is a claim about a machine and this is the machine.
+ */
+function cpuCount(): number {
+  return availableParallelism();
+}
 const ORBIT_MS_TORN = 100;
 
 /**
@@ -197,6 +279,20 @@ const ORBIT_MS_TORN = 100;
  * property the figure has to have (F468).
  */
 const ORBIT_RATE = (2 * Math.PI) / 12_000;
+
+/**
+ * How long `stop()` waits for a capture still running (C28 I17).
+ *
+ * **250 ms, and the figure rests on an asymmetry rather than on odds.** A `deep`
+ * capture is a `node:inspector` write this component does not control; waiting
+ * without a bound makes a shell that will not exit on Ctrl-C, and not waiting
+ * loses a file `report()` has already named. A quarter second is long enough
+ * for a capture that is finishing and short enough that a reader pressing an
+ * exit key does not notice — and what is still open past it is recorded as
+ * abandoned rather than dropped, so the cost of the bound being too short is a
+ * marked file rather than a missing one.
+ */
+const CAPTURE_DRAIN_MS = 250;
 
 class Session implements TuiInstance {
   #state: SessionState = "created";
@@ -223,7 +319,7 @@ class Session implements TuiInstance {
    * from the transcript does not un-send its image, and a document redrawn does
    * not need to re-send one.
    */
-  readonly #sentImages: SentImages = new Set<string>();
+  readonly #sentImages: SentImages = new Map<number, string>();
 
   /**
    * C03's spinner counter, and **the one thing F227 was about**.
@@ -280,7 +376,43 @@ class Session implements TuiInstance {
    * `activeTarget` does the rest — it is a *target*, not a third mode beside
    * navigate and interact (roadmap 15's ruling, C26 I2's argument unchanged).
    */
+  /**
+   * C28, or `null` — and `null` is the overwhelming case (C22 I92).
+   *
+   * At tier `off` there is no object at all rather than an object with an early
+   * return in every method, so what an unprofiled session pays is one
+   * `undefined` check at each seam.
+   */
+  #profiler: Profiler | null = null;
+
   #copyMode = false;
+
+  /**
+   * Where `ConstructDeps.debug` lands, and **it landed nowhere until now**
+   * (F1001, for F864).
+   *
+   * The chain was complete in every direction but this one. `debug?:` is
+   * declared on `ConstructDeps`, forwarded into C01 and C06's runner by
+   * `construct.ts`, and called from seven real sites — C01's stdout redirect,
+   * `beforeRelease threw`, `release: N sequence(s) failed`, `acquire failed
+   * midway`, the `SHELL=…` fallback and two `handoff failed to spawn` arms.
+   * Every hop compiled and every hop was correct on its own, because the
+   * parameter is optional at each of them; what was missing was an **argument at
+   * the one call site that starts the chain**, and `start()` below passed five
+   * deps and then six without ever passing this one. So both forwards took their
+   * `=== undefined` branch and all seven sites defaulted to a no-op in every
+   * real session.
+   *
+   * The first site is the one that cost something: output that would corrupt the
+   * alternate screen is caught, handed here, and was dropped.
+   *
+   * **Drained at step 3 of `stop()` and never before it**, for C01 I4's reason —
+   * a diagnostic written onto the alternate screen is discarded with the screen.
+   */
+  readonly #debug: string[] = [];
+
+  /** Lines the cap refused, reported rather than silently absent. */
+  #debugDropped = 0;
 
   constructor(private readonly config: ResolvedConfig) {}
 
@@ -321,8 +453,68 @@ class Session implements TuiInstance {
       return;
     }
 
+    // **C28, constructed here and nowhere else** (C22 I93). The seams below are
+    // functions this root was going to hand down anyway, so nothing under
+    // `src/shell/` imports the profiler and no import edge is added. With no
+    // `profile` field there is no object, and each seam costs one check (I92).
+    //
+    // **Gated on the tier, not on the field being present** (C28 I1). This read
+    // `this.config.profile !== undefined`, so `profile: { tier: "off" }` built
+    // the recorder *and* called `createResourceProbe`, which enables
+    // `monitorEventLoopDelay` and connects a GC `PerformanceObserver` for the
+    // life of the process. An application that had explicitly asked for nothing
+    // got the whole apparatus, and two files carried a comment saying it did
+    // not. The tier is the switch; the field only says which tier.
+    //
+    // The probe is constructed only at a tier that samples, for the same
+    // reason one level down: below `spans` nothing reads it, and enabling a
+    // histogram nobody snapshots is cost with no reader.
+    //
+    // **The inspector is constructed only at `deep`**, one rung above the probe
+    // and for the sharper version of the same reason: connecting an inspector
+    // session is cheap, and a session that exists can be posted to. A capture
+    // is a 2.6-second stall and a 60 MB file at the sizes measured in
+    // `node.ts`, so the apparatus that can take one is not present at a tier
+    // that did not ask for it.
+    //
+    // **`captureDir` is resolved here because this is the only place that knows
+    // both halves** (C22 I95, F901). The recorder's default is the literal
+    // `.calcium/profile`, which agreed with the invariant only because
+    // `DEFAULT_STATE_DIR` is `.calcium` — an application setting
+    // `stateDir: "/var/lib/app"` got its heap snapshots in `./.calcium/profile`,
+    // outside the directory it asked its state to live in and outside the
+    // `.gitignore` of `*` that C22 I67 writes there. The recorder keeps its
+    // literal for a profiler constructed without a session; a session supplies
+    // the resolved path, so the two cannot disagree about which directory the
+    // ignore rule covers.
+    // The default is the recorder's, read rather than restated (F967).
+    const profileTier = this.config.profile?.tier ?? DEFAULT_TIER;
+    if (this.config.profile !== undefined && isRecording(profileTier)) {
+      this.#profiler = createProfiler({
+        ...this.config.profile,
+        captureDir: this.config.profile.captureDir ?? `${this.config.stateDir}/profile`,
+      }, {
+        elapsed: this.config.elapsed,
+        // **The untapped `elapsed`, for the sampler's stamp** (C28 I53, F971).
+        // `config.elapsed` is the recording tap when one is on; the sampler is
+        // the one periodic reader in the process, and a periodic read on the
+        // positional channel lands at a position the replay never reaches.
+        sampleClock: this.config.sampleClock,
+        ...(isSpanning(profileTier)
+          ? { probe: createResourceProbe() }
+          : {}),
+        ...(profileTier === "deep"
+          ? { inspector: createInspector(this.config.elapsed, captureIo()) }
+          : {}),
+        schedule: this.config.schedule,
+        node: process.version,
+        cpus: cpuCount(),
+      });
+    }
+
     this.#graph = await constructGraph(this.config, {
       stop: (reason) => this.stop(reason),
+      ...(this.#profiler === null ? {} : { profiler: this.#profiler }),
       // **Two functions now, and they were one** (I55). C03 has distinguished
       // them since it was written — `writeFrame` calls `repaint` when the
       // screen's contents are unknown and `render` otherwise — and L4 handed it
@@ -330,12 +522,19 @@ class Session implements TuiInstance {
       // nothing. `frame-scheduler.ts` reasons about *"diffing against a screen
       // whose contents nobody knows"*, which only means something once one of
       // these two diffs and the other does not.
-      render: () => this.#render(),
-      repaint: () => {
+      render: (reason) => this.#render(reason),
+      repaint: (reason) => {
         this.#lastFrame = null;
-        this.#render();
+        this.#render(reason);
       },
       frame: this.#frameQueries(),
+      // **The argument the chain was missing** (F1001, for F864). Not optional
+      // here on purpose: an optional parameter no caller supplies is exactly the
+      // state this closes, and nothing in the enforcement suite asks which ones
+      // those are.
+      debug: (line) => {
+        this.#recordDebug(line);
+      },
       onFatal: (err) => {
         // C01's only fatal case, and it has already unwound what it held
         // (C01 §3). Nothing runs after this.
@@ -382,7 +581,26 @@ class Session implements TuiInstance {
     // session never runs. A warning routed there is unread by construction:
     // the same silence with more machinery. Measured under a PTY.
     if (!isUsable(this.#graph.capabilities)) {
-      throw new UnusableTerminalError(unusableCause(this.config.env));
+      // **Torn down before the throw, because the graph outlives the refusal
+      // otherwise** (F140). `constructGraph` has already run: a history file is
+      // open, the transport's stores are live, and §3b's timers are armed. An
+      // author who catches this rejection and carries on therefore has a process
+      // that never exits — measured under a PTY at 6 s and counting, with the
+      // rejection caught and the next line printed.
+      //
+      // **Uncaught it looks fine, which is why it survived**: node prints the
+      // named message and exits 1 with the handles still held, so the defect is
+      // invisible on the path everyone takes and total on the one that matters.
+      //
+      // `fault` for its exit code — 1, the same code the uncaught path gives —
+      // and it is the fourth of the five reasons to reach `stop()` rather than
+      // the third (I4). C01's own `fault` still does not arrive here; this one
+      // is C22's, taken before anything was acquired, so `release()` finds
+      // `held` empty and emits nothing (C01 I8, I20) — which is what T3.20's
+      // *nothing was acquired* assertion continues to hold.
+      const cause = unusableCause(this.config.env);
+      await this.stop("fault");
+      throw new UnusableTerminalError(cause);
     }
 
     const size = this.#graph.lifecycle.size();
@@ -444,6 +662,12 @@ class Session implements TuiInstance {
      */
     const greeting = this.config.greeting;
     if (greeting !== undefined) {
+      // **The slot is taken here and filled later** (I99, F158, F1024). This is
+      // the line that orders the greeting against every submission: the
+      // reservation is appended now, synchronously, before anything can be
+      // typed, and the document that arrives 2.58–4.47 s later settles into it.
+      // Nothing below waits on the producer and nothing needs to.
+      const slot = graph.pipeline.reserveGreeting();
       void (async () => {
         try {
           // **The context comes from the pipeline, not from here** (C22 I53).
@@ -451,10 +675,18 @@ class Session implements TuiInstance {
           // and could assemble a second one; one builder is the point.
           graph.pipeline.greeting(
             await greeting(graph.pipeline.producerContext()),
+            slot,
           );
         } catch {
           // Contained. The prompt is already usable and the session is running;
           // a welcome that could not reach its far side is not a startup fault.
+          //
+          // **And the slot is released** (I99). Left alone it stays streaming,
+          // and C13 never evicts a streaming entry — an empty reservation would
+          // sit under the cap for the life of the process. Settled it is
+          // invisible and evictable, which is what I44 now says instead of
+          // *produces no entry*.
+          graph.pipeline.abandonGreeting(slot);
         }
       })();
     }
@@ -524,16 +756,30 @@ class Session implements TuiInstance {
     return this.#stopping;
   }
 
-  #runStop(reason: StopReason): Promise<number> {
+  // **`async`, and the synchronous prefix is preserved rather than lost.** An
+  // async function runs to its first `await` synchronously, and the only one is
+  // the capture drain below — after the state changes and the spinner's
+  // disposal, before the report. So `stop()` still returns with the session
+  // already marked stopped, which is what C23 checks before accepting a
+  // submission (C28 I17).
+  async #runStop(reason: StopReason): Promise<number> {
     const code = EXIT_CODES[reason];
     const graph = this.#graph;
+
+    // C28 I15 — **the `end` line, written on every stop path including the one
+    // where nothing was constructed.** Its `open` count is what tells a replay
+    // that a stream was still running, and a recording with no `end` at all is
+    // the other half of the same signal: both read as truncated, because both
+    // are, and a recorder that only writes `end` on the clean path makes an
+    // orderly shutdown indistinguishable from a kill.
+    this.config.recording?.end();
 
     // T1.9, T3.15 — nothing acquired, no cleanup, and **no flag says so**:
     // there is no lifecycle to release, because construction never reached
     // step 7. The absence is structural rather than recorded (§8a).
     if (graph === null) {
       this.#state = "stopped";
-      return Promise.resolve(code);
+      return code;
     }
 
     // 1 — C23 refuses further submissions. Before the release, so a submission
@@ -556,6 +802,33 @@ class Session implements TuiInstance {
     graph.pipeline.dispose();
     void graph.surface.close("session");
 
+    // **1a — C28, and it had no call site at all** (C28 I2). `createProfiler`
+    // was constructed in `start()` and disposed by nothing, so
+    // `monitorEventLoopDelay`'s histogram stayed enabled and the GC
+    // `PerformanceObserver` stayed connected for the whole life of the process
+    // — a profiler leaking two process-wide handles is the defect it exists to
+    // find. Beside `pipeline.dispose()` for the same reason: the sampler
+    // re-arms itself off the injected timer, so a session that stops between
+    // two ticks holds a timer that holds the process open.
+
+    // **The report is taken here and not one line down** (C28 I38) — on
+    // asymmetry, because nothing observable separates the two orders today
+    // (F883). `report()` reads `probe.spaces()`, and taking it after `dispose()`
+    // was expected to empty `heapSpaces`; it does not, 11 spaces either side,
+    // because `node.ts`'s read has no dependency on a live probe. What keeps the
+    // order is that it costs nothing and the alternative rests on a disposed
+    // member still answering — which `capture()`, disposed the same way, refuses.
+    // **The bounded wait comes before the report, not before the release**
+    // (C28 I17, T3.5). A capture still running holds a file the report has
+    // already promised a path to, so waiting after `report()` would name a file
+    // whose contents were still arriving. The bound is what stops a shell that
+    // will not exit; what is still open past it is abandoned and *recorded* as
+    // abandoned, so the reader is told which file to disbelieve.
+    if (this.#profiler !== null) await this.#profiler.drain(CAPTURE_DRAIN_MS);
+    const onReport = this.config.profile?.onReport;
+    if (onReport !== undefined && this.#profiler !== null) onReport(this.#profiler.report());
+    this.#profiler?.dispose();
+
     // 2 — release, which runs `beforeRelease` (the cleanup) and then restores
     // the terminal. C01's own guard makes the cleanup once-only.
     graph.lifecycle.release();
@@ -571,6 +844,21 @@ class Session implements TuiInstance {
     // captured earlier**: `history.drain()` is step 2b, inside the release
     // above, so the warning from a failed final append exists only now.
     for (const line of graph.diagnostics()) this.config.stdout.write(`${line}\n`);
+
+    // **The sixth channel, and it is the session's rather than the graph's**
+    // (F1001, for F864). `graph.diagnostics()` above is a pull over five
+    // component collections; this is a push from a sink C01 and C06 were handed
+    // and nothing ever read. It drains here for the same reason they do — the
+    // release has happened, so the primary screen is back and a line written
+    // now survives — and it is a separate statement rather than a sixth entry in
+    // that list because the list is a pull over things the graph holds and this
+    // is not one of them.
+    for (const line of this.#debug) this.config.stdout.write(`${DEBUG_PREFIX}${line}\n`);
+    if (this.#debugDropped > 0) {
+      this.config.stdout.write(
+        `${DEBUG_PREFIX}${String(this.#debugDropped)} further line(s) dropped at the ${String(DEBUG_LINES)}-line cap\n`,
+      );
+    }
 
     // 4 — the caller's code, returned rather than exited: the caller owns the
     // process, and a library that calls `process.exit` cannot be embedded.
@@ -591,9 +879,41 @@ class Session implements TuiInstance {
    * a short frame: `paint` refuses, and one row too few leaves the previous
    * frame showing through while one too many scrolls the alternate screen.
    */
-  #render(): void {
+  /**
+   * One `debug` call, split into lines and capped (F1001).
+   *
+   * **A call is not a line.** Six of the seven writers hand over one sentence
+   * with no newline; C01's redirect hands over whatever chunk was written to
+   * `stdout`, which is `"a\nb\n"` for two `console.log`s in a row and `"x"` for
+   * a partial write. Splitting is what makes the cap count lines rather than
+   * calls, and it is what stops the drain below emitting a blank row per
+   * captured `console.log` — a trailing newline yields an empty tail on every
+   * one of them.
+   *
+   * An empty line is dropped rather than kept: it carries no diagnosis, and the
+   * cap is small enough that spending an entry on one is a line lost.
+   */
+  #recordDebug(chunk: string): void {
+    for (const line of chunk.split("\n")) {
+      if (line === "") continue;
+      if (this.#debug.length >= DEBUG_LINES) {
+        this.#debugDropped += 1;
+        continue;
+      }
+      this.#debug.push(line);
+    }
+  }
+
+  #render(reason: CommitReason = "input"): void {
     const graph = this.#graph;
     if (graph === null || !graph.lifecycle.acquired) return;
+
+    // **The frame's brackets, and the reason C03 chose** (C28 I16). Decoration:
+    // the profiler is `null` unless the app asked for one, so an unprofiled
+    // session pays one check here.
+    const prof = this.#profiler;
+    prof?.beginFrame(reason);
+    const frameSpan = prof?.span("frame");
 
     // **The composition is `render-frame.ts`'s and this calls it** (C22 I54,
     // C24 I25). It lived here as a private method returning `void`, which made
@@ -603,7 +923,10 @@ class Session implements TuiInstance {
     // through `expectDocument().lines()` stays on the production path across
     // all four only if there is one composition. A03's SS48 says so.
     const result = composeFrame({
-      composed: () => this.#composed(),
+      composed: () => {
+        using _s = prof?.span("compose") ?? NO_SPAN;
+        return this.#composed();
+      },
       paintDeps: (frame) => this.#paintDeps(graph, frame),
       resizeViewport: (size) => void graph.viewport.resize(size),
       cursorSequence: (cursor) => graph.lifecycle.cursorSequence(cursor),
@@ -635,9 +958,12 @@ class Session implements TuiInstance {
     // question C22 §4a leaves open, and this is the boundary it had.
     if (result.kind === "fallback") {
       // The fallback put something else on the screen, so no record describes
-      // it (I55).
+      // it (I55). A fallback is a frame's *absence* — counted, and kept out of
+      // every duration histogram (C28 I6).
       this.#lastFrame = null;
       drawFallback(result.size, (s) => void graph.lifecycle.writer.write(s));
+      frameSpan?.[Symbol.dispose]();
+      prof?.endFrame("fallback");
       return;
     }
 
@@ -667,16 +993,46 @@ class Session implements TuiInstance {
     // at the moment it appears. Keying on the windowed set instead would put a
     // transmission in a frame where nothing else changed — a scroll that emits
     // a payload — which is the worse of the two.
-    graph.lifecycle.writer.write(
-      transmitImage(
-        graph.transcript.entries.flatMap((e) => e.doc.blocks),
-        graph.capabilities,
-        this.#sentImages,
-        // The frame's width — the declared cell box is a render-time fact and
-        // was a hardcoded `1` (F380).
-        graph.lifecycle.size().columns,
-      ) + result.write,
-    );
+    // **The guard is asked before the argument is built** (F889). The `flatMap`
+    // below walks every block in every transcript entry, every frame, to hand
+    // the result to a function whose first line returns `""` unless the
+    // terminal speaks kitty — 90 µs and an eight-thousand-element array at two
+    // thousand entries, for nothing, on every terminal that does not.
+    const bytes =
+      (transmits(graph.capabilities)
+        ? transmitFrame(
+            // **One group per layout run, because that is where the width is**
+            // (C22 I98, F1062). The scope is still the entry — the `flatMap`
+            // that once stood here lost the only thing that makes a block id
+            // unique, and the seam and `visibleRows`' context take the scope
+            // together or neither does — but an entry is *two* runs when it is a
+            // card, at two widths, and the seam was taking the frame's for both.
+            // `entryLayout` is the same function `visibleRows` renders through,
+            // so the two cannot compute different numbers rather than agreeing
+            // to. It partitions blocks and no run is measured here, which is why
+            // this is affordable over every entry rather than the visible ones.
+            graph.transcript.entries.flatMap((e) =>
+              entryLayout(e.doc.blocks, graph.lifecycle.size().columns)
+                .filter((run) => !run.blank)
+                .map((run) => ({ scope: e.id, blocks: run.blocks, width: run.width })),
+            ),
+            graph.capabilities,
+            this.#sentImages,
+            // The frame's width, still — the fallback for a group declaring none,
+            // and the declared cell box is a render-time fact that was a
+            // hardcoded `1` before F380.
+            graph.lifecycle.size().columns,
+            graph.probe,
+          )
+        : "") + result.write;
+    {
+      // The write seam — A01 Appendix B's first row, and the one figure that
+      // cannot be taken from outside the process.
+      using _write = prof?.span("write") ?? NO_SPAN;
+      graph.lifecycle.writer.write(bytes);
+    }
+    prof?.count("bytes.written", bytes.length);
+    prof?.count("rows.written", result.lines.length);
     this.#lastFrame = result.lines;
 
     // **After the write, and that is the whole of why the frame stays one pass**
@@ -691,6 +1047,9 @@ class Session implements TuiInstance {
     // is the same rule `anyoneLooking` applies to a refresh source, and for the
     // same reason (C23 I46).
     this.#armSpinner();
+
+    frameSpan?.[Symbol.dispose]();
+    prof?.endFrame("frame");
   }
 
   /**
@@ -718,7 +1077,7 @@ class Session implements TuiInstance {
   #raiseReserves(graph: Graph): void {
     let raised = false;
     for (const req of graph.blockFaults.drain()) {
-      const entry = graph.transcript.entries.find((e) => e.id === req.entryId);
+      const entry = entryById(graph.transcript.entries, req.entryId);
       const held = entry === undefined ? undefined : blockById(entry.doc.blocks, req.blockId);
       if (!reserveNeeded(entry, held, req)) continue;
 
@@ -843,6 +1202,7 @@ class Session implements TuiInstance {
       registry: graph.blocks,
       theme: graph.theme.current,
       capabilities: graph.capabilities,
+      ...(graph.probe === undefined ? {} : { probe: graph.probe }),
       // **The layer host, and it is the one `/live` draws into** (C12 I107).
       scratch: graph.scratch,
       // C14 selected these at this width; the paint pads them and never
@@ -851,9 +1211,20 @@ class Session implements TuiInstance {
       // `size()`. A closure that re-read it is exactly the two-width frame the
       // note names, arriving through the one seam that looks harmless.
       transcriptRows: () =>
-        visibleRows(graph, width, this.#tick, (animated) => {
-          this.#animation = animated;
-        }),
+        visibleRows(
+          graph,
+          width,
+          this.#tick,
+          (animated) => {
+            this.#animation = animated;
+          },
+          // **The `Profiler`, not `graph.probe`, and the difference is the
+          // layering** (C28 I42). `entry()` sits beside `element()` on L4's
+          // interface because a transcript entry is a shell concept: no block
+          // renderer has one, so publishing it at L0 would be a member nothing
+          // below `src/shell/` could ever call.
+          this.#profiler,
+        ),
       promptRows: () => graph.editor.layout(width, PROMPT_GUTTER),
       promptCursor: () => graph.editor.cursorCell(width, PROMPT_GUTTER),
       // **The wash, mapped through the same walk the rows came from** (C17 I18,
@@ -1020,8 +1391,15 @@ class Session implements TuiInstance {
     const graph = this.#graph;
     return compose({
       chrome: this.config.chrome,
+      // C28 I39 — the `chrome` span, so the app's own header and footer are a
+      // phase of their own rather than Calcium's.
+      ...(graph?.probe === undefined ? {} : { probe: graph.probe }),
       session: () => graph?.session.snapshot ?? emptySnapshot(this.config),
       copyMode: () => this.#copyMode,
+      // C24 I32 — read per frame from the recorder rather than kept here. A
+      // second copy of the figure is a second place for the tier change to miss
+      // it, and the recorder is where the ring reset already clears it.
+      lastFrame: () => this.#profiler?.lastFrame(),
       now: this.config.clock,
       size: () => graph?.lifecycle.size() ?? { columns: 80, rows: 24 },
       // **The same number the paint path reads** (S01 §3, commitment 4 and 13).
@@ -1043,6 +1421,35 @@ class Session implements TuiInstance {
 }
 
 /**
+ * One entry by id, in constant time (F914, P11 defect 3).
+ *
+ * **The array's identity is the revision**, which is what makes a `WeakMap`
+ * keyed on it correct rather than a cache someone must remember to clear. C13's
+ * store never mutates `#entries` in place — every append, patch, settle and
+ * evict rebuilds the frozen array through `map` — so a new array is exactly the
+ * moment the index goes stale, and an entry patched in place keeps its id and
+ * its slot.
+ *
+ * The scan it replaces was O(entries) inside a loop over the *visible* entries,
+ * run once per frame: measured at 400 entries × 3 visible × 1231 frames, which
+ * is 1.5M comparisons a session for a lookup the store could answer in one.
+ * The cost is invisible to the span table because the scan is not a phase — it
+ * is the loop body's first line, and `visibleRows` has no span of its own.
+ */
+const ENTRY_INDEX = new WeakMap<object, ReadonlyMap<string, Entry>>();
+
+type Entry = Graph["transcript"]["entries"][number];
+
+function entryById(entries: readonly Entry[], id: string): Entry | undefined {
+  let index = ENTRY_INDEX.get(entries);
+  if (index === undefined) {
+    index = new Map(entries.map((e) => [e.id, e]));
+    ENTRY_INDEX.set(entries, index);
+  }
+  return index.get(id);
+}
+
+/**
  * The visible transcript, as rows, at the frame's width.
  *
  * C14 chose the range and the `skipRows`/`takeRows` slice; this renders exactly
@@ -1055,6 +1462,7 @@ function visibleRows(
   width: number,
   tick: number,
   onAnimation: (animated: Animated) => void,
+  profiler: Profiler | null,
 ): readonly string[] {
   const out: string[] = [];
   // **The cadence anything visible wants, reported once per frame.** The session
@@ -1069,15 +1477,30 @@ function visibleRows(
   const orbits: { entryId: string; blockId: string; declared: Plot["camera"] }[] = [];
   // **The animated images the frame drew, on the arms that draw them** (C22
   // I77). Gathered from the same windowed set as the orbits and for the same
-  // reason, and **not at `kitty`**: the protocol arm handed the terminal every
-  // frame once, so there the image is a still as far as this session's timer
-  // is concerned. On the halfblock and dither arms each frame is a text frame,
-  // which is the orbit's own cost and no more.
+  // reason, and **not where the terminal is animating it** — which is `kitty`
+  // *and a placement the encoding can address*, not the capability alone. This
+  // line read `imageProtocol !== "kitty"` and the block chose its arm from the
+  // box, so a picture past `MAX_PLACEHOLDER_SPAN` fell to the half block while
+  // the session armed nothing: frame 0, for ever (F624, F1026). The arm is
+  // asked per image now, of `placesAtProtocol`, at the width the run rendered
+  // it at. On the halfblock and dither arms each frame is a text frame, which
+  // is the orbit's own cost and no more.
   const frames: { entryId: string; blockId: string; delays: readonly number[] }[] = [];
-  const rasterising = graph.capabilities.imageProtocol !== "kitty";
   for (const ve of graph.viewport.visible().entries) {
-    const entry = graph.transcript.entries.find((e) => e.id === ve.id);
+    const entry = entryById(graph.transcript.entries, ve.id);
     if (entry === undefined) continue;
+    // **Whose work the elements below belong to** (C28 I42). A block id is
+    // unique within its own document (C04 I14) and a transcript holds many, so
+    // without this two entries showing a block with the same id are one row in
+    // `nodes` — and the merged row's `calls / frames` is the sum of their
+    // numerators over one denominator, which is exactly the layout-thrash
+    // signal `calls` is kept beside `frames` to give. Measured at 2.3 per frame
+    // true against 5.3 reported (F892).
+    //
+    // Here rather than anywhere else because this is where the id and the work
+    // meet: `windowEntry` and the render below both reach the registry, whose
+    // wrapper sees a `Block` and nothing about where it came from.
+    using _entry = profiler?.entry(entry.id) ?? NO_SPAN;
     // C22 I33 — the command that produced the entry, above it, as chrome. Its
     // rows are part of the entry's height (C14 I20), which is why the slice
     // below is taken over `chrome ++ blocks` rather than over the blocks alone.
@@ -1192,10 +1615,19 @@ function visibleRows(
         if (!graph.cameras.orbiting(entry.id, plot.id)) continue;
         orbits.push({ entryId: entry.id, blockId: plot.id, declared: plot.camera });
       }
-      if (rasterising) {
+    }
+
+    // **Over the pieces rather than the flattened set, because the arm reads a
+    // width** (C09 I67, F380). A card's body renders four cells in, and a
+    // placement is refused on a box `imageCells` derives from *that* width — so
+    // an image inside a card asked at the frame's width would be answered about
+    // a placement the frame never drew.
+    for (const piece of pieces) {
+      for (const blk of piece.windowed.blocks) {
         for (const b of [blk, ...descendants(blk)]) {
           if (b.kind !== "image") continue;
-          const animation = framesOf(b as Image);
+          if (placesAtProtocol(b as Image, graph.capabilities, piece.run.width, graph.probe)) continue;
+          const animation = framesOf(b as Image, graph.probe);
           if (animation === null) continue;
           frames.push({ entryId: entry.id, blockId: b.id, delays: animation.delays });
         }
@@ -1218,6 +1650,7 @@ function visibleRows(
             renderEntryPieces(graph.blocks, pieces, {
         theme: graph.theme.current,
         capabilities: graph.capabilities,
+        ...(graph.probe === undefined ? {} : { probe: graph.probe }),
         // **The third field, and the context was shipped with two** (C16 §3).
         // Focus was stored, derived and routed, and a focused row rendered
         // exactly like an unfocused one because nothing ever put it in the
@@ -1248,6 +1681,9 @@ function visibleRows(
           // C04 I93). `Frames` in `shell/`, advanced on the wake above, keyed by
           // `framesKey` — the three halves I71 says land together.
           frames: graph.frames.forEntry(entry.id),
+          // The placement scope, beside `frames` and for the same reason: it is
+          // the entry, and the seam is handed the same id (C09 I66, F987).
+          placementScope: entry.id,
           // **The reader's series overrides, with their writer and their axis**
           // (C22 I78, C12 I116). `toggleSeriesBlock` in `construct.ts` writes
           // it from the plot's own digits, the store joins the eviction

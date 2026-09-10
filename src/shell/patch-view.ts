@@ -175,6 +175,17 @@ export function createPatchView(deps: PatchViewDeps): PatchView {
     render(state, patch);
   });
 
+  // **Torn down by whichever caller removed the layer** (C15 I25, F944, §8a A7).
+  // The ⌃c ladder pops through `overlays.pop()` and never calls `pop()` here,
+  // so the entry and offset outlived the layer; the change stream carries the
+  // id before that call returns, and `dismiss()` above reaches this line as
+  // well, so the owner's own path and the ladder's end on one teardown.
+  deps.overlays.subscribe((change) => {
+    if ((change.kind === "pop" || change.kind === "dismiss") && change.id === PATCH_VIEW_ID) {
+      state = null;
+    }
+  });
+
   return {
     open(from, blockId) {
       if (from === null) return `\`${blockId}\` has no entry to resolve against`;

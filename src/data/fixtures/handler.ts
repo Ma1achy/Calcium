@@ -15,7 +15,6 @@
 
 import { withJson } from "../transport/argv.js";
 import type {
-  Clock,
   FixtureHandler,
   Fixture,
   Invocation,
@@ -35,8 +34,12 @@ export type FixtureHandlerOptions = Readonly<{
   world?: WorldDriver;
   /** `frozen` by default (I6). A caller that wants motion asks for it. */
   mode?: HandlerMode;
-  /** Required iff `mode === "live"` (I4). */
-  clock?: Clock["now"];
+  /**
+   * Required iff `mode === "live"` (I4). A `() => number` of the handler's own —
+   * the world moves by wall time, as the backwards-clock note below says — and
+   * not C06's `Clock`, whose only clock is the monotonic `elapsed` (F972).
+   */
+  clock?: () => number;
   /** Answers the B6 endpoint (I11). */
   manifest: Manifest;
 }>;
@@ -162,7 +165,7 @@ export function createFixtureHandler(opts: FixtureHandlerOptions): EmulatedHandl
   };
 
   const handler: FixtureHandler = (inv) => {
-    const argv = withJson(inv.argv);
+    const argv = withJson(inv.argv, inv.jsonFlag);
 
     // Before the routes, not inside them: B6 is a property of any far side, and
     // a fixture-backed session satisfies it like any other (I11). Answering it

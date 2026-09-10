@@ -87,12 +87,15 @@ export function createSubprocessTransport(opts: {
     ...(opts.env === undefined ? {} : { env: opts.env }),
   });
 
-  const spawnArgv = (inv: Invocation): readonly string[] => [binary, ...withJson(inv.argv)];
+  const spawnArgv = (inv: Invocation): readonly string[] => [
+    binary,
+    ...withJson(inv.argv, inv.jsonFlag),
+  ];
 
   return {
     async invoke(inv) {
       const argv = spawnArgv(inv);
-      const started = clock.now();
+      const started = clock.elapsed();
       const state: Termination = { cancelled: false, timedOut: false };
       const base = {
         argv,
@@ -123,7 +126,7 @@ export function createSubprocessTransport(opts: {
         return {
           ...base,
           stderr: messageOf(error),
-          durationMs: clock.now() - started,
+          durationMs: clock.elapsed() - started,
           cancelled: false,
           timedOut: false,
         };
@@ -157,7 +160,7 @@ export function createSubprocessTransport(opts: {
         stdout,
         stdoutRaw,
         stderr: err.text(),
-        durationMs: clock.now() - started,
+        durationMs: clock.elapsed() - started,
         parseError,
         cancelled: state.cancelled,
         timedOut: state.timedOut,
@@ -171,7 +174,7 @@ export function createSubprocessTransport(opts: {
     stream(inv) {
       async function* body(): AsyncGenerator<RawPatch> {
         const argv = spawnArgv(inv);
-        const started = clock.now();
+        const started = clock.elapsed();
         const state: Termination = { cancelled: false, timedOut: false };
 
         let child: ChildHandle | null = null;
@@ -224,7 +227,7 @@ export function createSubprocessTransport(opts: {
             stdout: undefined,
             stdoutRaw,
             stderr,
-            durationMs: clock.now() - started,
+            durationMs: clock.elapsed() - started,
             parseError: null,
             cancelled: state.cancelled,
             timedOut: state.timedOut,

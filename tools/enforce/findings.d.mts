@@ -64,3 +64,88 @@ export type TriageResult = Violation[] & {
 
 /** SP6 — every finding is keyed in the triage, and the declared total is derived. */
 export declare function checkTriageInventory(io?: FindingsIo): TriageResult;
+
+// --- SP12 — the register's open set -----------------------------------------
+//
+// **This file is a hand-written declaration beside a `.mjs`, and nothing checks
+// the two against each other.** That is how the first attempt at SP12 shipped a
+// commit whose own typecheck was red: the four exports existed in the module and
+// the suite ran them, and `tsc` reads this file and knew none of them. Runtime
+// and types disagreed and only a per-commit check could say so — the working
+// tree was red too, and `npm run enforce` was green throughout. A pair of
+// artefacts where one is the contract and the other is the behaviour wants the
+// question asked in both directions; here it is asked in neither, and saying so
+// is the honest version of adding four lines.
+
+/** The words a disposition may be written with, in the register's own vocabulary. */
+export declare const DISPOSITION_WORDS: readonly string[];
+
+/**
+ * The register's open set — every keyed row reading `open` or `partly`.
+ *
+ * Compared **by equality**, so it can only change deliberately: a subset check
+ * in either direction is silent about the other side, measured both ways on C10
+ * I39's debt list.
+ */
+export declare const TRIAGE_OPEN: readonly string[];
+
+/**
+ * A keyed row's **current** disposition, or `null` where it states none.
+ *
+ * A *marker*, not a word: a bold span whose first word is one of the vocabulary,
+ * or a table cell holding nothing else — so prose containing "open" is not a
+ * claim about a finding's state. The **last** marker wins, because dispositions
+ * are appended rather than replaced. FINDINGS F1031.
+ */
+export declare function dispositionOf(row: string): "open" | "closed" | null;
+
+/** Each finding's own keyed row, by id — a mention in another entry's prose is not one. */
+export declare function keyedRows(triage: string): Map<string, string>;
+
+/**
+ * SP12's counters, on `FindingsResult`'s precedent and for its reason.
+ *
+ * **`unstated` is the one that matters.** 332 of 1008 rows state no disposition,
+ * and they are counted rather than gated; a rule answering only "no violations"
+ * cannot distinguish a register everyone has dispositioned from one nobody has.
+ */
+export type OpenSetResult = Violation[] & {
+  /** Rows reading open — what is left to do. */
+  open: number;
+  /** Rows stating no disposition at all. Reported, not gated. */
+  unstated: number;
+  /** Keyed rows walked, so "clean" is distinguishable from "did not run". */
+  rows: number;
+};
+
+/** SP12 — the register's open set is a list compared by equality. */
+export declare function checkOpenSet(io?: FindingsIo, expected?: readonly string[]): OpenSetResult;
+
+/** `checkFindingIds`' counters — headings read, distinct ids, named continuations. */
+export type FindingIdsResult = Violation[] & {
+  headings: number;
+  ids: number;
+  followUps: number;
+};
+
+/**
+ * SP5's uniqueness arm — the ledger's ids are unique and its continuation
+ * headings are the stated set.
+ *
+ * **Declared here in the same commit as the `.mjs`, deliberately.** SP12 shipped
+ * four exports that existed, that the suite imported and ran, and that the module
+ * `tsc` sees did not have — because nothing checks this pair in either direction
+ * and neither `npm run enforce` nor the suite reads a declaration file. The only
+ * command that speaks is `npx tsc --noEmit`, and the only moment it speaks about
+ * a commit rather than a working tree is from a worktree. FINDINGS F1031, F1041.
+ */
+export declare function checkFindingIds(io?: FindingsIo): FindingIdsResult;
+
+/**
+ * SP14 — each `## N ·` group heading tallies the rows it heads, compared by
+ * equality. `io.read` is injectable so the fabricated violation can drive both
+ * directions without touching the register.
+ */
+export declare function checkGroupTallies(
+  io?: { read?: (file: string) => string },
+): import("./source-scans.d.mts").Violation[] & { groups: number };

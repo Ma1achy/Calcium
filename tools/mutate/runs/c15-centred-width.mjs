@@ -23,7 +23,7 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CMD =
   "npx vitest run test/unit/overlay.test.ts test/integration/confirm.test.ts " +
-  "test/integration/history.test.ts";
+  "test/integration/history.test.ts test/unit/profile-view.test.ts";
 const MANAGER = "src/viewport/overlay/manager.ts";
 const CONFIRM = "src/shell/confirm.ts";
 
@@ -38,6 +38,25 @@ const run = () => {
 };
 
 const MUTATIONS = [
+  {
+    // C15 I25, T6.23 — the removal reaches the owner a turn late. `pop()` has
+    // returned and the ladder has moved on while the view still answers `pane`;
+    // T1.28's *before `pop()` returned* is the clause that sees it.
+    name: "pop emits its change on a microtask",
+    file: MANAGER,
+    from: '    this.#emit({ kind: "pop", id: top.id, layerKind: top.kind });\n',
+    to: '    void Promise.resolve().then(() => this.#emit({ kind: "pop", id: top.id, layerKind: top.kind }));\n',
+    expect: "T1.28",
+  },
+  {
+    // C15 I25, T6.23 — no change at all for a `pop`, so an owner subscribed to
+    // the stream never learns the ladder removed its layer (F944's shape back).
+    name: "pop emits nothing",
+    file: MANAGER,
+    from: '    this.#emit({ kind: "pop", id: top.id, layerKind: top.kind });\n',
+    to: "",
+    expect: "T1.28",
+  },
   {
     // **The guard back at the caller.** `confirm.ts` still declares its width,
     // so every confirm row passes; C20's second centred layer is the one that

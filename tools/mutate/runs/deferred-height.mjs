@@ -62,8 +62,9 @@ const results = runPass({
       // I1's divergence created by the mechanism built to keep I1 whole.
       name: "`measure` ignores the floor",
       file: REG,
-      from: "      return { ok: true, rows: Math.max(rows, floor) };",
-      to: "      return { ok: true, rows };",
+      // The floored figure is now taken into a local the memo also records (C09 I61).
+      from: "      const floored = Math.max(rows, floor);",
+      to: "      const floored = rows;",
       expect: "T3.53",
     },
     {

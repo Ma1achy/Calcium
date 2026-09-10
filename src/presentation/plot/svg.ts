@@ -365,12 +365,24 @@ export const SVG_FAMILY = {
   // refuses. The parent refuses only when **no** child draws, because then there
   // is nothing on the page and I64 already says so.
   smallmultiples: "facets", pairplot: "facets",
-  // **A field with layers over it, and both halves of the deferral were right**
-  // (F294, §3ak.29). The condition was written as a symbol — *`contourFigure`,
-  // returning normalised marks with no `areaWidth`, no `areaRows`, no `caps` and
-  // no string in the signature* — and that is exactly what landed: marching
-  // squares over the **data's own grid**, where a crossing is a linear
-  // interpolation between two adjacent readings and no resampling adds one.
+  // **A field with layers over it, and the deferral was right about the shape
+  // and wrong about the name** (F294, §3ak.29, F1034). The condition was written
+  // as a symbol — *`contourFigure`, returning normalised marks with no
+  // `areaWidth`, no `areaRows`, no `caps` and no string in the signature* — and
+  // the **shape** is exactly what landed: marching squares over the **data's own
+  // grid**, where a crossing is a linear interpolation between two adjacent
+  // readings and no resampling adds one.
+  //
+  // **The symbol was never created and `fieldFigure` is what satisfies it**
+  // (`figure.ts`, `(block: Plot) => Figure` — no `areaWidth`, no `areaRows`, no
+  // `caps`, no string). `contourFigure` is in no file in the tree, and this
+  // comment used to say the symbol was *exactly what landed*, as does the plan
+  // note that closed the section. **Resolve the subject, not the marker**: a
+  // condition stated as a name is checked by grepping the name, and the thing
+  // that met it here is called something else — the same shape as F1025's
+  // facet-frame exclusion, where the workaround was in the tree and the record
+  // never moved. `horizonFigure` below *is* under the name F294 chose, which is
+  // why one of the two resolved and the pair read as though both did.
   //
   // **The family it named was `"matrix"` and it is `"field"`**, which is the one
   // thing measuring moved. The prediction was about resemblance and the member
@@ -2078,6 +2090,14 @@ export function plotToSvg(
   // and `┊` at every position tick; **both ways**, and drawing one was half of
   // what the style means.
   const gridded = figure.frame === "grid";
+  // **The last baseline *emitted* on each side, which is this arm's abut rule**
+  // (C12 I121, §3ak.50g). `ticksFor` is a ceiling on the step's coarseness and
+  // never the number drawn — the terminal resolves the density afterwards in
+  // `yLabels` — and this arm read the ticks and drew a label for every one, on
+  // a canvas whose height it takes from its caller. **A refusal reserves
+  // nothing** (I120), so only a label actually written moves an edge: one the
+  // callout suppresses leaves the next label the room it would have had.
+  const lastLabelAt: Record<"left" | "right", number | null> = { left: null, right: null };
   if (axis !== null && rule !== undefined && label !== undefined) {
     for (const [i, tick] of axis.ticks.entries()) {
       // **The string is the figure's** (D5). `String(tick)` printed `1` where
@@ -2133,6 +2153,15 @@ export function plotToSvg(
         // a label, and suppressing one glyph more than the ruling asks changes
         // the figure's geometry while every text assertion agrees (→ `RC4`).
         if (side === "right" && calloutRows.some((r) => Math.abs(r - y) < SVG_FONT_SIZE)) continue;
+        // **A full em between baselines, and the tick keeps its rule either
+        // way** (C12 I121, §3ak.50g). The bound is I114's own, one writer over:
+        // a glyph's ink is inside its em box, so two baselines an em apart
+        // cannot overlap and anything closer may. **Both sides**, because
+        // I114's *never the left's* is about a callout displacing a label and
+        // says nothing about two labels displacing each other — a crowded left
+        // gutter smears exactly as a right one does.
+        const previous = lastLabelAt[side];
+        if (previous !== null && Math.abs(y - previous) < SVG_FONT_SIZE) continue;
         const at = side === "left" ? box.left - LABEL_GAP : box.right + LABEL_GAP;
         // **The left side is `end`-anchored too and had no clip at all**, so a
         // long value label ran off the viewBox rather than being cut inside a
@@ -2148,6 +2177,7 @@ export function plotToSvg(
           // to the canvas may be cut to nothing it collides with, and where a
           // legend sits beyond the column that is the band it collides with.
           : fitLabel(text, box.right + rightRoom(figure, layout) - at);
+        lastLabelAt[side] = y;
         parts.push(`<text x="${n(at)}" y="${n(y + SVG_FONT_SIZE / 3)}" ` +
           `text-anchor="${side === "left" ? "end" : "start"}" ` +
           `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${label}">` +
@@ -2201,19 +2231,60 @@ export function plotToSvg(
     const span = box.right - box.left;
     const budget = Math.max(2, Math.min(9, Math.floor(span / SVG_TICK_PITCH) + 1));
     const axis = positionAxisAt(figure.position, budget);
+    // **The captions already drawn, which is this arm's abscissa abut rule**
+    // (C12 I123, §3ak.50h). `positionAxisAt` nices *inside* the domain and then
+    // appends the domain's own maximum at `at = 1`, so the last two ticks are
+    // whatever the domain leaves — `30` and `31` at 12.8 px, `150` and `159` at
+    // 22.5 px. The terminal arm packs the same axis and **drops** a caption that
+    // cannot keep its cell (`xTickRow`'s `free` cursor, and its abscissa reads
+    // `0 5 10 15 20 25 30`); this arm drew every tick at its exact position and
+    // `31` painted through `30` as a single unreadable glyph. One derivation,
+    // two placements, and only one of them had the gap rule — which is I121's
+    // finding on the other axis, whose remedy cited *the abscissa's precedent*
+    // for the budget and left the placement half here unwritten (F1025).
+    //
+    // **Cleared against every caption kept, not against the previous tick.** A
+    // refusal reserves nothing (I120), so the appended maximum is what goes and
+    // the niced ticks stand; and comparing against the kept set rather than
+    // walking a directional cursor is what makes the rule the same rule on a
+    // flipped axis, where the ticks descend across the page.
+    const kept: { left: number; right: number }[] = [];
     for (const [i, at] of axis.at.entries()) {
       const text = axis.labels[i] ?? "";
       if (text === "") continue;
-      const x = box.left + span * (figure.facing.x === "left" ? 1 - at : at);
+      // **The page position, taken once and read three times** — by the rule,
+      // by the anchor and by the band. `facing.x === "left"` reverses where a
+      // tick lands and used to leave the anchor behind (below).
+      const page = figure.facing.x === "left" ? 1 - at : at;
+      const x = box.left + span * page;
       // **The grid's other half** (F356). `plotFrame: "grid"` crosses and this
       // arm drew five horizontal rules and no verticals, under a comment above
       // saying *both ways*; the reason was never the member, it was that there
       // were no positions to hang a rule on.
+      //
+      // **Above the abut rule, because a suppressed caption keeps its rule** —
+      // I114's ruling about what a decision leaves behind, and `RC4`'s row one
+      // writer over: the figure's geometry does not move with its readings.
       if (gridded) {
         parts.push(`<line x1="${n(x)}" y1="${n(box.top)}" x2="${n(x)}" y2="${n(box.bottom)}" ` +
           `stroke="${rule ?? label}" stroke-width="1"/>`);
       }
-      const anchor = i === 0 ? "start" : i === axis.at.length - 1 ? "end" : "middle"; // cells-ok — a tick count
+      // **The anchor is the edge the tick lands on and never its index**
+      // (C12 I123). The edge captions are clamped by their anchor — the first
+      // grows right off `box.left`, the last grows left off `box.right` — and
+      // indexing that by `i` is a second reading of the direction `page`
+      // already holds. On `origin: "bottom-right"` the two parted: the axis
+      // maximum, last by index and leftmost on the page, anchored `end` at
+      // `box.left` and grew **into the gutter**, `49` landing on the value
+      // label `0` 14.84 px away; the minimum anchored `start` at `box.right`
+      // and grew 7.42 px past the box. Both are one expression apart.
+      const anchor = page <= 0 ? "start" : page >= 1 ? "end" : "middle";
+      // The arm's own bound on a monospace advance, the same one `gutterRoom`
+      // reserves with and `fitLabel` cuts to — not a second expression for it.
+      const w = text.length * SVG_FONT_SIZE * SVG_EM_MAX; // cells-ok — a character count
+      const left = anchor === "start" ? x : anchor === "end" ? x - w : x - w / 2;
+      if (kept.some((k) => left < k.right && k.left < left + w)) continue;
+      kept.push({ left, right: left + w });
       parts.push(`<text x="${n(x)}" y="${n(box.bottom + SVG_FONT_SIZE)}" text-anchor="${anchor}" ` +
         `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${label}">` +
         `${escape(text)}</text>`);

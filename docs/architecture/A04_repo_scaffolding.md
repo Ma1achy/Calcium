@@ -232,14 +232,38 @@ Same shape in all three, differing only in what the last stage can reach.
 install → check → enforce → audit → test → golden → e2e → [repo-specific]
 ```
 
-**Split by cost.** Private repos have a monthly Actions budget, and golden frames at sixteen configurations plus PTY e2e is where it goes.
+**Split by cost, and the cost is time rather than money here.** The sentence this replaces read *private repos have a monthly Actions budget, and golden frames at sixteen configurations plus PTY e2e is where it goes* — true of a private repository and not of this one. Calcium is public, and GitHub reports the figure per job rather than leaving it to the policy page: run 34492226500 comes back with `billable.UBUNTU.total_ms: 0` across five jobs against `run_duration_ms: 454000`, populated with zeroes rather than absent. The argument that survives, and the one the table is actually built on, is **latency**: a branch push is the inner loop, where the answer is wanted in seconds and a wrong one costs a re-run. That argues against running the expensive tier *automatically on every push* and says nothing about running it on demand. The two reasons agreed on one conclusion for long enough that nobody separated them (F1089).
 
 | Trigger | Stages |
 |---|---|
-| Every push to a branch | `install → check → enforce → audit → test` — under two minutes |
+| Every push to a branch | `install → check → enforce → audit → test` — **nine minutes on the runner, measured**, and Calcium's job adds `instruments` and `regime` to that list (F1090) |
 | **Pull request**, push to `main`, and tags | The above plus `golden → e2e → [repo-specific]` |
+| **Weekly** (Sunday 03:00 UTC), and on dispatch | `mutation-sweep` — every run under `tools/mutate/runs/` through `tools/mutate/sweep.mjs`, six shards, the anchors sweep first. A survivor, a stale exemption, an anchor miss off the debt list or a run that leaves the tree mutated is red where nobody was running the pass by hand (F952, F990) |
 
-`enforce` stays on every push regardless: it costs five seconds and catches the violations that become load-bearing fastest.
+`enforce` stays on every push regardless: it costs five seconds locally and ten on the runner, and it catches the violations that become load-bearing fastest.
+
+**The first row's figure is measured rather than intended, and it used to say two minutes.** That number was in this table from the initial commit on 2026-07-28 and was never taken on a runner; F1090 is the first green branch-push run there, and it reads:
+
+| step | seconds |
+|---|---|
+| `make install` | 16 |
+| `make enforce` | 10 |
+| `make check` | 7 |
+| **`make instruments`** | **151** |
+| `make audit` | 11 |
+| `make regime` | 2 |
+| `make test` | 333 |
+| whole job, with checkout and set-up | **539** |
+
+The table above is the shape all three repos share, so the two extra stages are named beside the figure rather than spliced into the arrow — but a reader budgeting Calcium's branch push needs them, and for twenty-nine days nothing here said so.
+
+**The stage list was wrong too, and by the expensive stage.** `instruments` and `regime` joined the job in `7f399391` on 2026-08-12 — a commit whose subject is *CI runs the seventh target, and a budget says which regime it was set in* — and the arrow above was not touched, so for twenty-nine days a reader budgeting this row was short by twenty-eight per cent of the job. **A stage added to a job is added to two records**, and the one that costs nothing to skip is this one.
+
+**Rearranging does not recover the old figure and the old figure is not a target.** `make test` alone is 333 s and it is the gate the row exists to promise; moving `instruments` to `full` would leave 377. What the promise was *for* survives and is worth restating: this row is the inner loop, so what belongs in it is what changes a decision within the push, and what does not belongs in `full`. Whether `instruments` clears that bar is a live question with its own cost argument, and it is not settled here.
+
+**A `schedule` or `workflow_dispatch` row in this table is a claim about the default branch.** GitHub registers those two triggers from the default branch and nowhere else, so a workflow written on a feature branch has no triggers at all until it is merged — not the cron, not the dispatch, not the inputs written to steer it. **The third row above is in exactly that state as this is written**, from `887de60d`: `gh workflow list --all` returns one workflow, and `gh run list --workflow mutation-sweep.yml` returns `HTTP 404: workflow mutation-sweep.yml not found on the default branch`. Present tense deliberately — F860's tell is a comment written in the past tense about a branch it is true of and a branch it is written about, and this paragraph is on the branch where the workflow is unregistered, not the one where it will be fixed. **And nothing reports it** — a cron that does not fire produces no run, no annotation and no red, so a gate that cannot run is indistinguishable from a gate with nothing to say. `gh workflow list --all` is the line that separates them, and it belongs in the close-out of any change to this table. F1089.
+
+**The same fact one step along**: the expensive tier is reachable from a feature branch by no means available on that branch. Widening a filter cannot do it and neither can adding a fourth trigger, because the trigger would not register either. That makes a finding whose measurement lives in `golden → e2e` blocked on a merge — a decision, not a repair — and a disposition reading *the next run is the measurement* should say so rather than read as though it is waiting on someone's time (F812, F1089).
 
 **The pull-request row is new, and it is here because the table's first form made `main` the only place the expensive tier could run — so `main` was the only place it could break, and nothing could stop it.**
 

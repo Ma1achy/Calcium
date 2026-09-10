@@ -47,7 +47,7 @@ export function createFixtureTransport(corpus: readonly Fixture[]): VerbTranspor
   // Used only where C06 constructs a result itself — a cancellation, where
   // nothing was recorded and the argv describes an invocation happening now.
   // **A replayed result is never given one** (I20).
-  const argvOf = (inv: Invocation): readonly string[] => withJson(inv.argv);
+  const argvOf = (inv: Invocation): readonly string[] => withJson(inv.argv, inv.jsonFlag);
 
   // Verbatim. `meta.argv` is a historical fact about the data — what actually
   // ran (D49) — and a recording captured a real invocation, so replay reports

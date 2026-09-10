@@ -56,11 +56,29 @@ const LEDGER = "examples/docker/FINDINGS.md";
  * directories to `examples/docker`; F84 is the same sentence about MG24. A
  * document written tomorrow at the root is covered on the day it is written
  * rather than on the day someone remembers this list exists.
+ *
+ * **The fourth time, and it is the one with a mechanism missing rather than a
+ * place missing.** `tools/` and `test/` were added to the walk below with five
+ * sentences of justification — *they hold 2 462 finding citations, 19% of the
+ * repository's* — and this list was not touched, so `inCitedScope` filtered
+ * every one of them straight back out three lines later. **645 files and 2 688
+ * citations walked and dropped**, with the rule's own comment reading as though
+ * the widening had landed. Measured before applying it, exactly as that comment
+ * says was done: **zero pre-existing violations** in the 645, and the only
+ * difference on the day is the round's own unfiled numbers — 3 violations
+ * against 11, all eight of them F1066–F1069 awaiting the ledger (F1069).
+ *
+ * A step can name an effect and have no mechanism, and the justification being
+ * correct is why nobody looked. The corpus assertion that would have caught it
+ * is a fabricated violation for the *scope* rather than for the rule, and the
+ * fire-test now carries one.
  */
 const CITED_FROM = [
   "examples/docker/",
   "docs/",
   "src/",
+  "tools/",
+  "test/",
 ];
 
 /**
@@ -80,11 +98,96 @@ const inCitedScope = (f) =>
   f === LEDGER || !f.includes("/") || CITED_FROM.some((p) => f.startsWith(p));
 
 /** The headings, which are the only declaration of what exists. */
+/**
+ * The four continuation headings, named rather than matched away.
+ *
+ * A follow-up section shares its finding's id — `## F37 closed` — and is the
+ * recorded convention, so it is not a duplicate. Matching *any* heading with
+ * text between the id and the dash would excuse a real duplicate written the
+ * same way, and the convention is four sections rather than a pattern, so it is
+ * a list. Compared by equality below, so a fifth follow-up is a decision and a
+ * deleted one is a failure.
+ */
+const FOLLOW_UPS = Object.freeze(["F37 confirmed at a cost", "F24 corrected", "F37 closed", "F374 closed"]);
+
 function declared() {
   const text = readFileSync(LEDGER, "utf8");
   const ids = new Set();
   for (const m of text.matchAll(/^##\s+(F\d+[a-z]?)\b/gmu)) ids.add(m[1]);
   return ids;
+}
+
+/**
+ * SP5's other half — **the ledger's ids are unique, and a `Set` cannot say so.**
+ *
+ * `declared()` collects into a `Set` because the question it answers is *does
+ * this id exist*. That makes a duplicate heading invisible: two `## F164`
+ * sections resolve every citation to F164 and the rule is green, while the
+ * register holds two different findings under one number and a reader following
+ * a citation lands on whichever comes first.
+ *
+ * **Measured, and it had happened.** One duplicate in 1 055 headings — an
+ * aborted write that left a heading, a two-row table and nothing else, above the
+ * real entry with a different title. Deleted; the count is now 1 054 headings
+ * over 1 050 ids, and the four remaining are the named follow-ups.
+ *
+ * **This is the failure mode a double-allocated finding number produces**, and
+ * that happened in the same session, from the other end: two lanes were handed
+ * one number and SP5 would have passed on both, because it can see an absence
+ * and not a collision. FINDINGS F1047, F1041.
+ */
+export function checkFindingIds(io) {
+  const readText = io?.read ?? ((f) => readFileSync(f, "utf8"));
+  const violations = [];
+  const seen = new Map();
+  const followUps = [];
+
+  for (const m of readText(LEDGER).matchAll(/^##\s+(F\d+[a-z]?)(\s[^—\n]*?)?\s+[—-]/gmu)) {
+    const id = m[1];
+    const tail = (m[2] ?? "").trim();
+    if (tail !== "") {
+      followUps.push(`${id} ${tail}`);
+      continue;
+    }
+    seen.set(id, (seen.get(id) ?? 0) + 1);
+  }
+
+  const dupes = [...seen.entries()].filter(([, n]) => n > 1).map(([id]) => id);
+  if (dupes.length > 0) {
+    violations.push({
+      rule: "SP5",
+      file: LEDGER,
+      message:
+        `${String(dupes.length)} finding id(s) carry more than one section: ${dupes.join(" ")}. ` +
+        `A citation resolves to whichever comes first, and \`declared()\` collects into a Set, ` +
+        `so the rule that checks citations cannot see this at all — it answers existence, not ` +
+        `uniqueness. Merge them, or give the later one its own number (F1047).`,
+      spec: "A03 §7a · FINDINGS",
+    });
+  }
+
+  // The convention, compared by equality — a fifth continuation is a decision,
+  // and a deleted one is a failure rather than a quietly shorter list.
+  const unexpected = followUps.filter((f) => !FOLLOW_UPS.includes(f));
+  const gone = FOLLOW_UPS.filter((f) => !followUps.includes(f));
+  if (unexpected.length > 0 || gone.length > 0) {
+    violations.push({
+      rule: "SP5",
+      file: LEDGER,
+      message:
+        `the continuation headings are not the stated set` +
+        `${unexpected.length > 0 ? ` — new: ${unexpected.join(" · ")}` : ""}` +
+        `${gone.length > 0 ? ` — gone: ${gone.join(" · ")}` : ""}. ` +
+        `A follow-up shares its finding's id deliberately; the list is what keeps that ` +
+        `distinguishable from a duplicate written the same way (F1047).`,
+      spec: "A03 §7a · FINDINGS",
+    });
+  }
+
+  violations.headings = [...seen.values()].reduce((a, b) => a + b, 0) + followUps.length;
+  violations.ids = seen.size;
+  violations.followUps = followUps.length;
+  return violations;
 }
 
 /**
@@ -174,6 +277,32 @@ export function checkFindings(io) {
         ...walk("src"),
         ...walk("docs"),
         ...walk("examples/docker"),
+        // **`tools/` and `test/`, added after they were measured rather than
+        // before.** They hold **2 462 finding citations, 19% of the
+        // repository's**, and every one was outside this rule until now — the
+        // same *scope excludes its subject* class as `examples/docker/src`
+        // above, arriving on the two directories where the instruments live.
+        // The instruments are the artefacts that cite findings most densely
+        // after the register itself, because every rule here carries the
+        // finding that produced it.
+        //
+        // **Measured before widening, so that it lands green rather than red.**
+        // A gate red on arrival is a gate edited to fit; this one was clean on
+        // arrival apart from the round's own unfiled numbers and two
+        // fabrication sentinels, and the sentinels were derived from the
+        // ledger's maximum rather than exempted, so the corpus has no
+        // exceptions to name. FINDINGS F1047, F1041.
+        //
+        // **And for one round this walk was the whole of the widening.**
+        // `CITED_FROM` was not touched, so `inCitedScope` below dropped all 645
+        // files these two lines add — the measurement above was made, written
+        // down, and never reached the predicate that decides. Both halves are
+        // in now, and the scope has a fabricated violation of its own in the
+        // fire-tests, because nothing here could have told the two states
+        // apart: a walk that adds files and a filter that removes them reports
+        // exactly what a correct scope reports (F1069).
+        ...walk("tools"),
+        ...walk("test"),
         // The root's own documents, not recursed — `walk` would descend into
         // every example and package. The five that cite this ledger live here
         // beside `CLAUDE.md`, which used to be the only one named. F84.
@@ -382,5 +511,344 @@ export function checkTriageInventory(io) {
 
   violations.ids = ids.length;
   violations.keyed = keyed.size;
+  return violations;
+}
+
+// --- SP12 — the register's open set, readable and compared by equality -------
+//
+// **The register is the document that says what is left to do, and its open set
+// could not be read.** SP6 already records the neighbouring problem in its own
+// comment — *"keyed" has no definition strong enough yet* — and stops there.
+// This is the next word along: not which rows are keyed, but which are **open**.
+//
+// **Measured, and the measurement is this session's own mistake.** Surveying the
+// register to decide what work remained, a grep for the bolded marker returned
+// **16** open findings, and lanes were dispatched against those sixteen. The
+// answer is **39**. The twenty-three that were missed are not obscure entries;
+// they are rows that write the same fact in a different form:
+//
+//   `**Open**`            the common form
+//   `**OPEN**`            F405
+//   `| open |`            F50 — a bare lowercase cell, and a real open defect
+//   `Open ·  … **Closed**` F79 — a superseded marker left in place, which reads
+//                          as open to any matcher that does not take the last
+//
+// That is the *a matcher that sees one encoding* class, landing on the register
+// itself: the reader reports absence when the value merely changes form, and it
+// is worst exactly where the forms accumulated over a long document's life.
+//
+// **This comment said 33 and seventeen on the day it landed, beside a list of
+// 39.** Both numbers came from a draft taken before the reader was finished, and
+// 16 + 17 = 33 is self-consistent, which is the whole reason it survived review —
+// the arithmetic offered as evidence agrees with itself, exactly as SP6's own
+// comment says of the sentence it was written against. The figure is corrected
+// here from `TRIAGE_OPEN.length`, which is the only copy anything runs, and the
+// mistake is left recorded rather than tidied because it is this rule's own
+// subject: **a claim is falsified by being summarised, not by being wrong**, and
+// the summary above a correct list is where to look for it. FINDINGS F1031.
+//
+// **The cost is not hypothetical and it is not the count.** A count that is
+// wrong low sends nobody anywhere. What it did was leave twenty-three open findings
+// undispatched while the survey read as complete — including F50, a column that
+// never grows, sitting open and uncounted beside F701, the finding about the same
+// columns that *was* dispatched. A register nobody can query is a register that
+// reports whatever the querier's regex happens to spell.
+//
+// **The vocabulary, and why the last token wins.** Dispositions here are
+// *appended* rather than replaced: a row records `Open` when filed and gains
+// `**Closed** (F991)` when the sweep resolves it, both left in place because the
+// history is the evidence. So the current disposition is the last one written,
+// and any reader that takes the first — or that asks whether "open" appears —
+// answers about the row's past.
+//
+// **What this does not reach, stated because an unrecorded limit reads as
+// strength.** 208 of 1004 keyed rows state no disposition at all. They are not
+// gated here and they are not assumed closed: they are reported as a count, on
+// SP6's own precedent that a gate red on arrival is a gate edited to fit. The
+// honest reading of those is *unstated*, and turning them into a fourth answer
+// is a sweep over the document rather than a rule over it. Second limit: the
+// vocabulary is closed by this file, so a row inventing a fifth word reads as
+// unstated rather than as a violation — loud in the safe direction, quiet in the
+// other, which is the same asymmetry MG24 carries and for the same reason.
+
+/**
+ * **The register's open set** — what is left to do, as a list rather than as a
+ * query nobody could write correctly.
+ *
+ * **Thirty-nine when this rule was written**, against the sixteen a `**Open**`
+ * grep returns. **Eighteen of the difference are `**Partly**`**, a disposition
+ * invented for findings whose remedy landed in part, which every reader in this
+ * repository was silently counting as done — the third-state problem the
+ * mutation harness has twice (F897, F949), arriving in the document that says
+ * what remains.
+ *
+ * **The count moves and this sentence must not be read as the current one.**
+ * That is this rule's own subject arriving in its own prose: a figure written
+ * once and left to read as present tense is exactly what the register did to
+ * itself. The only current answer is the list below, and the row that checks it
+ * derives the number rather than restating it — which is why that row stays
+ * green while this paragraph ages. The thirty-nine is kept because the
+ * *difference* is the finding, not the total.
+ *
+ * Ordered by number, which is the order a reader walks it in.
+ */
+export const TRIAGE_OPEN = Object.freeze([
+  "F812", "F1089", "F1092", "F1094",
+]);
+
+/** The words a disposition may be written with. */
+export const DISPOSITION_WORDS = ["open", "closed", "fixed", "absorbed", "retracted", "withdrawn", "partly", "superseded"];
+
+/** The ones that mean **not done**. `partly` counts as open: part of it is. */
+const OPEN_WORDS = new Set(["open", "partly"]);
+
+/**
+ * **A marker, and not merely the word.** The first reader here matched the
+ * vocabulary anywhere in the row and was wrong in both directions on real rows:
+ * F8 ends *"the shell refuses to open"* after a `**Closed**` and read as open,
+ * and F247's trailing cell `**gate open**` is a column value rather than a
+ * disposition. Prose containing a word is not a claim about the finding's state.
+ *
+ * So a marker is one of exactly two shapes, both of which a writer chooses
+ * deliberately:
+ *
+ *   a **bold span whose first word** is one of the vocabulary — `**Open**`,
+ *   `**Closed** (F991)`, `**Closed by F1017**`, `**OPEN**`
+ *
+ *   a **table cell holding nothing else** — `| open |`, `| fixed |`
+ *
+ * `**gate open**` is neither, because its first word is `gate`; *"refuses to
+ * open"* is neither, because it is not bold and not alone in a cell.
+ *
+ * **Two shapes in a row's prose desynchronise the pairing, and both are the
+ * writer's to avoid.** `[^*]*` cannot cross a `*`, so a bold span containing
+ * one — `**Closed — ruled *no operation*…**` — is not a marker at all and the
+ * previous disposition stands. And a bold span whose first character is not a
+ * letter — `**1**` in *against **1** open finding* — fails `([A-Za-z]+)`, so
+ * its **closing** `**` opens the next match and every marker after it is
+ * mis-paired: F1080's row read *open* with `**Closed**` written at the front
+ * of its disposition. Both were caught by SP12, which compares the set by
+ * equality and is therefore loud in both directions — but the row is the thing
+ * to fix, not the regex. In a keyed row, write a number as a word and keep `*`
+ * out of a bold span.
+ */
+const BOLD_MARKER = /\*\*\s*([A-Za-z]+)[^*]*\*\*/gu;
+
+/**
+ * A keyed row's **current** disposition, or `null` where it states none.
+ *
+ * Exported so the rule and its test cannot drift apart, and so a reader who
+ * wants the open set gets the same answer the gate has.
+ *
+ * **The last marker wins**, because dispositions here are appended rather than
+ * replaced: a row records `Open` when filed and gains `**Closed** (F991)` when
+ * the sweep resolves it, both left in place because the history is the evidence.
+ * A reader taking the first answers about the row's past.
+ */
+export function dispositionOf(row) {
+  // **One scan in document order, and not two passes.** The first draft matched
+  // bold spans, then cells, and let the second overwrite the first — so two
+  // readers of one row could disagree and the later loop won regardless of which
+  // marker the writer put last. `F229` is the row that showed it: a bold
+  // `**fixed**` and a cell `closed`, agreeing on the answer and disagreeing on
+  // the path. They agreed here; nothing made them.
+  const marks = [];
+  for (const m of row.matchAll(BOLD_MARKER)) {
+    const w = m[1].toLowerCase();
+    if (DISPOSITION_WORDS.includes(w)) marks.push([m.index ?? 0, w]);
+  }
+  let at = 0;
+  for (const cell of row.split("|")) {
+    const w = cell.trim().toLowerCase();
+    if (DISPOSITION_WORDS.includes(w)) marks.push([at, w]);
+    at += cell.length + 1;
+  }
+  if (marks.length === 0) return null;
+  marks.sort((a, b) => a[0] - b[0]);
+  const last = marks[marks.length - 1]?.[1];
+  return last !== undefined && OPEN_WORDS.has(last) ? "open" : "closed";
+}
+
+/**
+ * Each finding's **own** keyed row — the line that opens with its id, in either
+ * of the document's two shapes.
+ *
+ * A mention inside another entry's prose is not this finding's disposition, and
+ * reading one is how F79 first measured as open: its id appears in a sentence
+ * belonging to F86, which carries its own marker.
+ */
+export function keyedRows(triage) {
+  const rows = new Map();
+  for (const line of triage.split("\n")) {
+    const m = /^(?:\| )?\*\*F(\d+[a-z]?)\*\*[ |]/u.exec(line.trimStart());
+    if (m !== null && !rows.has(m[1])) rows.set(m[1], line);
+  }
+  return rows;
+}
+
+/**
+ * SP12 — the open set is a list, compared by equality.
+ *
+ * `expected` is the register's open set as the last person to change it left it.
+ * **Equality and not containment**: a finding that closes must be struck from
+ * this list, and one that opens must be added, and a subset check in either
+ * direction is silent about the other — measured, in both directions, on C10
+ * I39's debt list (T6.97).
+ */
+/**
+ * SP14 — each group heading's tally equals the rows it heads.
+ *
+ * **The second record of the open set, and it was the only one nobody read.**
+ * SP12 gates the set; each `## N ·` heading carries `X open · Y closed · Z with
+ * no verdict` for its own section, and closing a finding means editing both.
+ * Closing F158 and F1024 meant editing two headings by hand with nothing that
+ * would have gone red had neither been touched (F1080).
+ *
+ * **Why this is gated where `checkTriageInventory`'s per-group counts are
+ * not**, which is a live decision recorded above with two reconciliation passes
+ * behind it: *keyed* has no definition strong enough, so a gate over it would
+ * be red on arrival and edited to fit. A **disposition** has one —
+ * `dispositionOf`, which SP12 already compares by equality — so the tallies are
+ * exactly derivable today. Run over the corpus before wiring: 14 of 15 headings
+ * agreed, the fifteenth (§13) was out by one on `with no verdict`, and four
+ * stated a field not at all. Those five were repaired and the shapes
+ * normalised, so this is green on arrival with nothing edited to fit.
+ *
+ * **A heading that states no tally is a violation rather than a pass**, which
+ * is the whole of A03 §2 applied to a parser: `**closed**, all 5` and `9 closed
+ * · new at F80` each omitted a field, and a reader that shrugs at a missing
+ * number is a rule with a way to opt out of itself.
+ *
+ * `readText` is a parameter so the fabricated violation can drive both arms —
+ * a heading that overstates and one that understates — without touching the
+ * register.
+ */
+export function checkGroupTallies(io) {
+  const readText = io?.read ?? ((f) => readFileSync(f, "utf8"));
+  const violations = [];
+  const lines = readText(TRIAGE).split("\n");
+
+  // `keyedRows`' own model — the first line per id, across the whole document —
+  // because a per-group walk that counts every occurrence double-counts an id
+  // mentioned in a second group's prose, and the two readings differ (F1080).
+  const seen = new Set();
+  const groups = [];
+  let current = null;
+  for (const line of lines) {
+    const head = /^## (\d+|Singles)(?: · |\b)/u.exec(line);
+    if (head !== null) {
+      current = { name: head[1], heading: line, open: 0, closed: 0, none: 0 };
+      groups.push(current);
+      continue;
+    }
+    const row = /^(?:\| )?\*\*F(\d+[a-z]?)\*\*[ |]/u.exec(line.trimStart());
+    if (row === null || seen.has(row[1])) continue;
+    seen.add(row[1]);
+    if (current === null) continue;
+    const d = dispositionOf(line);
+    if (d === "open" || d === "partly") current.open += 1;
+    else if (d !== null) current.closed += 1;
+    else current.none += 1;
+  }
+
+  for (const g of groups) {
+    const stated = groupTally(g.heading);
+    if (stated === null) {
+      violations.push({
+        rule: "SP14",
+        file: TRIAGE,
+        spec: "A03 §7a · FINDINGS",
+        message:
+          `group ${g.name}'s heading states no tally. A heading with no numbers in it cannot ` +
+          `disagree with its rows, which is the vacuity class one list over: write ` +
+          `\`X open · Y closed · Z with no verdict\`, spelling a zero as \`none\`.`,
+      });
+      continue;
+    }
+    const wrong = [];
+    if (stated.open !== g.open) wrong.push(`open ${String(stated.open)} against ${String(g.open)}`);
+    if (stated.closed !== g.closed) wrong.push(`closed ${String(stated.closed)} against ${String(g.closed)}`);
+    if (stated.none !== g.none) wrong.push(`with no verdict ${String(stated.none)} against ${String(g.none)}`);
+    if (wrong.length > 0) {
+      violations.push({
+        rule: "SP14",
+        file: TRIAGE,
+        spec: "A03 §7a · FINDINGS",
+        message:
+          `group ${g.name}'s heading disagrees with the rows it heads — ${wrong.join("; ")}. ` +
+          `The heading is the second record of the open set and SP12 gates the first; a group ` +
+          `whose tally is stale reads as settled work and is the reason a closure has to edit ` +
+          `two places (F1080).`,
+      });
+    }
+  }
+
+  violations.groups = groups.length;
+  return violations;
+}
+
+/**
+ * A heading's stated tally, or `null` when it states none.
+ *
+ * `**closed**` spells zero open, which is how thirteen of the fifteen headings
+ * read and is worth keeping — a reader scanning for work looks for a word, not
+ * a digit. `none` spells zero anywhere a count is expected. Deliberately **not**
+ * reading `unread`: that is the ranking table's vocabulary for a *consumer*, and
+ * the first draft of F1080 rewrote four cells having read one as the other.
+ */
+function groupTally(heading) {
+  const open = /(?:^|[^\d])(\d+|none) open\b/u.exec(heading);
+  const closed = /(?:^|[^\d])(\d+|none) closed\b/u.exec(heading);
+  const none = /(?:^|[^\d])(\d+|none) with no verdict\b/u.exec(heading);
+  const zeroOpen = /\*\*closed\*\*/u.test(heading);
+  if ((open === null && !zeroOpen) || closed === null || none === null) return null;
+  const count = (m) => (m === null || m[1] === "none" ? 0 : Number(m[1]));
+  return { open: count(open), closed: count(closed), none: count(none) };
+}
+
+export function checkOpenSet(io, expected = TRIAGE_OPEN) {
+  const readText = io?.read ?? ((f) => readFileSync(f, "utf8"));
+  const violations = [];
+  const rows = keyedRows(readText(TRIAGE));
+
+  const found = [];
+  let unstated = 0;
+  for (const [id, row] of rows) {
+    const d = dispositionOf(row);
+    if (d === null) unstated += 1;
+    else if (d === "open") found.push(`F${id}`);
+  }
+  found.sort((a, b) => Number(a.slice(1).replace(/\D/gu, "")) - Number(b.slice(1).replace(/\D/gu, "")));
+
+  const listed = [...expected].sort((a, b) => Number(a.slice(1).replace(/\D/gu, "")) - Number(b.slice(1).replace(/\D/gu, "")));
+  const appeared = found.filter((x) => !listed.includes(x));
+  const cleared = listed.filter((x) => !found.includes(x));
+
+  if (appeared.length > 0) {
+    violations.push({
+      rule: "SP12",
+      file: TRIAGE,
+      spec: "A03 §7a · FINDINGS",
+      message:
+        `${String(appeared.length)} finding(s) read as open and are not on the register's ` +
+        `open set — ${appeared.join(", ")}. The set is what says what is left; a row that ` +
+        `opens without joining it is work nobody can query for.`,
+    });
+  }
+  if (cleared.length > 0) {
+    violations.push({
+      rule: "SP12",
+      file: "tools/enforce/findings.mjs",
+      spec: "A03 §7a · FINDINGS",
+      message:
+        `${String(cleared.length)} entr(y/ies) on the open set no longer read as open — ` +
+        `${cleared.join(", ")}. Compared by equality so the list can only shrink deliberately; ` +
+        `a subset check would let a closed finding sit on it unread.`,
+    });
+  }
+
+  violations.open = found.length;
+  violations.unstated = unstated;
+  violations.rows = rows.size;
   return violations;
 }

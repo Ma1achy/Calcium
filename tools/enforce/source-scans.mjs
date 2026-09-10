@@ -90,8 +90,8 @@ export const SCANS = [
     // `~/.prism` by name and has since survived two renames that would each have
     // retired it in silence: to `~/.calcium`, which no longer contained `prism`,
     // and to `.calcium`, which no longer contains a tilde. **A pattern naming
-    // today's default is a rule with an expiry date nobody wrote down** — A03
-    // §2's vacuity class arriving through a rename rather than through a bad rule.
+    // today's default is a rule with an expiry date nobody wrote down** —
+    // A03 §2's vacuity class arriving through a rename rather than a bad rule.
     //
     // The shape is a quoted string beginning with an optional `~/` and then a
     // dot-name. Relative imports are the near miss and they do not match: `./x`
@@ -100,6 +100,105 @@ export const SCANS = [
       /require\(["']fs["']\)|from\s+["']node:fs["']|["'`](?:~\/)?\.[a-z][a-z0-9._-]*(?:\/|["'`])/,
     scope: "src/interaction/history/", allow: [],
     why: "the filesystem and the state directory are injected (I11, I12): C20 writes through `HistoryFs`, and any hardcoded dot-directory path makes standalone development write beside a real install" },
+
+  // **SS58, and it is two rules because the two halves have different scopes.**
+  //
+  // Cited by `node.ts:4`, `types.ts` and C28 §1, I21 and T2.4 from the day C28
+  // was specified, and absent from this file until now — which is the shape
+  // *ask where a settled claim is written down* exists for. `node.ts`'s own
+  // opening comment says *SS58 bans these everywhere else*, and nothing banned
+  // anything.
+  //
+  // **The first arm** is the process reads: legitimate in exactly one file, and
+  // nowhere else in `src/`. Scoped to `src/` with `node.ts` allow-listed.
+  //
+  // **The second arm** is `performance.mark` and `performance.measure`, scoped
+  // to `src/` with **`allow: []`** — including `node.ts`. The user-timing buffer
+  // those two write to is unbounded and reading it costs 3 µs at zero entries
+  // and 449 µs at 10 000 (C28 I19), so the profiler has no more business filling
+  // it than any other file. **Written as one rule with one allow list it would
+  // have exempted the profiler from the defect it exists to find**, which is
+  // the reason worth carrying rather than the scope.
+  //
+  // **Corpus, measured before the rule was written** (2026-09-07, `src/`, comment
+  // lines excluded as `lineFires` excludes them): arm 1 matches 24 lines in
+  // `node.ts` and **nothing else** — the hits in `types.ts` and `session.ts` are
+  // all prose. Arm 2 matches nothing at all, in code or comment, `node.ts`
+  // included. So arm 1's allowance is exercised (SS53) and arm 2 is a rule over
+  // an empty corpus, which is the state a fabricated violation exists to make
+  // meaningful.
+  { id: "SS58", spec: "C28 I21 · C28 T2.4",
+    pattern:
+      /\b(?:process\.(?:memoryUsage|cpuUsage|resourceUsage)|getActiveResourcesInfo|monitorEventLoopDelay|eventLoopUtilization|PerformanceObserver|getHeapStatistics|getHeapSpaceStatistics|getHeapSnapshot)\b|from\s+["\']node:(?:v8|inspector)["\']/,
+    scope: "src/", allow: ["src/shell/profiling/node.ts"],
+    why: "the process is read in one file and injected everywhere else (C28 I21) — a component that reads memory or the loop directly cannot be unit-tested against a fake, and nothing ambient sits between the reading and the report" },
+
+  // **`C28 T2.4b`, not `T2.4`** (F1046). `profiler-seams.test.ts:1003` is
+  // *T2.4b (C28 I19): SS59's allow list is empty, and node.ts is not exempt
+  // from it*; C28 §10's T2.4 is `(I21)` — SS58's row. Naming a sibling's row
+  // is the citation that resolves against something real and unrelated, which
+  // is SP3's and SP8's shared stated limit.
+  { id: "SS59", spec: "C28 I19 · C28 T2.4b",
+    pattern: /\bperformance\.(?:mark|measure)\b/,
+    scope: "src/", allow: [],
+    why: "nothing under src/ writes the user-timing buffer, node.ts included — it is unbounded and reading it costs 449 µs at 10 000 entries, so the profiler is not exempt from the leak it exists to find" },
+
+  // The first element of a spread — `[...x][0]` — is the whole iterable
+  // allocated to read one member, and it is quadratic the moment `x` is the
+  // remainder of something being walked. `presentation/text.ts` held it twice:
+  // `const ch = [...text.slice(i)][0] ?? ""`, a cursor's read of one code point
+  // from the rest of a row, on every character of every row of every frame —
+  // 53 % of frame work, 3× the flat `codePointAt` read at 40 cells and 1081× at
+  // 400 (F937, F938). Correct, green under every test of both functions, and
+  // found only by measuring: a cost has no failing case, which is why the
+  // durable check is a scan and not a timing row — a timing row is what TRIAGE
+  // group 12 is made of, and C09 T3.77 carries one anyway, with a 20 ms floor
+  // under each operand and a bound midway between linear and quadratic.
+  //
+  // `Array.from(x)[0]` and `.at(0)` are the same read in other spellings. The
+  // `[^;\n]` bound keeps the spread inside one statement, so `[...xs]; b[0][0]`
+  // on one line does not fire.
+  //
+  // **Stated blind spot: the idiom written across two statements** — `const
+  // points = [...s]; points[0]` — which `clusterCells` does over one cluster and
+  // legitimately, because it goes on to read the array whole (`points.some`).
+  // A `for…of` that breaks after its first iteration, and a spread of a
+  // `slice` that is never indexed, are the same allocation and are not seen
+  // either. And the rule is about the *read*: a second per-character scan of
+  // the remainder by some other means is the same order of cost by a different
+  // mechanism and is not this pattern's subject.
+  { id: "SS60", spec: "C09 I60 · C09 T3.77",
+    pattern: /(?:\[\.\.\.[^;\n]*?\]|Array\.from\([^;\n]*?\))\s*(?:\[0\]|\.at\(0\))/,
+    scope: "src/", allow: [],
+    why: "the first element of a spread allocates the whole iterable to read one — a code point is read with codePointAt at the cursor, a first member with .values().next()" },
+
+  // SS61 is SS60's other half: not the first element but *any* — a string
+  // spread indexed as though a code point were a cell. Three readers and two
+  // writers had the shape. `mergedRow` read every layer at column `x` as
+  // `[...row][x]` (F977); the radar's line arm read its label row as
+  // `[...(labels[cy] ?? "")][cx]` (F982); both x-axis caption writers laid
+  // text in with `[...text].forEach((ch, i) => { row[start + i] = ch; })`
+  // after placing it by `cells()` (F985). A family is five code points in two
+  // cells and `図表` two in four, so every cell after the name moved three
+  // left or two right, and the ticks placed for the neighbours stayed where
+  // the cells said. A cell row is read through `rowCells` and written through
+  // `chargrid.ts`'s `write`, which is where the width lives (C09 I65). Corpus
+  // measured after the fix: nothing matches anywhere in `src/`.
+  //
+  // **Stated blind spot**: the same read across two statements — `const chars
+  // = [...text]; … chars[k]` — which is the shape the radar's *writer* had
+  // (F982), the shape the four F976 writers' `for (const ch of text)` loops
+  // had, and also the shape three raster reads legitimately hold
+  // (`ownedSpans`, `lastInkRow`, the box plot's `punch`), where every code
+  // point is one cell at `narrow` by C09 T1.40's set. The rule cannot tell a
+  // raster row from a label row: what separates them is whether the operand
+  // was placed by `cells()`, and that is not textual. And it fires on an
+  // array spread mapped with an index — `[...rows].map((r, i) => …)` — whose
+  // remedy is to drop the copy rather than to allow the line.
+  { id: "SS61", spec: "C12 I119 · C12 T1.140",
+    pattern: /(?:\[\.\.\.[^;\n]*?\]|Array\.from\([^;\n]*?\))\s*(?:\[(?!0\])|\.at\((?!0\))|\.(?:forEach|map)\(\s*\(\s*\w+\s*,\s*\w+)/,
+    scope: "src/", allow: [],
+    why: "a code-point index is not a cell column — a cluster is one cell or two and a joiner none; a cell row is read through rowCells and written through chargrid's write" },
 
   { id: "SS4", spec: "C13 I9 · C13 T2.2 · C14 T2.4",
     pattern: /\b(?:Date\.now|new Date|performance\.now|process\.hrtime|Date)\b/,
@@ -131,7 +230,20 @@ export const SCANS = [
   // (C16 T2.9). One file allowed, one file to check.
   { id: "SS14", spec: "C01 I1 · C01 T2.5",
     pattern: /\\x1b|\\u001b|\u001b/,
-    scope: "src/", allow: ["src/terminal/escapes.ts", "src/interaction/router/decode.ts"],
+    scope: "src/",
+    allow: [
+      "src/terminal/escapes.ts",
+      "src/interaction/router/decode.ts",
+      // The replay comparison's recogniser: it matches bytes a recording already
+      // holds and emits nothing, which is the inverse direction this rule was
+      // never about. Composing the pattern from `escapes.ts` was tried first and
+      // is the better argument — one table, no drift — but MG20 refuses the
+      // edge, because `lifecycle.ts` owns the cursor mode and a second reader of
+      // it is what that rule exists to stop. Two rules each right and impossible
+      // together, exactly as for `decode.ts`. If this file ever writes to a
+      // stream, that is the write path and this entry would hide it.
+      "src/shell/profiling/replay.ts",
+    ],
     why: "escape literals live in one module on the write path; recognising arriving bytes is the inverse direction" },
 
   // A C0 control character written literally into source. An escape, or not at
@@ -538,7 +650,12 @@ export const SCANS = [
   //
   // The pattern names the declarations rather than the calls, so importing
   // either owner is fine and writing a second is not.
-  { id: "SS30", spec: "C18 I11 · C18 T2.3 · C18 T2.10 · C19 T2.4 · C05 I18 · C05 T2.9",
+  { id: "SS30", spec: "C18 I11 · C18 I23 · C18 T2.3 · C18 T2.10 · C19 T2.4 · C05 I18 · C05 T2.9",
+    // **`C18 I23` was missing and the `why` below already named it.** The rule
+    // began as the tokeniser rule and grew a quoter and a distance-2 suggester;
+    // the pattern grew with it and the citation did not, so I23 — *there is
+    // exactly one implementation, as there is exactly one tokeniser* — was
+    // enforced completely by a rule that named its sibling and not it (F930).
     pattern:
       /^(?:export\s+)?(?:async\s+)?function\s+(?:tokenis[ez]e?|lex|shellSplit|quoteArg|shellQuote|quote|levenshtein|editDistance|distance)\b/m,
     scope: "src/",
@@ -610,7 +727,17 @@ export const SCANS = [
   // Moved here from eslint's `no-console`, and stronger for it: this catches
   // console.error and console.warn, which the lint rule did not, and it cannot
   // fall silent because a parser could not read the file.
-  { id: "SS33", spec: "C01 I8 · A04",
+  // **Retargeted from `C01 I8` to `C01 I9`, which A03's table has said all
+  // along** (F1046, and F934's SS37 exactly). I8 is about `release()` while
+  // suspended releasing the redirection without emitting sequences; **I9** is
+  // *stdout is redirected at construction; every write not made through
+  // `writer` goes to the debug sink* — this rule's `why` word for word. The
+  // ruling was on the record before the rule was written and no instrument
+  // joins the two records, which is the finding rather than the citation.
+  // `A04` gains its section for the same reason: A03 says `A04 §2`, which is
+  // *Dependency posture*, and it is why the check moved off eslint's
+  // `no-console` — a rule that cannot fall silent because a parser choked.
+  { id: "SS33", spec: "C01 I9 · A04 §2",
     pattern: /\bconsole\.\w+/,
     scope: "src/", allow: [],
     why: "C01 owns stdout; a stray write is captured to the debug log, but it should not exist" },
@@ -700,7 +827,7 @@ export const SCANS = [
   //
   // The `=` is what makes this a prop rather than prose: `color={style}` and
   // `color="red"` both match, a comment about colour does not.
-  // **A hyphen before it is an SVG attribute and not a prop** (§3ak.37). `\b`
+  // **A hyphen before it is an SVG attribute and not a prop** (C12 §3ak.37). `\b`
   // matches at the `c` of `stop-color=`, because `-` is a non-word character —
   // so the second arm's colour key, which writes `<stop stop-color="#440154"/>`,
   // read as an Ink prop discarding a depth tag. There is no other spelling: a
@@ -709,7 +836,19 @@ export const SCANS = [
   // **The lookbehind is narrower than a file exemption and that is the point.**
   // Allowing `svg.ts` would blind the rule to a real `color=` in the file most
   // likely to grow one.
-  { id: "SS37", spec: "C09 I4 · C09 T2.17",
+  // **This was ruled on, and the ruling never reached here** (F934). A03's
+  // table has said `C09 I15, T2.17` since the audit's third-kind pass, and
+  // `COMMITMENT_INVARIANT_AUDIT.md` §"A third kind of A03 defect" states it in
+  // words — *SS37 declared C09 I4 while its behaviour is C09 I15* — and names
+  // the class: *both fire correctly and always did; both were mislabelled, and
+  // every previous check read the label rather than the target.* The prose was
+  // corrected in two documents and the `spec` string this line holds was not,
+  // because nothing joins A03's Declared column to it. I4 is *no renderer
+  // emits a colour directly; styling comes from `resolve` against a declared
+  // palette slot*, a claim about where a colour comes from; I15 is *no
+  // renderer sets an Ink colour prop*, which is this pattern word for word,
+  // and it is what the `why` below describes.
+  { id: "SS37", spec: "C09 I15 · C09 T2.17",
     pattern: /(?<![\w-])(?:color|backgroundColor)\s*=/,
     scope: "src/presentation/", allow: [],
     why: "renderers emit SGR from terminal/escapes.ts; an Ink colour prop discards the depth tag" },
@@ -797,10 +936,10 @@ export const SCANS = [
   // --- SS46 — who may append with `origin: "refresh"` -----------------------
   //
   // **C23 §3b claimed one producer and there were four**, and the sentence read
-  // as a guarantee while constraining nothing. §3a's row now says what the value
-  // means rather than which mechanism sets it — *provenance, not mechanism*: a
-  // system notice with no user behind it. The four that qualify are C13's cap
-  // marker, C22's two startup warnings, and C23's identity notice.
+  // as a guarantee while constraining nothing. C23 §3a's row now says what the
+  // value means rather than which mechanism sets it — *provenance, not
+  // mechanism*: a system notice with no user behind it. The four that qualify
+  // are C13's cap marker, C22's two startup warnings, and C23's identity notice.
   //
   // A claim about a set wants a check or it is re-made by the next reader who
   // greps one site. The allow-list is the set, so a fifth append fails here
@@ -830,7 +969,10 @@ export const SCANS = [
   // `renderSequenceToLines` directly, or by aliasing `paint` through a variable,
   // passes — this catches the shape someone would actually write, which is the
   // old `#render()` body pasted somewhere new, and not a determined evasion.
-  { id: "SS48", spec: "C22 I54 · C24 I25",
+  // `FINDINGS F126` added to match A03 (F1046): both C22 I54 and C24 I25 cite
+  // F126 as this rule's provenance, so the code named the invariants and
+  // dropped the finding they were written from.
+  { id: "SS48", spec: "C22 I54 · C24 I25 · FINDINGS F126",
     pattern: /(?<![\w.])paint\s*\(/,
     scope: "src/shell/",
     allow: ["src/shell/render-frame.ts", "src/shell/paint.ts"],
@@ -1078,7 +1220,14 @@ export const SCANS = [
     ],
     why: "one grammar for a notice — composed in `documents.ts`, never a hand-composed `kind: \"notice\"` or a `b.notice.warn`/`.error` call outside it (C23 I61, F827); a site that rolls its own chooses its own glyph and the ones that forgot produced no entry at all" },
 
-  { id: "SS35", spec: "C04 §4 · C05 §2",
+  // **Retargeted from `C04 §4 · C05 §2` to `C04 I26`** (F1046). C04 I26 is
+  // *`Result` is declared here and nowhere else in the tree — two shapes under
+  // one name in one layer half compile and diverge quietly*, which is this
+  // row's `why` word for word, and C04's commitment 31 already said *enforced
+  // by SS35*. The old pair is the sharper half of the finding: **C04 §4 exists
+  // and is `Patches`**, so SP8 resolved the citation and had no opinion about
+  // its aim — the blind spot that rule states, arriving on the rule table.
+  { id: "SS35", spec: "C04 I26",
     pattern: /^\s*(?:export\s+)?type Result\s*[<=]/m,
     scope: "src/", allow: ["src/data/viewmodel/types.ts"],
     why: "one Result in the tree; two shapes under one name in one layer half compile and diverge quietly" },

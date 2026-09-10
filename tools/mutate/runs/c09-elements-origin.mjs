@@ -41,7 +41,8 @@ const results = runPass({
   run,
   control: {
     file: REG,
-    from: "  measure = (block: Block, width: number): number => this.#measured(block, normaliseWidth(width)).rows;",
+    // Two lines since C09 I61: every public member opens the call's memo through `#scoped`.
+    from: "  measure = (block: Block, width: number): number =>\n    this.#scoped(() => this.#measured(block, normaliseWidth(width)).rows);",
     to: "  measure = (): number => 1;",
     why: "every kind's height collapsed to one row, which every offset in the lifted list depends on",
   },
@@ -67,7 +68,8 @@ const results = runPass({
       // which is what `row = before` did for a column group and a panel.
       name: "the sequence cursor does not advance",
       file: REG,
-      from: "        row += this.measure(block, atWidth);\n",
+      // The cursor asks through the child seam since C09 I61 (`#measureChild` reads the call's memo).
+      from: "        row += this.#measureChild(block, atWidth);\n",
       to: "",
       expect: "T2.31",
     },

@@ -21,7 +21,8 @@
 // about. The fabricated violation catches the first, the scope check the
 // second, the existence check the third; no one of them catches the others,
 // which is why all three are here (A03 §2, commitment 14).
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, globSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { PLOT_UNIONS } from "../../src/data/viewmodel/validate.js";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -34,6 +35,9 @@ import {
   MODULE_GRAPH_RULES,
   checkExportedArguments,
   checkFunctionConsumers,
+  checkPlotUnions,
+  plotByReferenceMembers,
+  checkSpanNamesOpened,
   checkBuilderCoverage,
   checkSeamConsumers,
   publicSurfaceUseSignal,
@@ -65,6 +69,29 @@ import { COMPONENT_SOURCES, defaultIsImplemented } from "../../tools/enforce/tod
 
 /** A file that must fail `rule`, at a path inside its scope. */
 type Fabrication = { rule: string; file: string; source: string };
+
+/**
+ * Rules that are a specific invariant's mechanical form — **C24 T2.19 (I25)**.
+ *
+ * A `spec` string on the rule's registration is where these already lived, and
+ * it is data rather than a row: SP9 asks whether an invariant is *named by a
+ * test row*, and the answer for both of these was no while the check was
+ * complete. Compared by equality in the row below.
+ */
+const RULE_INVARIANTS: Readonly<Record<string, string>> = {
+  // `FINDINGS F126` added with the rule's own `spec` (F1046): A03's Declared
+  // column has carried it since the rule landed and the code had not.
+  SS48: "C22 I54 · C24 I25 · FINDINGS F126",
+  SS37: "C09 I15 · C09 T2.17",
+  SS13: "C14 I11 · C14 T2.4",
+  MG15: "C17 I10 · C17 I14 · C17 T2.6",
+  SS30: "C18 I11 · C18 I23 · C18 T2.3 · C18 T2.10 · C19 T2.4 · C05 I18 · C05 T2.9",
+  MG17: "C19 I12 · C19 T2.5",
+  SS9: "C20 I11 · C20 I12 · C20 T2.4",
+  MG23: "C23 §2 · C23 I14 · A02 Seam 4",
+  SS60: "C09 I60 · C09 T3.77",
+  SS61: "C12 I119 · C12 T1.140",
+};
 
 /**
  * One per implemented scan and module-graph rule. Each source is the smallest
@@ -109,6 +136,75 @@ const FABRICATED: readonly Fabrication[] = [
     source: 'const STATUSES = ["running", "failed", "queued"];',
   },
   { rule: "SS23", file: "src/presentation/blocks/text.ts", source: "const w = label.length;" },
+  {
+    // Copied from the real call site, per the standing rule: this is the line
+    // `node.ts` legitimately holds, placed in a file that may not hold it.
+    rule: "SS58",
+    file: "src/viewport/viewport/viewport.ts",
+    source: "const mem = process.memoryUsage();",
+  },
+  {
+    // The import half, which the accessor pattern does not cover — a file can
+    // name `node:inspector` and call nothing on it yet.
+    rule: "SS58",
+    file: "src/shell/execution.ts",
+    source: 'import { Session } from "node:inspector";',
+  },
+  {
+    // **Fabricated inside the file SS58 excuses**, which is the only placement
+    // that distinguishes the two arms: anywhere else both fire, and here only
+    // this one does. SS59's allow list is empty for the reason its `why` gives.
+    rule: "SS59",
+    file: "src/shell/profiling/node.ts",
+    source: 'performance.mark("frame");',
+  },
+  {
+    // **Copied from `text.ts:203` as it shipped** (F937), per commitment 14a:
+    // the cursor's read of one code point from the remainder of a row, on every
+    // character of every row of every frame. Fabricated at the file that held
+    // it, because SS60's allow list is empty and the rule has to fire there.
+    rule: "SS60",
+    file: "src/presentation/text.ts",
+    source: 'const ch = [...text.slice(i)][0] ?? "";',
+  },
+  {
+    // The same read spelled without a spread. No call site to copy — the tree
+    // never wrote it — so this is the rule's own alternative, and the row that
+    // proves the scan is not the spread's regex tested against itself is the
+    // control below, which is silent on a spread the code reads whole.
+    rule: "SS60",
+    file: "src/presentation/text.ts",
+    source: "const ch = Array.from(text.slice(i))[0] ?? \"\";",
+  },
+  {
+    // And `.at(0)`, the third spelling, at a file outside `presentation/` so
+    // the scope is shown to be `src/` and not the one file the finding named.
+    rule: "SS60",
+    file: "src/shell/paint.ts",
+    source: "const first = [...row].at(0) ?? \" \";",
+  },
+  {
+    // **Copied from `circle.ts:815` as it shipped** (F982), per commitment 14a:
+    // the radar line arm's read of its label row by code point, with the
+    // nested index the lazy bound has to reach past.
+    rule: "SS61",
+    file: "src/presentation/plot/circle.ts",
+    source: 'const label = [...(labels[cy] ?? "")][cx];',
+  },
+  {
+    // **Copied from `axes.ts:867` as it shipped** (F985): the caption writer's
+    // shape — placed by `cells()`, then written one code point per cell.
+    rule: "SS61",
+    file: "src/presentation/plot/axes.ts",
+    source: "[...text].forEach((ch, i) => { row[start + i] = ch; });",
+  },
+  {
+    // And `.at(i)` over `Array.from`, at a file outside `presentation/` so the
+    // scope is shown to be `src/` and not the directory the findings named.
+    rule: "SS61",
+    file: "src/shell/paint.ts",
+    source: "const glyph = Array.from(row).at(col) ?? \" \";",
+  },
   {
     // SS40's own violation, and the reason it is not SS23 widened. The same
     // expression in the editor wants a different answer: `cells()` is a display
@@ -699,6 +795,17 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       // allow-list rather than about the tree, and that half needs two runs of
       // the same fixture with different lists.
       "MG25",
+      // MG30 likewise: its corpus is a union declaration in one file measured
+      // against call sites in every other, so a fabrication is a *set* — the
+      // union plus the files that do and do not open its members.
+      "MG30",
+      // MG31 likewise, and for MG30's reason with the halves swapped: the
+      // declaration it reads is a *type* in one file and the table it compares
+      // against is a frozen object in another, so a fabrication is a pair of
+      // files. Its own rows below, and both directions of the equality are
+      // driven — a union the table omits, and a table entry the type does not
+      // declare.
+      "MG31",
       // SS47 likewise: its subject is a string literal's contents rather than a
       // line, and its exemptions carry reasons the shared shape has nowhere to put.
       "SS47",
@@ -810,6 +917,209 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     expect(named, "a supplied field is consumed; an unsupplied one is not").toEqual([
       "Grid.dots",
     ]);
+  });
+
+  it("MG24 does not read a parameter or a local's TYPE as a construction (F1027)", () => {
+    // **The record arm's test was the text `name:`, and that form is neither
+    // necessary nor sufficient.** Not sufficient here: `rungRows(spec, available:
+    // number)` annotates a parameter and builds nothing, and it answered for
+    // `HeapSpace.available` two components away. **6691 of the 18551 `name:`
+    // sites under `src/` sit outside any object literal** — a parameter list, an
+    // array, a local's type — and the arm counted every one as a construction.
+    //
+    // Five published members were in that state when this row was written:
+    // `Grid.mask`, `SankeyLayout.fits`, `EntryRun.indent`, `HeapSpace.available`,
+    // `PhaseRow.ms`. F218 is the instance that made the *other* direction loud —
+    // a `let blocked` failing the build on an undrawn glyph — and that direction
+    // is the cheap one. This one is silent.
+    const decl = "export type HeapSpace = Readonly<{\n  available: number;\n}>;\n";
+    const fired = (consumer: string): readonly string[] => {
+      const files: Record<string, string> = {
+        "src/shell/profiling/node.ts": decl,
+        "src/presentation/plot/definition.ts": consumer,
+      };
+      return checkSeamConsumers(Object.keys(files), (f) => files[f] ?? "", {}).map(
+        (v) => v.message.split(" ")[0] ?? "",
+      );
+    };
+
+    // The fabricated violation: the only `available:` in the tree annotates a
+    // parameter, so the member has no consumer and must be reported.
+    expect(
+      fired("function rungRows(spec: RungSpec, available: number): number {\n  return 1;\n}\n"),
+      "a parameter annotation builds nothing",
+    ).toEqual(["HeapSpace.available"]);
+
+    // **F218's own shape, and the fixture has to be the one it happened in.**
+    // Written first as a top-level `let`, this assertion survived the mutation
+    // that disables the binding-keyword test — because a top-level binding is
+    // outside every brace and the enclosing-bracket test already excludes it.
+    // The two readings agree exactly where the convenient fixture puts them.
+    // Inside a function body they do not: the body **is** a brace, and the
+    // keyword is the only thing left. That is where `let blocked` sat.
+    expect(
+      fired("function draw(): void {\n  let available: number | null = null;\n  void available;\n}\n"),
+      "nor does a local's type inside a body",
+    ).toEqual(["HeapSpace.available"]);
+
+    // **The control, and the row is vacuous without it.** If the two above fired
+    // because the corpus was empty rather than because the site was an
+    // annotation, a real construction would fire too — and it does not.
+    expect(fired("const s = { available: 4 };\n"), "a built member is still consumed").toEqual([]);
+  });
+
+  it("MG24 reads `{ …, name }` as a construction — a record built with no colon (F1027)", () => {
+    // **The other half: `name:` is not necessary either.** `{ ...layout,
+    // callouts }` builds the member in ES2015 shorthand, and the arm was blind
+    // to 538 such sites. Three allow-list entries were held open by that
+    // blindness — `Plot.graphLayout`, `ToolDef.oneShot`,
+    // `CompletionResult.superseded` — each reported unconsumed, correctly by
+    // accident, while a file two directories away built it.
+    const decl = "export type Layout = Readonly<{\n  callouts?: ReadonlyMap<number, string>;\n}>;\n";
+    const fired = (consumer: string): readonly string[] => {
+      const files: Record<string, string> = {
+        "src/presentation/plot/furniture.ts": decl,
+        "src/presentation/plot/definition.ts": consumer,
+      };
+      return checkSeamConsumers(Object.keys(files), (f) => files[f] ?? "", {}).map(
+        (v) => v.message.split(" ")[0] ?? "",
+      );
+    };
+    const signature =
+      "function withCallouts(layout: Layout, callouts: ReadonlyMap<number, string>): Layout {\n";
+
+    expect(fired(`${signature}  return { ...layout, callouts };\n}\n`), "shorthand builds it")
+      .toEqual([]);
+
+    // **The control that makes the line above mean something**, and it is the
+    // reason both halves had to land together: drop the shorthand and the
+    // parameter annotation is *all* that is left. Under the old arm that
+    // annotation cleared the member, so a row asserting only the line above
+    // would have passed against the defect as well as against the fix.
+    expect(fired(`${signature}  return layout;\n}\n`), "the annotation alone does not").toEqual([
+      "Layout.callouts",
+    ]);
+  });
+
+  it("MG24's construction scan is not fooled by an import clause or a template hole (F1027)", () => {
+    // Both were measured against the tree rather than imagined. A named import
+    // clause looks exactly like an object literal — `import { luminance, ratio }
+    // from "./contrast.js"` cleared `VerbRatio.ratio`, a *function* export three
+    // layers away standing in for a member built nowhere. And a `${…}` hole is
+    // code inside a string, so `${subject}` in a message template read as a
+    // shorthand property of `Finding`.
+    const decl = "export type VerbRatio = Readonly<{\n  ratio: number;\n}>;\n";
+    const fired = (consumer: string): readonly string[] => {
+      const files: Record<string, string> = {
+        "src/data/fixtures/provenance.ts": decl,
+        "src/presentation/plot/field.ts": consumer,
+      };
+      return checkSeamConsumers(Object.keys(files), (f) => files[f] ?? "", {}).map(
+        (v) => v.message.split(" ")[0] ?? "",
+      );
+    };
+
+    expect(fired('import { luminance, ratio } from "../theme/contrast.js";\n'), "an import clause")
+      .toEqual(["VerbRatio.ratio"]);
+    expect(fired("function m(ratio: number): string {\n  return `${ratio} of a core`;\n}\n"), "a hole")
+      .toEqual(["VerbRatio.ratio"]);
+
+    // **A template nested inside a hole, which is the case the hole tracking is
+    // actually for** — and the row above is not it. Disabling the `${…}` push
+    // failed nothing against the two assertions above, because a template's text
+    // is skipped either way. What it breaks is `paint.ts:523`: an inner backtick
+    // read as *closing* the outer template puts the rest of the line in code
+    // mode, and `${seq}${base}` then reads as two shorthand properties. Measured
+    // over `src/`: **8 spurious names across 4 files, and one file that stops
+    // balancing** (`tokenise.ts`). A mutation that fails nothing is a finding
+    // about the row, and this is the row it produced.
+    const nested =
+      "function based(line: string, base: string): string {\n" +
+      "  return `${base}${line.replace(RE, (ratio) => `${ratio}${base}`)}`;\n" +
+      "}\n";
+    expect(fired(nested), "an inner template does not open code").toEqual(["VerbRatio.ratio"]);
+
+    // The control: the same two files, with one real construction added. If the
+    // fixture could not clear the member at all, none of the assertions above
+    // would be about the scan.
+    expect(fired("const v = { ratio: 0.5 };\n"), "and a literal still clears it").toEqual([]);
+  });
+
+  it("MG24 reports a file whose construction scan did not balance (F1027)", () => {
+    // **A bracket stack is a failure mode the text test did not have**, so the
+    // rule says how far it got rather than degrading quietly. A regex literal
+    // carrying `[{,(` unbalances a naive scan, and so does `densities[i]! / maxD`
+    // — TypeScript's non-null assertion makes a division look like a regex
+    // opening, fifteen times in `kde.ts` alone. Both are handled; a file that
+    // still does not balance falls back to the old loose test rather than being
+    // accused on a reading known to be wrong, and this is what stops the
+    // fallback being silent. It is 0 of 371 files on the real tree.
+    const files: Record<string, string> = {
+      "src/a.ts": "export type T = Readonly<{\n  q: number;\n}>;\n",
+      "src/b.ts": "const x = {\n  q: 1,\n",
+    };
+    const violations = checkSeamConsumers(Object.keys(files), (f) => files[f] ?? "", {});
+
+    expect(
+      violations.map((v) => v.message).filter((m) => m.includes("did not balance")),
+      "the fallback names itself",
+    ).toHaveLength(1);
+    expect(
+      violations.map((v) => v.message.split(" ")[0]).filter((n) => n === "T.q"),
+      "and the member keeps the loose verdict rather than a wrong strict one",
+    ).toEqual([]);
+
+    // The control: balanced, and the report is gone. Without it the row cannot
+    // tell a working scan from one that reports on every file.
+    const ok: Record<string, string> = {
+      ...files,
+      "src/b.ts": "const x = {\n  q: 1,\n};\nvoid (a[0]! / b);\n",
+    };
+    expect(
+      checkSeamConsumers(Object.keys(ok), (f) => ok[f] ?? "", {}).map((v) => v.message),
+      "a non-null assertion beside a division is not a regex",
+    ).toEqual([]);
+  });
+
+  it("MG24's equality arm is not satisfied by a homonym, so an exemption keeps its reason", () => {
+    // **The third state the arm's message does not name.** It offers *wired now
+    // or gone*; the real disposition here is *still unconsumed, with a homonym
+    // elsewhere masking it*, and four listed entries were in it at once —
+    // `contexts.fork(…)` retiring `Rng.fork`, `cpu.user` retiring
+    // `Identity.user`. Following the message deletes a written reason and stops
+    // tracking a member that genuinely has no consumer.
+    //
+    // The arm therefore requires the consuming file to name the **owning type**.
+    // That is textually the first tightening A03 records as refused, and the arm
+    // is the difference: on the violation arm a false verdict accuses and cost
+    // 19 false accusations; here a false *still unconsumed* keeps an exemption
+    // one release too long while a false *stale* destroys a reason.
+    const decl =
+      "export interface Rng {\n" + "  next(): number;\n" + "  fork(seed: number): Rng;\n" + "}\n";
+    const listed = { "Rng.fork": "a capability the spec commits to with no caller" };
+    const stale = (consumer: string): readonly string[] => {
+      const files: Record<string, string> = {
+        "src/data/fixtures/rng.ts": decl,
+        "src/other.ts": consumer,
+      };
+      return checkSeamConsumers(Object.keys(files), (f) => files[f] ?? "", listed)
+        .filter((v) => v.message.includes("UNCONSUMED_MEMBERS names"))
+        .map((v) => v.message.split(" ")[2] ?? "");
+    };
+
+    // The fabricated violation: a real consumer, in a file that names the owner.
+    expect(stale('import type { Rng } from "./rng.js";\nr.fork(1);\n')).toEqual(["Rng.fork,"]);
+
+    // The third state — the same access, from a file that never mentions `Rng`.
+    expect(stale("contexts.fork(() => 1);\n")).toEqual([]);
+
+    // **The control, and the row is vacuous without it.** If the line above
+    // passed because the corpus was empty rather than because the owner test
+    // fired, adding a mention of `Rng` to the *same* file would change nothing.
+    expect(
+      stale('import type { Rng } from "./rng.js";\ncontexts.fork(() => 1);\n'),
+      "the owner named in the same file retires it again",
+    ).toEqual(["Rng.fork,"]);
   });
 
   it("MG24 reads a member on any line, so formatting does not decide what is watched", () => {
@@ -974,6 +1284,77 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       read: (f: string) => all[f] ?? "",
     };
   };
+
+  it("T2.2 (C24 I1): the scan is over the UNION of consumers, not over either alone", () => {
+    /**
+     * **Neither consumer alone exercises the whole surface** — the docker app
+     * touches no `spectrum`, no `WorldDriver` and only part of the manifest
+     * schema — so a signal computed against one would list a member the other
+     * needs and someone would remove it. The union is the claim, and it is the
+     * one property none of the five rows below reaches: every one of them
+     * passes a single app.
+     */
+    const { src, examples, read } = surfaceFiles(
+      'export type { Panel } from "./a.js";\n',
+      {
+        "src/a.ts":
+          "export type Panel = Readonly<{ width: number; footer: string; spectrum: string }>;\n",
+      },
+      {
+        "examples/docker/main.ts": "const p = { width: 40 };\n",
+        "examples/plots/main.ts": "const q = { footer: 'x' };\n",
+      },
+    );
+
+    const s = publicSurfaceUseSignal(src, examples, read);
+    expect(s.candidates.sort(), "named by either app is named — only `spectrum` is named by neither").toEqual([
+      "Panel.spectrum",
+    ]);
+
+    // **The control that makes it the union and not the first app.** Drop the
+    // second consumer and `footer` becomes a candidate — which is the removal a
+    // one-app scan would have argued for.
+    const alone = publicSurfaceUseSignal(src, ["examples/docker/main.ts"], read);
+    expect(alone.candidates.sort(), "one app alone lists what the other uses").toEqual([
+      "Panel.footer",
+      "Panel.spectrum",
+    ]);
+  });
+
+  it("T2.20 (C24 I11): the surface signal is reported and never gated", () => {
+    /**
+     * **A reported signal, not a build gate**, because the other side of the
+     * union lives in another repository and is refreshed on a version bump —
+     * so a red build here would depend on a tree this one does not contain.
+     *
+     * The proof is in the runner rather than in a fixture: `index.mjs` computes
+     * the signal after the violation set is closed and never adds to it, and
+     * enforce exits 0 today with a residue in the hundreds. A row asserting
+     * only "the function returns candidates" would pass equally on a gate.
+     */
+    const runner = readFileSync("tools/enforce/index.mjs", "utf8")
+      .replace(/\/\*[\s\S]*?\*\//gu, "")
+      .replace(/(^|[^:])\/\/.*$/gmu, "$1");
+
+    const call = runner.indexOf("publicSurfaceUseSignal(");
+    expect(call, "the signal is computed").toBeGreaterThan(0);
+    expect(runner.indexOf("if (violations.length === 0)"), "after the violation set is closed").toBeGreaterThan(call);
+
+    const assigned = /const (\w+) = publicSurfaceUseSignal\(/u.exec(runner)?.[1];
+    expect(assigned, "and held in a local").toBeDefined();
+    expect(
+      runner.match(new RegExp(`violations\\.push\\([^)]*\\b${assigned ?? "?"}\\b`, "gu")),
+      "which never reaches `violations`",
+    ).toBeNull();
+
+    // **And the residue is non-empty**, so the absence above is a decision
+    // rather than a tree with nothing to report — the vacuity this file's own
+    // rules are written against.
+    const files = globSync("src/**/*.ts").filter((f) => !f.endsWith(".d.ts"));
+    const apps = globSync("examples/**/*.ts").filter((f) => !f.endsWith(".d.ts"));
+    expect(apps.length, "both consumers are here to be read").toBeGreaterThan(10);
+    expect(publicSurfaceUseSignal(files, apps).candidates.length, "a residue enforce stays green with").toBeGreaterThan(0);
+  });
 
   it("48: a name collision can only CLEAR, so the residue under-reports and cannot over-report", () => {
     // **The founding cell, and it is F160 inverted.** MG24's verdict is
@@ -1238,7 +1619,113 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     ).toBe(true);
   });
 
-  it("MG27 fires: a block field no builder sets, and the reason list expires", () => {
+  it("MG27 reads every builder file, not a pair named by hand (F1028)", () => {
+    // **The rule opened `types.ts` and `builders/index.ts`, and `figure.ts` is a
+    // builder.** What that cost is F263: ten `BUILDER_OMISSIONS` entries whose
+    // reason — *shorthand lands in step 11* — was true about `b.plot` and was
+    // not the claim the rule enforces, which is *buildable by nothing public*.
+    // A grep answering *is it in this file* read as *is it reachable*.
+    //
+    // Re-derived here rather than restated: the list is **7 entries** today and
+    // **none of them is a `plot.*`**, because F263 removed the ten. What did
+    // **not** change is the scope, so this row is about the mechanism and not
+    // about its symptoms.
+    const types = [
+      "export type Gap = Readonly<{ gapBefore?: boolean }>;",
+      "export type Widget = Readonly<{",
+      '  kind: "widget";',
+      "  id: string;",
+      "  shown: string;",
+      "  viaFigure: number;",
+      "}> & Gap;",
+      "",
+      // **The lookup, not the union** (C04 I119). MG27 reads
+      // `KnownBlockKinds` because `Block` became an indexed access an app can
+      // join; a fabrication still written in the old shape drives a reader
+      // that no longer exists.
+      "export type KnownBlockKinds = {",
+      "  widget: Widget;",
+      "};",
+      "",
+    ].join("\n");
+    const index = [
+      "function finish(spec, opts, gapDefault) { return gapBefore; }",
+      "function widget(spec) {",
+      '  return finish({ kind: "widget", id: idOf(spec), shown: spec.shown }, spec, true);',
+      "}",
+    ].join("\n");
+    // A second builder, written the way `figure.ts` is: a class, no `finish<`,
+    // and its construction reached through `.build()`.
+    const figure = [
+      "export class WidgetBuilder {",
+      "  private viaFigure_?: number;",
+      "  setViaFigure(n: number): this { this.viaFigure_ = n; return this; }",
+      "  build(): Widget {",
+      '    return { kind: "widget", id: "x", shown: "y", viaFigure: this.viaFigure_ };',
+      "  }",
+      "}",
+    ].join("\n");
+
+    const read = (f: string): string =>
+      f.endsWith("types.ts") ? types : f.endsWith("index.ts") ? index : figure;
+    const fields = (files: readonly string[]): readonly (string | undefined)[] =>
+      checkBuilderCoverage([...files], read, {}, {}).map(
+        (v) => v.message.match(/`(\w+)` and no builder/u)?.[1],
+      );
+
+    // **The fabricated violation**: the field only the second builder sets, with
+    // the second builder outside the walk. This is what the rule reported for
+    // ten entries.
+    expect(
+      fields(["src/data/viewmodel/types.ts", "src/shell/builders/index.ts"]),
+      "unreachable, when the file that reaches it is not read",
+    ).toEqual(["viaFigure"]);
+
+    // **The control**, and the row is vacuous without it: the same tree with the
+    // file in it. If the fixture could not clear `viaFigure` at all, the line
+    // above would be about the fixture rather than about the scope.
+    expect(
+      fields([
+        "src/data/viewmodel/types.ts",
+        "src/shell/builders/index.ts",
+        "src/shell/builders/figure.ts",
+      ]),
+      "and reachable once the directory is the authority",
+    ).toEqual([]);
+
+    // **The split control — the file scope must not buy coverage-by-mention.**
+    // MG27's whole correction was that a builder's text names a field three
+    // times and only the constructed literal sets it. A second file read whole
+    // would undo that, so a `figure.ts` that names the field *above* its
+    // literal and does not set it must still fire. `figure.ts` has no `finish<`,
+    // so the split falls back to the block's own `kind:` line.
+    const mentionsOnly = [
+      "export class WidgetBuilder {",
+      "  private viaFigure_?: number;",
+      "  setViaFigure(viaFigure: number): this { this.viaFigure_ = viaFigure; return this; }",
+      "  build(): Widget {",
+      '    return { kind: "widget", id: "x", shown: "y" };',
+      "  }",
+      "}",
+    ].join("\n");
+    const readMention = (f: string): string =>
+      f.endsWith("types.ts") ? types : f.endsWith("index.ts") ? index : mentionsOnly;
+    expect(
+      checkBuilderCoverage(
+        [
+          "src/data/viewmodel/types.ts",
+          "src/shell/builders/index.ts",
+          "src/shell/builders/figure.ts",
+        ],
+        readMention,
+        {},
+        {},
+      ).map((v) => v.message.match(/`(\w+)` and no builder/u)?.[1]),
+      "a parameter named for the field is not a builder setting it",
+    ).toEqual(["viaFigure"]);
+  });
+
+  it("T2.18 (C24 I20): MG27 fires — a block field no builder sets, and the reason list expires", () => {
     // **Fabricated from the real first run**, where the three below came back:
     // `patch.collapsedAfter` (filed as F41 by a consumer who wanted it),
     // `patch.actions` and `table.sort` (found by this rule and nothing else).
@@ -1267,9 +1754,10 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       "  excused: boolean;",
       "}> & Gap & Floor;",
       "",
-      "export type Block =",
-      "  | Rule",
-      "  | Widget;",
+      "export type KnownBlockKinds = {",
+      "  rule: Rule;",
+      "  widget: Widget;",
+      "};",
       "",
     ].join("\n");
 
@@ -1363,7 +1851,184 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     ).toBe(true);
   });
 
-  it("MG25 fires: an exported function no other file in src/ names", () => {
+  // --- MG31 (C04 I118, F213, F1076) ---------------------------------------
+  //
+  // A fabricated tree in both directions and a control, because a rule that
+  // compares two declarations agrees with everything when it can parse neither.
+  const plotTree = (members: string, table: string): Record<string, string> => ({
+    "src/data/viewmodel/types.ts": `export type Plot = Readonly<{\n  form: PlotForm;\n${members}}>;\n`,
+    "src/data/viewmodel/validate.ts":
+      `export const PLOT_UNIONS: Readonly<Record<string, readonly (string | false)[]>> = Object.freeze({\n${table}});\n`,
+  });
+  const runPlotUnions = (tree: Record<string, string>): ReturnType<typeof checkPlotUnions> =>
+    checkPlotUnions(Object.keys(tree), (f: string) => tree[f] ?? "");
+
+  it("T2.128 (C04 I118, MG31) fires: a union in the type that the table does not carry", () => {
+    // **The shape the rule exists for.** `Plot` gained a union member and no
+    // membership rule reached it — eight members were in this state when the
+    // table was written, five of them named in no document (F1076).
+    const v = runPlotUnions(plotTree(
+      '  legend?: "above" | "below";\n  plotFrame?: "box" | "rule";\n',
+      '  legend: Object.freeze(["above", "below"]),\n',
+    ));
+    expect(v).toHaveLength(1);
+    expect(v[0]?.rule).toBe("MG31");
+    expect(v[0]?.message, "names the member").toContain("`plotFrame` is a union in the type and not in the table");
+    expect(v[0]?.message, "and not the one that is fine").not.toContain("`legend` is a union");
+  });
+
+  it("T2.128 (MG31) fires the other way: a table entry naming no union, and a values disagreement", () => {
+    // **Both directions, because a subset check is silent about the other**
+    // (F1076). A table entry with no subject is a rule that cannot be violated,
+    // and a union that gains a value the table has not heard of is refused by a
+    // gate that thinks it is doing its job.
+    const v = runPlotUnions(plotTree(
+      '  legend?: "above" | "below" | "left";\n',
+      '  legend: Object.freeze(["above", "below"]),\n  ghost: Object.freeze(["x"]),\n',
+    ));
+    expect(v).toHaveLength(1);
+    expect(v[0]?.message).toContain('`legend` admits "above", "below", "left" in the type and "above", "below" in the table');
+    expect(v[0]?.message).toContain("`ghost` is in the table and is not a string-literal union");
+  });
+
+  it("T2.128 (MG31) control: agreement is silent, and `false` survives the round trip", () => {
+    // The control says the fixture can be seen at all — and carries `false`,
+    // because three of `Plot`'s unions admit it and a reader that quoted it
+    // would disagree with the type on all three while looking correct.
+    expect(runPlotUnions(plotTree(
+      '  legend?: "above" | false;\n',
+      '  legend: Object.freeze<readonly (string | false)[]>(["above", false]),\n',
+    ))).toEqual([]);
+  });
+
+  it("T2.128 (MG31) reports rather than passes when it cannot parse either side", () => {
+    // A03 §2's vacuity class, asked of this rule: two declarations it cannot
+    // find agree perfectly.
+    const noType = runPlotUnions({
+      "src/data/viewmodel/types.ts": "export type Other = Readonly<{}>;\n",
+      "src/data/viewmodel/validate.ts": "export const PLOT_UNIONS = Object.freeze({\n});\n",
+    });
+    expect(noType).toHaveLength(1);
+    expect(noType[0]?.message).toContain("vacuous rather than satisfied");
+
+    const noTable = runPlotUnions({
+      "src/data/viewmodel/types.ts": 'export type Plot = Readonly<{\n  legend?: "above";\n}>;\n',
+      "src/data/viewmodel/validate.ts": "const nothing = 1;\n",
+    });
+    expect(noTable).toHaveLength(1);
+    expect(noTable[0]?.message).toContain("agrees with everything");
+  });
+
+  it("T2.132 (C04 I118, MG31, F1085): a member declaring its union by reference is resolved, not skipped", () => {
+    // **The form the rule's own comment said was absent.** `xFormat?:
+    // Plot["yFormat"]` had been in `Plot` for twenty-five days when the sentence
+    // asserting it was not landed, and the member accepted any value while the
+    // one it is declared from was refused.
+    const missing = runPlotUnions(plotTree(
+      '  yFormat?: "number" | "percent";\n  xFormat?: Plot["yFormat"];\n',
+      '  yFormat: Object.freeze(["number", "percent"]),\n',
+    ));
+    expect(missing).toHaveLength(1);
+    expect(missing[0]?.message, "the reference is carried to the table").toContain("`xFormat` is a union in the type and not in the table");
+
+    // The values are compared through the reference, so the entry cannot drift
+    // from the member it names.
+    const disagrees = runPlotUnions(plotTree(
+      '  yFormat?: "number" | "percent";\n  xFormat?: Plot["yFormat"];\n',
+      '  yFormat: Object.freeze(["number", "percent"]),\n  xFormat: Object.freeze(["number"]),\n',
+    ));
+    expect(disagrees).toHaveLength(1);
+    expect(disagrees[0]?.message).toContain("`xFormat` admits");
+
+    // **A reference to something that is not a union is reported rather than
+    // skipped**, because from the table's side an unresolvable reference reads
+    // exactly like a member needing no entry.
+    const unresolvable = runPlotUnions(plotTree(
+      '  yFormat?: "number" | "percent";\n  xFormat?: Plot["height"];\n',
+      '  yFormat: Object.freeze(["number", "percent"]),\n',
+    ));
+    expect(unresolvable).toHaveLength(1);
+    expect(unresolvable[0]?.message).toContain("`height` is not a string-literal union");
+
+    // The control: agreement through a reference is silent.
+    expect(runPlotUnions(plotTree(
+      '  yFormat?: "number" | "percent";\n  xFormat?: Plot["yFormat"];\n',
+      '  yFormat: Object.freeze(["number", "percent"]),\n  xFormat: Object.freeze(["number", "percent"]),\n',
+    ))).toEqual([]);
+
+    // **The corpus, counted rather than asserted absent** — which is the exact
+    // way the sentence this row replaces was true and useless. The arm cannot
+    // pass by having nothing to resolve.
+    const types = readFileSync("src/data/viewmodel/types.ts", "utf8");
+    const from = types.indexOf("export type Plot = Readonly<{");
+    const refs = plotByReferenceMembers(types.slice(from, types.indexOf("\n}>;", from)));
+    expect(refs, "Plot declares its unions by reference exactly once today").toEqual([{ member: "xFormat", referent: "yFormat" }]);
+  });
+
+  it("T2.128 (MG31): the real tree is clean, and the corpus it read is 25 members", () => {
+    // **The population, because an exit status is the same bit for clean and
+    // for did-not-run.** The rule reports nothing over the tree; the count is
+    // what says it had something to report nothing about.
+    expect(runPlotUnions({
+      "src/data/viewmodel/types.ts": readFileSync("src/data/viewmodel/types.ts", "utf8"),
+      "src/data/viewmodel/validate.ts": readFileSync("src/data/viewmodel/validate.ts", "utf8"),
+    })).toEqual([]);
+    expect(Object.keys(PLOT_UNIONS), "the class is 25, and the spec named five").toHaveLength(25);
+  });
+  it("MG30 fires: a SpanName member nothing opens", () => {
+    // **The shape this rule exists for**: a member added to the union and never
+    // wired. `PHASE_GROUP` is total over `SpanName`, so it still gets a phase
+    // and still reads as *this phase cost nothing* in every breakdown drawn
+    // from the report (C28 I39).
+    const tree: Record<string, string> = {
+      "src/shell/profiling/types.ts":
+        'export type SpanName = "frame" | "paint" | "assemble";\n',
+      "src/shell/session.ts": 'prof?.span("frame");\n',
+      // **The comment arm, which MG25 has and MG24 did not.** A member named
+      // only in the prose explaining why it is dead would otherwise count as
+      // its own opener.
+      "src/shell/paint.ts": '// span("paint") is not opened yet\nprof?.span("assemble");\n',
+    };
+    const files = Object.keys(tree);
+    const read = (f: string): string => tree[f] ?? "";
+
+    const violations = checkSpanNamesOpened(files, read);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.rule).toBe("MG30");
+    expect(violations[0]?.message, "names the member, not just the count").toContain("`paint`");
+    expect(violations[0]?.message).not.toContain("`frame`");
+  });
+
+  it("MG30's control: every member opened is no violation, and the corpus is not empty", () => {
+    // **An empty corpus passes the rule above exactly**, so the control is what
+    // says the fixture can be seen at all: the same union with the third member
+    // wired, and nothing reported.
+    const tree: Record<string, string> = {
+      "src/shell/profiling/types.ts":
+        'export type SpanName = "frame" | "paint" | "assemble";\n',
+      "src/shell/session.ts": 'prof?.span("frame");\n',
+      "src/shell/paint.ts": 'prof?.span("paint");\nprof?.span("assemble");\n',
+    };
+    expect(checkSpanNamesOpened(Object.keys(tree), (f: string) => tree[f] ?? "")).toEqual([]);
+  });
+
+  it("MG30 reports rather than passes when it cannot find the union", () => {
+    // **The vacuity arm.** A rule whose corpus is a declaration it failed to
+    // parse has nothing to be wrong about, and returns green — which is A03 §2's
+    // class arriving in the rule written to close C28 I39's version of it.
+    const tree: Record<string, string> = {
+      "src/shell/profiling/types.ts": "export type Tier = 'off';\n",
+    };
+    const violations = checkSpanNamesOpened(Object.keys(tree), (f: string) => tree[f] ?? "");
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain("vacuous rather than satisfied");
+  });
+
+  // **C24 T2.10's row, and it was already here** — the rule the spec names as
+  // I16's mechanical form, fabricated violation and equality arm and all. What
+  // was missing was the citation: SP9 asks whether an invariant is *named* by a
+  // row, and a row that checks it perfectly under another name answers no.
+  it("T2.10 (C24 I16): MG25 fires — an exported function no other file in src/ names", () => {
     // **Fabricated from the real first run**, where 7 of 281 came back and the
     // two shapes below were both in it: a producer with no driver
     // (`assignOffsets`) and a name that appears only inside a comment
@@ -1445,6 +2110,85 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     const fired = violations.filter((v) => v.rule === rule);
     expect(fired, `${rule} matched nothing — it would pass on a real violation`).toHaveLength(1);
     expect(fired[0]!.spec, `${rule} must name the spec that declared it`).toBeTruthy();
+
+    // **The citation, where SP9 can read it.** A rule that *is* an invariant's
+    // mechanical form covers it perfectly and names it nowhere a row can be
+    // seen — SP9 strips comments and `describe` titles, so the coverage was
+    // real and the answer to *which row names C24 I25* was none. Asserted by
+    // equality against what the rule declares, so a rule retargeted at a
+    // different spec fails here rather than drifting from the invariant it was
+    // written for.
+    const owed = RULE_INVARIANTS[rule];
+    if (owed !== undefined) {
+      expect(fired[0]!.spec, `${rule} is ${owed}'s mechanical form`).toBe(owed);
+    }
+  });
+
+  it("SS60 fires on the cursor's read and is silent on a spread the code reads whole", () => {
+    // **The control, which is what says the pattern is about the read and not
+    // about spreads.** Three spreads the tree legitimately holds, each of which
+    // a looser pattern would report: a spread of a slice into a longer literal
+    // (`paint.ts:299`, copied), a spread of a single cluster whose array is
+    // then read whole (the shape `clusterCells` held until F958 — the rule's stated blind spot,
+    // and the reason it is a blind spot rather than a violation), and two
+    // statements on one line where the second indexes something else, which is
+    // what the `[^;\n]` bound is for.
+    const read = (f: string): string =>
+      f === "src/presentation/a.ts"
+        ? "    return { rows: [...rows.slice(0, cap - 1), elision], first: 0, offset: 0, count: cap - 1 };\n"
+        : f === "src/presentation/b.ts"
+          ? "  const points = [...cluster];\n  const base = points[0]?.codePointAt(0);\n"
+          : f === "src/presentation/c.ts"
+            ? "  const all = [...xs]; const c = grid[0][0];\n"
+            : "";
+    const files = ["src/presentation/a.ts", "src/presentation/b.ts", "src/presentation/c.ts"];
+    expect(
+      checkSourceScans(files, read).filter((v) => v.rule === "SS60"),
+      "a spread that is not indexed at zero within its own statement is not this rule's subject",
+    ).toEqual([]);
+
+    // And the rule is live against the same reader: the shipped line, with a
+    // nested index inside the spread so the lazy bound is shown to reach past
+    // an inner `]`.
+    const fired = checkSourceScans(["src/presentation/d.ts"], () => "  const ch = [...rows[i].slice(j)][0] ?? \"\";\n").filter(
+      (v) => v.rule === "SS60",
+    );
+    expect(fired).toHaveLength(1);
+  });
+
+  it("SS61 fires on a code-point index and is silent at zero, across two statements, and on a spread read whole", () => {
+    // **The control, which is what says the rule is about the index and not
+    // about spreads.** SS60's own subject (`[0]`, so one rule per line and
+    // the two stay disjoint); the two-statement shape, which is the rule's
+    // stated blind spot — the radar writer's own (F982) and what three raster
+    // reads legitimately hold; a spread into a longer literal; and
+    // `Array.from` with a mapper whose second parameter is an index, which
+    // is the idiom every grid in `plot/` is built with.
+    const read = (f: string): string =>
+      f === "src/presentation/a.ts"
+        ? "  const ch = [...text.slice(i)][0] ?? \"\";\n"
+        : f === "src/presentation/b.ts"
+          ? "  const chars = [...text];\n  for (let k = 0; k < chars.length; k += 1) slots[row]![start + k] = chars[k]!;\n"
+          : f === "src/presentation/c.ts"
+            ? "  return placement === \"above\" ? [...horizontal, ...top] : top;\n"
+            : f === "src/presentation/d.ts"
+              ? "  const slots = Array.from({ length: n }, (_, i) => i * 2);\n"
+              : "";
+    const files = ["src/presentation/a.ts", "src/presentation/b.ts", "src/presentation/c.ts", "src/presentation/d.ts"];
+    expect(
+      checkSourceScans(files, read).filter((v) => v.rule === "SS61"),
+      "a spread indexed at zero, across two statements, or not indexed at all is not this rule's subject",
+    ).toEqual([]);
+
+    // And live against the same reader: the two shipped lines, one per file,
+    // the reader's with its nested index and the writer's with its `forEach`.
+    const fired = checkSourceScans(
+      ["src/presentation/e.ts", "src/presentation/f.ts"],
+      (f) => (f === "src/presentation/e.ts"
+        ? "      const label = [...(labels[cy] ?? \"\")][cx]; // cells-ok — a cell column\n"
+        : "    [...text].forEach((ch, i) => { row[start + i] = ch; }); // cells-ok — a column position\n"),
+    ).filter((v) => v.rule === "SS61");
+    expect(fired.map((v) => v.file), "a `cells-ok` mark does not excuse it — the mark is about the index, and the spread is the defect").toEqual(["src/presentation/e.ts:1", "src/presentation/f.ts:1"]);
   });
 
   it("SS51's vocabulary list equals `ramp.ts`'s, both directions", () => {
@@ -1476,12 +2220,27 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     // — the union's members come from one and the builder's literals from the
     // other — so a fabrication that supplies one file with one line gives it
     // nothing to compare. MG24 and MG3 are here for the same reason.
+    // **The fabrication had the same scope the rule had, and that is F1028's
+    // disease one rule along.** It patched `builders/index.ts` alone, because
+    // `checkBuilderCoverage` read one builder file; with the directory as the
+    // authority, `figure.ts` writes `form: this.form` — a parameter path, which
+    // opens every arm — so the one-file patch produces no unreachable arm at
+    // all. Both writers are hardcoded now, or the row is about the scope rather
+    // than about MG28.
+    //
+    // **And it corrects the rule's founding sentence.** A03 said the heatmap was
+    // *constructible only by reaching past `b` into `block()`*. Measured:
+    // `setForm` landed in `figure.ts` on **2026-08-18** (`127f19b1`) and the
+    // `heatmap` arm in `types.ts` on **2026-08-20** (`fc775c04`), so
+    // `b.figure().setForm("heatmap")` reached it from the day the arm existed.
+    // The gap MG28 was written for was real; the *reason* it was invisible was
+    // one builder file being read, which is F263 measured a third time.
     const files = srcFiles();
     const hardcoded = (f: string): string => {
       const src = readFileSync(f, "utf8");
-      return f.endsWith("builders/index.ts")
-        ? src.replace('form: form ?? "line",', 'form: "line",')
-        : src;
+      if (f.endsWith("builders/index.ts")) return src.replace('form: form ?? "line",', 'form: "line",');
+      if (f.endsWith("builders/figure.ts")) return src.replace("form: this.form,", 'form: "line",');
+      return src;
     };
 
     const fired = checkBuilderCoverage(files, hardcoded).filter((v) => v.rule === "MG28");
@@ -2546,6 +3305,51 @@ describe("SS52 — a NUL makes a file invisible to every search", () => {
         `${name}: \`${start}\` runs a .ts entry, and \`engines\` is ` +
           `\`${pkg.engines?.["node"] ?? "unset"}\` — so it needs --experimental-strip-types`,
       ).toBe(true);
+    }
+  });
+});
+
+describe("make check — the lint corpus is the repository's own sources (F1079)", () => {
+  it("T2.129 (F1079): eslint itself says the generated and scratch trees are out, and the sources are in", async () => {
+    // **Asked of eslint rather than read off the config.** A row that matched
+    // `ignores` against a list of strings would be measuring the prose: the
+    // pattern language is eslint's, `ignores` in a config object with no other
+    // key means something particular, and neither is checkable by reading. This
+    // asks the resolver the question the gate asks it.
+    //
+    // What it is for: `eslint .` had no `ignores` at all, so **745** files
+    // decided `make check` — 371 of them `dist/`, 87 scratch under `out/` — and
+    // **999** with the verification worktree in place, which is the procedure
+    // this repository uses to check a commit. The rule block is `tools/**`
+    // relative to the config, so nested copies got no rules; what fires
+    // everywhere is a **parsing** error, and a scratch probe with one stray
+    // paren took the gate red.
+    const { ESLint } = await import("eslint");
+    const linter = new ESLint();
+
+    for (const path of [
+      "dist/index.js",
+      "dist/interaction/parser/parse.js",
+      "out/probe/anything.mjs",
+      // The verification worktree, which `git worktree add out/verify <sha>`
+      // puts a whole second copy of the tree into.
+      "out/verify/tools/enforce/index.mjs",
+      "out/verify/src/index.js",
+      "coverage/lcov-report/index.js",
+    ]) {
+      expect(await linter.isPathIgnored(path), `${path} must not decide this gate`).toBe(true);
+    }
+
+    // **The control, and it is the whole row.** Ignoring everything satisfies
+    // every assertion above and turns `make check`'s lint half into a no-op —
+    // which is A03 §2's vacuity class arriving in a gate's configuration rather
+    // than in a rule.
+    for (const path of [
+      "tools/enforce/index.mjs",
+      "tools/instruments.mjs",
+      "eslint.config.js",
+    ]) {
+      expect(await linter.isPathIgnored(path), `${path} is a source and must be linted`).toBe(false);
     }
   });
 });

@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildSession, fakeFs } from "../support/session.js";
+import { SessionStateError } from "../../src/shell/types.js";
 import type { TuiConfig } from "../../src/shell/types.js";
 import { createExecutionPipeline } from "../../src/shell/execution.js";
 import { fakeStdin } from "../support/fake-terminal.js";
@@ -612,6 +613,46 @@ describe("C22 §4 step 7 — the greeting (I44)", () => {
     expect(stdout.chunks.join(""), "and said nothing about it").not.toContain("far side is down");
   });
 
+  it("T3.40 (I99, F158, F1024): a greeting resolving after a submission still sits above it", async () => {
+    // **The finding's own word is *above*, so the row reads row indices off the
+    // frame.** An assertion about `entries.length` is green for the defect too
+    // — both entries exist either way, and F1024's eighteen captures found the
+    // result in the byte stream on every losing run. What was wrong was where
+    // it ended up.
+    //
+    // Sixty rows so both fit: the subject is the order, and a height that
+    // scrolls one of them off turns a wrong order into a missing needle and the
+    // row would fail for a reason it did not choose.
+    const later: { resolve?: (d: ReturnType<typeof doc>) => void } = {};
+    const stdin = fakeStdin();
+    const { screen } = await buildSession(
+      {
+        stdin: stdin as never,
+        greeting: () => new Promise<ReturnType<typeof doc>>((resolve) => {
+          later.resolve = resolve;
+        }),
+      },
+      { columns: 100, rows: 60 },
+    );
+    await settle();
+
+    // The submission settles first — which is the losing order, measured 12 of
+    // 12 against the final frame before the slot was reserved.
+    stdin.emit("/help\r");
+    await settle();
+
+    expect(later.resolve, "the producer was called").toBeTypeOf("function");
+    later.resolve?.(doc("welcome aboard"));
+    await settle();
+
+    const rows = screen().rows;
+    const greetAt = rows.findIndex((r) => r.includes("welcome aboard"));
+    const helpAt = rows.findIndex((r) => r.includes("/help"));
+    expect(greetAt, "the greeting drew").toBeGreaterThanOrEqual(0);
+    expect(helpAt, "the result drew").toBeGreaterThanOrEqual(0);
+    expect(greetAt, "and the greeting is above the result it opened before").toBeLessThan(helpAt);
+  });
+
   it("T4.x (C23 I37, C16 I26, F21): `enter` on a focused row reaches the dispatcher", async () => {
     // **The mutation that matters is removing the wiring and watching a real
     // keystroke fail**, not removing the handler. `actions.ts` implemented all
@@ -1213,5 +1254,79 @@ describe("C22 — copy mode: the order inside the exit, and the far side under t
 
     expect(stdout.output.slice(before), "tracking back on Esc").toContain(MOUSE.enter);
     expect(screen().rows[0], "the indicator goes with the mode").not.toContain("COPY");
+  });
+});
+
+describe("C22 §4 — the greeting's context, and where `stopped` leads", () => {
+  it("T3.9e (I53): the greeting is a producer and is handed the producer context", async () => {
+    // **It returns a document and was told nothing**, which is the same
+    // omission the local route had at four other sites: a producer told nothing
+    // decides anyway, from a worse copy of the fact. So the assertion is on
+    // what it receives, not on what it draws — a greeting that renders
+    // correctly at the width it guessed is exactly the failure this forbids.
+    // The document, inline: `doc` in the step-7 describe above is scoped to it,
+    // and a different one is in scope here — which is how this row first drew
+    // nothing while every assertion about the context passed.
+    const greetDoc = (text: string) => ({
+      schema: "tui.view/1" as const,
+      command: "",
+      status: "ok" as const,
+      blocks: [{ kind: "raw" as const, id: "greet", text }],
+      meta: {
+        verb: null,
+        adapter: "greeting",
+        exitCode: 0,
+        durationMs: 0,
+        truncated: false,
+        argv: [] as readonly string[],
+        stderr: "",
+        transport: "local" as const,
+        origin: "user" as const,
+      },
+    });
+
+    let seen: Record<string, unknown> | null = null;
+    const { tui, stdout } = await buildSession(
+      {
+        greeting: (ctx) => {
+          seen = ctx as unknown as Record<string, unknown>;
+          return Promise.resolve(greetDoc("welcome aboard"));
+        },
+      },
+      { columns: 100, rows: 30 },
+    );
+    // `buildSession` starts it; `settle` is what lets the async greeting land,
+    // as T3.9b's control does.
+    await settle();
+
+    expect(seen, "the greeting ran").not.toBeNull();
+    // C07 I17's four facts, by equality: a fifth arriving, or one going
+    // missing on this route alone, fails here.
+    expect(Object.keys(seen!).sort(), "the producer context, entire").toEqual([
+      "capabilities",
+      "height",
+      "measure",
+      "width",
+    ]);
+    // And it is *this* session's width rather than a default — the fact a
+    // producer told nothing would have had to guess.
+    expect(seen!["width"], "the frame's width, handed down").toBe(100);
+    expect(stdout.chunks.join(""), "and it still drew").toContain("welcome aboard");
+    await tui.stop("exit");
+  });
+
+  it("T3.9f (C22 I16): `stopped` is terminal — a stopped session cannot be started again", async () => {
+    // Matching C01's released state: a second session constructs a new
+    // instance. The failure this forbids is a caller finding a half-started
+    // one, so the row asserts both that `start` refuses and that it refuses by
+    // *naming the state* rather than by throwing something a retry loop would
+    // swallow.
+    const { tui } = await buildSession();
+    await tui.stop("exit");
+
+    await expect(tui.start()).rejects.toThrow(SessionStateError);
+    // And it stays terminal: a second attempt is refused the same way, so the
+    // state did not move on the way through.
+    await expect(tui.start()).rejects.toThrow(SessionStateError);
   });
 });

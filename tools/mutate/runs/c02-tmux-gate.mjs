@@ -8,6 +8,17 @@
 // because nothing had ever asserted the three readers together inside tmux — so
 // the question this run asks is whether a row can now tell a gate on the
 // identification from a gate on a reader.
+//
+// **Eight anchors across four runs moved when C02 gained `sources`** (F1021).
+// Every rule in `capabilities.ts` now returns `Answer<T> = [value, source]`
+// instead of a bare value, so every `from:` on a `return` moved — and so did
+// every `to:`, which is the half a sweep does not read (F279). A `to:` still
+// returning a bare string is **not** a weaker mutation: `detectCapabilities`
+// destructures the pair, so `"narrow"` yields value `"n"` and source `"a"`,
+// and the run would measure a shape defect rather than the behaviour named.
+// All eight are *the code moved and the mutation still has a subject*; none
+// lost its subject and none moved its `expect:`.
+
 import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
@@ -64,8 +75,8 @@ const results = runPass({
       also: [
         {
           file: CAPS,
-          from: "  if (terminal !== null) return 24;",
-          to: "  if (terminal !== null && !inTmuxGate()) return 24;",
+          from: "  if (terminal !== null) return [24, \"inferred\"];",
+          to: "  if (terminal !== null && !inTmuxGate()) return [24, \"inferred\"];",
         },
         {
           file: CAPS,

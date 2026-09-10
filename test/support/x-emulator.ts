@@ -34,6 +34,18 @@ export function emulatorMissing(program: Emulator): string | null {
   return missing.length === 0 ? null : `${missing.join(", ")} not installed`;
 }
 
+/**
+ * Which of `candidates` are on `PATH`, in the order given.
+ *
+ * Exported so a row can compare the emulators it *could* drive against the ones
+ * it *does* — by equality, not by subset (F1044). A loop written as *for each
+ * emulator present* is the same green with one emulator as with three, and the
+ * day a third arrives in `.devcontainer/` the row that should have grown a
+ * column instead grows nothing and says nothing.
+ */
+export const installedPrograms = (candidates: readonly string[]): string[] =>
+  candidates.filter((p) => has(p));
+
 export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 /** Captures made by this process so far — part of the display number. */
@@ -172,8 +184,18 @@ export async function captureFromEmulator(opts: {
     // it is the only thing here that repairs the state rather than working
     // around it. Three `spawnSync` calls against a session lost to a stray
     // modifier read as a protocol defect.
-    xdo("keyup", "shift"); xdo("keyup", "ctrl"); xdo("keyup", "alt");
+    //
+    // **Third recurrence, 2026-09-10 on pull request 46, and it moved the clear
+    // rather than adding to it** (F812). The symptom came back as `CSI 27;2 u`
+    // for a lone Esc with the clear already in place — and the clear sat
+    // *before* a 200 ms settle, so anything the focus change or the window
+    // manager delivered in that window landed after it. It is the last thing
+    // before the drive now, with `super` added: `keyup` on a modifier that is
+    // already up costs nothing, and the one not cleared is the one that bites.
+    // **The earlier ordering is recorded rather than deleted** — it held for
+    // some runs and this is not a claim that the move is the cure.
     await sleep(200);
+    for (const mod of ["shift", "ctrl", "alt", "super"]) xdo("keyup", mod);
     await opts.drive(xdo, window, 1);
     for (let i = 0; i < 100 && !existsSync(join(work, "b.started")); i += 1) await sleep(100);
     await sleep(200);

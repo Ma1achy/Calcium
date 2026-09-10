@@ -31,6 +31,7 @@ import type { TerminalCapabilities } from "../terminal/capabilities.js";
 import { b, framedStatus } from "./builders/index.js";
 import type { ProducerContext } from "../data/adapters/types.js";
 import type { EntryId, TranscriptStore } from "../viewport/transcript/index.js";
+import type { TraceFn } from "./profiling/types.js";
 
 /** C23 §3b — a stream silent for this long gets a notice, never an error (C23 I25). */
 export const STALL_MS = 120_000;
@@ -73,8 +74,19 @@ export type ViewRefresh = Readonly<{
    * what the reference app did: one part's fetch accumulated and its sibling's
    * did not, so sharing the fetch between them would have stopped the ring
    * silently. A source layer without this has no consumer in the app F91 names.
+   *
+   * **Three parameters, and the third is `renderError`'s widening applied to the
+   * fold** (C23 §3c, F1023). `attempts` is the settlements that produced this
+   * version — `1` on a clean poll, `1 + n` after `n` transport failures — and it
+   * exists because the fold runs once per *version* while a version exists only
+   * when a fetch resolved. Without it an app whose accumulator is its fold, as
+   * the rule above requires, has no way to count a poll that failed at the
+   * transport. Additive, so an implementation taking two is unchanged.
    */
-  derive: Readonly<{ key: string; compute: (data: unknown, prev: unknown) => unknown }> | null;
+  derive: Readonly<{
+    key: string;
+    compute: (data: unknown, prev: unknown, attempts: number) => unknown;
+  }> | null;
   fetch: () => Promise<unknown>;
   /**
    * Separate from `fetch`, and that is A02 §7 rule 2 rather than tidiness.
@@ -278,7 +290,28 @@ export function backoffOf(intervalMs: number, consecutiveFailures: number): numb
 
 export type RefreshDeps = Readonly<{
   transcript: TranscriptStore;
+  /** The wall clock — deadlines, offsets and the stall watch (C23 I19, I20). */
   clock: () => number;
+  /**
+   * The monotonic clock — every duration a sweep writes into a frame (C23 I52,
+   * I53, F973): a readout's figure, a loading box's counter, a stale title's
+   * age. A duration is a difference between two reads, and the wall clock is
+   * the one that can be stepped between them.
+   */
+  elapsed: () => number;
+  /**
+   * One async bracket for a live part's fetch (C28 I36).
+   *
+   * **A part's `fetch` arrives when the part is declared**, so there is no
+   * object the composition root could have decorated on the way past — every
+   * other async seam is wrapped at the root. One function rather than a
+   * `Profiler`, so this module never learns a recorder exists.
+   *
+   * N sources can be in flight at once, and that is the case the bracket is for:
+   * each `trace` forks its own context, so two concurrent fetches attribute to
+   * two parents instead of nesting one inside the other (C28 I33).
+   */
+  trace?: TraceFn;
   /** The arm the stale title's separator resolves against (C09 I49, F828). */
   capabilities: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
   schedule: (fn: () => void, ms: number) => Disposable;
@@ -291,6 +324,21 @@ export type RefreshDeps = Readonly<{
   producerContext: () => ProducerContext;
   /** Appends a document. The identity notice is the only §3b path that does. */
   append: (text: string) => void;
+  /**
+   * A swallowed failure, on C23's two channels (§5a, I48, I70).
+   *
+   * **Not `append`, and the difference is which reader is owed.** `append`
+   * writes a notice the session is meant to read *about itself* — the identity
+   * loop's, `origin: "refresh"`. This is a defect in what the shell built, so it
+   * goes where every other swallowed failure goes: an entry at the moment and an
+   * accumulation C22 §8 step 3 drains onto the restored primary screen. The
+   * pipeline's `contain` is the implementation, and it deduplicates by message,
+   * which is what makes a part refusing on every tick say it once.
+   *
+   * Required rather than optional, because a report a consumer can forget to
+   * wire is a report that is not made — the vacuity class in a dependency.
+   */
+  fault: (stage: string, cause: unknown) => void;
   stopping: () => boolean;
   /**
    * Replaces a part's block on a pushed view (C15 §2's `update`).
@@ -459,7 +507,14 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
   type Part = {
     readonly spec: ViewRefresh;
     readonly host: RefreshHost;
-    readonly source: Source;
+    /**
+     * **Mutable, and the one writer is `stopPart`** (C23 I70). A part that can
+     * no longer land a patch is detached from whatever it was polling and given
+     * the dead source `declare`'s refusal already uses — so it stops without a
+     * second teardown path, and the host's *is everything here finished* sweep
+     * reads `done` and releases through the one call I32 names.
+     */
+    source: Source;
     /**
      * When this part's box first appeared, for the elapsed counter (C23 I52).
      *
@@ -504,6 +559,19 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     failures: number;
     inFlight: boolean;
     version: number;
+    /**
+     * **The settlements that produced this version, counted from the last one**
+     * (C23 I47, F1023). One on a clean poll; `1 + n` after `n` transport
+     * failures. It is the fold's third argument and it is why a failed attempt
+     * is countable at all.
+     *
+     * **Not `failures`, which is a different quantity with the same source.**
+     * `failures` is the *live* consecutive count — reset the instant a fetch
+     * resolves, read by the backoff and by the error arm, and therefore always
+     * `0` by the time any part renders a success. This is its total captured
+     * *before* the reset, so it survives into the arm that can accumulate.
+     */
+    attempts: number;
     data: unknown;
     /** One-shots are done after one attempt, whichever way it went (rule 3). */
     done: boolean;
@@ -547,6 +615,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     failures: 0,
     inFlight: false,
     version: 0,
+    attempts: 0,
     data: undefined,
     done: true,
     retired: true,
@@ -580,23 +649,133 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
   const errorArm = (part: Part): ((e: ErrorLike, r: number | null, a: number) => Block) =>
     part.spec.renderError ?? defaultErrorBlock(part.spec.id);
 
-  const put = (host: RefreshHost, part: Part, child: Block): boolean => {
+  /**
+   * What became of a part's patch — **four answers, because they have four
+   * different dispositions** (C23 I70, §8h, F1002).
+   *
+   * This was `boolean`, and `outcome.ok` was the whole of it. `PatchOutcome`'s
+   * arms answer two questions and the boolean carried only the first: *is the
+   * host gone* and *was the patch refused* are not one question, and the caller
+   * released a live host on the second — taking every sibling part on it and the
+   * entry's readout, and discarding the one sentence that said why.
+   */
+  type PutResult =
+    /** The patch landed. */
+    | Readonly<{ kind: "ok" }>
+    /** C13 has dropped the entry, or the layer has gone. Release the host (I33). */
+    | Readonly<{ kind: "hostGone" }>
+    /** The host lives and no longer holds this part's block. The part is over (§8h H3). */
+    | Readonly<{ kind: "partGone" }>
+    /** The host holds the block and the document refused the patch (§8h H4). */
+    | Readonly<{ kind: "refused"; error: ErrorLike }>;
+
+  /**
+   * Whether the entry still holds a block for this part.
+   *
+   * **The axis that separates §8h H3 from H4**, and it is asked of the host
+   * rather than read off `applyPatch`'s message: both arms come back as
+   * `reason: "patch"` and differ only in prose C04 composes, so discriminating on
+   * the text would keep a second copy of C04's rules in the component least able
+   * to notice when they change. `findBlock` is the walk `currentPanel` and the
+   * staleness sweep already use, so the two cannot drift.
+   */
+  const entryHolds = (id: EntryId, blockId: string): boolean => {
+    const entry = deps.transcript.entries.find((e) => e.id === id);
+    return entry !== undefined && findBlock(entry.doc.blocks, blockId) !== null;
+  };
+
+  const put = (host: RefreshHost, part: Part, child: Block): PutResult => {
     const existing = currentPanel(host, part);
     const base = livePanel(part.spec.id, titleOf(part), child);
     const panel: Block =
       existing?.gapBefore === true ? ({ ...base, gapBefore: true } as Block) : base;
-    if (host.kind === "view") return deps.updateView(host.id, part.spec.id, panel);
+    // **One boolean and one meaning on this arm** (§8h): C15 answers whether the
+    // layer is still there, and a view that cannot take a well-formed block is a
+    // state this seam cannot report — stated as the limit it is.
+    if (host.kind === "view") {
+      return deps.updateView(host.id, part.spec.id, panel) ? { kind: "ok" } : { kind: "hostGone" };
+    }
 
     const outcome = deps.transcript.patch(
       host.id,
       { op: "replace", blockId: part.spec.id, block: panel },
       "shell",
     );
-    // **`unknown` and `settled` are not failures** (C23 I21, §5). The host was
-    // evicted or finalised between arming and firing, so the part is over —
-    // backing off would be waiting to retry against something that is gone.
-    return outcome.ok;
+    if (outcome.ok) return { kind: "ok" };
+    // **`unknown` is not a failure** (C23 I21, §5): C13 dropped the entry between
+    // arming and firing, so the part is over and backing off would be retrying
+    // against something gone. `settled` never arrives — C13 gates a settled entry
+    // on `origin: "farSide"` and this patches as `"shell"` — and the comment that
+    // used to name it as one of two reasons for releasing described a state no
+    // caller can construct (§8h H5).
+    if (outcome.reason !== "patch") return { kind: "hostGone" };
+    return entryHolds(host.id, part.spec.id)
+      ? { kind: "refused", error: outcome.error }
+      : { kind: "partGone" };
   };
+
+  /**
+   * Stop one part without touching its host — **I43's disposition, reached a
+   * second way** (C23 I70).
+   *
+   * A refused declaration is already given a source that is `done`, referred to
+   * by nobody and never in `sources`; a part that cannot land a patch is in the
+   * same state and wants the same thing. Nothing here is a teardown: the host
+   * keeps its registration, `release` still reaches it, and the sweep's *every
+   * part done* check drops the host through the one call I32 names when this was
+   * the last thing polling on it.
+   */
+  const stopPart = (part: Part): void => {
+    part.source.parts.delete(part);
+    part.source = { ...deadSource(part.source.key, part.spec), parts: new Set<Part>() };
+  };
+
+  /**
+   * Act on a patch's answer, and say whether anything reached the screen.
+   *
+   * **One place, because four call sites agreeing by inspection is what I32 is
+   * about.** Before this the four disagreed: two released the host, one ignored
+   * the answer entirely and one counted it, so the same refusal meant three
+   * different things depending on which sweep saw it first.
+   */
+  const landed = (part: Part, result: PutResult): boolean => {
+    switch (result.kind) {
+      case "ok":
+        return true;
+      case "hostGone":
+        release(part.host);
+        return false;
+      case "partGone":
+        stopPart(part);
+        return false;
+      case "refused":
+        // **The part, never the host** (I70). And the report goes to the fault
+        // channel rather than into the panel, because the panel is reached by a
+        // patch and a patch is what was refused (§8h H4).
+        stopPart(part);
+        deps.fault(`live part "${part.spec.id}"`, result.error.message);
+        return false;
+    }
+  };
+
+  /**
+   * **The only way to patch a part**, and it is one function because `put`'s
+   * answer is an object.
+   *
+   * A four-armed result is the right shape and it has one hazard a boolean did
+   * not: `if (put(…))` still compiles and is **always true**. Three of the seven
+   * call sites were left that way by the change that introduced it — the
+   * staleness re-title, the loading counter and the declaration refusal — each
+   * committing a frame for a patch that may not have landed, and no row failed.
+   *
+   * **No row could have**, and that is the reason this is a joined function
+   * rather than a note. A refusal at those three is not constructible today: the
+   * only duplicate id a part can meet arrives from a patch that already landed,
+   * and the tick after that one stops the part before staleness, the loading
+   * counter or a declaration can look at it again. So the hazard is a compile-time
+   * one with no test that can hold it, and the remedy has to be the shape.
+   */
+  const write = (part: Part, child: Block): boolean => landed(part, put(part.host, part, child));
 
   /**
    * C23 I35 — the age lives in the title, and nowhere else does it fit.
@@ -609,7 +788,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
    */
   const titleOf = (part: Part): string => {
     if (!part.stale) return part.spec.title;
-    const secs = Math.max(0, Math.round((deps.clock() - (part.lastOk ?? 0)) / 1000));
+    const secs = Math.max(0, Math.round((deps.elapsed() - (part.lastOk ?? 0)) / 1000));
     return `${part.spec.title} ${glyphs(deps.capabilities).separator} ${String(secs)}s ago`;
   };
 
@@ -631,6 +810,19 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
    * A throwing `compute` propagates to the caller, which renders the error arm.
    * Nothing is stored, so **the version is not consumed** — a fold that threw has
    * not advanced, and the next one starts from the same `prev`.
+   *
+   * **The third argument is how a failed attempt becomes countable** (F1023).
+   * The fold runs once per *version*, and a version exists only when a fetch
+   * resolved, so a poll that failed at the transport reaches the error arm and
+   * never reaches here — and an app whose fold is its only accumulator cannot
+   * count it. `src.attempts` is the settlements that produced this version, so
+   * the fold learns *how many tries this reading cost* without ever being handed
+   * a second shape in `data`.
+   *
+   * **Read from the source rather than passed in**, because `folds` memoises by
+   * version and the count has to travel with the version it belongs to: a
+   * parameter would be taken from whichever part happened to render first, and
+   * a second part hitting the memo would never see it.
    */
   const derivedFor = (
     src: Source,
@@ -638,7 +830,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
   ): unknown => {
     const held = src.folds.get(derive.key);
     if (held !== undefined && held.version === src.version) return held.value;
-    const value = derive.compute(src.data, held?.value);
+    const value = derive.compute(src.data, held?.value, src.attempts);
     src.folds.set(derive.key, { version: src.version, value });
     return value;
   };
@@ -664,14 +856,15 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
       // rather than a countdown to a retry that will not happen. The attempt
       // count is still the source's: the fetch that produced this data may well
       // have failed twice on the way.
-      put(part.host, part, errorArm(part)(shown, null, src.failures));
-      return true;
+      // **Through `landed`, like every other write** (I70). The box that reports a
+      // deterministic throw can itself be refused, and this used to return `true`
+      // whatever happened — a containment whose own report was dropped, and a
+      // part left ticking against a document that would refuse it every time.
+      return write(part, errorArm(part)(shown, null, src.failures));
     }
-    part.lastOk = deps.clock();
+    part.lastOk = deps.elapsed();
     part.stale = false;
-    if (put(part.host, part, child)) return true;
-    release(part.host);
-    return false;
+    return write(part, child);
   };
 
   /**
@@ -688,8 +881,16 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     src.inFlight = true;
     const started = deps.clock();
 
-    void src
-      .fetch()
+    // Bracketed here rather than around the whole chain: what `livefetch`
+    // measures is the far side's latency, and `.then` is this shell's work on
+    // the answer — a different column, and one a reader is deciding a remedy
+    // from. Called directly when unprofiled, because a no-op wrapper is an
+    // allocation and a promise hop on a path that polls.
+    const fetched = deps.trace === undefined
+      ? src.fetch()
+      : deps.trace("livefetch", () => src.fetch());
+
+    void fetched
       .then(
         (data) => {
           // **§8c C2 — nothing failed, so nothing backs off.** A resolution whose
@@ -697,6 +898,12 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
           // failure would make a source that lost its readers poll *more slowly*
           // when they come back.
           if (src.retired || src.parts.size === 0) return;
+          // **Captured before the reset, which is the whole of why the fold can
+          // see a failed attempt** (I47, F1023). `failures` is the live
+          // consecutive count and the next line clears it, so every arm that
+          // renders a success reads `0` — the quantity was destroyed one
+          // statement before the only consumer that could accumulate it.
+          src.attempts = src.failures + 1;
           src.failures = 0;
           src.version += 1;
           src.data = data;
@@ -719,8 +926,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
           // once rather than once per referrer.
           let any = false;
           for (const part of [...src.parts]) {
-            if (put(part.host, part, errorArm(part)(shown, retryIn, src.failures))) any = true;
-            else release(part.host);
+            if (write(part, errorArm(part)(shown, retryIn, src.failures))) any = true;
           }
           if (any) deps.commit("stream");
         },
@@ -751,6 +957,9 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
   const sweepParts = (): void => {
     if (deps.stopping()) return;
     const now = deps.clock();
+    // The durations below — a box's counter, a title's age, a card's figure —
+    // are differences on the monotonic clock (F973); `now` stays the deadlines'.
+    const mono = deps.elapsed();
 
     // **Retirement is the sweep's and not `release`'s** (C23 I45, §8c C3). C23 I33a
     // settles by release-then-declare, both synchronous, so a source retired the
@@ -773,10 +982,10 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
       for (const part of src.parts) {
         if (!deps.visible(part.host)) continue;
         if (part.stale || part.lastOk === null) continue;
-        if (now - part.lastOk < part.spec.staleAfterMs) continue;
+        if (mono - part.lastOk < part.spec.staleAfterMs) continue;
         part.stale = true;
         const current = currentChild(part.host, part);
-        if (current !== null && put(part.host, part, current)) deps.commit("stream");
+        if (current !== null && write(part, current)) deps.commit("stream");
       }
 
       if (now >= src.dueAt && anyoneLooking(src)) runSource(src);
@@ -808,9 +1017,9 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
         // `retrying`, and `elapsedNeeded` says no to anything that is not a
         // loading `status` (§8a-bis B3).
         const shown = currentChild(part.host, part);
-        const since = now - part.startedAt;
+        const since = mono - part.startedAt;
         if (!elapsedNeeded(shown, since)) continue;
-        if (put(part.host, part, { ...(shown as Status), elapsedMs: since })) ticked = true;
+        if (write(part, { ...(shown as Status), elapsedMs: since })) ticked = true;
       }
     }
 
@@ -840,7 +1049,9 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
         const remaining = Math.max(0, src.dueAt - now);
         const shown = currentChild(part.host, part);
         if (!retryNeeded(shown, remaining)) continue;
-        if (put(part.host, part, { ...(shown as Status), retryInMs: remaining })) counted = true;
+        // The same four answers as every other write (I70): this rewrites the
+        // part's panel through `put`, so a document that refuses one refuses this.
+        if (write(part, { ...(shown as Status), retryInMs: remaining })) counted = true;
       }
     }
     if (counted) deps.commit("stream");
@@ -854,7 +1065,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     let read = false;
     for (const [id, r] of [...readouts]) {
       if (!deps.visible({ kind: "entry", id })) continue;
-      const since = now - r.startedAt;
+      const since = mono - r.startedAt;
       const figure = elapsed(since);
       if (figure === r.last) continue;
       // **The tick is the elapsed second** (C23 I58): the spinner's frame is a
@@ -886,7 +1097,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     // teardown path instead of through it — and I32's *five sites agreeing by
     // inspection* is exactly what that sentence is about.
     for (const entry of [...hosts.values()]) {
-      if (entry.parts.every((p) => p.source.done)) release(entry.host);
+      if (finished(entry)) release(entry.host);
     }
   };
 
@@ -952,6 +1163,27 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     { blockId: string; render: (elapsedMs: number, tick: number) => Block; startedAt: number; last: string }
   >();
 
+  /**
+   * Whether a host's registration has nothing left on it **and nothing else is
+   * using the entry** (C23 I53, I70).
+   *
+   * **The readout clause is the second half and it was missing.** I33's five
+   * triggers all mean *the entry is over*, and `release` drops the entry's
+   * running-card readout because of that. The sweep below calls the same
+   * function for something else entirely — *this host has nothing left to
+   * refresh* — and a card is still running while that is true. Measured: a card
+   * with a **one-shot** part froze its elapsed figure at 2s where the same card
+   * with no part at all, and with a periodic part, both reached 6s. The refusal
+   * ruling reaches it by a second door, since a stopped part is `done` too.
+   *
+   * The host is then released at settlement instead, through trigger 1, which is
+   * the same one call. What it costs is one map entry per running card until the
+   * card settles, and that is bounded by the cards on screen.
+   */
+  const finished = (entry: { host: RefreshHost; parts: Part[] }): boolean =>
+    entry.parts.every((p) => p.source.done) &&
+    !(entry.host.kind === "entry" && readouts.has(entry.host.id));
+
   const release = (host: RefreshHost): void => {
     // A released entry host takes its readout with it (I53) — the same five
     // triggers, through the same one path (I32).
@@ -1002,9 +1234,12 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
      * sweep ever runs again, and the host is never released — which is how a leak
      * with no symptom survives a green suite: a `done` source does not poll.
      */
+    // **Through the same predicate the sweep uses**, or the two disagree and the
+    // difference is a spin: a host the wake keeps arming for and the sweep
+    // declines to release schedules a zero-delay timer on every pass.
     const cleanup =
       [...sources.values()].some((s) => s.parts.size === 0) ||
-      [...hosts.values()].some((e) => e.parts.every((p) => p.source.done));
+      [...hosts.values()].some((e) => finished(e));
     for (const src of sources.values()) {
       if (src.parts.size === 0) continue;
       // **A paused source is not soonest** (C23 I46). Arming to an overdue source
@@ -1183,7 +1418,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     },
 
     readout: (id, blockId, render) => {
-      readouts.set(id, { blockId, render, startedAt: deps.clock(), last: elapsed(0) });
+      readouts.set(id, { blockId, render, startedAt: deps.elapsed(), last: elapsed(0) });
       armParts();
     },
 
@@ -1257,7 +1492,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
             // source is `done` — but the field is `readonly` and a refused part
             // is still a `Part`. Set from the same clock as the other arm, so
             // the two are not two answers to one question (I43).
-            startedAt: deps.clock(),
+            startedAt: deps.elapsed(),
             lastOk: null,
             stale: false,
           };
@@ -1283,6 +1518,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
             failures: 0,
             inFlight: false,
             version: 0,
+            attempts: 0,
             data: undefined,
             done: false,
             retired: false,
@@ -1296,7 +1532,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
           // **When the box appeared, which is when this part was declared** —
           // not when its source was created, which a shared fetch makes a
           // different moment (C23 I52).
-          startedAt: deps.clock(),
+          startedAt: deps.elapsed(),
           lastOk: null,
           stale: false,
         };
@@ -1315,7 +1551,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
           // count and `1` is the honest number: this is the first and only time
           // it will be drawn (I43 — its source is `done` and referred to by
           // nobody).
-          if (put(part.host, part, errorArm(part)({ message }, null, 1))) any = true;
+          if (write(part, errorArm(part)({ message }, null, 1))) any = true;
         }
         if (any) deps.commit("stream");
       }

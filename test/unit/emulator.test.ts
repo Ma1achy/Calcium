@@ -17,6 +17,48 @@ import type { Block } from "../../src/data/viewmodel/index.js";
 /** The child measurer a container would use; this kind never calls it. */
 const noChildren: MeasureFn = () => 0;
 
+/**
+ * A PTY child the runner can drive, and **nothing more than the port declares**.
+ *
+ * A fake that answered `running` itself would supply the behaviour under test —
+ * the runner derives it from `onExit`, and that derivation is what T1.12 is
+ * about. So this holds the callback and the caller fires it.
+ */
+function fakePtyChild(): {
+  child: unknown;
+  exit: (code: number, signal: number | undefined) => void;
+  writes: string[];
+  resizes: [number, number][];
+  killed: string[];
+} {
+  const writes: string[] = [];
+  const resizes: [number, number][] = [];
+  const killed: string[] = [];
+  let onExit: ((e: { exitCode: number; signal?: number }) => void) | null = null;
+  return {
+    child: {
+      pid: 4242,
+      onExit: (cb: (e: { exitCode: number; signal?: number }) => void) => {
+        onExit = cb;
+      },
+      onData: () => {},
+      write: (d: string) => {
+        writes.push(d);
+      },
+      resize: (c: number, r: number) => {
+        resizes.push([c, r]);
+      },
+      kill: (sig: string) => {
+        killed.push(sig);
+      },
+    },
+    exit: (code, signal) => onExit?.({ exitCode: code, ...(signal === undefined ? {} : { signal }) }),
+    writes,
+    resizes,
+    killed,
+  };
+}
+
 /** A minimal well-formed document around one block, for the gate's own rows. */
 const documentWith = (block: unknown): unknown => ({
   schema: "tui.view/1",
@@ -200,9 +242,100 @@ describe("C27 terminal emulator — tier 1", () => {
 });
 
 describe("C04 — the terminal kind, spec-first rows", () => {
-  it.todo("T1.31 (C04 I110): a terminal whose line text contains an escape, a bell or a C1 is refused by validateDocument naming the line; the same text with U+FFFD in their place is admitted — not deferred on a component: lands with the Terminal type");
-  it.todo("T1.32 (C04 I111): overlapping, out-of-range, out-of-order and adjacent-equal runs are each refused; a maximal ordered set is admitted — not deferred on a component: lands with the Terminal type");
-  it.todo("T1.33 (C04 I113): grid mode with dropped is refused; dropped: 0 is refused in both modes; a positive dropped in lines mode is admitted — not deferred on a component: lands with the Terminal type");
+  /** A well-formed terminal, with one field replaced per row. */
+  const term = (over: Record<string, unknown> = {}): unknown => ({
+    kind: "terminal",
+    id: "t1",
+    cols: 80,
+    screen: "lines",
+    lines: [{ text: "ok" }],
+    ...over,
+  });
+  /** The errors, or an empty list — so a row reads the same on either arm. */
+  const errs = (block: unknown): readonly string[] => {
+    const v = validateDocument(documentWith(block));
+    return v.ok ? [] : v.error;
+  };
+
+  it("T1.31 (C04 I110): a control in a terminal line is refused and the line is named; U+FFFD in its place is admitted", () => {
+    // **The second of two gates.** C27 I2 replaces controls at the cell walk, so
+    // a terminal this framework built cannot carry one — and a `terminal` can
+    // arrive from a far side that never ran C27, which is the case this gate is
+    // for. An escape reaching here is not a rendering defect: the line is
+    // emitted without stripping, so it would reach the *outer* terminal.
+    for (const [name, ch] of [
+      ["an escape", "\u001b"],
+      ["a bell", "\u0007"],
+      ["a C1", "\u0085"],
+    ] as const) {
+      const e = errs(term({ lines: [{ text: "fine" }, { text: `bad${ch}here` }] }));
+      expect(e.join(" "), `${name} is refused`).toContain("control character");
+      // **Named, not merely refused.** A document with forty lines and one bad
+      // one is a producer's bug to find, and `lines[1]` is the whole of the
+      // finding — which is why the index is asserted and not just the message.
+      expect(e.join(" "), `${name} names its line`).toContain("lines[1]");
+    }
+
+    // **The control that says the rule is about controls, not about oddness.**
+    // U+FFFD is what C27 I2 substitutes, so the admitted arm is the exact text
+    // the emulator would have produced from the refused one.
+    expect(errs(term({ lines: [{ text: "bad\ufffdhere" }] })), "the replacement is ordinary text").toEqual([]);
+  });
+
+  it("T1.32 (C04 I111): overlapping, out-of-range, out-of-order and adjacent-equal runs are each refused; a maximal ordered set is admitted", () => {
+    const withRuns = (runs: readonly unknown[]): readonly string[] =>
+      errs(term({ lines: [{ text: "abcdef", runs }] }));
+
+    expect(withRuns([{ from: 0, to: 4, bold: true }, { from: 2, to: 6 }]).join(" "), "overlapping").toContain(
+      "overlap or are out of order",
+    );
+    expect(withRuns([{ from: 0, to: 7 }]).join(" "), "past the end of the text").toContain("outside the text");
+    expect(withRuns([{ from: 4, to: 6 }, { from: 0, to: 2 }]).join(" "), "out of order").toContain(
+      "overlap or are out of order",
+    );
+
+    // **The addition to C04 I111's bounds gate, and the reason it is not tidiness.**
+    // Two adjacent runs with equal styles measure the same as one and diff
+    // differently on every frame — so a snapshot of an unchanged screen stops
+    // comparing equal to itself. Merging is the producer's job.
+    expect(
+      withRuns([{ from: 0, to: 3, bold: true }, { from: 3, to: 6, bold: true }]).join(" "),
+      "adjacent and equal",
+    ).toContain("adjacent runs share a style");
+
+    // The same offsets with *different* styles are maximal, which is the
+    // control: without it the row above would pass on a rule that refused every
+    // adjacency.
+    expect(
+      withRuns([{ from: 0, to: 3, bold: true }, { from: 3, to: 6, italic: true }]),
+      "adjacent and different is a maximal pair",
+    ).toEqual([]);
+    expect(
+      withRuns([{ from: 0, to: 2, bold: true }, { from: 3, to: 6, bold: true }]),
+      "equal styles with a default cell between them",
+    ).toEqual([]);
+  });
+
+  it("T1.33 (C04 I113): grid refuses dropped, zero is refused in both modes, and a positive dropped in lines is admitted", () => {
+    // **Exclusive by meaning rather than by convention**: the alternate screen
+    // has nothing above it to lose lines from.
+    expect(errs(term({ screen: "grid", dropped: 3 })).join(" "), "a grid has no scrollback").toContain(
+      "refused on a grid screen",
+    );
+
+    // **Declared by presence**, so a zero is not "none" — it is a marker row
+    // reading `0 lines dropped at the cap`. Both modes, because the check that
+    // rejects it is the field's own and not the grid rule: a row asserting only
+    // the grid arm would pass with the positivity check deleted.
+    for (const screen of ["lines", "grid"] as const) {
+      expect(errs(term({ screen, dropped: 0 })).join(" "), `dropped: 0 on ${screen}`).toContain(
+        "positive integer",
+      );
+    }
+
+    expect(errs(term({ screen: "lines", dropped: 34 })), "the case the marker row is drawn from").toEqual([]);
+    expect(errs(term({ screen: "grid" })), "and a grid with no dropped at all").toEqual([]);
+  });
 });
 
 describe("C09 · C10 — the terminal block and a literal colour", () => {
@@ -233,7 +366,52 @@ describe("C09 · C10 — the terminal block and a literal colour", () => {
 });
 
 describe("C21 · C22 — the PTY port, spec-first rows", () => {
-  it.todo("T1.11 (C21 I15, C21 I16): spawnPty with no pty in the deps throws naming pty; with a fake factory it calls spawn once with the given cols, rows, cwd and env — not deferred on a component: lands with spawnPty");
+  it("T1.11 (C21 I15, C21 I16): with no factory it throws naming the field, and with one it spawns once with what it was given", () => {
+    // **No fallback, and the message names the field a consumer sets** (I16).
+    // The state a bare message would describe — *no PTY factory* — is one the
+    // reader cannot act on; `TuiConfig.pty` is.
+    const bare = createProcessRunner({ env: {}, stdin: {} });
+    let thrown = "";
+    try {
+      bare.spawnPty("echo hi", { cwd: () => "/w", cols: 80, rows: 6 });
+    } catch (err) {
+      thrown = err instanceof Error ? err.message : String(err);
+    }
+    expect(thrown, "the field a consumer sets").toContain("TuiConfig.pty");
+    expect(thrown, "and that the framework depends on no PTY package").toContain("depends on no PTY package");
+
+    // **What reaches the factory, asserted rather than that it was reached.**
+    // A spy counting calls passes with every argument wrong, and the geometry is
+    // the half a child cannot recover from: a shell told the wrong `cols` wraps
+    // its own output and no later resize un-wraps what it already printed.
+    const calls: unknown[][] = [];
+    const runner = createProcessRunner({
+      env: { PATH: "/usr/bin", TERM: "dumb" },
+      stdin: {},
+      pty: {
+        spawn: (...args: unknown[]) => {
+          calls.push(args);
+          return fakePtyChild().child;
+        },
+      } as never,
+    });
+    runner.spawnPty("pytest -q", { cwd: () => "/work", cols: 120, rows: 30, env: { TERM: "xterm-256color" } });
+
+    expect(calls, "spawned once, not per read").toHaveLength(1);
+    const [file, argv, opts] = calls[0] as [string, readonly string[], Record<string, unknown>];
+    expect(typeof file, "a shell path").toBe("string");
+    // **`-c` and the user's string, unassembled.** C18 §5: nothing in the
+    // framework builds this command, and the distinction is visible here.
+    expect(argv, "the user's string under -c").toEqual(["-c", "pytest -q"]);
+    expect(opts["cols"], "the width it was given").toBe(120);
+    expect(opts["rows"], "and the height").toBe(30);
+    expect(opts["cwd"], "the cwd, resolved at spawn rather than captured").toBe("/work");
+    // The merge, and the direction: the call's own env wins over the runner's.
+    expect(opts["env"], "the runner's env under the call's").toEqual({
+      PATH: "/usr/bin",
+      TERM: "xterm-256color",
+    });
+  });
   it("T1.13 (C21 I18): hasPty reports the injected factory, and the throw agrees with it", () => {
     // **The flag and the throw against the same runner.** A flag answered from
     // anywhere but the deps passes a row that builds two runners and asks each
@@ -248,7 +426,38 @@ describe("C21 · C22 — the PTY port, spec-first rows", () => {
     const withFactory = createProcessRunner({ env: {}, stdin: {}, pty: { spawn } as never });
     expect(withFactory.hasPty, "a factory was injected").toBe(true);
   });
-  it.todo("T1.12 (C21 I17): a fake PTY child that has exited returns false from signal, ignores write, and has resolved exited — not deferred on a component: lands with spawnPty");
+  it("T1.12 (C21 I17): once the child has exited, signal answers false, write is ignored, and exited has resolved", async () => {
+    // **The race is normal, not exceptional.** A child may exit between the
+    // keystroke and its delivery, so a write after exit throwing would surface
+    // as an error in the user's face for something they did nothing wrong to
+    // cause. Ignored is the ruling; `signal` is the one that must *answer*,
+    // because a caller cancelling wants to know whether anything was cancelled.
+    const fake = fakePtyChild();
+    const runner = createProcessRunner({
+      env: {},
+      stdin: {},
+      pty: { spawn: () => fake.child } as never,
+    });
+    const handle = runner.spawnPty("sleep 5", { cwd: () => "/w", cols: 80, rows: 6 });
+
+    // The state the row is about, asserted before it is changed.
+    expect(handle.running, "alive to begin with").toBe(true);
+    expect(handle.signal("SIGINT"), "and a signal reaches it").toBe(true);
+    expect(fake.killed, "which is the child being killed, not a bookkeeping flag").toEqual(["SIGINT"]);
+
+    fake.exit(0, undefined);
+
+    expect(handle.running, "the exit was observed").toBe(false);
+    expect(await handle.exited, "and reported as one Exit").toEqual({ code: 0, signal: null });
+
+    const writesBefore = fake.writes.length;
+    handle.write("x");
+    expect(fake.writes.length, "a write after exit reaches nothing").toBe(writesBefore);
+    handle.resize(40, 10);
+    expect(fake.resizes, "and neither does a resize").toEqual([]);
+    expect(handle.signal("SIGKILL"), "and signalling answers false rather than throwing").toBe(false);
+    expect(fake.killed, "with nothing sent").toEqual(["SIGINT"]);
+  });
 });
 
 describe("C23 — the shell route as a live screen, spec-first rows", () => {

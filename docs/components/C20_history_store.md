@@ -475,6 +475,9 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T2.11** (I11): `HistoryFs` is structurally satisfied by C22 §2's `FileSystem` — a compile-level test, deferred until C22 exists.
 - **T2.12** (I24, I25, I26): every row of §7b, asserting the rule that fired as well as the output. A row that produces the right string through the wrong rule is a redactor that will produce the wrong string for the next input, and asserting output alone cannot tell them apart.
 
+- **T2.13** (I25): **the grid, because *every rule* is a claim about a set** — three rules × two compounds, each cell asserting both that the secret is gone and that it went **through the rule that cell is about**, since a right answer through the wrong rule is a redactor about to give a wrong one. Five of the six leaked when this was written and the sixth was incidental (F931).
+- **T2.13b** (I25): the scope, stated where it can be checked — a URL's query and fragment are scanned by their pieces; its **path** is not, and a path segment behaves identically with or without a scheme, which is what makes the exemption a policy rather than an oversight.
+- **T2.13c** (I25): one redaction reports one rule. The token-level splice and the text-level pass can both see the same assignment, and a doubled entry reports two redactions where one happened — the text is right in both worlds, so only the rule list tells them apart.
 ### Tier 3 — edge cases
 
 - **T3.1** (I9): a history file containing an invalid escape → empty history, warning, session opens.

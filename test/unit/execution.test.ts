@@ -19,7 +19,9 @@
 // the entry ending in the *other* arm's state.
 import { createEditor } from "../../src/interaction/editor/index.js";
 import { createConfirmHost } from "../../src/shell/confirm.js";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { checkOneStorePerComponent } from "../../tools/enforce/module-graph.mjs";
 import { createExecutionPipeline } from "../../src/shell/execution.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { createSessionStore } from "../../src/shell/state.js";
@@ -77,6 +79,12 @@ type Scripted = Readonly<{
 }>;
 
 const blocks = createBlockRegistry();
+
+/** What a greeting producer returns, for C22 I99's three rows. */
+const GREETING = { schema: "tui.view/1" as const, command: "", status: "ok" as const,
+      blocks: [{ kind: "raw" as const, id: "greet", text: "welcome aboard" }],
+      meta: { verb: null, adapter: "none", exitCode: 0, durationMs: 0, truncated: false,
+        argv: [] as readonly string[], stderr: "", transport: "local" as const, origin: "action" as const } };
 
 function harness(script: Scripted = {}) {
   const transcript = createTranscriptStore();
@@ -250,6 +258,8 @@ function harness(script: Scripted = {}) {
     },
     stop: () => Promise.resolve(0),
     clock: () => now,
+    // The card's duration axis (C23 I54, F973); one counter with `clock` here.
+    elapsed: () => now,
     schedule: (fn: () => void, ms: number) => {
       const t = { fn, at: now + ms, live: true };
       timers.push(t);
@@ -278,10 +288,19 @@ function harness(script: Scripted = {}) {
     // what `as unknown as PipelineDeps` buys and costs — `overlays` and `confirm`
     // are the two the comment above already records.
     visible: () => true,
+    // The seventh shipped verb's seam (C23 I68); `seal()` refuses the row without it.
+    profileView: {
+      open: () => "no profiler to show — this session was built without `TuiConfig.profile`",
+      switchPane: () => false,
+      move: () => false,
+      pop: () => false,
+      dispose: () => undefined,
+      pane: null,
+    },
   } as unknown as PipelineDeps;
 
   const pipeline = createExecutionPipeline(deps);
-  // The app's own local verbs. The framework's six register themselves; these
+  // The app's own local verbs. The framework's seven register themselves; these
   // are the fixture manifest's, and `seal()` reconciles both (C23 I27).
   pipeline.register("guide", () =>
     script.localLive === undefined
@@ -916,6 +935,61 @@ describe("C23 §2 — the seven routes", () => {
 
     expect(h.pipeline.faults.join("\n")).toContain("refused while stopping");
     expect(h.transcript.entries, "and nothing was appended after shutdown began").toHaveLength(0);
+  });
+
+  it("T3.72 (C22 I99, F158, F1024): the reservation is filled, not appended beside", async () => {
+    // **The id is the control.** Asserting one entry holding the greeting is
+    // green for a pipeline that appended and cleared, and green for one that
+    // never reserved at all; asserting that the entry's id is the one
+    // `reserveGreeting` handed back is green only for the seam that filled it.
+    const h = harness();
+    const slot = h.pipeline.reserveGreeting();
+    expect(slot, "the slot was taken").toBeTypeOf("string");
+    expect(h.transcript.entries, "and it is on the transcript at once").toHaveLength(1);
+    expect(h.transcript.entries[0]?.streaming, "unsettled, or `settle` refuses it (C13 \u00a72)").toBe(true);
+
+    h.pipeline.greeting(GREETING, slot);
+    await settled(h.pipeline);
+
+    expect(h.transcript.entries, "one entry, not two").toHaveLength(1);
+    expect(h.transcript.entries[0]?.id, "and it is the slot").toBe(slot);
+    expect(h.transcript.entries[0]?.streaming, "settled by the fill").toBe(false);
+    expect(
+      h.transcript.entries[0]?.doc.blocks.map((b) => (b.kind === "raw" ? b.text : b.kind)),
+      "holding what the producer returned",
+    ).toEqual(["welcome aboard"]);
+  });
+
+  it("T3.73 (C22 I99): an abandoned slot is settled, empty and evictable", async () => {
+    // C13 never evicts a streaming entry (C13 I6), so a reservation left alone
+    // outlives the cap for the life of the process. Released and abandoned
+    // differ in exactly one flag, which is why this row is the only place the
+    // release clause can fail.
+    const h = harness();
+    const slot = h.pipeline.reserveGreeting();
+    h.pipeline.abandonGreeting(slot);
+    await settled(h.pipeline);
+
+    expect(h.transcript.entries, "the entry is still there").toHaveLength(1);
+    expect(h.transcript.entries[0]?.streaming, "and no longer streaming").toBe(false);
+    expect(h.transcript.entries[0]?.doc.blocks, "and still draws nothing").toEqual([]);
+  });
+
+  it("T3.74 (C22 I99): a slot the user cleared is gone, and the greeting appends", async () => {
+    // `settle` answers `unknown` and the call site acts on it. Before C22 I99
+    // the outcome was discarded, so the greeting would have vanished with no
+    // refusal anywhere — the failure a returned `PatchOutcome` exists to make
+    // impossible and that this call site was not reading.
+    const h = harness();
+    const slot = h.pipeline.reserveGreeting();
+    h.transcript.clear();
+    expect(h.transcript.entries, "the slot is gone").toHaveLength(0);
+
+    h.pipeline.greeting(GREETING, slot);
+    await settled(h.pipeline);
+
+    expect(h.transcript.entries, "and the greeting appended rather than vanishing").toHaveLength(1);
+    expect(h.transcript.entries[0]?.id, "as a new entry, because the old id no longer exists").not.toBe(slot);
   });
 
   it("T3.38 (§5a): when the notice cannot land either, the collection still has it", async () => {
@@ -2381,3 +2455,124 @@ describe("C23 §4 — the submit row's two other steps", () => {
     expect(h.recorded.map((r) => r.command), "and now it is in C20").toContain("/ps --mine");
   });
 });
+
+describe("C23 §2, §3 — what the pipeline may not do", () => {
+  it("T1.60 (I41): `height` is non-null on the view route and null on every other", () => {
+    // **Decided from `isViewInvocation` before step 3** — the decision is
+    // already read there because after step 3 it is too late (C23 I3 appends
+    // the pending entry before the transport is invoked, and C13 has no
+    // delete). What this row asserts is the *partition*: a route that handed
+    // down the region's height everywhere would satisfy every assertion about
+    // a view's producer and quietly tell a transcript entry it is bounded.
+    const src = readFileSync("src/shell/execution.ts", "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+    // To the end of the call, not to the first `)` — `deps.region().height`
+    // carries one of its own, and truncating there makes the two arms read alike.
+    const calls = [...src.matchAll(/producerContext\((.*)\),?\s*$/gmu)].map((m) => m[1]!.trim());
+    expect(calls.length, "the corpus is not empty").toBeGreaterThan(3);
+
+    // **A tally, not a set** (F932). Two arguments and no third — `null`, or the
+    // region's height — and *how many of each*, compared by equality. The set of
+    // distinct answers is blind to the one change this row exists to catch: a
+    // route moving from `null` to the height leaves both answers present, so the
+    // vocabulary is unchanged while the partition is not. Measured, not supposed
+    // — the mutation that hands the height to a non-view route survived the set
+    // and is caught by this tally. A route added here must be classified
+    // deliberately, which is the point: I41 is a claim about *which routes*, not
+    // about which words appear somewhere in the file.
+    const tally: Record<string, number> = {};
+    for (const c of calls) tally[c] = (tally[c] ?? 0) + 1;
+    expect(tally, "two answers, and the partition between them").toEqual({
+      null: 5,
+      "deps.region().height": 2,
+    });
+
+    // And the region's height is a real bound rather than a stand-in for the
+    // terminal's — the distinction I41 turns on (C07 I18).
+    expect(src, "the view route reads the region").toMatch(/deps\.region\(\)\.height/u);
+  });
+
+  it("T1.61 (I24): C23 inserts no vertical spacing of its own", () => {
+    // **The rule has teeth in one direction only**: C23 may not *add* rhythm.
+    // A composition root that put a blank row between top-level blocks would
+    // make a document's height depend on where it was rendered — so the height
+    // C14 virtualises against and the height the frame draws would be computed
+    // by different code with no reason to agree, and it would be invisible to
+    // `measure`, the one place the system checks anything about height.
+    const files = ["src/shell/execution.ts", "src/shell/refresh.ts"];
+    for (const f of files) {
+      const stripped = readFileSync(f, "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\/\/.*$/gm, "");
+      // A blank `raw` block is the shape a spacer takes: an empty text, or a
+      // lone newline, appended between blocks that declare their own gaps.
+      const spacers = [...stripped.matchAll(/kind:\s*"raw"[^}]*text:\s*("(?:\\n|\s*)")/gu)];
+      expect(spacers.map((m) => m[1]), `${f} composes a spacer`).toEqual([]);
+    }
+
+    // The control: the pattern finds a spacer when one is written, so an empty
+    // result is a reading of these files rather than of a dead regex.
+    expect(
+      /kind:\s*"raw"[^}]*text:\s*("(?:\\n|\s*)")/u.test('block({ kind: "raw", id: "gap", text: "" })'),
+      "the pattern can fire",
+    ).toBe(true);
+
+    // And the positive half, so *no rhythm of its own* is not read as *no
+    // rhythm*: the declared gap is what survives, which is C04 I25's field
+    // doing the work C23 is forbidden to do. It is set where documents are
+    // *composed* — the local handlers — and nowhere in the routing itself,
+    // which is the division the invariant describes.
+    expect(readFileSync("src/shell/local/handlers.ts", "utf8"), "declared, block by block").toMatch(
+      /gapBefore:\s*true/u,
+    );
+  });
+
+  it("T1.62 (I23): `/debug` reads an entry's meta and reaches no transport", () => {
+    // **It never re-runs anything.** A `/debug` that re-invoked would produce a
+    // document that agrees with itself and disagrees with the entry it claims
+    // to describe — and every assertion about its *contents* would pass.
+    const handlers = readFileSync("src/shell/local/handlers.ts", "utf8");
+    // Anchored on the handler's own arrow and closed at its `return`, so the
+    // slice is `/debug` and not whatever follows it in the record.
+    const body = /\n    debug: \(argv\) => \{([\s\S]*?)\n      return doc\("\/debug", blocks\);/.exec(
+      handlers,
+    );
+    expect(body, "the debug handler").not.toBeNull();
+    const stripped = body![0]!.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+    // **A reach, not the word.** The handler reads `m.transport` and prints
+    // `transport` as a row label — so a pattern matching the noun reports the
+    // one thing I23 says it *should* do. What is forbidden is going back to a
+    // far side, which looks like `deps.transport`, an `invoke`, a `stream` or
+    // a resubmission.
+    const reach = /deps\.transport\b|\.invoke\(|\.stream\(|\.submit\(|\brerun\b/u;
+    expect(reach.test(stripped), "no re-run").toBe(false);
+    expect(stripped, "it reads the entry's meta instead").toMatch(/entry\.doc\.meta/u);
+    expect(
+      reach.test('const r = await deps.transport.for("ps").invoke(inv);'),
+      "the pattern can fire",
+    ).toBe(true);
+  });
+
+  it("T1.63 (I13): no component under C23 reaches a store another component owns", () => {
+    // I13's mechanical form is MG23 — *one store per component* — and it is
+    // asserted in `enforce-rules.test.ts` on a fabrication. What is owed here
+    // is that the rule is **live on the real tree**, because a rule that fires
+    // on a fabrication and is scoped to nothing reports zero for both reasons.
+    const violations = checkOneStorePerComponent(srcFiles("src/shell"), (f) =>
+      readFileSync(f, "utf8"),
+    );
+    expect(violations.filter((v) => v.rule === "MG23"), "the tree honours it").toEqual([]);
+  });
+});
+
+/** The walker MG23 is given, kept beside its one caller. */
+function srcFiles(dir: string, out: string[] = []): string[] {
+  for (const entry of readdirSync(dir)) {
+    const path = `${dir}/${entry}`;
+    if (statSync(path).isDirectory()) srcFiles(path, out);
+    else if (/\.tsx?$/.test(entry) && !/\.d\.ts$/.test(entry)) out.push(path);
+  }
+  return out;
+}

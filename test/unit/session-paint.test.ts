@@ -9,9 +9,10 @@
 //     composed at two widths is coherent at neither, and the wrap it causes
 //     scrolls the alternate screen.
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 
 import { compose, heightsSum, type Composed } from "../../src/shell/frame.js";
-import { paint, type PaintDeps } from "../../src/shell/paint.js";
+import { cursorFor, paint, placedLayers, type PaintDeps } from "../../src/shell/paint.js";
 import { exact, FrameError } from "../../src/shell/frame-error.js";
 import { displayCells } from "../../src/presentation/text.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
@@ -21,6 +22,14 @@ import { patchDefinition } from "../../src/presentation/patch/definition.js";
 import { SGR_RESET, sgr } from "../../src/terminal/escapes.js";
 import { resolveBase } from "../../src/presentation/theme/index.js";
 import type { SessionSnapshot } from "../../src/shell/types.js";
+import { createOverlayManager } from "../../src/viewport/overlay/index.js";
+import type { Placed } from "../../src/viewport/overlay/index.js";
+import type { ProfileReport } from "../../src/shell/profiling/types.js";
+import { registry as measurer, rows as contentRows } from "../support/overlay.js";
+import { buildSession } from "../support/session.js";
+import { makeDefaultChrome } from "../../src/shell/chrome.js";
+import { tone } from "../../src/presentation/blocks/paint.js";
+import type { Block, Pills } from "../../src/data/viewmodel/index.js";
 
 /** C09's measurer, for the footer's height (C22 I82). */
 const MEASURE = createBlockRegistry({ defaults: true }).measureSequence;
@@ -644,5 +653,249 @@ describe("C22 §6g — the theme's background is a base, not a span (C22 I65)", 
 
     const rows = paint(frameAt(40, 6), deps({ theme: LIGHT_THEME, capabilities: mono }));
     for (const row of rows) expect(row.includes("\x1b[")).toBe(false);
+  });
+  it("T1.5f (F889): the base-colour pass builds one regexp per call, not one per row", () => {
+    // **A source row, and the reason is that there is nothing else to read.**
+    // `toTerminalDefault()` is a factory — a `/g` pattern carries `lastIndex`
+    // and a shared one is a hazard across independent scans — so calling it
+    // inside the `.map` allocated a fresh regexp for every row of every frame.
+    // Moving the call out changes no byte of any frame, so no assertion about
+    // output can see it and no mutation of it fails a test: the shape is the
+    // only observable, and without this row it regresses in silence.
+    //
+    // Reuse is safe *within one pass* because `String.replace` with a global
+    // pattern sets `lastIndex` to 0 before it iterates and leaves it there.
+    const src = readFileSync("src/shell/paint.ts", "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|[^:])\/\/.*$/gm, "$1");
+    const body = /function based\([\s\S]*?\n}/.exec(src)?.[0] ?? "";
+    expect(body, "the function was found, not an empty match").toContain("toTerminalDefault");
+    expect(body.match(/toTerminalDefault\(\)/g) ?? [], "called once").toHaveLength(1);
+    expect(body, "and bound before the map").toMatch(
+      /const toDefault = toTerminalDefault\(\);[\s\S]*\.map\(/,
+    );
+    expect(body, "the map uses the bound one").toMatch(/line\.replace\(toDefault,/);
+  });
+});
+
+describe("C22 §4a — one overlay layout per frame, shared by the rows and the cursor (C22 I96)", () => {
+  /** A layer with a cursor of its own, from the real manager and the real placer. */
+  function cursorLayer(id: string) {
+    return {
+      id,
+      kind: "overlay" as const,
+      placement: { kind: "anchored" as const, row: 6, prefer: "above" as const },
+      content: contentRows(1, id),
+      dismissable: true,
+      width: 20,
+      cursor: { row: 0, col: 5 },
+    };
+  }
+
+  it("T1.58 (C22 I96): handed one layout, `paint` and `cursorFor` lay nothing out; handed none, each lays out for itself", () => {
+    const f = frameAt(40, 12);
+    let laid = 0;
+    const d = deps({
+      overlays: () => {
+        laid += 1;
+        return [];
+      },
+    });
+
+    // **The shared form** — the layout taken once and read twice, through the
+    // same wrapper `render-frame.ts` uses. `laid` is the count `spans.overlays`
+    // reports per frame in the real graph (C28 T1.61), and it was two for as
+    // long as each function took its own.
+    const placed: readonly Placed[] = placedLayers(d);
+    expect(laid, "the wrapper reaches the thunk — the counter can see a layout").toBe(1);
+    paint(f, d, placed);
+    cursorFor(f, d, placed);
+    expect(laid, "neither function laid the overlays out again").toBe(1);
+
+    // **The control, and the shape this replaced.** Without a layout in hand
+    // each function must take its own, so the thunk is reached once more per
+    // call — which is what says the counter can see a layout at all.
+    paint(f, d);
+    expect(laid, "`paint` alone lays out once").toBe(2);
+    cursorFor(f, d);
+    expect(laid, "`cursorFor` alone lays out once").toBe(3);
+  });
+
+  it("T1.59 (C22 I96): the cursor is placed from the layout the rows were composited from, not from a second one", () => {
+    // **Two records of one frame.** A thunk that answers differently on its
+    // second call is what a stack changing between two layouts looks like; with
+    // one layout the rows and the cursor agree by construction, and with two the
+    // frame would show a layer whose cursor is the prompt's.
+    const f = frameAt(40, 12);
+    const overlays = createOverlayManager({ registry: measurer });
+    overlays.push(cursorLayer("cur"));
+    const withLayer = overlays.layout(f.overlayRegion);
+    const top = withLayer[0];
+    if (top === undefined) throw new Error("the fixture placed nothing");
+
+    let calls = 0;
+    const d = deps({
+      overlays: () => {
+        calls += 1;
+        return calls === 1 ? withLayer : [];
+      },
+    });
+
+    const placed = placedLayers(d);
+    const lines = paint(f, d, placed);
+    const cursor = cursorFor(f, d, placed);
+    expect(displayCells(lines[f.region.top + top.top] ?? "") > 0 && (lines[f.region.top + top.top] ?? "").includes("cur row 0"), "the rows carry the layer").toBe(true);
+    expect(cursor, "and the cursor is the layer's, offset into frame coordinates").toEqual({
+      row: f.region.top + top.top,
+      col: top.left + 5,
+    });
+    expect(calls, "the thunk answered once for both").toBe(1);
+  });
+
+  it("T4.64 (C09 I61, C22 I86; C28 I31): a real session's chrome children are measured once per registry call — header 2.0 calls per frame, footer one more for compose's own call", async () => {
+    let seen: ProfileReport | null = null;
+    const { tui } = await buildSession({
+      profile: {
+        tier: "spans",
+        elapsed: (() => {
+          let t = 0;
+          return () => (t += 1);
+        })(),
+        onReport: (r) => void (seen = r),
+      },
+    });
+    await tui.stop("exit");
+    const report = seen as ProfileReport | null;
+    if (report === null) throw new Error("no report arrived");
+    expect(report.frames, "the session painted").toBeGreaterThan(0);
+
+    const node = (kind: string, id: string) => {
+      const found = report.nodes.find((n) => n.key === `${kind}#${id}`);
+      if (found === undefined) throw new Error(`no node ${kind}#${id} — the default chrome did not draw`);
+      return found;
+    };
+
+    // **`calls` counts the registry seam — one measure and one render is the
+    // floor for a rendered block** (C28 I31). The header's children read 3.0 and
+    // the footer's 4.0 before the registry answered a `(block, width)` once per
+    // call (F940): the group's `measure` asked, its `render`'s placements asked
+    // again, and the child's own render committed a third.
+    const header = node("group", "chrome.header");
+    const headerLeft = node("pills", "chrome.header.left");
+    const headerRight = node("pills", "chrome.header.right");
+    expect(header.calls, "the header group is rendered once per frame and measured by nobody").toBe(header.frames);
+    expect(headerLeft.calls, "one measure and one render per frame").toBe(2 * headerLeft.frames);
+    expect(headerRight.calls, "one measure and one render per frame").toBe(2 * headerRight.frames);
+
+    // **The footer is one call more, and the call is compose's** (C22 I82):
+    // `footerRows` is measured through `measureSequence` before the frame is
+    // painted, which is a registry call of its own and therefore a scope of its
+    // own (I61's bound is the call). The difference is asserted as exactly that
+    // one call rather than as a ceiling, so the row says where the extra ask
+    // lives instead of tolerating it.
+    const footer = node("group", "chrome.footer");
+    const footerLeft = node("pills", "chrome.footer.left");
+    const footerRight = node("pills", "chrome.footer.right");
+    expect(footer.calls, "compose's measure and paint's render").toBe(2 * footer.frames);
+    expect(footerLeft.calls, "the header's two plus compose's one").toBe(3 * footerLeft.frames);
+    expect(footerRight.calls, "the header's two plus compose's one").toBe(3 * footerRight.frames);
+  });
+});
+
+describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => {
+  /**
+   * Every chip the default chrome emits, with all three conditional ones up.
+   *
+   * **`copyMode`, `stopping` and `lastFrame` are all set** because each gates a
+   * chip, and a corpus assembled from the quiet session is three chips short —
+   * two of which are the only two in the file whose tone is not the default, so
+   * a walk over the quiet session would be a walk over the inert ones alone.
+   */
+  function chips(): readonly Pills["chips"][number][] {
+    const chrome = makeDefaultChrome("calcium", "/usr/local/bin/prism");
+    const ctx = {
+      session: {
+        cwd: "/home/ada/work",
+        env: Object.freeze({ HOME: "/home/ada" }),
+        lastUuid: null,
+        identity: null,
+        cluster: "fmx-prod",
+        health: "live" as const,
+        version: "1.0.0",
+        retained: null,
+        stopping: true,
+      } satisfies SessionSnapshot,
+      now: 1_700_000_000_000,
+      columns: 80,
+      copyMode: true,
+      lastFrame: 12.4,
+    };
+    const out: Pills["chips"][number][] = [];
+    const walk = (b: Block): void => {
+      if (b.kind === "pills") out.push(...b.chips);
+      if (b.kind === "group") b.children.forEach(walk);
+    };
+    [...chrome.header(ctx), ...chrome.footer(ctx)].forEach(walk);
+    return out;
+  }
+
+  it("T1.46b (C22 I86, I97, §6l.6 J, F1029): every chip names its tone, and the name is not the binary's ink", () => {
+    // **C22 pins its chrome's appearance rather than inheriting C09's default**,
+    // and that is why five explicit `tone: "muted"`s which each equal the default
+    // are not five inert words: they are one property, and this is the row that
+    // makes it one. `simple.ts` resolves `chip?.tone ?? "muted"`, so a change to
+    // *that* default would otherwise repaint every chrome row in every Calcium
+    // app with nothing in C22 moving and nothing here going red.
+    //
+    // **F1029 found one of the five and read it as a word to delete.** Measured
+    // here: dropping the clock's `tone: "muted"` moves 0 of 46 golden snapshots,
+    // exactly as dropping the binary's does — so the vacuity was never about
+    // that one chip. What was actually wrong is that **one chip of eight opted
+    // out of the pinning**, and it happened to be the one whose intended tone
+    // differed from the default.
+    //
+    // **The spec now carries it** — §6l.6 J's tone clause, I97 and T1.46b, all
+    // landed ahead of this row. The comment stays because what it names is the
+    // reason the row is T1.46's sibling: I86 is the geometry of the same two
+    // clusters, and a tone is appearance and never geometry, which is why the
+    // golden diff for this change touches every style map and no grid.
+    const all = chips();
+    // The corpus, before anything is asserted over it: a walk that found nothing
+    // satisfies every for-loop below it (`an exit status is the same bit for
+    // clean and for did-not-run`).
+    expect(all.map((c) => c.label), "eight chips, with all three conditional ones up").toEqual([
+      "calcium",
+      "/usr/local/bin/prism",
+      "COPY",
+      "22:13:20",
+      "/help",
+      "stopping",
+      "last  12.4ms",
+      "~/work",
+    ]);
+    for (const chip of all) {
+      expect(chip.tone, `${chip.label} inherits C09's default instead of naming its own`).toBeDefined();
+    }
+
+    // **And the sentence F1029 found could not be violated.** `{ label: name },
+    // { label: binary, tone: "muted" }` reads as *the binary is dimmer than the
+    // name* and rendered both at one ink, because `muted` **is** the default.
+    // Asserted on the resolved ink rather than on the two words: giving the name
+    // `tone: "muted"` spells a difference and paints none, and that is the defect
+    // this row exists for rather than the spelling it happened to arrive in.
+    const [name, binary] = all;
+    for (const theme of [DARK_THEME, LIGHT_THEME]) {
+      const ofName = tone(name?.tone ?? "muted", theme, FULL_CAPS);
+      const ofBinary = tone(binary?.tone ?? "muted", theme, FULL_CAPS);
+      expect(ofName, "the header's identity and the path it drives resolve to one ink").not.toEqual(ofBinary);
+    }
+    // The control: two chips that *are* meant to share an ink still do, so the
+    // assertion above is about these two and not about any two chips differing.
+    // (The `?? "muted"` arms are unreachable past the loop above, which is where
+    // an undefined tone is reported; they are here because `Tone` has no member
+    // that could stand for *absent*.)
+    expect(tone(all[3]?.tone ?? "muted", DARK_THEME, FULL_CAPS), "the clock and the cwd are both chrome").toEqual(
+      tone(all[7]?.tone ?? "muted", DARK_THEME, FULL_CAPS),
+    );
   });
 });

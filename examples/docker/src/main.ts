@@ -38,18 +38,19 @@ import { transferHandlers } from "./transfer.ts";
 const run = promisify(execFile);
 
 /**
- * The terminal's width, read by the app because nothing hands it to a local
- * handler (FINDINGS F14).
+ * **`width()` was here and is gone** (F14, F1008).
  *
- * `AdapterContext` carries `width` — C11 needs it and C07 gets it. `LocalContext`
- * carries `command` and nothing else, so the one route an app writes entirely
- * itself is the one that cannot know how wide the screen is. Reading
- * `process.stdout.columns` here is the app doing what C01 does for everything
- * else in the tree, which is exactly the duplication C01 I13 exists to prevent —
- * and it is wrong across a resize, because it is read once per command rather
- * than handed down.
+ * It read `process.stdout.columns` because `LocalContext` was
+ * `Readonly<{ command: string }>` and a local handler could not find out how
+ * wide the screen was. `LocalContext` is `ProducerContext & …` now, and
+ * `ProducerContext.width` is the frame's own — read from C01 at every
+ * invocation, so it is right across a resize where this was not.
+ *
+ * The call sites went in `c4b2869d` on 2026-08-07; **the declaration stayed
+ * thirty-four days with no caller**, because the example tree's own
+ * `tsconfig.json` did not set `noUnusedLocals` where the framework's does.
+ * That is F1008, and the flag is on all three examples now.
  */
-const width = (): number => process.stdout.columns || 80;
 
 /**
  * **`unicodeText` was here and is gone** (F54, F124, F43).
@@ -153,6 +154,21 @@ const tui = createTui({
   // cast. Every internal caller passes a literal, which is why no producer
   // could have met it. FINDINGS F53.
   capabilities: depthOverride(),
+  // **`counters`, because it is the lowest tier at which `/profile` opens — not
+  // because this app wants figures** (C28 §3, C28 T4.1, C23 I68). The verb is
+  // the framework's seventh and it draws C28's view only where a recorder
+  // exists: `tier: "off"` and no `profile` at all build one session and hold
+  // no recorder — C28 T4.1 asserts the two write identical bytes — so the verb
+  // refuses there with a notice naming this field, which is what this app did
+  // before this line (FINDINGS F953, F962). `counters` is the first recording
+  // tier: an integer per seam, measured at nil against `off` in C28 §3a's
+  // table. Opening the view raises to `spans` only while it is up and restores
+  // on close (C28 I50), and the counters survive that raise, so the overview
+  // opens on this session's frames and bytes rather than on zeros that are
+  // true of nothing (C28 I44). Measured on this app through a PTY, five
+  // spawns each way: the greeting's wall-clock is a median of 935 ms without
+  // this line and 862 ms with it, the two ranges overlapping (F962).
+  profile: { tier: "counters" },
   // Keyed by the verb, and a sub-verb's key is its whole name — the space is
   // part of it, not a separator this side of C18.
   adapters: {

@@ -26,6 +26,7 @@
  * one most callers want (C07 I18). A view's producer passes the region's.
  */
 import { fullRegistry } from "./expect-document.js";
+import { defaultStart } from "../shell/choice-selection.js";
 import type { ProducerContext } from "../data/adapters/types.js";
 import type { LocalContext } from "../shell/local/registry.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
@@ -68,15 +69,26 @@ export function producerContext(over: Partial<ProducerContext> = {}): ProducerCo
  * that means to exercise the other arm has to say which choice — which is the
  * one it should be saying out loud.
  *
- * A handler with no `default` in its choices gets the first, because `ask`
- * resolving with nothing is the second representation of *nothing happened* that
- * C23 I36 exists to refuse.
+ * **A handler with no `default` gets what the shell gives it, and this used to
+ * be a second record of that rule** (F926). It said *the first*, on a reason
+ * that is true and answers a different question: `ask` resolving with nothing
+ * is the second representation of *nothing happened* that C23 I36 exists to
+ * refuse — which argues against returning `""`, and not at all for the first
+ * choice over the last. `defaultStart` is *the marked one, else the **last***,
+ * because a destructive verb offers the safe option last (`yes`, `no`) and the
+ * fallback exists precisely for a caller who forgot to mark one.
+ *
+ * So the disagreement was aimed at the population it hurts: every caller in
+ * this repository marks a default, and the callers who do not are consumers —
+ * the ones this module is for. Called rather than restated, which is the
+ * argument `confirm.ts` already makes about its own two copies: *a question
+ * that opens on `no` and escapes to `yes` is the worst possible pair.*
  */
 export function localContext(over: Partial<LocalContext> = {}): LocalContext {
   return Object.freeze({
     ...producerContext(over),
     command: "/probe",
-    ask: (opts) => Promise.resolve((opts.choices.find((c) => c.default) ?? opts.choices[0])?.key ?? ""),
+    ask: (opts) => Promise.resolve(opts.choices[defaultStart(opts.choices)]?.key ?? ""),
     // **Empty by default, which is the failed-validation arm** (C22 I66). A
     // handler tested without saying what was parsed takes the path a malformed
     // invocation takes, and a test meaning to exercise the other arm says so.

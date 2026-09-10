@@ -8,6 +8,7 @@
 // runs the same cleanup exactly once, however it gets there. That is true of
 // all five, it is what I5 actually claims, and it survives the two paths being
 // reached through a different function — which the identity form could not.
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
 import { makeBeforeRelease } from "../../src/shell/shutdown.js";
@@ -143,5 +144,58 @@ describe("C22 §8 — cleanup", () => {
     stderr.mockRestore();
 
     expect([killed, drained]).toEqual([["killAll"], [0]]);
+  });
+});
+
+describe("C22 §4 — the two paths that do not set `stopping`", () => {
+  it("T1.5h (I4a): `beginStopping` has one call site, and it is not on the signal or fault path", () => {
+    // **`session.stopping` is unset on those two, and that is safe for one
+    // reason only**: `process.exit` runs synchronously inside the handler, so
+    // there is no window for a submission to interleave. The flag is
+    // unnecessary for exactly as long as that holds — which makes the
+    // *synchrony* the invariant and the flag's absence the consequence.
+    const shell = readdirSync("src/shell")
+      .filter((f) => f.endsWith(".ts"))
+      .map((f) => `src/shell/${f}`);
+    const callers: string[] = [];
+    for (const f of shell) {
+      const stripped = readFileSync(f, "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\/\/.*$/gm, "");
+      // A *call*, so the interface member in `state.ts` — `beginStopping(): void;`
+      // — is not counted as a caller of itself.
+      if (/\.beginStopping\(\)/.test(stripped)) callers.push(f);
+    }
+    expect(callers, "one caller: the ordinary stop").toEqual(["src/shell/session.ts"]);
+
+    // And it is inside `#runStop` — the ordinary path — rather than in a handler.
+    const session = readFileSync("src/shell/session.ts", "utf8");
+    const runStop = /async #runStop\(reason: StopReason\): Promise<number> \{([\s\S]*?)\n  \}/.exec(
+      session,
+    );
+    expect(runStop, "#runStop's body").not.toBeNull();
+    expect(runStop![1]!, "the flag is set on the ordinary stop").toMatch(/beginStopping\(\)/u);
+  });
+
+  it("T1.5i (I4a): the fault handler is synchronous — nothing may make either path await", () => {
+    // The clause with teeth, and it is the one a reader would not think to
+    // check: an `await` added to `onFatal` or to the release path opens the
+    // interleaving window the flag was never built to close.
+    const session = readFileSync("src/shell/session.ts", "utf8");
+    const onFatal = /onFatal: \(err\) => \{([\s\S]*?)\n      \}/.exec(session);
+    expect(onFatal, "the fault handler").not.toBeNull();
+    expect(/\bawait\b|\basync\b/.test(onFatal![1]!), "the fault path stays synchronous").toBe(
+      false,
+    );
+
+    // The cleanup C01 runs on the signal path, from the module that owns it.
+    const shutdown = readFileSync("src/shell/shutdown.ts", "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+    expect(/\basync\b|\bawait\b/.test(shutdown), "`beforeRelease` stays synchronous").toBe(false);
+    // The control: the pattern does find these words where they exist, so the
+    // two assertions above are readings of those files rather than of a regex
+    // that never matches.
+    expect(/\basync\b/.test(session), "the corpus is not empty").toBe(true);
   });
 });

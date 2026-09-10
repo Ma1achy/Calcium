@@ -14,6 +14,7 @@
  *   - **An unregistered language renders as plain text, not an error** — the
  *     same principle as C07's fallback adapter.
  */
+import { NO_SPAN } from "../../../data/viewmodel/index.js";
 import type { ReactElement } from "react";
 import { createLowlight } from "lowlight";
 import type { LanguageFn } from "highlight.js";
@@ -34,8 +35,8 @@ import typescript from "highlight.js/lib/languages/typescript";
 import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
-import type { Code } from "../../../data/viewmodel/index.js";
-import { cells, expandTabs, hardWrapCells, stripControl, truncateParts } from "../../text.js";
+import type { Code, Probe } from "../../../data/viewmodel/index.js";
+import { cells, clusterEnds, expandTabs, hardWrapCells, stripControl, truncateParts } from "../../text.js";
 import { sliceRuns } from "../../runs.js";
 import { paint, rows, slot, tone, type Span } from "../paint.js";
 import type { BlockDefinition, RenderContext, Windowed } from "../types.js";
@@ -153,7 +154,7 @@ const memo = new Map<string, readonly Token[]>();
 /** Bounded, so a long session cannot grow the cache without limit. */
 const MEMO_CAP = 256;
 
-export function tokenise(text: string, language: string): readonly Token[] {
+export function tokenise(text: string, language: string, probe?: Probe): readonly Token[] {
   // `\u0000` explicitly, and it is the right separator rather than an accident:
   // a NUL cannot occur in a language name, so no pair of (language, text) can
   // collide with another by straddling it. Written as an escape because it was a
@@ -161,15 +162,75 @@ export function tokenise(text: string, language: string): readonly Token[] {
   // diff.
   const key = `${language}\u0000${text}`;
   const held = memo.get(key);
-  if (held !== undefined) return held;
+  if (held !== undefined) {
+    probe?.hit("tokens");
+    return held;
+  }
+  // `absent` is the only reason this memo has: the key is the whole input, so a
+  // slot either exists or the text has never been seen. There is no axis to
+  // disagree on, and that is a property of the key rather than an omission.
+  probe?.miss("tokens", "absent");
 
-  const tokens = lowlight.registered(language)
+  const parsed = lowlight.registered(language)
     ? flatten(lowlight.highlight(language, text) as HastNode, null)
     : [{ text, slot: null }];
+  const tokens = wholeClusters(parsed, text);
 
-  if (memo.size >= MEMO_CAP) memo.clear();
+  if (memo.size >= MEMO_CAP) {
+    // **A cliff, not an eviction** — the cap clears all 256 at once, so the
+    // frame after it re-highlights every code block on screen. The counter is
+    // what makes that visible: one clear in a session is the cache working, one
+    // per frame is a working set larger than the cap and a periodic stall no
+    // duration alone would explain.
+    probe?.count("tokens.memo.cleared");
+    memo.clear();
+  }
   memo.set(key, tokens);
+  probe?.gauge("tokens.memo.size", memo.size);
   return tokens;
+}
+
+/**
+ * Token boundaries moved off cluster interiors (C09 I64, C04 I84, F970).
+ *
+ * A grammar's regexes see code units. `\b\d+` ends a `number` at its digits
+ * and never learns that the U+0600 before them is a Prepend the segmenter joins
+ * to the first one (UAX #29 GB9b), so `؀1` painted as a plain `؀` and a
+ * coloured `1` — an escape inside a cluster, the one piece the styled walk does
+ * not resolve (C09 §5a), in every grammar that tokenises a digit. A span reaches
+ * the painter through `runsOf`, which snaps it; a token never did.
+ *
+ * The rule is the one `runsOf` applies to a `to`: a boundary strictly inside a
+ * cluster moves on to the cluster's end, so the earlier token grows by the tail
+ * of the cluster and the later one loses its head — and is dropped when nothing
+ * is left of it. Width-preserving by construction, since the cluster is painted
+ * whole either way; what moves is which slot paints it, and `؀1` takes the
+ * Prepend's. `clusterEnds` answers `[]` only for printable ASCII, and source
+ * has newlines, so a block pays one segmentation of its text — once, through
+ * the memo above, since the key is the whole input. A control breaks a cluster
+ * on both sides (GB4, GB5), so no boundary crosses a newline and `tokenLines`
+ * is unaffected.
+ * A single token has no interior boundary, so the unregistered fallback pays
+ * nothing.
+ */
+function wholeClusters(tokens: readonly Token[], text: string): readonly Token[] {
+  if (tokens.length < 2) return tokens; // cells-ok — a token count
+  const ends = clusterEnds(text);
+  if (ends.length === 0) return tokens; // cells-ok — an array count
+  const out: Token[] = [];
+  let e = 0; // cells-ok — an index into the cluster ends
+  let from = 0; // cells-ok — a code-unit offset
+  let end = 0; // cells-ok — a code-unit offset
+  for (const token of tokens) {
+    end += token.text.length; // cells-ok — a code-unit offset
+    while (e < ends.length && (ends[e] as number) < end) e += 1; // cells-ok — an index into the cluster ends
+    const to = e < ends.length ? (ends[e] as number) : end; // cells-ok — the cluster end at or after the boundary
+    if (to > from) {
+      out.push({ text: text.slice(from, to), slot: token.slot });
+      from = to;
+    }
+  }
+  return out;
 }
 
 /**
@@ -372,12 +433,26 @@ export const codeDefinition: BlockDefinition<Code> = {
 
   render(block: Code, ctx: RenderContext): ReactElement {
     const width = normaliseWidth(ctx.width);
+    const probe = ctx.probe;
     const source = expandTabs(stripControl(block.text));
-    const perLine = tokenLines(tokenise(source, block.language));
+    // **Tokenise and paint, because they scale with different things.**
+    // Tokenising is a whole-block parse memoised on `(language, text)` — paid
+    // once and then free — and painting is per *visible* row, paid every frame.
+    // A block slow for the first reason wants the memo looked at; one slow for
+    // the second wants the window. The single figure they used to share could
+    // not tell them apart, and the memo's hit rate beside this says which.
+    let perLine;
+    {
+      using _t = probe?.span("code.tokenise") ?? NO_SPAN;
+      perLine = tokenLines(tokenise(source, block.language, probe));
+    }
     const defaultStyle = tone("default", ctx.theme, ctx.capabilities);
 
+    using _p = probe?.span("code.paint") ?? NO_SPAN;
+    const drawn = codeRows(block, width);
+    probe?.gauge("code.rows", drawn.length); // cells-ok — a count of items, not a display width
     return rows(
-      codeRows(block, width).map((row) => {
+      drawn.map((row) => {
         // Every rendered row is an exact slice of its source line, so the
         // tokens — which are offsets into that line — slice against it.
         const { kept, suffix } = truncateParts(row.text, width, ctx.capabilities);

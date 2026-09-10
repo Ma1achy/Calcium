@@ -53,7 +53,7 @@ const results = runPass({
       // `❯ /ps` over a table, §9c's settled state reached by no path.
       name: "the invoke route settles the adapted document without the card",
       file: EX,
-      from: "      settleWithDocument(pendingId, cardOver(doc, call, deps.clock() - startedAt, deps.capabilities));",
+      from: "      settleWithDocument(pendingId, cardOver(doc, call, deps.elapsed() - startedAt, deps.capabilities));",
       to: "      settleWithDocument(pendingId, doc);",
       expect: "T4.47",
     },
@@ -61,7 +61,7 @@ const results = runPass({
       // **T6.85, second arm.** The error arm settles `errorDoc` bare.
       name: "the invoke route's error arm settles the error document without the card",
       file: EX,
-      from: "      settleWithDocument(pendingId, cardOver(failed, call, deps.clock() - startedAt, deps.capabilities));",
+      from: "      settleWithDocument(pendingId, cardOver(failed, call, deps.elapsed() - startedAt, deps.capabilities));",
       to: "      settleWithDocument(pendingId, failed);",
       expect: "T4.47",
     },
@@ -182,12 +182,31 @@ const results = runPass({
       // C23 I60 (T4.51) — the clock starts at submit, not at approval: the head reads 5s after 2s of running.
       name: "the tool's clock starts at submit, not approval",
       file: EX,
-      from: "      startedAt = deps.clock();\n      // The word goes with the wait",
+      from: "      startedAt = deps.elapsed();\n      // The word goes with the wait",
       to: "      // The word goes with the wait",
       expect: "T4.51",
     },
     {
       // C23 I60 (T4.51) — a denial recorded as an ordinary failure.
+      // C23 I54 (T4.68, F973) — the card's figure on the wall clock, at both
+      // ends of the invoke route, because one end alone is `elapsed − clock`, a
+      // figure no reader would write. **And C28 T5.1d survives this, measured**
+      // (F975): a positional channel reproduces whatever is computed from it,
+      // so the row that sees a wrong axis is the one that skews one clock alone.
+      name: "the card's figure is the wall clock's",
+      file: EX,
+      from: "    let startedAt = deps.elapsed();",
+      to: "    let startedAt = deps.clock();",
+      also: [
+        {
+          file: EX,
+          from: "      settleWithDocument(pendingId, cardOver(doc, call, deps.elapsed() - startedAt, deps.capabilities));",
+          to: "      settleWithDocument(pendingId, cardOver(doc, call, deps.clock() - startedAt, deps.capabilities));",
+        },
+      ],
+      expect: "T4.68",
+    },
+    {
       name: "denied is recorded as exit 1",
       file: EX,
       from: "        deps.history.append(line, 126);",

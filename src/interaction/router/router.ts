@@ -11,6 +11,8 @@
  * it is not a second specification.
  */
 
+import { NO_SPAN } from "../../data/viewmodel/index.js";
+import type { Probe } from "../../data/viewmodel/index.js";
 import { activeTarget, type FocusInputs, type FocusStore } from "./focus.js";
 import type { Keymap } from "./keymap.js";
 import type { FocusTarget, InputEvent } from "./types.js";
@@ -37,6 +39,18 @@ export type Placed = Readonly<{
  * paying it twice would be a choice.
  */
 export type RouterDeps = Readonly<{
+  /**
+   * C28's seam (C28 I30, C28 I39). Absent is not recording, and that is the
+   * usual case.
+   *
+   * The `handler` span is opened here rather than around `dispatch`, because
+   * those are two different questions: `route` is *what did it cost to decide*
+   * and this is *what did it cost to act*, and the ladder walks up to seven
+   * rungs before either. Filing both under one name would put a keymap lookup
+   * and an app's own key handler in the same column — C28 I36's
+   * `handler`/`local` ruling, one layer up.
+   */
+  probe?: Probe;
   overlayTop: () => Readonly<{ kind: "overlay" | "view"; id: string; dismissable: boolean }> | null;
   /**
    * The top layer's answer handler, or null — I25.
@@ -361,7 +375,14 @@ export function createRouter(
   }
 
   function run(target: FocusTarget, e: InputEvent): boolean {
-    for (const h of handlers.get(target) ?? []) {
+    const list = handlers.get(target) ?? [];
+    // **Nothing to run is not a span** (C28 I39). `dispatch` calls this up to
+    // three times per event and most targets hold no handler, so opening one
+    // here unconditionally would make `spans.handler.count` a count of *rungs
+    // walked* under a name that says *handlers run*.
+    if (list.length === 0) return false; // graphemes-ok — a count of handlers
+    using _s = deps.probe?.span("handler") ?? NO_SPAN;
+    for (const h of list) {
       // Contained: a throwing handler leaves the event unconsumed and the
       // session alive (T3.15).
       try {

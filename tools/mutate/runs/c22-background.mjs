@@ -62,7 +62,7 @@ const MUTATIONS = [
     // nothing else.
     name: "a reset returns to the terminal's default",
     file: PAINT,
-    from: "    (line) => `${base}${line.replace(toTerminalDefault(), (seq) => `${seq}${base}`)}${SGR_RESET}`,",
+    from: "    (line) => `${base}${line.replace(toDefault, (seq) => `${seq}${base}`)}${SGR_RESET}`,",
     to: "    (line) => `${base}${line}${SGR_RESET}`,",
     expect: "T1.23",
   },

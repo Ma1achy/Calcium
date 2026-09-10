@@ -34,7 +34,7 @@ import {
 } from "../data/viewmodel/index.js";
 import {
   createBlockRegistry,
-  type BlockDefinition,
+  type AnyBlockDefinition,
   type BlockRegistry,
 } from "../presentation/blocks/index.js";
 import { tableDefinition } from "../presentation/table/index.js";
@@ -125,15 +125,6 @@ const KINDS_WITH_NOTHING_TO_CHECK: ReadonlyMap<BlockKind, Exemption> = new Map<
     },
   ],
   [
-    "scroll",
-    {
-      premise: "no-field",
-      why:
-        "a box and a residue row whose meaning is in its numbers, and the children are swept " +
-        "as blocks in their own right",
-    },
-  ],
-  [
     "image",
     {
       premise: "no-field",
@@ -155,15 +146,6 @@ const KINDS_WITH_NOTHING_TO_CHECK: ReadonlyMap<BlockKind, Exemption> = new Map<
         "carry meaning by colour, and these are not ours",
     },
   ],
-  [
-    "mosaic",
-    {
-      premise: "no-field",
-      why:
-        "pure geometry — a grid string, a height and two share arrays, none of which can carry " +
-        "a meaning that colour alone conveys; the children are swept as blocks in their own right",
-    },
-  ],
 ]);
 
 /** Any `tone` anywhere in a block, at any depth. The premise, falsifiable. */
@@ -173,6 +155,48 @@ function carriesATone(value: unknown): boolean {
   const record = value as Record<string, unknown>;
   if (typeof record["tone"] === "string") return true;
   return Object.values(record).some(carriesATone);
+}
+
+/**
+ * The four kinds that hold blocks — **and why two of them were exemptions**
+ * (F925).
+ *
+ * `scroll` and `mosaic` sat in `KINDS_WITH_NOTHING_TO_CHECK`, each with a `why`
+ * ending *"the children are swept as blocks in their own right"*. Nothing swept
+ * them: `visit` reached `default`, `assertNothingToCheck` returned, and the
+ * subtree was never read. The reason named a mechanism this file does not have.
+ *
+ * It did not fail silently, which is the half worth keeping and the half that
+ * made it visible: `carriesATone` is deep, so F102's guard fired on a
+ * *descendant's* tone. What that produced was a **false refusal** — a `scroll`
+ * holding a properly toned notice, text and all, could not be swept at all —
+ * and, on a real offence, the container named where the offender should be.
+ *
+ * **The guard was written for leaves.** A leaf's own fields are its whole
+ * subtree, so a deep scan and an own-fields scan are the same measurement
+ * there; for a container they are not, and the difference is exactly the
+ * children an arm sweeps. So the premise survives, scoped to the container's
+ * own fields — and it now covers `panel` and `group` too, which had an arm and
+ * therefore no premise check at all.
+ */
+const CONTAINER_PREMISE: ReadonlyMap<BlockKind, string> = new Map<BlockKind, string>([
+  ["group", "a direction, shares and alignments"],
+  ["panel", "a title, a footer and a live flag"],
+  ["scroll", "a box and a residue row whose meaning is in its numbers"],
+  ["mosaic", "pure geometry — a grid string, a height and two share arrays"],
+]);
+
+/** `carriesATone` over a container's **own** fields, its children excluded. */
+function assertContainerPremise(block: Block & { children: readonly Block[] }): void {
+  const { children: _children, ...own } = block;
+  if (!carriesATone(own)) return;
+  throw new Error(
+    `expectDocument: block kind "${block.kind}" is swept as a container on the premise that ` +
+      `its own fields carry no meaning colour alone could convey ` +
+      `(${CONTAINER_PREMISE.get(block.kind) ?? "?"}), and this one carries a tone outside its ` +
+      `children — the premise has expired and the arm needs a check, not a recursion ` +
+      `(C04 I37, F102, F925)`,
+  );
 }
 
 /**
@@ -235,11 +259,20 @@ const ASCII: TerminalCapabilities = Object.freeze({ ...TRUECOLOUR, unicode: "asc
  * that fell back to `raw` would still produce rows, still measure, and quietly
  * assert nothing about the kind under test.
  */
-export function fullRegistry(): BlockRegistry {
+export function fullRegistry(blocks: readonly AnyBlockDefinition[] = []): BlockRegistry {
   const r = createBlockRegistry({});
   for (const definition of [tableDefinition, plotDefinition, patchDefinition]) {
-    r.register(definition as unknown as BlockDefinition);
+    r.register(definition);
   }
+  // **The app's, after the framework's** (C24 I35, F405) — the same public
+  // route C11, C12 and C25 take.
+  //
+  // **It adds and never replaces**, and the first draft of this comment said
+  // the opposite. `register` throws on a kind already registered (T3.18): an
+  // app that shadows `logs` by accident gets a frame subtly wrong everywhere
+  // and no way to find out why. So passing `table` here is an error, loudly,
+  // which is the behaviour a consumer's own registry has.
+  for (const definition of blocks) r.register(definition);
   return r;
 }
 
@@ -299,8 +332,22 @@ export interface DocumentAssertions {
   lines(width: number, opts?: RenderOpts): readonly string[];
 }
 
-export function expectDocument(doc: ViewDocument): DocumentAssertions {
-  const registry = fullRegistry();
+export function expectDocument(
+  doc: ViewDocument,
+  /**
+   * The definitions the app registered (C24 I35, F405).
+   *
+   * **The measured failure is not an error.** Without them a registered kind
+   * falls back to `raw` and every height renders as **one row** — a plausible
+   * number, so `measuresCorrectly` and `rendersAt` both pass and assert nothing
+   * about the kind under test. `readonly AnyBlockDefinition[]` is exactly what
+   * `TuiConfig.blocks` takes, so this asks for nothing a consumer does not
+   * already hold, and the registry itself stays one of the eleven §3 keeps
+   * unreachable.
+   */
+  blocks: readonly AnyBlockDefinition[] = [],
+): DocumentAssertions {
+  const registry = fullRegistry(blocks);
   const resolved = theme();
 
   const rows = (caps: TerminalCapabilities, width: number): readonly string[] =>
@@ -535,6 +582,9 @@ export function expectDocument(doc: ViewDocument): DocumentAssertions {
             break;
           case "panel":
           case "group":
+          case "scroll":
+          case "mosaic":
+            assertContainerPremise(block);
             for (const child of block.children) visit(child);
             break;
           /**

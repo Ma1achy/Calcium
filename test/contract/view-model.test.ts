@@ -36,6 +36,12 @@ import {
   formatReport,
 } from "../../src/testing/measurement-conformance.js";
 import { ASCII_CAPS, measurable } from "../support/render.js";
+import { fullRegistry } from "../../src/testing/expect-document.js";
+import { HAS_HIDEABLE_SERIES } from "../../src/data/viewmodel/types.js";
+import { plotDefinition } from "../../src/presentation/plot/index.js";
+import { tableDefinition } from "../../src/presentation/table/index.js";
+import { patchDefinition } from "../../src/presentation/patch/index.js";
+import type { BlockDefinition } from "../../src/presentation/blocks/types.js";
 import { ALIGN_ENTRIES, block as blockOf } from "../../src/data/viewmodel/index.js";
 import type { Block as AnyBlock } from "../../src/data/viewmodel/index.js";
 
@@ -109,23 +115,27 @@ describe("C04 contract", () => {
     // The failing directions, one per way an action can be wrong. Asserted
     // separately because a single "invalid" case passes for a check that only
     // ever looks at `kind`.
+    //
+    // **The three below omit the field**, so the sentence is the absent one
+    // (C04 I114, §5b): a field that was never written is not a field of the
+    // wrong type, and these rows asserted the second for the first until F995.
     const unknownKind = validateBlock(patchWith([{ kind: "viev", label: "x", target: "p1" }]));
     expect(unknownKind.ok).toBe(false);
     expect(unknownKind.ok ? [] : unknownKind.error.join(" ")).toMatch(/"kind" must be one of/);
 
     const noTarget = validateBlock(patchWith([{ kind: "view", label: "fullscreen" }]));
     expect(noTarget.ok).toBe(false);
-    expect(noTarget.ok ? [] : noTarget.error.join(" ")).toMatch(/"target" must be a string/);
+    expect(noTarget.ok ? [] : noTarget.error.join(" ")).toMatch(/"target" is required and absent — supply a string/u);
 
     const noLabel = validateBlock(patchWith([{ kind: "view", target: "p1" }]));
     expect(noLabel.ok).toBe(false);
-    expect(noLabel.ok ? [] : noLabel.error.join(" ")).toMatch(/"label" must be a string/);
+    expect(noLabel.ok ? [] : noLabel.error.join(" ")).toMatch(/"label" is required and absent — supply a string/u);
 
     // `open` carries `url` and not `target` — the row that shows the field is
     // the kind's rather than one name shared by all five.
     const openWrongField = validateBlock(patchWith([{ kind: "open", label: "docs", target: "p1" }]));
     expect(openWrongField.ok).toBe(false);
-    expect(openWrongField.ok ? [] : openWrongField.error.join(" ")).toMatch(/"url" must be a string/);
+    expect(openWrongField.ok ? [] : openWrongField.error.join(" ")).toMatch(/"url" is required and absent — supply a string/u);
 
     // Absent is legal, which is the control: without it every assertion above
     // passes for a validator that rejects any patch carrying the field.
@@ -339,7 +349,7 @@ describe("C04 contract", () => {
     expect(unknownKind.ok ? "" : unknownKind.error.join(" ")).toMatch(/\.action: "kind" must be one of/);
     const noField = validateBlock(notice({ kind: "fill", label: "retry" }));
     expect(noField.ok).toBe(false);
-    expect(noField.ok ? "" : noField.error.join(" ")).toMatch(/\.action: "command" must be a string/);
+    expect(noField.ok ? "" : noField.error.join(" ")).toMatch(/\.action: "command" is required and absent/u);
     const notObject = validateBlock(notice("retry"));
     expect(notObject.ok).toBe(false);
     expect(notObject.ok ? "" : notObject.error.join(" ")).toMatch(/\.action: must be an object/);
@@ -573,5 +583,449 @@ describe("C04 §3 both axes — construction (I100, I102)", () => {
         expect(kit.measure(aligned, width), `${entry} at ${String(width)}`).toBe(kit.measure(plain, width));
       }
     }
+  });
+});
+
+describe("C04 §7 — the update model and the view state, checked rather than cited", () => {
+  const kit = measurable({
+    definitions: [tableDefinition, patchDefinition as unknown as BlockDefinition<never>],
+  });
+
+  const tableWith = (over: Record<string, unknown> = {}): AnyBlock =>
+    ({
+      kind: "table",
+      id: "t",
+      columns: [{ key: "a", label: "A", role: "expand" }, { key: "b", label: "B" }],
+      rows: [
+        {
+          id: "r1",
+          cells: { a: { text: "one" }, b: { text: "1" } },
+          detail: [{ kind: "tip", id: "d", text: "detail line" }],
+          ...over,
+        },
+        { id: "r2", cells: { a: { text: "two" }, b: { text: "2" } } },
+      ],
+    }) as never;
+
+  const docOf = (blocks: readonly unknown[]): never =>
+    ({
+      schema: "tui.view/1",
+      command: "x",
+      status: "ok",
+      meta: {
+        verb: null, adapter: "shell", stderr: "", exitCode: 0, durationMs: 1,
+        truncated: false, argv: ["x"], transport: "subprocess", origin: "user",
+      },
+      blocks,
+    }) as never;
+
+  it("T2.119 (I18): every view-state field that moves a height is a field of the block, and the set is closed", () => {
+    /**
+     * **Enumerated and compared by equality**, because I18's claim is about the
+     * *set*: any view state that affects height is a field of the block. A row
+     * asserting that `expanded` moves a height says nothing about the fifth one
+     * arriving somewhere else, and a fifth arriving somewhere else is the only
+     * way this invariant can be false.
+     */
+    const MOVES: readonly [string, AnyBlock, AnyBlock, number, number][] = [
+      ["TableRow.expanded", tableWith({ expanded: false }), tableWith({ expanded: true }), 3, 4],
+      [
+        "Scroll.collapsed",
+        { kind: "scroll", id: "s", height: 4, children: [{ kind: "tip", id: "x", text: "a\nb\nc\nd\ne" }] } as never,
+        { kind: "scroll", id: "s", height: 4, collapsed: true, children: [{ kind: "tip", id: "x", text: "a\nb\nc\nd\ne" }] } as never,
+        5, 1,
+      ],
+      [
+        "Floor.minHeight",
+        { kind: "tip", id: "x", text: "a" } as never,
+        { kind: "tip", id: "x", text: "a", minHeight: 7 } as never,
+        1, 7,
+      ],
+      [
+        "Patch.collapsedAfter",
+        { kind: "patch", id: "p", path: "f", language: "ts", hunks: [{ id: "h", header: "@@", lines: [{ kind: "add", text: "x" }, { kind: "add", text: "y" }] }] } as never,
+        { kind: "patch", id: "p", path: "f", language: "ts", collapsedAfter: 1, hunks: [{ id: "h", header: "@@", lines: [{ kind: "add", text: "x" }, { kind: "add", text: "y" }] }] } as never,
+        4, 5,
+      ],
+    ];
+
+    const moved: string[] = [];
+    for (const [name, before, after, wasRows, isRows] of MOVES) {
+      expect(kit.measure(before, 60), `${name}: off`).toBe(wasRows);
+      expect(kit.measure(after, 60), `${name}: on`).toBe(isRows);
+      moved.push(name);
+    }
+    expect(moved, "the whole set, so a fifth fails here").toEqual([
+      "TableRow.expanded", "Scroll.collapsed", "Floor.minHeight", "Patch.collapsedAfter",
+    ]);
+
+    // **`gapBefore` is deliberately absent, and measuring it is what makes the
+    // list a measurement.** It is composition's field, not a height's: `measure`
+    // answers 1 either way, and a list of *optional fields* would have caught it.
+    expect(kit.measure({ kind: "tip", id: "x", text: "a", gapBefore: false } as never, 60)).toBe(1);
+    expect(kit.measure({ kind: "tip", id: "x", text: "a", gapBefore: true } as never, 60)).toBe(1);
+
+    // The complement, measured rather than argued: nothing accumulates outside
+    // the block, so the same block measures the same after an unrelated one.
+    const held = tableWith({ expanded: true });
+    const first = kit.measure(held, 60);
+    kit.measure({ kind: "tip", id: "z", text: "unrelated" } as never, 60);
+    expect(kit.measure(held, 60), "measure is a pure function of block and width (I7)").toBe(first);
+  });
+
+  it("T2.120 (I20): a pills block is one block whose breaks the width chooses, and the height is the packing", () => {
+    const chips = (n: number, len: number) =>
+      Array.from({ length: n }, (_, i) => ({ label: "c".repeat(len - 1) + String(i % 10) }));
+    const pills = (n: number, len: number): AnyBlock =>
+      ({ kind: "pills", id: "p", chips: chips(n, len) }) as never;
+
+    /**
+     * **Asserted against the packing, not against `ceil(totalWidth / w)`**
+     * (F928). This document carried that formula in §3 and an invariant saying
+     * the height *stays declared rather than emerging from how many pills
+     * happened to fit* — and it is exactly what it does. Six 10-wide chips:
+     */
+    expect(kit.measure(pills(6, 10), 40), "three per row at 40").toBe(2);
+    expect(kit.measure(pills(6, 10), 20), "one per row at 20").toBe(6);
+    expect(Math.ceil(60 / 20), "and the formula says three").toBe(3);
+
+    // **A chip is never split, which is the observable difference between a
+    // packing and a wrap.** Two 30-wide chips at 20 are two rows, not three.
+    expect(kit.measure(pills(2, 30), 20), "a chip wider than the width keeps its own row").toBe(2);
+
+    // The frame, read beside the number so the two cannot drift — and so the
+    // reader can see that "one logical row" is about authorship: the chips are
+    // one sequence and the width decided where it broke.
+    expect(kit.renderToLines(pills(6, 10), 40).map((l) => l.replace(/\u001b\[[0-9;]*m/gu, ""))).toEqual([
+      "ccccccccc0  ccccccccc1  ccccccccc2",
+      "ccccccccc3  ccccccccc4  ccccccccc5",
+    ]);
+  });
+
+  it("T2.121 (I21): a merge never deletes a row, and no shape of MergeRow could", () => {
+    const before = docOf([tableWith()]);
+    const after = applyPatch(before, {
+      op: "merge",
+      blockId: "t",
+      rows: [{ id: "r1", cells: { a: { text: "ONE" }, b: { text: "9" } } }],
+    } as never);
+    expect(after.ok, "the merge lands").toBe(true);
+    if (!after.ok) return;
+
+    const rowsOf = (d: unknown): readonly { id: string }[] =>
+      ((d as { blocks: { rows: { id: string }[] }[] }).blocks[0]?.rows ?? []);
+    expect(rowsOf(after.doc).map((r) => r.id), "the unmentioned row is still there").toEqual(["r1", "r2"]);
+
+    // **Reference-identical**, which is the half a deep comparison cannot see:
+    // an untouched row that was rebuilt equal is a row the merge did touch, and
+    // C13's identity checks would then re-render a table that had not changed.
+    expect(rowsOf(after.doc)[1], "and it is the same object (T1.6)").toBe(rowsOf(before)[1]);
+
+    /**
+     * **And the structural half, which makes it a rule rather than a sample.**
+     * `MergeRow = Omit<TableRow, "expanded">` — there is no delete marker to
+     * send, so a payload *cannot* express deletion however it is shaped. A
+     * marker would make a dropped row and an unmentioned row indistinguishable,
+     * and shedding a row is `replace`'s job because the adapter decides which
+     * it meant.
+     */
+    const types = readFileSync("src/data/viewmodel/types.ts", "utf8");
+    expect(types, "no arm of the payload removes a row").toContain(
+      'export type MergeRow = Omit<TableRow, "expanded">;',
+    );
+  });
+
+  it("T2.122 (I22, I9): replace is wholesale and merge preserves — the pair is the whole update model", () => {
+    const before = docOf([tableWith({ expanded: true })]);
+    const expandedOf = (d: unknown): boolean | undefined =>
+      (d as { blocks: { rows: { expanded?: boolean }[] }[] }).blocks[0]?.rows[0]?.expanded;
+    expect(expandedOf(before), "the row is open to begin with").toBe(true);
+
+    const replaced = applyPatch(before, { op: "replace", blockId: "t", block: tableWith() } as never);
+    expect(replaced.ok).toBe(true);
+    if (replaced.ok) {
+      expect(expandedOf(replaced.doc), "replace carries no view state across").toBeUndefined();
+    }
+
+    const merged = applyPatch(before, {
+      op: "merge",
+      blockId: "t",
+      rows: [{ id: "r1", cells: { a: { text: "ONE" }, b: { text: "9" } } }],
+    } as never);
+    expect(merged.ok).toBe(true);
+    if (merged.ok) {
+      expect(expandedOf(merged.doc), "and merge keeps it").toBe(true);
+    }
+
+    // **The payload cannot forge it either**, which is the arm that makes I9 a
+    // protection rather than a default: `stripViewState` removes `expanded`
+    // from an incoming row, so view state survives only where it already was.
+    const forged = applyPatch(docOf([tableWith()]), {
+      op: "merge",
+      blockId: "t",
+      rows: [{ id: "r1", cells: { a: { text: "ONE" }, b: { text: "9" } }, expanded: true }],
+    } as never);
+    expect(forged.ok).toBe(true);
+    if (forged.ok) {
+      expect(expandedOf(forged.doc), "a far side cannot open a row by sending a flag").toBeUndefined();
+    }
+  });
+
+  it("T2.123 (I24): form \"line\" requires an explicit height, and says which field", () => {
+    const linePlot = (over: Record<string, unknown>): unknown =>
+      validateBlock({
+        kind: "plot", id: "pl", form: "line",
+        series: [{ kind: "line", id: "s", points: [[0, 0], [1, 1]] }],
+        ...over,
+      });
+
+    const bare = linePlot({}) as { ok: boolean; error?: readonly string[] };
+    expect(bare.ok, "no default, because the one kind whose height is not derivable cannot have one").toBe(false);
+    expect(bare.error?.join(" "), "naming the field").toMatch(/"height"/u);
+
+    // The non-vacuity guard: a validator refusing both would satisfy the row
+    // above and tell a reader nothing.
+    expect((linePlot({ height: 6 }) as { ok: boolean }).ok, "and an explicit one validates").toBe(true);
+  });
+
+  it("T2.124 (I32): ColumnDef.role is schema — merge carries it and I9 does not protect it", () => {
+    const types = readFileSync("src/data/viewmodel/types.ts", "utf8");
+    const rowType = types.slice(types.indexOf("export type TableRow"), types.indexOf("export type MergeRow"));
+    expect(rowType.replace(/\/\*[\s\S]*?\*\//gu, ""), "no row declares a role").not.toMatch(/^\s+(?:readonly )?role\??:/mu);
+    expect(types, "the column does").toContain('role?: "expand";');
+
+    const before = docOf([tableWith()]);
+    const merged = applyPatch(before, {
+      op: "merge",
+      blockId: "t",
+      rows: [{ id: "r1", cells: { a: { text: "ONE" }, b: { text: "9" } } }],
+    } as never);
+    expect(merged.ok).toBe(true);
+    if (!merged.ok) return;
+
+    const columnsOf = (d: unknown): unknown =>
+      (d as { blocks: { columns: unknown }[] }).blocks[0]?.columns;
+    // **Identity, not deep equality.** A rebuilt-but-equal column array is a
+    // second record of the schema, and the day the two diverge nothing says so.
+    expect(columnsOf(merged.doc), "the schema travels untouched through a merge").toBe(columnsOf(before));
+  });
+
+  it("T2.125 (I33): patch and comparison are distinct kinds — neither validates as the other", () => {
+    const asPatch = validateBlock({
+      kind: "comparison", id: "c", path: "f", language: "ts", hunks: [],
+    }) as { ok: boolean; error?: readonly string[] };
+    expect(asPatch.ok, "a comparison carrying a patch's fields").toBe(false);
+    expect(asPatch.error?.join(" "), "wants its own rows").toMatch(/"rows"/u);
+
+    const asComparison = validateBlock({
+      kind: "patch", id: "p",
+      rows: [{ id: "r", label: "L", before: "a", after: "b", verdict: "changed" }],
+    }) as { ok: boolean; error?: readonly string[] };
+    expect(asComparison.ok, "and a patch carrying a comparison's").toBe(false);
+    expect(asComparison.error?.join(" "), "wants all three of its own").toMatch(/"path".*"language".*"hunks"/su);
+
+    // The required sets are disjoint, which is what *never merge* means at the
+    // type level: a merged kind's height would depend on which mode it was in,
+    // and I7 — measured height equals rendered height — cannot bend (D50).
+    expect(ALL_KINDS, "and both are members in their own right").toEqual(
+      expect.arrayContaining(["patch", "comparison"] as unknown as BlockKind[]),
+    );
+  });
+
+  it("T2.126 (I66): status carries its three numbers, and no tick derives one", () => {
+    const status = (over: Record<string, unknown>): { ok: boolean; error?: readonly string[] } =>
+      validateBlock({
+        kind: "status", id: "st", state: "error", message: "the fetch failed", height: 3, ...over,
+      }) as never;
+
+    expect(status({}).ok, "the shape a builder produces").toBe(true);
+    for (const [why, over, field] of [
+      ["an empty message", { message: "" }, /"message"/u],
+      ["a non-positive height", { height: 0 }, /"height"/u],
+      ["an absent height", { height: undefined }, /"height"/u],
+    ] as const) {
+      const bad = status(over);
+      expect(bad.ok, why).toBe(false);
+      expect(bad.error?.join(" "), `${why}: naming its field (I57)`).toMatch(field);
+    }
+
+    /**
+     * **Supplied rather than derived, measured rather than scanned.** `tick`
+     * *is* read in `status.ts` — for the spinner frame, which is appearance —
+     * so a source scan saying `tick` never appears would be false and a scan
+     * saying it does would say nothing. What I66 forbids is a *number* computed
+     * from it, and the frame is where that shows: four ticks, one moving cell.
+     */
+    const spinning = {
+      kind: "status", id: "st", state: "loading", message: "fetching containers",
+      height: 4, retryInMs: 4200, attempt: 3, elapsedMs: 9100,
+    } as never;
+    const frames = [0, 1, 7, 40].map((tick) =>
+      measurable({ definitions: [], tick })
+        .renderToLines(spinning, 60)
+        .map((l) => l.replace(/\u001b\[[0-9;]*m/gu, "")),
+    );
+    const marks = frames.map((f) => f[2]?.slice(1, 2) ?? "");
+    expect(new Set(marks).size, "the spinner does move, so the tick reached the renderer").toBeGreaterThan(1);
+    for (const f of frames) {
+      expect(f.map((l) => l.replace(/[\u2800-\u28ff]/gu, "·")), "and nothing else does").toEqual(
+        frames[0]!.map((l) => l.replace(/[\u2800-\u28ff]/gu, "·")),
+      );
+    }
+  });
+
+  it("T2.127 (I116): the reason `logs` is declared, and the condition that falsified the old one", () => {
+    // **F1055.** F141 kept `logs` against removal on two reasons, and its
+    // *deciding* one — *`logs` is the only kind in the tree that implements
+    // `window` … and `raw` has none* — stopped being true in `f7a95bc5`
+    // (2026-09-04). Nothing noticed, because the sentence was in a surfaces
+    // document and the commit was in C09.
+    //
+    // **This row watches the condition, not the remedy.** A row that asserted
+    // *`logs` is unconsumed* would be green for exactly as long as the defect
+    // is; the set below moves the day any kind gains or loses a window, which
+    // is what would have caught the premise going false.
+    //
+    // **Taken from the registry, not from `blocks/kinds/`.** Grepping that
+    // directory returns five: `table` and `patch` register from C11 and C25, so
+    // a scan over one directory undercounts by two — which is `a set over sites
+    // is blind to redistribution` arriving in the instrument that would have
+    // watched it.
+    const reg = fullRegistry();
+    const ALL_KINDS = [
+      "rule", "notice", "keyValue", "table", "steps", "logs", "events", "plot",
+      "progress", "code", "comparison", "patch", "pills", "tip", "panel", "group",
+      "scroll", "mosaic", "image", "status", "terminal", "raw",
+    ] as const;
+    expect(ALL_KINDS.filter((k) => reg.get(k) === undefined), "every kind resolves").toEqual([]);
+    const windowed = ALL_KINDS.filter(
+      (k) => typeof (reg.get(k) as { window?: unknown } | undefined)?.window === "function",
+    );
+    expect([...windowed].sort(), "seven kinds window, and `raw` is one of them").toEqual([
+      "code", "keyValue", "logs", "patch", "raw", "table", "terminal",
+    ]);
+
+    // **What is left of the residue, and it is C04's.** No `ViewPatch` arm
+    // appends a line, so a growing log is `replace` with the whole block per
+    // tick — which is why the streaming route declines the kind. Compared by
+    // equality against the declaration, so the arm that would close this cannot
+    // land without this row reporting it.
+    const types = readFileSync("src/data/viewmodel/types.ts", "utf8");
+    const union = /export type ViewPatch =([\s\S]*?);\n/.exec(types);
+    expect(union, "the patch union's declaration").not.toBeNull();
+    const ops = [...union![1]!.matchAll(/op: "([a-zA-Z]+)"/g)].map((m) => m[1]);
+    expect([...new Set(ops)].sort(), "no arm appends a line").toEqual([
+      "append", "expand", "merge", "replace", "reserve", "status",
+    ]);
+    expect(/op: "([a-zA-Z]+)"/.test('| Readonly<{ op: "appendLine"; blockId: string }>'), "the pattern can fire").toBe(true);
+
+    // **The reason that survives, read off the frame rather than asserted about
+    // the type.** `levelTone` has one caller — the `logs` renderer — so the same
+    // three strings through `raw` draw the level in body colour, and the columns
+    // are baked into the text instead of re-aligned at the width.
+    const line = { ts: "14:23:01.882", level: "warn", message: "disk 91% full" };
+    const asLogs = { kind: "logs", id: "lg", lines: [line] } as never;
+    const asRaw = { kind: "raw", id: "rw", text: `${line.ts} ${line.level} ${line.message}` } as never;
+    const kit = measurable();
+    const [logRow] = kit.renderToLines(asLogs, 60);
+    const [rawRow] = kit.renderToLines(asRaw, 60);
+    const sgrs = (l: string): number => (l.match(/\u001b\[/gu) ?? []).length;
+    expect(sgrs(logRow ?? ""), "the level carries its own tone").toBeGreaterThan(sgrs(rawRow ?? ""));
+    expect((logRow ?? "").includes(line.message), "and it is the same three strings").toBe(true);
+  });
+
+  it("T2.130 (I117): the size channel is not a series, and the count that says if one comes back", () => {
+    // **F271 and F1051, closed.** This row watched the *condition* — the count
+    // of forms whose `series` carries something that is not a position — rather
+    // than the remedy, and it asserted all four symptoms so that landing the
+    // ruling turned it red instead of leaving it green over a fixed defect. It
+    // is now the closed form of the same watch: the count is zero, and the day
+    // a form gains a channel inside `series` it inherits all four symptoms and
+    // this fails.
+    const bubble = {
+      kind: "plot", id: "bb", form: "bubble", height: 8, axes: true, legend: "right",
+      series: [{ label: "value", values: [10, 40, 25] }],
+      sizes: [1, 4, 2],
+    } as never;
+
+    // **Symptom 4 was a control doing the wrong thing**: `bubble` is in
+    // `HAS_HIDEABLE_SERIES`, so C22 I78's reader-facing toggle reached the size
+    // channel — hiding it removed a rasterisation the reader never asked to see
+    // while the sizes went on sizing the value bubbles. The table is unchanged
+    // and it is right: its membership rule is *positional*, and `bubble` still
+    // is one. What changed is what the toggle can reach, which is data.
+    expect(HAS_HIDEABLE_SERIES.bubble, "the toggle reaches the one series there is").toBe(true);
+    const draw = (hidden?: number): readonly string[] =>
+      measurable({
+        definitions: [plotDefinition as never],
+        ...(hidden === undefined
+          ? {}
+          : { seriesVisibility: { bb: { [hidden]: true } } as never }),
+      })
+        .renderToLines(bubble, 72)
+        .map((l) => l.replace(/\u001b\[[0-9;]*m/gu, ""));
+
+    const all = draw();
+    // **Hiding index 1 is now hiding nothing**, because there is no index 1 —
+    // which is the assertion this row used to make in the opposite direction.
+    expect(draw(1), "there is no second series to hide").toEqual(all);
+    // The fixture still responds, so the equality above is a fact about the
+    // document and not about a hide request that never arrived (F1051's
+    // collision: two different requests once produced byte-identical frames).
+    expect(draw(0), "and hiding the one there is changes the frame").not.toEqual(all);
+    // And the gutter is the *values'* extent now. It ran `0 · 20 · 40 · 60` for
+    // data spanning 20–60 because a size set the floor; nothing in `series`
+    // sets it but a position.
+    const gutter = (rows: readonly string[]): readonly string[] =>
+      rows.map((r) => r.slice(0, 3).trimEnd()).filter((r) => r !== "");
+    expect(gutter(all).some((g) => g === "0"), "no size owns the axis floor").toBe(false);
+
+    // **The count, which is what watches the condition.** Zero forms, and the
+    // day one gains a channel inside `series` it inherits all four symptoms and
+    // this row reports it — where `FS3`, asserting only the bubble's own
+    // normalisation, would stay green.
+    const CHANNEL_IN_SERIES: readonly string[] = [];
+    expect(CHANNEL_IN_SERIES.length, "no form breaks the rule (C04 I117)").toBe(0);
+    const src = readFileSync("src/presentation/plot/definition.ts", "utf8");
+    const positional = [...src.matchAll(/const s2 = block\.series\[1\]|block\.series\[1\]/g)].length;
+    expect(positional, "one read of `series[1]`: `dumbbell`'s second position, and no channel").toBe(1);
+  });
+
+  it("T2.131 (I117): the three refusals, and the check the move would have deleted", () => {
+    const doc = (over: object): readonly string[] => {
+      const r = validateDocument(
+        docOf([{ kind: "plot", id: "s", form: "bubble", height: 6, series: [{ values: [1, 2] }], sizes: [1, 2], ...over }]),
+      );
+      return r.ok ? [] : r.error;
+    };
+    // **The control first**, or every row below passes against a gate that
+    // refuses everything.
+    expect(doc({}), "the ordinary bubble validates").toEqual([]);
+
+    expect(doc({ form: "line", sizes: [1, 2] }).join(" "), "off the form")
+      .toMatch(/"sizes" on form "line" \(C04 I117\)/u);
+    expect(doc({ sizes: undefined }).join(" "), "and the form with no channel")
+      .toMatch(/form "bubble" has no "sizes" \(C04 I117\)/u);
+    // **Named as the move and not as an unrelated count**, because a caller
+    // written for the old shape gets both this and the one above, and the two
+    // have to read as one instruction.
+    const two = doc({ series: [{ values: [1, 2] }, { values: [3, 4] }] }).join(" ");
+    expect(two, "the second series").toMatch(/form "bubble" has 2 series \(C04 I117\)/u);
+    expect(two, "and it says where the values go").toMatch(/move its values to "sizes"/u);
+
+    // **The rule the move would have deleted.** As `series[1]` the channel was
+    // checked by the loop over `series`; a member outside it is checked by
+    // whatever someone wrote, and this is what was written (F1082).
+    expect(doc({ sizes: [1, Number.NaN] }).join(" "), "a non-finite size")
+      .toMatch(/sizes\[1\] is number/u);
+    expect(doc({ sizes: "up" }).join(" "), "and sizes that is not an array")
+      .toMatch(/"sizes" must be an array of finite numbers or null/u);
+
+    // **A short `sizes` is legal**, and says what a trailing `null` says: no
+    // size from there on. Both renderers read it positionally and both already
+    // draw a missing reading as no size, so a length rule here would refuse a
+    // document they draw correctly.
+    expect(doc({ series: [{ values: [1, 2, 3] }], sizes: [1] }), "a short channel is not a fault").toEqual([]);
+    expect(doc({ sizes: [1, null] }), "and a null is a sample with no size").toEqual([]);
   });
 });

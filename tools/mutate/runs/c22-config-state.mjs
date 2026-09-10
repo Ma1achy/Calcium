@@ -93,8 +93,12 @@ const results = runPass({
     {
       name: "config: ignore the injected clock",
       file: "src/shell/config.ts",
-      from: "    clock: config.clock ?? ambient.clock,",
-      to: "    clock: ambient.clock,",
+      // Re-anchored when C28 I46 wrapped this line in the recording tap. **The
+      // mutation is unchanged**: it still discards the app's clock for the
+      // ambient one, through the same wrapper, so the tap is not what the row
+      // is measuring.
+      from: "((c) => (recording === null ? c : recording.wall(c)))(config.clock ?? ambient.clock)",
+      to: "((c) => (recording === null ? c : recording.wall(c)))(ambient.clock)",
       expect: "T1.5b",
     },
   ],

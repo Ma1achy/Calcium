@@ -136,6 +136,34 @@ export function imageKey(block: Image): string {
     : digestOf(`${block.digest}\u0000${JSON.stringify(block.overlay)}`);
 }
 
+/**
+ * **The placement's identity, which is not the picture's** (C09 I66, F987).
+ *
+ * `imageKey` answers *has this picture been sent*. This answers *where does this
+ * picture go* — and the two are different questions, because the id returned here
+ * is written into the foreground colour of **every** placeholder cell as well as
+ * into the transmission's `i=`. An identity that moves with the picture moves the
+ * whole grid with it: measured at 40×10, a frame of an animation cost 12 809 B of
+ * placeholders against 1 367 B of picture, and left a digest in the sent record
+ * per frame.
+ *
+ * **With a scope the id is a function of `(scope, block id)` alone**, so two frames
+ * of one block share it and the placeholders are byte-identical, which the row diff
+ * skips. **The scope is the entry** and not the document: C04 I14 makes a block id
+ * unique within a document and nothing makes it unique across the transcript, so
+ * `img-${file}` in two entries would otherwise collide and the second would replace
+ * the first's picture behind the first's placeholders — the wrong picture rather
+ * than none, which is what this arm exists to avoid.
+ *
+ * **With no scope it falls back to the picture's identity**, unchanged. A caller
+ * that scopes nothing — `renderToLines` in a test, the terminal probe's build, the
+ * catalogue — gets the safe and dear id rather than a block-keyed one, because the
+ * block's is only safe inside a scope.
+ */
+export function placementIdOf(block: Image, scope?: string): number {
+  return scope === undefined ? imageId(imageKey(block)) : imageId(`${scope}\u0000${block.id}`);
+}
+
 /** The largest escape kitty accepts for a direct transmission, in bytes. */
 const CHUNK = 4096; // cells-ok — a byte count
 
@@ -199,8 +227,15 @@ function chunked(opts: string, body: string): string {
  * The transmit-and-create-a-virtual-placement escape.
  *
  * `f=100` is PNG, which is the only format the codec reads; `q=2` suppresses the
- * terminal's reply, for C02's own reason — this framework does not run
- * interactive probes and a response would arrive as input nobody asked for.
+ * terminal's reply — and **the reason on record was false, so it is replaced
+ * rather than added to** (F414, F1057). It was *a response would arrive as input
+ * nobody asked for*: C16 I32 consumes every string-terminated reply and emits
+ * nothing, so `q=1` is harmless today and flipping the token changes nothing
+ * observable. The reason that survives being checked is that **nothing could
+ * read one** — a reply is unreadable until raw mode, raw mode is C01's
+ * `acquire()`, and by then the capability record is complete and four objects
+ * hold it (C02 I14). `q=1` would buy a diagnostic no seam reports, so the token
+ * stays and the finding closes on the ruling rather than on the flip.
  * `U=1` says the placement is addressed by Unicode placeholders rather than
  * drawn at the cursor, which is the whole distinction from iTerm2 and sixel.
  */
@@ -305,19 +340,44 @@ export function placeholderCell(id: number, row: number, col: number): string {
 export type Placement = Readonly<{ rows: readonly string[] }> | Readonly<{ fault: string }>;
 
 /**
+ * Whether a `cols` x `rows` placement is addressable — **the gate, without the
+ * grid** (C09 I67).
+ *
+ * `placementRows` refuses on exactly this and then builds `cols * rows` cells,
+ * which is the wrong price for a caller that only wants the answer: the session
+ * asks it once per image per frame, and a 32x400 picture would cost 12 800
+ * strings to be told *no*. So the condition is named here and `placementRows`
+ * reads it, rather than each holding a copy — the shape `imageKey`'s own comment
+ * names one file over, where two computations of one figure is how they come to
+ * disagree.
+ *
+ * **The two axes are not symmetrical in reachability, and F624's defence rested
+ * on the one that is rarer.** `imageCells` clamps `cols` to the frame's width, so
+ * `cols > MAX_PLACEHOLDER_SPAN` needs a terminal wider than 297 — measured over
+ * 770 (width, height, aspect) combinations, it happens at frame widths 298, 400
+ * and 600 and nowhere below. `rows` is the block's declared height, bounded by
+ * nothing under the registry's 2 000-row cap: a 16x400 GIF at `height: 400`
+ * measures `{cols: 32, rows: 400}` at **80 columns** (F1026).
+ */
+/**
  * The grid of placeholders a block of `rows` x `cols` occupies.
  *
  * **Refused past the table rather than wrapped**, because a wrapped diacritic is
  * a cell that addresses the wrong part of the image — a plausible wrong picture,
  * which is the failure mode this arm is built to avoid.
  */
+export function placementFits(cols: number, rows: number): boolean {
+  return cols >= 1 && rows >= 1 && cols <= MAX_PLACEHOLDER_SPAN && rows <= MAX_PLACEHOLDER_SPAN; // cells-ok — a cell count
+}
+
 export function placementRows(id: number, cols: number, rows: number): Placement {
-  if (cols < 1 || rows < 1) return { fault: `a placement is at least 1x1 — got ${String(cols)}x${String(rows)}` };
-  if (cols > MAX_PLACEHOLDER_SPAN || rows > MAX_PLACEHOLDER_SPAN) {
+  if (!placementFits(cols, rows)) {
     return {
       fault:
-        `a placement of ${String(cols)}x${String(rows)} exceeds the ${String(MAX_PLACEHOLDER_SPAN)} ` +
-        `positions this encoding carries — a wrapped diacritic addresses the wrong part of the image`,
+        cols < 1 || rows < 1
+          ? `a placement is at least 1x1 — got ${String(cols)}x${String(rows)}`
+          : `a placement of ${String(cols)}x${String(rows)} exceeds the ${String(MAX_PLACEHOLDER_SPAN)} ` +
+            `positions this encoding carries — a wrapped diacritic addresses the wrong part of the image`,
     };
   }
   const out: string[] = [];

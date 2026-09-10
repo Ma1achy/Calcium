@@ -14,7 +14,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { checkFindings, checkTriageInventory } from "../../tools/enforce/findings.mjs";
+import { checkFindingIds, checkFindings, checkGroupTallies, checkOpenSet, checkTriageInventory } from "../../tools/enforce/findings.mjs";
 import {
   checkSectionReferences,
   checkCommitments,
@@ -26,6 +26,7 @@ import {
   expectedOrder,
   invariantOrderOf,
   invariantsOf,
+  withoutTodos,
   OWNERS,
   REFERENCE_EXCEPTIONS,
   referenceFiles,
@@ -39,6 +40,9 @@ import {
   testRowsOf,
   mnemonicRowsOf,
   checkMnemonicRowIds,
+  checkCommitmentNumbers,
+  checkCommitmentOrder,
+  descentsOf,
   SPEC_RULES,
 } from "../../tools/enforce/commitments.mjs";
 
@@ -99,8 +103,23 @@ describe("A03 SP1 — commitment/invariant pairing", () => {
     // red. Two instances is the minimum for noticing a rule rather than evidence
     // for one — what both share is that the landing change touched no code the
     // count is about, so nothing else in the suite had a reason to move.
+    //
+    // **Third instance, 27 → 28 on C28** (the profiler, 2026-09-06). Identical
+    // shape, and the third case is where a rule inferred from two gets tested:
+    // this one confirms it rather than breaking it, because the shared property
+    // held again — `enforce` was green on the same tree these six rows were red
+    // on.
+    //
+    // **What differed is worth naming, because it is the half a confirming
+    // instance hides.** C26 and C27 landed with no test files at all; C28's
+    // spec-alone commit carries six, because SP9 requires every new invariant to
+    // be named by a test row and the `it.todo` marker route is how a spec-first
+    // commit meets it. So something else in the suite *did* move — 38 todos
+    // became 88 — and **no assertion anywhere covers that number**. It is not a
+    // gap worth closing by adding one: a todo count moves on every spec-first
+    // commit by design, where a spec count moves only when the corpus does.
     const files = specFiles();
-    expect(files.length).toBe(27);
+    expect(files.length).toBe(28);
 
     const total = files.reduce((n, f) => n + commitmentsOf(f).length, 0);
     expect(total).toBeGreaterThan(300);
@@ -368,7 +387,7 @@ describe("A03 SP2 — invariants are numbered 1..n, in order", () => {
     // The vacuity half. `checkOrdering` skips a spec declaring nothing, so a
     // parser that stopped matching would report twenty-six clean documents.
     const files = specFiles();
-    expect(files.length).toBe(27);
+    expect(files.length).toBe(28);
 
     const total = files.reduce((n, f) => n + invariantOrderOf(f).length, 0);
     expect(total, "355 invariants at the last audit; the parser must still see them").toBeGreaterThan(
@@ -471,7 +490,7 @@ describe("A03 SP9 — every invariant is named by at least one test row", () => 
     // that stopped seeing tests, reports every spec clean in the same green
     // line the correct answer prints.
     const files = specFiles();
-    expect(files.length).toBe(27);
+    expect(files.length).toBe(28);
     const r = checkInvariantCoverage(files, walkTests());
     expect(r.declared, "768 invariants at the last count; the parser must still see them")
       .toBeGreaterThan(700); // cells-ok — an invariant count
@@ -527,7 +546,7 @@ describe("A03 SP7 — a test row's number is unique within its spec", () => {
     // no test rows is skipped, so a parser that stopped matching would report
     // twenty-six clean documents in the same green line.
     const files = specFiles();
-    expect(files.length).toBe(27);
+    expect(files.length).toBe(28);
 
     const total = files.reduce((n, f) => n + testRowsOf(f).length, 0);
     expect(total, "1,100 test rows at the last count; the parser must still see them").toBeGreaterThan(
@@ -643,7 +662,7 @@ describe("A03 SP10 — a mnemonic test-row label is unique within its spec", () 
     // a parser that stopped matching would skip every file and report the same
     // green line. The count is what a reader watches, not the verdict.
     const files = specFiles();
-    expect(files.length).toBe(27);
+    expect(files.length).toBe(28);
 
     const declaring = files.filter((f) => mnemonicRowsOf(f).length > 0);
     expect(declaring.map((f) => (f.split("/").pop() ?? "").slice(0, 3)), "C09, C12 and C22 name rows by mnemonic").toEqual([
@@ -764,15 +783,79 @@ describe("A03 SP10 — a mnemonic test-row label is unique within its spec", () 
       SP8: "checkSectionReferences",
       SP9: "checkInvariantCoverage",
       SP10: "checkMnemonicRowIds",
+      SP11: "checkCommitmentNumbers",
+      SP12: "checkOpenSet",
+      SP13: "checkCommitmentOrder",
+      SP14: "checkGroupTallies",
     };
 
     // Equality, so a rule added to `SPEC_RULES` without a carrier fails here
     // rather than being invisible to the loop below.
     expect([...SPEC_RULES].sort()).toEqual(Object.keys(carriers).sort());
 
-    const runner = readFileSync("tools/enforce/index.mjs", "utf8");
+    // **Comments stripped first, because the row measured the prose.** The
+    // match was over the whole file, and every carrier in this map is *named*
+    // in a comment beside its call — so commenting the call out left the token
+    // in place and the row stayed green. Measured by mutating SP13's call site
+    // two ways: deleting the line fails this row, and turning it into
+    // `// ...checkCommitmentOrder(specs),` fails **nothing**. Commenting a call
+    // out is how a gate is switched off in practice, which makes it the one
+    // form the row most needed to see (F1069).
+    //
+    // *Stated limit*: it strips `//` lines and `/* … */` spans and nothing else,
+    // so a call inside a string or a template literal would still count. There
+    // are none in `index.mjs`, and the arm below asserts the stripping is not
+    // eating the file.
+    const runner = readFileSync("tools/enforce/index.mjs", "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .split("\n")
+      .filter((l) => !l.trimStart().startsWith("//"))
+      .join("\n");
+
+    // The stripper's own vacuity: an over-eager filter empties the corpus and
+    // every `toMatch` below then fails for the wrong reason — which reads as
+    // thirteen unwired rules rather than as a broken reader.
+    expect(runner.length, "the stripped runner is still most of the file").toBeGreaterThan(4000);
+
     for (const [rule, fn] of Object.entries(carriers)) {
       expect(runner, `${rule}: the gate never calls ${fn}`).toMatch(new RegExp(`\\b${fn}\\(`));
+    }
+
+    // **The stated limit above, closed, because it was measured again on a
+    // fifteenth rule and it is a fifth form of *a gate that exists and is not
+    // run*.** Calling a checker and never spreading its result computes a
+    // violation list nobody reads: mutating SP14 by deleting `...groupTallies,`
+    // while leaving `const groupTallies = checkGroupTallies();` in place failed
+    // **nothing** here, and the whole family passed. Deleting both lines fails
+    // the loop above, so the two mutations differ by exactly the spread.
+    //
+    // `SP8` is the one rule deliberately computed and reported without gating
+    // (A03 §9), so it is named rather than excluded — a list compared by
+    // equality, so a rule that stops gating has to say so here.
+    const reportOnly = ["SP8"];
+    expect(
+      reportOnly.every((r) => r in carriers),
+      "every report-only rule is a rule",
+    ).toBe(true);
+    const spread = runner.match(/\.\.\.[A-Za-z][\w.]*/gu)?.join(" ") ?? "";
+    expect(spread.length, "the runner spreads something").toBeGreaterThan(20);
+    for (const [rule, fn] of Object.entries(carriers)) {
+      if (reportOnly.includes(rule)) continue;
+      // The result reaches `violations` either as the spread of a named
+      // binding or as the spread of the call itself.
+      // **The binding may be destructured**, which the first draft did not
+      // reach: SP3 is `const { violations: refViolations, resolved } =
+      // checkReferences(…)`, and a matcher written for `const x = fn(` reported
+      // it unwired. So the whole left-hand side is taken and every identifier
+      // in it is a candidate — over-generous by design, because this arm is
+      // asking whether the result reaches the gate at all.
+      const lhs = new RegExp(`(?:const|let)\\s+([^=]+?)\\s*=\\s*(?:await\\s+)?${fn}\\(`, "u")
+        .exec(runner)?.[1];
+      const named = lhs === undefined ? [] : (lhs.match(/[A-Za-z][\w]*/gu) ?? []);
+      const reaches =
+        new RegExp(`\\.\\.\\.${fn}\\(`, "u").test(runner) ||
+        named.some((n) => new RegExp(`\\.\\.\\.${n}\\b`, "u").test(runner));
+      expect(reaches, `${rule}: ${fn} is called and its result never reaches the gate`).toBe(true);
     }
   });
 
@@ -802,6 +885,284 @@ describe("A03 SP10 — a mnemonic test-row label is unique within its spec", () 
     expect(checkMnemonicRowIds([FILE], read)[0]?.message).toContain("declares SK10 twice");
   });
 });
+
+// --- SP11 — a commitment's number is unique within its spec ----------------
+
+describe("A03 SP11 — a commitment's number is unique within its spec", () => {
+  it("SP11: the real corpus matches the debt list exactly, and it is a corpus", () => {
+    // **Three halves, and the middle one is what a green line cannot say.** The
+    // rule is the third; the first two are that the parser still reads the
+    // commitments and that the list of outstanding duplicates is not empty by
+    // accident. A reader that stopped matching reports every spec unique and
+    // exits 0 exactly as a clean corpus does.
+    const files = specFiles();
+    expect(files.length).toBe(28);
+
+    const total = files.reduce((n, f) => n + commitmentsOf(f).length, 0);
+    expect(total, "920 commitments at the last count; the parser must still see them").toBeGreaterThan(900);
+
+    // The equality arm, both directions: a fresh duplicate fails because it is
+    // not on the list, and a repaired one fails because the list still claims
+    // it. The second is what a subset check would miss, and it is how F225's own
+    // ruling outlived its reason unread.
+    expect(checkCommitmentNumbers(files), "run `make enforce` for the detail").toEqual([]);
+  });
+
+  it("SP11: fires on F664's own shape, in the file it happened in", () => {
+    // **The fabricated violation is the instance, over the real corpus rather
+    // than a fixture** (A03 commitment 14a). C09 §8 declared 41, 42 and 43
+    // twice — the animated image against the run's tone, and the two after them
+    // — and `make enforce` was green with all six in the file. The repair
+    // renumbered the second occurrence to 59–61 on F225's remedy; this puts one
+    // of them back, in a scratch copy read through the injected reader and never
+    // on disk, and the rule must find it in the document it happened in.
+    const target = "docs/components/C09_block_library.md";
+    const original = readFileSync(target, "utf8");
+    expect(original, "the anchor the replacement below depends on").toContain(
+      "59. **A run's tone and value reach colour",
+    );
+    const mutated = original.replace(
+      "59. **A run's tone and value reach colour",
+      "41. **A run's tone and value reach colour",
+    );
+    expect(mutated, "a fabrication that changed nothing is not a fabrication").not.toBe(original);
+
+    const violations = checkCommitmentNumbers(specFiles(), (f) =>
+      f === target ? mutated : readFileSync(f, "utf8"),
+    );
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.rule).toBe("SP11");
+    expect(violations[0]?.message).toContain("C09 41");
+    expect(violations[0]?.message).toContain("declared twice and not on the list");
+  });
+
+  it("SP11: the debt list may only shrink — a repaired entry still listed fails", () => {
+    // `UNCITED_INVARIANTS`' terms, and the direction a subset check cannot see.
+    // The nine outstanding duplicates are C04's 17–20, C16's 21, C21's 6 and
+    // C22's 30–32; an entry naming a number that has become unique is a dead
+    // excuse, and a dead excuse reads exactly like a live one.
+    const clean = checkCommitmentNumbers(specFiles(), (f) => readFileSync(f, "utf8"), [
+      "C04 17", "C04 18", "C04 19", "C04 20",
+      "C16 21",
+      "C21 6",
+      "C22 30", "C22 31", "C22 32",
+      "C09 41",
+    ]);
+
+    expect(clean).toHaveLength(1);
+    expect(clean[0]?.rule).toBe("SP11");
+    expect(clean[0]?.file, "the fault is in the list, so the message points at the list").toBe(
+      "tools/enforce/commitments.mjs",
+    );
+    expect(clean[0]?.message).toContain("C09 41");
+    expect(clean[0]?.message).toContain("now unique");
+  });
+
+  it("SP11: the outstanding nine are real, so the empty verdict is not the list's doing", () => {
+    // **A gate phrased over a corpus inherits its blind spots, and an exemption
+    // list is the blind spot you write yourself.** With the list emptied the
+    // rule must report exactly the nine the tree still holds — if it reported
+    // none, the green above would be the list agreeing with a reader that sees
+    // nothing rather than with a corpus that is clean.
+    const violations = checkCommitmentNumbers(specFiles(), (f) => readFileSync(f, "utf8"), []);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain(
+      "C04 17, C04 18, C04 19, C04 20, C16 21, C21 6, C22 30, C22 31, C22 32",
+    );
+  });
+
+  it("SP11: a lettered commitment is outside the rule, and outside SP1 with it", () => {
+    // **The blind spot, asserted rather than described.** `commitmentsOf`
+    // matches a line opening `n.`, so `14a.` is not a commitment to this reader
+    // — and 22 of them are declared across C01, C14, C22 and C23, C22 holding
+    // sixteen. A second, wider pattern inside SP11 is what one-reader-per-corpus
+    // forbids: two readers of one corpus disagree eventually, and the one that
+    // disagrees quietly is the one nothing asserts against. Widening the shared
+    // pattern is the remedy and it changes **SP1's** subject, so it lands under
+    // its own finding.
+    const FILE = "docs/components/C99_x.md";
+    const source = [
+      "# C99 — fabricated",
+      "",
+      "## Commitments",
+      "",
+      "1. First (I1).",
+      "1a. A variant of the first (I1).",
+      "1a. And a second one under the same label (I1).",
+      "",
+      "---",
+      "",
+    ].join("\n");
+    const read = at(source, FILE);
+
+    expect(commitmentsOf(FILE, read).map((c) => c.n), "only the unlettered line is read").toEqual([1]);
+    expect(checkCommitmentNumbers([FILE], read, []), "so a duplicated 1a passes").toEqual([]);
+  });
+
+  it("SP11: uniqueness is within one document, as SP10 rules for a mnemonic", () => {
+    // C09 and C22 both declare a commitment 41 about different things, and both
+    // are correct: a commitment number means nothing without the spec in front
+    // of it, and every one of the ten citations in the tree writes one. A
+    // corpus-wide comparison would gate legitimate reuse and be switched off,
+    // which is §2's lesson about every rule in this family.
+    const A = "docs/components/C98_x.md";
+    const B = "docs/components/C99_x.md";
+    const source = ["# fabricated", "", "## Commitments", "", "1. One (I1).", "2. Two (I1).", "", "---", ""].join("\n");
+    const read = (f: string): string => (f === A || f === B ? source : readFileSync(f, "utf8"));
+
+    expect(checkCommitmentNumbers([A, B], read, [])).toEqual([]);
+  });
+});
+
+// --- SP13 — a spec's commitment numbers ascend in document order -----------
+
+describe("A03 SP13 — a spec's commitments ascend in document order", () => {
+  it("SP13: the real corpus matches the descent list exactly, and it is a corpus", () => {
+    // SP11's three halves, for the other question about the same list. A reader
+    // that stopped matching finds no descents and exits 0 exactly as an
+    // ascending corpus does, so the corpus is asserted before it is asserted
+    // clean.
+    const files = specFiles();
+    expect(files.length).toBe(28);
+
+    const total = files.reduce((n, f) => n + commitmentsOf(f).length, 0);
+    expect(total, "935 commitments at the last count; the parser must still see them").toBeGreaterThan(900);
+
+    expect(checkCommitmentOrder(files), "run `make enforce` for the detail").toEqual([]);
+  });
+
+  it("SP13: fires on F1066's own shape, in a file it happened in", () => {
+    // **The fabricated violation is the instance, over the real corpus rather
+    // than a fixture** (A03 commitment 14a). C10 acquired `34>33` while the
+    // ordering half stood refused — commitments 33 and 34 written high-first at
+    // the end of the list, `npm run enforce` green with both in the file. The
+    // repair swapped the two numbers; this puts them back, in a scratch copy
+    // read through the injected reader and never on disk.
+    const target = "docs/components/C10_theme_resolution.md";
+    const original = readFileSync(target, "utf8");
+    expect(original, "the anchor the replacement below depends on").toContain(
+      "\n33. **A palette authored for hue",
+    );
+    const mutated = original
+      .replace("\n33. **A palette authored for hue", "\n34. **A palette authored for hue")
+      .replace("\n34. **A colour the theme did not choose", "\n33. **A colour the theme did not choose");
+    expect(mutated, "a fabrication that changed nothing is not a fabrication").not.toBe(original);
+
+    const violations = checkCommitmentOrder(specFiles(), (f) =>
+      f === target ? mutated : readFileSync(f, "utf8"),
+    );
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.rule).toBe("SP13");
+    expect(violations[0]?.file).toBe(target);
+    expect(violations[0]?.message).toContain("C10 34>33");
+    expect(violations[0]?.message).toContain("out of document order and not on the list");
+  });
+
+  it("SP13: the descent list may only shrink — a repaired descent still listed fails", () => {
+    // The direction a subset check cannot see, and the one that let the refusal
+    // this rule replaces outlive its own figure. `C03 9>8` is a descent no spec
+    // has; the list claiming it must fail rather than being quietly ignored.
+    const stale = checkCommitmentOrder(specFiles(), (f) => readFileSync(f, "utf8"), [
+      ...descentList(),
+      "C03 9>8",
+    ]);
+
+    expect(stale).toHaveLength(1);
+    expect(stale[0]?.rule).toBe("SP13");
+    expect(stale[0]?.file, "the fault is in the list, so the message points at the list").toBe(
+      "tools/enforce/commitments.mjs",
+    );
+    expect(stale[0]?.message).toContain("C03 9>8");
+    expect(stale[0]?.message).toContain("no longer there");
+  });
+
+  it("SP13: the outstanding twenty-eight are real, so the empty verdict is not the list's doing", () => {
+    // **A gate phrased over a corpus inherits its blind spots, and an exemption
+    // list is the blind spot you write yourself.** With the list emptied the
+    // rule must report the seven specs the tree still holds — if it reported
+    // none, the green above would be the list agreeing with a reader that sees
+    // nothing rather than with a corpus that ascends.
+    const violations = checkCommitmentOrder(specFiles(), (f) => readFileSync(f, "utf8"), []);
+
+    expect(violations.map((v) => (v.file.split("/").pop() ?? "").slice(0, 3))).toEqual([
+      "C01", "C02", "C04", "C09", "C12", "C16", "C22",
+    ]);
+    expect(violations.reduce((n, v) => n + descentsOf(v.file).length, 0)).toBe(28);
+  });
+
+  it("SP13: ascent is not 1..n — a gap passes and belongs to nobody", () => {
+    // **The stated limit, asserted rather than described.** C04 declares no
+    // commitment 80 and this rule is silent about it, deliberately: uniqueness
+    // is SP11's and gaps are owned by nothing. A rule that took SP2's `diagnose`
+    // wholesale would report all three from one reader, two of them in another
+    // rule's family.
+    const FILE = "docs/components/C99_x.md";
+    const source = [
+      "# C99 — fabricated",
+      "",
+      "## Commitments",
+      "",
+      "1. First (I1).",
+      "5. Fifth, with three numbers missing under it (I1).",
+      "6. Sixth (I1).",
+      "",
+      "---",
+      "",
+    ].join("\n");
+    const read = at(source, FILE);
+
+    expect(descentsOf(FILE, read), "nothing steps backwards").toEqual([]);
+    expect(checkCommitmentOrder([FILE], read, []), "so the gap is not this rule's").toEqual([]);
+  });
+
+  it("SP13: a lettered commitment is invisible, as it is to SP11 and SP1", () => {
+    // **The blind spot that bites hardest here.** `commitmentsOf` matches a line
+    // opening `n.`, so C22's `14a, 14b, 14c, 14d, 14e, 14i, 14j, 14k, 14h, 14g,
+    // 14f` is read as no commitments at all and the spec looks better ordered
+    // than it is. Widening the shared pattern changes SP1's subject and lands
+    // under its own finding — the ruling SP11 already made for this reader.
+    const FILE = "docs/components/C99_x.md";
+    const source = [
+      "# C99 — fabricated",
+      "",
+      "## Commitments",
+      "",
+      "1. First (I1).",
+      "1c. A variant declared before its siblings (I1).",
+      "1b. And out of order with them (I1).",
+      "2. Second (I1).",
+      "",
+      "---",
+      "",
+    ].join("\n");
+    const read = at(source, FILE);
+
+    expect(commitmentsOf(FILE, read).map((c) => c.n), "only the unlettered lines are read").toEqual([1, 2]);
+    expect(checkCommitmentOrder([FILE], read, []), "so `1c, 1b` passes").toEqual([]);
+
+    // The live instance, so the limit expires the day the pattern widens.
+    const lettered = readFileSync("docs/components/C22_composition_root.md", "utf8")
+      .split("\n")
+      .filter((l) => /^\d+[a-z]\./.test(l));
+    // **Eighteen, and the record said sixteen.** SP11's docstring and A03 §7a
+    // both wrote *C22 holding sixteen* beside a correct total of 22 — which is
+    // 2 + 1 + 18 + 1 across C01, C14, C22 and C23, so the total and the part
+    // never agreed. Both are corrected in the commit that adds this row.
+    expect(lettered.length, "C22's eighteen lettered commitments, seen by no SP rule").toBe(18);
+  });
+});
+
+/** The rule's own debt list, read back from the module the gate runs. */
+function descentList(): string[] {
+  // Read rather than duplicated: a second copy of twenty-eight keys in the test
+  // is a second reader of the same corpus, which is what `sectionLines`' note
+  // forbids one file over. The default list is what `checkCommitmentOrder` uses
+  // when none is passed, so the tree's own descents are exactly it.
+  return specFiles().flatMap((f) => descentsOf(f).map((d) => d.key));
+}
 
 // --- SP3 — every reference resolves ---------------------------------------
 
@@ -840,7 +1201,7 @@ describe("A03 SP3 — invariant references resolve outside the specs too", () =>
     // other twenty-five stayed invisible.
     const files = referenceFiles();
     const components = files.filter((f) => f.startsWith("docs/components/"));
-    expect(components.length, "all 27 component specs").toBe(27);
+    expect(components.length, "all 28 component specs").toBe(28);
 
     const { resolved } = checkReferences(components);
     expect(resolved, "the densest citation corpus in the project").toBeGreaterThan(1500);
@@ -899,17 +1260,53 @@ describe("A03 SP3 — invariant references resolve outside the specs too", () =>
     // **The fabrication is the real defect**, copied from the call site rather
     // than invented (A03 commitment 14a). `test/integration/capabilities.test.ts`
     // cited a bare `I13` about aborting before first paint — C01's rule, in a
-    // file about C02 — and had done since the file was written. That id is as it
-    // stood then; C01's is `I14` after the renumber, and the fixture below is the
-    // original text rather than a translation of it.
+    // file about C02 — and had done since the file was written.
+    //
+    // **It stopped fabricating on 2026-09-10, and nothing said so.** The row
+    // held `I13` deliberately, as the original text rather than a translation
+    // of it, and that was right for as long as **C02 had no I13**: the whole
+    // defect is that a bare number in a C02 file resolves against C02, and a
+    // number C02 lacks is what makes the resolution fail loudly. Then F1021
+    // gave C02 a real I13 — the detection record's `sources` member — so the
+    // citation became legal, the fixture stopped constructing a violation, and
+    // the row went red asserting a length of 1 against 0.
+    //
+    // **That is the vacuous-fabrication class arriving from the outside.** The
+    // usual form is a fixture that was always vacuous; this one was correct for
+    // months and was disarmed by a spec edit two components away, with nothing
+    // connecting the two. It failed loudly, which is the safe direction and the
+    // only reason it was found — a fabrication that quietly starts passing for
+    // the same reason would read as a clean gate. FINDINGS F1041.
+    //
+    // **It expired a second time on the same day, and the row's own limit is
+    // the reason.** The comment here said *it expires again the day C02
+    // declares an I14, which is the limit and is why the number is stated here
+    // rather than derived* — and C02 declared I14 that same day, 2026-09-10,
+    // in the session that wrote the sentence. A stated limit names a condition
+    // and nothing watches it; two instances of one class inside one day is the
+    // argument for closing the class rather than the instance (F1068).
+    //
+    // So the number is **derived**: the lowest `I n` C02 does not declare,
+    // asserted absent before it is used, so no spec edit two components away
+    // can disarm the fabrication again. What is copied from the real call site
+    // is the *shape* — a bare number in a C02-owned file, resolving against C02
+    // and failing — which is what A03 commitment 14a asks for. The digit was
+    // never the defect; C01 owning the rule is the story and C02 lacking the
+    // number is the mechanism.
+    const c02 = invariantsOf("docs/components/C02_capability_detection.md");
+    let n = 1;
+    while (c02.has(`I${String(n)}`)) n += 1;
+    const id = `I${String(n)}`;
+    expect(c02.has(id), "the fabrication is vacuous unless C02 lacks the number").toBe(false);
+
     const read = at(
-      "    // I13, and the reason it is stated as \"aborts before first paint\".\n",
+      `    // ${id}, and the reason it is stated as "aborts before first paint".\n`,
       "test/integration/capabilities.test.ts",
     );
     const { violations } = checkReferences(["test/integration/capabilities.test.ts"], read, {});
 
     expect(violations).toHaveLength(1);
-    expect(violations[0]?.message).toContain("cites C02 I13 (bare, by owner)");
+    expect(violations[0]?.message).toContain(`cites C02 ${id} (bare, by owner)`);
   });
 
   it("SP3 fires: a bare reference in a file nothing owns", () => {
@@ -1174,12 +1571,27 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
   it("SP6 fires: a finding filed and keyed nowhere", () => {
     // The drift the rule exists to catch, and the direction that actually
     // happened: 55 of them.
+    //
+    // **The id is derived, and it was `F999` until the ledger reached F999.**
+    // A hard-coded fabrication expires the day its number becomes real: the
+    // appended heading was a *duplicate* of a finding that is filed and keyed,
+    // so the rule had nothing to complain about and the row failed while the
+    // gate was correct. That is the vacuous-fabrication class arriving in a
+    // control — `test/support/README.md` asks a fixture to be shown responding
+    // to the thing under test, and this one had stopped.
     const { ledger, triage } = inventoryIo();
+    const next = Math.max(
+      0,
+      ...[...ledger.matchAll(/^## F(\d+)/gmu)].map((m) => Number(m[1])),
+    ) + 1; // cells-ok — a finding number
+    const id = `F${String(next)}`;
+    expect(ledger, "the fabricated id has to be one the ledger does not have")
+      .not.toContain(`## ${id} `);
     const filed = checkTriageInventory(
-      io(`${ledger}\n\n## F999 — a fabricated finding\n\nbody.\n`, triage),
+      io(`${ledger}\n\n## ${id} — a fabricated finding\n\nbody.\n`, triage),
     );
 
-    expect(filed.map((x) => x.message).join(" "), "an unkeyed finding fails").toContain("F999");
+    expect(filed.map((x) => x.message).join(" "), "an unkeyed finding fails").toContain(id);
   });
 
   it("SP6 fires: a key removed, which also moves the sum", () => {
@@ -1305,6 +1717,127 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
     expect(v.violations.map((x) => x.message).join(" ")).toContain("bare §4b");
   });
 
+  it("SP5: the ledger's ids are unique, and the reader counted something", () => {
+    // **The counters, because emptiness is the same answer as did-not-read.**
+    // A regex that matches nothing gives 0 headings, 0 duplicates and a clean
+    // gate, which is the shape this register has three named instances of.
+    const v = checkFindingIds();
+    expect(v.headings, "headings read").toBeGreaterThan(500);
+    expect(v.followUps, "and the continuations are among them").toBe(4);
+    expect(v.headings, "every heading is an id or a continuation").toBe(v.ids + v.followUps);
+    expect(v.map((x) => x.message), "SP5 uniqueness").toEqual([]);
+  });
+
+  it("SP5 fires: one id, two sections — the collision a Set cannot see", () => {
+    // The real defect, copied from the call site: an aborted write left a
+    // heading and a two-row table above the real entry, and every citation of
+    // that id resolved to the stub. `declared()` answers *does this exist*, so
+    // it was green throughout.
+    const ledger = readFileSync("examples/docker/FINDINGS.md", "utf8");
+    const dup = `${ledger}\n\n## F164 — a second section under a live id\n`;
+    const v = checkFindingIds({ read: () => dup });
+    expect(v).toHaveLength(1);
+    expect(v[0]?.rule).toBe("SP5");
+    expect(v[0]?.message).toContain("F164");
+    expect(v[0]?.message).toContain("more than one section");
+  });
+
+  it("SP5 fires: a continuation heading that is not on the stated list", () => {
+    // The other arm, and the reason the convention is a list rather than a
+    // pattern: matching any heading with text before the dash would excuse a
+    // real duplicate written the same way.
+    const ledger = readFileSync("examples/docker/FINDINGS.md", "utf8");
+    const extra = `${ledger}\n\n## F164 revisited — a fifth continuation nobody decided on\n`;
+    const v = checkFindingIds({ read: () => extra });
+    expect(v).toHaveLength(1);
+    expect(v[0]?.message).toContain("not the stated set");
+    expect(v[0]?.message).toContain("F164 revisited");
+  });
+
+  it("SP12: the real tree is clean, and the rule actually read it", () => {
+    // **The rule this test exists for was written because a grep answered 16
+    // where the set is 39.** The clean arm asserts the counters as well as the
+    // emptiness, because a reader that resolves no rows at all satisfies
+    // `toEqual([])` exactly as a document with nothing wrong does — the
+    // same-green-for-clean-and-did-not-run shape this register has three
+    // instances of. F1031.
+    const clean = checkOpenSet();
+    expect(clean.rows, "rows read").toBeGreaterThan(500);
+    expect(clean.unstated, "and rows stating no disposition are counted, not dropped").toBeGreaterThan(0);
+    expect(clean.map((x) => x.message), "SP12").toEqual([]);
+  });
+
+  it("SP12 fires: a finding closed and left on the open set", () => {
+    // The direction that actually happens — work lands, the row gains a
+    // closing marker, and the list nobody re-derives keeps the id. Compared by
+    // **equality**, so this is a violation rather than a silent pass.
+    expect(checkOpenSet().map((x) => x.message), "the list and the register agree today").toEqual([]);
+    // A finding the register does not read as open, asserted to be open.
+    const v = checkOpenSet(undefined, ["F1", "F2"]);
+    expect(v.length, "two ids stated open that the register does not").toBeGreaterThan(0);
+    expect(v.map((x) => x.message).join(" ")).toContain("no longer read as open");
+  });
+
+  it("SP12 fires: a row that became open with nothing stating it", () => {
+    // The other direction, and the one a subset check is silent about. The
+    // register is read for its open set and the stated list is given as empty,
+    // so every open row is unstated — which is what a list that stopped being
+    // maintained looks like from here.
+    const v = checkOpenSet(undefined, []);
+    expect(v.length, "an empty list against a register with open rows").toBeGreaterThan(0);
+    expect(v.map((x) => x.message).join(" ")).toContain("read as open and are not on");
+  });
+
+  it("SP14: the real register is clean, and the rule actually read it", () => {
+    // **The counter, because a reader that finds no groups satisfies
+    // `toEqual([])` exactly as a reconciled document does** — SP12's own
+    // same-green shape, one rule over. Fifteen groups today; the floor is well
+    // under it so a new group does not move the row.
+    const clean = checkGroupTallies();
+    expect(clean.groups, "groups read").toBeGreaterThanOrEqual(10);
+    expect(clean.map((x) => x.message), "SP14").toEqual([]);
+  });
+
+  it("SP14 fires: a heading that overstates and one that understates", () => {
+    // Both directions, because a rule tested on one arm is tested on half of
+    // itself. The register is fabricated rather than touched: two rows under
+    // one heading, one open and one closed, and the heading is written wrong
+    // each way in turn.
+    const doc = (tally: string) =>
+      ["## 1 · A fabricated group — " + tally, "", "**F1** — a thing · **Open** — not done", "**F2** — another · **Closed** — done", ""].join("\n");
+
+    const clean = checkGroupTallies({ read: () => doc("**1 open** · 1 closed · none with no verdict") });
+    expect(clean.map((x) => x.message), "the control — the tally the rows actually have").toEqual([]);
+
+    const over = checkGroupTallies({ read: () => doc("**3 open** · 1 closed · none with no verdict") });
+    expect(over.map((x) => x.message).join(" "), "more open than the rows hold").toContain("open 3 against 1");
+
+    const under = checkGroupTallies({ read: () => doc("**closed** · 1 closed · none with no verdict") });
+    expect(under.map((x) => x.message).join(" "), "and the direction that hides work").toContain("open 0 against 1");
+  });
+
+  it("SP14 fires: a heading that states no tally at all", () => {
+    // **The vacuity arm, and it is why the rule refuses rather than shrugs.**
+    // Two headings in the corpus read `**closed**, all 5` and `9 closed · new
+    // at F80` — each omitting a field — and a parser that treats a missing
+    // number as zero lets a heading opt out of being checked. Both were
+    // normalised; this row is what stops them coming back.
+    const bare = ["## 1 · A fabricated group — **closed**, all 2", "", "**F1** — a thing · **Closed** — done", ""].join("\n");
+    const v = checkGroupTallies({ read: () => bare });
+    expect(v.map((x) => x.message).join(" "), "no tally is a violation, not a pass").toContain("states no tally");
+  });
+
+  it("SP14: `unread` is the ranking table's word for a consumer and is not read here", () => {
+    // **F1080's own first draft is the fabrication.** It read the ranking
+    // table's `consumers` column — `N open · M unread` — as a disposition
+    // column and rewrote four cells; group 8's `4 open` against one open
+    // finding was the tell. So a heading spelling its third field `unread`
+    // must not resolve: the word means something else four columns away.
+    const doc = ["## 1 · A fabricated group — **closed** · 1 closed · none unread", "", "**F1** — a thing · **Closed** — done", ""].join("\n");
+    const v = checkGroupTallies({ read: () => doc });
+    expect(v.map((x) => x.message).join(" "), "`unread` does not spell a verdict count").toContain("states no tally");
+  });
+
   it("SP5: the real tree is clean, and the rule actually read it", () => {
     const v = checkFindings();
     expect(v.scanned, "files scanned").toBeGreaterThan(50);
@@ -1313,6 +1846,55 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
     // that a scope or regex regression cannot slip beneath it.
     expect(v.citations, "citations resolved — the rule saw its subject").toBeGreaterThan(200);
     expect(v.map((x) => x.message), "SP5").toEqual([]);
+  });
+
+  it("SP5 fires: a citation in `tools/`, which the walk added and the filter dropped", () => {
+    // **A fabricated violation for the *scope*, not for the rule** — the thing
+    // this family has now got wrong four times and could not have caught, since
+    // a walk that adds 645 files and a filter that removes them reports exactly
+    // what a correct scope reports. `tools/` and `test/` were added to the walk
+    // with five sentences of justification and `CITED_FROM` was not touched, so
+    // 2 688 citations across 423 files stayed outside a rule whose comment said
+    // they were inside. Widened before this row was written, and measured
+    // first: zero pre-existing violations in the 645 (F1069).
+    //
+    // The real corpus and the real walk, with one file's *text* replaced — so
+    // the row is about the scope predicate and nothing else. Injecting `files`
+    // would answer the question by assuming it, which is how the state above
+    // survived a round.
+    // **The sentinel is derived, and the widening is why it has to be.** This
+    // file is now inside SP5's own corpus, so a five-digit finding id written
+    // out in this source is a citation SP5 reads and cannot resolve — a
+    // permanent violation created by the fixture rather than by the tree.
+    // Measured: hard-coded, the gate went to 19 violations, three of them this
+    // row's own text and its own comment. Built from the ledger's maximum the
+    // number exists only in memory, which is the convention the SP6 row already
+    // carries for the other reason. **A number is never written out in a file
+    // this rule reads**, which is a limit on how the fixture may be phrased and
+    // not on the rule.
+    const ledger = readFileSync("examples/docker/FINDINGS.md", "utf8");
+    const next =
+      Math.max(0, ...[...ledger.matchAll(/^## F(\d+)/gmu)].map((m) => Number(m[1]))) + 1; // cells-ok — a finding number
+    const id = `F${String(next)}`;
+    expect(ledger, "the fabricated id has to be one the ledger does not have").not.toContain(`## ${id} `);
+
+    const target = "tools/enforce/commitments.mjs";
+    const v = checkFindings({
+      read: (f: string) => (f === target ? `// see FINDINGS ${id} for why.\n` : readFileSync(f, "utf8")),
+    });
+
+    const fired = v.filter((x) => x.file.startsWith(`${target}:`));
+    expect(fired, `${target} is outside SP5's corpus`).toHaveLength(1);
+    expect(fired[0]?.rule).toBe("SP5");
+    expect(fired[0]?.message).toContain(id);
+
+    // The other half of the same scope, so one directory landing does not read
+    // as both.
+    const t2 = "test/unit/enforce-rules.test.ts";
+    const v2 = checkFindings({
+      read: (f: string) => (f === t2 ? `// ${id}.\n` : readFileSync(f, "utf8")),
+    });
+    expect(v2.filter((x) => x.file.startsWith(`${t2}:`)), `${t2} is outside SP5's corpus`).toHaveLength(1);
   });
 
   it("SP5 fires: a citation past the end of the ledger", () => {
@@ -1478,5 +2060,173 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
       reader(seamDoc([["Command submit", "C99"]]), ownerDoc(["Submit"])),
     );
     expect(renamed, "two names for one row is drift, and is caught").toHaveLength(2);
+  });
+});
+
+// **Assembled rather than written literally.** `collectTodos` walks `test/` for
+// the same marker and cannot tell a fixture from a deferral, so a literal here
+// fails TD6 on a title that is a fragment of a template string. The alternative
+// is the exclusion `todo-expiry.test.ts` already takes — naming the whole file —
+// which blinds the deferral gate to every real todo this file might ever hold,
+// for the sake of four rows. The function under test still receives the exact
+// form: the concatenation is in the fixture's source, not in its value.
+const OPEN = `it.${"todo"}(`;
+
+describe("withoutTodos — the deferral filter behind the coverage signal (F907)", () => {
+  it("EC1: blanks a wrapped it.todo whole, and the one-line form the old filter handled", () => {
+    // **The fabricated violation is the wrapped call**, because it is the form
+    // the previous filter passed: it dropped lines matching the opening and a
+    // formatter puts the title on the next one. Measured when this landed, 13
+    // of 71 calls in `test/` were wrapped, and every todo carrying TD1's marker
+    // is — the marker is what pushes the line past the width.
+    const wrapped = [
+      "describe('x', () => {",
+      `  ${OPEN}`,
+      '    "T9.1 (C99 I7): a thing that does not run yet",',
+      "  );",
+      "  it('T9.2 (C99 I8): a thing that does', () => {});",
+      "});",
+    ].join("\n");
+    const out = withoutTodos(wrapped);
+    expect(out, "the wrapped title is gone").not.toContain("C99 I7");
+    expect(out, "and the running row is untouched").toContain("C99 I8");
+
+    const oneLine = `  ${OPEN}"T9.3 (C99 I9): the single-line form");`;
+    expect(withoutTodos(oneLine), "the form the old filter could see").not.toContain("C99 I9");
+  });
+
+  it("EC2: the control — code survives, and only prose is blanked", () => {
+    // **The control the rule owes**: a filter that blanked everything would pass
+    // EC1 completely, and a coverage signal computed over an empty corpus reports
+    // every invariant as uncited, which reads as a very thorough gate.
+    const clean = ["const a = 1;", "it('T9.4 (C99 I10): runs', () => {});"].join("\n");
+    expect(withoutTodos(clean), "nothing to strip, nothing stripped").toBe(clean);
+
+    // Comments go, because a citation in one is not a row — the second half of
+    // F907, found by laundering an invariant inside the comment written to warn
+    // about laundering it.
+    const prose = [
+      "// C99 I11 — what this file is about",
+      "/** C99 I12, in a block */",
+      "/*",
+      " * C99 I13, across lines",
+      " */",
+      "it('T9.5 (C99 I14): runs', () => {});",
+      "// it.todoish — a near miss with no paren",
+    ].join("\n");
+    const out = withoutTodos(prose);
+    expect(out, "no citation from a comment survives").not.toMatch(/C99 I11|C99 I12|C99 I13/u);
+    expect(out, "and the row does").toContain("C99 I14");
+  });
+
+  it("EC3: parens inside a title do not end the call early", () => {
+    // A lazy match to the first `)` stops inside `(C99 I11)` and leaves the rest
+    // of the title behind — which is the citation the filter exists to remove.
+    const s = [
+      `  ${OPEN}`,
+      '    "T9.5 (C99 I11): a title with (parentheses) and a cite (C99 I12) in it",',
+      "  );",
+      "  it('T9.6 (C99 I13): after', () => {});",
+    ].join("\n");
+    const out = withoutTodos(s);
+    expect(out, "both citations inside the todo go").not.toMatch(/C99 I11|C99 I12/u);
+    expect(out, "and the row after it stays").toContain("C99 I13");
+  });
+
+  it("EC4: the real corpus — every wrapped todo in test/ is invisible to the old filter and not to this one", () => {
+    // **The row that makes the other three about the tree rather than about a
+    // string.** It asserts the two populations rather than a threshold, so it
+    // stays true as todos are written and converted; what it forbids is the two
+    // filters agreeing, which is what a regression to line-matching would give.
+    const files = walkTests();
+    const oldFilter = (text: string): string =>
+      text
+        .split("\n")
+        .filter((l) => !/\bit\.todo\(/u.test(l))
+        .join("\n");
+    let survivedOld = 0;
+    let survivedNew = 0;
+    for (const f of files) {
+      const text = readFileSync(f, "utf8");
+      if (!/\bit\.todo\(/u.test(text)) continue;
+      survivedOld += (oldFilter(text).match(/\bT\d+\.\d+[a-z]? \(C\d\d I\d+/gu) ?? []).length;
+      survivedNew += (withoutTodos(text).match(/\bT\d+\.\d+[a-z]? \(C\d\d I\d+/gu) ?? []).length;
+    }
+    expect(survivedOld, "the old filter left deferred rows in the corpus").toBeGreaterThan(survivedNew);
+  });
+
+  it("EC5 (F1077): a describe title over a block that runs nothing goes, and the same title over a row stays", () => {
+    // **The fabricated violation is the shape F907 found and fixed by hand.**
+    // Its instance was `describe("C28 I45 — per-kind input gauges")` over pure
+    // todos: the todos stripped correctly, the title survived, and the invariant
+    // read as covered with nothing running behind it. The file was edited; the
+    // class was not, so the signal has been blind to it ever since.
+    const hollow = [
+      "describe('T9.7 (C99 I20): the gauges', () => {",
+      `  ${OPEN}"T9.8 (C99 I21): deferred", );`,
+      "});",
+    ].join("\n");
+    expect(withoutTodos(hollow), "nothing runs beneath it, so the title is not coverage").not.toContain("C99 I20");
+
+    // **The control, and it is what the qualification is for.** A filter that
+    // blanked every title would pass the arm above completely — and it would be
+    // wrong about 37 titles in this repository that cite an invariant over rows
+    // which do run, taking the reported figure from 33 to 70 on a corpus with no
+    // holes in it. Coverage written one level up is still coverage.
+    const live = [
+      "describe('T9.9 (C99 I22): the gauges', () => {",
+      "  it('T9.10: a row that runs', () => {});",
+      "});",
+    ].join("\n");
+    expect(withoutTodos(live), "a row runs beneath it, so the title stands").toContain("C99 I22");
+  });
+
+  it("EC6 (F1077): the corpus — an independent reader of the block agrees on every describe in test/", () => {
+    // **Two implementations rather than one restated.** The filter finds the
+    // block's end by indentation; this walks brace depth with string spans
+    // blanked, which is a different mechanism and not a rebuild of the same
+    // intent — a probe rebuilt from intent agrees with a transcription defect.
+    // Asserted as agreement rather than as a count, so it stays true as tests
+    // are written; the split is printed because movement is what it is good for.
+    const ROW = /^\s*(?:it|test)(?:\.each)?\s*[(`]/u;
+    const OPENER = /^\s*describe(?:\.\w+)?\s*[(.]/u;
+    const byBrace = (lines: readonly string[], at: number): boolean => {
+      let depth = 0;
+      let started = false;
+      for (let i = at; i < lines.length; i++) {
+        const bare = (lines[i] ?? "").replace(/(["'`])(?:\\.|(?!\1)[^\\])*\1/gu, '""');
+        if (i > at && started && ROW.test(lines[i] ?? "")) return true;
+        for (const ch of bare) {
+          if (ch === "{") { depth++; started = true; } else if (ch === "}") depth--;
+        }
+        if (started && depth <= 0) return false;
+      }
+      return false;
+    };
+
+    let blocks = 0;
+    let live = 0;
+    for (const f of walkTests()) {
+      const text = readFileSync(f, "utf8");
+      const raw = text.split("\n");
+      const stripped = withoutTodos(text).split("\n");
+      // **Openers are located in `raw` and judged in `stripped`**, because a
+      // hollow one has been blanked and cannot be found in the output that
+      // blanked it. The walk runs over a third array — the stripped text with
+      // every opener put back — so comments and todos are gone from it and no
+      // block starts on a line the filter removed. `withoutTodos` pushes one
+      // entry per input line on every branch, which is what makes the indices
+      // line up.
+      const forWalk = stripped.map((l, i) => (OPENER.test(raw[i] ?? "") ? (raw[i] ?? "") : l));
+      raw.forEach((line, i) => {
+        if (!OPENER.test(line)) return;
+        blocks++;
+        const kept = (stripped[i] ?? "").trim().length > 0;
+        if (kept) live++;
+        expect(kept, `${f}:${String(i + 1)} — the filter and the brace walk disagree`).toBe(byBrace(forWalk, i));
+      });
+    }
+    console.log(`describe blocks ${String(blocks)} · a row runs beneath ${String(live)} · hollow ${String(blocks - live)}`);
+    expect(blocks, "the corpus is not empty — a filter that blanked everything would agree with a walk that found nothing").toBeGreaterThan(100);
   });
 });

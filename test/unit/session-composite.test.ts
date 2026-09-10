@@ -553,3 +553,59 @@ describe("C22 §6a — the cursor (C15 I19)", () => {
     expect(painted[3], "the newest row is still the last").toContain("r5");
   });
 });
+
+describe("C22 §6b — the diff's leading reset (C22 I57)", () => {
+  const write = (f: Composed, previous: readonly string[] | null, rows: () => string[]): string => {
+    const result = composeFrame({
+      composed: () => f,
+      paintDeps: () => ({ ...deps(() => []), transcriptRows: rows }),
+      resizeViewport: () => undefined,
+      cursorSequence: () => "",
+      cursorShape: () => "",
+      previous: () => previous,
+    });
+    return result.kind === "frame" ? result.write : "";
+  };
+
+  it("T1.55 (C22 I57): every row a diff writes leads with a reset; the whole-frame path does not", () => {
+    // **The rule rests on asymmetry rather than on a live defect**, which is
+    // exactly why it needs a row. Measured when it was written, 0 of 50
+    // composed rows ended with a live SGR attribute — so a rule justified as
+    // *otherwise colour bleeds* forbids nothing today and reads precisely like
+    // a rule that holds (A03 §2, in a remedy rather than in a check). Four
+    // bytes a row, against a colour bleeding down every row below it and
+    // surviving the frame, on the day a renderer stops closing its own.
+    //
+    // A diff writes rows **out of order**, so a row can inherit a state that
+    // was never above it. That is the half no assertion about a whole frame
+    // reaches, and it is why both paths are read here: the prefix has to be the
+    // diff's and not a property of every write.
+    const f = frameAt();
+    const height = f.region.height;
+    const before = Array.from({ length: height }, (_, i) => `row-${String(i)}`.padEnd(30, "."));
+    const after = before.map((r, i) => (i === 1 || i === 3 ? r.toUpperCase() : r));
+
+    let rows = before;
+    const whole = write(f, null, () => rows);
+    const painted = whole.replace(/^\u001b\[H/u, "").split("\r\n");
+
+    rows = after;
+    const diffed = write(f, painted, () => rows);
+
+    const moves = [...diffed.matchAll(/\u001b\[\d+;\d+H/gu)];
+    expect(moves.length, "only the changed rows are written").toBe(2);
+    for (const m of moves) {
+      expect(
+        diffed.slice(m.index + m[0].length),
+        "a row a diff writes leads with a reset",
+      ).toMatch(/^\u001b\[0m/u);
+    }
+
+    // The complement: the whole-frame path writes from home downward in order,
+    // so no row can inherit a state from a row that was never above it, and it
+    // carries no per-row prefix. Without this the first assertion would be
+    // satisfied by a reset on every row of every write.
+    expect(whole.startsWith("\u001b[H"), "the whole frame goes home first").toBe(true);
+    expect(/\u001b\[\d+;\d+H/u.test(whole), "and positions nothing row by row").toBe(false);
+  });
+});

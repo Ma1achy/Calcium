@@ -199,7 +199,7 @@ describe("C19 §3 — candidates are projections of the manifest (I4)", () => {
     expect(got.map((c) => c.value)).toEqual(["running", "failed", "queued"]);
   });
 
-  it("T4.2 (C05 I11): a hidden tool is absent from candidates", () => {
+  it("T4.2 (C05 I11, C05 I14): a hidden tool is absent from candidates", () => {
     const m = manifest();
     const hidden = m.tools.filter((t) => t.hidden === true).map((t) => t.name);
     const offered = (verbSource(() => m).complete(at("/‸")) as readonly { value: string }[]).map(

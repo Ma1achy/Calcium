@@ -193,7 +193,7 @@ describe("C06 cancellation and timeout", () => {
     expect(settled.cancelled).toBe(false);
   });
 
-  it("T3.8: timeoutMs 0 → no timer is ever scheduled", async () => {
+  it("T3.8 (I21): timeoutMs 0 → no timer is ever scheduled", async () => {
     const r = rig({ exit: { code: 0, signal: null } });
     await r.transport.invoke(invocation({ timeoutMs: 0 }));
 
@@ -435,7 +435,7 @@ describe("C06 spawning", () => {
     expect(r.runner.spawns[0]?.argv).toEqual(["widget", ...nasty, "--json"]);
   });
 
-  it("T3.22: cwd changes between invocations → the second spawns in the new directory", async () => {
+  it("T3.22 (I22): cwd changes between invocations → the second spawns in the new directory", async () => {
     const fake = fakeClock();
     const runner = fakeRunner(() => ({ exit: { code: 0, signal: null } }));
     let where = "/one";

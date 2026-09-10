@@ -37,8 +37,10 @@ const results = runPass({
   run,
   control: {
     file: FILE,
-    from: "  if (isWide(base)) return 2;",
-    to: "  if (isWide(base)) return 1;",
+    // Re-anchored when `clusterCells` became a sum over the cluster (F978):
+    // the same arm, now `cp` inside the loop, and the same mutation.
+    from: "    if (isWide(cp)) total += 2;",
+    to: "    if (isWide(cp)) total += 1;",
     why: "T1.13 and T1.24 assert CJK at two cells in half a dozen rows; a run where this survives cannot see a kill at all",
   },
   mutations: [
@@ -78,8 +80,13 @@ const results = runPass({
       // hand-written table could not have had, because it never reached plane 14.
       name: "the supplementary variation selectors leave the zero-width table",
       file: FILE,
-      from: "    (cp >= 0xe0100 && cp <= 0xe01ef) // variation selectors, supplement",
-      to: "    (cp >= 0xe0100 && cp <= 0xe0100 - 1) // variation selectors, supplement",
+      // Re-anchored when the hand table became `ZERO_WIDTH_RANGES` (F978): the
+      // range is the table's last pair — anchored with the tag pair before it,
+      // because `AMBIGUOUS_RANGES` holds the same pair — and the mutation leaves it with
+      // its bounds crossed — `inRanges` can match nothing between them — which
+      // is what the old `cp <= 0xe0100 - 1` did to the hand-written test.
+      from: "0xe0020, 0xe007f, 0xe0100, 0xe01ef,",
+      to: "0xe0020, 0xe007f, 0xe0100, 0xe00ff,",
       expect: "T1.27e",
     },
     {

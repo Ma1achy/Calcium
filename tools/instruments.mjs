@@ -24,6 +24,23 @@
 // is the same bit for *clean* and for *the case list was empty* — the mistake
 // three instruments made in one session, each reporting a completion it never
 // observed. Every fixture prints `name — n/m rows`; this reads the counter.
+//
+// **And a run can report fewer tests than it collected** (F897, F1018). A
+// worker that dies mid-file writes `Tests  2 passed (6)`, and read against the
+// exit status alone that is *every row green under a non-zero exit* — which is
+// false. The bracket is the collected count F929 went looking for outside the
+// run, per fixture, needing no golden total to drift; `lost rows` is the state
+// it makes expressible.
+//
+// **And a summary naming a failure is a counter, not an absence** (F949). vitest
+// writes `Tests  1 failed | 5 passed (6)` when a row fails, and the first reader
+// matched `Tests N passed` — digits straight after the word — so the runs with
+// something to report were the ones reported as `0 rows ← reported no rows at
+// all`. F929 read that line as a starved child, and it was six rows that ran
+// and one that disagreed; under twelve busy loops on eleven cores the child was
+// never starved at all. The reader is `readCounter` below, exported so its
+// fixture can ask it the question this file's own first run got wrong, and the
+// summary line now says which state it saw.
 
 import { execFileSync } from "node:child_process";
 import { readdirSync, statSync } from "node:fs";
@@ -44,6 +61,22 @@ const COVERED = [
   ["tools/bench/patch-window.mjs", null], // same fixture — `gutter`
   ["tools/bench/liveness.mjs", null], // the guard itself, covered by its own rows
   ["tools/waitfor.mjs", ["npx", "vitest", "run", "test/unit/waitfor.test.ts"]],
+  // **This target was red from the commit that landed these and nobody ran it**
+  // (F905). Five files, 697 lines, inside a commit whose message is about
+  // `byEntry` and C28 I42 — so the equality comparison paid out exactly as it
+  // claims to, `45 found, 40 with a fixture`, and the payout went unread for a
+  // day. The fixture covers the three pure exports the whole family shares:
+  // where the chunk splits, what is stripped, and where the cursor is.
+  ["tools/capture-foreign.mjs", ["npx", "vitest", "run", "test/unit/capture-foreign.test.ts"]],
+  ["tools/capture-foreign.dump.mjs", null], // a thin driver over the three exports — same fixture
+  ["tools/capture-foreign.runs.mjs", null], // the same, plus `catalogue-png.mjs`'s own parser
+  // **The recording half, and it cannot run here.** Its target is an
+  // authenticated `claude` on the *host*; the container has no route to it, so
+  // it is `node-pty` and nothing else by construction. What a fixture could
+  // assert is that it spawns and writes bytes, which is `node-pty`'s claim and
+  // not this file's. The expiry is a symbol: the day it grows a parser, that
+  // parser gets rows. Grep: `grep -n "export" tools/capture-foreign-record.mjs`.
+  ["tools/capture-foreign-record.mjs", null],
   // **This target caught it on the day it landed**, which is the claim the
   // equality comparison above makes and this is the first time it has been paid
   // out: `scan-cost.mjs` was added, `make instruments` went from 16/16 to
@@ -81,6 +114,11 @@ const COVERED = [
   // source that moves. Eighteen had rotted when the sweep was first run, one of
   // them a **control**, which makes its whole run unstartable.
   ["tools/mutate/anchors.mjs", ["npx", "vitest", "run", "test/unit/mutate-anchors.test.ts"]],
+  // The sweep that runs every one of those configurations on a schedule, so
+  // a mutation that went vacuous is dated by a machine (F952, F990). Its
+  // fixture owes the planner and the reader; the executing half is the CI
+  // job `mutation-sweep`, which is what closes the class.
+  ["tools/mutate/sweep.mjs", ["npx", "vitest", "run", "test/unit/mutate-sweep.test.ts"]],
   // **The terminal read's two halves that a container can check.** Neither's
   // *verdict* is reachable from here — that is the whole reason the probe exists
   // — but the properties that make a verdict readable are: that the bytes are
@@ -90,6 +128,17 @@ const COVERED = [
   ["tools/terminal-probe/build.mjs", ["npx", "vitest", "run", "test/unit/terminal-probe.test.ts"]],
   ["tools/terminal-read.sh", null], // same fixture — the driver's own claims
   ["tools/proof.sh", ["npx", "vitest", "run", "test/unit/proof-guards.test.ts"]],
+  // **A tier-5 fixture, because the subject is `dist/`.** What this instrument
+  // owes is not arithmetic — `checkBudget` has its own tier-1 rows over report
+  // literals — but that a session driven through the built package's public
+  // surface produces a report the appendix's table can read. T5.3 asserts all
+  // six of A01's labels, that exactly two come back refused, and that the
+  // verdict is never `closed` while two rows are blank.
+  ["tools/profile.mjs", ["npx", "vitest", "run", "--dir", "test/e2e", "profiler"]],
+  // Same fixture, and it is a real exercise rather than a shared file: the
+  // doubles are what `profile.mjs` builds its session on, so a broken stdout is
+  // a dead fixture and T5.3's first assertion is the liveness line.
+  ["tools/bench/fakes.mjs", null],
   // **Both landed without a fixture and this target was not run**, so the gate
   // that exists to catch exactly that sat red for three commits. `catalogue-png`
   // shares the file because the two are one pipeline — frames out, images in —
@@ -149,6 +198,11 @@ const COVERED = [
   ["examples/docker/tools/corrections.mjs", ["node", "examples/docker/tools/corrections_test.mjs"]],
   ["examples/docker/tools/measure-raw.mjs", null], // same fixture — the shared registry
   ["examples/docker/tools/measure-s3.mjs", null], // same fixture
+  // **This runner's own reader.** It reported `0 rows` for a child that had run
+  // six and failed one (F929, F949), and nothing could ask it a question because
+  // the file ran at import. The reader is exported and the runner is behind a
+  // main guard, so the fixture imports one without starting the other.
+  ["tools/instruments.mjs", ["npx", "vitest", "run", "test/unit/instruments.test.ts"]],
 ];
 
 /**
@@ -159,7 +213,10 @@ const COVERED = [
 const NOT_INSTRUMENTS = {
   "tools/enforce": "the enforcement suite — gated by `make enforce`, with five fixtures of its own under test/unit/enforce-*",
   "tools/mutate/runs": "mutation configurations, not instruments: each is an input to `mutate.mjs`, which is covered — and their anchors are swept by `tools/mutate/anchors.mjs`, because *not an instrument* left them unwatched",
-  "tools/instruments.mjs": "this runner",
+  // A control, not an instrument: eleven lines writing known escapes to stdout
+  // so `trackAndTranslateCursor` can be checked against a placement nobody
+  // guessed. It measures nothing; it is measured against.
+  "tools/capture-foreign.cursor-control.mjs": "a control script for capture-foreign's cursor translation — it writes known escapes and reads nothing",
   "examples/docker/tools/_fixture.py": "the fixtures' own four-line harness",
   "examples/docker/tools/registry.mjs": "the shared registry, covered by probes_test.mjs",
   "examples/docker/tools/__pycache__": "not a file",
@@ -210,60 +267,174 @@ function inventory() {
   return found;
 }
 
-const files = inventory();
-const covered = new Set(COVERED.map(([f]) => f));
-const missing = files.filter((f) => !covered.has(f));
-const stale = [...covered].filter((f) => !files.includes(f));
-
-console.log(`instruments — ${String(files.length)} found, ${String(covered.size)} with a fixture\n`);
-
-if (missing.length > 0 || stale.length > 0) {
-  for (const f of missing) console.error(`  NO FIXTURE   ${f}`);
-  for (const f of stale) console.error(`  NOT PRESENT  ${f} — listed as covered and not on disk`);
-  console.error(
-    "\nThe inventory is compared by equality, so this is the whole of it: an " +
-      "instrument added without a fixture fails here on the day it lands.",
-  );
-  process.exit(1);
-}
-
-let failed = 0;
-let rowsTotal = 0;
-for (const [file, cmd] of COVERED) {
-  if (cmd === null) continue;
-  const [bin, ...args] = cmd;
-  let out = "";
-  let ok = true;
-  try {
-    out = execFileSync(bin, args, { cwd: ROOT, encoding: "utf8", stdio: "pipe" });
-  } catch (e) {
-    ok = false;
-    out = `${e.stdout ?? ""}${e.stderr ?? ""}`;
-  }
-  // **The counter, not the status.** A python fixture prints `name — n/m rows`;
-  // vitest prints `Tests  n passed`. Zero of either is a fixture that ran
-  // nothing, which exits 0 and reads as clean.
-  const py = /— (\d+)\/(\d+) rows/.exec(out);
-  // The ESC byte itself, not only the `[2m` after it: vitest writes
-  // `ESC[2m Tests ESC[22m ESC[1mESC[32m9 passed`, and leaving the escapes in
-  // place is what made the first run of this file report `0 rows` for four
-  // fixtures that had just passed. The same reading defect the mutation harness
-  // shipped, in the runner written to catch reading defects.
+/**
+ * Read a fixture's row counter off its output: `{ rows, failed }` — the rows
+ * that **ran**, and how many of them failed — or `null` when there is no counter.
+ *
+ * **The counter, not the status.** A python fixture prints `name — n/m rows`;
+ * vitest prints one `Tests` line. Zero of either is a fixture that ran nothing,
+ * which exits 0 and reads as clean.
+ *
+ * **The failed count is read beside the passed count, and `rows` is their sum**
+ * (F949). vitest's line is `Tests  1 failed | 5 passed (6)` when a row fails,
+ * `Tests  15 passed | 1 todo (16)` when one is deferred, and `Tests  no tests`
+ * when the file did not load — and matching `Tests N passed` with the digits
+ * straight after the word reads the first of those as no counter at all, which
+ * is what F929 saw and called starvation. A `todo` or a `skipped` did not run
+ * and is not a row; `no tests` is not a counter.
+ *
+ * The ESC byte itself, not only the `[2m` after it: vitest writes
+ * `ESC[2m Tests ESC[22m ESC[1mESC[32m9 passed`, and leaving the escapes in
+ * place is what made the first run of this file report `0 rows` for four
+ * fixtures that had just passed. The same reading defect the mutation harness
+ * shipped, in the runner written to catch reading defects.
+ */
+export function readCounter(out) {
   const clean = out.replace(/\u001b\[[0-9;]*m/g, "");
-  const ts = /Tests\s+(\d+) passed/.exec(clean);
-  const rows = py !== null ? Number(py[2]) : ts !== null ? Number(ts[1]) : 0;
-  rowsTotal += rows;
-  const bad = !ok || rows === 0;
-  if (bad) failed += 1;
-  console.log(
-    `  ${bad ? "FAIL" : "ok  "}  ${String(rows).padStart(3)} rows  ${file}` +
-      (rows === 0 ? "   ← reported no rows at all" : ""),
-  );
-  if (bad) console.log(out.split("\n").slice(-25).join("\n"));
+  const py = /— (\d+)\/(\d+) rows/.exec(clean);
+  if (py !== null) {
+    const rows = Number(py[2]);
+    // A python fixture prints what it ran; there is no second number saying
+    // what it meant to run, so `collected` is `reported` by construction.
+    return { rows, failed: rows - Number(py[1]), reported: rows, collected: rows };
+  }
+  const ts = /^\s*Tests\s+(.*)$/m.exec(clean);
+  if (ts === null || !/\d+ (passed|failed)/.test(ts[1])) return null;
+  const count = (word) => Number(new RegExp(`(\\d+) ${word}`).exec(ts[1])?.[1] ?? 0);
+  const passed = count("passed");
+  const failed = count("failed");
+  // **And the bracket, which is the count F929 went looking for outside the
+  // run** (F1018). `reported` is every bucket vitest names and `collected` is
+  // the total it prints beside them; a healthy run has them equal — measured
+  // against a green run, a failing run, one with a `todo` and two `skip`s, and
+  // a `-t`-filtered run — and a worker that dies mid-file reports
+  // `Tests  2 passed (6)`. `rows` stays the rows that *ran*, since a todo did
+  // not, so the two numbers answer different questions and neither can be
+  // derived from the other. A line with no bracket gets `collected: null`: a
+  // sheared capture cannot be asked whether anything was lost.
+  const bracket = /\((\d+)\)$/.exec(ts[1].trimEnd());
+  return {
+    rows: passed + failed,
+    failed,
+    reported: passed + failed + count("skipped") + count("todo"),
+    collected: bracket === null ? null : Number(bracket[1]),
+  };
 }
 
-console.log(
-  `\n${String(files.length)} instruments, every one with a fixture · ` +
-    `${String(rowsTotal)} rows · ${failed === 0 ? "all green" : `${String(failed)} FAILING`}`,
-);
-process.exit(failed === 0 ? 0 : 1);
+/**
+ * What the exit status and the counter say **together** — one of five states,
+ * because F929 had two and needed the third.
+ *
+ * `ok` needs both. `diverged` is a counter with failures, whatever the exit:
+ * the fixture ran and disagreed. `did not run` is a non-zero exit with no
+ * counter: the child died before its first row, starved or unable to load its
+ * file. `no rows` is a clean exit with no counter, the vacuous fixture this
+ * file was written against. And `errored after its rows` is every row green
+ * under a non-zero exit — an error outside the rows, which vitest reports as
+ * `Errors` beside a green `Tests` line.
+ */
+export function stateOf(ok, counter) {
+  if (counter === null || counter.rows === 0) return ok ? "no rows" : "did not run";
+  // **The sixth, and it is F929's own symptom read correctly at last** (F1018).
+  // A worker that dies mid-file takes its remaining tests with it, and the
+  // buckets vitest prints are the ones that finished. Read against the exit
+  // status alone that is `errored after its rows` — *every row green under a
+  // non-zero exit* — which is false: four rows were collected and never ran.
+  // Asked before the failure count, because a run that lost rows cannot be
+  // read either way; the row it would have diverged on may be one of the ones
+  // that never executed.
+  if (counter.collected !== null && counter.reported < counter.collected) return "lost rows";
+  if (counter.failed > 0) return "diverged";
+  return ok ? "ok" : "errored after its rows";
+}
+
+/** What a failing row says after its file, so the reader is told which state it was. */
+const NOTE = Object.freeze({
+  diverged: (c) => `← ${String(c.failed)} of ${String(c.rows)} failed — the fixture ran and disagreed`,
+  "lost rows": (c) =>
+    `← ${String(c.reported)} of the ${String(c.collected)} tests it collected were reported — a ` +
+    "worker died or the run was cut short, so neither a pass nor a failure can be read off it",
+  "did not run": () =>
+    "← exit non-zero and no counter — the child died before its first row: starved, or its file did not load",
+  "no rows": () => "← exit 0 and no counter — a fixture that ran nothing and called it clean",
+  "errored after its rows": (c) =>
+    `← all ${String(c.rows)} rows green and the exit non-zero — an error outside the rows`,
+});
+
+function main() {
+  const files = inventory();
+  const covered = new Set(COVERED.map(([f]) => f));
+  const missing = files.filter((f) => !covered.has(f));
+  const stale = [...covered].filter((f) => !files.includes(f));
+
+  console.log(`instruments — ${String(files.length)} found, ${String(covered.size)} with a fixture\n`);
+
+  if (missing.length > 0 || stale.length > 0) {
+    for (const f of missing) console.error(`  NO FIXTURE   ${f}`);
+    for (const f of stale) console.error(`  NOT PRESENT  ${f} — listed as covered and not on disk`);
+    console.error(
+      "\nThe inventory is compared by equality, so this is the whole of it: an " +
+        "instrument added without a fixture fails here on the day it lands.",
+    );
+    process.exit(1);
+  }
+
+  const tally = {
+    diverged: 0,
+    "did not run": 0,
+    "no rows": 0,
+    "errored after its rows": 0,
+    "lost rows": 0,
+  };
+  let rowsTotal = 0;
+  for (const [file, cmd] of COVERED) {
+    if (cmd === null) continue;
+    const [bin, ...args] = cmd;
+    let out = "";
+    let ok = true;
+    try {
+      // **`maxBuffer` set, because the default shears the summary off exactly
+      // the runs with most to say** — `mutate.mjs` records a sweep whose failing
+      // rows overran 1 MiB and came back with no summary. Sheared here, a
+      // divergence would read as `did not run`, the wrong one of the states below.
+      out = execFileSync(bin, args, {
+        cwd: ROOT,
+        encoding: "utf8",
+        stdio: "pipe",
+        maxBuffer: 64 * 1024 * 1024,
+      });
+    } catch (e) {
+      // A non-zero exit throws, and the output travels on the error rather than
+      // being lost: both streams are read, because the counter is on stdout and
+      // the reason is usually on stderr.
+      ok = false;
+      out = `${e.stdout ?? ""}${e.stderr ?? ""}`;
+    }
+    const counter = readCounter(out);
+    const state = stateOf(ok, counter);
+    const rows = counter?.rows ?? 0;
+    rowsTotal += rows;
+    if (state !== "ok") tally[state] += 1;
+    console.log(
+      `  ${state === "ok" ? "ok  " : "FAIL"}  ${String(rows).padStart(3)} rows  ${file}` +
+        (state === "ok" ? "" : `   ${NOTE[state](counter)}`),
+    );
+    if (state !== "ok") console.log(out.split("\n").slice(-25).join("\n"));
+  }
+
+  const failed = Object.values(tally).reduce((sum, n) => sum + n, 0);
+  const named = Object.entries(tally)
+    .filter(([, n]) => n > 0)
+    .map(([state, n]) => `${String(n)} ${state}`)
+    .join(", ");
+  console.log(
+    `\n${String(files.length)} instruments, every one with a fixture · ` +
+      `${String(rowsTotal)} rows · ${failed === 0 ? "all green" : `${String(failed)} FAILING — ${named}`}`,
+  );
+  process.exit(failed === 0 ? 0 : 1);
+}
+
+// **Behind a main guard, so the reader can be imported without the runner
+// starting** — `scan-cost.mjs`'s idiom. An entry that starts on import is
+// untestable, and a suite retargeted at its pieces reads as coverage.
+if (import.meta.url === `file://${process.argv[1] ?? ""}`) main();

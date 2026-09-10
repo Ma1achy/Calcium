@@ -38,8 +38,9 @@ const results = runPass({
   run,
   control: {
     file: REGISTRY,
-    from: "  windowChild = (block: Block, width: number, from: number, to: number): Windowed | null => {",
-    to: "  windowChild = (block: Block, _width: number, _from: number, _to: number): Windowed | null => {\n    return null;\n    // eslint-disable-next-line no-unreachable\n    const width = 0, from = 0, to = 0;",
+    // The member opens the call's memo since C09 I61, so the wrapper stays in the replacement.
+    from: "  windowChild = (block: Block, width: number, from: number, to: number): Windowed | null => this.#scoped(() => {",
+    to: "  windowChild = (block: Block, _width: number, _from: number, _to: number): Windowed | null => this.#scoped(() => {\n    return null;\n    // eslint-disable-next-line no-unreachable\n    const width = 0, from = 0, to = 0;",
     why:
       "a seam that never slices cannot satisfy a row about slicing — T2.125 asserts the six rows " +
       "a follow box shows and T2.28b the equality, so a pass where this survives is a pass that " +

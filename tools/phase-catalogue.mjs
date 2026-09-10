@@ -104,7 +104,7 @@ write("phase1-sphere-kitty", draw(b.image({ data: SPHERE, height: 12, alt: "a sh
 write(
   "phase1-transmission-kitty",
   `# the payload the shell writes beside the placement — not part of any frame\n` +
-    `${transmitImage([b.image({ data: SPHERE, height: 12, alt: "s" })], KITTY, new Set()).length} bytes`,
+    `${transmitImage([b.image({ data: SPHERE, height: 12, alt: "s" })], KITTY, new Map()).length} bytes`,
 );
 write(
   "phase1-bordered-24bit",

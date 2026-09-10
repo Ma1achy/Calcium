@@ -23,6 +23,21 @@
 // passes, and a mutation whose kill is not in doubt is seen to be killed. The
 // caller supplies that second one and says why it cannot survive — a generic
 // sentinel would be the harness marking its own homework.
+//
+// **And a third instance, which is the same defect in the reader's arity**
+// (F897, F1018). A worker that dies mid-file takes its remaining tests with it;
+// vitest reports the ones that finished — `Tests 2 passed (6)` — and every
+// predicate this file had answers correctly: there is a summary, no test
+// failed, no file failed. The row says SURVIVED for a run in which four of six
+// tests never executed. **A reader with two outcomes cannot report a third
+// state that exists**, and the missing one is *I could not tell*. `incomplete`
+// is that question and `INDETERMINATE` is the row it produces.
+//
+// F897 recorded the bytes once and shipped nothing, on the grounds that the
+// case would not reproduce. It reproduces on demand — `process.kill(
+// process.pid, "SIGKILL")` inside a test, vitest 4.1.10, measured 2026-09-10 —
+// and it never needed to: a summary reader is a pure function over a string,
+// and the bytes were already written down.
 import { readFileSync, writeFileSync, renameSync } from "node:fs";
 /** vitest colours its summary; the codes sit between the word and the count. */
 export function strip(output) {
@@ -30,9 +45,72 @@ export function strip(output) {
 }
 
 /** Did the run kill anything? Read off the stripped summary, not the exit code:
- * a suite that fails to *start* also exits non-zero and kills nothing. */
+ * a suite that fails to *start* also exits non-zero and kills nothing.
+ *
+ * **This predicate has two outcomes and there are three** — see `incomplete`
+ * below, which is the one it cannot express and must not be asked to. */
 export function killed(output) {
   return /Tests\s+\d+ failed/.test(strip(output)) || timedOut(output);
+}
+
+/**
+ * What vitest's summary says it **collected**, and what it says it **reported**.
+ * `null` when there is no `Tests` line, or when that line carries no total.
+ *
+ * vitest writes one bucket per outcome and the collected count in brackets:
+ * `Tests  1 failed | 5 passed (6)`, `Tests  15 passed | 1 todo (16)`,
+ * `Tests  1 passed | 4 skipped (5)`. In every healthy run the buckets sum to
+ * the total — measured across a green run, a failing run, a run with a `todo`
+ * and a `skip`, and a `-t`-filtered run, all against vitest 4.1.10.
+ *
+ * **The total is only read when it is there.** A capture sheared before the
+ * closing bracket has a `Tests` line and no total, and the honest answer to
+ * *were rows lost* is then *I cannot tell from this* rather than *yes* — a
+ * predicate that fires on absence would report every truncated buffer as an
+ * incomplete run and mean neither thing. `ran` owns truncation.
+ */
+export function tally(output) {
+  const line = /^\s*Tests\s+(.*)$/m.exec(strip(output));
+  if (line === null) return null;
+  const total = /\((\d+)\)$/.exec(line[1].trimEnd());
+  if (total === null) return null;
+  let reported = 0;
+  for (const m of line[1].matchAll(/(\d+)\s+(passed|failed|skipped|todo)\b/g)) reported += Number(m[1]);
+  return { reported, collected: Number(total[1]) };
+}
+
+/**
+ * Did the run report every test it collected?
+ *
+ * **The third state, and the one that reads as a survivor** (F897, F1018). A
+ * worker that dies mid-file takes its remaining tests with it, and vitest
+ * reports the ones that finished:
+ *
+ *      Test Files  1 passed (2)
+ *           Tests  2 passed (6)
+ *          Errors  1 error
+ *
+ * — a summary, so `ran` is true; no failing *test*, so `killed` is false; no
+ * failing *file*, so `unbuilt` is false. Every predicate this file had answers
+ * correctly and the row says `SURVIVED`, for a run in which four of six tests
+ * never executed. That is the direction the preamble calls worse than useless.
+ *
+ * **The reproduction was the blocker and it is not one.** F897 recorded the
+ * bytes once, could not make them come back, and shipped nothing. Measured
+ * 2026-09-10 on vitest 4.1.10: `process.kill(process.pid, "SIGKILL")` inside a
+ * test produces the block above on demand, every time, and the `Errors` line
+ * and the arithmetic arrive together.
+ *
+ * **The arithmetic is the signal, not the `Errors` line.** An unhandled error
+ * beside a complete set of rows loses nothing, and reads identically on that
+ * line; `reported < collected` says exactly *tests were collected and never
+ * reported*, which is the property the verdict depends on. It is also the count
+ * F929 went looking for outside the run — the corpus size it wanted is written
+ * on vitest's own summary, per run, and needs no golden number to drift.
+ */
+export function incomplete(output) {
+  const t = tally(output);
+  return t !== null && t.reported < t.collected;
 }
 
 /** Did the run reach a summary at all — pass *or* fail?
@@ -54,6 +132,31 @@ export function killed(output) {
  * most. A run whose subject is a sweep sets `maxBuffer` explicitly. */
 export function ran(output) {
   return /Tests\s+\d+ (failed|passed)/.test(strip(output)) || timedOut(output);
+}
+
+/**
+ * Did the run's **suites** load?
+ *
+ * **The third state that reads as a survivor, and the one this file did not
+ * have.** A mutation can break the parse of a module the suites import: three of
+ * four files then fail to collect, the fourth runs green, and vitest prints
+ *
+ *     Test Files  3 failed | 1 passed (4)
+ *          Tests  10 passed | 2 todo (12)
+ *
+ * — a summary, so `ran` is true; no failing *test*, so `killed` is false. The row
+ * reads `SURVIVED` and the summary tells the reader to go and look at the tests.
+ * The diagnosis is inverted: the finding is about the mutation, which did not
+ * compile, and nothing was measured at all. Measured on `c21-pty`'s
+ * wrapped-error row, whose `to` opened a `try` it never closed.
+ *
+ * **The signal is the disagreement between the two lines**, not the transform
+ * error above them — that wording is esbuild's and would miss a module that
+ * throws at import, which fails the same way for the same reason.
+ */
+export function unbuilt(output) {
+  const s = strip(output);
+  return /Test Files\s+\d+ failed/.test(s) && !/Tests\s+\d+ failed/.test(s);
 }
 
 /**
@@ -94,6 +197,28 @@ export class BlindHarnessError extends Error {
 export function apply(src, { file, from, to }) {
   if (!src.includes(from)) throw new AnchorError(file, from);
   return src.replace(from, to);
+}
+
+/**
+ * How many places an anchor matches — `replace` takes the first (F219).
+ *
+ * **The report could not tell F219 and F277 apart, and this is the half that
+ * makes it able to** (F1037). Both arrive as `SURVIVED` and they want opposite
+ * repairs: F219 is one mutation matching two sites, and wants the duplicate
+ * extracted; F277 is a **unique, present, textually correct** anchor on a line
+ * whose callers moved, and wants the anchor followed. F277's own body says the
+ * report cannot distinguish them — the multiplicity is the thing it was not
+ * carrying, and `anchors.mjs` has known it all along in a file nobody reads
+ * beside the pass.
+ *
+ * It does not close F277. Nothing static can: an anchor that resolves against a
+ * line that has changed *meaning* is the citation-resolves-against-the-wrong-
+ * invariant class, and `docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass says
+ * why no mechanism for it should be built. What it does is stop one of the two
+ * dispositions being invisible on the row that reports it.
+ */
+export function hitsOf(src, from) {
+  return src.split(from).length - 1;
 }
 
 /**
@@ -173,6 +298,13 @@ export function runPass({ mutations, control, read, write, run }) {
   // preamble above says why — *a run that never finished and a run that
   // finished green are the same `false`, and they mean opposite things*.
   const clean = run();
+  if (ran(clean) && unbuilt(clean)) {
+    throw new BlindHarnessError(
+      "a suite in the unmutated tree does not load — its tests never ran, and a mutation they " +
+        "cover would come back a survivor. The summary says so in two lines that disagree: " +
+        "`Test Files N failed` with no failing test. Fix the build first",
+    );
+  }
   if (!ran(clean)) {
     throw new BlindHarnessError(
       "the unmutated suite did not reach a summary — it did not compile, did not start, or was " +
@@ -183,10 +315,39 @@ export function runPass({ mutations, control, read, write, run }) {
   if (killed(clean)) {
     throw new BlindHarnessError("the unmutated suite already fails, so no row below means anything");
   }
+  // **The same bytes mean different things at the three moments `run` is
+  // called, and this is the first of them** (F1018). A clean run that lost rows
+  // is a baseline nobody measured: the rows below are compared against a tree
+  // whose coverage is unknown, and a mutation covered by one of the tests that
+  // never executed comes back a survivor with nothing wrong anywhere else.
+  if (incomplete(clean)) {
+    const t = tally(clean);
+    throw new BlindHarnessError(
+      `the unmutated suite reported ${String(t.reported)} of the ${String(t.collected)} tests it ` +
+        `collected — a worker died or the run was cut short, so the baseline is not the corpus. ` +
+        `Run it again before reading any row below`,
+    );
+  }
 
   write(control.file, apply(originals.get(control.file), control));
-  const controlKilled = killed(run());
+  const controlRun = run();
+  const controlKilled = killed(controlRun);
   restore();
+  // **The second moment, and the worst of the three.** The control pair is the
+  // harness's own guard against blindness, and a `killed` read off a run that
+  // lost rows satisfies it: the pair proves the harness saw *a* kill in a run
+  // that was not complete, which is not the claim the pair is making. Checked
+  // before `!controlKilled`, so the refusal names the incompleteness rather
+  // than sending the reader to the control's `why` — F922's lesson about a
+  // refusal that names the wrong subject.
+  if (incomplete(controlRun)) {
+    const t = tally(controlRun);
+    throw new BlindHarnessError(
+      `the control's run reported ${String(t.reported)} of the ${String(t.collected)} tests it ` +
+        `collected, so the pair proved nothing: a kill seen by a run that lost rows does not show ` +
+        `this pass can see one. Run it again`,
+    );
+  }
   if (!controlKilled) {
     throw new BlindHarnessError(
       `a mutation that cannot survive was not caught — ${control.why}. ` +
@@ -206,15 +367,35 @@ export function runPass({ mutations, control, read, write, run }) {
         staged.set(edit.file, apply(staged.get(edit.file) ?? originals.get(edit.file), edit));
       }
       for (const [f, src] of staged) write(f, src);
+      // Read off the tree as found, not off the staged copy: an `also` edit to
+      // the same file would have already changed it.
+      const hits = hitsOf(originals.get(m.file) ?? "", m.from);
       const output = run();
-      outcome = ran(output)
-        ? {
-            name: m.name,
-            expect: m.expect,
-            killed: killed(output),
-            byNamedTest: output.includes(m.expect),
-          }
-        : { name: m.name, expect: m.expect, killed: false, noSummary: true };
+      // **`unbuilt` is asked before `incomplete`, deliberately.** Both can hold
+      // at once — a mutation that takes three suites down and kills a worker in
+      // the fourth — and the more specific diagnosis is the one that names the
+      // mutation rather than the machine. Where the suites merely fail to load,
+      // the counts agree and only `unbuilt` fires: `Test Files 3 failed |
+      // 1 passed (4)` sits above `Tests 10 passed | 2 todo (12)`, and 12 is 12.
+      outcome = !ran(output)
+        ? { name: m.name, expect: m.expect, killed: false, noSummary: true }
+        : unbuilt(output)
+          ? { name: m.name, expect: m.expect, killed: false, unbuilt: true }
+          : incomplete(output)
+            ? {
+                name: m.name,
+                expect: m.expect,
+                killed: false,
+                indeterminate: true,
+                tally: tally(output),
+              }
+            : {
+                name: m.name,
+                expect: m.expect,
+                killed: killed(output),
+                byNamedTest: output.includes(m.expect),
+                hits,
+              };
     } catch (err) {
       if (!(err instanceof AnchorError)) throw err;
       outcome = { name: m.name, expect: m.expect, killed: false, anchorMissed: true };
@@ -232,14 +413,29 @@ export function report(results) {
   const lines = results.map((r) => {
     const state = r.noSummary
       ? "NO SUMMARY      "
+      : r.unbuilt
+      ? "DID NOT BUILD   "
       : r.anchorMissed
       ? "ANCHOR MISSED   "
+      : r.indeterminate
+      ? "INDETERMINATE   "
       : r.killed
         ? r.byNamedTest
           ? "caught          "
           : "CAUGHT ELSEWHERE"
         : "SURVIVED        ";
-    return `${state} ${String(r.expect).padEnd(8)} ${r.name}`;
+    // The figures, because *I could not tell* with no number beside it is a
+    // verdict the reader has to go and re-derive from the log. And a survivor
+    // whose anchor is not unique says so on its own line (F219, F277, F1037):
+    // `replace` took the first of several sites, so the row may be reporting on
+    // a site nobody chose.
+    const why =
+      r.indeterminate && r.tally
+        ? `   ← ${String(r.tally.reported)} of ${String(r.tally.collected)} tests reported`
+        : !r.killed && typeof r.hits === "number" && r.hits > 1
+          ? `   ← its anchor matches ${String(r.hits)}x — replace() took the first`
+          : "";
+    return `${state} ${String(r.expect).padEnd(8)} ${r.name}${why}`;
   });
   // **A run that did not finish is not a survivor and is not counted as one.**
   // Both exit non-zero, so the gate is the same; the report is not, and reading
@@ -257,19 +453,48 @@ export function report(results) {
   //
   // Both still fail the gate. What changes is what the one line says happened.
   const stale = results.filter((r) => r.anchorMissed);
-  const survivors = results.filter((r) => !r.killed && !r.noSummary && !r.anchorMissed);
+  // **The third row that is not a survivor**, and the newest. A `to` that does
+  // not parse takes the suites down with it, so nothing was measured — the
+  // finding is about the mutation and not about the tests it names.
+  const broke = results.filter((r) => r.unbuilt);
+  // **The fourth row that is not a survivor** (F897, F1018). A run that reported
+  // fewer tests than it collected answers neither question: the row it was
+  // aimed at may be one of the ones that never executed. Counted apart, because
+  // *I could not tell* and *the tests are weak* are opposite findings and the
+  // second one costs a session.
+  const unsure = results.filter((r) => r.indeterminate);
+  const survivors = results.filter(
+    (r) => !r.killed && !r.noSummary && !r.anchorMissed && !r.unbuilt && !r.indeterminate,
+  );
+  const unsureNote =
+    unsure.length === 0
+      ? ""
+      : `\n${unsure.length} run(s) reported fewer tests than they collected — a worker died or the ` +
+        `run was cut short, so those rows are not survivors and not kills. Run them again`;
   const staleNote =
     stale.length === 0
       ? ""
       : `\n${stale.length} anchor(s) did not match — those rows ran nothing and are not survivors`;
+  const brokeNote =
+    broke.length === 0
+      ? ""
+      : `\n${broke.length} mutation(s) did not compile — the suites failed to load, so nothing ` +
+        `was measured. Fix the \`to\`, not the test it names`;
   lines.push(
     blind.length > 0
       ? `\n${blind.length} run(s) produced no summary — the harness went blind mid-pass. ` +
           `Nothing above those rows means anything`
       : (survivors.length === 0
-          ? "\nevery mutation was caught"
-          : `\n${survivors.length} survived — a finding about the tests, or about the sentence they were written from`) +
-        staleNote,
+          ? stale.length + broke.length + unsure.length === 0
+            ? "\nevery mutation was caught"
+            : "\nno survivors among the rows that ran"
+          : `\n${survivors.length} survived — a finding about the tests, about the sentence they ` +
+            `were written from, or about the mutation. **Ask why the mutation cannot reach the ` +
+            `test before rewriting the test** (F277): the anchor may be textually perfect and ` +
+            `name a line whose callers moved, which reads exactly like a weak row`) +
+        unsureNote +
+        staleNote +
+        brokeNote,
   );
   return lines.join("\n");
 }

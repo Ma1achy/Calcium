@@ -47,12 +47,18 @@ import { resolveBase } from "../presentation/theme/index.js";
 import type { ResolvedTheme } from "../presentation/theme/index.js";
 import type { Style } from "../presentation/theme/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
+import { NO_SPAN } from "../data/viewmodel/index.js";
+import type { Probe } from "../data/viewmodel/index.js";
 import { spinnerFrames } from "../presentation/blocks/index.js";
 
 export type PaintDeps = Readonly<{
   registry: BlockRegistry;
   theme: ResolvedTheme;
   capabilities: TerminalCapabilities;
+  /**
+   * C28's seam (I30). Absent is not recording, and that is the usual case.
+   */
+  probe?: Probe;
   /** The visible transcript rows, already selected by C14 at this width. */
   transcriptRows: () => readonly string[];
   /** C17's display rows, already wrapped and gutter-aware (C17 §2, I18). */
@@ -184,6 +190,7 @@ function region(
       : renderSequenceToLines(deps.registry, blocks, width, {
           theme: deps.theme,
           capabilities: deps.capabilities,
+          ...(deps.probe === undefined ? {} : { probe: deps.probe }),
         });
 
   const out: string[] = [];
@@ -365,6 +372,11 @@ function washed(row: string, span: CellSpan, deps: PaintDeps): string {
 
 /** The wash, or reverse video where there is no colour to wash with (§4b). */
 function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly string[] {
+  // **Inside `body`, and separate from it** (C28 §2). `deps.promptRows()` and
+  // `deps.promptCursor()` below are both `editor.layout(width, gutter)` behind
+  // a thunk with no memo, so the prompt's cost is the one part of `body` a
+  // reader has a specific question about and no span could answer.
+  using _s = deps.probe?.span("prompt") ?? NO_SPAN;
   const cap = frame.promptRows;
   const cursor = deps.promptCursor();
   const window = promptWindow(frame, deps.promptRows(), cursor.row, deps.capabilities);
@@ -501,9 +513,37 @@ function ghostStyle(deps: PaintDeps): Style {
  */
 function based(lines: readonly string[], base: string): readonly string[] {
   if (base === "") return lines;
+  // **One regexp per call, not one per row.** `toTerminalDefault()` is a
+  // factory because a `/g` pattern carries `lastIndex` and a shared one is a
+  // hazard across independent scans — but `String.replace` with a global
+  // pattern sets `lastIndex` to 0 before it iterates and leaves it there, so
+  // reuse inside a single pass is safe and the allocation was per row per frame.
+  const toDefault = toTerminalDefault();
   return lines.map(
-    (line) => `${base}${line.replace(toTerminalDefault(), (seq) => `${seq}${base}`)}${SGR_RESET}`,
+    (line) => `${base}${line.replace(toDefault, (seq) => `${seq}${base}`)}${SGR_RESET}`,
   );
+}
+
+/**
+ * C15's placed layers, bracketed (C28 I39).
+ *
+ * **One layout per frame, shared by the rows and the cursor** (C22 I96). The
+ * caller lays the overlays out once and hands the result to both `paint` and
+ * `cursorFor`; each defaults to laying them out itself only so a caller holding
+ * one and not the other still gets an answer. It used to run twice per frame —
+ * once for the composite and once for the cursor — which C28 T1.61 asserted on
+ * purpose as the disagreement P11 named, and the two layouts were of the same
+ * region against the same overlay set, so the second could only ever agree
+ * with the first or be a defect.
+ *
+ * **One wrapper for every call site**, so `spans.overlays.count` is the number
+ * of times the layout actually ran: a per-call-site span would report two
+ * names each firing once, which is the same fact written so that nobody
+ * notices it.
+ */
+export function placedLayers(deps: PaintDeps): readonly Placed[] {
+  using _s = deps.probe?.span("overlays") ?? NO_SPAN;
+  return deps.overlays();
 }
 
 /** The screen's base, or the empty string where nothing is painted. */
@@ -512,7 +552,16 @@ function baseSequence(deps: PaintDeps): string {
   return sgr(resolveBase(deps.theme, deps.capabilities));
 }
 
-export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
+export function paint(
+  frame: Composed,
+  deps: PaintDeps,
+  placed: readonly Placed[] = placedLayers(deps),
+): readonly string[] {
+  // **The `draw` phase, and `using` is fine here** (C28 I39). F867's argument
+  // against `using` is about a wrapper entered once per block — an array
+  // allocation is invisible beside a 2 ms plot and dominates a rule's 220 ns
+  // measure. This runs once per frame.
+  using _paint = deps.probe?.span("paint") ?? NO_SPAN;
   if (!heightsSum(frame)) {
     throw new FrameError(
       `frame heights do not sum to ${String(frame.size.rows)} rows: ` +
@@ -562,8 +611,20 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
   // take no rows — that is why `heightsSum` above holds identically with three
   // overlays open and with none, and why nothing could see that for the whole
   // life of C15 no component drew one at all (S01 §3a).
-  const lines = composite(
-    [
+  // **`assemble` covers building the rows as well as compositing them**, because
+  // the region calls below are arguments and run inside it either way. Naming it
+  // for the narrower half would put the wider cost under a name that denies it.
+  using _assemble = deps.probe?.span("assemble") ?? NO_SPAN;
+
+  // **The parts, named** (C28 §2, F936). `assemble` was 58 % of a frame's work
+  // with nothing under it, which is a measurement that names the file and not
+  // the work. The arguments below are hoisted into locals for no reason but
+  // that: an argument evaluated inside a call cannot be bracketed separately
+  // from it, so the split is what makes the three costs distinguishable at all.
+  let rows: readonly string[];
+  {
+    using _body = deps.probe?.span("body") ?? NO_SPAN;
+    rows = [
       ...region(frame.header, HEADER_ROWS, width, deps),
       // **The header's rule** (I87, §6l.7) — the same row the prompt's two are,
       // so the header and the region's first row do not read as one block.
@@ -580,19 +641,27 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
       // and pads to it, so a footer taller than `MAX_FOOTER_ROWS` shows its top
       // (§6l.2 row 5) and one of zero rows takes nothing.
       ...region(frame.footer, frame.footerRows, width, deps),
-    ],
-    deps.overlays(),
-    {
+    ];
+  }
+
+  let lines: readonly string[];
+  {
+    using _composite = deps.probe?.span("composite") ?? NO_SPAN;
+    lines = composite(rows, placed, {
       registry: deps.registry,
       theme: deps.theme,
       capabilities: deps.capabilities,
       regionTop: frame.region.top,
       region: frame.overlayRegion,
       ...(deps.scratch === undefined ? {} : { scratch: deps.scratch }),
-    },
-  );
+    });
+  }
 
-  const painted = based(lines, baseSequence(deps));
+  let painted: readonly string[];
+  {
+    using _based = deps.probe?.span("based") ?? NO_SPAN;
+    painted = based(lines, baseSequence(deps));
+  }
 
   if (painted.length !== frame.size.rows) {
     throw new FrameError(
@@ -620,8 +689,13 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
  * A cursor above the window is hidden rather than clamped to its edge: it
  * genuinely is not on the screen, and a clamped one would claim otherwise.
  */
-export function cursorFor(frame: Composed, deps: PaintDeps): Cell | null {
-  const placed = deps.overlays();
+export function cursorFor(
+  frame: Composed,
+  deps: PaintDeps,
+  placed: readonly Placed[] = placedLayers(deps),
+): Cell | null {
+  // **The layout the rows were composited from** (C22 I96) — the top layer
+  // here is the top layer `composite` drew, by identity and not by agreement.
   const top = placed[placed.length - 1];
   if (top !== undefined) {
     if (top.cursor !== undefined) {
@@ -674,7 +748,20 @@ export function blankRowsAbove(regionHeight: number, rows: number): number {
 
 /** C14 selected these at this width; they are padded, never re-measured. */
 function transcript(frame: Composed, deps: PaintDeps, width: number): readonly string[] {
-  const rows = deps.transcriptRows();
+  // **Two spans, because splitting `assemble` left 48 % sitting in `body`**
+  // (C28 §2, F936). `visible` is the work — C14 selecting and C09 rendering —
+  // and this function's own self time is then the `exact()` loop below, which
+  // is a styled-width fit per row per frame. Measured apart from what it pads
+  // at last: 69 ms of self time over 34 frames after F938, 60 µs a row, and
+  // the row was the reason — one `│` in every patch gutter sent the whole
+  // row through the segmenter; 14 ms once C09 I63 asked it only for clusters
+  // (F955).
+  using _t = deps.probe?.span("transcript") ?? NO_SPAN;
+  let rows: readonly string[];
+  {
+    using _v = deps.probe?.span("visible") ?? NO_SPAN;
+    rows = deps.transcriptRows();
+  }
 
   // **More rows than the region has is refused, not trimmed** (I35). The trim was
   // `rows[0 … height)` — the *top* of the selection — so a viewport that thought

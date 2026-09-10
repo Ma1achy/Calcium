@@ -8,6 +8,7 @@
 // replay asserts the *whole* result — kind, tool, argv, residual, validation
 // and the rule that fired — because C17's trace replayed correctly over a
 // wrong grouping while only text and cursor were checked.
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
@@ -407,3 +408,58 @@ const SOURCES = [
   "src/interaction/parser/delegate.ts",
   "src/interaction/parser/parse.ts",
 ];
+
+describe("C18 §5 — validation is local, and delegated output is not C18's to read", () => {
+  it("T2.12 (I6): a malformed invocation is refused synchronously, and C18 can spawn nothing", () => {
+    // **Nothing is spawned to discover an invocation is malformed** — an
+    // absence claim, and the behavioural half cannot show it: a route that
+    // spawned first and validated after would return the same error.
+    //
+    // What can show it is that `parse` returns a value rather than a promise
+    // (there is no point at which a spawn could be awaited) and that C18 has no
+    // route to a spawner at all. Zero non-relative imports is the strongest
+    // form of that: no `node:child_process`, no transport, no runner, and
+    // nothing that could acquire one.
+    const files = readdirSync("src/interaction/parser")
+      .filter((f) => f.endsWith(".ts"))
+      .map((f) => `src/interaction/parser/${f}`);
+    const outward: string[] = [];
+    for (const f of files) {
+      const src = readFileSync(f, "utf8");
+      for (const m of src.matchAll(/^\s*import\s[^;]*?from\s+"([^"]+)"/gmu)) {
+        if (!m[1]!.startsWith("./") && !m[1]!.startsWith("../")) outward.push(`${f}: ${m[1]!}`);
+      }
+    }
+    expect(outward, "C18 imports nothing it did not write").toEqual([]);
+    expect(files.length, "the corpus is not empty").toBeGreaterThan(4);
+
+    // And the validation is in the returned value, not deferred to a caller.
+    const parsed = parse("/ps --nonesuch", ctx());
+    expect(parsed instanceof Promise, "nothing to await, so nothing to spawn first").toBe(false);
+  });
+
+  it("T2.13 (I13): a delegated line comes back whole, and C18 offers nothing that could parse a reply", () => {
+    // C18's half of I13 is the one testable here: it hands the shell a command
+    // and has no vocabulary for what comes back. The `raw` block is C23's
+    // (`execution.ts`'s shell route), and pretending otherwise would put a
+    // second envelope contract in the one place there is deliberately none.
+    const delegated = parse("echo hi | jq .", ctx());
+    expect(delegated.kind, "delegated, not adapted").toBe("shell");
+
+    // **The surface is the assertion.** Every export takes a *line the user
+    // typed* — none takes far-side output, so there is no function to call
+    // with a shell's reply even if a caller wanted to.
+    const surface = readFileSync("src/interaction/parser/index.ts", "utf8");
+    const exported = [...surface.matchAll(/export \{([^}]*)\}/gu)]
+      .flatMap((m) => m[1]!.split(","))
+      .map((n) => n.trim().replace(/^type\s+/u, ""))
+      .filter((n) => n.length > 0);
+    expect(exported.sort(), "four entry points, all over typed input").toEqual([
+      "parse",
+      "prefixPolicy",
+      "quote",
+      "slashPolicy",
+      "tokenise",
+    ]);
+  });
+});

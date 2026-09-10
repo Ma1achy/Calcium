@@ -10,14 +10,46 @@ import {
   applyPatch,
   block,
   BlockShapeError,
+  deepFreeze,
   validateBlock,
   validateDocument,
   type MergeRow,
   type Table,
+  type KnownBlockKind,
+  type KnownBlockKinds,
   type ViewDocument,
 } from "../../src/data/viewmodel/index.js";
-import { doc, ONE_PER_KIND, tableOf } from "../support/blocks.js";
+import { ALL_KINDS, doc, ONE_PER_KIND, tableOf } from "../support/blocks.js";
 import { b } from "../../src/shell/builders/index.js";
+
+/** T1.42's own kind — declared, so it is a `Block` rather than a cast (C04 I119). */
+type Gauge = Readonly<{ kind: "gauge"; id: string; reading: number }>;
+declare module "../../src/data/viewmodel/types.js" {
+  interface BlockKinds {
+    gauge: Gauge;
+  }
+}
+
+/** Both directions, so neither set can grow past the other (T2.129). */
+type Exact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+const keysMatchKinds: Exact<keyof KnownBlockKinds, KnownBlockKind> = true;
+
+/**
+ * The lookup's keys as a value, because a type has none at runtime.
+ *
+ * **Written out rather than derived**, which is the point: it is a second copy
+ * of the key list, and `keysMatchKinds` above is what stops the two drifting —
+ * a key here that is not in `KnownBlockKinds` is a compile error on the
+ * `Record`, and one missing is a compile error too.
+ */
+const KIND_NAMES: Readonly<Record<KnownBlockKind, true>> = Object.freeze({
+  rule: true, notice: true, keyValue: true, table: true, steps: true, logs: true,
+  events: true, plot: true, progress: true, code: true, comparison: true,
+  patch: true, pills: true, tip: true, panel: true, group: true, scroll: true,
+  mosaic: true, image: true, status: true, terminal: true, raw: true,
+});
+
+const KNOWN_KIND_COUNT = Object.keys(KIND_NAMES).length;
 
 /** The document used wherever a table needs to be patched. */
 function docWithTable(rows = 10): { document: ViewDocument; table: Table } {
@@ -69,6 +101,87 @@ describe("C04 immutability", () => {
       (table.rows[0]?.cells["a"] as { text: string }).text = "mutated";
     }).toThrow();
     expect(table.rows[0]?.cells["a"]?.text).toBe("x");
+  });
+
+  it("T1.39 (C04 I1, F1065): a subtree already deep-frozen is walked once, and is frozen at depth either way", () => {
+    // **The observable is a count of reads, not a duration** (F929). A timing
+    // assertion on a shared runner measures the runner, and this property is
+    // exact: the walk either reaches the subtree a second time or it does not.
+    //
+    // An accessor is a synthetic shape — blocks are plain data — and it is the
+    // only way to watch a walk from inside the thing being walked.
+    let reads = 0;
+    const watched: Record<string, unknown> = { text: "x" };
+    Object.defineProperty(watched, "seen", {
+      enumerable: true,
+      configurable: true,
+      get: () => {
+        reads++;
+        return "y";
+      },
+    });
+
+    const tree = { a: { b: [watched] } };
+    deepFreeze(tree);
+    const afterFirst = reads;
+    deepFreeze(tree);
+
+    expect(afterFirst, "the first walk reached the accessor").toBeGreaterThan(0);
+    expect(reads, "and the second did not walk it again").toBe(afterFirst);
+
+    // **The freeze the memo claims is real**, asserted rather than assumed: a
+    // memo that skipped the walk *before* freezing would satisfy the count and
+    // leave the tree mutable, which is the failure mode worth naming.
+    expect(Object.isFrozen(tree.a.b), "the array").toBe(true);
+    expect(Object.isFrozen(tree.a.b[0]), "and the object inside it").toBe(true);
+  });
+
+  it("T1.40 (C04 I1, F1065): the control — something else's shallow freeze is still walked to depth", () => {
+    // **This is the row that separates the memo from `Object.isFrozen`.** The
+    // tree shallow-freezes objects in a dozen places — every `Object.freeze({ … })`
+    // in a builder — and a shallow freeze says nothing about depth. Reading one
+    // as a memo hit passes T1.39 completely and leaves `blocks[0].rows[2]`
+    // mutable, which is the exact failure I1 opens with, reintroduced by the
+    // optimisation written for it.
+    const inner = { deep: ["a", "b"] };
+    const shallow = Object.freeze({ inner });
+
+    expect(Object.isFrozen(shallow), "the fixture is shallow-frozen").toBe(true);
+    expect(Object.isFrozen(inner), "and only shallowly — the fixture responds").toBe(false);
+
+    deepFreeze(shallow);
+
+    expect(Object.isFrozen(inner), "the walk went inside it").toBe(true);
+    expect(Object.isFrozen(inner.deep), "and to the bottom").toBe(true);
+  });
+
+  it("T1.41 (C04 I1, F1065): the array fast path's narrowing is what it says it is", () => {
+    // **A limit that is tested is a limit; one that is only written down is a
+    // hope.** Arrays walk by index because `Object.getOwnPropertyNames` on an
+    // n-element array allocates n strings per node per walk, and a document of
+    // blocks and lines is mostly array nodes. The cost of that choice is exactly
+    // this shape, and the row exists so a later reader meets it here rather than
+    // in a mutation.
+    const stray = { deep: ["x"] };
+    const arr: unknown[] & { meta?: unknown } = [{ a: 1 }];
+    arr.meta = stray;
+
+    deepFreeze({ blocks: arr });
+
+    expect(Object.isFrozen(arr), "the array itself").toBe(true);
+    expect(Object.isFrozen(arr[0]), "and its elements, which is the whole hot path").toBe(true);
+
+    // The freeze still covers it — it cannot be replaced …
+    expect(() => {
+      arr.meta = 1;
+    }).toThrow();
+    expect(arr.meta, "still the object it was").toBe(stray);
+
+    // … and its interior is what the fast path does not reach. Asserted as
+    // `false` deliberately: were the walk changed back, this row fails and says
+    // the documented limit has moved, which is the only way a stated limit
+    // stays true.
+    expect(Object.isFrozen(stray), "the stated narrowing").toBe(false);
   });
 
   it("T1.1b (I1): a cyclic literal freezes rather than hanging the constructor", () => {
@@ -650,5 +763,144 @@ describe("C04 merge does not delete", () => {
     const after = unwrap(applyPatch(document, { op: "merge", blockId: "t", rows: [] }));
 
     expect(tableIn(after).rows).toBe(tableIn(document).rows);
+  });
+});
+
+// C04 §5b — absent is not the wrong type (I114, FINDINGS F995).
+//
+// The validator had one sentence for two faults: a `notice` with no `tone` and a
+// `notice` whose `tone` was `42` both reported `"tone" must be a string`. True
+// both times, and the first time it is the sentence that sends a reader to the
+// value they wrote when there is no value to look at.
+describe("C04 required fields report absence and wrong type differently", () => {
+  /** The errors naming `key`, whatever else the document is wrong about. */
+  function about(b: unknown, key: string): string[] {
+    const r = validateBlock(b);
+    return r.ok ? [] : r.error.filter((m) => m.includes(`"${key}"`));
+  }
+
+  it("T1.34 (I114): a missing required field and a wrongly typed one are two sentences", () => {
+    // A string field, which is the instance F995 measured.
+    expect(about({ kind: "notice", id: "n", text: "hi" }, "tone")).toEqual([
+      'block (notice): "tone" is required and absent — supply a string',
+    ]);
+    expect(about({ kind: "notice", id: "n", text: "hi", tone: 42 }, "tone")).toEqual([
+      'block (notice): "tone" must be a string, got a number',
+    ]);
+
+    // And an array field, because a split built into `requireString` alone would
+    // pass every assertion above and leave fifteen call sites conflated.
+    expect(about({ kind: "table", id: "t", columns: [] }, "rows")).toEqual([
+      'block (table): "rows" is required and absent — supply an array',
+    ]);
+    expect(about({ kind: "table", id: "t", columns: [], rows: 5 }, "rows")).toEqual([
+      'block (table): "rows" must be an array, got a number',
+    ]);
+
+    // The control. Without it every assertion above passes for a validator that
+    // refuses any notice and any table.
+    expect(
+      validateBlock({ kind: "notice", id: "n", text: "hi", tone: "info" }).ok,
+      "a well-formed notice is still accepted",
+    ).toBe(true);
+  });
+
+  // The class rather than the three instances F995 named. Driven by the corpus
+  // rather than by a list of fields: a kind that gains a required field joins
+  // this sweep by discovery, and reading `validate.ts` for a shared helper
+  // missed twelve sites that this found.
+  it("T2.127 (I114, §5b): every required field in the corpus splits the two faults", () => {
+    // A conditional requirement whose sentence names the *condition* — `form
+    // "line" requires a numeric "height"` — rather than a value, so it never
+    // sends a reader to something they did not write. By equality, so a second
+    // bespoke sentence cannot join it unread.
+    const EXEMPT = ["plot.height"];
+
+    const found: string[] = [];
+    const identical: string[] = [];
+    const readsAsWrongType: string[] = [];
+    const countsDiffered: string[] = [];
+
+    for (const kind of ALL_KINDS) {
+      const fixture = ONE_PER_KIND[kind] as unknown as Record<string, unknown>;
+      for (const key of Object.keys(fixture)) {
+        if (key === "kind" || key === "id") continue;
+        const { [key]: held, ...without } = fixture;
+        // A value of a plainly different type, so the wrong-type arm is the one
+        // that fires rather than a range or vocabulary check further down.
+        const sentinel = typeof held === "string" ? 42 : "calcium-sentinel";
+
+        const absent = about({ ...without, kind, id: fixture["id"] }, key);
+        if (absent.length === 0) continue; // optional here — no absent fault to split
+        const wrong = about({ ...fixture, [key]: sentinel }, key);
+
+        const at = `${kind}.${key}`;
+        found.push(at);
+        if (EXEMPT.includes(at)) continue;
+        if (absent.join(" ") === wrong.join(" ")) identical.push(at);
+        if (/must be (a |an |one of |")/u.test(absent.join(" "))) readsAsWrongType.push(at);
+        if (absent.length !== wrong.length) countsDiffered.push(at);
+      }
+    }
+
+    // The absent arm never claims a type of a value nobody wrote — F995 itself.
+    expect(readsAsWrongType, "an absent field reported as the wrong type").toEqual([]);
+    // And the two arms are two sentences, which is the half a message reading
+    // `is required and absent` for *both* would satisfy.
+    expect(identical, "one sentence still covering both faults").toEqual([]);
+    // §5b row 5: one push per fault either way, so no `errors.length` moves.
+    expect(countsDiffered, "the split changed how many errors a fault produces").toEqual([]);
+
+    // Non-vacuity, and the count by equality: without this the row passes on a
+    // corpus that reaches nothing.
+    expect(found).toHaveLength(42);
+    expect(found.filter((at) => EXEMPT.includes(at)), "the exemption is reached").toEqual(EXEMPT);
+  });
+
+  it("T1.42 (I119, F405): a kind the framework never heard of is a `Block`, and validates", () => {
+    // **No cast anywhere in this row, and that is the assertion.** The runtime
+    // has accepted an app's kind since F1 — `validateDocument` skips an unknown
+    // kind rather than refusing it — and the types could not say so, which is
+    // the whole of F405. `Gauge` is declared at the top of this file by
+    // augmenting `BlockKinds`.
+    const gauge: Gauge = { kind: "gauge", id: "g-1", reading: 0.42 };
+    const doc: ViewDocument = {
+      schema: "tui.view/1",
+      command: "",
+      status: "ok",
+      blocks: [gauge],
+      meta: {
+        verb: null, adapter: "none", exitCode: 0, durationMs: 0, truncated: false,
+        argv: [], stderr: "", transport: "local", origin: "action",
+      },
+    };
+    const r = validateDocument(doc);
+    expect(r.ok, r.ok ? "" : (r.error ?? []).join("; ")).toBe(true);
+
+    // The fields survive: `KIND_CHECKS` has no row for this kind, so nothing
+    // strips or rewrites it.
+    const kept = r.ok ? r.value.blocks[0] : null;
+    expect(kept, "the block is the one that went in").toEqual(gauge);
+
+    // **And `deepFreeze` walks it like any other block** (I1). Asserted against
+    // the function that freezes rather than against `validateDocument`, which
+    // does not — the first draft of this row claimed the gate froze and was
+    // simply wrong about which step does it.
+    expect(Object.isFrozen(deepFreeze(structuredClone(gauge))), "frozen with the rest").toBe(true);
+  });
+
+  it("T2.129 (I119, F405): the lookup's keys and the union's kinds are the same set", () => {
+    // **The one place a mistyped key can be seen.** `KnownBlockKind` derives
+    // from `KnownBlock["kind"]` — the members' own discriminants — so writing
+    // `keyValue: Notice` or misspelling a key changes nothing about the union
+    // and everything about which rows `KIND_CHECKS`, `ANIMATES` and
+    // `RAMP_EXTENT` are asked for.
+    //
+    // **The failure is a compile error, not this expectation.** `keysMatchKinds`
+    // is typed `Exact<…>`, so a divergence makes `true` unassignable and
+    // `npm run check` goes red; the assertion below is what makes the row
+    // visible in a suite. Mutated to confirm: swapping a key fails `tsc`.
+    expect(keysMatchKinds, "keys and kinds agree in both directions").toBe(true);
+    expect(KNOWN_KIND_COUNT, "and the framework declares 22").toBe(22);
   });
 });

@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 // A03 — the enforcement suite. `make enforce`.
 // Every failure names: the rule, the file, what it prevents, and the spec.
-import { existsSync, readdirSync, statSync } from "node:fs";
-import { checkFindings, checkTriageInventory } from "./findings.mjs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { checkFindingIds, checkFindings, checkGroupTallies, checkOpenSet, checkTriageInventory } from "./findings.mjs";
 import {
   checkExportedArguments,
   checkFunctionConsumers,
+  checkPlotUnions,
+  checkSpanNamesOpened,
   checkLayerCycles,
   checkModuleGraph,
   checkOneStorePerComponent,
@@ -30,10 +32,13 @@ import {
   checkOrdering,
   checkTestRowIds,
   checkMnemonicRowIds,
+  checkCommitmentNumbers,
+  checkCommitmentOrder,
   checkReferences,
   checkSectionReferences,
   checkSeamFour,
   checkInvariantCoverage,
+  withoutTodos,
   referenceFiles,
   specFiles,
 } from "./commitments.mjs";
@@ -94,6 +99,29 @@ const sectionTargets = new Set(
 // SP9's own numbers, computed once and reported beside the gate — the list is
 // the evidence and the count is what a reader watches move.
 const coverage = checkInvariantCoverage(specs, walk("test"));
+const openSet = checkOpenSet();
+const groupTallies = checkGroupTallies();
+
+// **The same gate, run again with deferrals invisible** (F896). SP9 asks whether
+// an invariant is *named*, and `it.todo("T3.6 (C28 I15): …")` is a line that
+// names one — so a deferral is coverage, and an invariant whose only row does
+// not run passes exactly like one with a suite behind it. Twenty were in that
+// state when this was written, two of them (C28 I15, I26) about mechanisms that
+// exist nowhere in `src/`.
+//
+// **Reported, not gated, and the reason is in F896**: most of the twenty are
+// honest deferrals, and a gate red on arrival is a gate edited to fit. What was
+// missing is that the number above cannot tell the two populations apart, so a
+// deferral that has quietly become the only thing behind an invariant is
+// invisible in the figure that exists to say otherwise.
+const deferredOnly = checkInvariantCoverage(
+  specs,
+  walk("test"),
+  // Scoped to `test/`, because the same reader is handed the **specs** — the
+  // coverage check reads both sides — and a filter applied to a spec would be
+  // answering a different question with the same function.
+  (f) => (f.startsWith("test/") ? withoutTodos(readFileSync(f, "utf8")) : readFileSync(f, "utf8")),
+).uncited - coverage.uncited;
 
 // TD1–TD6 — the deferral rules, **in the gate for the first time.** For their
 // whole life the only runner was `test/unit/todo-expiry.test.ts`, which the
@@ -136,6 +164,9 @@ const violations = [
   ...checkOneStorePerComponent(files),
   ...checkSeamConsumers(files),
   ...checkFunctionConsumers(files),
+  ...checkSpanNamesOpened(files),
+  // MG31 — every string-literal union on `Plot` is in `PLOT_UNIONS` (C04 I118).
+  ...checkPlotUnions(files),
   // MG29 — a published function whose parameter type is interior (C24 I29, §8c).
   ...checkExportedArguments(files),
   ...checkSourceScans(files),
@@ -179,6 +210,17 @@ const violations = [
   // citation side of this was already exact and the definition side had no rule
   // at all (F635).
   ...checkMnemonicRowIds(specs),
+  // SP11 — and the same question for the numbered list SP1 reads and never
+  // counts. F225 ruled the class, repaired C09's four collisions and left the
+  // row to "the commit that implements it"; nothing watched that condition and
+  // the same document re-acquired three (F998).
+  ...checkCommitmentNumbers(specs),
+  // SP13 — and the other half of the same list, refused once on a figure that
+  // was wrong when it was written. Nine specs, not eleven, and the reason beside
+  // it was about the repair rather than the check — which SP11's own debt list
+  // shows are separable. Three commitments went in out of order with this gate
+  // green while the refusal stood (F1066).
+  ...checkCommitmentOrder(specs),
   // SP4 — Seam 4 and its owners agree, both directions. The only artefact
   // several components write to and none owns, wrong at every one that touched
   // it, because every row exists twice and nothing compared the copies.
@@ -187,7 +229,19 @@ const violations = [
   // only one with no citation check. Written after a wrong number resolved
   // against a real, unrelated finding with enforce green.
   ...checkFindings(),
+  ...checkFindingIds(),
   ...checkTriageInventory(),
+  // SP12 — the register's open set, readable and compared by equality. SP6
+  // records the neighbouring gap in its own comment and stops at *keyed*;
+  // this is the next word along, and the measurement that forced it is that a
+  // `**Open**` grep answers 16 where the set is 39 (F1031).
+  ...openSet,
+  // SP14 — the *second* record of that set. Each group heading tallies its own
+  // section and closing a finding edits both; nothing compared them, so two
+  // headings were recomputed by hand while SP12 stayed green (F1080). Gated
+  // where `checkTriageInventory`'s per-group counts are not, because a
+  // disposition has a definition and *keyed* does not.
+  ...groupTallies,
   // SP9 — an invariant nothing names is a claim no row was written against, and
   // it reads exactly like one that is satisfied. SP1 paired a commitment to an
   // invariant and nothing paired an invariant to a check, so *every invariant is
@@ -223,7 +277,8 @@ if (violations.length === 0) {
       // verdict — most of it is legitimate — so what it is good for is movement.
       `  ${DIM}invariant coverage · ${String(coverage.uncited)} of ` +
       `${String(coverage.declared)} invariants named by no test row, all listed ` +
-      `(SP9, gated by equality)${RESET}\n` +
+      `(SP9, gated by equality); ${String(deferredOnly)} more are named by no row that ` +
+      `runs — an it.todo, a describe title or a comment (F896, F907, reported not gated)${RESET}\n` +
       `  ${DIM}section citations · ${String(sectionsDangling.length)} of ` +
       `${String(sectionRefs.resolved + sectionsDangling.length)} resolve to no section, across ` +
       `${String(sectionTargets)} targets; ${String(sectionsUnowned)} more name no document ` +

@@ -11,8 +11,10 @@
 // emits `append` and then `evict`, and between them the cache legitimately holds
 // slots for entries that have just left. Asserting mid-flight asserts against a
 // half-applied operation.
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
+import { MARKER_ID } from "../../src/viewport/transcript/cap.js";
 import { createViewport } from "../../src/viewport/viewport/index.js";
 import { HeightIndex } from "../../src/viewport/viewport/index-tree.js";
 import { W, emptyDoc, measureSequence, rowsDoc } from "../support/viewport.js";
@@ -171,5 +173,73 @@ describe("C14 contract — post-conditions over sequences", () => {
 
     expect([...seen].sort()).toEqual(["append", "clear", "evict", "patch", "settle"]);
     checkInvariants(viewport, store, "after the exhaustive sweep");
+  });
+});
+
+describe("C14 §3 — the marker is an entry, and nothing is measured ahead", () => {
+  it("T2.16 (I13): the eviction marker measures, windows and scrolls like any other entry", () => {
+    // The marker is C13's (C13 I14) and C14 holds no special case for it, so
+    // the assertion is that it is *indistinguishable* — a row asserting the
+    // marker renders would pass just as well beside a branch that renders it
+    // specially, which is the thing this forbids.
+    const store = createTranscriptStore({ cap: 3 });
+    const viewport = createViewport(store, { width: W, height: 20, measureSequence });
+
+    for (let i = 0; i < 6; i += 1) store.append(rowsDoc(2, `e${String(i)}`));
+
+    const marker = store.entries.find((e) => e.id === MARKER_ID);
+    expect(marker, "the cap produced a marker").toBeDefined();
+
+    // It is in the index like anything else: the total is the sum over every
+    // entry including this one, and the marker's own height is not zero and not
+    // special-cased away.
+    const total = store.entries.reduce((n, e) => n + measureSequence(e.doc.blocks, W), 0);
+    expect(viewport.scroll.totalRows, "the marker is counted, not skipped").toBe(total);
+    expect(measureSequence(marker!.doc.blocks, W), "and it has a real height").toBeGreaterThan(0);
+
+    // And it is selectable: the window that starts at row 0 contains it, by the
+    // same rule that would contain any first entry.
+    const first = viewport.visible().entries.map((e) => e.id);
+    expect(first[0], "the marker sorts to the head and is drawn there").toBe(MARKER_ID);
+
+    // The structural half: C14 never names it. A branch on the marker's id
+    // would be invisible to every assertion above the moment it agreed.
+    const files = readdirSync("src/viewport/viewport")
+      .filter((f) => f.endsWith(".ts"))
+      .map((f) => `src/viewport/viewport/${f}`);
+    const naming = files.filter((f) =>
+      /MARKER_ID|isMarker|transcript:evicted/.test(
+        readFileSync(f, "utf8")
+          .replace(/\/\*[\s\S]*?\*\//g, "")
+          .replace(/^\s*\/\/.*$/gm, ""),
+      ),
+    );
+    expect(naming, "C14 holds no special case for the marker").toEqual([]);
+    expect(files.length, "the corpus is not empty").toBeGreaterThan(4);
+  });
+
+  it("T2.17 (I16): nothing outside the window is measured — there is no overscan in v1", () => {
+    // **Adding overscan is a measurable change against M-T3's baseline rather
+    // than a default nobody chose**, and this is the row that makes it
+    // measurable: a count, over a document far taller than the viewport.
+    const store = createTranscriptStore();
+    const measured: string[] = [];
+    const counting = (blocks: Parameters<typeof measureSequence>[0], w: number): number => {
+      measured.push(String((blocks[0] as { id?: string } | undefined)?.id ?? "?"));
+      return measureSequence(blocks, w);
+    };
+
+    const viewport = createViewport(store, { width: W, height: 4, measureSequence: counting });
+    for (let i = 0; i < 12; i += 1) store.append(rowsDoc(1, `e${String(i)}`));
+
+    // Appending measures each entry once — that is the index being built, not
+    // overscan. What matters is what happens when the window *moves*.
+    measured.length = 0;
+    viewport.scrollBy(1);
+    viewport.visible();
+
+    // Nothing new: every entry the window can reach was already in the index,
+    // and no entry beyond it was pulled in to be ready.
+    expect(measured, "a scroll measures nothing ahead").toEqual([]);
   });
 });

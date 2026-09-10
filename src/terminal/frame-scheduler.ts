@@ -51,8 +51,16 @@ export interface FrameScheduler {
 }
 
 export type FrameSchedulerOptions = Readonly<{
-  render: () => void;
-  repaint: () => void;
+  /**
+   * **The reason the frame is being drawn for, and only C03 can supply it**
+   * (I16). Among coalesced reasons this unit picks the strictest, at flush; a
+   * caller wrapping `commit` sees every reason committed and a caller wrapping
+   * this sees every frame, and neither can recover which reason a *coalesced*
+   * frame was drawn for. F395 recorded that the scheduler knows and hands it to
+   * nothing.
+   */
+  render: (reason: CommitReason) => void;
+  repaint: (reason: CommitReason) => void;
   capabilities: TerminalCapabilities;
   lifecycle: { readonly acquired: boolean };
   write: (s: string) => void;
@@ -124,6 +132,8 @@ export function createFrameScheduler(opts: FrameSchedulerOptions): FrameSchedule
   /** §4a — the screen held still on purpose (I13, I14). */
   let suspended = false;
   let deferred: CommitReason | null = null;
+  /** I16 — the reason the next frame is being drawn for. */
+  let driving: CommitReason | null = null;
 
   /**
    * Higher is stricter. Immediate outranks every coalesced reason; among
@@ -171,20 +181,33 @@ export function createFrameScheduler(opts: FrameSchedulerOptions): FrameSchedule
     if (!IMMEDIATE.has(first)) {
       // A fresh window from the end of the write (T3.15). No timer is
       // outstanding here — every path into a write consumes it — so I3 holds.
+      raise(first);
       state = "pending";
       armTimer(windows[first]);
       return;
     }
 
+    raise(first);
     writeFrame(); // The one deferred write (T3.7, T3.21).
 
     const second = takeDeferred();
     if (second === null) return;
+    raise(second);
     // Escalated, not dropped and not written inline. An immediate reason gets a
     // zero window, so it lands on the next turn rather than on this stack
     // (T3.20).
     state = "pending";
     armTimer(IMMEDIATE.has(second) ? 0 : windows[second]);
+  }
+
+  /**
+   * I16 — the strictest reason committed since the last write, which is the one
+   * the frame is drawn for. Separate from `deferred`, which is about a commit
+   * arriving *during* a write; this is about the frame about to happen.
+   */
+  function raise(reason: CommitReason): void {
+    driving =
+      driving === null || strictness(reason) > strictness(driving) ? reason : driving;
   }
 
   /** I10 — one deferral, at the strictest reason seen while writing. */
@@ -220,18 +243,22 @@ export function createFrameScheduler(opts: FrameSchedulerOptions): FrameSchedule
     }
 
     state = "writing";
+    // I16 — consumed here, so the next frame starts from nothing rather than
+    // inheriting this one's reason.
+    const reason = driving ?? "input";
+    driving = null;
     const sync = capabilities.synchronisedUpdate;
     if (sync) write(SYNC_UPDATE.enter);
     try {
       if (contaminated) {
-        repaint();
+        repaint(reason);
         // Cleared *after* the repaint returns, not before: a repaint that
         // throws must leave the flag set, so the next write retries it rather
         // than diffing against a screen whose contents nobody knows
         // (I5, T3.5, T6.5).
         contaminated = false;
       } else {
-        render();
+        render(reason);
       }
     } finally {
       // In the `finally`, not the `try`. An unbalanced open marker leaves the
@@ -249,10 +276,14 @@ export function createFrameScheduler(opts: FrameSchedulerOptions): FrameSchedule
     if (reason === "resize") contaminated = true;
 
     if (state === "writing") {
+      // The deferred reason becomes the *next* write's, raised at the point it
+      // is taken rather than here — this write already has one.
       deferred =
         deferred === null || strictness(reason) > strictness(deferred) ? reason : deferred;
       return;
     }
+
+    raise(reason);
 
     if (IMMEDIATE.has(reason)) {
       cancelTimer(); // I4 — the pending frame would draw the same state.

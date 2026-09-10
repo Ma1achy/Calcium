@@ -283,13 +283,27 @@ export function padStart(text: string, width: number, ambiguous: AmbiguousWidth 
 /**
  * Fit a plain string to exactly `width` cells: truncate if long, pad if short.
  * The two operations that must agree with the measurer, in one place.
+ *
+ * **They agreed with the measurer and not with each other** (I68, F1042). The
+ * parameter was `Pick<TerminalCapabilities, "unicode">`, so `truncate` received
+ * the caller's whole record and cut at the session's convention while `pad` was
+ * given nothing and fell to its `"narrow"` default. At `ambiguousWidth: "wide"`
+ * the two halves disagree by one cell per Ambiguous character: measured on a
+ * bordered `status` in a 40-cell block, five rows of six at 40 and the message
+ * row at **42**, the right border two cells outside the frame — which is the
+ * wrap hazard C01 and C02 name, on far-side text.
+ *
+ * **The type is why nobody saw it.** `Pick` removes nothing at runtime, so the
+ * call site was already passing `ctx.capabilities` and `truncate` was already
+ * right; the narrowing described a contract the function did not keep. A
+ * signature that cannot ask the question reads as a decision not to.
  */
 export function fit(
   text: string,
   width: number,
-  caps: Pick<TerminalCapabilities, "unicode">,
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
 ): string {
-  return pad(truncate(text, width, caps), width);
+  return pad(truncate(text, width, caps), width, caps.ambiguousWidth);
 }
 
 /**

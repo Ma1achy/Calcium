@@ -8,14 +8,19 @@ import { describe, expect, it } from "vitest";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { plotHeight } from "../../src/presentation/plot/height.js";
 import { columnsOf, finiteSamples, rowOf, seriesRange, FACING_DEFAULT } from "../../src/presentation/plot/scale.js";
-import { curveRows } from "../../src/presentation/plot/curve.js";
+import { curveRows, isBlank } from "../../src/presentation/plot/curve.js";
 import { createGrid, drawLine, foldBraille, setDot } from "../../src/presentation/plot/raster.js";
 import { sparkline } from "../../src/presentation/plot/sparkline.js";
+import { grid, paint, setMask, write } from "../../src/presentation/plot/chargrid.js";
+import { LINE_LEFT, LINE_RIGHT } from "../../src/presentation/plot/linedraw.js";
 import { stripHeights } from "../../src/presentation/plot/strips.js";
 import { lossCurve, plotOf } from "../support/blocks.js";
 import { ASCII_CAPS, FULL_CAPS, MONO_CAPS, measurable, visible } from "../support/render.js";
 import { gutter } from "../support/plot-forms.js";
-import { cells, displayCells } from "../../src/presentation/text.js";
+import { CELL_PER_UNIT_RANGES, cells, displayCells, rowCells } from "../../src/presentation/text.js";
+import { pointLabelRows } from "../../src/presentation/plot/pointlabels.js";
+import { xAxis } from "../../src/presentation/plot/axes.js";
+import { checkSourceScans } from "../../tools/enforce/source-scans.mjs";
 import { smallMultiplesRows } from "../../src/presentation/plot/facet.js";
 import { glyphs } from "../../src/presentation/blocks/glyphs.js";
 import { block, type Plot, type Series } from "../../src/data/viewmodel/index.js";
@@ -360,6 +365,268 @@ describe("C12 tier 6 — fail-on-revert", () => {
     expect(strip.trim().length, "the strip is drawn").toBeGreaterThan(0); // cells-ok — a cell count
     const flat = new Set(["\u2801", "\u2808", "\u2809", " "]);
     expect([...strip].some((c) => !flat.has(c)), "and it is jittered, not a rug").toBe(true);
+  });
+
+  it("T6.95 (I118): the writer returned to one code point per cell → T1.130 fails on the keycap, and C09 T2.129's NOT_WHOLE gains the four kinds", () => {
+    // **The revert, verbatim**: `chargrid.ts`'s `write` as it shipped, which is
+    // also the loop the treemap, the sankey and `pointlabels.ts` each carried
+    // (F969). A zero-width piece is written and the column does not move, so
+    // the piece after it overwrites it.
+    const perCodePoint = (row: string[], at: number, body: string): void => {
+      let col = at; // cells-ok — a column position
+      for (const ch of body) {
+        if (col < 0 || col >= row.length) break; // cells-ok — a column position
+        row[col] = ch;
+        const w = cells(ch, "narrow");
+        for (let k = 1; k < w; k += 1) if (col + k < row.length) row[col + k] = ""; // cells-ok — a cell count
+        col += w;
+      }
+    };
+    const KEYCAP = "1️⃣";
+    const FAMILY = "\u{1F468}‍\u{1F469}‍\u{1F467}";
+    // T1.130's assertion against the revert: the keycap's cell holds a bare
+    // digit, and the family occupies three cells with a face in each.
+    const keycap = new Array<string>(6).fill(" ");
+    perCodePoint(keycap, 1, KEYCAP);
+    expect(keycap[1]).toBe("1");
+    expect(keycap).not.toEqual([" ", KEYCAP, "", " ", " ", " "]);
+    const family = new Array<string>(8).fill(" ");
+    perCodePoint(family, 1, FAMILY);
+    expect(family.filter((c) => c !== " " && c !== "")).toHaveLength(3); // cells-ok — a cell count
+    expect(family.join("")).not.toContain(FAMILY);
+    // The writer as it is: one cell, the cluster whole.
+    const whole = new Array<string>(6).fill(" ");
+    write(whole, 1, KEYCAP, "narrow");
+    expect(whole).toEqual([" ", KEYCAP, "", " ", " ", " "]);
+  });
+
+  it("T6.96 (I118): the zero-width drop removed → T1.130's mark-only body fails; a zero-width cluster given a cell → its leading-mark case fails", () => {
+    // **Two reverts of one guard, and the leading-mark case sees only the
+    // second.** Without `if (w === 0) continue` the mark is written into the
+    // cell and the column stays, so the next cluster overwrites it — a leading
+    // mark vanishes exactly as it does with the guard, and only a body that is
+    // nothing but a mark shows the difference. Giving the cluster a cell of its
+    // own (`Math.max(1, w)`, the shape F970's scatter3 mutation restores) moves
+    // the column, and that is what the leading-mark case sees.
+    const unguarded = (row: string[], at: number, body: string): void => {
+      let col = at; // cells-ok — a column position
+      for (const cluster of body) {
+        const w = cells(cluster, "narrow");
+        row[col] = cluster;
+        col += w;
+      }
+    };
+    const own = (row: string[], at: number, body: string): void => {
+      let col = at; // cells-ok — a column position
+      for (const cluster of body) {
+        const w = Math.max(1, cells(cluster, "narrow"));
+        row[col] = cluster;
+        col += w;
+      }
+    };
+    const leading = new Array<string>(5).fill(" ");
+    unguarded(leading, 1, "́ab");
+    expect(leading, "the guard's removal is invisible to a leading mark").toEqual([" ", "a", "b", " ", " "]);
+    const only = new Array<string>(5).fill(" ");
+    unguarded(only, 1, "́");
+    expect(only, "and visible to a body that is only one").toEqual([" ", "́", " ", " ", " "]);
+    const shifted = new Array<string>(5).fill(" ");
+    own(shifted, 1, "́ab");
+    expect(shifted, "a cell of its own moves the column").toEqual([" ", "́", "a", "b", " "]);
+    // The writer as it is, on both.
+    const a = new Array<string>(5).fill(" ");
+    write(a, 1, "́ab", "narrow");
+    expect(a).toEqual([" ", "a", "b", " ", " "]);
+    const b = new Array<string>(5).fill(" ");
+    write(b, 1, "́", "narrow");
+    expect(b).toEqual([" ", " ", " ", " ", " "]);
+  });
+
+  it("T6.97 (I118, I57): the continuation cells left unfilled → TR11 fails, and an edge is drawn into the second half of a glyph", () => {
+    // **The state constructed**: a wide cluster written with no `""` behind it,
+    // on a grid whose mask carries an edge under the glyph's second cell. `paint`
+    // resolves a mask bit only where the text left the cell blank, so the edge
+    // appears between the halves of `図` — the row reads one cell wider than
+    // its cell count, which is TR11's column arithmetic failing and TM5's width
+    // assertion with it.
+    const noFill = (row: string[], at: number, body: string): void => {
+      let col = at; // cells-ok — a column position
+      for (const cluster of body) {
+        row[col] = cluster;
+        col += cells(cluster, "narrow");
+      }
+    };
+    const reverted = grid(1, 4);
+    setMask(reverted, 0, 2, LINE_LEFT | LINE_RIGHT);
+    noFill(reverted.text[0]!, 1, "図");
+    const drawn = paint(reverted, "rounded", FULL_CAPS)[0]!;
+    expect(drawn.startsWith(" 図")).toBe(true);
+    expect(cells(drawn, "narrow"), "an edge glyph inside the glyph's cells").toBe(4);
+    // The writer as it is: the continuation is `""`, which is not blank to
+    // `paint`, so the mask bit under it is never resolved.
+    const kept = grid(1, 4);
+    setMask(kept, 0, 2, LINE_LEFT | LINE_RIGHT);
+    write(kept.text[0]!, 1, "図", "narrow");
+    expect(paint(kept, "rounded", FULL_CAPS)[0]).toBe(" 図");
+  });
+
+  it("T6.98 (I119): the label layer indexed by code point → T1.135 fails on the family row, every cell after the name three to the left", () => {
+    // **The state constructed**: the overlay `pointLabelRows` hands the merge
+    // — a joined cell array — read at column `x` as `[...row][x]`, which is
+    // what `mergedRow` did until F977. A family is five code points in two
+    // cells, so that walk spends five columns on the name, reaches the cell
+    // after it three columns late, and composes a row three cells short of
+    // the area; T1.135's comparison right of the slot is what fails.
+    const FAMILY = "\u{1F468}\u200d\u{1F469}\u200d\u{1F467}";
+    const series = [{ values: [10, 42, 25, 88, 55, 30, 70, 15], label: "s", pointLabels: [null, FAMILY, null, null, null, null, null, null] }];
+    const range = seriesRange(series as never, {});
+    if (range === null) throw new Error("unreachable");
+    const overlay = pointLabelRows(series as never, range, 34, 9, FULL_CAPS, FACING_DEFAULT)[0]!;
+    const row = overlay.find((r) => r.includes(FAMILY));
+    if (row === undefined) throw new Error("the family was not placed");
+    const byCell = rowCells(row, "narrow");
+    const start = byCell.indexOf(FAMILY); // cells-ok — a cell index
+    expect(start, "the family sits in one cell").toBeGreaterThanOrEqual(0);
+    expect(byCell[start + 1], "and owns the cell behind it").toBe("");
+    expect(byCell, "the cell array is the area's width").toHaveLength(34); // cells-ok — a cell count
+    // The reverted walk over the same row.
+    const byCodePoint = [...row];
+    expect(byCodePoint, "three code points more than cells").toHaveLength(byCell.length + 3); // cells-ok — a code-point count
+    expect(byCodePoint.slice(start, start + 5).join(""), "five columns for the name").toBe(FAMILY);
+    expect(byCodePoint[start + 5], "the reserved cell read three columns late").toBe(byCell[start + 2]);
+    const composed = byCodePoint.slice(0, 34).join("");
+    expect(cells(composed, "narrow"), "and the row three cells short").toBe(31);
+    // The merge as it is: the cells, and the row exactly the area.
+    expect(cells(byCell.join(""), "narrow")).toBe(34);
+  });
+
+  it("T6.99 (I119): the continuation cell treated as blank → T1.136 fails with a gridline behind 図", () => {
+    // **The state constructed**: the merge's blank rule asked of a label's
+    // cell array before the continuation rule — `isBlank("")` is true in
+    // `curve.ts`, and the merge has to ask *is it a continuation* first. A
+    // gridline is then substituted into the cell 図 already occupies, and
+    // the glyph draws over its own second half: three columns, four cells.
+    const cellsOf = rowCells("図x", "narrow");
+    expect(cellsOf).toEqual(["図", "", "x"]);
+    const grid = "\u250a\u250a\u250a";
+    const reverted = cellsOf.map((c, x) => (isBlank(c) ? grid[x] ?? " " : c)).join("");
+    expect(reverted).toBe("図\u250ax");
+    expect(cells(reverted, "narrow"), "four cells in three columns").toBe(4);
+    // The merge as it is: a `""` is the cluster before it and receives nothing.
+    const kept = cellsOf.map((c, x) => (c === "" ? "" : isBlank(c) ? grid[x] ?? " " : c)).join("");
+    expect(kept).toBe("図x");
+    expect(cells(kept, "narrow")).toBe(3);
+  });
+
+  it("T6.100 (I119, C09 I63): the fast set widened to a wide code point → C09 T1.40 fails, a row of 日 split one unit per cell", () => {
+    // **The state constructed**: the per-unit split applied to a row the set
+    // does not admit. `日` is Wide, so the split gives it one cell where the
+    // terminal gives it two and every cell after it is one to the left — the
+    // half of F977 that TL13's fixture carries. C09 T1.40 asserts each member
+    // of `CELL_PER_UNIT_RANGES` measures one cell at `narrow`, which the
+    // widened member does not.
+    const perUnit = [..."日本x"];
+    expect(perUnit).toEqual(["日", "本", "x"]);
+    expect(cells(perUnit.join(""), "narrow"), "five cells in three").toBe(5);
+    expect(cells("日", "narrow"), "the member T1.40 refuses").toBe(2);
+    const admitted = (cp: number): boolean => {
+      for (let i = 0; i < CELL_PER_UNIT_RANGES.length; i += 2) { // cells-ok — a pair index
+        if (cp >= CELL_PER_UNIT_RANGES[i]! && cp <= CELL_PER_UNIT_RANGES[i + 1]!) return true;
+      }
+      return false;
+    };
+    expect(admitted(0x65e5), "and the set does not admit it").toBe(false);
+    expect(admitted(0x2500), "while it admits box drawing").toBe(true);
+    // The function as it is: the cluster walk.
+    expect(rowCells("日本x", "narrow")).toEqual(["日", "", "本", "", "x"]);
+  });
+
+  it("T6.101 (I118): the radar's writer restored to one code point per slot → T1.139 fails, `east` three cells left of its column", () => {
+    // **The state constructed**: `labelRows`' slot row as it shipped — the
+    // name placed by `cells()` at `start`, then `[...text]` written one code
+    // point per slot from there. A family is five code points, so it takes
+    // five slots for a two-cell reservation and overwrites the three blank
+    // slots after it; the join drops nothing, and the row comes back three
+    // cells short with every label after the name three to the left (F982).
+    const FAMILY = "\u{1F468}\u200d\u{1F469}\u200d\u{1F467}";
+    const shipped = Array.from({ length: 45 }, () => " ");
+    const start = 16; // cells-ok — a column position
+    expect([...FAMILY], "five code points in two cells").toHaveLength(5); // cells-ok — a code-point count
+    [...FAMILY].forEach((ch, k) => { shipped[start + k] = ch; });
+    const joined = shipped.join("");
+    expect(cells(joined, "narrow"), "three cells short of the row").toBe(42);
+    expect(rowCells(joined, "narrow").indexOf(""), "the family owns one continuation").toBe(start + 1);
+    // The writer as it is: the cluster in one cell, `""` behind it, the row its count.
+    const kept = Array.from({ length: 45 }, () => " ");
+    write(kept, start, FAMILY, "narrow");
+    expect(kept.slice(start, start + 3)).toEqual([FAMILY, "", " "]);
+    expect(cells(kept.join(""), "narrow")).toBe(45);
+  });
+
+  it("T6.102 (I119): the line arm reading its label row by code point → T1.140 fails, the row two cells over the width and into the clamp", () => {
+    // **The state constructed**: the joined label row the line arm reads —
+    // `図表` at cell 14 and `east` at cell 42, the probe's row — read at
+    // column `cx` as `[...row][cx]`. The two ideographs are two code points
+    // in four cells, so the index reaches `east` two columns early, and a
+    // figure composed column by column to the row's width carries every
+    // code point of the text and two blanks after: two cells over (F982).
+    const row = `${" ".repeat(14)}図表 ${"▐".repeat(23)}east`;
+    const width = cells(row, "narrow");
+    expect(width).toBe(46);
+    const byCodePoint = [...row];
+    expect(byCodePoint, "two entries fewer than cells").toHaveLength(width - 2); // cells-ok — a code-point count
+    expect(byCodePoint[42], "the column `east` starts in, read by code point").toBe("s");
+    const composed = Array.from({ length: width }, (_c, cx) => byCodePoint[cx] ?? " ").join(""); // cells-ok — a cell column
+    expect(cells(composed, "narrow"), "two cells over the width").toBe(width + 2);
+    // The read as it is: cells, `""` behind 図 and behind 表, the composition the width.
+    const byCell = rowCells(row, "narrow");
+    expect(byCell).toHaveLength(width);
+    expect(byCell.slice(14, 18)).toEqual(["図", "", "表", ""]);
+    expect(byCell[42]).toBe("e");
+    expect(cells(byCell.join(""), "narrow")).toBe(width);
+  });
+
+  it("T6.103 (I118): the captions' writer restored to one code point per cell → T1.141 fails, the centre caption three cells left of its tick", () => {
+    // **The state constructed**: `xAxis`'s row as it shipped — a caption
+    // placed by `cells()` and written `[...text]` one code point per cell.
+    // With a family at the left, its five code points take five cells of a
+    // two-cell reservation; the centre and right captions are written where
+    // the cells said and the join brings them three cells left — under ticks
+    // recorded where the cells said, which did not move (F985).
+    const FAMILY = "\u{1F468}\u200d\u{1F469}\u200d\u{1F467}";
+    const w = 51; // cells-ok — an area width
+    const axis = xAxis([FAMILY, "mid", "end"], w, FULL_CAPS);
+    const plain = xAxis(["ab", "mid", "end"], w, FULL_CAPS);
+    expect(axis.tickColumns, "the ticks are the control's").toEqual(plain.tickColumns);
+    const midStart = Math.floor((w - 3) / 2); // cells-ok — a column position
+    expect(axis.tickColumns[1], "the centre tick, where the cells said").toBe(midStart + 1);
+    const shipped = Array.from({ length: w }, () => " ");
+    const lay = (text: string, start: number): void => { [...text].forEach((ch, i) => { shipped[start + i] = ch; }); };
+    lay(FAMILY, 0);
+    lay("mid", midStart);
+    lay("end", w - 3);
+    const midAt = (text: string): number => rowCells(text, "narrow").findIndex((c, i, a) => c === "m" && a[i + 1] === "i" && a[i + 2] === "d"); // cells-ok — a cell index
+    expect(midAt(shipped.join("")), "three cells left of where it was placed").toBe(midStart - 3);
+    // The writer as it is: the caption's first cell is where the tick was recorded from.
+    expect(midAt(axis.text)).toBe(midStart);
+    expect(cells(axis.text, "narrow")).toBe(cells(plain.text, "narrow"));
+  });
+
+  it("T6.104 (I119): restoring the line arm's `[...(labels[cy] ?? \"\")][cx]` or the captions' `[...text].forEach((ch, i) …)` anywhere in `src/` → SS61 fires on the line under `make enforce`", () => {
+    // The two shipped lines at the files that held them, marks and all — a
+    // `cells-ok` mark is about the index and the spread is the defect — and
+    // the control: the two-statement shape is silent, because it is the
+    // rule's stated blind spot and the row says so rather than implying the
+    // rule reaches it.
+    const fired = checkSourceScans(
+      ["src/presentation/plot/circle.ts", "src/presentation/plot/axes.ts"],
+      (f) => (f.endsWith("circle.ts")
+        ? '      const label = [...(labels[cy] ?? "")][cx]; // cells-ok — a cell column\n'
+        : "    [...text].forEach((ch, i) => { row[start + i] = ch; }); // cells-ok — a column position\n"),
+    ).filter((v) => v.rule === "SS61");
+    expect(fired.map((v) => v.file)).toEqual(["src/presentation/plot/circle.ts:1", "src/presentation/plot/axes.ts:1"]);
+    const silent = checkSourceScans(["src/presentation/plot/circle.ts"], () => "    const chars = [...text];\n").filter((v) => v.rule === "SS61");
+    expect(silent, "the two-statement shape is the stated blind spot").toEqual([]);
   });
 
   it("T6.13 (I15): three unconditional y-labels → T3.2 renders outside its rows", () => {

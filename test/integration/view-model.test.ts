@@ -10,6 +10,7 @@
 import { describe, expect, it } from "vitest";
 import { createAdapterRegistry } from "../../src/data/adapters/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
+import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
 import {
   applyPatch,
   block,
@@ -18,6 +19,14 @@ import {
   type ViewDocument,
 } from "../../src/data/viewmodel/index.js";
 import { CORPUS, doc, tableOf } from "../support/blocks.js";
+
+/** T4.2's own kind — declared, so it is a `Block` rather than a cast (C04 I119). */
+type Banner = Readonly<{ kind: "banner"; id: string; text: string }>;
+declare module "../../src/data/viewmodel/types.js" {
+  interface BlockKinds {
+    banner: Banner;
+  }
+}
 import { DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable } from "../support/render.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
@@ -193,13 +202,26 @@ describe("C04 integration — the document lifecycle", () => {
     // and checked without anyone editing a list — and a consumer's kind that
     // breaks I1 fails the same assertion the built-ins do.
     const registry = createBlockRegistry({});
-    registry.register({
+    // **Annotated, because `AnyBlockDefinition` is a union and `kind` is
+    // `string`.** TypeScript discriminates a union by a literal property, and
+    // `BlockDefinition.kind` is deliberately `string` — so a bare object
+    // literal here matches every member and none, and its callbacks infer
+    // `any`. Naming the parameterisation is what a consumer does anyway, and
+    // it is what the example's `faultyDefinition` does.
+    const bannerDefinition: BlockDefinition<Banner> = {
       kind: "banner",
       measure: () => 2,
       render: (b, ctx) => renderBanner(b, ctx),
-    });
+    };
+    registry.register(bannerDefinition);
 
-    const banner = { kind: "banner", id: "banner-1", text: "custom" } as unknown as Block;
+    // **No cast, and its absence is the assertion** (C04 I119, F405). The block
+    // used to be `{ … } as unknown as Block`, because the union was closed and
+    // a consumer's kind could not enter a document. `Banner` is declared at the
+    // top of this file by augmenting `BlockKinds`, so it is a `Block` on its
+    // own terms — and this row is the framework's own second consumer of that
+    // mechanism, beside the example's `faulty`.
+    const banner: Block = { kind: "banner", id: "banner-1", text: "custom" };
     const kit = {
       measure: (b: Block, w: number) => registry.measure(b, w),
       renderToLines: (b: Block, w: number) =>

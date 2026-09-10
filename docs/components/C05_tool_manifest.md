@@ -85,6 +85,8 @@ type ToolDef = Readonly<{
   hidden?:   boolean;                 // omitted from help and completion, still invocable
   interactive?: boolean;              // takes the terminal — C23 §4's handoff (I19)
   view?:        boolean;              // the result is a pushed view — C22 §13a (I20)
+  jsonFlag?: readonly string[];       // this verb's way of asking for JSON — overrides the
+                                      // manifest's; [] means the verb needs none (I26)
 }>;
 
 type Manifest = Readonly<{
@@ -93,6 +95,8 @@ type Manifest = Readonly<{
   version: string;                    // the far side's version, for skew reporting
   tools: readonly ToolDef[];          // every tool — what findTool and validation read
   appTools: readonly ToolDef[];       // what the app wrote — §3
+  jsonFlag?: readonly string[];       // how this binary is asked for machine-shaped output;
+                                      // absent means ["--json"] (I26)
 }>;
 
 function parseManifest(raw: unknown): Result<Manifest, readonly ManifestError[]>;
@@ -139,11 +143,17 @@ operation able to withdraw it. The full argument is C22 §13a; what it settles h
 party, and the party is the one `interactive` already names.
 
 **Both `ToolDef` and `FlagDef` carry it, and an invocation is a view if either says so.**
-Two declaration sites and one rule, because the surfaces need both: `/dashboard` and
-docker-tui's `container stats <id>` are verbs, while S12's `--logs` is a flag on a `ps`
+Two declaration sites and one rule, because the surfaces need both: docker-tui's
+`container stats <id>` and `inspect <c>` are verbs, while S12's `--logs` is a flag on a `ps`
 that otherwise appends. A verb-level field alone cannot describe a tool whose tier depends
 on how it was invoked, and duplicating `ps` into two tools to express it would put one
 verb's flags in two places.
+
+**`/dashboard` stood here as the verb-level example and is now the counter-example**
+(F1022). It is `local: true`, and `DOCKER_TUI_SURFACES.md` S1 rules it explicitly *"**Not**
+a pushed view — it is the **live block on launch** … an ordinary transcript entry"*. The
+sentence naming it was written before either half was checked, and it is the third named
+consumer of this arm that cannot take it — see the `local` refusal below.
 
 **S3 was named here as `ps <uuid> --watch` and cannot be built that way.** `docker ps`
 takes no positional argument, `--watch` is not a docker flag, and C06 I4 sends argv to the
@@ -154,7 +164,7 @@ the shape it reached for is real and S12 still needs it; what changes is the cla
 strength, and it is now written down that **the flag arm's only consumer is a test
 fixture** while the verb arm has a real one.
 
-**Two combinations are refused at parse (I20)**, in I19's shape and for I19's reason:
+**Three combinations are refused at parse (I20)**, in I19's shape and for I19's reason:
 
 - **`view` with `interactive`.** Both hand input ownership away, to different places — the
   view to the shell's own keymap, the handoff to a child process. There is no arbitration
@@ -163,10 +173,62 @@ fixture** while the verb arm has a real one.
 - **`view` with `oneShot`.** A one-shot writes one frame to stdout and exits, bypassing the
   TTY gate; a view is nothing but a claim on a terminal that stays. The flag would be inert,
   which is A03 §2's vacuity class arriving in a manifest.
+- **`view` with `local`** (F1022, closing F23 and F129). A local verb is classified on
+  `tool.local` by C18 before anything reads its tier, and `isViewInvocation` is read on the
+  `app` route and nowhere else — so the pair parsed, sealed, validated, ran, and appended an
+  ordinary transcript entry with **no view, no refusal and nothing saying so**. Inert in
+  exactly the way the other two are, and refused by nothing until now.
 
 `view` with `streams` is **allowed**, and deliberately: S12's logs view is a streaming
 NDJSON source rendered into a pushed view, so refusing the pair would refuse the surface the
 ruling was taken for.
+
+#### The `local` refusal, and why it is a refusal rather than a route
+
+**The forcing argument for a declaration is absent on this route.** §13a's case for putting
+the tier on the manifest is C23 I3: the pending entry is appended *before* the transport is
+invoked and C13 has no delete, so a decision taken on seeing the result could only produce a
+view *and* an entry nothing can withdraw. `runLocal` has no transport and appends nothing in
+advance — it appends **once**, after the handler has returned. So a local verb may decide on
+seeing its own result, and needs no declaration to do it.
+
+**And it already does.** `/profile` is the framework's own local verb whose summary reads
+*open the profiler's view*: its handler calls `view.open(pane)` and returns a transcript
+notice as the record. That is a different tier from this field — the transcript is *not*
+untouched — and it is the shape a local verb has.
+
+**What the refusal forecloses was measured, not assumed** — F23 filed this rather than
+fixing it *"because `/dashboard` is local and S6/S7 will want views"*. Going to find where
+that was written down turned up no file, so it was measured against
+`DOCKER_TUI_SURFACES.md`:
+
+| named consumer | what its own drawing says |
+|---|---|
+| `/dashboard` (S1) | *"**Not** a pushed view — it is the **live block on launch** … an ordinary transcript entry"* |
+| `/compare A B` (S6) | drawn as `❯ /compare …` with the block beneath it — a transcript entry, no letter keys |
+| `/drift <c>` (S7) | drawn the same way, and called *"the comparison showcase"* rather than a view |
+
+Three named consumers, none of which can take the mark, and **no manifest in the tree
+declares the pair** — the framework's seven verbs, docker-tui's twelve and
+`test/support/manifest.fixture.json` were all read. A count of consumers is an argument only
+if the consumers share a shape (F161).
+
+**Refused loudly rather than routed, on this component's own precedent.** `view` with
+`streams` was a declarable pair with no route: C22 §13a reserved the route, refused the pair
+*loudly*, and built it when the first consumer concrete enough — S9's `/logs` — forced it.
+The defect F23 and F129 name is that this pair is refused **silently**. Parse rather than run
+time, because I19's argument is that the author learns at declaration rather than from a user
+watching a terminal misbehave, and I20's other two refusals are already here.
+
+**The reservation, with its condition named as a symbol.** If a local verb is ever to declare
+its result a view, the route is `runLocal` gaining `runIntoView`'s non-streaming tail —
+`documentView.open` / handler / `fill` / `declareLiveInView` / `recordHistory` — with
+`producerContext(region().height)` in place of the `null` C07 §3a cell B records as *right by
+accident*. Two things are owed before that is worth building: a consumer, and a seam. **The
+seam is the residue this refusal leaves**: `LocalContext` (`shell/local/registry.ts`) carries
+`command`, `ask`, `profile?` and `args` and **no view owner**, so `/profile`'s shape is
+reachable by the framework and by no app. An operation exists with no seam to call it from,
+and that — not this field — is what an app actually lacks today.
 
 ### `interactive` — the app author is the only party who knows
 
@@ -337,9 +399,11 @@ The *report* is deduplicated on the unordered pair. One error for one mistake �
 
 ## 3. The framework's own verbs
 
-**`parseManifest` returns the app's tools plus Calcium's six**, and this belongs here rather than in C22 because it is a statement about what a manifest *is*.
+**`parseManifest` returns the app's tools plus Calcium's seven**, and this belongs here rather than in C22 because it is a statement about what a manifest *is*.
 
-`/help`, `/clear`, `/theme`, `/history`, `/debug` and `/exit` are verbs. They have names, they take arguments, they complete, they validate, and they appear in help. Everything the manifest exists to describe is true of them, and the only reason they were absent is that nobody wrote them down. C23 ships the handlers (C23 §2); C18 classifies `local` from the manifest; so without the rows, the handlers are registered for verbs nothing can ever classify to — which is precisely what C23 I27's reconciliation reports, and it is right to.
+**And an eighth would be a breaking change for every app already using the name.** I6 makes the collision a parse error at construction, so the app does not start, and no row in the framework's own suite can see it — nothing in `src/` holds an app's manifest. The check is the examples' suites, which is where `/profile` becoming the seventh found both examples declaring their own `profile`: nine rows red in the proof gate for docker-tui, the plots demo refusing to start in its own suite, and nothing red in the framework's 5 841 rows (F953). A verb joins this list with a grep of every manifest in the tree, not after.
+
+`/help`, `/clear`, `/theme`, `/history`, `/debug`, `/exit` and `/profile` are verbs. They have names, they take arguments, they complete, they validate, and they appear in help. Everything the manifest exists to describe is true of them, and the only reason they were absent is that nobody wrote them down. C23 ships the handlers (C23 §2); C18 classifies `local` from the manifest; so without the rows, the handlers are registered for verbs nothing can ever classify to — which is precisely what C23 I27's reconciliation reports, and it is right to.
 
 **In C05 rather than C22.** Put the merge in session construction and `parseManifest` returns something that is not yet a manifest — the seam-shaped defect where a value is valid at one call site and incomplete at another. C05 already validates, rejects duplicates and seals; "the framework's verbs are present" is one more thing that is true of every parsed manifest.
 
@@ -348,7 +412,7 @@ The *report* is deduplicated on the unordered pair. One error for one mistake �
 Three consequences, each checked rather than assumed:
 
 - **`hidden` is the mechanism for anything an app should not see in completion**, and `/debug` uses it. `visibleTools` drops it and `findTool` still resolves it, which is exactly the pair that field means (§ToolDef). The other five are ordinary.
-- **The six need no eighth `ArgType`.** `/theme` takes an `enum`, `/history` and `/debug` an optional `int`. EX5 claims the union stays domain-free, and the framework's own verbs failing it would have been the strongest counterexample there could be. They do not.
+- **The seven need no eighth `ArgType`.** `/theme` and `/profile` take an `enum` — `/profile`'s is optional, its four values C28's `PANES` written at L0 and held equal by C23 T1.67 — `/history` and `/debug` an optional `int`. EX5 claims the union stays domain-free, and the framework's own verbs failing it would have been the strongest counterexample there could be. They do not.
 - **They are a `ToolDef[]`, not a `Manifest` fragment.** A fragment implies a schema version and a merge of two schemas; an array is just tools, and tools is all this is.
 
 ### The partition lives on `Manifest`, not on `ToolDef`
@@ -359,7 +423,7 @@ A `source: "app" | "framework"` field on each tool would be settable by an app w
 
 **Two consumers, not one.** `serialise` emits `appTools`, because what round-trips is what the app wrote. And **`/help` groups by it**: `/clear` and `/exit` are different in kind from `/ps` and `/promote`, and a flat list hides that. The second consumer is why this is a partition rather than a filter at one call site.
 
-**And T2.7's property gets sharper rather than weaker.** *Parsing its own serialised output yields an equal manifest* still holds exactly — serialise emits `appTools`, parse re-derives the framework's six, and the two are equal. That is a stronger claim than round-tripping a flat list, because it asserts the derivation is deterministic as well as that nothing is lost.
+**And T2.7's property gets sharper rather than weaker.** *Parsing its own serialised output yields an equal manifest* still holds exactly — serialise emits `appTools`, parse re-derives the framework's seven, and the two are equal. That is a stronger claim than round-tripping a flat list, because it asserts the derivation is deterministic as well as that nothing is lost.
 
 Without the partition the property is simply false: a parsed manifest contains rows the parser added, and re-parsing them hits §3's collision check. The check cannot tell an app declaring `clear` from a re-parse of output that already contains it, and nothing in the input distinguishes them — the same shape as C13's patch gate before it read `origin`.
 
@@ -404,7 +468,7 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 - **I3** — Parsing is strict about structure and lenient about extension. Unknown *fields* are ignored; malformed *known* fields are errors. A newer far side can add fields without breaking an older TUI.
 - **I4** — `values` is present iff `type === "enum"`; `pattern` is present iff `type === "pattern"`. Enforced at parse.
 - **I5** — No `ArgType` encodes an app-domain concept. The union is closed and generic; app-specific shapes use `pattern`.
-- **I6** — Tool names are unique. Duplicates are a parse error, not a last-wins — **including against the framework's six** (§3), so an app shadowing `clear` fails at parse rather than silently overriding a verb Calcium's own handlers depend on.
+- **I6** — Tool names are unique. Duplicates are a parse error, not a last-wins — **including against the framework's seven** (§3), so an app shadowing `clear` fails at parse rather than silently overriding a verb Calcium's own handlers depend on.
 - **I7** — `findTool` returns the longest matching tool.
 - **I8** — `validateInvocation` is pure and performs no I/O.
 - **I9** — Validation failures are `ErrorLike`, rendering through the ordinary error path.
@@ -418,12 +482,13 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 - **I17** — A `conflicts` declaration is checked in the direction it is declared; reporting is deduplicated on the unordered pair, so one mistake is one error.
 - **I18** — There is exactly one distance-2 suggester in the tree, and it is C05's. A01 A.2's cutoff is a policy about *when a suggestion is worth making*, and two implementations agree about the distance and diverge about the tie-break — which is where a suggestion is wrong rather than absent, and a wrong suggestion is the thing the cutoff exists to prevent.
 - **I19** — `interactive` is refused with `streams` and refused with `local: true`, **wherever either is declared** — a flag's arm re-creates the same impossible verb, and a refusal reading only the tool covers one of the two ways to write it (I24). Enforced at parse, as I4 is. Both combinations describe a verb that cannot exist, and both would otherwise be discovered by a user watching a terminal misbehave rather than by the author who declared them.
-- **I20** — `view` is declarable on a `ToolDef` and on a `FlagDef`, and an invocation is a view if either declares it. It is refused with `interactive` and with `oneShot`, at parse, as I19 is, **and the refusal reads both declarations of each** (I24); it is permitted with `streams`, because S12's logs view is exactly that pair. The declaration lives here rather than on the document an adapter returns because C22 §13a shows an adapter-side decision cannot be implemented: C23 I3 appends the pending entry first and C13 has nothing that removes it.
-- **I21** — A flag declared `shellOnly` is validated exactly as any other and is **absent from `argv`**. `validateInvocation` returns `transmitted` — the invocation minus those switches — because it is the one walk that knows where a flag ends, and a second copy of that grammar in C18 is the drift a shared implementation prevents. The value survives in `args`, so the shell can read what the far side never sees. **The axis is transmission, not presentation**: `--json` selects a rendering *and* is understood by the far side, so it stays transmitted; `--raw` means nothing to the binary, and `/inspect <c> --raw` ran `docker inspect <c> --raw` for docker to exit 125 (F39). `shellOnly` is refused on anything but a `bool` and refused with a `short`, at parse: a switch spans one token and a strip is a comparison, while a valued or clustered flag spans tokens the parser would have to re-derive.
-- **I22** — `--help` is reserved on **every** tool, appended where the framework's six verbs are appended, and an app declaring it fails at parse as an app declaring `clear` does. Reserved rather than asked for, because a per-app `--help` is a per-app discipline and one app forgetting it is a verb with no help — the silent failure `usageBlocks` already argues against for hardcoded usage strings. Appended to `tools` and never to `appTools`, so the round-trip re-derives it rather than re-parsing it (F92).
+- **I20** — `view` is declarable on a `ToolDef` and on a `FlagDef`, and an invocation is a view if either declares it. It is refused with `interactive`, with `oneShot` and with `local`, at parse, as I19 is, **and the refusal reads both declarations of each** (I24); it is permitted with `streams`, because S12's logs view is exactly that pair. The declaration lives here rather than on the document an adapter returns because C22 §13a shows an adapter-side decision cannot be implemented: C23 I3 appends the pending entry first and C13 has nothing that removes it. **The `local` refusal is the one whose reason is not *a verb that cannot exist*** (F1022, closing F23 and F129): C23 I3 is an obligation of the *app* route, `runLocal` appends once and only after its handler returns, so nothing forces a local verb's tier to be declared and the field is inert on the one route C18 sends it to. A local verb that wants a view pushes it from its handler and returns a transcript notice as the record, which is what `/profile` does; the seam that would let an *app*'s handler do the same does not exist, and §`view` names it as the residue rather than this field.
+- **I21** — A flag declared `shellOnly` is validated exactly as any other and is **absent from `argv`**. `validateInvocation` returns `transmitted` — the invocation minus those switches — because it is the one walk that knows where a flag ends, and a second copy of that grammar in C18 is the drift a shared implementation prevents. The value survives in `args`, so the shell can read what the far side never sees. **The axis is transmission, not presentation**: the JSON tokens select a rendering *and* are understood by the far side, so they stay transmitted — which is why I26 makes *which tokens* a declaration rather than leaving `--json` as a claim about every binary; `--raw` means nothing to the binary, and `/inspect <c> --raw` ran `docker inspect <c> --raw` for docker to exit 125 (F39). `shellOnly` is refused on anything but a `bool` and refused with a `short`, at parse: a switch spans one token and a strip is a comparison, while a valued or clustered flag spans tokens the parser would have to re-derive.
+- **I22** — `--help` is reserved on **every** tool, appended where the framework's seven verbs are appended, and an app declaring it fails at parse as an app declaring `clear` does. Reserved rather than asked for, because a per-app `--help` is a per-app discipline and one app forgetting it is a verb with no help — the silent failure `usageBlocks` already argues against for hardcoded usage strings. Appended to `tools` and never to `appTools`, so the round-trip re-derives it rather than re-parsing it (F92).
 - **I23** — `interactive` is declarable on a `FlagDef` as well as on a `ToolDef`, and an invocation's contract is the tool's declaration unless a flag present in it carries an arm. **An arm equal to the tool's default is refused at parse**, which is what makes the arms on a tool agree: every one reads `!default`, so two flags cannot disagree and there is nothing to arbitrate. Resolved by `validateInvocation` — the walk that knows which flags a token names — and returned on the success arm, for I21's reason. `false` and absent differ on this member and on no other in either type: absent means *this flag does not decide* (F80).
 - **I24** — A cross-field refusal reads every declaration of each field it names, not the tool's. `view` on a flag with `interactive` on the tool is the pair I20 forbids, written the other way, and it parsed (F118). The conservative form is deliberate: an arm resolving `interactive` to `false` beside a `view` flag would be legal, and refusing it costs an app nothing today because no app declares one — **the limit is recorded rather than discovered**, and the first consumer to want the pair is the argument for narrowing it.
 - **I25** — **A verb declares whether its output may be persisted, and nothing else can.** `persist?: boolean` is `handoff`'s shape and `handoff`'s argument one row down — *the app author is the only party who can know this*, and detection is not available. Here the fact is what the verb's output contains: `inspect` renders a container's whole environment, and no property of a `ViewDocument` distinguishes that from a list of image tags. **The framework never redacts** — C20's redactor works on a tokenised command line, a rendered document has seventeen kinds and no tokens, and a redactor wrong about one kind is worse than none because it is switched on. Absent means **no**, because a missing feature is visible on the first resume and a leaked secret is not visible at all (C13 I20, §5b, F168).
+- **I26** — **The tokens that ask a far side for JSON are the far side's, declared here, and `--json` is a default rather than a fact.** Calcium appended `--json` unconditionally and no manifest member named the flag, so the framework's own demo cannot drive `docker`, which spells it `--format json` (F1, F1006). It is `interactive`'s and `persist`'s argument in its cheapest form — *the app author is the only party who can know this* — with the difference that here the framework had guessed, and a guess that is right for one binary is not detection. **Three states, and `[]` is not absent**: absent inherits, `[]` appends nothing because the verb already emits JSON, and a non-empty sequence is appended whole. A verb's declaration replaces the manifest's rather than merging with it, because merging two token sequences has no meaning. **Refused with `local` at parse**, as `interactive` is: a local verb is never spawned, so the declaration cannot take effect and an author would act on it.
 
 ---
 
@@ -445,12 +510,14 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 14. Conflicts are directional in the check and deduplicated in the report (I17).
 15. The distance-2 suggester is exported, so C18's unknown verbs and C05's unknown flags are one implementation (I18).
 16. `interactive` declares a terminal contract, on a tool or on a flag, and the two combinations that cannot exist are refused at parse wherever they are declared (I19, I24).
-17. `view` declares that a result is a pushed view rather than a transcript entry, on a tool or on a flag, and it is read before the verb runs because nothing can withdraw a pending entry afterwards (I20, C22 §13a).
+17. `view` declares that a result is a pushed view rather than a transcript entry, on a tool or on a flag, and it is read before the verb runs because nothing can withdraw a pending entry afterwards; it is refused with `local`, whose route never reads it (I20, C22 §13a).
 18. A flag may be declared `shellOnly`: validated, readable, and never transmitted. The split is computed by the validator, not re-derived by the parser, and it is refused on anything but a switch (I21).
-19. `--help` is a flag Calcium reserves on every verb, on the same terms as the six verbs it reserves — appended, collision-checked, and absent from what round-trips (I22).
+19. `--help` is a flag Calcium reserves on every verb, on the same terms as the seven verbs it reserves — appended, collision-checked, and absent from what round-trips (I22).
 20. A verb's terminal contract is resolved per invocation, by the validator, from the tool's declaration and the flags actually present — and an arm that could only restate the default is refused, so no two arms can disagree (I23).
 21. A cross-field refusal covers every way its combination can be written, not the one the first consumer used (I24).
 22. **A verb declares whether its output may be persisted**, on `handoff`'s ground and with the opposite default: absent is no, because the framework cannot look at a document and tell (I25).
+23. **How a binary is asked for JSON is declared, not assumed** (I26, → C06 I4, C06 I25). `--json` stays the default so every existing manifest is unchanged, and it stops being a fact about every far side: the framework's own demo target spells it `--format json`, and the member that fixes that is one the app author was always the only party able to write.
+24. **A required field that is absent and one of the wrong type are two sentences** (→ C04 I114). The ruling is C04's and so is the implementation — `absentMessage` and `wrongTypeMessage` travel through the barrel `parse.ts` already imports — because the conflation was here too, at thirteen required strings and every required boolean, and a second copy of a sentence is a second rule the day one of them is corrected (F995).
 
 ---
 
@@ -482,7 +549,11 @@ Six tiers. Every cell of the §4 transition table is covered.
 - **T1.17** (I16, §3): `--since -1h` → a `missing_value` error whose remediation names the token and the `=` form; `--since=-1h` validates. Both halves in one test: the message is only right if the thing it recommends actually works.
 - **T1.18** (I17): a one-directional `conflicts` declaration, given both flags → one error, reported from the flag that declares it. A mutual declaration → still one error.
 - **T1.19b** (I23, I24): a flag arm equal to the tool's default → parse error at `tools[i].flags[j].interactive`, in both directions (`true` on a plain verb, `false` on an interactive one); a flag arm of `true` on a `streams` tool and on a `local` tool → parse error, which is I19 read through the flag; a flag declaring `view` on a tool declaring `interactive` → parse error, **which is the row that fails today** (F118). And the arm that must survive all four: `run` declared `interactive: true` with `detach` declaring `false` parses, and the value reaches the `FlagDef`.
+- **T1.22** (→ C04 I114, F995): a tool with no `summary` and a tool whose `summary` is `42` are refused by **two different sentences** — *is required and absent — supply a string* against *must be a string, got a number* — and the same pair for the required boolean `local`; `null` is **present and wrong**. The absent arm is asserted never to read *must be a …*, which is the wording the split exists to remove, and the control is the untouched fixture drawing no error at all. **The sentences come from C04's helpers**, not a second copy: one rule with two implementations is two rules the day one is corrected. Written because splitting the two helpers changed the message at thirteen call sites and this suite stayed green — the file's one message assertion is on a *conditional* requirement, which is deliberately unchanged.
+- **T1.20** (I26): a manifest declaring `jsonFlag: ["--format", "json"]` parses and the sequence survives onto the `Manifest`; a verb declaring `jsonFlag: ["--format", "{{json .}}"]` parses and **replaces** the manifest's rather than merging with it; `jsonFlag: []` on a verb parses and is **not** absent, which is the distinction the three states rest on; a manifest with no `jsonFlag` at all parses and resolves `["--json"]`, so every manifest written before this member is unchanged. The last arm is the one that keeps the rest from being a rewrite.
+- **T1.21** (I26): `jsonFlag` on a `local: true` verb → parse error at `tools[i].jsonFlag`, as `interactive` with `local` is; a non-array, an array holding a non-string, and an array holding an empty string are each refused naming the path. The control is a spawned verb with the same declaration, which parses — without it the row passes against a parser that refuses every `jsonFlag`.
 - **T1.19** (I19): `interactive` with `streams` → parse error at the tool's path; `interactive` with `local: true` → parse error; `interactive` alone on a spawned tool → parses, and the field survives onto the `ToolDef`. The third half is what stops the rule from being a blanket refusal that passes the first two.
+- **T1.23** (I20, I24, F1022): `view: true` with `local: true` → parse error at `tools[i].view`; a **flag** declaring `view` on a `local` tool → the same error, which is I24 read through the flag and the form F129 named; and the two controls without which the row passes against a parser that refuses every `view` — a spawned tool declaring `view: true` parses with the field on the `ToolDef`, and a `local` tool declaring no `view` anywhere parses. The fourth arm is the one that keeps the rule honest about *what it forecloses*: a `local` tool whose flag is `shellOnly` and **not** `view` parses, because `shellOnly` is the transmission axis and this refusal is the tier's.
 
 ### Tier 2 — contract / interface
 
@@ -497,6 +568,7 @@ Six tiers. Every cell of the §4 transition table is covered.
 - **T2.9** (I18): the exported `suggestName` is the one the flag path uses — an unknown flag's suggestion and the same call made directly agree, including the tie-break where two candidates sit at the same distance. Identity of behaviour asserted on the case where two implementations would differ, not on the case where they would agree.
 - **T2.8** (I8): `findTool` over the same manifest twice returns deeply equal results, **and** a second manifest object with identical content does not observe the first's results. `findTool` caches its match index (§3a) and this is the first cache in the tree, so purity is asserted rather than argued. The second half is the load-bearing one: a cache keyed on content rather than object identity passes every other test in this suite and breaks the moment two manifests differ only in a field the key ignores. Asserted by comparing results — the test does not know the cache exists.
 
+- **T2.23, T2.23b, T2.23c** (I13): four versions parse, including `not-a-version` — a parser validating the *shape* would refuse that while still refusing nothing for being too old, and the two read alike. The one refusal mentioning `version` is **presence**, measured rather than assumed: an empty string is rejected because the field must be there for skew reporting, which is the opposite of enforcing a range. T2.23b is the complement that makes it a rule rather than a tolerance — an undeclared verb is refused where it is looked up, one verb at a time. T2.23c is the absence claim over the component with a control, because a behavioural row can only show the versions it thought to try.
 ### Tier 3 — edge cases
 
 - **T3.1**: `seal` before `load` → throws.
@@ -552,6 +624,7 @@ Six tiers. Every cell of the §4 transition table is covered.
 - **T6.14** (I23): resolving the contract from `tool.interactive` alone → T2.10's `-d` row fails. The verb is spawned into a handoff, the container id is written to a terminal that is repainted a frame later, and the transcript says it finished — which is the failure measured in §2 and the reason the field changed shape.
 - **T6.15** (I24): reading only the tool's `view` in I20's refusal → T1.19b's fourth row fails. That is the state the rule shipped in, and it passed every test written against the pair declared the way its first consumer declared it.
 - **T6.13** (I19): accepting `interactive` alongside `streams` → T1.19 fails. A verb declaring both reaches C23, where whichever path loses does nothing and reports nothing — the failure the parse-time refusal exists to move to the author.
+- **T6.16** (I20, F1022): dropping the `local` arm from I20's refusal → T1.23 fails. That is the state the rule shipped in for the whole of the component's life, and **nothing else could see it**: the pair parses, seals, validates and runs, and the only symptom is a transcript entry where a view was declared. Both of the other refusals fire at parse, so a suite indexed by *does an inert declaration fail* tested the two arms that had one and agreed.
 
 ---
 
@@ -583,8 +656,18 @@ A row governed by one rule restates that rule.
 | 13 | `true` | `false`, flag **absent** from this invocation | — | *declared* × *present* | the default: resolution reads the flags actually given |
 | 14 | `true` | `false` on a `shellOnly` flag | — | I21 strips it from `argv` × it still decides | resolved `false` — it is an occurrence, and presence is what resolution reads, not transmission |
 | 15 | any | any | **validation failed** | *the contract is resolved by the validator* × *C23 routes on it* | **route after the gate.** F119 — C23 read the declaration above the `validation.ok` check, so an interactive verb was spawned unvalidated |
+| 16 | tool `view` | — | `local` | I20 *the tier is declared* × I12 *a local verb is never spawned* | **refused** since F1022 — and it parsed for the whole of the component's life, silently appending an entry |
+| 17 | — | flag `view` | `local` | row 16 written through the flag (I24) | **refused** — the form F129 named, and `isViewInvocation` reads both sites, so a rule reading only the tool would repeat F118 |
+| 18 | — | flag `shellOnly`, **not** `view` | `local` | I21 *transmission* × I20 *the tier* | **permitted** — the two axes are independent, and this is row 16's control: without it the refusal could be reading the wrong field |
 
-**Three of fifteen are defects at HEAD**, and none is a row about `interactive` alone.
+**Rows 16 to 18 are the third pass, and the first two rows are one defect written twice**
+(F1022). Both are *structural* in §8a's sense — no event stands between *C18 classifies on
+`tool.local`* and *`isViewInvocation` is read on the `app` route* — which is why F129 found
+them with a table and nothing else did. The row that makes them a finding rather than a
+restatement is **18**: `local` meets two flag-level fields, and only one of them is the
+tier, so a refusal that fired on either would be a rule about the wrong axis.
+
+**Three of the first fifteen are defects at HEAD**, and none is a row about `interactive` alone.
 Row 9 is a rule covering one of the two ways to write its own combination; row 15 is a
 gate the route steps over; rows 3 and 4 are the ruling that removes the arbitration the
 naive shape would have needed. Rows 1, 2, 13 and 14 are the ones that had to keep working.
@@ -801,6 +884,46 @@ reader, and every step reads as coverage** — the finding is not that any of th
 mistaken but that a deferral chain is a claim nothing resolves. *Would landing this close it*
 applies to a deferral as much as to a fix, and the only thing that answered it was going to the
 reader and finding it there.
+
+## 8c. The walk — how a far side is asked for JSON
+
+**A classification table again, and for §8a's reason**: a manifest is at rest, a verb's
+declaration and the manifest's are two statements that both hold, and there is no event
+between them. What is new is a third party — **what the user typed** — which is at rest in
+the same sense, because `withJson` sees a finished `argv`.
+
+Indexed by which two rules could both decide the tokens.
+
+| # | manifest | verb | the user typed | the two rules | ruling |
+|---|---|---|---|---|---|
+| 1 | — | — | `ps` | *the default is `--json`* × *nothing is declared* | `["ps","--json"]` — today's behaviour, and the row that makes this additive |
+| 2 | `["--format","json"]` | — | `ps` | *the manifest declares* × *the verb does not* | `["ps","--format","json"]` — inherited |
+| 3 | `["--format","json"]` | `["--format","{{json .}}"]` | `inspect c1` | *the manifest declares* × *the verb declares* | **the verb wins whole.** Merging two token sequences has no meaning: a verb overriding is overriding the sequence |
+| 4 | `["--format","json"]` | `[]` | `version` | *absent inherits* × *`[]` is a value* | **nothing appended.** `[]` and absent must differ or a verb that already emits JSON cannot say so |
+| 5 | `["-o","json"]` | — | `get pods -o yaml` | I4 *appended exactly once* × D16 *a user who types it is asking to see the contract* | **nothing appended, on the first token.** Matching the whole sequence would append `-o json` after `-o yaml` and silently override what the user asked for; matching the first token leaves both rules intact |
+| 6 | `["--format","json"]` | — | `ps --format table` | row 5 × *the payload is always machine-shaped* | **nothing appended, and the output is unparseable** — which C06 already handles: `stdout` undefined, `parseError` set, C07 falls back to a `raw` block. Identical to today's outcome for a user who types `--json` at a binary that has none |
+| 7 | — | `["--json"]` | `ps` | *the verb declares* × *the default is the same tokens* | `["ps","--json"]`. A declaration equal to the default is **permitted**, unlike §8a rows 3 and 4: there the arm decided something already decided by a field with one meaning, here the manifest's value is data the author may restate |
+| 8 | any | any on a `local` verb | — | *a local verb is never spawned* × *a declaration takes effect* | **refused at parse** (I26). A declaration that cannot fire is one an author will act on |
+| 9 | `["--format","json"]` | — | a recorded fixture | *the corpus is indexed by `argv`* × *the flag is appended* | **the corpus is unaffected.** `Fixture.argv` is already the invocation form *without* the flag (C06 §2), so the match key never held it. What changes is `argvOf` for a result C06 constructs itself, which describes an invocation happening now and must carry the flag in force |
+| 10 | `["--format","json"]` | — | replay of a corpus recorded under `--json` | *replay reports verbatim* (C06 I20) × *the flag in force* | **verbatim wins.** `meta.argv` is a historical fact about the data; the mismatch is the signal that the corpus is stale, which is D49's own argument and not a new one |
+
+**Row 5 is the cell two correct statements overlap in**, and it is the whole reason the
+dedupe is not `includes` over the sequence. I4's argument is *a far side that treats a
+repeated flag as an error fails a command that was correct*; D16's is *a user who types it
+is asking to see the contract*. A whole-sequence match satisfies neither for a valued flag,
+and both are satisfied by reading the first token — which is also the only token a
+single-token flag has, so nothing about today's behaviour moves.
+
+**Row 7 is the row that reads like §8a rows 3 and 4 and rules the other way.** There the
+refusal exists because an arm equal to the default decides nothing, which makes two arms
+unable to disagree. Here there is nothing to arbitrate: one value wins by position, and a
+verb restating the manifest's tokens has said something true. Refusing it would mean an
+author cannot copy a working line onto the verb that needs it.
+
+**What no row here reaches.** Whether the *value* a far side wants is well-formed — docker's
+`{{json .}}` is a Go template and a typo in it is a runtime error the manifest cannot see.
+That is the same limit `interactive` has, and it is the reason the member is a token
+sequence rather than a grammar.
 
 ## 9. Out of scope
 

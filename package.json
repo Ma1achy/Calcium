@@ -22,6 +22,10 @@
     "./fixtures": {
       "types": "./dist/fixtures/index.d.ts",
       "default": "./dist/fixtures/index.js"
+    },
+    "./profiling": {
+      "types": "./dist/shell/profiling/index.d.ts",
+      "default": "./dist/shell/profiling/index.js"
     }
   },
   "repository": {
@@ -58,7 +62,7 @@
     "@types/react": "19.2.17",
     "eslint": "10.8.0",
     "node-pty": "1.1.0",
-    "sharp": "0.35.3",
+    "sharp": "0.35.4",
     "tsx": "4.23.13",
     "typescript": "7.0.2",
     "vitest": "4.1.10"

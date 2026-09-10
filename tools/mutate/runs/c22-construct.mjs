@@ -35,8 +35,13 @@ const results = runPass({
       // Seam 4's C22 rows: the shell pushes, the component never reaches.
       name: "wire the resize after the router instead of at 8a",
       file: "src/shell/construct.ts",
-      from: '  at("resize", () => {\n    lifecycle.onResize',
-      to: '  at("router", () => undefined);\n  at("resize", () => {\n    lifecycle.onResize',
+      // **Anchored on the step's opening line alone.** The old anchor reached
+      // through to `lifecycle.onResize` on the next line, and C28's recording
+      // and width taps landed between the two — a mutation whose subject is
+      // *where the step sits* should not be anchored on what the step's first
+      // statement happens to be (F912 keyed the sweep that found it).
+      from: '  at("resize", () => {',
+      to: '  at("router", () => undefined);\n  at("resize", () => {',
       expect: "T1.1",
     },
     {

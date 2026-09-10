@@ -219,6 +219,21 @@ Each of these produces code that compiles, passes review, and is wrong.
   before a line of implementation looked disproportionate at the time, and every one
   of those seven pre-code defects would otherwise have been a rewrite.
 
+  **And a live mutation is a property of the tree, not of the harness — so the rule has a
+  converse, and the converse is the one that was in no document.** *Never edit `src` while a
+  mutation pass runs* is written down and understood: the pass restores from contents it
+  captured, so an edit that lands in between is silently reverted. The other direction has
+  the same cause and reads as unrelated: **never start anything that reads `src` while a hand
+  mutation is live.** A build in that window compiles the mutation into `dist/`, and every
+  probe, tier-5 run and instrument reading `dist/` afterwards measures the mutation instead of
+  the tree — with nothing anywhere reporting a conflict, because each step did exactly what it
+  was asked. Nothing wrong shipped the one time it happened, and only because `dist/` was
+  rebuilt after the restore and before any probe read it, which is luck rather than a
+  mechanism. The two rules are one fact stated from either end: **while a mutation is live the
+  tree is not the tree**, so nothing may write to it and nothing may read from it. FINDINGS
+  F608. The practical form is that a hand mutation and a build are never in flight together,
+  and `git status` after any killed pass is the cheapest check that the first half held.
+
 - **Ask where a settled claim is written down.** This is the sixth blind spot and it is
   the only one about the *record* rather than about an artefact — every other instrument
   checks a thing that exists. The frame-read checks output. The mutation pass checks
@@ -435,7 +450,7 @@ implementation is the cheapest kind to fix.
 | `src/presentation/` | C09 blocks · C10 theme · C11 table · C12 plot · C25 patch |
 | `src/viewport/` | C13 transcript · C14 viewport · C15 overlays |
 | `src/interaction/` | C16 router · C17 editor · C18 parser · C19 completion · C20 history |
-| `src/shell/` | C22 composition · C23 execution |
+| `src/shell/` | C22 composition · C23 execution · C28 profiler |
 | `src/index.ts` | C24 public API |
 
 Full index at [`docs/INDEX.md`](docs/INDEX.md).

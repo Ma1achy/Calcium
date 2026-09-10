@@ -14,6 +14,11 @@ import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const DEF = "src/presentation/plot/definition.ts";
+// **The continuation cell moved with the loop** (C12 I118, F976): the treemap
+// writes its names through `chargrid.ts`'s shared writer now, so the fourth
+// mutation anchors there. It still mutates the treemap's continuation — and
+// every other writer's with it, which is what one writer means.
+const CHARGRID = "src/presentation/plot/chargrid.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -79,8 +84,8 @@ const results = runPass({
       // leave its second cell for the fill to walk into, so a name containing
       // one is a name with a block glyph inside it.
       name: "a wide codepoint leaves no continuation cell",
-      file: DEF,
-      from: "      for (let k = 1; k < w; k += 1) named[at.row]![col + k] = \"\"; // cells-ok — a cell count",
+      file: CHARGRID,
+      from: "    for (let k = 1; k < w; k += 1) if (col + k < row.length) row[col + k] = \"\"; // cells-ok — a cell count",
       to: "",
       expect: "TM5",
     },

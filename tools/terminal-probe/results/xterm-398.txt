@@ -1,0 +1,46 @@
+========================================================================
+the terminal read — the machine half
+========================================================================
+
+TERM             xterm
+TERM_PROGRAM     ? 
+EMULATOR         XTerm(398)
+size             100 x 48 cells
+
+-- kitty graphics support ----------------------------------------------
+  1x1 direct RGB query  ->  NO RESPONSE
+  ** the terminal did not answer OK; everything below is unreadable **
+
+-- G7 · what the terminal decodes --------------------------------------
+  palette.png       16x8      2479B  ->  NO RESPONSE
+                   CONTROL — our decoder reads this one
+  photo.png         27x10   644034B  ->  NO RESPONSE
+                   CONTROL — ordinary 8-bit RGB, 2000x1500
+  depth16.png       16x6    264787B  ->  NO RESPONSE
+                   we refuse: bit depth 16
+  interlaced.png    16x6    230842B  ->  NO RESPONSE
+                   we refuse: Adam7
+  corrupt.png       16x8      2474B  ->  NO RESPONSE
+                   THE CONTROL — a real PNG with its IDAT scrambled; this MUST fail
+  replace-a.png     16x8      2474B  ->  NO RESPONSE
+                   THE REPLACE PAIR — both at i=911; an error here is the protocol refusing
+  replace-b.png     21x8    644028B  ->  NO RESPONSE
+                   THE REPLACE PAIR — both at i=911; an error here is the protocol refusing
+
+-- check 2 · is a plane-16 placeholder ONE CELL ------------------------
+  20 placeholder cells emitted
+  cursor column 1 -> 3   consumed 2
+  the claim is 20 (one cell each).  DOES NOT HOLD
+  ** 0.10 cells per placeholder — every image is that factor wide **
+
+-- check 2b · the same, for a placeholder of a TRANSMITTED image -------
+  palette.png, one placement row of 16 cells
+  cursor column 1 -> 2   consumed 1
+  the claim is 16.  DOES NOT HOLD
+
+-- check 9 · where the cursor lands after an image ---------------------
+  palette.png placed at 16x8
+  cursor row 40 -> 39   advanced -1 rows, column 1
+  expected 8 rows and column 1.  DOES NOT HOLD
+
+========================================================================

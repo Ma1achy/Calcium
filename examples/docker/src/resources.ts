@@ -22,7 +22,7 @@
  */
 
 import { b } from "@fmx/calcium";
-import type { AdapterDocument, AdapterContext, Block, ColumnDef, RawResult, ViewDocument } from "@fmx/calcium";
+import type { AdapterDocument, AdapterContext, Block, ColumnDef, RawResult } from "@fmx/calcium";
 import { parseNdjson, str, type Row } from "./ndjson.ts";
 
 /** The nine `meta` fields, as F13 requires until `compose` is exported. */

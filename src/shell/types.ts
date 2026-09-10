@@ -10,6 +10,7 @@
  * C23 satisfies it structurally when it lands.
  */
 
+import type { ProfileOptions, ProfileReport, TraceFn } from "./profiling/types.js";
 import type { ConfirmHost } from "./confirm.js";
 import type { Adapter, AdapterRegistry, ProducerContext } from "../data/adapters/index.js";
 import type { ManifestDocument, ManifestStore } from "../data/manifest/index.js";
@@ -19,6 +20,7 @@ import type { Action, Block, ViewDocument } from "../data/viewmodel/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
 import type { DocumentView } from "./document-view.js";
 import type { PatchView } from "./patch-view.js";
+import type { ProfileView } from "./profile-view.js";
 import type { RefreshHost } from "./refresh.js";
 import type { CompletionSource } from "../interaction/completion/index.js";
 import type { FocusTarget } from "../interaction/router/types.js";
@@ -26,7 +28,7 @@ import type { CursorStyle } from "../terminal/escapes.js";
 import type { LineEditor } from "../interaction/editor/index.js";
 import type { HistoryStore } from "../interaction/history/types.js";
 import type { CommandPolicy } from "../interaction/parser/index.js";
-import type { BlockDefinition, BlockRegistry } from "../presentation/blocks/index.js";
+import type { AnyBlockDefinition, BlockRegistry } from "../presentation/blocks/index.js";
 import type { ThemeSet, ThemeStore } from "../presentation/theme/index.js";
 import type { FrameScheduler } from "../terminal/frame-scheduler.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
@@ -96,6 +98,21 @@ export type ChromeContext = Readonly<{
    * a property of the frame, like `columns`.
    */
   copyMode: boolean;
+  /**
+   * C24 I32 — the **previous** frame's cost in milliseconds, and the member's
+   * name says which frame it describes.
+   *
+   * A frame's own total cannot be known while it is being composed, so a member
+   * named for the current frame would hold a number it cannot have. The figure
+   * is the recorder's `work` — composition, not the wait before it began, which
+   * grows while the session is idle and is not the frame's cost (C28 I4).
+   *
+   * `undefined` at tier `off`, at every tier below `spans` where no duration is
+   * taken, for the first frame of a session, and for the first frame after a
+   * tier change — a figure from the tier before the change is one that is no
+   * longer being maintained.
+   */
+  lastFrame?: number;
 }>;
 
 export type ChromeFn = (ctx: ChromeContext) => readonly Block[];
@@ -258,7 +275,30 @@ export interface Pipeline {
    * chrome — so `/clear` removes it, it scrolls away, and a `b.live` part inside
    * it is driven because it took the route every other document takes (C23 I33a).
    */
-  greeting(doc: ViewDocument): void;
+  greeting(doc: ViewDocument, into?: string | null): void;
+  /**
+   * §4 step 7's **slot**, taken before the producer is awaited (I99).
+   *
+   * **The greeting occupies the slot the session opened at, not the slot its
+   * producer resolves into** (F158, F1024). An `async` greeting appends
+   * whenever its far side answers — measured at 2.58–4.47 s over eighteen PTY
+   * captures — which is long enough for a verb submitted meanwhile to settle
+   * first and be scrolled off by a banner landing under it.
+   *
+   * Returns the id `greeting` settles into, or `null` when the append itself
+   * failed. `null` is the degradation and it is the behaviour that shipped
+   * before this seam existed: `greeting(doc, null)` appends.
+   */
+  reserveGreeting(): string | null;
+  /**
+   * The reserved slot released without a document (I99).
+   *
+   * **A rejected producer must not leave the slot streaming**, because C13
+   * never evicts a streaming entry (C13 I6) and an unsettled reservation would
+   * sit under the cap for the life of the process. `null` is a no-op, so the
+   * caller's `catch` needs no guard of its own.
+   */
+  abandonGreeting(into: string | null): void;
   /**
    * Stops §3b's timers. Called at C22 §8 **step 1**, where `stopping` is set.
    *
@@ -352,6 +392,29 @@ export type PipelineDeps = Readonly<{
    * rendering.
    */
   confirm: ConfirmHost;
+  /** C28's report, when a profiler exists (C22 I93). Absent otherwise. */
+  profile?: () => ProfileReport;
+  /**
+   * C28 §3c's view, for `/profile`'s handler (C23 I68).
+   *
+   * **Supplied by the root, always** — a session built without `TuiConfig.profile`
+   * still gets a view, whose `open` refuses naming that option (C28 T1.97). The
+   * row is in `FRAMEWORK_TOOLS`, `execution.ts` hands this to `shippedHandlers`,
+   * and C23 I27 refuses the pair in either half's absence (T4.66, T4.67).
+   */
+  profileView: ProfileView;
+  /**
+   * One async bracket for C23's local verb route (C28 I36).
+   *
+   * **The registry is built in here**, so there is no object the composition
+   * root could have decorated on the way past — every other async seam is
+   * wrapped at the root. One function rather than a `Profiler`, so this module
+   * never learns a recorder exists. Absent means unprofiled, and the call site
+   * falls back to calling the handler directly rather than through a no-op
+   * wrapper: a wrapper is an allocation and a promise hop on the path that is
+   * meant to cost nothing at `off`.
+   */
+  trace?: TraceFn;
   /**
    * Whether a call needs a decision before it runs, and what the layer says
    * (C23 I60). `null` runs the call; a record puts the card in `waiting`, asks
@@ -386,6 +449,15 @@ export type PipelineDeps = Readonly<{
   stop: (reason: StopReason) => Promise<number>;
   /** C22's injected clock — §3b's three mechanisms and nothing else (C23 I19). */
   clock: () => number;
+  /**
+   * C22's monotonic clock, for every duration a frame draws (C23 I52, I53,
+   * I54, F973): the card's figure, the readouts, a part's age. `clock` is the
+   * wall clock — a time of day, steppable, and drawn as one by the chrome — so
+   * a duration taken from it was a difference between two readings of the
+   * wrong instrument, and under C28's positional replay it sat on the channel
+   * the header's second hand is served from.
+   */
+  elapsed: () => number;
   /** C22's ambient `setTimeout`, for §3b's timers. Nothing else schedules. */
   schedule: (fn: () => void, ms: number) => Disposable;
   /** Scheme-checked by C23 before use (C23 I17). */
@@ -410,7 +482,7 @@ export type TuiConfig = Readonly<{
    * The app's own verbs, or a path to a JSON document containing them.
    *
    * **A `ManifestDocument`, not a `Manifest`** (C22 I23a). A `Manifest` is what
-   * `parseManifest` returns — it carries `appTools` and the framework's six
+   * `parseManifest` returns — it carries `appTools` and the framework's own
    * verbs, both derived — so asking for one was asking for the parser's output
    * before the call, and the only function that produces it is exported nowhere.
    * Construction parses whichever arm arrives.
@@ -464,7 +536,12 @@ export type TuiConfig = Readonly<{
    * none (I82, §6l). The two rules bounding the prompt are not configurable.
    */
   chrome?: Chrome;
-  blocks?: readonly BlockDefinition[];
+  // **`AnyBlockDefinition`, which is the consumer-facing half of C04 I119**
+  // (F405). `readonly BlockDefinition[]` asked each element to handle *any*
+  // block — contravariance, correctly — so an app's definition for its own
+  // kind was refused here and every consumer paid a cast. Each element
+  // handles one kind and the registry dispatches by it.
+  blocks?: readonly AnyBlockDefinition[];
   /**
    * The most rows one block may occupy (C14 §4b, I24; C09 §2b). Default 2 000.
    *
@@ -480,6 +557,17 @@ export type TuiConfig = Readonly<{
 
   /** Off by default; 50 when enabled without a count (C13 §5a). */
   debug?: Readonly<{ retainPayloads?: number }>;
+
+  /**
+   * C28 — off by default, and *off* means no object at all (C22 I92).
+   *
+   * One field with every member optional, because A02 commitment 5 is the rule
+   * and a profiler is exactly the thing that grows a second one. `elapsed` and
+   * `probe` live here rather than beside `clock` and `fs` because at tier `off`
+   * nothing reads them, so a top-level injection would be a required-looking
+   * seam with no reader in the overwhelming case.
+   */
+  profile?: ProfileOptions;
 
   /**
    * The process environment, supplied by the app (I20).
@@ -547,6 +635,18 @@ export type TuiConfig = Readonly<{
   /** The session's starting directory. Defaults to the process's. */
   cwd?: string;
   clock?: () => number;
+  /**
+   * The monotonic clock, overridable for the same reason `clock` is (C28 I14).
+   *
+   * **The asymmetry this removes was not a decision.** `clock` has been
+   * injectable since C22 and `elapsed` was not, because nothing outside the
+   * process had a reason to supply one — the profiler takes its own through
+   * `ProfileOptions.elapsed` and everything else reads the wall clock. A replay
+   * is the first consumer that needs both: a frame carries a time of day *and*,
+   * since C24 I32, a duration, so pinning one and not the other reproduces half
+   * a frame.
+   */
+  elapsed?: () => number;
   fs?: FileSystem;
   /** Default `.calcium`, beside the project. The **app** resolves its own variable (I20). */
   stateDir?: string;

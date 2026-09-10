@@ -6,7 +6,7 @@
  * renderer (C09 §1).
  */
 import type { ReactElement } from "react";
-import type { Action, Block, Camera, Measure, MeasureFn, WidthFn } from "../../data/viewmodel/index.js";
+import type { Action, Block, BlockKind, Camera, Measure, MeasureFn, Probe, WidthFn } from "../../data/viewmodel/index.js";
 import type { ResolvedTheme } from "../theme/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
@@ -110,6 +110,20 @@ export type RenderContext = Readonly<{
   theme: ResolvedTheme;
   capabilities: TerminalCapabilities;
   /**
+   * Where a renderer reports what it spent time on (C28 I30).
+   *
+   * Absent is the overwhelming case and means *nobody is recording* — a call
+   * site writes `ctx.probe?.span(...)` and pays one check. The type comes from
+   * L0 beside `Measure`, so naming it adds no import edge and C09 still knows
+   * nothing about C28.
+   *
+   * **The wrapper around the registry cannot replace this.** Decoration from L4
+   * sees a block enter and leave; it cannot see that two thirds of a plot's
+   * time went to rasterising and none to its axes. That distinction is only
+   * available inside the renderer, and this is how the renderer says it.
+   */
+  probe?: Probe;
+  /**
    * Scroll offsets by block id, in **rows** (C04 I48).
    *
    * **View state, arriving the way focus does** — a record the container looks
@@ -160,6 +174,24 @@ export type RenderContext = Readonly<{
    * screen, so the frame is appearance and never geometry.
    */
   frames?: Readonly<Record<string, number>>;
+  /**
+   * The scope an image's placement is identified within (C09 I66, F987).
+   *
+   * **Written by L4 beside `frames`**, and it is the transcript entry's id: a
+   * block id is unique within a document (C04 I14) and nothing makes it unique
+   * across the transcript, so a placement keyed by block id alone would let the
+   * second `/svg` replace the first's picture behind the first's placeholders.
+   *
+   * **Absent is the picture's identity**, exactly as before — a caller that scopes
+   * nothing gets the safe and dear id. It must be absent on **both** sides or
+   * present on both: a scoped seam against an unscoped frame places an image
+   * nobody transmitted, and the converse transmits at an id nothing addresses.
+   * Both draw nothing, which is why T4.58's control constructs that pair.
+   *
+   * `measure` does not receive it (I8): a placement id is appearance and the box
+   * it addresses is geometry, and the box is a function of the block and the width.
+   */
+  placementScope?: string;
   /**
    * The reader's overrides of `Series.hidden`, by plot block id and then by
    * series index (C04 I99, C12 I116, C22 I78).
@@ -429,6 +461,30 @@ export type BlockKeyBinding = Readonly<{
   action: string;
 }>;
 
+/**
+ * A definition of **some one kind** — the element type a registry stores and
+ * `TuiConfig.blocks` takes (C04 I119, F405).
+ *
+ * **Not `BlockDefinition<Block>`, and the difference is the whole registration
+ * surface.** `B` sits in parameter position only — deliberately, see `Windowed`
+ * above — so `BlockDefinition<B>` is *contravariant*: a definition that handles
+ * only `Table` is correctly refused where one handling any `Block` is asked
+ * for. That is right about assignment and wrong about the registry, which
+ * dispatches by `kind` and hands each definition nothing but its own. Written
+ * as a union over the kinds, `BlockDefinition<Table>` is a member because
+ * `table` is, and an app's `BlockDefinition<Faulty>` is a member the moment
+ * `faulty` joins `BlockKinds`.
+ *
+ * Measured: five `as unknown as BlockDefinition` casts in `src/` were the cost
+ * of the old element type — three in `construct.ts`, one in `expect-document`,
+ * one in `defaults.ts` — plus one per definition in every consumer. They become
+ * **one**, at the line that stores into a `Map` keyed by kind, where the
+ * dispatch is the thing the compiler cannot see.
+ */
+export type AnyBlockDefinition = {
+  [K in BlockKind]: BlockDefinition<Extract<Block, { kind: K }>>;
+}[BlockKind];
+
 export interface BlockDefinition<B extends Block = Block> {
   kind: string;
   measure: Measure<B>;
@@ -505,7 +561,7 @@ export interface BlockDefinition<B extends Block = Block> {
 }
 
 export interface BlockRegistry {
-  register(definition: BlockDefinition): void;
+  register(definition: AnyBlockDefinition): void;
   get(kind: string): BlockDefinition | undefined;
   seal(): void;
   measure(block: Block, width: number): number;

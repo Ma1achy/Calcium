@@ -437,6 +437,9 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 - **I24** — **One block occupies at most `maxBlockRows` rows plus one marker row, and the marker says what was cut.** The registry resolves every block to its capped form before any definition sees it — `window(block, w, 0, cap)` with `capped: { shown, total }` attached — so `measure` counts `shown + 1`, `render` draws `shown` rows and then `… shown of total rows` in `muted`, and no kind implements the cap. `shown` is the window's own rows and not `cap`, because a window is a unit boundary and the marker must name the rows on screen. A block whose rows are within the cap is returned by reference, unchanged. Default 2 000, the app's to raise per session and never per block (§4b, C09 §2b).
 - **I25** — **The window and the cap compose: a window over a capped block windows the capped rows, and the marker travels with the piece that reaches it.** `windowSequence` windows the capped form; a range below the marker yields the definition's window with `capped` stripped — byte-identical to the same range of the uncapped block — and a range whose `to` reaches the marker row carries `capped` onto the piece. The field is attached after the definition's window, never before, because a kind's window may build a fresh block and drop it. C09 I26's identity holds for every window of a capped block with the marker counted as one row.
 - **I26** — **The cap applies to exactly the kinds that declare `window`, and no list of kinds is consulted.** A kind's `window` is its statement that its rows are its lines; the kinds atomic by ruling — `plot` (C12 I1), `image`, `scroll` (C04 §3c), `panel`, `group`, `mosaic` and the single-row kinds — are outside the cap by the same absence that makes them unwindowable, and a container's children are capped individually through the child seam. A kind that declares `window` is capped on the day it does.
+- **I27** — **`stats` reports the cache's hits and its misses by reason, and the reason is the axis the comparison rejected first.** `HeightCache.get`'s three-way test already distinguishes `absent`, `rev` and `width`; publishing which one rejected costs nothing and turns a size into a hit rate. The shape joins the three members `stats` already has: `hits: number` and `misses: Readonly<Record<"absent" | "rev" | "width" | "nothing-changed", number>>`. A size says how much is held; only a hit rate says whether holding it was worth anything (F863).
+- **I28** — **`nothing-changed` is a value comparison, never an axis.** A miss where no axis moved cannot occur — a slot agreeing on `rev` and `width` **is** a hit — so the counter is *the recomputed height equalled the height the miss discarded*, which is wasted work reporting itself. Counting it as a fourth axis would be a member that can never be non-zero (→ C28 I8).
+- **I29** — **The measure seam is told *whose* blocks these are.** `measureSequence` takes the entry's id beside the blocks and the width, as `chromeRows` already takes the entry itself — C14 reads neither and passes both, so this adds nothing C14 can be wrong about. What it buys is at the other end: block ids are unique within a document (C04 I14) and a transcript holds many, so a measurer handed only `(blocks, width)` cannot tell one entry's `table#t1` from another's. Measured — with the height cache warm the shell attributes every element from its own render loop and this path opens nothing; on a miss it opens the whole entry, and three unattributed calls in three frames on a four-entry fixture become every entry on a resize, which is the axis this component exists to make cheap (C28 I42, F892). **Optional, and the default is the shipped behaviour**: a caller that omits it measures exactly as before, so this is not a second way to measure.
 
 ---
 
@@ -467,6 +470,8 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 23. One block occupies at most `maxBlockRows` rows plus a marker row that names what was cut; the cap is the registry's, generic over `BlockDefinition`, and no kind implements it (I24, §4b).
 24. A window over a capped block windows the capped rows, and the marker travels with the piece that reaches it (I25, §4b).
 25. The cap applies to exactly the kinds that declare `window`; atomic kinds are outside it by the same absence, and a container's children are capped through the child seam (I26, §4b).
+25a. **A seam carries the identity of the thing it is asked about** (I29). `chromeRows` takes the entry and `measureSequence` takes its id; C14 reads neither, and a measurer that wants to attribute what it measured cannot recover the identity from the blocks.
+26. **A cache that publishes its size publishes its hit rate and its miss reasons** (I27, I28). The comparisons already happen; which one rejected is free, and the value comparison that says a miss was pointless costs one more. A size cannot say whether the cache is working.
 
 ---
 
@@ -475,6 +480,9 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 Six tiers. Every cell of the §7 transition table is covered.
 
 ### Tier 1 — unit
+
+- **T1.21** (I27): one `get` on an empty cache, one after a `set`, one after the `rev` moved and one after the width did → `hits` is 1 and `misses` is `{absent: 1, rev: 1, width: 1, "nothing-changed": 0}`. Each reason is asserted by name, not by a total, because a total is satisfied by redistribution.
+- **T1.22** (I28): a `rev` bump that recomputes the **same** height → `misses.rev` is 1 **and** `misses["nothing-changed"]` is 1; the same bump recomputing a different height leaves the second at 0. The two counters are not exclusive: the axis says what invalidated, the value comparison says whether it needed to.
 
 Fake heights, no rendering.
 
@@ -517,6 +525,8 @@ Fake heights, no rendering.
 - **T2.13** (I25, C09 I26): over every `[from, to)` of a capped `logs` and a capped `table`, `measure(piece) − skipRows − dropRows === to − from` with the marker counted, and the rows kept equal the capped rendering's rows at those offsets — the identity and the frame, because containment is not correctness.
 - **T2.14** (I24): `createBlockRegistry({ maxBlockRows })` refuses `0`, a negative, a fraction and `NaN` at construction, and `createTui` refuses the same values as a `ConfigError` naming `maxBlockRows` before anything is built.
 
+- **T2.16** (I13): the eviction marker is measured, counted in `totalRows` and drawn at the head like any other entry — and, over `src/viewport/viewport/`, C14 never names `MARKER_ID`, `isMarker` or the id itself. The behavioural half alone would pass beside a branch that rendered it specially, which is the thing the invariant forbids; the marker is C13's (C13 I14) and C14 holding a second opinion about it is how the two come to disagree.
+- **T2.17** (I16): a counting `measureSequence` over a document three times the viewport's height records **nothing** on a scroll — the entries the window can reach were already in the index and none beyond it is pulled in to be ready. **Adding overscan is a measurable change against M-T3's baseline rather than a default nobody chose**, and this is the row that makes it measurable.
 ### Tier 3 — edge cases
 
 - **T3.1**: empty transcript → empty range, `topRow` 0, no throw.
@@ -526,6 +536,9 @@ Fake heights, no rendering.
 - **T3.3**: `viewportHeight` of 0 → empty range, no division by zero.
 - **T3.4**: `viewportHeight` of 1 → exactly one row visible.
 - **T3.5**: a single entry taller than the entire viewport → scrolls within itself correctly at every offset.
+- **T3.5b**: the rows the range selects are the rows C09 draws, at **every** offset — two six-row entries in a four-row viewport, stepped one row at a time, with each entry's real render sliced by its own `skipRows`/`takeRows` and compared against the whole transcript's rows at `topRow`. **The drift test in miniature, and the reason the walk is a scheduled step**: a range that is arithmetically self-consistent can still select rows that are not the ones on screen, and every assertion about the numbers agrees while it does. T4.1 is the same question at seven widths with C09 in the loop; this is the cheap edge-tier form of it.
+
+  **Listed here because it was not** (F570). The row has existed in `test/edge/viewport.test.ts` since the tier was built and C14 named no `T3.5b`, so its number resolved against nothing — which is how the same number came to be used twice for two different rows, the older of which this is. T6.15 in `test/revert/overlay.test.ts` names `T3.5b` too, and that one is C15's; the two are distinguished by their files and by their invariants, not by their numbers.
 - **T3.6**: an entry measuring 0 rows (empty `group`) → skipped without consuming a row and without breaking the index.
 - **T3.7** (I7): width shrinks so the anchored entry is now shorter than its row offset → clamps to that entry's last row, never spills.
 - **T3.8** (I6): the anchored entry is evicted → the anchor falls forward to the oldest surviving entry, and the viewport does not jump to the top.
@@ -574,6 +587,10 @@ Fake heights, no rendering.
 - **T4.10** (with C13, §4): an entry appended empty and streaming, then settled with a document → `totalRows` covers its rows and `visible()` includes it. **The transition rather than either end**: `settle(id, doc)` is newer than this component's invalidation table, and both halves were separately correct while nothing measured the entry after the settle.
 
 ### Tier 6 — fail-on-revert
+
+- **T2.15** (I29): a viewport whose injected `measureSequence` records its third argument → every call names the entry whose blocks it was given, and a run with two entries records two distinct ids. **Asserted on the ids and not on the arity**, because a parameter declared and never passed satisfies the type and is what a later reader deletes.
+- **T6.25** (I29): dropping the entry id from the `measureSequence` call → T2.15 fails, and C28's `byEntry` under-reports every entry by whatever the height cache missed — an undercount with no signal, which is worse than the absence it looks like.
+- **T6.24** (I28): counting `nothing-changed` as a fourth axis — a miss where none of the three moved — → T1.22 fails, and **the counter becomes one that can never be non-zero**, because a slot agreeing on `rev` and `width` is a hit. The revert to guard against is not a wrong number but a vacuous one, which reads as a healthy zero for ever.
 
 - **T6.1** (I4): recomputing `topRow` from an index rather than the anchor → T1.10 and T5.3 fail; the view jumps whenever a stream above it grows.
 - **T6.2** (I3): adding theme to the cache key → T1.12 fails and every theme toggle remeasures the session.

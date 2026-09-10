@@ -100,7 +100,7 @@ import type {
   StepInput,
 } from "./types.js";
 import { rememberLive } from "./live.js";
-import { FigureBuilder } from "./figure.js";
+import { FigureBuilder, type FigureChainOpts } from "./figure.js";
 
 // --- the two shared decisions ---------------------------------------------
 
@@ -535,6 +535,15 @@ function plot(
     layout?: Plot["layout"];
     binning?: Plot["binning"];
     offsets?: Plot["offsets"];
+    /**
+     * A bubble's size channel — **required there and refused everywhere else**
+     * (C04 I117, F271).
+     *
+     * It was `series[1]`, so a consumer expressed it by passing a second
+     * series and inherited every rule written about one. Reaching it now means
+     * a member of its own, or `bubble` is a form no consumer can build.
+     */
+    sizes?: Plot["sizes"];
     totals?: Plot["totals"];
     facets?: Plot["facets"];
     emptyMessage?: Plot["emptyMessage"];
@@ -542,7 +551,7 @@ function plot(
     yScale?: Plot["yScale"];
   },
 ): Plot {
-  const { quartiles, categories, segments, bands, graph, graphLayout, series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, points3, lines3, surfaces3, light3, colourBy, camera, axes3, origin3, box3, axisStyle3, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, xTitle, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, treeLayout, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross, calendarUnit, startDate, layout, binning, offsets, totals, facets, emptyMessage, xScale, yScale } =
+  const { quartiles, categories, segments, bands, graph, graphLayout, series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, points3, lines3, surfaces3, light3, colourBy, camera, axes3, origin3, box3, axisStyle3, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, xTitle, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, treeLayout, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross, calendarUnit, startDate, layout, binning, offsets, totals, facets, emptyMessage, xScale, yScale, sizes } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -985,6 +994,7 @@ function plot(
       ...(layout === undefined ? {} : { layout }),
       ...(binning === undefined ? {} : { binning }),
       ...(offsets === undefined ? {} : { offsets }),
+      ...(sizes === undefined ? {} : { sizes }),
       ...(totals === undefined ? {} : { totals }),
       ...(facets === undefined ? {} : { facets }),
       ...(emptyMessage === undefined ? {} : { emptyMessage }),
@@ -1771,8 +1781,14 @@ export const b = {
   plot,
   spark,
   progress,
-  figure: (opts?: { title?: string; height?: number; axes?: boolean; yFormat?: Plot["yFormat"]; yMin?: number; yMax?: number }) =>
-    new FigureBuilder(opts),
+  // **The chain's option type, not a hand-copy of half of it** (F1028). This was
+  // six fields written out here while `FigureOpts` declared twelve and
+  // `FigureBuilder.build()` spread all twelve — so `colormap`, `xScale`,
+  // `yScale`, `plotStyle`, `plotDetail` and `plotCorners` were forwarded to the
+  // block by a builder no caller could tell about them. `FigureChainOpts` is
+  // `FigureOpts` less the two whose refusals this file owns and the chain does
+  // not; `figure.ts` carries which two and why, with the grep that expires it.
+  figure: (opts?: FigureChainOpts) => new FigureBuilder(opts),
   code,
   comparison,
   patch,

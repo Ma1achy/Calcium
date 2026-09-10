@@ -142,7 +142,20 @@ export const DARK: ThemeTokens = Object.freeze({
      * Okabe-Ito, adjusted per theme against its own background. The canonical
      * set is designed for print on white: its black is 1.21 against this ground
      * and its blue 3.36, so the two are replaced by a neutral and a lighter
-     * blue. Every slot clears 6.2 here, measured.
+     * blue. Every slot clears 6.2 here, measured — worst 6.26, `c6`.
+     *
+     * **Those three figures are this theme's and they were copied to the light
+     * one, where all three are false** (F1017). Kept here with the worst slot
+     * named, because a figure that travelled once travels again.
+     *
+     * **Five canonical slots are gone, not two.** This palette keeps orange,
+     * skyBlue and yellow; `c3`, `c5`, `c6`, `c7` and `c8` are new. Every one was
+     * chosen against the ground and none was measured for the property the set
+     * is named for: **seven pairs here are under C10 I39's floor**, worst 1.5,
+     * tritan `c2`/`c3`. `#3cbf9a` is the substitution that costs the most — the
+     * colormap variant swaps it in for black and that one swap takes a set from
+     * 7.9 to 1.5, because it sits beside skyBlue under tritanopia. The list is
+     * `test/contract/theme.test.ts` T2.38, compared by equality; C10 §4j rules.
      */
     categorical: Object.freeze({
       carries: "decoration",

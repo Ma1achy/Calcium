@@ -15,6 +15,7 @@
  * carries a second obligation — the row's background covers it to the full width —
  * so a row built any other way is both unclamped and ragged.
  */
+import { NO_SPAN } from "../../data/viewmodel/index.js";
 import type { ReactElement } from "react";
 import { rows } from "../blocks/paint.js";
 import { cells } from "../text.js";
@@ -195,8 +196,26 @@ export const patchDefinition: BlockDefinition<Patch> = {
 
   render(block: Patch, ctx: RenderContext): ReactElement {
     const width = normaliseWidth(ctx.width);
-    const layout: Layout = layoutFor(block, width);
-    const columns = patchLayout(block, width, layout);
+    const probe = ctx.probe;
+    // **F134's kind, and the split that says which half.** A 5,000-line diff
+    // takes 3.7 s to open against `logs`'s 85.9 ms under identical load. The
+    // layout is a function of the block and the width; the lines are per hunk
+    // line and include the intra-line span work. One figure could not say which
+    // of the two the seconds were in.
+    let columns;
+    {
+      using _l = probe?.span("patch.layout") ?? NO_SPAN;
+      const layout: Layout = layoutFor(block, width);
+      columns = patchLayout(block, width, layout);
+    }
+    if (probe?.on === true) {
+      probe.gauge("patch.hunks", block.hunks.length); // cells-ok — a count of items, not a display width
+      probe.gauge(
+        "patch.lines",
+        block.hunks.reduce((n, h) => n + h.lines.length, 0), // cells-ok — a line count
+      );
+    }
+    using _lines = probe?.span("patch.lines") ?? NO_SPAN;
 
     const out: string[] = [header(block, columns, ctx)];
     for (const hunk of block.hunks) out.push(...hunkLines(hunk, block, columns, ctx));

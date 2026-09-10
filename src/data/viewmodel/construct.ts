@@ -45,16 +45,46 @@ import { childBlocks } from "./tree.js";
  * cyclic literal would fail worse than one that freezes it and lets validation
  * name the problem.
  */
+const DEEP_FROZEN = new WeakSet<object>();
+
 export function deepFreeze<T>(value: T, seen: WeakSet<object> = new WeakSet()): T {
   if (value === null || typeof value !== "object") return value;
   const obj = value as unknown as object;
+  // **Already walked by this function, so its children are frozen too** (F1065).
+  // Not `Object.isFrozen`, which would be wrong: the tree freezes objects
+  // shallowly in a dozen places — every `Object.freeze({ … })` in a builder or a
+  // table — and a shallow freeze says nothing about depth, which is the exact
+  // failure I1's doc comment above opens with.
+  if (DEEP_FROZEN.has(obj)) return value;
   if (seen.has(obj)) return value;
   seen.add(obj);
 
-  for (const key of Object.getOwnPropertyNames(obj)) {
-    deepFreeze((obj as Record<string, unknown>)[key], seen);
+  // **Arrays by index, and it is the allocation rather than the loop** (F1065).
+  // `Object.getOwnPropertyNames` on an n-element array builds an n-string array
+  // to iterate, once per array node per walk — which is most of what a document
+  // of blocks and lines is. Measured over 8 000 ticks of a growing `logs` block:
+  // 2 069 ms to 540 ms, on top of the memo's own 4 502 ms to 2 069 ms.
+  //
+  // **Its one narrowing, stated because it is real**: an array's own *non-index*
+  // property is no longer walked. It is still frozen along with the array — the
+  // freeze covers every own property's writability — so it cannot be replaced;
+  // what is no longer reached is its interior. Nothing in a `ViewDocument` has
+  // one and `JSON.parse` cannot produce one, which is the argument, and T1.41 is
+  // the row that keeps the claim honest rather than assumed.
+  if (Array.isArray(obj)) {
+    for (let i = 0; i < obj.length; i++) deepFreeze(obj[i], seen); // cells-ok — an index, not a width
+  } else {
+    for (const key of Object.getOwnPropertyNames(obj)) {
+      deepFreeze((obj as Record<string, unknown>)[key], seen);
+    }
   }
-  return Object.freeze(value);
+  Object.freeze(value);
+  // **After the freeze, not before.** `seen` is added to first because it is the
+  // cycle guard and has to be; this one is a claim that the subtree is done, and
+  // a walk that threw part-way through would otherwise leave that claim standing
+  // over an unfrozen tree.
+  DEEP_FROZEN.add(obj);
+  return value;
 }
 
 /** Thrown by a constructor. A bug in the calling adapter, not a runtime condition. */

@@ -790,6 +790,55 @@ describe("C24 §5 — b.live", () => {
     expect(b.live({ ...base, every: 1_000, fetch: () => Promise.resolve(1) }).kind).toBe("panel");
   });
 
+  it("a fold can name `attempts`, and the row's gate is tsc rather than the runner (F1023)", () => {
+    // **The paired-artefact shape, and this is the half that was missing.**
+    // `refresh.ts` has passed a third argument to `derive.compute` since F1023 —
+    // a fold runs only on success, so a source failing for a minute reaches it
+    // as a gap it cannot see — and `LiveSpec` still declared two parameters. The
+    // argument arrived at run time and no app could name it.
+    //
+    // **What would fail if the parameter were dropped again, asked rather than
+    // assumed.** Measured: reverting `types.ts` to `(data, prev) => unknown` and
+    // running `npx tsc --noEmit` **exits 0** — nothing in `src/`, `test/` or
+    // `examples/` assigned a three-parameter fold to this type, so the whole
+    // suite is green either way. That is the honest state of it, and this row is
+    // the consumer that changes it: the declaration below is a plain assignment
+    // with no directive, so dropping the parameter makes it TS2554 and `tsc`
+    // stops. **The runner would still be green**, which is the row's own limit
+    // and the reason it is written down rather than asserted around.
+    const counting: LiveSpec = {
+      ...base,
+      every: 1_000,
+      fetch: () => Promise.resolve(1),
+      derive: { key: "attempts", compute: (_d, prev, attempts: number) => [prev, attempts] },
+    };
+
+    const tooMany: LiveSpec = {
+      ...base,
+      every: 1_000,
+      fetch: () => Promise.resolve(1),
+      derive: {
+        key: "x",
+        // @ts-expect-error — and no fourth. An unused directive is TS2578, so
+        // this line checks itself: widening the fold stops the file building.
+        compute: (_d: unknown, _p: unknown, _a: number, _extra: number) => null,
+      },
+    };
+    void tooMany;
+
+    // A fold that ignores the count still compiles, which is what makes the
+    // widening additive rather than a break for every existing app.
+    const twoArgs: LiveSpec = {
+      ...base,
+      every: 1_000,
+      fetch: () => Promise.resolve(1),
+      derive: { key: "y", compute: (_d, prev) => prev },
+    };
+
+    expect(b.live(counting).kind, "the counting fold builds").toBe("panel");
+    expect(b.live(twoArgs).kind, "and so does one that ignores it").toBe("panel");
+  });
+
   it("T3.6: staleAfter below every throws, because a builder cannot warn", () => {
     // The row said *warns*. A builder is pure and has no sink — SS33 bans
     // `console.*`, C02's warnings are C22's channel, and a notice in place of the

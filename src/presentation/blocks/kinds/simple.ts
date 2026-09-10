@@ -149,6 +149,13 @@ export const ruleDefinition: BlockDefinition<Rule> = {
   render(block: Rule, ctx: RenderContext): ReactElement {
     const g = glyphs(ctx.capabilities);
     const width = normaliseWidth(ctx.width);
+    // **The label before the clamp, which is the whole point of the gauge**
+    // (C28 I45). `stripControl` walks every character the application supplied;
+    // the truncation below is what makes the *drawn* row a constant, and it is
+    // therefore what hides an unbounded label from every downstream figure. A
+    // rule measures 1 at every width and every label, so nothing else in the
+    // report can say why a frame full of them is slow.
+    ctx.probe?.gauge("rule.label", block.label.length); // cells-ok — an input size, not a display width
     const label = stripControl(block.label);
     // **Three tiers, and the fill is the whole axis** (C09 I40, C04 I94). The
     // lead stays two cells and the label stays in its column, so `measure` is 1
@@ -325,6 +332,15 @@ export const noticeDefinition: BlockDefinition<Notice> = {
       : tone(block.tone, ctx.theme, ctx.capabilities);
     const prefix = prefixCells(block.glyph);
     const wrapped = noticeRows(block, ctx.width, ctx.capabilities);
+    // **The wrapped rows, not the text's length** (C28 I45). `noticeRows` is
+    // what the cost is in and `wrapped` is already here, so the gauge is free —
+    // and it is the number that moves when a notice gets slow, because the wrap
+    // is per row and the text is walked once.
+    ctx.probe?.gauge("notice.rows", wrapped.length); // cells-ok — a count of rows, not a display width
+    // **Separately, because two inputs grow independently.** A one-row notice
+    // with two hundred spans and a two-hundred-row notice with none are the same
+    // number under either gauge alone, and they are not the same cost.
+    ctx.probe?.gauge("notice.spans", block.spans?.length ?? 0); // cells-ok — a count of runs
     // The block's colormap reaches the painter by name; a valued run reads it
     // there and nowhere else (C04 I90).
     const paintCtx = { theme: ctx.theme, capabilities: ctx.capabilities, tick: ctx.tick, ...(block.colormap === undefined ? {} : { colormap: block.colormap }) };
@@ -373,11 +389,12 @@ export const tipDefinition: BlockDefinition<Tip> = {
 
   render(block: Tip, ctx: RenderContext): ReactElement {
     const style = tone("dim", ctx.theme, ctx.capabilities);
-    return rows(
-      wrapCells(tipText(block), normaliseWidth(ctx.width)).map((line) =>
-        paint([{ text: line, style }]),
-      ),
-    );
+    const wrapped = wrapCells(tipText(block), normaliseWidth(ctx.width));
+    // C28 I45 — the wrap is the cost and the rows are already here. `tipText`
+    // folds the actions into the text, so this counts what was drawn rather
+    // than what the block declared.
+    ctx.probe?.gauge("tip.rows", wrapped.length); // cells-ok — a count of rows, not a display width
+    return rows(wrapped.map((line) => paint([{ text: line, style }])));
   },
 };
 
@@ -407,6 +424,10 @@ export const progressDefinition: BlockDefinition<Progress> = {
     const fill = Math.min(1, fraction);
     const percent = `${Math.round(fraction * 100)}%`;
 
+    // The same clamp and the same reason as `rule` (C28 I45): `stripControl`
+    // walks the whole label, `truncate` throws most of it away, and `measure`
+    // is 1 either way.
+    ctx.probe?.gauge("progress.label", block.label.length); // cells-ok — an input size, not a display width
     const labelRoom = Math.max(0, Math.floor(width / 3));
     const labelColumn = pad(
       truncate(stripControl(block.label), labelRoom, ctx.capabilities),
@@ -575,6 +596,7 @@ export const pillsDefinition: BlockDefinition<Pills> = {
   elements: pillsElements,
 
   render(block: Pills, ctx: RenderContext): ReactElement {
+    ctx.probe?.gauge("pills.chips", block.chips.length); // cells-ok — a count of items, not a display width
     const byLabel = new Map(block.chips.map((chip) => [stripControl(chip.label), chip]));
     // **Focus, and it read `ctx.focus` nowhere before this** (C11 I14, F764's
     // neighbour): a focused chip drew as an unfocused one in every frame, so a
@@ -669,6 +691,7 @@ export const rawDefinition: BlockDefinition<Raw> = {
   },
 
   render(block: Raw, ctx: RenderContext): ReactElement {
+    ctx.probe?.gauge("raw.lines", block.text.split("\n").length); // cells-ok — a count of items, not a display width
     const width = normaliseWidth(ctx.width);
     // The runs cut per line, as `rawLines` cuts the text — one `\n` rule for
     // both halves. A truncated line keeps the runs inside `kept` and paints the

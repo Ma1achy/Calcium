@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { SCAN_BUDGET_MS } from "../support/budget.js";
 
 import { checkSourceScans } from "../../tools/enforce/source-scans.mjs";
+import { fires, sourceOf } from "../support/source.js";
 import {
   DEGRADATION,
   detectCapabilities,
@@ -92,6 +93,96 @@ describe("C02 contract", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  // **T2.10 — the watch I14 owes its own condition, not its remedy** (F1057).
+  //
+  // The refusal is that a capability answered from the wire has nowhere to go:
+  // a reply is unreadable until raw mode (measured — four queries put to
+  // XTerm(398) and kitty 0.41.1 give 0 bytes in 1500 ms of canonical mode
+  // against 0.89–0.99 ms and 13.3–23.4 ms in raw, T5.9 and §3), raw mode is
+  // C01's `acquire()`, and by then the record is built and six objects built at
+  // C22's construction hold it. So **raw mode is the entry price a reply reader
+  // cannot avoid**, and the routes into it are what a scan should watch. A row
+  // asserting `q=2` on C09's transmissions would watch the *remedy* and stay
+  // green for exactly as long as the silence it is about.
+  it("T2.10 (I14): one entry into raw mode in `src/`, and it is C01's — every route, not one symbol", () => {
+    // **The routes and not the symbol, because the evasion is already shipped.**
+    // `tools/terminal-probe/probe.py` reads a terminal's reply by opening
+    // `/dev/tty` and calling `tty.setraw` on its own descriptor; it never goes
+    // near `setRawMode`. A scan named for that one call would pass over a
+    // TypeScript port of a file in this repository.
+    //
+    // **A call, not the name.** The first draft matched `\bsetRawMode\b` and
+    // came back red on `src/testing/replay.ts`, whose fake stdin *declares*
+    // `setRawMode: () => stream` to satisfy `NodeJS.ReadStream`. Declaring the
+    // member is not entering the mode, and a rule over a bare symbol cannot tell
+    // the two apart — so the pattern is the call shape, and the fake is left
+    // where it is rather than allow-listed into a hole.
+    const ROUTES: readonly (readonly [string, RegExp])[] = [
+      ["stdin.setRawMode(…)", /setRawMode\s*\(/u],
+      ["opening the controlling terminal", /\/dev\/tty/u],
+      ["termios directly", /\btcsetattr\b/u],
+      ["spawning stty", /\bstty\b/u],
+    ];
+    // C01 owns the mode: `take("rawMode")` inside `acquire()`, released at
+    // `release()`. Nothing else in `src/` may enter it by any route.
+    const ALLOWED = "src/terminal/lifecycle.ts";
+
+    const walk = (dir: string, out: string[] = []): string[] => {
+      for (const entry of readdirSync(dir)) {
+        const path = `${dir}/${entry}`;
+        if (statSync(path).isDirectory()) walk(path, out);
+        else if (/\.tsx?$/.test(entry) && !/\.d\.ts$/.test(entry)) out.push(path);
+      }
+      return out;
+    };
+
+    // **Comments off first**, or the file that explains why it never enters raw
+    // mode is the file that fails hardest — prose about a mechanism is denser
+    // than the mechanism.
+    const violations: string[] = [];
+    for (const file of walk("src")) {
+      if (file === ALLOWED) continue;
+      const text = sourceOf(file);
+      for (const [name, pattern] of ROUTES) {
+        if (fires(text, pattern)) violations.push(`${file} — ${name}`);
+      }
+    }
+    expect(violations, violations.join("\n")).toEqual([]);
+
+    // **The control, because a scan whose corpus is empty passes for the wrong
+    // reason** — and this one strips comments, which is the shape that empties
+    // a corpus silently. C01's own call must still be visible after stripping.
+    expect(
+      fires(sourceOf(ALLOWED), /setRawMode\s*\(/u),
+      "the stripper ate C01's own raw-mode call, so the scan above proved nothing",
+    ).toBe(true);
+    // **And the entry itself, not the name.** The line above survived deleting
+    // `stdin.setRawMode(on)` outright: C01 wraps it in a local `setRawMode`
+    // helper that `ACQUIRE` and `RELEASE` call by name, so the broad pattern
+    // matched the *wrapper's* call sites and reported a corpus that no longer
+    // contained the mechanism. The control has to name the stream.
+    expect(
+      fires(sourceOf(ALLOWED), /\bstdin\.setRawMode\s*\(/u),
+      "C01 no longer enters raw mode at all — the scan is watching an entry price nobody pays",
+    ).toBe(true);
+    // **And every route's matcher can see its own violation** — the other half
+    // of the control, and over the whole set rather than its first member,
+    // because a pattern narrowed to dodge a false positive is exactly the
+    // pattern that stops matching anything.
+    const FABRICATED: Readonly<Record<string, string>> = {
+      "stdin.setRawMode(…)": `stdin.setRawMode(true);`,
+      "opening the controlling terminal": `const fd = openSync("/dev/tty", "r+");`,
+      "termios directly": `tcsetattr(fd, TCSANOW, raw);`,
+      "spawning stty": `spawnSync("stty", ["raw", "-echo"]);`,
+    };
+    for (const [name, pattern] of ROUTES) {
+      expect(fires(FABRICATED[name] ?? "", pattern), `${name} matches nothing`).toBe(true);
+    }
+    // The one shape that must *not* fire: declaring the member on a fake stream,
+    // which `src/testing/replay.ts` does and which is not entering the mode.
+    expect(fires(`setRawMode: () => stream,`, /setRawMode\s*\(/u)).toBe(false);
   });
 
   it("T2.5 (I5): A03 SS10 finds no terminal env read outside capabilities.ts", () => {
@@ -187,6 +278,38 @@ describe("C02 contract", () => {
     // appended to the block while the record grew in the middle is a diff that
     // reads as agreement.
     expect(declared).toEqual(Object.keys(capabilities));
+  });
+
+  it("T2.9 (I1, I13): sources and the record are a bijection, over the kinds §3 declares", () => {
+    // **The closed set is parsed from the spec, not restated here.** A kind
+    // invented in code and never written down is exactly the drift this field
+    // exists to stop happening to a *value*; restating the list in the test
+    // would make the two agree with each other and with nothing else.
+    const spec = readFileSync("docs/components/C02_capability_detection.md", "utf8");
+    const table = spec.split("| kind | the answer came from | wrong when |")[1]?.split("\n\n")[0];
+    expect(table, "§3's kinds table not found").toBeDefined();
+    const kinds = [...table!.matchAll(/^\|\s*`([a-z]+)`\s*\|/gmu)].map((m) => m[1]!);
+    // Parsed something, and each once — a regex matching nothing makes every
+    // assertion below vacuous in the direction that matters (a fabricated
+    // violation can be vacuous).
+    expect(kinds.length, "kinds parsed from §3").toBe(5);
+    expect(new Set(kinds).size).toBe(kinds.length);
+
+    for (const env of FIXTURES) {
+      const { capabilities, sources } = detectCapabilities(env);
+      expect(Object.keys(sources).sort(), JSON.stringify(env)).toEqual(
+        Object.keys(capabilities).sort(),
+      );
+      for (const field of FIELDS) {
+        expect(kinds, `${field} in ${JSON.stringify(env)}`).toContain(sources[field]);
+      }
+      expect(Object.isFrozen(sources), "the map is frozen like the record").toBe(true);
+    }
+
+    // The control: the corpus is not one kind repeated. Four of the five appear
+    // across the fixtures above — `declared` needs an override and is T3.14's.
+    const seen = new Set(FIXTURES.flatMap((env) => Object.values(detectCapabilities(env).sources)));
+    expect([...seen].sort()).toEqual(["assumed", "inferred", "stated", "unreachable"]);
   });
 
   it("T2.7 (I8): no warning is emitted — every warning is returned", () => {

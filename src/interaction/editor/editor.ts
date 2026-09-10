@@ -14,7 +14,7 @@
  */
 
 import { clamp, count, removeBetween, sliceBetween, splitAt, stripForBuffer } from "./graphemes.js";
-import { cursorCell, displayRows, layout, type Cell, type Gutter } from "./layout.js";
+import { cursorCell, layout, type Cell, type Gutter } from "./layout.js";
 import { classify, wordLeft, wordRight } from "./words.js";
 import { History, type Snapshot } from "./undo.js";
 
@@ -539,12 +539,69 @@ class Editor implements LineEditor {
     return true;
   }
 
+  /**
+   * The last walk, kept (I24).
+   *
+   * **Field-wise rather than a joined key**, because building a key string is
+   * O(buffer) and the walk it is meant to avoid is O(buffer) too — a memo that
+   * costs its subject's order saves the constant and nothing else. `#text` is
+   * only ever *assigned*, so the identity check here is the string comparison's
+   * fast path on every hit.
+   */
+  #laidOut: {
+    text: string;
+    width: number;
+    first: number;
+    cont: number;
+    rows: readonly string[];
+  } | null = null;
+
   layout(width: number, gutter: Gutter): readonly string[] {
-    return layout(this.#text, width, gutter, this.drawAs);
+    // **One entry, because the call pattern is one question asked five times**
+    // (I24, F914). A frame asks `promptRows` from the composed frame and again
+    // from the paint deps, and the composition itself runs twice — 4.97 calls a
+    // frame measured, against a buffer that had changed on none of them. A
+    // larger cache would hold answers for widths nobody is asking about: the
+    // second width in a session is a resize, and a resize is what changed the
+    // answer.
+    //
+    // **The chip table is not in the key, and the reason is the writer rather
+    // than the key** (I24). `drawAs` resolves a sentinel through `#chips`, so
+    // the table looks like part of what the walk reads — but `insertChip` is its
+    // only writer and it mints a fresh sentinel and inserts it in the same call,
+    // so the buffer moving is a strict precondition for the table moving. A
+    // `chips.size` term would be a key term no input can make differ, which is
+    // A03 §2's vacuity class wearing a memo's clothes. The blind spot is real
+    // and stated: a second writer that registered a chip without inserting its
+    // sentinel would leave this stale, and T1.43 pins the precondition for the
+    // writer that exists rather than pretending to watch one that does not.
+    const hit = this.#laidOut;
+    if (
+      hit !== null &&
+      hit.text === this.#text &&
+      hit.width === width &&
+      hit.first === gutter.first &&
+      hit.cont === gutter.cont
+    ) {
+      return hit.rows;
+    }
+    // **Frozen, because the memo shares it** (I24). Before this every call
+    // returned a fresh array and a caller that mutated the rows hurt only
+    // itself; a shared reference makes that same mutation poison every later
+    // answer. `readonly` is erased at run time, so the guard has to be a real
+    // one — and it costs O(rows) on a miss, where the walk that produced them
+    // already cost O(buffer).
+    const rows = Object.freeze(layout(this.#text, width, gutter, this.drawAs));
+    this.#laidOut = { text: this.#text, width, first: gutter.first, cont: gutter.cont, rows };
+    return rows;
   }
 
   displayRows(width: number, gutter: Gutter): number {
-    return displayRows(this.#text, width, gutter, this.drawAs);
+    // **I18 through the memo.** The count is the rows' own length rather than a
+    // second call into `layout.ts`, so the two cannot disagree — T6.17's
+    // mutation has nowhere left to happen — and the frame's five questions
+    // share one walk rather than two.
+    return this.layout(width, gutter).length; // graphemes-ok
   }
 
   cursorCell(width: number, gutter: Gutter): Cell {

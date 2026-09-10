@@ -1587,7 +1587,7 @@ describe("GROUP 6j: the six that had no renderer", () => {
     // single-point renders compares nothing — the first version did, and got 4
     // against 4. Two points at opposite ends, and each half counted.
     const pair = bubbleRows(
-      { values: [50, 50] }, { values: [1, 100] }, { min: 0, max: 100 }, 30, 8, FULL_CAPS,
+      { values: [50, 50] }, [1, 100], { min: 0, max: 100 }, 30, 8, FULL_CAPS,
     FACING_DEFAULT,
     );
     const half = (rs: readonly string[], left: boolean): number =>
@@ -1597,7 +1597,7 @@ describe("GROUP 6j: the six that had no renderer", () => {
     // And the grid is in dots: seven points must produce seven marks, not two.
     const seven = bubbleRows(
       { values: [10, 20, 30, 40, 50, 60, 70] },
-      { values: [5, 5, 5, 5, 5, 5, 5] },
+      [5, 5, 5, 5, 5, 5, 5],
       { min: 0, max: 80 }, 40, 8, FULL_CAPS,
     FACING_DEFAULT,
     );
@@ -3196,8 +3196,15 @@ it("OR11 (§3ac B1, B2): the crosshair's column follows the facing, curve and ca
     // a different refusal.** `tree` is the first: without a `hierarchy` the
     // constructor complains about that instead, and the row would pass on a
     // gate it never reached (C04 I65).
+    // **What a form requires before any other rule can be asked about it.** A
+    // structure form needs a `hierarchy`; a `bubble` needs its `sizes` channel
+    // (C04 I117) — and a document missing one is refused for *that*, so a row
+    // asserting a different refusal reads as passing and a row asserting
+    // acceptance goes red.
     const valid = (form: PlotForm): object =>
-      HIERARCHY_ROLE[form] === "structure" ? { hierarchy: { label: "root" } } : {};
+      HIERARCHY_ROLE[form] === "structure"
+        ? { hierarchy: { label: "root" } }
+        : form === "bubble" ? { sizes: [1, 2] } : {};
 
     const bad = validateBlock({
       kind: "plot", id: "p", form: "bar", height: 5,
@@ -3445,8 +3452,15 @@ describe("C12 §3ad — axisCross, and the two conditions that are not one condi
     // a different refusal.** `tree` is the first: without a `hierarchy` the
     // constructor complains about that instead, and the row would pass on a
     // gate it never reached (C04 I65).
+    // **What a form requires before any other rule can be asked about it.** A
+    // structure form needs a `hierarchy`; a `bubble` needs its `sizes` channel
+    // (C04 I117) — and a document missing one is refused for *that*, so a row
+    // asserting a different refusal reads as passing and a row asserting
+    // acceptance goes red.
     const valid = (form: PlotForm): object =>
-      HIERARCHY_ROLE[form] === "structure" ? { hierarchy: { label: "root" } } : {};
+      HIERARCHY_ROLE[form] === "structure"
+        ? { hierarchy: { label: "root" } }
+        : form === "bubble" ? { sizes: [1, 2] } : {};
 
     for (const form of refused) {
       const bad = validateBlock({
@@ -3462,6 +3476,7 @@ describe("C12 §3ad — axisCross, and the two conditions that are not one condi
     for (const form of forms.filter((f) => HONOURS_AXIS_CROSS[f])) {
       expect(validateBlock({
         kind: "plot", id: "k", form, height: 5, series: [{ values: [1, 2] }], axisCross: "zero",
+        ...valid(form),
       }).ok, `${form} accepted`).toBe(true);
     }
   });

@@ -39,7 +39,8 @@ const results = runPass({
   run,
   control: {
     file: REG,
-    from: "  measure = (block: Block, width: number): number => this.#measured(block, normaliseWidth(width)).rows;",
+    // Two lines since C09 I61: every public member opens the call's memo through `#scoped`.
+    from: "  measure = (block: Block, width: number): number =>\n    this.#scoped(() => this.#measured(block, normaliseWidth(width)).rows);",
     to: "  measure = (): number => 1;",
     why: "every kind's height collapsed to one row, which T2.1 and half of tier 3 are about",
   },

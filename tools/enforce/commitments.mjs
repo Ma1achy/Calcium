@@ -674,6 +674,315 @@ export function checkMnemonicRowIds(files, readFile = (f) => readFileSync(f, "ut
   return violations;
 }
 
+// --- SP11 — a commitment's number is unique within its spec -----------------
+//
+// **SP7's argument for the other numbered list on the page, and it was argued
+// for once already and not built** (F225, F998). SP1 resolves each commitment's
+// citation and never looks at its number; SP2 numbers the invariants; SP7 and
+// SP10 number the test rows. The commitments were the one list nothing counted.
+//
+// **F225 found it, fixed the instance, and deliberately deferred the rule.** C09
+// §8 was two lists — 1–21 and a restart at 11 running to 14 — so four numbers
+// named two commitments each, and one of the three citations into the collision
+// (`expect-document.ts`'s `C09 commitment 14`) resolved against neither
+// candidate. It was repaired by renumbering the second list to 22–25, and the
+// entry closes: *the row lands with its implementation and this entry is the
+// prose that goes ahead of it.* Nothing watched that condition. **The same
+// document re-acquired three duplicates** — 41, 42 and 43, two of them born in
+// one commit — and they were rediscovered from scratch, as F664, with no
+// reference to the entry that had already ruled the class.
+//
+// **Twelve duplicated numbers across five of twenty-eight specs on this rule's
+// first run** (2026-09-09): C04's 17–20, C09's 41–43, C16's 21, C21's 6 and
+// C22's 30–32. Every one reads as backed — nothing is missing and nothing
+// dangles, so SP1 and SP3 stay green — which is A03 §2's failure arriving at the
+// citation rather than at the rule, for the third family in this file.
+//
+// **Ten citations of a C09 commitment number exist across `docs/`, `src/`,
+// `test/`, `tools/` and `examples/`**, naming commitments 5, 11, 14, 19 and 35;
+// none names 41, 42 or 43. That is the measurement that made C09's repair a
+// three-line edit, and it is the measurement F225 could not make in its own
+// favour — its collision had a live citation in `src/`.
+
+/**
+ * Commitment numbers declared twice **today**, keyed `C04 17`, with the spec.
+ *
+ * **A debt list and not an exemption**, on `UNCITED_INVARIANTS`' terms: compared
+ * by equality in both directions, so an entry whose number becomes unique is a
+ * failure exactly as a new duplicate is. A subset check lets a dead entry
+ * outlive its reason unread, which is how F225's own ruling went unbuilt.
+ *
+ * **C09's three are absent because they were repaired rather than listed**, and
+ * the difference is ownership rather than difficulty: the lane that wrote this
+ * rule owns C09's commitment list and owns none of the other four. Each of these
+ * is a renumber of the second occurrence to the next free number at the end,
+ * which is F225's remedy, plus the citations of every number that moves — and
+ * *checking the citations* is the work, not the renumber. C04 and C22 are the
+ * two with hundreds of commitments and the most citations to walk.
+ */
+const DUPLICATE_COMMITMENTS = Object.freeze([
+  "C04 17", "C04 18", "C04 19", "C04 20",
+  "C16 21",
+  "C21 6",
+  "C22 30", "C22 31", "C22 32",
+]);
+
+/**
+ * SP11 — every commitment number locates one commitment (F225, F664, F998).
+ *
+ * **Its blind spot is the lettered commitment, and the limit is shared rather
+ * than forked.** `commitmentsOf` matches `^\d+\.`, so a spec writing `14a.`
+ * declares a commitment neither this rule nor SP1 can see — **22 of them across
+ * C01, C14, C22 and C23, measured 2026-09-09**, C22 holding eighteen (the
+ * figure read *sixteen* beside a correct total of 22, which is 2 + 1 + 18 + 1;
+ * re-counted inside the Commitments section, F1067). Reading
+ * them through a second, wider pattern here is what `sectionLines`' own note
+ * forbids: two readers of one corpus disagree eventually, and the one that
+ * disagrees quietly is the one nothing asserts against. Widening the shared
+ * pattern is the remedy and it is a change to **SP1's** subject — measured at
+ * 942 commitments against 920 with zero new SP1 violations — so it lands under
+ * its own finding, where the diff can be read for what it is.
+ *
+ * **Order was refused here and is now SP13's, and the refusal was wrong in both
+ * directions.** This docstring used to read *order is not gated, and that is a
+ * ruling with a figure behind it — eleven of twenty-eight specs declare their
+ * commitments out of order today*. Re-measured at the commit that wrote it, the
+ * figure is **nine** by descent and **ten** by exact `1..n`; and the reason
+ * beside it — a corpus-wide renumber and every citation of every number that
+ * moves — is a reason to refuse the **repair**, which this rule's own debt list
+ * shows is separable from the check. Both halves are gated now (F1066). What
+ * survives of the old sentence is the split: uniqueness is this rule's, ascent
+ * is SP13's, and neither reads the other's list.
+ *
+ * **And uniqueness is within one document.** C09 and C22 both declare a
+ * commitment 41 about different things, exactly as SP10 rules for `IF8`: a
+ * commitment number is meaningless without the spec in front of it, and every
+ * citation in the tree writes one.
+ */
+export function checkCommitmentNumbers(
+  files,
+  readFile = (f) => readFileSync(f, "utf8"),
+  exempt = DUPLICATE_COMMITMENTS,
+) {
+  const found = [];
+
+  for (const file of files) {
+    const id = (file.split("/").pop() ?? "").slice(0, 3);
+    // SP7's vacuity arm, and SP1 carries it for this same corpus: a document
+    // with no Commitments section produces no findings and looks compliant. The
+    // fire-test asserts the corpus size before asserting it is clean.
+    const numbers = commitmentsOf(file, readFile).map((c) => String(c.n));
+    for (const n of duplicatesIn(numbers)) found.push(`${id} ${n}`);
+  }
+
+  const listed = [...exempt].sort();
+  const seen = found.slice().sort();
+  const violations = [];
+  const fresh = seen.filter((x) => !listed.includes(x));
+  const cleared = listed.filter((x) => !seen.includes(x));
+
+  if (fresh.length > 0) {
+    violations.push({
+      rule: "SP11",
+      file: "docs/components",
+      spec: "A03 §2 · A03 §7a",
+      message:
+        `${String(fresh.length)} commitment number(s) declared twice and not on ` +
+        `the list — ${fresh.join(", ")}. A citation into a duplicated number ` +
+        `resolves to whichever commitment a reader meets first and neither ` +
+        `reading is wrong, while nothing is missing and nothing dangles. ` +
+        `Renumber the second occurrence to the next free number at the end of ` +
+        `its own list, and re-point every citation of it (F225's remedy).`,
+    });
+  }
+  if (cleared.length > 0) {
+    violations.push({
+      rule: "SP11",
+      file: "tools/enforce/commitments.mjs",
+      spec: "A03 §2 · A03 §7a",
+      message:
+        `${String(cleared.length)} entr(y/ies) on the debt list name a number ` +
+        `that is now unique — ${cleared.join(", ")}. The list is compared by ` +
+        `equality so it can only shrink; remove them. A subset check would let a ` +
+        `repaired entry outlive its reason unread.`,
+    });
+  }
+
+  return violations;
+}
+
+// --- SP13 — a spec's commitment numbers ascend in document order -----------
+//
+// **SP2's question asked of the other numbered list, refused once, and the
+// figure the refusal rested on was wrong when it was written.** SP11's own
+// docstring ruled the ordering half out — *eleven of twenty-eight specs declare
+// their commitments out of order today* — and re-measuring at `c7b2504d`, the
+// commit that wrote that sentence, gives **nine** by descent and **ten** by
+// exact `1..n`. Neither reading is eleven, and the count is the whole of the
+// argument, because the argument is about how much repair the rule would demand.
+//
+// **The reason attached to it is true about a different decision.** *A renumber
+// of two of the largest documents in the project and every citation of every
+// number that moves* is a reason to refuse the **repair**. It is not a reason to
+// refuse the **rule**, because a debt list separates the two — which is exactly
+// what `checkCommitmentNumbers` does, forty lines up, for a defect it also could
+// not repair. The asymmetry between the two halves of one list was never argued;
+// it was inherited from how much work each half looked like.
+//
+// **And the gap it left is live rather than theoretical.** Between that commit
+// and this one the corpus went from 32 descents to 34 with `npm run enforce`
+// green throughout: C10 acquired `34>33`, C28 acquired `35>34`, and C02's
+// `15>14` widened to `16>14` — three commitments written out of document order,
+// none of them visible to anything (F1066). C10 and C28 are repaired in the
+// commit that adds this rule; C02 belongs to another lane and is on the list.
+//
+// **Ascent, not `1..n`, and the split is deliberate.** SP11 owns uniqueness, so
+// a duplicated run is its finding and not this one; nothing owns gaps and the
+// corpus has exactly one (C04 declares no commitment 80). Copying SP2's
+// `diagnose` would have brought all four of its arms across — duplicate, orphan
+// letter, gap, transposition — and two of them belong to another rule or to a
+// reader that cannot see their subject. A rule reimplemented beside an existing
+// one keeps its birthday clauses; this one takes the shared **parser** and
+// leaves the shared **verdict** alone.
+
+/**
+ * Where a spec's commitment numbers step backwards, keyed `C04 20>17`.
+ *
+ * The key is the descending **pair** rather than a position, because a position
+ * moves whenever anything is inserted anywhere above it and a pair does not. Its
+ * cost is stated with the rule: repairing one descent can change a neighbouring
+ * pair that is still a descent, and that edit then reports twice — once fresh,
+ * once cleared, both naming the same spec.
+ */
+export function descentsOf(file, readFile = (f) => readFileSync(f, "utf8")) {
+  const id = (file.split("/").pop() ?? "").slice(0, 3);
+  const cs = commitmentsOf(file, readFile);
+  const out = [];
+
+  for (let i = 1; i < cs.length; i += 1) {
+    if (cs[i].n < cs[i - 1].n) out.push({ key: `${id} ${cs[i - 1].n}>${cs[i].n}`, line: cs[i].line });
+  }
+
+  return out;
+}
+
+/**
+ * The descents outstanding **today**, keyed as `descentsOf` writes them.
+ *
+ * **A debt list and not an exemption**, on `DUPLICATE_COMMITMENTS`' terms:
+ * compared by equality in both directions, so a repaired descent still listed
+ * fails exactly as a fresh one does. Twenty-eight across seven specs, against
+ * thirty-four across nine before C10 and C28 were renumbered in the commit that
+ * wrote this.
+ *
+ * **What is not here is as measured as what is.** C10 and C28 were repaired
+ * rather than listed because their commitment numbers are cited by nothing in
+ * the tree — grepped across `docs/`, `src/`, `test/`, `tools/` and `examples/`
+ * for both the qualified and the bare form. The seven that remain are of three
+ * kinds and each kind is a different owner's work:
+ *
+ *   - **C04, C16, C22** — their descents *are* SP11's duplicate runs seen from
+ *     the other side, so renumbering in document order resolves both and makes
+ *     `DUPLICATE_COMMITMENTS` fail its equality arm. The two lists cannot be
+ *     paid down independently; whoever takes one takes the other.
+ *   - **C12** — commitments 64 and 68 are cited by `plot-shared-geometry.test.ts`
+ *     and `tools/mutate/runs/c12-arm-seam.mjs`, and `64>63` moves both.
+ *   - **C01, C09** — no citations, but C01's repair is not a renumber: `20a.` is
+ *     declared two positions from its base, so a positional renumber renames it
+ *     `23a` and invents a variant of a commitment about mouse hover. C09 moves
+ *     eighteen numbers for two descents.
+ */
+const COMMITMENT_DESCENTS = Object.freeze([
+  "C01 22>20",
+  // C02 is another lane's document as this lands. If its rulings move the
+  // displaced 14, this entry goes stale and the rule says so — which is the
+  // loud direction, and the reason the list is compared by equality.
+  "C02 16>14",
+  "C04 20>17", "C04 53>48", "C04 50>47", "C04 62>57",
+  "C04 74>73", "C04 79>77", "C04 77>75", "C04 92>91",
+  "C09 61>44", "C09 51>49",
+  "C12 31>30", "C12 30>28", "C12 64>63", "C12 109>83",
+  "C12 86>85", "C12 85>84", "C12 84>82", "C12 94>93",
+  "C16 21>19", "C16 24>23",
+  "C22 18>16", "C22 32>30", "C22 30>29", "C22 47>46", "C22 49>48", "C22 69>41",
+]);
+
+/**
+ * SP13 — a spec's commitment numbers ascend in document order (F1066).
+ *
+ * Fresh descents are reported **per spec**, so the message can carry the line:
+ * one edit produces at most two descents and they are in one document, which is
+ * not SP2's situation — a transposed invariant displaces every id after it and
+ * would report sixteen findings about one edit. A cleared entry is a fault in
+ * the list rather than in a spec, so it is reported once against the list.
+ *
+ * **Stated blind spots.**
+ *
+ * - **A lettered commitment is invisible**, because `commitmentsOf` matches
+ *   `^\d+\.` — the limit SP1 and SP11 already carry, and it bites hardest here.
+ *   C22 declares `14a, 14b, 14c, 14d, 14e, 14i, 14j, 14k, 14h, 14g, 14f` and
+ *   this rule reads that spec as having one fewer problem than it has; 22 such
+ *   lines across C01, C14, C22 and C23. Widening the shared pattern changes
+ *   SP1's subject and lands under its own finding, which is the ruling SP11
+ *   already made for the same reader.
+ * - **Ascent is not `1..n`.** A gap passes — C04 has the corpus's only one —
+ *   and so does a list that starts at 5. Uniqueness is SP11's.
+ * - **The scope is `docs/components/`**, as SP1's, SP2's and SP11's are.
+ *   Measured outside it: 1 of 15 surface specs is disordered (S10, `12>11`,
+ *   with 11 and 12 declared twice) and 0 of 4 architecture documents.
+ */
+export function checkCommitmentOrder(
+  files,
+  readFile = (f) => readFileSync(f, "utf8"),
+  exempt = COMMITMENT_DESCENTS,
+) {
+  const violations = [];
+  const listed = [...exempt];
+  const seen = [];
+
+  for (const file of files) {
+    // SP11's vacuity arm, for the same corpus and the same reason: a document
+    // with no Commitments section, or a parser that has stopped matching,
+    // produces no descents and reads exactly like a list that ascends. The
+    // fire-test asserts the corpus size before asserting it is clean.
+    const descents = descentsOf(file, readFile);
+    for (const d of descents) seen.push(d.key);
+
+    const fresh = descents.filter((d) => !listed.includes(d.key));
+    if (fresh.length === 0) continue;
+
+    violations.push({
+      rule: "SP13",
+      file,
+      spec: "A03 §2 · A03 §7a",
+      message:
+        `${(file.split("/").pop() ?? "").slice(0, 3)} declares ` +
+        `${String(fresh.length)} commitment(s) out of document order and not on ` +
+        `the list — ${fresh.map((d) => `${d.key} at line ${String(d.line)}`).join(", ")}. ` +
+        `A list that has stopped ascending has stopped locating anything, which ` +
+        `is SP2's argument for the invariants one list over. Renumber in ` +
+        `document order: the grouping is the right editorial instinct and it is ` +
+        `the numbers that move.`,
+    });
+  }
+
+  const cleared = listed.filter((key) => !seen.includes(key));
+  if (cleared.length > 0) {
+    violations.push({
+      rule: "SP13",
+      file: "tools/enforce/commitments.mjs",
+      spec: "A03 §2 · A03 §7a",
+      message:
+        `${String(cleared.length)} entr(y/ies) on the descent list name a step ` +
+        `back that is no longer there — ${cleared.join(", ")}. The list is ` +
+        `compared by equality so it can only shrink; remove them. A repaired ` +
+        `descent still listed reads exactly like a live one.`,
+    });
+  }
+
+  return violations;
+}
+
 // --- SP4 — Seam 4 and its owners agree, both directions --------------------
 //
 // **The only artefact several components write to and none owns.** A02 Seam 4
@@ -1231,17 +1540,20 @@ export function scanSections(file, src, options = {}) {
  * one would under-report, silently.
  */
 const UNCITED_INVARIANTS = Object.freeze([
-  "C01 I15", "C01 I16", "C01 I17", "C03 I11", "C04 I18", "C04 I20", "C04 I21", "C04 I22", "C04 I24",
-  "C04 I32", "C04 I33", "C04 I66", "C05 I13", "C05 I14", "C06 I21", "C06 I22", "C06 I23",
-  "C07 I16", "C07 I17", "C07 I21", "C08 I16", "C09 I15", "C09 I16", "C10 I18", "C10 I19",
-  "C10 I20", "C11 I12", "C14 I11", "C14 I13", "C14 I15", "C14 I16", "C14 I22",
-  "C16 I1", "C16 I16", "C17 I10", "C17 I14", "C18 I11", "C18 I13", "C18 I23",
-  "C18 I6", "C19 I12", "C20 I11", "C20 I25", "C21 I7", "C22 I16", "C22 I39", "C22 I4a",
-  "C22 I53", "C22 I57", "C23 I13", "C23 I14", "C23 I23", "C23 I24",
-  "C23 I41", "C24 I1", "C24 I10", "C24 I11", "C24 I13", "C24 I14", "C24 I16", "C24 I19",
-  "C24 I20", "C24 I22", "C24 I25", "C24 I26", "C24 I28", "C24 I6", "C24 I7",
-  "C25 I11", "C25 I14", "C25 I15", "C25 I16", "C25 I17", "C25 I19a", "C25 I20a", "C25 I20b",
-  "C26 I1", "C26 I11", "C26 I15", "C26 I8",
+  // **Empty, and the empty list is the assertion.** SP9 compares by equality, so
+  // this cannot silently re-fill: an invariant added without a row naming it
+  // fails on the commit that adds it, and the entry a contributor writes here to
+  // get past that is the entry a reviewer sees.
+  //
+  // What the 80 turned out to be, closed over three passes: **thirty-two were
+  // already covered** by a row that named the mechanism rather than the
+  // invariant — a rule's fabricated violation, a differently-titled row, or a
+  // T-number the spec itself named — and wanted a citation, not a test. The rest
+  // wanted rows, and four of those are **watches** rather than coverage, because
+  // their subject does not exist yet: C25 I14–I16's `maxExpandHeight`, C26 I15's
+  // arrow and escape policies, and C08 I16's world, which is app-side by
+  // construction. Each asserts the absence and fails the day the subject lands.
+
 ]);
 
 /**
@@ -1274,6 +1586,118 @@ const UNCITED_INVARIANTS = Object.freeze([
  * is written. Two matchers agreed on the total and disagreed on the members, so
  * the count is not the evidence and the list is.
  */
+/**
+ * Blank every line of an `it.todo(…)` call, not the line the call opens on.
+ *
+ * **The first version filtered lines matching `it.todo(` and nothing else**, so
+ * a call the formatter wrapped —
+ *
+ *     it.todo(
+ *       "T1.77 (C28 I45): … ",
+ *     );
+ *
+ * — kept its title, and the invariant that title names read as covered by a row
+ * that runs. Measured when this was written: **13 of 71 `it.todo` calls are
+ * wrapped**, and every todo long enough to carry TD1's marker is, because that
+ * is what pushes the line past the formatter's width. So the signal built to
+ * separate deferrals from rows could not see the deferrals most likely to be
+ * one (F907).
+ *
+ * Paren depth rather than a regex over the whole call: a title may contain `(`
+ * and `)` — most of them cite `(C28 I45)` — so a lazy match to the first `)`
+ * stops inside the citation and leaves the rest of the title behind.
+ */
+/**
+ * A row that runs. `it.todo` is already gone by the time this is asked, and
+ * `.skip` is absent by construction rather than by a clause: `it.skip(` does not
+ * match, because a row that does not run cannot stand behind an invariant. The
+ * corpus holds no live `.skip`, `.only` or `describe.skip`, so no clause here is
+ * carrying a case nothing can produce.
+ */
+const ROW = /^\s*(?:it|test)(?:\.each)?\s*[(`]/u;
+const DESCRIBE = /^\s*describe(?:\.\w+)?\s*[(.]/u;
+
+/**
+ * Whether the block opened at `at` holds a row that runs, by indentation — the
+ * block ends at the first non-blank line indented no further than its opener.
+ * Measured against an independent brace-depth walk over all **1129** `describe`s
+ * in `test/`: no disagreement, which is why the simpler reader is the one here.
+ */
+function blockRunsARow(lines, at) {
+  const indent = (lines[at] ?? "").search(/\S/u);
+  for (let i = at + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim().length === 0) continue;
+    if (line.search(/\S/u) <= indent) return false;
+    if (ROW.test(line)) return true;
+  }
+  return false;
+}
+
+/**
+ * **A `describe` title is not a row either — the third clause of the sentence
+ * below, and the one F907 ruled and did not build.** Its instance was
+ * `describe("C28 I45 — per-kind input gauges")` over a block of pure `it.todo`s:
+ * the todos stripped correctly, the title survived, and the invariant read as
+ * covered with nothing running behind it. That *file* was edited by hand and the
+ * class was left standing, which is what makes this the instance-not-class shape
+ * rather than an oversight (F1077).
+ *
+ * **Blanked only where the block runs nothing**, and that qualification is the
+ * whole of it. **37** titles in `test/` cite an invariant over rows that do run —
+ * coverage written one level up — and reporting those as *no row runs* would take
+ * the figure from 33 to 70 on a corpus with no holes in it. The hollow shape has
+ * **zero** instances today, so this is a rule whose subject is currently empty:
+ * EC5 fabricates one, and EC6 asserts the 37 against it, because a filter that
+ * blanked every title would pass EC5 and read as thorough.
+ */
+export function withoutTodos(text) {
+  const out = [];
+  let depth = 0;
+  let block = false;
+  for (const line of text.split("\n")) {
+    // **Comments go too, and the signal's wording follows.** A citation in a
+    // `describe` title or a file header is not a row either, and this was found
+    // by laundering the same invariant twice inside one session — the second
+    // time in the comment written to warn about the first (F907). What the
+    // number claims is that nothing *runs* behind the invariant, and a corpus
+    // holding prose cannot support that claim however the todos are stripped.
+    const trimmed = line.trim();
+    if (block) {
+      if (trimmed.includes("*/")) block = false;
+      out.push("");
+      continue;
+    }
+    if (trimmed.startsWith("//")) {
+      out.push("");
+      continue;
+    }
+    if (trimmed.startsWith("/*")) {
+      if (!trimmed.includes("*/")) block = true;
+      out.push("");
+      continue;
+    }
+    const opens = depth > 0 || /\bit\.todo\(/u.test(line);
+    if (!opens) {
+      out.push(line);
+      continue;
+    }
+    const from = depth > 0 ? 0 : line.indexOf("it.todo(") + "it.todo".length;
+    for (let i = from; i < line.length; i++) {
+      if (line[i] === "(") depth++;
+      else if (line[i] === ")") depth--;
+    }
+    // The line is dropped whole. A statement sharing a line with the end of a
+    // todo would go with it; none does, and a formatter that produced one would
+    // be writing `);foo()`.
+    out.push("");
+  }
+  for (let i = 0; i < out.length; i++) {
+    if (DESCRIBE.test(out[i]) && !blockRunsARow(out, i)) out[i] = "";
+  }
+  return out.join("\n");
+}
+
 export function checkInvariantCoverage(
   specs,
   testFiles,
@@ -1732,4 +2156,7 @@ export function checkReferences(
 // was green throughout, because the rule *was* implemented and running; the only
 // thing that could see the gap was the suite, and the suite is not what was run.
 // That is A03 §2's own subject reaching the list that enforces it.
-export const SPEC_RULES = ["SP1", "SP2", "SP3", "SP4", "SP5", "SP6", "SP7", "SP8", "SP9", "SP10"];
+export const SPEC_RULES = [
+  "SP1", "SP2", "SP3", "SP4", "SP5", "SP6", "SP7", "SP8", "SP9", "SP10", "SP11",
+  "SP12", "SP13", "SP14",
+];

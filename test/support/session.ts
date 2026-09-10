@@ -8,6 +8,8 @@
  * viewport wrong is visible rather than absorbed.
  */
 
+import { afterEach } from "vitest";
+
 import { resolveConfig, type Ambient } from "../../src/shell/config.js";
 import { constructGraph, type FrameQueries, type Graph } from "../../src/shell/construct.js";
 import { defaultTheme } from "../../src/presentation/theme/index.js";
@@ -15,6 +17,7 @@ import { createTui } from "../../src/shell/session.js";
 import type { FileSystem, TuiConfig, TuiInstance } from "../../src/shell/types.js";
 import { fakeStdin, fakeStdout, type FakeStdin, type FakeStdout } from "./fake-terminal.js";
 import { screenFrom, type Screen } from "./screen.js";
+import type { Profiler } from "../../src/shell/profiling/types.js";
 
 /**
  * **What an author writes, and nothing more** (C22 I23a).
@@ -35,6 +38,47 @@ export const MANIFEST: TuiConfig["manifest"] = {
   version: "1.0.0",
   tools: [],
 };
+
+/**
+ * Every session this module has constructed and not yet torn down (F1003).
+ *
+ * **A lifecycle's handlers are process-global and only `release()` drops them**
+ * (C01 I3): registration happens at construction, deliberately, because a
+ * two-call API invites the ordering bug the design exists to prevent. Nothing
+ * here released, so each `buildGraph` left eight handlers on `process` —
+ * measured at **234 listeners** in one file after 29 constructions, against 2 in
+ * a clean worker.
+ *
+ * **The consequence is not the warning.** `uncaughtException` and
+ * `unhandledRejection` are among the eight, and the handler is `fault()`, which
+ * unwinds and calls `process.exit(1)`. One stray rejection anywhere in a file
+ * therefore runs *every* dead session's fatal path and takes the worker with it,
+ * attributed to whichever test was unlucky.
+ *
+ * **The idiom is `test/unit/lifecycle.test.ts`'s**, which has held exactly this
+ * array and this hook since C01 was built — *handlers are process-global; an
+ * un-released instance leaks into the next test.* This is that sentence applied
+ * to the harness every other file constructs through.
+ */
+const live: (() => Promise<void> | void)[] = [];
+
+/**
+ * **Registered by the harness rather than by each file**, because a teardown 44
+ * files have to remember is one that a 45th will not. Vitest registers this on
+ * the importing file's root suite, which is what `setupFiles` would do and
+ * `vitest.config.ts` has none.
+ */
+afterEach(async () => {
+  for (const teardown of live.splice(0)) {
+    try {
+      await teardown();
+    } catch {
+      // Already released, or released while suspended. Either is fine here —
+      // the point is that the handlers are gone, and `release` is idempotent
+      // once the state is terminal (C01 I2, I11).
+    }
+  }
+});
 
 export function fakeFs(): FileSystem {
   const files = new Map<string, string>();
@@ -143,6 +187,7 @@ export function fakeClock(): { now: () => number; advance: (ms: number) => void 
 export function fakeAmbient(clock = fakeClock()): Ambient {
   return {
     clock: clock.now,
+    elapsed: () => 0,   // profiling is off in this fixture; read for durations, which stay at zero (C23 I54)
     cwd: "/work",
     fs: fakeFs(),
     schedule: (fn, ms) => {
@@ -199,6 +244,7 @@ export async function buildSession(
     env: { TERM: "xterm-256color", LANG: "en_GB.UTF-8" },
     cwd: "/work",
     clock: clock.now,
+    elapsed: () => 0,   // profiling is off in this fixture; read for durations, which stay at zero (C23 I54)
     fs: fakeFs(),
     stdout: stdout as unknown as NodeJS.WriteStream,
     stdin: fakeStdin(),
@@ -206,6 +252,9 @@ export async function buildSession(
   });
 
   await tui.start();
+  // `stop` is idempotent — `#stopping ??=` — so a row that stops its own session
+  // is unaffected, and one that does not still gets its handlers back.
+  live.push(() => void tui.stop("exit"));
 
   return {
     screen: () => screenFrom(stdout.chunks, size),
@@ -223,6 +272,26 @@ export async function buildSession(
 export async function buildGraph(
   overrides: Partial<TuiConfig> = {},
   size = { columns: 100, rows: 30 },
+  /**
+   * C28's recorder, injected as the root's own caller does (C22 I93).
+   *
+   * **Here rather than through `overrides.profile`**, because that field makes
+   * `Session` build one and keep it private — there is no public accessor yet —
+   * and a row that cannot read the report cannot assert the wiring. Passing the
+   * object is the same edge `session.ts` uses, and the row then reads what the
+   * root actually handed down rather than what it could have.
+   */
+  profiler?: Profiler,
+  /**
+   * The ambient values, when a row is about one of them.
+   *
+   * **`elapsed` and `schedule` have no other injection point.** They live on
+   * `Ambient`, not on `TuiConfig`, so a row asserting *the injected `elapsed` is
+   * never called* could not reach the function it was asserting about — it
+   * passed on a fake nothing was ever going to read, which is the shape an
+   * absence assertion fails in silently (C22 T1.51).
+   */
+  ambient?: Ambient,
 ): Promise<{
   graph: Graph;
   stdout: FakeStdout;
@@ -273,7 +342,7 @@ export async function buildGraph(
       stdin,
       ...overrides,
     },
-    fakeAmbient(clock),
+    ambient ?? fakeAmbient(clock),
   );
 
   const graph = await constructGraph(config, {
@@ -284,7 +353,14 @@ export async function buildGraph(
     onFatal: (err) => {
       throw err;
     },
+    ...(profiler === undefined ? {} : { profiler }),
   });
+
+  // **The lifecycle, not the graph**: `release()` is the only path that drops
+  // the handlers `register()` attached at construction (C01 I3), and it is a
+  // legal transition from `constructed` — the state table refuses nothing, and
+  // with nothing acquired it emits nothing and restores stdout.
+  live.push(() => void graph.lifecycle.release());
 
   return {
     graph,

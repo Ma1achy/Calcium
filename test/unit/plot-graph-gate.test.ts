@@ -16,6 +16,7 @@ import { b } from "../../src/shell/builders/index.js";
 import { ONE_PER_FORM } from "../support/plot-forms.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { FULL_CAPS, measurable } from "../support/render.js";
+import { cells } from "../../src/presentation/text.js";
 
 const kit = measurable({ definitions: [plotDefinition], capabilities: FULL_CAPS });
 
@@ -148,6 +149,23 @@ describe("GG — the graph gate, at both ends", () => {
         return Math.floor((from + to - 1) / 2); // cells-ok — a column position
       });
     expect(new Set(centres).size, `the chain is one column: ${centres.join(", ")}`).toBe(1);
+  });
+
+  it("T1.134 (C12 I118, C12 I58): a family and a keycap as node ids reach the frame whole", () => {
+    const KEYCAP = "1️⃣";
+    const FAMILY = "\u{1F468}‍\u{1F469}‍\u{1F467}";
+    const rows = renderGraph({
+      nodes: [{ id: FAMILY }, { id: KEYCAP }, { id: "c" }],
+      edges: [{ from: FAMILY, to: KEYCAP }, { from: KEYCAP, to: "c" }],
+    }, 40);
+    // **Compared in NFC**, as C09 T2.129 compares. `graph`'s labels went
+    // through `chargrid.ts`'s writer from the day the form was extracted from
+    // `tree`, so the keycap read `1` and the family three faces here until the
+    // writer took clusters (F969, C12 I118, F976).
+    const shown = rows.join("\n").normalize("NFC");
+    expect(shown).toContain(FAMILY.normalize("NFC"));
+    expect(shown).toContain(KEYCAP.normalize("NFC"));
+    for (const r of rows) expect(cells(r, "narrow"), r).toBeLessThanOrEqual(40); // cells-ok — a cell count
   });
 
   it("GG6 (C04 I69): the fixture the sweeps use exercises the passes it is under test for", () => {

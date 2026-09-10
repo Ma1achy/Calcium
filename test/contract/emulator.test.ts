@@ -1,7 +1,20 @@
 // C27 — terminal emulator (docs/components/C27_terminal_emulator.md §9), tier 2.
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
+
+// **Type-only, both of them** — `import type` is erased, so this file names the
+// package without loading its native binding and without making C21's claim
+// false by the act of checking it (C21 I15).
+import type * as nodePty from "node-pty";
+import type { IPty } from "node-pty";
+
+import type { PtyFactory, PtyProcess } from "../../src/data/process/types.js";
+import { resolveConfig } from "../../src/shell/config.js";
+import { buildGraph, fakeAmbient, MANIFEST } from "../support/session.js";
+import { pipelineHarness, settled } from "../support/execution.js";
+import { createProcessRunner } from "../../src/data/process/runner.js";
+import { defaultTheme } from "../../src/presentation/theme/index.js";
 
 import { createEmulator } from "../../src/data/emulator/emulator.js";
 import { ANIMATES, tickIntervalOf } from "../../src/presentation/blocks/animation.js";
@@ -9,6 +22,23 @@ import { RAMP_EXTENT } from "../../src/presentation/blocks/ramp.js";
 import { degradeColour } from "../../src/presentation/theme/colormap.js";
 import { b } from "../../src/shell/builders/index.js";
 import { measurable } from "../support/render.js";
+import { validateDocument } from "../../src/data/viewmodel/validate.js";
+import { TERMINAL_KEYS, TERMINAL_RUN_KEYS } from "../../src/data/viewmodel/types.js";
+
+/** The errors, or an empty list — so a row reads the same on either arm. */
+const errs = (block: unknown): readonly string[] => {
+  const v = validateDocument({
+    schema: "tui.view/1",
+    command: "!pytest",
+    status: "ok",
+    meta: {
+      verb: null, adapter: "shell", stderr: "", exitCode: 0, durationMs: 12,
+      truncated: false, argv: ["pytest"], transport: "subprocess", origin: "user",
+    },
+    blocks: [block],
+  });
+  return v.ok ? [] : v.error;
+};
 
 const harnessFor = (): ReturnType<typeof measurable> => measurable({});
 
@@ -92,7 +122,63 @@ describe("C27 terminal emulator — tier 2", () => {
 });
 
 describe("C04 — the terminal kind, spec-first rows", () => {
-  it.todo("T2.118 (C04 I110, §5a): a terminal carrying every run field and both modes round-trips through JSON deep-equal, and TERMINAL_KEYS refuses a seventh block key and an eleventh run key by name — not deferred on a component: lands with the Terminal type");
+  it("T2.118 (C04 I110, §5a): every run field round-trips through JSON, and both key sets refuse an extra by name", () => {
+    // **The round trip is the contract**, because a `terminal` crosses the
+    // transport as JSON and comes back: a field the serialiser drops is a style
+    // the far side declared and the frame does not draw, and nothing else in
+    // the suite would notice.
+    const every = {
+      kind: "terminal",
+      id: "t1",
+      cols: 80,
+      screen: "lines",
+      lines: [
+        {
+          text: "abcdef",
+          runs: [
+            {
+              from: 0,
+              to: 3,
+              fg: { kind: "rgb", hex: "#ff8800" },
+              bg: { kind: "ansi256", index: 17 },
+              bold: true,
+              dim: false,
+              italic: true,
+              underline: true,
+              inverse: false,
+              strike: true,
+            },
+          ],
+        },
+      ],
+      cursor: { line: 0, col: 4 },
+      dropped: 12,
+    };
+    expect(JSON.parse(JSON.stringify(every)), "every run field survives").toEqual(every);
+    expect(errs(every), "and the whole of it validates").toEqual([]);
+
+    // The grid arm, which cannot carry `dropped` — so both modes are exercised
+    // rather than the one that happens to hold more fields.
+    const grid = { ...every, screen: "grid", dropped: undefined };
+    delete (grid as Record<string, unknown>)["dropped"];
+    expect(JSON.parse(JSON.stringify(grid)), "and the grid mode round-trips too").toEqual(grid);
+    expect(errs(grid), "and validates").toEqual([]);
+
+    // **By name, not by count.** The deferral for this row said *a seventh block
+    // key*, which was true when the type had six; it now has nine, and a row
+    // written to the old number would have failed for the right reason and said
+    // the wrong thing. Asserting the set's size beside the refusal is what keeps
+    // the two in step — a key added without a decision fails here.
+    expect(TERMINAL_KEYS.size, "nine block keys, and the deferral said seven").toBe(9);
+    expect(TERMINAL_RUN_KEYS.size, "ten run keys").toBe(10);
+    expect(errs({ ...every, screenful: true }).join(" "), "an extra block key").toContain(
+      'unknown key "screenful" on terminal',
+    );
+    expect(
+      errs({ ...every, lines: [{ text: "abc", runs: [{ from: 0, to: 3, blink: true }] }] }).join(" "),
+      "an extra run key",
+    ).toContain('unknown key "blink" on a run');
+  });
 });
 
 describe("C09 · C10 — the terminal block and a literal colour", () => {
@@ -125,10 +211,248 @@ describe("C09 · C10 — the terminal block and a literal colour", () => {
 });
 
 describe("C21 · C22 — the PTY port, spec-first rows", () => {
-  it.todo("T2.8 (C21 I15): no node-pty import anywhere in src/, and a compile-level check that node-pty's IPty is assignable to PtyProcess; skipped with a reported reason when node-pty is absent — not deferred on a component: lands with the PtyFactory port");
-  it.todo("T2.100 (C22 I91): TuiConfig.pty reaches the runner's deps by object identity, and config.pty is read at exactly one site in src/shell/ — not deferred on a component: lands with TuiConfig.pty");
+  it("T2.8 (C21 I15): src/ imports no PTY package, and node-pty satisfies both halves of the port", () => {
+    // **The compile-level half, and `tsc` is the assertion.** Neither expression
+    // has a runtime claim to make; each is an error if one half of I15 is false,
+    // and the `expect` below exists so `noUnusedLocals` keeps them.
+    //
+    // **Both halves, because I15 names both types.** The row this replaces asked
+    // only for `IPty` → `PtyProcess`, which passes — and the factory did not,
+    // for one `readonly` (F920). A row citing a two-part invariant and covering
+    // one part reads, from the citation, exactly like coverage.
+    const asProcess = (p: IPty): PtyProcess => p;
+    const asFactory = (m: typeof nodePty): PtyFactory => m;
+    expect([asProcess, asFactory].every((f) => typeof f === "function")).toBe(true);
+
+    // The scan half — a signature cannot state *and nothing imports it*.
+    const imports = (code: string): boolean =>
+      /(?:from|require\()\s*["'][^"']*node-pty/u.test(
+        code.replace(/\/\*[\s\S]*?\*\//gu, "").replace(/\/\/[^\n]*/gu, ""),
+      );
+
+    // **The control first** (SS26): a scan that matches nothing passes exactly
+    // like one whose corpus is clean, and `types.ts` now discusses `node-pty` in
+    // prose — so the matcher must see an import and not a mention.
+    expect(imports('import { spawn } from "node-pty";'), "the matcher sees an import").toBe(true);
+    expect(imports('const x = 1; // node-pty satisfies it unchanged'), "not a comment").toBe(false);
+    // **The third encoding, and the one that caught the first draft of T6.16**:
+    // `runner.ts`'s throw message names the package in a *string literal*, which
+    // a comment-stripper is built not to touch. A control with two arms passed
+    // over a corpus the two-armed matcher got wrong.
+    expect(imports('throw new Error("node-pty satisfies it unchanged");'), "not a string").toBe(false);
+
+    const offenders = srcFiles("src").filter((f) => imports(readFileSync(f, "utf8")));
+    expect(offenders, "src/ imports no PTY package").toEqual([]);
+    expect(srcFiles("src").length, "over a non-empty corpus").toBeGreaterThan(200);
+
+    // **No installed-or-not arm.** The deferral asked for one, reported rather
+    // than silent. `node-pty` is a devDependency the container builds by name in
+    // `make install`, and `test/support/pty.ts` has imported it unconditionally
+    // all along — a skip here would be a branch nothing can enter, which is the
+    // vacuity class this row is otherwise about.
+  });
+  it("T2.9 (C21 I19): the port's numeric signal arrives in the pipe arm's vocabulary", async () => {
+    // **`0` is the port's word for *none*, and it is not `undefined`.** Passed
+    // through as `SIG${n}` it read `SIG0` for every clean exit, and C23's
+    // `exit.signal !== null` made every successful command on the PTY arm an
+    // error under a correct screen (F924). Nine rows agreed it did not, because
+    // every one of them hands a fake that resolves `{code: 0, signal: null}` by
+    // hand — the fixture supplying the behaviour under test.
+    const exitWith = async (e: Record<string, number>): Promise<unknown> => {
+      let fire: ((e: unknown) => void) | null = null;
+      const runner = createProcessRunner({
+        env: {},
+        stdin: {},
+        pty: {
+          spawn: () => ({
+            pid: 1,
+            onData: () => {},
+            onExit: (cb: (e: unknown) => void) => {
+              fire = cb;
+            },
+            write: () => {},
+            resize: () => {},
+            kill: () => {},
+          }),
+        } as never,
+      });
+      const handle = runner.spawnPty("x", { cwd: () => "/w", cols: 80, rows: 6 });
+      (fire as unknown as (e: unknown) => void)(e);
+      return await handle.exited;
+    };
+
+    // The three shapes a real port produces, measured on `node-pty` 1.1.0.
+    expect(await exitWith({ exitCode: 0, signal: 0 }), "a clean exit").toEqual({
+      code: 0,
+      signal: null,
+    });
+    expect(await exitWith({ exitCode: 3, signal: 0 }), "a non-zero exit is still not a signal").toEqual({
+      code: 3,
+      signal: null,
+    });
+    expect(await exitWith({ exitCode: 0, signal: 15 }), "and a signal is named, not numbered").toEqual({
+      code: 0,
+      signal: "SIGTERM",
+    });
+
+    // A port that omits the field entirely — the shape the type allows and
+    // every fake in this repository takes.
+    expect(await exitWith({ exitCode: 0 }), "an absent field is no signal").toEqual({
+      code: 0,
+      signal: null,
+    });
+
+    // **The fallback, so an unknown number is reported rather than swallowed.**
+    expect(await exitWith({ exitCode: 0, signal: 199 }), "nothing is lost").toEqual({
+      code: 0,
+      signal: "SIG199",
+    });
+  });
+
+  it("T2.100 (C22 I91): the consumer's factory reaches the runner unwrapped, through two pure forwards", async () => {
+    // **The object, not a shape like it.** A root that wrapped the factory —
+    // to log a spawn, to default a size — would satisfy every behavioural
+    // assertion here and be the second place the port's shape is known, which
+    // is the thing I91 forbids.
+    const spawned: unknown[][] = [];
+    const factory = {
+      spawn: (...args: unknown[]) => {
+        spawned.push(args);
+        return { pid: 909, onData: () => {}, onExit: () => {}, write: () => {}, resize: () => {}, kill: () => {} };
+      },
+    };
+
+    // Hop one, by identity. `resolveConfig` reads the *consumer's* config.
+    const resolved = resolveConfig(
+      {
+        name: "prism",
+        binary: "prism",
+        manifest: MANIFEST,
+        theme: defaultTheme,
+        stateDir: "/state",
+        env: { TERM: "xterm-256color", LANG: "en_GB.UTF-8" },
+        pty: factory as never,
+      },
+      fakeAmbient(),
+    );
+    expect(resolved.pty, "the same object, not a copy of it").toBe(factory);
+
+    // Hop two, through the runner the root actually built. The factory's own
+    // `spawn` is the only thing that returns pid 909, so a wrapper that
+    // reconstructed the port would be visible in `spawned` — which is empty
+    // until the runner calls through.
+    const { graph } = await buildGraph({ pty: factory as never });
+    expect(graph.runner.hasPty, "the seam C23 reads before choosing an arm").toBe(true);
+    const handle = graph.runner.spawnPty("sleep 1", { cwd: () => "/w", cols: 80, rows: 6 });
+    expect(spawned, "the consumer's own spawn was called").toHaveLength(1);
+    expect(handle.pid, "and its child came back").toBe(909);
+
+    // And the absent arm, so the row does not pass on a runner that would
+    // answer `true` regardless.
+    const { graph: bare } = await buildGraph();
+    expect(bare.runner.hasPty, "no factory, no arm").toBe(false);
+
+    // **The source half — and the count is two, not one.** The spec's row said
+    // *exactly one site*, which is a grep, and the grep gives two: `config.ts`
+    // copies the consumer's field onto the resolved config, `construct.ts`
+    // hands the resolved one to the runner. Each comment says *the one site*
+    // and each is right about its own `config` object; the number is only wrong
+    // when read as a scan of `src/shell/` (F923). What C22 I91 actually forbids is
+    // a read that is not a forward, so that is what is asserted.
+    const sites = ["src/shell/config.ts", "src/shell/construct.ts"].map((f) => ({
+      file: f,
+      hits: [...readFileSync(f, "utf8").matchAll(/config\.pty/gu)].length,
+      forward: readFileSync(f, "utf8").includes(
+        "...(config.pty === undefined ? {} : { pty: config.pty })",
+      ),
+    }));
+    expect(sites.map((s) => s.hits), "two mentions per site — the guard and the value").toEqual([2, 2]);
+    expect(sites.every((s) => s.forward), "each is the same spread, with nothing between").toBe(true);
+
+    const elsewhere = srcFiles("src/shell").filter(
+      (f) => !f.endsWith("config.ts") && !f.endsWith("construct.ts") && readFileSync(f, "utf8").includes("config.pty"),
+    );
+    expect(elsewhere, "and nowhere else in src/shell/ reads it at all").toEqual([]);
+  });
 });
 
 describe("C23 — the shell route as a live screen, spec-first rows", () => {
-  it.todo("T2.47 (C23 I67): a settled terminal document carries no cursor at any position, and dispose is called after snapshot, asserted by call order — not deferred on a component: lands with the route's settle");
+  // **Partial, not deferred** (F919). The blocker — *lands with the route's
+  // settle* — landed, and `test/unit/emulator.test.ts` holds a running T2.47
+  // asserting both halves: a settled screen carries no cursor, and a dispose
+  // before the snapshot would have thrown C27's refusal, so `status: "ok"` is
+  // the ordering. What is not covered is the corpus: *at any position* against
+  // the one position that row builds. That is owed coverage on built code
+  // rather than work waiting on a component, and the distinction is the whole
+  // of the closes/reframes/partial test — a deferral that says *partial* is the
+  // only one of the three that leaves a residue named.
+  it("T2.47 (C23 I67): a settled terminal carries no cursor from any position, and the snapshot precedes the dispose", async () => {
+    // **Every position, because the one an ad-hoc script leaves is the easy
+    // one.** A `delete final.cursor` and a `cursor: { line: 0, col: 0 }` guard
+    // agree wherever the child happens to stop at the origin, and C04 I112
+    // admits the key — so a settled block drawing an inverse cell at 0,0 passes
+    // every existing assertion.
+    const parks: readonly [string, string][] = [
+      ["at the origin", "\u001b[H"],
+      ["mid-line", "abcdef\u001b[3G"],
+      ["at the last column", "\u001b[80G"],
+      ["on the last row", "\u001b[24;1H"],
+      ["after a bare carriage return", "half a line\r"],
+      ["where the child hid it", "\u001b[?25l\u001b[5;7H"],
+      ["where the child left it visible", "\u001b[?25h\u001b[2;2H"],
+    ];
+
+    for (const [where, escape] of parks) {
+      const h = pipelineHarness({
+        hasPty: true,
+        spawnPty: () => ({
+          pid: 1,
+          exited: Promise.resolve({ code: 0, signal: null }),
+          running: false,
+          onData: (cb) => {
+            cb(`kept ${where}\r\n${escape}`);
+          },
+          write: () => undefined,
+          resize: () => undefined,
+          signal: () => true,
+        }),
+      });
+      h.pipeline.submit("pytest");
+      await settled(h.pipeline);
+
+      const doc = h.transcript.entries[0]?.doc;
+      const found: unknown[] = [];
+      const walk = (v: unknown): void => {
+        if (Array.isArray(v)) return void v.forEach(walk);
+        if (v === null || typeof v !== "object") return;
+        const o = v as Record<string, unknown>;
+        if (o["kind"] === "terminal") found.push(o);
+        Object.values(o).forEach(walk);
+      };
+      walk(doc?.blocks);
+
+      expect(found, `${where}: one terminal block`).toHaveLength(1);
+      const block = found[0] as Record<string, unknown>;
+      // **The key, not its value.** C04 I85 refuses an unknown key and
+      // `cursor: undefined` is a key, so `toBeUndefined` passes on a document
+      // the validator would reject.
+      expect(Object.keys(block), where).not.toContain("cursor");
+      expect(errs(block), `${where}: and the whole document validates`).toEqual([]);
+
+      // **The dispose is after the snapshot, read from the only side a test
+      // has.** C27 I12 makes a snapshot taken after `dispose` refuse, so a
+      // settled block that still holds what the child wrote is the ordering —
+      // and an empty one would be the reversed pair, not an empty child.
+      expect(JSON.stringify(block), `${where}: the snapshot came first`).toContain(`kept ${where}`);
+    }
+  });
 });
+
+function srcFiles(dir: string, out: string[] = []): string[] {
+  for (const entry of readdirSync(dir)) {
+    const path = `${dir}/${entry}`;
+    if (statSync(path).isDirectory()) srcFiles(path, out);
+    else if (/\.tsx?$/u.test(entry) && !/\.d\.ts$/u.test(entry)) out.push(path);
+  }
+  return out;
+}

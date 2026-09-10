@@ -166,7 +166,7 @@ export const ONE_PER_FORM: Readonly<Record<PlotForm, Plot>> = Object.freeze({
   }),
   bubble: block({
     kind: "plot", id: "form-bubble", form: "bubble", height: 6, axes: true,
-    series: [s([10, 25, 15, 30]), s([1, 8, 3, 5])],
+    series: [s([10, 25, 15, 30])], sizes: [1, 8, 3, 5],
   }),
   autocorrelation: block({
     kind: "plot", id: "form-acf", form: "autocorrelation", height: 6, axes: true,

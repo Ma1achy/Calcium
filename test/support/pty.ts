@@ -20,14 +20,25 @@ import { cells } from "../../src/presentation/text.js";
 const MARKER = "__TERMIOS__";
 
 /**
- * A complete escape sequence at position 0 — the boundary test for `feed`.
+ * The escape sequences the harness recognises — one alternation, built into
+ * the three regexes that must agree: the boundary test below, the walk's token
+ * in `painter`, and `trackWrap`'s stripper.
  *
- * The same alternatives the walk matches, anchored. Kept beside them because
- * two lists that must agree and are written apart is the drift a shared
- * implementation prevents; if the walk learns a sequence, this must too.
+ * **One source, because three copies drifted together** (F966). Each accepted
+ * a CSI as parameters then a final letter, `\[[0-9;?]*[a-zA-Z]`, and the CSI
+ * grammar has an intermediate class between them — parameters `0x30–0x3F`,
+ * intermediates `0x20–0x2F`, a final `0x40–0x7E`. `DECSCUSR` uses it:
+ * `ESC [ 6 SP q` is the beam C01 sets at the prompt, the matcher stopped at
+ * the space, and the walk painted ` q` where the cursor was — F962's drive read
+ * the prompt row as `[0 q` after the prompt glyph. The parameter class was
+ * short too: the kitty keyboard protocol's `CSI > 3 u` and `CSI < u` carry a
+ * private byte it did not name. The framework's own tier-5 rows saw neither,
+ * because they write both at start and release only and read the rows between.
  */
-const COMPLETE_ESCAPE =
-  /^\u001b(?:\[[0-9;?]*[a-zA-Z]|\][^\u0007\u001b]*(?:\u0007|\u001b\\)|[()][0-9A-Za-z]|[0-9A-Za-z])/u;
+const ESCAPE_ALTERNATIVES = String.raw`\[[0-?]*[ -/]*[@-~]|\][^\u0007\u001b]*(?:\u0007|\u001b\\)|[()][0-9A-Za-z]|[0-9A-Za-z]`;
+
+/** A complete escape sequence at position 0 — the boundary test for `feed`. */
+const COMPLETE_ESCAPE = new RegExp(String.raw`^\u001b(?:${ESCAPE_ALTERNATIVES})`, "u");
 
 /**
  * The screen the program is painting, as the rows a user would see (F149).
@@ -177,8 +188,10 @@ export function painter(initialCols: number, initialRows: number): Painter {
   // One pass, one token at a time. Anything not named here is a presentation
   // escape — SGR, DECSET, the synchronised-update window — and moves no write
   // head, so it is skipped rather than rendered.
-  const token =
-    /\u001b\[(\d*)(?:;(\d*))?([Hf])|\u001b\[(\d*)J|\u001b\[\?1049([hl])|\u001b\[([0-9;]*)m|\u001b(?:\[[0-9;?]*[a-zA-Z]|\][^\u0007\u001b]*(?:\u0007|\u001b\\)|[()][0-9A-Za-z]|[0-9A-Za-z])|(\r)|(\n)|([^\r\n\u001b]+)/g;
+  const token = new RegExp(
+    String.raw`\u001b\[(\d*)(?:;(\d*))?([Hf])|\u001b\[(\d*)J|\u001b\[\?1049([hl])|\u001b\[([0-9;]*)m|\u001b(?:${ESCAPE_ALTERNATIVES})|(\r)|(\n)|([^\r\n\u001b]+)`,
+    "g",
+  );
 
   function apply(chunk: string): void {
   for (const m of chunk.matchAll(token)) {
@@ -418,7 +431,7 @@ export type WrapState = {
   wrapped: boolean;
 };
 
-const CSI = /\x1b(?:\[[0-9;?]*[a-zA-Z]|\][^\x07\x1b]*(?:\x07|\x1b\\)|[()][0-9A-Za-z]|[0-9A-Za-z])/g;
+const CSI = new RegExp(String.raw`\u001b(?:${ESCAPE_ALTERNATIVES})`, "g");
 
 export function trackWrap(bytes: string, cols: number): WrapState {
   const plain = bytes.replace(CSI, "");
@@ -588,6 +601,17 @@ export type InteractivePty = {
   /** Everything received so far. */
   readonly output: string;
   /**
+   * When each read arrived and how many bytes it carried.
+   *
+   * **The harness's clock, because the program's stream has none.** A C28
+   * recording orders its frames and stamps nothing, so whether a frame was
+   * written before or after a far side answered is a fact only the receiving
+   * end can date. Reads, not frames: a frame can arrive in two reads and two
+   * frames in one, and the boundary a `TextDecoder` sees is the PTY's. What a
+   * row wants from this is the gap, and a read's size says which frame it was.
+   */
+  readonly reads: readonly Readonly<{ at: number; bytes: number }>[];
+  /**
    * The most recently written frame, as rows, with escapes removed.
    *
    * **`output` is cumulative and almost never what a row wants to assert
@@ -734,8 +758,10 @@ export function interactivePty(
   const bytes = new TextDecoder("utf-8");
   const waiters: { re: RegExp; resolve: (m: RegExpExecArray) => void }[] = [];
   const exitWaiters: ((code: number) => void)[] = [];
+  const reads: { at: number; bytes: number }[] = [];
 
   term.onData((d) => {
+    reads.push({ at: Date.now(), bytes: (d as unknown as Uint8Array).length });
     // Through the one streaming decoder — see `bytes`.
     const text = bytes.decode(d as unknown as Uint8Array, { stream: true });
     output += text;
@@ -781,6 +807,9 @@ export function interactivePty(
     },
     get output() {
       return output;
+    },
+    get reads() {
+      return reads;
     },
     get frame() {
       // Applied as it arrived, not re-derived — see `paint` and F149.

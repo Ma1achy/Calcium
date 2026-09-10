@@ -102,13 +102,17 @@ members named by no example to 123**, all nine of them `Plot`'s — `xTitle`, `c
 **Five findings, F371–F375**, and the first frame produced three of them. The full entries are in
 [`../docker/FINDINGS.md`](../docker/FINDINGS.md).
 
-| | | whose |
-|---|---|---|
-| **F371** | `b.plot` cannot express `layout`; eleven of `Plot`'s datum types are unpublished | C24 |
-| **F372** | a live part is torn down in silence when the shell's own patch is refused | C23 |
-| **F373** | `applyPatch` can commit a document `validateDocument` refuses — I14 is not re-established | C04 / C13 |
-| **F374** | a vertical bar reserves a legend's width and draws nothing; a category label drops silently | C12 |
-| **F375** | the bar's value labels abut — `4.17.4` is two numbers | C12 |
+| | | whose | at HEAD |
+|---|---|---|---|
+| **F371** | `b.plot` cannot express `layout`; eleven of `Plot`'s datum types are unpublished | C24 | **closed** — all eight of F335's members are published; the example's own row asserts `layout` present |
+| **F372** | a live part is torn down in silence when the shell's own patch is refused | C23 | **closed** |
+| **F373** | `applyPatch` can commit a document `validateDocument` refuses — I14 is not re-established | C04 / C13 | **closed** — the three resolving sites refuse a duplicate id |
+| **F374** | a vertical bar reserves a legend's width and draws nothing; a category label drops silently | C12 | **open** — the horizontal arm says `+3 more`; the column arm drops a name and its tick with nothing said |
+| **F375** | the bar's value labels abut — `4.17.4` is two numbers | C12 | **closed** |
+
+**The right-hand column is the point of the table.** Written in the present tense and left, five
+sentences about a framework that has since changed read as five live defects; four of them are
+not (F1008). `examples/docker/TRIAGE.md` carries the current disposition of every one.
 
 ---
 
@@ -138,6 +142,10 @@ sample, and a run of cells is what that is. Honest at this width.
 
 `layout` is one of F335's eight and the demo cannot reach it, so four stages of one budget are
 drawn side by side where they are parts of a whole.
+
+> **`layout` is published now** (F371, closed). The paragraphs below are the reading of the frame
+> as it was when the finding was filed, and they are kept because the *reading* is what has value
+> — the plan asking for the wrong member first is the lesson, not the absence.
 
 **The plan asked for the wrong member first.** It said `layout: "grouped"` — the reading a bar
 chart is for — and rendering the block absent, `"overlap"` and `"grouped"` gives one

@@ -23,6 +23,10 @@
 
 import { accessSync, constants } from "node:fs";
 import { spawn as nodeSpawn } from "node:child_process";
+// **Aliased, because `constants` is already imported from `node:fs` above.**
+// Written unaliased it type-checks against the *fs* constants and fails on
+// `.signals` — the two modules export the same name and the first one wins.
+import { constants as osConstants } from "node:os";
 import type { ChildProcess } from "node:child_process";
 import { createBoundedStream } from "./stream.js";
 import type {
@@ -263,13 +267,12 @@ export function createProcessRunner(deps: ProcessRunnerDeps): ProcessRunner {
         child.onExit(({ exitCode, signal }) => {
           running = false;
           ptyChildren.delete(handle);
-          // A terminal child's death arrives as a number; a signal is reported
-          // as one when the platform gives it, and `null` otherwise — the same
-          // shape a piped child resolves with, so a caller reads one `Exit`.
-          resolve({
-            code: exitCode,
-            signal: signal === undefined ? null : `SIG${String(signal)}`,
-          });
+          // A terminal child's death arrives as a **number**, and the port uses
+          // **0 for none** — so this is a normalisation and not a cast (I19,
+          // F924). Left as a cast it read `SIG0` for every clean exit, and
+          // C23's `exit.signal !== null` made every successful command on this
+          // arm an error, under a correct screen.
+          resolve({ code: exitCode, signal: signalName(signal) });
         });
       });
 
@@ -374,6 +377,34 @@ export function createProcessRunner(deps: ProcessRunnerDeps): ProcessRunner {
       ]);
     },
   };
+}
+
+/**
+ * Node's own signal table, inverted — number to name (C21 I19).
+ *
+ * **First name wins**, because the table is not injective: 6 is `SIGABRT` and
+ * `SIGIOT`, 29 is `SIGIO` and `SIGPOLL`. Which alias a reader sees is arbitrary
+ * either way; what is not arbitrary is that it is the same one every time, and
+ * a `Map` built last-wins changes with Node's key order.
+ */
+const SIGNAL_NAMES: ReadonlyMap<number, string> = (() => {
+  const byNumber = new Map<number, string>();
+  for (const [name, number] of Object.entries(osConstants.signals)) {
+    if (!byNumber.has(number)) byNumber.set(number, name);
+  }
+  return byNumber;
+})();
+
+/**
+ * A PTY port's numeric signal, in the vocabulary a piped child resolves with.
+ *
+ * `undefined` and `0` both mean *no signal*: the first is a port that omits the
+ * field, the second is `node-pty`, which always sends one. `SIG${n}` survives as
+ * the fallback so an unknown number is reported rather than swallowed.
+ */
+function signalName(signal: number | undefined): string | null {
+  if (signal === undefined || signal === 0) return null;
+  return SIGNAL_NAMES.get(signal) ?? `SIG${String(signal)}`;
 }
 
 function messageOf(error: unknown): string {

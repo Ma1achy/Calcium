@@ -41,8 +41,9 @@ const results = runPass({
       // one row taller than the index says — C09 I1 broken by the registry itself.
       name: "COUNT-DROPPED: `measure` stops counting the marker row",
       file: REGISTRY,
-      from: "form.definition.measure(form.block, width, this.measure) + (form.capped === null ? 0 : 1);",
-      to: "form.definition.measure(form.block, width, this.measure);",
+      from:
+        "form.definition.measure(form.block, width, this.#measureChild, this.probe) +\n        (form.capped === null ? 0 : 1);",
+      to: "form.definition.measure(form.block, width, this.#measureChild, this.probe);",
       expect: "T6.22", // and T1.19
     },
     {
@@ -68,7 +69,8 @@ const results = runPass({
       // boundary unit is kept whole and the marker then lies by two.
       name: "SHOWN-IS-CAP: the marker names the cap and not the window's rows",
       file: REGISTRY,
-      from: "    const shown = resolved.definition.measure(out.block, width, this.measure);",
+      from:
+        "    const shown = resolved.definition.measure(out.block, width, this.#measureChild, this.probe);",
       to: "    const shown = this.#cap;",
       expect: "T3.20",
     },
@@ -92,14 +94,18 @@ const results = runPass({
       expect: "T6.22", // and T1.20, T2.13
     },
     {
-      // The window is asked for rows past the content: the definition's window
-      // clamps, the marker row is then requested twice, and the slack is wrong
-      // for the window over the marker alone.
+      // The window is asked for rows past the content. **Vacuous, and recorded
+      // as such** (F952): the definition's window is taken over the form's block,
+      // which has exactly `cap` rows, so `Math.min(localTo, contentRows)` cannot
+      // bind and no row can see it go — measured 2026-09-09 at HEAD's registry
+      // and at the memoised one alike, 16 of 16 green with it applied. The clamp
+      // is left in place as the guard it reads as; what is recorded is that
+      // nothing in the suite constrains it.
       name: "MARKER-ROW-WINDOWED: the definition's window is asked for the marker row",
       file: REGISTRY,
       from: "        const wTo = Math.max(wFrom + 1, Math.min(localTo, contentRows));",
       to: "        const wTo = Math.max(wFrom + 1, localTo);",
-      expect: "T1.20", // and T2.13
+      expect: "(none — expected to survive)",
     },
     {
       // The predicate becomes a list: the registry's own kinds still cap and an
@@ -126,8 +132,9 @@ const results = runPass({
       // over the cap measures `shown + 1` whatever the floor says.
       name: "FLOOR-FIRST: the floor no longer applies to a capped block",
       file: REGISTRY,
-      from: "      return { ok: true, rows: Math.max(rows, floor) };",
-      to: "      return { ok: true, rows: form.capped === null ? Math.max(rows, floor) : rows };",
+      // The floored figure is now taken into a local the memo also records (C09 I61).
+      from: "      const floored = Math.max(rows, floor);",
+      to: "      const floored = form.capped === null ? Math.max(rows, floor) : rows;",
       expect: "T3.21",
     },
     {
@@ -142,4 +149,7 @@ const results = runPass({
 });
 
 console.log(report(results));
-process.exit(results.some((r) => !r.killed) ? 1 : 0);
+// One listed survivor whose `expect` says so in the anchor sweep's reserved
+// words (F952); the exit code stays one honest bit for every other row.
+const unexpected = results.filter((r) => !r.killed && r.expect !== "(none — expected to survive)");
+process.exit(unexpected.length > 0 ? 1 : 0);

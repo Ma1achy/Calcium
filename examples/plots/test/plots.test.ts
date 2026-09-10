@@ -22,10 +22,10 @@ import { describe, expect, it } from "vitest";
 import { b, completeLocal } from "@fmx/calcium";
 import { expectDocument, liveParts, producerContext } from "@fmx/calcium/testing";
 import type { Block, ViewDocument, TerminalCapabilities } from "@fmx/calcium";
-import { CATALOGUE, everyVariant, FORMS, refusals, variantsOf } from "../src/catalogue.ts";
+import { CATALOGUE, everyVariant, FORMS, refusals, refuse, variantsOf } from "../src/catalogue.ts";
 import type { Entry } from "../src/catalogue.ts";
 import {
-  adaptSample, compare, everyForm, faults, formFull, greetingDocument, barStyles, images, liveFor, monitor, mosaics, rungs, spinners, unknown,
+  adaptSample, compare, everyForm, faults, formFull, greetingDocument, barStyles, images, liveFor, monitor, mosaics, profileBlocks, rungs, spinners, unknown,
 } from "../src/commands.ts";
 import { manifest } from "../src/manifest.ts";
 
@@ -147,14 +147,24 @@ describe("the plot demo", () => {
     //
     // Exercised through the same branch `/all` and `/form` take, so it is live
     // code with a caller rather than an affordance nobody has run.
+    //
+    // **And it calls `refuse` rather than writing the object out** (F1008). The
+    // catalogue kept that helper on the strength of a comment saying this row
+    // exercised it, and this row built the refusal by hand — so the sentence
+    // was true of the *shape* and false of the *function*, and a helper with no
+    // caller stood behind it. Constructing the literal here also meant the row
+    // could not see the message drift, which is the half a shape assertion
+    // never covers.
     const entry: Entry = {
       says: "a form with no builder",
-      at: () => ({ refused: "`nothing` is not declared on `b.plot`", needs: "nothing" }),
+      at: () => refuse("nothing", "no builder yet"),
     };
     const drawn = entry.at(0, 8);
     expect("refused" in drawn, "the branch every composer takes").toBe(true);
     if (!("refused" in drawn)) throw new Error("unreachable");
     expect(drawn.needs).toBe("nothing");
+    expect(drawn.refused, "the sentence the notice draws, from the helper the catalogue keeps")
+      .toBe("`nothing` is not declared on `b.plot` — no builder yet");
   });
 
   it("the animated figure is the static one at a later phase", () => {
@@ -367,6 +377,19 @@ describe("every command composes a document the transcript would accept", () => 
     image: () => [as("image", [images()])],
     spinners: () => [as("spinners", [spinners()])],
     bars: () => [as("bars", [barStyles()])],
+    // **The arm a document test can construct** — and the one every app that
+    // does not configure a profiler sees. `ProfileReport` is reachable only
+    // through `ctx.profile()`: there is no constructor on the public surface and
+    // none in `@fmx/calcium/testing`, so the present arm needs a live session
+    // (F917). It is not uncovered — `profilePane` is exercised across every pane
+    // by the framework's own `test/unit/profiler.test.ts`; what this row adds is
+    // that the command composes a document the transcript accepts.
+    // `FULL` is declared below and closed over rather than repeated: these
+    // entries are thunks, so nothing here runs until an `it` does. The absent
+    // arm ignores capabilities entirely — it is passed because the signature
+    // takes it, and a second capability record in this file would be one more
+    // thing to keep in step.
+    report: () => [as("report", profileBlocks(undefined, [], FULL))],
   };
 
   it("T-doc1: the coverage table names every command the manifest declares", () => {
@@ -391,10 +414,12 @@ describe("every command composes a document the transcript would accept", () => 
     }
     expect(bad).toEqual([]);
     // 46 forms twice, plus /all, /faults, /monitor, /rungs, /mosaic, /image,
-    // /spinners, /bars and sample's two — ten singletons. The count is asserted
-    // so a document appearing or vanishing has to be attributed rather than
-    // noticed: `/image` moved this from seven, the two galleries from eight.
-    expect(checked, "documents built").toBe(FORMS.length * 2 + 10);
+    // /spinners, /bars, /report and sample's two — eleven singletons. The count
+    // is asserted so a document appearing or vanishing has to be attributed
+    // rather than noticed: `/image` moved this from seven, the two galleries
+    // from eight, and `/report` (then named `/profile`, F953) from ten — which is the row working, since the
+    // command had been in the manifest and in no coverage row since `b62b64df`.
+    expect(checked, "documents built").toBe(FORMS.length * 2 + 11);
   });
 
   it("T-doc3: an unknown form is a document too", () => {
@@ -438,7 +463,15 @@ describe("every command composes a document the transcript would accept", () => 
           rendered += 1;
           continue;
         }
-        const data = part.spec.derive === undefined ? value : part.spec.derive.compute(value, undefined);
+        // `undefined` prev and `0` attempts is the first tick: no fold held and
+        // nothing has failed yet, which is what `refresh.ts:833` passes on the
+        // first resolution of a source. The third argument arrived when the
+        // declaration caught up with the runtime, and the note attached to it —
+        // *additive, so every existing fold compiles unchanged* — is true about
+        // a fold and says nothing about a **caller**, which must supply all
+        // three. This line is the caller, and it is in a workspace the root
+        // `tsc` does not reach (F1075).
+        const data = part.spec.derive === undefined ? value : part.spec.derive.compute(value, undefined, 0);
         try {
           expectDocument(as(d.command, [...d.blocks, part.spec.render(data, ctx)])).isValid();
           rendered += 1;

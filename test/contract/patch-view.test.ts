@@ -14,6 +14,7 @@ import { createOverlayManager } from "../../src/viewport/overlay/index.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { createPatchView, PATCH_VIEW_ID } from "../../src/shell/patch-view.js";
 import { registry } from "../support/overlay.js";
+import { readFileSync } from "node:fs";
 
 const REGION = { width: 80, height: 10 } as const;
 
@@ -308,5 +309,121 @@ describe("C22 §3 — the fullscreen patch view", () => {
     const h = harness();
     expect(h.view.move("pageDown")).toBe(false);
     expect(h.view.pop()).toBe(false);
+  });
+});
+
+describe("C25 §3b — what the view may read, and where its motions land", () => {
+  it("T2.10 (C25 I17): the view's dependencies are overlays, transcript, region and redraw — no data seam", () => {
+    /**
+     * ***Never needs data the block does not carry* is a claim about the
+     * dependency list**, and no assertion about output can see it. A view that
+     * fetched the file would produce a *better* frame, pass every rendering row
+     * here, and make fullscreen a data decision — which §3b spent a ruling
+     * refusing, because whole-file-with-changes is the editor and the editor is
+     * a different component.
+     *
+     * Compared by equality: a fifth dep is a failure here whatever it is for.
+     */
+    const source = readFileSync("src/shell/patch-view.ts", "utf8");
+    const deps = source
+      .slice(source.indexOf("export type PatchViewDeps"), source.indexOf("export interface PatchView"))
+      .replace(/\/\*[\s\S]*?\*\//gu, "");
+    expect([...deps.matchAll(/^ {2}(\w+):/gmu)].map((m) => m[1])).toEqual([
+      "overlays", "transcript", "region", "redraw",
+    ]);
+
+    // And the fullscreen form is every hunk of *this* block: walked to the
+    // bottom, each of the three headers has been on screen.
+    const h = harness();
+    const entry = h.transcript.append(docWith([PATCH("p1")]));
+    expect(h.view.open(entry, "p1"), "the view opens").toBeNull();
+
+    const seen = new Set<string>(shownHeaders(h));
+    for (let i = 0; i < 12; i += 1) {
+      if (!h.view.move("nextHunk")) break;
+      for (const header of shownHeaders(h)) seen.add(header);
+    }
+    expect([...seen].sort(), "every hunk of the block, uncollapsed").toEqual(
+      ["@@ -18,4 +18,4 @@", "@@ -60,4 +60,4 @@", "@@ -90,4 +90,4 @@"],
+    );
+  });
+
+  it("T2.14 (C25 I20b): a motion and its inverse return to where they started", () => {
+    const h = harness();
+    const entry = h.transcript.append(docWith([PATCH("p1")]));
+    expect(h.view.open(entry, "p1"), "the view opens").toBeNull();
+
+    const shown = (): string => JSON.stringify(h.overlays.top?.content[0] ?? null);
+
+    /**
+     * **The round trip is what a caller/window disagreement breaks**, and it is
+     * the only observable form of C25 I20b from outside: the offset is private —
+     * deliberately, since a second source for *where am I* is how two answers
+     * come to disagree — so a row cannot read it and compare. What it can do is
+     * drive a motion and its inverse and ask whether the view came back.
+     *
+     * If the builder snapped internally, the view would store 7 while drawing
+     * the window for 4; the inverse motion computes from 7 and lands somewhere
+     * else, and the reader's place is gone. **Neither direction is visible to a
+     * test that drives one motion**, which is why this row drives pairs.
+     *
+     * `move` returns *handled*, not *moved* — `keys.ts` passes it straight
+     * through as the key effect — so a clamped `nextHunk` at the bottom
+     * correctly reports `true`. The content is the artefact to read.
+     */
+    h.view.move("top");
+    const top = shown();
+
+    h.view.move("top");
+    h.view.move("pageDown");
+    const paged = shown();
+    expect(paged, "pageDown moves off the top").not.toBe(top);
+    h.view.move("pageUp");
+    expect(shown(), "pageDown then pageUp comes back").toBe(top);
+
+    /**
+     * **The hunk pair is a seek, not a scroll**, so its round trip starts at a
+     * hunk rather than at the document top: `top` is offset 0 and hunk one's
+     * header is a row below it, so `top → nextHunk → prevHunk` correctly lands
+     * on the header and not where it began.
+     */
+    h.view.move("top");
+    h.view.move("nextHunk");
+    const firstHunk = shown();
+    h.view.move("nextHunk");
+    expect(shown(), "and on to the next").not.toBe(firstHunk);
+    h.view.move("prevHunk");
+    expect(shown(), "nextHunk then prevHunk comes back").toBe(firstHunk);
+
+    // **And the two absolute motions are idempotent**, which is the same claim
+    // where there is nowhere further to land: a valid offset stays valid.
+    for (const motion of ["top", "bottom"] as const) {
+      h.view.move(motion);
+      const once = shown();
+      h.view.move(motion);
+      expect(shown(), `${motion} twice is ${motion} once`).toBe(once);
+    }
+
+    // The non-vacuity guard: the two ends are different windows, so the
+    // assertions above are comparing something.
+    h.view.move("top");
+    const atTop = shown();
+    h.view.move("bottom");
+    expect(shown(), "the document is taller than its region").not.toBe(atTop);
+  });
+
+  it("T2.15 (C15 I25, C25 §8a A7): the ⌃c ladder's `overlays.pop()` reaches the owner — its own `pop()` then has nothing to do, and a fresh open is accepted", () => {
+    const h = harness();
+    const entry = h.transcript.append(docWith([PATCH("p1")]));
+    expect(h.view.open(entry, "p1")).toBeNull();
+    expect(h.overlays.pop()?.id, "the ladder's call, not the owner's").toBe(PATCH_VIEW_ID);
+    expect(h.overlays.top).toBeNull();
+    // F944's shape: the entry and offset outlived the layer, so `pop()` would
+    // have dismissed an id that had gone and answered true for nothing, and a
+    // motion would have re-clamped against a layer that was not there.
+    expect(h.view.pop()).toBe(false);
+    expect(h.view.move("pageDown")).toBe(false);
+    expect(h.view.open(entry, "p1"), "clean after the ladder").toBeNull();
+    expect(h.overlays.stack.map((l) => l.id)).toEqual([PATCH_VIEW_ID]);
   });
 });

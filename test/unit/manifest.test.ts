@@ -6,6 +6,7 @@ import {
   ARG_TYPES,
   createManifestStore,
   findTool,
+  jsonFlagFor,
   parseManifest,
   validateInvocation,
   visibleTools,
@@ -66,7 +67,7 @@ describe("C05 parse", () => {
 
     expect(Object.isFrozen(result.value)).toBe(true);
     expect(result.value.binary).toBe("widget");
-    // Nine from the fixture, plus the six Calcium ships (C05 §3). Written as
+    // Nine from the fixture, plus the seven Calcium ships (C05 §3). Written as
     // the sum rather than 15, so a change to either side names which moved.
     expect(result.value.tools).toHaveLength(9 + FRAMEWORK_TOOLS.length);
     expect(
@@ -97,6 +98,170 @@ describe("C05 parse", () => {
     const result = parseManifest(source);
     expect(result.ok).toBe(false);
     expect(errorsOf(result)).toContain('tools[0].flags: "flags" must be an array');
+  });
+
+  it("T1.22 (C04 I114, F995): a required field absent and a required field of the wrong type are two sentences", () => {
+    // **The residue of F995's class, in the component it named** (C04 §5b's
+    // last section). C05's parser had the same conflation at its own required
+    // fields, and the sentences come from C04's helpers rather than from a
+    // second copy — one rule with two implementations is two rules the day one
+    // of them is corrected.
+    //
+    // **Nothing asserted the old sentences.** Splitting `takeString` and
+    // `takeBoolean` changed the message at thirteen call sites and this suite
+    // stayed green, which is why the row exists at all: the one message
+    // assertion in the file is on a *conditional* requirement, and that one is
+    // deliberately unchanged.
+    const absentString = raw();
+    delete (absentString["tools"] as Record<string, unknown>[])[0]!["summary"];
+    expect(errorsOf(parseManifest(absentString))).toContain(
+      'tools[0].summary: "summary" is required and absent — supply a string',
+    );
+
+    const wrongString = raw();
+    (wrongString["tools"] as Record<string, unknown>[])[0]!["summary"] = 42;
+    expect(errorsOf(parseManifest(wrongString))).toContain(
+      'tools[0].summary: "summary" must be a string, got a number',
+    );
+
+    const absentBoolean = raw();
+    delete (absentBoolean["tools"] as Record<string, unknown>[])[0]!["local"];
+    expect(errorsOf(parseManifest(absentBoolean))).toContain(
+      'tools[0].local: "local" is required and absent — supply a boolean',
+    );
+
+    const wrongBoolean = raw();
+    (wrongBoolean["tools"] as Record<string, unknown>[])[0]!["local"] = "yes";
+    expect(errorsOf(parseManifest(wrongBoolean))).toContain(
+      'tools[0].local: "local" must be a boolean, got a string',
+    );
+
+    // **`null` is present and wrong**, not absent — C04 §5b row 2, because a
+    // far side spelling absence that way is shown its own bytes.
+    const nulled = raw();
+    (nulled["tools"] as Record<string, unknown>[])[0]!["summary"] = null;
+    expect(errorsOf(parseManifest(nulled))).toContain(
+      'tools[0].summary: "summary" must be a string, got null',
+    );
+
+    // **And the absent arm never reads *must be a …***, asserted rather than
+    // trusted — that is the wording that sent every reader to a value they had
+    // not written, and it is the whole of what the split is for.
+    const absentMessages = errorsOf(parseManifest(absentString)).filter((m) =>
+      m.includes("is required and absent"),
+    );
+    expect(absentMessages.length, "the absent arm fired").toBeGreaterThan(0);
+    for (const m of absentMessages) expect(m).not.toContain("must be a");
+
+    // The control: the untouched fixture draws none of these, without which
+    // every assertion above would pass against a parser that refuses every tool.
+    expect(errorsOf(parseManifest(raw())), "a valid manifest is not refused").toEqual([]);
+  });
+
+  it("T1.20 (I26): a manifest declares its JSON tokens, a verb overrides them, and absent is not empty", () => {
+    const declared = raw();
+    declared["jsonFlag"] = ["--format", "json"];
+    const m = parseManifest(declared);
+    expect(errorsOf(m)).toEqual([]);
+    if (!m.ok) return;
+    expect(m.value.jsonFlag, "the sequence survives the parse").toEqual(["--format", "json"]);
+
+    // **The verb replaces the manifest's whole, never merging**: one CLI is not
+    // uniform — `docker ps --format json` against
+    // `docker inspect --format '{{json .}}'` — and merging two token sequences
+    // has no meaning.
+    const perVerb = raw();
+    perVerb["jsonFlag"] = ["--format", "json"];
+    (perVerb["tools"] as Record<string, unknown>[])[0]!["jsonFlag"] = ["--format", "{{json .}}"];
+    const v = parseManifest(perVerb);
+    expect(errorsOf(v)).toEqual([]);
+    if (!v.ok) return;
+    expect(v.value.tools[0]?.jsonFlag).toEqual(["--format", "{{json .}}"]);
+    expect(v.value.jsonFlag, "and the manifest's is untouched").toEqual(["--format", "json"]);
+
+    // **`[]` parses and is not absent**, which is the distinction the three
+    // states rest on: absent inherits and empty appends nothing.
+    const empty = raw();
+    (empty["tools"] as Record<string, unknown>[])[0]!["jsonFlag"] = [];
+    const z = parseManifest(empty);
+    expect(errorsOf(z)).toEqual([]);
+    if (!z.ok) return;
+    expect(z.value.tools[0]?.jsonFlag, "declared as no tokens").toEqual([]);
+    expect("jsonFlag" in (z.value.tools[1] ?? {}), "and absent on its neighbour").toBe(false);
+
+    // **The arm that keeps the rest from being a rewrite**: a manifest with no
+    // `jsonFlag` parses and carries none, so the seam supplies `["--json"]` and
+    // every manifest written before the member is unchanged. The default is
+    // deliberately not written in here — a parser that did would make
+    // *declared as --json* and *not declared* the same value on the round trip.
+    const bare = parseManifest(raw());
+    expect(errorsOf(bare)).toEqual([]);
+    if (!bare.ok) return;
+    expect("jsonFlag" in bare.value, "absent stays absent").toBe(false);
+  });
+
+  it("T1.21 (I26): jsonFlag is refused on a local verb, and refused when malformed", () => {
+    // A local verb is never spawned, so the declaration cannot take effect —
+    // `interactive`'s refusal for `interactive`'s reason.
+    const onLocal = raw();
+    const tools = onLocal["tools"] as Record<string, unknown>[];
+    const localTool = tools.find((t) => t["local"] === true);
+    expect(localTool, "the fixture has a local verb to hang this on").toBeDefined();
+    localTool!["jsonFlag"] = ["--json"];
+    expect(errorsOf(parseManifest(onLocal)).join("\n")).toContain(
+      "is local and declares jsonFlag",
+    );
+
+    const notArray = raw();
+    tools0(notArray)["jsonFlag"] = "--json";
+    expect(errorsOf(parseManifest(notArray))).toContain(
+      'tools[0].jsonFlag: "jsonFlag" must be an array of strings, got a string',
+    );
+
+    const notStrings = raw();
+    tools0(notStrings)["jsonFlag"] = ["--format", 7];
+    expect(errorsOf(parseManifest(notStrings)).join("\n")).toContain("[1] is not a string");
+
+    const emptyToken = raw();
+    tools0(emptyToken)["jsonFlag"] = ["--format", ""];
+    expect(errorsOf(parseManifest(emptyToken)).join("\n")).toContain("[1] is empty");
+
+    // **The control**, without which every arm above passes against a parser
+    // that refuses every `jsonFlag`: the same declaration on a spawned verb.
+    const spawned = raw();
+    const spawnedTool = (spawned["tools"] as Record<string, unknown>[]).find(
+      (t) => t["local"] !== true,
+    );
+    expect(spawnedTool, "and a spawned one").toBeDefined();
+    spawnedTool!["jsonFlag"] = ["--json"];
+    expect(errorsOf(parseManifest(spawned))).toEqual([]);
+  });
+
+  it("T1.20b (I26): the verb wins whole, absent inherits, and empty is a declaration", () => {
+    // **The resolution has its own row because the parser's do not reach it.**
+    // Swapping the two operands here — the manifest winning over the verb —
+    // leaves every parse assertion green, which is the shape a seam-level row
+    // exists to catch.
+    const m = (over: Record<string, unknown>) => ({ ...fixture(), ...over }) as never;
+    const tool = (over: Record<string, unknown>) =>
+      ({ name: "t", local: false, summary: "", args: [], flags: [], ...over }) as never;
+
+    expect(
+      jsonFlagFor(m({ jsonFlag: ["--format", "json"] }), tool({ jsonFlag: ["-o", "json"] })),
+      "the verb replaces the manifest's, whole",
+    ).toEqual(["-o", "json"]);
+    expect(
+      jsonFlagFor(m({ jsonFlag: ["--format", "json"] }), tool({})),
+      "absent inherits",
+    ).toEqual(["--format", "json"]);
+    expect(
+      jsonFlagFor(m({ jsonFlag: ["--format", "json"] }), tool({ jsonFlag: [] })),
+      "and empty is a declaration of no tokens, not an absence",
+    ).toEqual([]);
+    expect(
+      jsonFlagFor(m({}), tool({})),
+      "nothing declared anywhere resolves to nothing, and the seam supplies the default",
+    ).toBeUndefined();
   });
 
   it("T1.7 (I4): values iff enum, pattern iff pattern", () => {
@@ -197,7 +362,7 @@ describe("C05 findTool", () => {
     expect(findTool(fixture(), [])).toBeNull();
   });
 
-  it("T1.15: a hidden tool is absent from visibleTools and still resolves", () => {
+  it("T1.15 (I14): a hidden tool is absent from visibleTools and still resolves", () => {
     // Asserted together. Split into two tests both pass while the intent —
     // invocable, not offered — goes missing between them.
     const m = fixture();
@@ -510,6 +675,71 @@ describe("C05 validate", () => {
     expect(parsed.value.tools.find((t) => t.name === "ps")?.view).toBeUndefined();
   });
 
+  it("T1.23 (I20, I24): view is refused with local, on the tool and on a flag, and the two controls say which field the refusal reads", () => {
+    // **The defect this closes was invisible to every other row in this file**
+    // (F1022, closing F23 and F129). `view` with `interactive` and `view` with
+    // `oneShot` both fail at parse, so a suite indexed by *does an inert
+    // declaration fail* tested the two arms that had a refusal and agreed. The
+    // pair below parsed, sealed, validated and ran, and the only symptom was a
+    // transcript entry where a view had been declared — C18 classifies on
+    // `tool.local` first and `isViewInvocation` is read on the `app` route and
+    // nowhere else, so nothing between the manifest and the frame said so.
+    const findGuide = (source: Record<string, unknown>): Record<string, unknown> =>
+      (source["tools"] as Record<string, unknown>[]).find((t) => t["name"] === "guide")!;
+
+    const REFUSAL =
+      'tools[7].view: "guide" is local and declares view — a local verb is handled ' +
+      "in-process and never reaches the route that opens one, so the declaration is " +
+      "inert; a local verb that wants a view pushes it from its handler, as `/profile` does";
+
+    // The tool-level pair — F23's form.
+    const toolView = raw();
+    findGuide(toolView)["view"] = true;
+    expect(errorsOf(parseManifest(toolView))).toContain(REFUSAL);
+
+    // The flag-level pair — F129's form, and I24's rule: a cross-field refusal
+    // reads *every* declaration of each field it names. A rule that read only
+    // `tool.view` would pass the row above and repeat F118 here.
+    const flagView = raw();
+    findGuide(flagView)["flags"] = [
+      { name: "wide", type: "bool", view: true, summary: "open it as a view" },
+    ];
+    expect(errorsOf(parseManifest(flagView))).toContain(REFUSAL);
+
+    // **Control 1 — the same declaration on a spawned tool parses.** Without it
+    // the two rows above pass against a parser that refuses every `view`, which
+    // is the state T1.20's `streams` arm exists to prevent one axis over.
+    const spawned = raw();
+    const tools = spawned["tools"] as Record<string, unknown>[];
+    const edit = tools.find((t) => t["name"] === "edit")!;
+    delete edit["interactive"];
+    edit["flags"] = [];
+    edit["view"] = true;
+    const okSpawned = parseManifest(spawned);
+    expect(okSpawned.ok, errorsOf(okSpawned).join("\n")).toBe(true);
+    if (okSpawned.ok) {
+      expect(okSpawned.value.tools.find((t) => t.name === "edit")?.view).toBe(true);
+    }
+
+    // **Control 2 — the untouched fixture draws no such error**, so the corpus
+    // the rule resolves against is non-empty and `guide` is a `local` tool
+    // whether or not this row edits it. A fabricated violation whose control is
+    // missing cannot tell a firing rule from an empty corpus.
+    expect(errorsOf(parseManifest(raw())).filter((m) => m.includes("is local and declares view"))).toHaveLength(0);
+
+    // **Control 3 — the axes are independent, and this is the row that makes
+    // the rule about the tier rather than about flags on local verbs.** A
+    // `shellOnly` switch on the same local tool parses: I21 is transmission and
+    // I20 is the tier, and a refusal reading the wrong field would fail here
+    // while passing everything above it (§8a row 18).
+    const shellOnly = raw();
+    findGuide(shellOnly)["flags"] = [
+      { name: "wide", type: "bool", shellOnly: true, summary: "widen the output" },
+    ];
+    const okShellOnly = parseManifest(shellOnly);
+    expect(okShellOnly.ok, errorsOf(okShellOnly).join("\n")).toBe(true);
+  });
+
   it("T1.18 (I17): a conflict is reported once, whichever side declares it", () => {
     // One-directional is how an app ordinarily writes it, and deduplicating by
     // name order dropped exactly those. Mutual is one mistake, so it stays one
@@ -592,4 +822,8 @@ function enumFlag(source: Bag, index: number): Bag {
 
 function promoteArg(source: Bag): Bag {
   return (toolAt(source, 3)["args"] as Bag[])[0]!;
+}
+
+function tools0(source: Bag): Bag {
+  return (source["tools"] as Bag[])[0]!;
 }

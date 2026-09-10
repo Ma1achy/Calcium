@@ -292,7 +292,7 @@ describe("C01 signals", () => {
     expect(exit).toHaveBeenCalledWith(130);
   });
 
-  it("T3.12 (C10): SIGTSTP releases, removes its handler, re-raises", () => {
+  it("T3.12 (I16, C10): SIGTSTP releases, removes its handler, re-raises with default disposition", () => {
     const { lifecycle, stdout } = harness();
     lifecycle.acquire();
 
@@ -307,7 +307,7 @@ describe("C01 signals", () => {
     expect(lifecycle.suspended).toBe(true);
   });
 
-  it("T3.13: SIGCONT re-acquires, reinstalls SIGTSTP, notifies onResume once", () => {
+  it("T3.13 (I15): SIGCONT re-acquires, reinstalls SIGTSTP, notifies onResume once — and sets no flag", () => {
     const { lifecycle, stdout } = harness();
     lifecycle.acquire();
     const resumed = vi.fn();

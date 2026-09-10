@@ -16,9 +16,12 @@
  */
 import { spinnerIntervalMs } from "./glyphs.js";
 import { animatesByContent, rampCadenceMs } from "./ramp.js";
-import type { Block, BlockKind, Status } from "../../data/viewmodel/index.js";
+import type { Block, BlockKind, KnownBlockKind, Status } from "../../data/viewmodel/index.js";
 
-export const ANIMATES: Readonly<Record<BlockKind, boolean>> = Object.freeze({
+// **`KnownBlockKind` and not `BlockKind`** (C04 I119): the union is open and
+// this table is the framework's own. Keyed on the open union it would demand
+// an entry for a kind an app declared and this build never heard of.
+export const ANIMATES: Readonly<Record<KnownBlockKind, boolean>> = Object.freeze({
   code: false,
   comparison: false,
   events: false,
@@ -63,7 +66,11 @@ function childrenOf(block: Block): readonly Block[] {
  * about which kinds are in scope.
  */
 export function tickIntervalOf(block: Block): number | null {
-  if (ANIMATES[block.kind] === true) {
+  // **Read through a widening cast, for the reason `rampExtentOf` states**
+  // (C04 I119): the declaration is the exhaustiveness assertion and the read is
+  // total. `=== true` was already the right comparison — an app's kind answers
+  // `undefined` and is not animated by nature.
+  if ((ANIMATES as Readonly<Partial<Record<BlockKind, boolean>>>)[block.kind] === true) {
     return block.kind === "status" ? spinnerIntervalMs((block as Status).spinner) : spinnerIntervalMs();
   }
   // By content (C09 I54): a moving ramp asks for the default set's cadence

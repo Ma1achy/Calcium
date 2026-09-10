@@ -6,7 +6,8 @@
 // type-checks `test/`, so a `@ts-expect-error` that stops being an error fails
 // the build — which makes it the one assertion here that a passing run of this
 // file would not catch on its own.
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { execSync } from "node:child_process";
+import { fstatSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { SCAN_BUDGET_MS } from "../support/budget.js";
 
@@ -171,5 +172,77 @@ describe("C21 boundaries", () => {
     expect(exits).toHaveLength(100);
     expect(exits.filter((e) => e.code === null)).toHaveLength(34);
     expect(r.live).toHaveLength(0);
+  });
+});
+
+describe("C21 §4 — handoff's stdio and its process group", () => {
+  it("T2.10 (I7): a handed-off child shares this process group and this fd 1", async () => {
+    // **Facts a fake cannot supply.** `nodeSpawn` is imported rather than
+    // injected here, so a spy would assert the options object this file wrote —
+    // the test agreeing with itself. A real child can be asked two questions
+    // whose answers come from the OS: which process group it is in, and what
+    // its descriptor 1 actually points at. Both are the invariant.
+    //
+    // The contrast is the point: C21's *other* spawn is `detached` on purpose
+    // (I2, T6.1), so *shares our group* is a decision this route makes rather
+    // than a default it inherited.
+    const runner = createProcessRunner({ env: process.env, stdin: {} });
+    // **`out/` is not tracked and not gitignored — it is a directory every
+    // developer machine grows and a fresh checkout does not have** (F1087). The
+    // child's last statement writes here, so without this the child throws
+    // `ENOENT`, exits 1, and the assertion below reports a *process* fact —
+    // "the child ran to completion" — about a missing directory. Red on the
+    // first CI run this branch ever had, green on every machine that has ever
+    // run a probe.
+    mkdirSync("out", { recursive: true });
+    const report = `out/handoff-${String(process.pid)}.json`;
+    // `process.getpgrp` does not exist in Node, so the child asks `ps` — the
+    // same question `groupMembers` asks, from the other side of the spawn.
+    const child =
+      "const fs=require('node:fs');" +
+      "const cp=require('node:child_process');" +
+      "const s=fs.fstatSync(1);" +
+      "const pgid=Number(cp.execSync('ps -o pgid= -p '+process.pid).toString().trim());" +
+      `fs.writeFileSync(${JSON.stringify(report)},` +
+      "JSON.stringify({pgid,dev:s.dev,ino:s.ino,rdev:s.rdev}));";
+
+    const exit = await runner.handoff(["node", "-e", child], { cwd: () => process.cwd() });
+    expect(exit.code, "the child ran to completion").toBe(0);
+
+    const seen = JSON.parse(readFileSync(report, "utf8")) as Record<string, number>;
+    rmSync(report, { force: true });
+
+    // Not detached: a detached child leads a group of its own, so this is the
+    // one number that separates the two spawn routes.
+    const ours = Number(
+      execSync(`ps -o pgid= -p ${String(process.pid)}`).toString().trim(),
+    );
+    expect(seen["pgid"], "the child shares this process group").toBe(ours);
+
+    // Inherited: descriptor 1 is *ours*, identified by what it points at rather
+    // than by anything the child was told. A piped spawn gives it a fresh pipe,
+    // whose inode differs.
+    const own = fstatSync(1);
+    expect(
+      [seen["dev"], seen["ino"], seen["rdev"]],
+      "the child's fd 1 is this process's, not a pipe",
+    ).toEqual([own.dev, own.ino, own.rdev]);
+  });
+
+  it("T2.10b (I7): the handoff spawn passes `stdio: \"inherit\"` and never `detached`", () => {
+    // The structural half, and it is over the one call site rather than the
+    // file: `spawn` and `spawnPty` are detached or piped by design, so a scan
+    // for `detached` across C21 would report them and say nothing about this.
+    const src = readFileSync("src/data/process/runner.ts", "utf8");
+    const body = /handoff\(argv: readonly string\[\], opts: SpawnOptions\): Promise<Exit> \{([\s\S]*?)\n    \},/.exec(
+      src,
+    );
+    expect(body, "handoff's body").not.toBeNull();
+    const stripped = body![1]!.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    expect(stripped, "inherited").toMatch(/stdio:\s*"inherit"/u);
+    expect(/\bdetached\b/.test(stripped), "and not detached").toBe(false);
+    // The control: `detached` is a word this file does use, elsewhere, so its
+    // absence here is a reading of this route rather than of a dead pattern.
+    expect(/\bdetached\b/.test(src), "the corpus is not empty").toBe(true);
   });
 });

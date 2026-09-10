@@ -36,7 +36,7 @@ import type { ProducerContext } from "../data/adapters/types.js";
 import { overflowNotice, withOverflowNotice } from "../data/adapters/overflow.js";
 import { createEmulator } from "../data/emulator/emulator.js";
 import { BODY_INDENT } from "./entry-layout.js";
-import { isViewInvocation } from "../data/manifest/index.js";
+import { isViewInvocation, jsonFlagFor } from "../data/manifest/index.js";
 import type { ValidationResult } from "../data/manifest/index.js";
 import { b } from "./builders/index.js";
 import { liveDeclarations } from "./builders/live.js";
@@ -187,6 +187,9 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       history: () => deps.history.entries,
       bindings: () => deps.bindings(),
       stop: deps.stop,
+      // C28 §3c's view, for `/profile` (C23 I68) — the row is in
+      // `FRAMEWORK_TOOLS`, so a handler missing here is what `seal()` refuses.
+      profileView: deps.profileView,
     }),
   )) {
     local.register(verb, handler);
@@ -330,6 +333,16 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    */
   type Settle = Readonly<{ line: string; into: EntryId | null }>;
 
+  /**
+   * A slot reserved before its document existed (C22 I99).
+   *
+   * **Deliberately not a `Settle`.** `route` takes one, and every submission it
+   * routes has a line: I29 records the line as typed at settlement, on every
+   * terminal path. A lineless arm inside `Settle` would be a second way for a
+   * submission to enter no history, which is the defect I29 exists to forbid.
+   */
+  type IntoSlot = Readonly<{ line?: undefined; into: EntryId }>;
+
   /** A submission routed as it was typed — the ordinary case. */
   const now = (line: string): Settle => ({ line, into: null });
 
@@ -354,7 +367,16 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
      * The submission this settles, when it settles one (I29). Absent at the four
      * sites that are not submissions — the same test that always gated history.
      */
-    settle?: Settle,
+    settle?: Settle | IntoSlot,
+    /**
+     * How the entry is appended, when it is appended.
+     *
+     * **Here rather than at the call site**, because this is the one place a
+     * document reaches the transcript and *how* is part of that. C22 I99's
+     * reservation is the only caller that needs it: a slot must be streaming or
+     * `settle` will refuse to fill it (C13 §2).
+     */
+    opts?: Parameters<typeof deps.transcript.append>[1],
   ): string | null => {
     const line = settle?.line;
     let id: string | null = null;
@@ -363,10 +385,21 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // has its entry; appending here would put a row on screen when it was
       // typed and a second when it ran.
       if (settle?.into != null) {
-        deps.transcript.settle(settle.into, doc);
-        id = settle.into;
+        const outcome = deps.transcript.settle(settle.into, doc);
+        // **The refusal is read, and this is the first caller that could see
+        // one** (C22 I99). `unknown` is a `/clear` between the reserve and the
+        // settle: the slot the user emptied is gone, and a document settled
+        // into it would vanish with no refusal anywhere — so it appends.
+        //
+        // `settled` is left exactly as it was. A route settling twice is a
+        // caller bug this change did not measure, and appending there would
+        // put a second copy on screen for one submission.
+        id =
+          outcome.ok || outcome.reason !== "unknown"
+            ? settle.into
+            : deps.transcript.append(doc, opts);
       } else {
-        id = deps.transcript.append(doc);
+        id = deps.transcript.append(doc, opts);
       }
       declareLive(id, doc.blocks);
       if (line !== undefined) recordHistory(line, doc);
@@ -997,13 +1030,13 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     // `line` is read throughout; `settle` carries where its document goes.
     const { line } = settle;
     guard.take("local", verb);
-    const startedAt = deps.clock();
+    const startedAt = deps.elapsed();
     // **A local verb is a call** (I55, §8g row 12; the design's §18 — *the tools
     // are the manifest*), so it settles as a card like the adapter route: the
     // header over the handler's blocks. `argv` here is already the arguments —
     // the caller sliced the verb off — so it is the header's `args` as it stands.
     const call = { name: verb, args: argv.join(" ") };
-    const carded = (doc: ViewDocument): ViewDocument => cardOver(doc, call, deps.clock() - startedAt, deps.capabilities);
+    const carded = (doc: ViewDocument): ViewDocument => cardOver(doc, call, deps.elapsed() - startedAt, deps.capabilities);
     try {
       const handler = local.get(verb);
       if (handler === undefined) {
@@ -1020,7 +1053,15 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         );
         return;
       }
-      const produced = await handler(argv, {
+      // **`local`, not `handler`** (C28 I36). `handler` is the input path's
+      // name — whichever key handler `router.dispatch` resolves to — and groups
+      // as `input`; this route produces a `ViewDocument` in this process, so it
+      // is `compute`. This round's plan called both of them `handler`.
+      //
+      // Called directly when unprofiled rather than through a no-op wrapper:
+      // the wrapper is an allocation and a promise hop on the path that is
+      // meant to cost nothing at `off`.
+      const invoke = async () => handler(argv, {
         // **`null`, and C07 §3a cell B records that it is right by accident.**
         // The local route cannot open a view — C18 classifies on `tool.local`
         // first and `isViewInvocation` is read only on the `app` route — so a
@@ -1033,8 +1074,14 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         // one is open would replace the layer under the first handler's promise
         // — the host owns that, not this call site.
         ask: deps.confirm.ask,
+        ...(deps.profile === undefined ? {} : { profile: deps.profile }),
         args,
       });
+      // A local handler may return synchronously, and `trace` brackets a
+      // promise seam — so `invoke` is `async` and the profiled path costs one
+      // microtask more than the bare one. Once per command, against a route
+      // that has already awaited.
+      const produced = await (deps.trace === undefined ? invoke() : deps.trace("local", invoke));
       // **C23 states the command, not the handler** (I15, C22 I33) — the same
       // argument as C07 I16 makes for `doc.command` on the adapter side, and the
       // same one I13 makes for `meta`: the framework knows what was submitted
@@ -1060,7 +1107,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         command: line,
         verb,
         argv,
-        durationMs: deps.clock() - startedAt,
+        durationMs: deps.elapsed() - startedAt,
       });
       appendAndCommit(carded(doc), settle);
       // A02 Seam 4's theme row: `theme.setTheme` → `scheduler.invalidate`.
@@ -1126,10 +1173,16 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     try {
       const transport = deps.transport.for(verb);
       const streams = result.tool.streams ?? false;
+      // **The caller resolves it, so C06 never reads C05** (C05 I26, C06 I25,
+      // F1). `streams`' seam exactly, one field up.
+      const loaded = deps.manifest.manifest;
+      const jsonFlag =
+        loaded === null ? result.tool.jsonFlag : jsonFlagFor(loaded, result.tool);
       const invocation = {
         verb,
         argv: result.argv,
         streams,
+        ...(jsonFlag === undefined ? {} : { jsonFlag }),
         // 0 is unbounded, which is what a follow needs (C06 commitment 7).
         timeoutMs: streams ? 0 : DEFAULT_TIMEOUT_MS,
         signal: controller.signal,
@@ -1352,11 +1405,15 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         deps.capabilities,
         tick,
       );
-    // The card's clock. C23's own (`deps.clock`, C22-injected), never `tick`:
-    // C03 coalesces and drops that under load (C04 I66, C09 I32). `let`,
-    // because an approval restarts it (I60, §8f P1): the figure counts from
-    // when the tool starts, not from when the question was asked.
-    let startedAt = deps.clock();
+    // The card's clock. C23's own (`deps.elapsed`, C22-injected), never `tick`:
+    // C03 coalesces and drops that under load (C04 I66, C09 I32). **`elapsed`
+    // and not `clock`** (F973): the figure is a duration, the wall clock is a
+    // time of day that can be stepped between the two reads, and under C28's
+    // positional replay a wall-derived figure sat on the channel the header's
+    // second hand is served from. `let`, because an approval restarts it (I60,
+    // §8f P1): the figure counts from when the tool starts, not from when the
+    // question was asked.
+    let startedAt = deps.elapsed();
 
     // **A deferred submission already has one, and this is the site the compiler
     // could not check** (roadmap 33). `into` type-checks at every one of the
@@ -1402,7 +1459,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     const finishCard = (outcome: string): void => {
       deps.transcript.patch(
         pendingId,
-        { op: "replace", blockId: call.id, block: header(deps.clock() - startedAt, outcome) },
+        { op: "replace", blockId: call.id, block: header(deps.elapsed() - startedAt, outcome) },
         "shell",
       );
     };
@@ -1429,7 +1486,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         guard.release();
         return;
       }
-      startedAt = deps.clock();
+      startedAt = deps.elapsed();
       // The word goes with the wait: the head reads the spinner alone until the
       // readout's first wake brings the figure — the readout's own first write
       // is a second away, and a head still saying `waiting` while the tool runs
@@ -1464,10 +1521,15 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // means a single document, which is the safe direction — a verb wrongly
       // streamed would hold a subscription nothing ends.
       const streams = result.tool.streams ?? false;
+      // The same resolution, from the same function (C05 I26, F1).
+      const loaded = deps.manifest.manifest;
+      const jsonFlag =
+        loaded === null ? result.tool.jsonFlag : jsonFlagFor(loaded, result.tool);
       const invocation = {
         verb,
         argv: result.argv,
         streams,
+        ...(jsonFlag === undefined ? {} : { jsonFlag }),
         // 0 is unbounded, which is what a live view needs (C06 commitment 7).
         timeoutMs: streams ? 0 : DEFAULT_TIMEOUT_MS,
         signal: controller.signal,
@@ -1518,7 +1580,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // this the settle replaced the card wholesale and `❯ /ps` over a table
       // was what a finished listing read — §9c's settled state on this route
       // was reached by no path.
-      settleWithDocument(pendingId, cardOver(doc, call, deps.clock() - startedAt, deps.capabilities));
+      settleWithDocument(pendingId, cardOver(doc, call, deps.elapsed() - startedAt, deps.capabilities));
       recordHistory(line, doc); // I29 — the app route's settlement.
 
       // C23 I7 — declared, never inferred. A verb declaring none leaves `$_`
@@ -1537,7 +1599,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       );
       // I55, §8g row 11 — the status box is the body and the verdict is the
       // header's: two statements of one fact, and the header is the one 1-bit keeps.
-      settleWithDocument(pendingId, cardOver(failed, call, deps.clock() - startedAt, deps.capabilities));
+      settleWithDocument(pendingId, cardOver(failed, call, deps.elapsed() - startedAt, deps.capabilities));
       recordHistory(line, failed); // I29 — a failure is a settlement.
       deps.scheduler.commit("completion");
     } finally {
@@ -2166,6 +2228,11 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   const refresh = createRefreshDriver({
     transcript: deps.transcript,
     clock: deps.clock,
+    elapsed: deps.elapsed,
+    // Passed through rather than re-derived: this pipeline was handed one
+    // bracket and the driver needs the same one, so a `livefetch` span nests
+    // under whatever route opened it (C28 I36).
+    ...(deps.trace === undefined ? {} : { trace: deps.trace }),
     capabilities: deps.capabilities,
     schedule: deps.schedule,
     commit: (reason) => void deps.scheduler.commit(reason),
@@ -2175,6 +2242,12 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     // `origin: "refresh"`.** The other two patch, and a patch carries no `meta`.
     append: (text) =>
       void appendAndCommit(noticeDoc("", text, "info", { origin: "refresh" })),
+    // **The other channel, and it is the one every swallowed failure uses**
+    // (C23 I48, I70, §5a). A refused patch is a defect in what the shell built,
+    // reported where `resetFocus` and a throwing append are reported rather than
+    // as a `refresh` notice — and `contain` is what deduplicates it, so a part
+    // refusing on every tick says it once.
+    fault: contain,
     stopping: () => deps.session().stopping,
     // **A second seam, because the two hosts are different components.** §3b
     // commits that an entry and a pushed view are driven by *the same code*,
@@ -2237,7 +2310,42 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     // C22 §4 step 7 (C22 I44). Through `appendAndCommit` like everything else,
     // which is what drives a live part in it and what lets `/clear` remove it.
     // No `line`: nothing was typed, so nothing enters history (I29).
-    greeting: (doc) => void appendAndCommit(doc),
+    greeting: (doc, into) => void appendAndCommit(doc, into == null ? undefined : { into }),
+
+    /**
+     * C22 I99 — the slot, taken before the producer is awaited.
+     *
+     * **Streaming**, because that is what unsettled means (C13 §2) and `settle`
+     * refuses an entry that has already settled. **Empty**, because the
+     * reservation must draw nothing: `commandRows("")` is no rows at all and
+     * `measureSequence([])` is zero, with C22 I85 ruling that an entry holding
+     * no blocks reserves no blank either. `origin: "action"` because the app
+     * did this and the user did not — it is only ever read on a reservation the
+     * producer then abandoned.
+     */
+    reserveGreeting: () =>
+      appendAndCommit(compose({ command: "", blocks: [], meta: { origin: "action" } }), undefined, {
+        streaming: true,
+      }),
+
+    /**
+     * C22 I99 — the slot released without a document, when the producer threw.
+     *
+     * **A bare settle, and it is not the second way in that C13 §3 argues
+     * against**: with no document `rev` does not move, so C14's
+     * `(entryId, rev, width)` slot is still describing what it holds. What
+     * moves is `streaming`, which is the whole point — C13 never evicts a
+     * streaming entry (C13 I6), so a reservation left alone outlives the cap.
+     *
+     * The outcome is not read because there is nothing to recover: `unknown` is
+     * a `/clear` that already removed the slot, and `settled` cannot arise —
+     * this runs only where the producer rejected and nothing filled it.
+     */
+    abandonGreeting: (into) => {
+      if (into === null) return;
+      deps.transcript.settle(into);
+      deps.scheduler.commit("input");
+    },
     dispose: () => void refresh.dispose(),
 
     /**

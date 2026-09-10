@@ -32,7 +32,7 @@ import { initialRegionHeight } from "./frame.js";
 import { elementsOfEntry, measureEntry } from "./entry-layout.js";
 import { createManifestStore, parseManifest, withThemeNames } from "../data/manifest/index.js";
 import type { ManifestError } from "../data/manifest/index.js";
-import { block as makeBlock, descendants } from "../data/viewmodel/index.js";
+import { NO_SPAN, block as makeBlock, descendants } from "../data/viewmodel/index.js";
 import type { Block, Plot, Result } from "../data/viewmodel/index.js";
 import { createProcessRunner } from "../data/process/runner.js";
 import {
@@ -41,7 +41,7 @@ import {
   type TransportRouter,
 } from "../data/transport/index.js";
 import type { ProcessRunner } from "../data/process/types.js";
-import { createBlockRegistry, type BlockDefinition } from "../presentation/blocks/index.js";
+import { createBlockRegistry } from "../presentation/blocks/index.js";
 import { BlockFaultLog } from "./block-faults.js";
 import { tableDefinition } from "../presentation/table/index.js";
 import { cursorable, legendHitAt, plotDefinition, sampleIndexAt } from "../presentation/plot/index.js";
@@ -73,11 +73,22 @@ import { createDecoder } from "../interaction/router/decode.js";
 import { createKeyEffects } from "./keys.js";
 import { createDocumentView } from "./document-view.js";
 import { createPatchView } from "./patch-view.js";
+import { createProfileView } from "./profile-view.js";
+import type { ProfileView } from "./profile-view.js";
 import type { FocusTarget, InputEvent, Key, KeyAction } from "../interaction/router/types.js";
 import { openHistory, SEARCH_ID } from "../interaction/history/index.js";
 import { detectCapabilities, type TerminalCapabilities } from "../terminal/capabilities.js";
 import { glyphs } from "../presentation/blocks/index.js";
-import { createFrameScheduler } from "../terminal/frame-scheduler.js";
+import { createFrameScheduler, type CommitReason } from "../terminal/frame-scheduler.js";
+import type { Profiler, ProfileReport, TraceFn } from "./profiling/types.js";
+import { instrumentRegistry, type ProbeableRegistry } from "./profiling/registry-probe.js";
+import { recordWriter, recordTransport, type Recording } from "./profiling/record.js";
+import {
+  instrumentAdapters,
+  instrumentCompletion,
+  instrumentTransport,
+} from "./profiling/async-probe.js";
+import type { Probe } from "../data/viewmodel/index.js";
 import {
   createTerminalLifecycle,
   terminalSize,
@@ -96,6 +107,106 @@ import { createSessionStore, type SessionStore } from "./state.js";
 import { createSurfaceHost, type SurfaceHost } from "./surface.js";
 
 /** Where the chosen variant lives (I40). One value, one file. */
+/**
+ * C28 I28 — a lifecycle whose suspension is visible to the profiler.
+ *
+ * Delegating through the prototype rather than copying: `acquired` is a getter
+ * over live state, and every other member is C01's to answer.
+ */
+/**
+ * C28 I46 — the frame tap, over C01's `writer`.
+ *
+ * **Here and not on `config.stdout`**, because C01 replaces `stdout.write` with
+ * a debug redirect at construction and keeps the original only on `writer`
+ * (C01 I9). A tap on the stream is inside that redirect: it forwards every
+ * frame into the debug sink and the session draws nothing, silently (F909).
+ * `writer` is C01's own definition of the renderer, which makes it the only
+ * handle on which *every frame this session drew* is true.
+ *
+ * `Object.create` rather than a spread, so the accessors C01 publishes stay
+ * live — the same reason `suspendAware` below takes a prototype view.
+ */
+function frameRecording<T extends { readonly writer: NodeJS.WriteStream }>(
+  lifecycle: T,
+  recording: Recording | null,
+): T {
+  if (recording === null) return lifecycle;
+  const view = Object.create(lifecycle) as { writer: NodeJS.WriteStream };
+  Object.defineProperty(view, "writer", { value: recordWriter(lifecycle.writer, recording) });
+  return view as T;
+}
+
+function suspendAware<T extends { suspend(): void; resume(): void }>(
+  lifecycle: T,
+  profiler: Profiler | undefined,
+): T {
+  if (profiler === undefined) return lifecycle;
+  const view = Object.create(lifecycle) as T;
+  view.suspend = (): void => {
+    // Set **before** the terminal is released, so a tick landing between the
+    // two is already labelled. The other order leaves a window whose width is
+    // whatever `suspend()` costs, and a sample in it is exactly the reading the
+    // invariant exists to refuse.
+    //
+    // **And cleared again if the suspend is refused.** C01's transition table
+    // throws on `suspend()` from a state with nothing acquired, and a flag set
+    // before a throw strands the session as permanently suspended in the
+    // report — every subsequent sample labelled unreadable, from one refusal.
+    // The set is the cheap half and the unwind is the correct half; keeping
+    // both is what makes ordering the calls this way safe.
+    profiler.setSuspended(true);
+    try {
+      lifecycle.suspend();
+    } catch (err) {
+      profiler.setSuspended(false);
+      throw err;
+    }
+  };
+  view.resume = (): void => {
+    // And cleared **after** the terminal is reacquired, for the mirror of the
+    // same reason. A refused `resume()` leaves the flag set, which is right:
+    // nothing was reacquired, so the session is still not the foreground.
+    lifecycle.resume();
+    profiler.setSuspended(false);
+  };
+  return view;
+}
+
+/**
+ * C28 §3c — the profiler view's timer is disposed when the terminal is released.
+ *
+ * **The same decoration as `suspendAware`, one method over.** `stop()` calls
+ * `graph.lifecycle.release()` after the report is taken and the profiler
+ * disposed (C28 I38, `session.ts`), and that is the moment the view's timer
+ * must stop: the scheduler drops a commit while unacquired (C03 I1), so a tick
+ * after release draws nothing — what it would do is hold the process open for
+ * up to `VIEW_REFRESH_MS` and call `report()` on a disposed recorder. A signal
+ * exit takes C01's `releaseInternal` and then `process.exit`, which takes the
+ * timer with it.
+ *
+ * `dispose` is read at release rather than captured, because the lifecycle is
+ * built at step 7 and the view at step 10: the root hands the wrapper a thunk
+ * over a slot it fills later, which is `lastInputAt`'s pattern for a value one
+ * step writes and an earlier step's closure reads.
+ *
+ * Gated on the profiler as `suspendAware` is: without one the view never arms a
+ * timer — `open` refuses — and *off is free* (C22 I92) includes a wrapper the
+ * unprofiled session would otherwise carry.
+ */
+function disposingOnRelease<T extends { release(): void }>(
+  lifecycle: T,
+  profiler: Profiler | undefined,
+  dispose: () => void,
+): T {
+  if (profiler === undefined) return lifecycle;
+  const view = Object.create(lifecycle) as T;
+  view.release = (): void => {
+    dispose();
+    lifecycle.release();
+  };
+  return view;
+}
+
 export function themePath(stateDir: string): string {
   return `${stateDir}/theme`;
 }
@@ -243,15 +354,37 @@ export type ConstructDeps = Readonly<{
   /** C22's own `stop`, for `/exit` and the confirm rungs. */
   stop: (reason: StopReason) => Promise<number>;
   /** The frame. C03 takes both; `frame.ts` supplies them. */
-  render: () => void;
-  repaint: () => void;
+  /** The reason C03 chose for this frame (C03 I16). */
+  render: (reason: CommitReason) => void;
+  repaint: (reason: CommitReason) => void;
   frame: FrameQueries;
   onFatal: (err: unknown) => never;
   /** Diagnostics sink — C01 owns the redirection, this is where lines land. */
   debug?: (line: string) => void;
+  /**
+   * C28, or absent — and absent is the overwhelming case (C22 I92).
+   *
+   * Decoration, not instrumentation (A02 §2 Seam 6): the graph wraps two of the
+   * functions it was going to build anyway — the scheduler's `commit` and the
+   * registry's `measureChild` — and hands the wrapped ones down. No component
+   * below `src/shell/` learns that a profiler exists.
+   */
+  profiler?: Profiler;
 }>;
 
 export type Graph = Readonly<{
+  /**
+   * C28's instrumentation seam, or absent (C28 I30).
+   *
+   * **On the graph rather than threaded**, because the two render paths that
+   * need it — `#paintDeps` and `visibleRows` — already share this and nothing
+   * else. Three parameters that have to agree is how one of them ends up not
+   * agreeing.
+   *
+   * The L0 type, so this line adds no import edge that MG1 would refuse and the
+   * registry still knows nothing about a profiler.
+   */
+  probe?: Probe;
   /**
    * The live entry's elements, from the registry's one walk (C26 §5, §8b.4).
    *
@@ -351,6 +484,18 @@ export type Graph = Readonly<{
    */
   scratch: RenderScratchStore;
   overlays: ReturnType<typeof createOverlayManager>;
+  /**
+   * C28 §3c's view, on the graph so a row can open it without a verb.
+   *
+   * The other two owners are not here, and the difference is who can reach
+   * them: a patch view opens from an action and a document view from a verb's
+   * declaration, and both are driven end to end through the pipeline. This one
+   * is reached by `/profile`, whose manifest row lands with `execution.ts`'s
+   * pass (C23 T4.66); the rows about the bracket, the tier and the ladder need
+   * the view before that lands, and they need it on a real graph — the commit
+   * seam under test is this file's (C28 T4.4, T4.6–T4.9).
+   */
+  profileView: ProfileView;
   history: Awaited<ReturnType<typeof openHistory>>;
   editor: ReturnType<typeof createEditor>;
   theme: ThemeStore;
@@ -530,19 +675,23 @@ export async function constructGraph(
     // returns a table, so it was rendering its own output as source.
     //
     // Before `config.blocks`, so an app may still replace any of them.
-    blocks.register(tableDefinition as unknown as BlockDefinition);
-    blocks.register(plotDefinition as unknown as BlockDefinition);
-    blocks.register(patchDefinition as unknown as BlockDefinition);
+    blocks.register(tableDefinition);
+    blocks.register(plotDefinition);
+    blocks.register(patchDefinition);
     for (const definition of config.blocks) blocks.register(definition);
 
     const adapters = createAdapterRegistry(config.adapters);
+    // `adapt` and `adaptPatch`, bracketed at the seam rather than at the two
+    // call sites in `execution.ts` — the root built this registry, so it is
+    // the root that wraps it (C22 I93, C28 I36).
+    if (deps.profiler !== undefined) instrumentAdapters(adapters, deps.profiler);
 
     const manifest = createManifestStore();
 
     // **Both arms are parsed here, and that is the whole of I23** (C22 §3a).
     //
     // The object arm used to be taken as already-parsed and refused when it
-    // lacked Calcium's six verbs — which no author could supply, because
+    // lacked Calcium's own verbs — which no author could supply, because
     // `parseManifest` derives them and is exported from no entry point. The path
     // arm handed `readFile`'s **string** to a function that requires a record,
     // with no `JSON.parse` between them, so it had never run. `createTui` could
@@ -592,6 +741,9 @@ export async function constructGraph(
       completion.register(source);
     }
     for (const source of config.completionSources) completion.register(source);
+    // After the sources, because `request` is what is replaced and
+    // registration does not go through it (C28 I36).
+    if (deps.profiler !== undefined) instrumentCompletion(completion, deps.profiler);
 
     return { blocks, adapters, manifest, completion, blockFaults, completionFaults };
   })().catch((cause: unknown) => {
@@ -611,6 +763,21 @@ export async function constructGraph(
     built.adapters.seal();
     built.manifest.seal();
   });
+
+  // --- 4a. C28's render tree, by decoration (C28 I31) -----------------------
+  //
+  // **After the seal and before anything renders.** The registry's members are
+  // arrow own-properties, so replacing them here is what the class's own
+  // `this.measure` / `this.render` — and the `measureChild` / `renderChild` it
+  // hands down — will resolve through. Installed once; nothing below
+  // `src/shell/` learns a profiler exists. See `profiling/registry-probe.ts`
+  // for why this reaches every depth and which three calls it cannot see.
+  if (deps.profiler !== undefined) {
+    instrumentRegistry(
+      built.blocks as unknown as ProbeableRegistry,
+      deps.profiler,
+    );
+  }
 
   // --- 5. stores ------------------------------------------------------------
   //
@@ -652,6 +819,7 @@ export async function constructGraph(
     // — C14 takes the reader half, and passing the store satisfies it.
     const viewport = createViewport(transcript, {
       width: size.columns,
+      ...(deps.profiler === undefined ? {} : { probe: deps.profiler.asProbe() }),
       // **The region's height, not the terminal's** (C22 I34, C14 I22). The
       // first `#render` overwrites this from the composed frame; it is computed
       // rather than left at `size.rows` because `visible()` is answerable before
@@ -664,7 +832,32 @@ export async function constructGraph(
       // **Through the entry's layout** (C22 I83, §6l.4 D): a card's body is
       // measured at `width − 2`, by the same function `visibleRows` renders it
       // through, so the rows C14 counts are the rows the frame draws.
-      measureSequence: (blocks, width) => measureEntry(built.blocks.measureSequence, blocks, width),
+      // **The measure seam** (A02 §2 Seam 6), and it runs on a height-cache
+      // **miss**, not every frame. The sentence here used to say the opposite —
+      // *whatever the cache holds* — and measuring it is what found the hole in
+      // C28 I42's first repair: over twenty retained trees this path opened no
+      // element span at all, and three appended entries then opened one each
+      // (F892b). A path that is quiet because a cache is warm and a path that
+      // does not exist produce the same trees.
+      //
+      // **No attribution here any more, and its removal is the point.** This
+      // used to time the whole sequence and hand every block in it
+      // `spent / blocks.length` — an equal share of one total. A plot measures
+      // 260× a rule, so the resulting `byKind` reported how many blocks of each
+      // kind were on screen and nothing about what any of them cost. Real
+      // per-block figures come from the registry wrapper installed at step 4a,
+      // which is entered once per block at every depth; this seam is left as
+      // the plain call it decorates.
+      // **The entry scope for the measure half** (C28 I42, C14 I29). The other
+      // half is `visibleRows`' own loop; this is the path C14 takes on a height
+      // cache miss, which on a resize is every entry. Without it an entry's cost
+      // reads low by whatever the cache missed, and the shortfall lands in the
+      // same bucket as the chrome — where a reader is told to expect one (F892b).
+      measureSequence: (blocks, width, entryId) => {
+        using _entry =
+          entryId === undefined ? NO_SPAN : (deps.profiler?.entry(entryId) ?? NO_SPAN);
+        return measureEntry(built.blocks.measureSequence, blocks, width);
+      },
       // C14 I20 / C22 I33 — the command line is chrome the composer draws, so
       // it is part of the height the index virtualises against. **The same
       // function that draws it**, or the two arithmetics part company and the
@@ -678,7 +871,7 @@ export async function constructGraph(
     // the key cannot express is an entry that no longer exists: its slot would
     // hold a rendered document nothing can reach, for the life of the session.
     // C14's `HeightCache` takes the same two changes for the same reason.
-    const rendered = new RenderCache();
+    const rendered = new RenderCache(deps.profiler?.asProbe());
     // **One subscription for both** (C04 I48). The rendered rows and the offset
     // that chose them are the same fact about the same entry, and two callbacks
     // would be two places for a future eviction path to reach one and miss the
@@ -708,7 +901,7 @@ export async function constructGraph(
     // document that held the mesh. Adding it to the callback would be a third
     // place for a future eviction path to reach two of — which is exactly the
     // argument the comment above makes, applied by *not* doing it.
-    const scratch = new RenderScratchStore();
+    const scratch = new RenderScratchStore(deps.profiler?.asProbe());
     transcript.subscribe((change) => {
       if (change.kind === "evict") {
         for (const id of change.ids) {
@@ -1000,8 +1193,16 @@ export async function constructGraph(
   // After 5 and 6 (I1): `beforeRelease` closes over the history store and the
   // runner, and C01's signal handlers exit the process after releasing — so
   // cleanup not wired by now never runs on a signal path at all.
+  // **Decorated once, here** (C22 I93, C28 I28). Every consumer of `lifecycle`
+  // gets the suspend-aware view, not only the handoff path: `suspend()` means
+  // the terminal belongs to somebody else whatever asked for it, and a second
+  // caller learning to suspend without learning to tell the profiler is exactly
+  // how F903 happened the first time.
+  // The profiler view is built at step 10 and its timer must stop at release
+  // (C28 §3c, §9b S5); the slot is filled there and read by the wrapper below.
+  let profileViewRef: ProfileView | null = null;
   const lifecycle = at("lifecycle", () =>
-    createTerminalLifecycle({
+    frameRecording(disposingOnRelease(suspendAware(createTerminalLifecycle({
       stdout: config.stdout,
       stdin: config.stdin,
       capabilities: detection.capabilities,
@@ -1011,21 +1212,54 @@ export async function constructGraph(
       onFatal: deps.onFatal,
       beforeRelease: makeBeforeRelease(runner, stores.history, [stores.transcriptWriter]),
       ...(deps.debug === undefined ? {} : { debug: deps.debug }),
-    }),
+    }), deps.profiler), deps.profiler, () => profileViewRef?.dispose()), config.recording),
   );
 
   // --- 8. the frame scheduler -----------------------------------------------
   // After the lifecycle: C03 takes `lifecycle` and `write`, so there is nothing
   // to construct before it exists.
-  const scheduler = at("scheduler", () =>
-    createFrameScheduler({
+  const scheduler = at("scheduler", () => {
+    const inner = createFrameScheduler({
       render: deps.render,
       repaint: deps.repaint,
       capabilities: detection.capabilities,
       lifecycle,
       write: (s) => void lifecycle.writer.write(s),
-    }),
-  );
+    });
+    const prof = deps.profiler;
+    if (prof === undefined) return inner;
+    // **The commit seam.** `wait` is dated from the earliest commit still
+    // unserved (C28 I5) and only this wrapper sees them all; C03 reads no clock
+    // and must not start. The `own` flag is how a frame the profiler's own
+    // surface raised is told from one the reader caused (C28 I12).
+    return Object.freeze({
+      ...inner,
+      commit: (reason: CommitReason) => {
+        // **`false` here is what this seam knows, and it is no longer the whole
+        // answer** (C28 I12). A frame raised by the profiler's own surface
+        // reaches this seam as an ordinary `stream` commit and nothing at this
+        // level can tell it from the reader's — the block id that would
+        // distinguish them is C23's and does not travel with a commit. The
+        // origin travels with the *call* instead: a surface brackets its
+        // refresh in `profiler.own`, and `commit` reads the bracket.
+        //
+        // `profile-view.ts` is the one surface that brackets — every redraw
+        // it raises, on the timer and on a key, runs inside `profiler.own`
+        // (C28 I49) — so this line is unchanged from the day it passed `false`
+        // unconditionally and now means what it says: the seam's own answer,
+        // with the bracket's read on top. C28 T4.4 drives it through this
+        // scheduler; T1.92 asserts it at the view.
+        prof.commit(reason, false);
+        inner.commit(reason);
+      },
+      get pending() {
+        return inner.pending;
+      },
+      get contaminated() {
+        return inner.contaminated;
+      },
+    });
+  });
 
   // --- 8a. the two cross-layer effects C22 owns (A02 Seam 4) ----------------
   //
@@ -1050,6 +1284,37 @@ export async function constructGraph(
   let refreshAnchors: () => void = () => undefined;
 
   at("resize", () => {
+    // C28 I46 — **the resize tap, here rather than on the `stdout` stream.** The
+    // recorder's first draft compared `stdout.columns` against the size it saw
+    // last, which is a dimension read outside `lifecycle.ts` (SS42) and records
+    // a width before the session has adopted one. C01 owns when a size becomes
+    // true, and this is where it says so.
+    //
+    // **The initial size is taken here and not from a first event**, because
+    // `onResize` fires on `SIGWINCH` and on nothing else — the draft's comment
+    // claimed it fired once on acquire, and a recording of a session nobody
+    // resized would then have carried no size at all.
+    //
+    // It is written as `geometry` and not as the first `resize`: a replay
+    // delivers resizes as signals, and a signal for the size the session
+    // already has contaminates a frame the recording drew as a difference
+    // (F912). See `RecordedEvent`'s `geometry` arm.
+    if (config.recording !== null) {
+      const rec = config.recording;
+      rec.geometry(lifecycle.size());
+      lifecycle.onResize((size) => void rec.resize(size));
+    }
+
+    // **The profiler is told the width from the same place** (C28 I26, SS42).
+    // The initial one is `lifecycle.size()` for the same reason the recording's
+    // is: `onResize` fires on `SIGWINCH` and on nothing else, so a session
+    // nobody resized would leave every span carrying a null width.
+    const prof = deps.profiler;
+    if (prof !== undefined) {
+      prof.resized(lifecycle.size().columns);
+      lifecycle.onResize((size) => void prof.resized(size.columns));
+    }
+
     lifecycle.onResize(() => {
       // **The viewport is not resized here, and that is where the 544 ms was**
       // (C03 I15, F423). The comment this replaces said *the width, and not the
@@ -1131,7 +1396,13 @@ export async function constructGraph(
       // own fix.
       // A thunk: `entryAtRegionRow` is declared below, with the other pointer
       // helpers, and the router is built here. Called at dispatch, never now.
-      deps: routerDeps(stores, runner, scheduler, deps.frame, () => pipeline, confirm, (row) => entryAtRegionRow(row)),
+      deps: {
+        ...routerDeps(stores, runner, scheduler, deps.frame, () => pipeline, confirm, (row) => entryAtRegionRow(row)),
+        // C28 I39 — the `handler` span. Spread in here rather than threaded
+        // through `routerDeps`, whose seven parameters are all C16's own and
+        // none of which the profiler belongs among.
+        ...(deps.profiler === undefined ? {} : { probe: deps.profiler.asProbe() }),
+      },
     }),
   );
 
@@ -1172,6 +1443,36 @@ export async function constructGraph(
   });
 
   /**
+   * The profiler's view — C28 §3c, and the third owner of a `kind: "view"` layer.
+   *
+   * Built beside the other two and for their reason: `/profile`'s handler is
+   * registered inside the pipeline and closes over this. **Always built, and
+   * given `null` when there is no profiler**, so the verb exists in every
+   * session and refuses in a document rather than vanishing (C23 I68); without
+   * a profiler it arms no timer and pushes no layer, so *off is free* holds.
+   *
+   * **The commit is the decorated `scheduler`'s and the bracket is the view's**
+   * (C28 I49). The seam eight steps up passes `false` for what it knows; the
+   * view wraps `update` and this call in `profiler.own`, and the seam reads the
+   * bracket. Nothing about the seam changed for this — which was the point of
+   * writing it that way.
+   *
+   * `detection.capabilities` whole (C09 I49, F828): `profilePane`'s ASCII
+   * default is for a caller with no terminal, and this one has the resolved
+   * record — after C22 I49's overrides, as every other consumer here takes it.
+   */
+  const profileView = createProfileView({
+    overlays: stores.overlays,
+    profiler: deps.profiler ?? null,
+    capabilities: detection.capabilities,
+    measureSequence: (blocks, width) => built.blocks.measureSequence(blocks, width),
+    region: deps.frame.overlayRegion,
+    schedule: config.schedule,
+    redraw: (reason) => void scheduler.commit(reason),
+  });
+  profileViewRef = profileView;
+
+  /**
    * `--no-bg`, for as long as the invocation that set it is the last `/theme`
    * (C22 I66).
    *
@@ -1196,7 +1497,31 @@ export async function constructGraph(
 
       transcript: stores.transcript,
       scheduler,
-      transport: config.transport ?? defaultTransport(config, runner, session),
+      // **The report reaches a surface through the local route and no other**
+      // (C24 I31, C22 I93). A `/profile` verb is where it is wanted, and
+      // `LocalContext` is L4; `ProducerContext` is L0 and putting it there
+      // would be the upward edge MG1 exists to refuse.
+      ...(deps.profiler === undefined
+        ? {}
+        : { profile: (): ProfileReport => deps.profiler?.report() as ProfileReport }),
+      // `for(verb)` is the seam and not the two `invoke` calls, because
+      // `VerbTransport` is what execution holds — wrapping the lookup reaches
+      // `invoke` and `stream` without either call site changing (C28 I36).
+      // C28 I46 — the recording tap sits **outside** the profiler's, so a
+      // recording holds what the far side actually returned rather than what
+      // the instrumented wrapper handed on. The two are the same value today;
+      // ordering them deliberately is what stops that being an accident.
+      transport: ((r) => (config.recording === null ? r : recordTransport(r, config.recording)))(
+        ((r) => (deps.profiler === undefined ? r : instrumentTransport(r, deps.profiler)))(
+          config.transport ?? defaultTransport(config, runner, session),
+        ),
+      ),
+      // C23's local verb route, which the root cannot decorate: the registry
+      // is built inside `createExecutionPipeline`. The narrowest thing that
+      // works is one function, so `execution.ts` never names a profiler.
+      ...(deps.profiler === undefined
+        ? {}
+        : { trace: deps.profiler.trace.bind(deps.profiler) as TraceFn }),
       adapters: built.adapters,
       manifest: built.manifest,
       blocks: built.blocks,
@@ -1209,6 +1534,11 @@ export async function constructGraph(
       overlays: stores.overlays,
       patchView,
       documentView,
+      // C28 §3c — for `/profile`'s handler, the way `stop` reaches `/exit`.
+      // Read by `execution.ts` when it hands `shippedHandlers` the view; until
+      // then `shippedHandlers` includes no `profile` handler, so the manifest's
+      // six and the registry's six still reconcile (C23 I27, T1.64).
+      profileView,
       /**
        * C23 I46 — whether anyone is looking at a live part's host.
        *
@@ -1251,6 +1581,8 @@ export async function constructGraph(
       resetFocus: () => router.resetFocus(),
       stop: deps.stop,
       clock: config.clock,
+      // The card's and the readouts' durations (C23 I52, I53, I54, F973).
+      elapsed: config.elapsed,
       schedule: config.schedule,
       openUrl: config.openUrl ?? defaultOpener(config.platform, runner, session),
 
@@ -1878,6 +2210,7 @@ export async function constructGraph(
     overlayRegion: deps.frame.overlayRegion,
     patchView,
     documentView,
+    profileView,
     releaseView: () => void pipeline.releaseView(),
     focus,
     // The entry half of B1's pair; the exit is already on the `⌃c` rung below.
@@ -2360,9 +2693,27 @@ export async function constructGraph(
   // Startup step 8's mechanism (I24). C16's decoder owns no timer and C01
   // delivers bytes and interprets none; neither is wired to the other by
   // existing, and nothing else in the tree may read stdin.
+  // C28 I30 — the narrowing view, taken once. `asProbe()` builds an object, and
+  // the two seams below are on the input path.
+  const probe = deps.profiler?.asProbe();
+
   const decoder = at("decoder", () =>
     createDecoder({ capabilities: detection.capabilities, now: config.clock }),
   );
+
+  /**
+   * The `decode` span — bytes to events (C28 I39).
+   *
+   * **A wrapper rather than a decoration of the decoder**, because the two
+   * things worth timing are `push` and `poll` and they are the same work
+   * reached two ways: a chunk arriving, and the disambiguation deadline
+   * expiring. One name over both is what makes `spans.decode.count` the number
+   * of times bytes were interpreted.
+   */
+  const decoded = (read: () => readonly InputEvent[]): readonly InputEvent[] => {
+    using _s = probe?.span("decode") ?? NO_SPAN;
+    return read();
+  };
 
   at("input", () => {
     let wake: Disposable | null = null;
@@ -2383,9 +2734,18 @@ export async function constructGraph(
      * The commit still belongs to a non-empty batch: nothing changed, so
      * nothing needs drawing.
      */
+    // **The `route` span, per event and not per batch** (C28 I39). A batch is
+    // whatever one read of stdin held, so a per-batch figure moves with how the
+    // OS chunked the input rather than with what a key cost to route — and a
+    // paste of two hundred characters would read as one very slow route.
+    const routed = (e: InputEvent): void => {
+      using _s = probe?.span("route") ?? NO_SPAN;
+      router.dispatch(e);
+    };
+
     const deliver = (events: readonly InputEvent[]): void => {
       if (events.length > 0) {
-        for (const e of events) router.dispatch(e);
+        for (const e of events) routed(e);
         // After the keys and before the frame: the peek follows the focus the
         // keys just moved (C15 §2a).
         syncPeek();
@@ -2442,11 +2802,11 @@ export async function constructGraph(
       if (at === null) return;
       wake = config.schedule(() => {
         wake = null;
-        deliver(decoder.poll());
+        deliver(decoded(() => decoder.poll()));
       }, Math.max(0, at - config.clock()));
     }
 
-    lifecycle.onInput((chunk) => void deliver(decoder.push(chunk)));
+    lifecycle.onInput((chunk) => void deliver(decoded(() => decoder.push(chunk))));
   });
 
   const surface = createSurfaceHost({
@@ -2527,12 +2887,14 @@ export async function constructGraph(
         ...pipeline.faults,
         ...built.completionFaults.messages,
       ]),
+    ...(deps.profiler === undefined ? {} : { probe: deps.profiler.asProbe() }),
     blocks: built.blocks,
     blockFaults: built.blockFaults,
     adapters: built.adapters,
     manifest: built.manifest,
     completion: built.completion,
     ...stores,
+    profileView,
     runner,
     lifecycle,
     scheduler,
@@ -2676,7 +3038,9 @@ function defaultTransport(
       mode: "subprocess",
       binary: config.binary,
       runner,
-      clock: { now: config.clock, schedule: config.schedule },
+      // **`elapsed`, because `durationMs` is a duration** (C06 I19, F972): the
+      // wall clock is C22's time of day and the one the chrome draws.
+      clock: { elapsed: config.elapsed, schedule: config.schedule },
       env: config.env,
       cwd: session.cwd,
     }),

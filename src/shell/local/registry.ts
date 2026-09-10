@@ -16,6 +16,7 @@
  * than a missing command at the prompt.
  */
 
+import type { ProfileReport } from "../profiling/types.js";
 import type { Manifest } from "../../data/manifest/index.js";
 import type { Block, LocalDocument } from "../../data/viewmodel/index.js";
 import type { ProducerContext } from "../../data/adapters/types.js";
@@ -73,6 +74,15 @@ export type LocalContext = ProducerContext & Readonly<{
    * handle and no path by which it could tell the two apart if there were.
    */
   ask: (opts: AskOptions) => Promise<string>;
+  /**
+   * C28's report, or absent — and absent is the overwhelming case.
+   *
+   * **Here rather than on `ProducerContext`**, which is L0: a `ProfileReport`
+   * is L4's, and putting it on the shared context would be an upward import
+   * MG1 exists to refuse. A local verb is where a `/profile` surface is reached,
+   * so this is the seam that needs it and the only one that can have it.
+   */
+  profile?: () => ProfileReport;
   /**
    * What C05 parsed out of this invocation (C22 I66, C05 §4).
    *

@@ -15,11 +15,22 @@
 
 import { block } from "../../src/data/viewmodel/index.js";
 import { measurable, FULL_CAPS } from "./render.js";
+import { tableDefinition } from "../../src/presentation/table/index.js";
+import { plotDefinition } from "../../src/presentation/plot/index.js";
+import { patchDefinition } from "../../src/presentation/patch/index.js";
 import { place } from "../../src/viewport/overlay/index.js";
 import type { Layer, Placed, Region } from "../../src/viewport/overlay/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 
-const kit = measurable({ capabilities: FULL_CAPS });
+// **With the three kinds C09 does not register by default** (F959). Bare, an
+// unregistered `table`, `plot` or `patch` falls to `raw` and measures as the
+// wrapped lines of its JSON — so a view test windowing a pane that holds one
+// was windowing the wrong document and every height it asserted was the
+// instrument's. This is the registry `construct.ts` builds, less the app's.
+const kit = measurable({
+  capabilities: FULL_CAPS,
+  definitions: [tableDefinition, plotDefinition, patchDefinition],
+});
 
 export const registry = {
   measureSequence: (blocks: readonly Block[], width: number): number =>

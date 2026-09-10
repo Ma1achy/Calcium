@@ -641,3 +641,243 @@ describe("C16 §2 — reset across a suspension", () => {
 });
 
 const HEURISTIC_ELAPSE = 30;
+
+/**
+ * C16 §2a / §2b — the string-terminated arm and I12 at every ESC arm.
+ *
+ * **Written with named byte constants, not literal control characters.** Every
+ * other row in this file spells `ESC` as the byte, which is invisible in a diff
+ * and does not survive being copied; the rows below distinguish `ST` from `BEL`
+ * and a reader has to be able to see which one a row is asserting.
+ */
+const ESC = "\u001b";
+const ST = `${ESC}\\`;
+const BEL = "\u0007";
+
+/**
+ * **Eight string-terminated replies, captured verbatim** from the two emulators
+ * in this container on 2026-09-10 under Xvfb — `test/support/x-emulator.ts`, the
+ * same harness T5.8 uses. At HEAD before the arm they decoded to
+ * 23 + 23 + 24 + 14 + 23 + 17 + 10 + 30 = **164** key events, each opening with
+ * a bindable `Alt-` key.
+ *
+ * **Both terminator forms are here because which one arrives is not a property
+ * of the terminal.** XTerm 398 mirrors the query's terminator — three
+ * `BEL`-terminated OSC queries came back `BEL`-terminated — while its
+ * `XTVERSION`, a DCS reply with no `BEL` form, came back `ST`-terminated in the
+ * same capture; kitty 0.41.1 answers `ST` whatever it is asked. An arm reading
+ * one form is wrong on one of the two emulators installed here.
+ */
+const REAL_REPLIES: readonly (readonly [string, string])[] = [
+  ["XTerm(398) OSC 11, BEL-terminated", `${ESC}]11;rgb:ffff/ffff/ffff${BEL}`],
+  ["XTerm(398) OSC 10, BEL-terminated", `${ESC}]10;rgb:0000/0000/0000${BEL}`],
+  ["XTerm(398) OSC 4;1, BEL-terminated", `${ESC}]4;1;rgb:cdcd/0000/0000${BEL}`],
+  ["XTerm(398) XTVERSION — DCS, ST", `${ESC}P>|XTerm(398)${ST}`],
+  ["kitty 0.41.1 OSC 11, ST-terminated", `${ESC}]11;rgb:0000/0000/0000${ST}`],
+  ["kitty 0.41.1 XTVERSION — DCS, ST", `${ESC}P>|kitty(0.41.1)${ST}`],
+  ["kitty graphics OK — APC, ST", `${ESC}_Gi=31;OK${ST}`],
+  ["kitty graphics EBADPNG — APC, ST", `${ESC}_Gi=31;EBADPNG:Not a PNG file${ST}`],
+];
+
+/**
+ * The three CSI-shaped replies, which decoded to **0 events before the arm and
+ * 0 after it** — the control that makes this a question about the *shape* of a
+ * reply rather than about a protocol. The same three questions asked in a CSI
+ * form were already safe to receive; F1035 measured these and T5.8 locates the
+ * first of them in a live kitty capture.
+ */
+const CSI_REPLIES: readonly (readonly [string, string])[] = [
+  ["DECRQM 2026", `${ESC}[?2026;2$y`],
+  ["keyboard flags", `${ESC}[?0u`],
+  ["DA1", `${ESC}[?62;c`],
+];
+
+describe("C16 §2a — a control string is consumed whole (I32)", () => {
+  it("T1.3t (I32, §2a): eight real replies from two emulators decode to zero events, and all five introducers with them", () => {
+    // **Asserted per reply and as a total.** A row phrased as *no `Alt-_`* is
+    // satisfied by a decoder that drops the introducer and types the payload,
+    // which is what the cap's recovery does deliberately and what a half-built
+    // arm does by accident.
+    let total = 0;
+    for (const [name, bytes] of [...REAL_REPLIES, ...CSI_REPLIES]) {
+      const { d } = decoder();
+      const events = feed(d, bytes);
+      total += events.length;
+      expect(events, `${name} reaches the application as nothing`).toEqual([]);
+      // **And the decoder is still reading**, which is the assertion the row
+      // was missing. `toEqual([])` is the same green for *consumed* and for
+      // *still waiting for a terminator*: with the `BEL` clause deleted, an
+      // XTerm OSC reply scans past its `BEL`, finds no `ST`, holds the whole
+      // thing in `pending` and emits nothing — and every row above passed. The
+      // mutation pass found it; nothing in a green run could (M2, F1043).
+      expect(names(feed(d, "a")), `${name}: the next key still decodes`).toEqual(["a"]);
+    }
+    expect(total, "164 events from the eight string replies at HEAD; the right number is none").toBe(0);
+
+    // **The class is the introducer set, not the three protocols that happened
+    // to be queried.** SOS and PM are sent by no terminal here and are in the
+    // arm because a set named for its first members becomes a membership rule.
+    for (const intro of ["P", "X", "]", "^", "_"]) {
+      const { d } = decoder();
+      expect(feed(d, `${ESC}${intro}payload${ST}`), `ESC ${intro} … ST`).toEqual([]);
+      expect(names(feed(d, "a")), `ESC ${intro}: consumed, not swallowed`).toEqual(["a"]);
+    }
+
+    // **The control that proves the fixture can move.** `ESC Q` is not an
+    // introducer, so the Meta arm still claims it — without this, an arm that
+    // swallowed *every* ESC pair would pass every assertion above.
+    const { d } = decoder();
+    expect(names(feed(d, `${ESC}Qpayload${ST}`))[0], "ESC Q is still Meta").toBe("Q");
+  });
+
+  it("T1.3t (I32, §2a row d): BEL closes an OSC and nothing else — the narrower rule", () => {
+    // XTerm answered three BEL-terminated OSC queries with BEL-terminated
+    // replies in one capture; its XTVERSION, a DCS reply with no BEL form, came
+    // back ST-terminated in the same capture.
+    const osc = decoder();
+    expect(feed(osc.d, `${ESC}]11;rgb:0/0/0${BEL}`), "OSC closes at BEL").toEqual([]);
+
+    // A BEL inside an APC payload is payload: kitty's graphics data is base64
+    // and its error text is prose. The string runs past it to the ST, so the
+    // whole thing is consumed and the `x` after the BEL never becomes a key.
+    const apc = decoder();
+    expect(feed(apc.d, `${ESC}_Gi=1;a${BEL}x${ST}`), "APC does not close at BEL").toEqual([]);
+    // The control: were BEL a terminator here, `x` and `Alt-\` would follow it.
+    expect(names(feed(apc.d, "z")), "and the decoder is still reading").toEqual(["z"]);
+  });
+
+  it("T1.3u (I32, §2a row b): a bare ST with no opener is still `Alt-\\`, and a bare BEL is still Ctrl-G", () => {
+    // **The rejection path.** The arm declines these bytes, and declining must
+    // leave nothing behind — which the terminated string in the same feed
+    // proves by decoding to nothing straight afterwards.
+    const { d } = decoder();
+    const events = feed(d, `${ST}${BEL}${ESC}_Gi=1;OK${ST}a`);
+    const label = (e: InputEvent): string =>
+      e.kind === "key" ? `${e.key.name}${e.key.meta ? "+meta" : ""}${e.key.ctrl ? "+ctrl" : ""}` : e.kind;
+    expect(events.map(label)).toEqual([
+      "\\+meta",
+      "g+ctrl",
+      "a",
+    ]);
+  });
+
+  it("T3.18 (I32, §2a trace 1, rows e/f/g): split chunks wait, a stray ESC ends the string, and the cap discards the introducer alone", () => {
+    // **trace 1 — split across two chunks.** At HEAD the first chunk emitted
+    // seven keys, so a split reply was worse than an unsplit one: the `Alt-_`
+    // fired before the terminal had finished speaking.
+    {
+      const { d } = decoder();
+      expect(feed(d, `${ESC}_Gi=31;`), "not yet decidable").toEqual([]);
+      expect(feed(d, `OK${ST}`), "and the second chunk completes it").toEqual([]);
+      expect(names(feed(d, "a")), "the decoder carried nothing over").toEqual(["a"]);
+    }
+
+    // **row e — a stray ESC ends the string as malformed** (ECMA-48 §8.3.14:
+    // the only ESC legal inside a control string opens ST). The arrow after it
+    // decodes on its own, and the payload before it is consumed rather than
+    // sprayed as keys.
+    {
+      const { d } = decoder();
+      expect(names(feed(d, `${ESC}]11;rgb${ESC}[A`))).toEqual(["up"]);
+    }
+
+    // **rows f and g — the cap.** A hazard the arm creates rather than one it
+    // repairs: an unterminated CSI ends on the next typed letter and a control
+    // string is bounded by nothing. The recovery discards the **introducer**
+    // and lets the payload decode on, which is the one disposition that cannot
+    // swallow what the reader typed.
+    {
+      const { d } = decoder();
+      expect(feed(d, `${ESC}]0;`), "held").toEqual([]);
+      expect(feed(d, "x".repeat(200)), "still held, under the cap").toEqual([]);
+      const past = feed(d, "x".repeat(60));
+      expect(past.length, "past the cap the whole payload decodes as keys").toBeGreaterThan(200);
+      expect(names(past)[0], "and the introducer is what was discarded").toBe("0");
+    }
+
+    // **The positive control for the cap**, and it is the assertion that says
+    // the bound is a bound rather than a truncation: a *terminated* reply of
+    // the same length is still consumed whole. Without it the row above passes
+    // for an arm that gives up at 256 bytes unconditionally.
+    {
+      const { d } = decoder();
+      expect(feed(d, `${ESC}_G${"x".repeat(300)}${ST}`), "300 bytes, terminated").toEqual([]);
+    }
+
+    // **And the usual recovery is not the cap.** Every escape sequence supplies
+    // the stray ESC of row e, so an unterminated introducer un-wedges on the
+    // reader's next arrow key — well before 256 printables.
+    {
+      const { d } = decoder();
+      feed(d, `${ESC}]0;no-end`);
+      expect(feed(d, "hello"), "swallowed, which is the cost row g names").toEqual([]);
+      expect(names(feed(d, `${ESC}[A`)), "the arrow ends it").toEqual(["up"]);
+      expect(names(feed(d, "world")), "and typing resumes").toEqual(["w", "o", "r", "l", "d"]);
+    }
+  });
+});
+
+describe("C16 §2b — I12 held on one ESC arm of four (F1045)", () => {
+  it("T3.19 (I12, §2b): a pasted OSC-8 hyperlink is one paste and no keys, and so are SS3, ESC+printable and a trailing ESC", () => {
+    // **`ls --hyperlink=auto`, `gh` and any terminal-aware pager emit OSC 8**,
+    // and a `PS1` line carries OSC 0 — so §2a's hole is reachable with nothing
+    // asking a terminal anything. At HEAD this emitted `Alt-]`, `Alt-\`,
+    // `Alt-]`, `Alt-\` **before** the paste event, and the payload arrived with
+    // its `]` and `\` missing.
+    {
+      const { d } = decoder();
+      feed(d, `${ESC}[200~`);
+      expect(feed(d, `see ${ESC}]8;;http://x${ST}here${ESC}]8;;${ST} ok`), "no keys out of a paste").toEqual([]);
+      const events = feed(d, `${ESC}[201~`);
+      expect(events).toHaveLength(1);
+      expect(events[0], "and the payload keeps its brackets").toEqual({
+        kind: "paste",
+        text: "see ]8;;http://x\\here]8;;\\ ok",
+      });
+    }
+
+    // The SS3 arm: `ESC O A` in a payload emitted `up`.
+    {
+      const { d } = decoder();
+      feed(d, `${ESC}[200~`);
+      expect(feed(d, `a${ESC}OAb`), "SS3 in a payload is payload").toEqual([]);
+      expect(feed(d, `${ESC}[201~`)[0]).toEqual({ kind: "paste", text: "aOAb" });
+    }
+
+    // The Meta arm: `ESC z` in a payload emitted `Alt-z`.
+    {
+      const { d } = decoder();
+      feed(d, `${ESC}[200~`);
+      expect(feed(d, `a${ESC}zb`), "ESC+printable in a payload is payload").toEqual([]);
+      expect(feed(d, `${ESC}[201~`)[0]).toEqual({ kind: "paste", text: "azb" });
+    }
+
+    // The fourth arm is not an arm: a **trailing lone ESC** emitted `escape` at
+    // the next `poll()`, because the disambiguation window answered a question
+    // it should not have been asked. It may be the head of the `CSI 201~` end
+    // marker, so it is not yet decidable — and T3.4's 1 s timeout is the
+    // backstop that already existed for a paste that stops arriving.
+    {
+      const { d, c } = decoder();
+      feed(d, `${ESC}[200~abc`);
+      expect(feed(d, ESC), "held").toEqual([]);
+      c.advance(60);
+      expect(d.poll(), "past the 50 ms window, still nothing — it is paste state").toEqual([]);
+      expect(feed(d, "[201~")[0], "and the ESC was the end marker's").toEqual({
+        kind: "paste",
+        text: "abc",
+      });
+    }
+
+    // **The control: the CSI arm, which is the one that already held.** A
+    // helper applied to three arms of four passes every row about the other
+    // three, so the arm that was right is asserted in the same test as the
+    // three that were not.
+    {
+      const { d } = decoder();
+      feed(d, `${ESC}[200~`);
+      expect(feed(d, `red ${ESC}[31mtext${ESC}[0m`), "CSI in a payload is payload").toEqual([]);
+      expect(feed(d, `${ESC}[201~`)[0]).toEqual({ kind: "paste", text: "red [31mtext[0m" });
+    }
+  });
+});

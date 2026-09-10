@@ -14,10 +14,19 @@ import type { ProcessRunner } from "../process/types.js";
 
 export type Invocation = Readonly<{
   verb: string;
-  /** `["ps", "--mine"]` — `--json` is appended by the transport (I4), never typed. */
+  /** `["ps", "--mine"]` — the JSON tokens are appended by the transport (I4), never typed. */
   argv: readonly string[];
   /** From the manifest. C06 does not read C05; the caller does. */
   streams: boolean;
+  /**
+   * The tokens asking this far side for JSON (C06 I25, C05 I26, F1).
+   *
+   * `streams`' seam exactly, and for the same reason: the caller resolves the
+   * verb's declaration against the manifest's and hands over the answer, so a
+   * transport never learns what a verb is. Absent means `["--json"]`; `[]`
+   * means append nothing.
+   */
+  jsonFlag?: readonly string[];
   /** 0 = unbounded, which is what live views use (commitment 7). */
   timeoutMs: number;
   signal: AbortSignal;
@@ -84,9 +93,17 @@ export interface TransportRouter {
  * asserts each rung against a counter rather than sleeping four seconds a case —
  * the same shape C03 takes its `schedule` in, so `fakeClock()` drives it
  * unchanged.
+ *
+ * **`elapsed`, not the wall clock** (F972). A duration is a difference between
+ * two reads, and the wall clock is the one that can be stepped between them;
+ * C22 injects a monotonic `elapsed` beside `clock` and that is the axis a
+ * duration belongs on. The member was `now` — C22's wall clock — for as long as
+ * nothing compared the two: C28's replay serves clock reads by position, and a
+ * transport reading the wall channel put the only two non-chrome reads on the
+ * clock the chrome draws a time of day from (F963).
  */
 export type Clock = Readonly<{
-  now: () => number;
+  elapsed: () => number;
   schedule: (fn: () => void, ms: number) => Disposable;
 }>;
 

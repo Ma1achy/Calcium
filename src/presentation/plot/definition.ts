@@ -23,7 +23,7 @@
 import type { AmbiguousWidth } from "../text.js";
 import type { ReactElement } from "react";
 import { paint, rows, slot, tone, type Span } from "../blocks/paint.js";
-import { cells, fitStyled, truncate } from "../text.js";
+import { cells, fitStyled, rowCells, truncate } from "../text.js";
 import { SGR_RESET } from "../../terminal/escapes.js";
 
 import { AXIS_GUTTER, FRAME_RIGHT, plotAreaRows, plotHeight } from "./height.js";
@@ -34,6 +34,7 @@ import {
   positionDomainOf, proportionDecisions, sharesOf, valueAxisOf, WAFFLE_ROWS,
 } from "./figure.js";
 import { treeArea } from "./tree.js";
+import { write } from "./chargrid.js";
 import { graphArea } from "./graph.js";
 import { sankeyArea, type SankeyCell } from "./sankey.js";
 import { curveRows, isBlank } from "./curve.js";
@@ -73,7 +74,7 @@ import { bubbleRows, scatterRows, stepRows } from "./scatter.js";
 import { plot3dRows } from "./scatter3.js";
 import { quartileRange } from "../../data/viewmodel/distribution.js";
 import { boxplotBand, boxplotColumn, bulletRow, forestRow, dumbbellRow, lagRow, timelineRow } from "./glyph-row.js";
-import { barColumn, barRow, lollipopRow, dotplotRow, stackedBarRow, funnelRow, ganttRow, waterfallRow, type BandRow } from "./categorical.js";
+import { barColumn, barRow, lollipopRow, dotplotRow, stackedBarRow, funnelRow, ganttRow, waterfallRow, type BandRow, type LabelClaim } from "./categorical.js";
 import { pairFor } from "./ramp.js";
 import { squareColumns } from "./aspect.js";
 import { waffleCells } from "./waffle.js";
@@ -91,7 +92,7 @@ import { smallMultiplesRows } from "./facet.js";
 import { seriesHidden } from "./visibility.js";
 import { stripHeights } from "./strips.js";
 import type { Annotation, OHLC, QuartileSummary, Plot, PlotForm, Series } from "../../data/viewmodel/index.js";
-import { HAS_HIDEABLE_SERIES } from "../../data/viewmodel/index.js";
+import { HAS_HIDEABLE_SERIES, NO_SPAN } from "../../data/viewmodel/index.js";
 import type { ColourRef, Style } from "../theme/index.js";
 import type { BlockDefinition, BlockKeyBinding, NavElement, RenderContext } from "../blocks/types.js";
 import type { MeasureFn } from "../../data/viewmodel/index.js";
@@ -148,6 +149,11 @@ const MIN_AREA = 4;
 
 /** A rasterised series and the colour it carries. */
 type Layer = Readonly<{
+  /**
+   * One row per area row, one glyph per cell — or, for a `"label"`, a label
+   * writer's joined cell array, whose wide clusters are followed by `""`
+   * (I118). The merge derives the cells back with `rowCells` (I119).
+   */
   glyphRows: readonly string[];
   ref: ColourRef;
   /**
@@ -434,45 +440,6 @@ function markedSpans(
   );
 }
 
-/**
- * Gridlines under a row of data spans (C12 I26, C12 I23).
- *
- * **Behind, never over.** A gridline drawn on top of a series is a series with a
- * hole in it, and at one cell per sample the hole *is* the sample. So the grid
- * supplies only the cells the data left blank — which is `mergedRow`'s own
- * first-non-blank rule, one layer further down.
- */
-function behind(
-  grid: string,
-  spans: readonly Span[],
-  ctx: RenderContext,
-): readonly Span[] {
-  if (grid.trim() === "") return spans;
-  const muted = tone("muted", ctx.theme, ctx.capabilities);
-  const out: Span[] = [];
-  let x = 0; // cells-ok — a column index
-  for (const span of spans) {
-    let run = "";
-    for (const ch of span.text) {
-      // **U+2800 is a blank too**, and it is the one a braille raster emits — a
-      // check for `" "` alone found no empty cells in a dot-grid row and the
-      // gridlines never appeared, on a style whose whole difference is that they
-      // do. The braille blank is a printing character that looks empty, which is
-      // the same trap the ink mask in `refdiff` had to be told about.
-      const empty = ch === " " || ch === "\u2800";
-      run += empty ? (grid[x] ?? " ") : ch; // cells-ok — a column index
-      x += 1; // cells-ok — a column index
-    }
-    // A run that was entirely blank now carries only gridline, so it takes the
-    // muted style rather than the layer's colour.
-    const wasBlank = span.text.replace(/[ \u2800]/gu, "") === "";
-    out.push(wasBlank && run.trim() !== ""
-      ? { text: run, style: muted }
-      : span.style === undefined ? { text: run } : { text: run, style: span.style });
-  }
-  return out;
-}
-
 /** Braille is `U+2800 + bits`, which is what makes the union below an OR. */
 const BRAILLE_BASE = 0x2800;
 const BRAILLE_TOP = 0x28ff;
@@ -484,7 +451,8 @@ function brailleBits(ch: string): number | null {
 }
 
 /**
- * Layers to one row of spans — **per dot where the vocabulary allows it** (C12 I40, §3u).
+ * Layers to one row of spans — **per dot where the vocabulary allows it**, with
+ * the gridlines behind (C12 I40, I119, I26, §3u).
  *
  * This took the whole cell to the first layer that inked it, and every figure
  * that composites is folded to braille *before* it arrives, so the second
@@ -505,6 +473,28 @@ function brailleBits(ch: string): number | null {
  * is a ruling — labels over polygons over frame — that a dot count would
  * overturn wherever the frame happened to be denser.
  *
+ * **A layer meets the merge as cells** (I119, F981). A label's row is a joined
+ * cell array — a cluster in one cell, `""` in the cells a wide one occupies
+ * after it (I118) — and this read every layer at column `x` as `[...row][x]`,
+ * a code-point index into a string that no longer carried the cells: a
+ * three-member family was five columns to that walk and two to the terminal,
+ * two CJK ideographs two and four, so every cell after a name on its row
+ * drifted, three left or two right, and the row came out short or clamped
+ * (F977). Each row is derived once by `rowCells` before the column loop —
+ * which also retires a whole-row spread per column, the width squared — and
+ * a `""` cell is the cluster before it: it goes to that layer, nothing is
+ * OR-ed or substituted into it, and the run receives nothing for it.
+ *
+ * **The gridlines are folded in** (I26, I23). Behind, never over: a gridline
+ * drawn on top of a series is a series with a hole in it, and at one cell per
+ * sample the hole *is* the sample. So `grid` supplies only the cells the data
+ * left blank — the first-non-blank rule one layer further down — and a run no
+ * layer inked that took a gridline is styled muted, while a gridline landing
+ * in a styled run keeps the run's colour. This was `behind()`, a second walk
+ * over the finished spans stepping one code point per cell, which read its
+ * gridline at the drifted column whenever a name held a cluster; one walk now,
+ * and the cell index is the only index.
+ *
  * At `colourDepth: 1` this path is not taken at all — the plot stacks (I6).
  */
 function mergedRow(
@@ -512,27 +502,49 @@ function mergedRow(
   rowIndex: number,
   layout: Layout,
   ctx: RenderContext,
+  /**
+   * The gridline row laid behind the data — `gridRow`'s string with the cross
+   * and the cursor over it (§3ad) — or nothing, which is every arm without
+   * furniture in the area: the pie, the radar, the stacked strips.
+   */
+  grid: string | null = null,
 ): readonly Span[] {
   const spans: Span[] = [];
   let turns = 0; // cells-ok — a contested-cell count
   let run = "";
   let runRef: ColourRef | null = null;
+  // **Whether the run took a gridline into a blank cell.** A run with no ref
+  // is blank by construction — a cell nobody inked is `" "` — so *wholly blank
+  // and holding a gridline* is *no ref and gridded*: `behind()`'s
+  // `wasBlank && run.trim() !== ""`, said in the merge's own terms.
+  let gridded = false;
+  // Indexed by cell. Every glyph the furniture draws is one cell — ASCII at
+  // `wide` (C09 §4) — so a code-point split is the cell array.
+  const gridCells = grid !== null && grid.trim() !== "" ? [...grid] : null;
+  const muted = gridCells === null ? null : tone("muted", ctx.theme, ctx.capabilities);
 
   const flush = (): void => {
     if (run === "") return;
     spans.push(
       runRef === null
-        ? { text: run }
+        ? gridded && muted !== null ? { text: run, style: muted } : { text: run }
         : { text: run, style: slot(runRef, ctx.theme, ctx.capabilities) },
     );
     run = "";
+    gridded = false;
   };
+
+  // Every layer's row as cells, once per row (I119) — the docstring says why.
+  const rows = layers.map((l) => rowCells(l.glyphRows[rowIndex] ?? "", ctx.capabilities.ambiguousWidth));
 
   for (let x = 0; x < layout.areaWidth; x += 1) {
     let cell = " ";
     let cellRef: ColourRef | null = null;
     let cellKind: Layer["kind"] | null = null;
     let bits = 0;
+    // A continuation cell — `""`, the second cell of a wide cluster — which
+    // the cluster before it already carries (I119).
+    let continuation = false;
     /**
      * The `"curve"` layers contending for this cell, in layer order (I44).
      *
@@ -542,8 +554,19 @@ function mergedRow(
      * nobody reads again.
      */
     const peers: { ref: ColourRef; ink: number }[] = [];
-    for (const layer of layers) {
-      const candidate = [...(layer.glyphRows[rowIndex] ?? "")][x] ?? " ";
+    for (const [i, layer] of layers.entries()) { // cells-ok — a layer index
+      const candidate = rows[i]![x] ?? " ";
+      if (candidate === "") {
+        // **Not blank: the cluster before it owns this cell** (I119). It goes
+        // to that layer and ends the cell as a letter would; under a cell an
+        // upper layer inked it contributes nothing, as any occluded candidate
+        // does (I44).
+        if (cellRef !== null) continue;
+        cellRef = layer.ref;
+        cellKind = layer.kind;
+        continuation = true;
+        break;
+      }
       if (isBlank(candidate)) continue;
       const dots = brailleBits(candidate);
       if (cellRef === null) {
@@ -594,6 +617,19 @@ function mergedRow(
     if (cellRef !== runRef) {
       flush();
       runRef = cellRef;
+    }
+    // Nothing for a continuation cell: the cluster already carries the cells
+    // it measures, and a gridline may not land inside a glyph.
+    if (continuation) continue;
+    if (gridCells !== null && (cell === " " || cell === "\u2800")) {
+      // **U+2800 is a blank too**, and it is the one a braille raster emits — a
+      // check for `" "` alone found no empty cells in a dot-grid row and the
+      // gridlines never appeared, on a style whose whole difference is that they
+      // do. The braille blank is a printing character that looks empty, which is
+      // the same trap the ink mask in `refdiff` had to be told about.
+      const under = gridCells[x] ?? " ";
+      if (under !== " ") gridded = true;
+      cell = under;
     }
     run += cell;
   }
@@ -752,7 +788,7 @@ function cursorColumn(block: Plot, cursorIdx: number, areaWidth: number): number
 }
 
 /**
- * A blank area row with the cursor's column dashed, for `behind()` (C12 I37).
+ * A blank area row with the cursor's column dashed, for `mergedRow`'s `grid` (C12 I37).
  *
  * **Behind the data and never over it.** `dashedVertical` is already the slot
  * for a reference line drawn beside data, and its own comment gives the reason:
@@ -768,7 +804,7 @@ function cursorRule(column: number | null, layout: Layout, ctx: RenderContext): 
     x === column ? g.dashedVertical : " ").join(""); // cells-ok — a column index
 }
 
-/** First non-blank of two reference rows, so `behind()` takes one string. */
+/** First non-blank of two reference rows, so `mergedRow` takes one `grid` string. */
 function overlay(over: string, under: string): string {
   if (under === "") return over;
   if (over.trim() === "") return under;
@@ -1253,7 +1289,11 @@ function overlaidRows(
     plotRow(
       i,
       byRow.get(i) ?? "",
-      behind(
+      mergedRow(
+        layers,
+        i,
+        withRight,
+        ctx,
         // **The cross over the grid over the cursor.** The cross shares the
         // grid's alphabet and they agree in the cells they share — the grid
         // draws where a value is written and zero is a value — so the order
@@ -1263,8 +1303,6 @@ function overlaidRows(
           crossRow(withRight, i, zeroRow, zeroColumn, ctx),
           overlay(gridRow(withRight, gridTicks, ctx, byRow.has(i)), cursor),
         ),
-        mergedRow(layers, i, withRight, ctx),
-        ctx,
       ),
       withRight,
       ctx,
@@ -1423,9 +1461,20 @@ function layoutFor(
   // One set of *labels* is drawn on both sides (I47); a callout is written only
   // on the right, so sizing the left column for it would waste the cells at
   // every width. Same content, two widths, one measurement each.
-  const right = sides.right // cells-ok — a cell width
-    ? Math.max(wanted, calloutWidth(block, caps.ambiguousWidth, stacked))
-    : 0;
+  //
+  // **And each of the two decides for itself whether it needs room** (C12 I122,
+  // F994). This was `sides.right ? max(wanted, calloutWidth(…)) : 0`, which
+  // makes a callout — *a name at the line's end* (I48) — conditional on the
+  // value scale being printed, a member it has nothing to do with (I47). The
+  // second arm never had the coupling: `rightRoom` takes the callout's reserve
+  // and the labels' reserve as two independent maxima, and **its own doc
+  // comment cites the expression above as the same thing in this arm's units**,
+  // which it was not. A sentence claiming parity with a mirror it does not
+  // match is what kept the two apart.
+  const right = Math.max( // cells-ok — a cell width
+    sides.right ? wanted : 0, // cells-ok — a cell width
+    calloutWidth(block, caps.ambiguousWidth, stacked),
+  );
   // **The frame's right edge is furniture and pays before the curve**, which is
   // the same rung it has always been: labels, then furniture, then the plot
   // area. A cell narrower is a curve; a cell narrower still is a `…`.
@@ -1435,6 +1484,9 @@ function layoutFor(
       gutter: left + AXIS_GUTTER,
       labelColumn: left,
       rightColumn: right,
+      // **The column may be the callout's alone** (C12 I122), so which axis was
+      // asked for is carried rather than inferred from the column's width.
+      rightLabels: sides.right,
       areaWidth: width - left - AXIS_GUTTER - rightGutterWidth(right),
       frame: true,
     };
@@ -1634,8 +1686,13 @@ function categoricalColumnForm(
    *
    * The *drawing* still uses the band's own `colWidth` — a five-column band
    * draws its raincloud five wide. Only the choice of figure is the chart's.
+   *
+   * `claim` is how a column asks for the cells its number wants (C12 I120,
+   * §6p). Granted or refused against **the composed row**, which is the only
+   * place two bands' numbers can be seen beside each other — a column builds
+   * once and can see no neighbour. Builders that write no number ignore it.
    */
-  columnBuilder: (categoryIndex: number, colWidth: number, rows: number, min: number, max: number, narrowest: number) => readonly string[],
+  columnBuilder: (categoryIndex: number, colWidth: number, rows: number, min: number, max: number, narrowest: number, claim: LabelClaim) => readonly string[],
   /**
    * The column's colour, where it is not the category's — **the parameter
    * `categoricalForm` already had** (C12 I42, §3v).
@@ -1670,7 +1727,19 @@ function categoricalColumnForm(
   const extra = layout.areaWidth - base * n; // cells-ok — a column width
   const widths = Array.from({ length: n }, (_, i) => base + (i < extra ? 1 : 0)); // cells-ok — a column width
 
-  const columns = widths.map((cw, i) => columnBuilder(i, cw, areaRows, range.min, range.max, base));
+  // **One claimer per composed row, and the columns are visited left to right**
+  // (C12 I120, §6p). A number sits on its own bar's top, so two of them on
+  // different rows never contend; a single edge for the whole area would drop
+  // labels that never met. `widths.map` is the ordering the fold needs, and the
+  // offset is what turns a column's own `start` into a claim on the row.
+  const claimers = Array.from({ length: areaRows }, () => labelClaimer()); // cells-ok — a row count
+  let offset = 0; // cells-ok — a column position
+  const columns = widths.map((cw, i) => {
+    const from = offset; // cells-ok — a column position
+    offset += cw; // cells-ok — a column width
+    return columnBuilder(i, cw, areaRows, range.min, range.max, base, (row, start, width) =>
+      claimers[row]?.(from + start, width) ?? true); // cells-ok — a column position
+  });
 
   // The value scale in the gutter, placed exactly as `overlaidRows` places it —
   // one implementation of *which row carries which label*, and the scale and the
@@ -1712,6 +1781,29 @@ function categoricalColumnForm(
 }
 
 /**
+ * The placer both of this arm's label rows share — **a cell of clearance, or the
+ * label is dropped** (C12 I120, §6p).
+ *
+ * Left to right, first placed wins, and a refusal **reserves nothing**: the next
+ * label is measured against the last one *kept*, so a run of contending labels
+ * degrades to alternate survivors rather than to its first alone. That is the
+ * difference between dropping and eliding, and it is the one cell of the walk
+ * the classification table could not reach (§6p.2 step 3).
+ *
+ * One claimer per row it places on. The numbers over the bands sit on their own
+ * bars' tops, so two on different rows never contend — a single edge for the
+ * whole plot area would drop labels that never met.
+ */
+function labelClaimer(): (start: number, width: number) => boolean {
+  let end = -1; // cells-ok — a column position, one past the last kept label
+  return (start, width) => {
+    if (start <= end) return false; // cells-ok — a column position
+    end = start + width; // cells-ok — a column position
+    return true;
+  };
+}
+
+/**
  * The category names under their columns, and the ones that would collide dropped.
  *
  * **`xLabels` is the wrong shape and cannot be made right.** It is a fixed
@@ -1736,17 +1828,80 @@ function columnLabels(
   widths: readonly number[],
   caps: RenderContext["capabilities"],
 ): { readonly row: string; readonly ticks: readonly number[] } {
+  const total = widths.reduce((a, w) => a + w, 0); // cells-ok — a cell width
+
+  // **One placement pass, over a stated tail reservation** (C12 I8, F374). The
+  // count is not known until the pass has run and the pass depends on the count,
+  // so this walks to a fixed point: reserving cells can only drop more names,
+  // which can only grow the count, which can only reserve more — monotonic, and
+  // bounded by the number of categories because each round drops at least one
+  // more or stops.
+  let reserved = 0; // cells-ok — a cell width
+  let placed = place(cats, widths, caps, total - reserved);
+  for (let round = 0; round <= cats.length; round += 1) { // cells-ok — a category count
+    const missing = cats.length - placed.ticks.length; // cells-ok — a category count
+    const want = missing === 0 ? 0 : cells(noticeFor(missing), caps.ambiguousWidth) + 1; // cells-ok — a cell width
+    if (want === reserved) break;
+    reserved = want;
+    placed = place(cats, widths, caps, total - reserved);
+  }
+
+  const missing = cats.length - placed.ticks.length; // cells-ok — a category count
+  if (missing === 0) return placed;
+
+  // Right-aligned in the cells the placer was told to leave: the names run left
+  // to right and the count is the last thing on the row, which is where a reader
+  // looks for *and the rest*.
+  const notice = noticeFor(missing);
+  const at = Math.max(cells(placed.row, caps.ambiguousWidth), total - cells(notice, caps.ambiguousWidth)); // cells-ok — a column position
+  const row = placed.row + " ".repeat(Math.max(0, at - cells(placed.row, caps.ambiguousWidth))) + notice; // cells-ok — a cell width
+  return { row, ticks: placed.ticks };
+}
+
+/**
+ * What the axis says about the names it could not draw (C12 I8).
+ *
+ * **The count and not the names**, which is the one place this arm departs from
+ * the horizontal one's `+N more · a · b`. There the notice takes a whole area
+ * row and has space to list; here the reason a name was dropped *is* that there
+ * is no width for it, and names strung along the axis read as more category
+ * labels — the mush `columnLabels` drops rather than truncates to avoid.
+ */
+function noticeFor(missing: number): string {
+  return `+${String(missing)}`; // cells-ok — a category count
+}
+
+/**
+ * One left-to-right placement pass, told how many cells it may use.
+ *
+ * `limit` is the whole area's width minus whatever the notice has reserved, and
+ * a label whose end would pass it is refused like any other contender — so the
+ * count that is about to be written cannot land on top of a name.
+ */
+function place(
+  cats: readonly string[],
+  widths: readonly number[],
+  caps: RenderContext["capabilities"],
+  limit: number,
+): { readonly row: string; readonly ticks: readonly number[] } {
   const ambiguous = caps.ambiguousWidth;
   let row = "";
   const ticks: number[] = [];
   let x = 0; // cells-ok — a column position
+  // **A cell of clearance and not merely no overlap** (C12 I120, F992). The
+  // guard here was `start >= cells(row)`, which forbids an overlap and permits
+  // exact adjacency — so `mon tue wed thu` in eighteen cells composed
+  // `montuewedthu`, four names read as one word. It is the same defect the
+  // value labels over the same figure had, in the writer cited as already
+  // holding the rule against it.
+  const claim = labelClaimer();
   for (const [i, w] of widths.entries()) {
     const name = cats[i] ?? "";
     const nw = cells(name, ambiguous);
     const centre = x + Math.floor(w / 2); // cells-ok — a column position
-    // Fits in its own column, and starts at or after where the row already ends.
+    // Fits in its own column, and clears the last name kept by a cell.
     const start = centre - Math.floor(nw / 2); // cells-ok — a column position
-    if (nw > 0 && nw <= w && start >= cells(row, ambiguous)) {
+    if (nw > 0 && nw <= w && start + nw <= limit && claim(start, nw)) { // cells-ok — a column position
       row += " ".repeat(start - cells(row, ambiguous)) + name;
       ticks.push(centre);
     }
@@ -1807,7 +1962,7 @@ function stackedForm(
     plotRow(
       i,
       byRow.get(i) ?? "",
-      behind(gridRow(layout, ticks, ctx, byRow.has(i)), mergedRow(layers, i, layout, ctx), ctx),
+      mergedRow(layers, i, layout, ctx, gridRow(layout, ticks, ctx, byRow.has(i))),
       layout,
       ctx,
     ),
@@ -2090,8 +2245,8 @@ function treemapRows(block: Plot, width: number, ctx: RenderContext): readonly s
   }
 
   // The names, written into cells their own tile still owns. `undefined` is
-  // *no label here*; `""` is the second cell of a wide codepoint and emits
-  // nothing, so a two-cell character cannot leave a hole the fill walks into.
+  // *no label here*; `""` is the cell behind a wide cluster and emits nothing,
+  // so a two-cell character cannot leave a hole the fill walks into.
   const ambiguous = ctx.capabilities.ambiguousWidth;
   const named: (string | undefined)[][] =
     Array.from({ length: areaRows }, () => new Array<string | undefined>(width).fill(undefined));
@@ -2101,13 +2256,10 @@ function treemapRows(block: Plot, width: number, ctx: RenderContext): readonly s
     const text = ` ${t.label} `;
     const at = ownRun(grid, t.index, cells(text, ambiguous), areaRows, width); // cells-ok — a tile index
     if (at === null) continue;
-    let col = at.col; // cells-ok — a column position
-    for (const ch of text) {
-      named[at.row]![col] = ch;
-      const w = cells(ch, ambiguous);
-      for (let k = 1; k < w; k += 1) named[at.row]![col + k] = ""; // cells-ok — a cell count
-      col += w;
-    }
+    // **Cluster by cluster, through the one writer** (C12 I118, §3n). This was
+    // a private loop over code points, and `café` decomposed reached the tile
+    // as `cafe` (F969, F976).
+    write(named[at.row]!, at.col, text, ambiguous);
   }
 
   const out = grid.map((row, r) => {
@@ -2228,7 +2380,19 @@ function positionalForm(
   ctx: RenderContext,
   rasterise: Rasteriser,
 ): readonly string[] {
-  const { stacked, bars, axis, layout } = positionalLayout(block, width, ctx);
+  // **Three phases, and they answer different questions.** `layout` is the
+  // scale and the axis decision — a function of the data's range and the box,
+  // and the phase a pinned range makes free. `area` is the raster, which is
+  // where a cell count multiplies. `furniture` is the axes, labels and legend,
+  // which cost per *row* rather than per cell and are the phase a tall thin
+  // plot spends most of its time in.
+  const probe = ctx.probe;
+  let laid;
+  {
+    using _s = probe?.span("plot.layout") ?? NO_SPAN;
+    laid = positionalLayout(block, width, ctx);
+  }
+  const { stacked, bars, axis, layout } = laid;
   // **A pinned range is not a reading.** `seriesRange` answers *what are the
   // bounds*, and with `yMin`/`yMax` given it answers even for an empty series —
   // so `ecdf`, which pins 0..1 to build its block, drew bare axes where every
@@ -2252,9 +2416,14 @@ function positionalForm(
   // — before the furniture exists. Two calls would be two chances for the
   // vertical rule and the `0` caption to land in different cells.
   const xaxis = xRowFor(block, layout.areaWidth, ctx);
-  const area = stacked
-    ? stackedRows(block, range, layout, ctx)
-    : overlaidRows(block, axis, layout, ctx, xaxis, rasterise, candleLayers(bars, range, layout, ctx, positionalDecisions(block).facing), at);
+  let area: readonly string[];
+  {
+    using _s = probe?.span("plot.area") ?? NO_SPAN;
+    area = stacked
+      ? stackedRows(block, range, layout, ctx)
+      : overlaidRows(block, axis, layout, ctx, xaxis, rasterise, candleLayers(bars, range, layout, ctx, positionalDecisions(block).facing), at);
+  }
+  using _f = probe?.span("plot.furniture") ?? NO_SPAN;
   return axed(block, area, layout, ctx, xaxis, marked ? { idx: cursorIdx, at } : null);
 }
 
@@ -2475,8 +2644,8 @@ const FORM_ROWS: Readonly<
         categories: cats.flatMap((c) => block.series.map((_sr, k) => (k === 0 ? c : ""))),
         series: [{ values: ordered }],
       };
-      return categoricalColumnForm(banded, width, ctx, (i, cw, rows, lo, hi) =>
-        barColumn(ordered[i] ?? null, lo, hi, cw, rows, ctx.capabilities, true, block.yFormat),
+      return categoricalColumnForm(banded, width, ctx, (i, cw, rows, lo, hi, _narrowest, claim) =>
+        barColumn(ordered[i] ?? null, lo, hi, cw, rows, ctx.capabilities, true, block.yFormat, claim),
         // Bands run category-major, so band `r` is series `r % n` — which is
         // what the legend names, and what the band's own index does not.
         (r) => slotOf(r % per), // cells-ok — a series index
@@ -2511,8 +2680,8 @@ const FORM_ROWS: Readonly<
     // the value scale instead of the names, the names run along the bottom, and
     // the eighths fill from the cell's bottom rather than its left.
     if (block.orientation === "vertical") {
-      return categoricalColumnForm(block, width, ctx, (i, cw, rows, lo, hi) =>
-        barColumn(block.series[0]?.values[i] ?? null, lo, hi, cw, rows, ctx.capabilities, true, block.yFormat),
+      return categoricalColumnForm(block, width, ctx, (i, cw, rows, lo, hi, _narrowest, claim) =>
+        barColumn(block.series[0]?.values[i] ?? null, lo, hi, cw, rows, ctx.capabilities, true, block.yFormat, claim),
       );
     }
     let ri = 0;
@@ -2738,10 +2907,16 @@ const FORM_ROWS: Readonly<
    *
    * The fourth encoding axis, and the one a terminal has least room for: a cell
    * is the smallest mark there is, so size is spent on *how many cells* rather
-   * than on a radius. Two series, read as (position, magnitude).
+   * than on a radius.
+   *
+   * **One series and a channel beside it** (C04 I117, F271). It was two series
+   * read as (position, magnitude), and every rule written about a series then
+   * applied to the magnitude: the ordinate spanned it, `overlaidRows` drew it,
+   * the legend named it, and the reader's toggle reached it. `sizes` is not a
+   * series, so none of the four is a decision this form has to make.
    */
   bubble: (block, width, ctx) => positionalForm(block, width, ctx, (sr, range, aw, rows, caps, facing) =>
-    bubbleRows(sr, block.series[1], range, aw, rows, caps, facing)),
+    bubbleRows(sr, block.sizes, range, aw, rows, caps, facing)),
 
   /**
    * An autocorrelation plot — one bar per lag, with a confidence band.
@@ -3215,7 +3390,28 @@ const render = (block: Plot, ctx: RenderContext): ReactElement => {
   const frame = Math.max(1, Math.floor(ctx.width));
   const drawn = drawnWidth(block, frame);
   const pad = alignPad(block, frame, drawn);
-  const body = FORM_ROWS[block.form](block, drawn, ctx);
+  // **The form, because the forms are not one renderer** (C28 I30). Thirty-odd
+  // of them share this entry and nothing else; a `line` and a `surface` have
+  // different costs, different shapes and different fixes, and one `plot` figure
+  // averaging them says which block to look at and nothing about why.
+  //
+  // The gauges are the half that makes the span mean something. Cost alone says
+  // the plot was slow; cost against sample count says whether it is linear, and
+  // the second is the finding.
+  const probe = ctx.probe;
+  if (probe?.on === true) {
+    probe.gauge("plot.series", block.series.length); // cells-ok — a count of items, not a display width
+    probe.gauge(
+      "plot.samples",
+      block.series.reduce((n, sr) => n + sr.values.length, 0), // cells-ok — a sample count
+    );
+    probe.gauge("plot.area.cells", drawn * plotHeight(block)); // cells-ok — a cell count
+  }
+  let body: readonly string[];
+  {
+    using _form = probe?.span(`plot.form.${block.form}`) ?? NO_SPAN;
+    body = FORM_ROWS[block.form](block, drawn, ctx);
+  }
   // **A row is a string with its SGR already embedded**, so the pad is a leading
   // run of blanks and cannot disturb a colour: a blank carries none (§3ab).
   return rows(pad === 0 ? [...body] : body.map((r) => " ".repeat(pad) + r)); // cells-ok

@@ -1,6 +1,7 @@
 // C01 tier 2 — contract. The interface A02 §2 promises, so C03 and the shell
 // can be written against it.
 import { readdirSync, statSync } from "node:fs";
+import { constants } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SCAN_BUDGET_MS } from "../support/budget.js";
 
@@ -216,5 +217,41 @@ describe("C01 contract", () => {
     expect(ss34!.pattern.test("render({ alternateScreen: true }, ui)")).toBe(true);
 
     expect(checkSourceScans(srcFiles()).filter((v) => v.rule === "SS34")).toEqual([]);
+  });
+});
+
+describe("C01 §5 — the shutdown codes", () => {
+  it("T2.11 (I17): three signals, three codes, each 128 + its own number", () => {
+    // **The set, not its first member.** Two rows already assert one code each —
+    // T3.x's 130 on SIGINT and T3.16's 143 on SIGTERM — and a single shutdown
+    // code satisfies both if the two happen to be driven separately. SIGHUP was
+    // asserted nowhere at all, which is the member that would have gone.
+    const codes = new Map<"SIGINT" | "SIGTERM" | "SIGHUP", number>();
+
+    for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
+      const l = build();
+      l.acquire();
+      const exit = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
+      process.emit(signal);
+      const call = exit.mock.calls.at(-1);
+      exit.mockRestore();
+      expect(call, `${signal} exited without a code`).toBeDefined();
+      codes.set(signal, call![0] as number);
+    }
+
+    // The arithmetic, read from the OS rather than restated. A literal table
+    // compared against a literal table is A03 §2's vacuity class: it agrees with
+    // itself whatever the mapping is. `os.constants.signals` is the other side.
+    for (const [signal, code] of codes) {
+      expect(code, `${signal} is 128 + ${String(constants.signals[signal])}`).toBe(
+        128 + constants.signals[signal],
+      );
+    }
+
+    // D54's failure, stated as the property it forbids: one shutdown *path* is
+    // worth having and one shutdown *code* misreports a supervisor's SIGTERM as
+    // a user pressing Ctrl-C. Three signals, three distinct codes.
+    expect(new Set(codes.values()).size, "a shared code cannot say which signal").toBe(3);
+    expect([...codes.values()]).toEqual([130, 143, 129]);
   });
 });

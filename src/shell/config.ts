@@ -17,6 +17,8 @@ import { DEFAULT_MAX_BLOCK_ROWS } from "../presentation/blocks/index.js";
 import { slashPolicy } from "../interaction/parser/index.js";
 import { createExecutionPipeline } from "./execution.js";
 import { makeDefaultChrome } from "./chrome.js";
+import { createRecording, recordStdin } from "./profiling/record.js";
+import { DEFAULT_TIER } from "./profiling/recorder.js";
 import { ConfigError, type FileSystem, type TuiConfig } from "./types.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
 
@@ -157,11 +159,38 @@ export function validateConfig(config: TuiConfig): void {
   if (config.hover !== undefined && typeof config.hover !== "boolean") {
     throw new ConfigError("hover", `must be a boolean, got ${String(config.hover)}`);
   }
+  // C22 I94 — **the same path, not both fields.** The rule was written as *set
+  // together*, and building the apparatus falsified it: a replay is compared to
+  // its recording by **recording the replay**, because the two byte streams
+  // have to be captured by the same code at the same point or the comparison is
+  // between different populations. Replaying A while recording B is the normal
+  // case. One path for both is the incoherent one, and it is the only one the
+  // original argument was ever about (F910).
+  //
+  // **The message names both fields**, because a refusal naming one reads as
+  // that field being invalid and neither is.
+  const profile = config.profile;
+  if (profile?.record !== undefined && profile.record === profile.replay) {
+    throw new ConfigError(
+      "profile.record",
+      "and `profile.replay` name the same path — a session cannot be driven by a recording it " +
+        "is overwriting. Record to a different path (C28 I46, C22 I94)",
+    );
+  }
 }
 
 export type Ambient = Readonly<{
   /** `Date.now`, from the one file SS1 allows to name it. */
   clock: () => number;
+  /**
+   * A monotonic, sub-millisecond clock — `performance.now`, from the same file.
+   *
+   * **A second clock rather than a widening of the first** (C22 §2c). `clock`
+   * is wall-clock, is drawn as a time of day by the default chrome, and has
+   * millisecond resolution: it cannot measure a 0.3 ms paint. Read only when a
+   * profiler exists, which at tier `off` is never (C22 I92).
+   */
+  elapsed: () => number;
   /** `process.cwd()`, for the same reason: one file performs the read. */
   cwd: string;
   /** The real filesystem — `node:fs` at the boundary, which is C22 (A04 §2). */
@@ -179,10 +208,89 @@ export type Ambient = Readonly<{
   platform: NodeJS.Platform;
 }>;
 
+/**
+ * The recording's sink — **buffered until the directory exists, then synchronous**
+ * (C28 I46).
+ *
+ * `FileSystem.appendFileSync` does not create directories, and `stateDir` is
+ * **It appends and does not truncate**, because `FileSystem` has no synchronous
+ * write and widening a published interface for this would touch seven
+ * implementations. A rerun into the same path therefore concatenates, which
+ * `parseRecording` refuses by name rather than silently merging two sessions.
+ *
+ * created during startup (C22 I67) while the `regime` line is written at
+ * construction. So a failed append keeps its line and the next one retries;
+ * the window in which anything can be lost is startup, before the lifecycle is
+ * acquired and therefore before any input, resize, patch or frame exists. Once
+ * the first append lands, every line after it is on disk when it returns —
+ * which is what makes a truncated recording detectable rather than merely
+ * short (I15).
+ */
+function recordingSink(fs: FileSystem, path: string): (line: string) => void {
+  let pending = "";
+  return (line) => {
+    pending += line;
+    try {
+      fs.appendFileSync(path, pending);
+      pending = "";
+    } catch {
+      // Kept, and retried on the next line. Not reported: a recording is a
+      // profiling artefact, and failing a session because one could not be
+      // written is the instrument breaking its subject.
+    }
+  };
+}
+
 export function resolveConfig(config: TuiConfig, ambient: Ambient) {
   validateConfig(config);
 
   const retain = config.debug?.retainPayloads;
+
+  const io = {
+    stdout: config.stdout ?? process.stdout,
+    stdin: config.stdin ?? process.stdin,
+  };
+  // **Construction-time facts only** (C28 I47): the capabilities are a verdict
+  // a session computes from this environment and the replies it reads back, and
+  // recording the verdict takes C02 out of the gate.
+  const recordPath = config.profile?.record;
+  const recording =
+    recordPath === undefined ? null : createRecording(recordingSink(config.fs ?? ambient.fs, recordPath));
+  if (recording !== null) {
+    // **`process.on("exit")`, because a signal exit does not pass through
+    // `stop()`.** C01's `signalExit` releases the terminal and calls
+    // `process.exit` directly (`lifecycle.ts`), so `Session.#runStop` — where
+    // `recording.end()` lives — never runs, and the clock reads still in the
+    // batch are lost with it. Measured: a session ended with SIGTERM wrote no
+    // `end` line, its recording parsed as truncated, and the replay's clock ran
+    // out five frames in (F912).
+    //
+    // `exit` listeners run synchronously and the sink appends synchronously, so
+    // this is the one hook that reaches every way out — signal, fault and clean
+    // stop alike. `end()` is idempotent, so the ordinary path still ends where
+    // it always did. The listener exists only when a recording does.
+    process.on("exit", () => void recording.end());
+    recording.regime({
+      node: process.version,
+      // **No size here** — C01 owns the terminal's dimensions and hands them
+      // down (SS42), so the initial one arrives as the first `resize` event
+      // from `lifecycle.onResize`, wired in the root. Reading `stdout.columns`
+      // here would record a width before the session had adopted one.
+      tier: config.profile?.tier ?? DEFAULT_TIER,
+      name: config.name,
+      binary: config.binary,
+      // **Only the defined entries.** `ProcessEnv` admits `undefined` and JSON
+      // drops those keys anyway, so filtering here is what makes the recording
+      // and the type say the same thing.
+      env: Object.fromEntries(
+        Object.entries(config.env ?? {}).filter((e): e is [string, string] => e[1] !== undefined),
+      ),
+    });
+  }
+
+  // The one `elapsed` the session has, held before the tap so the two members
+  // below are the same clock with and without a recording.
+  const rawElapsed = config.elapsed ?? ambient.elapsed;
 
   return Object.freeze({
     name: config.name,
@@ -214,6 +322,25 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
 
     // Absent, nothing is retained. Present without a count, 50 (§2).
     retainPayloads: config.debug === undefined ? 0 : (retain ?? DEFAULT_RETAIN_PAYLOADS),
+    // C28, unresolved on purpose: every member has a default and the recorder
+    // is where they are applied, so the root does not hold a second copy —
+    // the two places the root needs the tier before a recorder exists (the
+    // regime line above, the gate in `session.ts`) read the recorder's
+    // `DEFAULT_TIER` rather than restating it (F967).
+    profile: config.profile,
+    // C28 I14, F908 — **wrapped, so read `n` can return what read `n` returned.**
+    // The tidier-looking alternative is to pin a replayed clock to the event
+    // stream; it flattens every duration to zero, and C24 I32 put a duration in
+    // the default footer, so it diverges on every frame of every recording
+    // taken from a live session.
+    elapsed: recording === null ? rawElapsed : recording.mono(rawElapsed),
+    // C28 I53, F971 — **the same function, before the tap, for the sampler's
+    // stamp.** A periodic reader on the positional channel is unreplayable: its
+    // tick lands between two of the session's reads at a position the replay
+    // cannot reproduce, so the sampler stamps from the clock the recording never
+    // sees. Threaded rather than read anew, which is what keeps SS1's allow-list
+    // at one file.
+    sampleClock: rawElapsed,
 
     env: config.env ?? {},
     // **Undefined, not `{}`** (C22 I49). C02 distinguishes an absent overrides
@@ -228,15 +355,31 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     // and the default lives with the other defaults.
     hover: config.hover ?? false,
     cwd: config.cwd ?? ambient.cwd,
-    clock: config.clock ?? ambient.clock,
+    clock: ((c) => (recording === null ? c : recording.wall(c)))(config.clock ?? ambient.clock),
     schedule: ambient.schedule,
     platform: ambient.platform,
     fs: config.fs ?? ambient.fs,
     stateDir: config.stateDir ?? DEFAULT_STATE_DIR,
     ...(config.persist === undefined ? {} : { persist: config.persist }),
     openUrl: config.openUrl,
-    stdout: config.stdout ?? process.stdout,
-    stdin: config.stdin ?? process.stdin,
+    // C28 I46 — the input tap, applied at the one place that resolves the
+    // streams and the clocks. **Nothing below this line knows a recording
+    // exists**: each tap is a decorator over the value that was going to be
+    // handed down anyway, which is what keeps the shell free of a
+    // recorder-shaped seam.
+    //
+    // **`stdout` is not tapped here, and that is F909.** C01 captures
+    // `stdout.write` at construction and then replaces it with one that routes
+    // to `debug` (I9); a tap on this stream is therefore *inside* that
+    // redirect, so `writer.write` reaches the tap, the tap calls
+    // `stdout.write`, and by then `stdout.write` is the debug sink. The session
+    // drew nothing at all, silently. The frame tap is on `lifecycle.writer` in
+    // `construct.ts`, which is the handle C01 says is the renderer's — the same
+    // structural argument SS42 makes about the size.
+    stdout: io.stdout,
+    stdin: recording === null ? io.stdin : recordStdin(io.stdin, recording),
+    /** The recording itself, for the taps `construct.ts` applies (I46). */
+    recording,
     // C22 I91 — carried, never inspected: the root's whole job for it.
     ...(config.pty === undefined ? {} : { pty: config.pty }),
 

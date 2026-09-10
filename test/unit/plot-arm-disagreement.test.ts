@@ -194,8 +194,24 @@ const MEASURED = {
   // **14 → 16 with `bar/all-zero`** — the zero-span arm (C12 I89); both cells
   // it adds to `numericLabels` are the reader's known limit on a bar's axis.
   "bar": { silent: "0/16", "numericLabels": "12/16", "identityLabels": "4/16", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "histogram": { silent: "0/12", "numericLabels": "12/12", "identityLabels": "10/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "6/12" },
-  "boxplot": { silent: "0/12", "numericLabels": "10/12", "identityLabels": "1/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  // **Three `notice` cells opened when the vertical axis stopped dropping in
+  // silence** (C12 I8, F374): `histogram` 6 → 7, `boxplot` and `violin` from
+  // `agree` to one cell each. A vertical categorical figure keeps a category
+  // name only where it clears its neighbour, and it now says `+N` in the label
+  // row for the ones it could not keep — where the SVG arm has the pixels and
+  // withholds nothing. That is `notice`'s own disposition, which §2 already
+  // names legitimate: *the terminal withholds only where a frame is too small*.
+  //
+  // **The cells opened in `identityLabels` first, and that was the reader.**
+  // `+3` has a name's shape, so the x-row scan filed the count as a category —
+  // the same class as `keyReadings` cutting `WITHHELD` before it splits, and the
+  // same class the heatmap comment above records for `3 older not shown`. The
+  // reader cuts a trailing `+N` from the x-row and folds it into `notice`, which
+  // is where a withholding belongs; cut at the x-row rather than widened into
+  // `WITHHELD`, because that predicate runs over every row and a bare `+N`
+  // elsewhere on a frame is not this notice.
+  "histogram": { silent: "0/12", "numericLabels": "12/12", "identityLabels": "10/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "7/12" },
+  "boxplot": { silent: "0/12", "numericLabels": "10/12", "identityLabels": "1/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "1/12" },
   "forest": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "2/4", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   //  closed with F326: its two categories are `1` and `2`,
   // numerals that the clip-path rule filed as names on one side only.
@@ -279,7 +295,7 @@ const MEASURED = {
   // the summary and this arm from the samples' own extent, so `numericLabels`
   // differs on every variant. Recorded rather than resolved — the arms draw the
   // same outline and disagree about the axis they hang it on.
-  "violin": { silent: "0/38", "numericLabels": "38/38", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "violin": { silent: "0/38", "numericLabels": "38/38", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "1/38" },
   // **`identityLabels` `2/2` → `agree`** (F386). Both arms drew both row names
   // and disagreed about *which row each named*: `ridgeline` stacks from the
   // floor in the terminal — `baselines[0]` on the bottom row — and this arm laid
@@ -962,7 +978,14 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // frame — none collides with the variant it was cut from, which is the
     // response `test/support/README.md` asks a fixture to show.
     // **237**: the six `sankey` variants, each a distinct frame (C12 §3ap).
-    expect(t.distinct, "distinct terminal frames").toBe(237); // cells-ok — a frame count; 228 + `line/log`, `line/whiskers-placed`, `pie/all-zero` + six `sankey`
+    // **239 with F350's fixtures repaired.** Two of the three collision groups
+    // separated: `line/legend-right` gained the `legend: "right"` its name was
+    // the only claim for, and `heatmap/palette` moved off `viridis`, which is
+    // `rampOf`'s answer for a heatmap already. The third — `histogram/scott` —
+    // needed its **sample** rather than its field: at 200 samples `sturges` and
+    // `scott` produce the same bins, and the shared `bell` is 300 now, the
+    // smallest measured size at which the three strategies disagree.
+    expect(t.distinct, "distinct terminal frames").toBe(239); // cells-ok — a frame count; 228 + `line/log`, `line/whiskers-placed`, `pie/all-zero` + six `sankey` + F350's two
     // **134 -> 148**: the density family draws, so nineteen violin variants and
     // one ridgeline stop colliding in the single refusal group (F383).
     // **153, and the addition is a *collision*** — `plot3d`'s variants all
@@ -976,15 +999,33 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // **169**: fourteen of the twenty-one draw here; the seven `plot3d` ones
     // join the one refusal document.
     // **178**: the six `sankey` documents, each distinct — this arm draws all of them.
-    expect(s.distinct, "distinct documents").toBe(178); // cells-ok — a frame count; the four axis variants join the one refusal group + `line/log`, `line/whiskers-placed`, `pie/all-zero` + six `sankey`
+    expect(s.distinct, "distinct documents").toBe(180); // cells-ok — a frame count; the four axis variants join the one refusal group + `line/log`, `line/whiskers-placed`, `pie/all-zero` + six `sankey` + F350's two
 
-    // **The terminal's four are F350's**, and asserting them keeps that finding
-    // alive: three are variants whose names state a claim their block does not
-    // make, and `slope`'s pair is legitimate — C12 I74's own proof, a form whose
-    // sixth reading changes nothing about the picture.
+    // **Two of F350's four were repaired and one was reclassified** (F350,
+    // closed). What is left is two **legitimate** collisions, each of which is a
+    // rule's own proof rather than a fixture asserting nothing:
+    //
+    // - `slope`'s pair is C12 I74's — six readings whose first and last are the
+    //   other's two must draw the same figure.
+    // - **`line/legend-right` is the auto-enable rule's**, and this is the
+    //   correction. The finding read it as *a variant naming a field its block
+    //   does not set*. Setting the field was measured and it changes the frame at
+    //   exactly the two arms where it must not: at **1 bit and ASCII** the
+    //   positional family stacks into strips, `stackedRows` writes each series'
+    //   name in the y gutter, and `legendPlacement` declines — *not where the form
+    //   has already labelled its own rows*. An explicit `"right"` overrode that
+    //   decline and drew `alpha` in the gutter and `█ alpha` in a legend beside
+    //   it. Four frames moved and all four were worse, so the field stays out and
+    //   this collision is legitimate: **an explicit value is not the same as the
+    //   resolved default**, and the collision with `multi-series` is what proves
+    //   the default resolves to `"right"` above the colour floor.
+    //
+    // The two that were repaired: `heatmap/palette` was set to `viridis`, which
+    // is `rampOf`'s answer for a heatmap already, and `histogram/scott` needed
+    // its **sample** rather than its field — at 200 samples `sturges` and
+    // `scott` produce the same bins, which is a third category the finding
+    // lumped with the other two.
     expect(t.groups, "terminal collisions past the empty document").toEqual([
-      ["heatmap/default", "heatmap/palette"],
-      ["histogram/default", "histogram/scott"],
       ["line/legend-right", "line/multi-series"],
       ["slope/default", "slope/six-readings"],
     ]);
@@ -1050,8 +1091,6 @@ describe("AD — the two arms decide separately, and here is where", () => {
       ["boxplot/compact", "boxplot/compact-box-line"],
       ["calendar/day", "calendar/day-stretch"],
       ["flame/default", "icicle/default"],
-      ["heatmap/default", "heatmap/palette"],
-      ["histogram/default", "histogram/scott"],
       ["horizon/bands-3", "horizon/folded-1x3"],
       ["line/candlestick-overlay", "line/cursor-candles"],
       // **`line/confidence` · `line/confidence-unfilled` is gone from this

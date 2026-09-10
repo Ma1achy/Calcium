@@ -1539,6 +1539,18 @@ that is dropped takes its tick with it. termplot has no x-ticks at all — its a
 one widget and a count on the other — so this half has no precedent to copy and follows the
 y-axis' rule instead.
 
+**And a caption is laid in whole, through the one writer** (I118). Both caption writers placed by
+`cells()` and then wrote `[...text]` one code point per cell, so a family caption took five cells
+of a two-cell reservation and `図表` two of four, and the captions after it sat three cells left
+or two right of the ticks recorded for them — the ticks were right and the text under them was
+not (F985). `chargrid.ts`'s `write` lays each cluster in the cells it measures (§3n); the
+tick-label arm goes through it too, though a formatted number is ASCII and no frame can show the
+difference there, which is why its restoration is an expected survivor in `c12-radar-captions.mjs`
+rather than a caught mutation. Two baseline frames moved with the fix, the heatmap's caption row at
+`wide` where `…` is two cells — 28 cells to 26, the area's width, the old row having overhung the
+grid by the blank slot each truncated caption left behind it (`heatmap-captions-left-wide-40w`,
+`-60w`).
+
 **Gridlines draw behind the data.** `mergedRow` resolves first-non-blank, so the grid layer is
 appended last for the reason an annotation is (§3e): a rule that overwrote a sample would hide
 what it exists to be measured against.
@@ -1911,6 +1923,91 @@ than replacing with *the layer owning the most dots*: the radar's order is a rul
 polygons over frame, because a word a polygon runs through is unreadable — and reading it off dot
 counts would put the frame above a polygon wherever the frame happened to be denser.
 
+### The cell, and what the join lost
+
+`pointLabelRows` builds a cell array per row — a cluster in one cell, `""` in the cells a wide one
+occupies after it, the array `chargrid.ts`'s writer lays out (I118) — and hands it on as
+`rows.map((r) => r.join(""))`, because a `Layer`'s rows are strings. `mergedRow` then read every
+layer at column `x` as `[...(layer.glyphRows[rowIndex] ?? "")][x]`: a code-point index into a
+string that no longer carried the cells, and a whole-row spread per column. A `""` contributes no
+code point, so a two-cell glyph was one column to the walk and the cells after it were read one
+early; a family's five code points were five columns, so the cells after it were read three late.
+`behind()` walked the finished spans the same way — one code point, `x += 1` — and laid its
+gridline at the same drifted column. F977's frame, a `line` plot with `plotFrame: "grid"` at 40,
+row 6 with no label, with a family at sample 1, and with `図表`:
+
+```
+none    |    │┊ ╭────╮   │    ┊    │    │   │  ┊│| 40
+family  |    │┊ ╭────👨‍👩‍👧    ┊    │    │   │  ┊│| 37
+cjk     |    │┊ ╭────図表  │    ┊    │    │   │ …| 40
+```
+
+Read right of the slot: without a label `┊@21 │@26 │@31 │@35 ┊@38 │@39`; with the family every
+cell three to the left and the row three cells short, the frame's edge at 36; with `図表` every
+cell two to the right and the frame's edge clamped off. The name itself survived both, because
+the walk appended the code points it took in order — which is why F976's rows could see it whole
+while the row around it was wrong, and why TL13's `/[│|]$/` filter skipped the one row its
+fixture was written for.
+
+**A layer meets the merge as cells, and the cell array is derived where the width lives** (I119).
+`rowCells(text, ambiguous)` in `text.ts` is the join's inverse — each cluster at its first cell,
+`""` in the cells a wide one occupies after it, a cluster measuring nothing on the cell that owns
+the cluster before it or dropped at the head — measured by `cells()` per cluster, the writer's own
+measure, so the two cannot disagree about a cell (C09 I63, C09 I65, C09 §5). `mergedRow` derives
+every layer's row once, above the column loop, and indexes the arrays; a `""` is the cluster
+before it — the cell goes to that layer, nothing is OR-ed or substituted into it, and the run
+receives nothing for it, because the cluster already carries the cells it measures. Every other
+rule of the merge — the braille union within a kind, first-wins across kinds, the contested-cell
+turn — is as it was. The rows a rasteriser draws are split without a segmenter: printable ASCII
+at either mode, and at `narrow` arrows, box drawing and block elements, braille and the sextants,
+which is every alphabet a curve, a frame or a marker uses. That set is `CELL_PER_UNIT_RANGES`,
+and C09 T1.40 asserts each member measures one cell at the mode it is admitted in and is not
+zero-width, so the fast path is a checked claim rather than a table.
+
+**`behind()` is folded into the merge and gone.** Its two rules are the merge's now: a blank
+cell — `" "` or U+2800 — takes the grid's glyph at its column, and a run no layer inked that took
+a gridline is styled muted while a gridline inside a styled run keeps the run's colour. The grid
+is indexed by cell and the cell index is the only index, so a name no longer moves the dashes.
+Byte-identical on every frame without a wide or multi-code-point label, by construction: a cell
+no layer inked has no ref, so *wholly blank and holding a gridline* is *no ref and gridded*, which
+is `behind()`'s `wasBlank && run.trim() !== ""` said in the merge's own terms, and the spans the
+merge emits are the spans `behind()` rebuilt; the golden set is the check, four wide arms among it.
+
+After, the same rows:
+
+```
+none    |    │┊ ╭────╮   │    ┊    │    │   │  ┊│| 40
+family  |    │┊ ╭────👨‍👩‍👧  │    ┊    │    │   │  ┊│| 40
+cjk     |    │┊ ╭────図表│    ┊    │    │   │  ┊│| 40
+```
+
+Every cell right of the slot is the unlabelled row's, at both widths (T1.135).
+
+**The cost, in F955's bench form** — best of five 20 ms batches, `plotDefinition` rendering a
+`line` plot with three series of 400 samples and `plotFrame: "grid"`, height 20, through `tsx`
+against `src/`; two samples before and three after, the best of each:
+
+| | 80 columns | 200 columns | 200 ⁄ 80 |
+|---|---|---|---|
+| the definition's render, before | 2.51 ms | 7.70 ms | 3.06 |
+| after | **1.72 ms** | **2.91 ms** | **1.69** |
+| through Ink, before | 9.66 ms | 18.07 ms | 1.87 |
+| after | 8.79 ms | 13.00 ms | 1.48 |
+
+The per-column spread was a copy of every layer's row per cell — the width squared per row — and
+at 200 columns it was some three fifths of the definition's render; the ratio between the widths
+falls from three to below the 2.5 the width alone accounts for, because the spread was the only
+term that grew faster than the row. `field.ts`'s merge had the same spread and no text ever
+reaches it (F976); it is hoisted the same way and nothing else about it changes.
+
+**Not claimed.** A label beginning with a bare spacing mark after an inked cell — `ः` at the head
+of a name — joins the segmenter's cluster to the cell before it, so the gap cell is owned by the
+label rather than transparent: one cell of ownership, and no other. The radar's category
+writer, `circle.ts`'s `labelRows`, was not `chargrid.ts`'s when this was written and wrote one
+code point per slot (F982); it is now, its line arm reads the row through `rowCells` (§3w, F984),
+the same shape was in both x-axis caption writers (§3d, F985), and SS61 keeps a code-point index
+off a cell row from here on (A03 §4).
+
 ---
 
 ## 3v. More than one histogram, and the edges they have to share
@@ -2040,6 +2137,13 @@ coverage — which is the right trade for a **shape**, where braille's is right 
 The composition stays the third attempt's: one grid, an owner per sub-cell, no merge. *Data takes
 the tone over furniture, and `Math.max` gave it the frame:* `furniture` is `series.length`, greater
 than every series index, so a polygon crossing a ring lost its colour cell by cell.
+
+**The label row is read as cells** (I119). `labelRows` joins the cells it wrote and this arm read
+the string back by code point — `[...(labels[cy] ?? "")][cx]` — so a family was five columns and
+`図表` two: `east`, sharing the row, stood three cells left over the disc or two right, and with
+`図表` the row ran two cells over the width and ended in the clamp's `…` (F982). `rowCells` gives
+the writer's array back once per row; a `""` is the name's cell, draws no quadrant and appends
+nothing to the run, and the row is the control's cell for cell outside the name (F984, T1.140).
 
 **"A cell can carry two shapes in different quadrants while its tone is one layer's — and it bites
 less at 2×2 than at 1×1, because the glyph keeps both and only the tone is chosen" is what this
@@ -2466,7 +2570,7 @@ there rather than leaving a reader to infer it from a frame.
 **The half of the old refusal that survives**, and the half nobody restated: *the labels are
 worse than the lines.* A contour label sits **in** the line it names, in a gap cut for it, and
 there is no gap-cutting vocabulary here. A label written over a contour is the contour with a
-hole in it — `behind()`'s argument for gridlines, one layer up, and at one cell per crossing the
+hole in it — the merge's argument for gridlines (§3u), one layer up, and at one cell per crossing the
 hole *is* the crossing. So the levels go in the legend, each in its own colour, and I27 already
 sizes a vertical legend from its content.
 
@@ -3649,7 +3753,12 @@ about a *callout* — so a reader indexing by label kind never reaches it.
 
 `Series.pointLabels` is read by the terminal alone — `pointlabels.ts`, and the two sites in
 `definition.ts` that hand it the names — and I55 is written in cells: a free-cell single pass, a
-one-cell `+` at a survivor. The second arm reads none of it, and until now nothing said whether that
+one-cell `+` at a survivor. The name itself is laid into the row by `chargrid.ts`'s shared writer,
+cluster by cluster (I118, §3n); `pointlabels.ts` carried a private copy of the per-code-point loop
+until F976, and the overlay meets the merge as cells (I119, §3u) — the join hands `mergedRow`
+strings and `rowCells` gives the writer's array back, so a wide or multi-code-point name shifts
+nothing after it, which it did until F977 (F981). The second arm reads none of it, and until now
+nothing said whether that
 was a decision. I81 already made the split this needs, for `yCallout`: *three things were in one
 function and one of them crosses*. The same split, applied:
 
@@ -3859,7 +3968,7 @@ wanted.
 | the notice's row × the layout's rows | *the notice costs a row* meets *the layout was chosen against the budget* | **4** — §3ag.4's cycle in a second place, ruled the same way: chosen once against the full budget, the last row spent if anything was dropped, never revisited |
 | a fan of one × the bar across the children | *a parent joins its children with a bar* meets *the bar spans the children's columns* | **5** — zero length drawn as `┬`…`┴` is a branch glyph where nothing branches. One child is `│`, and the two differ in the frame |
 | a single-node tree × all three layouts | *each layout has its own shape* meets *a root with no children has no shape to have* | **6** — one row, one name, no edge, no notice — **and the walk said the three agree exactly, which the frames refuse.** The top-down figure centres its drawing in the area and the other two begin at column 0, so a single node discriminates no *structure* and does discriminate *placement*. The corrected reading is the useful one: a single-node fixture cannot tell one layout's shape from another's, and the only thing it can tell them apart by is the one property the ruling above had not been made about (§3ah.2) |
-| a wide codepoint × the column arithmetic | *`cells()` and never `.length`* meets *a two-cell character owns the cell behind it* | **7** — the treemap's names already answer it, continuation cell and all (§3n, T1.104) |
+| a wide codepoint × the column arithmetic | *`cells()` and never `.length`* meets *a two-cell character owns the cell behind it* | **7** — the shared writer answers it, continuation cell and all: a cluster is placed whole in the cells it measures and the cells after its first are `""` (§3n, I118, T1.104, T1.130) |
 | `unicode: "ascii"` × the outline's indent | *the ASCII grid is identical* (I9) meets *the indent is a run of glyphs* | **8** — `├── ` and `|-- ` are both four cells, so four is chosen **because both alphabets have a four-cell form** |
 | `colourDepth: 1` × I25 | *category identity survives colour loss* meets *edges are structure and names are text* | **9** — nothing to carry, and the row exists so the absence is stated rather than found later |
 | `legend` × a form with no series | *a legend names series, segments and annotations* (§3ag.4) meets *a tree has none of the three* | **10** — no entries, so `"right"` costs no width, and **`"below"` still costs its row**: that is I27 rather than an oversight, since a row appearing when data arrives shifts the transcript below it. A tree can never gain a series, so it is the second member of I27's stated residue rather than an exception to it (F222) |
@@ -4076,7 +4185,7 @@ where two rules both hold. A row governed by one rule restates that rule and fin
 | **G8** | drop · a non-empty graph | every node dropped | draw nothing and give the whole area to the notice — `tree`'s `keptCount === 0` arm |
 | **G9** | longest path · disconnected components | two components with no edge between them | they **share** layers, laid out together from 0. Stacking would need a second placement pass and a component is not a unit the caller named |
 | **G10** | box drawing · `ambiguousWidth: "wide"` | every edge glyph doubles | `glyphForMask`'s existing arms — inherited from `tree`, and the reason §3ai.3 refuses to add a new character |
-| **G11** | a two-cell label · edge routing | an edge walks into the `""` continuation cell | `tree`'s `write` already leaves it unwalkable (§3n) |
+| **G11** | a two-cell label · edge routing | an edge walks into the `""` continuation cell | `chargrid.ts`'s `write` — the one writer every label goes through (I118) — already leaves it unwalkable (§3n) |
 | **G12** | declared height · the drop | the height is C12 I1's promise | area rows are the declared height less furniture, and the fit drops until it holds |
 | **G13** | `graph` present · `hierarchy` present | both on `form: "graph"` | refused — a form has one data shape (C04 I69) |
 | **G14** | `graphLayout` present · `graph` absent | two faults in one document | the missing `graph` is reported; the walk stops at the first |
@@ -4869,7 +4978,7 @@ is where a pattern stops being a coincidence and becomes something to state once
 | | the terminal draws | the SVG draws | which is right |
 |---|---|---|---|
 | **F269** `ecdf` | one fixed staircase for every dataset of a given size | the raw samples, stepped | **neither** — the ECDF wants a uniform grid over the data range |
-| **F271** `bubble` | the size channel as a second bubble series, named in the legend | one series, sized | **the SVG** |
+| **F271** `bubble` | the size channel as a second bubble series, named in the legend | one series, sized | **the SVG** — taken, C04 I117: `sizes` is a channel and not a member of `series`, so both arms draw one series sized |
 | **F272** `bar`, signed | every bar from the range floor, so no negative bars | zero-anchored, growing both ways | **the SVG** |
 
 **The tie-break is still right.** *The terminal is right by default* is a claim about where to look
@@ -5006,10 +5115,12 @@ Every other curve, scatter and matrix frame is **unchanged to the byte**, which 
 than hoped: the projector reproduces three hand-written loops exactly, including the one whose
 coordinate is spent on colour instead of position.
 
-**And the bubble frame is F271 visible in the second arm.** Both series carry the same radii, because
-`positionalForm` hands `block.series[1]` to `bubbleRows` as the sizes *for every series* — so the size
-channel is drawn as a series sized by itself, in its own colour, in both arms now. One wrong figure
-rather than two different ones, which is the tie-break's whole argument.
+**And the bubble frame was F271 visible in the second arm.** Both series carried the same radii, because
+`positionalForm` handed `block.series[1]` to `bubbleRows` as the sizes *for every series* — so the size
+channel was drawn as a series sized by itself, in its own colour, in both arms. One wrong figure rather
+than two different ones, which was the tie-break's whole argument, and which is what made the correction
+a single ruling instead of two. **Closed at C04 I117**: `sizes` is a channel, `bubble` refuses a second
+`series`, and there is nothing left for `positionalForm` to hand round.
 
 ---
 
@@ -7718,7 +7829,7 @@ Structural again, and for the same reason as §3ak.49a: nothing happens between 
 | `valueLabels: "both"` on a **horizontal** figure | `"both"` names a right-hand column | the labels are written *under* the box | **no displacement.** Governed by `!valueOnX`, the same clause `rightRoom` reads |
 | a suppressed label's **gridline** | the tick keeps its rule | the label goes | **the rule is still drawn.** This is what the decision leaves behind, and it is not a cell either artefact shape indexes: the loop body draws a rule *and* a label, and suppressing one glyph more than intended changes the figure's geometry rather than its text |
 | a callout's row overlaps a **legend** entry's | the legend is furniture in the same right band | I48: *a callout does not replace the legend* | **the legend's placement, and it is given in §3ak.50f** (I115). Recorded here as *out of this ruling* and left, which is the state a conflict should not be left in — and the reading was wrong as well as unfinished: nothing has to give, because `area()` reserves two columns off one edge and every writer anchors to that edge. F726, now closed |
-| two **callouts** overlap each other | I48's later-wins ladder | I81's stated blind spot: this arm stacks text at the same `y` | **§3ak.50d.** Still open, now with a measurement |
+| two **callouts** overlap each other | I48's later-wins ladder | I81's stated blind spot: this arm stacks text at the same `y` | **Ruled in §3ak.50d, and the ruling is to name it rather than build it.** Measured first: across the 212 committed frames that draw anything, **no two callout texts come within `SVG_FONT_SIZE` of each other** — only 4 carry two at all and the closest pair is 84.757 px, seven glyph heights. So the mechanism would be an invariant vacuous until its subject exists, and it would also be the wrong mechanism: I48's two rejected alternatives were rejected for reasons this arm does not have, and the third option is a **nudge by a glyph height**, which is a lie about a row in cells and a placement in pixels. Deferred as the symbol `calloutNudge`, absent from the tree, so the deferral is checkable by grep |
 
 ### 3ak.50d · Two callouts, and the third option cells did not have
 
@@ -7845,6 +7956,259 @@ committed bytes — `line-callout-multiseries` and `line-callout-last`, exactly 
 carried the overprint. *Every SVG golden moves* was the fear at F706 and was 10 of 244 there; here
 it is two, and the reason is the cell above: `rightRoom` is 0 on 81 of the 83 frames that have a
 right-placed legend at all.
+
+---
+
+### 3ak.50g · The tick budget is a cell count and the canvas is pixels — and the remedy is not the one the finding named
+
+**F993 (F729) is right about the mechanism and wrong about the fix**, and measuring is what separated
+them. The value axis is niced once, in `axisOver`, against `ticksFor(plotAreaRows(block))` — a count
+derived from the block's declared **row** height — while `svgLayout` takes any pixel height and is
+**on the public surface** (`src/index.ts`), so a consumer chooses the canvas and the label density
+was chosen against a different unit entirely. The entry's remedy was *derive the SVG budget from the
+canvas*, on the abscissa's precedent: `SVG_TICK_PITCH` divides a pixel width by a label pitch where
+`xTicksFor` divides a cell width by one, and the file already says *a shared count would be a width
+crossing the seam*.
+
+**It does not carry to the ordinate, and the reason is in the two nicings.** `positionAxisAt` picks
+nice numbers **inside** the domain and never moves it — §3d's rule, stated there because sample 0 is
+drawn in column 0 — so the abscissa's budget is free to differ per arm. The ordinate's nicing snaps
+the range **outward**, so the budget is an input to the range: measured over `{min: −12.4, max: 7.9}`,
+budgets 3, 5, 8, 11, 14 and 20 give **five different ranges** — `[−20, 10]`, `[−15, 10]`,
+`[−12.5, 10]`, `[−14, 8]`, `[−13, 8]`. A per-arm ordinate budget therefore does not thin the labels;
+it moves **where every sample sits**, and turns a label-density disagreement into a geometry one.
+
+**So the shared budget stays and the missing rule is the abut rule.** `ticksFor`'s own header
+already says what it is — *a ceiling on the step's coarseness, not the number drawn; how many
+survive is decided by the abut rule in `yLabels`* — and the second arm reads `figure.value.ticks`
+and draws a label for **every one of them**, with no density rule of any kind. That is the whole
+defect: not a count derived in the wrong unit, but a count that was never supposed to be the answer,
+consumed by an arm with nothing to resolve it against.
+
+**Measured before the rule**, over the catalogue's 210 non-facet drawn frames, counting pairs of
+same-side value labels whose baselines are closer than one em:
+
+| canvas | pairs | frames | worst pitch |
+|---|---|---|---|
+| 640 × 320 — the shipped default | **0** | 0 | — |
+| 640 × 240 | 2 | 1 | 10.35 px |
+| 640 × 200 | 3 | 2 | 8.63 px |
+| 640 × 160 | 3 | 2 | 6.90 px |
+| 640 × 120 | 4 | 3 | 5.18 px |
+
+**F729's own table does not reproduce and is superseded here.** It recorded 19 right-hand labels at
+15.29 px on a `height: 40` block and 19 at every canvas down to 120; at HEAD that block draws **11**
+labels — `ticksFor(40)` is 14 and the nicing settles on 11 — at 27.52 px falling to 10.32 px. The
+mechanism is the same and every figure moved, which is what re-measuring a carried claim is for.
+
+**Two corrections to the instrument, both of which manufactured evidence before they were fixed.**
+The first sweep read `<text x=` attributes out of the flattened document and reported **30 pairs at
+0.00 px** in `smallmultiples` and `pairplot` — a facet is a **nested `<svg x="…">`** with its own
+coordinate system, so every facet collapsed onto the first. The second read grouped every label-ink
+text by `x`, which swept the abscissa's captions in with the gutter's. Both read as findings. The
+sweep now excludes nested-svg frames by name and takes the two gutter columns the emitter's own
+anchors define.
+
+**The ruling** is I121: a value label is emitted only where its baseline clears the last one emitted
+**on its own side** by a full em, and the tick and its gridline are drawn either way. Every clause is
+borrowed rather than invented — the em bound is I114's own (*a glyph's ink is inside its em box, so
+two baselines a full em apart cannot overlap and anything closer may*), the suppressed label keeping
+its gridline is I114's ruling about what a decision leaves behind, and *a refusal reserves nothing*
+is I120's, one arm over. **A label the callout suppresses does not move the edge either**, which is
+the same clause reaching the interaction I114 already owns.
+
+**Stated blind spot.** The em is a bound and not a measurement, so it suppresses a label that a
+narrow face would have cleared — erring in the direction that keeps a number legible off the axis
+rather than smearing two into one, which is I114's own argument for the same constant. And the left
+gutter is included where I114's callout rule excludes it: two *left* labels overprint each other
+exactly as two right ones do, and *never the left's* is a rule about the **callout** displacing a
+label, not about labels displacing each other.
+
+---
+
+### 3ak.50h · Does a callout need a right axis? — and the sentence that kept the two arms apart
+
+**No, and the second arm's own comment already said so.** F994 (F711) records one cell —
+`yAxis: false, yCallout: "both"`, where the terminal draws nothing and the SVG draws `alpha 10` —
+and says the disagreement matrix does not have the row. Swept across the member's whole product it
+is **9 of 15 cells**: every `yAxis` that is not `"right"` or `"both"`, the default included, draws
+the callout in one arm and nothing in the other.
+
+**But all nine are documents the model refuses**, which the entry does not say and which changes
+what the finding is. `validate.ts` carries C04 I60's fourth refusal —
+*`"yCallout"` … with `"yAxis"` of `"left"` … a callout is written in the right gutter and there is
+none; widen `"yAxis"` to `"right"` or `"both"`* — and `validateBlock` rejects all nine. So the
+disagreement is real and cannot ship: it is two arms differing on an input neither is contracted for,
+and `definition.ts`'s `sides.right ? … : 0` was not drawing the wrong thing, it was declining to draw
+something forbidden.
+
+**What is a defect is the coupling itself, and the evidence is a comment.** The SVG's `rightRoom`
+takes the callout's reserve and the value labels' reserve as **two independent maxima** — the callout
+needs no axis there and never has. Its doc comment justifies that shape by citing the other arm:
+*`definition.ts` sizes its right column `sides.right ? max(wanted, calloutWidth(block, ambiguous,
+stacked)) : 0`, because one column holds both.* **The two expressions are not the same.** The
+terminal's gates the whole maximum on `sides.right`; this one gates only the labels' half. A sentence
+asserting parity with a mirror it does not match is what let the arms stay apart, and it is the class
+where the justification is checkable and the check was never run — one file over from where it was
+written.
+
+**The ruling.** A callout is *a name at the line's end* (I48) and the axis is a separate member
+(I47); nothing about printing the value scale is a precondition for naming where a series stops. So
+the terminal's expression becomes the one its mirror already claims it is —
+`max(sides.right ? wanted : 0, calloutWidth(…))` — and the comment becomes true.
+
+**Read the frame, because the count agreed and the frame did not.** With that change alone all 15
+cells report *agree*, and `yAxis: false` drew `├ 5` and `├ 0` **down the side of a plot that asked
+for no axis**. `rightColumn > 0` had been standing in for *this figure has a right axis*, which it
+could for exactly as long as a right column was only ever grown for one. So `Layout` gains
+`rightLabels`, and I122 is that separation: **a column is room, not a request.**
+
+**Measured after**: **0 of 1220** committed catalogue frames move — on every valid document either
+the callout draws nothing or `sides.right` is already true, so the new maximum is the old expression
+term for term. All 15 cells agree, and `yAxis: "right"` still writes `├ 5` and `├ 0` beside its
+`┣ 10`.
+
+**What is owed elsewhere and is not C12's.** C04 I60's fourth refusal still forbids the nine
+documents, so this arm is reachable only by handing `plotToSvg` or the registry a `Plot` directly.
+Whether the refusal should be lifted is C04's ruling and `validate.ts`'s clause
+(`ya === undefined || ya === "left" || ya === false`). The cost of keeping it is already written down
+in this repository: `examples/plots/README.md` records the demo widening to `yAxis: "both"` to get
+one number and receiving **a complete second axis, identical labels down both sides**. Named here so
+the condition has a symbol to grep for rather than a sentence to remember.
+
+**And why there is no disagreement-matrix row, which is what the entry asked for.** The matrix is
+swept over `CATALOGUE_FORMS`, and every member of it is a document the validator accepts — a cell
+that only exists on refused input cannot be a row there without the corpus growing an invalid member.
+The artefact that holds this is a **test row over the member's own product** (`YC1`), asserting the
+refusal and the agreement separately, which is what the matrix could not do.
+
+---
+
+### 3ak.50i · The abscissa had no abut rule, and the sweep that was supposed to find it was reading a nested document flat
+
+**The subject is F733's residue** — what F732's 244-frame overprint sweep found *outside* the right
+band, carried since as a list of six frames in three shapes. Re-deriving it rather than trusting it
+is where this starts, and the entry was wrong about the largest shape it named.
+
+**The sweep re-derives and the list does not.** Run as written, the residue is **124 pairs in 9
+frames**, which is exactly F732's 126 in 11 minus the right band's 2 in 2 that I115 closed. So the
+sweep reproduces. But F733 names **six** frames and the sweep finds **nine**: `calendar-hour` (23
+pairs, the single largest contributor), `line-cursor-flipped` and `line-cursor-candles-flipped` are
+in the residue and in no entry.
+
+**And 84 of the 124 are the instrument, not the figure.** `pairplot-default` and
+`smallmultiples-default` are the only two frames in the corpus that are **nested** documents — four
+`<svg x="0|160|320|480" y="0" viewBox="0 0 160 320">` panels, one per facet, written by `plotToSvg`'s
+facet arm at `child.replace("<svg xmlns=", …)`. A sweep that regexes `<text x=` out of the flattened
+bytes reads four panels' **panel-local** coordinates as one page, so every panel collapses onto the
+first: `"100"` at `(64.4, 16.8)` three times over is one gutter label in four panels 160 px apart.
+F733's headline clause — *identical texts at identical coordinates … panels re-emitting one gutter
+label* — is that artefact, and **the class it names has zero instances**. Resolving the nesting drops
+the residue from 124 pairs to **40**, and no pair anywhere in the corpus is two identical strings at
+one point.
+
+**This was already half-known and the record did not move.** `RC8`'s own header says it: *taking
+`<text x=` out of the flattened document reported 30 pairs at 0.00 px in `smallmultiples` and
+`pairplot` — a facet is a nested `<svg x="…">` with its own coordinate system.* Its remedy was to
+**exclude facet documents by name**, which is the instance rather than the class — so the two nested
+frames sit outside every band rule in the file, and F733's un-corrected reading of the same defect
+stayed in the register. The instrument is repaired here instead: one `pageTexts` that resolves a
+nested `<svg x= y=>` into page coordinates, `RC8`'s exclusion deleted, and the eight facet frames
+back inside the sweep (→ F1025).
+
+#### The walk — a classification table, because every contender holds at rest
+
+There is no event between two captions on one row: the interactions are structural, so the artefact
+is a table and not a trace (§6a's shape, C18's). The rules it crosses are the ones any two of which
+could claim one cell of the abscissa's caption row:
+
+- **R1** — `positionAxisAt` nices *inside* the domain and then appends the domain's own maximum at
+  `at = 1`. Measured: `0…31` → `0 5 10 15 20 25 30 **31**`; `0…159` → `… 125 150 **159**`;
+  `0…29` at budget 2 → `0 25 **29**`.
+- **R2** — a caption's page position is `box.left + span · (facing.x === "left" ? 1 − at : at)`.
+- **R3** — its anchor was `i === 0 ? "start" : i === last ? "end" : "middle"`.
+- **R4** — I121's abut rule: a label is emitted only where it clears the last one emitted, and a
+  refusal reserves nothing (I120). Written for the **ordinate** only.
+- **R5** — the terminal arm's placement for the *same* axis (`xTickRow`): centre on the tick, clamp
+  into the row, push clear of the last one kept by a cell, **drop** what no longer fits.
+- **R6** — I114's bound: a glyph's ink is inside its em box.
+
+| # | the cell two rules claim | what the corpus draws | verdict |
+|---|---|---|---|
+| 1 | R1 × (R4 absent here) — the appended maximum sits closer than an em to the last niced tick | `30`/`31` overlapping 9.46 px, `150`/`159` 10.92 px, `25`/`29` 14.48 px — **10 pairs in 4 frames** | **defect**, and R5 is the proof it is one: the terminal packs the same `positionAxisAt` output and its candlestick abscissa reads `0 5 10 15 20 25 30`, `31` dropped |
+| 2 | R2 × R3 at index 0 under `facing.x === "left"` | the minimum is **last on the page**, keeps its `start` anchor at `box.right`, and grows 7.42 px past the box | **defect** |
+| 3 | R2 × R3 at the last index under `facing.x === "left"` | the maximum is **first on the page**, keeps its `end` anchor at `box.left`, and grows 14.84 px **into the gutter** — `49` landing on the value label `0`, `23` on `95` | **defect**, 2 pairs in 2 frames |
+| 4 | R6 × a *column* of captions at a pitch just under an em | `calendar-hour` at **11.467 px**, `sankey-crowded` at **11.600 px** | **not a defect** — and only reading the frame says so: the em bound over-reports on a column, because a sub-em pitch overlaps in the descender band and these glyphs have none. Both render legibly. 24 of the 40 residual pairs |
+| 5 | the treemap's nesting inset × a tile's caption anchor | `render`, `curve`, `raster` at 1 px diagonal steps — three generations of one hierarchy, each name at its own tile's top-left, which nesting makes the *same* corner | **defect, recorded not repaired** — the reader sees `raster` alone and reads it as the name of the whole `render` block. It is `tiles`' question, not the axis emitter's, and it wants a ruling on whether a hierarchy names every level (F1025) |
+
+**Row 1 is where the two arms part, and it is I121's own sentence coming back one axis over.** I121
+gave the ordinate the abut rule and cited *the abscissa's precedent* for keeping the **budget**
+shared — correctly — while the abscissa's **placement** half was never written. One derivation, two
+placements, and only one of them had a gap rule.
+
+**Row 4 is what the frame-read bought and no number would have.** Every instrument here compares
+coordinates; a coordinate cannot tell a 11.47 px column of digits from a 9.46 px row of them, and
+the two want opposite answers. Suppressing `calendar-hour`'s hours would remove readings a reader
+can use.
+
+#### The ruling (I123)
+
+**The abscissa's captions are placed by R5 in this arm's units.** Two clauses, one expression each:
+
+- **A caption is drawn only where its band clears a caption already drawn.** The clearance is
+  positional and **direction-free**, which is the observable half: replacing it with the terminal's
+  own left-to-right `free` cursor draws **one** caption on a flipped axis, because the ticks descend
+  across the page and the cursor runs backwards through them.
+- **The anchor is the edge the tick lands on, never its index.** `page <= 0 ? "start" : page >= 1 ?
+  "end" : "middle"`, reading the position R2 already computed rather than indexing the direction a
+  second time.
+
+**Two clauses inherited from I120/I121 are vacuous here and the mutation pass is what said so.**
+*A refusal reserves nothing* and *cleared against the kept set rather than against the last one kept*
+both name distinctions this axis cannot have: the abscissa's positions are monotone in `x`, so the
+last kept caption is always the nearest one, and the only caption the rule drops anywhere in the
+corpus is `positionAxisAt`'s appended maximum — which is **last**, with nothing after it to reserve
+for. Both mutations survive, and a sentence that cannot be violated reads exactly like one that is
+obeyed (A03 §2 in prose). They are written here as inherited and uninstanced rather than restated as
+though they decided something; the day the rule drops an interior caption is the day they acquire a
+subject.
+
+**The gridline of a dropped caption is still drawn** — I114's ruling about what a decision leaves
+behind, `RC4`'s clause one writer over: the figure's geometry does not move with its readings.
+
+**The width is `text.length · SVG_FONT_SIZE · SVG_EM_MAX`**, the same bound `gutterRoom` reserves
+with and `fitLabel` cuts to, and not a second expression for it (§3ak.49's class).
+
+**Measured after the rule**: row overprints over the catalogue go **10 → 0** at 640 × 320 and at
+640 × 200, and **36 → 18** at 320 × 320; nothing leaves the `viewBox` at either shipped canvas;
+**6 of 244** committed frames move, exactly the six the two repaired classes name.
+
+**The 18 that remain at 320 are a different emitter and are named rather than absorbed**: the
+categorical captions row (`boxplot/vertical`, `violin/raindrop-vertical`), which is I120's rule in
+this arm's units and has no more claim to be unwritten than this one did. It is not instanced at
+either shipped canvas, which is the corpus's property and not the rule's — F993's lesson — so `RC10`
+sweeps a narrow canvas too and the row is stated as owed.
+
+#### The mutation pass, run by hand and reported as measured
+
+| mutation | kills |
+|---|---|
+| the abut rule removed — the shipped defect restored | `RC10` **and** `RC11` (the control: the kill that is not in doubt) |
+| the anchor back to `i === 0 ? "start" : i === last ? "end"` | **`RC11` alone** — and that is the finding restated: the flip's collision is with a text on a *different* baseline, which a row rule cannot see however many frames it sweeps |
+| the clearance widened to twice the advance | `RC11` — **and it survived pass one.** At the candlestick's 64 px tick pitch and 15 px labels, twice an advance reaches no neighbour; `RC11` gained a dense fixture (11 ticks at ~50 px, 39–47 px labels) from that survival, exactly F728's shape one axis over |
+| the `gridded` push moved below the abut check | `RC11` — **and it survived pass one too.** The dropped caption is the appended maximum at `box.right`, so its rule coincides with the frame's right edge and a *distinct-baseline* count cannot see it go. The row counts elements as well now: 10 → 9 |
+| the terminal's left-to-right `free` cursor in place of the positional clearance | `RC11` — the flipped abscissa collapses to **one** caption |
+| cleared against the last kept rather than every kept | **survives** — vacuous, above |
+| a refusal reserves something (the dropped caption still moves the edge) | **survives** — vacuous, above |
+| the advance taken from the widest *measured* face (0.6182) instead of the arm's bound (0.65) | **survives**, and by design: the rows measure at 0.6182 for `RM1`'s own reason — a box drawn at `SVG_EM_MAX` agrees with the code by construction — so they see whether the result overprints at the widest face anyone renders with, never which constant reserved it |
+| **the survivor control**: the overlap test given a `1e-9` tolerance | **survives**, which is what the control is for |
+
+**Stated blind spots, three.** The three-caption path (`block.xLabels` given) reads no `facing` at
+all and clamps by thirds — zero instances in the corpus, because no variant carries both `xLabels`
+and a flipped `origin`, so the corpus is the reason and not the rule. The treemap's stacked tile
+names (row 5) are recorded and not ruled. And `RC10` is a **row** rule where `RC8` is a **column**
+one: a caption against a text on a *different* baseline is reached only where one of them is in the
+abscissa's own row, which is how row 3's corner pair is caught and is not a general band rule.
 
 ---
 ---
@@ -8988,7 +9352,7 @@ governed by one rule restates it and is not here.
 |---|---|---|---|
 | **K1** | deduplication (§3ai.4 G1) · a weight per edge | `a→b 2` and `b→a 3`: reversal makes them one edge | **the weights are summed.** A flow drawn once and counted once is data loss in the other direction; `graphLayers` gained `origins` — the declared edges each segment stands for — so `graph` reads nothing new and a sankey sums over it. The first origin is the edge that survived |
 | **K2** | slice stacking · crossing minimisation | the ribbons leaving one bar could cross each other at the bar | slices are ordered by the **far end's centre** on both sides, after placement, so a bar's fan leaves in the order it arrives. Stable on the segment index for equal centres (I11) |
-| **K3** | labels · width | three labels of 14, 12 and 16 cells in two gaps of 19 | the two outer ones fit exactly and the middle would run into the last, so **the middle is dropped** — written from the outside in, never truncated (§3n). Measured: `long-labels` names three at 80 columns and two at 40 |
+| **K3** | labels · width | three labels of 14, 12 and 16 cells in two gaps of 19 | the two outer ones fit exactly and the middle would run into the last, so **the middle is dropped** — written from the outside in, never truncated (§3n), and cluster by cluster through the shared writer (I118). Measured: `long-labels` names three at 80 columns and two at 40 |
 | **K4** | dummy nodes (§3ai.4 G5) · a ribbon through a layer | an edge spanning two layers has a waypoint in the middle one | the dummy is **ribbon, never bar**, in the declared source's slot, and it **counts in that layer's height and scale** — a ribbon passing through spends the layer's rows too. Measured on `cycle`: `a→c` through layer 1 at `[13, 16)`, the same slot on both of its sides |
 | **K5** | a bar's minimum · a small height | twelve sources in a four-row figure | a slice is never below one half-row; the gap falls one row → a half-row → none; then the **least-flow** node goes and the notice names it. Measured: `crowded` keeps eight of twelve at gap 0 and says `+4 more · src-01 · src-02 · src-03 · src-04` |
 | **K6** | total in ≠ total out | `hub` receives 2 and emits 5 | **the bar is the larger side** and the shorter side leaves bare bar below its last slice — what a sankey draws for a loss. Measured: `hub` is 16 half-rows; its one incoming ribbon covers `[1, 7)` and the ten below it are bar with nothing arriving |
@@ -9499,7 +9863,7 @@ has landed (C22 I76), the mouse column with C16 §4a and the hover with C01 I21;
 ### Two marks, because either alone fails in the case that motivates it
 
 **A dashed vertical behind the data**, at the cursor's column, composited through the same
-`behind()` path the gridlines use — so it never overwrites a sample and shows in the gaps.
+merge's gridline pass (§3u) — so it never overwrites a sample and shows in the gaps.
 `dashedVertical` is already the slot for *a reference line drawn beside data*, and its comment
 gives the reason: a solid rule through a figure reads as part of it.
 
@@ -9770,6 +10134,32 @@ did not fit is still drawn, still coloured and still carries its extent; nothing
 absent. Counting it would also have fed the sizing cycle §3ag.4 records. **The correction is one
 commit old and inside the arc that wrote it**, which is the ordinary way an over-applied invariant
 gets caught: by walking the rule it was borrowed from.
+
+**The name is written cluster by cluster, and one writer does it for every form that lays text
+into a cell row** (I118; C09 I64, C09 §5a). A label's unit is the grapheme cluster and not the code point: `café` decomposed is four
+clusters, a keycap `1️⃣` is one, a family `👨‍👩‍👧` is one. `treemapRows`, `tree`, `graph` and
+`sankey` each wrote **one code point per cell**, advancing by `cells()` of the code point — so a
+zero-width piece was written and overwritten by what followed, and the family arrived as three
+faces, the keycap as a bare digit, and `café` as `cafe` (F969). The rule now: the writer is
+`chargrid.ts`'s `write`, shared by the four, by the point labels (§3ag), by the radar's category
+labels (§3w) and by the x axis's captions and tick labels (§3d), and it places each cluster of
+`graphemes(body)` **whole** in the cell where it starts, with the `cells(cluster) − 1`
+cells after it set to `""` — the continuation cell the four already kept, so a two-cell character
+cannot leave a hole the fill walks into, an edge cannot be routed through the second half of a glyph
+(§3ai.4 G11), and the row keeps its count. **A cluster measuring nothing owns no cell**: a lone
+leading combining mark or a bare joiner is dropped and the column does not move, because attaching
+it to a neighbour would put a mark on an edge glyph or on the tile's colour ring, which is worse than
+losing a mark that had no base. `scatter3.ts`'s `overlay` is the precedent (I92, F970) and stays a
+writer of its own, because its cells are spans carrying an ink rather than strings (F976).
+
+**The radar's and the axis's writers had the other defect.** They placed by `cells()` — the
+reservation was right — and then wrote `[...text]` one code point per *slot*, so a family took
+five slots for a two-cell reservation and overwrote the three blank slots after it, and `図表`
+took two slots of four and left two blank inside its own; the join drops nothing, and every label
+sharing the row moved three cells left or two right, under ticks that stayed where the cells said
+(F982, F985). Found by asking which layers carry text after F981, and then by sweeping every
+spread in `plot/` for the shape; the three the sweep left are raster reads, one cell per code
+point at `narrow` by C09 T1.40's set, and SS61 states them as its blind spot (A03 §4).
 
 **Four rulings from this arc have now been overturned by running the code**, and each was called
 forced when it was written — the padding ring here; the shift-inward in §3ag that turned out to
@@ -10567,6 +10957,73 @@ would have to be re-run rather than extended.
 
 ---
 
+## 6p. The label-collision walk — both artefacts, because the writers are structure and the placer is a fold
+
+**The finding's premise was checked before anything was built on it, and it is half true — which is
+the first ruling.** F992 names the bar's value labels as the writer with no collision guard and
+`columnLabels`, one label row down in the same file, as the sibling that has one: *the drop-or-abut
+choice is already made beside it.* Measured, the sibling's guard is `start >= cells(row, ambiguous)`,
+which forbids an **overlap** and permits exact **adjacency** — so `mon tue wed thu` in eighteen
+cells draws `montuewedthu`, which is the entry's own `4.17.4` one row down, in the writer cited as
+the model. *A minimum of one cell is the whole fix* was right about the fix and wrong about it
+already existing anywhere. **One rule, two writers, and neither had it.**
+
+**Both artefact shapes, because the component has both kinds of interaction.** Two labels legal in
+their own columns and unreadable beside each other is **structure** — both hold at rest, with no
+event between them — and the placer is a **fold**, where every decision depends on which of its
+predecessors survived. The table finds the first; only the trace reaches the second, and the second
+is where *drop* differs from *elide*.
+
+### 6p.1 · The table — rules that both hold at rest
+
+| # | the two rules | the input | ruling |
+|---|---|---|---|
+| 1 | the number is centred on its own column (I20) × a number **as wide as** its column is kept (I20) | two 3-cell bands holding `4.1` and `7.4`, tops on one row | **`4.17.4`, and the reader's failure is not crowding.** A crowded row is read as crowded; this is read as *one number that is none of the values*, which no assertion about either bar can see because both are individually correct. The later label is **dropped** |
+| 2 | the number is centred × a number **narrower** than its column is kept | `wide < w` anywhere | **nothing to rule, and the arithmetic is why the fix is cheap.** Centring leaves `⌈(w − wide) ÷ 2⌉ ≥ 1` cells after the label whenever `wide < w`, so a label short of its column's full width can never abut the next one. The whole class is `wide == w` — the collision needs the **earlier** label to fill its band exactly |
+| 3 | a label sits on its own bar's top row (I20) × the bands are concatenated into one composed row (§3j) | two full-width labels on **different** rows | **no interaction, and a single running edge across the figure would invent one.** The fold is per composed row, so a claim carries its row; a placer that tracked one edge for the whole area would drop labels that never met |
+| 4 | a number is dropped rather than shrunk (I20) × the run is not shrunk either (I20) | any dropped label | **what the ruling leaves behind, and it is I20's own reason.** The bar is still drawn and still read against the value scale in the gutter — the argument I20 already makes for dropping at the ceiling and for a number wider than its band. Nothing becomes unreadable; one figure loses a readout it could not have carried honestly |
+| 5 | a value label × **the neighbouring band's ink** | `▇▇▇3.4`, and `│4.1` at the frame | **out of scope, and named rather than left silent.** A ramp glyph is not a digit, so the pair does not read as one number — the defect is a *misreading* and not a *crowding*, and a rule that separated a number from a bar top would spend a cell of every band on a hazard nobody has |
+| 6 | a category name is centred on its band's centre (§3j) × a name starting **at** the row's end is kept | `mon tue wed thu` at 18 cells | **the same ruling, in the writer the entry cited as already having it.** `montuewedthu` names four days and reads as one word |
+| 7 | a name wider than its band is dropped × the fold | an axis where every name fills its band | **the fold degrades to alternate names**, which is what `columnLabels`' own header already claims — *it degrades to the two ends rather than to mush* — and did not do. `nw < w` in place of the fold would drop **every** name at that width instead of every other one |
+| 8 | the composer holds every band × `barColumn` returns exactly `rows × width` cells | the guard's home | **the guard cannot live in the column builder, and the composer cannot derive it.** `barColumn` is called once per band and can see no neighbour; the composer holds them all and cannot tell a digit cell from a ramp glyph by reading the strings back. So the **policy** is the composer's and the **geometry** stays where it is — the builder *asks* before it writes. Deriving the placement a second time in the composer is exactly what I114 refused for the callout's row one arm over: one product written twice, disagreeing at equality |
+
+### 6p.2 · The trace — one composed row, bands left to right
+
+Four 3-cell bands whose tops land on one row, values `4.1`, `7.4`, `5.2`, `1`.
+
+| step | band | the label | claims | the last kept ends at | ruling |
+|---|---|---|---|---|---|
+| 1 | 0 | `4.1` | 0–2 | — | **keep**. Nothing to clear |
+| 2 | 1 | `7.4` | 3–5 | 3 | **drop**. It would start where the row already ends |
+| 3 | 2 | `5.2` | 6–8 | 3 | **keep — and the edge it clears is step 1's, not step 2's.** This is the cell the table cannot reach: a drop is **not** a reservation. Had step 2's refusal moved the edge, step 3 would go too and the row would collapse to one label, which is *elide* and is a different figure |
+| 4 | 3 | `1` | 10 | 9 | **keep**. A band whose label was dropped still occupies its cells, so the arithmetic of the next claim is the composed row's and not the surviving labels' |
+
+The row a fold has and a single pass does not: **a band with no label on this row does not move the
+edge at all.** A bar whose top is elsewhere, an absent value, a number too wide for its band — each
+leaves the edge where the last *written* label left it, which is what lets a sparse row keep every
+label it has.
+
+### 6p.3 · Residue
+
+**Which labels survive is a ruling and not a consequence.** Left to right, first placed wins, is
+`pointlabels.ts`' rule one scale down (*a label never displaces one already placed, so the frame does
+not depend on which of two independent labels was considered first*) and `columnLabels`' stated
+intent. A scoring pass preferring the extremes, or the largest values, is a **different figure** and
+is not ruled here — it would also make the frame depend on the data in a way a reader comparing two
+phases of an animation cannot follow.
+
+**The horizontal arm is outside this and it is worth saying why.** `barRow` writes its number inside
+its own row's width, against an allowance the whole chart shares (I20) — there is no neighbour along
+that axis, because the neighbour is the next *row*. The transpose that makes the two arms answer
+differently about shrinking is the same one that gives only the vertical arm this hazard.
+
+**The stacked and normalised arms draw no per-band number**, so nothing here reaches them; and
+`valueBar` — the table cell in `bar.ts`, which is where the finding says the writer is — pads to
+exactly its cell's width and is composed by C11, so its neighbour is a column separator rather than
+another number.
+
+---
+
 ## 7. Invariants
 
 - **I1** — Measured height is a function of the block alone, never of the data.
@@ -10577,6 +11034,37 @@ would have to be re-run rather than extended.
 - **I6** — At `colourDepth: 1`, multi-series plots stack; series are never distinguished by colour alone.
 - **I7** — Stacked strips sum to exactly `height`; series labels occupy the y-label column and consume no plot rows.
 - **I8** — **A datum that cannot be given a row is named in the area, never dropped silently — and the subject is *rows*, not series.** When series outnumber the rows, the plot draws the first plus a `+N more` legend and marks itself truncated; a tree whose nodes do not fit spends a row on a `warn`-toned notice **before** choosing its layout (I57); and a **category** past the last row is named the same way. *Measured before the third arm existed: `categoricalForm` opened `const labels = cats.slice(0, areaRows)` while the series branch spent twenty lines on the notice with a comment saying a series dropped in silence is the failure it exists to avoid. Three of 45 row-bearing variants in the catalogue were short and all three were histograms — `freedman-diaconis` drawing 8 of 11 bins, **39 of 200 samples and the whole right tail**, as a clean unimodal distribution that had ended. The rule was written about the subject that had the defect, and a histogram's rows are bins a strategy chose rather than categories an author wrote, so the count is not a number anybody could check against the height* (F319).
+
+  **The fourth arm, and it drops for width rather than for rows** (F374). A *vertical* categorical
+  figure gives each category a column and writes the names beneath, and `columnLabels` keeps a name
+  only where it fits its own column **and** clears the last one kept — so four five-cell names over a
+  30-cell frame draw **one tick and one name**, with nothing saying the other three exist. Measured:
+  `Monday` alone under a four-bar frame that has four bars. The horizontal arm spends its last *area*
+  row on `+N more · …` and this arm has no row to spend, because a second furniture row would change
+  the block's height and I1 forbids it. **So the count goes in the label row itself**, right-aligned,
+  with the placer reserving its cells before it places anything — `+3` beside `Monday` rather than a
+  row that is silent about three quarters of its own axis.
+
+  **The count alone, and not the names.** The horizontal arm lists what it dropped because it has a
+  row to list them in; here the reason a name was dropped *is* that there is no width for it, and a
+  list of names along the axis reads as more category labels — the mush `columnLabels` drops rather
+  than truncates to avoid. **Muted, not `warn`**: the row is furniture and `xLabelRowFor` tones the
+  whole of it as furniture, which is the axis speaking about itself rather than the plot reporting a
+  fault.
+
+  **The notice is paid for out of the names, and that is the trade I8 asks for.** The reservation
+  can cost a name that used to be drawn: `boxplot/vertical` at 40 cells read
+  `setosa           virginica hybrid` — three names under four bars — and reads
+  `setosa           virginica       +2` now. Two names where there were three, and that is the
+  better frame: **a name lost is a name a reader can no longer read; a silence lost is a frame a
+  reader can no longer misread.** The old row was not merely incomplete, it was wrong about how
+  many categories the figure has, and every assertion over it passed.
+
+  **`+N` and not `+N more`**, which is the one place the vocabulary departs from the five other
+  sites that spell it out. Measured: at 18 cells over four three-cell names, `+N` leaves
+  `mon   wed +2` and `+N more` leaves `mon  +3 more` — the longer form costs a name to say the same
+  thing, on an axis that is crowded by construction. Consistency of wording is worth less than a
+  category name.
 - **I9** — The ASCII fallback occupies an identical cell grid to the Unicode form.
 - **I10** — A plot never emits a character outside its measured region — `height` rows without axes, `height + 3` with (the frame's lid, the axis rule, the x-labels), by `width` cells. The matrix family keeps `height + 2`: it has no lid.
 - **I11** — C12 owns no state; every render is a pure function of block, width and context.
@@ -10699,6 +11187,14 @@ would have to be re-run rather than extended.
 - **I115** — **The right margin is a band with three writers, ordered outward from the box, and each anchors on the previous one's outer edge rather than on the box's.** `area()` takes the value column's reserve **and** the legend's band off one edge, and every writer in the band was anchored to that edge — so the value labels and the callout were drawn on top of the legend while the reserve grown for them stood empty at the canvas: 180.8 px taken on `line-callout-multiseries`, 52.8 px of it unreachable, with `99.12` painted through `alpha`. **The order is the column and then the legend**, because a value label names a tick and has to stay beside it while a legend names identities rather than coordinates. So the labels and the callout keep `box.right + LABEL_GAP` and the legend's `originX` becomes `box.right + rightRoom(figure, layout) + 12` — which is `box.right + 12` unchanged wherever there is no column, and that is **81 of the 83 frames** in the corpus that carry a right-placed legend. **The cut moves with the anchor**: a right-hand label and a callout are `fitLabel`-cut to the column's outer edge and no longer to the page, which is *the same number* on every figure with no legend beyond the column (`box.right = width − rightRoom` whenever the cap binds) and is what stops a capped callout writing across the band the legend was just moved out of. **This is not I48's clause and does not need it**: the ruling displaces nothing, so it is licensed under both readings of *a callout does not replace the legend*, and a sentence that licenses a decision either way is not the sentence that decided it. **Measured before the rule**: 2 overprinting pairs in 2 of 244 frames — F726 recorded four in two, and the other two were a right-hand tick `100` **I114 does not draw**, 2.415 px from the callout that suppresses it. **Measured after it**: 2 frames move, nothing leaves the `viewBox`, and the widest text ends at 640.00 on a frame that does not move. **Stated blind spot**: the legend has **no `fitLabel` at either anchor**, so an entry wider than its band runs off the page — the tightest slack in the corpus is 18.80 px, and the missing verb is owed under the name `legendFit`. *The tick-against-legend half is not instanced and is not absent: I114's suppression is what hides it, so it returns the day a callout is short enough to leave the top tick drawn* (→ I47, I48, I113, I114, §3ak.50f).
 - **I116** — **A hidden series is a layer that is not rasterised, with its index kept, its legend entry kept under `glyphs.hollow`, its callout, readout and point labels withheld, and the axis unmoved — and the plot declares the digits that toggle it.** `overlaidRows` and the stacked arm skip the layer and keep the slot (`refOf(s, index)` colours the rest); the legend keeps the label and the slot colour and puts `hollow` in the swatch, a mark rather than a tone because colour is never the only channel (I6) and one bit is where the toggle must still read. `seriesRange` runs over every series so the remaining curves do not move on the toggle and the gutter does not resize. Every series hidden draws the frame, axis and legend with a blank area, never *No data.*. `RenderContext.seriesVisibility` is read before `Series.hidden` (C22 I78). `keymap(block)` declares `1` … `min(9, n)` → `toggleSeriesN`, merged at `liveBlock` because no digit is a built-in — measured — and withdrawn with focus (C16 I27, A01 D4); the SVG arm honours the member and cannot see the store (→ C04 I99, C22 I78, §3aq).
 - **I117** — **The legend's hit test is its placement inverted by search, never a second formula.** `legendEntryAt` lays the entries out with the functions that drew them — `legendCell` for a vertical legend's row, `legendRowLayout` for a horizontal one — and answers the series index whose cells contain the pointer: the swatch and the label, not the leading blank, the separator or the `+n` tail. Only a `series` slot answers, and only where `HAS_HIDEABLE_SERIES` holds. `legendHitAt` reaches the legend's origin through `positionalLayout`, `alignPad` and `frameOf` — the three the frame was composed with — so a left legend's column, a right one's, a lid and an alignment pad are right for free, as `sampleIndexAt`'s candles are (→ C16 §4a, C22 I78, §3aq).
+- **I118** — **A label writer places a grapheme cluster whole, in the cells it measures, and a cluster measuring none owns no cell.** `chargrid.ts`'s `write` is the one writer: the treemap's names, `tree`'s and `graph`'s labels, the sankey's node labels, the point labels, the radar's category labels and the x axis's captions and tick labels all lay text into a cell row through it, and it walks `graphemes(body)` rather than code points — each cluster into the cell where it starts, the `cells(cluster) − 1` cells after it set to `""` so the row keeps its count and no fill, edge or ribbon is drawn into the second half of a glyph, and a cluster that measures nothing dropped with the column unmoved. Four writers wrote one code point per cell and lost every zero-width piece to the code point after it — a family as three faces, a keycap as a bare digit, `café` as `cafe` (F969) — and the fix is one function rather than four because that is how the four arrived (§3n, §3ag, §3ai.4 G11, §3ap.4 K3; → C09 I64, C09 §5a; F976). Three more placed by `cells()` and then wrote one code point per *slot*, so a family overran its two-cell reservation by three and `図表` left two cells blank inside its own, and every label sharing the row moved with the error (§3w, §3d; F982, F984, F985).
+- **I119** — **A layer meets the merge as cells: each row is derived once by cluster, a cluster owning the cells it measures, so a name shifts nothing after it and the gridlines land in the cells the data left blank.** `mergedRow` derives every layer's row through `rowCells` before its column loop — each cluster at its first cell, `""` in the cells a wide one occupies after it, measured by `cells()` per cluster as the writer measured (I118) — and indexes the arrays by cell; a `""` is the cluster before it, so the cell goes to that layer, nothing is OR-ed or substituted into it, and the run receives nothing for it. The gridlines are the merge's own pass: a blank cell takes the grid's glyph at its column, a run no layer inked that took one is muted, and a gridline inside a styled run keeps the run's colour — `behind()`'s two rules with the cell index as the only index, byte-identical wherever no label holds a wide or multi-code-point cluster. The rows a rasteriser draws are split one unit per cell without a segmenter, and that set is checked rather than tabled (C09 T1.40). A joined label row read by code point put a family at five columns and `図表` at two, shifting every cell after the name three left or two right. The radar's line arm composes without a merge and reads its label row through the same function, so a name is the cells it measures on that arm too (§3u, §3w; → C09 I63, C09 I65, C09 §5; F977, F981, F982, F984). SS61 is the mechanical form: a string spread read at any index but SS60's first is a code-point index taken for a cell column (A03 §4).
+- **I120** — **A label is written only where it clears the last one kept on its row by a cell; otherwise it is dropped, never shrunk and never slid.** One rule over both label rows of the categorical column arm — the numbers over the bands (I20) and the category names under them (§3j) — because they are one question asked twice and were answered by neither. **The clearance is a whole cell and the comparison is against the last label *kept*, not the last one considered**: a refusal reserves nothing, so a run of contending labels degrades to alternate survivors rather than to the first alone. *Measured before the rule: `4.1` and `7.4` in adjacent three-cell bands compose `4.17.4` — a number that is neither value — and the sibling cited as already holding the rule draws `montuewedthu` for four category names in eighteen cells, its `start >= cells(row)` forbidding an overlap and permitting exact adjacency* (F992). **The claim is per composed row and carries it**, because a band's number sits on its own bar's top and two bands' numbers on different rows never meet; one edge for the whole area would drop labels that never contended. **The policy is the composer's and the geometry stays in the builder** — `barColumn` sees no neighbour and the composer cannot tell a digit cell from a ramp glyph by reading its own output, so the builder asks for its cells and the composer grants or refuses them. Deriving the placement a second time in the composer is what I114 refused one arm over. **Ink is not a label**: a number beside the next band's run, or against the frame, is left alone — a ramp glyph is not a digit and the pair does not read as one number (§3b, §3j, §6p; → I20, I55, I114, I118).
+- **I121** — **The SVG arm's value labels answer to an abut rule of their own, and the tick budget is not it.** `ticksFor` is *a ceiling on the step's coarseness, not the number drawn* — its own header says so, and the terminal resolves the density afterwards in `yLabels` at `MIN_LABEL_GAP` rows. The second arm read `figure.value.ticks` and drew a label for every one, with no density rule at all, while `svgLayout` takes any pixel height and is on the public surface: a count chosen in **cells** spent on a canvas measured in **pixels**. So a label is emitted only where its baseline clears the last one emitted **on its own side** by a full `SVG_FONT_SIZE`, and the tick, its gridline and its rule are drawn either way (I114's ruling about what a decision leaves behind). **A refusal reserves nothing** — I120's clause one arm over — so a label suppressed by the abut rule *or by the callout* (I114) leaves the edge where the last **emitted** label left it, and a crowded gutter degrades to alternate readings rather than to its first. **The budget itself stays shared, and measuring is what settled that**: the entry's remedy was a per-arm pixel budget on the abscissa's precedent, and the abscissa can afford one only because `positionAxisAt` nices *inside* the domain — the ordinate's nicing snaps the range outward, so over `{min: −12.4, max: 7.9}` six budgets give **five different ranges**, and a per-arm ordinate budget moves where every sample sits rather than how many numbers are printed. *Measured before the rule: 0 same-side pairs closer than an em over 210 catalogue frames at the shipped 640 × 320, 2 at 240, 3 at 200, 3 at 160 and 4 at 120 — the ceiling was the only thing holding, and it is a property of the corpus's height rather than of the rule* (F993; → I47, I114, I120, §3ak.50g).
+- **I122** — **The right column is grown for whatever is written in it, and a column is room rather than a request.** A callout is *a name at the line's end* (I48) and the value axis is a separate member (I47), so the column's width is `max(sides.right ? wanted : 0, calloutWidth(…))` — each tenant deciding for itself, which is what the second arm's `rightRoom` has always done. It had been `sides.right ? max(wanted, calloutWidth(…)) : 0`, making the callout conditional on a member it has nothing to do with; **the sentence that kept that in place is `rightRoom`'s own doc comment, which cites the terminal's expression as the same rule in pixels and is wrong about it** — the terminal gated the whole maximum where this arm gates only the labels' half. **And the separation is the second half of the rule**: `rightColumn > 0` had been standing in for *this figure has a right axis*, so a column grown for a callout alone drew the mirrored labels too — `├ 5` and `├ 0` down the side of a plot at `yAxis: false`, found by reading the frame after a change whose every count said *agree*. `Layout.rightLabels` carries which axis was asked for, and its absence means `rightColumn > 0` because that is what every layout built before a callout could grow a column means. *Measured: 9 of the member's 15 cells disagreed between the arms, all nine on documents `validateBlock` refuses under C04 I60; after, 15 of 15 agree and **0 of 1220** committed catalogue frames move* (F994; → I47, I48, I113, §3ak.50h).
+- **I123** — **The abscissa's captions are placed by the terminal arm's rule in this arm's units: one is drawn only where its band clears every caption already drawn, and its anchor is the edge its tick lands on rather than its index.** `positionAxisAt` nices *inside* the domain and then appends the domain's own maximum at `at = 1`, so the last two ticks are whatever the domain leaves — `30` and `31` 12.8 px apart, `150` and `159` 22.5 px, `25` and `29` 7.06 px. The terminal packs that same axis through `xTickRow`'s `free` cursor and **drops** a caption that cannot keep its cell, and its candlestick abscissa reads `0 5 10 15 20 25 30`; this arm drew every tick at its exact position and `31` painted through `30` as one unreadable glyph. **One derivation, two placements, and only one of them had the gap rule** — which is I121's finding one axis over, whose remedy cited *the abscissa's precedent* for keeping the budget shared and left the placement half here unwritten. **The clearance is positional and direction-free**, which is the half that can be violated: the terminal's own left-to-right `free` cursor draws **one** caption on a flipped axis, the ticks descending across the page. *A refusal reserves nothing* (I120) and *cleared against the kept set rather than the last kept* are inherited from I121 and are **vacuous on this axis** — positions are monotone in `x` and the only caption ever dropped is the appended maximum, which is last — which the mutation pass said and no reader could. **And the anchor is the position's** — `page <= 0 ? "start" : page >= 1 ? "end" : "middle"`: the edge captions are clamped by their anchor, and indexing that by `i` while the position reads `facing` parted the two on `origin: "bottom-right"`, where the maximum anchored `end` at `box.left` and grew 14.84 px **into the gutter** onto the value label, and the minimum anchored `start` at `box.right` and grew 7.42 px past the box. **The gridline of a dropped caption is still drawn** (I114's ruling about what a decision leaves behind). The width is `text.length · SVG_FONT_SIZE · SVG_EM_MAX`, the bound `gutterRoom` reserves with, and not a second expression for it. *Measured before the rule: 10 row overprints over 212 catalogue frames at the shipped 640 × 320 and 36 at 320 × 320; after, **0** and 18, the 18 being the categorical captions row and named as owed. **6 of 244** committed frames move. And the residue this came from was **124 pairs in 9 frames** read flat and **40** with the facet panels' coordinates resolved — 84 of them one gutter label in four panels 160 px apart, a class with zero instances* (F1025, F733; → I114, I120, I121, §3ak.50i).
+- **I124** — **A caller's own characters reach the frame at every rung, deliberately, and I54 never said otherwise.** F364 opens by quoting I54 as *every frame at `unicode: "ascii"` is ASCII*; I54 says an **alphabet** is chosen by capability and every **sub-cell repertoire** has a stated substitute. The stronger sentence is `AA1`'s assertion, which is true over the catalogue and false in general — *a claim is falsified by being summarised*, arriving in the citation rather than in the body. **Three measurements settle the ruling, all taken 2026-09-10:** (1) the class is not this component's — of thirteen text-bearing kinds driven with one `…` through the published `expectDocument(…).lines()`, **twelve respond and all twelve leak**: `raw`, `notice`, `code`, `events`, `comparison`, `tip`, `pills`, `steps`, `keyValue`, `table`, `logs` and `plot`, so the plot's five members are five instances of a framework-wide class and the renderer is not the subject. (2) **The operation does not exist**: `asciify|foldTo|deunicode|unidecode` returns nothing across `src/` and `tools/`, and the one `…` substitution in the tree — `src/presentation/text.ts:749`, `caps.unicode === "ascii" ? "~" : "…"` — swaps the marker the **framework appends** when it truncates, not a character the caller wrote. (3) **Degrading here alone would draw one string two ways in one document**: `b.raw("waiting…")` beside a plot's `xTitle: "waiting…"`, differing because of which component drew them. **Refused, with the cost**: a general fold is a transliteration table — a dependency row with five justification parts, or a hand table — and it is lossy exactly where it matters, since `名前` and an emoji have no ASCII image and the honest output is `??`, which is worse than the terminal's own replacement glyph and silently destroys a name. **Reopen when a fold exists as an operation and C09 rules for the class**; until then the residue is C09's and `AA1c` is what watches it (F364, F1052, → C09, C02 §4).
+- **I125** — **`SankeyCell` is two arms, and the background arm demands a glyph the runtime keeper produced.** The type inhabited both kinds of cell — a character of a node's label, pushed straight from the overlay, and a cell of the picture the canvas drew — so *a background never lands on a character a reader reads* (C10 I21) was a property of one `if` in one function with nothing stating it. The first arm carries `background?: undefined`; the second demands `PictureGlyph`, a brand whose only constructor is `pictureGlyph`, which is `assertPictureGlyph` with a cast after it. So the assertion is not a check beside the construction — it is **on the only path to the type**, and a later caller hand-building a background-bearing cell gets a compile error where it used to get a green suite and a wrong frame. **The brand is on the channel and not on the alphabet**, which is what keeps the admitted set narrow: `ASCII.top` is `-`, not a fill, and it reaches no background-bearing cell because `cellOf` passes `below` only on the unicode arm — an alphabet-level brand would have had to admit it. F717 left this owed on two blocker files and both are C12's: `sankey.ts` declares the type and `definition.ts` reads `.text`, `.ref` and `.background` off it, and the union narrows at both reads unchanged (F717, F1054, → C10 I21, §4c.1, §4g.4).
 
 ## 8. Commitments
 
@@ -10822,6 +11318,14 @@ would have to be re-run rather than extended.
 116. **A hidden series keeps its slot, its name and its place in the range, and loses only its ink; the plot itself declares the digits that toggle it** (I116). The mark is a glyph and not a tone, the axis holds, an empty plot is a frame and a legend, and the keymap is the first `BlockKeymap` producer.
 117. **A legend that clicks finds its entry by searching the map that drew it** (I117). The swatch and the label hit, the blanks between do not, and the answer is a series index or nothing — never an annotation's, a candle's, or a form's whose series cannot be hidden.
 115. **A conflict with nothing to decide it usually has nothing to decide** (I115). F726 read the callout striking the legend as two invariants that cannot both hold, and the remedy it named — *the legend's placement* — was recorded and not given. The frame says otherwise: `area()` subtracts the column's reserve **and** the legend's band from one edge, and then the column, the callout and the legend all anchor on that edge, so 52.8 px of reserved canvas stands empty outside a legend the column is drawn on top of. Nothing has to give. Ordering the band outward from the box moves **2 of 244** frames, and F726's fourth interaction — a right-hand tick colliding with the legend on its own — **is not drawn at all**, because I114 suppresses that tick 2.415 px from the callout (§3ak.50f).
+118. **A name reaches the frame as the clusters it was given, through one writer for every form that lays text into a cell row** (I118). The treemap, `tree`, `graph`, the sankey, the point labels, the radar's category labels and the x axis's captions and tick labels call `chargrid.ts`'s `write`; a cluster lands whole in the cells it measures, the continuation cells stay `""`, and a cluster measuring nothing owns no cell. Four private per-code-point loops were how a keycap became a digit and a family three faces (F969, F976); three more, placed by cells and written by code point, were how a family moved every label sharing its row (F982, F984, F985).
+119. **A layer meets the merge as cells, derived once per row by cluster** (I119). `rowCells` is the label writer's join inverted, the merge reads every layer by cell index and lays the gridlines in the same pass, and a name shifts nothing after it: F977's rows are the unlabelled rows cell for cell, the fast set is a checked claim, and `behind()` is gone (F981). The radar's line arm reads its label row through the same function (F984), and SS61 keeps a code-point index off a cell row anywhere in `src/`.
+120. **A label clears the last one kept on its row by a cell, or it is dropped** (I120). One placer for the numbers over the bands and the names under them, because the two are one question and neither had an answer: `4.17.4` is `4.1` and `7.4`, and the sibling that was supposed to hold the rule drew `montuewedthu`. A refusal reserves nothing, so a crowded row degrades to alternate labels rather than to its first — and the builder asks the composer for its cells rather than the composer reading a placement back out of the frame (§6p, F992).
+121. **A tick budget is not a label count, and the second arm was reading it as one** (I121). `ticksFor` says how fine a step to reach for and `yLabels` decides how many survive; the SVG arm had the first and none of the second, on a canvas whose height it takes from its caller. The abut rule is I114's em bound and I120's *a refusal reserves nothing*, and the budget stays shared because the ordinate's nicing moves the **range** — six budgets, five ranges — where the abscissa's does not (§3ak.50g, F993).
+122. **A callout does not need an axis, and a column is not a request** (I122). The second arm never had the coupling and its own comment cited the terminal's expression as the same rule in other units, which it was not — a justification whose parity claim nobody checked, one file from where it was written. 9 of 15 cells disagreed, all nine on documents C04 I60 refuses; the fix is the expression the comment already describes, plus `rightLabels`, because the first form of it drew a right-hand scale on a plot at `yAxis: false` and every count said the arms agreed (§3ak.50h, F994).
+123. **The second arm's abscissa had no abut rule and the sweep that should have found it was reading a nested document flat** (I123). `positionAxisAt` appends the domain's maximum after the niced ticks; the terminal drops a caption that cannot keep its cell and this arm drew all of them, so `31` painted through `30`. The anchor was indexed by `i` while the position read `facing`, which on a flipped axis put the maximum's `end` anchor at `box.left` and grew it into the gutter. And F733's residue — *identical texts at identical coordinates* — was 84 pairs of one gutter label in four facet panels 160 px apart: a class with **zero** instances, already half-diagnosed in `RC8`'s header and excluded by name rather than resolved (§3ak.50i, F1025).
+124. **Caller text is not degraded, and the refusal is recorded rather than deferred** (I124). The reason replaces the old one rather than joining it: F364 read the leak as the renderer's because the renderer is what degrades its own tables, and the measurement says twelve of twelve text-bearing kinds do the same thing. The operation a fix would call does not exist, and the one that looks like it swaps the framework's own truncation marker (§3af, F1052).
+125. **A structural guarantee held by one `if` is written into the type or it is not held** (I125). `SankeyCell` was one wide record serving label cells and picture cells both, so half its inhabitants were text and it could forbid none. The union does, and the brand puts the runtime keeper on the only path to the arm that needs it — which is the compile-time half C10 §4g.4 named and left owed with both blocker files, both of them this component's (F717, F1054).
 
 ## 9. Tests
 
@@ -10830,6 +11334,7 @@ Six tiers. No state machine — C12 is pure over the block.
 ### Tier 1 — unit
 
 - **AA1** (I54, §3af): **the whole corpus, at both ASCII arms** — every catalogue form × variant rendered at `unicode: "ascii"` with `ambiguousWidth` at each value, asserting every codepoint is under 128. One assertion rather than a row per form, because the four sites were four different mechanisms and what they share is the output. It is the row that would have caught all of them, and the measurement it replaces is 49 of 159 and 24 of 159.
+- **AA1c** (I124, §3af): **the class, by equality across kinds, which is what watches the condition.** `AA1b` asserts that the plot's five caller-supplied members leak — a row that asserts a disagreement on purpose, green for exactly as long as the defect is and silent when the defect gets worse. This one drives one `…` through every text-bearing block kind via the published `expectDocument(…).lines()` and compares the leaking set by equality, so it moves when a kind starts degrading, when a kind stops, **and** when a new text-bearing kind arrives with the class already in it. Its own control is the *responds* check the finding's fixtures needed: a kind whose frame does not carry the ellipsis at `unicode: "full"` is reported as a broken fixture rather than counted as degraded — which is how four vacuous passes were caught while measuring this.
 - **AA2** (I54, §3af): a `line` plot at `ascii · narrow` draws a **connected** figure in `+ - |` — asserted as *no codepoint above 127* **and** *a `+` appears where the curve turns*, because falling back to the density ramp satisfies the first and loses what `plotStyle: "line"` means. The paired row is the same fixture at `unicode: "full"`, which must still be `╭─╯`.
 - **AA3** (I54, §3af): `plotStyle: "braille"` on a violin and an unstyled `contour`, both at ASCII, render in the ramp and **do not refuse** — the block is valid, the document renders, and only the alphabet changed (I18's precedent).
 - **AA4** (I54, §3af): `expectDocument(doc).degradesToAscii()` **passes** for a document holding a line plot, a contour and a two-series bar with a legend. The framework's own published contract, exercised against the forms that broke it — and the *fixture responds* control is the same assertion at `unicode: "full"`, which must find the non-ASCII it is supposed to allow there.
@@ -11050,6 +11555,18 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.129** (I117): `legendHitAt` against legends located in painted frames — right, left and `below` — at the swatch, the label, the blanks, the tail, the gutter and the area; a `bar`'s legend and an annotation's entry answer `null`. In `test/unit/plot-legend-hit.test.ts`.
 - **T1.125** (I57): `TR13` — the outline's *last child* glyph is read from the **real** sibling list: a node whose later siblings were truncated still draws `├──`, and the last one drawn keeps its `╰──` where the claim is true. **Found by reading the overflow frame** (§3ah.8a), and the row records the arm it could not have been found on — at `unicode: "ascii"` both forms substitute to `+`, so no frame there distinguishes them.
 - **T1.124** (I57): `TR11` — a wide codepoint in a label is measured with `cells()`, and the cell behind it is not written into (§3n, T1.104).
+- **T1.130** (I118, C09 I64): the shared writer at the six shapes C09 T2.129 feeds — `café` decomposed, `1️⃣`, `🇬🇧`, `👨‍👩‍👧`, `؀1`, `aः` — each cluster in one cell, the wide ones followed by `""`, the column advanced by `cells()` of the cluster **rather than by a literal**, so C09's re-measure of the spacing mark's width (`aः`, F969's second residue) moves nothing here; a lone leading mark dropped with the column unmoved; a body that is only a mark writing nothing; nothing written past the row's end and a negative start writing nothing. **Asserted on the whole row after each write**, not on the cell the cluster landed in. And `tree` through the public render, a family and a keycap in its labels, both whole in the frame. In `test/unit/plot-tree.test.ts`.
+- **T1.131** (I118, I55): the treemap through the public render with a family and a keycap as leaf names — both whole in the frame, compared in NFC as C09 T2.129 compares, and every row exactly the width. In `test/unit/plot-hierarchy.test.ts`.
+- **T1.132** (I118, I110): the sankey through `sankeyArea` — a label's cell holds the whole cluster and the cell after it `""` — and through the public render, both shapes whole. In `test/unit/plot-sankey.test.ts`.
+- **T1.133** (I118, I55): the point labels through `pointLabelRows` — the cluster in one cell, `""` behind it — and through the public render, both shapes whole. In `test/unit/plot-point-labels.test.ts`.
+- **T1.134** (I118, I58): `graph` through the public render with a family and a keycap as node ids, both whole. In `test/unit/plot-graph-gate.test.ts`.
+- **T1.135** (I119): F977's probe as a row — a `line` plot, `plotFrame: "grid"`, `axes: true`, eight samples, at 40 and at 80, with no label and with a family, `図表`, `aः`, `1️⃣` and `peak` at sample 1: every visible cell right of the label's slot — the text's cells and the reserved cell — is the unlabelled frame's cell at the same column, compared by cell position through the cluster walk and never by string index; every cell left of the gap likewise; the row measures exactly the width by `cells()`; and the frame's right edge stands at the last column. In `test/unit/plot-label-merge.test.ts`.
+- **T1.136** (I119): the gridlines land in the cells the data left blank and nowhere else on a labelled row — the same fixture with `plotFrame: "box"` beside it: every inked cell of the box row is the grid row's cell, every blank one is blank or a gridline, no gridline inside the label's cells and no cell at all behind `図`; and read as spans, every gridline carries the muted tone, the label's run the series colour, and no styled run holds a gridline or a blank — the run-colour rule kept from `behind()` has no blank to fire on, because a cell no layer inked has no ref. In `test/unit/plot-label-merge.test.ts`.
+- **T1.137** (I119): the stacked one-bit arm — `colourDepth: 1` with unicode, two series so the form stacks and `strip.names` carries the labels — at the same shapes: the row holding a family label and the row holding `図表` are the unlabelled frame's rows cell for cell outside the slot, exactly the width, edge at the last column. In `test/unit/plot-label-merge.test.ts`.
+- **T1.138** (I119, F977): TL13's fixture — `図表` at 70 on the scatter — every row but the caption measures 70, the label's row that TL13's `/[│|]$/` filter skipped included; TL13 itself asserts every row by position now. In `test/unit/plot-label-merge.test.ts`.
+- **T1.139** (I118): the braille arm — a six-category radar at 60, the sixth category a family, `図表` and a keycap in turn, each beside an ASCII name of its width as the control: the name whole in the frame; the row it shares with `east` measuring what the control's does; the cells outside the name's slot the control's cell for cell, read through the cluster walk and never by string index; `east` at its column; no row of the frame past the width or into the clamp. And a responds row — names of different widths move their own start. In `test/unit/plot-radar-labels.test.ts`.
+- **T1.140** (I118, I119): the line arm at the same shapes and controls, through `radarQuadFigure`'s read — and `図表`'s two ideographs adjacent in the frame with nothing of the polygon between them, the continuation cell being the name's. In `test/unit/plot-radar-labels.test.ts`.
+- **T1.141** (I118): `xAxis`'s three captions with a family, `図表` and a keycap at the left and then at the centre, each beside an ASCII caption of its width: the caption whole, the row's width the control's, the ticks the control's, every other caption starting where it starts beside the control, and XA4's anchor rule held by cells — the left caption starting on its tick, the centre straddling it, the right ending on it. `XA10` in `test/unit/plot-x-axis.test.ts`.
 - **T2.9** (I56): **`HAS_X_TITLE` is re-measured rather than trusted** — every `true` renders its title and keeps `measure === rendered`, every `false` is refused at the gate, and the count of drawing forms is asserted at 26 so the sweep cannot pass against an all-`false` record. This is the row that makes the record safe to edit.
 - **T2.10** (I34) — `PD1`–`PD3`: every form with no ladder refuses `plotDetail` at **both** gates, for all three values, with the count asserted at **42** so the row cannot pass against an all-`true` record; `boxplot` and `violin` still accept all three; **absent is accepted everywhere**, which is the row that says why the defect was invisible; and `HAS_DETAIL_RUNGS` agrees with `RUNG_FORMS` form for form, read from `definition.ts` rather than restated, so the two halves cannot both be a copy of one mistake.
 - **T2.11** (I57, I34): `TR12` — `plotDetail` is refused on `tree` at both gates and `HAS_DETAIL_RUNGS.tree` is `false` — B1's record answering its first new question, and answering it in the negative.
@@ -11071,7 +11588,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **FV1–FV3** (I60, §3ak): **`HAS_VALUE_AXIS`' true direction over the corpus** — a form marked `false` never draws a numeric gutter label, at both widths and every capability set, with the count of forms checked reported rather than assumed. **`FV1` failed on the commit that introduced it**, four offenders, against a record its own author had just written (F267). `FV2` refuses the converse — a form marked `true` need draw no numeric label, because whether the gutter holds values is orientation and rung — and `FV3` pins the strings the axis carries, so the arm that stopped computing them cannot start again.
 - **DS1–DS4** (I66, §3ak.8): **every catalogue fixture rendered twice, with its numbers moved by a position-varying factor** — a uniform scale leaves a normalised figure identical and a reversal leaves a histogram identical, and neither is a defect. `DS2` is the row that makes `DS1`'s number mean anything: the exempt set is the fixtures with **nothing to perturb**, compared by equality, and it is 15 of the 16 unmoving frames. `DS3` is the fabricated violation — a comparison that never reports equality reports every form as moving, on any corpus. `DS4` names `ecdf`'s mechanism, so a repair that moves the frame for the wrong reason still has to face it.
 - **FC1–FC9** (I59, I61, I64, I65, §3ak.7): **the curve family's emitter, and the terminal reading it back.** `FC1` is the seam's claim as an assertion — a mark's `y` and `rowOf`'s row are one coordinate with the facing applied once each side, which no frame shows because a frame wrong in both arms is a frame that agrees. `FC2` breaks a run where the samples stop being consecutive; `FC3` composes the legend once and projects the swatch twice, at two capability rungs; `FC4` refuses with an empty list rather than a throw, including the pinned-bounds case where an axis exists and nothing was measured; `FC5` asserts the figure describes the block that is **drawn**; `FC6` holds the decisions and the marks apart, so no caller can hold a figure with another family's marks on it; `FC7`–`FC9` came from the mutation pass — **the orientation, the mark's own slot and the scale each had a row named after them and no assertion in it**, and `FC9`'s subject is a unit block because no rendered fixture anywhere constructs a `yScale` (F270).
-- **FS1–FS3** (I59, I62, §3ak.7): **the scatter family, whose decisions are the curve's** — both reach `positionalForm`, so the extent, the nicing, the tick count and the facing are one computation and only the marks differ, which is what makes a *family* the unit rather than a form. `FS3` carries the size channel: a bubble's radius **is data** and crosses normalised against the size series' own maximum, where a scatter dot's radius is each renderer's and does not. **It also asserts F271** — the channel is a member of `series`, so the terminal draws it as a second bubble series and the figure says so; correcting that here would be a divergence no commit announced, and the row fails the day the channel stops being a series.
+- **FS1–FS3** (I59, I62, §3ak.7): **the scatter family, whose decisions are the curve's** — both reach `positionalForm`, so the extent, the nicing, the tick count and the facing are one computation and only the marks differ, which is what makes a *family* the unit rather than a form. `FS3` carries the size channel: a bubble's radius **is data** and crosses normalised against the size series' own maximum, where a scatter dot's radius is each renderer's and does not. **It also asserted F271** — the channel was a member of `series`, so the terminal drew it as a second bubble series and the figure said so; correcting that inside a refactor would have been a divergence no commit announced, and the row was written to fail the day the channel stopped being a series. C04 I117 is that day: `FS3` now holds the closed form — no marks at `seriesIndex` 1, and an identity of one.
 - **FB1–FB5** (I59, I62, I64, §3ak.7): **the bar family, where `identity` stops meaning the series.** The member is *what the figure's slots are named* — a curve's are its series, a bar's its categories — so the legend and the identity are one list there and **two** here, and `FB1` asserts both answers side by side so the difference is on purpose. `FB2` holds the zero-anchored extent (`[10, 25, 15]` anchored at 10 draws nothing for its first category); `FB3` is D11, the orientation the two arms defaulted opposite ways; `FB4` puts the rects in the **figure's** space rather than the screen's, `x` along the identity axis whatever the orientation says — and **asserts F272**, that both terminal arms fill from the range floor so a signed bar chart draws no negative bars. `FB5` keeps the identity through a refusal.
 - **FM1–FM4** (I60, I61, I62, §3ak.7): **the matrix family, where `value` is `null` and `extent` is not** — the pair is the family's whole shape. Three renderers furnished an axis out of `seriesRange([]) ?? {0, 1}` over readings that are colours; there is no axis, and the *ramp* still has a domain, so `FM1` holds both halves. `FM2` carries the type's one extension: a matrix cell has no length and no position to spend on its value, so **the reading crosses on the mark** — `point.size`'s argument one mark along — and each arm turns it into a colour at its own depth. `FM3` pins the family's own facing default, reachable from two files before it was decided once. `FM4` takes the identity from the **gutter**, because an unlabelled row is `""` there and `row N` to the overflow notice twenty-five lines away, and `series N` to the positional families — three answers to *what is this row called*.
 - **FD1–FD5** (I59, I62, I64, §3ak.7): **the distribution family, and the reason `GlyphRole` exists.** A median is `┃` at full unicode, `|` in ASCII and a distinct mark below the colour floor; a mean is a different character; an outlier a third — and the SVG draws a line and two circles. What both arms agree about is **which of the seven things this is**, which is the whole content of the seam here. `FD2` holds `quartileRange`'s two arms: a boxplot's extent is the whiskers plus outliers, a forest plot's is the interval, because a confidence bound can reach past the observed range. `FD3` is `absent` — `normalisedSummary` falls `centre` back to the median, so the *summary* cannot say **nothing was reported** and the role is what does, which is how the SVG refuses where the terminal draws.
@@ -11084,6 +11601,12 @@ Six tiers. No state machine — C12 is pure over the block.
 - **U4** (I62, §3ak): identical across themes, because the refs are unresolved — a theme change moves nothing in the figure.
 - **RM1–RM5** (I113, §3ak.49): **the right margin, and the rows are split by which half of the rule they can see.** `RM1` is geometric over the emitted document and over the whole catalogue — every `<text>` inside its own `viewBox` at **0.6182**, the widest face measured, and not at the arm's own constant, because a row asserting at `SVG_EM_MAX` agrees with the code by construction. It is the row the byte-compare golden could not make: `line-callout-both` recorded `alpha 0.8774` 67 px off the page and agreed with itself for as long as it existed. `RM2` is the reserve — the maximum of the callout and the right-hand labels, and **zero where neither is drawn**, which is the half that would make this the wrong rule. `RM3` asserts that the marks walk and the axis emitter answer to one box, which is the interaction the walk found rather than the overflow. `RM4` is the cap and the marked cut. `RM5` is the boundary where the reserve and the fit meet — a string in a margin sized for exactly that string. **The hand pass is what indexed them**: removing the reserve does not fail `RM1`, because the fit still contains the string, and removing the fit does not fail `RM2` — a containment row cannot see a reserve going missing and a reserve row cannot see containment going missing.
 - **RC1–RC6** (I114, §3ak.50): **the callout's row, and the first of them is the row `RM1` could not be.** `RC1` is geometric over the whole catalogue and it is the one the corpus needed: no callout's painted band overlaps a right-hand value label's, where `RM1` asks only whether a string is on the page and agreed with all ten overprints for as long as they existed. **Containment is not correctness**, and this is the measured instance of that — every one of those ten strings was inside its `viewBox`. `RC2` is the left side, at `yAxis: "both"`, where one tick has a label on each side and I48 says only the right one may go: the row asserts the **left label survives on the contended tick specifically**, not merely that left labels exist, because a count agrees with a rule that drops the wrong one. `RC3` is the half that would make this the wrong rule, and **designing the mutations is what gave it its shape**: `RC1` is satisfied by deleting the whole right column, so a row asserting only *no overprint* accepts an over-eager rule that suppresses every label. `RC3` therefore asserts the **set** — the right column still reads every label the callout did not land on, by value *and* by row — and it asserts it at **two tick pitches**, because the first mutation run showed the sparse one cannot see a widened threshold: at `height: 8` the labels are 137.6 px apart and four times a glyph reaches nothing, at `height: 40` they are **15.29 px** apart and it reaches a neighbour. The second half of the row is the figure with no right-hand column at all, whose left gutter must be untouched by a callout arriving. `RC4` is the suppressed label's **gridline**, still drawn, which is what the ruling leaves behind. `RC5` is the wiring rather than the mechanism: it asserts the emitter reads what the walk wrote, by constructing a block whose callout lands on a tick and checking the *emitter's* output, so it fails if `marks` is ever called after the axis pass. `RC6` is F713's real hazard on the other side of the box — no left-hand value label in the catalogue is ellipsised, which fires the moment `gutterRoom` under-measures what the emitter draws, from any cause.
+- **RC8** (I121, §3ak.50g): **no two same-side value labels paint the same band, over the whole catalogue and at four canvases** — the shipped 640 × 320 and three shorter ones, because at the default the count is zero and a row that swept only there would pass against no rule at all. **The sweep reads page coordinates and takes the gutter columns the emitter's own anchors define**, both of which are corrections to an instrument that reported 30 pairs at 0.00 px from nested `<svg>` coordinate systems and swept the abscissa's captions in with the ordinate's. **The first correction was to exclude the facet frames by name, which was the instance rather than the class**: the two nested documents then sat outside every band rule in the file while F733 carried the same un-resolved reading of the same two frames as a finding. It resolves the nesting now — 848 frames swept where the exclusion swept 840, still 0 pairs (§3ak.50i, F1025). **`RC1` cannot be widened into this**: it indexes *callout against label*, so label-against-label is outside its shape however many frames it sweeps, which is the whole of F729's point.
+- **YC10** (I122, §3ak.50h): **the member's whole product, both arms, and the refusal beside it.** Every `yAxis` × `yCallout` pair — 15 cells — asserting that the callout's text appears in the terminal's right gutter **and** in the SVG, or in neither. **The terminal side is read positionally**, past the plot area's right edge, because `10` is also the top axis label and a substring test over the frame reports a callout wherever the scale happens to name the same number — the first form of this row did exactly that and reported three cells as agreeing. Paired with the refusal, which **YC7 already asserts** — so this row cites it rather than restating it: `validateBlock` rejects the nine cells whose `yAxis` is not `"right"` or `"both"`, and the agreement asserted here is currently reachable only by handing a renderer a `Plot` directly. It fails the day C04 I60's fourth refusal is lifted **or** the arms drift apart again.
+- **YC11** (I122, §3ak.50h): **a column grown for a callout alone carries no mirrored labels** — the half a count cannot see. At `yAxis: false, yCallout: "both"` the right gutter holds `┣ alpha 10` on the series' last row and the frame's own `│` on every other, with no `├` stub and no number anywhere past the area; and its control is `yAxis: "right"`, where the same figure keeps `├ 5` and `├ 0` beside the callout. **The row exists because reading the frame is what found it**: with `rightLabels` absent every cell of YC10 reported *agree* while the terminal drew a scale the block had switched off.
+- **RC9** (I121, §3ak.50g): **the half that would make it the wrong rule.** `RC8` is satisfied by emitting no value labels at all, so `RC9` asserts the **set** — at the default canvas every tick still carries its label on both sides at `yAxis: "both"`, by value and by baseline — and at a canvas where the rule bites, that **the survivors are alternate ticks rather than the first alone**, which is where *a refusal reserves nothing* fails and nothing else sees it. Paired with the gridline: a suppressed label's rule is still drawn, so the figure's geometry does not move with its readings (I114's `RC4` one writer over).
+- **RC10** (I123, §3ak.50i): **no two texts sharing a baseline paint the same band, over the catalogue at two canvases** — the **row** rule to `RC8`'s column one, and the row F732's residue needed. Ten pairs lived in it: `31` written through `30` on both candlesticks and `29` through `25` in all four facets of `pairplot` and `smallmultiples`, every one inside its own `viewBox` and inside a golden that agreed with it. `RC1` indexes *callout against label* and `RC8` a pitch down a column, so neither could be widened into this. **The control is that the rule bit, not that the corpus is non-empty**: a row asserting *no overprint* is satisfied by an emitter that draws no captions and by a corpus whose ticks are never close, so it also asserts that some frame has a caption the abut rule dropped — `positionAxisAt`'s appended maximum. **Its blind spot is stated**: a text on a *different* baseline is outside it, which is why the anchor mutation kills `RC11` alone.
+- **RC11** (I123, §3ak.50i): **the half that would make `RC10` the wrong rule**, and it took two passes to get there. `RC10` is satisfied by an abscissa that draws nothing, so this asserts the **set** — the niced ticks stand and the one that goes is the appended maximum, checked against `xTickRow`'s own output so the rule is the terminal's rather than this row's invention. **A second fixture came out of the mutation pass**: at the candlestick's 64 px tick pitch a clearance widened to twice the advance reaches no neighbour and this row survived it, so it gained a dense abscissa (11 ticks at ~50 px, 39–47 px labels) where the same widening thins the row to alternate readings — F728's shape one axis over. **And the gridline half survived pass one too**, because the dropped caption is the appended maximum at `box.right` and its rule coincides with the frame's right edge: counting *distinct* baselines cannot see it go and counting elements can, so the row does both — 8 distinct x, 10 elements, 7 captions. The last third is the flip: the captions read in reverse, the leftmost anchors `start` and the rightmost `end`, and nothing else on the page paints the abscissa's band — with a control proving the ordinate's bottom label **is** in that band, so the check resolves against a text rather than against nothing.
 - **RC7** (I115, §3ak.50f): **the right band's three writers hold disjoint columns, over the whole catalogue — and it asserts positions rather than containment.** Every one of the two overprinting pairs was inside its own `viewBox`, so a containment row agreed with both; `RC7` sweeps every frame for a legend entry sharing a horizontal band with a callout or a right-hand value label, using the emitter's own `rect`-then-`text` arithmetic to identify a legend entry rather than a coordinate. **The half that would make it the wrong rule is asserted too**: the legend of a figure with **no** right-hand column keeps `box.right + 12` exactly, so a rule that pushed every legend outward fails here and nowhere else — and that is 81 of the 83 frames, which is what makes the row cheap to satisfy wrongly. **The fixture property that makes it sensitive is the column's width**: `rightRoom` must be non-zero *and* the legend must be drawn, which is `yCallout: "last"` with `legend` on `line-callout-multiseries`, where the reserve is 52.8 px — a legend moved by anything less than a glyph would still overprint, and 52.8 is 6.8 glyphs.
 - **U5** (I59, §3ak.17): **the SVG arm cannot see a capability, asserted on the signature rather than on a frame.** *As written — `identical at every capability set` — the row had no parameter to vary and therefore nothing to be wrong about.* `plotToSvg` takes a block, a theme and a layout; `svg.ts` imports no `Caps`. The guard is structural and says so, so a green run is not read as a measurement.
 - **U6** (I59, §3ak.15, §3ak.17): **walk artefact B — the rung ladder as a trace, and the degradation audit this component has never had.** Its first half, *the terminal's figure is identical at every capability set*, is unfalsifiable for U5's reason and becomes the same structural guard: the emitters take `block` alone. **The content is the second half**, and it is a record — 46 forms against the four edges that isolate one capability each, classified on raw frames. *The `CAPS` array's neighbours are not those edges*: `ascii` is two capabilities from full, so a trace walking the array would attribute a colour change to the unicode rung. `U6c` is the control — `tree` draws no SGR at 24-bit, so its `same` cells are what make the other 45 evidence.
@@ -11104,8 +11627,16 @@ Six tiers. No state machine — C12 is pure over the block.
 - **SK7** (I111): the 24-bit frame's non-label glyphs are `█ ▒ ▀ ▄`, the ASCII frame's are `# = -`, the wide frame **is** the ASCII frame, the one-bit unicode frame keeps `█` and `▒` distinct, and a two-owner cell carries a background SGR at 24-bit.
 - **SK8** (I110, §3ap.3): the SVG draws one `<rect>` per declared node and one path per segment at `fill-opacity="0.5"`, the last layer's label `text-anchor="end"`, and the rect heights of `x` and `y` in the ratio `7 : 4` — continuous, because that arm has no quantum.
 - **SK11** (I112, §3ap.7): every `<text>` a sankey's SVG emits for a node carries the **`tone.default`** hex and a `stroke` in **the page's own ground** with `paint-order="stroke"` — asserted over all six variants and on **both** shipped theme variants, so the row is about the slots rather than about two hex literals. Paired with the ratio itself: `ratio(fill, stroke)` per label is at or above `DEFAULT_FLOOR`, which is the promise, and the two hex values are only how it is kept. The reversed notice is excluded by name — it is `tone.warn` on bare ground and is not a node label.
+- **SK13** (I125, F1054): **the type refuses what the `if` was holding.** Two `@ts-expect-error` rows are the subject — a label cell given a `background`, and a background-bearing cell whose `text` is a plain string — and each is a *compile* failure rather than a thrown one, which is the whole difference from what shipped. The fabricated violation is checked by compilation itself: `tsc --noEmit` is green only if both directives are *used*, so a union that stopped refusing would report the directives as unnecessary and fail. The behavioural control is the runtime keeper still firing: `pictureGlyph("A", …)` throws with C10 I21's message, because the brand is the assertion and not a second gate beside it. And the drawn frame is read rather than counted — every cell of a default sankey at 24-bit that carries a `background` carries a fill glyph, which is the property, taken off the frame the arm produced.
+- **SK12** (I110 K3, F980): a first name of thirty cells against a gap of seventeen at 40 columns is dropped whole — never cut, the middle bar standing in column 20 of every row, the middle label keeping its cells — and fits at 80. The fit test is the only guard here: nothing is written in the name's way, so the overlap guard cannot stand in for it, which is what SK5's fixture had let it do.
 - **SK9** (I110 K10, I11): two renders are byte-identical, and every layer's bars keep the ordering pass's order top to bottom after relaxation.
 - **SK10** (C04 I69, I92): the builder admits `graph` on `sankey` as the validator does. Runs the day `b.plot`'s guard is widened; until then it is a `todo` that names the file — a deferral whose condition is the code itself, so it cannot stay deferred once met.
+- **LC1** (I120, §6p.1 row 1): **the reproduction, and it is asserted as a frame rather than as a count.** The row asserts `4.17.4` is gone **and** that `4.1` is still there whole — because a rule that dropped both satisfies the absence alone, and that is the over-eager placer this row exists to refuse. **Both numbers separated is not available and I20 is why**: three cells cannot hold `4.1`, a blank and `7.4`, and the only way to make room is to write one of them over the band it does not name, which is the reason I20 already drops a number wider than its band. The *fixture responds first* control is the same two bands composed with no claimer at all, which must still read `4.17.4`.
+- **LC2** (I120, §6p.2 step 3): **a drop is not a reservation**, which is the row only the trace could ask for. Three contending labels in a row keep the **first and the third**, not the first alone — the mutation that moves the edge on a refusal turns the fold into an elide and fails here and nowhere else.
+- **LC3** (I120, §6p.1 row 3): **the claim carries its row.** Two full-width numbers in adjacent bands whose bars top on *different* rows both survive. A single edge for the whole plot area passes LC1 and LC2 and fails here.
+- **LC4** (I120, §6p.1 row 6): the category names under the same figure obey it — `mon tue wed thu` at the width that composed `montuewedthu` now reads whole names with a cell between, and the **ticks** under them are the surviving names' and no others.
+- **LC5** (I120, §6p.1 row 2): the arithmetic that bounds the class — over every band width and every label width that fits it, a label short of its band's full width leaves at least one cell after itself, so **the fold refuses nothing** in that case. The row that keeps the guard from being over-eager.
+- **LC6** (I120, §6p.1 row 5): a number beside the **next band's ink** is untouched, and so is one against the frame. The half that would make this the wrong rule: a placer that treated any non-blank cell as a claim would erase readouts the reader can read.
 
 ### Tier 2 — contract / interface
 
@@ -11240,7 +11771,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.78** (I110, §3ap.4 K6): the bar taken from the in-side alone → **SK2 fails** — `hub` shrinks to its two units and the loss disappears, with every other assertion green.
 - **T6.79** (I110, K1): the weight read from the first origin only → **SK3's second half fails**: `a→b 2` and `b→a 3` draw a ribbon of 2, correct in every count but the one that carries the data.
 - **T6.80** (I110, K4): the dummy drawn as a bar → **SK4 fails** — a node the graph does not have, in the right colour at the right rows.
-- **T6.81** (I110, K3): the fit test removed so a label is written wherever its bar is → **SK5 fails**: `rate-limiter` runs under `upstream-service` at 40 columns. Labels written inner-first instead → **SK5 fails the other way**, keeping the middle name and losing the sink's.
+- **T6.81** (I110, K3): the fit test removed so a label is written wherever its bar is → **SK12 fails**: a thirty-cell first name is written across the middle bar at 40 columns and takes the middle label's cells. SK5 no longer sees this mutation (F980): its middle name is dropped by the overlap guard before the fit test runs, because the sink's name, written first outside-in, holds the same cells. Labels written inner-first instead → **SK5 fails the other way**, keeping the middle name and losing the sink's.
 - **T6.87** (I112, §3ap.7): the label's ink put back to `LABEL` — the axis furniture's `tone.muted` — → **SK11 fails**, on the slot row and on the ratio row, the light variant at 2.44 and under `muted`'s own floor.
 - **T6.88** (I112, §3ap.7): the halo dropped, the ink left at `tone.default` → **SK11 fails** on the `stroke`/`paint-order` half. This is the mutation that says the halo is load-bearing rather than decorative: without it the backdrop is the ribbon again and the ratio row has nothing to resolve against.
 - **T6.89** (I112, §3ap.7): `paint-order="stroke"` dropped and the `stroke` kept → **SK11 fails on 12 rows and not on 24**, and the ratio row does not move. That asymmetry is the whole reason `paint-order` is a separate assertion: the stroke is then painted *over* the fill, every label becomes a ground-coloured blob, and a rule that reads the two hex attributes is satisfied by exactly the document that hides it. Measured — 24 rows for the ink, 24 for the halo, **12** for this.
@@ -11254,6 +11785,17 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.93** (I116, §3aq): four mutations — the layer filter, the `hollow` arm, the override read, the `keymap` member — each named with the row it kills, in `tools/mutate/runs/c22-series-visibility.mjs`.
 - **T6.94** (I117, §3aq): the legend's column origin off by the swatch's width → **T1.129**'s swatch arm and C16 T4.73 fail; the row origin ignoring the lid → T1.129's vertical arms fail. `tools/mutate/runs/c01-hover-legend.mjs`.
 - **T6.92** (I115, §3ak.50f): four mutations in `c12-svg-legend-column.mjs`, **run by hand twice and reported as measured** — the legend's anchor reverted to `box.right + 12`, the shipped defect (→ **`RC7` alone**, and **`RM1` and `RC1` both survive**, which is the finding restated: an overprint between two *different* writers is invisible to a row about one of them); the anchor pushed out unconditionally by `LEGEND_SHARE · width` (→ `RC7` on its no-column half, **and `RM1`**, because 81 uncontended legends move toward the edge and strings leave the page — four rows in all); the right label's cut returned to `layout.width` (→ `RC7`); and the callout's cut returned to `layout.width` at the walk's call site (→ `RC7`). **The last two survived the first pass**, because no frame in the catalogue has a right legend *and* a writer past the cap — the clause was not vacuous, the corpus was — and `RC7` gained two constructed fixtures from that survival: a 48-character `yCallout: "name"` at the default width, cut to 27 characters against 42, and a `0.000123` readout at `svgLayout(160, 200)`, cut to `0.000…` against standing whole. The second fixture is narrow because a **numeric** right-hand label cannot reach the cap at the default width: `formatReadout` writes ~18 characters at worst, 140 px against 213.3. **Two controls, one slot.** The harness's `control` is the mutation whose kill is not in doubt — the shipped defect — because its job is to prove the pass can see a kill; the *survivor* control widens the column's edge by `1e-9`, inside `fitLabel`'s own tolerance, and was run by hand (`+ 12` → `+ 13` on the legend's gap was rejected for it because `RC7` asserts positions and sees a pixel). The run's first version put the survivor in the harness's slot and the harness refused to report (`BlindHarnessError`) — the instrument catching its own misuse, which is what the control pair is for.
+- **T6.95** (I118): the writer returned to one code point per cell → **T1.130 fails on the keycap** — a bare digit in the cell — and C09 T2.129's `NOT_WHOLE` gains the four kinds back. In `test/revert/plot.test.ts`; the mutation is `tools/mutate/runs/c12-label-writers.mjs`, with the treemap's and the sankey's calls each replaced by a local per-code-point loop beside it.
+- **T6.96** (I118): the zero-width drop removed → a lone mark is written into a cell, and **T1.130's mark-only body fails**; a zero-width cluster given a cell of its own → **T1.130's leading-mark case fails** on the column. The leading-mark case cannot see the first mutation, because the next cluster overwrites the cell either way — which is why the row carries both. In `test/revert/plot.test.ts` and `c12-label-writers.mjs`.
+- **T6.97** (I118, I57): the continuation cells left unfilled → **T1.124/`TR11` fails** — `描画` with a blank between its halves and `raster` measured at the wrong column — and `TM5` fails on the row's width. In `test/revert/plot.test.ts` and `c12-label-writers.mjs`.
+- **T6.98** (I119): the label layer indexed by code point — `[...row][x]` over the overlay `pointLabelRows` hands the merge — → **T1.135 fails on the family row**: five columns for the name, the reserved cell read three columns late, the composed row 31 cells of 34. In `test/revert/plot.test.ts`; the mutation is `tools/mutate/runs/c12-label-merge.mjs`.
+- **T6.99** (I119): the continuation cell treated as blank — `isBlank("")` asked before the continuation rule — → **T1.136 fails with a gridline behind `図`**, four cells in three columns. In `test/revert/plot.test.ts` and `c12-label-merge.mjs`.
+- **T6.100** (I119, C09 I63): the fast set widened to a wide code point — a row of `日` split one unit per cell — → **C09 T1.40 fails** on the member that measures two. In `test/revert/plot.test.ts` and `c12-label-merge.mjs`.
+- **T6.101** (I118): the radar's writer restored to one code point per slot — a family's five code points into a two-cell reservation, the three blank slots after it overwritten, the join three cells short — → **T1.139 fails**, `east` three cells left of its column. In `test/revert/plot.test.ts` and `c12-radar-captions.mjs`.
+- **T6.102** (I119): the line arm reading its label row by code point — `図表` at cell 14 and `east` at 42, the index reaching `east` two columns early and the composition two cells over the width — → **T1.140 fails** into the clamp. In `test/revert/plot.test.ts` and `c12-radar-captions.mjs`.
+- **T6.103** (I118): the captions' writer restored to one code point per cell — a family at the left, the centre caption written where the cells said and joined three cells left of the tick recorded for it — → **T1.141 fails**. In `test/revert/plot.test.ts` and `c12-radar-captions.mjs`; the tick-label arm's restoration is the run's expected survivor, because a formatted number is ASCII.
+- **T6.104** (I119): restoring `[...(labels[cy] ?? "")][cx]` or `[...text].forEach((ch, i) …)` anywhere in `src/`, `cells-ok` mark and all → **SS61 fires** on the line under `make enforce`, which is what its three fabrications show; the two-statement shape is silent, because it is the rule's stated blind spot and the row says so. In `test/revert/plot.test.ts`, and the rule mutated from three sides in `c12-radar-captions.mjs`.
+- **T6.105** (I123, §3ak.50i): nine mutations on the abscissa's placer, **run by hand and reported as measured**, with the table in §3ak.50i. The abut rule removed — the shipped defect restored — kills `RC10` **and** `RC11` and is the control; the anchor back to `i === 0 ? "start" : i === last ? "end"` kills **`RC11` alone**, which is the finding restated, because the flip's collision is with a text on a different baseline and no row rule reaches it; the clearance doubled and the `gridded` push moved below the drop each **survived pass one** and gave `RC11` a fixture and a second counter respectively; the terminal's left-to-right `free` cursor collapses a flipped abscissa to one caption and kills `RC11`. **Three survivors, each with its reason**: *cleared against the last kept rather than every kept* and *a refusal reserves something* are vacuous on this axis — positions are monotone in `x` and the only caption ever dropped is the last — which is A03 §2's class arriving in prose and is why the ruling no longer claims either; the advance taken from the widest measured face rather than the arm's bound survives by design, the rows measuring at 0.6182 for `RM1`'s own reason. The survivor control is a `1e-9` tolerance on the overlap test.
 
 ## 10. Out of scope
 

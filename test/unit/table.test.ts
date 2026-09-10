@@ -410,6 +410,80 @@ describe("C11 tier 1 — planColumns", () => {
     expect(COLUMN_GAP).toBe(2);
     expect(planColumns(psColumns(), 160).gap).toBe(COLUMN_GAP);
   });
+
+  /**
+   * **A declaration with nowhere to fire** (I22, F1032, and F50 from the other
+   * side).
+   *
+   * A column with no `flex` is allocated its `minWidth` by step 6 and never
+   * grows, so `maxWidth` is a ceiling on nothing. F50 recorded the consequence
+   * as a consumer shape — `/diff`'s PATH declared `maxWidth: 72`, had no `flex`
+   * and drew at 20 cells with 80 empty beside it — and §3's step 7 used to say
+   * *clamp each column*, which is the sentence a surface author reads before
+   * writing one. In the one consumer in the tree, **26 of 26 `maxWidth`
+   * declarations sit on columns with no `flex`**.
+   *
+   * The row is a **deep equality over the whole sweep**, not a spot check: the
+   * claim is that the field cannot change a plan, and one width is a claim about
+   * one width. The control is the last block — the same cap on a `flex` column
+   * *does* move the plan — without which this row passes just as well against a
+   * planner that ignores `maxWidth` entirely, which is the vacuity it is written
+   * to avoid.
+   *
+   * It also pins the reversal. Making `maxWidth` imply growth is a real option
+   * and it is not taken: it would relay out every table declaring one, and it
+   * contradicts step 8's decision to leave residual width unused. This fails the
+   * day someone takes it, which is what makes that a decision rather than a
+   * drift — T2.7's argument, one field over.
+   */
+  it("T1.25 (I22): `maxWidth` on a column with no `flex` cannot change a plan, at any width", () => {
+    const drop = (c: ColumnDef): ColumnDef => {
+      const { maxWidth: _capped, ...rest } = c;
+      return rest as ColumnDef;
+    };
+    const SHAPES: readonly (readonly ColumnDef[])[] = [
+      [{ key: "a", label: "a", align: "left", priority: 90, minWidth: 8, maxWidth: 40, sortable: false }],
+      [
+        { key: "a", label: "a", align: "left", priority: 90, minWidth: 8, maxWidth: 40, sortable: false },
+        { key: "b", label: "b", align: "left", priority: 80, minWidth: 8, flex: true, sortable: false },
+      ],
+      [
+        { key: "a", label: "a", align: "left", priority: 90, minWidth: 8, maxWidth: 40, sortable: false },
+        { key: "b", label: "b", align: "left", priority: 80, minWidth: 8, maxWidth: 12, sortable: false },
+      ],
+      // F50's `/diff`: the fixed column first, the flexible one second.
+      [
+        { key: "kind", label: "kind", align: "left", priority: 90, minWidth: 10, maxWidth: 72, sortable: false },
+        { key: "path", label: "path", align: "left", priority: 80, minWidth: 12, flex: true, sortable: false },
+      ],
+      // F50's `/ps`: one flex column swallowing the residual, a capped one after it.
+      [
+        { key: "name", label: "name", align: "left", priority: 90, minWidth: 10, flex: true, sortable: false },
+        { key: "ports", label: "ports", align: "left", priority: 80, minWidth: 10, maxWidth: 30, sortable: false },
+      ],
+    ];
+
+    let compared = 0;
+    for (const shape of SHAPES) {
+      const bare = shape.map((c) => (c.flex === true ? c : drop(c)));
+      for (let width = 1; width <= 200; width += 1) {
+        expect(planColumns(shape, width), `shape ${shape.map((c) => c.key).join("+")} at ${String(width)}`).toEqual(
+          planColumns(bare, width),
+        );
+        compared += 1; // cells-ok — a plan count
+      }
+    }
+    expect(compared, "the sweep must be the size it claims").toBe(1000);
+
+    // **The control**, and without it the sweep above is satisfied by a planner
+    // that never reads `maxWidth` at all: on a `flex` column the cap fires.
+    const capped: readonly ColumnDef[] = [
+      { key: "a", label: "a", align: "left", priority: 90, minWidth: 8, maxWidth: 20, flex: true, sortable: false },
+      { key: "b", label: "b", align: "left", priority: 80, minWidth: 8, flex: true, sortable: false },
+    ];
+    expect(planColumns(capped, 120).visible.map((v) => v.width)).toEqual([20, 98]);
+    expect(planColumns(capped.map(drop), 120).visible.map((v) => v.width)).toEqual([59, 59]);
+  });
 });
 
 describe("C11 — an element's `copy` is its source, not its rendering (C26 §5c)", () => {

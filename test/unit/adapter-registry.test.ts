@@ -696,3 +696,99 @@ describe("I22 (T1.21) — an overflowed result is a notice, never meta.truncated
     expect(cut(doc)).toHaveLength(1);
   });
 });
+
+// C07 §7a, I23 — a far side that produced nothing is not an adapter that failed.
+//
+// One sentence covered both subjects, so `spawn ENOENT` reported "The adapter
+// for "list" failed (Unexpected end of JSON input)" underneath a correct
+// diagnosis of the real cause: the reader had been told the truth and was then
+// sent to open the wrong file (F996, F152).
+describe("§7a (I23) — the notice names the layer that actually failed", () => {
+  /** An adapter that parses the payload, so no payload is a throw. */
+  const parser: Adapter = {
+    schema: "tui.view/1",
+    adapt: (r) => ({
+      schema: "tui.view/1",
+      command: "/ps",
+      status: "ok",
+      blocks: [{ kind: "raw", id: "out", text: String((JSON.parse(r.stdoutRaw) as object) !== null) }],
+    }),
+  };
+
+  function notice(over: Partial<RawResult>): string {
+    const doc = createAdapterRegistry({ ps: parser }).adapt(raw(over), CTX);
+    valid(doc);
+    const found = doc.blocks.find((b) => b.id === "adapter-failed");
+    if (found?.kind !== "notice") throw new Error("the contained failure is unrecorded");
+    return found.text;
+  }
+
+  const NOTHING = 'The command produced no output, so the "ps" adapter had nothing to render.';
+  const BLAMED = /^The adapter for "ps" failed \(/u;
+
+  it("T1.22 (I23, §7a): all four cells, and the set that moves is exactly the two with no output", () => {
+    // The two axes the table crosses: did the far side fail, and was there
+    // anything to adapt. Asserted as four cells rather than two, because the
+    // remedy F152 proposed — suppress when the mapped outcome is an error —
+    // passes at cells 3 and 4 and is wrong at 2 and 1 respectively.
+    const cells = {
+      // 1 — ok, and a payload the adapter cannot use. Its own fault.
+      "ok + payload": notice({ exitCode: 0, stdoutRaw: '{"rows":', stdout: undefined }),
+      // 2 — ok, and nothing written. `status` is "ok" here, which is why a
+      // status test leaves this cell blaming the adapter.
+      "ok + empty": notice({ exitCode: 0, stdoutRaw: "", stdout: undefined }),
+      // 3 — the cell the finding measured, twice.
+      "error + empty": notice({ exitCode: 13, stdoutRaw: "", stdout: undefined, stderr: "svc: permission denied" }),
+      // 4 — failed *and* emitted something. A status test suppresses this one,
+      // and it is the case where an adapter genuinely choked on bytes it was
+      // given.
+      "error + payload": notice({ exitCode: 13, stdoutRaw: '{"rows":', stdout: undefined, stderr: "svc: partial" }),
+    };
+
+    // The set, not its first member: which cells name the missing output is the
+    // whole ruling, and a per-cell assertion cannot say "exactly these two".
+    expect(Object.keys(cells).filter((k) => cells[k as keyof typeof cells] === NOTHING)).toEqual([
+      "ok + empty",
+      "error + empty",
+    ]);
+    expect(cells["ok + payload"]).toMatch(BLAMED);
+    expect(cells["error + payload"]).toMatch(BLAMED);
+
+    // The third direction a status test misses: `cancelled` maps to "partial".
+    expect(notice({ cancelled: true, stdoutRaw: "", stdout: undefined })).toBe(NOTHING);
+
+    // The control. Without it every assertion above passes for a registry that
+    // stopped rendering anything: all four still come back through the fallback
+    // and all four documents are valid (`valid` runs inside `notice`).
+    expect(
+      createAdapterRegistry({ ps: parser }).adapt(raw(), CTX).blocks.some((b) => b.id === "adapter-failed"),
+      "a payload the adapter can use draws no notice at all",
+    ).toBe(false);
+  });
+
+  it("T3.21 (I23, §7a): whitespace is nothing to adapt, and an unparseable payload is not", () => {
+    // `stdoutRaw`, trimmed — a far side that wrote a bare newline produced no
+    // more to render than one that wrote nothing.
+    for (const written of ["", "\n", "   ", "\t\n "]) {
+      expect(notice({ stdoutRaw: written, stdout: undefined }), JSON.stringify(written)).toBe(NOTHING);
+    }
+
+    // And the boundary in the other direction. `stdout === undefined` is *not*
+    // the test: each of these parses to nothing and is still a payload an
+    // adapter was handed, so the adapter is the right subject.
+    for (const written of ["{", "not json at all", '{"rows":']) {
+      expect(notice({ stdoutRaw: written, stdout: undefined }), JSON.stringify(written)).toMatch(BLAMED);
+    }
+
+    // The third outcome, which this row found by asserting the wrong one first:
+    // `"null"` is *parseable*, so the adapter succeeds and there is no notice at
+    // all. Kept because it is the arm that says the two sentences above are a
+    // split of the failure path rather than something drawn on every result.
+    const parsed = createAdapterRegistry({ ps: parser }).adapt(
+      raw({ stdoutRaw: "null", stdout: null }),
+      CTX,
+    );
+    valid(parsed);
+    expect(parsed.blocks.map((b) => b.id), "the adapter rendered it").toEqual(["out"]);
+  });
+});

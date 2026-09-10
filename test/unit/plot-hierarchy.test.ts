@@ -106,6 +106,27 @@ describe("TM — the treemap names its tiles", () => {
     for (const row of rows) expect(cells(row, "narrow"), row).toBe(60);
   });
 
+  it("T1.131 (C12 I118, C12 I55): a family, a keycap and a decomposed name as leaf names reach the frame whole", () => {
+    const KEYCAP = "1️⃣";
+    const FAMILY = "\u{1F468}‍\u{1F469}‍\u{1F467}";
+    const NFD = "café";
+    const shaped: HierarchyNode = {
+      label: "root", value: 100,
+      children: [{ label: FAMILY, value: 40 }, { label: KEYCAP, value: 35 }, { label: NFD, value: 25 }],
+    };
+    const rows = draw({ hierarchy: shaped }, 60);
+    // **Compared in NFC**, as C09 T2.129 compares: Ink composes what it wraps,
+    // and composing a cluster is not splitting one — a dropped joiner, selector
+    // or mark fails in either form. The names were written one code point per
+    // cell, so this frame read `1` for the keycap, three faces for the family
+    // and `cafe` for the name (F969) until the shared writer (C12 I118, F976).
+    const shown = text(rows).normalize("NFC");
+    expect(shown).toContain(FAMILY.normalize("NFC"));
+    expect(shown).toContain(KEYCAP.normalize("NFC"));
+    expect(shown).toContain(NFD.normalize("NFC"));
+    for (const row of rows) expect(cells(row, "narrow"), row).toBe(60);
+  });
+
   it("TM4 (C12 I55): a width too narrow for any name draws the tiles and none of them", () => {
     // The fixture responds: the same tree at 80 names five leaves.
     const narrow = text(draw({ hierarchy: TREE }, 12));

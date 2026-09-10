@@ -147,6 +147,7 @@ export const keyValueDefinition: BlockDefinition<KeyValue> = {
   },
 
   render(block: KeyValue, ctx: RenderContext): ReactElement {
+    ctx.probe?.gauge("keyValue.rows", block.rows.length); // cells-ok — a count of items, not a display width
     const width = normaliseWidth(ctx.width);
     const keyWidth = block.keyWidth ?? keyColumn(block, width);
     const valueWidth = Math.max(1, width - keyWidth - COLUMN_GAP);
@@ -240,6 +241,7 @@ export const logsDefinition: BlockDefinition<Logs> = {
   },
 
   render(block: Logs, ctx: RenderContext): ReactElement {
+    ctx.probe?.gauge("logs.lines", block.lines.length); // cells-ok — a count of items, not a display width
     const width = normaliseWidth(ctx.width);
 
     return rows(
@@ -282,6 +284,7 @@ export const eventsDefinition: BlockDefinition<Events> = {
   measure: (block: Events): number => atLeastOne(block.events.length), // cells-ok
 
   render(block: Events, ctx: RenderContext): ReactElement {
+    ctx.probe?.gauge("events.events", block.events.length); // cells-ok — a count of items, not a display width
     const width = normaliseWidth(ctx.width);
     const typeWidth = widest(
       block.events.map((e) => stripControl(e.type)),
@@ -404,6 +407,7 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
   measure: (block: Comparison): number => atLeastOne(block.rows.length + 1), // cells-ok
 
   render(block: Comparison, ctx: RenderContext): ReactElement {
+    ctx.probe?.gauge("comparison.rows", block.rows.length); // cells-ok — a count of items, not a display width
     const width = normaliseWidth(ctx.width);
     // The marker column appears only when a row declares a change, so a block
     // that uses the verdict half alone renders exactly as it did before the
@@ -461,21 +465,37 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
             ...(marked > 0
               ? [
                   {
+                    // **The one `pad` on this row that keeps the default, and it
+                    // keeps it for a reason rather than by omission**: the markers
+                    // are ASCII (` ~+-`), one cell at both conventions, so the
+                    // convention has no subject here (F1042).
                     text: pad(CHANGE_MARKERS[entry.change ?? "unchanged"], marked),
                     style: tone("muted", ctx.theme, ctx.capabilities),
                   },
                 ]
               : []),
             {
+              // **Cut at the session's convention, so padded at it too** (I68,
+              // F1042). Every `pad` on this row carries far-side text and the
+              // convention was dropped at all three, so at `wide` each column
+              // started late and `clampSpans` took the difference out of the
+              // last one: measured at 44 cells, `9°C ±2` came back as `9°C ±…`
+              // with the row still totalling 44 — the shape no width assertion
+              // can see.
               text: pad(
                 truncate(stripControl(entry.field), fieldWidth, ctx.capabilities),
                 fieldWidth,
+                ctx.capabilities.ambiguousWidth,
               ),
               style: tone("muted", ctx.theme, ctx.capabilities),
             },
             { text: " ".repeat(COLUMN_GAP) },
             {
-              text: pad(truncate(stripControl(entry.a), column, ctx.capabilities), column),
+              text: pad(
+                truncate(stripControl(entry.a), column, ctx.capabilities),
+                column,
+                ctx.capabilities.ambiguousWidth,
+              ),
               style: tone("default", ctx.theme, ctx.capabilities),
             },
             { text: " ".repeat(COLUMN_GAP) },
@@ -487,6 +507,7 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
                 markFor(entry.verdict, judged, ctx) +
                   truncate(stripControl(entry.b), Math.max(1, column - judged), ctx.capabilities),
                 column,
+                ctx.capabilities.ambiguousWidth,
               ),
               style: tone(verdictTone(entry.verdict), ctx.theme, ctx.capabilities),
             },
@@ -509,6 +530,7 @@ export const stepsDefinition: BlockDefinition<Steps> = {
   measure: (block: Steps): number => atLeastOne(block.steps.length), // cells-ok
 
   render(block: Steps, ctx: RenderContext): ReactElement {
+    ctx.probe?.gauge("steps.steps", block.steps.length); // cells-ok — a count of items, not a display width
     const g = glyphs(ctx.capabilities);
     const frames = spinnerFrames(ctx.capabilities);
     const width = normaliseWidth(ctx.width);

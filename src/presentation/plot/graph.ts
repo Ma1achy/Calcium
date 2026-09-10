@@ -521,7 +521,7 @@ export function graphArea(
     row.forEach((id, i) => {
       const x = shift + (xs[l]?.[i] ?? 0); // cells-ok — a column position
       const real = id < g.nodes.length; // cells-ok — an edge count
-      if (real) write(canvas.text[2 * l] ?? [], x, labelOf(g, id), caps); // cells-ok — a row index
+      if (real) write(canvas.text[2 * l] ?? [], x, labelOf(g, id), caps.ambiguousWidth); // cells-ok — a row index
       centre.set(id, x + Math.floor((cw(id) - 1) / 2)); // cells-ok — a column position
     });
   });

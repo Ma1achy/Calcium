@@ -3275,32 +3275,28 @@ export function bulletFigure(block: Plot): Figure {
  * sample with no size gets no `size` member rather than a zero, because zero is
  * a radius the terminal draws as a single dot and *absent* is not.
  *
- * **This reproduces F271 deliberately, and the alternative was worse.** A
- * bubble's size channel is `block.series[1]` — a *member of `series`*, with
- * nothing to say it is not a series — so `overlaidRows` rasterises it like any
- * other, `seriesRange` stretches the value axis over it, and `identityOf` names
- * it in the legend. The shipped catalogue frame shows all three: a gutter
- * running `0 · 20 · 40 · 60` for data spanning 20–60, a second set of bubbles in
- * the size series' own colour, and a legend reading *value · size*.
- *
- * Emitting one series here would be **correcting the terminal inside a
- * refactor**, which is the one thing this pass forbids: no frame would move, the
- * two arms would disagree at step 4, and the correction would be announced by
- * nothing. So the figure says what the terminal draws and F271 is owed — the
- * fix is a channel that is not a member of `series`, which is a C04 ruling.
+ * **F271 is closed here and the channel is `block.sizes`** (C04 I117). It was
+ * `block.series[1]`, and this comment used to say the figure reproduced the
+ * defect deliberately, because correcting the terminal inside a refactor would
+ * have moved no frame while the arms disagreed at step 4. The ruling landed
+ * instead: a size is not a position, so it is not a member of `series`, and the
+ * four symptoms — the ordinate spanning it, `overlaidRows` rasterising it, the
+ * legend naming it, the reader's toggle reaching it — are gone by construction
+ * rather than by four fixes. Eleven baseline frames and the `plot-forms`
+ * snapshot moved with it, which is the announcement the refactor could not make.
  */
 export function scatterFigure(block: Plot): Figure {
   const decisions = positionalDecisions(block);
   const { value } = decisions;
   const marks: Drawn[] = [];
   if (value !== null) {
-    // The second series is the size channel, and it is never a series of its own
-    // — `bubbleRows` reads `block.series[1]` positionally against the first.
-    const sizes = block.form === "bubble" ? block.series[1]?.values : undefined;
+    // The size channel, read positionally against the value series — the same
+    // reading `bubbleRows` makes, from the same member (C04 I117).
+    const sizes = block.form === "bubble" ? block.sizes : undefined;
     const finite = (sizes ?? []).filter((v): v is number => v !== null && Number.isFinite(v));
     const maxSize = Math.max(1, ...finite);
     // Every member of `series` is drawn, because `overlaidRows` draws every
-    // member of `series` — including the one that is a channel (F271).
+    // member of `series` — and on a `bubble` there is now exactly one.
     block.series.forEach((series, seriesIndex) => {
       const span = Math.max(1, series.values.length - 1); // cells-ok — a sample count
       series.values.forEach((v, i) => {

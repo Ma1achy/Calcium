@@ -107,7 +107,7 @@ const results = runPass({
       // a correct still — the symptom C22 I77 names.
       name: "the renderer ignores the context's frame",
       file: IMAGE,
-      from: "    const px = pixelsOf(block, ctx.frames?.[block.id] ?? 0);",
+      from: "    const px = pixelsOf(block, ctx.frames?.[block.id] ?? 0, ctx.probe);",
       to: "    const px = pixelsOf(block, 0);",
       expect: "IF6",
     },
@@ -161,11 +161,36 @@ const results = runPass({
     {
       // **Gathered at kitty too.** The terminal is animating and the session
       // redraws placeholders that do not change — a wake per frame for nothing.
+      //
+      // Re-anchored 2026-09-10. The `from` was
+      // `const rasterising = graph.capabilities.imageProtocol !== "kitty";`,
+      // one flag for the whole frame; the decision is now asked per image of
+      // `placesAtProtocol`, at the width the run rendered it at (C09 I67,
+      // F1026). **The statement is the same one** — the guard is what stops the
+      // gather where the terminal is animating, so removing it is still
+      // *gather everything* — and T4.17o's kitty section still names it.
       name: "animated images are gathered on the protocol arm",
       file: SESSION,
-      from: '  const rasterising = graph.capabilities.imageProtocol !== "kitty";',
-      to: "  const rasterising = true;",
+      from: "          if (placesAtProtocol(b as Image, graph.capabilities, piece.run.width, graph.probe)) continue;\n",
+      to: "          if (false) continue;\n",
       expect: "T4.17o",
+    },
+    {
+      // **The arm read off the capability rather than asked of the block** —
+      // F624's shipped defect, restored. A picture the placement encoding
+      // cannot address falls to the half block while the session gathers
+      // nothing for it, so the frame is frame 0 for ever.
+      //
+      // **It is a second row and not a second `to` on the one above** because
+      // no row above can see it: every fixture in this file places, and a
+      // picture small enough to place is gathered correctly under either rule.
+      // Only a refused placement separates them, which is T4.17t's fixture and
+      // the reason that row exists (F1026).
+      name: "the session gathers by capability rather than by the block's arm",
+      file: SESSION,
+      from: "          if (placesAtProtocol(b as Image, graph.capabilities, piece.run.width, graph.probe)) continue;\n",
+      to: '          if (graph.capabilities.imageProtocol === "kitty") continue;\n',
+      expect: "T4.17t",
     },
     {
       // **The GIF sent as PNG bytes.** `f=100` with GIF data — kitty decodes

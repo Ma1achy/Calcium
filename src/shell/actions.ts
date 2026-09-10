@@ -168,7 +168,20 @@ export function createActionDispatcher(deps: ActionDeps) {
         const entry = deps.transcript.entries.find((e) => e.id === from);
         if (entry === undefined) return;
 
-        for (const b of entry.doc.blocks) {
+        // **One walk, read by both arms** (C04 I98, C04 I115, F1015). The fold
+        // arm forty lines below already descended through `descendants` and this
+        // one scanned `entry.doc.blocks` — F1010's asymmetry inside a single
+        // function, and §3c S5's *at any depth* written on one of the search's
+        // two halves. A row of a table inside a `panel` — which is what `b.live`
+        // produces — got *nothing to expand*, a second false statement beside
+        // `applyPatch`'s. Hoisted rather than copied: two expressions listing
+        // the same containers is the enumeration `tree.ts` exists to stop.
+        const reachable: readonly Block[] = [
+          ...entry.doc.blocks,
+          ...entry.doc.blocks.flatMap((b) => [...descendants(b)]),
+        ];
+
+        for (const b of reachable) {
           if (b.kind !== "table") continue;
           const row = b.rows.find((r) => r.id === action.target);
           if (row === undefined) continue;
@@ -190,12 +203,13 @@ export function createActionDispatcher(deps: ActionDeps) {
         }
 
         // **A block declaring a collapsed form, at any depth** (C04 I98). Rows
-        // first — the shipped path above — then blocks, so a row id equalling a
-        // block id has a known answer (C04 §3c S5). The toggle is a shell-origin
-        // `replace` with the flag inverted: `op: "expand"` names a row and
-        // `patch.ts` refuses a scroll (*is a scroll, which has no rows*), which
-        // was measured before this arm was written rather than assumed.
-        const folded = [...entry.doc.blocks, ...entry.doc.blocks.flatMap((b) => [...descendants(b)])].find(
+        // first — the arm above, reading the same `reachable` — then blocks, so
+        // a row id equalling a block id has a known answer (C04 §3c S5). The
+        // toggle is a shell-origin `replace` with the flag inverted:
+        // `op: "expand"` names a row and `patch.ts` refuses a scroll (*is a
+        // scroll, which has no rows*), which was measured before this arm was
+        // written rather than assumed.
+        const folded = reachable.find(
           (b: Block): b is Scroll =>
             b.kind === "scroll" && b.id === action.target && b.collapsed !== undefined,
         );

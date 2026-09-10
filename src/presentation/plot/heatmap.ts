@@ -389,7 +389,7 @@ function matrixRows(
     // non-empty.
     const merged = overlay.length === 0 // cells-ok — a layer count
       ? null
-      : mergeFieldLayers(overlay, r, layout.areaWidth);
+      : mergeFieldLayers(overlay, r, layout.areaWidth, ctx.capabilities.ambiguousWidth);
     out.push(
       plotRow(
         r,

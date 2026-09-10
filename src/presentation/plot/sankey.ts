@@ -34,6 +34,7 @@ import type { Graph } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { assertPictureGlyph, type ColourRef } from "../theme/index.js";
 import { cells } from "../text.js";
+import { write } from "./chargrid.js";
 import { graphLayers } from "./graph.js";
 import { refOf } from "./marks.js";
 
@@ -277,11 +278,52 @@ export function sankeyLayout(g: Graph, opts: SankeyOptions): SankeyLayout {
 // ------------------------------------------------------------ the terminal arm
 
 /**
- * One cell of the drawn area. `ref` and `background` name palette slots —
- * C10 resolves them (CLAUDE.md, *never embed a colour*); the glyph carries
- * bar against ribbon at every depth (I17).
+ * A glyph that has passed `assertPictureGlyph`, and the only way to obtain one
+ * is `pictureGlyph` below (C10 I21, C12 I125).
+ *
+ * **The brand is on the channel, not on the alphabet** — `picture.ts` says why:
+ * `ASCII.top` is `-`, which is not a fill and never reaches a background-bearing
+ * cell because `cellOf` passes `below` only on the unicode arm. Branding the
+ * alphabet would have had to admit `-`; branding what the background arm demands
+ * admits nothing that did not pass the runtime keeper.
  */
-export type SankeyCell = Readonly<{ text: string; ref?: ColourRef; background?: ColourRef }>;
+declare const PICTURE_GLYPH: unique symbol;
+export type PictureGlyph = string & { readonly [PICTURE_GLYPH]: true };
+
+/**
+ * One cell of the drawn area, **as two arms rather than one wide record**
+ * (C12 I125, F717, F1054).
+ *
+ * `ref` and `background` name palette slots — C10 resolves them (CLAUDE.md,
+ * *never embed a colour*); the glyph carries bar against ribbon at every depth
+ * (I17).
+ *
+ * **Why a union.** This type inhabits *two* kinds of cell: a character of a
+ * node's label, pushed straight from the overlay, and a cell of the picture the
+ * canvas drew. As one record it could forbid neither — half its inhabitants are
+ * real text, so *a background never lands on a character a reader reads* was a
+ * property of one `if` in one function and nothing stated it. The first arm has
+ * `background?: undefined`, so a label cell cannot acquire one; the second
+ * demands a `PictureGlyph`, so the cell that carries one cannot hold anything
+ * `assertPictureGlyph` would refuse. `ref` alone stays on the first arm because
+ * a single-owner glyph is ink on the ground and I21 has nothing to say about it.
+ */
+export type SankeyCell =
+  | Readonly<{ text: string; ref?: ColourRef; background?: undefined }>
+  | Readonly<{ text: PictureGlyph; ref: ColourRef; background: ColourRef }>;
+
+/**
+ * The brand's only constructor, and it is the runtime check (C10 I21).
+ *
+ * A cast here rather than at the call sites is the whole of the guarantee: the
+ * type cannot be reached without the assertion running, so a later caller that
+ * builds a background-bearing cell by hand gets a compile error where it used to
+ * get a green suite and a wrong frame.
+ */
+function pictureGlyph(glyph: string, site: string): PictureGlyph {
+  assertPictureGlyph(glyph, site);
+  return glyph as PictureGlyph;
+}
 
 /**
  * The block alphabet, and the ASCII arm it falls to.
@@ -466,13 +508,10 @@ export function sankeyArea(
       let taken = false;
       for (let c = col; c < col + w; c += 1) if (line[c] !== undefined) taken = true; // cells-ok — a column position
       if (taken) continue;
-      let c = col; // cells-ok — a column position
-      for (const ch of label) {
-        line[c] = ch;
-        const cw = cells(ch, caps.ambiguousWidth);
-        for (let j = 1; j < cw; j += 1) line[c + j] = ""; // cells-ok — a cell count
-        c += cw;
-      }
+      // **Cluster by cluster, through the one writer** (C12 I118, §3n). This
+      // was a private loop over code points, and a keycap reached the frame as
+      // a bare digit (F969, F976).
+      write(line, col, label, caps.ambiguousWidth);
     }
   }
 
@@ -520,8 +559,9 @@ function cell(text: string, owner: number, below?: number): SankeyCell {
   if (owner < 0) return { text };
   const ref = refOf(owner);
   if (below === undefined || below < 0) return { text, ref };
-  assertPictureGlyph(text, "sankeyArea");
-  return { text, ref, background: refOf(below) };
+  // The assertion is inside `pictureGlyph`, which is what makes the second arm
+  // unreachable without it (C12 I125).
+  return { text: pictureGlyph(text, "sankeyArea"), ref, background: refOf(below) };
 }
 
 function cellOf(top: Half | null, bot: Half | null, a: Alphabet): SankeyCell {

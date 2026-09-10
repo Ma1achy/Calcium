@@ -5,6 +5,12 @@ import { CORPUS_BUDGET_MS } from "../support/budget.js";
 
 
 import { createEditor } from "../../src/interaction/editor/index.js";
+// **Deeper than the barrel, deliberately.** The linearity claim needs the
+// walk's `drawAs` seam, which `editor.displayRows` fills in from its own chip
+// table; `layout.ts` takes it as a parameter. Adding an export to the barrel
+// for a test would be an export nothing else consumes (MG24).
+import { displayRows } from "../../src/interaction/editor/layout.js";
+import { graphemes } from "../../src/interaction/editor/graphemes.js";
 
 // This file builds a large corpus; `budget.ts` carries the measurement and
 // why the 5 s default is not a margin. Re-measure before raising it.
@@ -28,17 +34,86 @@ describe("C17 §6 — large input", () => {
     expect(e.text.length, "a megabyte, near enough").toBeGreaterThan(1_000_000); // graphemes-ok
     expect(insertMs, "one paste, one edit").toBeLessThan(2000);
 
-    const half = createEditor({ text: text.slice(0, Math.floor(text.length / 2)) }); // graphemes-ok
-    const smallStart = Date.now();
-    const smallRows = half.displayRows(80, G);
-    const smallMs = Math.max(1, Date.now() - smallStart);
+    const halfText = text.slice(0, Math.floor(text.length / 2)); // graphemes-ok
 
-    const bigStart = Date.now();
-    const bigRows = e.displayRows(80, G);
-    const bigMs = Math.max(1, Date.now() - bigStart);
+    // **The linearity claim is a count now, not a duration** (F1091). The ratio
+    // it replaces had to separate linear from quadratic — 2 from 4 — with the
+    // bound at 3, one unit of headroom either side, and five runs of this row
+    // alone read 2.38, 2.35, 1.38, 1.84 and 2.13. A spread of a whole unit on
+    // an instrument that has to resolve one. Inside a full `make all` the
+    // record is 2.14 green and 3.06 red, and the two paragraphs this replaces
+    // carried 3.03 and 3.17 red before that.
+    //
+    // **Both earlier repairs — a minimum of five, then a minimum of three over
+    // fresh editors after F1014's memo — missed the mechanism, and it is not
+    // the machine being busy.** In the red run the small walk read 328 ms
+    // inside its solo range of 252–360 while the big walk read 1004 against a
+    // solo 496–611. A busy machine slows both and the ratio survives; twice the
+    // text is twice the allocation, so the big walk pays a collection the small
+    // one does not, and no minimum over N removes a cost every one of the N
+    // readings pays. F1084 is the same rule from the other side — a ratio is an
+    // instrument only when its noise is common to both operands.
+    //
+    // **So: measure the thing the ratio was a proxy for**, which is F1084's
+    // repair as well. The walk calls `drawAs` exactly once per cluster, at one
+    // site, so a counting `drawAs` that returns its input unchanged reports the
+    // inner loop's trip count — one visit per cluster, where a re-walk is 2n.
+    // Exact, load-free, and a stronger claim than any duration: the fabricated
+    // violation, a second `drawAs?.(cluster)` ahead of the real one, gives
+    // 2 000 064 against 1 000 032 while the walk's duration reads 667 ms
+    // against 668 clean. No timing could have seen it.
+    //
+    // **Its blind spot, stated**: this counts iterations, so a change making
+    // each step O(rows) — copying the rows array per cluster, say — is
+    // quadratic and invisible here, and the timing that would have moved is
+    // evidence below rather than an assertion. Nothing in the suite reaches
+    // that class. The alternative is keeping a bound that has been red three
+    // times and green by luck, which detects nothing and reports constantly.
+    const visits = (t: string): number => {
+      let n = 0;
+      displayRows(t, 80, G, (cluster) => {
+        n += 1;
+        return cluster;
+      });
+      return n;
+    };
 
-    expect(bigRows / smallRows, "twice the text, twice the rows").toBeCloseTo(2, 0);
-    expect(bigMs / smallMs, "and not four times the work").toBeLessThan(3);
+    const bigVisits = visits(text);
+    const smallVisits = visits(halfText);
+
+    // The instrument is shown to respond before it is asserted against
+    // (`test/support/README.md`): a counter that never fires and one that fires
+    // once per cluster both satisfy an equality against zero.
+    expect(smallVisits, "the counter fires at all").toBeGreaterThan(0);
+    expect(bigVisits, "and it separates the two sizes").toBeGreaterThan(smallVisits);
+
+    expect(bigVisits, "one visit per cluster, and one walk").toBe(graphemes(text).length); // graphemes-ok
+    expect(smallVisits, "and the same over half of it").toBe(graphemes(halfText).length); // graphemes-ok
+
+    // **The durations are reported and asserted on only for resolution.** One
+    // reading each: the minimum over three existed to quieten a ratio that is
+    // no longer an assertion, and paying three walks of each size to print a
+    // number is a cost with no claim behind it. **Measured, the row falls from
+    // 4.78 s to 3.04 s alone**, which is a third of the pressure F1088 put on
+    // `CORPUS_BUDGET_MS` given back — the count costs two walks and two
+    // segmentations, and it replaced six.
+    const timed = (t: string): { rows: number; ms: number } => {
+      const ed = createEditor({ text: t });
+      const start = performance.now();
+      const rows = ed.displayRows(80, G);
+      return { rows, ms: performance.now() - start };
+    };
+
+    const small = timed(halfText);
+    const big = timed(text);
+
+    expect(small.ms, "the smaller walk is above the clock's resolution").toBeGreaterThan(1);
+
+    console.log(
+      `T3.15 · ${smallVisits} → ${bigVisits} visits, exact · ${small.ms.toFixed(2)} ms → ${big.ms.toFixed(2)} ms, ratio ${(big.ms / small.ms).toFixed(2)} — reported, not asserted (F1091)`,
+    );
+
+    expect(big.rows / small.rows, "twice the text, twice the rows").toBeCloseTo(2, 0);
   });
 
   it("T3.16: a lone surrogate never reaches the segmenter intact", () => {

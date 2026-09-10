@@ -26,6 +26,7 @@ import type { Graph } from "../../src/data/viewmodel/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { refOf } from "../../src/presentation/plot/marks.js";
 import { sankeyArea, sankeyLayout } from "../../src/presentation/plot/sankey.js";
+import type { SankeyCell } from "../../src/presentation/plot/sankey.js";
 import { plotToSvg } from "../../src/presentation/plot/svg.js";
 import { b } from "../../src/shell/builders/index.js";
 import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
@@ -250,12 +251,54 @@ describe("SK — the sankey, one geometry and two painters (C12 I110, I111)", ()
     }
   });
 
+  it("T1.132 (C12 I118, C12 I110): a family and a keycap as node names — whole in `sankeyArea`'s cells and in the frame", () => {
+    const KEYCAP = "1️⃣";
+    const FAMILY = "\u{1F468}‍\u{1F469}‍\u{1F467}";
+    const g = graph([FAMILY, "b", KEYCAP, "y"], [[FAMILY, KEYCAP, 5], ["b", "y", 3], [FAMILY, "y", 2]]);
+    // **Read before Ink**: the label's cell holds the whole cluster and the
+    // cell after it is the continuation. The loop this replaced wrote one code
+    // point per cell, so the keycap's cell held `1` and the family's three
+    // cells held a face each (F969, F976).
+    const area = sankeyArea(g, 9, 80, FULL_CAPS);
+    for (const [name, shape] of [["FAMILY", FAMILY], ["KEYCAP", KEYCAP]] as const) {
+      const hits = area.rows.flatMap((row) => row.flatMap((c, i) => (c.text === shape ? [{ row, i }] : [])));
+      expect(hits, `${name} in exactly one cell`).toHaveLength(1); // cells-ok — a hit count
+      const { row, i } = hits[0]!;
+      expect(row[i + 1]?.text, `${name}'s continuation`).toBe("");
+    }
+    // And through the public render, compared in NFC as C09 T2.129 compares.
+    const shown = frame(g, 80, FULL_CAPS).map(strip).join("\n").normalize("NFC");
+    expect(shown).toContain(FAMILY.normalize("NFC"));
+    expect(shown).toContain(KEYCAP.normalize("NFC"));
+  });
+
   // **The builder's gate, and the row runs the day the builder admits the
   // form.** `b.plot` refuses `graph` off `form: "graph"` (C04 I69) and was not
   // widened when `sankey` took the member on `graph`'s rule (C04 I92); the
   // validator admits it and T2.38 asserts so. The two gates disagree today, the
   // fix belongs to `src/shell/builders/index.ts`, and this is `todo` rather than
   // red so that it flips to a running row — not a passing skip — on its own.
+  it("SK12 (C12 I110 K3): a label longer than its gap is dropped whole, and the fit test is the only guard that sees it", () => {
+    // **SK5's fixture stopped seeing the fit test** (F980). At 40 columns the
+    // `long-labels` middle name is right-placed at 22 and the sink's name,
+    // written before it outside-in, is left-placed at 22 — so the overlap
+    // guard drops the middle name whether the fit test runs or not, and the
+    // frames with and without it are byte-identical. Here the first name is
+    // thirty cells against a gap of seventeen, and nothing else is written in
+    // its way: the fit test alone decides, and without it the name is written
+    // across the middle bar and takes the middle label's cells.
+    const g = graph(["authentication-gateway-service", "b", "c"], [["authentication-gateway-service", "b", 3], ["b", "c", 3]]);
+    const narrow = frame(g, 40, FULL_CAPS, 7).map(strip);
+    const wide = frame(g, 80, FULL_CAPS, 7).map(strip).join("\n");
+    expect(wide, "the fixture responds: at 80 the name fits its gap").toContain("authentication-gateway-service");
+    expect(narrow.join("\n"), "dropped whole").not.toContain("authentication");
+    expect(narrow.join("\n"), "and never cut").not.toMatch(/[…~]/u);
+    expect(narrow.join("\n"), "the middle label keeps its cells").toMatch(/█▒b▒/u);
+    // The middle bar stands in every row: a name written wherever its bar is
+    // would put a letter in column 20.
+    for (const line of narrow) expect([...line][20], line).toBe("█"); // cells-ok — a column index into single-cell glyphs
+  });
+
   const spec = { id: "s", form: "sankey", height: 9, series: [], graph: DEFAULT } as unknown as Parameters<typeof b.plot>[0];
   const builderAdmits = ((): boolean => {
     try {
@@ -268,5 +311,56 @@ describe("SK — the sankey, one geometry and two painters (C12 I110, I111)", ()
   (builderAdmits ? it : it.todo)("SK10 (C04 I69, I92): the builder admits `graph` on `sankey` as the validator does", () => {
     expect(() => b.plot(spec)).not.toThrow();
     expect(() => b.plot({ ...spec, form: "line" } as never), "and still refuses it off both forms").toThrow(/I69/u);
+  });
+
+  it("SK13 (C12 I125, F1054): the type refuses what one `if` was holding", () => {
+    // **F717's residue.** `SankeyCell` was one wide record inhabiting both the
+    // label cells and the picture cells, so *a background never lands on a
+    // character a reader reads* (C10 I21) was a property of one branch in
+    // `sankeyArea` and nothing stated it. The union states it, and the second
+    // arm demands a `PictureGlyph` — a brand whose only constructor runs
+    // `assertPictureGlyph`, so the keeper is on the path to the type rather
+    // than beside the construction.
+    //
+    // **The refusals are the subject and compilation is the gate.** A
+    // `@ts-expect-error` that stops being needed is an *error* under
+    // `tsc --noEmit`, so a union that quietly widened again fails the check
+    // rather than passing this row — which is the fabricated violation the
+    // structural half owes, checked by the compiler instead of by an assertion.
+    const ref = refOf(0);
+    const other = refOf(1);
+
+    // The admitted set: a label character, and a cell with one owner.
+    const label: SankeyCell = { text: "A" };
+    const owned: SankeyCell = { text: "\u2588", ref };
+    expect([label.text, owned.text]).toEqual(["A", "\u2588"]);
+
+    // @ts-expect-error — a background may not be attached to a plain string (C12 I125)
+    const refused: SankeyCell = { text: "A", ref, background: other };
+    // @ts-expect-error — nor to a label cell that names no owner at all
+    const alsoRefused: SankeyCell = { text: " ", background: other };
+    expect([refused, alsoRefused].length, "both forms are constructed and both are refused").toBe(2);
+
+    // **Read the frame, not only the type.** Every cell the arm draws with a
+    // background carries a fill glyph — the property, taken off the cells the
+    // constructor produced rather than asserted about the constructor.
+    const twoOwners = graph(
+      ["a", "b", "c", "x", "y"],
+      [["a", "x", 5], ["a", "y", 1], ["b", "y", 3], ["c", "x", 2]],
+    );
+    const painted = sankeyArea(twoOwners, 5, 80, FULL_CAPS).rows
+      .flat()
+      .filter((c) => c.background !== undefined);
+    expect(painted.length, "the fixture responds — five rows is where two owners share cells").toBe(77);
+    expect([...new Set(painted.map((c) => c.text))], "and every one of them is a fill").toEqual(["\u2580"]);
+
+    // The control that says which fixture responds: the same call on a graph
+    // whose layers never share a cell draws no background at all, so asserting
+    // the property there would have been vacuous.
+    const noSharing = graph(["src", "hub", "p", "q"], [["src", "hub", 6], ["hub", "p", 10], ["hub", "q", 6]]);
+    expect(
+      sankeyArea(noSharing, 5, 80, FULL_CAPS).rows.flat().filter((c) => c.background !== undefined),
+      "the vacuous fixture, named rather than avoided",
+    ).toEqual([]);
   });
 });

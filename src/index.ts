@@ -93,9 +93,36 @@ export type {
 
 // --- blocks — the type a consumer returns -----------------------------------
 
+/**
+ * **`PlotForm` and `Camera` are here because a consumer aliased its way to both**
+ * (F999, C24 I34, §8e).
+ *
+ * `examples/plots` recovered each by indexing the block that carries it —
+ * `Plot["form"]` and `NonNullable<Plot["camera"]>` — and both spellings compile,
+ * which is what kept them invisible: inside this package every caller imports
+ * the declaration from `data/viewmodel` directly, so the gap exists only on the
+ * one surface a consumer can see.
+ *
+ * The two are on the list for different halves of one reason. A form is what a
+ * consumer switches on, and the alias came back into an app file under the
+ * framework's own name — the drift `LocalContext` was published to prevent. A
+ * camera is a **view**, which C04 I75 keeps off the block deliberately and
+ * `RenderContext.cameras` carries live, so naming it through `Plot` says the one
+ * thing the type is at pains not to be.
+ *
+ * Not the general case: fifty named types sit in a published member's type
+ * position unpublished, and most are a property of the single owner that names
+ * them, where indexing is the right spelling. The consumers' aliases are the
+ * population that picks these two out, and T2.21 is that population checked.
+ */
 export type {
   Action,
   Block,
+  // **The interface an app augments to declare its own kind** (C04 I119,
+  // F405). Published beside `Block` because `declare module "@fmx/calcium"`
+  // merges against this entry point and nowhere else.
+  BlockKinds,
+  Camera,
   Cell,
   Code,
   Comparison,
@@ -111,6 +138,7 @@ export type {
   Patch,
   Pills,
   Plot,
+  PlotForm,
   Progress,
   Raw,
   Rule,
@@ -292,7 +320,9 @@ export type {
   ParseResult,
 } from "./interaction/parser/index.js";
 
-export type { BlockDefinition, RenderContext } from "./presentation/blocks/index.js";
+// `AnyBlockDefinition` is what `TuiConfig.blocks` takes — a definition of some
+// **one** kind, which is what an app writes (C04 I119, F405).
+export type { AnyBlockDefinition, BlockDefinition, RenderContext } from "./presentation/blocks/index.js";
 /**
  * C24 I22 — a `code` block accepts any language name, and until this existed
  * only two of them meant anything (C09 §4a, F93).
@@ -360,6 +390,15 @@ export type { ArtSpec, ArtTier } from "./presentation/art.js";
  * `RenderContext` and could not be spelled.
  */
 export type { TerminalCapabilities } from "./terminal/capabilities.js";
+/**
+ * The two capability fields a glyph resolution reads (C24 I29, MG29).
+ *
+ * Published because `profilePane` takes one, and a consumer with no name for a
+ * parameter's type cannot supply it. A whole `TerminalCapabilities` satisfies
+ * it, which is what the one caller inside the framework — C28 §3c's view, which
+ * hands over `detection.capabilities` whole — does.
+ */
+export type { GlyphCaps } from "./presentation/blocks/index.js";
 
 /**
  * **Which glyph rung an image will take on this terminal** (C09 I37, §8b).
@@ -461,3 +500,45 @@ export type { WorldDriver } from "./data/fixtures/index.js";
 export { cells, truncate } from "./presentation/text.js";
 export type { AmbiguousWidth } from "./presentation/text.js";
 export { planColumns } from "./presentation/table/index.js";
+
+// --- C28, the profiler ------------------------------------------------------
+
+/**
+ * **The report types and the panes, and nothing that runs a profiler** (C24
+ * I31). A recorder is reached through `createTui`'s `profile` field and only
+ * there; what is published here is what a surface needs to *read* a report and
+ * draw it. An entry point shipping behaviour the runtime surface cannot reach
+ * would be a second way in.
+ *
+ * `profilePane` is a pure function from a report to blocks, which is why it is
+ * safe to publish: it composes the same builders an application already has.
+ * The framework's own view (`/profile`, C28 §3c) draws with these three through
+ * the same exports and nothing that opens it is published (C24 I33) —
+ * `paneTitle` had no consumer anywhere until that view (F945).
+ */
+export { profilePane, paneTitle, PANES } from "./shell/profiling/panes.js";
+
+/**
+ * **The exporters, and they run — which is not a contradiction of C24 I31.**
+ * `@fmx/calcium/profiling` publishes types and nothing that runs; these are on
+ * the *root*, where behaviour lives, and they are pure functions from a report
+ * to a string. Neither constructs a recorder, so importing one cannot start a
+ * profiler, which is what C24 I31's rule is about.
+ *
+ * They exist because a flame chart is a solved problem: `toTraceEvents` writes
+ * the format Perfetto and speedscope read, so the picture arrives with nothing
+ * rendered here, and `toNdjson` writes the one shape a four-hour session can be
+ * appended to and read back with `jq`.
+ */
+export { toNdjson, toTraceEvents } from "./shell/profiling/export.js";
+export type { PaneName } from "./shell/profiling/panes.js";
+export type {
+  FrameRecord,
+  Histogram as ProfileHistogram,
+  MissReason,
+  ProfileOptions,
+  ProfileReport,
+  ResourceSample,
+  SpanName,
+  Tier,
+} from "./shell/profiling/types.js";

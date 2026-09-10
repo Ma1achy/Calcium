@@ -1,5 +1,6 @@
 /**
- * YA1–YA7 and YC1–YC9: the gutter on both sides, and the callout (C12 I47, I48).
+ * YA1–YA7, YC1–YC9 and YC10–YC11: the gutter on both sides, and the callout
+ * (C12 I47, I48, I122).
  *
  * **The rows follow §6c's two artefacts.** The table's cells are structural —
  * two rules that hold at rest — and the trace's are the ladder, where a rung is
@@ -8,7 +9,10 @@
  */
 import { describe, expect, it } from "vitest";
 import { block } from "../../src/data/viewmodel/index.js";
-import { validateDocument } from "../../src/data/viewmodel/validate.js";
+import { validateBlock, validateDocument } from "../../src/data/viewmodel/validate.js";
+import type { Plot } from "../../src/data/viewmodel/index.js";
+import { plotToSvg, SVG_DEFAULT_LAYOUT } from "../../src/presentation/plot/svg.js";
+import { DARK_THEME } from "../support/render.js";
 import { b } from "../../src/shell/builders/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { FULL_CAPS, measurable } from "../support/render.js";
@@ -636,5 +640,157 @@ describe("TL6 (C12 I55, C12 I6): below the colour floor the strips already say t
     // And it is a number, not a name — or the equality above would hold with
     // both arms writing the same wrong thing.
     expect(gutters(both[calloutRows(both)[0]!]!).right).toMatch(/^[\d.]+$/u);
+  });
+});
+
+describe("YC10 (C12 I122): a callout draws with or without a right axis, and both arms agree", () => {
+  // **The member's whole product, both arms** (F994, §3ak.50h). 9 of the 15
+  // cells disagreed: every `yAxis` that is not `"right"` or `"both"` — the
+  // default included — drew the callout in the SVG and nothing in the terminal,
+  // because `definition.ts` gated the whole right-column maximum on
+  // `sides.right` where `rightRoom` has always gated only the labels' half.
+  const AXES = [undefined, false, "left", "right", "both"] as const;
+  const CALLS = ["last", "name", "both"] as const;
+  const WANT = { last: "10", name: "alpha", both: "alpha 10" } as const;
+
+  const plot = (ya: (typeof AXES)[number], yc: (typeof CALLS)[number]): Plot =>
+    block({
+      kind: "plot", id: "yc10", form: "line", height: 6, axes: true, legend: false,
+      yFormat: "number", series: [{ label: "alpha", values: [2, 6, 4, 10] }],
+      ...(ya === undefined ? {} : { yAxis: ya }), yCallout: yc,
+    }) as Plot;
+
+  /**
+   * **Read positionally, past the plot area's right edge.** `10` is also this
+   * figure's top axis label, so a substring test over the frame reports a
+   * callout wherever the scale happens to name the same number — the first
+   * form of this row did exactly that and called three cells agreeing.
+   */
+  const terminalCallout = (p: Plot, want: string): boolean =>
+    kit().renderToLines(p, 30).map(plain).some((r) => {
+      const last = [...r].reduce((m, c, i) => (/[│┤├┣┐┘]/u.test(c) ? i : m), -1); // cells-ok — a column index
+      return last >= 0 && r.slice(last + 1).includes(want);
+    });
+
+  const svgCallout = (p: Plot, want: string): boolean =>
+    [...(plotToSvg(p, DARK_THEME, SVG_DEFAULT_LAYOUT) ?? "").matchAll(/<text\s[^>]*>([^<]*)<\/text>/gu)]
+      .some((m) => m[1] === want);
+
+  it("all fifteen cells, and the arms answer alike in every one", () => {
+    const disagree: string[] = [];
+    for (const ya of AXES) {
+      for (const yc of CALLS) {
+        const p = plot(ya, yc);
+        const t = terminalCallout(p, WANT[yc]);
+        const s = svgCallout(p, WANT[yc]);
+        if (t !== s) disagree.push(`yAxis ${String(ya)} · yCallout ${yc}: terminal ${String(t)}, svg ${String(s)}`);
+        // Not merely equal: both must actually draw it, or a renderer that drew
+        // no callouts anywhere would satisfy the comparison in all fifteen.
+        if (!t || !s) disagree.push(`yAxis ${String(ya)} · yCallout ${yc}: neither arm drew "${WANT[yc]}"`);
+      }
+    }
+    expect(disagree, "the callout is written by both arms at every `yAxis`").toEqual([]);
+  });
+
+  it("nine of the fifteen are documents the model refuses, which YC7 asserts and this records", () => {
+    // The agreement above is reachable only by handing a renderer a `Plot`
+    // directly: C04 I60's fourth refusal still forbids these nine, and the day
+    // it is lifted this row fails and says so.
+    const refused: string[] = [];
+    for (const ya of AXES) {
+      for (const yc of CALLS) {
+        if (validateBlock(plot(ya, yc)).ok) continue;
+        refused.push(`${String(ya)}/${yc}`);
+      }
+    }
+    expect(refused).toHaveLength(9); // cells-ok — a cell count
+    expect(refused.every((r) => !r.startsWith("right") && !r.startsWith("both"))).toBe(true);
+  });
+});
+
+describe("YC11 (C12 I122): a column grown for a callout alone carries no mirrored labels", () => {
+  // **Found by reading the frame and by nothing else.** With the right column's
+  // width the only signal, `yAxis: false` drew `├ 5` and `├ 0` down the side of
+  // a plot that had switched the axis off — while every cell of YC10 reported
+  // the arms agreeing.
+  const right = (extra: object): readonly string[] =>
+    kit().renderToLines(block({
+      kind: "plot", id: "yc11", form: "line", height: 6, axes: true, legend: false,
+      yFormat: "number", series: [{ label: "alpha", values: [2, 6, 4, 10] }], ...extra,
+    }), 30).map(plain).map((r) => {
+      const last = [...r].reduce((m, c, i) => (/[│┤├┣┐┘└]/u.test(c) ? i : m), -1); // cells-ok — a column index
+      return last < 0 ? "" : r.slice(last + 1).trim();
+    });
+
+  it("`yAxis: false` writes the callout and no scale", () => {
+    const gutter = right({ yAxis: false, yCallout: "both" });
+    expect(gutter.filter((g) => g !== "")).toEqual(["alpha 10"]);
+  });
+
+  it("a left axis with a callout column writes no scale on the right", () => {
+    // **The cell the first draft of this row did not drive, and the mutation
+    // pass is what said so.** Deleting the guard — `mirrored = label` — survived
+    // every assertion here, because at `yAxis: false` the row label is empty
+    // anyway: the guard and its absence agree at that input, so the row was
+    // asserting a rule against a state where the rule has nothing to do.
+    //
+    // A **left** axis makes the labels exist and a callout makes the right
+    // column exist, and `rightLabels` is false — which is the only shape where
+    // *a column is room rather than a request* can be violated.
+    // `yCallout: "last"` writes the value alone where `"both"` carries the
+    // series name with it — asserted as measured rather than as guessed, which
+    // is what the first form of this assertion got wrong.
+    const gutter = right({ yAxis: "left", yCallout: "last" }).filter((g) => g !== "");
+    expect(gutter, "the callout alone, and no mirrored scale").toEqual(["10"]);
+  });
+
+  it("and the left column is not widened by the callout either", () => {
+    // **The second survivor of the same pass, and it survived the first repair
+    // too.** Widening the *left* column by `max(wanted, calloutWidth(…))`
+    // survived every YA row because those fixtures declare no callout — and
+    // then survived this row's own first form, which asked for `yCallout:
+    // "last"` over values reaching 10. The scale there reads `10`/`5`/`0` and
+    // the callout reads `10`: both two cells wide, so the maximum is the width
+    // already there and the mutation has nothing to be wrong about.
+    //
+    // **A frame that constructs a callout is not yet a frame where a wider
+    // callout can be seen.** What the row needs is a callout *wider than the
+    // scale*, which is a property of the numbers and the label rather than of
+    // the fields being set — a single-digit axis and an eleven-cell name
+    // (C12 I47: a callout is only ever written on the right).
+    const NAME = "utilisation";
+    const fixture = (extra: object): string[] => kit().renderToLines(block({
+      kind: "plot", id: "yc11l", form: "line", height: 6, axes: true, legend: false,
+      yFormat: "number", yAxis: "left",
+      series: [{ label: NAME, values: [2, 6, 4, 9] }], ...extra,
+    }), 30).map(plain);
+    const withCallout = fixture({ yCallout: "name" });
+    const without = fixture({});
+
+    const leftWidth = (lines: readonly string[]): number =>
+      Math.max(0, ...lines.filter((l) => EDGE.test(l)).map((l) => l.search(EDGE))); // cells-ok — a column index
+
+    // **The property this row rests on, asserted rather than assumed.** Without
+    // it the row passes on a fixture where both arms agree, which is what the
+    // first form did.
+    expect(
+      cells(NAME, FULL_CAPS.ambiguousWidth),
+      "the callout has to be wider than the scale it must not size",
+    ).toBeGreaterThan(leftWidth(without));
+    expect(leftWidth(withCallout), "the callout is on the right, so the left is unchanged").toBe(
+      leftWidth(without),
+    );
+    // The control: the callout did arrive, so the comparison is between two
+    // frames that differ rather than two renders of the same block.
+    expect(withCallout.join("\n")).toContain(NAME);
+    expect(without.join("\n")).not.toContain(NAME);
+    expect(leftWidth(without), "and there is a left column to widen").toBeGreaterThan(0);
+  });
+
+  it("the control: `yAxis: \"right\"` keeps its ticks beside the same callout", () => {
+    const gutter = right({ yAxis: "right", yCallout: "last" }).filter((g) => g !== "");
+    expect(gutter).toContain("10");
+    expect(gutter.length).toBeGreaterThan(1); // cells-ok — a label count
+    expect(gutter.filter((g) => g !== "10")).toEqual(["5", "0"]);
   });
 });

@@ -69,6 +69,39 @@ export type TerminalCapabilities = Readonly<{
 }>;
 
 /**
+ * **How a field was answered, named for what would falsify it** (I13, §3).
+ *
+ * `declared` is the reader's own override and is not a claim about the terminal
+ * at all. `stated` is a variable whose *value* carries the fact — `COLORTERM`,
+ * `COLORFGBG`, the locale — and is wrong only if its writer is. `inferred` is a
+ * **name** matched against the identification's table, and is wrong whenever the
+ * name is: `TERM` set by hand, a terminal borrowing another's terminfo entry, a
+ * name surviving a hop the capability does not. `assumed` is the framework's own
+ * default where nothing in the environment carried the fact. `unreachable` is a
+ * claim **withheld** — the terminal was identified and the sequence is measured
+ * not to reach it (I11, F432).
+ *
+ * **Not a precedence order.** `TERM=dumb` with `COLORTERM=truecolor` answers 1,
+ * so an `assumed` rung outranks a `stated` one (T3.3): the `dumb` gate is a veto
+ * and not a rung, and a sentence reading the five as a lattice would be false at
+ * the first row while reading as a tidy summary.
+ */
+export type CapabilitySource = "declared" | "stated" | "inferred" | "assumed" | "unreachable";
+
+/**
+ * A value and how it was reached, **returned together by the rule that reached
+ * it** (I13).
+ *
+ * A second map from field to source, kept beside the rules, would be a fourth
+ * list in a component that was just repaired for having three (F418) — and it
+ * would be the drifting kind, because nothing compares a value against a
+ * description of where it came from. The pair makes them one edit.
+ */
+type Answer<T> = readonly [value: T, source: CapabilitySource];
+
+type Answers = { readonly [K in keyof TerminalCapabilities]: Answer<TerminalCapabilities[K]> };
+
+/**
  * Warnings are returned, never emitted (I8). Detection runs before the terminal
  * is acquired and before C22 has a diagnostics path; C22 §8 orders release
  * before printing, so C02 decides what is wrong and C22 decides when the user
@@ -79,6 +112,13 @@ export type TerminalCapabilities = Readonly<{
  */
 type Detection = Readonly<{
   capabilities: TerminalCapabilities;
+  /**
+   * How each field was answered (I13). Four of the ten are `inferred` from a
+   * name; the record used to carry no way to tell those from the six that are
+   * not, so `imageProtocol: "none"` on an unnamed terminal and the same value
+   * inside a multiplexer were one fact with two remedies.
+   */
+  sources: Readonly<Record<keyof TerminalCapabilities, CapabilitySource>>;
   warnings: readonly string[];
 }>;
 
@@ -163,12 +203,16 @@ function detectColourDepth(
   term: string | undefined,
   colorterm: string | undefined,
   terminal: TerminalName | null,
-): TerminalCapabilities["colourDepth"] {
+): Answer<TerminalCapabilities["colourDepth"]> {
   // Order matters, and the dumb gate comes first: a dumb terminal renders no
   // colour whatever COLORTERM claims about the emulator (T3.3). Absent TERM is
   // dumb — see §3.
-  if (term === undefined || term === "dumb") return 1;
-  if (colorterm === "truecolor" || colorterm === "24bit") return 24;
+  //
+  // **This rung is why the five sources are not a precedence order** (I13): it is
+  // `assumed` and it outranks the `stated` one below it, because a veto is not a
+  // rung.
+  if (term === undefined || term === "dumb") return [1, "assumed"];
+  if (colorterm === "truecolor" || colorterm === "24bit") return [24, "stated"];
   // **The identification, below `COLORTERM`** (I11). A real Ghostty sets
   // `COLORTERM`, so this row looks like an artefact of our own harness stripping
   // it — and it is not: **`ssh` allocates a pty and forwards `TERM`, never
@@ -181,9 +225,17 @@ function detectColourDepth(
   // identification's** — `detect` hands over a `terminal` that is already `null`
   // inside a multiplexer, so the rule is stated once for every reader instead of
   // once per reader (F432).
-  if (terminal !== null) return 24;
-  if (term.includes("256color")) return 8;
-  return 4;
+  //
+  // **And it is the one field the `TMUX` gate demotes rather than refuses**
+  // (I13): there is a rule below this one, so inside a multiplexer the answer
+  // falls through to `TERM`'s shape and is `assumed` — a claim — where
+  // `imageProtocol` and its two siblings have nothing below and answer
+  // `unreachable`, which is not a claim at all.
+  if (terminal !== null) return [24, "inferred"];
+  // `TERM`'s *shape*, not a statement about colour: T3.2 takes `foo-bar-256` to
+  // 8 on purpose, and an arbitrary name containing a substring is a heuristic.
+  if (term.includes("256color")) return [8, "assumed"];
+  return [4, "assumed"];
 }
 
 /**
@@ -194,11 +246,12 @@ function detectUnicode(
   lcAll: string | undefined,
   lcCtype: string | undefined,
   lang: string | undefined,
-): TerminalCapabilities["unicode"] {
+): Answer<TerminalCapabilities["unicode"]> {
   const locale = lcAll ?? lcCtype ?? lang;
-  if (locale === undefined) return "ascii";
+  // Nothing carried the fact, so the answer is ours (I13).
+  if (locale === undefined) return ["ascii", "assumed"];
   // Hyphen optional, case-insensitive: UTF-8, utf-8 and UTF8 all count (T1.4).
-  return /UTF-?8/i.test(locale) ? "full" : "ascii";
+  return [/UTF-?8/i.test(locale) ? "full" : "ascii", "stated"];
 }
 
 /**
@@ -223,11 +276,11 @@ function detectAmbiguousWidth(
   lcAll: string | undefined,
   lcCtype: string | undefined,
   lang: string | undefined,
-): TerminalCapabilities["ambiguousWidth"] {
+): Answer<TerminalCapabilities["ambiguousWidth"]> {
   const locale = lcAll ?? lcCtype ?? lang;
-  if (locale === undefined) return "narrow";
+  if (locale === undefined) return ["narrow", "assumed"];
   const subtag = locale.toLowerCase().split(/[_.@-]/u)[0] ?? "";
-  return WIDE_AMBIGUOUS_LANGUAGES.includes(subtag) ? "wide" : "narrow";
+  return [WIDE_AMBIGUOUS_LANGUAGES.includes(subtag) ? "wide" : "narrow", "stated"];
 }
 
 /**
@@ -246,20 +299,24 @@ function detectAmbiguousWidth(
  */
 function detectBackgroundPolarity(
   colorfgbg: string | undefined,
-): TerminalCapabilities["backgroundPolarity"] {
-  if (colorfgbg === undefined) return "unknown";
+): Answer<TerminalCapabilities["backgroundPolarity"]> {
+  // **Every `unknown` is `assumed` and every polarity is `stated`** (I13), which
+  // is the same partition the third value already draws: `unknown` is this
+  // component declining, whatever the variable held, and `dark`/`light` is the
+  // variable speaking.
+  if (colorfgbg === undefined) return ["unknown", "assumed"];
   const cut = colorfgbg.lastIndexOf(";");
-  if (cut === -1) return "unknown";
+  if (cut === -1) return ["unknown", "assumed"];
   const background = colorfgbg.slice(cut + 1).trim();
   // A digit test before the parse: `parseInt` reads `15abc` as 15 and `""` as
   // NaN, and only one of those two is a value this rule should decline.
-  if (!/^\d+$/u.test(background)) return "unknown";
+  if (!/^\d+$/u.test(background)) return ["unknown", "assumed"];
   const index = Number(background);
   // 0–6 are the dark half of the base eight, 7 is light grey, 8 is bright black
   // and 9–15 are the bright half. Above 15 the answer is C10's table and C10 is
   // a layer up, so it is declined rather than guessed at.
-  if (index > 15) return "unknown";
-  return index === 7 || index > 8 ? "light" : "dark";
+  if (index > 15) return ["unknown", "assumed"];
+  return [index === 7 || index > 8 ? "light" : "dark", "stated"];
 }
 
 /**
@@ -325,11 +382,28 @@ function identifyTerminal(
  * for a corrupted control, so the protocol is present and success is
  * distinguishable from failure (F415).
  *
+ * **And kitty is, since F1060.** kitty 0.41.1 under Xvfb answers `OK` for all
+ * seven cases and `EBADPNG:bad adaptive filter value` for the corrupt control;
+ * XTerm 398, which speaks no graphics protocol at all, answers `NO RESPONSE` to
+ * every one and falls through this table to `none`. Two records that agree with
+ * a table say nothing on their own — what they are for is that the arm which
+ * *refuses* is exercised by a real terminal, so the row reading them is not one
+ * that has only ever seen agreement. Note the two terminals name the same
+ * failure differently, which is why nothing matches on the error text.
+ *
  * **WezTerm and Windows Terminal are `none`, owed and not claimed.** Neither has
  * been measured here and the asymmetry decides it: placeholders addressing an
  * image the terminal never received draw *nothing*, where a wrong `none` draws a
- * dither. The expiry is an instrument rather than a hope — run the probe there
- * and read the verdict.
+ * dither.
+ *
+ * **The expiry is a row that goes red, not an instruction to a reader** (F1060).
+ * Run `tools/terminal-probe/probe.py` in one of them with no argument: the
+ * report lands in `tools/terminal-probe/results/`, and `terminal-probe.test.ts`
+ * TP7 reads every record there back through `detectCapabilities` and fails
+ * naming the file when a recorded verdict disagrees with this table. Before that
+ * row this comment said *run the probe there and read the verdict* while nothing
+ * read the verdict — a deferral with an instrument, an output file, and no
+ * reader, which is a deferral with a hope wearing a tool's clothes.
  *
  * **`synchronisedUpdate` and `colourDepth` have no table of their own**, because
  * the membership criterion for the map above *is* being an emulator modern enough
@@ -374,7 +448,35 @@ const KEYBOARD_PROTOCOL: Readonly<
   windowsterminal: "none",
 };
 
-function detect(env: Readonly<NodeJS.ProcessEnv>): TerminalCapabilities {
+/**
+ * **The one place a capability is read out of the identification** (I11, I13).
+ *
+ * Takes both the ungated `identified` and the gated `terminal` because the two
+ * disagree exactly where the answer stops being a claim: identified and then
+ * withheld is `unreachable` — *this terminal probably can and the bytes do not
+ * arrive* — where never identified is `inferred`, the table simply not naming
+ * it. Same value, opposite remedies, which is what the fifth kind is for.
+ */
+function fromIdentity<T>(
+  identified: TerminalName | null,
+  terminal: TerminalName | null,
+  table: Readonly<Record<TerminalName, T>>,
+  none: T,
+): Answer<T> {
+  if (terminal !== null) return [table[terminal], "inferred"];
+  return [none, identified === null ? "inferred" : "unreachable"];
+}
+
+const SYNCHRONISED_UPDATE: Readonly<Record<TerminalName, boolean>> = {
+  kitty: true,
+  ghostty: true,
+  iterm2: true,
+  wezterm: true,
+  foot: true,
+  windowsterminal: true,
+};
+
+function detect(env: Readonly<NodeJS.ProcessEnv>): Answers {
   const term = read(env, "TERM");
   const termProgram = read(env, "TERM_PROGRAM");
 
@@ -405,6 +507,14 @@ function detect(env: Readonly<NodeJS.ProcessEnv>): TerminalCapabilities {
   // and it is the one `mouse` (D34) and `colourDepth` already give.
   const terminal = inTmux ? null : identified;
 
+  // `mouse` is `unreachable` inside a multiplexer without needing a name: D34's
+  // gate is about passthrough and applies to a terminal we never identified.
+  const mouse: Answer<boolean> = !usable
+    ? [false, "assumed"]
+    : inTmux
+      ? [false, "unreachable"]
+      : [true, "assumed"];
+
   return {
     colourDepth: detectColourDepth(term, read(env, "COLORTERM"), terminal),
     unicode: detectUnicode(read(env, "LC_ALL"), read(env, "LC_CTYPE"), read(env, "LANG")),
@@ -418,14 +528,14 @@ function detect(env: Readonly<NodeJS.ProcessEnv>): TerminalCapabilities {
     // `TERM=dumb` — depth 1 colours nothing — which is a separate fact and the
     // reason the combination is asserted rather than assumed (T3.12).
     backgroundPolarity: detectBackgroundPolarity(read(env, "COLORFGBG")),
-    synchronisedUpdate: terminal !== null,
-    bracketedPaste: usable,
-    mouse: usable && !inTmux,
-    imageProtocol: terminal === null ? "none" : IMAGE_PROTOCOL[terminal],
+    synchronisedUpdate: fromIdentity(identified, terminal, SYNCHRONISED_UPDATE, false),
+    bracketedPaste: [usable, "assumed"],
+    mouse,
+    imageProtocol: fromIdentity(identified, terminal, IMAGE_PROTOCOL, "none"),
     // The same `terminal`, so the same gate (I11): inside tmux this is `none`
     // because the identification is, not because this line remembered to ask.
-    keyboardProtocol: terminal === null ? "none" : KEYBOARD_PROTOCOL[terminal],
-    altScreen: usable,
+    keyboardProtocol: fromIdentity(identified, terminal, KEYBOARD_PROTOCOL, "none"),
+    altScreen: [usable, "assumed"],
   };
 }
 
@@ -461,11 +571,34 @@ const FIELDS = Object.keys(VALIDATORS) as (keyof TerminalCapabilities)[];
 
 // --- public interface (§2) --------------------------------------------------
 
+/**
+ * What a source means when it is put in front of a reader (I13).
+ *
+ * The rejection warning is `sources`' first consumer and the reason the field is
+ * more than a label: *keeping the detected `"none"`* tells a reader nothing they
+ * can act on, where *inferred from the terminal's identity* says the framework
+ * guessed from a name and declaring the field is the fix.
+ */
+const SOURCE_PROSE: Readonly<Record<CapabilitySource, string>> = Object.freeze({
+  declared: "declared",
+  stated: "stated by the environment",
+  inferred: "inferred from the terminal's identity",
+  assumed: "assumed, because nothing in the environment says",
+  unreachable: "withheld, because the sequence does not reach the terminal",
+});
+
 export function detectCapabilities(
   env: Readonly<NodeJS.ProcessEnv>,
   overrides?: Partial<TerminalCapabilities>,
 ): Detection {
-  const resolved: Record<string, unknown> = { ...detect(env) };
+  const answers = detect(env);
+  const resolved: Record<string, unknown> = {};
+  const sources: Record<string, CapabilitySource> = {};
+  for (const field of FIELDS) {
+    const [value, source] = answers[field];
+    resolved[field] = value;
+    sources[field] = source;
+  }
   const warnings: string[] = [];
 
   if (overrides !== undefined) {
@@ -475,10 +608,17 @@ export function detectCapabilities(
       if (value === undefined) continue;
       if (VALIDATORS[field](value)) {
         resolved[field] = value;
+        // **Only here** (I13). I4 says an out-of-domain value *is not an
+        // override*, and this is the line where that sentence becomes something
+        // a reader can observe: the rejected arm below keeps the detected value
+        // and must keep the detected source with it, because nothing else in the
+        // record would differ (T3.14).
+        sources[field] = "declared";
       } else {
         warnings.push(
           `[terminal] ${field}: ${JSON.stringify(value)} is not a valid value; ` +
-            `keeping the detected ${JSON.stringify(resolved[field])}`,
+            `keeping the detected ${JSON.stringify(resolved[field])} ` +
+            `(${SOURCE_PROSE[sources[field] ?? "assumed"]})`,
         );
       }
     }
@@ -488,6 +628,9 @@ export function detectCapabilities(
   // same input are deeply equal and share no reference (I3, T2.3, T6.7).
   return Object.freeze({
     capabilities: Object.freeze(resolved) as TerminalCapabilities,
+    sources: Object.freeze(sources) as Readonly<
+      Record<keyof TerminalCapabilities, CapabilitySource>
+    >,
     warnings: Object.freeze(warnings),
   });
 }

@@ -94,6 +94,25 @@ export type Layout = Readonly<{
    */
   rightColumn?: number;
   /**
+   * Whether that column carries the **mirrored value labels**, as against
+   * holding a callout and nothing else (C12 I122, F994).
+   *
+   * **The column's existence used to stand in for the axis's**, and it could,
+   * for as long as a right column was only ever grown for an axis. A callout
+   * needs cells at the line's end and has nothing to do with whether the value
+   * scale is printed (I47, I48) — so once the column can be grown for the
+   * callout alone, `rightColumn > 0` stops answering *does this figure have a
+   * right axis* and starts answering *is there room out there*. Read the frame
+   * and the difference is `├ 5` and `├ 0` written down the side of a plot that
+   * asked for no axis at all, which is what the first form of F994's fix drew.
+   *
+   * **Absent is `rightColumn > 0`**, which is every layout built before a column
+   * could exist for a callout alone — `reserving` here and the matrix's own in
+   * `heatmap.ts`, both of which size the column from `sides.right` and cannot
+   * reach the new case.
+   */
+  rightLabels?: boolean;
+  /**
    * What the right gutter writes **instead of** the mirrored label, by area row
    * (I48).
    *
@@ -250,14 +269,19 @@ function rightGutterSpans(
       },
     ];
   }
+  // **The mirrored label, only where the block asked for that axis** (I122).
+  // The column may exist for a callout alone, and a column is not a request:
+  // writing the label here because there is room is how `yAxis: false` came to
+  // draw a right-hand scale.
+  const mirrored = showsRightLabels(layout) ? label : "";
   // `teeLeft` and not `teeRight`: the stub points **out** at the label it joins,
   // which on this side is outward to the right. §3f's own note about termplot
   // drawing `tick_right` on a left border is this rule read from the other end.
-  const edge = bare ? " " : label === "" ? g.vertical : g.teeLeft;
+  const edge = bare ? " " : mirrored === "" ? g.vertical : g.teeLeft;
   return [
     { text: edge, style: edgeTone },
     { text: " ", style: muted },
-    { text: pad(truncate(label, column, ctx.capabilities), column, amb), style: muted },
+    { text: pad(truncate(mirrored, column, ctx.capabilities), column, amb), style: muted },
   ];
 }
 
@@ -299,7 +323,17 @@ export function yAxisSides(block: Pick<Plot, "axes" | "form" | "yAxis">): { left
  * since those are drawn on exactly the rows the gutter labels (I26).
  */
 export function hasYLabels(layout: Layout): boolean {
-  return layout.labelColumn > 0 || (layout.rightColumn ?? 0) > 0;
+  return layout.labelColumn > 0 || showsRightLabels(layout);
+}
+
+/**
+ * Does the right column hold the mirrored labels, or only a callout (I122)?
+ *
+ * One reader for the field's default, because two sites ask and a default
+ * written twice is the rule with two copies this file keeps finding.
+ */
+export function showsRightLabels(layout: Layout): boolean {
+  return layout.rightLabels ?? (layout.rightColumn ?? 0) > 0;
 }
 
 /**

@@ -46,14 +46,16 @@ Nothing else in the codebase branches on mode.
 ```typescript
 type Invocation = Readonly<{
   verb:      string;
-  argv:      readonly string[];       // ["ps", "--mine"] — "--json" appended by transport
+  argv:      readonly string[];       // ["ps", "--mine"] — the JSON tokens appended by transport
   streams:   boolean;                 // from the manifest
+  jsonFlag?: readonly string[];       // this far side's JSON tokens, resolved by the caller;
+                                      // absent = ["--json"], [] = append nothing (I25)
   timeoutMs: number;                  // 0 = unbounded (live views)
   signal:    AbortSignal;
 }>;
 
 type RawResult = Readonly<{
-  argv:       readonly string[];      // exactly what was spawned, including --json
+  argv:       readonly string[];      // exactly what was spawned, including the JSON tokens
   exitCode:   number | null;          // null iff killed by signal
   signal:     string | null;
   stdout:     unknown;                // parsed JSON, or undefined if unparseable
@@ -84,7 +86,7 @@ interface TransportRouter {
 }
 
 type Clock = Readonly<{
-  now:      () => number;                                   // durationMs
+  elapsed:  () => number;                                   // durationMs — monotonic, never the wall clock (I19)
   schedule: (fn: () => void, ms: number) => Disposable;     // the §4 ladder
 }>;
 
@@ -126,6 +128,8 @@ function createRouter(opts: {
 
 `clock` is injected for the same reason C03's `schedule` is. `durationMs` needs the time twice and the §4 ladder needs two 2 s timers, and both are ambient reads that SS1 permits only in `src/shell/session.ts`. Injected, T3.5 asserts each rung of the ladder against a counter instead of sleeping through four seconds per case.
 
+**And the time it needs twice is `elapsed`, the monotonic clock, not the wall clock** (F972). A duration is a difference of two readings, and a wall clock can be stepped between them; under C28's positional replay the wall channel is also the one the header's second hand is served from, so the transport's pair sat on the channel where a stale position shows (F963). The root hands it `config.elapsed`, and the stand-in that mirrors the pair (`src/testing/replay.ts`) reads `elapsed` at the same two positions.
+
 ### `Fixture`
 
 ```typescript
@@ -153,7 +157,11 @@ The fixture's own `argv` — the `Fixture.argv` field, not `result.argv` — rem
 
 ## 3. Invocation
 
-`--json` is appended by the transport, never typed by the user (D16). A user who types `--json` explicitly is asking to see the contract, and C07 renders it raw — but that is C07's decision, and C06 appends regardless so the payload is always machine-shaped.
+The tokens that ask for JSON are appended by the transport, never typed by the user (D16). A user who types them explicitly is asking to see the contract, and C07 renders it raw — but that is C07's decision, and C06 appends regardless so the payload is always machine-shaped.
+
+**Which tokens is the far side's business and reaches C06 on the `Invocation`** (I25, C05 I26). `--json` was appended unconditionally and is a convention rather than a fact: the framework's own demo target spells it `--format json`, so Calcium could not drive `docker` without a shim (F1). C06 does not read C05 — the caller resolves the verb's declaration against the manifest's and puts the result on the invocation, which is exactly what `Invocation.streams` already does one field up. Absent means `["--json"]`, so every corpus, manifest and row written before the member is unchanged.
+
+**The dedupe reads the first token, not the sequence.** For `["-o","json"]` against a user who typed `-o yaml`, matching the whole sequence would append `-o json` after it and silently override what the user asked for — last-wins on most far sides — while matching the first token appends nothing and leaves both I4's argument and D16's intact. A single-token flag has only a first token, so nothing about the original behaviour moves (C05 §8c row 5).
 
 Spawning uses an **argv array**, never a shell string (D18). No quoting, no word splitting, no injection surface. The shell is never in the loop.
 
@@ -234,6 +242,23 @@ Streams are exempt — a `--watch` is a subscription, not a command, and holding
 
 The guard lives here rather than in L4 because it is mechanical and because the router is the only place that sees every invocation.
 
+### `busy` is declared, and this is the ruling F882 asked for
+
+`TransportRouter.busy` sat on `UNCONSUMED_MEMBERS` for months with a reason in two halves, and **both halves were homonyms** — measured at HEAD on 2026-09-10, and neither is about this component:
+
+| the carried premise | what is actually there |
+|---|---|
+| *"`router.ts` records that a guard replaced the member"* | `grep -n replac src/data/transport/router.ts` → **0 hits**. The sentence lives in `src/interaction/router/router.ts:78`, C16's input router, about `RouterDeps.busy` — a different member on a different interface in a file with the same basename |
+| *"`construct.ts` counts seventeen call sites until `busy`"* | `src/shell/construct.ts:2922` reads *"C16's sixteen pulls … seventeen until `busy` and `shellChild` became one `inFlight`"*. Also C16's, also `RouterDeps` |
+
+So *the tree documents the deletion twice* was **one file that never said it and one file about another component's member**. The exemption's reason had no source, and the ruling it deferred was never C06's to make in the first place — C16 §5 and C23 I5 already took it, in the other direction: *C23's guard is authoritative; C06's is a backstop*. What C16 removed is its own `RouterDeps.busy`, because a boolean sourced from a backstop could not tell an `app` route from a `shell` one. Nothing there asked C06 to stop reporting.
+
+**`busy` stays declared, and the reason is that it is the only observable I13 has.** The guard is a closure variable — `inFlight` in `createRouter` — so *at most one non-streaming invocation is in flight, and every settlement path releases it* is a claim about a private binding. `busy` is what makes it a claim a test can take: T1.1, T1.2, T2.6, T3.1, T3.2 and T3.3 all read it, and T2.6's hundred invocations across every settlement path have nothing else to assert against. Delete the member and I13 becomes unstateable, T2.6 unwritable and T6.7 — *releasing the guard only on success* — passes.
+
+**What would remove it**: a reader that can see the guard without the member. There is none and there should not be one, because the alternative is exporting `inFlight`'s binding, which is the same member under a worse name. **What would make it wrong**: a second guard at the same scope. C23's is at a different one and `router.ts`'s header says so in the same words, deliberately, *so that neither is tidied away by someone who finds the second one*.
+
+**And MG24 can no longer ask the question** (F882): C28's transport decorator has to *be* a `TransportRouter`, so it re-exposes `busy` and the rule sees a reader. That is why this is written here rather than left to a gate — a forwarding wrapper answers *yes, consumed* for every member of every interface it decorates, so the seams the profiler touches are exactly the ones the rule went quiet on.
+
 ### Router state machine
 
 | From ↓ / call → | `invoke` | `stream` | invocation settles |
@@ -250,7 +275,7 @@ Settling covers success, failure, cancellation and timeout alike — every path 
 - **I1** — C06 never references `ViewDocument`, `Block` or any C04 type. Verified on the module graph.
 - **I2** — C06 interprets nothing: no exit-code mapping, no envelope synthesis, no status.
 - **I3** — Spawning always uses an argv array. No string is ever passed to a shell.
-- **I4** — `--json` is appended exactly once, even if the user supplied it.
+- **I4** — The JSON tokens are appended exactly once, even if the user supplied them — and *supplied* is decided on the **first** token, so a valued flag the user gave with another value suppresses the append rather than being overridden by it (C05 §8c row 5).
 - **I5** — stderr is never merged into stdout.
 - **I6** — `stdoutRaw` is retained regardless of parseability.
 - **I7** — Output produced before death is retained on cancel, timeout and crash.
@@ -265,12 +290,14 @@ Settling covers success, failure, cancellation and timeout alike — every path 
 - **I16** — `FixtureTransport` reads no clock and holds no world state; it replays a corpus and nothing else.
 - **I17** — The test runner selects `fixture`. Nothing in the test suite selects `emulated` *as a source of expected values*: `EmulatedTransport` is constructed only over a fixed handler, to assert interface parity (I15), and C08's world never appears in a test path (C08 I14). The qualifier is load-bearing — without it I17 and I15 contradict each other, since parity cannot be asserted for an implementation no test may construct.
 - **I18** — C06 reads no environment. `createTransport` takes `mode` as a parameter, and no module under `src/` resolves `PRISM_TUI_TRANSPORT`.
-- **I19** — Time enters C06 only through injected `now` and `schedule`. No ambient clock, no ambient timer.
+- **I19** — Time enters C06 only through injected `elapsed` and `schedule`, and `durationMs` is the difference of two `elapsed` readings — the monotonic clock, never the wall clock (F972). No ambient clock, no ambient timer.
 - **I20** — **No transport rewrites a result it did not construct.** `createFixtureTransport` replays a stored `RawResult` verbatim, `argv` included; `createEmulatedTransport` reports what its handler produced. Synthesis is confined to results C06 builds itself — a cancellation, an abort before dispatch — where there is nothing to report and the argv describes an invocation happening now. Whoever produces a result owns its `argv`; the transport carrying it does not.
 - **I21** — `timeoutMs: 0` schedules no timer at all. Not a very large timeout — none, asserted on the absence of the `schedule` call, because a timer armed with 0 and cleared later satisfies the weaker reading and kills every live view.
 - **I22** — `cwd` is read at spawn, never captured at construction. A captured string spawns every subsequent verb in the directory the session started in, which is the one bug a pass-through `cd` is guaranteed to produce.
 - **I23** — `createEmulatedTransport` takes a handler closure and C06 references no app type. The world stays app-side behind a function, which is what lets `prism-tui` and `docker-tui` each have one without the framework knowing either exists.
 - **I24** — The parity suite compares the **complete** `RawResult`, not a chosen subset, on both the settled path and inside the terminal `end` patch. Fields that cannot match across transports are named individually with a reason, and that list is closed: a field is exempt by being on it, never by not being looked at.
+- **I25** — **Which tokens ask for JSON travels on the `Invocation`, and C06 still does not read C05.** The caller resolves the verb's `jsonFlag` against the manifest's — the verb whole, never merged — and hands C06 a sequence; absent means `["--json"]`, and `[]` means append nothing. This is `Invocation.streams`' seam exactly, for the same reason: a transport that read a manifest would be a transport that knows what a verb is (F1, F1006, C05 I26).
+- **I26** — **`busy` is I13's only observable, and it is declared for that reason alone.** The guard is a closure binding inside `createRouter`; without the member, *at most one invocation is in flight* is a claim about a private variable and no tier can take it. Six rows read it — T1.1, T1.2, T2.6, T3.1, T3.2, T3.3 — and T6.7's revert is caught by none of them if it goes. It is **not** a second guard: C23 I5's is authoritative and covers every foreground route, this one covers direct transport misuse, and the two scopes are stated in both files so neither is tidied away by a reader who finds the other. **An exemption list is not where this belongs**, because a decorator that must satisfy the interface manufactures a reader for every member it wraps and the rule goes quiet (F882, §6).
 
 ---
 
@@ -294,9 +321,11 @@ Settling covers success, failure, cancellation and timeout alike — every path 
 16. Line buffering is bounded at 1 MB (I11).
 17. All three implementations are substitutable in every test that does not concern spawning (I15).
 18. The fixture transport replays and nothing else — no clock, no world state (I16).
-19. Time enters only through injected `now` and `schedule` (I19).
+19. Time enters only through injected `elapsed` and `schedule`, and a duration is two monotonic readings apart (I19).
 20. Replay reports what was recorded, verbatim (I20). `meta.argv` is a historical fact about the data — what actually ran — not a reproduction hint, so a corpus recorded against one binary says so even when the app now spawns another. `meta.transport` disambiguates; the two fields together are honest.
 21. The parity suite compares the complete `RawResult` (I24). A suite that picks fields is a suite with holes exactly where nobody looked.
+22. **The JSON tokens are the far side's and arrive on the invocation** (I4, I25, → C05 I26). `--json` stays the default and stops being a claim about every binary; the dedupe reads the first token so a user who supplied the flag with another value is not overridden.
+23. **`busy` is declared because I13 has no other observable**, not because a caller wants it (I26). The two premises that kept it on `UNCONSUMED_MEMBERS` were homonyms of C16's `RouterDeps.busy` in a file of the same basename, and the ruling they deferred had already been taken the other way by C16 §5 and C23 I5 (§6, F882, F1053).
 
 ---
 
@@ -310,6 +339,8 @@ Six tiers. Every cell of the §6 transition table is covered. `ProcessRunner` is
 - **T1.2**: invocation resolves → `busy` false.
 - **T1.3** (I4): argv `["ps","--mine"]` → spawned argv is `["ps","--mine","--json"]`.
 - **T1.4** (I4): argv already containing `--json` → appended once, not twice.
+- **T1.14** (I4, I25): an invocation carrying `jsonFlag: ["--format","json"]` → the sequence is appended whole; `jsonFlag: []` → nothing is appended; `jsonFlag` absent → `--json`, which is T1.3's answer and is what makes the member additive. The three arms in one row because the interesting cell is that `[]` and absent are different, and a row asserting either alone passes against an implementation that conflates them.
+- **T1.15** (I4): `jsonFlag: ["-o","json"]` against argv `["get","pods","-o","yaml"]` → **nothing appended**, because the first token is present; against `["get","pods"]` → the pair appended. The user's value survives, and the control is what makes it a dedupe rather than a refusal to ever append.
 - **T1.5** (I3): the runner receives an array; no code path builds a command string.
 - **T1.6**: exit 0 with valid JSON → `stdout` parsed, `parseError` null, `stdoutRaw` populated.
 - **T1.7** (I6): exit 0 with unparseable stdout → `stdout` undefined, `parseError` set, `stdoutRaw` intact.
@@ -318,6 +349,7 @@ Six tiers. Every cell of the §6 transition table is covered. `ProcessRunner` is
 - **T1.10** (I14): `for("ps")` with an override returns it; `for("unmapped")` returns the default.
 - **T1.11**: exit 2 → reported as 2 with no interpretation; no envelope is constructed.
 - **T1.12**: killed by signal → `exitCode` null, `signal` set.
+- **T1.13** (I19): 150 ms ticked on the injected `elapsed` between spawn and close → `durationMs` 150 — the injected monotonic clock and nothing else. The run in `tools/mutate/runs/c06-transport-clock.mjs` is written against this row alone (T6.17).
 
 ### Tier 2 — contract / interface
 
@@ -340,7 +372,9 @@ Six tiers. Every cell of the §6 transition table is covered. `ProcessRunner` is
 - **T2.4** (I9): for a matrix of terminations — clean exit, non-zero exit, cancel, timeout, spawn failure, malformed stream — exactly one `end` patch is emitted, and it is last.
 - **T2.5**: `AsyncIterable` contract — early `break` by the consumer terminates the child and still settles.
 - **T2.6** (I13): after a hundred invocations across every settlement path, `busy` is false.
+- **T2.13** (I26): **`busy` is on the interface, and it is the whole of what a caller can see of the guard.** The row asserts the member is declared and reports `true` inside an invocation and `false` outside it — the two readings I13 is stated over — and then the part that makes it a watch rather than a restatement: the router's *public* surface is `for`, `busy`, `inFlight` and nothing else, so there is no second way to observe the guard and removing the member removes the observation. The control is the negative: a router with the member deleted from the type fails to compile the five rows that read it, which is why this one is about the declaration and not about a value.
 
+- **T2.12, T2.12b** (I23): the handler is driven as a closure over an app's own mutable world — the mutation lands on the caller's object and on the second reply, so the state is the app's and the transport is the thing with nowhere to put it. T2.12b is the structural half, because a closure that happens to be generic looks exactly like a seam that is: `FixtureHandler`'s declaration names `Invocation`, `RawResult`, `RawPatch` and `AsyncIterable` and nothing else, compared **by equality**, and no file under `src/data/transport/` names an app in an import or a literal.
 ### Tier 3 — edge cases
 
 - **T3.1**: `invoke` while busy → rejects with an error naming the in-flight verb; the running invocation is unaffected.
@@ -369,6 +403,7 @@ Six tiers. Every cell of the §6 transition table is covered. `ProcessRunner` is
 - **T3.21** (I3): argv containing shell metacharacters (`;`, `|`, `$(…)`, backticks) → passed literally, no expansion, no injection.
 - **T3.22**: `cwd` changes between two invocations → the second spawns in the new directory.
 - **T3.23**: an invocation with no matching fixture → throws, naming verb and argv. A miss is never a plausible failure, or a test asserts against a fixture that is not there and passes.
+- **T3.25** (I25, I20, → C05 I26): the declared tokens reach **what is spawned**, and a replay still reports **what ran**. The first draft of this row asserted that all three transports report the declared tokens and the fixture transport failed it — correctly, because a replayed `argv` is a historical fact about the data (D49) and not a reconstruction. So the row is the disagreement rather than the agreement: the transports share one resolution and differ on whose argv they report, which is §3's second half. Its control is the same invocation with nothing declared, without which it passes against a transport that appends whatever it is handed and never had a default of its own.
 - **T3.24** (I15): cancel mid-stream against the *fixture* transport → the lines already yielded are retained and `cancelled` is set, exactly as T3.4 asserts for subprocess. The fixture transport honours `signal`, or T3.4 becomes spawn-concerned by accident and the shared suite narrows.
 
 ### Tier 4 — integration
@@ -406,7 +441,7 @@ Real subprocesses.
 - **T6.10** (I15): a fixture-only or subprocess-only behaviour → T2.1 fails on the shared suite.
 - **T6.15** (I15): narrowing the shared suite from three transports to two → T2.1 fails on the missing case, rather than passing with less covered.
 - **T6.16** (I18): reading `process.env` in `createTransport` → T2.9 and SS10 fail.
-- **T6.17** (I19): reading `Date.now()` for `durationMs` → SS1 fails, and T3.5's ladder assertions become four-second sleeps.
+- **T6.17** (I19): reading `Date.now()` for `durationMs` → SS1 fails, and T3.5's ladder assertions become four-second sleeps; taking `durationMs` from one reading → T1.13 fails, 0 against the 150 ms ticked between the two. The root handing the transport the wall clock is above C06 and invisible here — C28 T5.1c is what sees it, by parity on both channels (F972).
 - **T6.11** (I14): making transport selection global → T3.20 fails, and with it the incremental-migration property.
 - **T6.12**: capturing `cwd` at construction → T3.22 fails.
 - **T6.13** (I11): removing the line cap → T3.16b fails on unbounded growth.

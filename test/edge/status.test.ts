@@ -11,6 +11,7 @@ import { block } from "../../src/data/viewmodel/index.js";
 import { spinnerFrames } from "../../src/presentation/blocks/index.js";
 import { ASCII_CAPS, FULL_CAPS, measurable } from "../support/render.js";
 import { MESSAGE_LINE_CAP, statusRowsFor } from "../../src/presentation/blocks/kinds/status.js";
+import { cells } from "../../src/presentation/text.js";
 
 const ESC = String.fromCharCode(27);
 const SGR = new RegExp(`${ESC}\\[[0-9;]*m`, "gu");
@@ -516,6 +517,46 @@ describe("C09 I34 — the height fits the message and the width does not", () =>
     // The neighbour on the other side, so the row is a boundary and not a point.
     const over = `${exact}\n${wide(CAP)}`;
     expect(framed(over, 40).join(""), "one more line and the mark appears").toContain("…");
+  });
+
+  it("T3.87 (C09 I68): at `ambiguousWidth: \"wide\"` every row of a bordered box is the block's width, and a comparison keeps its last column", () => {
+    // **Read the frame, not the total.** The two members of this class fail
+    // differently and only one is visible to a width assertion: `status` has no
+    // clamp above `fit`, so its row overflowed the block — the wrap hazard C01
+    // and C02 name, on far-side text — while `comparison` sits inside
+    // `clampSpans` and stayed exactly its width by losing the tail of its last
+    // column instead (F1042).
+    const WIDE = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
+    const message = "Δ drift 3°C above the ±threshold and then more words to force a cut";
+
+    // The fixture must respond to the convention, or the row cannot fail.
+    expect([cells("Δ", "narrow"), cells("Δ", "wide")], "the fixture moves").toEqual([1, 2]);
+
+    for (const width of [24, 32, 40, 60]) {
+      const rows = draw({ message, height: 7 }, width, { capabilities: WIDE });
+      for (const [i, r] of rows.entries()) {
+        expect(cells(r, "wide"), `row ${String(i)} at width ${String(width)}: ${JSON.stringify(r)}`).toBe(width);
+      }
+      // **The control**: the same box at `narrow`, which was always right.
+      for (const r of draw({ message, height: 7 }, width, { capabilities: FULL_CAPS })) {
+        expect(cells(r, "narrow"), `narrow control at ${String(width)}`).toBe(width);
+      }
+    }
+
+    // **The other member**, where the total never moved. `9°C ±2` came back as
+    // `9°C ±…` with every row at 44 before and after.
+    const cmp = block({
+      kind: "comparison",
+      id: "c",
+      columns: { a: "before", b: "after" },
+      rows: [
+        { field: "Δ latency", a: "3°C ±1", b: "9°C ±2", change: "changed" },
+        { field: "plain", a: "abcdef", b: "ghijkl" },
+      ],
+    } as never) as never;
+    const cmpRows = measurable({ capabilities: WIDE }).renderToLines(cmp, 44).map(plain);
+    expect(cmpRows.join("\n"), "the last column is not cut").toContain("9°C ±2");
+    for (const r of cmpRows) expect(cells(r, "wide"), JSON.stringify(r)).toBeLessThanOrEqual(44);
   });
 
   it("T3.64 (C09 I34): the request follows the width ladder rather than assuming a tag", () => {

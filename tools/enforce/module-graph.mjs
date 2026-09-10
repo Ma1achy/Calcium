@@ -35,7 +35,7 @@ export function componentOf(file) {
  * the vacuity suite can assert every one of them has been shown to fire; a rule
  * added here without a fabricated violation fails A03 commitment 14.
  */
-export const MODULE_GRAPH_RULES = ["MG1", "MG2", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22", "MG23", "MG24", "MG25", "MG26", "MG27", "MG28", "MG29"];
+export const MODULE_GRAPH_RULES = ["MG1", "MG2", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22", "MG23", "MG24", "MG25", "MG26", "MG27", "MG28", "MG29", "MG30", "MG31"];
 
 /**
  * MG6 is a **third kind of rule**, and saying so is the point of this comment.
@@ -794,7 +794,18 @@ function checkUnionReach(types, typeNames, fieldsOf, byKind, shared) {
       // invisible to another. Anchored to an object-literal position — after `{`
       // or `,` — so a destructure or a type member is not read as a write.
       if (new RegExp(`[{,]\\s*${field}\\s*[,}]`, "u").test(body)) parameterised = true;
-      for (const m of body.matchAll(new RegExp(`\\b${field}:\\s*([^,\\n]+)`, "gu"))) {
+      // **Anchored at an object-literal position, like the shorthand arm above
+      // it** (F1027's class, found by F1028). The two arms of one rule disagreed:
+      // the shorthand arm required `{` or `,` in front and this one required
+      // nothing, so `setForm(form: PlotForm)` — a **parameter annotation** —
+      // read as a non-literal write and opened every arm of the union. That was
+      // invisible while MG27 read one builder file, because `index.ts`'s bodies
+      // are sliced from `finish<` and every annotation is above it; `figure.ts`
+      // builds from a class and its setters sit below the `kind:` line the
+      // fallback splits on. Same disease as MG24's record arm, one rule along:
+      // a question about construction answered by a form TypeScript also uses
+      // for declaration.
+      for (const m of body.matchAll(new RegExp(`[{,\\n]\\s*${field}:\\s*([^,\\n]+)`, "gu"))) {
         const value = m[1].trim();
         const literal = /^"([^"]+)"/u.exec(value);
         if (literal === null) parameterised = true;
@@ -827,7 +838,21 @@ export function checkBuilderCoverage(
   never = BUILDER_NEVER,
 ) {
   const typesFile = files.find((f) => f.endsWith("src/data/viewmodel/types.ts"));
-  const buildersFile = files.find((f) => f.endsWith("src/shell/builders/index.ts"));
+  // **Every file in `src/shell/builders/`, not a pair named by hand** (F1028).
+  //
+  // The rule read `types.ts` and `builders/index.ts`, and `figure.ts` builds a
+  // `kind: "plot"` block it never opened. What that cost is measured at F263:
+  // ten `BUILDER_OMISSIONS` entries reading *shorthand lands in step 11* — true
+  // about `b.plot`, and not the claim this rule enforces, which is *buildable by
+  // nothing public*. A grep answering *is it in this file* was read as *is it
+  // reachable*, which is F84's correct-sentence class inside an exemption list.
+  //
+  // **A hand-named pair is F228's shape in a scope**, exactly as the base-field
+  // list below was before it was derived: the list reads as authoritative and
+  // the directory is the authority. There are six files in it today and two
+  // build blocks; a seventh is covered on the day it is written.
+  const builderFiles = files.filter((f) => /src\/shell\/builders\/[^/]+\.ts$/u.test(f));
+  const buildersFile = builderFiles.find((f) => f.endsWith("src/shell/builders/index.ts"));
   if (typesFile === undefined || buildersFile === undefined) return [];
 
   const types = readFile(typesFile);
@@ -837,9 +862,32 @@ export function checkBuilderCoverage(
   // first run of this scanned for the literal and invented three kinds:
   // `Hunk.lines[].kind` is `"add" | "remove" | "context"`, which is a line's
   // kind and not a block's (C04 I35's neighbour).
-  const union = /export type Block =\n([\s\S]*?);\n/u.exec(types);
-  if (union === null) return [];
-  const typeNames = [...union[1].matchAll(/\|\s*(\w+)/gu)].map((m) => m[1]);
+  //
+  // **`KnownBlockKinds` and not `Block`** (C04 I119). `Block` became
+  // `BlockKinds[keyof BlockKinds] & Gap & Floor` so an app can join the union,
+  // and this regex — written for a `|`-separated list — matched nothing and the
+  // rule returned zero violations while reading as green. **Its fabricated
+  // violation is what said so**, which is the whole argument for keeping one.
+  const union = /export type KnownBlockKinds = \{\n([\s\S]*?)\n\};\n/u.exec(types);
+  if (union === null) {
+    // **Loud, and it used to be `return []`.** A rule that cannot find its
+    // subject reports exactly what a clean tree reports (A03 §2), and this one
+    // spent a commit in that state. The message names the shape it looked for,
+    // because the next person to move the declaration is the person who needs
+    // to read it.
+    return [
+      {
+        rule: "MG27",
+        file: typesFile,
+        spec: "A03 §3, MG27 · C04 I119",
+        message:
+          "the block kinds could not be read — `export type KnownBlockKinds = {` was not " +
+          "found, so MG27 and MG28 have no corpus and would report a clean tree. " +
+          "The lookup is the authority for which types are blocks; if it moved, move this.",
+      },
+    ];
+  }
+  const typeNames = [...union[1].matchAll(/:\s*(\w+);/gu)].map((m) => m[1]);
 
   const fieldsOf = (name) => {
     // **Brace-matched, and it was a non-greedy regex** (F430). `export type Rule
@@ -890,14 +938,29 @@ export function checkBuilderCoverage(
   // into the function *above* it and its writes were attributed there. That is
   // silent in both directions — a field the helper sets reads as set by its
   // neighbour, and a neighbour that stopped setting one reads as still setting it.
+  //
+  // **Keyed by file as well as by name since F1028**, because two builder files
+  // may both declare a `plot` and the walk would otherwise keep one of them.
   const bodies = new Map();
-  const starts = [...builders.matchAll(/^(?:export )?(?:function|const) (\w+)/gmu)]
-    .map((m) => [m.index, m[1]]);
-  for (const [i, [pos, name]] of starts.entries()) {
-    const end = i + 1 < starts.length ? starts[i + 1][0] : builders.length;
-    bodies.set(name, builders.slice(pos, end));
+  for (const bf of builderFiles) {
+    const src = bf === buildersFile ? builders : readFile(bf);
+    const starts = [...src.matchAll(/^(?:export )?(?:function|const) (\w+)/gmu)]
+      .map((m) => [m.index, m[1]]);
+    // **A builder file need not open with a function.** `figure.ts` does, by
+    // accident of two helpers sitting above its class, and a file that is only a
+    // class would have contributed nothing at all — the rule passing because it
+    // read no text, which is the vacuity a fabricated violation exists to catch.
+    if (starts.length === 0) {
+      bodies.set(`${bf}#*`, src);
+      continue;
+    }
+    for (const [i, [pos, name]] of starts.entries()) {
+      const end = i + 1 < starts.length ? starts[i + 1][0] : src.length;
+      bodies.set(`${bf}#${name}`, src.slice(pos, end));
+    }
   }
-  const shared = (bodies.get("finish") ?? "") + (bodies.get("idOf") ?? "");
+  const shared =
+    (bodies.get(`${buildersFile}#finish`) ?? "") + (bodies.get(`${buildersFile}#idOf`) ?? "");
 
   // **From `finish<` onward, never the whole body** — the correction the
   // mutation pass forced, and without it this rule reports a gap once and then
@@ -911,11 +974,20 @@ export function checkBuilderCoverage(
   //
   // The construction begins at `finish<`, and the annotation and destructure are
   // both above it, so the split needs no parser.
+  //
+  // **`figure.ts` builds from a class method and has no `finish<`**, so the
+  // split falls back to the block's own `kind:` literal — which is the first
+  // line of the constructed object and sits below every annotation and every
+  // private field. Measured on `figure.ts`: the constructed literal covers 25
+  // `Plot` fields and reading the whole file covers **the same 25**, so the
+  // fallback costs nothing here; it is the split rather than the file scope that
+  // keeps that true, and the row named for F1028 fabricates the difference.
   const byKind = new Map();
-  for (const [name, body] of bodies) {
-    if (name === "finish" || name === "idOf") continue;
+  for (const [key, body] of bodies) {
+    if (key === `${buildersFile}#finish` || key === `${buildersFile}#idOf`) continue;
     const at = body.indexOf("finish<");
-    const constructed = at === -1 ? body : body.slice(at);
+    const from = at === -1 ? body.search(/kind: "/u) : at;
+    const constructed = from === -1 ? body : body.slice(from);
     for (const m of constructed.matchAll(/kind: "(\w+)"/gu)) {
       byKind.set(m[1], (byKind.get(m[1]) ?? "") + constructed);
     }
@@ -1564,6 +1636,10 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   // `styleOf` or `lineOf` in `snapshot.ts` — MG24 asks whether a name appears
   // *elsewhere in `src/`*, and for a port cut from a dependency the answer is
   // structurally no and always will be.
+  "Collision.vision":
+    "C10 §4j.3 — `cvd.ts` measures and does not gate. Every shipped theme fails the separation floor, so a load-time refusal would reject the framework's own themes and lowering the floor until they pass is the same edit under another number; the ruling is that the check is a **row** (T2.38, by equality) and not `validatePalette`. So there is no `src/` consumer by design rather than by omission, and the member is read where the debt list is read. Removing it would leave a verdict that cannot say which model or which pair, which T1.41 exists to forbid",
+  "Collision.deltaE":
+    "C10 §4j.3 — `cvd.ts` measures and does not gate. Every shipped theme fails the separation floor, so a load-time refusal would reject the framework's own themes and lowering the floor until they pass is the same edit under another number; the ruling is that the check is a **row** (T2.38, by equality) and not `validatePalette`. So there is no `src/` consumer by design rather than by omission, and the member is read where the debt list is read. Removing it would leave a verdict that cannot say which model or which pair, which T1.41 exists to forbid",
   "CellLike.getChars":
     "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
     + "can be tested against a hand-built buffer and the package stays confined to one file "
@@ -1724,20 +1800,17 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
 
   // --- published ahead of the value that makes it readable ------------------
   //
-  // **A single-value union has nothing for a consumer to branch on**, which is
-  // A03 §2's vacuity class arriving in a field rather than in a rule. Reading
-  // `block.graphLayout ?? "layered"` in the renderer would satisfy this gate
-  // exactly and decide nothing — a check that cannot fire, dressed as one that
-  // passes — so the exemption is taken instead of the fake read.
-  "Plot.graphLayout":
-    "C04 I70, C12 §3ai.2 — one value and one default, so nothing can branch on " +
-    "it. The half that is NOT vacuous is the refusal, which `b.plot` enforces on " +
-    "every other form and `validate.ts` on every document, and the compile error " +
-    "it makes of `graphLayout: \"force\"`. It is published ahead of its second " +
-    "value because adding it WITH `force` widens a union that did not exist, and " +
-    "every exhaustive consumer becomes a compile error saying nothing about what " +
-    "moved. **The expiry is a symbol**: `shiftInward` and the label taxonomy, " +
-    "which is what `force` is refused on (F242). Grep it when picking this up.",
+  // **`Plot.graphLayout` was here and its exemption was simply wrong** (F1027).
+  // The written reason — *a single-value union has nothing to branch on, so
+  // reading `block.graphLayout ?? "layered"` would satisfy the gate and decide
+  // nothing* — is still true and was never the question MG24 asks. The field is
+  // **built** by `src/shell/builders/index.ts:779`,
+  // `...(graphLayout === undefined ? {} : { graphLayout })`, which crosses a
+  // component seam from `data/viewmodel/`; the arm could not see it because
+  // ES2015 shorthand carries no colon. Kept here rather than deleted because the
+  // reason is the argument against wiring a fake read, and it outlives the entry.
+  // The expiry is still a symbol: `shiftInward` and the label taxonomy, which is
+  // what `force` is refused on (F242).
 
   // --- consumed, and not from `src/` ----------------------------------------
   //
@@ -1865,6 +1938,11 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "C16 diagnostics — the dispatch trace for the last event, published so " +
     "`test/unit/router-dispatch.test.ts` can assert the ladder was walked in order. " +
     "A component reading it would be a second priority list, which C16 §8a rules out",
+  "OpenNode.childTime":
+    "C28 — the self-time accumulator on an *open* span. `tree.ts` adds a child's " +
+    "total to it at close and subtracts it to get self time; `OpenNode` is exported " +
+    "because the recorder holds one, and this field is that file's arithmetic rather " +
+    "than a seam. Nothing outside should read a span mid-flight",
   "Rng.fork":
     "C08 — a child stream for a nested generator. The fixture recorder is the " +
     "specified consumer and records linearly today, so `fork` is a capability the " +
@@ -1945,12 +2023,14 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "C08 — the integer draw beneath the fixture generators. `rng.ts` uses it internally " +
     "and `test/unit/corpus.test.ts` asserts the stream is reproducible, which is the only " +
     "place a deterministic RNG is observable at all",
-  "TransportRouter.busy":
-    "C06 diagnostics — whether a route is in flight. **F83's own evidence, and it survived " +
-    "its own removal**: `router.ts` records that a guard replaced it and `construct.ts` " +
-    "counts seventeen call sites until it, so the tree documents the deletion twice and " +
-    "the member is still declared. Kept listed rather than deleted until C06 rules, because " +
-    "removing a member two comments describe as removed wants the spec edit first",
+  // **`TransportRouter.busy` left this list on 2026-09-07, and not because
+  // anything wanted it** (F882). C28's transport decorator re-exposes every
+  // member `TransportRouter` declares — it has to, to be a `TransportRouter` —
+  // so wrapping the seam manufactured a reader for `busy` and MG24 stopped
+  // reporting it. The entry's own question is untouched: `router.ts` records
+  // that a guard replaced the member and `construct.ts` counts seventeen call
+  // sites until it, so the tree still documents the deletion twice and C06 still
+  // owes the ruling. What changed is that the rule can no longer ask.
   // **`FrameScheduler.pending` and `CompletionEngine.pending` both left here on
   // 2026-09-06, and only one of them for a consumer** (F849). C23's shell route
   // reads `deps.scheduler.pending` to coalesce its snapshots (C23 I64), which is
@@ -2061,7 +2141,13 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "ProvenanceProblem.fixtureId": "C08 — which fixture a provenance problem names, asserted in test",
   "VerbRatio.recorded": "C08 — provenance tally, asserted in test. **Three siblings are dead: F99**",
   "VerbRatio.flagged": "C08 — as `recorded`",
-  "CompletionResult.superseded": "C19 — the token-of-validity outcome; asserted at three tiers and never branched on by a component, which is C19 I13's whole point",
+  // `CompletionResult.superseded` was here and MG24 can no longer ask about it
+  // (F1027). The reason — *the token-of-validity outcome, asserted at three tiers
+  // and never branched on by a component, which is C19 I13's whole point* — is
+  // unchanged and still true. What changed is the rule: `engine.ts:333` builds the
+  // record with a bare `superseded,` and the arm now reads shorthand, so a member
+  // its own component's factory constructs satisfies the file-scoped test. That is
+  // the narrow/wide trade this file's header records, arriving as a live instance.
   // **`EngineOptions.onSourceError` and `SourceErrorSink.onSourceError` were
   // here and are gone** — both halves of one seam, unwired in the product until
   // `construct.ts` passed `createSourceErrorSink().onSourceError` (2026-09-03);
@@ -2082,6 +2168,29 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "Finding.means": "C09 §7 — as `subject`",
   "ConformanceReport.findings": "C09 §7 — as `subject`",
   "ConformanceReport.skipped": "C09 §7 — as `subject`, and the reference app reads it in five places",
+  // C28 I37 — A01 Appendix B's rows, filled from a `ProfileReport`. Same
+  // disposal as `Finding.subject` above and for the same reason: this is a
+  // report, so its consumer is the suite that asserts it and the tool that
+  // prints it, neither of which is in `src/`. `formatBudget` reads all four of
+  // the row fields one screen below their declaration; MG24 discounts a
+  // same-file read, correctly, because a component consuming its own member is
+  // not a seam. `test/unit/profiler-budget.test.ts` asserts each of the six.
+  "MeasuredRow.crossed": "C28 I37 — the appendix's verdict per row; asserted by T1.25 and T1.28",
+  "MeasuredRow.marginal": "C28 I37 — whether a crossing is inside the histogram's own error (I13); asserted by T1.28",
+  "MeasuredRow.thresholdText": "C28 I37 — A01's threshold beside the figure, so a verdict a reader can check travels with it; asserted by T1.25",
+  "UnansweredRow.thresholdText": "C28 I37 — A01's threshold quoted beside a refusal, so the blank row still says what it was blank against; asserted by T1.26",
+  "UnansweredRow.needs": "C28 I37 — what a refused row would require, which is the whole content of a refusal; asserted by T1.26 and T1.27",
+  "PhaseReport.inFrame":
+    "C28 I41 - the spans opened inside a frame, the only population `latency.work` contains. `make profile` reads it and `tools/` is outside this scan; asserted by T1.65 and T1.66",
+  "LeakReport.collected":
+    "C28 I43 - whether any collection happened at all, which is the only thing separating a leak " +
+    "from a run under no memory pressure: identical figures, opposite readings. `make profile` " +
+    "reads it through `formatLeaks` and `tools/` is outside this scan; asserted by T1.74",
+  "LeakRow.liveShare":
+    "C28 I43 - `live / created`, the shape a single run supports where an absolute figure does not " +
+    "(the floor is one and means nothing). Read by `formatLeaks` and by `make profile`; asserted by T1.74",
+  "BudgetReport.crossed": "C28 I37 — the crossed rows, for a caller deciding; asserted by T1.28",
+  "BudgetReport.unanswered": "C28 I37 — the rows with no answer, which is what makes the verdict `undecided`; asserted by T1.27 and T1.29",
   "ConformanceReport.kindsCovered": "C09 §7 — measurement-conformance coverage, asserted by the harness's own row",
   "ConformanceReport.exactness": "C09 §2a — how many windows were compared row for row and how many the EXACT_ROWS bound left out. A report, so its consumer is the row that reads it: `block-window.test.ts` asserts `read`, because a bound nobody can see reads as coverage",
   "Failure.check": "C09 §7 — measurement failure record, asserted by the harness",
@@ -2094,10 +2203,12 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "zero today and is asserted to be zero by T2.17. It exists so the vacuity is " +
     "reported rather than implied: the day a kind declares both, that row fails and " +
     "the agreement becomes live with nothing new to write",
-  "ToolDef.oneShot":
-    "C05 — **already documented at length as having no subject** (C22 §4). Correct " +
-    "disposal, independently confirmed: the coverage audit reached it from the " +
-    "`export type` side and C22 had ruled on it from the spec side",
+  // `ToolDef.oneShot` was here and MG24 can no longer ask about it (F1027), for
+  // the same mechanism as `CompletionResult.superseded` above: `parse.ts:617`
+  // writes `...(oneShot === undefined ? {} : { oneShot })`, a shorthand the arm
+  // was blind to. The reason stands — *already documented at length as having no
+  // subject* (C22 §4), reached independently from the `export type` side by the
+  // coverage audit and from the spec side by C22.
 
   // --- dead everywhere, and each names its finding --------------------------
   //
@@ -2193,6 +2304,51 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "Failure.actual":
     "**F99** — the measured value beside `expected`, which *is* read. A failure report " +
     "naming what was expected and not what happened is the half that makes it actionable",
+
+  // --- cleared by a parameter annotation until F1027 -------------------------
+  //
+  // **Five members MG24 had stopped asking about**, each answered by a `name:`
+  // that annotates a binding rather than building anything. They are entries and
+  // not fixes because every one of them is genuinely consumed *inside its own
+  // file* — which is the gap this rule's header calls deliberate — and because a
+  // renderer's internal plane is not a seam. What was measured for each: every
+  // `.name` and `{ name }` site under `src/`, `test/` and `examples/`.
+  "Grid.mask":
+    "C12 §3ai — the box-drawing plane beside `text`, merged by `paint` in the file " +
+    "that declares it. `circle.ts`, `raster.ts` and `tree.ts` name `Grid` and none " +
+    "of them touches `mask`: the merge is the point, so a second reader would be a " +
+    "second place the text-wins-the-cell rule is decided. Cleared until F1027 by " +
+    "`const mask: number[][]` in `kde.ts` and a `mask: number` parameter in " +
+    "`linedraw.ts` — neither of which builds a `Grid`",
+  "SankeyLayout.fits":
+    "C12 §3ap.4 — **reported rather than enforced**, and the sentence saying so is " +
+    "in `sankey.ts` beside the layout: this function has no budget to spend and the " +
+    "terminal arm owns the loop that drops nodes until the stack holds. Read by its " +
+    "own renderer at `sankey.ts:375` and asserted by `plot-sankey.test.ts:70`, which " +
+    "is the diagnostic-read-only-by-a-test category the header counts at eleven. " +
+    "Cleared until F1027 by a `fits: number` parameter in `completion/menu.ts`",
+  "EntryRun.indent":
+    "C22 I89 — `gutter.length × GUTTER_UNIT`, and the run that carries it is the " +
+    "only thing that can apply it: `entry-layout.ts` reads it at both column ends " +
+    "so a body element's columns agree with its own by construction. Asserted from " +
+    "outside at `frame-budget.test.ts:284/302/470` and `tool-call.test.ts:56`, " +
+    "including the identity `run.indent === run.gutter.length * GUTTER_UNIT`. " +
+    "Cleared until F1027 by `safeJson(v: Json, indent: number)` in `adapters/`",
+  "HeapSpace.available":
+    "C28 I16 — **V8's numbers are the API and this one has no reader anywhere**: " +
+    "not in `src/`, not in `test/`, not in `examples/`. F99's shape on a five-field " +
+    "record whose other four are read. It is here rather than deleted because the " +
+    "record is *V8's* shape — `getHeapSpaceStatistics` returns five fields and " +
+    "dropping one makes the type disagree with its source — and because " +
+    "`space_available_size` is the field a heap-pressure read would want first. " +
+    "Cleared until F1027 by `rungRows(spec, available: number)` in `plot/`",
+  "PhaseRow.ms":
+    "C28 — the phase total, read by `profiler-budget.test.ts:549` summing " +
+    "`session.map((row) => row.ms)` against the measured 755.9 and by :576 for the " +
+    "no-phase row. The report is composed and read in `testing/profile.ts` and " +
+    "asserted from the suite, which is where a residue with the wrong sign was " +
+    "caught. Cleared until F1027 by twenty-three `ms: number` parameter " +
+    "annotations, `schedule(fn, ms)` chief among them",
 
 });
 
@@ -2302,6 +2458,143 @@ function interfaceMembers(files, readFile) {
 }
 
 /**
+ * **What a record member's construction actually looks like, since F1027.**
+ *
+ * MG24's record arm asked whether the text `name:` appears in another file, and
+ * that form is **neither necessary nor sufficient** — two errors that cancel, so
+ * a clean run looks identical either way:
+ *
+ *   not sufficient  `function rungRows(spec: RungSpec, available: number)` is a
+ *                   parameter annotation and constructs nothing, yet it answered
+ *                   for `HeapSpace.available` two components away. **6691 of the
+ *                   18551 `name:` sites under `src/` are outside any object
+ *                   literal** — a parameter list, an array, a local's type — and
+ *                   the arm counted every one of them as a construction.
+ *   not necessary   `{ ...layout, callouts }` builds `Layout.callouts` with no
+ *                   colon at all. 538 shorthand sites, and three allow-list
+ *                   entries were held open by the arm's blindness to them.
+ *
+ * F218 is the instance that made this loud: a `let blocked: Owner | null` in
+ * `pointlabels.ts` cleared `GlyphSet.blocked`, an undrawn glyph two directories
+ * away. **That direction is the cheap one** — the build fails and someone renames
+ * a local. It also no longer reproduces: the equality arm's `owned` scoping landed
+ * afterwards, and re-fabricating the rename produces **0 violations**. The
+ * expensive direction was never fixed and is silent — a member nobody exempted
+ * reads as consumed and MG24 stops asking. **Seven were in that state**, five of
+ * them unexempt: `Grid.mask`, `SankeyLayout.fits`, `EntryRun.indent`,
+ * `HeapSpace.available`, `PhaseRow.ms`, and `Identity.groups` / `Finding.subject`
+ * which were exempt for a reason that had stopped being the reason.
+ *
+ * **And three exemptions were held open by the other half.** `Plot.graphLayout`,
+ * `ToolDef.oneShot` and `CompletionResult.superseded` are all built by shorthand
+ * and were therefore reported unconsumed, correctly by accident. Removed here.
+ * One of the three, `Plot.graphLayout`, crosses a component seam (`builders/`
+ * against `data/viewmodel/`) and its exemption was simply wrong. The other two are
+ * built by their own component's factory — `parse.ts` for a type in `types.ts` —
+ * which the file-scoped arm counts and the component-scoped reading would not.
+ * That is the narrow/wide trade this header already records, now with three
+ * measured instances rather than an argument.
+ *
+ * **This is not F105/F160's class and none of their four refused tightenings
+ * reaches it.** Those all move the *consumer scope* — files naming the owner,
+ * `(owner, name)` keying, import reachability — and all four fail because a
+ * legitimate consumer gets caught. Here nothing legitimate is caught: a parameter
+ * annotation is not a construction in any architecture, and the shorthand form
+ * is a construction in every one. Name collision between two *types* is still the
+ * standing residue, still printed by `nameExactnessSignal`, still not gated.
+ *
+ * **The scan's own control, because a bracket stack is a new failure mode the
+ * text test did not have.** A regex literal carrying `[{,(` unbalances a naive
+ * stack — and so does `densities[i]! / maxD`, where TypeScript's non-null
+ * assertion makes a division look like a regex opening (fifteen in `kde.ts`
+ * alone). So the scan returns its depth, `checkSeamConsumers` falls back to the
+ * old loose test for any file that does not balance, and the count of such files
+ * is reported rather than assumed to be zero. It is **0 of 371** today.
+ */
+function constructionScan(src) {
+  const stack = [];
+  const enclosing = new Array(src.length).fill("");
+  const top = () => stack.at(-1) ?? "";
+  let prev = "";
+  let prev2 = "";
+  const shift = (c) => { prev2 = prev; prev = c; };
+  for (let i = 0; i < src.length; i += 1) {
+    const c = src[i];
+    const t = top();
+    if (t === "'" || t === '"') {
+      if (c === "\\") { i += 1; continue; }
+      if (c === t) { stack.pop(); shift("s"); }
+      continue;
+    }
+    if (t === "`") {
+      if (c === "\\") { i += 1; continue; }
+      if (c === "`") { stack.pop(); shift("s"); continue; }
+      // A `${…}` hole is code, but an identifier inside one is not a property of
+      // the object literal the template happens to sit in — `${subject}` read as
+      // a shorthand property of `Finding` before this line existed.
+      if (c === "$" && src[i + 1] === "{") { stack.push("$"); i += 1; shift("{"); }
+      continue;
+    }
+    if (t === "/") {
+      if (c === "\\") { i += 1; continue; }
+      if (c === "[") { stack.push("]"); continue; }
+      if (c === "/") { stack.pop(); shift("r"); }
+      continue;
+    }
+    if (t === "]") {
+      if (c === "\\") { i += 1; continue; }
+      if (c === "]") stack.pop();
+      continue;
+    }
+    enclosing[i] = t;
+    if (c === "'" || c === '"' || c === "`") { stack.push(c); continue; }
+    if (c === "/") {
+      const nonNull = prev === "!" && /[\w$)\]"'`sr]/.test(prev2);
+      if (!nonNull && /[(,=:[!&|?{;+\-*%<>~^]|^$/.test(prev)) { stack.push("/"); continue; }
+    }
+    if (c === "{" || c === "(" || c === "[") { stack.push(c); shift(c); continue; }
+    if (c === "}" || c === ")" || c === "]") { stack.pop(); enclosing[i] = top(); shift(c); continue; }
+    if (!/\s/.test(c)) shift(c);
+  }
+  return { enclosing, depth: stack.length };
+}
+
+/** A binding keyword's `name:` is a type annotation and never a property. */
+const BINDING_KEYWORD = /(?:^|[^\w$.])(?:let|const|var|readonly|private|public|protected)\s+$/;
+
+/**
+ * The member names a file **builds** — `{ name: … }` and `{ …, name }` — as
+ * against the names it merely annotates. `null` when the scan did not balance,
+ * which is the caller's signal to fall back to the loose text test.
+ */
+function constructedNames(src) {
+  const { enclosing, depth } = constructionScan(src);
+  if (depth !== 0) return null;
+  // **A named import clause is not an object literal, and it looks exactly like
+  // one.** `import { DEFAULT_FLOOR, luminance, ratio } from "./contrast.js"`
+  // cleared `VerbRatio.ratio` on the first run of the shorthand arm — a
+  // *function* export, three layers away, standing in for a member built
+  // nowhere. Blanked in place rather than removed, so the offsets the scan
+  // returned still line up.
+  const masked = src.replace(
+    /(?:^|\n)[ \t]*(?:import|export)\s+(?:type\s+)?\{[^}]*\}/g,
+    (m) => m.replace(/[^\n]/g, " "),
+  );
+  const out = new Set();
+  for (const m of masked.matchAll(/(?:^|[{,(\s])([A-Za-z_$][\w$]*)\s*:/gm)) {
+    const at = m.index + m[0].indexOf(m[1]);
+    if (enclosing[at] !== "{") continue;
+    if (BINDING_KEYWORD.test(src.slice(Math.max(0, at - 32), at))) continue;
+    out.add(m[1]);
+  }
+  for (const m of masked.matchAll(/[{,]\s*([A-Za-z_$][\w$]*)\s*(?=[,}])/g)) {
+    const at = m.index + m[0].indexOf(m[1]);
+    if (enclosing[at] === "{") out.add(m[1]);
+  }
+  return out;
+}
+
+/**
  * MG24, as a pure function over its inputs so it can be run against fabricated
  * files and shown to fire (A03 commitment 14).
  */
@@ -2312,6 +2605,8 @@ export function checkSeamConsumers(
 ) {
   const violations = [];
   const unconsumed = new Set();
+  /** The equality arm's set — see the asymmetry argued at the consumer test. */
+  const unconsumedByOwner = new Set();
   const sources = new Map(files.map((f) => [f, readFile(f)]));
 
   // **Comments stripped before counting a consumer, as MG25 does.**
@@ -2335,6 +2630,12 @@ export function checkSeamConsumers(
       src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1"),
     ]),
   );
+
+  // F1027 — what each file BUILDS, as against what it merely annotates.
+  // `null` for a file whose bracket scan did not balance; those keep the old
+  // loose test, and `unbalancedFiles` is what says how many that is.
+  const constructed = new Map([...stripped].map(([f, t]) => [f, constructedNames(t)]));
+  const unbalanced = [...constructed].filter(([, v]) => v === null).map(([f]) => f);
 
   for (const { owner, name, file, record } of interfaceMembers(files, (f) => sources.get(f) ?? "")) {
     const key = `${owner}.${name}`;
@@ -2397,11 +2698,40 @@ export function checkSeamConsumers(
     const consumer = record
       ? new RegExp(`[.?]\\s*${name}\\b|(?:^|[{,(\\s])${name}\\s*:`, "m")
       : new RegExp(`[.?]\\s*${name}\\b`);
+    //
+    // **The equality arm asks a stricter question, and the asymmetry is why.**
+    // `owned` additionally requires the consuming file to name the owning type.
+    // On the violation arm that scoping was measured and rejected — 19 false
+    // accusations, recorded above — because there a false verdict accuses a
+    // member of being dead. Here the direction reverses: a false *stale* verdict
+    // deletes a written reason and stops tracking a member that is genuinely
+    // unconsumed, while a false *still unconsumed* only keeps an exemption one
+    // release too long. Cheap in one direction, expensive in the other.
+    //
+    // It exists because the loose test has a third outcome the arm's message
+    // does not name. *Wired now or gone* were the two on offer; the third is
+    // **still unconsumed, with a homonym elsewhere masking it**, and three of
+    // four listed entries were in it at once — `contexts.fork` retiring
+    // `Rng.fork`, `cpu.user` retiring `Identity.user`. The blind spot is F105's,
+    // recorded there as having no cheap remedy; that was true of the arm it was
+    // found on.
+    const ownerPattern = new RegExp(`\\b${owner}\\b`);
+    // The access arm alone, since F1027 splits the record arm's other half out
+    // of the regex and into `constructedNames`.
+    const access = new RegExp(`[.?]\\s*${name}\\b`);
     let consumed = false;
+    let owned = false;
     for (const [other, src] of stripped) {
       if (other === file) continue;
-      if (consumer.test(src)) {
-        consumed = true;
+      const built = constructed.get(other);
+      const hit =
+        record && built !== null && built !== undefined
+          ? access.test(src) || built.has(name)
+          : consumer.test(src);
+      if (!hit) continue;
+      consumed = true;
+      if (ownerPattern.test(src)) {
+        owned = true;
         break;
       }
     }
@@ -2409,6 +2739,7 @@ export function checkSeamConsumers(
     // see that a listed member is *still* unconsumed. Skipping early would make
     // every entry permanently justified by its own presence.
     if (!consumed) unconsumed.add(key);
+    if (!owned) unconsumedByOwner.add(key);
 
     if (allowed[key] !== undefined) continue;
     if (consumed) continue;
@@ -2438,14 +2769,30 @@ export function checkSeamConsumers(
   // It only means anything because the loop above records `unconsumed` before
   // consulting the list.
   for (const key of Object.keys(allowed)) {
-    if (unconsumed.has(key)) continue;
+    if (unconsumedByOwner.has(key)) continue;
     violations.push({
       rule: "MG24",
       file: "tools/enforce/module-graph.mjs",
       message:
         `UNCONSUMED_MEMBERS names ${key}, which is no longer an unconsumed published ` +
-        `member — it is either wired now or gone. Remove the entry: an exemption that ` +
-        `outlives its reason is how the list stops being read`,
+        `member — a file that also names ${key.split(".")[0]} reads it. Remove the ` +
+        `entry: an exemption that outlives its reason is how the list stops being read`,
+      spec: "A03 §3, MG24",
+    });
+  }
+
+  // **A rule that reports how exact it was, because a bracket scan is a failure
+  // mode the text test did not have.** F1027. A file whose scan does not balance
+  // keeps the loose test rather than being accused on a reading known to be
+  // wrong, and this is what stops that fallback being silent.
+  if (unbalanced.length > 0) {
+    violations.push({
+      rule: "MG24",
+      file: "tools/enforce/module-graph.mjs",
+      message:
+        `the construction scan did not balance for ${String(unbalanced.length)} file(s) — ` +
+        `${unbalanced.slice(0, 3).join(", ")} — so they fell back to the loose text test ` +
+        `and a member built only there may still read as consumed. Fix the scan or record why`,
       spec: "A03 §3, MG24",
     });
   }
@@ -2506,8 +2853,12 @@ export function componentSeamSignal(files, readFile = (f) => readFileSync(f, "ut
  *   anywhere in `src/`, declares a field with the same name and something reads it.
  *
  * **Two measured instances of one mechanism, so this closes the class rather than
- * the second instance.** What closes it is not a tightening — three were measured
- * and all three are rejected, with the figures, so nobody re-derives them:
+ * the second instance.** What closes it is not a tightening of the violation arm
+ * — three were measured and all three are rejected, with the figures, so nobody
+ * re-derives them. **The count was written down as four in two summaries and
+ * enumerated as three here**, which is the summary-drops-the-condition shape
+ * (F86, F89, F92) applied to a tally: the body carries the figures and the
+ * abstract carried a number nobody could resolve against them. Three:
  *
  *   scope the shorthand arm to files naming the owner   19 false violations (F105)
  *   key by (owner, name) exactly                        needs a receiver's TYPE;
@@ -2591,8 +2942,8 @@ export function nameExactnessSignal(files, readFile = (f) => readFileSync(f, "ut
 /**
  * **The public surface by use — roadmap 48, A03 §9.** Reported, never gated.
  *
- * F105 and F160 closed MG24's name-matching as a class: four tightenings
- * measured, four refused. What F160 left is a residue, and it named the shape
+ * F105 and F160 closed MG24's name-matching as a class: three tightenings
+ * measured, three refused. What F160 left is a residue, and it named the shape
  * that could work — *a second consumer written from the public surface names
  * every field it uses, and the residue is the candidates, by **use** rather than
  * by name.* This is that measurement.
@@ -3088,6 +3439,207 @@ export function checkDevEntryIsolation(files, readFile = (f) => readFileSync(f, 
   }
 
   return violations;
+}
+
+/**
+ * MG30 — every `SpanName` is opened somewhere under `src/`, or removed (C28 I39).
+ *
+ * **`PHASE_GROUP` is total over the union by construction**, so a member nobody
+ * opens is still given a phase, still appears in a compute-versus-draw
+ * breakdown, and still reads as *this phase cost nothing*. Seven of nineteen
+ * were in that state when this landed — `chrome`, `overlays`, `paint`,
+ * `assemble`, `decode`, `route` and `handler` — leaving `draw` with one opener
+ * of three and `input` with one of four.
+ *
+ * **By equality against the union's own members, not against a written list.**
+ * A list is satisfied by the list, which is the shape this rule exists to
+ * refuse: a member added to `SpanName` and never wired passes any check whose
+ * corpus is the check's own table.
+ *
+ * **Known limit.** It matches `span("name")` and `trace("name"` textually, so a
+ * call built from a variable is invisible to it and would read as a dead member.
+ * There is none today; the day there is, the disposition is to name it here
+ * rather than to widen the match, because a matcher that accepts an expression
+ * accepts anything.
+ *
+ * Comments are stripped before counting, as MG25 does and MG24 did not: a
+ * member named only in the prose explaining why it is dead would otherwise
+ * count as its own opener (F84's class).
+ */
+/**
+ * MG31 — **every string-literal union `Plot` declares is in `PLOT_UNIONS`, with
+ * the same values** (C04 I118, F213, F1076).
+ *
+ * **The rule exists because the enumeration was mistaken for the class.** C04's
+ * `colormap` clause names five members as *unions for the same reason*, and the
+ * five were read as the set. `Plot` declares **24**, of which eight had no
+ * membership rule anywhere — three of the five, plus `layout`, `binning`,
+ * `box3`, `axes3` and `colourBy`, which appear in no document. Five clauses
+ * would have closed a third of it, and the twenty-fifth member would have been
+ * unchecked on the day it landed.
+ *
+ * **Both directions, by equality.** A member in the type and not the table is
+ * unchecked; a member in the table and not the type is a rule with no subject,
+ * which reads exactly like a rule that is satisfied. The values are compared the
+ * same way, so a union gaining a value fails here rather than being silently
+ * refused by a gate that has not heard of it.
+ *
+ * **The blind spot, stated because an unrecorded one reads as strength**: this
+ * compares two declarations and says nothing about whether the table is *read*.
+ * `plotUnionErrors` looping it is what makes an entry a check, and that is
+ * asserted by T2.x's rows in `test/unit/` rather than here — a scan can see a
+ * table and cannot see a loop over it.
+ *
+ * **And the parse is textual, which is where this rule was wrong about itself**
+ * (F1085). The comment used to name two escapes a textual parse has — a member
+ * written across two lines, and a union built by reference — and then assert
+ * *both forms are absent from `Plot` today*. `xFormat?: Plot["yFormat"]` is the
+ * second form. It landed on 2026-08-16 and this sentence landed on 2026-09-10,
+ * so it was not overtaken: **it was false when written**, and the member it hid
+ * accepted any value while `yFormat`, the member it is declared from, was
+ * refused. `Plot["yFormat"]` is the file's convention rather than an accident,
+ * written three times — `BarSpec.format`, `AxisSpec3.format` and `Plot.xFormat`.
+ *
+ * So the by-reference form is now **resolved** rather than skipped, by
+ * `plotByReferenceMembers`, which the rule and its row share so the two cannot
+ * drift. What is left of the blind spot is the multi-line member, and the
+ * honest form of that clause is a count the rule takes rather than a claim a
+ * reader trusts: **naming a limit is a claim about the rule and review can
+ * check it; claiming the corpus does not reach the limit is a claim about the
+ * corpus, and only a measurement can.**
+ */
+/**
+ * `Plot`'s members that declare a union **by reference** — `x?: Plot["y"];`.
+ *
+ * Exported so MG31 and T2.132 read the same corpus. A row that re-derives the
+ * pattern is a second implementation with the first one's birthday clauses, and
+ * the count is what stops the resolution arm passing by having nothing to
+ * resolve — which is exactly how the sentence it replaces was true and useless.
+ *
+ * Takes `Plot`'s body rather than the file, so the caller's brace-matching is
+ * the one thing that decides what "on `Plot`" means.
+ */
+export function plotByReferenceMembers(body) {
+  const BY_REF = /^ {2}(\w+)\?: Plot\["(\w+)"\];$/gmu;
+  return [...body.matchAll(BY_REF)].map((m) => ({ member: m[1], referent: m[2] }));
+}
+
+export function checkPlotUnions(files, readFile = (f) => readFileSync(f, "utf8")) {
+  const TYPES = "src/data/viewmodel/types.ts";
+  const VALIDATE = "src/data/viewmodel/validate.ts";
+  if (!files.includes(TYPES) || !files.includes(VALIDATE)) return [];
+  const fail = (message) => [{ rule: "MG31", file: TYPES, message, spec: "A03 §3, MG31 · C04 I118" }];
+
+  const types = readFile(TYPES);
+  const start = types.indexOf("export type Plot = Readonly<{");
+  if (start === -1) return fail("no `export type Plot = Readonly<{` to read — the rule's corpus is the declaration itself, so one it cannot find makes it vacuous rather than satisfied (C04 I118)");
+  const end = types.indexOf("\n}>;", start);
+  const body = types.slice(start, end === -1 ? undefined : end);
+
+  // `  name?: "a" | "b" | false;` — two-space indent, so a nested type's members
+  // are not read as `Plot`'s.
+  const MEMBER = /^ {2}(\w+)\?: ((?:"[^"]+"|false)(?: \| (?:"[^"]+"|false))*);$/gmu;
+  const declared = new Map();
+  for (const m of body.matchAll(MEMBER)) {
+    declared.set(m[1], m[2].split(" | ").map((v) => (v === "false" ? false : v.slice(1, -1))));
+  }
+  if (declared.size === 0) return fail("`Plot` declares no string-literal union member, which it has 24 of — the member pattern has stopped matching and the rule is now vacuous over an empty set (C04 I118)");
+
+  // A member declared by reference carries the referent's values, so it is
+  // resolved into `declared` and then compared like any other (F1085). A
+  // referent that is not itself a union is reported rather than resolved: the
+  // reference would then name something this rule cannot check, which reads
+  // from the table's side exactly like a member that needs no entry.
+  const unresolved = [];
+  for (const { member, referent } of plotByReferenceMembers(body)) {
+    const values = declared.get(referent);
+    if (values === undefined) {
+      unresolved.push(`\`${member}\` is declared as \`Plot["${referent}"]\` and \`${referent}\` is not a string-literal union on \`Plot\` — the reference resolves to something this rule cannot check, and an unresolvable reference reads from the table's side exactly like a member needing no entry`);
+      continue;
+    }
+    declared.set(member, values);
+  }
+
+  const table = readFile(VALIDATE);
+  const tStart = table.indexOf("export const PLOT_UNIONS");
+  if (tStart === -1) return fail("no `export const PLOT_UNIONS` in validate.ts — the table is the membership mechanism and a rule comparing against nothing agrees with everything (C04 I118)");
+  const tEnd = table.indexOf("\n});", tStart);
+  const tBody = table.slice(tStart, tEnd === -1 ? undefined : tEnd);
+  const ENTRY = /^ {2}(\w+): Object\.freeze(?:<[^>]*>)?\(\[([^\]]*)\]\),$/gmu;
+  const listed = new Map();
+  for (const m of tBody.matchAll(ENTRY)) {
+    listed.set(m[1], m[2].split(",").map((v) => v.trim()).filter((v) => v !== "").map((v) => (v === "false" ? false : v.slice(1, -1))));
+  }
+
+  const show = (vs) => vs.map((v) => (v === false ? "false" : `"${v}"`)).join(", ");
+  const problems = [...unresolved];
+  for (const [name, values] of declared) {
+    const have = listed.get(name);
+    if (have === undefined) {
+      problems.push(`\`${name}\` is a union in the type and not in the table — nothing refuses a value outside it, and being a union is a compile-time fact this gate's subject does not have`);
+      continue;
+    }
+    if (show(have) !== show(values)) {
+      problems.push(`\`${name}\` admits ${show(values)} in the type and ${show(have)} in the table`);
+    }
+  }
+  for (const name of listed.keys()) {
+    if (!declared.has(name)) problems.push(`\`${name}\` is in the table and is not a string-literal union on \`Plot\` — a rule with no subject reads exactly like one that is satisfied`);
+  }
+  if (problems.length === 0) return [];
+  return fail(
+    `PLOT_UNIONS and \`Plot\` disagree in ${String(problems.length)} place(s): ${problems.join("; ")}. `
+      + `The table is what \`plotUnionErrors\` loops, so a member missing from it is a member no document gate checks (C04 I118, F213).`,
+  );
+}
+
+export function checkSpanNamesOpened(files, readFile = (f) => readFileSync(f, "utf8")) {
+  const TYPES = "src/shell/profiling/types.ts";
+  if (!files.includes(TYPES)) return [];
+
+  const source = readFile(TYPES);
+  const union = /export type SpanName =([\s\S]*?);/.exec(source);
+  if (union === null) {
+    return [
+      {
+        rule: "MG30",
+        file: TYPES,
+        message:
+          "no `export type SpanName = …;` to read — the rule's corpus is the union itself, so a " +
+          "declaration it cannot find makes it vacuous rather than satisfied (C28 I39)",
+        spec: "A03 §3, MG30 · C28 I39",
+      },
+    ];
+  }
+  const declared = [...union[1].matchAll(/"([a-z]+)"/g)].map((m) => m[1]);
+
+  const opened = new Set();
+  for (const raw of files) {
+    const file = raw.replaceAll("\\", "/");
+    if (!file.startsWith("src/")) continue;
+    // Comments stripped before counting, as MG25 does and MG24 did not: a
+    // member named only in the prose explaining why it is dead would otherwise
+    // count as its own opener.
+    const body = readFile(file)
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|[^:])\/\/.*$/gm, "$1");
+    for (const m of body.matchAll(/\b(?:span|trace)\(\s*"([a-z.]+)"/g)) opened.add(m[1]);
+  }
+
+  const dead = declared.filter((n) => !opened.has(n));
+  if (dead.length === 0) return [];
+  return [
+    {
+      rule: "MG30",
+      file: TYPES,
+      message:
+        `SpanName declares ${String(dead.length)} member(s) nothing opens — ${dead.map((n) => `\`${n}\``).join(", ")}. ` +
+        "`PHASE_GROUP` maps every member, so an unopened one is a row of zero in a table that reads as " +
+        "a measurement. Open it, or delete it: a union member with no call site is a declaration " +
+        "nothing can violate (C28 I39)",
+      spec: "A03 §3, MG30 · C28 I39",
+    },
+  ];
 }
 
 export function checkFunctionConsumers(

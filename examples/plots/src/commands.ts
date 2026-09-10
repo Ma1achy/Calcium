@@ -13,8 +13,15 @@
  * returns blocks and touches no clock, no session and no terminal, which is
  * what makes `everyDocument()` in the suite able to validate all of them.
  */
-import { b, barStyleNames, halfBlockEligible, spinnerSetNames } from "@fmx/calcium";
-import type { AdapterDocument, Block, TerminalCapabilities, ViewDocument } from "@fmx/calcium";
+import { b, barStyleNames, halfBlockEligible, PANES, profilePane, spinnerSetNames } from "@fmx/calcium";
+import type {
+  AdapterDocument,
+  Block,
+  PaneName,
+  ProfileReport,
+  TerminalCapabilities,
+  ViewDocument,
+} from "@fmx/calcium";
 import os from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1002,4 +1009,41 @@ export function barStyles(): Block {
     caption(`${String(names.length)} bar styles · Progress.style names one · ASCII under unicode: ascii, and where the style is narrow-only under ambiguousWidth: wide`),
     columnsOf(cells, 3, "bar-styles"),
   ], { id: "bars" });
+}
+
+/**
+ * **The framework profiling itself, drawn with the framework's own plots.**
+ *
+ * Here rather than inline in the handler because the coverage table in
+ * `plots.test.ts` asserts a row per command by equality, and a builder that
+ * lives inside `main.ts` can only be covered by re-typing it — which is the
+ * two-records defect the table exists to prevent. Every sibling in this file is
+ * here for the same reason.
+ *
+ * **The absent arm is real rather than defensive**: `ctx.profile` is `undefined`
+ * unless `TuiConfig.profile` was set, so this is what every app that does not
+ * ask for a profiler sees, and it is the arm a document test can construct. The
+ * present arm needs a live session — `ProfileReport` is reachable only through
+ * `ctx.profile()`, with no constructor on the public surface or in
+ * `@fmx/calcium/testing` (F917) — and `profilePane` itself is covered across
+ * every pane by the framework's own `test/unit/profiler.test.ts`.
+ */
+export function profileBlocks(
+  report: ProfileReport | undefined,
+  argv: readonly string[],
+  capabilities: TerminalCapabilities,
+): readonly Block[] {
+  if (report === undefined) {
+    return [
+      b.notice("warn", "no profiler on this session — set `profile` in the config", undefined, {
+        id: "prof-off",
+      }),
+    ];
+  }
+  const asked = (argv[0] ?? "overview") as PaneName;
+  const pane: PaneName = PANES.includes(asked) ? asked : "overview";
+  return [
+    b.notice("info", `pane \`${pane}\` · ${PANES.join(" · ")}`, undefined, { id: "prof-nav" }),
+    ...profilePane(report, pane, capabilities),
+  ];
 }

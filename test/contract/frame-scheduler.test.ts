@@ -1,6 +1,7 @@
 // C03 tier 2 — contract. The interface A02 §2 promises, so C13, C14, C17 and
 // the shell can be written against it.
-import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { describe, expect, it, vi } from "vitest";
 import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
 import { createFrameScheduler } from "../../src/terminal/frame-scheduler.js";
 import type { CommitReason } from "../../src/terminal/frame-scheduler.js";
@@ -207,5 +208,58 @@ describe("C03 contract", () => {
     // Cancellable, so the real timer cannot outlive the test.
     scheduler.commit("input");
     expect(scheduler.pending).toBe(false);
+  });
+});
+
+describe("C03 §2 — time enters through one seam", () => {
+  it("T2.9 (I11): a scheduler given a `schedule` never touches the ambient timer", () => {
+    // **Asserted on the absence of the ambient call, not on the counter.** The
+    // coalescing rows already drive `clock.schedule` and prove the window is a
+    // counter rather than a sleep — but every one of them passes just as well
+    // beside a `setTimeout` running in parallel, because a duplicate timer
+    // firing at the same moment changes nothing they read. The property this
+    // invariant states is that there is no second timer to fire.
+    const ambient = vi.spyOn(globalThis, "setTimeout");
+    const interval = vi.spyOn(globalThis, "setInterval");
+    try {
+      const h = harness();
+      h.scheduler.commit("stream");
+      h.scheduler.commit("stream");
+      h.clock.advance(33);
+      h.scheduler.commit("input");
+      h.scheduler.flush();
+
+      expect(h.clock.arms.length, "the injected seam was used at all").toBeGreaterThan(0);
+      expect(ambient, "an ambient setTimeout is a second clock C03 cannot be asked about").not.toHaveBeenCalled();
+      expect(interval).not.toHaveBeenCalled();
+    } finally {
+      ambient.mockRestore();
+      interval.mockRestore();
+    }
+  });
+
+  it("T2.9b (I11): the file's only `setTimeout` is the default seam's own body", () => {
+    // The behavioural row above is blind to a path it did not drive. This one
+    // is over the file: `defaultSchedule` exists so an app need not supply a
+    // timer, and it is the one place the ambient clock may be read — so a
+    // second `setTimeout` anywhere else is the violation whatever it is for.
+    const src = readFileSync("src/terminal/frame-scheduler.ts", "utf8");
+    const stripped = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    const timers = [...stripped.matchAll(/\bset(?:Timeout|Interval|Immediate)\b/g)];
+    expect(timers, "one ambient timer, inside the default seam").toHaveLength(1);
+    // The nearest preceding declaration by name, so the row says *which*
+    // function holds the timer rather than only that one does.
+    const before = stripped.slice(0, timers[0]!.index);
+    // Function-valued declarations only: `const handle = setTimeout(…)` is a
+    // local and the nearest *declaration*, which is not the question asked.
+    const fns = [...before.matchAll(/const\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\(|function\s+([A-Za-z_$][\w$]*)/g)];
+    const enclosing = fns.at(-1);
+    expect(enclosing?.[1] ?? enclosing?.[2], "the ambient timer's own function").toBe(
+      "defaultSchedule",
+    );
+
+    // The control: the pattern finds something when there is something to find,
+    // so a rewrite that renamed the primitive cannot report zero and pass.
+    expect(/\bsetTimeout\b/.test(src), "the corpus is not empty").toBe(true);
   });
 });

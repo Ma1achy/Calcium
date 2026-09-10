@@ -37,7 +37,7 @@ function annotationOpts(opts?: AnnotationOpts): { tone?: AnnotationTone; hidden?
   };
 }
 
-type FigureOpts = {
+export type FigureOpts = {
   title?: string;
   height?: number;
   axes?: boolean;
@@ -50,17 +50,46 @@ type FigureOpts = {
   // **Indexed rather than restated.** These were three hand-copies of `Plot`'s
   // unions, and `plotStyle` gaining `"candlestick"` is what a copy cannot
   // survive — it would have gone on reading as a complete vocabulary.
-  //
-  // **`setOhlc` is deliberately absent, and these three fields are why**
-  // (FINDINGS F181). `b.figure` is the only public door to this chain and it
-  // forwards six of `FigureOpts`' twelve fields — not `plotStyle` — so a chain
-  // that could set the candles could never set the style that draws them. A
-  // method whose data has no reachable renderer is an operation with no seam to
-  // call it from; it lands when `b.figure` forwards the style.
   plotStyle?: Plot["plotStyle"];
   plotDetail?: Plot["plotDetail"];
   plotCorners?: Plot["plotCorners"];
 };
+
+/**
+ * **What `b.figure` forwards, and the two it does not** (F1028, F181).
+ *
+ * `b.figure` accepted six of these twelve and `build()` spread all twelve, so
+ * six were declared, forwarded to the block, and passable by nobody:
+ * `colormap`, `xScale`, `yScale`, `plotStyle`, `plotDetail`, `plotCorners`.
+ * F181 recorded that as *three*; it is six, and the two that arrived since are
+ * the two withheld here.
+ *
+ * **Four of the six open now and two do not, and the split is measured rather
+ * than chosen.** `b.plot` carries 40 refusals; grouped by the field their
+ * message names, `colormap`, `xScale`, `yScale` and `plotCorners` have **none**
+ * between them, so forwarding them adds a second door to a room with no lock on
+ * the first. `plotStyle` has **three** — `"candlestick"` with no `ohlc`
+ * (C04 I57), a style not on the drawn form's arms (C04 I59), and `plotFill:
+ * "solid"` against `plotStyle: "line"` — and `plotDetail` has **one**, a detail
+ * not on the drawn form (C12 I34).
+ *
+ * **Those refusals are the only gate.** `validateDocument` refuses the same
+ * documents, and its only caller in `src/` is `transcript-persist.ts`, on
+ * untrusted input read back from disk — a locally built block is never
+ * validated, which is what `b.plot`'s own comment means by *refused at
+ * construction on exactly the terms `validateDocument` refuses it*. So a chain
+ * that forwarded `plotStyle` would build a document the framework refuses, and
+ * nothing between the chain and the screen would say so.
+ *
+ * **The blocker as a symbol, since a deferral that names a condition and nothing
+ * watches it stops being a deferral.** The two open when the chain can refuse
+ * what `b.plot` refuses: grep `plotStyle` in `builders/index.ts` for the three,
+ * `plotDetail` for the fourth. `setOhlc` is behind the same door and no longer
+ * behind *this* one — `b.figure` forwards ten of twelve now, and the reason the
+ * eleventh is missing is a refusal it would skip rather than a field it cannot
+ * carry.
+ */
+export type FigureChainOpts = Omit<FigureOpts, "plotStyle" | "plotDetail">;
 
 // **No `marker`.** `Series` has no such member (C04 I76): no 2-D renderer has a
 // glyph channel for one, so the option this carried was accepted by every gate

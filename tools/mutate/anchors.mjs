@@ -24,8 +24,43 @@
 // at the right thing* — an anchor that resolves against a line that has changed
 // meaning is the citation-resolves-against-the-wrong-invariant class, and
 // `docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass says why no mechanism for
-// that should be built. This checks only that the text is there to be replaced.
+// that should be built. F277 is the measured instance: a unique, present,
+// textually correct anchor on a line whose *callers* moved, reporting SURVIVED
+// against a test that was right all along.
+//
+// **And a mutation is a pair, of which this read one half** (F279, F1030).
+// `anchorsOf` extracted `{file, from}`, confirmed `from` resolved, and reported
+// `no drift` — a sentence about the corpus that was true of half of it.
+// Re-anchoring is exactly the operation that breaks the unchecked half: a row
+// moved from `svg.ts` to `figure.ts` kept the old arm's `to:`, which spliced a
+// statement into an object literal, and every suite failed to *transform*.
+// `ran()` caught that, and `ran()` exists for a SIGPIPE'd suite — the right
+// outcome from the wrong instrument, minutes into a pass that is not in the
+// default gate, where this runs in seconds.
+//
+// **The blocker F279 recorded is gone and the satisfier was never in this
+// repository.** It read: the honest gate is apply-and-parse, TypeScript 7.0.2's
+// JS entry point no longer exports `createSourceFile`, and `esbuild` is only
+// vite's transitive dependency — so it was owed on a symbol, *a parser `tools/`
+// may depend on*. Both halves still hold at HEAD (measured 2026-09-10:
+// `Object.keys(await import("typescript"))` is `default, version,
+// versionMajorMinor`; esbuild is transitive through vite **and** tsx). What
+// changed is the runtime: node 22.23's `module.stripTypeScriptTypes` is a
+// TypeScript parser in the standard library, needing no dependency row at all.
+// `parseOf` below is that gate — **1947 of 1974 pairs applied and parsed in
+// 6.8 s, zero false positives**, and the 27 are the `.md` anchors and the
+// already-listed stale ones.
+//
+// **And that the run is a program at all** (F997). Every arm here reads the run
+// as *text*, and text resolves whether or not the file parses: a `const STACK`
+// declared twice in `c12-arm-seam.mjs` made the run die before its first
+// mutation while this sweep reported *1005 anchors · 937 expectations · no run
+// drifted from what the list says*. Every anchor did resolve and the sentence
+// was true. `parseErrorOf` is the one question a text sweep cannot answer for
+// itself, and it is asked first.
+import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
+import { stripTypeScriptTypes } from "node:module";
 
 const ROOT = process.cwd();
 
@@ -77,6 +112,11 @@ const CROSS_TIER = {
   // corpus cannot see it; `test/e2e/completion.test.ts` can, and this run does
   // not execute tier 5.
   "c19-menu-window.mjs": ["C19 T5.1"],
+  // Two wirings the unit corpus cannot see: `session.ts` handing the sampler
+  // the tapped `elapsed` (C28 I53) and `construct.ts` handing the transport the
+  // wall clock (C06 I19). Both are one file below the seam T1.104 resolves, and
+  // the row that counts is tier 5's parity on both channels (F971, F972).
+  "c28-profiler.mjs": ["C28 T5.1c"],
 };
 
 /**
@@ -147,6 +187,78 @@ const KNOWN_SILENT = {};
  * a file with no `runPass(` at all is not a run and is not checked, which is
  * what lets a mutations-only fixture through MA1.
  */
+/**
+ * Why node refuses to parse a run, or `null` when it parses (F997).
+ *
+ * **The question every other arm in this file assumes an answer to.** A `from:`
+ * is found by a regular expression and a tail is read by `lastIndexOf`, and
+ * both work perfectly on a file that is not a program — so a run with a
+ * duplicated `const` reports every anchor resolving, right up until someone
+ * spends the half hour and watches it die before its first mutation. **A green
+ * from this sweep is what licenses not spending that half hour**, which is why
+ * the cheap proxy owes the cheap question.
+ *
+ * `process.execPath` rather than `node`: the parse that counts is the one
+ * performed by the runtime that will run the pass, and a second binary on the
+ * PATH answers a question nobody asked.
+ *
+ * **No debt list, and the asymmetry is the reason.** A stale anchor is listed
+ * rather than repaired because re-anchoring without running the pass produces a
+ * mutation that applies and asserts nothing — a repair that reads as coverage.
+ * A syntax error has no such trap: the file cannot run at all, so there is
+ * nothing a repair could quietly invalidate, and the remedy is the line eslint
+ * has already printed. An entry here would be an excuse for a five-second fix.
+ *
+ * **The blind spots, stated.** This asks whether the file *parses*, not whether
+ * it *links*: a mistyped named import — `import { runPas } from "../mutate.mjs"`
+ * — is resolved when the module is instantiated, and no check short of running
+ * the module sees it. Nor does it reach a run that parses, links, and throws on
+ * its first statement, or one whose `to` does not parse — the harness reports
+ * that last one itself, as `DID NOT BUILD`. What closes the class is executing
+ * the run, and executing a run is the pass.
+ */
+function parseErrorOf(path) {
+  const r = spawnSync(process.execPath, ["--check", path], { encoding: "utf8" });
+  if (r.status === 0) return null;
+  // node prints `<path>:<line>`, the offending source, a caret, then the error.
+  const lines = `${r.stderr ?? ""}`.split("\n");
+  const at = /:(\d+)$/.exec(lines[0] ?? "");
+  const why = lines.find((l) => /^[A-Za-z]*Error: /.test(l))?.trim() ?? "node --check refused it";
+  return at === null ? why : `${why} (line ${at[1]})`;
+}
+
+/**
+ * Extensions `parseOf` can answer for. A mutation into a `.md` fixture or a
+ * `.py` tool is not a syntax question this parser is entitled to; those rows
+ * are counted as unparsed rather than skipped silently, on `tails`' argument.
+ */
+const PARSEABLE = /\.(ts|mts|cts|js|mjs|cjs)$/;
+
+/**
+ * Why the parser refuses a source, or `null` when it accepts it (F279, F1030).
+ *
+ * **`mode: "transform"` rather than `"strip"`**, and the difference is one
+ * construct: strip-only refuses a TypeScript `enum` as unsupported rather than
+ * as malformed, which would be a false positive the day somebody writes one.
+ * The tree has none today — measured — and a gate that would fire on a legal
+ * construct is a gate that gets an exemption and stops being read.
+ *
+ * **Stated blind spots.** It asks whether the result is a *program*, not
+ * whether it type-checks and not whether it means anything: a `to` that swaps
+ * two arguments of the same type parses perfectly, and so does one that
+ * asserts nothing. And it cannot see `.tsx` (there is none in the tree) or a
+ * `.md`/`.py` subject, which are counted apart. What closes the class is
+ * running the pass, and running the pass is the pass.
+ */
+function parseOf(src) {
+  try {
+    stripTypeScriptTypes(src, { mode: "transform" });
+    return null;
+  } catch (e) {
+    return `${e.message}`.split("\n")[0].slice(0, 120);
+  }
+}
+
 function silenceOf(src) {
   const at = src.lastIndexOf("runPass(");
   if (at === -1) return null;
@@ -170,7 +282,11 @@ const KNOWN_STALE = {
   "c22-construct.mjs": 3,
   "c22-frame-session.mjs": 2,
   "c22-selection-wash.mjs": 1,
-  "c23-refresh.mjs": 10,
+  // `c23-refresh.mjs` was 10 and is gone (F1011): all ten were re-anchored and
+  // the pass runs 17 of 17 caught, control killed. Nine were one rework — the
+  // thing that polls is the source, not the part — and the tenth was a mutation
+  // whose subject `b.live` no longer has, so it went with it rather than being
+  // re-pointed at a nearby line it would have asserted nothing about.
 
   // **Six of these arrived at once, and none of them rotted that day** (F173).
   // They were stale already and the checker could not see them: it matched only
@@ -265,9 +381,16 @@ function anchorsOf(src) {
   // fixed the form in front of it and stopped there — which is why this matches a
   // *sequence* of literals rather than a third alternative.
   const LITERAL = String.raw`"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'`;
+  // **The `to:` half, optional in the pattern on purpose** (F1030). Requiring
+  // it would let a row whose replacement this reader cannot see vanish from the
+  // anchor count instead of failing — F173's shape exactly, a widening that
+  // narrows. So it is a trailing optional group, and the rows without one are
+  // counted rather than dropped: `to: null` reaches the caller, which reports
+  // the number.
   const re = new RegExp(
     String.raw`file:\s*([A-Z_][A-Z_0-9]*|"[^"]*"|'[^']*')\s*,\s*\n\s*(?:\/\/[^\n]*\n\s*)*from:\s*` +
-      String.raw`((?:(?:${LITERAL})\s*\+?\s*)+)`,
+      String.raw`((?:(?:${LITERAL})\s*\+?\s*)+)` +
+      String.raw`(?:,\s*\n\s*(?:\/\/[^\n]*\n\s*)*to:\s*((?:(?:${LITERAL})\s*\+?\s*)+))?`,
     "g",
   );
   const pieces = new RegExp(LITERAL, "g");
@@ -275,10 +398,9 @@ function anchorsOf(src) {
     const raw = m[1];
     const file = raw.startsWith('"') || raw.startsWith("'") ? raw.slice(1, -1) : consts[raw];
     if (file === undefined) continue;
-    const from = (m[2].match(pieces) ?? [])
-      .map((lit) => unquote(lit.slice(1, -1), lit[0]))
-      .join("");
-    out.push({ file, from });
+    const join = (blob) =>
+      (blob.match(pieces) ?? []).map((lit) => unquote(lit.slice(1, -1), lit[0])).join("");
+    out.push({ file, from: join(m[2]), to: m[3] === undefined ? null : join(m[3]) });
   }
   return out;
 }
@@ -335,6 +457,31 @@ const RESERVED_EXPECTS = new Set([
   "(none — expected to survive)",
 ]);
 
+/**
+ * A second row inside one `expect:` — a comma at **paren depth zero** followed by
+ * another row-shaped token. The convention is one row per expectation; see the
+ * refusal at the call site for why this is refused rather than split (F606).
+ *
+ * **The depth test is not fastidiousness, it is the first draft's defect.** A
+ * plain `/,\s*[A-Z]{1,3}\d/` reads `"C1 (R1.2, R5.1)"` — a row name followed by
+ * the requirements it cites, and the verbatim title of a real test — as two
+ * rows, and fired on **four** legal expectations in `docker-ps.mjs` the first
+ * time it ran. That is the false positive CLAUDE.md names: a gate that fires on
+ * a legal construct is a gate that gets an exemption and stops being read. The
+ * corpus caught it, review would not have, and the rule shipped one shape
+ * narrower as a result.
+ */
+function namesTwoRows(expectation) {
+  let depth = 0;
+  for (let i = 0; i < expectation.length; i += 1) {
+    const c = expectation[i];
+    if (c === "(" || c === "[") depth += 1;
+    else if (c === ")" || c === "]") depth -= 1;
+    else if (c === "," && depth === 0 && /^\s*[A-Z]{1,3}\d/u.test(expectation.slice(i + 1))) return true;
+  }
+  return false;
+}
+
 /** Every `expect:` string a run declares. */
 function expectationsOf(src) {
   return [...src.matchAll(/expect:\s*"([^"]+)"/g)].map((m) => m[1]);
@@ -377,7 +524,13 @@ let suites = 0;
 let expectations = 0;
 /** Expectations naming a row no test path of their own run contains. */
 const unreachable = [];
+/** Expectations naming more than one row — the convention, stated (F606). */
+const malformed = [];
 const missing = {};
+// **And which** — a count that says one is missing sends the reader to a second
+// tool to learn which one (the C28 run, 119 anchors, on the day the header mask
+// moved). The file and the head of the anchor, per run.
+const missingWhat = {};
 /** Anchors matching more than once — see the note in the loop below (F219). */
 const ambiguous = [];
 const ambiguousBy = {};
@@ -386,6 +539,18 @@ const unresolvable = [];
 const silent = {};
 /** Runs whose tail was read at all — the counter, so a reader matching nothing shows. */
 let tails = 0;
+/** Runs node refuses to parse (F997) — see `parseErrorOf`. */
+const unparseable = [];
+/** Runs handed to `node --check` — the control, on `tails`' argument. */
+let parsed = 0;
+/** Mutations applied and re-parsed (F1030) — the control, on `tails`' argument. */
+let applied = 0;
+/** Anchors whose `to:` this reader could not see — counted, never dropped. */
+let toless = 0;
+/** Anchors whose subject is not a language this parser answers for. */
+let foreign = 0;
+/** Mutations whose result is not a program — see `parseOf`. */
+const splices = [];
 
 // **Two roots, because a run cwds to the package it mutates.** The docker runs
 // address `src/ps.ts` and mean `examples/docker/src/ps.ts`; resolving against
@@ -395,6 +560,18 @@ const rootsFor = (file) => [`${ROOT}/${file}`, `${ROOT}/examples/docker/${file}`
 
 for (const run of runs) {
   const src = readFileSync(`${RUNS_AT}/${run}`, "utf8");
+  // **Can the run start?** (F997). Checked before the tail, on the tail's own
+  // argument one step earlier: a run that cannot report is a run whose anchors
+  // do not matter, and a run that cannot parse is a run whose *tail* does not
+  // matter either. Reported once and the file abandoned, because anchors read
+  // out of a file nothing will execute are noise stacked on the one thing that
+  // has to be fixed first.
+  parsed += 1;
+  const broken = parseErrorOf(`${RUNS_AT}/${run}`);
+  if (broken !== null) {
+    unparseable.push(`${run}: ${broken} — the run cannot start, so no anchor of its resolves against anything that will run (F997)`);
+    continue;
+  }
   // **Does the run say what it found?** (F768). Checked before the anchors,
   // because a run that cannot report is a run whose anchors do not matter.
   if (src.includes("runPass(")) {
@@ -417,15 +594,47 @@ for (const run of runs) {
   // skipped — resolving it against the repo root alone reports every docker row
   // unreachable, which is this check's own two-roots hazard and it fired while
   // the check was being written.
+  //
+  // **One row per `expect:`, and the convention is stated here because it was
+  // stated nowhere** (F606, F1041). The lookup is a substring test over the
+  // corpus, so a two-row expectation like `"T1.20, T6.22"` is searched for as
+  // one literal string and can never be found — it reports *unreachable* on two
+  // rows that both exist. Eight of eleven expectations in `c14-cap.mjs` were
+  // rewritten to one row each when that was discovered, and the convention they
+  // were rewritten to was never written down anywhere, so nothing stopped the
+  // next one.
+  //
+  // **Refusing is the honest gate, not splitting on the comma.** An `expect:`
+  // is a claim about *which instrument catches this mutation*, and two rows make
+  // the claim ambiguous in a way no reader resolves: caught by both, or by
+  // either, or by whichever ran first. Splitting would make the string resolve
+  // and leave the ambiguity — a repair that turns a loud wrong answer into a
+  // quiet one. So a multi-row expectation is refused by name, with the remedy in
+  // the message, and the mutation gets split into the two it was always
+  // describing.
+  //
+  // **Its blind spot, stated**: this recognises a second row by a comma followed
+  // by a row-shaped token. An expectation naming two rows some other way — a
+  // slash, a range, prose — reads as one row and reaches the substring test,
+  // where it fails as *unreachable* rather than as malformed. That is the safe
+  // direction and it is not the same as being caught.
   const corpus = testCorpusOf(src, run);
   for (const e of expectationsOf(src)) {
     expectations += 1;
+    if (namesTwoRows(e)) {
+      malformed.push(
+        `${run}: expects "${e}", which names more than one row — an expectation is a claim ` +
+          `about which instrument catches this mutation, and two rows leave it ambiguous. ` +
+          `Split the mutation, one row each (F606)`,
+      );
+      continue;
+    }
     if (RESERVED_EXPECTS.has(e) || corpus.includes(e)) continue;
     const known = (OWN ? CROSS_TIER[run] : undefined) ?? [];
     if (known.includes(e)) continue;
     unreachable.push(`${run}: expects "${e}", which no test path it runs contains`);
   }
-  for (const { file, from } of anchorsOf(src)) {
+  for (const { file, from, to } of anchorsOf(src)) {
     const path = rootsFor(file).find((p) => existsSync(p));
     if (path === undefined) {
       unresolvable.push(`${run}: ${file} does not exist under either root`);
@@ -447,8 +656,35 @@ for (const run of runs) {
     // re-pointed and an ambiguous one means the source has two copies of
     // something that should have one.
     const hits = body.split(from).length - 1;
+    // **The half this sweep did not read** (F279, F1030). A mutation is a pair,
+    // and re-anchoring moves the `from` while leaving the `to` behind — which
+    // is how a statement got spliced into an object literal and every suite
+    // failed to transform, minutes after this file reported no drift.
+    //
+    // Applied only where the anchor is unique, because `String.replace` takes
+    // the first match and an ambiguous anchor is already its own failure above.
+    // The clean file is parsed only when the mutated one refuses, so a source
+    // that was already broken is reported as itself rather than blamed on the
+    // mutation it happens to carry.
+    if (hits === 1 && to !== null) {
+      if (!PARSEABLE.test(file)) foreign += 1;
+      else {
+        applied += 1;
+        const why = parseOf(body.replace(from, to));
+        if (why !== null && parseOf(body) === null) {
+          splices.push(
+            `${run}: applying a mutation to ${file} leaves something that is not a program — ` +
+              `${why}\n      to ${JSON.stringify(to).slice(0, 88)}`,
+          );
+        }
+      }
+    }
+    if (hits === 1 && to === null) toless += 1;
     if (hits === 1) continue;
-    if (hits === 0) missing[run] = (missing[run] ?? 0) + 1;
+    if (hits === 0) {
+      missing[run] = (missing[run] ?? 0) + 1;
+      (missingWhat[run] ??= []).push(`${file} · ${JSON.stringify(from).slice(0, 88)}`);
+    }
     else {
       ambiguousBy[run] = (ambiguousBy[run] ?? 0) + 1;
       ambiguous.push(`${run}: an anchor matches ${String(hits)}x in ${file} — replace() takes the first`);
@@ -458,16 +694,36 @@ for (const run of runs) {
 
 const runsWith = Object.keys(missing).length;
 const total = Object.values(missing).reduce((a, n) => a + n, 0);
+// **A clause rather than a rewrite.** `test/unit/mutate-sweep.test.ts` MS3 reads
+// the *last* line's total and the fixture reads `· n test paths ·` out of this
+// one, so every counter keeps its ` · ` neighbours and the new one is appended
+// to the family instead of resetting it.
 console.log(
-  `mutation anchors — ${String(runs.length)} runs · ${String(checked)} anchors · ` +
+  `mutation anchors — ${String(runs.length)} runs · ${String(parsed)} parsed · ` +
+    `${String(checked)} anchors · ` +
     `${String(suites)} test paths · ${String(expectations)} expectations · ` +
     `${String(tails)} tails · ` +
+    `${String(applied)} applied+parsed · ` +
     `${String(total)} missing across ${String(runsWith)} run(s)` +
+    `${unparseable.length > 0 ? ` · ${String(unparseable.length)} unparseable` : ""}` +
+    `${malformed.length > 0 ? ` · ${String(malformed.length)} multi-row expectations` : ""}` +
+    `${splices.length > 0 ? ` · ${String(splices.length)} splice(s)` : ""}` +
+    `${toless > 0 ? ` · ${String(toless)} with no readable to:` : ""}` +
+    `${foreign > 0 ? ` · ${String(foreign)} not a language this parses` : ""}` +
     `${ambiguous.length > 0 ? ` · ${String(ambiguous.length)} ambiguous` : ""}` +
     `${Object.keys(silent).length > 0 ? ` · ${String(Object.keys(silent).length)} silent` : ""}`,
 );
 
-const problems = [...unresolvable, ...unreachable];
+// The parse arm leads, because it is the failure that makes the rest of the
+// report about a file nothing can run (F997).
+// **No debt list for the splices, and the asymmetry is `parseErrorOf`'s.** A
+// stale anchor is listed rather than repaired because re-anchoring without
+// running the pass produces a mutation that applies and asserts nothing — a
+// repair that reads as coverage. A `to` that is not a program has no such trap:
+// it asserts nothing *today*, the pass reports it as DID NOT BUILD if anyone
+// runs one, and any repair is strictly better than what is there. An entry here
+// would be an excuse for a five-second fix.
+const problems = [...unparseable, ...malformed, ...splices, ...unresolvable, ...unreachable];
 
 // **The silence arm** (F768), on the same equality terms as the others: a tail
 // that says nothing and is not on the list fails; one on the list for a
@@ -514,10 +770,11 @@ for (const [run, names] of Object.entries(OWN ? CROSS_TIER : {})) {
 
 // The equality arm, both directions.
 const LIST = OWN ? KNOWN_STALE : {};
+const named = (run) => (missingWhat[run] ?? []).map((a) => `\n      ${a}`).join("");
 for (const [run, n] of Object.entries(missing)) {
   const known = LIST[run];
-  if (known === undefined) problems.push(`${run}: ${String(n)} anchor(s) missing and it is not on the list`);
-  else if (known !== n) problems.push(`${run}: ${String(n)} anchor(s) missing, the list says ${String(known)}`);
+  if (known === undefined) problems.push(`${run}: ${String(n)} anchor(s) missing and it is not on the list${named(run)}`);
+  else if (known !== n) problems.push(`${run}: ${String(n)} anchor(s) missing, the list says ${String(known)}${named(run)}`);
 }
 for (const [run, n] of Object.entries(LIST)) {
   if (missing[run] === undefined) {

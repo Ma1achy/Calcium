@@ -23,6 +23,8 @@ import { CAPS, FORMS, clearGenerated, frameFor, stripSgr } from "../../tools/plo
 // doing exactly what it is for. `plot-catalogue.mjs` above still has none.
 import { ansiToSvg, colour256, parseLine, sheetBg, unparsedSgr } from "../../tools/catalogue-png.mjs";
 import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
+import { b } from "../../src/shell/builders/index.js";
+import { expectDocument } from "../../src/testing/expect-document.js";
 
 /** The rendered catalogue, which is what PC11 sweeps. */
 const CATALOGUE = join(import.meta.dirname, "..", "..", "docs", "catalogue");
@@ -120,6 +122,62 @@ describe("plot-catalogue — the corpus renders", () => {
         "emptyMessage leaks", "xTitle leaks", "xLabels leaks",
         "series label leaks", "categories leaks",
       ]);
+  });
+
+  it("AA1c (C12 I124, F1052): caller text is a framework-wide class, measured by equality", () => {
+    // **AA1b watches the remedy; this watches the condition.** A row that
+    // asserts a disagreement on purpose is green for exactly as long as the
+    // defect is, and says nothing when the defect gets worse. AA1b covers the
+    // plot's five members. The class is thirteen block kinds wide, and the
+    // ruling that refuses to fix it here (I124) rests on that width — so the
+    // width is what has to be asserted, not the instance.
+    //
+    // **The fixture-responds control is the subject, not a courtesy.** Four
+    // kinds passed as "degraded" while measuring this because the builder call
+    // was wrong and the frame carried a framework error instead of the block.
+    // A kind whose frame has no ellipsis at `unicode: "full"` is reported as a
+    // broken fixture here rather than counted as degraded.
+    const E = "\u2026";
+    const ASCII = {
+      colourDepth: 1, unicode: "ascii", ambiguousWidth: "narrow",
+      synchronisedUpdate: true, bracketedPaste: true, mouse: true,
+      imageProtocol: "none", keyboardProtocol: "none", altScreen: true,
+    } as const;
+    const document_ = (blk: unknown): never =>
+      ({ v: 1, id: "d", title: "t", blocks: [blk] }) as never;
+
+    const kinds: readonly (readonly [string, unknown])[] = [
+      ["raw", b.raw(`wait${E}`, { id: "r" })],
+      ["notice", b.notice.warn(`wait${E}`, { id: "n" })],
+      ["code", b.code("ts", `x = "${E}"`, { id: "cd" })],
+      ["events", b.events([{ ts: "00:00:00", type: "start", message: `up${E}` }], { id: "ev" })],
+      ["comparison", b.comparison([{ field: `f${E}`, a: `a${E}`, b: `b${E}` }], { id: "cp" })],
+      ["tip", b.tip(`try${E}`, undefined, { id: "tp" })],
+      ["pills", b.pills([{ label: `p${E}` }], { id: "pl" })],
+      ["steps", b.steps([{ label: `s${E}`, state: "done" }], { id: "st" })],
+      ["keyValue", b.kv({ [`k${E}`]: `v${E}` }, { id: "kv" })],
+      ["table", b.table({ id: "t", columns: [b.col("a", { label: `A${E}` })], rows: [b.row("r1", { a: `x${E}` })] })],
+      ["logs", b.logs([{ ts: "00:00:00", level: "info", message: `up${E}` }], { id: "l" })],
+      ["plot", b.plot({ id: "p", form: "line", height: 6, axes: true, series: [{ values: [1, 2, 3] }], xTitle: `sec${E}` })],
+    ];
+
+    const leaks: string[] = [];
+    const inert: string[] = [];
+    for (const [name, blk] of kinds) {
+      const at = (caps: unknown): readonly string[] =>
+        expectDocument(document_(blk)).lines(40, { capabilities: caps as never });
+      if (!at({ ...ASCII, unicode: "full", colourDepth: 24 }).some((l) => l.includes(E))) {
+        inert.push(name);
+        continue;
+      }
+      if (at(ASCII).some((l) => l.includes(E))) leaks.push(name);
+    }
+
+    expect(inert, "every fixture puts the caller's ellipsis on screen at `full`").toEqual([]);
+    expect(leaks.sort(), "the class C09 owes a ruling on, and C12 is one member of").toEqual([
+      "code", "comparison", "events", "keyValue", "logs", "notice",
+      "pills", "plot", "raw", "steps", "table", "tip",
+    ]);
   });
 
   it("AA2 (C12 I54): a line at ASCII is still *connected*, in `+ - |`", () => {

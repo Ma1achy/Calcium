@@ -76,11 +76,28 @@ export type FlagDef = Readonly<{
    * and docker exited 125. Naming the field for presentation would have put
    * `--json` on the wrong side of it.
    *
-   * **This is what `view` already needed and never had.** The comment above
+   * **This is what `view` already needed and never had, and the sentence that
+   * said so was wrong in both halves** (F1022). It read: *the comment above
    * records that `ps <uuid> --watch` "cannot be built that way" because argv
-   * goes over verbatim — so the `view` arm has been usable only on `local`
-   * tools since it was written, and nothing said so. A `view` flag on a spawned
-   * tool wants `shellOnly` too; F108 is the arm being narrower than its type.
+   * goes over verbatim — so the `view` arm has been usable only on `local` tools
+   * since it was written.* Both halves have since been falsified, in opposite
+   * directions, and neither was ever measured:
+   *
+   * - **Spawned tools.** `shellOnly` is what a `view` flag on a spawned verb was
+   *   missing, and it exists — F108 closed at `4721e283`. So the arm is usable
+   *   on a spawned tool now, and the "only `local`" clause is stale.
+   * - **Local tools.** It was never usable there either. `isViewInvocation` is
+   *   read on the `app` route and nowhere else, so the one route the sentence
+   *   named as the arm's home is the one route that ignores the field. The arm
+   *   was usable on **neither**, which is F23 and F129 as one gap.
+   *
+   * `view` with `local` is refused at parse since F1022, so the second half is
+   * now true by construction rather than by accident.
+   *
+   * A deferral names a condition and nothing watches it: the condition here was
+   * *a `view` flag on a spawned tool needs somewhere to go*, it was met by
+   * `shellOnly` in another file, and the sentence outlived it. CLAUDE.md's named
+   * class, and this is a further instance.
    *
    * Validated exactly as any other flag: it is in `residual`, so `requires`,
    * `conflicts` and type-checking are unchanged. Only `argv` drops it.
@@ -188,10 +205,36 @@ export type ToolDef = Readonly<{
    * while the prompt would otherwise hold focus, so the prompt must go.
    *
    * `FlagDef` carries it too, and an invocation is a view if either says so.
-   * Refused with `interactive` and with `oneShot`; permitted with `streams`,
-   * because S12's logs view is exactly that pair.
+   * Refused with `interactive`, with `oneShot` and with `local`; permitted with
+   * `streams`, because S12's logs view is exactly that pair.
+   *
+   * **The `local` refusal is the one whose reason is not *a verb that cannot
+   * exist*** (F1022, closing F23 and F129). The argument above — *the decision
+   * precedes step 3, and the only thing known before a verb runs is its
+   * declaration* — is C23 I3's, and C23 I3 is an obligation of the **app** route.
+   * `runLocal` has no transport and appends nothing in advance, so the tier need
+   * not be known before the verb runs there, and a local verb that wants a view
+   * pushes it from its handler and returns a transcript notice as the record.
+   * `/profile` is the shipped instance. See C05 §`view` for what the refusal was
+   * measured against and what it reserves.
    */
   view?: boolean;
+  /**
+   * The tokens that ask **this verb** for machine-shaped output (C05 I26, F1).
+   *
+   * Overrides the manifest's, whole and never merged — one CLI is not uniform:
+   * `docker ps --format json` against `docker inspect --format '{{json .}}'`.
+   *
+   * **Three states, and `[]` is not absent.** Absent inherits the manifest's;
+   * `[]` appends nothing, for a verb that already emits JSON; a non-empty
+   * sequence is appended as it stands. A member where absent and empty meant
+   * the same thing could not express the middle one.
+   *
+   * Refused with `local` at parse, as `interactive` is: a local verb is never
+   * spawned, so the declaration cannot take effect and an author would act on
+   * it anyway.
+   */
+  jsonFlag?: readonly string[];
 }>;
 
 export type Manifest = Readonly<{
@@ -214,6 +257,21 @@ export type Manifest = Readonly<{
    * different in kind from `/ps` and a flat list hides that.
    */
   appTools: readonly ToolDef[];
+  /**
+   * How **this binary** is asked for machine-shaped output (C05 I26, F1).
+   *
+   * **Absent means `["--json"]`**, which is what the transport appended
+   * unconditionally before this member existed — so every manifest written
+   * without it is unchanged, and the change is additive rather than a
+   * migration.
+   *
+   * `--json` was a convention read as a fact. The framework's own demo target
+   * spells it `--format json`, so Calcium could not drive `docker` without a
+   * shim, and the party who knows is the app author — `interactive`'s and
+   * `persist`'s argument, with the difference that here the framework had
+   * already guessed.
+   */
+  jsonFlag?: readonly string[];
 }>;
 
 /**

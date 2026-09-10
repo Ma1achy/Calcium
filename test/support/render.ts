@@ -128,7 +128,7 @@ export function measurable(
     /** The registry's row cap (C14 I24); the default is C09's. A suite about a definition's arithmetic raises it. */
     maxBlockRows?: number;
     /**
-     * Kinds registered through C09's public `register`, on top of the fourteen
+     * Kinds registered through C09's public `register`, on top of the nineteen
      * defaults. `table`, `plot` and `patch` are **not** defaults — C11, C12 and
      * C25 register them, which is what proves the extension path (C09 §3) — so a
      * suite that wants one passes it here.

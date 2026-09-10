@@ -113,9 +113,13 @@ const results = runPass({
       // **The seam's dedup removed.** Every frame re-sends the payload, which is
       // correct on the wire — `a=T` replaces at that id — and wrong about cost:
       // a megabyte per frame for a picture that has not changed.
+      //
+      // Re-anchored at C09 I66 (F987): the record is a map from the placement to
+      // the picture at it, so the condition moved from *has this picture been
+      // sent* to *is this the picture at this placement*.
       name: "the transmission is not deduplicated by digest",
       file: SEAM,
-      from: "    if (sent.has(key)) continue;",
+      from: "    if (sent.get(id) === key) continue;",
       to: "    if (false) continue;",
       expect: "IK7",
     },
@@ -124,8 +128,8 @@ const results = runPass({
       // cannot read — printed as text on anything but kitty.
       name: "the seam transmits at every protocol",
       file: SEAM,
-      from: '  if (capabilities.imageProtocol !== "kitty") return "";',
-      to: '  if (false) return "";',
+      from: "): string {\n  if (!transmits(capabilities)) return \"\";\n  const found: Image[] = [];",
+      to: "): string {\n  if (false) return \"\";\n  const found: Image[] = [];",
       expect: "IK7",
     },
     {

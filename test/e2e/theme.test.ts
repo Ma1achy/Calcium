@@ -213,14 +213,23 @@ describe("C10 e2e", () => {
       // theme and painted under another would be a row of a different width,
       // and a torn write would be a frame with the wrong row count.
       const frames = pty.output.split("\u001b[H").slice(1);
-      expect(frames.length, "fifty toggles produced frames").toBeGreaterThan(10);
+      let whole = 0;
       for (const [i, frame] of frames.entries()) {
         const rows = frame.replaceAll(/\u001b\[[0-9;?]*[A-Za-z]/g, "").split(/\r*\n/);
         // The last chunk may still be arriving, so the final frame is allowed
         // to be short; every completed one is exactly the terminal's height.
         if (i === frames.length - 1) continue;
         expect(rows, `frame ${String(i)}`).toHaveLength(24);
+        whole += 1;
       }
+      // **The control counts what the loop checked, not what the scheduler
+      // produced** (F1004). This read `frames.length > 10`, and how many frames
+      // fifty submissions fifteen milliseconds apart coalesce into is C03's
+      // window and the machine's load — not this row's subject, which is that
+      // every completed frame is whole. Ten is a margin against contention
+      // wearing an assertion's clothes; the number the loop needs is the number
+      // it examined, and with one frame on the screen it examines none.
+      expect(whole, "and at least one completed frame was checked").toBeGreaterThan(0);
 
       // **And the session still takes input**, which a frame snapshot cannot
       // tell you: a session that had wedged would leave the last frame on the

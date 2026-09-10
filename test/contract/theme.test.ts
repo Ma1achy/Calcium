@@ -6,6 +6,7 @@ import { SCAN_BUDGET_MS } from "../support/budget.js";
 
 import {
   defaultTheme,
+  loadTheme,
   decorationTextPairs,
   diffPairs,
   errorTagPairs,
@@ -17,8 +18,11 @@ import {
   resolveBackground,
   resolveTone,
   textSurfaces,
+  collisions,
+  OKABE_ITO_CANONICAL,
   type ColourRef,
 } from "../../src/presentation/theme/index.js";
+import { OKABE_ITO } from "../../src/data/colormaps/qualitative/okabe-ito.js";
 import { plotToSvg } from "../../src/presentation/plot/svg.js";
 import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
 import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
@@ -408,7 +412,7 @@ describe("C10 contract", () => {
     }
   });
 
-  it("T2.4 (I3): every shipped theme clears every floor on bg and bgElev", () => {
+  it("T2.4 (I3, I19, I20): every shipped theme clears every floor on bg and bgElev, recomputed", () => {
     // Recomputed from the shipped token, not read from A01 A.1's recorded
     // figure. That is what makes the catalogue an assertion this test upholds
     // rather than a record of what someone intended.
@@ -820,5 +824,106 @@ describe("C10 contract", () => {
         }
       }
     }
+  });
+});
+
+describe("C10 §2 — the shipped default is a working value", () => {
+  it("T2.37 (I18): `defaultTheme` loads with no overrides, and every variant clears every floor", () => {
+    // **T2.4 is the contrast half and it is over `SHIPPED`, which *is*
+    // `defaultTheme`** — so what is owed here is the other clause: that the one
+    // required config field has a working value to fill it with. A framework
+    // whose only required field has no working value is a framework nobody
+    // starts, and no assertion about ratios can see that.
+    for (const [variant] of SHIPPED) {
+      const loaded = loadTheme(defaultTheme, variant as keyof typeof defaultTheme);
+      expect(loaded.ok, `${variant} did not load`).toBe(true);
+      expect(loaded.ok && loaded.value.current, `${variant} loaded empty`).toBeTruthy();
+    }
+
+    // And it is one line to fill because it is one value: the whole set is a
+    // single frozen export, not a builder the caller has to assemble.
+    expect(Object.isFrozen(defaultTheme), "handed over ready to use").toBe(true);
+    expect(SHIPPED.length, "and it carries more than one variant").toBeGreaterThan(1);
+  });
+});
+
+/**
+ * **C10 §4j — the debt list, compared by equality.**
+ *
+ * §4j.3 rules that this is a row and not `validatePalette`: every shipped theme
+ * fails the floor, so a load-time throw would refuse the framework's own themes
+ * and lowering the floor until they pass is the same edit under another number.
+ * What a row can do instead is hold the failure *exactly*, so the day one is
+ * repaired the list has to move with it.
+ */
+describe("C10 §4j — the categorical separation debt", () => {
+  /**
+   * **The list is `KNOWN_STALE`'s shape and it is here for that list's reason.**
+   * A subset check would let a cleared collision outlive its reason unread — the
+   * failure mode `compare-exemption-lists-by-equality` was written for. Both
+   * directions: a new pair fails this row and a repaired one fails it too.
+   */
+  const DEBT: Readonly<Record<string, readonly string[]>> = {
+    light: [
+      "protan c1/c4 2.6", "deutan c1/c4 0.6", "deutan c1/c6 3.5", "deutan c4/c6 4.0",
+      "tritan c1/c7 5.3", "tritan c2/c3 5.1", "tritan c6/c7 6.5",
+    ],
+    dark: [
+      "protan c2/c5 5.4", "deutan c1/c6 6.3", "deutan c2/c5 3.4", "tritan c1/c7 6.8",
+      "tritan c2/c3 1.5", "tritan c2/c5 6.5", "tritan c3/c5 5.1",
+    ],
+    "high-contrast": [
+      "protan c2/c5 5.4", "deutan c1/c6 6.3", "deutan c2/c5 3.4", "tritan c1/c7 6.8",
+      "tritan c2/c3 1.5", "tritan c2/c5 6.5", "tritan c3/c5 5.1",
+    ],
+  };
+
+  it("T2.38 (I39, §4j): every shipped theme's collisions are its debt list exactly", () => {
+    // The variant set itself, by equality — a theme added with no entry would
+    // otherwise be measured by nothing, which is I30's shape one level out.
+    expect(SHIPPED.map(([v]) => v).sort(), "the debt list covers every shipped theme")
+      .toEqual(Object.keys(DEBT).sort());
+
+    for (const [variant, tokens] of SHIPPED) {
+      const slots = tokens.palettes.categorical?.slots ?? {};
+      const found = collisions(slots).map((c) => `${c.vision} ${c.a}/${c.b} ${c.deltaE.toFixed(1)}`);
+      expect(found, `${variant} — a new collision fails here and a repaired one fails here too`)
+        .toEqual(DEBT[variant]);
+    }
+
+    // **`high-contrast` ships `dark`'s list and not a list of the same length.**
+    // The theme exists to maximise distinguishability and its palette is the
+    // dark theme's, so the two are asserted identical rather than separately
+    // correct — a divergence in either is a finding about a deliberate copy.
+    expect(DEBT["high-contrast"], "the same pairs, not merely as many").toEqual(DEBT["dark"]);
+
+    // The control. Without it a floor of seven and a floor of seventy are the
+    // same rule here: every shipped palette fails both.
+    expect(collisions(OKABE_ITO_CANONICAL), "canonical Okabe-Ito, the calibrating set").toEqual([]);
+  });
+
+  /**
+   * **T2.38a (C10 I39, §4j.1) — one substitution, and it is the whole debt.**
+   *
+   * The three variants diverge from canonical by very different amounts, and
+   * the smallest divergence is the one that shows the mechanism. The colormap
+   * keeps seven canonical slots and swaps `#3cbf9a` in for black; that swap is
+   * the entirety of its collision list. It is the only variant where cause and
+   * effect are separable, which is why the row is here rather than folded into
+   * the sweep above.
+   */
+  it("T2.38a (I39, §4j): the colormap's single substitution is the whole of its debt", () => {
+    const hex = (t: readonly [number, number, number]): string =>
+      `#${t.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+    const slots: Record<string, string> = {};
+    OKABE_ITO.forEach((t, i) => { slots[`m${String(i + 1)}`] = hex(t); });
+
+    const canonical = new Set(Object.values(OKABE_ITO_CANONICAL).map((v) => v.toLowerCase()));
+    const novel = Object.entries(slots).filter(([, v]) => !canonical.has(v.toLowerCase()));
+    expect(novel, "seven canonical slots and one substitution").toEqual([["m8", "#3cbf9a"]]);
+
+    // And the substitution is the whole debt: one pair, and `m8` is in it.
+    expect(collisions(slots).map((c) => `${c.vision} ${c.a}/${c.b} ${c.deltaE.toFixed(1)}`))
+      .toEqual(["tritan m2/m8 1.5"]);
   });
 });

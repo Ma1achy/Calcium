@@ -73,9 +73,21 @@ const results = runPass({
       // C23 I46: a card nobody is looking at written into at one full frame each.
       name: "the readout writes off screen",
       file: FILE,
-      from: '      if (!deps.visible({ kind: "entry", id })) continue;\n      const since = now - r.startedAt;',
-      to: '      const since = now - r.startedAt;',
+      from: '      if (!deps.visible({ kind: "entry", id })) continue;\n      const since = mono - r.startedAt;',
+      to: '      const since = mono - r.startedAt;',
       expect: "T3.61c",
+    },
+    {
+      // C23 I53 (T3.64, F973) — the readout's figure on the wall clock, at
+      // registration and at the sweep, because one alone is `elapsed − clock`.
+      // Under `tick` the harness moves both clocks together, so every other
+      // readout row is green on either axis; `skew` moves the wall clock alone.
+      name: "the readout's figure is the wall clock's",
+      file: FILE,
+      from: "      readouts.set(id, { blockId, render, startedAt: deps.elapsed(), last: elapsed(0) });",
+      to: "      readouts.set(id, { blockId, render, startedAt: deps.clock(), last: elapsed(0) });",
+      also: [{ file: FILE, from: "      const since = mono - r.startedAt;", to: "      const since = now - r.startedAt;" }],
+      expect: "T3.64",
     },
   ],
 });

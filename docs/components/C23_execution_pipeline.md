@@ -124,7 +124,7 @@ rather than a second mechanism here.** The layer is pushed with
 it takes a key. See I36 for why that flag is `false` on a layer the user can
 plainly escape.
 
-Calcium ships handlers for the concerns it owns — `/help` renders from the manifest (C16 §6, so documentation cannot drift), `/clear` empties C13, `/theme` switches C10, `/history` reads C20, `/debug` reads an entry's invocation record, `/exit` calls `C22.stop`. An app registers its own alongside them.
+Calcium ships handlers for the concerns it owns — `/help` renders from the manifest (C16 §6, so documentation cannot drift), `/clear` empties C13, `/theme` switches C10, `/history` reads C20, `/debug` reads an entry's invocation record, `/exit` calls `C22.stop`, and `/profile` opens C28's view (below). An app registers its own alongside them.
 
 **The six are rows in every manifest (C05 §3), and that is what makes them reachable.** C18 classifies `local` from the manifest, so a handler for a verb the manifest does not declare is one nothing can ever route to — which is exactly what I27's reconciliation reports. Registering the handlers without the rows was tried and failed construction on all six, correctly.
 
@@ -146,6 +146,54 @@ Renders a `keyValue` of `argv`, `transport`, `origin`, `exitCode`, `durationMs` 
 **It is a local command and not an action, and that is the whole design.** An action originating from a frozen entry is refused (I18), and inspecting an *older* entry is the entire point — an inspect action would be refused on every entry worth inspecting. Reading an entry's `meta` is not firing an action: nothing re-runs, nothing reaches the far side, and the stale-data footgun I18 exists to prevent does not arise. D5 is untouched.
 
 This is also what distinguishes `/debug` from `{ } json`, which several surfaces offer. `{ } json` **re-runs** the command with `--json` — honest, and what the command says, but on a `--watch` or a changing cluster it returns different data than the block it was opened from. `/debug` describes the entry in front of you.
+
+#### `/profile` — the profiler's view
+
+```
+/profile              open the profiler view on its `overview` pane
+/profile <pane>       open it on `overview`, `frame`, `distribution` or `memory`
+```
+
+**It opens a view and appends a notice; it never appends the report** (I68, I69). The panes are
+C28's (`profilePane`, C28 §3c), drawn in a `kind: "view"` layer the view refreshes on a timer, and
+the entry this verb appends says which pane opened and nothing more. A document holding the panes
+would freeze one report into the transcript's record and be stale on the next frame — I18's
+stale-data shape with the framework's own figures — and the entry sits under the view anyway, read
+after `Esc`.
+
+**Three arms, and each answers through the local route rather than throwing** (I2). With no profiler
+configured — a session built without `TuiConfig.profile`, which is every session that did not ask
+(C28 T4.1) — the handler answers a `warn` notice naming `TuiConfig.profile` and opens nothing; there
+is no recorder whose tier could be raised, and C28 §3's *a tier is raised by `/profile`* was a
+sentence with no mechanism behind it (F946). With a pane that is not one of C28's `PANES`,
+validation fails, the handler runs with `args` empty (a local verb is not gated on validation), and
+it answers a usage notice naming the four and the token typed — `/theme`'s arm, one verb over. With
+another layer up, it answers the view's own refusal string, *close what is open*, as `document-view`
+does (C15 I1's refusal is a throw, and a handler is nowhere to report one).
+
+**The pane comes from `ctx.args`, never from `argv[0]`** (C22 I66), for `/theme`'s reason: C05
+parsed and enum-checked it, and a second reader of one fact drifts from the first. `argv[0]` is read
+on the failure arm alone, to quote the token.
+
+**The handler reaches the view through `HandlerDeps`, the way `/exit` reaches `stop`**, and the view
+is C22's to build: it holds the overlay manager, the scheduler's commit, the profiler and the
+terminal's capabilities, all of which are the root's. `LocalContext.profile` — the report — stays a
+function, because a consumer's own handler reading it is the case that seam was published for (C28
+§4); opening the framework's view is not a consumer's operation and does not join the published
+context.
+
+**The seventh row, and the reconciliation that holds it.** `/profile` is a framework verb: its row is
+in `FRAMEWORK_TOOLS` (C05 §3) with `pane` as an optional `enum` whose four values are C28's `PANES`
+written at L0 — the manifest may not import the shell, so T1.67 holds the two lists equal — and
+`execution.ts` hands the root's view to `shippedHandlers`. I27 refuses a handler with no row and a row
+with no handler, in either order, so `HandlerDeps.profileView` is required and the view arrives
+whether or not a recorder does; with none it refuses through the route (T4.67). The handler was
+included only when a view was handed in for the one round in which the row and the call site were
+outside the files being edited, so that a tree with neither was exactly the six; T4.66 and T4.67 went
+live when the row landed and that conditional went with it.
+
+Inside the view, `n`/`p` switch panes, `g`/`G` and the page keys move the window, `Esc` closes and
+the ⌃c ladder pops it — C16's `pushedView` bindings, none new (C28 §3c).
 
 ---
 
@@ -248,8 +296,8 @@ indented table is what a finished listing reads** — §9c's settled state, on e
 - **A call that produces calls carries them, and the parent's head is derived** (I62).
   `ToolCallSpec.children`, each with its own id; the composer's `rollUp` sums same-unit counts and
   otherwise writes `k of N` with `· m failed` when any did; the parent's duration is its own readout
-  — wall clock, not the children's total, which do not add up under concurrency and are not made
-  to. Children are appended in start order and never reordered; a running child is head only and a
+  — its own `elapsed` figure, not the children's total, which do not add up under concurrency and
+  are not made to. Children are appended in start order and never reordered; a running child is head only and a
   settled child's body is a collapsed scroll, so N streams are never N moving regions.
 
 **Before and not after, and the reason is not refusal.** The first draft of this paragraph said a
@@ -306,7 +354,7 @@ The action dispatcher — `pipeline.onAction`, the function C16's `rowActivate` 
 | `fill` | `editor.setText(command)`, cursor at end, one undo unit, then `commit("input")` and a fill-flash tick |
 | `exec` | Submitted through §2 exactly as if typed — same guard, same routes, same entry |
 | `open` | Handed to the injected `openUrl` (C22 §2); never spawned through a shell |
-| `expand` | An `op: "expand"` patch toggling the row's flag (C04 §4), at `"shell"` origin. The op names the operation readably; the origin is what gets it past a settled entry (C13 §6) |
+| `expand` | An `op: "expand"` patch toggling the row's flag (C04 §4), at `"shell"` origin. The op names the operation readably; the origin is what gets it past a settled entry (C13 §6). **`target` names a row, so the block holding it is found first — at any depth, from the same walk the fold arm reads** (→ C04 I98, → C04 I115) |
 | `view` | `target` resolved against the **source entry's own blocks, at any depth**, then pushed as a C15 `kind: "view"` layer whose owner is C22. An unresolved target, or a stack that already holds a layer, is a refusal |
 
 `fill` populating the prompt rather than running is A01 D8's default, and it is why `production cancel <uuid>` is readable before it happens. Only filter pills use `exec`, because a filter is reversible.
@@ -319,7 +367,7 @@ The mechanism differs from the pop's, because a pop has nothing to say and a ref
 
 #### `view` resolves its target, and refuses two things rather than one
 
-**The target is resolved against the source entry's blocks and nowhere wider** (C04 I34). `expand` needed no resolution — it names a row on the entry it came from, which the dispatcher already holds — and `view` is the first kind whose `target` names something the dispatcher has to *find*. A free string an adapter supplies, resolved against the whole transcript, would let one entry's action fill the screen with another entry's data; resolved against nothing at all, a stale block id becomes a key that does nothing and reports nothing. **Within the entry it resolves at any depth**, which is the opposite direction and carries none of that risk: a container is part of the entry that declared it, and a `panel` is what `b.live` and I34 both produce, so a top-level `find` refuses the arrangement the framework itself builds (I31).
+**The target is resolved against the source entry's blocks and nowhere wider** (C04 I34). `expand` resolves no *entry* — it names a row on the entry it came from, which the dispatcher already holds — and `view` is the first kind whose `target` names something outside the block it was drawn from. **The sentence this replaces said `expand` needed no resolution at all, which is true of the entry and false of the block** (F1015): a row does not carry its table's id, so the arm still has to find the block holding it, and for as long as the sentence stood it did that with a top-level `find` while the fold arm beneath it descended. A correct clause about which *document* is searched read as a clause about there being no search. A free string an adapter supplies, resolved against the whole transcript, would let one entry's action fill the screen with another entry's data; resolved against nothing at all, a stale block id becomes a key that does nothing and reports nothing. **Within the entry it resolves at any depth**, which is the opposite direction and carries none of that risk: a container is part of the entry that declared it, and a `panel` is what `b.live` and I34 both produce, so a top-level `find` refuses the arrangement the framework itself builds (I31). **That argument is `expand`'s too and was written only here** — one paragraph away, about the other kind — which is the whole distance F1015 travelled: the clause that met the condition and the arm that needed it were in the same section, and neither half was wrong.
 
 **The second refusal is the one the walk found, and it is a throw C15 already owns.** `OverlayManager.push` throws when a view is raised onto a non-empty stack — views do not nest (C15 I1) and there is no legitimate path to accommodate. That throw is correct where it lives and is reached from a *renderer's* callback here, so letting it escape would put an `OverlayError` inside a React event handler with no frame to report it in. The dispatcher checks the stack and refuses through §3a's notice path instead. This is the case a table indexed by accepted paths does not reach: neither rule is wrong, and the interaction is between a ruling that throws and a caller that cannot catch usefully.
 
@@ -533,6 +581,55 @@ derivation layer therefore has no consumer in the app it was filed against.
 not like a `fetch`**, so it does not retry, and the parts reading it render their error arm.
 The version is not consumed, because a fold that threw has not advanced.
 
+#### The fold is told how many attempts produced this version (F1023)
+
+`compute` is `(data, prev, attempts)`. **`attempts` is the settlements since the previous
+version** — `1` on a clean poll, `1 + n` after `n` transport failures — and it is read from
+the source rather than passed by the part, because `folds` memoises by version and the count
+has to travel with the version it belongs to.
+
+**The gap it closes is where two of this section's own rules overlap.** *Anything that
+accumulates belongs in a derivation* and *the fold runs once per source version* are both
+correct, and a version exists only when a fetch resolved — so the one place an accumulator is
+safe is the one place a failed poll never reaches. An app counting attempts, which is what
+docker-tui's `axisCaption` does to report a stall as *N attempts, M readings*, could not count
+the one that failed at the transport.
+
+**The two misses are not the same and only one was lost.** A container that has stopped still
+*resolves* — the far side answers `--` for every measurement — so the fold runs and the miss
+is recorded. What was gone is `docker` itself failing.
+
+**The hedge for doing nothing was the transient/cumulative conflation.** F137 argued the loss
+was tolerable because *the driver renders the error arm and the panel title says `unavailable`
+outright, so the caption's divergence was the weaker of two signals for one event*. Measured
+against the code, they are not two signals for one event: `write(part, errorArm(…))` replaces
+the part's content and the next successful poll replaces it back, so the error arm is
+**transient** and lives only while the source is failing, while the caption is **cumulative**
+and is read after recovery. After a stall that recovered, the screen shows a healthy ring
+beside a caption whose two numbers agree — it asserts that no attempt was missed. That is
+worse than silence, and it is what the hedge could not see because it compared the two signals
+at one moment rather than over the sequence.
+
+**Three arms were on the table and the entry named two.**
+
+| arm | what it costs | why not |
+|---|---|---|
+| do nothing | nothing | the caption actively reports *no stall* after one, above |
+| run the fold on the failure path — `compute(data \| error, prev)` | every app's fold handles a second shape in a parameter typed `unknown`, so it must sniff | a cost paid by every consumer for a case most do not accumulate across |
+| **tell the fold an attempt happened, without handing it an error shape** | one additive parameter | **taken** |
+
+**The third arm is not novel here — it is `renderError`'s widening applied to the sibling
+member.** `LiveSpec.renderError` is already `(err, retryInMs, attempt)`, whose own comment
+reads *three parameters, and the third is a deliberate widening … additive, so an
+implementation taking two is unchanged*. The same quantity, one member up, ruled once
+already. A function of fewer parameters is assignable, so every fold in the tree is unchanged.
+
+**What it does not do, stated rather than discovered.** The fold still runs only on success,
+so it learns of the failures on the *next* reading and a source that never recovers never
+updates the count. That is the division of labour rather than a residue: the error arm reports
+the stall while it is happening and the fold reports it afterwards, and the hedge above is
+true once both exist and was false with only one.
+
 ### What a shared source does at each moment
 
 **One fetch per source per tick**, and **every part referring to the source when it resolves
@@ -675,7 +772,12 @@ reads like a defect and is the count doing its job.
 **Owned here, because this is where the clock is.** C04 I66 and C09 I32 rule that `retryInMs`,
 `attempt` and `elapsedMs` are supplied and never derived — `tick` cannot carry a duration, since
 C03 coalesces and drops commits under load, and L1 may not read a clock at all. `resolveStall`
-above is the precedent: a duration computed from `deps.clock()`, patched in at `origin: "shell"`.
+above is the precedent: a duration computed by the shell and patched in at `origin: "shell"` —
+from `deps.elapsed()`, the monotonic clock (F973). `deps.clock` is the wall clock, drawn as a time of
+day and stepped by the world, and a difference of two of its readings is not a duration; under C28's
+positional replay it is also the channel the header's second hand is served from. The deadlines — a
+retry's `dueAt`, the stall watch's threshold — stay on `deps.clock`, because a deadline is compared
+with the timer's own axis, and the stall notice's whole-minute figure goes with them (F973 names it).
 
 Four rules, and each one exists because the walk found something:
 
@@ -709,13 +811,14 @@ card's `· 4s` is stale the moment it is drawn. Measured 2026-09-05: the stall d
 `STALL_MS / 4` — thirty seconds, thirty times too coarse for a figure that moves every second —
 and the part sweep already arms itself to `now + ELAPSED_TICK_MS` while a loading box is waiting
 (I52) or a backoff is counting down (F407). The readout is a third condition on that arming and a
-third loop in that sweep: `readout(id, blockId, render)` records the clock at registration, and
-every sweep compares `elapsed(now − startedAt)` with the figure last written and, only when they
+third loop in that sweep: `readout(id, blockId, render)` records `deps.elapsed()` at registration, and
+every sweep compares `elapsed(mono − startedAt)` with the figure last written and, only when they
 differ and only while `visible` says someone is looking, replaces the block through
 `transcript.patch(…, "shell")` with `render(since)`. **One wake for every running card, not one
 per card** — the timer is `armParts`'s, so ten cards cost the same timer as one. Time is C22's:
-`deps.clock` and `deps.schedule` come from `session.ts`, and C03's coalescing is why the figure is
-never derived from `tick` (C04 I66, C09 I32). It stops on `settled(id)`, on `release` of the entry
+`deps.elapsed`, `deps.clock` and `deps.schedule` come from `session.ts` — the figure is
+`deps.elapsed`'s, the monotonic clock, and the arming is `deps.clock`'s (F973) — and C03's coalescing
+is why the figure is never derived from `tick` (C04 I66, C09 I32). It stops on `settled(id)`, on `release` of the entry
 host, on `dispose`, and on a patch the transcript refuses — an entry evicted or cleared underneath
 it. Below one second `elapsed()` draws nothing (T2.46), so the card reads *name(args)* at dispatch
 and gains `· 1s` on the first wake — the row's first assertion is the bare header, not `0s`.
@@ -893,7 +996,7 @@ Every stage can fail, and none may kill the session (A02 §7).
 | Adapter throws | C07 contains it; fallback rendering plus a muted notice |
 | Patch application fails | C13's `patch` returns one of three `{ok: false}` arms and never throws (C04 §4, I15), so the response is per arm (§8a A2). `"patch"` — settle with what it had, a notice carrying the `ErrorLike`'s message, **and cancel the subscription** (§8a A3): the entry is final, so a child still streaming into it spends a process on output nothing can consume. `"settled"` and `"unknown"` — drop it, no notice. Both mean the entry is already in its final state, and a notice would describe the transcript rather than the command |
 | A refresh part's `fetch` rejects | Contained to that part (I21): its panel renders the error at its own size, backoff doubles to the five-minute cap, siblings and the rest of the host are untouched. **A `render` that throws does not retry** — A02 §7 rule 2, and a one-shot part does not retry either, rule 3 |
-| A refresh patch returns `{ok:false}` | Not a failure and never a backoff. `"unknown"` means the host was evicted and `"settled"` that it finalised between arming and firing; both mean the part is over, so it is released. Treating either as a transport failure would back off against a host that is gone |
+| A refresh patch returns `{ok:false}` | Never a backoff, and **two dispositions rather than one** (I70, §8h, F1002). The axis is *what is gone*, not *whether it worked*: `"unknown"` means C13 has dropped the entry, so the **host** is released — treating it as a transport failure would back off against something gone. `"patch"` means the entry is alive and C04 refused what the shell built, so the **part** is stopped and the host is not, and the message `applyPatch` returned is recorded as a fault (I48, §5a) because the panel that would have drawn it is reached by the patch that failed. A part whose block the host no longer holds is over rather than refused, and is as ordinary as `"unknown"`. `"settled"` cannot arrive here at all: C13 gates a settled entry on `origin: "farSide"` and a part patches as `"shell"` |
 | A local handler throws | Error document naming the verb |
 | `transcript.append` throws | The only stage whose failure loses the *entry*. **Recorded as a fault and reported** (I48), the frame still commits, and I1's second exception names it rather than leaving the invariant false. **The machine still returns to `idle`** (§8a A5) — I1's exception is about the entry, not a licence to keep the guard, and a stranded guard refuses every submission for the life of the session |
 | The append succeeded and a later statement threw | **Not this row, and §5 read as though it were** — the catch covers five statements and only the first is `append` (§8e). The entry exists; what is lost is the rest of the sequence. **The catch finishes what the try did not** (I49) |
@@ -992,7 +1095,7 @@ Per submission.
 - **I16** — C23 is the sole supplier of the action dispatcher: `pipeline.onAction`, reached by C16 through `KeyDeps.onAction` (I37), is constructed here and nowhere else, and no component below L4 dispatches an action. **The member this used to name — C09's `RenderContext.onAction` — no longer exists** (C09 §2): every real frame rendered against a no-op default, so the clause was exclusive about a field nothing read while the working route ran beside it.
 - **I17** — `open` actions go through the injected opener with an `http`/`https` scheme check, never through a shell.
 - **I18** — Actions originating from a frozen entry are refused, and **the refusal patches the source entry rather than appending**. An append would freeze the block the action came from, refusing the next action for a different reason and clearing the selection A01 D7 preserves — C23 §4's pop row, one section over. **All five kinds, and the notice names the entry's recorded command; the one thing that fires from a frozen entry is a re-run of that command through §2's submit** (`rerunEntry`, → C16 I29) — which is not an action, fires against the command text and never the document's data, and is what both named consumers (a notebook's re-run, an agent harness's retry) actually need. Reachable from a keyboard since C26 §4g, which is when the ruling had to be finished. **`expand` is the one exception, and it was found by walking the design against this rule** (C04 §3c S4): it reveals data the entry already holds, fills nothing and runs nothing, so A01 D8's staleness argument has no purchase on it — and the surfaces it exists for (a folded reasoning panel, a tool call's folded body; `AGENT_TUI_DESIGN.md` §9b–c) are settled entries by the time anyone reads them. *Five kinds refused* is therefore four: `fill`, `exec`, `open` and `view` stay refused; `expand` toggles a fold on a frozen entry through a shell-origin patch, which C13 §2 admits. **A `notice`'s `action` (C04, arc 6) arrives at the same dispatcher and takes the same refusal**, and the notice that names it is patched beside the notice that offered it — T4.16 measures both, the entry count unchanged.
-- **I19** — Stall detection, part refresh and the identity notice are C23's — the first two on C22's injected clock, the third on C22's signal. No adapter, view, layer or entry reads a clock, and no component but C23 appends.
+- **I19** — Stall detection, part refresh and the identity notice are C23's — the first two on C22's injected clocks, deadlines on `clock` and durations on `elapsed` (F973), the third on C22's signal. No adapter, view, layer or entry reads a clock, and no component but C23 appends.
 - **I20** — Refresh offsets are assigned so no two declared parts fire in the same tick.
 - **I21** — A failing refresh is contained to its declared part, backs off to a 5-minute cap, and resets on success. **Two failures do not retry at all**: a `render` that throws is deterministic, so retrying burns cycles and flickers (A02 §7 rule 2), and a part declaring no interval is one-shot, so re-attempting it is a surprise the user did not ask for (rule 3). Both are decided from the declaration rather than from the failure, which is what makes them answerable at the moment one arrives. And a patch refused with `"unknown"` or `"settled"` is not a failure in this sense — the host is gone, so the part is released rather than backed off.
 - **I22** — Every appended document carries `meta.origin`. No path omits it, and no default supplies it silently.
@@ -1021,7 +1124,7 @@ Per submission.
 - **I44** — **One fetch per source per tick, and every part referring to the source when it resolves renders that one result**, applied as a set before a single commit. Including a part declared while the fetch was in flight, so joining a shared source draws on the next resolution rather than after a full interval of its own. This is the invariant the whole row exists for: two parts of one document cannot hold two samples of one instant, because there is one sample.
 - **I45** — **A source with no referring parts is retired on the next sweep, not at release.** I33a declares at settlement by **release-then-declare**, so retiring at `release` drops the refcount to zero between two synchronous calls, destroys the source and its derivation, and rebuilds them empty — the accumulated history reset on every settle, with the panel still drawing and every assertion about it passing. The same *heard rather than checked* disposition I33 takes for eviction, one level down (§8c C3).
 - **I46** — **A source polls only while some part referring to it belongs to a visible host**: paused means no fetch, no derivation, no render and no patch, and on return the source is due immediately. **It is not I9's freeze and not a violation of it** — I9 protects a frozen entry that is still receiving patches, and scrolled-off is a different state where nobody is looking and the data must be fresh the moment they look. It applies to **every** part rather than only those declaring a `source`, because a part accumulating inside its `fetch` is already broken by §3c's rule and pausing surfaces that rather than causing it. Granularity is the **host**: C14 answers per entry and nothing gives per-block offsets, so a part inside a partly-visible entry counts as visible, and a `view` host is visible while its layer exists. A fetch already in flight is applied rather than discarded.
-- **I47** — **A derivation is a fold over a source's versions, run once per version and shared by key**, and its result reaches `render` in the fetched data's place. `compute` throws like a `render` and not like a `fetch` (A02 §7 rule 2): deterministic, so it does not retry, and the version is not consumed because a fold that threw has not advanced. **Anything that accumulates belongs here and per-part state is view state only** — which is what makes I46's pause safe, since a paused part holds nothing that could fall behind.
+- **I47** — **A derivation is a fold over a source's versions, run once per version and shared by key**, and its result reaches `render` in the fetched data's place. `compute` throws like a `render` and not like a `fetch` (A02 §7 rule 2): deterministic, so it does not retry, and the version is not consumed because a fold that threw has not advanced. **Anything that accumulates belongs here and per-part state is view state only** — which is what makes I46's pause safe, since a paused part holds nothing that could fall behind. **`compute` is `(data, prev, attempts)`, and the third parameter is what makes a failed poll countable** (F1023): `attempts` is the settlements that produced this version — `1` on a clean poll, `1 + n` after `n` transport failures — read from the source so it travels with the version the memo is keyed by. Without it the two halves of this invariant overlap into a hole: accumulation belongs here, a version exists only when a fetch resolved, so the only safe accumulator is the only thing a transport failure never reaches. Additive, on `LiveSpec.renderError`'s precedent — a fold taking two parameters is unchanged.
 - **I48** — **A swallowed failure is recorded and reported on two channels, and C23 chooses neither moment for the second** (§5a). Every bare `catch` in the pipeline records the reason in `faults`, deduplicated by message; C22 §8 step 3 drains it onto the restored primary screen beside C02's capability warnings and C20's history warnings. This is C02's ruling taken a third time — *the component decides what is wrong, never when the user is told* — and it is why `faults` is a readable collection rather than a callback: a callback chooses the moment, and the moment is after the terminal is released. The other channel is the fault notice, which speaks at the time and cannot be relied on, because in §8e's first row appending is what failed. **The prose it replaces claimed a defect log that no component had.**
 - **I49** — **The catch finishes what the try did not.** `resetFocus` and the commit run on every path out of `appendAndCommit`, and the entry id is returned whenever the entry exists. §8e's table is the argument: four of five rows leave the append done and the sequence after it abandoned, and the reset is the one whose absence is permanent — T4.7b asserts its position because a frame painted with focus in a frozen block is the failure it prevents. The same reasoning §8a A5 applied to the guard, applied to the four statements that ruling did not look at.
 
@@ -1029,8 +1132,8 @@ Per submission.
 - **I50** — **The `shell` route's failure is a document like any other: `error` filled, and the shell's own stderr in it.** A non-zero exit composed `status: "error"` with no `error` field, which C04 I3 forbids in both directions, so `transcript.append` refused every one of them (C13 I10) and the route produced **no entry at all** — the user seeing F15's fault notice cite two invariant numbers instead of the command they typed. This is the **third instance of the class `documents.ts` closed at `noticeDoc`**, and the argument recorded there — *filling the field here rather than at the two call sites is the class rather than the instances* — is why it recurred: the class was closed at one composer, and this route does not go through it. **Closing a class means checking the class has one member.** The second half is `stderr`: `ChildHandle` delivers it separately (C21 I3) and the route read only `stdout`, so a failing command's one explanatory sentence was produced, delivered and dropped — leaving a raw block that was empty as well as unappendable. §3's verb route already reads it, which is both the precedent and the proof it was reachable. **A bare word is the likeliest thing an unfamiliar reader types**, and it is the input this route exists for.
 - **I51** — **The two framework defaults construct a `status`, and its state is decided by whether a retry is coming.** `b.live`'s placeholder is `loading`; a failed fetch is `retrying` when the driver has a countdown to show and **`error` when it has not**, because §3d rule 3 makes `retryIn` `null` for every one-shot and a `retrying` box without `retryInMs` draws no activity line **and therefore no spinner** — a blank row where the one moving thing goes. The state union already carries the distinction, so the fallback reads it rather than asserting a state it has not observed (C09 §3a). **Their heights are 3, 2 and 1, they are *framed*, and only a frame says so.** The first ruling was 2, 2 and 1 on a measurement that still holds — both land inside `livePanel`, which already draws a border and carries the title, so at 3 the box spent a row on a second border inside the first and at 4 it bought the ERROR tag at two nested borders (F234). **What that ruling could not choose is the figure**, because C09's ladder coupled the tag to the border and every option was one of those two: a box that reads as a red line, or two nested frames. C09 §3a's `framed` ladder is the third, and it is the one this layer wanted — no border, because the panel has one, and the rows spent on the tag and the content instead. So `retrying` takes **3** (tag, message, activity line), `error` takes **2** (tag, message), and `loading` stays **1**: it has no tag to gain and its whole content is the line that moves. A declared height with nothing to put in it is still a blank row, which is I31 working and a defect only where this layer picks the number (F406).
 - **I52** — **The elapsed counter is written here, only when the figure changes, only while someone is looking, and never into a block this layer did not put there.** The clock is C23's — C04 I66 and C09 I32 forbid deriving a duration from `tick`, which C03 coalesces and drops under load, and L1 may not read one — so `resolveStall`'s shape is the precedent. **The guard is on the rendered string and not on the clock**, and its argument is hygiene rather than throughput: measured, the counter beside its own spinner costs **0.4 frames a second**, because C03 folds six writes in ten into a frame already scheduled — but a write that changes nothing observable is still a `rev` bump, and it invalidates C14's height cache and says a document changed when it did not (F234). **`anyoneLooking` gates it, the same gate the poll uses** (I46): C22's ticker disarms when nothing on screen animates and this driver cannot see the viewport, so off screen the spinner stops while the counter would go on writing — at one whole frame each rather than 0.4, which is the condition the cost measurement was taken under and could not itself name. And the target is **the block currently in place**, never one remembered at declaration, because a fetch can fail between the arm and the fire; `attempt` is `src.failures` and therefore consecutive, reset by any success and shared by every part behind one source (§8d D6).
-- **I53** — **A pending entry's elapsed readout re-composes on the one-second wake while it runs and stops when it settles**, through `readout(id, blockId, render)`: the figure is compared as a rendered string (I52's guard), written only while someone is looking (I46), and never after `settled`, `release` or a refused patch. One timer serves every readout — it is `armParts`'s wake, armed to `now + ELAPSED_TICK_MS` while any visible readout is live — and the stall detector's thirty-second re-arm is not the cadence, measured. The block the readout replaces is whatever `render` returns for the elapsed milliseconds, so the driver knows nothing of tool calls; `toolCallHeader` is the consumer's.
-- **I54** — **The pending entry is the running card.** Step 3 appends `toolCallDoc` — one `step` header reading `verb(args)` — and registers its readout with the header's id before the transport is invoked; a queued entry's `queued behind` notice is *replaced* by the header when its route takes it and never before, so no figure counts a wait. The outcome is written into the header, with its final figure, exactly where settlement keeps the card — `settle(id)`: `exit N`, `cancelled`, `truncated`, `failed`, each patched **before** the settle — and not where settlement replaces it (`settle(id, doc)`), because there the document is the outcome and no header survives. The body is the entry's own appended blocks and the stall notice is a row of it; the card is drawn by nothing that reads `streaming`.
+- **I53** — **A pending entry's elapsed readout re-composes on the one-second wake while it runs and stops when it settles**, through `readout(id, blockId, render)`: the figure is compared as a rendered string (I52's guard), written only while someone is looking (I46), and never after `settled`, an **I33** release or a refused patch. **Which release matters, and the qualifier is the fix rather than a nicety** (§8h H8, F1002): the driver also releases a host for housekeeping — *nothing on this host still polls* — and that is not one of I33's five triggers and does not mean the entry is over. Read as one, a card carrying a **one-shot** live part lost its counter two sweeps in: measured at **2s against 6s** for the same card with no part and with a periodic part. The housekeeping release therefore skips a host whose entry still has a readout, and that host is released at settlement instead — through trigger 1, the same one call. One timer serves every readout — it is `armParts`'s wake, armed to `now + ELAPSED_TICK_MS` while any visible readout is live — and the stall detector's thirty-second re-arm is not the cadence, measured. The block the readout replaces is whatever `render` returns for the elapsed milliseconds, so the driver knows nothing of tool calls; `toolCallHeader` is the consumer's.
+- **I54** — **The pending entry is the running card.** Step 3 appends `toolCallDoc` — one `step` header reading `verb(args)` — and registers its readout with the header's id before the transport is invoked; a queued entry's `queued behind` notice is *replaced* by the header when its route takes it and never before, so no figure counts a wait. The outcome is written into the header, with its final figure, exactly where settlement keeps the card — `settle(id)`: `exit N`, `cancelled`, `truncated`, `failed`, each patched **before** the settle — and not where settlement replaces it (`settle(id, doc)`), because there the document is the outcome and no header survives. The body is the entry's own appended blocks and the stall notice is a row of it; the card is drawn by nothing that reads `streaming`. **The card's figure is `deps.elapsed`'s** — `startedAt` at dispatch and every `cardOver` at settlement — never the wall clock's: a duration is two monotonic readings apart, and on the wall clock it was a difference of two times of day that the world can step between (F973; T4.68 skews the wall clock alone and the figure does not move).
 - **I55** — **Every settlement keeps the card.** `settle(id)` routes patch the header with its final figure and verdict before the settle; `settle(id, doc)` routes compose the replacement as the header over the result's blocks — `exit N`, a count where one exists, or a word where none does (I59) — so no route settles an entry that began as a card into a document without one (→ §*The pending entry is the running card*, §8g rows 6, 10, 11).
 - **I56** — **The card's body is the result, hung under the hook.** On every route the blocks after the header are the entry's body and lay out through C22's `entryLayout` (C22 I83, C22 I84) — four cells in, `⎿` at column 2 on the first row — and the shell composes no second indent of its own (→ §8g row 12).
 - **I57** — **A card's body begins on the hook's row: the layout drops `gapBefore` from the body's first block, and the stored document keeps its blocks by identity.** C22's `entryLayout` builds the body run from a copy of the first block without its gap (`cardBody`), read by the measurer and the renderer and rebuilt from the current `doc.blocks` every frame; later blocks keep theirs and the document is untouched. **Not on the document**: a live part is declared by object identity (`builders/live.ts`'s `WeakMap`), so clearing by copying on `cardOver` dropped the part it copied and it never ticked — F821, found by execution T1.40 two components from the change. C04 §3a's leading gap holds of every document as stored; the hook row is the layout's, and a hook over a blank row is the empty-block class as chrome (→ C22 §6l.6 row 17, C22 I83).
@@ -1045,6 +1148,9 @@ Per submission.
 - **I65** — **A width change tells the child and the emulator the same number, computed once, from one signal.** Not an order: the child's repaint reaches the emulator through the write queue, so it cannot arrive between the two calls however they are sequenced, and an ordering claim here constrains nothing. What can be wrong is the figure — the region's width where the body's belongs, or two computations that disagree by `BODY_INDENT` — and a child wrapping at a column the grid does not have puts every line after the first in the wrong place.
 - **I66** — **The shell route registers a cancel, and the screen survives it.** The ladder's first rung signals the child's group and the card settles `cancelled` holding what it had drawn.
 - **I67** — **Every write is awaited before the final snapshot, and a settled terminal block carries no cursor, and what it keeps is decided by the screen flag: the scrollback in `lines` mode, the grid in `grid` mode.** Two artefacts, and the flag the child itself set says which one it left behind.
+- **I68** — **`/profile [pane]` opens C28's view through the local route, and every refusal is a document on that route rather than a throw**: a `warn` notice naming `TuiConfig.profile` when no profiler exists, a usage notice naming C28's four panes and the token typed when the pane is not one of them, and the view's own *close what is open* when another layer is up. The pane is read from `ctx.args` and never from `argv[0]`, except to quote the token on the failure arm (C22 I66). The view is reached through `HandlerDeps`, as `/exit` reaches `stop`, and `LocalContext.profile` stays the report and only the report.
+- **I69** — **What `/profile` appends is a notice naming the pane, never the panes.** The report is drawn in the view and refreshed there; a document carrying it would freeze one report into the transcript's record and read as current on every later frame, which is I18's stale-data shape with the framework's own figures inside it.
+- **I70** — **A refused patch stops the part and never the host, and a refusal the host still holds the block for is recorded as a fault.** `PatchOutcome`'s arms answer two different questions — *is the host gone* and *was the patch refused* — and a driver reading `outcome.ok` answers only the first, so the shell building a patch C04 cannot take took the same silent teardown as an evicted entry: every sibling part on that host and the entry's elapsed readout (I53) stopped with it, and the exact diagnosis was discarded at the one place that could report it (§8h, F1002). A refused part is given the dead source I43 already defines, so it stops **without a second teardown path** (I32) and the host is released by the sweep once nothing on it still polls. **The report is a fault and not the part's own panel**, which is §5a's first sentence one component along — the reporting path is the path that failed, and I43's refusal can draw in the panel only because it is refused *before* a patch is needed.
 
 
 ## 8. Commitments
@@ -1089,7 +1195,7 @@ Per submission.
 37. A bound is stated where a region defines the document and `null` where nothing does (I41, C07 I18).
 38. Two parts reading one source read one sample of one instant: the key declares sameness, one fetch serves every part referring to it, and the whole set is applied before one commit (I42, I44).
 39. A conflicting cadence on one key is refused at declaration rather than arbitrated, and the fetches themselves are taken on the key's word because nothing can compare them (I43).
-40. Anything that accumulates is a fold over the source's versions, run once per version and shared; per-part state is view state only (I47).
+40. Anything that accumulates is a fold over the source's versions, run once per version and shared, and the fold is told how many settlements produced the version it is folding; per-part state is view state only (I47).
 41. A source polls only while something is looking at it, and stops nothing when it is not — no teardown, no release, and due again the moment a referring host is visible (I46, I45, I9).
 42. A failure the pipeline swallows is said twice — once in the transcript at the time, once on the restored primary screen at exit — and C23 chooses only the first moment (I48).
 43. A stage failure after the append finishes the sequence rather than abandoning it, and the entry id is returned whenever the entry exists (I49).
@@ -1105,8 +1211,11 @@ Per submission.
 53. **The outcome is a number** (I59). `ok` goes; a count where the route has one, a word only for the states that have no number.
 54. **Approval is a layer and a denial is a record** (I60). The wait is not the run; the card stands with `denied`; history says 126 until the far side says otherwise.
 55. **Failure is a box under a kept head, and one file composes notices** (I61). F406's class closed by a scan widened to the builder call rather than by twelve repairs.
-56. **A parent's head is written by nobody** (I62). Derived from the children in start order, wall clock for its own figure, and never the sum.
+56. **A parent's head is written by nobody** (I62). Derived from the children in start order, its own `elapsed` figure, and never the sum.
 57. **A command's output is a screen, live** (I63, I64, I66, I67). One arm chosen and kept, one snapshot per frame, a cancel that works, and a settled block that keeps what the child left rather than what the route captured.
+58. **`/profile` opens the profiler's view, and refuses in a document** (I68). No profiler, an unknown pane and an occupied stack each answer through the route the verb came in on.
+59. **The transcript records that the view opened, not what it showed** (I69). The figures live where they are refreshed.
+60. **A refused patch stops the part, not the host, and says what was refused** (I70). Three arms, two questions: the host is released when C13 has dropped the entry, and the part alone when the document refuses what the shell built — with `applyPatch`'s message on §5a's two channels.
 
 ---
 
@@ -1763,7 +1872,7 @@ blank.
 | denied | kept | none — it never ran | **P12** `denied`, written before the settle | none | — |
 | retrying | same, still counting | **P11** `· ⠋ Ns` — the head keeps elapsed | — | kept, plus the `status` box at `retrying` with the countdown and the attempt | — |
 | resumed after a retry | same | same | — | the box **replaced in place** by the first output block or `resumed after N attempts` | — |
-| parent, children running | same | wall clock, its own readout | **P13** `k of N`, re-composed as each child settles | one head per child, in start order, no bodies | — |
+| parent, children running | same | its own readout, on `elapsed` | **P13** `k of N`, re-composed as each child settles | one head per child, in start order, no bodies | — |
 | parent, settled | kept | its own final figure | **P13** the same-unit sum, else `k of N · m failed` | children's heads over their collapsed bodies | — |
 | queued, waiting | **P2** `queued behind X` — a `notice`, not a `step` | **P1** none: the clock has not started | — | — | — |
 | queued, routed | **P2** header *replaces* the notice, same entry | starts here | — | — | — |
@@ -1892,6 +2001,68 @@ interaction**; the events are the mechanism and the cells are where two rules me
 **What the trace confirmed rather than found**: rows 2, 5 and 7 are I53's own rows (T3.61) seen
 from the route — the driver's contract held without change once the producer existed.
 
+## 8h. The classification table — a part's patch and what the host holds
+
+The subject is one line — `if (put(…)) return true; release(part.host)` — and the index is
+**what is true of the host at rest when the patch is answered**. A trace cannot reach these:
+nothing happens between the patch and the answer, and the two rules that overlap in every row
+below — *a refused patch means the part is over* and *release is the host's, not the part's*
+(I32) — both hold with no event between them. §8a A2 asked the same question about the
+**streaming** route and answered it there; this table is that question asked of §3b, where the
+answer had been *one boolean* since the driver was written (F1002).
+
+| # | Cell | Rules meeting | Ruling |
+|---|---|---|---|
+| H1 | the entry holds exactly one block with the part's id | — | `ok`. One rule, and it finds nothing — it is here so the table's axis is total |
+| H2 | the entry was evicted or cleared | I33 triggers 3 and 4 × `put`'s answer | `"unknown"`, the **host** is gone, `release(host)`. Already released by the change subscription in the same synchronous turn, so this arm is the belt to that brace — **and the mutation pass says so**: replacing the release with a part-level stop survives every row, because the housekeeping sweep reaches the same state one wake later. Recorded as an expected survivor rather than deleted; what it buys is one map entry, and a leak with no symptom is what this driver has been bitten by twice |
+| H3 | the entry is alive and holds **no** block with the part's id | I34's one-block-one-part × `applyPatch`'s `n === 0` | `"patch"` with a message, and the **part** is over rather than refused. Reachable when the far side replaces a container block with a subtree that no longer holds the panel; ordinary in exactly the way H2 is, and it deserves the same silence |
+| H4 | the entry is alive and holds the id **twice** | C04 I14 × the shell composing a patch | `"patch"`, and this is the defect: the host is alive, the document cannot take what the shell built, and **releasing is wrong in every direction** — it stops the part, its siblings and the entry's readout, and discards the only sentence that explains any of it |
+| H5 | the entry is alive and **settled**, patched by the shell | C13 §6's origin gate × `put`'s `"shell"` | Lands. `"settled"` is unreachable from this seam, and the comment that named it as one of two reasons for releasing was describing a state no caller can construct — A03 §2's vacuity class, in the comment recording the reasoning |
+| H6 | H4 on a host with a second, well-formed part | I21's containment × I32's host-level release | The cell that makes this a table rather than a restatement: two correct rules, and where they overlap a part that cannot draw takes down one that can. Measured before the fix at **2 fetches against 6** for the healthy sibling over six one-second ticks |
+| H7 | H4 on a host that also has a running card | I53 × I32 | `release` deletes the readout, so the elapsed figure on that entry freezes too — the same over-broad teardown, one mechanism along, and invisible to any row about the part |
+| H8 | a host whose parts are **all finished** while the entry's card is still running | I53's *release drops the readout* × the sweep's *nothing here still polls* | Two releases with one name. The sweep's is housekeeping and the entry is not over, so it **skips a host that still has a readout** — otherwise a one-shot part froze its own card's figure, which is H7 arriving with no refusal anywhere near it (measured 2s against 6s) |
+
+### H4 — the report cannot be the panel, which is why it is a fault
+
+I21 contains a failing refresh *in its declared part's panel*, and I43 draws its cadence refusal
+there too. Neither is available here. **The panel is reached by a patch and the patch is what was
+refused** — so the natural remedy is the one thing the cell rules out, and the ladder §5a
+already built is what is left: a notice at the moment and an accumulation at shutdown, deduplicated
+by message so a part refusing on every tick says it once.
+
+That is §5a's first sentence — *the reporting path is the path that failed* — arriving in a
+second component, and it is the reason the ruling is a fault rather than a fifth thing drawn on
+screen.
+
+### H8 — the row the ruling's own test row found, and it is older than the ruling
+
+H7 says `release` takes the entry's readout with it, and the fix for H4 was supposed to end
+that. The row written for H7 measured **3s where it wanted 6s**, which is the implementation
+falsifying the walk: stopping the part makes it `done`, a host whose parts are all `done` is
+swept away, and the sweep releases through the same call the five triggers use.
+
+**The defect is older than F1002 and reachable with no refusal at all.** A one-shot part is
+`done` after one attempt (A02 §7 rule 3), so a card carrying one loses its elapsed figure two
+sweeps in — measured at **2s**, against **6s** for the same card with no live part and **6s**
+with a periodic one. Two controls, because a single reading proves nothing about which of the
+three things in the frame stopped.
+
+One name for two operations is the whole of it: *the entry is over* and *nothing on this host
+still polls* are different claims, and only the first should silence a running card.
+
+### H3 against H4 — the driver asks the host rather than reading the message
+
+Both arms are `{ok: false, reason: "patch", error}` and only their `error.message` differs, which
+makes the message the obvious discriminator and the wrong one: parsing prose C04 composes is a
+second copy of C04's rules, kept in the component least able to notice when they change.
+
+**The driver asks the question it already has an answer for.** `findBlock` walks the entry for the
+part's id — the same walk the staleness sweep and `currentPanel` use — and *does the host still
+hold this block* separates the two cells with no reference to what C04 said. A part whose block has
+gone is over; a part whose block is there and whose patch was refused is a defect worth a sentence.
+
+---
+
 ## 9. Tests
 
 Six tiers. Every cell of the §6 table is covered.
@@ -1934,6 +2105,7 @@ Fake transport, fake stores.
 - **T1.39** (I42, I44): two parts naming one `source` → **one** `fetch` call per tick and both panels carrying the same value. **The control is the same two parts with no `source`**, which must show two calls and two different values — without it the row passes against a driver that never fetches at all, and the two-values half is the defect F91 was filed on.
 - **T1.40** (I43): two parts, one key, different `every` → the losing part's panel carries a message naming **both** part ids and **both** values, and that part never fetches. Asserted on the rendered block rather than on a throw: the throw was the first implementation and it was invisible from every transcript route, so a row that caught an exception would have passed against a session showing two loading panels for ever. The fetch count is the second half — a refusal that still polls is not one.
 - **T1.41** (I47): a derivation read by two parts → `compute` runs **once per source version**, not once per part, and `prev` carries the previous fold. Three versions, because two pass against an implementation that recomputes from scratch each time.
+- **T1.41b** (I47, F1023): a source that rejects twice and then resolves → the fold is entered **once**, with `attempts === 3`, and a clean poll before it saw `attempts === 1`. Three arms, and the second is the one the row exists for: the sequence must be *fail, fail, succeed* rather than one failure, because `1 + n` and a bare *did it fail* agree at `n = 1`. The first arm is what separates *the count exists* from *the count is one*. The third is a **control on the widening rather than a discriminator**: two parts read the source and the fold is still entered once per version, so I47's shared-fold property survives the third parameter — see T6.45b for the mutation that showed this arm is weaker than it was first written to be.
 - **T1.42** (I45): settlement's release-then-declare on a key both documents name → the derivation's accumulation **survives**. The assertion is the accumulated history and not the current value: a source destroyed and rebuilt renders a perfectly correct latest sample.
 - **T1.43** (I46): a host off screen → no `fetch` across several intervals; visible again → a `fetch` immediately, not on the next interval. Both halves in one row, because a driver that pauses and never resumes satisfies the first.
 - **T1.44** (I42): a part whose `source` string is spelled to look like another part's implicit key → the two do **not** share. A fabricated violation, because the namespaces are disjoint by construction and the row is otherwise vacuous.
@@ -1947,6 +2119,14 @@ Fake transport, fake stores.
 - **T1.53** (I64): a chunk written while `scheduler.pending` is true produces no patch; the next chunk after the frame lands produces one holding both. Then a child that goes quiet with a pending frame → the readout's wake renders the missing lines, asserted with no further chunk written.
 - **T1.52** (I63): with a factory injected the route calls `spawnPty` and never `spawnShell`; with none it calls `spawnShell` and never `spawnPty`. Two spies, four assertions.
 
+- **T1.60** (C23 I41): every `producerContext(...)` call in `execution.ts` passes either `null` or `deps.region().height`, and **how many of each**, compared by equality. A route handing the region's height down everywhere would satisfy every assertion about a view's producer while quietly telling a transcript entry it is bounded. **The tally rather than the set, and F932 is why**: the distinct answers are the *vocabulary*, and a route moving from `null` to the height leaves both present — 5 and 2 becoming 4 and 3 — so the set is unchanged while the partition is not. I41 is a claim about which routes, and only a count can see one change sides.
+- **T1.61** (C23 I24): no `raw` block with empty or newline-only text is composed in `execution.ts` or `refresh.ts`, with a control showing the pattern fires on one. **The rule has teeth in one direction only** — C23 may not *add* rhythm — so the positive half is asserted too: `gapBefore` is set where documents are composed, in the local handlers, and nowhere in the routing, which is the division the invariant describes.
+- **T1.62** (C23 I23): `/debug`'s body reaches no transport — asserted on a **reach** (`deps.transport`, `.invoke(`, `.stream(`, `.submit(`) rather than on the noun, because the handler reads `entry.doc.meta` and prints `transport` as a row label, which is the one thing I23 says it *should* do. A `/debug` that re-invoked would produce a document agreeing with itself and disagreeing with the entry it claims to describe, and every assertion about its contents would pass.
+- **T1.63** (C23 I13): MG23 is run over the real `src/shell` tree and reports nothing. Its fabricated violation is asserted in `enforce-rules.test.ts`; what is owed here is that the rule is **live on the tree**, because a rule that fires on a fabrication and is scoped to nothing reports zero for both reasons.
+- **T1.64** (I68): `shippedHandlers` with a view handed in whose `open` refuses naming `TuiConfig.profile` → `/profile` answers a `warn` notice carrying that name, and the view's `open` was called once with `overview`; `shippedHandlers` with **no** view handed in → the map holds the six and no `profile` key, so a tree without the manifest row registers nothing I27 would refuse. **Both arms**, because the transitional conditional is a birthday clause and this is the row that watches it.
+- **T1.65** (I68, C22 I66): `/profile frame` with `args: { pane: "frame" }` → the view opened on `frame` and the notice names it; `/profile foo` with `args` empty and `argv: ["foo"]` → a usage notice naming all four of C28's `PANES` and the token `foo`, and the view's `open` was not called. **The pane is asserted to come from `args`**: a handler reading `argv[0]` passes the first arm and is caught by the second only because the usage text quotes the token — so the row also feeds `argv: ["memory"]` with `args: { pane: "frame" }` and expects `frame`.
+- **T1.66** (I69): the document `/profile` appends holds one `notice` and no block whose id is one of the panes' — no `ov-`, `fr-`, `di-` or `me-` prefixed id and no `plot` — asserted over the document's block tree rather than its length, because a notice wrapping a panel of plots is one block too.
+- **T1.67** (I68, C05 §3): `FRAMEWORK_TOOLS`' `profile` row is `local`, takes one optional `enum` argument named `pane`, and its `values` equal C28's `PANES` member for member; and the seven names are the six and `profile`. The L0 copy of an L4 list, held equal by the only file that may import both.
 ### Tier 2 — contract / interface
 
 - **T2.1** (I2): a fault injected at each of the eight stages in §5 → a document is appended and the session survives, eight times.
@@ -2045,7 +2225,7 @@ Fake transport, fake stores.
 - **T4.50** (I59): a listing whose adapted document carries a row count settles to `· 0.4s · 12 rows`; one with no count settles to `· 0.4s` and no third field; a non-zero exit is `exit N`; the string `ok` appears in no settled head across the seven routes.
 - **T4.51** (I60, §8f P10, P12; C04 §3c S4): a call needing approval reads `· ⠋ waiting` with no readout registered; *approve* pops the layer and the first wake after it reads `· ⠋ 1s`; *deny* settles the card reading `· denied` with history code 126 and no body. And row 18's cell: `⏎` on a running card's head folds and unfolds the body, an unpaged box reopening at its tail and a paged one where it was.
 - **T4.52** (I61, §8f P8, P11): a stream throw settles the card over a `status` box at `error`; a retry appends a box at `retrying` whose countdown moves while the head's figure counts elapsed, and the resuming patch replaces the box in place — the block count is unchanged across the resume.
-- **T4.53** (I62, §8f P13, §8g rows 20–21): a parent with three children, dispatched in order, reads `· ⠋ 4s · 1 of 3` after the second settles; children stay in dispatch order when the third settles before the first; the settled parent reads the same-unit sum where all three carry `files`, and `2 of 3 · 1 failed` where one failed; the parent's figure is the wall clock and not the children's sum; Ctrl-C mid-run rolls up `0 of 3 · 3 cancelled`.
+- **T4.53** (I62, §8f P13, §8g rows 20–21): a parent with three children, dispatched in order, reads `· ⠋ 4s · 1 of 3` after the second settles; children stay in dispatch order when the third settles before the first; the settled parent reads the same-unit sum where all three carry `files`, and `2 of 3 · 1 failed` where one failed; the parent's figure is its own clock's and not the children's sum; Ctrl-C mid-run rolls up `0 of 3 · 3 cancelled`.
 
 ### Tier 5 — e2e
 
@@ -2089,7 +2269,12 @@ Fake transport, fake stores.
 - **T4.23** (I38, C05 I23): a manifest declaring `run` interactive with `detach` carrying the arm. `/run -d nginx` reaches the transport and its document carries the far side's output; `/run -it alpine sh` reaches `handoff`. **Both halves in one row**, because a route that always spawns satisfies the first and a route that always hands off satisfies the second.
 - **T4.24** (I38): `/exec` with its required argument missing → an error document, and `runner.handoff` is never called. The fake's call count is the assertion; a test checking only the document passes on the ordering that spawns first and reports afterwards.
 - **T4.64** (I65, with C27): a width change mid-run → the child's `resize` spy records the width it was given, the settled block's `cols` records the emulator's, and the two are the same number and equal to the body's inner width. **Two spies, because one cannot see an agreement**: the first version of this row watched only the child, and every ordering mutation survived it.
-- **T4.65** (I63, I67, with C21, C27): the same byte script on both arms → the PTY arm's document carries the child's colours and the pipe arm's does not, and both settle with the same text.
+- **T4.65** (I63, I67, with C21, C27): the same byte script on both arms → both settle with the **same** screen: the same lines, the same mode, the colours the bytes carried, and neither with a cursor.
+  **The colour difference is not the framework's and cannot be asserted here.** `env` is computed once above the arm choice and one emulator parses both, so nothing in this route treats the arms differently about colour — a real child calls `isatty` and decides. With a fake on both sides the fixture would supply exactly the behaviour under test, so that claim is **T5.6's**, where a real `node-pty` makes it a fact a fake cannot have (F923).
+- **T4.66** (I68, I27, with C05, C22): a real pipeline over a manifest carrying the framework's rows, `pipeline.submit("/profile frame")` → the view is open on `frame`, the transcript gained one entry whose blocks are a notice and nothing of the panes, and `seal()` accepted the seven. Constructing the harness is the I27 half: `seal()` runs inside it and refuses a row without a handler or a handler without a row, so a red T4.66 with no assertion reached is the reconciliation refusing.
+- **T4.69** (I70, I48, §8h H4): from the public entry — a `b.live` part whose `render` gives its child the panel's id, five ticks, and the message on the **restored primary screen** after `stop`. The contract rows construct the state; this one is the only thing that fails when the pipeline builds the driver with a sink that reports nowhere.
+- **T4.68** (I54, F973): `/ps` gated on a held invoke, three seconds of wall skew and two of `elapsed` → the running head reads `· ⠙ 2s`, and on release the settled head reads `ps · 2s`; the wall clock's five are not the call's. Under `tick` the two clocks agree, so every card row above passes on either axis — `skew` is what separates them.
+- **T4.67** (I68, with C22): the same pipeline built from a session with no `profile` → `/profile` appends the refusal notice naming `TuiConfig.profile`, the stack is empty afterwards, and `seal()` accepted the seven — the handler exists whether or not a recorder does, and refuses rather than vanishing. The refusal is the view's own string, so a session that grows a recorder later changes nothing here.
 - **T3.55b** (I52): `elapsedNeeded` refuses a `null` panel, a non-`status` block, and a `retrying` box — **the arms the sweep cannot reach**, since the caller has just checked the block is a loading `status`. §8a-bis B3's ruling asked directly.
 - **T3.55c** (I52, F234): the comparison is the **rendered figure** and never the clock — nothing under a second, nothing across 1000→1900 ms, a write at 2000, and `1m 40s` → `1m 41s` past ninety-nine. The range where a clock comparison and a figure comparison disagree, which is the mutation that survived the first pass.
 - **T3.56** (I52): the elapsed figure advances while the first fetch is in flight, driven through `declare` and the sweep rather than by calling the writer — a row that reached in and computed a duration would pass on the day nothing armed a timer, which is F227 one layer up.
@@ -2098,6 +2283,17 @@ Fake transport, fake stores.
 - **T3.59** (I52, I46, F234): a box nobody is looking at is not written to, and the counter resumes on `visibilityChanged` with the **whole** wait rather than the watched part. §8a-bis B7, and the condition F234's 0.4-frames measurement was taken under and could not name.
 - **T3.62** (I66): `!sleep 100` then the ladder's first rung → the child receives `SIGINT`, the card settles `cancelled`, and the block holds the lines written before the press. **The row F844 was written for**: today `cancelInFlight` is null on this route and the entry sits pending.
 - **T3.63** (I63): a `spawnPty` that throws → the card settles `failed` naming the error, and `spawnShell` is never called.
+- **T3.65** (I70, §8h H4, H6): a part whose rendered child takes the panel's own id — the host is **not** released, the well-formed sibling keeps its cadence at **6 polls against the refused part's 2**, the panel is frozen at the first value that landed, and one fault carries `applyPatch`'s message. The sibling is the assertion: both parts stopped at 2 before the ruling.
+- **T3.66** (I70, §8h H3): the far side replaces the group holding a part's panel with a subtree that does not — the entry is alive, the patch comes back `no block "a"`, the part stops after one further poll and **nothing is reported**. Absence is not failure, and C13 already calls a stale reference ordinary.
+- **T3.67** (I70, §8h H2): a layer that has gone still takes **both** its parts down. The control for the ruling, on the arm where the host's disappearance is the only reading: a fix that merely stopped releasing passes every other row and fails this one.
+- **T3.68** (I70, §8h H5): a settled entry takes a `"shell"` patch and refuses a `"farSide"` one — the fabricated violation for `put`'s old comment, which named `settled` as one of two reasons to release and described a state no caller can construct.
+- **T3.69** (I70, I53, §8h H7): the running card on the refused part's entry keeps counting — six seconds after six wakes, with the refusal reported once.
+- **T3.70** (I53, §8h H8): a card carrying a **one-shot** part reaches `6s` where it froze at `2s`, against two controls at `6s` — no live part, and a periodic one — and the wake it arms is the readout's second rather than a zero-delay spin.
+- **T3.71** (I70, I52): a stopped part arms no wake. **With a second host in play**, which the first draft of the row did not have: one host alone returns at `armParts`'s *no sources, no readouts* guard, so both trees armed nothing and the row passed against the mutation it was written for.
+- **T3.72** (C22 I99, F158, F1024): `reserveGreeting()` then `greeting(doc, slot)` → **one** entry, settled, holding the document — the reservation was filled and not appended beside. The control is the id: the entry's id is the one `reserveGreeting` returned, so a row cannot pass by appending and settling something else.
+- **T3.73** (C22 I99): `reserveGreeting()` then `abandonGreeting(slot)` → the entry is settled, empty and `streaming: false`. **The clause nothing else reaches**: a slot left streaming is never evicted (C13 I6), and the only observable difference between released and abandoned is the flag. Mutating the release away fails here and nowhere else.
+- **T3.74** (C22 I99): `reserveGreeting()`, then `clear()`, then `greeting(doc, slot)` → the document is **appended**, because `settle` answered `unknown` and the slot the user emptied is gone. The failure this rules out is a greeting that vanishes with no refusal anywhere — the outcome was discarded at this call site until C22 I99.
+- **T3.64** (I53, F973): four seconds of wall-clock skew between two wakes with `elapsed` still → the running header draws nothing new, and the figure after two monotonic seconds is `2s` and not `6s`.
 - **T1.40b** (I51, F234): a one-shot's failure draws `error` at one row, not `retrying` at two — the classification table's C1, where the second row would be blank because `activityLine` draws nothing for a countdown that is not coming.
 - **T6.72** (I52, F234): removing the visibility gate → **T3.59 fails and nothing else does.** The counter still advances and the figure is still right; the only difference is that an off-screen box writes a whole frame a second where it wrote nothing, and no assertion about what the box *says* can see that.
 - **T6.37** (I12): moving the driver's release into `beforeRelease` → T4.22 fails. The ordering C22 §8 already keeps for `killAll`, arriving for the mechanism that has a promise in flight.
@@ -2110,6 +2306,8 @@ Fake transport, fake stores.
 - **T6.43** (I46): pausing an invisible source without resuming it → T1.43 fails. Pairs with the opposite revert, treating any visible host as making every source due, which fails T4.26 instead — two directions, because a one-directional pause passes half of each row.
 - **T6.44** (I44): committing per part rather than per source → T2.23 fails. A frame-level assertion cannot see it: C03's 33 ms `stream` window already coalesces them into one frame, which is why the row counts commits.
 - **T6.45** (I47): running `compute` once per part rather than once per version → T1.41 fails, and a fold advances N times per tick — a ring buffer that fills N× too fast, with every sample in it genuine.
+- **T6.45b** (I47, F1023): capturing `attempts` **after** `failures` is reset rather than before → T1.41b fails with `1` where it expects `3`. That is the state the driver shipped in, and it is invisible to every other row: `failures` is correct for the backoff and correct for the error arm, and is destroyed one statement before the only consumer that could accumulate it. The second mutation is `src.failures` in place of `src.failures + 1` — *failures since* rather than *settlements* — which T1.41b's first arm kills at `0` against `1`, and which is why that arm asserts a clean poll before anything fails.
+  - **A third mutation survived, and it indicts this row's own prose rather than the test** (A03 §2's vacuity class arriving in a sentence). It was written here as *passing `attempts` as a parameter to `derivedFor` instead of reading `src.attempts` fails T1.41b's third arm, because the memo hands the second part the value without re-entering the fold* — and measured, it fails nothing, because the only value a call site has to pass **is** `src.attempts`. The sentence named where a value is computed, which is not observable; **the third arm is a control on I47's once-per-version property under the widening, not a discriminator for where the number is read**, and describing it the other way made it read as a stronger row than it is. Recorded rather than deleted: a mutation that fails nothing is a finding about an artefact, and the artefact here was this line.
 - **T6.46** (I48): restoring the bare `catch` — recording nothing — → T1.45 fails. **The revert is the shipped behaviour of every version before this one**, and its symptom is that there is none: no entry, no message, no exit code, and a green suite. F15 took four wrong turns to find because of exactly this.
 - **T6.47** (I48): keeping the collection and dropping the fault notice → T1.48 fails while T1.45 still passes. The half that is easy: `faults` is a field a test can read, and a reader who never reaches `stop()` learns nothing at the moment it matters.
 - **T6.48** (I48): keeping the notice and dropping the collection → T3.38 fails. The opposite half, and the one that looks sufficient until §8e's first row, where appending is what threw.
@@ -2127,7 +2325,7 @@ Fake transport, fake stores.
 - **T6.89** (I59): `outcomeOf` restored to return `ok` → T4.50 fails on the string it forbids across every route.
 - **T6.90** (I60): the readout registered at dispatch for a waiting call → T4.51's post-approval figure reads the wait; a denial settling with a document → T4.51's body assertion fails and the head is gone.
 - **T6.91** (I61): the stream arm restored to `b.notice.error` → T4.52 fails on the kind and A03 SS56 names the line; the retry box removed on resume rather than replaced → T4.52's block-count assertion fails, which is A4 in a test.
-- **T6.92** (I62): children sorted by settlement → T4.53's order assertion fails; `rollUp` restating the first child's outcome → T4.53's `2 of 3 · 1 failed` fails; the parent's figure summed from the children → T4.53's wall-clock assertion fails.
+- **T6.92** (I62): children sorted by settlement → T4.53's order assertion fails; `rollUp` restating the first child's outcome → T4.53's `2 of 3 · 1 failed` fails; the parent's figure summed from the children → T4.53's own-figure assertion fails.
 - **T6.83** (I54): registering the readout at enqueue, or leaving the queued notice in place at the route → T4.41 fails on one half each: a queued line counts its wait as its run, or runs reading *queued behind*.
 - **T6.53** (I53): dropping the readout's arming clause from `armParts` → T3.61 fails at its second assertion — the figure never moves because no wake is armed, F227's class one row over — while every `elapsedNeeded` row stays green. Dropping the `settled` deletion → T3.61 fails at its third: the settled header keeps counting.
 - **T6.98** (I64): dropping the readout registration → T1.53's tail arm fails and a child's last lines wait for a chunk that never comes.
@@ -2135,6 +2333,8 @@ Fake transport, fake stores.
 - **T6.94** (I65): the child told the region's width while the emulator takes the body's → T4.64's two figures differ by `BODY_INDENT` and a real child wraps four columns late.
 - **T6.95** (I66): dropping the cancel registration → T3.62 fails, which is the defect F844 records as shipped.
 - **T6.96** (I67): keeping the cursor on settle → T2.47 fails and a settled block draws a cursor nobody is writing at.
+- **T6.99** (I53, I54): the card's `startedAt` and its settlement's `cardOver` on `deps.clock()` → T4.68 fails on the settled figure — and C28 T5.1d survives it, measured, because a positional channel reproduces whatever is computed from it (F975); the readout's `startedAt` and `since` on `deps.clock()` → T3.64 fails on the figure after the skew.
+- **T6.100** (I70): reading `outcome.ok` as the whole answer — the shipped behaviour — → **T3.65** fails. Eleven mutations in `tools/mutate/runs/c23-patch-refusal.mjs`, ten caught by name and one recorded as an expected survivor: replacing the `hostGone` release with a part-level stop, which §8h H2 says is unobservable and which the pass confirms.
 - **T6.97** (I63): falling back to the pipe arm when `spawnPty` throws → T3.63 fails and a configuration error becomes a child that quietly lost its colours.
 
 ---

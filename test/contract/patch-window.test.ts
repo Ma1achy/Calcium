@@ -21,7 +21,8 @@ import {
   totalRows,
   windowPatch,
 } from "../../src/presentation/patch/window.js";
-import { hunkRows, isCollapsed, layoutFor } from "../../src/presentation/patch/height.js";
+import { hunkRows, isCollapsed, layoutFor, pairedRows } from "../../src/presentation/patch/height.js";
+import { globSync, readFileSync } from "node:fs";
 import { PATCH_CORPUS } from "../support/blocks.js";
 
 const UNIFIED = 80;
@@ -321,7 +322,11 @@ describe("C25 §3c — windowing", () => {
     expect(win.hunks[0]?.lines.length).toBeLessThan(ILLUSTRATION.lines.length);
   });
 
-  it("clampOffset stops at the first offset that reaches the end, not at total − height", () => {
+  // **C25 T2.12's row, and it was already here.** The rule the spec names as
+  // I20a's whole content — property asserted rather than number — under a title
+  // naming only the function. Third instance in one pass of a row that checks an
+  // invariant perfectly and answers *no* to the question SP9 asks.
+  it("T2.12 (C25 I20a): clampOffset stops at the first offset that reaches the end, not at total − height", () => {
     // **`total - height` was the first ceiling and it was wrong, and this test
     // is what said so.** That figure is arithmetic over the full rendering, and
     // a window is a slice plus sticky headers (I18) — so a window opened there
@@ -366,5 +371,169 @@ describe("C25 §3c — windowing", () => {
   it("a patch with no hunks windows to itself", () => {
     const empty = patchOf([]);
     expect(totalRows(windowPatch(empty, UNIFIED, 0, 10), UNIFIED)).toBe(1);
+  });
+});
+
+describe("C25 §7 — the invariants that had no row", () => {
+  it("T2.8 (C25 I11): there is no expanded flag — expansion is the rewrite of collapsedBefore", () => {
+    /**
+     * **Structural first, because that is the load-bearing half.** A flag would
+     * be a second record of what the document already says, and the two would
+     * disagree the first time a patch was replaced under an open region. The
+     * only field is `Hunk.collapsedBefore`, and there is nothing to set.
+     */
+    const types = readFileSync("src/data/viewmodel/types.ts", "utf8");
+    const hunk = types.slice(types.indexOf("export type Hunk = "), types.indexOf("export type Patch = "));
+    expect(hunk, "the collapse is a count of hidden lines").toContain("collapsedBefore?: number;");
+    expect(hunk.replace(/\/\*[\s\S]*?\*\//gu, ""), "and there is no flag beside it").not.toMatch(
+      /^\s+(?:readonly )?expanded\??:/mu,
+    );
+
+    // **`ILLUSTRATION` already carries `collapsedBefore: 14`**, so a spread is
+    // not an expanded form — it is the same block. The field is removed here,
+    // which is the state the row claims to be constructing.
+    const { collapsedBefore: _hidden, ...uncollapsed } = ILLUSTRATION;
+    const collapsed = patchOf([{ ...ILLUSTRATION, collapsedBefore: 30 }]);
+    const expanded = patchOf([uncollapsed]);
+
+    // C25 renders whatever the field says, and renders it the same way twice —
+    // so nothing outside the document decided what was shown.
+    const first = windowPatch(collapsed, UNIFIED, 0, 40);
+    const again = windowPatch(collapsed, UNIFIED, 0, 40);
+    expect(JSON.stringify(again), "the same block, the same window").toBe(JSON.stringify(first));
+
+    // **And the rewrite is what expands it**: the same hunks, one field removed,
+    // and the collapse marker's row is gone. `hunkRows` is the arithmetic both
+    // halves share, so this is measured rather than asserted about a frame.
+    const layout = layoutFor(collapsed, UNIFIED);
+    expect(hunkRows(collapsed.hunks[0]!, layout), "a collapsed region costs its marker a row").toBe(
+      hunkRows(expanded.hunks[0]!, layout) + 1,
+    );
+    expect(isCollapsed(expanded.hunks[0]?.collapsedBefore), "and the rewritten block is not collapsed").toBe(false);
+  });
+
+  it("T2.9 (C25 I14, C25 I15, C25 I16): maxExpandHeight is in no source file, and this row expires when it is", () => {
+    /**
+     * **A watch, not a coverage row.** §3a records all three as *specified and
+     * unbuilt*: the thresholds are multiples of a viewport height and C25 cannot
+     * see a viewport, so the invariants have nothing to be false about — A03 §2's
+     * vacuity class holding three of them open. A row asserting the behaviour
+     * would assert nothing; this one asserts the absence and fails the day the
+     * field lands, which is when I14, I15 and I16 owe real rows.
+     */
+    const sources = globSync("src/**/*.ts").filter((f) => !f.endsWith(".d.ts"));
+    expect(sources.length, "over a non-empty tree").toBeGreaterThan(100);
+    const naming = sources.filter((f) => readFileSync(f, "utf8").includes("maxExpandHeight"));
+    expect(naming, "when this fails, C25 I14, I15 and I16 need rows and this one goes").toEqual([]);
+
+    /**
+     * **The half that is C25's and is true today.** Both numbers are computable
+     * before either is offered, because `measure` is pure and takes the width —
+     * nothing has to be rendered to know whether the expanded form would fit.
+     */
+    const { collapsedBefore: _hidden, ...uncollapsed } = ILLUSTRATION;
+    const collapsed = patchOf([{ ...ILLUSTRATION, collapsedBefore: 30 }]);
+    const expanded = patchOf([uncollapsed]);
+    const layout = layoutFor(collapsed, UNIFIED);
+    expect(hunkRows(collapsed.hunks[0]!, layout), "the collapsed height").toBeGreaterThan(0);
+    expect(hunkRows(expanded.hunks[0]!, layout), "and the expanded one, both without a viewport").toBeGreaterThan(0);
+
+    // **And the change that must not be made**, named in §3a: a height in
+    // `measure`'s signature would make a block's geometry depend on the thing
+    // C14 derives *from* that geometry.
+    const vm = readFileSync("src/data/viewmodel/types.ts", "utf8");
+    const measure = vm
+      .slice(vm.indexOf("export type Measure<"), vm.indexOf("=> number;", vm.indexOf("export type Measure<")))
+      .replace(/\/\*[\s\S]*?\*\//gu, "");
+    expect([...measure.matchAll(/^ {2}(\w+)\??:/gmu)].map((m) => m[1])).toEqual([
+      "block", "width", "measureChild", "probe",
+    ]);
+  });
+
+  it("T2.11 (C25 I19a): a row-wise cut of a run is additive, over every run up to 4×4 at every cut point", () => {
+    /**
+     * **Asserted against `pairedRows` itself**, not against a restatement of it.
+     * The whole invariant is that the window and the renderer share one row
+     * model, so a second copy of the arithmetic here would be the drift I1
+     * exists to prevent — and it would agree with itself whatever either did.
+     *
+     * I19's non-additivity is about cutting the *line array*: one removed and
+     * two added lines are two rows whole and three rows cut between them. A
+     * row-wise cut takes the first `min(k, removes)` removes beside the first
+     * `min(k, adds)` adds, and that is exactly `k`.
+     */
+    const run = (removes: number, adds: number): Hunk["lines"] => [
+      ...Array.from({ length: removes }, (_, i) => line("remove", `- ${String(i)}`)),
+      ...Array.from({ length: adds }, (_, i) => line("add", `+ ${String(i)}`)),
+    ];
+
+    let cases = 0;
+    for (let removes = 0; removes <= 4; removes += 1) {
+      for (let adds = 0; adds <= 4; adds += 1) {
+        if (removes === 0 && adds === 0) continue;
+        const whole = pairedRows(run(removes, adds));
+        expect(whole, `${String(removes)}×${String(adds)} is max, not sum`).toBe(Math.max(removes, adds));
+
+        for (let k = 0; k <= whole; k += 1) {
+          const head = run(Math.min(k, removes), Math.min(k, adds));
+          const tail = run(removes - Math.min(k, removes), adds - Math.min(k, adds));
+          expect(pairedRows(head), `${String(removes)}×${String(adds)} cut at ${String(k)}: the head`).toBe(k);
+          expect(pairedRows(tail), `${String(removes)}×${String(adds)} cut at ${String(k)}: the tail`).toBe(whole - k);
+          cases += 1;
+        }
+      }
+    }
+    // The corpus is the claim's own scope, so a shrunken loop cannot pass quietly.
+    // **The figure is the loop's, taken from the run.** Written by hand it was
+    // 85; the sum of `max(r, a) + 1` over the twenty-four runs is 94.
+    expect(cases, "every run up to 4×4, at every cut point").toBe(94);
+  });
+
+  it("T2.13 (C25 I20b): a clamped offset is one a window may begin at, and the caller and the window agree", () => {
+    for (const width of [UNIFIED, SPLIT]) {
+      const height = 6;
+      const ceiling = clampOffset(THREE, width, height, 10_000);
+
+      /**
+       * **Idempotent, which is what makes the returned value usable.** Snapping
+       * inside the builder instead leaves the caller's offset and the window it
+       * produces disagreeing: the caller stores 7, the window opened at 4, and
+       * the next motion computes from 7.
+       */
+      const valid: number[] = [];
+      for (let offset = 0; offset <= ceiling; offset += 1) {
+        const clamped = clampOffset(THREE, width, height, offset);
+        expect(clampOffset(THREE, width, height, clamped), `${String(width)}: ${String(offset)} settles`).toBe(clamped);
+        if (clamped === offset) valid.push(offset);
+
+        // And the two routes agree: a caller holding the clamped value receives
+        // the window the raw offset would have produced.
+        expect(
+          JSON.stringify(windowPatch(THREE, width, clamped, height)),
+          `${String(width)}: the clamped offset gives the raw offset's window`,
+        ).toBe(JSON.stringify(windowPatch(THREE, width, offset, height)));
+      }
+
+      expect(valid.length, `${String(width)}: there are offsets to move between`).toBeGreaterThan(2);
+
+      /**
+       * **A limit, measured and recorded rather than asserted away.** Two
+       * adjacent valid offsets can produce the *same* window: offsets 0 and 1
+       * of `THREE` at width 80 both draw the first three context lines, because
+       * the row they differ by is the sticky path header (I18), which a window
+       * re-adds whether or not it was skipped. That is the shape I20b's second
+       * clause names — a keystroke that redraws what is already on screen —
+       * arriving through the sticky rule rather than through where the snapping
+       * happens.
+       *
+       * **It is unreachable today, which is why this is a note and not a
+       * failure**: `PatchViewMotion` is `nextHunk`, `prevHunk`, `top`, `bottom`,
+       * `pageUp`, `pageDown`, and none of them steps by one row. T2.14 checks
+       * the motions that exist. A line-wise motion added here would need this
+       * measured again, and this comment is where the next reader finds that.
+       */
+      const drawn = valid.map((o) => JSON.stringify(windowPatch(THREE, width, o, height)));
+      expect(new Set(drawn).size, `${String(width)}: the offsets do reach distinct windows`).toBeGreaterThan(1);
+    }
   });
 });

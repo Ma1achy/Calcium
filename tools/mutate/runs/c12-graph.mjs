@@ -132,4 +132,36 @@ const results = runPass({
 });
 
 console.log(report(results));
-process.exit(results.some((r) => !r.killed) ? 1 : 0);
+
+// **Three survivors, recorded and disposed of in F243, declared here so the exit
+// means something** (F980). The run exited 1 on them at every pass since, which
+// reads the same as a new survivor in a summary. `c19-menu-window.mjs`'s form.
+const EXPECTED_SURVIVORS = new Map([
+  [
+    "the deduplication runs on the un-reversed edge",
+    "F243 §1 — drawing an edge twice is a no-op: the mask ORs the bits, so removing " +
+      "deduplication changes nothing in any frame.",
+  ],
+  [
+    "best-kept holds a reference to the rows the next sweep mutates",
+    "F243 §2 — the corpus cannot reach the defect the sweep trace predicted: no fixture " +
+      "has a later sweep that worsens the crossing count.",
+  ],
+  [
+    "a dropped node leaves its edges behind",
+    "F243 §3 — the drop's guard is doubled downstream, so the edges left behind are " +
+      "filtered again; the mutation indicts the subject, not the tests.",
+  ],
+]);
+for (const r of results) {
+  const why = EXPECTED_SURVIVORS.get(r.name);
+  if (why === undefined) continue;
+  console.log(
+    r.killed
+      ? `\nEXEMPTION IS STALE  ${r.name}\n  now caught — remove it from EXPECTED_SURVIVORS`
+      : `\nEXPECTED SURVIVOR   ${r.name}\n  ${why}`,
+  );
+}
+const unexpected = results.filter((r) => !r.killed && !EXPECTED_SURVIVORS.has(r.name));
+const stale = results.filter((r) => r.killed && EXPECTED_SURVIVORS.has(r.name));
+process.exit(unexpected.length + stale.length > 0 ? 1 : 0);

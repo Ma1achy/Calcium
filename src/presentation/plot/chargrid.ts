@@ -13,7 +13,7 @@
  * cell it occupies and an edge routed through it is bent rather than drawn over.
  */
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
-import { cells } from "../text.js";
+import { cells, graphemes, type AmbiguousWidth } from "../text.js";
 import { glyphForMask } from "./linedraw.js";
 
 type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
@@ -29,18 +29,48 @@ export function grid(rows: number, columns: number): Grid {
 }
 
 /**
- * Lay a label into a row from `at`, one codepoint per its own cell width.
+ * Lay a label into a row from `at`, one grapheme cluster per the cells it
+ * measures (C12 I118, §3n).
  *
- * A two-cell character writes itself and leaves `""` behind it, so the cell it
- * occupies is not one an edge can walk into — the same continuation the
- * treemap's names and a point label both needed, and the same reason (§3n).
+ * **The one writer.** The treemap's names, `tree`'s and `graph`'s labels, the
+ * sankey's node labels, the point labels, the radar's category labels and the
+ * x axis's captions and tick labels all come through here. Four private
+ * copies of this loop wrote one *code point* per cell, advancing by `cells()`
+ * of the code point, so a zero-width piece was written and then overwritten
+ * by the piece after it: a family `👨‍👩‍👧` arrived as three faces, a keycap `1️⃣`
+ * as a bare digit, and `café` decomposed as `cafe` (F969, F976). Three more
+ * placed by `cells()` and then wrote one code point per *slot*, so a family
+ * overran its reservation by three and `図表` left two blank inside its own,
+ * and every label sharing the row moved (F982, F985).
+ *
+ * **A cluster owns the cells it measures.** It is written whole into the cell
+ * where it starts, and the cells after that one up to its width are `""` —
+ * the continuation the four already kept, so a two-cell character is not one
+ * an edge, a fill or a ribbon can walk into, and the row keeps its count. **A
+ * cluster measuring nothing owns none**: a lone leading combining mark or a
+ * bare joiner is dropped and the column does not move, because attaching it
+ * to a neighbour would put a mark on an edge glyph or on a tile's colour ring,
+ * which is worse than losing a mark that had no base. `scatter3.ts`'s
+ * `overlay` is the precedent (C12 I92, F970).
+ *
+ * The row is `(string | undefined)[]` because the treemap's grid and the
+ * sankey's line use `undefined` for *no label here*; a `string[]` row is
+ * assignable, and the tree, the graph and the point labels pass one. A
+ * cluster that would start outside the row stops the write, so a caller that
+ * placed by measurement cannot write past the row.
  */
-export function write(row: string[], at: number, body: string, caps: Caps): void {
+export function write(
+  row: (string | undefined)[],
+  at: number,
+  body: string,
+  ambiguous: AmbiguousWidth,
+): void {
   let col = at; // cells-ok — a column position
-  for (const ch of body) {
+  for (const cluster of graphemes(body)) {
     if (col < 0 || col >= row.length) break; // cells-ok — a column position
-    row[col] = ch;
-    const w = cells(ch, caps.ambiguousWidth);
+    const w = cells(cluster, ambiguous);
+    if (w === 0) continue;
+    row[col] = cluster;
     for (let k = 1; k < w; k += 1) if (col + k < row.length) row[col + k] = ""; // cells-ok — a cell count
     col += w; // cells-ok — a cell count
   }

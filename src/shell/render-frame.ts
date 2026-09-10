@@ -30,7 +30,8 @@
  * composition; the boundary is where it was.
  */
 import { CURSOR_HOME as HOME, SGR_RESET, cursorTo } from "../terminal/escapes.js";
-import { cursorFor, paint, type PaintDeps } from "./paint.js";
+import { cursorFor, paint, placedLayers, type PaintDeps } from "./paint.js";
+import type { Placed } from "../viewport/overlay/index.js";
 import { FrameError } from "./frame-error.js";
 import type { Composed } from "./frame.js";
 import type { TerminalSize } from "../terminal/lifecycle.js";
@@ -102,9 +103,23 @@ export function composeFrame(deps: FrameDeps): FrameResult {
   // Nothing could see it, because the surplus rows were discarded below.
   deps.resizeViewport({ width: frame.size.columns, height: frame.region.height });
 
+  // **One overlay layout per frame, shared by the paint and the cursor** (C22
+  // I96). `paint()` and `cursorFor()` each laid the overlays out for themselves
+  // — the same answer computed twice, 0.9 ms of a frame — and C28 T1.61 pinned
+  // the pair at *exactly twice* for as long as it lasted (F941). The layout
+  // runs inside the `try` because it always did: it was the first thing
+  // `paint()` used to do. So does building the paint's dependencies — the
+  // old call site had `deps.paintDeps(frame)` inside the `try` as `paint()`'s
+  // argument, and C22 T4.11f substitutes a `paintDeps` that throws to reach
+  // the fallback. Landing the shared layout lifted the call out, and that row
+  // went red on the first full run (F941).
+  let painting: PaintDeps;
+  let placed: readonly Placed[];
   let lines: readonly string[];
   try {
-    lines = paint(frame, deps.paintDeps(frame));
+    painting = deps.paintDeps(frame);
+    placed = placedLayers(painting);
+    lines = paint(frame, painting, placed);
   } catch (err) {
     // A frame that cannot be composed coherently draws the fallback rather than
     // a short frame: one row too few leaves the previous frame showing through
@@ -125,7 +140,7 @@ export function composeFrame(deps: FrameDeps): FrameResult {
   // and the bytes still have to land inside the one `write`, because a
   // separate call cannot be kept inside C03's synchronised-update window. The
   // owner yields them; the frame embeds them.
-  const cursor = cursorFor(frame, deps.paintDeps(frame));
+  const cursor = cursorFor(frame, painting, placed);
   const hide = deps.cursorSequence(null);
   return {
     kind: "frame",

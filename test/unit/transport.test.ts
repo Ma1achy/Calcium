@@ -101,11 +101,89 @@ describe("C06 argv", () => {
     expect(withJson(["ps", "--json"]).filter((a) => a === "--json")).toHaveLength(1);
   });
 
+  it("T1.14 (C06 I4, I25, C05 I26, F1): the tokens are the far side's — appended whole, or not at all", () => {
+    // **`--json` was a convention read as a fact** (F1). The framework's own
+    // demo target spells it `--format json`, so Calcium could not drive
+    // `docker` without a shim. The tokens now travel on the invocation, which
+    // is `streams`' seam exactly: the caller resolves the verb's declaration
+    // against the manifest's, and C06 never reads C05.
+    expect(withJson(["ps"], ["--format", "json"])).toEqual(["ps", "--format", "json"]);
+
+    // **The three states in one row, because the interesting cell is that `[]`
+    // and absent differ.** A row asserting either alone passes against an
+    // implementation that conflates them, and a verb that already emits JSON
+    // has no other way to say so.
+    expect(withJson(["version"], []), "an empty declaration appends nothing").toEqual(["version"]);
+    expect(withJson(["ps"], undefined), "absent is the default").toEqual(["ps", "--json"]);
+    expect(withJson(["ps"]), "and so is not passing it at all").toEqual(["ps", "--json"]);
+
+    // The result is a fresh array either way, so a caller cannot write through
+    // it into the invocation it was given.
+    const argv = ["ps"];
+    expect(withJson(argv, [])).not.toBe(argv);
+  });
+
+  it("T1.15 (C06 I4): the dedupe reads the first token, so a user's own value survives", () => {
+    // **The cell where two correct statements overlap** (C05 §8c row 5). I4's
+    // argument is *a far side that treats a repeated flag as an error fails a
+    // command that was correct*; D16's is *a user who types it is asking to see
+    // the contract*. Matching the whole sequence satisfies neither for a valued
+    // flag: it would append `-o json` after `-o yaml` and silently override
+    // what the user asked for, because most far sides take the last one.
+    expect(withJson(["get", "pods", "-o", "yaml"], ["-o", "json"])).toEqual([
+      "get",
+      "pods",
+      "-o",
+      "yaml",
+    ]);
+
+    // The control, without which the row passes against an implementation that
+    // never appends anything.
+    expect(withJson(["get", "pods"], ["-o", "json"])).toEqual(["get", "pods", "-o", "json"]);
+
+    // And the single-token case is unchanged, which is what makes the whole
+    // member additive: a one-token flag has only a first token.
+    expect(withJson(["ps", "--json"], ["--json"])).toEqual(["ps", "--json"]);
+  });
+
   it("T1.3 (I4): the spawned argv carries the binary and the flag", async () => {
     const { transport, runner } = subprocess({ exit: { code: 0, signal: null } });
     await transport.invoke(invocation({ argv: ["ps", "--mine"] }));
 
     expect(runner.spawns[0]?.argv).toEqual(["widget", "ps", "--mine", "--json"]);
+  });
+
+  it("T3.25 (C06 I25, I20, C05 I26): the declaration reaches what is spawned, and a replay reports what ran", async () => {
+    // **The first draft of this row asserted what I20 forbids**, and the
+    // fixture transport caught it: it expected every transport to report the
+    // declared tokens, and replay reported `--json` — because a replayed
+    // result's `argv` is a *historical fact about the data* (D49), not a
+    // reconstruction. The transports agree about the resolution and disagree
+    // about whose argv they report, which is §3's second half and is worth a
+    // row rather than a sentence.
+    const argv = ["ps", "--mine"];
+    const declared = ["--format", "json"];
+
+    const { transport, runner } = subprocess({ exit: { code: 0, signal: null } });
+    await transport.invoke(invocation({ argv, jsonFlag: declared }));
+    expect(runner.spawns[0]?.argv, "the child is given the declared tokens").toEqual([
+      "widget",
+      "ps",
+      "--mine",
+      "--format",
+      "json",
+    ]);
+
+    // The control, without which the arm above passes against a transport that
+    // appends whatever it is handed and never had a default of its own.
+    const { transport: bare, runner: bareRunner } = subprocess({ exit: { code: 0, signal: null } });
+    await bare.invoke(invocation({ argv }));
+    expect(bareRunner.spawns[0]?.argv, "and nothing declared is --json").toEqual([
+      "widget",
+      "ps",
+      "--mine",
+      "--json",
+    ]);
   });
 
   it("T1.5 (I3): the runner receives an array, and spawnShell is never reached", async () => {
@@ -178,7 +256,7 @@ describe("C06 reporting", () => {
     expect(r.signal).toBe("SIGKILL");
   });
 
-  it("T1.13: durationMs comes from the injected clock, not an ambient one", async () => {
+  it("T1.13 (I19): durationMs comes from the injected monotonic clock, not an ambient one", async () => {
     const fake = fakeClock();
     const clock = clockOf(fake);
     const child = fakeChild({ ignores: [] });

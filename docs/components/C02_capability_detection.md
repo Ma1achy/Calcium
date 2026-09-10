@@ -6,7 +6,7 @@
 | **Package** | `@fmx/calcium` |
 | **Layer** | L0 terminal |
 | **Depends on** | Nothing. Pure function over an environment record |
-| **Consumed by** | C01 (what to acquire) · C03 (synchronised update) · C09 C10 C11 C12 (rendering fallbacks) · C17 (bracketed paste) · L4 (refuse-to-open decision) |
+| **Consumed by** | C01 (what to acquire) · C03 (synchronised update) · C09 C10 C11 C12 (rendering fallbacks) · C17 (bracketed paste) · L4 (refuse-to-open decision, and the surfacing of `sources` in diagnostics) |
 | **Source** | A01 D28, D29 · A02 §2 |
 | **Status** | Draft |
 
@@ -43,11 +43,18 @@ function detectCapabilities(
   overrides?: Partial<TerminalCapabilities>,
 ): Readonly<{
   capabilities: TerminalCapabilities;
+  sources:      Readonly<Record<keyof TerminalCapabilities, CapabilitySource>>;
   warnings:     readonly string[];
 }>;
 
+type CapabilitySource = "declared" | "stated" | "inferred" | "assumed" | "unreachable";
+
 function isUsable(caps: TerminalCapabilities): boolean;   // altScreen only
 ```
+
+**`sources` says how each field was answered and `capabilities` says what the answer was.** Four
+of the ten are inferred from the emulator's *name* and are wrong whenever the name is (§3, I13);
+nothing in the record used to distinguish those from the six that are not.
 
 `env` is passed in rather than read from `process`. That is what makes every detection rule testable as a table of inputs, and it is the only reason this component needs no mocking framework.
 
@@ -177,6 +184,152 @@ alone is sufficient there and no user setting is required. It belongs to whoever
 (`terminal/escapes.ts`), not to detection, and it is what would let `imageProtocol` survive a
 multiplexer instead of being switched off in one.
 
+### The record says how each answer was reached, because four of them are guesses and nothing said so
+
+**Identification is not capability**, and the section above rules the half of that sentence a
+multiplexer decides. This is the other half: *which emulator is this* is answered by matching a
+name against a table, and a name is not a measurement. F418 named the axis and stopped there —
+so the record shipped with `imageProtocol: "kitty"` and `unicode: "full"` side by side, one an
+inference from a string and the other the locale stating a fact, and **a consumer could not tell
+them apart because the record did not carry the difference**.
+
+`sources` carries it. The kinds are named for **what would have to be wrong for the answer to be
+wrong**, which is the only property a consumer can act on:
+
+| kind | the answer came from | wrong when |
+|---|---|---|
+| `declared` | the reader's own `[terminal]` override (I4) | never — it is not a claim about the terminal |
+| `stated` | a variable whose **value carries the fact**: `COLORTERM`, `COLORFGBG`, `LC_ALL` · `LC_CTYPE` · `LANG` | the writer of the variable is wrong |
+| `inferred` | the identification — a **name** matched against a table | **the name is wrong**, which is a whole class: `TERM` set by hand, a terminal borrowing another's terminfo entry, a name that survives a hop the capability does not |
+| `assumed` | `TERM` is present and not `dumb`, or its shape contains `256color` — nothing about *which* terminal this is | any terminal that is present and does not do the thing |
+| `unreachable` | nothing: the terminal was identified and the sequence is **known not to reach it** (F432's measurement) | it stops being true when the wrapper in `escapes.ts` lands |
+
+| field | `TERM=xterm-kitty` | `TERM=xterm` | inside `TMUX` | with an override |
+|---|---|---|---|---|
+| `colourDepth` | `inferred` — or `stated` when `COLORTERM` speaks | `assumed` | `assumed` | `declared` |
+| `unicode` | `stated` | `stated` | `stated` | `declared` |
+| `ambiguousWidth` | `stated` | `stated` | `stated` | `declared` |
+| `backgroundPolarity` | `stated` | `stated` | `stated` | `declared` |
+| `synchronisedUpdate` | `inferred` | `inferred` | **`unreachable`** | `declared` |
+| `bracketedPaste` | `assumed` | `assumed` | `assumed` | `declared` |
+| `mouse` | `assumed` | `assumed` | **`unreachable`** | `declared` |
+| `imageProtocol` | `inferred` | `inferred` | **`unreachable`** | `declared` |
+| `keyboardProtocol` | `inferred` | `inferred` | **`unreachable`** | `declared` |
+| `altScreen` | `assumed` | `assumed` | `assumed` | `declared` |
+
+**The gate demotes `colourDepth` and refuses the other three, and that asymmetry is the table's
+content rather than an inconsistency.** Inside a multiplexer the identification is `null` for every
+reader (I11), and `colourDepth` has a rule *below* the identification to fall through to — so it
+answers 4 or 8 from `TERM`'s shape, which is a claim, `assumed`. The other three have nothing
+below, so their answer is a **withheld** claim and not a claim at all. The distinction earns its
+value the same way I10's `unknown` does: `imageProtocol: "none"` at `inferred` means *your terminal
+is not in the table — declare it, or run the probe*, and the identical `"none"` at `unreachable`
+means *your terminal very likely can, tmux eats the bytes, and the fix is not yours*. **Two
+remedies behind one value is what a third value is for.**
+
+**The kinds are not a precedence order, and one row is why.** It is tempting to read the table as a
+lattice — `declared` beats `stated` beats `inferred` beats `assumed` — and `colourDepth`'s rule
+order does read that way for three of its four rungs, which is what the code comment saying
+*`COLORTERM` is the terminal speaking for itself and a name is us inferring* was reaching for. It is
+false at the top: `TERM=dumb` with `COLORTERM=truecolor` answers **1**, so an `assumed` rung
+outranks a `stated` one (T3.3). The gate is a veto and not a rung. **A classification of what
+falsifies an answer and an ordering of which rule wins are two things**, and a sentence merging them
+would read as correct and forbid nothing.
+
+**The source is produced by the rule that produced the value, never beside it.** A second table
+mapping field to source, kept up to date with the rules, is exactly the defect this component was
+just repaired for — F418 is three lists about one terminal, and a provenance list computed
+separately would be a fourth. Each rule returns the pair, so the two cannot disagree without the
+same edit breaking both (I13, T6.14).
+
+**A rejected override is not `declared`.** I4 already says a value outside a field's domain *is not
+an override*; the source is where that sentence becomes observable, because the record keeps the
+detected value and could keep the detected source or not, and nothing else in the record would
+differ (T3.14). The rejection warning names the source it kept, which is what makes it actionable:
+*keeping the detected `"none"` (inferred from the terminal's identity)* tells a reader that
+declaring the field is the fix, where the bare value does not.
+
+**Stated blind spot.** `TERM=dumb` is a *statement* and its answers are recorded as `assumed`,
+alongside an absent `TERM`, which is not. C02 treats the two identically everywhere (§3), and a
+`sources` map that split them would be the only place in the component that does — a distinction
+visible in one field of the record and in no behaviour is worse than the imprecision.
+
+#### What a terminal will actually answer, measured
+
+**`inferred` is a guess, and the entry that named the axis could not check it.** It can be checked
+now: the devcontainer has kitty 0.41.1 and XTerm(398) under Xvfb, and `test/support/x-emulator.ts`
+drives an emulator and returns the bytes it wrote to its pty. Every claim the identification makes
+for kitty was put to kitty, with xterm as the terminal the table declines to name (T5.8):
+
+| query | kitty 0.41.1 answers | XTerm(398) answers | the table claims |
+|---|---|---|---|
+| `CSI ? 2026 $ p` — DECRQM | `CSI ? 2026 ; 2 $ y` — supported | `CSI ? 2026 ; 0 $ y` — **not recognised** | `synchronisedUpdate` true / false ✓ |
+| `APC _G i=31,s=1,v=1,a=q,t=d,f=24; … ST` | `APC _G i=31;OK ST` | nothing | `imageProtocol` `kitty` / `none` ✓ |
+| `CSI ? u` | `CSI ? 0 u` | nothing | `keyboardProtocol` `kitty` / `none` ✓ |
+| `CSI c` — DA1 | `CSI ? 62 ; c` | `CSI ? 64 ; 1 ; 2 ; 6 ; 9 ; 15 ; … ; 28 c` — **no `4`, so no sixel** | — |
+
+**Four for four, which is the result worth having and not the one to celebrate.** The table is
+right about the two emulators that can be run here; the class `inferred` names is unchanged, because
+the failure mode was never *the table is wrong about kitty* — it is *this is not kitty and the name
+says it is*. What the run buys is that the arms are no longer unmeasured in the sense F415 shipped:
+`imageProtocol` had never run against a terminal, and now two of its four rows have.
+
+**And DECRQM answers on both, which prices §3's refusal properly.** A terminal that does not
+implement the mode still replies `;0`, so *unrecognised* and *supported* are distinguishable — the
+interrogative probe §3 declines is not a coin toss for this capability. The refusal stands on the
+terminal that answers **nothing**: the graphics query and `CSI ? u` produced no bytes at all from
+xterm, so any probe needs a window, and a startup hang is worse than a wrong guess that can be
+overridden. The cost is now stated rather than assumed.
+
+#### The reply channel, ruled — and the blocker four documents named was never the one in the way
+
+**This subsection used to say two of the three inferred capabilities were *one C02 ruling away from
+being measured*, with the ruling blocked on a decoder arm.** The arm landed — C16 I32, every
+string-terminated reply consumed whole and emitting nothing — and **nothing about detection moved**,
+because the input path was never what stood in the way (I14, F1057). What follows is the reason that
+replaces it, measured on 2026-09-10 rather than reasoned from the protocol.
+
+**A reply is unreadable until raw mode.** The four queries §3 measures — DECRQM `CSI ? 2026 $ p`,
+`CSI ? u`, the graphics query, and DA1 as a sentinel — put to XTerm(398) and to kitty 0.41.1 under
+Xvfb:
+
+| the tty's line discipline | what the reader gets | how long |
+|---|---|---|
+| canonical — XTerm(398) | **0 bytes** | 1500 ms window, timed out |
+| canonical — kitty 0.41.1 | **0 bytes** | 1500 ms window, timed out |
+| raw — XTerm(398) | all four answered, DA1 last | **0.89 / 0.94 / 0.99 ms**, three runs |
+| raw — kitty 0.41.1 | all four answered, DA1 last | **13.3 / 15.9 / 22.6 / 23.4 ms**, four runs |
+
+**And the bytes are not discarded in the meantime — they are held, and they are echoed.** Through a
+pty: a reply written 250 ms before `setRawMode(true)` reaches the child as the empty string and then
+arrives *in full* the moment raw mode is entered, so a query asked too early answers into whatever
+reads next. While it waits, the line discipline echoes it back to the display in `ECHOCTL` form —
+`ESC ] 11 ; rgb:1234/5678/9abc ST` returns as the 26 printable characters `^[]11;rgb:1234/5678/9abc^[\`.
+**That is F414's symptom** — a reply landing where the reader is looking — arriving by a mechanism no
+entry named, in the one window early enough for a probe to matter.
+
+**Raw mode is `acquire()`'s, and by then the record is spent.** `stdin.setRawMode` is called in one
+file in `src/` — C01's `lifecycle.ts`, inside `acquire()`'s `take("rawMode")` — and `acquire()` is
+reached from one call site, C22's `session.ts` `#open()`. The record is built at C22's step 2 and read
+at **eleven** sites before that; **six** of them hand it into an object built there — the lifecycle,
+the frame scheduler, the profile view, the pipeline, C16's decoder and the session graph itself — and
+C22 I58's render-cache key omits it *because* it never moves (T4.18d). **So a capability answered from the wire has nowhere to go.**
+
+**The refusal rests on that and on neither of the two things it reads as.** It is not danger: C16 I32
+makes a reply harmless, and `q=1` on C09's transmissions is free of consequence today. It is not
+latency: one burst terminated by DA1 costs a single round trip, and a capability that answers
+*nothing* costs nothing extra — XTerm's silence on the graphics query and on `CSI ? u` did not delay
+its DA1 by a measurable microsecond. Both figures are above so that the next reader can check them
+and finds the argument does not stand on them.
+
+**Where a reply channel goes if one is ever built.** Before construction: a function the application
+calls with its own streams, which takes raw mode, sends one burst terminated by DA1, restores, and
+hands its answers to `TuiConfig.capabilities` — where I4 already makes them win and I13 already
+records them `declared`. That keeps I2 intact, keeps the record constant, and needs no arbitration
+with C16 at all: nothing else is subscribed while it runs, and a reply that arrives after its window
+closes reaches the decoder and is consumed by C16 I32. **The entry point is C24's public surface, not
+this component's**, which is why C02 rules the shape and does not grow the seam.
+
 ### Ghostty, and how the second list came to be kept up
 
 **`synchronisedUpdate` has named ghostty since v1 and `imageProtocol` never did.** They are
@@ -194,12 +347,36 @@ and the failure path is distinguishable from the success path. Both `TERM` and `
 are matched because a `ghostty` inside `tmux` reports `TERM=screen-256color` while
 `TERM_PROGRAM` survives.
 
-**WezTerm and Konsole are owed and deliberately not claimed.** Both are widely said to implement
-the protocol and **neither has been measured here**, and a false positive is worse than a false
-negative: placeholders addressing an image the terminal never received draw *nothing*, which is
-C09 §4c's loud failure arriving through a detection table. The expiry is cheap and named — run
-`tools/terminal-probe/probe.py` in the terminal and read the verdict — so this is a deferral with
-an instrument rather than a deferral with a hope.
+**Two more records since, and the second is the one that makes the first mean anything** (F1060,
+F1071). kitty 0.41.1 answers `OK` for all seven cases and `EBADPNG:bad adaptive filter value` for
+the corrupt control. XTerm 398, which speaks no graphics protocol at all, answers `NO RESPONSE` to
+every one and falls through this table to `none`. **Records that agree with a table say nothing on
+their own**: with agreeing records only, a reader firing on *measured ahead of the table* is
+indistinguishable from one that also fires on *the table claims what the terminal refused*, and
+XTerm is the terminal that exercises the second arm. The two terminals name the same failure
+differently, which is why nothing matches on the error text.
+
+**WezTerm and Windows Terminal are owed and deliberately not claimed.** Both are widely said to
+implement the protocol and **neither has been measured here**, and a false positive is worse than a
+false negative: placeholders addressing an image the terminal never received draw *nothing*, which
+is C09 §4c's loud failure arriving through a detection table.
+
+**This sentence named Konsole until F1071, and `TerminalName` never had a `konsole` member.** The
+two unmeasured `none` rows are `wezterm` and `windowsterminal`; `konsole` appears in `src/` only in
+a `COLORFGBG` comment about an unrelated rule, and `capabilities.test.ts` T1.7's `KONSOLE_VERSION`
+row is an *unidentified* terminal falling through. Recorded rather than quietly corrected, because
+the shape is the reusable part: **a spec naming a terminal the code cannot name is a deferral owed
+to nobody**, and it survived twenty-five components because *WezTerm and X are owed* reads as
+complete whatever X is. Checking the pair finds it; checking the sentence does not.
+
+**The expiry is a row that goes red, not a reader who remembers** (F1071). Run the probe in one of
+them with no argument and the report lands in `tools/terminal-probe/results/`, where
+`terminal-probe.test.ts` TP7 reads every record there back through `detectCapabilities` and fails —
+naming the file — when a recorded verdict disagrees with this table. Until that row existed this
+paragraph said *run the probe and read the verdict* while nothing read the verdict: an instrument,
+an output file, and no reader, which is a deferral with a hope wearing a tool's clothes. **What it
+still does not check is the rest of the report** — TP7 reads one line, so a terminal answering `OK`
+to the 1×1 query and then refusing real transmissions would pass it.
 
 **Which rules the `dumb` gate applies to.** `TERM = dumb` gates every rule derived from `TERM` — `colourDepth`, `bracketedPaste`, `mouse`, `altScreen`. It does **not** gate rules derived from `TERM_PROGRAM` — `synchronisedUpdate` and `imageProtocol` — or from `COLORFGBG` — `backgroundPolarity` — because those describe the emulator, and `TERM=dumb` is a statement about terminfo. The case that makes this matter is an override of `altScreen: true` under `TERM=dumb` (T1.9): the user has said detection is wrong about their terminal, and iTerm2 supports synchronised update whatever `TERM` claims. Gating it would give them an alt screen that tears.
 
@@ -384,6 +561,10 @@ Alternate screen is the sole hard requirement (D28). A fullscreen application on
 
 - **I12** — **Nothing is reachable only with the keyboard protocol.** `keyboardProtocol` makes interaction better and never possible: every key, binding and affordance available under `"kitty"` is available under `"none"`, by a route the keymap carries. Concretely — a `Key` event's `event` field is optional and absent under `"none"`, so a consumer that ignores it is unchanged; C01 pushes the flags only when the record says so (C01 I10) and pops rather than resets, so the terminal's prior state survives; and no binding in `keymap.ts` may name an `event` filter without a fallback that fires without one (A03 SS55). The protocol is detected from the identification and gated by `TMUX` with every other reader of it (I11), and it is declarable over the top like every field (I4), so a terminal the table does not know can be told to use it — and the table's errors run in the safe direction, because `none` on a terminal that would have answered is the behaviour every terminal already has.
 
+- **I13** — **Every field carries how its answer was reached, and the source is produced by the rule that produced the value.** `declared` is the reader's override, `stated` a variable whose value carries the fact, `inferred` a name matched against the identification's table, `assumed` `TERM`'s presence or shape, and `unreachable` a claim withheld because the sequence does not reach the emulator (§3, I11). **The five classify what would falsify an answer and are not a precedence order** — `TERM=dumb` with `COLORTERM=truecolor` answers 1, so an `assumed` rung outranks a `stated` one, and a reader taking the list as a lattice is wrong at the first row (T3.3). **A rejected override keeps the detected source with the detected value**, because I4 says an out-of-domain value is not an override and this is where that sentence becomes observable (T3.14). **Not a table beside the rules**: a second map from field to source is the fourth list in a component repaired for having three, so each rule returns the pair and no edit can move one without the other (T1.14, T6.14). Four fields are `inferred` and their failure mode is one thing — the name is wrong — which is the distinction the record did not carry and F418 named without ruling.
+
+- **I14** — **Nothing in the framework reads what the terminal says back, and the record's lifetime is the reason.** A reply is unreadable until raw mode — measured, four queries against XTerm(398) and kitty 0.41.1 give **0 bytes in 1500 ms** of canonical mode against 0.89–0.99 ms and 13.3–23.4 ms in raw — and raw mode is entered in one place, C01's `acquire()`, which C22 reaches after the record has been built at its step 2, read at eleven sites and handed into six objects built there — the lifecycle, the frame scheduler, the profile view, the pipeline, C16's decoder and the session graph. C22 I58's cache key omits the record **because** it never moves (T4.18d). So a capability answered from the wire would have to move a record six objects already hold, which is C22's to allow and not this component's to do. **The reason is neither of the two it reads as, and both are measured in §3 so that a reader who checks finds the argument does not rest on them**: C16 I32 makes a reply harmless, and a burst terminated by DA1 prices a probe at one round trip with a silent capability costing nothing. A reply channel, if one is built, runs **before construction** and arrives as `TuiConfig.capabilities` overrides — I4 makes them win, I13 records them `declared`, and the entry point is C24's. **The watch is on the condition and not on the remedy** (T2.10): raw mode is the entry price a reply reader cannot avoid, so a scan for every route into it fails the day one exists, where a row asserting `q=2` on C09's transmissions would be green for exactly as long as the silence is (F414, F1057).
+
 ---
 
 ## 6. Commitments
@@ -402,7 +583,9 @@ Alternate screen is the sole hard requirement (D28). A fullscreen application on
 12. **`ambiguousWidth` is detected from the locale, overridden by declaration, and constant for the session** — and `cells()` takes it as a parameter rather than reading it, because only L1 measures and L0's data half must not learn about terminals (I9). `cells()` is C09's and takes it as an argument.
 13. **`backgroundPolarity` is detected from `COLORFGBG`, is three-valued, and is never acted on here** — the certain range is 0–15 because the range beyond it is C10's table and C10 is a layer up, and *not stated* keeps its own value because the consumer branches on it (I10). What a polarity *means* for which theme opens is decided against a set C02 cannot see (→ C22 I68).
 15. **`keyboardProtocol` is the identification's second column, pushed by C01 as `CSI > 3 u` and popped as `CSI < u`, and nothing is reachable only with it** — a lone `Esc` and a modified Enter arrive whole, a repeat or release is an optional field on the event, and every affordance the protocol improves has a route that works at `"none"` (I12). The bits *not* pushed are stated with their reasons in §3, and the one that would report a lone modifier is among them.
+16. **The record says how each field was answered, in the same expression that answered it** — five kinds, named for what would falsify the answer, so `imageProtocol: "none"` inside a multiplexer and `imageProtocol: "none"` on an unnamed terminal stop being one value with two remedies (I13). Four fields are inferred from a name and six are not, and nothing in the record used to distinguish them; the kinds are a classification and **not** a precedence order, which is the sentence a reader would otherwise write and `TERM=dumb` falsifies.
 14. **The emulator is identified once, every capability consults that identification, and the identification is gated by `TMUX` before any of them see it** — `synchronisedUpdate` and `imageProtocol` read it, and `colourDepth` reads it too but is outranked by `COLORTERM`, because that variable is the terminal speaking for itself where a name is us inferring (I11). **Identification is not capability**, and the second question — *does a sequence reach it* — is asked in one place rather than by each reader: measured, tmux consumes both an unwrapped APC and `ESC [ ? 2026 h`, and the wrapped form is what survives (§3, FINDINGS F432).
+17. **A terminal's answer is never read, and the reason is the record's lifetime rather than the input path** — a reply is unreadable until raw mode, raw mode is `acquire()`'s, and by then six objects built at C22's construction hold the record; so a probe would run before construction and arrive as an override, on C24's surface and not this component's (I14). Neither of the reasons the file used to give survives being checked: C16 I32 makes a reply harmless where F414 said it would be typed into the prompt, and a DA1-terminated burst makes a probe one round trip where §3 said it needed a window — **both are measured in §3 for that reason**, because a justification the next reader cannot reproduce is one they delete.
 
 ---
 
@@ -425,6 +608,7 @@ A table of `env` fixtures. No mocks, no terminal.
 - **T1.12c** (I11): the gate is measured behaviour rather than caution, and `TERM_PROGRAM` is the route that reaches it — `TERM=screen-256color` with `TERM_PROGRAM=ghostty` identifies, and the same with `TMUX` set does not.
 - **T1.12** (I11): **the identification is one function and the capabilities are its readers.** A source scan over `terminal/capabilities.ts` finds every emulator name — `xterm-kitty`, `xterm-ghostty`, `iterm.app`, `ghostty`, `wezterm`, `windowsterminal` — inside the identifying function alone, and none in any `detect*` that answers a capability. **Asserted structurally rather than by comparing the three answers**, because three lists that happen to agree pass an agreement test and still are three lists (F84's shape: the property worth holding is the one a scan can see).
 - **T1.13** (I11, I12): keyboard protocol — `TERM=xterm-kitty`, `TERM=xterm-ghostty`, `TERM_PROGRAM=WezTerm` and `TERM=foot` → `kitty`; `TERM_PROGRAM=iTerm.app`, `TERM_PROGRAM=WindowsTerminal` and plain `xterm` → `none`; **and `TERM=xterm-kitty` with `TMUX=/tmp/x` → `none`**, through the identification's gate rather than a gate of its own — asserted beside `imageProtocol` in the same row, because a gate applied to one column and not the other is the state T1.12b was written against. `keyboardProtocol: "kitty"` declared over `TERM=xterm` wins (I4), and `"sixel"` declared for it is rejected with a warning (T3.5's shape).
+- **T1.14** (I13): **`sources` over the whole record, at four environments in one row** — `TERM=xterm-kitty`, plain `xterm`, the same kitty inside `TMUX`, and one with an override. The four together, because a source asserted at one environment is satisfied by a constant: the row that carries the content is kitty inside tmux, where `colourDepth` goes to `assumed` and the other three to `unreachable` from the same gate. `COLORTERM` beside the name moves `colourDepth` from `inferred` to `stated` with the value unchanged at 24 — **the value cannot see that move**, which is the whole argument for the field. **The three `stated` fields are also asserted at the environment that states nothing, and the mutation pass is why**: flipping each *nothing carried the fact* arm to `stated` killed nothing at first, because `assumed` is produced by four other fields at every fixture, so T2.9's bijection, its control over the set of kinds, and every whole-map comparison stayed green. A set over sites records the vocabulary and reads as though it records the assignment.
 - **T1.8**: alt screen — `TERM=xterm` → true; `TERM=dumb` → false; `TERM` unset → false.
 - **T1.9** (I4): every field can be overridden, including `altScreen: true` on `TERM=dumb`.
 - **T1.10** (I7): `isUsable` is true iff `altScreen`, regardless of every other field being at its worst value.
@@ -439,6 +623,8 @@ A table of `env` fixtures. No mocks, no terminal.
 - **T2.5** (I5): a source scan over `src/` finds no read of the environment outside `terminal/capabilities.ts` — of any variable, since SS10's subject is `process.env` and not a name list. This is A03 SS10, executed from the test suite against the same scan definition `make enforce` uses.
 - **T2.6** (I6): every capability field appears in the §4 degradation table with a named owner, and the table names no field the record does not have — a bijection over §4's `Field` column, parsed at test time, so both adding a field without a fallback and leaving a stale row behind fail the build. Each row's owner must match the implementation's table for the field it names.
 - **T2.8** (I1, I6): **§2's interface block and the record are a bijection too**, parsed at test time from the fenced TypeScript exactly as T2.6 parses §4's table. Separate from T2.6 because the two tables fail separately and one of them already had: `ambiguousWidth` shipped with a §3 subsection, a §4 row, an invariant and a commitment, and §2 declaring seven fields — T2.6 was green throughout, because the bijection it checks is the *other* table (F214). A field added to the record without being declared in §2 fails here.
+- **T2.9** (I1, I13): **`sources` and the record are a bijection, and §3's table is parsed for the closed set of kinds.** Every key of the record has a source, no source names a field the record lacks, and every value is one of the five §3 declares — parsed from the spec at test time, as T2.6 and T2.8 parse their tables, so a kind invented in code without a row here fails the build. The map is frozen, like the record.
+- **T2.10** (I14): **a source scan over `src/` finds exactly one entry into raw mode, and it is C01's.** `stdin.setRawMode` in `terminal/lifecycle.ts` and nothing else — no `/dev/tty` opened, no `stty` spawned, no `tcsetattr`. **The rule is the routes and not the symbol**, because a reply reader that opens `/dev/tty` for itself never touches `setRawMode` and a scan named for that one call would not see it — which is exactly what `tools/terminal-probe/probe.py` does, so the evasion is a shipped shape rather than an invented one. The lifecycle's own call is asserted **present**, because a scan whose corpus is empty passes for the wrong reason. This is the watch I14 owes its own condition: a reply reader must pay raw mode, and the day one does this row names the file.
 - **T2.7** (I8): no warning is emitted. Across every T1 fixture and the T3.5 bad-override case, neither `stdout` nor `stderr` is written to; the rejected override appears in the returned `warnings` instead.
 
 ### Tier 3 — edge cases
@@ -455,6 +641,7 @@ A table of `env` fixtures. No mocks, no terminal.
 - **T3.11** (I10): `COLORFGBG` set to each of the sixteen indices as the background → exactly {0…6, 8} are `dark` and {7, 9…15} are `light`. The whole domain, because the split has two discontinuities and a sampled pair cannot tell a wrong boundary from a right one.
 - **T3.12** (I10): `TERM=dumb` with `COLORFGBG=0;15` → `light`, `altScreen` false. T3.10's assertion for the other ungated rule, and the same argument: the gate is about terminfo and this variable is not.
 - **T3.13** (I10): `COLORFGBG=""` → `unknown`, through `read`'s empty-string rule rather than through a second check — the same path T3.6 asserts for `TMUX`.
+- **T3.14** (I4, I13): **a rejected override keeps the detected source, and an accepted one takes `declared`.** `colourDepth: 12` under `TERM=xterm-kitty` leaves the value 24 **and** the source `inferred`; `colourDepth: 8` leaves 8 and `declared`. Also `{ colourDepth: undefined }`, which the loop skips and which must therefore stay detected — the three cases where a naive "the key is present in `overrides`" rule answers `declared` and is wrong twice.
 - **T3.10**: `TERM=dumb` with `TERM_PROGRAM=iTerm.app` → `synchronisedUpdate` true, `imageProtocol` `iterm2`, `altScreen` false. Asserts the §3 gate boundary as intent rather than oversight: `TERM_PROGRAM` describes the emulator and survives a dumb terminfo, which is what makes an `altScreen: true` override usable.
 
 ### Tier 4 — integration
@@ -480,8 +667,13 @@ PTY harness with a controlled environment.
 - **T5.6** (I12, C01 I6): the capability forced on under `TERM=xterm-256color` → the PTY captures `ESC [ > 3 u` before the frame and `ESC [ < u` after it, with the pop **before** `1006l` — bytes read from the PTY, not reconstructed from the record; and the same run unforced captures neither. Both arms, because the forced arm alone passes a lifecycle that pushes unconditionally.
 - **T5.7** (I12; C16 I30): a real emulator — **kitty 0.41, under Xvfb, driven by XTEST** — receives `KITTY_KEYBOARD.enter` and answers `CSI 27 u` for a lone `Esc`, `CSI 27;1:3 u` for its release, `CSI 13;2 u` for Shift-Enter and `CSI 13;2:3 u` released; the real decoder reads the capture back as those six events. **Was a named `it.todo` for want of an emulator** (F810): the devcontainer and the `full` CI job install `xvfb xdotool kitty xterm`, and where one is absent the row skips *by name*, the reason in its title — never a silent pass. Every capture carries a typed control byte, because a capture with no reader is the same zero as a quiet terminal (F808).
 
+- **T5.8** (I13, I11): **the identification's four claims put to a real emulator** — kitty 0.41.1 and XTerm(398) under Xvfb, driven by XTEST, the bytes read from the emulator's own pty. DECRQM `CSI ? 2026 $ p` answers `;2` on kitty and **`;0` — not recognised** — on xterm; the kitty graphics query answers `OK` on kitty and nothing on xterm; `CSI ? u` answers `CSI ? 0 u` on kitty and nothing on xterm. All three agree with what `inferred` claims for each, which is the first time `imageProtocol` has been run against a terminal in this repository's own suite (F415 shipped it having never been). **And the reply channel measured beside them**: the same replies pushed through the real decoder give **0 events** for every CSI shape and a burst opening with `Alt-_` for the APC one — so two of the three queries are already safe to ask and one is not, which is FINDINGS F414's blocker resolved to a shape rather than to a protocol. Every capture carries a control keystroke, and the emulator's absence skips the row **by name** in its title.
+
+- **T5.9** (I14): **the refusal's premise, executed rather than described** — a real pty, the test playing the terminal. A DECRQM-shaped reply written into the master reaches the child as the **empty string** while the tty is canonical; the same bytes arrive **in full** the moment `setRawMode(true)` is called, so they were held rather than dropped; and in between the line discipline **echoes** them to the display in `ECHOCTL` form, which is asserted on the master's own bytes. Three assertions and not one, because *not delivered* and *never sent* are the same empty string and only the echo says which — the same reason F808 gives every capture a control byte. The echo is also F414's symptom arriving by the mechanism no entry named.
+
 ### Tier 6 — fail-on-revert
 
+- **T6.16** (I14): giving C02 a probe that opens `/dev/tty` and reads a reply — the shape `tools/terminal-probe/probe.py` already has, and one that never calls `setRawMode` → **T2.10 fails naming the file**, while a row asserting `q=2` on every C09 transmission passes unchanged. That contrast is the row's content: one watches the condition and the other watches the remedy, and the second is green for exactly as long as the silence is.
 - **T6.1** (I2): adding an interactive probe with an await → T2.4 fails.
 - **T6.2** (I5): reading `process.env.TERM` from a renderer → the source scan in T2.5 fails, naming the file.
 - **T6.3** (I4): making detection win over overrides for any field → T1.9 fails.
@@ -495,6 +687,8 @@ PTY harness with a controlled environment.
 - **T6.11** (I11): re-deriving a capability from its own emulator list — `synchronisedUpdate: term === "xterm-kitty" || term === "xterm-ghostty" || […].includes(termProgram)` inline in `detect`, which answers **identically on every fixture in this file** — → **T1.12 fails alone; T1.1, T1.5 and T1.7 all pass.** Measured, and the first mutation written for this row did not have that property: hard-coding `xterm-kitty` into `detectColourDepth` also broke T1.1's tmux row, so it was a *disagreeing* second list and proved nothing about the invariant. **A second list that agrees is invisible to every assertion about answers**, which is the state this file shipped in for the life of the project and the whole content of the row.
 - **T6.10** (I1): adding a field to the record without declaring it in §2 → **T2.8 fails and T2.6 does not**, which is the state `ambiguousWidth` shipped in.
 - **T6.12** (I11, I12): gating `keyboardProtocol` on the ungated identification — `identified` rather than `terminal` — → T1.13's tmux arm fails while every other capability's tmux row passes, which is the per-reader gate T6.11b describes arriving in a new column.
+- **T6.14** (I13): **computing `sources` from a table beside the rules instead of from the rules** — a `Record<keyof TerminalCapabilities, CapabilitySource>` written out by hand, correct for `TERM=xterm-kitty` and for plain `xterm` — → **T1.14 fails on the tmux column alone**, because a static map cannot express a field whose kind moves with the environment and `colourDepth` is that field. The mutation is the one that *agrees* everywhere else, on T6.11's argument: a second list that disagrees proves nothing about single-sourcing.
+- **T6.15** (I4, I13): **marking any field named in `overrides` as `declared`**, before the validator runs → **T3.14 fails on the rejected and the `undefined` cases and passes on the accepted one**, which is the asymmetry the row exists for — the value is identical in all three and only the source separates them.
 - **T6.13** (I12, C01 I6): making C01 reset the protocol with `CSI = 0 u` instead of popping → C01 T1.2 fails on the exact leave byte; making C01 push it unconditionally → C01 T1.28 and T5.6's unforced arm fail.
 
 ---
@@ -507,6 +701,6 @@ PTY harness with a controlled environment.
 | The minimum-size threshold (60 × 16) | An app policy, not a terminal capability — L4 |
 | Tone → colour resolution | C10 |
 | The ASCII glyph substitutions themselves | C09, C12 |
-| Interactive capability probes | Phase 1B — an opportunistic 50 ms `XTVERSION` that upgrades the record if it answers and is ignored if it does not |
-| Querying the keyboard protocol | Phase 1B — `CSI ? u`, to which a supporting terminal answers `CSI ? flags u` and any other says nothing. It would replace `keyboardProtocol`'s table with a measurement and would have to share `XTVERSION`'s window and its I2 exemption; until then the table is the answer and its errors run in the safe direction (§3) |
+| Interactive capability probes | Phase 1B, and **not here whatever phase it is** (I14): the record is complete and six objects hold it before a reply is readable, so the seam is a pre-construction function whose answers arrive as overrides, on C24's surface. **Two of this row's three stated parameters were wrong** (2026-09-10). Its *blocker* — `XTVERSION`'s reply being DCS-shaped and unreadable — is void: C16 I32 consumes every string-terminated reply and emits nothing. Its *anchor* was the wrong query: `XTVERSION` answers a **name**, so it replaces one inference with a better-sourced inference, and it is the only one of the four whose reply is DCS-shaped — **the plan's own choice of query is what put the plan behind the missing arm**, where DECRQM is CSI-shaped, has always decoded to nothing, and answers the capability itself (F1059). Its *window* is a guess: a burst terminated by DA1 resolves at the slowest **answering** query and a silent capability costs nothing, measured at 0.89–0.99 ms on XTerm(398) and 13.3–23.4 ms on kitty 0.41.1, so a fixed 50 ms prices the **terminal's** silence and is barely twice kitty's local worst case with no network in between (F1058) |
+| Querying the keyboard protocol | Phase 1B — `CSI ? u`, to which a supporting terminal answers `CSI ? flags u` and any other says nothing. **`nothing` is the reading a sentinel makes cheap**: DA1 comes back from a terminal that declined the question, so *unsupported* is decided at one round trip rather than at a window's expiry (§3). It would replace `keyboardProtocol`'s table with a measurement and would share the burst above and its entry point; until then the table is the answer and its errors run in the safe direction (§3) |
 | Using the image protocol | Phase 1B |

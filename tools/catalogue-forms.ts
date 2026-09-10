@@ -90,9 +90,38 @@ const sin = (n: number, step = 0.1): number[] =>
 const sin50 = sin(50);
 const sin500 = sin(500);
 
+/**
+ * The histogram family's shared sample — **300, and the size is the fixture's
+ * subject** (F350).
+ *
+ * At 200 `sturges` and `scott` produced the *same bins*, so `histogram/scott`
+ * drew a frame byte-identical to `histogram/default` while setting a field it
+ * was named for. That is not a fixture omitting a field, like `line/legend-right`
+ * was, nor one setting it to the default, like `heatmap/palette` — it is the
+ * third category the finding lumped with those two: **a real variation over a
+ * sample where the rules agree.** A corpus chosen for a property may not have it.
+ *
+ * Measured on this generator, first bin at width 60, all three strategies:
+ *
+ * | n | sturges | scott | freedman-diaconis | distinct |
+ * |---|---|---|---|---|
+ * | 200 | — | — | — | **2** — `default` ≡ `scott` |
+ * | **300** | `[5.9, 15.0)` | `[5.9, 14.1)` | `[5.9, 11.9)` | **3** |
+ * | 400 | `[5.9, 15.0)` | `[5.9, 13.5)` | `[5.9, 11.6)` | 3 |
+ * | 800 | `[4.0, 12.4)` | `[4.0, 10.2)` | `[4.0, 8.9)` | 3 |
+ * | 2000 | `[4.0, 11.7)` | `[4.0, 8.6)` | `[4.0, 7.6)` | 3 |
+ *
+ * 300 is the smallest measured size at which the three disagree, which is the
+ * smallest change that makes each of the three fixtures demonstrate its own rule.
+ * Sturges grows as `log₂ n` and the other two shrink as `n^(-1/3)`, so the gap
+ * only widens above it — the choice is *the least movement*, not a threshold.
+ *
+ * **Only these three fixtures read it**, so the blast radius is the family whose
+ * axis this is.
+ */
 const bell = (() => {
   const r = prng(0x5eed);
-  return Array.from({ length: 200 }, () => {
+  return Array.from({ length: 300 }, () => {
     // Irwin–Hall n=3, scaled — a hump rather than a flat field, so a histogram
     // fixture has a shape to be wrong about.
     const u = (r() + r() + r()) / 3;
@@ -534,6 +563,25 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
   },
   line: {
     // C12 §3g — all four placements, and the default that turns itself on.
+    //
+    // **The missing `legend: "right"` is not a defect, and adding it was wrong**
+    // (F350). This entry is byte-identical JSON to `multi-series` and F350 read
+    // that as *a variant naming a field its block does not set*. Setting the
+    // field was measured, and it changes the frame at exactly the two arms where
+    // it must not: at **1 bit and ASCII** the positional family stacks into
+    // strips and `stackedRows` writes each series' name in the y gutter, so
+    // `legendPlacement` declines — *not where the form has already labelled its
+    // own rows*. An explicit `"right"` overrode that decline and drew `alpha` in
+    // the gutter and `█ alpha` in a legend beside it, which is the third copy of
+    // a name the rung exists to prevent. Four frames moved and all four were
+    // worse.
+    //
+    // **So the collision is legitimate and is the auto-enable rule's own proof**,
+    // as this entry's comment above already says: *the default that turns itself
+    // on*. `multi-series` sets no `legend` and this one is named for what the
+    // default resolves to, so their being one frame above the colour floor is
+    // the demonstration. **An explicit value is not the same as the resolved
+    // default** — that is the whole finding, and it is why the field stays out.
     "legend-right": {
       form: "line", height: 8, axes: true,
       series: [s(sin50, "alpha"), s(sin50.map((v) => 100 - v), "beta"), s(sin(50, 0.2), "gamma")],
@@ -925,7 +973,10 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     // The reported defect's case: fewer readings than cells. `default` cannot
     // show it — it over-fills the width, so the window never pads.
     sparse: { form: "heatmap", height: 5, axes: true, series: matrix(5, 20) },
-    palette: { form: "heatmap", height: 5, axes: true, colormap: "viridis", series: matrix(5, 90) },
+    // **`magma`, because `viridis` is what `rampOf` answers for a heatmap
+    // already** (F350). Set to the default, the variant named for the palette
+    // drew the same frame as `default` and demonstrated nothing.
+    palette: { form: "heatmap", height: 5, axes: true, colormap: "magma", series: matrix(5, 90) },
     empty: { form: "heatmap", height: 3, axes: true, series: [s([], "empty")] },
     // **The matrix half of `origin`, and its default is the other corner**
     // (C12 §3ac): `series[0]`, `values[0]` is at the *top* left because a row
@@ -1363,10 +1414,8 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
   bubble: {
     default: {
       form: "bubble", height: 10, axes: true,
-      series: [
-        s([20, 45, 30, 60, 38, 52, 25], "value"),
-        s([2, 9, 4, 14, 6, 11, 3], "size"),
-      ],
+      series: [s([20, 45, 30, 60, 38, 52, 25], "value")],
+      sizes: [2, 9, 4, 14, 6, 11, 3],
     },
   },
   autocorrelation: {

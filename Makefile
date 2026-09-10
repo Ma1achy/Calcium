@@ -91,12 +91,31 @@ catalogue:          ## the frames `instruments` and `test` sweep — generated, 
 instruments: catalogue  ## every instrument's own fixture, and the inventory by equality (group 9)
 	node tools/instruments.mjs
 
+mutate:             ## every mutation run, serially, the tree hashed either side (F952) — SHARD=k/n ONLY=substr
+	@# **Runs weekly in CI as `mutation-sweep`, six shards**, which is what closes
+	@# F952: a run with no row that sees a mutation reads exactly like one that
+	@# does until the pass is run, and a pass is a session by hand. Here for a
+	@# desk: `make mutate ONLY=c12-` runs one component's runs. The anchors
+	@# sweep goes first and a red one runs nothing.
+	node tools/mutate/sweep.mjs $(if $(SHARD),--shard $(SHARD)) $(if $(ONLY),--only $(ONLY))
+
 roadmap:            ## the Order column's claims, resolved against the tree
 	@# **Reports through `make instruments` as well**, where its fixture lives.
 	@# Here as a target of its own because the column is edited by hand and this
 	@# is the one-line answer to *did I break a citation* — the same reason
 	@# `enforce` is separable from `all`.
 	node tools/roadmap-status.mjs
+
+profile:            ## A01 Appendix B, filled from a real session (C28 T5.3)
+	@# **Reports, never fails** — `regime`'s disposition, for `regime`'s reason: a
+	@# budget is a claim about a regime and a runner is not the regime it was
+	@# measured in. Four of the appendix's six rows come back measured and two come
+	@# back refused naming what they need, which is the output, not a shortfall.
+	@#
+	@# **Needs `dist/`**, so it builds first: a probe against a stale build gives a
+	@# wrong negative and nothing revisits a ruled-out candidate.
+	npm run build
+	node tools/profile.mjs
 
 regime:             ## what a source-scan pass costs *here*, beside the recorded figures
 	@# **Reports, never fails.** A budget is a claim about a regime and a runner

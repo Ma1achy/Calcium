@@ -112,10 +112,27 @@ export const LIGHT: ThemeTokens = Object.freeze({
      * because silently reusing a colour is a segmentation that lies — and that
      * is measured rather than argued: `index % 4` shipped.
      *
-     * Okabe-Ito, adjusted per theme against its own background. The canonical
-     * set is designed for print on white: its black is 1.21 against this ground
-     * and its blue 3.36, so the two are replaced by a neutral and a lighter
-     * blue. Every slot clears 6.2 here, measured.
+     * **Okabe-Ito adapted, and adapted further than anything here recorded.**
+     * This comment used to carry three figures — *its black is 1.21 against this
+     * ground and its blue 3.36 … Every slot clears 6.2 here, measured* — and all
+     * three are the **dark** theme's, copied verbatim to a ground where each is
+     * false. On `#fafafa` canonical black measures 20.12, canonical blue 4.97,
+     * and the worst slot here is `c4` at **5.17**, with `c1` at 5.41 and `c2` at
+     * 5.96 also under 6.2. Nothing is in violation: these slots owe I35's 4.5 and
+     * clear it. What was wrong is a comment saying *measured* that was not, and
+     * that is F1017.
+     *
+     * **Not two slots replaced but eight.** This palette keeps **none** of the
+     * canonical set; `dark` keeps three. Every substitution was chosen against
+     * the ground and none was re-measured for the property the palette is named
+     * for — and the two are not independent. `c1` and `c4` are canonical orange
+     * and yellow darkened to clear this ground; those two hues differ mostly in
+     * the channel a deuteranope has lost, so lightness is what is left to
+     * separate them, and the ground floor is a constraint on lightness. The
+     * canonical pair measures 11.7 under deuteranopia. **These two measure 0.6.**
+     *
+     * Seven pairs here are under C10 I39's floor. The list is in `test/contract/
+     * theme.test.ts` T2.38, compared by equality, and C10 §4j is the ruling.
      */
     categorical: Object.freeze({
       carries: "decoration",

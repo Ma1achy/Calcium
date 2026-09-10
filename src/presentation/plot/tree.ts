@@ -281,7 +281,7 @@ function drawTopDown(
       labelX = Math.max(x0, mid - Math.floor((own - 1) / 2)); // cells-ok — a column position
     }
     centre[i] = labelX + Math.floor((own - 1) / 2); // cells-ok — a column position
-    write(g.text[2 * nodes[i]!.depth]!, labelX, label, caps); // cells-ok — a row index
+    write(g.text[2 * nodes[i]!.depth]!, labelX, label, caps.ambiguousWidth); // cells-ok — a row index
   };
   place(0, lead);
 
@@ -329,7 +329,7 @@ function drawLeftRight(
   for (const [i, node] of nodes.entries()) { // cells-ok — a node index
     if (kept[i] !== true) continue;
     const x = colStart[node.depth] ?? 0; // cells-ok — a column position
-    write(g.text[row[i]!]!, x, node.label, caps);
+    write(g.text[row[i]!]!, x, node.label, caps.ambiguousWidth);
     const kids = keptKids(nodes, kept, i);
     if (kids.length === 0) continue; // cells-ok — a child count
     const turn = x + widest[node.depth]!; // cells-ok — a column position
@@ -394,7 +394,7 @@ function drawOutline(
         .slice(1)
         .map((a) => (isLast(a) ? " ".repeat(OUTLINE_INDENT) : bar))
         .join("") + (node.depth === 0 ? "" : (isLast(i) ? elbow : branch));
-    write(g.text[r]!, 0, `${prefix}${node.label}`, caps);
+    write(g.text[r]!, 0, `${prefix}${node.label}`, caps.ambiguousWidth);
     r += 1; // cells-ok — a row index
   }
 }

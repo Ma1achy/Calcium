@@ -30,7 +30,8 @@ import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { BRAILLE_DOTS, createGrid, drawLine, foldBraille, foldSolid, setDot, type Grid } from "./raster.js";
 import { glyphs } from "../blocks/glyphs.js";
 import { pad, padStart } from "../blocks/paint.js";
-import { cells, truncate } from "../text.js";
+import { cells, rowCells, truncate, type AmbiguousWidth } from "../text.js";
+import { write } from "./chargrid.js";
 import { extentFor, extentRun, pairFor } from "./ramp.js";
 import { QUAD_BL, QUAD_BR, QUAD_TL, QUAD_TR, quadrantGlyph } from "./linedraw.js";
 import { percentOf, type Share } from "./figure.js";
@@ -672,11 +673,14 @@ function labelRows(
           ? Math.round(anchorX) - textW
           : Math.round(anchorX - textW / 2);
     const start = Math.max(0, Math.min(gridCells - textW, wanted));
-    const chars = [...text];
-    for (let k = 0; k < chars.length; k += 1) { // cells-ok — a character count
-      const target = slots[row]?.[start + k];
-      if (target !== undefined) slots[row]![start + k] = chars[k]!;
-    }
+    // **Through the one writer** (I118). This wrote `[...text]` one code point
+    // per slot after placing by `cells()`: a family was five slots for a
+    // two-cell reservation and overran three it never reserved, `図表` two
+    // slots for four cells and left two blank inside it — and every label
+    // sharing the row moved with the error, on both arms (F982). A cluster
+    // owns the cells it measures and the continuation cells are `""`, which
+    // the join drops, so the row keeps its count.
+    write(slots[row]!, start, text, ambiguous);
   }
   return slots.map((row) => row.join(""));
 }
@@ -720,6 +724,7 @@ function radarQuadFigure(
   series: readonly Series[],
   ceiling: number,
   labels: readonly string[],
+  ambiguous: AmbiguousWidth,
   gridShape: "polygon" | "circle" = "polygon",
 ): readonly (readonly MarkedText[])[] {
   const cols = Math.ceil(d.dotWidth / BRAILLE_DOTS.x); // cells-ok — a column count
@@ -791,6 +796,12 @@ function radarQuadFigure(
   const gridRows: (readonly MarkedText[])[] = [];
   for (let cy = 0; cy < rows; cy += 1) { // cells-ok — a cell row
     const out: MarkedText[] = [];
+    // **The label row as cells, once per row** (I119). `labelRows` joins the
+    // cells it wrote and this read the string back by code point — a family
+    // five columns, `図表` two — so the row ran two cells over the width and
+    // ended in the clamp (F982). `rowCells` is the join's inverse: a cluster
+    // at its first cell and `""` behind a wide one.
+    const labelCells = rowCells(labels[cy] ?? "", ambiguous);
     for (let cx = 0; cx < cols; cx += 1) { // cells-ok — a cell column
       const quads = [
         [cx * 2, cy * 2, QUAD_TL], [cx * 2 + 1, cy * 2, QUAD_TR],
@@ -812,8 +823,10 @@ function radarQuadFigure(
       for (const [x, y, bit] of quads) {
         if (bits[y * sx + x] === 1 && owner[y * sx + x] === who) mask |= bit; // cells-ok — a sub-cell position
       }
-      const label = [...(labels[cy] ?? "")][cx]; // cells-ok — a cell column
-      // The names last and whole, so a word a polygon crosses stays a word.
+      const label = labelCells[cx]; // cells-ok — a cell column
+      // The names last and whole, so a word a polygon crosses stays a word. A
+      // `""` is the cell a wide glyph occupies after its first: the name's,
+      // so no quadrant is drawn under it, and it appends nothing to the run.
       const named = label !== undefined && label !== " ";
       const text = named ? label : quadrantGlyph(mask);
       const index = named ? furniture : who;
@@ -927,7 +940,7 @@ export function radarRender(
       ? {
           figure: radarQuadFigure(
             disc, categories, series, ceiling,
-            labelRows(disc, categories, discWidth, h, caps), gridShape,
+            labelRows(disc, categories, discWidth, h, caps), caps.ambiguousWidth, gridShape,
           ),
         }
       : {}),

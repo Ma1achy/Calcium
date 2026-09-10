@@ -242,6 +242,95 @@ describe("C02 detection", () => {
     expect(rejected.warnings[0]).toContain("keyboardProtocol");
   });
 
+  it("T1.14 (C02 I13): every field says how it was answered, and the tmux column is the row's content", () => {
+    // **Four environments in one row, because a source asserted at one is
+    // satisfied by a constant.** The whole of `sources` is compared, not a
+    // field of it: a map that answered `"inferred"` everywhere would pass any
+    // row naming `imageProtocol` on a kitty.
+    const named = detectCapabilities({
+      TERM: "xterm-kitty",
+      LANG: "en_GB.UTF-8",
+      COLORFGBG: "0;15",
+    }).sources;
+    expect(named).toEqual({
+      colourDepth: "inferred",
+      unicode: "stated",
+      ambiguousWidth: "stated",
+      backgroundPolarity: "stated",
+      synchronisedUpdate: "inferred",
+      bracketedPaste: "assumed",
+      mouse: "assumed",
+      imageProtocol: "inferred",
+      keyboardProtocol: "inferred",
+      altScreen: "assumed",
+    });
+
+    // **`COLORTERM` moves `colourDepth` from `inferred` to `stated` and the
+    // value does not move at all** — both rules answer 24. The record used to
+    // carry no way to see that, which is the argument for the field in one
+    // assertion: the terminal speaking for itself and us reading a name are the
+    // same number and not the same fact.
+    const spoken = detectCapabilities({ TERM: "xterm-kitty", COLORTERM: "truecolor" });
+    expect([spoken.capabilities.colourDepth, spoken.sources.colourDepth]).toEqual([24, "stated"]);
+    expect(named.colourDepth).toBe("inferred");
+
+    // Nothing named: the identification simply does not hold this terminal, so
+    // the three that read it are `inferred` at their `none` values — a guess,
+    // and not a withheld claim.
+    const plain = detectCapabilities({ TERM: "xterm" }).sources;
+    expect([plain.imageProtocol, plain.synchronisedUpdate, plain.keyboardProtocol, plain.mouse])
+      .toEqual(["inferred", "inferred", "inferred", "assumed"]);
+
+    // **The gate demotes one field and refuses three, from one expression.**
+    // `colourDepth` has a rule below the identification to fall through to, so
+    // it answers 4 from `TERM`'s shape — a claim, `assumed`. The other three
+    // have nothing below and withhold. Asserted together: a row naming one of
+    // them passes against a gate that reached only that one, which is T1.12b's
+    // argument arriving in a second column.
+    const inside = detectCapabilities({ TERM: "xterm-kitty", TMUX: "/tmp/x" });
+    expect([
+      inside.sources.colourDepth,
+      inside.sources.imageProtocol,
+      inside.sources.synchronisedUpdate,
+      inside.sources.keyboardProtocol,
+      inside.sources.mouse,
+    ]).toEqual(["assumed", "unreachable", "unreachable", "unreachable", "unreachable"]);
+    // And the values are identical to the unidentified terminal's, which is why
+    // one value with two remedies needed a second field to tell them apart.
+    expect(inside.capabilities.imageProtocol).toBe(detectCapabilities({ TERM: "xterm" }).capabilities.imageProtocol);
+    // An *unidentified* terminal inside tmux is not `unreachable`: nothing was
+    // withheld, the table never named it. The fifth kind means "this terminal
+    // probably can and the bytes do not arrive", and that needs a name.
+    expect(detectCapabilities({ TERM: "xterm", TMUX: "/tmp/x" }).sources.imageProtocol).toBe("inferred");
+
+    // **The three `stated` fields at the environment that states nothing**, and
+    // the mutation pass is why they are here rather than only at the top of this
+    // row. Flipping each "nothing carried the fact" arm to `"stated"` killed
+    // **nothing**: `assumed` is produced by four other fields at every fixture,
+    // so the bijection in T2.9, its control over the set of kinds, and every
+    // whole-map comparison above stayed green. **A set over sites is blind to
+    // redistribution** — it records the vocabulary and reads as though it
+    // records the assignment.
+    const silent = detectCapabilities({ TERM: "xterm" }).sources;
+    expect([silent.unicode, silent.ambiguousWidth, silent.backgroundPolarity]).toEqual([
+      "assumed",
+      "assumed",
+      "assumed",
+    ]);
+    // `COLORFGBG` present and declined is still `assumed`: `unknown` is this
+    // component declining whatever the variable held, which is the same
+    // partition the third value already draws (C02 I10).
+    expect(
+      detectCapabilities({ TERM: "xterm", COLORFGBG: "15;default" }).sources.backgroundPolarity,
+    ).toBe("assumed");
+    expect(named.backgroundPolarity, "and a polarity is the variable speaking").toBe("stated");
+
+    // **The five are not a precedence order**, and this is the row that says so
+    // (C02 I13): `dumb` is `assumed` and it outranks a `stated` `COLORTERM`.
+    const dumb = detectCapabilities({ TERM: "dumb", COLORTERM: "truecolor" });
+    expect([dumb.capabilities.colourDepth, dumb.sources.colourDepth]).toEqual([1, "assumed"]);
+  });
+
   it("T1.8: alt screen needs TERM present and not dumb", () => {
     expect(caps({ TERM: "xterm" }).altScreen).toBe(true);
     expect(caps({ TERM: "dumb" }).altScreen).toBe(false);

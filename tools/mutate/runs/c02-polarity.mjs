@@ -11,6 +11,17 @@
 // exactly the set where *search by variant* and *search for the name `light`*
 // agree, and a set with no light theme agrees with them too — so `by-name` is
 // caught by one row in the suite and silent in the other five.
+//
+// **Eight anchors across four runs moved when C02 gained `sources`** (F1021).
+// Every rule in `capabilities.ts` now returns `Answer<T> = [value, source]`
+// instead of a bare value, so every `from:` on a `return` moved — and so did
+// every `to:`, which is the half a sweep does not read (F279). A `to:` still
+// returning a bare string is **not** a weaker mutation: `detectCapabilities`
+// destructures the pair, so `"narrow"` yields value `"n"` and source `"a"`,
+// and the run would measure a shape defect rather than the behaviour named.
+// All eight are *the code moved and the mutation still has a subject*; none
+// lost its subject and none moved its `expect:`.
+
 import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
@@ -65,8 +76,10 @@ const results = runPass({
       // first theme, so this removes the *reason* and keeps the answer.
       name: "an absent COLORFGBG reads as a dark terminal",
       file: CAPS,
-      from: '  if (colorfgbg === undefined) return "unknown";',
-      to: '  if (colorfgbg === undefined) return "dark";',
+      // The *value* alone: the source stays `assumed`, so a row that fails
+      // fails on the polarity and not on a second thing changed at once.
+      from: '  if (colorfgbg === undefined) return ["unknown", "assumed"];',
+      to: '  if (colorfgbg === undefined) return ["dark", "assumed"];',
       expect: "T1.11",
     },
     {
@@ -74,7 +87,7 @@ const results = runPass({
       // background would be answered from a cube this layer does not have.
       name: "an index above 15 is answered anyway",
       file: CAPS,
-      from: '  if (index > 15) return "unknown";',
+      from: '  if (index > 15) return ["unknown", "assumed"];',
       to: "",
       expect: "T1.11",
     },
@@ -84,8 +97,8 @@ const results = runPass({
       // brights, which is the boundary a sampled pair of fixtures cannot see.
       name: "the light half starts at 7 and runs to 15",
       file: CAPS,
-      from: '  return index === 7 || index > 8 ? "light" : "dark";',
-      to: '  return index >= 7 ? "light" : "dark";',
+      from: '  return [index === 7 || index > 8 ? "light" : "dark", "stated"];',
+      to: '  return [index >= 7 ? "light" : "dark", "stated"];',
       expect: "T3.11",
     },
     {
@@ -93,8 +106,8 @@ const results = runPass({
       // `default` is NaN and declines, but `15abc` would answer 15.
       name: "the background is parsed rather than tested for digits",
       file: CAPS,
-      from: "  if (!/^\\d+$/u.test(background)) return \"unknown\";\n  const index = Number(background);",
-      to: "  const index = Number.parseInt(background, 10);\n  if (Number.isNaN(index)) return \"unknown\";",
+      from: "  if (!/^\\d+$/u.test(background)) return [\"unknown\", \"assumed\"];\n  const index = Number(background);",
+      to: "  const index = Number.parseInt(background, 10);\n  if (Number.isNaN(index)) return [\"unknown\", \"assumed\"];",
       expect: "T1.11",
     },
     {

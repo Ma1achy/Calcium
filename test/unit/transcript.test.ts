@@ -171,6 +171,63 @@ describe("C13 unit", () => {
     expect(s.blockCount).toBe(0);
   });
 
+
+  it("T1.40 (I21): every mutation replaces the entries array, and no read copies it", () => {
+    // **Identity, not content** (I21). A mutation that built an equal-but-new
+    // array and one that wrote through the array it had already handed out are
+    // indistinguishable to every other row in this file — each of them reads the
+    // entries and asserts what is in them. L4 keys a `WeakMap` on this array and
+    // answers `entryById` from it, so the identity *is* the revision, and the
+    // in-place write is the defect that leaves that index serving an entry the
+    // store no longer holds (F914).
+    const s = createTranscriptStore({ cap: 2 });
+
+    // The half that has to hold for the key to be worth anything: a read is not
+    // a mutation. A getter returning `[...this.#entries]` is correct, misses on
+    // every lookup, and is the direction no other row here looks.
+    const held = s.entries;
+    expect(s.entries, "two reads with nothing between them").toBe(held);
+
+    const seen: unknown[] = [s.entries];
+    const bump = (label: string): void => {
+      const now = s.entries;
+      for (const before of seen) expect(now, `${label} replaced the array`).not.toBe(before);
+      seen.push(now);
+    };
+
+    // **Streaming, because an unmarked patch is a far-side patch and a settled
+    // entry refuses one** (I8, T1.7d/T1.7e). Written the obvious way this row
+    // passed its own `patch` assertion by having no patch at all — the store was
+    // right and the fixture had not been shown to respond to the thing under
+    // test (`test/support/README.md`).
+    const a = s.append(docOf(1), { streaming: true });
+    bump("append");
+    expect(s.patch(a, appendPatch("extra")).ok, "the patch lands").toBe(true);
+    bump("patch");
+    s.settle(a);
+    bump("settle");
+    s.append(docOf(1));
+    s.append(docOf(1)); // over cap 2 — the oldest goes
+    expect(s.droppedBlocks, "and the eviction happened").toBeGreaterThan(0);
+    bump("eviction");
+    s.clear();
+    bump("clear");
+
+    // **The stale half, shown rather than argued.** An index built from a read
+    // before a patch still holds the entry the store has replaced — which is
+    // exactly what a consumer keyed on array identity is protected from, and
+    // what it is exposed to the moment a mutation writes in place.
+    const t = createTranscriptStore();
+    const id = t.append(docOf(1), { streaming: true });
+    const first = t.entries;
+    const index = new Map(first.map((e) => [e.id, e]));
+    expect(t.patch(id, appendPatch("extra")).ok, "the patch lands").toBe(true);
+
+    expect(t.entries, "the store moved on").not.toBe(first);
+    expect(index.get(id), "and the old index did not").toBe(first[0]);
+    expect(index.get(id), "so it is stale, by identity").not.toBe(t.entries[0]);
+  });
+
   it("T1.12 (I12): each operation emits exactly one Change of the right kind", () => {
     const s = createTranscriptStore();
     const changes: Change[] = [];

@@ -34,7 +34,7 @@ const manifest = [];
 for (const [file, height, why] of CASES) {
   const block = b.image({ id: `p-${file}`, path: join(ASSETS, file), height, alt: file });
   const box = imageCells(block, WIDTH);
-  const real = transmitImage([block], KITTY, new Set(), WIDTH);
+  const real = transmitImage([block], KITTY, new Map(), WIDTH);
   if (real === "") throw new Error(`${file}: transmitImage produced nothing`);
   if (!real.includes("q=2")) throw new Error(`${file}: expected q=2 in the shipped escape`);
   const asking = real.split("q=2").join("q=0");
@@ -124,7 +124,7 @@ import { readFileSync } from "node:fs";
   for (const [name, file] of [["replace-a.png", "palette.png"], ["replace-b.png", "photo.png"]]) {
     const block = b.image({ id: `x-${file}`, path: join(ASSETS, file), height: 8, alt: file });
     const box = imageCells(block, WIDTH);
-    const real = transmitImage([block], KITTY, new Set(), WIDTH);
+    const real = transmitImage([block], KITTY, new Map(), WIDTH);
     // The id is substituted the way `q=2 → q=0` is, and asserted the same way.
     // `,i=N,` cannot occur in the payload: base64 carries no commas.
     const derived = `,i=${String(imageId(imageKey(block)))},`;

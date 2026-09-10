@@ -379,10 +379,14 @@ def r_slope(a, s):
 
 
 def r_bubble(a, s):
+    # The size channel is `sizes` and not a second series (C04 I117, F271): a
+    # size is not a position, so it is not a member of `series`, and reading it
+    # from there is what made the reference agree with a defect.
     ss = series(s)
-    if len(ss) < 2:
+    sizes = [x for x in s.get("sizes", []) if x is not None]
+    if not ss or not sizes:
         return
-    xs, sizes = ss[0], ss[1]
+    xs = ss[0]
     n = min(len(xs), len(sizes))
     a.scatter(range(n), xs[:n], s=[max(1.0, v) * 4 for v in sizes[:n]])
 

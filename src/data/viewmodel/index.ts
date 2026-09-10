@@ -21,6 +21,10 @@ export type {
   Action,
   Block,
   BlockKind,
+  BlockKinds,
+  KnownBlock,
+  KnownBlockKind,
+  KnownBlockKinds,
   Cell,
   Code,
   ColumnDef,
@@ -98,7 +102,16 @@ export { ACTION_KINDS, CAMERA_DEFAULT, COLORMAP_NAMES, GLYPH_REQUIRED_TONES, HAS
 
 export { BlockShapeError, block, cell, deepFreeze, descendants, document, rebuild } from "./construct.js";
 
-export { hierarchyFault, validateBlock, validateDocument, type Validity } from "./validate.js";
+// `absentMessage` and `wrongTypeMessage` travel because C05's parser checks required fields
+// too, and C04 I114 is one ruling rather than two copies of a sentence (F995).
+export {
+  absentMessage,
+  hierarchyFault,
+  validateBlock,
+  validateDocument,
+  wrongTypeMessage,
+  type Validity,
+} from "./validate.js";
 
 export { applyPatch } from "./patch.js";
 
@@ -142,3 +155,12 @@ export { overlayFault, overlayRange, DEFAULT_OVERLAY_COLORMAP } from "./overlay.
 export { pinnedRange, sharedRange, type PinnedRange, type RangePin } from "./range.js";
 
 export { digestOf } from "./digest.js";
+
+/**
+ * C28's instrumentation seam (I34).
+ *
+ * Exported from L0 so every layer can name `Probe` without importing a
+ * profiler, which is the whole point of declaring it here rather than in
+ * `src/shell/profiling/`.
+ */
+export { NO_PROBE, NO_SPAN, type MissReason, type Probe } from "./probe.js";

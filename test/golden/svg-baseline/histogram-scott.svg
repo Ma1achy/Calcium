@@ -8,13 +8,15 @@
 <text x="221.867" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">25</text>
 <text x="354.133" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">50</text>
 <text x="486.4" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">75</text>
-<rect x="89.6" y="18.916" width="21.163" height="18.347" fill="#e69f00"/>
-<rect x="89.6" y="49.493" width="37.035" height="18.347" fill="#e69f00"/>
-<rect x="89.6" y="80.071" width="111.104" height="18.347" fill="#e69f00"/>
-<rect x="89.6" y="110.649" width="132.267" height="18.347" fill="#e69f00"/>
-<rect x="89.6" y="141.227" width="185.173" height="18.347" fill="#e69f00"/>
-<rect x="89.6" y="171.804" width="269.824" height="18.347" fill="#e69f00"/>
-<rect x="89.6" y="202.382" width="164.011" height="18.347" fill="#e69f00"/>
-<rect x="89.6" y="232.96" width="84.651" height="18.347" fill="#e69f00"/>
-<rect x="89.6" y="263.538" width="52.907" height="18.347" fill="#e69f00"/>
+<rect x="89.6" y="17.804" width="26.453" height="15.011" fill="#e69f00"/>
+<rect x="89.6" y="42.822" width="47.616" height="15.011" fill="#e69f00"/>
+<rect x="89.6" y="67.84" width="132.267" height="15.011" fill="#e69f00"/>
+<rect x="89.6" y="92.858" width="179.883" height="15.011" fill="#e69f00"/>
+<rect x="89.6" y="117.876" width="243.371" height="15.011" fill="#e69f00"/>
+<rect x="89.6" y="142.895" width="354.475" height="15.011" fill="#e69f00"/>
+<rect x="89.6" y="167.913" width="312.149" height="15.011" fill="#e69f00"/>
+<rect x="89.6" y="192.931" width="132.267" height="15.011" fill="#e69f00"/>
+<rect x="89.6" y="217.949" width="105.813" height="15.011" fill="#e69f00"/>
+<rect x="89.6" y="242.967" width="47.616" height="15.011" fill="#e69f00"/>
+<rect x="89.6" y="267.985" width="5.291" height="15.011" fill="#e69f00"/>
 </svg>

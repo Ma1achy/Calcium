@@ -83,7 +83,7 @@ const header =
     clusters(
       "chrome.header",
       [
-        { label: name },
+        { label: name, tone: "default" },
         { label: binary, tone: "muted" },
         // **Not optional, and not a footer hint.** Copy mode is the one mode
         // whose whole effect is that things stop responding — the mouse goes
@@ -123,12 +123,46 @@ export function foldHome(cwd: string, home: string | undefined): string {
  * itself answers, so it is right in every app. An app that wants no footer
  * returns `[]` and gets none (I82).
  */
+/**
+ * C24 I32's figure, as one cell.
+ *
+ * **One decimal, and the unit attached.** A frame budget is 16 ms, so the
+ * digit after the point is the one that separates a comfortable frame from a
+ * tight one and everything below it is noise a reader would have to ignore.
+ * `<0.1ms` rather than `0.0ms` for a frame too fast to resolve, because a
+ * rounded zero reads as *not measured* and that is the one thing it is not.
+ *
+ * **Fixed width, and that is not tidiness** (F911). The figure is redrawn every
+ * frame and it sits in a cluster with cells after it, so a cell whose width
+ * tracks its value moves everything to its right on every frame a session gets
+ * faster or slower — `last 9.6ms` against `last <0.1ms` is a one-column shift,
+ * once per frame, for as long as the profiler is on. It was found by a replay
+ * comparison, where the shift showed up as the padding differing rather than
+ * the number; the number was already known to differ and was already masked.
+ * Five is the width of `123.4`, which covers a frame up to a second; anything
+ * past that overflows the pad and is a session with a larger problem than its
+ * footer's alignment.
+ */
+export function formatFrameCost(ms: number): string {
+  const figure = ms < 0.05 ? "<0.1" : ms.toFixed(1);
+  return `last ${figure.padStart(5, " ")}ms`;
+}
+
 const footer = (ctx: ChromeContext): readonly Block[] => [
   clusters(
     "chrome.footer",
     [
       { label: "/help", tone: "muted" },
       ...(ctx.session.stopping ? [{ label: "stopping", tone: "warn" as const }] : []),
+      // **C24 I32 — present only while something is measuring.** An application
+      // that did not ask to be profiled has no figure and gets no cell, so this
+      // moves no frame that was not already profiling. The label carries `last`
+      // rather than the bare number: a frame's own cost is unknowable while it
+      // composes, and an unqualified `12.4ms` beside a live clock reads as the
+      // frame you are looking at.
+      ...(ctx.lastFrame === undefined
+        ? []
+        : [{ label: formatFrameCost(ctx.lastFrame), tone: "muted" as const }]),
     ],
     [{ label: foldHome(ctx.session.cwd, ctx.session.env["HOME"]), tone: "muted" }],
   ),

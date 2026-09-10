@@ -16,6 +16,7 @@
 //   MA4 — the debt list is compared by **equality**. An entry that starts
 //         resolving again fails, so a dead excuse cannot outlive its reason.
 import { execFileSync } from "node:child_process";
+import { SWEEP_BUDGET_MS } from "../support/budget.js";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -77,6 +78,12 @@ describe("tools/mutate/anchors.mjs", () => {
 
     expect(r.ok).toBe(false);
     expect(r.out).toContain("fake.mjs");
+    // **And the anchor itself**, because a count that says one is missing sends
+    // the reader to a second tool to learn which: the C28 run's 119 anchors, on
+    // the day the header mask moved and an earlier mutation still named it.
+    expect(r.out, "names the file and the anchor's head").toContain(
+      'src/data/viewmodel/tree.ts · "export function hasChildren(b: Block): b is ContainerBlock {"',
+    );
   });
 
   it("MA3: the debt list does not travel to a foreign directory", () => {
@@ -220,7 +227,111 @@ describe("tools/mutate/anchors.mjs", () => {
     expect(r.ok, "the list is this repository's").toBe(false);
   });
 
-  it("MA4 (the equality arm): the real tree matches the list exactly", () => {
+  it("MA8 (F997): a run node cannot parse fails, and the file that parses does not", () => {
+    // **The fabricated violation is the instance that produced the finding**,
+    // not a shape invented for the test (A03 commitment 14a). Three rows were
+    // being added to `c12-arm-seam.mjs` and a `const STACK` went in at line 84
+    // beside the one already at 88, so `node tools/mutate/runs/c12-arm-seam.mjs`
+    // died before its first mutation. This sweep said *1005 anchors · 937
+    // expectations · no run drifted from what the list says* — every anchor did
+    // resolve, and the sentence was true of a file that cannot start.
+    const parses = `const STACK = "src/presentation/blocks/plot3d.ts";\n${resolving}`;
+    const ok = run(runsDir("fake.mjs", parses));
+    expect(ok.ok, ok.out).toBe(true);
+    // **The control, and it is the whole of what makes the row above mean
+    // something**: a checker that never spawns reports every run clean, and
+    // exits 0 exactly as a clean sweep does. This says the corpus it read was
+    // not empty.
+    expect(ok.out, "the file was handed to node --check, not skipped").toMatch(/· 1 parsed ·/u);
+
+    const twice = parses.replace(
+      'const STACK = "src/presentation/blocks/plot3d.ts";',
+      'const STACK = "src/presentation/blocks/plot3d.ts";\nconst STACK = "src/presentation/blocks/plot3d.ts";',
+    );
+    expect(twice, "the replacement fired").not.toBe(parses);
+    const r = run(runsDir("fake.mjs", twice));
+    expect(r.ok, "a run that cannot start").toBe(false);
+    expect(r.out).toContain("fake.mjs");
+    expect(r.out, "the error node gave, and where").toContain(
+      "SyntaxError: Identifier 'STACK' has already been declared (line 2)",
+    );
+    expect(r.out, "and why a text sweep owes the question").toContain("the run cannot start");
+
+    // **And the file is abandoned rather than read on.** A stale anchor inside a
+    // run that cannot start is noise stacked on the one thing that has to be
+    // fixed first, and a report carrying both invites repairing the wrong one —
+    // which is `KNOWN_STALE`'s own hazard, a re-anchoring nobody ran.
+    const alsoStale = twice.replace(
+      "export function hasChildren(block: Block): block is ContainerBlock {",
+      "export function noSuchThing(): void {",
+    );
+    expect(alsoStale, "the replacement fired").not.toBe(twice);
+    const both = run(runsDir("fake.mjs", alsoStale));
+    expect(both.ok).toBe(false);
+    expect(both.out).toContain("has already been declared");
+    expect(both.out, "the parse error, and nothing about the anchor beneath it").toContain("1 problems.");
+
+    // **Blind spot, stated rather than tested away**: this asks whether the file
+    // parses, not whether it *links*. `import { runPas } from "../mutate.mjs"`
+    // parses, and the missing export is resolved at instantiation — nothing
+    // short of executing the module sees it, and executing a run is the pass.
+  });
+
+  it("MA9 (F279, F1030): a mutation whose `to` is not a program fails, and one that is does not", () => {
+    // **The half this sweep did not read.** A mutation is a pair; `anchorsOf`
+    // extracted `{file, from}`, found `from` present, and reported `no drift`
+    // — a sentence about a corpus that was true of half of it. Re-anchoring is
+    // the operation that breaks the unchecked half.
+    //
+    // **The bytes are F279's own.** Step 4 moved a row from `svg.ts` to
+    // `figure.ts`, changing `file:` and `from:` and keeping the SVG arm's
+    // replacement — `const inverted = block.form !== "icicle";` — which splices
+    // a statement into an object literal. Every suite failed to *transform*,
+    // and this sweep had run clean minutes before. The `from` here is a
+    // different object-literal property, chosen because it does not move; the
+    // `to` is the line that was actually left behind, and the shape it produces
+    // is the shape that shipped.
+    const splice = `
+const SRC = "src/data/viewmodel/tree.ts";
+const MUTATIONS = [
+  {
+    file: SRC,
+    from: "  panel: true,",
+    to: "  const inverted = block.form !== \\"icicle\\";",
+  },
+];
+`;
+    const bad = run(runsDir("fake.mjs", splice));
+    expect(bad.ok, "a statement in an object literal is not a program").toBe(false);
+    expect(bad.out).toContain("fake.mjs");
+    expect(bad.out, "and the sweep says what it applied, not only that it looked").toContain(
+      "leaves something that is not a program",
+    );
+    expect(bad.out, "with the replacement quoted, so the reader is sent to the pair").toContain(
+      "const inverted",
+    );
+
+    // **The control, and it is what makes the row above mean anything**: a
+    // parser that refuses everything reports every run broken and fails
+    // identically. `resolving`'s own `to` is a legal signature.
+    const good = run(runsDir("fake.mjs", resolving));
+    expect(good.ok, good.out).toBe(true);
+    // **And the counter** (MA5b's argument): an arm that applies nothing exits
+    // 0 exactly as a clean one does, so the number that says it ran is asserted.
+    expect(good.out, "the pair was applied and re-parsed, not skipped").toMatch(
+      /· 1 applied\+parsed ·/u,
+    );
+
+    // **A source that was already broken is not blamed on the mutation it
+    // carries.** The clean file is parsed only when the mutated one refuses, so
+    // the arm reports a splice and never a pre-existing syntax error — which
+    // would send the reader to a run file for a defect in `src/`.
+  });
+
+  // The whole sweep in a child process, and its budget carries the three
+  // measurements (F1088): 9.4 s alone, 25.1 s inside a green `make all`,
+  // against the 30 s global it was running under. 1.19× is not a margin.
+  it("MA4 (the equality arm): the real tree matches the list exactly", { timeout: SWEEP_BUDGET_MS }, () => {
     // **Both directions.** A new stale anchor fails because it is not on the
     // list; a repaired one fails because the list still claims it. The second is
     // the one a subset check would miss, and it is how an excuse outlives its
@@ -229,8 +340,24 @@ describe("tools/mutate/anchors.mjs", () => {
 
     expect(r.ok, r.out).toBe(true);
     expect(r.out).toMatch(/known stale, and no run drifted/u);
-    // **And the counter, for the reason MA5b gives.** 184 test paths across 97
-    // runs; a scan reading none of them exits 0 exactly as a clean one does.
+    // **And the counter, for the reason MA5b gives.** A scan reading no test
+    // path exits 0 exactly as a clean one does.
     expect(r.out, "the real sweep read its subject").toMatch(/· \d{2,} test paths ·/u);
+    // **MA9's control over the tree rather than a fixture** (F1030): every
+    // unique anchor's `to` applied and handed to the parser. Measured
+    // 2026-09-10: 1984 anchors, 1938 applied and parsed, 2 whose subject is not
+    // a language this parses, zero splices — and 6.8 s of the sweep's runtime.
+    expect(r.out, "and applied the half it used to skip").toMatch(/· \d{3,} applied\+parsed ·/u);
+    // MA8's control over the real corpus rather than a fixture: every run in the
+    // tree handed to `node --check`, all of them parsing. A fabricated directory
+    // proves the arm can fire; this proves it fires over the tree.
+    //
+    // **Both bounds are `\d{2,}` because the corpus grows every round**, and a
+    // figure written into an assertion goes stale in the direction that still
+    // passes. Measured **2026-09-09: 189 runs, 189 parsed, 479 test paths** —
+    // the same day two earlier figures in this block read 182 and 184, which is
+    // the argument for keeping the number in a comment with its date and out of
+    // the pattern.
+    expect(r.out, "every run in the tree was parsed").toMatch(/· \d{2,} parsed ·/u);
   });
 });

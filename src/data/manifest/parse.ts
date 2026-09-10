@@ -19,7 +19,7 @@
  * that would otherwise be found as a hang.
  */
 
-import { deepFreeze } from "../viewmodel/index.js";
+import { absentMessage, deepFreeze, wrongTypeMessage } from "../viewmodel/index.js";
 import {
   ARG_TYPES,
   MANIFEST_SCHEMA,
@@ -59,9 +59,18 @@ function takeString(
   at: string,
   { allowEmpty = false } = {},
 ): string | null {
+  // **Absent and wrong are two faults** (C04 I114, §5b, F995). This read
+  // *must be a string* for a key that was never written, which sends a reader
+  // to a value there is no value for — the same conflation C04's validator had
+  // and the same one `src/shell/config.ts` already ruled on in the other
+  // direction, for the config an app author types.
   const v = src[key];
+  if (v === undefined) {
+    fail(e, `${at}.${key}`, absentMessage(`"${key}"`, "a string"));
+    return null;
+  }
   if (typeof v !== "string") {
-    fail(e, `${at}.${key}`, `"${key}" must be a string`);
+    fail(e, `${at}.${key}`, wrongTypeMessage(`"${key}"`, "a string", v));
     return null;
   }
   if (!allowEmpty && v.length === 0) {
@@ -72,9 +81,14 @@ function takeString(
 }
 
 function takeBoolean(src: Record<string, unknown>, key: string, e: Errors, at: string): boolean | null {
+  // The same split, for the same reason (C04 I114, F995).
   const v = src[key];
+  if (v === undefined) {
+    fail(e, `${at}.${key}`, absentMessage(`"${key}"`, "a boolean"));
+    return null;
+  }
   if (typeof v !== "boolean") {
-    fail(e, `${at}.${key}`, `"${key}" must be a boolean`);
+    fail(e, `${at}.${key}`, wrongTypeMessage(`"${key}"`, "a boolean", v));
     return null;
   }
   return v;
@@ -94,6 +108,43 @@ function takeOptionalBoolean(
     return undefined;
   }
   return v;
+}
+
+/**
+ * An optional array of non-empty strings, kept **distinct from absent** (C05
+ * I26, F1).
+ *
+ * `takeStringArray` returns `undefined` on both an absent key and a malformed
+ * value, which is right where absent and empty mean the same thing and wrong
+ * for `jsonFlag`, whose three states are *inherit*, *append nothing* and *these
+ * tokens*. So this one answers `undefined` only for a key that is not there.
+ */
+function takeJsonFlag(
+  src: Record<string, unknown>,
+  e: Errors,
+  at: string,
+): readonly string[] | undefined {
+  const v = src["jsonFlag"];
+  if (v === undefined) return undefined;
+  if (!Array.isArray(v)) {
+    fail(e, `${at}.jsonFlag`, wrongTypeMessage('"jsonFlag"', "an array of strings", v));
+    return undefined;
+  }
+  const out: string[] = [];
+  for (const [i, item] of v.entries()) {
+    if (typeof item !== "string" || item.length === 0) {
+      fail(
+        e,
+        `${at}.jsonFlag[${String(i)}]`,
+        `"jsonFlag" holds a non-empty string per token, and [${String(i)}] is ` +
+          `${typeof item === "string" ? "empty" : "not a string"} — an empty token would be ` +
+          `spawned as a bare argument the far side cannot read`,
+      );
+      return undefined;
+    }
+    out.push(item);
+  }
+  return Object.freeze(out);
 }
 
 function takeStringArray(
@@ -457,6 +508,7 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
   const persist = takeOptionalBoolean(raw, "persist", e, at);
   const interactive = takeOptionalBoolean(raw, "interactive", e, at);
   const view = takeOptionalBoolean(raw, "view", e, at);
+  const jsonFlag = takeJsonFlag(raw, e, at);
 
   // **I23 — a flag's arm must differ from the tool's default.** An arm that
   // restates it decides nothing, which is A03 §2's vacuity class arriving in a
@@ -507,10 +559,10 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
     }
   }
 
-  // I20 — `view` is the tier, and its two refusals are I19's shape. `streams` is
-  // deliberately absent from them: S12's logs view is a streaming source rendered
-  // into a pushed view, so refusing that pair would refuse the surface C22 §13a
-  // was ruled for.
+  // I20 — `view` is the tier, and its three refusals are I19's shape. `streams`
+  // is deliberately absent from them: S12's logs view is a streaming source
+  // rendered into a pushed view, so refusing that pair would refuse the surface
+  // C22 §13a was ruled for.
   //
   // I24 again, and this is where the rule was found missing: I20's own sentence
   // says `view` is declarable on a flag, and this refusal read the tool's field
@@ -539,6 +591,61 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
           `and exits without a terminal, and a view is a claim on one that stays`,
       );
     }
+    // **`view` with `local`, the third refusal, and it is inert for a reason
+    // neither of the other two has** (F1022, closing F23 and F129).
+    //
+    // The other two describe a verb that cannot exist. This one describes a
+    // verb the *route* ignores: C18 classifies on `tool.local` first, and
+    // `isViewInvocation` is read on the `app` route and nowhere else, so the
+    // pair parsed, sealed, validated, ran, and appended an ordinary transcript
+    // entry — no view, no refusal, and nothing anywhere saying so.
+    //
+    // **The declaration buys nothing on this route, and the forcing argument
+    // for having one is absent here.** C22 §13a's whole case for putting the
+    // tier on the manifest is C23 I3: the pending entry is appended before the
+    // transport is invoked and C13 has no delete, so an adapter-side decision
+    // could only produce a view *and* an entry that nothing can withdraw. The
+    // local route has no transport and appends nothing in advance — `runLocal`
+    // appends once, after the handler has returned — so a local verb may decide
+    // on seeing its own result. `/profile` is the shipped instance: its handler
+    // calls `view.open(pane)` and returns a transcript notice as the record.
+    //
+    // **Refused rather than routed, on this repo's own precedent.** `view` with
+    // `streams` was a declarable pair with no route; §13a reserved the route,
+    // refused the pair *loudly*, and built it when S9's `/logs` forced it. The
+    // defect F23 and F129 name is that this pair is refused **silently**. Parse
+    // rather than run time, because I19's argument is that the author should
+    // learn at declaration and I20's other two refusals are already here.
+    //
+    // What it forecloses was measured rather than assumed: F23 refused this arm
+    // on the ground that `/dashboard` is local and S6/S7 would want views.
+    // `DOCKER_TUI_SURFACES.md` S1 rules `/dashboard` explicitly **not** a pushed
+    // view, and draws S6 `/compare` and S7 `/drift` as transcript entries under
+    // a prompt echo, with no letter keys — so none of the three named consumers
+    // can take the mark, and no manifest in the tree declares the pair.
+    if (local) {
+      fail(
+        e,
+        `${at}.view`,
+        `"${name}" is local and declares view — a local verb is handled ` +
+          `in-process and never reaches the route that opens one, so the ` +
+          `declaration is inert; a local verb that wants a view pushes it from ` +
+          `its handler, as \`/profile\` does`,
+      );
+    }
+  }
+
+  // **I26 — a declaration that cannot take effect.** A local verb is never
+  // spawned, so its JSON tokens would be appended to nothing; the refusal is
+  // `interactive`'s above, for `interactive`'s reason — an author reading the
+  // manifest back would act on a field that does nothing.
+  if (local && jsonFlag !== undefined) {
+    fail(
+      e,
+      `${at}.jsonFlag`,
+      `"${name}" is local and declares jsonFlag — a local verb is handled ` +
+        `in-process and never spawned, so there is no argv for the tokens to join`,
+    );
   }
 
   return {
@@ -547,6 +654,7 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
     summary,
     args,
     flags,
+    ...(jsonFlag === undefined ? {} : { jsonFlag }),
     ...(streams === undefined ? {} : { streams }),
     ...(oneShot === undefined ? {} : { oneShot }),
     ...(hidden === undefined ? {} : { hidden }),
@@ -602,6 +710,10 @@ export function parseManifest(raw: unknown): Result<Manifest, readonly ManifestE
 
   const binary = takeString(raw, "binary", e, "");
   const version = takeString(raw, "version", e, "");
+  // Absent means `["--json"]`, resolved at the seam rather than defaulted here:
+  // a parser writing the default in would make *declared as `--json`* and *not
+  // declared* indistinguishable on the round trip (C05 I26, T2.7).
+  const jsonFlag = takeJsonFlag(raw, e, "");
 
   const rawTools = raw["tools"];
   const tools: ToolDef[] = [];
@@ -609,7 +721,7 @@ export function parseManifest(raw: unknown): Result<Manifest, readonly ManifestE
     fail(e, "tools", `"tools" must be an array`);
   } else {
     const seen = new Map<string, number>();
-    // **Seeded with the framework's six** (C05 §3), so an app declaring its own
+    // **Seeded with the framework's verbs** (C05 §3), so an app declaring its own
     // `clear` collides at parse rather than silently overriding a verb
     // Calcium's handlers depend on. I6 already refuses duplicates; this is
     // that rule reaching the rows the app did not write.
@@ -650,7 +762,7 @@ export function parseManifest(raw: unknown): Result<Manifest, readonly ManifestE
 
   return {
     ok: true,
-    // **The framework's six, appended** (C05 §3). Appended rather than prepended
+    // **The framework's verbs, appended** (C05 §3). Appended rather than prepended
     // so no index an app could read is shifted: `fail` reports `tools[3]`, and a
     // parse error pointing at a row nobody wrote is worse than no path at all.
     value: deepFreeze({
@@ -671,8 +783,14 @@ export function parseManifest(raw: unknown): Result<Manifest, readonly ManifestE
         Object.freeze({ ...t, flags: Object.freeze([...t.flags, ...FRAMEWORK_FLAGS]) }),
       ),
       // What the app wrote (§3). `serialise` emits this, so the round-trip
-      // property holds exactly: parse re-derives the framework's six.
+      // property holds exactly: parse re-derives the framework's verbs (C05 §3
+      // holds the count; nothing here repeats it — F954).
       appTools: tools,
+      // Absent stays absent (C05 I26): a parser writing `["--json"]` in would
+      // make *declared as `--json`* and *not declared* the same value, and the
+      // round-trip property T2.7 asserts would then hold about a manifest the
+      // app did not write.
+      ...(jsonFlag === undefined ? {} : { jsonFlag }),
     }),
   };
 }

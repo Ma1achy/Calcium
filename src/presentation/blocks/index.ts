@@ -1,5 +1,5 @@
 /**
- * C09 — the registry and fourteen default kinds.
+ * C09 — the registry and nineteen default kinds.
  *
  * The obligation that dominates every decision here: **`measure(block, w)`
  * equals the number of rows `render(block)` occupies at width `w`** (I1). C14
@@ -15,6 +15,7 @@ export { ANIMATES, animationIntervalOf, tickIntervalOf } from "./animation.js";
 export { countdown, elapsed, statusRowsFor } from "./kinds/status.js";
 export {
   glyphs,
+  type GlyphCaps,
   glyphFor,
   glyphCells,
   spinnerFrames,
@@ -39,6 +40,7 @@ export {
   type Token,
 } from "./kinds/code.js";
 export type {
+  AnyBlockDefinition,
   BlockDefinition,
   BlockFault,
   BlockRegistry,

@@ -6,10 +6,15 @@
 // and the reason this file tests it apart from any block.
 import { describe, expect, it } from "vitest";
 import {
+  CELL_PER_UNIT_RANGES,
   cells,
+  clusterWidth,
   displayCells,
   expandTabs,
+  fitStyled,
+  graphemes,
   hardWrapCells,
+  rowCells,
   sliceCells,
   stripControl,
   truncate,
@@ -312,6 +317,153 @@ describe("sliceCells (C09 §5a, I20)", () => {
   });
 });
 
+describe("fitStyled (C09 §5a)", () => {
+  // The function every row of every frame goes through (`exact()` in
+  // `shell/paint.ts`), and until F937 it had no row of its own: every caller's
+  // suite exercised it and none pinned its four answers, so a change to the walk
+  // had nothing to fail against but golden frames.
+  const RED = "\u001b[31m";
+  const SGR = /\u001b\[[0-9;]*m/g;
+
+  /** A UTF-16 half with no partner beside it — the thing a code-unit step makes. */
+  const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
+
+  it("T1.30 (I9, §5a): the four answers — untouched, padded, cut plain, cut and closed", () => {
+    // Already `width`: returned as given, styled or not, with no bytes added.
+    expect(fitStyled("abc", 3, SGR_RESET)).toBe("abc");
+    expect(fitStyled(`${RED}abc${SGR_RESET}`, 3, SGR_RESET)).toBe(`${RED}abc${SGR_RESET}`);
+
+    // Short: padded with spaces to exactly `width`, and a pad is not a cut, so
+    // even a styled row gains no reset beyond the ones it carried.
+    expect(fitStyled("ab", 4, SGR_RESET)).toBe("ab  ");
+    expect(fitStyled(`${RED}ab${SGR_RESET}`, 4, SGR_RESET)).toBe(`${RED}ab${SGR_RESET}  `);
+
+    // Long and plain: cut, and no reset — four bytes on every plain row of every
+    // frame would have every golden asserting the reset rather than the row.
+    expect(fitStyled("abcdef", 3, SGR_RESET)).toBe("abc");
+
+    // Long and styled: cut and closed with the reset it was handed, so the
+    // colour cannot bleed into the rows below.
+    expect(fitStyled(`${RED}abcdef${SGR_RESET}`, 3, SGR_RESET)).toBe(`${RED}abc${SGR_RESET}`);
+
+    // A double-width glyph straddling the cut is dropped and its cell blanked,
+    // never halved (I9) — and the blank counts as a cut, so a styled row closes.
+    expect(fitStyled("a日b", 2, SGR_RESET)).toBe("a ");
+    expect(fitStyled("a日b", 3, SGR_RESET)).toBe("a日");
+    expect(fitStyled(`${RED}a日b`, 2, SGR_RESET)).toBe(`${RED}a${SGR_RESET} `);
+
+    // Escapes are copied through whole and cost no cells.
+    const fitted = fitStyled(`${RED}a${SGR_RESET}b`, 5, SGR_RESET);
+    expect(displayCells(fitted)).toBe(5);
+    expect(fitted.match(SGR)).toEqual([RED, SGR_RESET]);
+  });
+
+  it("T1.31 (I60, I20, I63, §5a): the cursor steps whole characters, in both walks", () => {
+    // **The step is a cluster, never a code unit** (I63). An astral character
+    // is two UTF-16 units and one step; a combining mark travels with its base
+    // as one piece, so it stays with it at the cut; a lone surrogate is one
+    // one-cell step, exactly as the string iterator walked it before the read
+    // was replaced (F938). Every answer here was the code-point walk's too —
+    // the rows a cluster step changes are T3.79's. The fabricated violation is
+    // a code-unit step: the low half of every astral pair then re-enters the
+    // walk as a character of its own, one cell wide, and lands in the output.
+    expect(fitStyled("a\u{1F44D}bc", 4, SGR_RESET), "cut after an astral pair").toBe("a\u{1F44D}b");
+    expect(fitStyled("\u{1F44D}", 4, SGR_RESET), "padded after an astral pair").toBe("\u{1F44D}  ");
+    expect(fitStyled("e\u0301xy", 1, SGR_RESET), "the mark stays with its base").toBe("e\u0301");
+    expect(fitStyled("\ud83dxy", 2, SGR_RESET), "a lone surrogate is one step of one cell").toBe("\ud83dx");
+    expect(sliceCells("a\u{1F44D}bc", 1, 4), "a window over an astral pair").toBe("\u{1F44D}b");
+    expect(sliceCells("a\u{1F44D}bc", 3, 4), "a window after one").toBe("b");
+
+    // And over a corpus whose clusters are additive — every cluster's width is
+    // the sum of its code points' — both walks hit `width` exactly and never
+    // manufacture a lone surrogate. (The non-additive clusters are T3.79's,
+    // F939.)
+    const corpus = ["plain ascii", "日本語のテキスト", "a\u{1F44D}b\u{1F600}c", "e\u0301 o\u0308 u\u0300", `${RED}x\u{1F44D}${SGR_RESET}y\u{1F600}`];
+    for (const line of corpus) {
+      const whole = displayCells(line);
+      for (let w = 0; w <= whole + 2; w += 1) {
+        const fitted = fitStyled(line, w, SGR_RESET);
+        expect(displayCells(fitted), `fitStyled(${JSON.stringify(line)}, ${String(w)})`).toBe(w);
+        expect(LONE_SURROGATE.test(fitted), `a lone surrogate in fitStyled(${JSON.stringify(line)}, ${String(w)})`).toBe(false);
+      }
+      for (let a = 0; a <= whole; a += 1) {
+        for (let b = a; b <= whole; b += 1) {
+          const window = sliceCells(line, a, b);
+          expect(displayCells(window), `sliceCells(${JSON.stringify(line)}, ${String(a)}, ${String(b)})`).toBe(b - a);
+          expect(LONE_SURROGATE.test(window), `a lone surrogate in sliceCells(${JSON.stringify(line)}, ${String(a)}, ${String(b)})`).toBe(false);
+        }
+      }
+    }
+  });
+});
+
+describe("C09 §5a — the three pieces, and where the segmenter is asked (I63)", () => {
+  const ESC = String.fromCharCode(27);
+  const RED = `${ESC}[31m`;
+  const SGR = new RegExp(`${ESC}\\[[0-9;]*m`, "g");
+
+  it("T1.36 (I63, §5a): a row of printable ASCII and escapes is measured in one scan, and everything else is measured as it was", () => {
+    // **The reference is the definition the fast path replaced** — the escapes
+    // stripped and the rest handed to `cells` — not the function under test.
+    // The corpus reaches both arms: rows the scan answers alone, and rows that
+    // fall through at a tab, a control, a bare escape or a glyph.
+    const rows = [
+      "", "plain", `${RED}styled${SGR_RESET}`, `${RED}${SGR_RESET}`, "a\tb", `a${String.fromCharCode(7)}b`,
+      `a${ESC}b`, `${RED}a${ESC}[b`, "日本", `${RED}│${SGR_RESET} x`, "e\u0301", "\u{1F44D}", "1\ufe0f\u20e3", "a\u0903",
+    ];
+    for (const row of rows) {
+      expect(displayCells(row), JSON.stringify(row)).toBe(cells(row.replace(SGR, "")));
+    }
+    const fast = rows.filter((r) => /^[\x20-\x7e]*$/.test(r.replace(SGR, "")) && !r.includes(`${ESC}b`) && !r.includes(`${ESC}[b`));
+    expect(fast.length, "rows the scan answers alone").toBeGreaterThan(3);
+    expect(rows.length - fast.length, "and rows that fall through").toBeGreaterThan(5);
+
+    // **The run gives up its last character when what follows could extend
+    // it** — a keycap is a digit, a selector and an enclosing mark, two cells
+    // as one cluster and one cell as a digit beside a zero-width tail; a
+    // spacing mark after a letter joins the letter's cluster and takes a cell
+    // of its own, as the terminal advances (I65). **The next line read `1`
+    // until F978** — *a spacing mark stays with its base* — the defect written
+    // into the test as its reason and green for as long as the defect was
+    // (F979): `aः` is two cells to string-width 8.2.2 and to xterm, and a
+    // `raw` row padded by the old answer wrapped in Ink (T2.133).
+    expect(cells("1\ufe0f\u20e3"), "keycap: one cluster of two cells").toBe(2);
+    expect(cells("a\u0903"), "a spacing mark joins its base's cluster and takes a cell — the terminal's answer (F978)").toBe(2);
+    expect(cells("\u06001"), "a Prepend joins the digit after it").toBe(1);
+    expect(fitStyled("\u06001x", 1, SGR_RESET), "and the walk keeps that cluster whole").toBe("\u06001");
+  });
+
+  it("T1.36 (I63, §5a): the corners — a control is carried at no width, and an escape is never inside a piece", () => {
+    // A control character is a cluster of its own and has no width (I18): the
+    // walks carry it through and the measurer strips it, so the row measures
+    // what is drawn either way. A bare escape is one.
+    const bel = String.fromCharCode(7);
+    expect(fitStyled(`a${bel}b`, 3, SGR_RESET)).toBe(`a${bel}b `);
+    expect(sliceCells(`a${bel}b`, 1, 2)).toBe(`${bel}b`);
+    expect(fitStyled(`a${ESC}b`, 3, SGR_RESET)).toBe(`a${ESC}b `);
+    expect(fitStyled("a\tb", 4, SGR_RESET), "a tab is one cell, as `cells` counts it").toBe("a\tb ");
+
+    // **An escape's final `m` is a letter, and a mark placed directly after an
+    // escape joins it in the segmenter's eyes.** The piece is the mark alone,
+    // zero cells, and the escape is whole — never repeated, never split — so
+    // the row still measures what the terminal draws. C04 I84 keeps a renderer
+    // from painting an escape inside a cluster; this is the corner it leaves.
+    const marked = `x${RED}\u0301y`;
+    expect(displayCells(marked)).toBe(2);
+    expect(fitStyled(marked, 4, SGR_RESET)).toBe(`${marked}  `);
+    expect(displayCells(fitStyled(marked, 4, SGR_RESET))).toBe(4);
+    expect(sliceCells(marked, 1, 2)).toBe(`${RED}\u0301y${SGR_RESET}`);
+
+    // **A combining mark at a window's right edge stays with its base** (F956).
+    // The code-point walk broke at the edge before the mark — `[0, 2)` over
+    // `ae\u0301b` came back `ae` — and no width could see it, because a base
+    // without its mark measures what the base does.
+    expect(sliceCells("ae\u0301b", 0, 2)).toBe("ae\u0301");
+    expect(sliceCells("ae\u0301b", 0, 2).length, "two cells, three code units").toBe(3); // cells-ok — a code-unit count, deliberately
+    expect(sliceCells(`${RED}ae\u0301${SGR_RESET}b`, 0, 2)).toBe(`${RED}ae\u0301${SGR_RESET}${SGR_RESET}`);
+  });
+});
+
 describe("C09 §5 — the printable-ASCII path", () => {
   // **The path is an equality, so it is tested as one.** A fast path that is
   // *nearly* right is worse than none: it puts the frame one cell into a row
@@ -501,7 +653,10 @@ describe("cells — the Wide set against its source (C09 §5)", () => {
     [0x2b1b, 0x2b1c, "black and white large squares"],
     [0x4dc0, 0x4dff, "the Yijing hexagrams — 64"],
     [0xa960, 0xa97c, "Hangul Jamo Extended-A — 29"],
-    [0x16fe0, 0x16fe4, "Tangut and Nushu iteration marks"],
+    // U+16FE0..U+16FE4 in the property; asserted to U+16FE3 because U+16FE4,
+    // the Khitan small script filler, is a nonspacing mark, and a nonspacing
+    // mark is zero before it is Wide (I65, T1.37) — string-width agrees.
+    [0x16fe0, 0x16fe3, "Tangut and Nushu iteration marks"],
     [0x16ff0, 0x16ff6, "Vietnamese alternate reading marks"],
     [0x17000, 0x18cd5, "Tangut ideographs — 7,382"],
     [0x18cff, 0x18d1e, "Khitan small script"],
@@ -611,5 +766,273 @@ describe("cells — the Wide set against its source (C09 §5)", () => {
     expect(cells("\u{1F1E6}", "narrow"), "REGIONAL INDICATOR A alone — Neutral in the property").toBe(2);
     expect(cells("\u{1F1E6}\u{1F1E9}", "narrow"), "and a pair is one flag of two cells, not four").toBe(2);
     expect(cells("\u{0301}", "narrow"), "COMBINING ACUTE ACCENT — Ambiguous in the property, zero here").toBe(0);
+  });
+});
+
+/**
+ * C09 T1.37–T1.39 — a cluster measures as the terminal advances, and the
+ * zero-width set is the property (C09 §5, I65).
+ *
+ * The third table in `text.ts` written by hand and found wrong against its
+ * source (F979), and the one whose errors landed on the cluster: `clusterCells`
+ * gave every cluster the width of its base code point, so a spacing mark —
+ * `Mc`, a cell to every terminal and to Ink — measured nothing, and a `raw`
+ * row padded by that answer wrapped in Ink (F969, F978, T2.133). T1.36
+ * asserted the old answer as the rule.
+ *
+ * **The reference is a table of measured values, not a reconstruction of the
+ * walk**, as §5's fast-path rows are: `cells()` at both conventions, with
+ * string-width 8.2.2 (as Ink 7.1.1 resolves it) and `@xterm/headless` 6.0.0's
+ * cursor column beside each, read in the container on Unicode 17.0. Asserted
+ * as one set by equality, so a member cannot be dropped to keep the row green.
+ */
+describe("cells — a cluster measures as the terminal advances (C09 §5, I65)", () => {
+  /**
+   * Name, text, `cells` at narrow, at wide — and in the comment what
+   * string-width and xterm-headless answered, which the row does not assert:
+   * the emulator is not a reference for a keycap, a Prepend or a lone mark
+   * (C27 I6), and Ink's answer is the one T2.133 holds a frame to.
+   */
+  const SHAPES: readonly (readonly [string, string, number, number])[] = [
+    //  name, text, narrow, wide                                                      string-width · xterm
+    ["café, decomposed", "cafe\u0301", 4, 4],                                        // 4 · 4
+    ["keycap 1️⃣", "1\ufe0f\u20e3", 2, 2],                                           // 2 · 1
+    ["flag 🇬🇧", "\u{1F1EC}\u{1F1E7}", 2, 2],                                        // 2 · 2
+    ["family 👨‍👩‍👧", "\u{1F468}\u200d\u{1F469}\u200d\u{1F467}", 2, 2],          // 2 · 3
+    ["Prepend ؀1", "\u06001", 1, 1],                                                 // 1 · 2
+    ["aः — a and U+0903, Mc", "a\u0903", 2, 2],                                      // 2 · 2 — read 1 before F978
+    ["कि — U+0915 U+093F, Mc", "\u0915\u093f", 2, 2],                                // 2 · 2 — read 1
+    ["กา — U+0E01 U+0E32, two letters", "\u0e01\u0e32", 2, 2],                       // 2 · 2 — read 1: U+0E32 sat in the hand table
+    ["กำ — U+0E33, a letter with GCB SpacingMark", "\u0e01\u0e33", 2, 2],            // 1 · 2 — read 1; Ink's 1 pads short
+    ["בְ — U+05D1 U+05B0, Mn", "\u05d1\u05b0", 1, 1],                                // 1 · 1
+    ["a and a soft hyphen", "a\u00ad", 2, 3],                                         // 1 · 2 — U+00AD is drawn, and Ambiguous at wide
+    ["lone ः", "\u0903", 1, 1],                                                       // 1 · 1
+    ["lone ́ U+0301", "\u0301", 0, 0],                                                // 0 · 1
+    ["a ZWSP b", "a\u200bb", 2, 2],                                                   // 2 · 2
+    ["கொ — Tamil, Mc", "\u0b95\u0bca", 2, 2],                                        // 2 · 2 — read 1
+    ["কা — Bengali, Mc", "\u0995\u09be", 2, 2],                                      // 2 · 2 — read 1
+    ["हिन्दी", "\u0939\u093f\u0928\u094d\u0926\u0940", 5, 5],                   // 4 · 5 — read 2
+    ["日 with U+0301", "\u65e5\u0301", 2, 2],                                        // 2 · 2
+    ["👋🏽 — a wave and a modifier", "\u{1F44B}\u{1F3FD}", 2, 2],                      // 2 · 2
+    ["England — 🏴 and six tags", "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}", 2, 2], // 2 · 1
+    ["a joiner alone", "\u200d", 0, 0],                                               // 0 · 1
+    ["1⃣ without the selector", "1\u20e3", 1, 1],                                     // 2 · 1
+    ["a modifier alone", "\u{1F3FB}", 2, 2],                                          // 2 · 1 — the rule's reason does not reach it
+    ["a and a modifier", "a\u{1F3FB}", 1, 1],                                         // 1 · 2 — the emulator draws the swatch
+    ["a, a joiner, b", "a\u200db", 2, 2],                                             // 2 · 2 — two clusters
+    ["Prepend and ⚠️", "\u0600\u26a0\ufe0f", 2, 2],                                  // 1 · 2
+    ["が — か and U+3099", "\u304b\u3099", 2, 2],                                    // 2 · 2
+    ["U+3099 alone — Mn, and Wide in the property", "\u3099", 0, 0],                  // 0 · 1 — read 2
+  ];
+
+  it("T1.37 (I65): the shapes as one set — every shape's cells at narrow and at wide equal the table", () => {
+    // **Equality over the set, not a member at a time**: a table with one row
+    // removed reads exactly like a table that passed. Under the base rule that
+    // stood here every `Mc` shape read 1 and हिन्दी 2 (T6.111); with the joiner
+    // no longer ending the sum the family reads 6 (T6.113).
+    expect(SHAPES.length, "the shapes the ruling was measured on").toBe(28);
+    const measured = Object.fromEntries(SHAPES.map(([name, text]) => [name, [cells(text), cells(text, "wide")]]));
+    const expected = Object.fromEntries(SHAPES.map(([name, , narrow, wide]) => [name, [narrow, wide]]));
+    expect(measured).toEqual(expected);
+  });
+
+  it("T1.38 (I65): the zero-width table is the property, re-derived here and compared by equality, and its two exclusions are deliberate", () => {
+    // **Derived at test time, not read off the table**: every code point in
+    // `Mn`, `Me` or `Cf` of the Unicode this runtime carries, minus U+00AD —
+    // the rule `ZERO_WIDTH_RANGES` states — merged into `[lo, hi]` runs, beside
+    // the code points `cells()` measures at zero, merged the same way. Controls
+    // are set aside: `cells` strips them (I18, T1.14) and no table ever held
+    // them. Measured through `clusterWidth`, which for one non-control code
+    // point is the path `cells` takes without the segmenter in front of it —
+    // the whole range costs 1.8 s through `cells` and a fifth of that here, so
+    // the row sweeps every plane rather than the assigned ones. The day the
+    // runtime's Unicode moves, this fails and the table is regenerated, which
+    // is what *checked rather than recorded* means.
+    const ZERO = /^[\p{Mn}\p{Me}\p{Cf}]$/u;
+    const CONTROL = /^\p{Cc}$/u;
+    const runs = (members: readonly number[]): number[] => {
+      const out: number[] = [];
+      for (const cp of members) {
+        if (out.length > 0 && out[out.length - 1] === cp - 1) out[out.length - 1] = cp; // cells-ok — a run's end, not a width
+        else out.push(cp, cp);
+      }
+      return out;
+    };
+    const expected: number[] = [];
+    const measured: number[] = [];
+    for (let cp = 0; cp <= 0x10ffff; cp += 1) {
+      if (cp >= 0xd800 && cp <= 0xdfff) continue;
+      const ch = String.fromCodePoint(cp);
+      if (CONTROL.test(ch)) continue;
+      if (ZERO.test(ch) && cp !== 0xad) expected.push(cp);
+      if (clusterWidth(ch) === 0) measured.push(cp);
+    }
+    expect(expected.length, "the derivation read the property at all — 2,241 on Unicode 17.0").toBeGreaterThan(2000); // cells-ok — a count of code points
+    expect(runs(measured), "what measures zero is exactly the derived set").toEqual(runs(expected));
+
+    // **The two exclusions, asserted where they are claimed.** U+00AD is `Cf`
+    // and every terminal draws it — xterm advances a cell, Kuhn's `wcwidth`
+    // names it width 1 in its header — so it measures one here where
+    // string-width measures none: an over-count on the Ink side, which pads
+    // short and cannot wrap (T6.114 is the admission).
+    expect(cells("\u00ad"), "SOFT HYPHEN alone").toBe(1);
+    expect(cells("a\u00ad"), "and after a letter — two clusters, two cells").toBe(2);
+    // The Hangul conjoining jamo are letters that `wcwidth` zeroes so a
+    // decomposed syllable measures what the precomposed one does; this table
+    // does not, and the limit is recorded rather than adopted: a decomposed 가
+    // is three here against xterm's and string-width's two.
+    expect(cells("\u1161"), "HANGUL JUNGSEONG A alone — a letter, one cell; wcwidth's zero is the recorded limit").toBe(1);
+    expect(cells("\u1100\u1161"), "a decomposed 가 — three, an over-count of one in the safe direction").toBe(3);
+    expect(cells("\uac00"), "the precomposed syllable — two").toBe(2);
+  });
+
+  it("T1.39 (I65, I19): the walks and the measurer part company nowhere — truncate, wrap, slice, fit and clusterWidth agree with cells() on a row of spacing marks", () => {
+    // One implementation (I6): every walk asks `clusterCells` for a cluster's
+    // width, so the sum reaches the cut, the wrap, the window and C17's cursor
+    // together. Read before asserted: each answer below is what the walk gave.
+    const ROW = "a\u0903 \u0915\u093f x"; // aः, a space, कि, a space, x — 2 + 1 + 2 + 1 + 1
+    const ESC = String.fromCharCode(27);
+    const RED = `${ESC}[31m`;
+    expect(cells(ROW)).toBe(7);
+    expect(clusterWidth("a\u0903"), "C17's question, the same implementation").toBe(2);
+    expect(clusterWidth("\u0915\u093f")).toBe(2);
+
+    // The cut: a cluster that would straddle it is dropped and its cells left
+    // blank (I9), and every cut measures exactly its limit.
+    expect(truncate(ROW, 3, FULL)).toBe("a\u0903…");
+    expect(truncate(ROW, 2, FULL), "aः would straddle the cut: blank, then the marker").toBe(" …");
+    expect(truncate(ROW, 6, FULL)).toBe("a\u0903 \u0915\u093f…");
+    for (const w of [1, 2, 3, 4, 5, 6, 7]) expect(cells(truncate(ROW, w, FULL)), `truncate at ${String(w)}`).toBe(w);
+
+    // The wrap: a two-cell cluster is placed whole on a row of two, and at
+    // width 1 it is unplaceable — `?` (I19), as a CJK glyph is. Under the base
+    // rule `aः` was one cell and was placed at 1.
+    expect(wrapCells(ROW, 2)).toEqual(["a\u0903", "\u0915\u093f", "x"]);
+    expect(wrapCells(ROW, 4)).toEqual(["a\u0903", "\u0915\u093f x"]);
+    expect(wrapCells("a\u0903", 1), "unplaceable at 1").toEqual(["?"]);
+    expect(wrapCells(ROW, 1)).toEqual(["?", "?", "x"]);
+
+    // The window: at cluster boundaries it is the cluster; straddling one it
+    // is blank, never half a cluster.
+    expect(sliceCells(ROW, 0, 2)).toBe("a\u0903");
+    expect(sliceCells(ROW, 3, 5)).toBe("\u0915\u093f");
+    expect(sliceCells(ROW, 1, 3), "a window across aः and the space").toBe("  ");
+    expect(sliceCells(ROW, 0, 1)).toBe(" ");
+
+    // The fit, at every width from 0 to two past the row; and the styled
+    // form, where the cluster and its SGR travel together.
+    expect(fitStyled(ROW, 2, SGR_RESET)).toBe("a\u0903");
+    expect(fitStyled(ROW, 5, SGR_RESET)).toBe("a\u0903 \u0915\u093f");
+    expect(fitStyled(ROW, 9, SGR_RESET)).toBe(`${ROW}  `);
+    for (let w = 0; w <= 9; w += 1) expect(displayCells(fitStyled(ROW, w, SGR_RESET)), `fit at ${String(w)}`).toBe(w);
+    const styled = `${RED}a\u0903${SGR_RESET} \u0915\u093f`;
+    expect(displayCells(styled)).toBe(5);
+    expect(sliceCells(styled, 0, 2)).toBe(`${RED}a\u0903${SGR_RESET}${SGR_RESET}`);
+    expect(sliceCells(styled, 3, 5)).toBe("\u0915\u093f");
+  });
+});
+
+/**
+ * C09 T1.40 — a row as the cells the terminal draws it in (C09 §5, I63, I65).
+ *
+ * `rowCells` is the inverse of a label writer's join, for C12's merge, which
+ * read a joined cell array by code point and put a family at five columns
+ * (F977, C12 I119). Two claims: the function equals the cluster walk on a
+ * corpus that reaches both of its arms, and the fast set it splits without a
+ * segmenter is a **checked** set — every member measures one cell at the mode
+ * it is admitted in — so a table revision that made one of them wide or
+ * combining fails here rather than in a frame.
+ */
+describe("rowCells — a row as cells, and the fast set is a checked claim (C09 §5, I63, I65)", () => {
+  const FAMILY = "\u{1F468}\u200d\u{1F469}\u200d\u{1F467}";
+  const KEYCAP = "1\ufe0f\u20e3";
+
+  /**
+   * The reference — `graphemes` and `cells`, the writer's own walk (C12 I118):
+   * a cluster at its first cell, `""` behind a wide one, a cluster measuring
+   * nothing on the cell that owns the cluster before it or dropped at the head.
+   */
+  const walk = (text: string, ambiguous: "narrow" | "wide"): readonly string[] => {
+    const out: string[] = [];
+    for (const cluster of graphemes(text)) {
+      const w = cells(cluster, ambiguous);
+      if (w === 0) {
+        let at = out.length - 1; // cells-ok — a cell index
+        while (at > 0 && out[at] === "") at -= 1; // cells-ok — a cell index
+        if (at >= 0) out[at] = `${out[at] ?? ""}${cluster}`;
+        continue;
+      }
+      out.push(cluster);
+      for (let k = 1; k < w; k += 1) out.push("");
+    }
+    return out;
+  };
+
+  it("T1.40 (I63, I65): rowCells equals the cluster walk over a corpus reaching both arms, at narrow and at wide", () => {
+    // **Both arms**: rows the per-unit split answers alone — ASCII at either
+    // mode; braille, box drawing, blocks, arrows and a sextant pair at
+    // narrow — and rows that walk the clusters: a family, a keycap, `図表`,
+    // `aः`, a decomposed `é`, a lone leading mark, a lone joiner, and the
+    // fast alphabets at wide, where box drawing measures two (I65).
+    const corpus = [
+      "", "abc def", "\u2801\u2802\u2800\u28ff", "\u256d\u2500\u2500\u256e\u2502", "\u2581\u2584\u2588",
+      "\u2192\u2197\u2191", "\u{1FB00}\u{1FB3B}", FAMILY, KEYCAP, "図表", "a\u0903", "e\u0301",
+      "\u0301ab", "\u200d", "a\u200db", "a\u200bb", "図\u200bx", "日本x", "\u2500a図", " \u2500 x ",
+    ];
+    for (const ambiguous of ["narrow", "wide"] as const) {
+      for (const row of corpus) {
+        expect(rowCells(row, ambiguous), `${JSON.stringify(row)} at ${ambiguous}`).toEqual(walk(row, ambiguous));
+      }
+    }
+    // **The shapes, as literal cells** — the reference is a table where the
+    // walk above could be wrong in the same way as the function.
+    expect(rowCells("abc", "narrow")).toEqual(["a", "b", "c"]);
+    expect(rowCells("\u256d\u2500", "narrow"), "box drawing, one per cell at narrow").toEqual(["\u256d", "\u2500"]);
+    expect(rowCells("\u256d\u2500", "wide"), "and two at wide, where the plot has already fallen back to ASCII").toEqual(["\u256d", "", "\u2500", ""]);
+    expect(rowCells("\u2801\u2800", "wide"), "braille is Neutral: one at wide too").toEqual(["\u2801", "\u2800"]);
+    expect(rowCells("\u{1FB00}\u{1FB3B}", "narrow"), "a sextant is one pair, one cell").toEqual(["\u{1FB00}", "\u{1FB3B}"]);
+    expect(rowCells(FAMILY, "narrow")).toEqual([FAMILY, ""]);
+    expect(rowCells(KEYCAP, "narrow")).toEqual([KEYCAP, ""]);
+    expect(rowCells("図表", "narrow")).toEqual(["図", "", "表", ""]);
+    expect(rowCells("a\u0903", "narrow"), "a spacing mark: one cluster of two cells (I65)").toEqual(["a\u0903", ""]);
+    expect(rowCells("e\u0301", "narrow")).toEqual(["e\u0301"]);
+    expect(rowCells("\u0301ab", "narrow"), "a lone leading mark owns no cell").toEqual(["a", "b"]);
+    expect(rowCells("\u200d", "narrow"), "a lone joiner owns no cell").toEqual([]);
+    expect(rowCells("a\u200bb", "narrow"), "a zero-width cluster rides on the cell before it").toEqual(["a\u200b", "b"]);
+    expect(rowCells("図\u200bx", "narrow"), "past a continuation, on the cell that owns the glyph").toEqual(["図\u200b", "", "x"]);
+    expect(rowCells("\u2500a図", "narrow"), "one glyph outside the set sends the row to the walk").toEqual(["\u2500", "a", "図", ""]);
+    // The count is the width, on both arms.
+    for (const row of corpus) expect(rowCells(row, "narrow").length, JSON.stringify(row)).toBe(cells(row, "narrow")); // cells-ok — a cell count against the measure
+  });
+
+  it("T1.40 (I63, I65): every member of the fast set measures one cell at the mode it is admitted in, and is not zero-width", () => {
+    // **Derived from the ranges the function reads**, not restated: the set is
+    // admitted at `narrow` — its BMP ranges are Ambiguous in part — and
+    // printable ASCII at either mode. A member measuring two or none here is a
+    // member the per-unit split would put in the wrong cell, and this row
+    // fails before any frame does (C12 T6.100 constructs the widened set).
+    expect(CELL_PER_UNIT_RANGES.length % 2, "flat [lo, hi] pairs").toBe(0); // cells-ok — a pair count
+    let members = 0; // cells-ok — a code-point count
+    for (let i = 0; i < CELL_PER_UNIT_RANGES.length; i += 2) { // cells-ok — a pair index
+      const lo = CELL_PER_UNIT_RANGES[i]!;
+      const hi = CELL_PER_UNIT_RANGES[i + 1]!;
+      expect(lo <= hi, `pair ${String(i / 2)} ascending`).toBe(true);
+      for (let cp = lo; cp <= hi; cp += 1) {
+        const ch = String.fromCodePoint(cp);
+        expect(cells(ch, "narrow"), `U+${cp.toString(16)} at narrow`).toBe(1);
+        expect(rowCells(ch, "narrow"), `U+${cp.toString(16)} as a row`).toEqual([ch]);
+        members += 1;
+      }
+    }
+    expect(members, "the set was read at all — four ranges, 784 code points").toBe(784); // cells-ok — a code-point count
+    for (let cp = 0x20; cp <= 0x7e; cp += 1) {
+      const ch = String.fromCharCode(cp);
+      expect(cells(ch, "narrow"), `ASCII U+${cp.toString(16)}`).toBe(1);
+      expect(cells(ch, "wide"), `ASCII U+${cp.toString(16)} at wide`).toBe(1);
+    }
+    // The control: a wide code point and a combining mark are what the check
+    // refuses, so the assertion above is not one every code point satisfies.
+    expect(cells("日", "narrow")).toBe(2);
+    expect(cells("\u0301", "narrow")).toBe(0);
   });
 });

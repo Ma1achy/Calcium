@@ -85,3 +85,43 @@ export {
   type ElementReport,
   type NavigableRegistry,
 } from "./navigation-conformance.js";
+
+// A01 Appendix B — the M-T6 decision gate, filled from a report rather than
+// estimated (C28 I37). `formatBudget` emits the appendix's own three columns, so
+// filling it is a copy; two of its six rows come back unanswerable, because a
+// plausible zero in a decision gate closes an experiment nobody ran.
+export {
+  BUDGET,
+  checkBudget,
+  checkLeaks,
+  checkPhases,
+  formatBudget,
+  formatLeaks,
+  formatPhases,
+  type BudgetOptions,
+  type BudgetReport,
+  type BudgetResult,
+  type BudgetRow,
+  type BudgetVerdict,
+  type MeasuredRow,
+  type LeakReport,
+  type LeakRow,
+  type PhaseReport,
+  type PhaseRow,
+  type UnansweredRow,
+} from "./profile.js";
+export {
+  checkReplay,
+  compareFrames,
+  formatReplay,
+  parseRecording,
+  replayClocks,
+  driveRecording,
+  farGate,
+  formatDrive,
+  replayStdin,
+  replayStdout,
+  replayTransport,
+  CLOCK_DERIVED,
+} from "./replay.js";
+export type { DriveOutcome, Recording, ReplayResult } from "./replay.js";

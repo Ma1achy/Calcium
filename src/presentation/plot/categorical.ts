@@ -75,6 +75,22 @@ export function barRow(
 }
 
 /**
+ * Asking the composer for the cells a number wants, before writing it (C12 I120).
+ *
+ * **The policy is the composer's and the geometry is this file's**, because
+ * neither can hold both: a column is built once and can see no neighbour, and
+ * the composer holds every column and cannot tell a digit cell from a ramp
+ * glyph by reading the strings back. So the placement is *carried out* rather
+ * than derived a second time — I114's ruling for the callout's row, one arm
+ * over, and for the same reason.
+ *
+ * `row` and `start` are the column's own; the composer adds the column's offset.
+ * Absent, everything is granted, which is what a lone `barColumn` outside a
+ * chart can know.
+ */
+export type LabelClaim = (row: number, start: number, width: number) => boolean;
+
+/**
  * One **column** of a vertical bar chart, top row first.
  *
  * The horizontal bar's transpose, and the vocabulary transposes with it (C12 I30):
@@ -99,6 +115,7 @@ export function barColumn(
   caps: Caps,
   showValue = false,
   format?: Plot["yFormat"],
+  claim?: LabelClaim,
 ): readonly string[] {
   const w = Math.max(1, Math.floor(width));
   const h = Math.max(1, Math.floor(rows));
@@ -142,6 +159,13 @@ export function barColumn(
   const at = h - 1 - inked; // cells-ok — a row index
   if (at < 0) return out; // cells-ok — a row index
   const left = Math.floor((w - wide) / 2); // cells-ok — a column position
+  // **And the cells have to be free of the number to its left** (C12 I120,
+  // §6p). Two bands whose numbers each fill their own band compose `4.17.4`
+  // out of `4.1` and `7.4` — one number that is neither value, which is worse
+  // than a row that lost one. The ask is here rather than at the top because
+  // only a label actually about to be written may move the composer's edge:
+  // a band that drops its number for any of the reasons above claims nothing.
+  if (claim !== undefined && !claim(at, left, wide)) return out; // cells-ok — a column position
   out[at] = " ".repeat(left) + text + " ".repeat(w - left - wide);
   return out;
 }

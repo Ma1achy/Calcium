@@ -18,11 +18,11 @@ import {
   type Decoded,
   type Pixels,
 } from "../../image/index.js";
-import { imageId, imageKey, placementRows } from "../../image/kitty.js";
+import { placementFits, placementIdOf, placementRows } from "../../image/kitty.js";
 import { overlayColour, overlayField } from "../../image/overlay.js";
 import { paint, type Span } from "../paint.js";
 import { statusDefinition } from "./status.js";
-import type { Image, Status } from "../../../data/viewmodel/index.js";
+import type { Image, MeasureFn, Probe, Status } from "../../../data/viewmodel/index.js";
 import { truncate } from "../../text.js";
 import type { BlockDefinition, RenderContext } from "../types.js";
 
@@ -44,9 +44,13 @@ const DECODED = new Map<string, Decoded>();
  * the reader as the same `alt`. The reason is computed for every refusal; it
  * cost nothing to keep and a reader could never see one.
  */
-function decodedOf(block: Image): Decoded {
+function decodedOf(block: Image, probe?: Probe): Decoded {
   const held = DECODED.get(block.digest);
-  if (held !== undefined) return held;
+  if (held !== undefined) {
+    probe?.hit("decode");
+    return held;
+  }
+  probe?.miss("decode", "absent");
   let decoded: Decoded;
   try {
     decoded = decodeImage(Uint8Array.from(Buffer.from(block.data, "base64")));
@@ -56,6 +60,20 @@ function decodedOf(block: Image): Decoded {
     decoded = { ok: false, fault: "the block's data is not base64" };
   }
   DECODED.set(block.digest, decoded);
+  // **This map has no cap** — see the header above. The gauge is the whole
+  // finding: every distinct digest a session ever renders stays decoded for the
+  // life of the process, so a `--watch` on a directory of images grows it
+  // without bound and nothing else in the tree would say so. A hit rate cannot
+  // show it; occupancy can.
+  probe?.gauge("decode.entries", DECODED.size);
+  // **The gauge says how many are held; this says whether any was ever let go**
+  // (C28 I43). They are not — the map has no cap and nothing deletes from it —
+  // so `created` and `live` moving together is this map's *known* answer, and
+  // the counter is here as the one that would notice if that changed. A leak
+  // counter is worth as much on a leak that is understood as on one that is
+  // not: it is the difference between a decision recorded and a decision
+  // assumed to still hold.
+  probe?.track("image.decoded", decoded);
   return decoded;
 }
 
@@ -68,8 +86,8 @@ function decodedOf(block: Image): Decoded {
  * than refusing — the store keeps the index inside the count, and a block whose
  * bytes changed under a held index has a new digest and a new slot.
  */
-function pixelsOf(block: Image, frame = 0): Pixels | null {
-  const decoded = decodedOf(block);
+function pixelsOf(block: Image, frame = 0, probe?: Probe): Pixels | null {
+  const decoded = decodedOf(block, probe);
   if (!decoded.ok) return null;
   if (decoded.animation === undefined || frame === 0) return decoded.pixels;
   const frames = decoded.animation.frames;
@@ -84,8 +102,8 @@ function pixelsOf(block: Image, frame = 0): Pixels | null {
  * what delays — the block knows, the store does not, and the decoder is
  * already memoised on the digest so the question costs a map lookup.
  */
-export function framesOf(block: Image): Animation | null {
-  const decoded = decodedOf(block);
+export function framesOf(block: Image, probe?: Probe): Animation | null {
+  const decoded = decodedOf(block, probe);
   return decoded.ok ? (decoded.animation ?? null) : null;
 }
 
@@ -104,8 +122,8 @@ export function framesOf(block: Image): Animation | null {
  * signature, no IHDR, a zero dimension — and then the 20-column placeholder is
  * still the honest answer.
  */
-function extentOf(block: Image): Readonly<{ width: number; height: number }> | null {
-  const decoded = decodedOf(block);
+function extentOf(block: Image, probe?: Probe): Readonly<{ width: number; height: number }> | null {
+  const decoded = decodedOf(block, probe);
   return decoded.ok ? decoded.pixels : (decoded.size ?? null);
 }
 
@@ -121,10 +139,14 @@ function extentOf(block: Image): Readonly<{ width: number; height: number }> | n
  * outside its rectangle addresses part of an image the terminal is not drawing
  * there, so over-drawing here is worse than wrong.
  */
-export function imageCells(block: Image, width: number): { cols: number; rows: number } {
+export function imageCells(
+  block: Image,
+  width: number,
+  probe?: Probe,
+): { cols: number; rows: number } {
   // **The extent and not the pixels** (F413) — this is the whole of what the
   // geometry wants, and it survives a refusal the rasterisers cannot.
-  const px = extentOf(block);
+  const px = extentOf(block, probe);
   const w = Math.max(1, Math.floor(width)); // cells-ok — a cell count
   const declared = Math.max(1, block.height); // cells-ok — a row count
   if (px === null) return { cols: Math.min(w, 20), rows: declared }; // cells-ok — a cell count
@@ -134,6 +156,41 @@ export function imageCells(block: Image, width: number): { cols: number; rows: n
   // Scaled to the width, and the rows follow rather than being kept.
   const scaled = Math.max(1, Math.round(w / (2 * aspect))); // cells-ok — a row count
   return { cols: w, rows: Math.min(declared, scaled) }; // cells-ok — a row count
+}
+
+/**
+ * **Which arm this block takes, asked rather than inferred** (C09 I67, F1026).
+ *
+ * The renderer below, the session's animation gather (C22 I77) and the
+ * transmission seam (C09 I66) each need the same answer, and each used to
+ * compute a *different* one: the renderer asked `placementRows`, and the other
+ * two asked `imageProtocol`. **The capability is half the arm** — a placement
+ * past the diacritic encoding falls to the half block, on either axis — so a
+ * shell gating on the capability alone gathered no frames for a picture it was
+ * rasterising (frame 0 for ever, F624) and wrote a transmission no placeholder
+ * addresses.
+ *
+ * **It is a question travelling down and not an answer travelling up.** The
+ * finding that recorded the gap said the remedy needed "a seam carrying a
+ * block's chosen arm back to the shell", which A02 Seam 4 forbids and which is
+ * why it was priced as large. There is no chosen arm to carry: the arm is a pure
+ * function of `(block, width, capabilities)`, so L4 calls **down** into it, as it
+ * already calls down into `imageCells` (F380) and `placementIdOf` (F987) in this
+ * same pair of files.
+ *
+ * **The width is the one the block is rendered at**, not the frame's — a card's
+ * body is four cells in (C22 §6l.4 D) and `imageCells` reads the width, which is
+ * the whole of F380.
+ */
+export function placesAtProtocol(
+  block: Image,
+  capabilities: RenderContext["capabilities"],
+  width: number,
+  probe?: Probe,
+): boolean {
+  if (capabilities.imageProtocol !== "kitty") return false;
+  const { cols, rows } = imageCells(block, width, probe);
+  return placementFits(cols, rows);
 }
 
 /**
@@ -154,12 +211,19 @@ export const imageDefinition: BlockDefinition<Image> = {
   kind: "image",
 
   /** The clamped row count — never the declared one when the width bites. */
-  measure(block: Image, width: number): number {
-    return imageCells(block, width).rows;
+  measure(block: Image, width: number, _measureChild: MeasureFn, probe?: Probe): number {
+    return imageCells(block, width, probe).rows;
   },
 
   render(block: Image, ctx: RenderContext): ReactElement {
-    const { cols, rows } = imageCells(block, ctx.width);
+    const { cols, rows } = imageCells(block, ctx.width, ctx.probe);
+    // C28 I45 — the payload, which the decode and the kitty transmission both
+    // walk in full, and which `cols * rows` cannot stand in for: the drawn cell
+    // count is clamped to the width and a two-megabyte PNG in a 20×10 box is the
+    // same figure as a two-kilobyte one. **`decode.entries` is not this gauge**
+    // — it counts what the cache holds, so a file that grew reads identically
+    // (F906).
+    ctx.probe?.gauge("image.bytes", block.data.length); // cells-ok — an input size, not a display width
 
     // **The protocol arm comes first, and that is the F413 ordering.** It used
     // to sit below the decode gate, so a PNG this repository cannot rasterise
@@ -177,10 +241,15 @@ export const imageDefinition: BlockDefinition<Image> = {
     // wrapping a diacritic: a wrapped one addresses the wrong part of the image,
     // which is a plausible wrong picture — the failure this arm is built to
     // avoid, and the one a reader cannot diagnose.
-    const placed =
-      ctx.capabilities.imageProtocol === "kitty"
-        ? placementRows(imageId(imageKey(block)), cols, rows)
-        : null;
+    //
+    // **The gate is `placesAtProtocol` and not a second copy of it** (I67): the
+    // shell asks the same function, so the arm the frame draws and the arm the
+    // session gathers for cannot part company. No probe is passed — the box
+    // above already recorded this block's decode, and a second `imageCells` here
+    // would count it twice (C28 I30).
+    const placed = placesAtProtocol(block, ctx.capabilities, ctx.width)
+      ? placementRows(placementIdOf(block, ctx.placementScope), cols, rows)
+      : null;
     if (placed !== null && "rows" in placed) {
       // **The overlay is not here at `kitty` and that is the whole ruling**
       // (C04 §3h.2): the cell's rendering is the terminal's, so it is composited
@@ -198,7 +267,16 @@ export const imageDefinition: BlockDefinition<Image> = {
     // **And this is where the frame enters** (C04 I93, C22 I77): the protocol
     // arm above transmitted every frame once and the terminal is animating it,
     // so the index is read only by the arms that draw a glyph per cell.
-    const px = pixelsOf(block, ctx.frames?.[block.id] ?? 0);
+    const px = pixelsOf(block, ctx.frames?.[block.id] ?? 0, ctx.probe);
+    // **The second input, and it is independent of the first** (C28 I45): a
+    // compressed PNG is small and enormous at once, so `image.bytes` bounds the
+    // decode and this bounds the dither. Recorded here rather than beside it
+    // because only this path walks the source pixels — the protocol arm above
+    // hands the bytes to the terminal and rasterises nothing, and a gauge that
+    // fired there would report a cost the frame did not pay.
+    if (px !== null) {
+      ctx.probe?.gauge("image.pixels", px.width * px.height); // cells-ok — a source pixel count
+    }
 
     // **A block whose bytes do not decode draws the refusal, with the reason**
     // (I38, F410). It drew `alt` for every one of them, and the ruling that put
@@ -215,7 +293,7 @@ export const imageDefinition: BlockDefinition<Image> = {
     // the box says which refusal and `alt` says what the picture was, and the
     // first is the one a reader cannot recover any other way.
     if (px === null) {
-      const decoded = decodedOf(block);
+      const decoded = decodedOf(block, ctx.probe);
       const fault = decoded.ok ? "" : decoded.fault;
       const boxRows = rows >= 2 ? rows - 1 : rows; // cells-ok — a row count
       const box = statusDefinition.render(faultStatus(block, fault, boxRows), ctx);

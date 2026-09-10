@@ -12,6 +12,8 @@ import { validateDocument } from "../../src/data/viewmodel/validate.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { ASCII_CAPS, FULL_CAPS, MONO_CAPS, measurable } from "../support/render.js";
 import { cells } from "../../src/presentation/text.js";
+import { pointLabelRows } from "../../src/presentation/plot/pointlabels.js";
+import { FACING_DEFAULT, seriesRange } from "../../src/presentation/plot/scale.js";
 
 const V = [10, 42, 25, 88, 55, 30, 70, 15];
 const kit = (caps: object = FULL_CAPS) =>
@@ -176,10 +178,21 @@ describe("TL13 (C12 I55): a name is text, so it survives every alphabet", () => 
     for (const ch of rows.join("")) expect(ch.codePointAt(0) ?? 0, ch).toBeLessThan(128);
   });
 
-  it("a wide codepoint leaves the row exactly as wide", () => {
+  it("a wide codepoint leaves every row exactly as wide — the label's row included", () => {
     const rows = at([null, "図表", null, null, null, null, null, null]);
     expect(rows.join("\n")).toContain("図表");
-    for (const r of rows.filter((x) => /[│|]$/u.test(x))) expect(cells(r, "narrow"), r).toBe(70);
+    // **Every row but the caption, by position rather than by content.** This
+    // filtered on `/[│|]$/` — rows ending in the frame's edge — and the one row
+    // the fixture was written for was the one row the filter skipped: with the
+    // merge reading the overlay by code point, `図表`'s row ran two cells past
+    // the width and ended in the clamp's `…`, so it never matched, and the row
+    // was green for as long as the defect was (F977, C12 I119; T1.138 reads
+    // the same fixture). The caption is the last row and is 69 with or without
+    // labels — Ink trims its trailing blank — so it is set aside by index.
+    const area = rows.slice(0, -1);
+    expect(area.length).toBeGreaterThan(4); // cells-ok — a row count
+    for (const r of area) expect(cells(r, "narrow"), r).toBe(70);
+    expect(cells(rows[rows.length - 1] ?? "", "narrow"), "the caption").toBeLessThanOrEqual(70); // cells-ok — a row index
   });
 });
 
@@ -221,6 +234,34 @@ describe("TL14 (C12 I55): at most one label per cell column", () => {
     const rows = draw({ series: [{ values: many, label: "a", pointLabels: labels }] });
     for (const r of rows.filter((x) => /[│|]$/u.test(x))) expect(cells(r, "narrow"), r).toBe(70);
     expect(rows.join("\n")).toMatch(/s\d/u);
+  });
+});
+
+describe("T1.133 (C12 I118, C12 I55): a family and a keycap as names — whole in `pointLabelRows` and in the frame", () => {
+  const KEYCAP = "1️⃣";
+  const FAMILY = "\u{1F468}‍\u{1F469}‍\u{1F467}";
+  const labels = [null, FAMILY, null, null, null, KEYCAP, null, null];
+
+  it("read before Ink: each name is in the overlay whole, and the overlay measures the area", () => {
+    const series = [{ values: V, label: "a", pointLabels: labels }];
+    const range = seriesRange(series as never, {});
+    expect(range).not.toBeNull();
+    const rows = pointLabelRows(series as never, range!, 60, 9, FULL_CAPS, FACING_DEFAULT);
+    const overlay = rows[0]!;
+    expect(overlay).toHaveLength(9); // cells-ok — a row count
+    // The private loop this file carried wrote one code point per cell, so
+    // the family sat here as three faces and the keycap as a bare digit
+    // (F969, F976); the joined overlay still measured the area either way,
+    // which is why the shape is asserted and not only the width.
+    expect(overlay.join("\n")).toContain(FAMILY);
+    expect(overlay.join("\n")).toContain(KEYCAP);
+    for (const row of overlay) expect(cells(row, "narrow"), row).toBe(60);
+  });
+
+  it("through the public render, compared in NFC as C09 T2.129 compares", () => {
+    const shown = at(labels).join("\n").normalize("NFC");
+    expect(shown).toContain(FAMILY.normalize("NFC"));
+    expect(shown).toContain(KEYCAP.normalize("NFC"));
   });
 });
 

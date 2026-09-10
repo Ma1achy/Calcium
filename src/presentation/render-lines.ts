@@ -21,6 +21,7 @@
  */
 import { Box, Text, renderToString } from "ink";
 import { createElement } from "react";
+import { NO_SPAN } from "../data/viewmodel/index.js";
 import type { Block } from "../data/viewmodel/index.js";
 import type { BlockRegistry, RenderContext, RenderContextInput } from "./blocks/index.js";
 import type { ResolvedTheme } from "./theme/index.js";
@@ -46,6 +47,11 @@ export type RenderOptions = Readonly<{
   cameras?: RenderContext["cameras"];
   /** Per-image frame indices (C04 I93, C22 I77). Absent is frame 0. */
   frames?: RenderContext["frames"];
+  /**
+   * The scope a placement is identified within (C09 I66). Absent is the
+   * picture's identity, and it must be absent on the seam too.
+   */
+  placementScope?: RenderContext["placementScope"];
   /** Per-plot series overrides (C04 I99, C22 I78). Absent is each block's own `hidden`. */
   seriesVisibility?: RenderContext["seriesVisibility"];
   /**
@@ -54,6 +60,8 @@ export type RenderOptions = Readonly<{
    * is not a cache, and PR10's control asserts exactly that.
    */
   scratch?: RenderContext["scratch"];
+  /** C28's seam (I30). Absent is not recording. */
+  probe?: RenderContext["probe"];
 }>;
 
 /**
@@ -80,9 +88,11 @@ export function renderToLines(
     ...(options.cursorPositions === undefined ? {} : { cursorPositions: options.cursorPositions }),
     ...(options.cameras === undefined ? {} : { cameras: options.cameras }),
     ...(options.frames === undefined ? {} : { frames: options.frames }),
+    ...(options.placementScope === undefined ? {} : { placementScope: options.placementScope }),
     ...(options.seriesVisibility === undefined ? {} : { seriesVisibility: options.seriesVisibility }),
     ...(options.scratch === undefined ? {} : { scratch: options.scratch }),
     tick: options.tick ?? 0,
+    ...(options.probe === undefined ? {} : { probe: options.probe }),
   };
 
   // Counted against a sentinel row rather than by splitting the output.
@@ -132,20 +142,38 @@ export function renderSequenceToLines(
     ...(options.cursorPositions === undefined ? {} : { cursorPositions: options.cursorPositions }),
     ...(options.cameras === undefined ? {} : { cameras: options.cameras }),
     ...(options.frames === undefined ? {} : { frames: options.frames }),
+    ...(options.placementScope === undefined ? {} : { placementScope: options.placementScope }),
     ...(options.seriesVisibility === undefined ? {} : { seriesVisibility: options.seriesVisibility }),
     ...(options.scratch === undefined ? {} : { scratch: options.scratch }),
     tick: options.tick ?? 0,
+    ...(options.probe === undefined ? {} : { probe: options.probe }),
   };
 
-  const painted = renderToString(
-    createElement(
+  // **The two halves are timed apart, and this is the split that matters most**
+  // (C28 I31). Everything above `renderToString` is Calcium building an element
+  // tree — every block's `render`, every container's placement arithmetic.
+  // Everything inside it is React and Yoga: `createContainer`,
+  // `updateContainerSync`, `calculateLayout`, the string walk, then a full
+  // unmount and `yogaNode.free()`. Ink reuses nothing between calls, so that is
+  // a complete mount-and-teardown cycle per invocation and there is no reason to
+  // assume it is the cheap half. Merged into one span the question is
+  // unanswerable; split, the first frame answers it.
+  const probe = options.probe;
+  let element;
+  {
+    using _build = probe?.span("elements") ?? NO_SPAN;
+    element = createElement(
       Box,
       { flexDirection: "column" },
       registry.renderSequence(blocks, ctx),
       createElement(Text, { key: "sentinel" }, SENTINEL),
-    ),
-    { columns: width },
-  );
+    );
+  }
+  let painted: string;
+  {
+    using _react = probe?.span("react") ?? NO_SPAN;
+    painted = renderToString(element, { columns: width });
+  }
 
   const lines = painted.split("\n");
   return lines.slice(0, Math.max(0, lines.length - 1)); // cells-ok — rows, not columns

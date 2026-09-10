@@ -228,35 +228,59 @@ export function applyPatch(doc: ViewDocument, patch: ViewPatch): PatchResult {
       // fails only when it names nothing: a target that does not exist is a
       // caller bug, and silently succeeding is what makes an action that did
       // nothing indistinguishable from one that worked.
-      const target = doc.blocks.find((b) => b.id === patch.blockId);
-      if (target === undefined) {
-        return fail(`expand: no block "${patch.blockId}" in the document`, "expand");
+      //
+      // **Through `countId`/`rewrite`, for `reserve`'s reason below** (I115).
+      // This arm was the odd sibling: a `doc.blocks.find` and a `doc.blocks.map`
+      // where the other three resolve through the walk, so a table inside a
+      // `group` — the arrangement `b.live` and C04 I34 both produce — answered
+      // *no block "tbl" in the document* about a document holding it, while
+      // `replace`, `merge` and `reserve` all found it. **The refusal was not
+      // merely a refusal but a false statement about the document**, in the file
+      // that owns the walk (F1015). The two sides agree because they ask
+      // `tree.ts`'s one question, not because two enumerations happen to list
+      // the same container kinds today (F1010's ruling).
+      const n = countId(doc.blocks, patch.blockId);
+      if (n === 0) return fail(unknownId(patch.blockId, "expand"), "expand");
+      // **The duplicate arm arrives with the walk rather than beside it.** A
+      // `find` silently takes the first of two where I14 says there is no
+      // correct target, which is the hole F1010 closed in `putBlock` reaching
+      // `applyPatch` itself — and the case I14 declares impossible is the case
+      // a document arriving from an adapter can be.
+      if (n > 1) return fail(duplicateId(patch.blockId), "expand");
+
+      // Reported after the rewrite for `merge`'s reason: `rewrite` is the one
+      // thing that knows which block the id resolved to, and asking twice is
+      // the second walk this arm was fixed to remove.
+      let wrongKind: string | null = null;
+      let noSuchRow = false;
+      const blocks = rewrite(doc.blocks, patch.blockId, (b) => {
+        if (b.kind !== "table") {
+          wrongKind = b.kind;
+          return b;
+        }
+        if (!b.rows.some((r) => r.id === patch.rowId)) {
+          noSuchRow = true;
+          return b;
+        }
+        // I68 — an expansion changes the rows, so the height that failed is not
+        // the height now.
+        return withoutFloor({
+          ...b,
+          rows: b.rows.map((r) => (r.id === patch.rowId ? { ...r, expanded: patch.expanded } : r)),
+        });
+      });
+
+      if (wrongKind !== null) {
+        return fail(
+          `expand: block "${patch.blockId}" is a ${String(wrongKind)}, which has no rows`,
+          "expand",
+        );
       }
-      if (target.kind !== "table") {
-        return fail(`expand: block "${patch.blockId}" is a ${target.kind}, which has no rows`, "expand");
-      }
-      if (!target.rows.some((r) => r.id === patch.rowId)) {
+      if (noSuchRow) {
         return fail(`expand: no row "${patch.rowId}" in block "${patch.blockId}"`, "expand");
       }
 
-      return {
-        ok: true,
-        doc: deepFreeze({
-          ...doc,
-          blocks: doc.blocks.map((b) =>
-            b.id === patch.blockId && b.kind === "table"
-              ? // I68 — an expansion changes the rows, so the height that failed
-                // is not the height now.
-                withoutFloor({
-                  ...b,
-                  rows: b.rows.map((r) =>
-                    r.id === patch.rowId ? { ...r, expanded: patch.expanded } : r,
-                  ),
-                })
-              : b,
-          ),
-        }),
-      };
+      return { ok: true, doc: deepFreeze({ ...doc, blocks }) };
     }
 
     case "reserve": {

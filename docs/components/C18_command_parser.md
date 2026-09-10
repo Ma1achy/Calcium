@@ -812,6 +812,8 @@ Six tiers. No state machine — C18 is pure.
 - **T2.10** (I23): C18 imports C05's suggester; a second edit-distance implementation fails SS30.
 - **T2.11** (§8a): the classification table replayed row for row, asserting the **whole** result — kind, tool, argv, residual, validation and the rule that fired.
 
+- **T2.12** (I6): C18 imports nothing outside its own directory — no `node:child_process`, no transport, no runner, and nothing that could acquire one — and `parse` returns a value rather than a promise, so there is no point at which a spawn could be awaited. **Nothing is spawned to discover an invocation is malformed** is an absence claim the behavioural half cannot show: a route that spawned first and validated after would return the same error.
+- **T2.13** (I13): a line with an operator classifies as `shell` and comes back whole, and C18's exported surface is compared **by equality** against `parse`, `prefixPolicy`, `quote`, `slashPolicy`, `tokenise` — five entry points, every one over a line the user typed. There is no function to call with a shell's reply even if a caller wanted to, which is what *C18 does not parse it* means where a reader can check it. The `raw` block itself is C23's (`execution.ts`'s shell route).
 ### Tier 3 — edge cases
 
 - **T3.1**: `/` alone → `error`, not an empty tool name.

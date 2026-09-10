@@ -24,7 +24,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { b } from "@fmx/calcium";
 import { bannerRow } from "./banner.ts";
-import type { LocalDocument, Block, ColumnDef, Glyph, TableRow, Tone, ViewDocument } from "@fmx/calcium";
+import type { LocalDocument, Block, ColumnDef, Glyph, TableRow, Tone } from "@fmx/calcium";
 import { parseNdjson, str } from "./ndjson.ts";
 import type { Row } from "./ndjson.ts";
 import { stateOf } from "./ps.ts";
