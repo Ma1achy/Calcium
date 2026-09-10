@@ -81,6 +81,24 @@ describe("C09 §5a — the walk is linear in the row (C09 I60)", () => {
 
     // The control that says the operands measured something: a longer row costs
     // more, whatever the clock's resolution.
+    //
+    // **It lost once, and the figures are here because a rare red is a
+    // reproduction spent.** 2026-09-10, inside a `make all` on a host that was
+    // killing background processes for memory: `400 cells took 0.0154 ms
+    // against 0.0364 at 50` — the *small* row measured 2.4× the large one.
+    // Not a near miss around a small gap, and not the clock's resolution
+    // either: `perCall` runs each subject for 20 ms and takes a minimum over
+    // three reps, so both operands are steady-state. What the sentence above
+    // does not survive is the two measurements being taken minutes apart on a
+    // machine whose state moved in between — the load lands on whichever
+    // operand it lands on, and this control reads that as a claim about cost.
+    //
+    // Re-measured five times alone immediately after: green five of five. So it
+    // is recorded rather than repaired — the countable thing F1084 and F1091
+    // reach for is `Segments.prototype.containing`, and this arm's rows are
+    // ASCII and never touch the segmenter, which is the whole point of the row
+    // below it. If it reds again outside a memory-pressured chain, that is the
+    // second sample and the repair is a different instrument, not a wider bound.
     expect(largeMs, `400 cells took ${largeMs.toFixed(4)} ms against ${smallMs.toFixed(4)} at 50`).toBeGreaterThan(smallMs);
     expect(
       ratio,
