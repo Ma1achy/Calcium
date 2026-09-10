@@ -6,7 +6,7 @@
  * renderer (C09 §1).
  */
 import type { ReactElement } from "react";
-import type { Action, Block, Camera, Measure, MeasureFn, Probe, WidthFn } from "../../data/viewmodel/index.js";
+import type { Action, Block, BlockKind, Camera, Measure, MeasureFn, Probe, WidthFn } from "../../data/viewmodel/index.js";
 import type { ResolvedTheme } from "../theme/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
@@ -461,6 +461,30 @@ export type BlockKeyBinding = Readonly<{
   action: string;
 }>;
 
+/**
+ * A definition of **some one kind** — the element type a registry stores and
+ * `TuiConfig.blocks` takes (C04 I119, F405).
+ *
+ * **Not `BlockDefinition<Block>`, and the difference is the whole registration
+ * surface.** `B` sits in parameter position only — deliberately, see `Windowed`
+ * above — so `BlockDefinition<B>` is *contravariant*: a definition that handles
+ * only `Table` is correctly refused where one handling any `Block` is asked
+ * for. That is right about assignment and wrong about the registry, which
+ * dispatches by `kind` and hands each definition nothing but its own. Written
+ * as a union over the kinds, `BlockDefinition<Table>` is a member because
+ * `table` is, and an app's `BlockDefinition<Faulty>` is a member the moment
+ * `faulty` joins `BlockKinds`.
+ *
+ * Measured: five `as unknown as BlockDefinition` casts in `src/` were the cost
+ * of the old element type — three in `construct.ts`, one in `expect-document`,
+ * one in `defaults.ts` — plus one per definition in every consumer. They become
+ * **one**, at the line that stores into a `Map` keyed by kind, where the
+ * dispatch is the thing the compiler cannot see.
+ */
+export type AnyBlockDefinition = {
+  [K in BlockKind]: BlockDefinition<Extract<Block, { kind: K }>>;
+}[BlockKind];
+
 export interface BlockDefinition<B extends Block = Block> {
   kind: string;
   measure: Measure<B>;
@@ -537,7 +561,7 @@ export interface BlockDefinition<B extends Block = Block> {
 }
 
 export interface BlockRegistry {
-  register(definition: BlockDefinition): void;
+  register(definition: AnyBlockDefinition): void;
   get(kind: string): BlockDefinition | undefined;
   seal(): void;
   measure(block: Block, width: number): number;

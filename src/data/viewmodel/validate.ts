@@ -19,7 +19,7 @@ import {
   type Action,
   type Annotation,
   type Block,
-  type BlockKind,
+  type KnownBlockKind,
   type DocumentStatus,
   type Glyph,
   COLORMAP_NAMES,
@@ -1244,7 +1244,10 @@ function splitsSurrogate(text: string, i: number): boolean {
  * One entry per member of the union. `Record<BlockKind, …>` is the assertion:
  * a new kind without a row here is a type error, not a silent pass (T2.10).
  */
-const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
+// **`KnownBlockKind` and not `BlockKind`** (C04 I119): the union is open and
+// this table is the framework's own. Keyed on the open union it would demand
+// an entry for a kind an app declared and this build never heard of.
+const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
   rule: (b, e, at) => {
     requireString(b, "label", e, at);
     // C04 I94 — three drawn forms, so three values. A fourth would be accepted
@@ -3015,7 +3018,7 @@ function walkBlock(
   // kinds through C09 (F1). It is unvalidatable here, and `raw` renders it
   // degraded rather than nothing (C09 §2).
   if (KNOWN_KINDS.has(kind)) {
-    KIND_CHECKS[kind as BlockKind](value, errors, where);
+    KIND_CHECKS[kind as KnownBlockKind](value, errors, where);
   }
 
   path.add(value);

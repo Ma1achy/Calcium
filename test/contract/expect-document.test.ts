@@ -23,10 +23,13 @@
 // options parameter taking extra `BlockDefinition`s, which a consumer with a
 // custom kind needs anyway (F1); it is not built, and saying so here is
 // cheaper than a comment that implies these two lines are tested.
+import { createElement } from "react";
+import { Text } from "ink";
 import { describe, expect, it } from "vitest";
 import { block, document } from "../../src/data/viewmodel/index.js";
 import type { Block, ViewDocument } from "../../src/data/viewmodel/index.js";
 import { b } from "../../src/shell/builders/index.js";
+import type { AnyBlockDefinition } from "../../src/presentation/blocks/index.js";
 import { expectDocument, liveParts } from "../../src/testing/index.js";
 import { producerContext, FULL_CAPABILITIES as FULL } from "../support/producer-context.js";
 import { CORPUS, doc } from "../support/blocks.js";
@@ -537,7 +540,39 @@ describe("liveParts — what `b.live` declared (C24 I24, F28)", () => {
     expect(liveParts(plain)).toEqual([]);
   });
 
-  it.todo(
-    "T2.22 (C24 I35, F405): `expectDocument(doc, [definition])` measures a registered kind at its declared height, and without the argument the same document measures one row — not deferred on a component, because `expectDocument` and `TuiConfig.blocks` both exist; the parameter is what this commit rules",
-  );
+  it("T2.22 (C24 I35, F405): the helper measures what the app registered, and one row is what it did before", () => {
+    // **Both arms in one row, because the failing reading is not an error.** An
+    // unregistered kind falls back to `raw` and renders at **one row** — a
+    // plausible number, so `measuresCorrectly` and `rendersAt` both pass and
+    // assert nothing about the kind under test. A row asserting only the
+    // registered arm cannot tell a registered definition from a fallback.
+    const gaugeDoc: ViewDocument = document({
+      schema: "tui.view/1",
+      command: "",
+      status: "ok",
+      blocks: [{ kind: "gauge", id: "g-1", reading: 0.42 } as unknown as Block],
+      meta: {
+        verb: null, adapter: "none", exitCode: 0, durationMs: 0, truncated: false,
+        argv: [], stderr: "", transport: "local", origin: "action",
+      },
+    });
+    const definition: AnyBlockDefinition = {
+      kind: "gauge",
+      measure: () => 4,
+      // **Four rows drawn, not four rows declared.** `lines()` counts what the
+      // renderer produced; a definition whose `measure` says four and whose
+      // render draws one would pass a row that only read `measure`, and the
+      // fallback this is separating from draws exactly one.
+      render: () => createElement(Text, null, "a\nb\nc\nd"),
+    };
+
+    expect(
+      expectDocument(gaugeDoc, [definition]).lines(80).length,
+      "the height the definition declared",
+    ).toBe(4);
+    expect(
+      expectDocument(gaugeDoc).lines(80).length,
+      "and without it, the `raw` fallback — one row, and no error anywhere",
+    ).toBe(1);
+  });
 });

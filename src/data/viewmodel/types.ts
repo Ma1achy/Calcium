@@ -3408,29 +3408,99 @@ export type Status = Readonly<{
   framed?: boolean;
 }> & Gap & Floor;
 
-export type Block =
-  | Rule
-  | Notice
-  | KeyValue
-  | Table
-  | Steps
-  | Logs
-  | Events
-  | Plot
-  | Progress
-  | Code
-  | Comparison
-  | Patch
-  | Pills
-  | Tip
-  | Panel
-  | Group
-  | Scroll
-  | Mosaic
-  | Image
-  | Status
-  | Terminal
-  | Raw;
+/**
+ * The kinds the framework itself declares — **closed**, and the domain of every
+ * table that asserts one entry per kind (I119).
+ *
+ * Keyed by the member's own `kind`, and the two are asserted equal in both
+ * directions (T2.129): `KnownBlockKind` derives from `KnownBlock["kind"]`, so a
+ * key spelt wrongly here changes nothing about the union and everything about
+ * which rows `KIND_CHECKS`, `ANIMATES` and `RAMP_EXTENT` are asked for.
+ *
+ * **A `type` where `BlockKinds` below is an `interface`, and the difference is
+ * not stylistic.** Augmentation needs an interface; a lookup does not, and
+ * spelling this one as an interface put twenty-two members in front of MG24,
+ * which asks whether a published member is named anywhere else in `src/`. Six
+ * were not. The other sixteen passed because a word like `rule` or `image`
+ * occurs elsewhere for unrelated reasons — a rule answering by coincidence on
+ * three-quarters of its corpus, which is worse than answering wrongly. There
+ * is no seam here: every member is reached through `keyof` and never by name.
+ */
+export type KnownBlockKinds = {
+  rule: Rule;
+  notice: Notice;
+  keyValue: KeyValue;
+  table: Table;
+  steps: Steps;
+  logs: Logs;
+  events: Events;
+  plot: Plot;
+  progress: Progress;
+  code: Code;
+  comparison: Comparison;
+  patch: Patch;
+  pills: Pills;
+  tip: Tip;
+  panel: Panel;
+  group: Group;
+  scroll: Scroll;
+  mosaic: Mosaic;
+  image: Image;
+  status: Status;
+  terminal: Terminal;
+  raw: Raw;
+};
+
+/**
+ * Every kind a document may hold — the framework's, and any an app declares
+ * (I119, F405).
+ *
+ * **This is the interface an app augments**, which is the type-level half of a
+ * mechanism the runtime has had since F1: `TuiConfig.blocks` takes the
+ * definitions, an unknown kind validates rather than being refused, and a
+ * renderer that has none draws it degraded as `raw`.
+ *
+ * ```ts
+ * declare module "@fmx/calcium" {
+ *   interface BlockKinds { faulty: Faulty }
+ * }
+ * ```
+ *
+ * `KnownBlockKinds` stays closed on purpose and is what the framework's own
+ * exhaustive tables are keyed on. A table over the open union is wrong in both
+ * directions — this build demanding an entry for a kind it never heard of, and
+ * a consumer's declared type promising a value at a key the table does not
+ * hold.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- the empty
+// body is the mechanism: an app's augmentation is what fills it, and a body
+// here would be a member every app inherits.
+export interface BlockKinds extends KnownBlockKinds {}
+
+/** A block of a kind the framework declares. */
+export type KnownBlock = KnownBlockKinds[keyof KnownBlockKinds];
+
+/** The framework's own kinds, closed — see `KnownBlockKinds`. */
+export type KnownBlockKind = KnownBlock["kind"];
+
+/**
+ * **Intersected with `Gap & Floor`, and the implementation is what asked for
+ * it** (I119). Every framework kind already carries both; the layout reads
+ * `gapBefore` and `minHeight` off any `Block` it is handed, so a member without
+ * them makes those reads a type error on the whole union.
+ *
+ * Declaring the base here rather than asking an app to remember it is the
+ * difference between a contract the compiler holds and a sentence in a
+ * document. Intersection distributes over a union, so `switch (b.kind)` narrows
+ * exactly as before — measured, because that is the property the whole shape
+ * would be worthless without.
+ *
+ * Found by augmenting from inside this program: an app's build never re-checks
+ * `src/`, so a kind missing the base is invisible to the app and would read
+ * `undefined` at runtime. The framework's own suite is the only place the
+ * omission can surface, and T4.2 is where it did.
+ */
+export type Block = BlockKinds[keyof BlockKinds] & Gap & Floor;
 
 export type BlockKind = Block["kind"];
 

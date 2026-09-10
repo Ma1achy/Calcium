@@ -15,10 +15,41 @@ import {
   validateDocument,
   type MergeRow,
   type Table,
+  type KnownBlockKind,
+  type KnownBlockKinds,
   type ViewDocument,
 } from "../../src/data/viewmodel/index.js";
 import { ALL_KINDS, doc, ONE_PER_KIND, tableOf } from "../support/blocks.js";
 import { b } from "../../src/shell/builders/index.js";
+
+/** T1.42's own kind — declared, so it is a `Block` rather than a cast (C04 I119). */
+type Gauge = Readonly<{ kind: "gauge"; id: string; reading: number }>;
+declare module "../../src/data/viewmodel/types.js" {
+  interface BlockKinds {
+    gauge: Gauge;
+  }
+}
+
+/** Both directions, so neither set can grow past the other (T2.129). */
+type Exact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+const keysMatchKinds: Exact<keyof KnownBlockKinds, KnownBlockKind> = true;
+
+/**
+ * The lookup's keys as a value, because a type has none at runtime.
+ *
+ * **Written out rather than derived**, which is the point: it is a second copy
+ * of the key list, and `keysMatchKinds` above is what stops the two drifting —
+ * a key here that is not in `KnownBlockKinds` is a compile error on the
+ * `Record`, and one missing is a compile error too.
+ */
+const KIND_NAMES: Readonly<Record<KnownBlockKind, true>> = Object.freeze({
+  rule: true, notice: true, keyValue: true, table: true, steps: true, logs: true,
+  events: true, plot: true, progress: true, code: true, comparison: true,
+  patch: true, pills: true, tip: true, panel: true, group: true, scroll: true,
+  mosaic: true, image: true, status: true, terminal: true, raw: true,
+});
+
+const KNOWN_KIND_COUNT = Object.keys(KIND_NAMES).length;
 
 /** The document used wherever a table needs to be patched. */
 function docWithTable(rows = 10): { document: ViewDocument; table: Table } {
@@ -826,7 +857,50 @@ describe("C04 required fields report absence and wrong type differently", () => 
     expect(found.filter((at) => EXEMPT.includes(at)), "the exemption is reached").toEqual(EXEMPT);
   });
 
-  it.todo(
-    "T1.42 (C04 I119, F405): a document holding a kind the framework has never heard of validates and its fields survive the round trip — not deferred on a component, because the runtime half has shipped since F1; this commit rules the type-level half and the next one builds it",
-  );
+  it("T1.42 (I119, F405): a kind the framework never heard of is a `Block`, and validates", () => {
+    // **No cast anywhere in this row, and that is the assertion.** The runtime
+    // has accepted an app's kind since F1 — `validateDocument` skips an unknown
+    // kind rather than refusing it — and the types could not say so, which is
+    // the whole of F405. `Gauge` is declared at the top of this file by
+    // augmenting `BlockKinds`.
+    const gauge: Gauge = { kind: "gauge", id: "g-1", reading: 0.42 };
+    const doc: ViewDocument = {
+      schema: "tui.view/1",
+      command: "",
+      status: "ok",
+      blocks: [gauge],
+      meta: {
+        verb: null, adapter: "none", exitCode: 0, durationMs: 0, truncated: false,
+        argv: [], stderr: "", transport: "local", origin: "action",
+      },
+    };
+    const r = validateDocument(doc);
+    expect(r.ok, r.ok ? "" : (r.error ?? []).join("; ")).toBe(true);
+
+    // The fields survive: `KIND_CHECKS` has no row for this kind, so nothing
+    // strips or rewrites it.
+    const kept = r.ok ? r.value.blocks[0] : null;
+    expect(kept, "the block is the one that went in").toEqual(gauge);
+
+    // **And `deepFreeze` walks it like any other block** (I1). Asserted against
+    // the function that freezes rather than against `validateDocument`, which
+    // does not — the first draft of this row claimed the gate froze and was
+    // simply wrong about which step does it.
+    expect(Object.isFrozen(deepFreeze(structuredClone(gauge))), "frozen with the rest").toBe(true);
+  });
+
+  it("T2.129 (I119, F405): the lookup's keys and the union's kinds are the same set", () => {
+    // **The one place a mistyped key can be seen.** `KnownBlockKind` derives
+    // from `KnownBlock["kind"]` — the members' own discriminants — so writing
+    // `keyValue: Notice` or misspelling a key changes nothing about the union
+    // and everything about which rows `KIND_CHECKS`, `ANIMATES` and
+    // `RAMP_EXTENT` are asked for.
+    //
+    // **The failure is a compile error, not this expectation.** `keysMatchKinds`
+    // is typed `Exact<…>`, so a divergence makes `true` unassignable and
+    // `npm run check` goes red; the assertion below is what makes the row
+    // visible in a suite. Mutated to confirm: swapping a key fails `tsc`.
+    expect(keysMatchKinds, "keys and kinds agree in both directions").toBe(true);
+    expect(KNOWN_KIND_COUNT, "and the framework declares 22").toBe(22);
+  });
 });

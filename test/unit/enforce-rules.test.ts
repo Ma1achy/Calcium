@@ -1638,8 +1638,13 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       "  viaFigure: number;",
       "}> & Gap;",
       "",
-      "export type Block =",
-      "  | Widget;",
+      // **The lookup, not the union** (C04 I119). MG27 reads
+      // `KnownBlockKinds` because `Block` became an indexed access an app can
+      // join; a fabrication still written in the old shape drives a reader
+      // that no longer exists.
+      "export type KnownBlockKinds = {",
+      "  widget: Widget;",
+      "};",
       "",
     ].join("\n");
     const index = [
@@ -1748,9 +1753,10 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       "  excused: boolean;",
       "}> & Gap & Floor;",
       "",
-      "export type Block =",
-      "  | Rule",
-      "  | Widget;",
+      "export type KnownBlockKinds = {",
+      "  rule: Rule;",
+      "  widget: Widget;",
+      "};",
       "",
     ].join("\n");
 

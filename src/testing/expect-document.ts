@@ -34,7 +34,7 @@ import {
 } from "../data/viewmodel/index.js";
 import {
   createBlockRegistry,
-  type BlockDefinition,
+  type AnyBlockDefinition,
   type BlockRegistry,
 } from "../presentation/blocks/index.js";
 import { tableDefinition } from "../presentation/table/index.js";
@@ -259,11 +259,20 @@ const ASCII: TerminalCapabilities = Object.freeze({ ...TRUECOLOUR, unicode: "asc
  * that fell back to `raw` would still produce rows, still measure, and quietly
  * assert nothing about the kind under test.
  */
-export function fullRegistry(): BlockRegistry {
+export function fullRegistry(blocks: readonly AnyBlockDefinition[] = []): BlockRegistry {
   const r = createBlockRegistry({});
   for (const definition of [tableDefinition, plotDefinition, patchDefinition]) {
-    r.register(definition as unknown as BlockDefinition);
+    r.register(definition);
   }
+  // **The app's, after the framework's** (C24 I35, F405) — the same public
+  // route C11, C12 and C25 take.
+  //
+  // **It adds and never replaces**, and the first draft of this comment said
+  // the opposite. `register` throws on a kind already registered (T3.18): an
+  // app that shadows `logs` by accident gets a frame subtly wrong everywhere
+  // and no way to find out why. So passing `table` here is an error, loudly,
+  // which is the behaviour a consumer's own registry has.
+  for (const definition of blocks) r.register(definition);
   return r;
 }
 
@@ -323,8 +332,22 @@ export interface DocumentAssertions {
   lines(width: number, opts?: RenderOpts): readonly string[];
 }
 
-export function expectDocument(doc: ViewDocument): DocumentAssertions {
-  const registry = fullRegistry();
+export function expectDocument(
+  doc: ViewDocument,
+  /**
+   * The definitions the app registered (C24 I35, F405).
+   *
+   * **The measured failure is not an error.** Without them a registered kind
+   * falls back to `raw` and every height renders as **one row** — a plausible
+   * number, so `measuresCorrectly` and `rendersAt` both pass and assert nothing
+   * about the kind under test. `readonly AnyBlockDefinition[]` is exactly what
+   * `TuiConfig.blocks` takes, so this asks for nothing a consumer does not
+   * already hold, and the registry itself stays one of the eleven §3 keeps
+   * unreachable.
+   */
+  blocks: readonly AnyBlockDefinition[] = [],
+): DocumentAssertions {
+  const registry = fullRegistry(blocks);
   const resolved = theme();
 
   const rows = (caps: TerminalCapabilities, width: number): readonly string[] =>

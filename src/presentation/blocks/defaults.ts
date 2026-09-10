@@ -37,9 +37,13 @@ import {
   ruleDefinition,
   tipDefinition,
 } from "./kinds/simple.js";
-import type { BlockDefinition } from "./types.js";
+import type { AnyBlockDefinition } from "./types.js";
 
-export const DEFAULT_DEFINITIONS: readonly BlockDefinition[] = Object.freeze([
+// **`AnyBlockDefinition`, which is what these are** (C04 I119, F405). The
+// declared type was `readonly BlockDefinition[]` — every element promising to
+// handle any block — so the list ended with `as BlockDefinition[]` to make the
+// lie compile. Each of these handles exactly one kind, and the union says so.
+export const DEFAULT_DEFINITIONS: readonly AnyBlockDefinition[] = Object.freeze([
   ruleDefinition,
   noticeDefinition,
   keyValueDefinition,
@@ -59,4 +63,4 @@ export const DEFAULT_DEFINITIONS: readonly BlockDefinition[] = Object.freeze([
   terminalDefinition,
   statusDefinition,
   rawDefinition,
-] as BlockDefinition[]);
+]);

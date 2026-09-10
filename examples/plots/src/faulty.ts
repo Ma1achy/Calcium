@@ -18,10 +18,30 @@
  * own kind; the demo registers one that fails on purpose because the subject is
  * what the framework does about it.
  */
-import type { Block, BlockDefinition } from "@fmx/calcium";
+import type { BlockDefinition } from "@fmx/calcium";
 
 /** The block this kind renders — a height, and the reason it will not draw. */
 export type Faulty = Readonly<{ kind: "faulty"; id: string; height: number; why: string }>;
+
+/**
+ * **The declaration that puts this kind in the union** (C04 I119, F405).
+ *
+ * The runtime accepted an app's kind from F1 and the types could not express
+ * one, so everything below took `as unknown as` — three of them, on the
+ * definition's two parameters and on the constructor's return. The interface is
+ * published beside `Block`, augmentation merges against `@fmx/calcium`'s own
+ * entry point, and `Block` is `BlockKinds[keyof BlockKinds]`, so declaring the
+ * member is the whole of it.
+ *
+ * **This file is the consumer that proves it.** A framework cannot check its
+ * own extension point from inside; the casts were the finding kept in the tree,
+ * and their absence is what says the finding closed.
+ */
+declare module "@fmx/calcium" {
+  interface BlockKinds {
+    faulty: Faulty;
+  }
+}
 
 /**
  * **`measure` answers and `render` throws, which is the split that matters.**
@@ -32,29 +52,28 @@ export type Faulty = Readonly<{ kind: "faulty"; id: string; height: number; why:
  * already promised and C09 I1's divergence stays closed: the frame draws the rows
  * `measure` said, whichever way the render went.
  */
-export const faultyDefinition: BlockDefinition = {
+export const faultyDefinition: BlockDefinition<Faulty> = {
   kind: "faulty",
-  measure: (block) => (block as unknown as Faulty).height,
+  measure: (block) => block.height,
   render: (block) => {
-    throw new Error((block as unknown as Faulty).why);
+    throw new Error(block.why);
   },
 };
 
 /**
  * One block, at the height whose rung it is meant to show.
  *
- * **The two casts are the finding, not the workaround** (F405). `validateDocument`
- * says so in its own words — *an unknown kind is not an error: the union is open
- * and an app registers kinds through C09* — and `TuiConfig.blocks` takes the
- * definitions. So the mechanism is real and the **types** do not reach it:
- * `BlockDefinition<B extends Block>` bounds a definition by the closed union, and
- * a consumer's block is not in it, so the block cannot enter a document and the
- * definition cannot be parameterised by it.
+ * **The casts were the finding and they are gone** (F405, C04 I119). There were
+ * three, not the two the finding counted — `measure`'s, `render`'s and this
+ * constructor's return. `validateDocument` always said the union was open in its
+ * own words; what changed is that `Block` is now `BlockKinds[keyof BlockKinds]`,
+ * so a definition can be parameterised by the app's own block and the block can
+ * enter a document without being lied about.
  *
- * The same shape as the rest of this arc — a capability the runtime has and the
- * published surface cannot express — and recorded rather than fixed here, because
- * widening `Block` decides how `childBlocksOf` walks an app's kind and whether
- * measurement conformance binds it. That is a ruling, not an edit.
+ * The three questions that held it open were each already answered at their own
+ * site, citing F1: `validateDocument` skips an unknown kind, `childBlocksOf`
+ * refuses to descend into an app kind's `children`, and `uncoveredKinds` takes
+ * `string` so app kinds are counted. C04 I119 is the type-level half.
  */
-export const faulty = (id: string, height: number, why: string): Block =>
-  Object.freeze({ kind: "faulty", id, height, why }) as unknown as Block;
+export const faulty = (id: string, height: number, why: string): Faulty =>
+  Object.freeze({ kind: "faulty", id, height, why });

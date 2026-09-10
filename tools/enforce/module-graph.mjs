@@ -862,9 +862,32 @@ export function checkBuilderCoverage(
   // first run of this scanned for the literal and invented three kinds:
   // `Hunk.lines[].kind` is `"add" | "remove" | "context"`, which is a line's
   // kind and not a block's (C04 I35's neighbour).
-  const union = /export type Block =\n([\s\S]*?);\n/u.exec(types);
-  if (union === null) return [];
-  const typeNames = [...union[1].matchAll(/\|\s*(\w+)/gu)].map((m) => m[1]);
+  //
+  // **`KnownBlockKinds` and not `Block`** (C04 I119). `Block` became
+  // `BlockKinds[keyof BlockKinds] & Gap & Floor` so an app can join the union,
+  // and this regex — written for a `|`-separated list — matched nothing and the
+  // rule returned zero violations while reading as green. **Its fabricated
+  // violation is what said so**, which is the whole argument for keeping one.
+  const union = /export type KnownBlockKinds = \{\n([\s\S]*?)\n\};\n/u.exec(types);
+  if (union === null) {
+    // **Loud, and it used to be `return []`.** A rule that cannot find its
+    // subject reports exactly what a clean tree reports (A03 §2), and this one
+    // spent a commit in that state. The message names the shape it looked for,
+    // because the next person to move the declaration is the person who needs
+    // to read it.
+    return [
+      {
+        rule: "MG27",
+        file: typesFile,
+        spec: "A03 §3, MG27 · C04 I119",
+        message:
+          "the block kinds could not be read — `export type KnownBlockKinds = {` was not " +
+          "found, so MG27 and MG28 have no corpus and would report a clean tree. " +
+          "The lookup is the authority for which types are blocks; if it moved, move this.",
+      },
+    ];
+  }
+  const typeNames = [...union[1].matchAll(/:\s*(\w+);/gu)].map((m) => m[1]);
 
   const fieldsOf = (name) => {
     // **Brace-matched, and it was a non-greedy regex** (F430). `export type Rule

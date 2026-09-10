@@ -105,6 +105,10 @@ export type {
 export type {
   Action,
   Block,
+  // **The interface an app augments to declare its own kind** (C04 I119,
+  // F405). Published beside `Block` because `declare module "@fmx/calcium"`
+  // merges against this entry point and nowhere else.
+  BlockKinds,
   Camera,
   Cell,
   Code,
@@ -303,7 +307,9 @@ export type {
   ParseResult,
 } from "./interaction/parser/index.js";
 
-export type { BlockDefinition, RenderContext } from "./presentation/blocks/index.js";
+// `AnyBlockDefinition` is what `TuiConfig.blocks` takes — a definition of some
+// **one** kind, which is what an app writes (C04 I119, F405).
+export type { AnyBlockDefinition, BlockDefinition, RenderContext } from "./presentation/blocks/index.js";
 /**
  * C24 I22 — a `code` block accepts any language name, and until this existed
  * only two of them meant anything (C09 §4a, F93).

@@ -75,8 +75,12 @@ const results = runPass({
       // into an app file under a framework name. C24 T6.17.
       name: "F999: `Camera` leaves the runtime entry",
       file: ENTRY,
-      from: "  Block,\n  Camera,\n  Cell,\n",
-      to: "  Block,\n  Cell,\n",
+      // **Narrowed from `Block,\n  Camera,\n  Cell,` when `BlockKinds` landed
+      // between the first two** (C04 I119). The anchor named a neighbour the
+      // mutation has no opinion about, so an unrelated export broke it; two
+      // lines is the least that still removes `Camera` and nothing else.
+      from: "  Camera,\n  Cell,\n",
+      to: "  Cell,\n",
       expect: "the two clearances are two arms",
     },
     {

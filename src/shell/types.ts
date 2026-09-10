@@ -28,7 +28,7 @@ import type { CursorStyle } from "../terminal/escapes.js";
 import type { LineEditor } from "../interaction/editor/index.js";
 import type { HistoryStore } from "../interaction/history/types.js";
 import type { CommandPolicy } from "../interaction/parser/index.js";
-import type { BlockDefinition, BlockRegistry } from "../presentation/blocks/index.js";
+import type { AnyBlockDefinition, BlockRegistry } from "../presentation/blocks/index.js";
 import type { ThemeSet, ThemeStore } from "../presentation/theme/index.js";
 import type { FrameScheduler } from "../terminal/frame-scheduler.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
@@ -535,7 +535,12 @@ export type TuiConfig = Readonly<{
    * none (I82, §6l). The two rules bounding the prompt are not configurable.
    */
   chrome?: Chrome;
-  blocks?: readonly BlockDefinition[];
+  // **`AnyBlockDefinition`, which is the consumer-facing half of C04 I119**
+  // (F405). `readonly BlockDefinition[]` asked each element to handle *any*
+  // block — contravariance, correctly — so an app's definition for its own
+  // kind was refused here and every consumer paid a cast. Each element
+  // handles one kind and the registry dispatches by it.
+  blocks?: readonly AnyBlockDefinition[];
   /**
    * The most rows one block may occupy (C14 §4b, I24; C09 §2b). Default 2 000.
    *

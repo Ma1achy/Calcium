@@ -28,6 +28,7 @@ import { clampSpans, paint, rows, tone } from "./paint.js";
 import { truncate } from "../text.js";
 import { statusDefinition, statusRowsFor } from "./kinds/status.js";
 import type {
+  AnyBlockDefinition,
   BlockDefinition,
   BlockFault,
   BlockRegistry,
@@ -246,11 +247,19 @@ class Registry implements BlockRegistry {
   };
 
   constructor(
-    definitions: readonly BlockDefinition[],
+    definitions: readonly AnyBlockDefinition[],
     onError: (fault: BlockFault) => void,
     maxBlockRows: number,
   ) {
-    for (const definition of definitions) this.#definitions.set(definition.kind, definition);
+    // **The one cast the whole shape costs** (C04 I119, F405). A definition
+    // handles exactly one kind and the map is keyed by that kind, so every
+    // lookup hands a definition nothing but its own block — a dispatch the
+    // compiler cannot see, and the same class of contract `Windowed`'s note
+    // describes. It replaces five casts at call sites and one per definition in
+    // every consumer.
+    for (const definition of definitions) {
+      this.#definitions.set(definition.kind, definition as BlockDefinition);
+    }
     this.#onError = onError;
     // **Refused here rather than defaulted** (C14 T2.14). A cap of `0` would
     // mark every block and a fraction would put the marker at a row nothing

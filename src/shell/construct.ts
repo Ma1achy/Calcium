@@ -41,7 +41,7 @@ import {
   type TransportRouter,
 } from "../data/transport/index.js";
 import type { ProcessRunner } from "../data/process/types.js";
-import { createBlockRegistry, type BlockDefinition } from "../presentation/blocks/index.js";
+import { createBlockRegistry } from "../presentation/blocks/index.js";
 import { BlockFaultLog } from "./block-faults.js";
 import { tableDefinition } from "../presentation/table/index.js";
 import { cursorable, legendHitAt, plotDefinition, sampleIndexAt } from "../presentation/plot/index.js";
@@ -673,9 +673,9 @@ export async function constructGraph(
     // returns a table, so it was rendering its own output as source.
     //
     // Before `config.blocks`, so an app may still replace any of them.
-    blocks.register(tableDefinition as unknown as BlockDefinition);
-    blocks.register(plotDefinition as unknown as BlockDefinition);
-    blocks.register(patchDefinition as unknown as BlockDefinition);
+    blocks.register(tableDefinition);
+    blocks.register(plotDefinition);
+    blocks.register(patchDefinition);
     for (const definition of config.blocks) blocks.register(definition);
 
     const adapters = createAdapterRegistry(config.adapters);

@@ -7,7 +7,7 @@
  * clock or a capability; the frame is a function of `tick` and of nothing else,
  * which is what keeps the GIF catalogue deterministic.
  */
-import type { Block, BlockKind, Progress, Ramp, RampAnimation, TextSpan } from "../../data/viewmodel/index.js";
+import type { Block, BlockKind, KnownBlockKind, Progress, Ramp, RampAnimation, TextSpan } from "../../data/viewmodel/index.js";
 import { spinnerIntervalMs } from "./glyphs.js";
 
 /**
@@ -19,7 +19,10 @@ import { spinnerIntervalMs } from "./glyphs.js";
  * (C04 I108), so the record is the statement and the type is the gate.
  */
 export type RampExtent = "none" | "clusters" | "axis";
-export const RAMP_EXTENT: Readonly<Record<BlockKind, RampExtent>> = Object.freeze({
+// **`KnownBlockKind` and not `BlockKind`** (C04 I119): the union is open and
+// this table is the framework's own. Keyed on the open union it would demand
+// an entry for a kind an app declared and this build never heard of.
+export const RAMP_EXTENT: Readonly<Record<KnownBlockKind, RampExtent>> = Object.freeze({
   code: "none",
   comparison: "none",
   events: "none",
@@ -133,8 +136,31 @@ function spansMove(spans: readonly TextSpan[] | undefined): boolean {
  * asked, through `RAMP_EXTENT`, so a kind marked `none` answers `false` without
  * being read.
  */
+/**
+ * The table read for a kind that may not be in it (C04 I119).
+ *
+ * **One cast, and the alternative is a table keyed on the open union.** The
+ * declaration is the exhaustiveness assertion — a framework kind without a row
+ * fails to compile — and the read is total, because `block.kind` may be a kind
+ * an app declared. Widening the table's key would lose the assertion; widening
+ * the read loses nothing.
+ */
+function rampExtentOf(kind: BlockKind): RampExtent | undefined {
+  return (RAMP_EXTENT as Readonly<Partial<Record<BlockKind, RampExtent>>>)[kind];
+}
+
 export function animatesByContent(block: Block): boolean {
-  switch (RAMP_EXTENT[block.kind]) {
+  switch (rampExtentOf(block.kind)) {
+    // **An app's kind, and the arm the closed table made visible** (C04 I119).
+    // The lookup was `Record<BlockKind, …>` and answered `RampExtent` for every
+    // kind by declaration; keyed on the framework's own it answers `undefined`
+    // for a kind an app registered, and this function's `boolean` was a lie for
+    // exactly that input — it returned `undefined`, falsy, right by accident.
+    //
+    // `false` and not a throw: C09 draws an unknown kind degraded rather than
+    // refusing it (§2), and a content ramp is a property of a block the
+    // framework knows how to read. An app that wants one animates by nature.
+    case undefined:
     case "none":
       return false;
     case "axis":

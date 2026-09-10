@@ -11,17 +11,25 @@ import {
   block,
   document,
   type Block,
-  type BlockKind,
   type ColumnDef,
   type Hunk,
   type Plot,
+  type KnownBlockKind,
   type Table,
   type LocalDocument,
   type ViewDocument,
 } from "../../src/data/viewmodel/index.js";
 
-/** One representative, well-formed block per kind. */
-export const ONE_PER_KIND: Readonly<Record<BlockKind, Block>> = Object.freeze({
+/**
+ * One representative, well-formed block per kind.
+ *
+ * **`KnownBlockKind`, for the reason the three tables in `src/` use it** (C04
+ * I119): this is the framework's own corpus and the union is open. Keyed on
+ * `BlockKind` it demanded a fixture for `banner`, the kind T4.2 declares by
+ * augmenting `BlockKinds` — which is the augmentation's blast radius inside one
+ * program, arriving as a type error rather than as a silent gap.
+ */
+export const ONE_PER_KIND: Readonly<Record<KnownBlockKind, Block>> = Object.freeze({
   rule: block({ kind: "rule", id: "rule-1", label: "Deployments", meta: "3 active" }),
 
   notice: block({ kind: "notice", id: "notice-1", tone: "info", text: "Nothing to do." }),
@@ -221,7 +229,11 @@ export const ONE_PER_KIND: Readonly<Record<BlockKind, Block>> = Object.freeze({
   raw: block({ kind: "raw", id: "raw-1", text: "pre-formatted\noutput" }),
 });
 
-export const ALL_KINDS = Object.keys(ONE_PER_KIND) as readonly BlockKind[];
+// **`KnownBlockKind`, because that is what the keys are** (C04 I119). The cast
+// said `BlockKind` and the map is over the framework's own kinds, so every
+// `ONE_PER_KIND[kind]` in the suite was indexing a closed record with an open
+// key the moment a test declared one.
+export const ALL_KINDS = Object.keys(ONE_PER_KIND) as readonly KnownBlockKind[];
 
 /**
  * The adversarial set (T2.3). Every one is a *legal* block that a measurer must

@@ -40,6 +40,7 @@ export {
   type Token,
 } from "./kinds/code.js";
 export type {
+  AnyBlockDefinition,
   BlockDefinition,
   BlockFault,
   BlockRegistry,
