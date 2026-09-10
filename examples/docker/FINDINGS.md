@@ -44475,3 +44475,112 @@ the row that went red was one of them.
 lines, and the pre-replay messages are built only in the failing branch — a
 green run spawns no `ps`.
 
+## F1082 — `Plot` has sixty-eight members and no record of which are checked ★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/data/viewmodel/validate.ts` against `Plot` in `types.ts` |
+| **Reached for** | the by-hand walk for F271, asking what a channel loses by leaving `series` |
+| **Verdict** | **open** — the instance F271 would have created is fixed; the class is a coverage table and a check per uncovered member |
+
+### What the walk asked
+
+F271 moves a bubble's size channel out of `series`. Row 10 of its classification
+table is *a non-finite number in `sizes`*, and the answer is that as `series[1]`
+the channel was checked by the loop over `series`, which calls
+`requireFiniteNumbers` on every member's `values` — and **nothing carries that
+over**. A member outside `series` is validated by whatever someone wrote for it.
+
+`sizes` got its call. The question was whether it was the only one.
+
+### The measurement
+
+`Plot`'s declaration, top-level members only, against `validate.ts` with
+comments stripped and no assumption about how a name is spelled — a key can be
+bare where a lookup is quoted, which is the encoding a first pass got wrong:
+
+| | |
+|---|---|
+| `Plot` members | 68 |
+| never appearing in `validate.ts` code | **14** |
+
+`xLabels xMin xMax xFormat emptyMessage quartiles offsets totals facets segments
+xScale yScale bandwidth axisStyle3`
+
+Appearing is weaker than being checked, so 14 is a floor rather than the answer.
+Two are exactly the shape that started this — `offsets?: readonly number[]` and
+`totals?: readonly boolean[]`, declared, reachable from `b.plot`, ungated — and
+one is worse: **`facets?: readonly Plot[]` holds child plots**, so every rule in
+the file stops at the first nesting.
+
+### Why it is invisible
+
+**I118 is this rule with a narrower subject, and it was built.** MG31 compares
+`PLOT_UNIONS` against `Plot`'s string-literal unions **by equality in both
+directions**, so a union added to the type is *unchecked and reported* rather
+than merely unchecked. There is no equivalent for the members that are not
+unions, and a missing check reads exactly like a satisfied one — the vacuity
+class, one level up from a rule to the absence of one.
+
+### What it would take
+
+A table of members to their check, compared against `Plot`'s declaration the way
+MG31 compares its own, with an explicit exemption list carrying reasons — the
+allow-list shape rather than a narrowed scope, so a member with no check is
+named rather than absent. Then a check per uncovered member. The count is what
+makes this a project and not a line, which is why it is filed rather than folded
+into F271.
+
+## F1083 — narrowing a racy reading by kind lowered its rate and kept its shape ★★★
+
+| | |
+|---|---|
+| **Surface** | `test/unit/profiler-seams.test.ts` T1.9 (C24 I31) |
+| **Reached for** | F271's plot change turned it red three runs of three, having been green |
+| **Verdict** | **closed** — read as a bound, with the case the bound cannot see written beside it |
+
+### The row and its own history
+
+T1.9 asserts that importing `src/shell/profiling/index.js` starts nothing, by
+reading `process.getActiveResourcesInfo()` either side of an `await import`. It
+has been repaired once already, and the repair is in the comment above it:
+
+> **Counted by kind, not in total.** The total moved on its own here — 5 before
+> the import and 4 after, a handle the harness released while the module was
+> loading — so an equality on it is a row that fails on activity it is not
+> about.
+
+The diagnosis was right and the repair changed the population rather than the
+shape. `Timeout` and `Immediate` are still process-wide, so the equality is
+still a race with every other timer in the process — a smaller one.
+
+### Measured
+
+| run | before | after |
+|---|---|---|
+| `--dir test/unit`, twice | 3 | 2 |
+| `npm test` | 3 | 2 |
+| the file alone | equal | equal |
+
+A foreign `Timeout` fired while the dynamic import awaited.
+
+### The repair, and what it cannot see
+
+A timer *this import* registers can only raise the count, so `after <= before`
+is the invariant with the race taken out rather than a weaker claim about it.
+The upward control — `setInterval` and a `+1` — moves to the same base.
+
+**The blind spot is stated and not closed.** An import that registers one in the
+same window as a foreign one expiring nets to zero and passes.
+`getActiveResourcesInfo` returns kinds and not identities, so nothing here can
+tell those apart. What makes the case unreachable in practice is the structural
+assertion beside it: the namespace publishes nothing callable, and a module with
+no callable export has nothing to arm a timer from.
+
+### Why it is filed rather than fixed quietly
+
+**An unrelated change surfaced it.** F271 moves a bubble's size channel and
+touches no timer, no import and no profiler; it shifted the suite's timing
+enough to flip this row three times running. A verdict that moves under a change
+that cannot reach its subject is a reading about the harness, and that is the
+finding — the flake is the symptom.
