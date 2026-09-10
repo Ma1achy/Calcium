@@ -52,10 +52,16 @@ const results = runPass({
     {
       // **The renderer deriving the picture's id again**, which is the shipped
       // arm: the frame moves when the picture does.
+      //
+      // Re-anchored 2026-09-10: the call is unchanged and its indentation is
+      // not. The ternary's test moved from `ctx.capabilities.imageProtocol ===
+      // "kitty"` to `placesAtProtocol(block, ctx.capabilities, ctx.width)`
+      // (C09 I67, F1026), which is shorter, so the continuation lost two
+      // spaces. Same statement, same expectation.
       name: "the renderer derives the picture's id with a scope in hand",
       file: IMAGE,
-      from: "        ? placementRows(placementIdOf(block, ctx.placementScope), cols, rows)\n",
-      to: "        ? placementRows(placementIdOf(block), cols, rows)\n",
+      from: "      ? placementRows(placementIdOf(block, ctx.placementScope), cols, rows)\n",
+      to: "      ? placementRows(placementIdOf(block), cols, rows)\n",
       expect: "T2.135",
     },
     {

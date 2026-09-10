@@ -41,7 +41,7 @@ import { descendants } from "../data/viewmodel/index.js";
 import type { Block, Image, Plot } from "../data/viewmodel/index.js";
 import { entryLayout, renderEntryPieces, windowEntry } from "./entry-layout.js";
 import { animationIntervalOf } from "../presentation/blocks/index.js";
-import { framesOf } from "../presentation/blocks/kinds/image.js";
+import { framesOf, placesAtProtocol } from "../presentation/blocks/kinds/image.js";
 import type { FocusState } from "../presentation/blocks/index.js";
 import { contextAt } from "../interaction/completion/index.js";
 import { selectionSpans, type CellSpan } from "../interaction/editor/index.js";
@@ -1424,12 +1424,15 @@ function visibleRows(
   const orbits: { entryId: string; blockId: string; declared: Plot["camera"] }[] = [];
   // **The animated images the frame drew, on the arms that draw them** (C22
   // I77). Gathered from the same windowed set as the orbits and for the same
-  // reason, and **not at `kitty`**: the protocol arm handed the terminal every
-  // frame once, so there the image is a still as far as this session's timer
-  // is concerned. On the halfblock and dither arms each frame is a text frame,
-  // which is the orbit's own cost and no more.
+  // reason, and **not where the terminal is animating it** — which is `kitty`
+  // *and a placement the encoding can address*, not the capability alone. This
+  // line read `imageProtocol !== "kitty"` and the block chose its arm from the
+  // box, so a picture past `MAX_PLACEHOLDER_SPAN` fell to the half block while
+  // the session armed nothing: frame 0, for ever (F624, F1026). The arm is
+  // asked per image now, of `placesAtProtocol`, at the width the run rendered
+  // it at. On the halfblock and dither arms each frame is a text frame, which
+  // is the orbit's own cost and no more.
   const frames: { entryId: string; blockId: string; delays: readonly number[] }[] = [];
-  const rasterising = graph.capabilities.imageProtocol !== "kitty";
   for (const ve of graph.viewport.visible().entries) {
     const entry = entryById(graph.transcript.entries, ve.id);
     if (entry === undefined) continue;
@@ -1559,9 +1562,18 @@ function visibleRows(
         if (!graph.cameras.orbiting(entry.id, plot.id)) continue;
         orbits.push({ entryId: entry.id, blockId: plot.id, declared: plot.camera });
       }
-      if (rasterising) {
+    }
+
+    // **Over the pieces rather than the flattened set, because the arm reads a
+    // width** (C09 I67, F380). A card's body renders four cells in, and a
+    // placement is refused on a box `imageCells` derives from *that* width — so
+    // an image inside a card asked at the frame's width would be answered about
+    // a placement the frame never drew.
+    for (const piece of pieces) {
+      for (const blk of piece.windowed.blocks) {
         for (const b of [blk, ...descendants(blk)]) {
           if (b.kind !== "image") continue;
+          if (placesAtProtocol(b as Image, graph.capabilities, piece.run.width, graph.probe)) continue;
           const animation = framesOf(b as Image, graph.probe);
           if (animation === null) continue;
           frames.push({ entryId: entry.id, blockId: b.id, delays: animation.delays });

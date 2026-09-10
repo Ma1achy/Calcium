@@ -333,19 +333,44 @@ export function placeholderCell(id: number, row: number, col: number): string {
 export type Placement = Readonly<{ rows: readonly string[] }> | Readonly<{ fault: string }>;
 
 /**
+ * Whether a `cols` x `rows` placement is addressable — **the gate, without the
+ * grid** (C09 I67).
+ *
+ * `placementRows` refuses on exactly this and then builds `cols * rows` cells,
+ * which is the wrong price for a caller that only wants the answer: the session
+ * asks it once per image per frame, and a 32x400 picture would cost 12 800
+ * strings to be told *no*. So the condition is named here and `placementRows`
+ * reads it, rather than each holding a copy — the shape `imageKey`'s own comment
+ * names one file over, where two computations of one figure is how they come to
+ * disagree.
+ *
+ * **The two axes are not symmetrical in reachability, and F624's defence rested
+ * on the one that is rarer.** `imageCells` clamps `cols` to the frame's width, so
+ * `cols > MAX_PLACEHOLDER_SPAN` needs a terminal wider than 297 — measured over
+ * 770 (width, height, aspect) combinations, it happens at frame widths 298, 400
+ * and 600 and nowhere below. `rows` is the block's declared height, bounded by
+ * nothing under the registry's 2 000-row cap: a 16x400 GIF at `height: 400`
+ * measures `{cols: 32, rows: 400}` at **80 columns** (F1026).
+ */
+/**
  * The grid of placeholders a block of `rows` x `cols` occupies.
  *
  * **Refused past the table rather than wrapped**, because a wrapped diacritic is
  * a cell that addresses the wrong part of the image — a plausible wrong picture,
  * which is the failure mode this arm is built to avoid.
  */
+export function placementFits(cols: number, rows: number): boolean {
+  return cols >= 1 && rows >= 1 && cols <= MAX_PLACEHOLDER_SPAN && rows <= MAX_PLACEHOLDER_SPAN; // cells-ok — a cell count
+}
+
 export function placementRows(id: number, cols: number, rows: number): Placement {
-  if (cols < 1 || rows < 1) return { fault: `a placement is at least 1x1 — got ${String(cols)}x${String(rows)}` };
-  if (cols > MAX_PLACEHOLDER_SPAN || rows > MAX_PLACEHOLDER_SPAN) {
+  if (!placementFits(cols, rows)) {
     return {
       fault:
-        `a placement of ${String(cols)}x${String(rows)} exceeds the ${String(MAX_PLACEHOLDER_SPAN)} ` +
-        `positions this encoding carries — a wrapped diacritic addresses the wrong part of the image`,
+        cols < 1 || rows < 1
+          ? `a placement is at least 1x1 — got ${String(cols)}x${String(rows)}`
+          : `a placement of ${String(cols)}x${String(rows)} exceeds the ${String(MAX_PLACEHOLDER_SPAN)} ` +
+            `positions this encoding carries — a wrapped diacritic addresses the wrong part of the image`,
     };
   }
   const out: string[] = [];

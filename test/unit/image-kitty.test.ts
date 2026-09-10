@@ -19,13 +19,14 @@ import { createElement } from "react";
 import {
   imageId,
   imageKey,
+  placementFits,
   placementIdOf,
   placementRows,
   transmit,
   MAX_PLACEHOLDER_SPAN,
   PLACEHOLDER,
 } from "../../src/presentation/image/kitty.js";
-import { imageCells } from "../../src/presentation/blocks/kinds/image.js";
+import { imageCells, placesAtProtocol } from "../../src/presentation/blocks/kinds/image.js";
 import { digestOf, type Image } from "../../src/data/viewmodel/index.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
@@ -202,6 +203,95 @@ describe("IK — the kitty arm, as properties", () => {
     expect(narrow).toContain(`,c=${String(small.cols)},`);
   });
 
+  it("T1.42 (C09 I67): the arm is the capability and the box, and the two axes of the refusal are not equally reachable", () => {
+    // **The gate has one expression.** `placementFits` and `placementRows`
+    // answer the same question, so a copy of the condition in either cannot
+    // drift from the other. Swept over both axes; the pairs are chosen so no
+    // passing box builds more than a few hundred cells except at the boundary
+    // itself, which is built once on each side.
+    let swept = 0;
+    const edges = [0, 1, 2, 3, 10, 296, 297, 298, 299, 400];
+    for (const cols of [...Array.from({ length: 301 }, (_c, i) => i), 400]) {
+      for (const rows of [0, 1, 2, 297, 298]) {
+        expect(placementFits(cols, rows), `${String(cols)}x${String(rows)}`).toBe(
+          "rows" in placementRows(1, cols, rows),
+        );
+        swept += 1;
+      }
+    }
+    for (const rows of [...Array.from({ length: 301 }, (_c, i) => i), 400]) {
+      for (const cols of [0, 1, 2, 297, 298]) {
+        expect(placementFits(cols, rows), `${String(cols)}x${String(rows)}`).toBe(
+          "rows" in placementRows(1, cols, rows),
+        );
+        swept += 1;
+      }
+    }
+    for (const cols of edges) {
+      for (const rows of edges) {
+        if (cols * rows > 100_000) continue; // the 297x297 corner is built once, below
+        expect(placementFits(cols, rows), `${String(cols)}x${String(rows)}`).toBe(
+          "rows" in placementRows(1, cols, rows),
+        );
+        swept += 1;
+      }
+    }
+    expect(placementFits(297, 297), "the corner itself").toBe("rows" in placementRows(1, 297, 297));
+    expect(swept, "the sweep is not empty").toBeGreaterThan(3000);
+
+    // **The capability is half of the arm and the box is the other half**
+    // (F624, F1026). A shell that asked only the first gathered no frames for a
+    // picture it was rasterising.
+    const small = b.image({ id: "s", data: rgbPng64(16, 16, () => [200, 10, 10]), height: 4, alt: "a" }) as Image;
+    for (const protocol of ["none", "iterm2", "sixel"] as const) {
+      expect(
+        placesAtProtocol(small, { ...FULL_CAPS, imageProtocol: protocol }, 80),
+        `no arm but kitty places, and ${protocol} is not it`,
+      ).toBe(false);
+    }
+    expect(placesAtProtocol(small, KITTY_CAPS, 80), "and kitty with an addressable box does").toBe(true);
+
+    // **The columns axis needs a terminal wider than 297**, because
+    // `imageCells` clamps `cols` to the width. Swept over the widths a terminal
+    // has and the aspects a picture has.
+    const aspects: readonly (readonly [number, number])[] = [[8, 8], [320, 240], [16, 400], [640, 64], [1, 100]];
+    let overCols = 0;
+    const widthsThatOverflow = new Set<number>();
+    for (const width of [40, 60, 80, 120, 200, 296, 297, 298, 400, 600]) {
+      for (const height of [1, 3, 10, 40, 100, 296, 297, 298, 400, 1000, 2000]) {
+        for (const [pw, ph] of aspects) {
+          const blk = b.image({ id: "x", data: rgbPng64(pw, ph, () => [1, 2, 3]), height, alt: "a" }) as Image;
+          const box = imageCells(blk, width);
+          if (box.cols > MAX_PLACEHOLDER_SPAN) { overCols += 1; widthsThatOverflow.add(width); }
+        }
+      }
+    }
+    expect(overCols, "the sweep reaches the columns axis at all").toBeGreaterThan(0);
+    expect(
+      [...widthsThatOverflow].every((w) => w > MAX_PLACEHOLDER_SPAN),
+      "and only ever on a terminal wider than the encoding",
+    ).toBe(true);
+
+    // **The rows axis needs no unusual terminal at all**, which is the half
+    // F624's defence — *at 298+ cells a still was already the honest answer* —
+    // never covered. A 16x400 picture declared 400 rows tall is 32 cells wide.
+    const tall = b.image({ id: "t", data: rgbPng64(16, 400, (x, y) => [x, y % 256, 0]), height: 400, alt: "a" }) as Image;
+    expect(imageCells(tall, 80)).toEqual({ cols: 32, rows: 400 });
+    expect(placesAtProtocol(tall, KITTY_CAPS, 80), "refused on rows, at 32 cells wide").toBe(false);
+    expect(
+      "fault" in placementRows(1, 32, 400) && placementRows(1, 32, 400),
+      "and the refusal names the encoding rather than the width",
+    ).toBeTruthy();
+
+    // **The floor cannot be reached from `imageCells`**, so the `1x1` arm of the
+    // refusal has no subject on this path — stated rather than left as a row
+    // that restates its own rule.
+    for (const width of [0, 1, -5, 0.4]) {
+      const box = imageCells(tall, width);
+      expect(Math.min(box.cols, box.rows), `width ${String(width)}`).toBeGreaterThanOrEqual(1);
+    }
+  });
+
   it("IK11 (F381): every chunk's payload is a multiple of four base64 bytes", () => {
     // **kitty decodes base64 per chunk rather than concatenating first**, so a
     // chunk whose length is not a multiple of 4 corrupts everything after it.
@@ -331,8 +421,4 @@ describe("C09 §4c — the placement's identity is not the picture's (I66)", () 
       placementIdOf(one, "e1"),
     );
   });
-});
-
-describe("C09 §4c — the placement refusal's second axis (I67)", () => {
-  it.todo("T1.44 (C09 I67, §4c): `placementRows` refuses on rows as well as columns, and the rows axis is reachable at an ordinary width — a 16x400 GIF at height 400 is {cols: 32, rows: 400} at eighty columns, where the columns axis needs a terminal wider than 297 and occurs at no width below it — not deferred on a component: it lands with the image kind in the next commit");
 });

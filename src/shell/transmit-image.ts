@@ -27,7 +27,7 @@
 import { imageKey, payload, placementIdOf, transmit, transmitAnimation, transmitRgba } from "../presentation/image/kitty.js";
 import { compositeOverlay } from "../presentation/image/overlay.js";
 import { decodeImage } from "../presentation/image/index.js";
-import { imageCells } from "../presentation/blocks/kinds/image.js";
+import { imageCells, placesAtProtocol } from "../presentation/blocks/kinds/image.js";
 import type { Block, Image } from "../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
 import type { Probe } from "../data/viewmodel/index.js";
@@ -140,6 +140,21 @@ export function transmitImage(
     // alone means two blocks of one image with different overlays transmit once
     // and both draw the first — the wrong picture rather than none.
     const key = imageKey(image);
+    // **A picture the renderer will not place is not transmitted** (C09 I67,
+    // §8b G14, F1026). `transmits(capabilities)` above is the capability half of
+    // the arm and the box is the other half: past `MAX_PLACEHOLDER_SPAN` on
+    // either axis the block draws half blocks and no cell addresses this id, so
+    // the whole transmission went on the wire for nothing — measured through a
+    // session at 80 columns, four APC escapes and 317 B for one 16x400 GIF
+    // against zero placeholder cells in the frame that followed. And it is not
+    // discarded: in kitty 0.41.1 an unaddressed transmission answers `OK`,
+    // draws nothing and stays resident until something addresses it (F1036).
+    //
+    // **Before `live.add`, deliberately.** A placement that has stopped being
+    // addressable — the terminal narrowed under it — is then absent from `live`
+    // and released by the sweep, so it re-transmits if it becomes addressable
+    // again. Claiming it here would hold a record for a placement no frame draws.
+    if (!placesAtProtocol(image, capabilities, width, probe)) continue;
     // **The placement is where the picture goes and the key is what is there**
     // (C09 I66). Two derivations of one id agree only while both are pure
     // functions of the same block, so both sides take it from `placementIdOf`.

@@ -39,6 +39,8 @@ import {
 } from "../../src/presentation/image/index.js";
 import { transmitAnimation, transmitRgba } from "../../src/presentation/image/kitty.js";
 import { transmitImage, type SentImages } from "../../src/shell/transmit-image.js";
+import { placesAtProtocol } from "../../src/presentation/blocks/kinds/image.js";
+import { styledScreenFrom } from "../support/styled-screen.js";
 import { Frames } from "../../src/shell/frames.js";
 import { b } from "../../src/shell/builders/index.js";
 import type { Image } from "../../src/data/viewmodel/index.js";
@@ -572,6 +574,72 @@ describe("C22 I77 — the wake", () => {
       vi.useRealTimers();
     }
   });
+
+  it("T4.17t (C22 I77, C09 I67): the refusal path at kitty animates, read from the session's own frame in colour", async () => {
+    vi.useFakeTimers();
+    try {
+      // **A picture the encoding cannot address, on an ordinary terminal.** The
+      // refusal has two axes and `rows` is the one that needs no unusual width:
+      // a 16x400 GIF declared 400 rows tall is 32 cells wide at 80 columns, and
+      // `placementRows` refuses it. F624 recorded the resulting still as
+      // unrepairable and defended it with *at 298+ cells a still was already the
+      // honest answer*, which is about the other axis (F1026).
+      const raw = Buffer.alloc(16 * 400 * 2 * 4);
+      for (let i = 0; i < 16 * 400; i += 1) {
+        raw[i * 4] = 255; raw[i * 4 + 3] = 255;
+        raw[(16 * 400 + i) * 4 + 1] = 255; raw[(16 * 400 + i) * 4 + 3] = 255;
+      }
+      const data = (await sharp(raw, { raw: { width: 16, height: 800, channels: 4, pageHeight: 400 } })
+        .gif({ loop: 0, delay: [100, 200] })
+        .toBuffer()).toString("base64");
+      const gif = b.image({ id: "g", data, height: 400, alt: "red then green" });
+
+      expect(imageCells(gif as Image, 80), "the fixture takes the rows axis").toEqual({ cols: 32, rows: 400 });
+      expect(placesAtProtocol(gif as Image, KITTY_CAPS, 80), "and its placement is refused").toBe(false);
+
+      // **A frame read in colour, because stripped text cannot tell red from
+      // green** — the whole picture is one glyph repeated, so `screen()` reports
+      // a correct animation as a still.
+      const size = { columns: 80, rows: 20 };
+      const inkOver = async (protocol: "kitty" | "none"): Promise<readonly string[]> => {
+        const built = await session(
+          { kind: "count", measure: () => 1, render: () => inkRows(["counted"]) },
+          [{ kind: "count", id: "c" }, gif],
+          { capabilities: { imageProtocol: protocol } },
+        );
+        const inks = new Set<string>();
+        const read = (): void => {
+          for (const row of styledScreenFrom(built.stdout.chunks, size)) {
+            for (const cell of row) if (cell.ch === "▀") inks.add(cell.style.fg);
+          }
+        };
+        read();
+        for (let i = 0; i < 30; i += 1) { await wake(built, 33); read(); }
+        return [...inks].sort();
+      };
+
+      // **The control first**: the same document off the protocol arm must show
+      // two inks, or a green kitty arm would be a fixture that never animated.
+      const control = await inkOver("none");
+      expect(control.length, `the control must animate — saw ${JSON.stringify(control)}`).toBe(2);
+      // **And the arm under test.** Gathering by `imageProtocol` gives one.
+      expect(await inkOver("kitty"), "the refused placement rasterises, so the session gathers it").toEqual(control);
+
+      // **And nothing is transmitted for a placement no cell addresses** (C09
+      // §8b G14): four escapes and 317 B went on the wire for this block before.
+      const built = await session(
+        { kind: "count", measure: () => 1, render: () => inkRows(["counted"]) },
+        [{ kind: "count", id: "c" }, gif],
+        { capabilities: { imageProtocol: "kitty" } },
+      );
+      expect(
+        [...built.stdout.chunks.join("").matchAll(/_G/gu)].length,
+        "no APC escape for a picture the frame places with no cell",
+      ).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 120_000);
 
   it("T4.17q (C22 I77, I74): a GIF beside a spinner keeps its own cadence", async () => {
     vi.useFakeTimers();

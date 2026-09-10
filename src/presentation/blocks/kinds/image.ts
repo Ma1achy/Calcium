@@ -18,7 +18,7 @@ import {
   type Decoded,
   type Pixels,
 } from "../../image/index.js";
-import { placementIdOf, placementRows } from "../../image/kitty.js";
+import { placementFits, placementIdOf, placementRows } from "../../image/kitty.js";
 import { overlayColour, overlayField } from "../../image/overlay.js";
 import { paint, type Span } from "../paint.js";
 import { statusDefinition } from "./status.js";
@@ -159,6 +159,41 @@ export function imageCells(
 }
 
 /**
+ * **Which arm this block takes, asked rather than inferred** (C09 I67, F1026).
+ *
+ * The renderer below, the session's animation gather (C22 I77) and the
+ * transmission seam (C09 I66) each need the same answer, and each used to
+ * compute a *different* one: the renderer asked `placementRows`, and the other
+ * two asked `imageProtocol`. **The capability is half the arm** — a placement
+ * past the diacritic encoding falls to the half block, on either axis — so a
+ * shell gating on the capability alone gathered no frames for a picture it was
+ * rasterising (frame 0 for ever, F624) and wrote a transmission no placeholder
+ * addresses.
+ *
+ * **It is a question travelling down and not an answer travelling up.** The
+ * finding that recorded the gap said the remedy needed "a seam carrying a
+ * block's chosen arm back to the shell", which A02 Seam 4 forbids and which is
+ * why it was priced as large. There is no chosen arm to carry: the arm is a pure
+ * function of `(block, width, capabilities)`, so L4 calls **down** into it, as it
+ * already calls down into `imageCells` (F380) and `placementIdOf` (F987) in this
+ * same pair of files.
+ *
+ * **The width is the one the block is rendered at**, not the frame's — a card's
+ * body is four cells in (C22 §6l.4 D) and `imageCells` reads the width, which is
+ * the whole of F380.
+ */
+export function placesAtProtocol(
+  block: Image,
+  capabilities: RenderContext["capabilities"],
+  width: number,
+  probe?: Probe,
+): boolean {
+  if (capabilities.imageProtocol !== "kitty") return false;
+  const { cols, rows } = imageCells(block, width, probe);
+  return placementFits(cols, rows);
+}
+
+/**
  * The refusal, as the block the rest of the framework draws for one (I38).
  *
  * **`error` and never `retrying`**: no attempt is coming, and the two states
@@ -206,10 +241,15 @@ export const imageDefinition: BlockDefinition<Image> = {
     // wrapping a diacritic: a wrapped one addresses the wrong part of the image,
     // which is a plausible wrong picture — the failure this arm is built to
     // avoid, and the one a reader cannot diagnose.
-    const placed =
-      ctx.capabilities.imageProtocol === "kitty"
-        ? placementRows(placementIdOf(block, ctx.placementScope), cols, rows)
-        : null;
+    //
+    // **The gate is `placesAtProtocol` and not a second copy of it** (I67): the
+    // shell asks the same function, so the arm the frame draws and the arm the
+    // session gathers for cannot part company. No probe is passed — the box
+    // above already recorded this block's decode, and a second `imageCells` here
+    // would count it twice (C28 I30).
+    const placed = placesAtProtocol(block, ctx.capabilities, ctx.width)
+      ? placementRows(placementIdOf(block, ctx.placementScope), cols, rows)
+      : null;
     if (placed !== null && "rows" in placed) {
       // **The overlay is not here at `kitty` and that is the whole ruling**
       // (C04 §3h.2): the cell's rendering is the terminal's, so it is composited
