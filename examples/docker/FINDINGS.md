@@ -40887,14 +40887,24 @@ be violated, which is A03 §2's vacuity class outside a rule. The remedy is a ru
 the name `tone: "default"` or drop the inert word — and it is C22's, not mine.
 
 **3 — `promptRegion`'s membership guard is asserted by nothing, and there is a row for it.**
+**False, and false when written — see F1073.** `test/unit/session-composite.test.ts:450` T1.21b
+constructs exactly the state described below and is the one thing in the tree that fails on the
+mutation. It landed in `3aa88ef2` on 2026-08-14, twenty-seven days before this entry, and C22 has
+carried its spec row since. The measurement here is honest about the forty-eight rows it ran and
+wrong about the conclusion it drew from them: **a mutation's verdict is only as wide as the file
+list it was run over**, and this list was three files chosen by proximity to `paint.ts` while the
+row that binds lives in the file about *composition*. The paragraph is left standing because the
+mechanism it describes is right and only its last clause is not.
+
 `test/unit/session-paint.test.ts:509` T4.26 says *"the marker row is untouched"* and its comment
 calls itself *the row the mutation pass demanded*. Dropping `if (shows(window, span.row))` from
 `paint.ts` leaves it **green**, along with all 31 rows in that file, 8 in `cursor-positions` and 9
-in `integration/editor` — **48 rows, none of which fails.** The reason is the fixture: T4.26 passes
+in `integration/editor` — **48 rows, none of which fails** *(of those forty-eight; T1.21b, in a
+fourth file, does — F1073)*. The reason is the fixture: T4.26 passes
 one span, on editor row 4, which is *inside* the window, so the guard cannot bind and the row is
 testing the **mapping** on the same line rather than the membership. The state the guard exists for
 is a span on an **elided** row — with `cap = 3`, `first = 6`, `offset = 1`, editor row 5 maps to
-painted 0, which is the marker — and no fixture in the suite constructs it. `window-wash` selects
+painted 0, which is the marker — and no fixture *in those three files* constructs it. `window-wash` selects
 all thirteen rows, so six of them are elided; it is the only thing in the tree that goes red, and
 the diff is exactly one line of the style map:
 
@@ -43011,11 +43021,20 @@ capability with no direct query, which neither of the two in question is.
 |---|---|
 | **Surface** | `src/terminal/capabilities.ts` — the image-protocol table's doc comment · `tools/terminal-probe/` and its result file |
 | **Reached for** | *WezTerm and Windows Terminal are `none`, owed and not claimed … the expiry is an instrument rather than a hope — run the probe there and read the verdict* |
-| **Verdict** | **Open.** The verdict lands in a file the repository holds, and nothing compares it to the table it is the evidence for |
+| **Verdict** | **Closed by F1071 — and this cell was wrong in the direction that mattered.** The verdict landed in no file the repository held; `result.txt` was gitignored and untracked, so a reader on CI or a fresh clone had no evidence at all |
 
-The probe writes its report to a path given on the command line, and the repository holds the
-Ghostty 1.3.1 run that put that terminal on the kitty arm. **Nothing in `src/` or the suite
-reads it**: the only mentions outside the tool are two lines of ledger prose, and the probe's
+**Corrected here rather than rewritten, because the correction is the finding.** The sentence
+above read *the verdict lands in a file the repository holds*, and `git ls-files
+tools/terminal-probe/` returned three files, none of them the report; `git check-ignore` names
+`tools/terminal-probe/.gitignore:2`. The single record the image-protocol table rested on existed
+on one laptop. Not overwritable-by-the-next-terminal, which is what this entry worried about —
+**absent from every clone**. Wrong in both directions again: not held where the finding said, and
+the reason it was unread is stronger than the reason given. Everything below is as written and
+re-derived true at HEAD.
+
+The probe writes its report to a path given on the command line, and the
+Ghostty 1.3.1 run that put that terminal on the kitty arm is the only record of it.
+**Nothing in `src/` or the suite reads it**: the only mentions outside the tool are two lines of ledger prose, and the probe's
 own eight test rows assert the *build script's source text* rather than any verdict. A single
 output path also means a second terminal's run overwrites the only evidence the table
 currently rests on.
@@ -43024,9 +43043,9 @@ So the comment's distinction — *a deferral with an instrument rather than a de
 hope* — is right about the instrument and silent about the loop. The expiry still depends on a
 person noticing, which is exactly what the deferral rule says goes unwatched.
 
-**Not landed.** Closing it wants a per-terminal results directory and a row that fails when a
-recorded verdict disagrees with the table, which is a build rather than a ruling and changes
-the probe's output contract.
+**Not landed** *(at the time of writing; landed in F1071)*. Closing it wants a per-terminal results
+directory and a row that fails when a recorded verdict disagrees with the table, which is a build
+rather than a ruling and changes the probe's output contract.
 
 ## F1070 — a source-text assertion lives in a different file from its subject, and three of seven cross a component ★★★★☆
 
@@ -43267,3 +43286,331 @@ A reading under which the two directories were deliberately excluded after the w
 written. There is no such comment and the comment that exists argues the opposite. Or a count
 showing the dropped set holds no citations; it holds 2 688 by a loose regex, and the rule's
 own matcher resolves eleven violations' worth of real ones today.
+
+## F1071 — the deferral's instrument had an output file, the file had no reader, and the file was not in the repository ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `tools/terminal-probe/probe.py` and the new `tools/terminal-probe/results/` · `src/terminal/capabilities.ts`'s image-protocol comment · `test/unit/terminal-probe.test.ts` TP6–TP10 · C02 §3 |
+| **Reached for** | F1060 — *the expiry is an instrument rather than a hope, and nothing reads the verdict* |
+| **Verdict** | **Closed, and F1060's own verdict cell was wrong in the direction that mattered**: the evidence was never in the repository at all |
+
+### Re-deriving F1060, claim by claim
+
+F1060's verdict reads *"The verdict lands in a file **the repository holds**, and nothing compares
+it to the table it is the evidence for."* The second half was true. The first was not, and no file
+held it:
+
+```
+$ git ls-files tools/terminal-probe/
+tools/terminal-probe/.gitignore
+tools/terminal-probe/build.mjs
+tools/terminal-probe/probe.py
+$ git check-ignore -v tools/terminal-probe/result.txt
+tools/terminal-probe/.gitignore:2:result.txt   tools/terminal-probe/result.txt
+$ git log --oneline -- tools/terminal-probe/result.txt      # empty
+```
+
+**The single record the image-protocol table rested on existed on one laptop.** Not
+overwritable-by-the-next-terminal, which is what F1060 worried about — *absent from every clone*. A
+reader on CI, or on a fresh checkout, had no evidence at all, and would have found the gitignore
+line before finding the file. *Ask where a settled claim is written down*, and wrong in both
+directions again: it was not held where the finding said, and the reason it was unread is stronger
+than the reason given.
+
+The rest re-derived as stated. `probe.py` writes to `sys.argv[1]` — true. Nothing in `src/` or the
+suite read it — true. Eight rows asserting source text — true, though the split is five over
+`build.mjs` and three over `terminal-read.sh`.
+
+**And one thing nobody had noticed.** `bytes/manifest.json` holds **7** cases; the Ghostty record
+reports **5**. That record predates the `replace-a`/`replace-b` pair (`bytes/` mtime `Aug 31
+22:35`, the report `Aug 31 13:42`), so the only evidence the table rested on had been stale for the
+whole of F421's instrumentation.
+
+### The contract, decided rather than inherited
+
+A file name is a public surface for anyone who has run the probe, so the argument keeps its
+meaning exactly:
+
+    python3 probe.py            # -> results/<terminal>.txt, the corpus TP7 reads
+    python3 probe.py <path>     # -> <path>, unchanged
+
+**The alternative considered and refused** was redefining `argv[1]` to name the results
+*directory*. An invocation whose shape does not change and whose meaning does is the worst kind of
+break — it would put a directory where a caller expected a file with nothing reporting a conflict.
+Making the *default* do the new thing means the person with an invocation memorised keeps their
+file and the person who runs it bare — who is the one who has not read this — gets the loop.
+Measured: bare was previously an `IndexError` raised **after** the whole terminal read and
+**before** a line of it was printed, so the reading was lost. Verified after the change: an
+explicit-path run wrote 1 925 bytes to its path and left `results/kitty-0.41.1.txt` byte-identical
+(md5 `2ba4ec41…` before and after).
+
+**The record's own header is what the reader parses; the filename is for a human.** Renaming a file
+therefore breaks nothing and two records for one terminal are read as two. Two runs of the same
+terminal at the same version overwrite, deliberately: the newest reading of `kitty 0.41.1` *is* the
+reading of `kitty 0.41.1`.
+
+### Two new measurements, and the second is the one that matters
+
+Run under Xvfb in the devcontainer, `kitty --config NONE` and `xterm -geometry 100x48`:
+
+| record | TERM | verdict on the 1×1 direct-RGB query | corrupt control | geometry checks |
+|---|---|---|---|---|
+| `ghostty-1.3.1.txt` | `xterm-ghostty` | `OK` (5 cases) | `EINVAL: invalid data` | 3 HOLD |
+| `kitty-0.41.1.txt` | `xterm-kitty` | `OK` (7 cases) | `EBADPNG:bad adaptive filter value` | 3 HOLD |
+| `xterm-398.txt` | `xterm` | `NO RESPONSE` (7 cases) | `NO RESPONSE` | 3 DO NOT HOLD |
+
+**XTerm is the negative control and it is why the comparison means anything.** With three `OK`
+records a comparator that only ever fires on the *measured-ahead-of-the-table* arm looks identical
+to one that also fires on *the-table-claims-what-the-terminal-refused*. XTerm answers nothing,
+falls through to `none`, and agrees — so the refusing arm is exercised by a real terminal rather
+than only by a fabrication.
+
+The two terminals name the same failure differently. **Nothing matches on the error text**, only on
+`OK`.
+
+### The rows, and why one of them is not written
+
+`agreement()` is a **pure function over a parsed record**, not a loop with an assertion inside it,
+precisely so a record that does not exist can be classified. It answers three things and not two:
+the probe asks one question — *does this terminal decode a kitty graphics transmission* — so a
+table saying `iterm2` or `sixel` is neither confirmed nor contradicted. Folding that into *agrees*
+would let a class of record sit in the corpus checked by nothing and looking checked; it is named,
+and TP6 counts it.
+
+- **TP6** — the corpus is non-empty **and** holds a record on each arm. An exit status is the same
+  bit for *clean* and for *the case list was empty*.
+- **TP7** — every recorded verdict agrees with `IMAGE_PROTOCOL`. The loop the comment claimed and
+  did not have.
+- **TP8** — the comparison is shown to fire in both directions before it is trusted.
+- **TP9** — the reader's labels are the ones `probe.py` emits, on **comment-stripped** source. Two
+  languages, no symbol to share and no type to break.
+- **TP10** — the parser pinned to the three real records and to the shape with no `EMULATOR` line.
+
+**No absence assertion, deliberately.** *There is no recorded verdict for WezTerm* passes hardest on
+the day one appears, and passes for the wrong reason on any day the directory cannot be read. TP7 is
+turned red by the same event — a WezTerm record landing — without the hazard, so a second row
+watching the same trigger would be a copy with a failure mode of its own.
+
+### The mutation table
+
+Hand mutations, `cp` aside / apply with an asserted anchor / run / `cp` back, md5 compared after
+each. No `src/` file was mutated for this half.
+
+| # | mutation | file | fails |
+|---|---|---|---|
+| M-a | `agreement` always returns `"agrees"` | the test | **TP8** — TP7 stays green |
+| M-b | the *table claims `kitty`, terminal refused* arm dropped | the test | **TP8** — TP7 stays green |
+| M-c | the corpus reads as empty (`.txt` → `.report`) | the test | **TP6** — TP7 **green over an empty corpus** |
+| M-d | `EMULATOR` header label drifts | `probe.py` | **TP9** |
+| M-e | `field` stops mapping the probe's `?` onto *no value* | the test | **nothing — survived** |
+
+**M-a and M-c are the argument for TP6 and TP8 existing at all**: in both, TP7 — the row that is the
+point of the whole build — reports green. A comparator that always agrees and a corpus with nothing
+in it are exactly the two ways this closes as theatre.
+
+**M-e survived, and that is a finding about the row rather than a licence.** The clause is not
+inert: with `?` kept as a program name the red row's own message names the probe's placeholder
+instead of the terminal, and *a red row carries its verdict*. TP10 was written for it and M-e now
+fails there.
+
+**The fabricated disagreement, which is the load-bearing check.** A synthetic
+`wezterm-20240203-110809.txt` — the real XTerm record with its identity and verdict rewritten —
+placed in `results/`. TP7 went red carrying the whole verdict:
+
+> `WezTerm(20240203-110809) (wezterm-20240203-110809.txt) answered OK to a kitty graphics
+> transmission and the table says imageProtocol: "none". The table is behind a measurement — move
+> the row in src/terminal/capabilities.ts's IMAGE_PROTOCOL and widen C02 T1.7.`
+
+Removed afterwards; `results/` holds three files.
+
+**No capability's value was changed.** WezTerm and Windows Terminal remain `none` and remain
+unmeasured. Only the comment moved — and C02 §3, which named **Konsole** where `TerminalName` has
+no `konsole` member and never had one. That divergence is recorded in the spec rather than quietly
+corrected: *WezTerm and X are owed* reads as complete whatever X is, which is how it went past
+twenty-five components.
+
+### What would falsify this
+
+- A terminal that answers `OK` to the 1×1 query and then refuses real transmissions would make the
+  recorded verdict a worse predictor than the table. The probe's own G7 rows are the check for that
+  and TP7 does not read them — it reads one line.
+- The `iterm2` and `sixel` arms of the table are unreachable from any query the probe sends, so a
+  record from either is classified *asks a different question* and checked by nothing. Named, not
+  silently agreed with.
+- `TERM_PROGRAM` is split at the first space. No value in the wild carries one; if one ever does,
+  the program name truncates. It is not used in the comparison — only in the filename, which
+  `probe.py` composes in Python where the two are separate.
+- TP9 pins strings, not emission. A `probe.py` that reformats its header while keeping those
+  literals somewhere would pass it.
+- The three records came from `kitty --config NONE` under Xvfb in the devcontainer. A user's config
+  should not change a graphics verdict; that is an assumption, not a measurement.
+
+## F1072 — the inert tone was one of five, and the vacuity was not the word that was there but the one that was missing ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/chrome.ts` · `test/unit/session-paint.test.ts` T1.46b · `test/golden/__snapshots__/session-frame.test.ts.snap` · C22 §6l.6 J, I97, commitment 67 |
+| **Reached for** | F1029 disposition 2 — *`tone: "muted"` on the binary chip forbids nothing; the remedy is a ruling, either give the name `tone: "default"` or drop the inert word* |
+| **Verdict** | **Live, and the class is five.** Ruled `tone: "default"` on the name — but the finding was mis-framed: dropping any of the five moves nothing, so no single word was the defect |
+
+### Re-derived at HEAD
+
+`chrome.ts:87` still wrote `{ label: binary, tone: "muted" }`; `simple.ts:620` still resolves
+`chip?.tone ?? "muted"`. C22 §6l.6 J named the chips and said nothing about their tones, so neither
+remedy was a spec disagreement — and that silence is the actual gap, which is why this landed as an
+invariant rather than as a one-word edit.
+
+**Then the census, which F1029 did not take.** `chrome.ts` emits **eight** chips. **Seven** carry an
+explicit tone. The one that does not is `name`. And of the seven, five are `muted` — which *is* the
+default — so each is inert on its own:
+
+| mutation | moved of 46 golden snapshots |
+|---|---|
+| the binary chip loses `tone: "muted"` (F1029's M6) | **0** |
+| the **clock** chip loses `tone: "muted"` | **0** |
+
+Same zero, same reason. **So the vacuity was never about that one chip.** Reading the five as five
+words to delete would leave C22 inheriting C09's default at every chip — a change to `simple.ts`'s
+`?? "muted"` would then repaint every chrome row of every Calcium app with nothing in C22 moving.
+The five are one property: **C22 pins its chrome's appearance rather than inheriting it.** What was
+actually wrong is that **one chip of eight opted out of the pinning, and it happened to be the one
+whose intended tone differed.**
+
+### The ruling, and the frame it was read from
+
+`{ label: name, tone: "default" }`. Three reasons, in order of weight:
+
+1. **It executes an intent the code already records.** `{ label: name }, { label: binary, tone:
+   "muted" }` reads as *the binary is dimmer than the name*; the author who meant *both muted* wrote
+   `tone: "muted"` five times elsewhere in the same file. Dropping the word erases the record;
+   supplying the missing one honours it.
+2. **The design reference makes the header identity.** `docs/design/AGENT_TUI_DESIGN.md` line 1409:
+   *"Header is identity — what am I talking to. Footer is state."* And `binary` is an absolute path
+   in two of the three shipped examples (`/workspace/examples/plots/bin/plots`), which C22 §6l.6's
+   own measured frame quotes as `plots-tui  /workspace/…/plots  19:10:07`. A path and the app's name
+   at one ink makes the longer, less identifying string as prominent as the identity.
+3. **It does not compete with what is meant to stand out.** `COPY` and `stopping` are `warn` — a
+   hue, not a brightness.
+
+**Read from the frame, not reasoned.** The style-map legend before and after:
+
+```
+- A = fg 38;5;241  bg —  attrs —          (name, binary, clock, both rules, footer: one ink)
++ A = fg 38;5;188  bg —  attrs —          (the name)
++ B = fg 38;5;241  bg —  attrs —          (everything else in chrome)
+```
+
+**19 of 46 snapshots moved: 15 style maps and the 4 `boot` byte rows. No grid moved** — `git diff`
+on the snapshot file touches only `SF2 · … — the styles` and `SF3 · … — the bytes` blocks, and not
+one `SF1 · … — the grid`. That is a tone being appearance and never geometry, which is the property
+the split readings exist to separate. `corpus.test.ts` passes unchanged, so the README's census
+still agrees with the directory.
+
+**Recorded against the ruling**, since a refusal that accumulates only supporting reasons is one
+nobody re-reads: this adds a third level of emphasis to a row that had two, and chrome is meant to
+recede. It is reversible in one word, and the corpus now holds both readings apart.
+
+### T1.46b, which is what makes the change more than a snapshot
+
+A golden records; it does not check. The row walks the blocks `makeDefaultChrome` returns — with
+`copyMode`, `stopping` and `lastFrame` all up, because each gates a chip and the quiet session is
+three short, two of which are the only two whose tone is not the default — and asserts two
+separately-satisfiable things:
+
+1. **every chip names its tone** — the class, and the property C22 actually holds (I97);
+2. **the name and the binary do not resolve to the same ink** — asserted on the *resolved* ink
+   through `tone(…, theme, caps)` in dark and light, not on the two words.
+
+Clause 2 is the one that matters. `tone: "muted"` on the name spells a difference and paints none —
+the same defect in a different spelling — and a source assertion about the word `default` would
+pass it.
+
+| # | mutation | fails on |
+|---|---|---|
+| N1 | the ruling reverted (`name` loses its tone) | clause 1 — *calcium inherits C09's default instead of naming its own* |
+| N2 | `name` given `tone: "muted"` | clause 2 — *the header's identity and the path it drives resolve to one ink* |
+| N3 | the **clock** stops naming its tone | clause 1, naming the clock |
+| N4 | the chip walk finds nothing | the label list — the corpus control |
+
+Four fire, and the two clauses fail separately. The label list is asserted before anything loops
+over the chips, because a walk that found nothing satisfies every `for` below it.
+
+**The fixture corrected the row on the way**: the clock was written as `14:13:20` and it is
+`22:13:20` UTC at the fixed epoch. A fixture that argues back is one that is live.
+
+### What would falsify this
+
+- The row asserts resolved ink at 24-bit in dark and light. **At 1-bit both tones collapse and the
+  row does not run there** — a header whose two chips are one ink at 1-bit is correct and
+  unasserted.
+- The snapshots regenerated here were generated by the code they now defend. The four mutations are
+  the only reason to believe they are not merely recording.
+- Tier 5 was not run by the lane. This moves bytes; a PTY row asserting the header's SGR would move.
+
+## F1073 — the disposition was closed four weeks before it was written down, and the mutation that missed it chose its own blast radius ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `test/unit/session-composite.test.ts:450` T1.21b · `src/shell/paint.ts:394` · F1029's disposition 3 and its TRIAGE row |
+| **Reached for** | F1029 — *`promptRegion`'s membership guard is asserted by nothing … no fixture in the suite constructs it* |
+| **Verdict** | **False at HEAD and false when written.** The row exists, the spec names it, and it is the only thing in the tree that fails |
+
+F1029 measured: dropping `if (shows(window, span.row))` leaves green *"all 31 rows in that file, 8
+in `cursor-positions` and 9 in `integration/editor` — 48 rows, none of which fails"*, and concluded
+no fixture constructs the state.
+
+**Measured again**, in a copy of the tree, the same guard dropped:
+
+```
+× T1.21b (C22 I62, §6e table row 2): a span outside the window does not wash the marker
+  Tests  1 failed | 46 passed (47)
+```
+
+T1.21b is in `test/unit/session-composite.test.ts` — **the one file the three-file mutation set did
+not include.** Its fixture is exactly the state F1029 describes: six editor rows, cursor at 5,
+*"Editor row 2 is one above the window, which shows rows 3, 4 and 5."*
+
+**And it is not recent.** It landed in `3aa88ef2` on **2026-08-14**, twenty-seven days before the
+golden corpus (`b7138463`, 2026-09-10) — `git merge-base --is-ancestor` confirms it is an ancestor.
+The C22 spec has carried the row since, at line 2436, with F1029's own sentence already in it:
+*"T4.26's 'the marker row is untouched' cannot construct this, because its span is inside the
+window."* The finding was written as new against a record that already held it, which is F855/F856's
+class: **run *ask where a claim is written down* on a finding before writing the number.**
+
+**The mechanism worth keeping.** A mutation's verdict is *nothing failed*, and that is only as wide
+as the file list it was run over. F1029's list was three files chosen by proximity to `paint.ts`;
+the row that binds lives in the file about *composition*, because the guard's two consumers are the
+cursor and the wash and the cursor's row is where the pair was fixed. *Run the whole suite, not a
+chosen subset* is written down for test runs and had not been stated for **mutation blast radius** —
+a hand-listed set is the same defect with the same shape, and here it converted a closed item into a
+finding, a roadmap residue and a lane's brief.
+
+**No work was manufactured.** Nothing was added for this disposition; the correction is to F1029's
+text and to the register.
+
+### What would falsify this
+
+- The measurement covered `session-composite` and `session-paint` only. If some *other* row also
+  fails on that mutation, T1.21b is not the unique watcher — which would strengthen the conclusion,
+  not weaken it.
+- T1.21b watches the wash's half of the guard. `shows` has two more call sites (`paint.ts:420`, the
+  spinner's row, and `:726`, `cursorFor`); T1.21 and T1.21e cover those, and neither was mutated.
+
+## F1074 — allocated, never spent, recorded so the number cannot be reused ☆☆☆☆☆
+
+| | |
+|---|---|
+| **Surface** | none — this entry exists so an allocated number resolves |
+| **Reached for** | the fourth number pre-allocated to round 8's Lane P, against two subjects that produced three findings |
+| **Verdict** | **unspent**; nothing was measured under it and nothing should be |
+
+Numbers are pre-allocated to a lane before it runs, because two lanes discovering the same next
+number is a collision nothing detects. Four were allocated here and three were used. **A number that
+names nothing is worse than a number that names its own absence** — without this entry the next
+round hands F1074 to something else while a lane report already spends it, and SP5 reads any `F\d+`
+as a citation because it cannot tell a citation from a disclaimer.
+
+This is F1040's precedent applied to the other cause. F1040 was spent and folded; this one was never
+spent at all, and the two want the same record for the same reason: **a finding number is a name in a
+namespace every document shares.**
