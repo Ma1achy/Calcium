@@ -45074,6 +45074,15 @@ its own row, not folded into this one.
   the complement of those.
 - **Runs existing on this branch.** Measured: none.
 
+### One clause it owes, so it is not closed against the wrong ref
+
+The fix is on `feat/profiler`. `main`'s copy of `ci.yml` still reads
+`branches: [main]`, and will until this merges — which is F860's fifth form
+waiting to happen: *somebody looked, diagnosed it right, and fixed the ref they
+were standing on*. Recorded here rather than discovered from `main` in a
+fortnight. The close-out reads `gh run list --branch main --limit 1` after the
+merge, not the branch's own green.
+
 ## F1087 — a contract row writes to `out/`, which a fresh checkout does not have ★★★
 
 | | |
@@ -45249,3 +45258,137 @@ number is the asymmetry, not the odds*. F967's class: a file that restates
 another file's default is a copy that goes stale in one commit. Labelled rather
 than rewritten, because those sentences are the record of why the explicit
 budgets exist at all.
+
+## F1089 — a trigger's reach is a property of the ref the file is on, and two of this repository's three are on the wrong one ★★★★
+
+| | |
+|---|---|
+| **Surface** | `.github/workflows/mutation-sweep.yml:12-19` · `ci.yml:108,143,177` · A04 §6's table |
+| **Reached for** | F812, whose disposition has read *the next run is the measurement* since it was filed, and whose measurement lives in the one job a working branch cannot reach |
+| **Verdict** | **open** |
+
+### Going to find out how to run the expensive tier, and finding a workflow that cannot run at all
+
+F812 and F839 are about an emulator green in the devcontainer and red on the
+runner. Their remedy has been *harden the fixture and let the next run say*, and
+the run they need is `full` — the only job that installs `xvfb xdotool xterm
+kitty`, without which C02 T5.7 and C16 T5.9 **skip by name**, which that job's
+own comment calls *not a pass, and not the gate either*. Measured on the one run
+this branch has, 34492226500:
+
+```
+fast       failure
+degraded   skipped
+full       skipped
+proof      skipped
+publish    skipped
+```
+
+`full`'s guard is `pull_request || refs/heads/main || refs/tags/v*`, so the
+question was whether a fourth trigger could reach it — `workflow_dispatch`, the
+key `mutation-sweep.yml` already carries and A04 §6's table already writes a row
+for. Checking whether that would work is where the finding is:
+
+```
+$ gh workflow list --all
+ci   active   322506113
+
+$ gh run list --workflow mutation-sweep.yml
+HTTP 404: workflow mutation-sweep.yml not found on the default branch
+```
+
+**GitHub's own error names the mechanism.** `schedule` and `workflow_dispatch`
+register from the **default branch** and nowhere else. `mutation-sweep.yml`
+landed `887de60d` on 2026-09-09 and exists on `feat/profiler` alone, so it has
+**neither of its two triggers** — not the weekly cron, not the dispatch, and
+not the `only:` input written to steer it.
+
+### What A04 §6 says about that row
+
+> **Weekly** (Sunday 03:00 UTC), and on dispatch · `mutation-sweep` — every run
+> under `tools/mutate/runs/` through `tools/mutate/sweep.mjs`, six shards, the
+> anchors sweep first. A survivor, a stale exemption, an anchor miss off the
+> debt list or a run that leaves the tree mutated is red **where nobody was
+> running the pass by hand** (F952, F990)
+
+That row is the whole answer to F980's *18 of 283 anchors stale, two of them
+controls*. It describes a gate that has never been capable of firing.
+
+**And nothing would have reported it.** The first Sunday is 2026-09-13, three
+days out; a cron that does not fire produces no run, no annotation and no red —
+the silence is identical to a green week. This is A03 §2's vacuity class in a
+scheduler: **a gate that cannot run and a gate with nothing to report are the
+same absence.** The `gh workflow list --all` line is the only thing that tells
+them apart, and it is one line.
+
+### So F812's remedy is not a workflow edit
+
+Adding `workflow_dispatch` to `ci.yml` on this branch inherits exactly the same
+constraint: it would register nothing until it is on `main`. **The expensive
+tier is unreachable from a feature branch by any means available on that
+branch** — not a filter to widen, not a guard to relax, a property of where the
+file is. That makes F812's blocker a merge, which is a decision rather than a
+repair, and it is now measured rather than assumed.
+
+### The cost premise, checked while it was standing in the way
+
+A04 §6 opens the split with *"Private repos have a monthly Actions budget, and
+golden frames at sixteen configurations plus PTY e2e is where it goes."*
+`Calcium` is **public**, and the figure is in the API rather than the policy
+page:
+
+```
+$ gh api /repos/Ma1achy/Calcium/actions/runs/34492226500/timing
+{"billable":{"UBUNTU":{"total_ms":0,"jobs":5,"job_runs":[…five zeroes…]}},
+ "run_duration_ms":454000}
+```
+
+Seven and a half minutes of wall clock, **zero billable** — and `billable` is
+*populated with zeroes* rather than absent, so GitHub is reporting a figure for
+these runs and the figure is nothing.
+
+§6's second argument is the one that survives: *branch pushes keep the
+two-minute promise … the inner loop, where the answer is wanted in seconds*.
+That argues against the expensive tier running **automatically on every push**
+and argues nothing against it running **on demand**. Two reasons agreeing on one
+conclusion, and a reader stops at the first — which had never been checked
+against the repository it names a category of. *A refusal accumulates reasons*,
+one step earlier than usual: the thin reason is not thin, it is about somebody
+else's repository.
+
+### One clause F1086 owes, before it is closed against the wrong ref
+
+`main`'s `ci.yml` still reads `branches: [main]`. The F1086 fix is on
+`feat/profiler`, which is F860's fifth form waiting to happen — *somebody looked,
+diagnosed it right, and fixed the ref they were standing on*. Recorded in F1086
+now rather than discovered from `main` in a fortnight.
+
+### The class
+
+A **ninth form of *a gate that exists and is not run***, and the first where the
+gate is not merely unrun but **unregistered**. The eight before it were a missing
+target, a missing job, a red job nobody read, a fixture reading state a runner
+lacks, a close against the wrong ref, a gate nobody ran, a name collision, and a
+trigger that excluded its own subject. Every one of those is visible in the
+repository: you can read the file and see the gap. This one is invisible in the
+repository by construction — **the file is correct, complete and on the wrong
+ref**, and the only artefact that disagrees is on GitHub's side of the wire.
+
+### Remedy
+
+The sweep's triggers need the file on `main`; the expensive tier's fourth
+trigger needs the same. Both are a merge, so the entry names them and takes
+neither. What lands here is the record and A04 §6 gaining the sentence a reader
+needs: **a `schedule` or `workflow_dispatch` row in that table is a claim about
+the default branch**, and a workflow written on a feature branch has no triggers
+until it is merged.
+
+### What would falsify this
+
+- **The sweep having run.** `gh run list --workflow mutation-sweep.yml` is a
+  404 naming the default branch; `gh workflow list --all` returns one workflow.
+- **The file being on `main`.** `git ls-tree origin/main .github/workflows/`
+  returns `ci.yml` alone.
+- **The repository being private**, which would revive the cost argument.
+  `gh repo view --json isPrivate` → `false`.
+- **`billable` being absent rather than zero.** It is present, with `jobs: 5`.
