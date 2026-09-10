@@ -67,10 +67,39 @@ If a cache is ever wanted, its shape is settled and it is not a per-registry clo
 4  the highest-priority column is always admitted, even if it alone exceeds width
 5  restore admitted columns to their original order for display
 6  distribute residual width to flex columns, evenly, remainder to the leftmost
-7  clamp each column to maxWidth where declared; redistribute what that frees
+7  clamp each *flex* column to maxWidth where declared; redistribute what that
+   frees
 8  if no column is flex, residual width is left unused — the table renders
    narrower than the terminal rather than stretching columns arbitrarily
 ```
+
+**Step 7 says *flex* and it used to say *each column*, and the difference is 26
+declarations** (I22, F1032). A column with no `flex` is allocated its `minWidth` by
+step 6 and never grows, so a ceiling on its growth is a ceiling on nothing: measured
+over five column shapes at every width from 1 to 200, **1,000 plans compared with and
+without `maxWidth` on the non-flex columns, 0 differing** — against a control where the
+same cap on a *flex* column moves it from 59 cells to 20. `maxWidth` without `flex` is
+the A03 §2 vacuity class arriving in a declaration instead of a rule: it reads as a
+constraint, it is accepted, and there is nowhere for it to fire.
+
+The old wording is what a surface author reads before writing one. In the one consumer
+in the tree, **26 of 26 `maxWidth` declarations are on columns with no `flex`**, across
+four surfaces — and a fifth surface found it, wrote *"`maxWidth` was doing nothing …
+it caps a growth that never happens"* in a comment beside the columns it had just
+rewritten, and asserted `maxWidth === undefined` on every one of them. That discovery
+reached one file. It is CLAUDE.md's deferral shape with the halves swapped: the surface
+that found the condition did not know it was writing the spec's correction, so the
+workaround stayed local and the other four surfaces still declare the field.
+
+**This is a wording change and not a behaviour change.** `planColumns` has always
+clamped flex columns only, and it is right to: a non-flex column sits at `minWidth`,
+`maxOf` floors a cap at `minOf` (T3.4), so a clamp could only ever be a no-op. What
+changes is that the sentence now forbids what the code already refuses. Making
+`maxWidth` *imply* growth is the other repair and it is deliberately not taken here:
+it would move every layout in every surface that declares one, which is 26 of them,
+and it contradicts step 8's decision to leave residual width unused rather than
+stretch columns nobody asked to stretch. T1.25 pins the current answer so that
+reversal is a decision rather than a drift.
 
 **Step 3's `while` is a bound on the loop, not a filter over it.** Admission **stops** at the first column that does not fit; it does not skip that column and carry on to narrower ones. The two readings survive every reading of this sentence and differ by one cell in practice: at width 80, S03's admitted set reaches 72 cells through `age`, `kind` at 10 would take it to 84 and is refused, and `mr` at 6 needs exactly 80 and fits — so a skipping planner shows `mr` at a width whose drop table says `mr` goes. S03 §3's table at 80 is what pins it, and C11 T4.1 asserts it.
 
@@ -119,6 +148,20 @@ Sort is view state on the block (C04 §3), so it survives freezing and is record
 - **Missing values sort last** in both directions. A column of mostly-empty cells should not bury the populated ones under either arrow.
 
 **The indicator is ` ↑` / ` ↓` appended to the active column's header** (A01 Appendix A.4). Its two characters are C09's, not C11's: C09 §4 owns both renderings of every character that enters a frame and the 1:1 width rule that makes ASCII degradation height-preserving, so they are a rôle in its glyph set (`^` and `v`) rather than a literal here. The indicator is appended *inside* the column's planned width, so a header whose label then exceeds that width truncates — geometry is the plan's, and an indicator that widened a column would make the header disagree with the rows beneath it.
+
+**And the indicator is not the only way a header can widen** (I21). The sentence above
+names the thing C11 *appends*; the padding is the thing C11 *completes*, and the two
+are separate causes of one symptom. C09's `fit` — which the header used — takes
+`Pick<TerminalCapabilities, "unicode">`, so it cannot ask about `ambiguousWidth`: it
+forwards the record it is handed to `truncate`, which reads the field structurally and
+cuts at the session's convention, and then pads at `"narrow"` unconditionally. The one
+function whose reason for existing is that truncation and padding cannot disagree
+therefore disagrees with itself, by one cell per Ambiguous character. `rowSpans` pads
+at `ctx.capabilities.ambiguousWidth`, so at `ambiguousWidth: "wide"` a header carrying
+`Δt` and `°C` began its `note` column at cell **36** where both rows beneath it began
+it at **34**, and `clampSpans` cut the surplus off the end — leaving a truncation
+marker in a header where nothing was too long for its column. Every line was 44 cells
+before and after, which is why no assertion about a row's width could see it (F1019).
 
 ---
 
@@ -229,6 +272,8 @@ derived, and a hand-built table setting either would assert something its own ro
 - **I18** — The action bar's presence is `actionBar` when the block declares it and `rows.some(r => r.actions)` otherwise. **A window declares it and a producer does not**: the presence is derived from the rows, so a slice moves it in both directions — losing two rows the parent counted, or drawing a bar in the middle of a scrolled table. I17 is unchanged by this: the pin is computed from the parent's data at the moment the window is taken, so presence still never follows focus.
 - **I19** — A window's rows are in **display** order and carry `presorted`, and `sortedRows` returns a `presorted` block's rows untouched. Without it the slice re-derives its own comparator — `kindOf` reads the values present — and a window can reverse its own rows while every count and every height stays correct, which is the one failure C09 I26 cannot see.
 - **I20** — A window of a table holds at least one row. A bodyless window is a different block: the empty-table rule fires and it measures `header + 1`, and an action bar whose existence derives from the rows cannot be drawn beside none. The row that makes it non-empty is paid for in `skipRows` or `dropRows` according to which end it falls outside.
+- **I21** — Every drawn row of a table begins each column at the same cell, **the header included**. The header is truncated *and* padded at the session's `ambiguousWidth`, which is the convention the plan's cells are spent in and the one the rows beneath it use; a header measured at a different convention widens a column for one line of the frame and the frame then answers twice about where a column starts. Width totals are blind to it — the row is clamped back to the plan's total either way — so the property is over the *offsets*, not the sum.
+- **I22** — `maxWidth` constrains a **flex** column and nothing else. A column with no `flex` is allocated exactly its `minWidth`, so a declared ceiling on it can never fire: the plan is deeply equal with and without one, at every width. C11 neither refuses the declaration nor honours it — a planner must stay total (I7) and has nowhere to report (SS33) — so the rule is stated here and asserted, and a change that made `maxWidth` imply growth fails T1.25 rather than silently relaying out every table that declares one.
 
 ---
 
@@ -252,6 +297,8 @@ derived, and a hand-built table setting either would assert something its own ro
 16. **A window pins the bar's presence, because a presence is as derived as a width** (I18). Both directions: a slice can lose a bar the parent counted and a slice can draw one the parent put somewhere else. Set by `window` and by no producer (→ C09 I25a, MG27).
 17. **A window's rows are in display order and are not sorted again** (I19). `sortedRows` is not idempotent over a slice — `kindOf` reads the values present — so a window that re-sorted could reverse itself with every count correct (→ FINDINGS F429).
 18. **A window holds at least one row, and both ends of a table are paid for** (I20). The header alone is bodyless and the bar alone cannot exist, so the nearest row is kept and charged to `skipRows` or `dropRows` (→ C09 I26).
+19. **The header is padded at the same convention as the rows beneath it** (I21). Where a column begins is a property of the frame and not of a row, and the total is blind to it (→ FINDINGS F1019).
+20. **A ceiling applies to a column that can grow, and only to one** (I22). `maxWidth` without `flex` is accepted and inert; the rule is stated rather than enforced, and pinned so that reversing it is a decision (→ FINDINGS F1032, F50).
 
 ---
 
@@ -284,6 +331,7 @@ Six tiers. No state machine — C11 is pure over the block.
 - **T1.22** (I20): `[0, 1)` keeps a row and charges it to `dropRows`, and renders the header rather than the empty message; `[n−1, n)` keeps a row and charges it to `skipRows`, with `showHeader: false`. Neither end of a table is a row, and the two are paid at opposite ends.
 - **T1.23** (I14): a table handed `selected` naming `a`, `b`, `c` with the head on `c` paints `a` and `b` in `default` over the selection wash — a span carrying its own tone inside `b` included, because the mutation that kept span tones on a selected row failed nothing until a fixture had one — and `c` in `accent`, and the row above `a` unwashed — **which rows, not how many**, because a wash on the wrong three rows satisfies every count. Handed the same pairs under a block id that is not its own it paints exactly what it paints with no focus. And `selected` naming the head alone is **byte-identical** to `selected` absent: the sentinel, measured. At `colourDepth: 1` the two washed rows carry `7` (reverse video) and the head does not.
 - **T1.24** (I14): `pills` paints the focused chip `accent`, a selected one washed, and the same chip under another block's focus in its own tone. The control is the frame at HEAD, where a focused chip drew as an unfocused one.
+- **T1.25** (I22): `planColumns` over five column shapes at every width from 1 to 200 — 1,000 plans — is **deeply equal** with and without `maxWidth` on the columns that declare no `flex`. The control is the same cap on a *flex* column, where the plan does move (20 cells against 59), so the row cannot pass by measuring a function that ignores `maxWidth` altogether. A change that made `maxWidth` imply growth fails this, which is the point: it is a decision to revisit deliberately, as T2.7 is for the cache.
 - **T1.19** (I17): the bar carries the focused row's action labels; with focus on a different row it carries that row's; with no focus it is blank and the height is unchanged. The blank case is what stops the row being conditional in the renderer while looking unconditional in the measurer.
 
 ### Tier 2 — contract / interface
@@ -321,6 +369,7 @@ Six tiers. No state machine — C11 is pure over the block.
   **This check does not exist yet, and C04 I14 is not it.** I13 covers *block* ids, nested children included, and `validateDocument` implements exactly that — table rows are not blocks, so two rows sharing an `id` currently validate clean. Row-id uniqueness is C04's to add, on the same reasoning as I13 and beside it; C11 cannot check it without duplicating a boundary rule one layer up (C09 I6's argument, one directory over). Raised from here because C11 is the first component to depend on it.
 - **T3.18**: no column declares `flex` and the table is narrower than the terminal → residual width is unused; columns are not stretched.
 - **T3.19** (I15): a table with a data column keyed `expand` and no `role` → the cell's own text renders and no marker is drawn. The collision a reserved key would have caused, asserted rather than avoided by convention.
+- **T3.20** (I21): at `ambiguousWidth: "wide"`, a table whose column labels carry an Ambiguous character (`Δt` left-aligned, `°C` right-aligned) → the header and both rows beneath it begin every left-aligned column at the same cell, and each column's extent holds that column's text. Asserted as the whole frame at once, because a header compared against one row is an assertion both lines could be wrong in. **The total sees nothing**: every line is 44 cells before and after, so the row that would have caught this is the one nobody writes. The second arm is the control — ASCII labels over the same data at the same width move nothing — so the subject is the label rather than the renderer, and `°C` rather than `µs` because U+00B5 is *not* Ambiguous and a fixture using it left the `padStart` site covered by a character that cannot move.
 - **T3.16**: 10,000 rows → planning stays sub-millisecond; measurement is linear.
 - **T3.17**: width changes between measure and render → the plan is the new width's. With no cache there is nothing to go stale, and this asserts the property the memo key was there to protect: a second call at a different width plans for that width, and the first plan is not retained anywhere.
 

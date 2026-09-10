@@ -598,3 +598,7 @@ describe("C09 contract — the slice seam", () => {
     expect(kit.registry.windowChild(lines("plain", 6), 40, 2, 5), "and the seam takes it").not.toBeNull();
   });
 });
+
+describe("C09 §3 — a fit that carries the width convention it cuts at (I68)", () => {
+  it.todo("T2.41 (C09 I68, §3): `fit` pads at the same ambiguous-width convention it truncates at, so a bordered block draws its declared width — the marker `truncate` appends is itself Ambiguous, so the defect needs no ambiguous input, only a message long enough to be cut — not deferred on a component: it lands with the pad sites in the next commit");
+});

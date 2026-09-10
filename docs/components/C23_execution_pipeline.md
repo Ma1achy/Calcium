@@ -581,6 +581,55 @@ derivation layer therefore has no consumer in the app it was filed against.
 not like a `fetch`**, so it does not retry, and the parts reading it render their error arm.
 The version is not consumed, because a fold that threw has not advanced.
 
+#### The fold is told how many attempts produced this version (F1023)
+
+`compute` is `(data, prev, attempts)`. **`attempts` is the settlements since the previous
+version** — `1` on a clean poll, `1 + n` after `n` transport failures — and it is read from
+the source rather than passed by the part, because `folds` memoises by version and the count
+has to travel with the version it belongs to.
+
+**The gap it closes is where two of this section's own rules overlap.** *Anything that
+accumulates belongs in a derivation* and *the fold runs once per source version* are both
+correct, and a version exists only when a fetch resolved — so the one place an accumulator is
+safe is the one place a failed poll never reaches. An app counting attempts, which is what
+docker-tui's `axisCaption` does to report a stall as *N attempts, M readings*, could not count
+the one that failed at the transport.
+
+**The two misses are not the same and only one was lost.** A container that has stopped still
+*resolves* — the far side answers `--` for every measurement — so the fold runs and the miss
+is recorded. What was gone is `docker` itself failing.
+
+**The hedge for doing nothing was the transient/cumulative conflation.** F137 argued the loss
+was tolerable because *the driver renders the error arm and the panel title says `unavailable`
+outright, so the caption's divergence was the weaker of two signals for one event*. Measured
+against the code, they are not two signals for one event: `write(part, errorArm(…))` replaces
+the part's content and the next successful poll replaces it back, so the error arm is
+**transient** and lives only while the source is failing, while the caption is **cumulative**
+and is read after recovery. After a stall that recovered, the screen shows a healthy ring
+beside a caption whose two numbers agree — it asserts that no attempt was missed. That is
+worse than silence, and it is what the hedge could not see because it compared the two signals
+at one moment rather than over the sequence.
+
+**Three arms were on the table and the entry named two.**
+
+| arm | what it costs | why not |
+|---|---|---|
+| do nothing | nothing | the caption actively reports *no stall* after one, above |
+| run the fold on the failure path — `compute(data \| error, prev)` | every app's fold handles a second shape in a parameter typed `unknown`, so it must sniff | a cost paid by every consumer for a case most do not accumulate across |
+| **tell the fold an attempt happened, without handing it an error shape** | one additive parameter | **taken** |
+
+**The third arm is not novel here — it is `renderError`'s widening applied to the sibling
+member.** `LiveSpec.renderError` is already `(err, retryInMs, attempt)`, whose own comment
+reads *three parameters, and the third is a deliberate widening … additive, so an
+implementation taking two is unchanged*. The same quantity, one member up, ruled once
+already. A function of fewer parameters is assignable, so every fold in the tree is unchanged.
+
+**What it does not do, stated rather than discovered.** The fold still runs only on success,
+so it learns of the failures on the *next* reading and a source that never recovers never
+updates the count. That is the division of labour rather than a residue: the error arm reports
+the stall while it is happening and the fold reports it afterwards, and the hedge above is
+true once both exist and was false with only one.
+
 ### What a shared source does at each moment
 
 **One fetch per source per tick**, and **every part referring to the source when it resolves
@@ -1075,7 +1124,7 @@ Per submission.
 - **I44** — **One fetch per source per tick, and every part referring to the source when it resolves renders that one result**, applied as a set before a single commit. Including a part declared while the fetch was in flight, so joining a shared source draws on the next resolution rather than after a full interval of its own. This is the invariant the whole row exists for: two parts of one document cannot hold two samples of one instant, because there is one sample.
 - **I45** — **A source with no referring parts is retired on the next sweep, not at release.** I33a declares at settlement by **release-then-declare**, so retiring at `release` drops the refcount to zero between two synchronous calls, destroys the source and its derivation, and rebuilds them empty — the accumulated history reset on every settle, with the panel still drawing and every assertion about it passing. The same *heard rather than checked* disposition I33 takes for eviction, one level down (§8c C3).
 - **I46** — **A source polls only while some part referring to it belongs to a visible host**: paused means no fetch, no derivation, no render and no patch, and on return the source is due immediately. **It is not I9's freeze and not a violation of it** — I9 protects a frozen entry that is still receiving patches, and scrolled-off is a different state where nobody is looking and the data must be fresh the moment they look. It applies to **every** part rather than only those declaring a `source`, because a part accumulating inside its `fetch` is already broken by §3c's rule and pausing surfaces that rather than causing it. Granularity is the **host**: C14 answers per entry and nothing gives per-block offsets, so a part inside a partly-visible entry counts as visible, and a `view` host is visible while its layer exists. A fetch already in flight is applied rather than discarded.
-- **I47** — **A derivation is a fold over a source's versions, run once per version and shared by key**, and its result reaches `render` in the fetched data's place. `compute` throws like a `render` and not like a `fetch` (A02 §7 rule 2): deterministic, so it does not retry, and the version is not consumed because a fold that threw has not advanced. **Anything that accumulates belongs here and per-part state is view state only** — which is what makes I46's pause safe, since a paused part holds nothing that could fall behind.
+- **I47** — **A derivation is a fold over a source's versions, run once per version and shared by key**, and its result reaches `render` in the fetched data's place. `compute` throws like a `render` and not like a `fetch` (A02 §7 rule 2): deterministic, so it does not retry, and the version is not consumed because a fold that threw has not advanced. **Anything that accumulates belongs here and per-part state is view state only** — which is what makes I46's pause safe, since a paused part holds nothing that could fall behind. **`compute` is `(data, prev, attempts)`, and the third parameter is what makes a failed poll countable** (F1023): `attempts` is the settlements that produced this version — `1` on a clean poll, `1 + n` after `n` transport failures — read from the source so it travels with the version the memo is keyed by. Without it the two halves of this invariant overlap into a hole: accumulation belongs here, a version exists only when a fetch resolved, so the only safe accumulator is the only thing a transport failure never reaches. Additive, on `LiveSpec.renderError`'s precedent — a fold taking two parameters is unchanged.
 - **I48** — **A swallowed failure is recorded and reported on two channels, and C23 chooses neither moment for the second** (§5a). Every bare `catch` in the pipeline records the reason in `faults`, deduplicated by message; C22 §8 step 3 drains it onto the restored primary screen beside C02's capability warnings and C20's history warnings. This is C02's ruling taken a third time — *the component decides what is wrong, never when the user is told* — and it is why `faults` is a readable collection rather than a callback: a callback chooses the moment, and the moment is after the terminal is released. The other channel is the fault notice, which speaks at the time and cannot be relied on, because in §8e's first row appending is what failed. **The prose it replaces claimed a defect log that no component had.**
 - **I49** — **The catch finishes what the try did not.** `resetFocus` and the commit run on every path out of `appendAndCommit`, and the entry id is returned whenever the entry exists. §8e's table is the argument: four of five rows leave the append done and the sequence after it abandoned, and the reset is the one whose absence is permanent — T4.7b asserts its position because a frame painted with focus in a frozen block is the failure it prevents. The same reasoning §8a A5 applied to the guard, applied to the four statements that ruling did not look at.
 
@@ -1146,7 +1195,7 @@ Per submission.
 37. A bound is stated where a region defines the document and `null` where nothing does (I41, C07 I18).
 38. Two parts reading one source read one sample of one instant: the key declares sameness, one fetch serves every part referring to it, and the whole set is applied before one commit (I42, I44).
 39. A conflicting cadence on one key is refused at declaration rather than arbitrated, and the fetches themselves are taken on the key's word because nothing can compare them (I43).
-40. Anything that accumulates is a fold over the source's versions, run once per version and shared; per-part state is view state only (I47).
+40. Anything that accumulates is a fold over the source's versions, run once per version and shared, and the fold is told how many settlements produced the version it is folding; per-part state is view state only (I47).
 41. A source polls only while something is looking at it, and stops nothing when it is not — no teardown, no release, and due again the moment a referring host is visible (I46, I45, I9).
 42. A failure the pipeline swallows is said twice — once in the transcript at the time, once on the restored primary screen at exit — and C23 chooses only the first moment (I48).
 43. A stage failure after the append finishes the sequence rather than abandoning it, and the entry id is returned whenever the entry exists (I49).
@@ -2056,6 +2105,7 @@ Fake transport, fake stores.
 - **T1.39** (I42, I44): two parts naming one `source` → **one** `fetch` call per tick and both panels carrying the same value. **The control is the same two parts with no `source`**, which must show two calls and two different values — without it the row passes against a driver that never fetches at all, and the two-values half is the defect F91 was filed on.
 - **T1.40** (I43): two parts, one key, different `every` → the losing part's panel carries a message naming **both** part ids and **both** values, and that part never fetches. Asserted on the rendered block rather than on a throw: the throw was the first implementation and it was invisible from every transcript route, so a row that caught an exception would have passed against a session showing two loading panels for ever. The fetch count is the second half — a refusal that still polls is not one.
 - **T1.41** (I47): a derivation read by two parts → `compute` runs **once per source version**, not once per part, and `prev` carries the previous fold. Three versions, because two pass against an implementation that recomputes from scratch each time.
+- **T1.41b** (I47, F1023): a source that rejects twice and then resolves → the fold is entered **once**, with `attempts === 3`, and a clean poll before it saw `attempts === 1`. Three arms, and the second is the one the row exists for: the sequence must be *fail, fail, succeed* rather than one failure, because `1 + n` and a bare *did it fail* agree at `n = 1`. The first arm is what separates *the count exists* from *the count is one*. The third is a **control on the widening rather than a discriminator**: two parts read the source and the fold is still entered once per version, so I47's shared-fold property survives the third parameter — see T6.45b for the mutation that showed this arm is weaker than it was first written to be.
 - **T1.42** (I45): settlement's release-then-declare on a key both documents name → the derivation's accumulation **survives**. The assertion is the accumulated history and not the current value: a source destroyed and rebuilt renders a perfectly correct latest sample.
 - **T1.43** (I46): a host off screen → no `fetch` across several intervals; visible again → a `fetch` immediately, not on the next interval. Both halves in one row, because a driver that pauses and never resumes satisfies the first.
 - **T1.44** (I42): a part whose `source` string is spelled to look like another part's implicit key → the two do **not** share. A fabricated violation, because the namespaces are disjoint by construction and the row is otherwise vacuous.
@@ -2253,6 +2303,8 @@ Fake transport, fake stores.
 - **T6.43** (I46): pausing an invisible source without resuming it → T1.43 fails. Pairs with the opposite revert, treating any visible host as making every source due, which fails T4.26 instead — two directions, because a one-directional pause passes half of each row.
 - **T6.44** (I44): committing per part rather than per source → T2.23 fails. A frame-level assertion cannot see it: C03's 33 ms `stream` window already coalesces them into one frame, which is why the row counts commits.
 - **T6.45** (I47): running `compute` once per part rather than once per version → T1.41 fails, and a fold advances N times per tick — a ring buffer that fills N× too fast, with every sample in it genuine.
+- **T6.45b** (I47, F1023): capturing `attempts` **after** `failures` is reset rather than before → T1.41b fails with `1` where it expects `3`. That is the state the driver shipped in, and it is invisible to every other row: `failures` is correct for the backoff and correct for the error arm, and is destroyed one statement before the only consumer that could accumulate it. The second mutation is `src.failures` in place of `src.failures + 1` — *failures since* rather than *settlements* — which T1.41b's first arm kills at `0` against `1`, and which is why that arm asserts a clean poll before anything fails.
+  - **A third mutation survived, and it indicts this row's own prose rather than the test** (A03 §2's vacuity class arriving in a sentence). It was written here as *passing `attempts` as a parameter to `derivedFor` instead of reading `src.attempts` fails T1.41b's third arm, because the memo hands the second part the value without re-entering the fold* — and measured, it fails nothing, because the only value a call site has to pass **is** `src.attempts`. The sentence named where a value is computed, which is not observable; **the third arm is a control on I47's once-per-version property under the widening, not a discriminator for where the number is read**, and describing it the other way made it read as a stronger row than it is. Recorded rather than deleted: a mutation that fails nothing is a finding about an artefact, and the artefact here was this line.
 - **T6.46** (I48): restoring the bare `catch` — recording nothing — → T1.45 fails. **The revert is the shipped behaviour of every version before this one**, and its symptom is that there is none: no entry, no message, no exit code, and a green suite. F15 took four wrong turns to find because of exactly this.
 - **T6.47** (I48): keeping the collection and dropping the fault notice → T1.48 fails while T1.45 still passes. The half that is easy: `faults` is a field a test can read, and a reader who never reaches `stop()` learns nothing at the moment it matters.
 - **T6.48** (I48): keeping the notice and dropping the collection → T3.38 fails. The opposite half, and the one that looks sufficient until §8e's first row, where appending is what threw.

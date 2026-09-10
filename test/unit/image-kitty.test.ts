@@ -332,3 +332,7 @@ describe("C09 §4c — the placement's identity is not the picture's (I66)", () 
     );
   });
 });
+
+describe("C09 §4c — the placement refusal's second axis (I67)", () => {
+  it.todo("T1.44 (C09 I67, §4c): `placementRows` refuses on rows as well as columns, and the rows axis is reachable at an ordinary width — a 16x400 GIF at height 400 is {cols: 32, rows: 400} at eighty columns, where the columns axis needs a terminal wider than 297 and occurs at no width below it — not deferred on a component: it lands with the image kind in the next commit");
+});

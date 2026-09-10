@@ -306,3 +306,7 @@ describe("C11 tier 3 — ascii parity", () => {
     }
   });
 });
+
+describe("C11 §4 — a column starts at one cell per frame (I21)", () => {
+  it.todo("T3.20 (C11 I21, §4): every row of a frame begins each column at the same cell, the header included, at both ambiguous-width conventions — asserted as ink offsets per row rather than as a width total, because every line measured 44 cells before and after and no total could see it — not deferred on a component: it lands with fitAt in the next commit");
+});

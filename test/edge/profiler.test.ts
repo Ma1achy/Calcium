@@ -592,3 +592,7 @@ describe("C28 — profiler, tier 3 spec-first rows", () => {
   });
 
 });
+
+describe("C28 §9c — two filters for two projections (I54)", () => {
+  it.todo("T3.15 (C28 I54, §9c): `timeline` filters by cause and the durations filter by cause and outcome, so a fallback frame is a point in the series and not a sample in a mean — `excluded` and `timeline` are never summable, and the ring bound is spent on a fallback either way — not deferred on a component: it lands with the recorder in the next commit");
+});

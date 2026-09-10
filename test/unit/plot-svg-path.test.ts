@@ -2737,3 +2737,7 @@ describe("SK11 — the sankey node label reads against what it is drawn on (C12 
     expect(svg.match(/text-anchor="end"/gu)?.length, "the last layer's labels still flip").toBe(2);
   });
 });
+
+describe("C12 §3ak.50i — the abscissa's abut rule (I123)", () => {
+  it.todo("RC10 (C12 I123, §3ak.50i): the abscissa reserves the cell its last caption needs, so the domain maximum appended after the niced ticks cannot overprint it — a row rule, so a collision at a different baseline is outside it and RC11 is what sees the anchor — not deferred on a component: it lands with svg.ts in the next commit");
+});

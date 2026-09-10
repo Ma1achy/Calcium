@@ -627,3 +627,7 @@ describe("C11 §5a — the window", () => {
     expect((bar.block as Table).showHeader, "the header is out of range").toBe(false);
   });
 });
+
+describe("C11 §3 — a ceiling that can never fire (I22)", () => {
+  it.todo("T1.25 (C11 I22, §3): `maxWidth` on a column with no `flex` cannot change a plan at any width — a thousand plans over five shapes and two hundred widths, deep-equal with the cap and without it, against a control where the same cap on a flex column moves it from 59 to 20 — not deferred on a component: it lands with the spec wording in the next commit");
+});
