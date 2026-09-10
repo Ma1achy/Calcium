@@ -46684,3 +46684,79 @@ reading the section against the code.**
   the header pills since it was written.
 - **`measures / frames` being flat, and so no better than `calls / frames`.** It
   is 1.0 for the header pair against 2.0 for the footer pair in the same session.
+
+## F1099 — two of the report's six sections are computed in the script, and both of them carried the mislabel ★★★★
+
+| | |
+|---|---|
+| **Surface** | `tools/profile.mjs:294` and `:339` · `src/testing/profile.ts` · C28 I37, I41 |
+| **Reached for** | asking, after F1098, why *that* section was the one that was wrong |
+| **Verdict** | **open** |
+
+### The census
+
+`make profile` prints six sections. Three come from the harness as a `check*`
+paired with a `format*`; three are computed in the script:
+
+| section | source | was it wrong |
+|---|---|---|
+| A01 Appendix B | `formatBudget(checkBudget(…))` | no |
+| Where the frame went | `formatPhases(checkPhases(…))` | no |
+| Between frames | the same pair | no |
+| **Slowest elements** | **inline in the script** | **yes — F1098** |
+| **Cost per transcript entry** | **inline in the script** | **yes — the same word** |
+| Objects made and let go | `formatLeaks(checkLeaks(…))` | no |
+
+Both defects are the same defect. `byEntry`'s histogram is fed once per
+`ElementHandle` dispose whatever seam opened it, so its `count` is measures plus
+renders — **203** for the one entry this session draws, which is 68 + 1 + 67 + 67
+to the unit — printed under the column heading *elements measured*.
+
+### The ruling this applies was already taken, once
+
+`tools/profile.mjs`'s own header carries it:
+
+> `@fmx/calcium/profiling` was the third and is no longer needed: the phase table
+> moved into the harness, because **a reading computed in a script is a reading
+> no row can be written against**, which is how its negative residue went
+> unasserted (C28 I41, F888).
+
+F888 is the measured precedent: a script-computed phase table divided
+out-of-frame spans by in-frame work and printed a residue of **−460.5 ms**, and
+nothing caught it, because there was nothing to write a row against. The remedy
+was to move that table into `src/testing/profile.ts`. **The two tables beside it
+were left where they were**, and they are the two that were wrong.
+
+So this is not a rule inferred from a correlation of six. It is a ruling made
+once, for a reason that names the mechanism, and applied to one of the three
+sections it covered.
+
+### Why a script is where a label rots
+
+A `check*` returns a value and a `format*` renders it, so a row can assert the
+value and a second row the rendering. Inline in a script there is no value — the
+number is interpolated into a template string on its way to `stdout`, and the
+only thing a test could assert is the whole line, which is why nobody does.
+`tools/instruments.mjs` runs `tools/profile.mjs` against a fixture and checks it
+produces output; it has 9 rows and not one of them can see a column heading.
+
+### Remedy
+
+`checkElements` / `formatElements` and `checkEntries` / `formatEntries` in
+`src/testing/profile.ts`, matching the three siblings: runner-free, input a
+`ProfileReport`, nothing on the surface a consumer cannot construct (C28 I37).
+The threshold the *measured more than once per frame* marker is taken at becomes
+a published member rather than a literal, so a row can assert it — and the row
+that matters is the one asserting that a report whose blocks are each measured
+once and rendered once produces **no** flagged rows, which is F1098 made unable
+to return at the report seam rather than only at the aggregate.
+
+### What would falsify this
+
+- **A row somewhere already asserting either table's headings.** `grep` for the
+  column words across `test/` returns nothing; the instruments fixture asserts
+  the tool runs and what its exit code is.
+- **The three harness sections having been wrong too.** They were checked while
+  F1098 was open: budget, phases and leaks all say what they count.
+- **The two script sections having been wrong for unrelated reasons.** They carry
+  the same word about the same seam, and one of them is the other's population.
