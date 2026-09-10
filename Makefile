@@ -91,7 +91,15 @@ catalogue:          ## the frames `instruments` and `test` sweep — generated, 
 instruments: catalogue  ## every instrument's own fixture, and the inventory by equality (group 9)
 	node tools/instruments.mjs
 
-mutate:             ## every mutation run, serially, the tree hashed either side (F952) — SHARD=k/n ONLY=substr
+mutate: catalogue     ## every mutation run, serially, the tree hashed either side (F952) — SHARD=k/n ONLY=substr
+	@# **`catalogue` for the same reason `test` has it, and the reason is two
+	@# targets up**: `docs/catalogue/` is generated and gitignored, and the runs
+	@# drive suites that read it. Without it `c12-ascii-alphabet` dies in nine
+	@# seconds on `BlindHarnessError: the unmutated suite already fails`, which
+	@# is the harness's vacuity guard working and the caller having broken the
+	@# baseline — `caught 0 survived 0 expected 0`, a run that measured nothing.
+	@# Invisible on any machine that has ever run `make test`, and red on the
+	@# first CI run this workflow ever had (F1097).
 	@# **Runs weekly in CI as `mutation-sweep`, six shards**, which is what closes
 	@# F952: a run with no row that sees a mutation reads exactly like one that
 	@# does until the pass is run, and a pass is a session by hand. Here for a
