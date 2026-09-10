@@ -104,6 +104,18 @@ describe("runInPty parameters", () => {
 });
 
 describe("interactivePty parameters", () => {
+  // **One red under load, with its figures, because a rare red is a reproduction
+  // spent** — the C09 T3.77 precedent. Inside a `make all` on 2026-09-10, on a
+  // machine that had just run a 37-minute mutation pass and three full chains,
+  // the row below failed with `never saw /DONE/ in:\n43 132`: the child printed
+  // its window size and the sentinel never arrived inside the wait. Green 15 of
+  // 15 alone immediately afterwards, and green in the chain that followed.
+  //
+  // Recorded rather than repaired. The reading says the child ran and answered,
+  // so what ran out is the wait — and a bound widened on one sample under a load
+  // nobody measured is a bound spent. What the next red is owed is the elapsed
+  // time beside the output, which this row does not yet carry; named here rather
+  // than added on a guess about which number matters.
   it(
     "cols and rows: the child's window is the size asked for",
     async () => {
