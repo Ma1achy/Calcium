@@ -46290,7 +46290,7 @@ my own.
 |---|---|
 | **Surface** | `.github/workflows/mutation-sweep.yml` · `Makefile`'s `mutate` target · `tools/mutate/sweep.mjs` |
 | **Reached for** | dispatching the workflow to close F1089 — the trigger's first firing |
-| **Verdict** | **open** |
+| **Verdict** | **partly** — the catalogue and the log are repaired and driven; the per-run timeout is measured and left, because it is a cost model rather than a constant |
 
 ### What the first run said
 
@@ -46415,6 +46415,42 @@ which names a file that is also unreachable on a runner, but at least says so.
 - **The timeout is not raised.** 2 237 s is recorded against the 2 700 s bound
   with both figures and the runner's ratio, and the cost model is named as the
   question it is.
+
+### Partly — two of three repaired and driven, one measured and left
+
+**The catalogue.** `make mutate` gains `catalogue` and the job runs the target.
+Driven both ways rather than asserted: `make -n mutate SHARD=2/6 ONLY=c12-x`
+prints the three generators and then `node tools/mutate/sweep.mjs --shard 2/6
+--only c12-x`, so the pass-through is exact; and a real run through the target
+regenerates 2 440 frames and comes back green at 78 s with 6 caught.
+
+**The log.** `redTails` takes an injected `readFile`, for the reason every rule
+in `tools/enforce/` does — a row cannot manufacture a red run of the real sweep,
+so five rows in `MS7` drive the formatter and the path, and three hand mutations
+each kill one: the slice taken from the head, the skip arm emitting a header
+instead of skipping, and the path dropping `--out`. The wiring is proven by
+running the sweep with the catalogue moved aside, which now prints
+
+```
+  ── c12-ascii-alphabet.mjs, last 14 of 14 lines ──
+  │ BlindHarnessError: mutation harness is not live: the unmutated suite
+  │ already fails, so no row below means anything
+```
+
+— the sentence that previously cost a local reproduction to obtain.
+
+**The timeout is not raised, and this is the part that stays open.** 2 237 s
+against 2 700 s is a ratio, and F1088's ruling would put the bound at the
+runner's 4.1× — about 9 200 s. But a shard runs thirty-two of these, the job's
+own timeout is 300 minutes, and the workflow says *one shard is about an hour*.
+**A bound that admits this run breaks the shard**, so the number cannot be
+chosen without measuring what a whole shard costs on a runner, which is the
+first thing the next full sweep will report now that it can run at all.
+
+Recorded rather than bumped, with both figures and the ratio, which is what
+`a guard whose trigger did not fire keeps its place on asymmetry` asks for: the
+next person to read this finds the measurement rather than a constant they
+cannot reproduce.
 
 ### What would falsify this
 
