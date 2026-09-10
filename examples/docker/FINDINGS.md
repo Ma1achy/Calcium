@@ -45747,7 +45747,7 @@ the entry. A count carried into a sentence is a claim, whoever is carrying it.
 |---|---|
 | **Surface** | `test/contract/plot.test.ts:122` (C12 T2.1, I2) |
 | **Reached for** | the first pull-request CI this branch has had, which F1086 and the merge made possible |
-| **Verdict** | **open** |
+| **Verdict** | **closed** — the number leaves the file for `CORPUS_BUDGET_MS`, shown to reach the row rather than assumed to |
 
 ### The row and the number
 
@@ -45823,3 +45823,17 @@ measurement that the argument was missing.
 - **The row being genuinely slower than it should be.** 6.9 s locally against a
   documented 3.2 s, and the difference is this branch's own additions to the
   corpus; the runner figure is 3.0× the local one, which is the regime.
+
+### Closed, with the constant shown to reach the row
+
+The one way this repair could fail silently is the constant not being read —
+a wrong argument position leaves the row on the global and green, which is
+indistinguishable from the fix working. Driven: with `CORPUS_BUDGET_MS` set to
+`1`, the row fails with
+
+```
+Error: Test timed out in 1ms.
+```
+
+`budget.ts` restored from a copy, md5 compared. The row runs in **2 309 ms**
+alone and 6 936 ms inside the suite, against sixty.
