@@ -613,6 +613,10 @@ describe("C22 §4 step 7 — the greeting (I44)", () => {
     expect(stdout.chunks.join(""), "and said nothing about it").not.toContain("far side is down");
   });
 
+  it.todo(
+    "T3.40 (C22 I99, F158, F1024): a greeting resolving after a submission has settled is still the transcript's first entry — not deferred on a component, because C22 §4 step 7 and C23's append path both exist; the reservation seam is what this commit rules and the next one builds",
+  );
+
   it("T4.x (C23 I37, C16 I26, F21): `enter` on a focused row reaches the dispatcher", async () => {
     // **The mutation that matters is removing the wiring and watching a real
     // keystroke fail**, not removing the handler. `actions.ts` implemented all
