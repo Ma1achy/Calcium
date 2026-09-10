@@ -38,7 +38,7 @@ Nothing else is exported. The block shape is C04's, the registry is C09's, and a
 
 ### The illustration
 
-C09 §3's sixteen kinds each have one. C25 had a measurement line and no picture, and its field names commit to a git-style unified diff and to nothing else — so the renderer would have been written to a plausible reading of `Hunk` rather than to a drawing. **Five things below are decisions rather than consequences, and two of them are inferable the wrong way from the fields alone.**
+C09 §3 gives all nineteen kinds a measure/render row and **not one of them a drawing of its ordinary output** — its six pictures are `status`'s three contents, the rung a box inside a border needs, the two ladders and `image`'s dither, every one of them a degradation. The claim this line used to make, *sixteen kinds each have one*, was false in both halves (F1013), and it made this section read as catching up with a norm rather than as one of fourteen specs in twenty-eight that draw anything at all. C25 had a measurement line and no picture, and its field names commit to a git-style unified diff and to nothing else — so the renderer would have been written to a plausible reading of `Hunk` rather than to a drawing. **Five things below are decisions rather than consequences, and two of them are inferable the wrong way from the fields alone.**
 
 ```
 ── serving/volatility-estimator.yaml ───────────────────────────────────────────

@@ -3102,6 +3102,99 @@ persisted document rests on.
 
 ---
 
+## 5b. Absent is not the wrong type
+
+**One sentence covered two faults.** A `notice` built without a `tone` — required,
+`tone: Tone`, no `?` — reported
+
+```
+blocks[0] (notice): "tone" must be a string
+```
+
+and so did a `notice` whose `tone` was `42`. `undefined` is not a string, so the
+sentence was true both times. The first time it is the sentence that sends a reader
+to the value they wrote, and there is no value to look at (→ FINDINGS F995).
+
+**The ruling was already in this repository, in the other direction, four files
+away.** `src/shell/config.ts` distinguishes the two for `createTui`'s required
+fields — *`name: ""` is a supplied field and a bad value, and reporting it as
+missing sends the reader to the wrong line* — and the argument is symmetric. Half
+of it was applied, to the config an app author writes by hand, and not to the
+validator every adapter's output passes through.
+
+**The class, counted before anything was edited — and the count was wrong.**
+Reading the file for *which function emits this sentence* found forty-seven sites:
+`requireString` at 13 call sites and `requireArray` at 15 over twenty block kinds,
+`checkAction`'s `label` and its kind's own field, `walkBlock`'s `kind`, the
+document-level checks in `validateMeta` and `validateDocument`, and the required
+enum checks. Every one is a required field, checked against the type rather than
+assumed, so the absent arm is never wrong at a caller that meant *optional*.
+
+**Driving the one-per-kind corpus found twelve more, and that is a finding about
+the index rather than about the file.** Deleting each key of each valid fixture in
+turn and reading what came back reaches sites by *field*, where the reading above
+reached them by *emitter* — so `terminal.cols`, `terminal.screen`, `status.message`,
+`status.height`, `progress.current`, `progress.total`, `group.direction`,
+`image.height`, `image.digest`, `mosaic.height`, `mosaic.areas` and `scroll.height`
+were invisible to it. Each has a bespoke predicate and a bespoke sentence, which is
+exactly why no grep for a shared helper reaches them.
+
+**`image.digest` is the same defect pointing the other way**, and it is the one the
+finding's own citation predicts: *`digest` is derived at construction and must be
+present* was emitted for a digest that **was** present and was a number — the
+mirror of `src/shell/config.ts`'s *reporting it as missing sends the reader to the
+wrong line*, in the file that comment was never applied to.
+
+**The measured figures**: **56 call sites** in `validate.ts` carry the split, and
+across the one-per-kind corpus **42 required keys** are reachable by deleting a
+field, of which **41 now report absence differently from a wrong type** and none
+reports absence as *must be a …*.
+
+### The walk — a classification table, because a document is at rest
+
+Nothing here is event-mediated. `validateDocument` is a pure function over a value
+that has already arrived, so a sequence trace has no sequence to index; what a key
+can hold, against the rules that hold beside it, is the whole of the structure.
+
+| # | the two rules that meet | the cell | ruling |
+|---|---|---|---|
+| 1 | *absent and wrong are two faults* × *§5a's round trip* | `{tone: undefined}`, whose round trip is `{}` | **the test is `=== undefined`, never `key in b`.** `in` gives one document two different sentences either side of `JSON.stringify`, which is the disagreement §5a exists to forbid; `=== undefined` gives the object and its wire form the same one. §5a row 3 already ruled that value unreachable through the framework, so this row inherits a citation rather than opening a question |
+| 2 | *absent gets its own sentence* × *I46a: `null` is the gap* | `{"tone": null}` — the spelling a far side reaches for when it means *nothing* | **`null` is present and wrong.** I46a is about a position inside a series that has a reading or does not, and a required scalar has no such notion; the framework cannot know what a producer meant by it. The sentence reports what arrived — `got null` — so a far side that spelled absence that way is shown its own bytes rather than told about ours |
+| 3 | *the sentence names the value* × *the payload is a far side's* | `text` holding four megabytes of the wrong thing | **the wrong-type arm names the type and never the value.** An error goes on a terminal line and the value is unbounded by construction. `got a number` is bounded, and it is the whole of what a reader could not already see by opening the line |
+| 4 | *the absent arm says the key is missing* × *the reader has to write one* | `{}` at a key whose type the reader does not know | **the absent sentence carries the type too**, at the end, where the wrong-type arm carries what arrived. *Supply a string* is the half a bare *absent* leaves out, and it is why this is a split rather than a second message bolted on |
+| 5 | *one fault, one line* × *the walk carries on past it* | a `panel` with no `children` | **the error count does not move.** Each arm is one `push` where there was one, and the recursion into children is guarded by `isArray` below — so no assertion on `errors.length` changes, and no walk reaches into the value the message has just refused |
+| 6 | *the split is for required fields* × *a message that names a vocabulary* | `status`, `meta.transport`, `meta.origin`, a plot's `form`, an action's `kind`, a ramp's `fill` — the six required enum checks | **the absent arm is shared and the wrong arm is left alone.** *must be one of ok, error, partial, proposed* is already correct about a value that arrived and wrong only about one that did not, so those six gain the branch and keep their sentence. It is the smallest edit that closes the class rather than the tidiest one that rewrites it |
+
+**Row 6 is where the table caught itself and then stopped too early.** The enum
+sites do not share the helper, they share the *fault*, so an index that follows
+`requireString` never reaches them — which the table says. What it did not say is
+that the same objection applies twelve more times, to sites with neither a helper
+nor a vocabulary, and only running the corpus found those. **A table indexed by the
+mechanism is still an index by mechanism**; the corpus is what indexes by subject,
+and the two disagreed by twelve.
+
+### The one exemption, and what is out of reach
+
+**`plot.height` is the forty-second key and it keeps one sentence for both arms**:
+*form "line" requires a numeric "height" — there is no default*. It is a
+**conditional** requirement, and its sentence names the condition rather than a
+value, so it never tells a reader to go and look at something they did not write —
+which is the whole of what F995 is about. T2.127 holds it as a one-entry exemption
+compared **by equality**, so a second bespoke sentence cannot join it unread.
+
+**Out of reach, named so the count stays a count.** `checkHierarchyNode` returns the
+**first** fault as a string rather than accumulating, so it has a different shape
+and its own row; `src/data/manifest/parse.ts` carries the same conflation at seven
+sites and belongs to C05. Neither is counted above, and both are the same finding.
+
+### What would falsify it
+
+A required field whose absent arm reads *must be a …*. T2.127 sweeps the sites and
+asserts **both** sentences per site against a count, so a site added without the
+split fails rather than passing on a message that reads as covering it.
+
+---
+
 ## 6. Invariants
 
 - **I1** — `ViewDocument` and every `Block` are deeply immutable. All mutation is `applyPatch` returning a new value.
@@ -3252,6 +3345,7 @@ persisted document rests on.
 - **I111** — **A `terminal`'s runs are maximal, non-overlapping, ordered, and within the text; a default-styled cell is in no run.** `TextSpan`'s offset convention (I83) and its bounds gate, with one addition: two adjacent runs with equal styles are refused, because merging is the producer's job and a snapshot that fails to merge measures the same and diffs differently on every frame.
 - **I112** — **`cursor`, when present, indexes a line that exists and a column within `cols`; and `measure` never reads it.** Appearance, never geometry — the cursor moves on every keystroke the child receives and a height that moved with it would reflow the transcript.
 - **I113** — **`screen: "grid"` means the snapshot is the whole screen and `dropped` cannot be present; `dropped`, when present, is a positive integer.** The alternate screen has no scrollback to lose lines from, so the two fields are mutually exclusive by meaning rather than by convention, and the gate says so.
+- **I114** — **A required field that is absent and a required field of the wrong type are two faults with two sentences, and absence is decided by `=== undefined`.** The absent arm names the key and what to supply; the wrong arm keeps *must be a …* and adds the type that arrived, never the value — a far side's payload is unbounded and an error is one terminal line. `null` is present and wrong, because I46a's gap is a reading inside a series and not a member that was never written. `key in b` is refused: it splits one document into two sentences either side of `JSON.stringify`, which §5a forbids.
 
 
 
@@ -3363,6 +3457,7 @@ persisted document rests on.
 ---
 100. **A child's screen is a block, and its colours are its own** (I110, I111). The one kind carrying a literal `ColourValue`, on `image`'s argument that a child's bytes are data rather than the application's taste — with the containment gate that makes it safe to render without stripping.
 101. **Two counts, two places, two questions** (I113). What the reader can scroll to is the container's; what is gone for good is the block's, drawn on presence so a zero is never written.
+102. **A message names the fault it found** (I114). Absent and present-but-wrong are two lines to open, and one sentence sent every reader to the value they had not written; the ruling was already in `src/shell/config.ts` for the config an app author types and had never reached the validator every adapter's output passes through (F995).
 
 ## 8. Tests
 
@@ -3403,6 +3498,7 @@ Six tiers. No state machine, so no transition table.
 - **T1.31** (I110): a `terminal` whose line text contains `\x1b[31m`, `\x07` or `\u009b` is refused by `validateDocument`, each naming the line index; the same text with those characters replaced by U+FFFD is admitted.
 - **T1.32** (I111): runs that overlap, that run past the text, that are out of order, or that are adjacent with equal styles are each refused; a maximal ordered set is admitted.
 - **T1.33** (I113): `screen: "grid"` with `dropped: 3` is refused; `dropped: 0` is refused in both modes; `dropped: 3` in `"lines"` mode is admitted.
+- **T1.34** (I114, §5b, F995): a `notice` with no `tone` and a `notice` whose `tone` is `42` are refused by **two different sentences** — *is required and absent — supply a string* against *must be a string, got a number* — and the same pair for a `table` with no `rows` against `rows: 5`. Both directions, because a validator that reported *absent* for everything would pass the first half alone.
 
 ### Tier 2 — contract / interface
 
@@ -3458,6 +3554,7 @@ The generic suite. **These run against every registered block kind, including ap
 - **T2.124** (I32): `role` is on `ColumnDef` and on no row type, and a merge leaves `columns` **reference-identical** — so it travels with the schema and is outside what I9 protects, which is the whole of the claim. Identity rather than deep equality: a rebuilt-but-equal column array is a second record of the schema, and the day it diverges nothing would say so.
 - **T2.125** (I33): neither kind validates as the other — a `comparison` carrying `patch`'s `path`/`language`/`hunks` is refused, and a `patch` carrying `comparison`'s `rows` is refused naming all three missing fields. The required sets are disjoint, which is what *never merge* means at the type level; a merged kind's height would depend on which mode it was in, and I7 cannot bend.
 - **T2.126** (I66): an empty `message` and a non-positive `height` are refused naming the field, an absent `height` the same, and the three numbers are optional — with a source scan that `status`'s renderer never reads `tick`, because *supplied rather than derived* is a claim about where the value comes from and no value assertion can see it.
+- **T2.127** (I114, §5b, F995): **the class rather than the three instances, and driven by the corpus rather than by a list.** Every key of every `ONE_PER_KIND` fixture is deleted in turn and then replaced by a value of the wrong type; wherever deleting it draws a complaint the field is required, and the two complaints must differ, the absent one must not read *must be a …*, and the wrong one must name the type that arrived. **42 required keys** is asserted by equality, so a kind that gains a required field joins the sweep by discovery; `plot.height` is the single declared exemption, also by equality. The row finds sites no grep for a helper reaches — twelve of them on its first run.
 
 ### Tier 3 — edge cases
 
@@ -3522,6 +3619,7 @@ The generic suite. **These run against every registered block kind, including ap
 - **T3.67** (I85) — **the accepted loss, asserted so a change is visible.** At 1-bit an `ok` notice (emphasised → bold) with a bold span paints a frame byte-identical to the same block without the span; at 8-bit the two differ. A row that starts failing is a compensation that has been added, and the ruling says there is none.
 - **T3.78** (I112): a `terminal` measures the same with `cursor` present and absent, at every position including the last line's last column; a `cursor` naming a line that does not exist, or a column at `cols`, is refused.
 - **T3.79** (I110): a wide cluster split across the gate — text ending mid-surrogate — is refused as malformed rather than passed, and a line of only styled blanks is admitted.
+- **T3.80** (I114, §5b): the two cells the table rules on. `{tone: null}` is **present and wrong** and the message says `got null`; `{tone: undefined}` reports **absent**, and reports it identically to `{}` and to its own `JSON.parse(JSON.stringify(...))` — the round-trip agreement §5a row 3 asks for, asserted rather than assumed. Its control is a valid `tone`, without which the row passes against a validator that refuses every notice.
 
 ### Tier 4 — integration
 
@@ -3540,7 +3638,7 @@ The generic suite. **These run against every registered block kind, including ap
 
 - **T5.1**: a real session scrolls a 10,000-block transcript top to bottom; every block's on-screen row count matches its measured height, sampled at every screenful. The drift test.
 - **T5.2**: the same, at four terminal widths, with resize between passes.
-- **T5.3a** (C14 I4): a live stream appending above a **detached** viewport does not move it. The control has to come *after* the claim: the lines that arrive while detached are never drawn — which is the property — so counting them in the captured bytes cannot work, and the stream's advance is read from the bottom once the view is re-attached.
+- **T5.3a** (C14 I4): a live stream appending above a **detached** viewport does not move it. The control has to come *after* the claim: the lines that arrive while detached are never drawn — which is the property — so counting them in the captured bytes cannot work, and the stream's advance is read from the bottom once the view is re-attached — **waited for, never measured**: how far it got while sixty keystrokes were processed is the machine's figure and not this invariant's, and the row asserted a magnitude until F1004.
 - **T5.3b**: the same with `merge` patches → an expanded row stays expanded and stays put. **Split from T5.3 rather than left bundled**, because the two halves have different blockers and the append half was reachable while waiting behind the other. What the merge half needs is a patch that is not an append: the default stream adapter maps every `data` patch to `op: "append"` (`src/data/adapters/stream.ts`), and `op: "merge"` is reachable only through an app adapter's `adaptPatch`. So two harness parameters — a registered adapter mapping a far-side line onto an existing table row, and a streaming verb that emits rows rather than notices.
 
 ### Tier 6 — fail-on-revert

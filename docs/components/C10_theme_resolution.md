@@ -1167,7 +1167,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T5.1**: golden frames for every block kind in both variants at 24-, 8-, 4- and 1-bit — thirty-two frame sets.
 - **T5.2**: a real session under `TERM=xterm` (16 colours) → readable, distinct, no truecolour escapes emitted.
 - **T5.3**: a real session under `TERM=dumb` → no colour escapes at all, statuses still distinguishable.
-- **T5.4**: `/theme` toggled fifty times mid-session → no flicker, no half-themed frame, no memory growth.
+- **T5.4**: `/theme` toggled fifty times mid-session → no flicker, no half-themed frame, no memory growth. **The control counts the frames the row examined, never the frames the scheduler produced** (F1004): how many frames fifty submissions coalesce into is C03's window and the machine's load, and a floor under it is contention wearing this row's name.
 
 ### Tier 6 — fail-on-revert
 

@@ -536,6 +536,9 @@ Fake heights, no rendering.
 - **T3.3**: `viewportHeight` of 0 → empty range, no division by zero.
 - **T3.4**: `viewportHeight` of 1 → exactly one row visible.
 - **T3.5**: a single entry taller than the entire viewport → scrolls within itself correctly at every offset.
+- **T3.5b**: the rows the range selects are the rows C09 draws, at **every** offset — two six-row entries in a four-row viewport, stepped one row at a time, with each entry's real render sliced by its own `skipRows`/`takeRows` and compared against the whole transcript's rows at `topRow`. **The drift test in miniature, and the reason the walk is a scheduled step**: a range that is arithmetically self-consistent can still select rows that are not the ones on screen, and every assertion about the numbers agrees while it does. T4.1 is the same question at seven widths with C09 in the loop; this is the cheap edge-tier form of it.
+
+  **Listed here because it was not** (F570). The row has existed in `test/edge/viewport.test.ts` since the tier was built and C14 named no `T3.5b`, so its number resolved against nothing — which is how the same number came to be used twice for two different rows, the older of which this is. T6.15 in `test/revert/overlay.test.ts` names `T3.5b` too, and that one is C15's; the two are distinguished by their files and by their invariants, not by their numbers.
 - **T3.6**: an entry measuring 0 rows (empty `group`) → skipped without consuming a row and without breaking the index.
 - **T3.7** (I7): width shrinks so the anchored entry is now shorter than its row offset → clamps to that entry's last row, never spills.
 - **T3.8** (I6): the anchored entry is evicted → the anchor falls forward to the oldest surviving entry, and the viewport does not jump to the top.

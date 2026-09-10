@@ -46,14 +46,16 @@ Nothing else in the codebase branches on mode.
 ```typescript
 type Invocation = Readonly<{
   verb:      string;
-  argv:      readonly string[];       // ["ps", "--mine"] — "--json" appended by transport
+  argv:      readonly string[];       // ["ps", "--mine"] — the JSON tokens appended by transport
   streams:   boolean;                 // from the manifest
+  jsonFlag?: readonly string[];       // this far side's JSON tokens, resolved by the caller;
+                                      // absent = ["--json"], [] = append nothing (I25)
   timeoutMs: number;                  // 0 = unbounded (live views)
   signal:    AbortSignal;
 }>;
 
 type RawResult = Readonly<{
-  argv:       readonly string[];      // exactly what was spawned, including --json
+  argv:       readonly string[];      // exactly what was spawned, including the JSON tokens
   exitCode:   number | null;          // null iff killed by signal
   signal:     string | null;
   stdout:     unknown;                // parsed JSON, or undefined if unparseable
@@ -155,7 +157,11 @@ The fixture's own `argv` — the `Fixture.argv` field, not `result.argv` — rem
 
 ## 3. Invocation
 
-`--json` is appended by the transport, never typed by the user (D16). A user who types `--json` explicitly is asking to see the contract, and C07 renders it raw — but that is C07's decision, and C06 appends regardless so the payload is always machine-shaped.
+The tokens that ask for JSON are appended by the transport, never typed by the user (D16). A user who types them explicitly is asking to see the contract, and C07 renders it raw — but that is C07's decision, and C06 appends regardless so the payload is always machine-shaped.
+
+**Which tokens is the far side's business and reaches C06 on the `Invocation`** (I25, C05 I26). `--json` was appended unconditionally and is a convention rather than a fact: the framework's own demo target spells it `--format json`, so Calcium could not drive `docker` without a shim (F1). C06 does not read C05 — the caller resolves the verb's declaration against the manifest's and puts the result on the invocation, which is exactly what `Invocation.streams` already does one field up. Absent means `["--json"]`, so every corpus, manifest and row written before the member is unchanged.
+
+**The dedupe reads the first token, not the sequence.** For `["-o","json"]` against a user who typed `-o yaml`, matching the whole sequence would append `-o json` after it and silently override what the user asked for — last-wins on most far sides — while matching the first token appends nothing and leaves both I4's argument and D16's intact. A single-token flag has only a first token, so nothing about the original behaviour moves (C05 §8c row 5).
 
 Spawning uses an **argv array**, never a shell string (D18). No quoting, no word splitting, no injection surface. The shell is never in the loop.
 
@@ -252,7 +258,7 @@ Settling covers success, failure, cancellation and timeout alike — every path 
 - **I1** — C06 never references `ViewDocument`, `Block` or any C04 type. Verified on the module graph.
 - **I2** — C06 interprets nothing: no exit-code mapping, no envelope synthesis, no status.
 - **I3** — Spawning always uses an argv array. No string is ever passed to a shell.
-- **I4** — `--json` is appended exactly once, even if the user supplied it.
+- **I4** — The JSON tokens are appended exactly once, even if the user supplied them — and *supplied* is decided on the **first** token, so a valued flag the user gave with another value suppresses the append rather than being overridden by it (C05 §8c row 5).
 - **I5** — stderr is never merged into stdout.
 - **I6** — `stdoutRaw` is retained regardless of parseability.
 - **I7** — Output produced before death is retained on cancel, timeout and crash.
@@ -273,6 +279,7 @@ Settling covers success, failure, cancellation and timeout alike — every path 
 - **I22** — `cwd` is read at spawn, never captured at construction. A captured string spawns every subsequent verb in the directory the session started in, which is the one bug a pass-through `cd` is guaranteed to produce.
 - **I23** — `createEmulatedTransport` takes a handler closure and C06 references no app type. The world stays app-side behind a function, which is what lets `prism-tui` and `docker-tui` each have one without the framework knowing either exists.
 - **I24** — The parity suite compares the **complete** `RawResult`, not a chosen subset, on both the settled path and inside the terminal `end` patch. Fields that cannot match across transports are named individually with a reason, and that list is closed: a field is exempt by being on it, never by not being looked at.
+- **I25** — **Which tokens ask for JSON travels on the `Invocation`, and C06 still does not read C05.** The caller resolves the verb's `jsonFlag` against the manifest's — the verb whole, never merged — and hands C06 a sequence; absent means `["--json"]`, and `[]` means append nothing. This is `Invocation.streams`' seam exactly, for the same reason: a transport that read a manifest would be a transport that knows what a verb is (F1, F1006, C05 I26).
 
 ---
 
@@ -299,6 +306,7 @@ Settling covers success, failure, cancellation and timeout alike — every path 
 19. Time enters only through injected `elapsed` and `schedule`, and a duration is two monotonic readings apart (I19).
 20. Replay reports what was recorded, verbatim (I20). `meta.argv` is a historical fact about the data — what actually ran — not a reproduction hint, so a corpus recorded against one binary says so even when the app now spawns another. `meta.transport` disambiguates; the two fields together are honest.
 21. The parity suite compares the complete `RawResult` (I24). A suite that picks fields is a suite with holes exactly where nobody looked.
+22. **The JSON tokens are the far side's and arrive on the invocation** (I4, I25, → C05 I26). `--json` stays the default and stops being a claim about every binary; the dedupe reads the first token so a user who supplied the flag with another value is not overridden.
 
 ---
 
@@ -312,6 +320,8 @@ Six tiers. Every cell of the §6 transition table is covered. `ProcessRunner` is
 - **T1.2**: invocation resolves → `busy` false.
 - **T1.3** (I4): argv `["ps","--mine"]` → spawned argv is `["ps","--mine","--json"]`.
 - **T1.4** (I4): argv already containing `--json` → appended once, not twice.
+- **T1.14** (I4, I25): an invocation carrying `jsonFlag: ["--format","json"]` → the sequence is appended whole; `jsonFlag: []` → nothing is appended; `jsonFlag` absent → `--json`, which is T1.3's answer and is what makes the member additive. The three arms in one row because the interesting cell is that `[]` and absent are different, and a row asserting either alone passes against an implementation that conflates them.
+- **T1.15** (I4): `jsonFlag: ["-o","json"]` against argv `["get","pods","-o","yaml"]` → **nothing appended**, because the first token is present; against `["get","pods"]` → the pair appended. The user's value survives, and the control is what makes it a dedupe rather than a refusal to ever append.
 - **T1.5** (I3): the runner receives an array; no code path builds a command string.
 - **T1.6**: exit 0 with valid JSON → `stdout` parsed, `parseError` null, `stdoutRaw` populated.
 - **T1.7** (I6): exit 0 with unparseable stdout → `stdout` undefined, `parseError` set, `stdoutRaw` intact.
@@ -373,6 +383,7 @@ Six tiers. Every cell of the §6 transition table is covered. `ProcessRunner` is
 - **T3.21** (I3): argv containing shell metacharacters (`;`, `|`, `$(…)`, backticks) → passed literally, no expansion, no injection.
 - **T3.22**: `cwd` changes between two invocations → the second spawns in the new directory.
 - **T3.23**: an invocation with no matching fixture → throws, naming verb and argv. A miss is never a plausible failure, or a test asserts against a fixture that is not there and passes.
+- **T3.25** (I25, I20, → C05 I26): the declared tokens reach **what is spawned**, and a replay still reports **what ran**. The first draft of this row asserted that all three transports report the declared tokens and the fixture transport failed it — correctly, because a replayed `argv` is a historical fact about the data (D49) and not a reconstruction. So the row is the disagreement rather than the agreement: the transports share one resolution and differ on whose argv they report, which is §3's second half. Its control is the same invocation with nothing declared, without which it passes against a transport that appends whatever it is handed and never had a default of its own.
 - **T3.24** (I15): cancel mid-stream against the *fixture* transport → the lines already yielded are retained and `cancelled` is set, exactly as T3.4 asserts for subprocess. The fixture transport honours `signal`, or T3.4 becomes spawn-concerned by accident and the shared suite narrows.
 
 ### Tier 4 — integration

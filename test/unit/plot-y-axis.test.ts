@@ -638,3 +638,5 @@ describe("TL6 (C12 I55, C12 I6): below the colour floor the strips already say t
     expect(gutters(both[calloutRows(both)[0]!]!).right).toMatch(/^[\d.]+$/u);
   });
 });
+
+it.todo("YC10 (C12 I122): a callout draws with or without a right axis, and both arms agree — not deferred on a component: the row lands with C12 I122's implementation in this round's code commit");

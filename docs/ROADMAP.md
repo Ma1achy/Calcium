@@ -15,6 +15,28 @@
 > one ruling, not six, and none of the four moved because anything got more severe. They
 > moved because a fourth or fifth consumer turned up.
 
+## Resolved against HEAD, 2026-09-10
+
+**The header retires the *ranking* and says the evidence stands. It does not say which
+sentences below are still true, and four of them are not** — every entry's premise is a
+present-tense claim about a type, and all four types have changed since. A reader resolving a
+premise from here would take a false one, which is the failure mode this repository names
+*ask where a settled claim is written down*. The reasoning stays; the premises are marked.
+
+| entry | what landed | the sentence here that is now false |
+|---|---|---|
+| **1** | `ProducerContext` — `width`, `height`, `capabilities`, `measure` — on every producing route; `LocalContext` and `AdapterContext` are intersections of it (C07 I17–I20, C22 I45) | *"`LocalContext` carries `command`"*, and *"Neither carries the capability record, the region, a measurer or a validator"*. All four are carried. |
+| **1** | `producerContext()` and `localContext()` on `@fmx/calcium/testing` (C24 I26) | — the consuming half F132 found, closed with it |
+| **1** | `ProducerContext.height`, non-null exactly on a view invocation | *"no producer can see the region … this one field cannot be supplied and the split floor stays declared"*. It can be, and CLAUDE.md carries this as the second of its deferral instances. |
+| **2** | F27's three builder fields | — |
+| **3** | C04's absence/failure split, 16 of 19 | — the group's five open are later findings, not these |
+| **4** | C04 **I36** (`Comparison` carries `change` and `verdict` as two optional fields, never one union — F30 by name) and **I38** (a mark is derived from a named fact; a glyph slot where a shape names only a tone — F18, F34) | *"What has to be ruled"*. It was ruled, in the document this entry asks a question of. |
+
+**The counts in the table below are the F55-era counts** and the header already says so; entry
+1 is twelve findings, not six. `examples/docker/TRIAGE.md` carries the current figures.
+
+---
+
 Four pieces of Calcium work, each with a real application hitting it. Derived from
 `examples/docker/FINDINGS.md` — sixty-seven entries logged in the order they were hit — by
 way of `examples/docker/TRIAGE.md`, which groups them by shape and ranks them by how many
@@ -59,6 +81,11 @@ by the application duplicating a Calcium module.**
 carries the capability record, the region, a measurer or a validator — and the framework
 has all four at construction, in one place, already resolved.
 
+> **False at HEAD, and it is the paragraph an entry's premises are read from.** Both types
+> are `ProducerContext & …` now, and `ProducerContext` carries `width`, `height`,
+> `capabilities` and `measure`. The ruling this paragraph asks for was taken and the
+> paragraph reads as though it is still owed.
+
 **F54 is the entry that priced the group, and it is the newest.** Every earlier instance is
 an app *duplicating* a Calcium module — bad, and at least self-contained: there is one
 wrong copy, in one file, to fix when the seam opens. F54 is an app *threading* a Calcium
@@ -79,6 +106,12 @@ the root. That is not a copy to delete later; it is a parameter in eight signatu
   falsified by the code: no producer can see the region, because the decision that needs it
   runs before the window exists. The honest answer may be that this one field cannot be
   supplied and the split floor stays declared.
+
+  > **Answered the other way.** `ProducerContext.height` is `number | null`, non-null **iff**
+  > the document is bound by a region — which is a view invocation and nothing else, decided
+  > by C23 before the producer runs. The app's `SPLIT_FLOOR` still reads as though this were
+  > open, and CLAUDE.md carries the pair as the second of its three deferral instances: the
+  > condition is written where the deferral is and what met it is written elsewhere.
 
 **And it now has a number, which none of the other entries do.** R01 commitment 1 set a
 tripwire — *under 300 lines of app code; exceeding it is a finding about Calcium* — and
@@ -212,6 +245,13 @@ slot. That is the same collision with a **continuous** axis. F49 is the collisio
 all, even where a value exists.
 
 **What has to be ruled**, and this is the largest design question on the list:
+
+> **Ruled, in C04.** **I36** splits the union the entry asks about — `Comparison`'s row carries
+> `change` and `verdict` as two separate optional fields, citing F30 by name, on the argument
+> that `comparisonTone` had always coloured one half and left the other neutral. **I38** answers
+> the other two: a mark is derived from a fact the block names, and a shape naming only a tone
+> gets a glyph slot when a surface needs one. The 1-bit constraint below is what both rest on,
+> and `/diff`'s `+ - ~` is still the instance that was correct at every depth.
 
 - Whether the answer is a second axis on the block (`change?: "added" | "removed" |
   "modified"`), a widened `Tone`, or a theme-level concept that `Tone` and a change axis

@@ -229,3 +229,6 @@ describe.each(transportCases())("C06 shared — $name", ({ make }) => {
     expect(patches[0]).toEqual({ kind: "data", value: { n: 1 } });
   });
 });
+
+it.todo("T1.14 (C06 I4, I25, C05 I26, F1): the tokens are the far side's — appended whole, or not at all — not deferred on a component: the row lands with C05 I26 and C06 I25's implementation in this round's code commit");
+it.todo("T3.25 (C06 I25, I20, C05 I26): the declaration reaches what is spawned, and a replay reports what ran — not deferred on a component: the row lands with C06 I25's implementation in this round's code commit");

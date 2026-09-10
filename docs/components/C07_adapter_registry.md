@@ -324,6 +324,33 @@ adapter throws → log → re-adapt through the fallback
 
 The notice is muted rather than an error because the *command* may have succeeded perfectly; it is the presentation that failed, and the user should still see their data.
 
+### 7a. A far side that produced nothing is not an adapter that failed
+
+**One sentence covered two subjects.** Point the binary at a path that does not exist and the screen said
+
+```
+✗ The command did not start.
+spawn /nonexistent/svc ENOENT
+The adapter for "list" failed (Unexpected end of JSON input); showing the default rendering.
+```
+
+The first two lines are right and the third sends the reader to debug an adapter that did exactly what it should: there was no output, so there was no JSON. **The reader has already been told the truth and is then told to go and look somewhere else**, which is worse than silence, because the wrong file is the one they will open (→ FINDINGS F996, F152).
+
+**F152's own remedy splits on the wrong axis, and measuring the four cells is what shows it.** It proposed suppressing the notice when `outcome.status === "error"` — inferred from two instances, `spawn ENOENT` and exit 13, which are both far-side failures with nothing on stdout. Two instances fitting a rule is the minimum for noticing one, not evidence for it, and both remaining cells break this one:
+
+| | far side | `stdoutRaw` | measured, before the split | the ruling |
+|---|---|---|---|---|
+| 1 | ok | a payload | *the adapter for "list" failed* | **unchanged** — the adapter was handed something and could not render it, which is its own fault and worth reporting |
+| 2 | **ok** | **empty** | *Completed with no output.* **and** *the adapter for "list" failed* | **the new sentence.** `status` is `ok`, so F152's remedy leaves this cell blaming the adapter for a command that said nothing |
+| 3 | error | empty | *exited with code 13* **and** *the adapter for "list" failed* | **the new sentence** — the cell the finding measured |
+| 4 | error | **a payload** | *the adapter for "list" failed* | **unchanged.** F152's remedy suppresses this one, and it is the case where an adapter genuinely choked on bytes it was given |
+
+**So the axis is *was there anything to adapt*, and not *did the far side fail*.** `raw.stdoutRaw.trim() === ""` is the whole discriminator — not `stdout === undefined`, which is *unparseable* and includes cell 1's real payload, and not `outcome.status`, which is cells 2 and 4. A cancelled invocation is the fifth instance and it points the same way: `mapResult` returns `partial`, so a status test would blame the adapter there too.
+
+**The new sentence names the cause before the consequence and blames nobody**: *The command produced no output, so the "list" adapter had nothing to render.* It is muted, like the one it replaces, and it is appended in the same position — last, after the far side's own notice — so the real cause is always above the framework's aside.
+
+**Why cell 2 gets a sentence rather than silence.** The fallback already says *Completed with no output*, and one more line looks redundant. It is not the same fact: the fallback's notice is about the **document**, and this one is about **why the registered adapter did not produce it** — without it, an app author whose adapter is registered sees an unadapted rendering and is told nothing about why. Suppression is also a second rule to get wrong per cell, where this is one test at one site.
+
 ---
 
 ## 8. Registry state machine
@@ -359,6 +386,7 @@ The notice is muted rather than an error because the *command* may have succeede
 - **I20** — `measure` is the frame's own measurer, not a second implementation. One answer or the two drift (C09 I1), which is the same argument `cells()` rests on.
 - **I21** — `flags` carries C05's validated flag **values**, not tokens (C05 I21). It is what makes `shellOnly` usable: a flag the shell consumes is absent from `argv` by construction, so an adapter reading `raw.argv` cannot see the thing that selects its own rendering. `userRequestedJson` is this field hardcoded for one flag and stays, because `--json` is transmitted and `--raw` is not — two axes, two fields.
 - **I22** — **An overflowed `RawResult` produces a document carrying an overflow `notice`, on every route, and `meta.truncated` is not how it is recorded.** The block is appended in `finish` so no route can omit it, its id yields to a collision rather than failing validation, and `meta.truncated` keeps I13's meaning — the fallback capped rows — so the two causes stay distinguishable to the reader and to anything that reads `meta`. C23's `shell` route, which does not pass through the registry, appends the same block (§4).
+- **I23** — **A far side that wrote nothing and an adapter that failed are two notices, and the discriminator is `stdoutRaw`.** When a registered adapter throws with nothing on standard output the notice names the missing output and not the adapter; with a payload present it names the adapter, because an adapter handed bytes it cannot render is at fault and the reader should be sent to it. `outcome.status` is not the test — it is `ok` when a command succeeds silently and `error` when a failing command still emits a payload, so it is wrong in both directions (§7a, F996). Both notices are muted and both are appended last, after the far side's own.
 
 ---
 
@@ -388,6 +416,7 @@ The notice is muted rather than an error because the *command* may have succeede
 22. A producer measures with the frame's own measurer, so a split decided in an adapter and the rows drawn on screen are one arithmetic (I20).
 23. `flags` carries validated values, which is what makes a `shellOnly` flag readable by the adapter whose rendering it selects (I21).
 24. An overflowed result says so in a `notice` the reader sees, on every route, and `meta.truncated` goes on meaning what I13 says it means (I22).
+25. **A notice names the layer that actually failed** (I23). A command that produced nothing and an adapter that could not render what it was given are two sentences, discriminated by `stdoutRaw` rather than by status — because a status test is wrong at a silent success and at a failure that still emitted a payload (§7a, F996).
 
 ---
 
@@ -417,6 +446,7 @@ Six tiers. Every cell of the §8 transition table is covered.
 - **T1.18** (I13): an adapter returning a document whose `meta` claims `origin: "agent"`, `transport: "local"` and a wrong `argv` → all three are overwritten from the context and the `RawResult`; the adapter's `resultId`, `adapter` and `truncated` survive.
 - **T1.19** (I14): each `meta.exitCode` case — an exit code, `SIGTERM` → 143, an unrecognised signal name → 128, both null → −1.
 - **T1.20** (I14, §4): an invocation aborted before spawn → `partial` with `meta.exitCode` −1, not an error. Same code as a spawn failure, opposite status.
+- **T1.22** (I23, §7a, F996): **all four cells of the table, in one row, because the axis is what the finding got wrong.** A registered adapter that throws is driven with (far side ok · a payload), (ok · empty), (error · empty) and (error · a payload); the two empty cells name the missing output and never the adapter, the two payload cells name the adapter, and **the set that moves is asserted to be exactly the two empty ones** — which buys nothing over four per-cell assertions today and everything at the fifth cell, since a case added to the table is constrained the moment it exists. That correction came from the mutation pass; the reason first written down was wrong. A fifth case — `cancelled`, whose status is `partial` — takes the empty arm, which is the case a status test misses in the third direction. The control is that all four still render through the fallback and all four documents are valid.
 - **T1.21** (I22): a `RawResult` with `overflowed: true` through the fallback route, the identity route and the last resort → each document carries one `notice` naming the cut and `meta.truncated` is `false`; the same three with `overflowed: false` carry none. An identity document that already uses the id `overflowed` → the notice is appended under a suffixed id and the document is not the last resort.
 
 ### Tier 2 — contract / interface
@@ -449,6 +479,7 @@ Six tiers. Every cell of the §8 transition table is covered.
 - **T3.13**: a 50 MB parsed payload → `truncated` set, row cap of 2,000 applied, a notice names the dropped count, and the block cap (D40) is respected.
 - **T3.13b**: an array of 100,000 uniform objects → one table of 2,000 rows, not 100,000, and adaptation completes within budget.
 - **T3.20**: `cancelled` and `timedOut` both set → `partial`, per the §4 precedence.
+- **T3.21** (I23, §7a): the boundary of *nothing to adapt*. `stdoutRaw` of `""`, `"\n"` and `"   "` all take the empty arm — a far side that wrote only whitespace produced nothing to adapt — while `"null"` and `"{"` take the adapter arm, because those are bytes an adapter was given and could not use. `stdout === undefined` is **not** the test and this row is what says so: `"{"` parses to `undefined` and is a payload.
 - **T3.14**: stdout containing ANSI escape sequences → stripped or escaped, never emitted into a block. A tool that colours its own JSON cannot inject styling.
 - **T3.15**: an envelope whose `details` contains a circular structure → contained; `message` still renders.
 - **T3.16**: `remediation` that is not a runnable command → rendered as text, no fill action.

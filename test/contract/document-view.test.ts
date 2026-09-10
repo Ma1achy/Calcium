@@ -517,3 +517,5 @@ describe("C22 §13a — a live part hosted by a pushed view", () => {
     ).toBe(`tick ${String(h.fetches)}`);
   });
 });
+
+it.todo("T4.87 (C23 I70, C22 I48, §13a): a part inside a container keeps ticking, and its top-level sibling is not released — not deferred on a component: the row lands with C23 I70's implementation in this round's code commit");

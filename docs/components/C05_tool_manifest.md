@@ -85,6 +85,8 @@ type ToolDef = Readonly<{
   hidden?:   boolean;                 // omitted from help and completion, still invocable
   interactive?: boolean;              // takes the terminal — C23 §4's handoff (I19)
   view?:        boolean;              // the result is a pushed view — C22 §13a (I20)
+  jsonFlag?: readonly string[];       // this verb's way of asking for JSON — overrides the
+                                      // manifest's; [] means the verb needs none (I26)
 }>;
 
 type Manifest = Readonly<{
@@ -93,6 +95,8 @@ type Manifest = Readonly<{
   version: string;                    // the far side's version, for skew reporting
   tools: readonly ToolDef[];          // every tool — what findTool and validation read
   appTools: readonly ToolDef[];       // what the app wrote — §3
+  jsonFlag?: readonly string[];       // how this binary is asked for machine-shaped output;
+                                      // absent means ["--json"] (I26)
 }>;
 
 function parseManifest(raw: unknown): Result<Manifest, readonly ManifestError[]>;
@@ -421,11 +425,12 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 - **I18** — There is exactly one distance-2 suggester in the tree, and it is C05's. A01 A.2's cutoff is a policy about *when a suggestion is worth making*, and two implementations agree about the distance and diverge about the tie-break — which is where a suggestion is wrong rather than absent, and a wrong suggestion is the thing the cutoff exists to prevent.
 - **I19** — `interactive` is refused with `streams` and refused with `local: true`, **wherever either is declared** — a flag's arm re-creates the same impossible verb, and a refusal reading only the tool covers one of the two ways to write it (I24). Enforced at parse, as I4 is. Both combinations describe a verb that cannot exist, and both would otherwise be discovered by a user watching a terminal misbehave rather than by the author who declared them.
 - **I20** — `view` is declarable on a `ToolDef` and on a `FlagDef`, and an invocation is a view if either declares it. It is refused with `interactive` and with `oneShot`, at parse, as I19 is, **and the refusal reads both declarations of each** (I24); it is permitted with `streams`, because S12's logs view is exactly that pair. The declaration lives here rather than on the document an adapter returns because C22 §13a shows an adapter-side decision cannot be implemented: C23 I3 appends the pending entry first and C13 has nothing that removes it.
-- **I21** — A flag declared `shellOnly` is validated exactly as any other and is **absent from `argv`**. `validateInvocation` returns `transmitted` — the invocation minus those switches — because it is the one walk that knows where a flag ends, and a second copy of that grammar in C18 is the drift a shared implementation prevents. The value survives in `args`, so the shell can read what the far side never sees. **The axis is transmission, not presentation**: `--json` selects a rendering *and* is understood by the far side, so it stays transmitted; `--raw` means nothing to the binary, and `/inspect <c> --raw` ran `docker inspect <c> --raw` for docker to exit 125 (F39). `shellOnly` is refused on anything but a `bool` and refused with a `short`, at parse: a switch spans one token and a strip is a comparison, while a valued or clustered flag spans tokens the parser would have to re-derive.
+- **I21** — A flag declared `shellOnly` is validated exactly as any other and is **absent from `argv`**. `validateInvocation` returns `transmitted` — the invocation minus those switches — because it is the one walk that knows where a flag ends, and a second copy of that grammar in C18 is the drift a shared implementation prevents. The value survives in `args`, so the shell can read what the far side never sees. **The axis is transmission, not presentation**: the JSON tokens select a rendering *and* are understood by the far side, so they stay transmitted — which is why I26 makes *which tokens* a declaration rather than leaving `--json` as a claim about every binary; `--raw` means nothing to the binary, and `/inspect <c> --raw` ran `docker inspect <c> --raw` for docker to exit 125 (F39). `shellOnly` is refused on anything but a `bool` and refused with a `short`, at parse: a switch spans one token and a strip is a comparison, while a valued or clustered flag spans tokens the parser would have to re-derive.
 - **I22** — `--help` is reserved on **every** tool, appended where the framework's seven verbs are appended, and an app declaring it fails at parse as an app declaring `clear` does. Reserved rather than asked for, because a per-app `--help` is a per-app discipline and one app forgetting it is a verb with no help — the silent failure `usageBlocks` already argues against for hardcoded usage strings. Appended to `tools` and never to `appTools`, so the round-trip re-derives it rather than re-parsing it (F92).
 - **I23** — `interactive` is declarable on a `FlagDef` as well as on a `ToolDef`, and an invocation's contract is the tool's declaration unless a flag present in it carries an arm. **An arm equal to the tool's default is refused at parse**, which is what makes the arms on a tool agree: every one reads `!default`, so two flags cannot disagree and there is nothing to arbitrate. Resolved by `validateInvocation` — the walk that knows which flags a token names — and returned on the success arm, for I21's reason. `false` and absent differ on this member and on no other in either type: absent means *this flag does not decide* (F80).
 - **I24** — A cross-field refusal reads every declaration of each field it names, not the tool's. `view` on a flag with `interactive` on the tool is the pair I20 forbids, written the other way, and it parsed (F118). The conservative form is deliberate: an arm resolving `interactive` to `false` beside a `view` flag would be legal, and refusing it costs an app nothing today because no app declares one — **the limit is recorded rather than discovered**, and the first consumer to want the pair is the argument for narrowing it.
 - **I25** — **A verb declares whether its output may be persisted, and nothing else can.** `persist?: boolean` is `handoff`'s shape and `handoff`'s argument one row down — *the app author is the only party who can know this*, and detection is not available. Here the fact is what the verb's output contains: `inspect` renders a container's whole environment, and no property of a `ViewDocument` distinguishes that from a list of image tags. **The framework never redacts** — C20's redactor works on a tokenised command line, a rendered document has seventeen kinds and no tokens, and a redactor wrong about one kind is worse than none because it is switched on. Absent means **no**, because a missing feature is visible on the first resume and a leaked secret is not visible at all (C13 I20, §5b, F168).
+- **I26** — **The tokens that ask a far side for JSON are the far side's, declared here, and `--json` is a default rather than a fact.** Calcium appended `--json` unconditionally and no manifest member named the flag, so the framework's own demo cannot drive `docker`, which spells it `--format json` (F1, F1006). It is `interactive`'s and `persist`'s argument in its cheapest form — *the app author is the only party who can know this* — with the difference that here the framework had guessed, and a guess that is right for one binary is not detection. **Three states, and `[]` is not absent**: absent inherits, `[]` appends nothing because the verb already emits JSON, and a non-empty sequence is appended whole. A verb's declaration replaces the manifest's rather than merging with it, because merging two token sequences has no meaning. **Refused with `local` at parse**, as `interactive` is: a local verb is never spawned, so the declaration cannot take effect and an author would act on it.
 
 ---
 
@@ -453,6 +458,8 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 20. A verb's terminal contract is resolved per invocation, by the validator, from the tool's declaration and the flags actually present — and an arm that could only restate the default is refused, so no two arms can disagree (I23).
 21. A cross-field refusal covers every way its combination can be written, not the one the first consumer used (I24).
 22. **A verb declares whether its output may be persisted**, on `handoff`'s ground and with the opposite default: absent is no, because the framework cannot look at a document and tell (I25).
+23. **How a binary is asked for JSON is declared, not assumed** (I26, → C06 I4, C06 I25). `--json` stays the default so every existing manifest is unchanged, and it stops being a fact about every far side: the framework's own demo target spells it `--format json`, and the member that fixes that is one the app author was always the only party able to write.
+24. **A required field that is absent and one of the wrong type are two sentences** (→ C04 I114). The ruling is C04's and so is the implementation — `absentMessage` and `wrongTypeMessage` travel through the barrel `parse.ts` already imports — because the conflation was here too, at thirteen required strings and every required boolean, and a second copy of a sentence is a second rule the day one of them is corrected (F995).
 
 ---
 
@@ -484,6 +491,9 @@ Six tiers. Every cell of the §4 transition table is covered.
 - **T1.17** (I16, §3): `--since -1h` → a `missing_value` error whose remediation names the token and the `=` form; `--since=-1h` validates. Both halves in one test: the message is only right if the thing it recommends actually works.
 - **T1.18** (I17): a one-directional `conflicts` declaration, given both flags → one error, reported from the flag that declares it. A mutual declaration → still one error.
 - **T1.19b** (I23, I24): a flag arm equal to the tool's default → parse error at `tools[i].flags[j].interactive`, in both directions (`true` on a plain verb, `false` on an interactive one); a flag arm of `true` on a `streams` tool and on a `local` tool → parse error, which is I19 read through the flag; a flag declaring `view` on a tool declaring `interactive` → parse error, **which is the row that fails today** (F118). And the arm that must survive all four: `run` declared `interactive: true` with `detach` declaring `false` parses, and the value reaches the `FlagDef`.
+- **T1.22** (→ C04 I114, F995): a tool with no `summary` and a tool whose `summary` is `42` are refused by **two different sentences** — *is required and absent — supply a string* against *must be a string, got a number* — and the same pair for the required boolean `local`; `null` is **present and wrong**. The absent arm is asserted never to read *must be a …*, which is the wording the split exists to remove, and the control is the untouched fixture drawing no error at all. **The sentences come from C04's helpers**, not a second copy: one rule with two implementations is two rules the day one is corrected. Written because splitting the two helpers changed the message at thirteen call sites and this suite stayed green — the file's one message assertion is on a *conditional* requirement, which is deliberately unchanged.
+- **T1.20** (I26): a manifest declaring `jsonFlag: ["--format", "json"]` parses and the sequence survives onto the `Manifest`; a verb declaring `jsonFlag: ["--format", "{{json .}}"]` parses and **replaces** the manifest's rather than merging with it; `jsonFlag: []` on a verb parses and is **not** absent, which is the distinction the three states rest on; a manifest with no `jsonFlag` at all parses and resolves `["--json"]`, so every manifest written before this member is unchanged. The last arm is the one that keeps the rest from being a rewrite.
+- **T1.21** (I26): `jsonFlag` on a `local: true` verb → parse error at `tools[i].jsonFlag`, as `interactive` with `local` is; a non-array, an array holding a non-string, and an array holding an empty string are each refused naming the path. The control is a spawned verb with the same declaration, which parses — without it the row passes against a parser that refuses every `jsonFlag`.
 - **T1.19** (I19): `interactive` with `streams` → parse error at the tool's path; `interactive` with `local: true` → parse error; `interactive` alone on a spawned tool → parses, and the field survives onto the `ToolDef`. The third half is what stops the rule from being a blanket refusal that passes the first two.
 
 ### Tier 2 — contract / interface
@@ -804,6 +814,46 @@ reader, and every step reads as coverage** — the finding is not that any of th
 mistaken but that a deferral chain is a claim nothing resolves. *Would landing this close it*
 applies to a deferral as much as to a fix, and the only thing that answered it was going to the
 reader and finding it there.
+
+## 8c. The walk — how a far side is asked for JSON
+
+**A classification table again, and for §8a's reason**: a manifest is at rest, a verb's
+declaration and the manifest's are two statements that both hold, and there is no event
+between them. What is new is a third party — **what the user typed** — which is at rest in
+the same sense, because `withJson` sees a finished `argv`.
+
+Indexed by which two rules could both decide the tokens.
+
+| # | manifest | verb | the user typed | the two rules | ruling |
+|---|---|---|---|---|---|
+| 1 | — | — | `ps` | *the default is `--json`* × *nothing is declared* | `["ps","--json"]` — today's behaviour, and the row that makes this additive |
+| 2 | `["--format","json"]` | — | `ps` | *the manifest declares* × *the verb does not* | `["ps","--format","json"]` — inherited |
+| 3 | `["--format","json"]` | `["--format","{{json .}}"]` | `inspect c1` | *the manifest declares* × *the verb declares* | **the verb wins whole.** Merging two token sequences has no meaning: a verb overriding is overriding the sequence |
+| 4 | `["--format","json"]` | `[]` | `version` | *absent inherits* × *`[]` is a value* | **nothing appended.** `[]` and absent must differ or a verb that already emits JSON cannot say so |
+| 5 | `["-o","json"]` | — | `get pods -o yaml` | I4 *appended exactly once* × D16 *a user who types it is asking to see the contract* | **nothing appended, on the first token.** Matching the whole sequence would append `-o json` after `-o yaml` and silently override what the user asked for; matching the first token leaves both rules intact |
+| 6 | `["--format","json"]` | — | `ps --format table` | row 5 × *the payload is always machine-shaped* | **nothing appended, and the output is unparseable** — which C06 already handles: `stdout` undefined, `parseError` set, C07 falls back to a `raw` block. Identical to today's outcome for a user who types `--json` at a binary that has none |
+| 7 | — | `["--json"]` | `ps` | *the verb declares* × *the default is the same tokens* | `["ps","--json"]`. A declaration equal to the default is **permitted**, unlike §8a rows 3 and 4: there the arm decided something already decided by a field with one meaning, here the manifest's value is data the author may restate |
+| 8 | any | any on a `local` verb | — | *a local verb is never spawned* × *a declaration takes effect* | **refused at parse** (I26). A declaration that cannot fire is one an author will act on |
+| 9 | `["--format","json"]` | — | a recorded fixture | *the corpus is indexed by `argv`* × *the flag is appended* | **the corpus is unaffected.** `Fixture.argv` is already the invocation form *without* the flag (C06 §2), so the match key never held it. What changes is `argvOf` for a result C06 constructs itself, which describes an invocation happening now and must carry the flag in force |
+| 10 | `["--format","json"]` | — | replay of a corpus recorded under `--json` | *replay reports verbatim* (C06 I20) × *the flag in force* | **verbatim wins.** `meta.argv` is a historical fact about the data; the mismatch is the signal that the corpus is stale, which is D49's own argument and not a new one |
+
+**Row 5 is the cell two correct statements overlap in**, and it is the whole reason the
+dedupe is not `includes` over the sequence. I4's argument is *a far side that treats a
+repeated flag as an error fails a command that was correct*; D16's is *a user who types it
+is asking to see the contract*. A whole-sequence match satisfies neither for a valued flag,
+and both are satisfied by reading the first token — which is also the only token a
+single-token flag has, so nothing about today's behaviour moves.
+
+**Row 7 is the row that reads like §8a rows 3 and 4 and rules the other way.** There the
+refusal exists because an arm equal to the default decides nothing, which makes two arms
+unable to disagree. Here there is nothing to arbitrate: one value wins by position, and a
+verb restating the manifest's tokens has said something true. Refusing it would mean an
+author cannot copy a working line onto the verb that needs it.
+
+**What no row here reaches.** Whether the *value* a far side wants is well-formed — docker's
+`{{json .}}` is a Go template and a typo in it is a runtime error the manifest cannot see.
+That is the same limit `interactive` has, and it is the reason the member is a token
+sequence rather than a grammar.
 
 ## 9. Out of scope
 

@@ -2633,3 +2633,5 @@ describe("SK11 — the sankey node label reads against what it is drawn on (C12 
     expect(svg.match(/text-anchor="end"/gu)?.length, "the last layer's labels still flip").toBe(2);
   });
 });
+
+it.todo("RC8 (C12 I121, §3ak.50g): no two same-side value labels paint the same band — not deferred on a component: the row lands with C12 I121's implementation in this round's code commit");

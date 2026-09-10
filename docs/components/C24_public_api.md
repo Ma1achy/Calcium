@@ -49,7 +49,7 @@ export type { TuiConfig, TuiInstance, SessionSnapshot, ChromeFn, StopReason };
 // blocks — the type a consumer returns
 export type {
   Block, Rule, Notice, KeyValue, Table, TableRow, Cell, Steps, Logs, Events,
-  Plot, Series, Progress, Code, Comparison, Patch, Hunk, Pills, Tip, Panel, Group, Raw,
+  Plot, PlotForm, Camera, Series, Progress, Code, Comparison, Patch, Hunk, Pills, Tip, Panel, Group, Raw,
   Tone, Glyph, Action, ErrorLike, ViewDocument, ViewPatch,
 };
 
@@ -184,6 +184,8 @@ false.
 be nameable — and `SessionSnapshot.identity` was already exported *structurally*,
 through a field whose type had no name on this list. A consumer could read it and
 could not annotate it, which is the omission below described from the other side.
+
+**`PlotForm` and `Camera` are exported because a consumer aliased its way to both** (I34, §8e). They are the two names `examples/plots` recovered by indexing — `Plot["form"]` and `NonNullable<Plot["camera"]>` — and they are on this list for different halves of one reason. A form is what a consumer *switches on*, so a catalogue keyed by one wants the union under its own name rather than under a local alias carrying the framework's; and a camera is a **view**, which C04 I75 keeps off the block deliberately and `RenderContext.cameras` carries live, so naming it through `Plot` says the one thing the type is at pains not to be. Neither is the general case: fifty named types sit in a published member's type position unpublished, and the population that picks these two out is the consumers' aliases rather than that list.
 
 **The builder-argument types are exported because §4's signatures name them.** A list that exports `b.table` and not `ColumnDef` gives a consumer a function whose parameter they cannot annotate, and the workaround — `Parameters<typeof b.table>[0]["columns"][number]` — is the shape of an omission rather than a design. Six of the seven are introduced by the builders themselves and exist nowhere else; `ColumnDef` is C04's and was absent from this list while `TableRow`, `Series` and `Hunk` were on it, which is the same omission caught by consistency rather than by use.
 
@@ -1042,6 +1044,57 @@ the renderer's, and the reason has to say so on its own rather than by counting 
 
 ---
 
+## 8e. What the third consumer needed a third time — a name for a type it already held
+
+**F999** (for F505). `examples/plots` reached a third gap by the same means, and this one is visible only in the
+consumer's own file. Two of its type aliases exist to recover a name the surface does not publish:
+
+```ts
+export type PlotForm = Plot["form"];                // catalogue.ts:20
+type PlotCamera = NonNullable<Plot["camera"]>;      // catalogue.ts:97
+```
+
+Both compile. `Plot.form` is declared `PlotForm` and `Plot.camera` is declared `Partial<Camera>`,
+so `src/` has a name for each and the surface has neither — every internal caller imports the
+declaration from `data/viewmodel` directly, which is why the omission is invisible from inside the
+package. **A package cannot reach through its own boundary and notice**, which is §3's sentence
+about `parseManifest` arriving at a type rather than at a function.
+
+**The camera is the one that says something false and the form is the one that costs something.**
+A `Camera` is a *view* — C04 I75 keeps the live one off the block for exactly that reason and hands
+it to the renderer through `RenderContext.cameras` — so naming it through the block that carries a
+starting angle makes it read as a property of plots. `PlotForm` is worse in a quieter way: the alias
+carries the framework's **own name**, in an app file, and the app's doc comment says *"Every form
+`PlotForm` declares"* while pointing at a local declaration. That is the drift `LocalContext` was
+published to prevent — a consumer re-declaring a framework signature by hand — reached through an
+index expression instead of by hand.
+
+**And the camera alias was dead, which corrects F505's own argument for the export.** It was
+written for `cameraAt(phase, rung.camera)` — the demo's hand-rolled orbit — and F509 removed the
+orbit, took the function with it, and left the alias declared, unread, and still carrying F505's
+paragraph justifying an export. So *the consumer that would justify it is the workaround above* had
+expired, and the export rests instead on `RenderContext.cameras`: a consumer writing its own 3-D
+block kind receives a `RenderContext` (§3's hooks list) and cannot name what `ctx.cameras` holds.
+The alias is replaced by a helper over `Partial<Camera>` — the rung-camera merge F504 left as an
+inline spread, which is the *helper, control or orbit* F505 predicted a consumer would want the name
+for.
+
+**The class, measured before ruling on it.** Fifty named types under `src/` sit in the type position
+of a published member and are not published themselves. Fifty exports is not the answer and the
+count is not the argument: most of them are a property of the one owner that names them, where
+indexing is the right spelling and a second name would be a second record. The two here are the ones
+a consumer **reached for**, and the population that says so is the consumers' own index expressions
+rather than the surface's member list. Two others in the same files are not instances and are what
+tells the rule from a rewrite of it: `Series["tone"]` indexes a type that **is** published, and
+`TerminalCapabilities["imageProtocol"]` indexes an inline union that `src/` never named — nothing to
+publish, so nothing to fix.
+
+So the rule is over the consumers and not over the surface (I34), and the row that checks it is what
+keeps member three from arriving unread — which is the whole of why this section exists rather than
+one more line on §3's list.
+
+---
+
 ## 9. Invariants
 
 - **I1** — Every export is used by **the union of** `prism-tui` and the reference app. Neither alone exercises the whole surface — docker touches no `spectrum`, no `WorldDriver` and only part of the manifest schema. An export used by neither is removed.
@@ -1059,7 +1112,7 @@ the renderer's, and the reason has to say so on its own rather than by counting 
 - **I13** — `@fmx/calcium/testing` ships the document assertions, so no consumer reimplements them. `degradesTo1Bit` is the one that earns the module: it is B04's compliance sweep, and no consumer would write it themselves, which is exactly how the colour axis starts losing information invisibly.
 - **I14** — `planColumns`, `cells` and `truncate` are public because a custom block kind cannot satisfy C09 I1 without them. A consumer measuring width with `.length` disagrees with the measurer, and the disagreement is silent.
 - **I15** — Every block-returning `b.*` builder sets a `gapBefore` default **of its own** (§4), and an explicit `gapBefore` always wins over it — at every position, including the first, which is the only one where the two can disagree. The explicit value arrives through `BlockOpts`, which every one of them accepts; before that argument existed the invariant was unwritable as a test, and so was the half of §4 that promised it. The default is the builder's and not the block kind's: `b.steps` gaps and `b.spinner` does not, and both return `Steps`. A builder with no default is a kind whose rhythm silently depends on which adapter wrote it.
-- **I16** — No entry point exports a type that declares work for the framework to perform unless something in `src/` performs it. `ViewRefresh` is the measured case: a consumer could declare a refreshing part, type-check, and never be called — A03 §2's vacuity class reached through the export list rather than through a rule. MG25 is the mechanical form, over free functions and constants; a declaration type is caught by the producer it belongs to appearing there.
+- **I16** — No entry point exports a type that declares work for the framework to perform unless something in `src/` performs it. `ViewRefresh` is the measured case: a consumer could declare a refreshing part, type-check, and never be called — A03 §2's vacuity class reached through the export list rather than through a rule. MG25 is the mechanical form, over **functions and classes** — not constants, which A03 §MG25 correction 1 excludes deliberately and this sentence named for some time anyway (F1000); a declaration type is caught by the producer it belongs to appearing there.
 - **I17** — `b.seq` is the only place a block's position changes what it carries, and it changes it at construction rather than at measurement (§4a). C04 §3a's ruling stands: a block measures the same wherever it is concatenated. Before this, no code anywhere stripped a first block's gap — the rule every S-series figure depends on was discipline, and the one file in `src/` that set `gapBefore` set it by hand, per position.
 - **I18** — Every `KeyValue` the block type can hold is one `b.kv` can build. The record arm cannot express a repeated label and `KeyValue.rows` is an array, so the array arm is what closes the gap (§4). **The narrowing that C24 had already ruled on was a different one** — `KeyValueInput` against `CellInput`, which is about a value with nowhere to go — and the container was unremarked, which is how it went eleven builders and one whole app without being noticed. A builder narrower than its block is either a ruling with a reason written down or a defect; there is no third state, and the reason is what tells them apart. **The rule now has a mechanism, and it fired the day it was written**: MG27 compares every block type's fields against the builder that constructs it, and found `patch.collapsedAfter`, `patch.actions` and `table.sort` unreachable. This invariant and commitment 16 had both stated the rule correctly for as long as they had existed, which is what a rule with nothing reading it looks like from the inside (F114).
 - **I19** — The producers of a hook's argument types are exported wherever the hook is: a consumer implementing `CompletionSource` can build the `CompletionContext` it receives, through `contextAt` and `parseManifest`. A type without its producer is testable only by a hand-built literal that agrees with the test rather than with the derivation.
@@ -1079,6 +1132,7 @@ the renderer's, and the reason has to say so on its own rather than by counting 
 - **I31** — **`@fmx/calcium/profiling` publishes types, `Tier`, and nothing that runs.** No recorder, no probe, no capture: a consumer imports it to *read* a report, and everything that produces one is reached through `createTui`. An entry point that ships behaviour nothing on the runtime surface can reach is a second way in (→ C22 I93).
 - **I32** — **`ChromeContext.lastFrame` carries the previous frame's `work` and its name says so.** The figure is composition alone and never `work + wait`: the wait is time before the frame began, so a sum grows while the session is idle (C28 I4). It reports the last **completed** frame whatever its `outcome` — `report()` filters fallbacks out of `timeline` and `worst` because those are projections over frames that drew, and this is the most recent measurement rather than a projection; a session repeatedly falling back would otherwise hold a drawn frame's figure on screen indefinitely. It clears with the ring on a tier change, because a figure from the tier before is one nothing is maintaining. The current frame's total cannot be known while composing it, so a member named for the current frame would hold a number it cannot have — the shape this repository keeps finding. It is `undefined` at tier `off` and for the first frame of a session, and a chrome that draws it says which frame it is describing.
 - **I33** — **The profiler's view is opened at the prompt and never constructed by a consumer: no `ProfileView`, `createProfileView` or layer id joins the published surface, and the pane exports that were published for a consumer drawing its own — `profilePane`, `paneTitle`, `PANES`, `GlyphCaps` — are what the framework's own view draws with, through the same exports.** `paneTitle` was published with no consumer anywhere in the tree, tools or examples for the whole of its life, and MG24 could not see it because a root re-export of a function is not an interface member (F945); the view is its first consumer, and this invariant is what says a published pane helper has to have one.
+- **I34** (F999) — **A consumer does not index a published type to recover a name `src/` already declares.** The two instances are `examples/plots`' own aliases — `Plot["form"]` for `PlotForm` and `NonNullable<Plot["camera"]>` for `Camera` (§8e) — and both compile, which is the direction that makes this silent: the index expression is a *correct* way to spell a type and a *wrong* way to name one. `Camera` is a view and C04 I75 keeps the live one off the block; `PlotForm` came back into an app file under the framework's own name, beside a comment describing the framework's declaration. **The population is the consumers' index expressions and not the surface's member list**, and that is the ruling rather than a convenience: fifty named types sit in a published member's type position unpublished, most of them a property of the single owner that names them, where indexing is the right spelling and a second name would be a second record. The check resolves each `Owner["member"]` in the example apps to the member's declared type name and fails when `src/` declares it and no entry point publishes it — so `Series["tone"]`, whose type **is** published, and `TerminalCapabilities["imageProtocol"]`, an inline union `src/` never named, are cleared for two different reasons and neither is a special case. **Stated blind spot**: it sees the aliases a consumer wrote, so a consumer who gave up and hand-declared the union instead is outside it — the failure mode `LocalContext` was published against, and the one an index expression is evidence *of*.
 ---
 
 ## 10. Commitments
@@ -1115,6 +1169,7 @@ the renderer's, and the reason has to say so on its own rather than by counting 
 30. **A fourth entry point, for types a consumer reads rather than behaviour they run** (I31). `profiling` ships because the profiler ships; it holds no recorder, so importing it cannot start one.
 31. **The context carries the *last* frame's cost, and the member is named for it** (I32). A frame's total is unknowable while it is being composed, so the honest member is the one that says which frame it describes.
 32. **The profiler's view is a verb's, not a consumer's** (I33). Nothing that opens it is published; what was published to draw a pane is what the framework draws its own with.
+33. **A type `src/` names is nameable from the surface, and the consumers are what say which ones** (I34, §8e). Checked over the index expressions an app wrote rather than over the members a type declares, because the gap is invisible from inside a package whose every caller imports the declaration directly — and because the member list would answer *fifty*, where the consumers answer *two*.
 
 ---
 
@@ -1158,6 +1213,7 @@ the renderer's, and the reason has to say so on its own rather than by counting 
 - **T2.17** (I6, I28): `LiveSpec`'s field set is compared **by equality** against a classified list — identity, declaration, rendering — and no field names a driving policy: no `pause`, no `retry`, no `backoff`, no `whenHidden`. The invariant is about the *driver's* behaviour and not about `every`, and an absence assertion over an unenumerated type is satisfied by every field it cannot see, so the classification is what makes it able to fail: an eleventh field fails until someone says which of the three it is.
 - **T2.18** (I20): MG27 fires on a block field no builder sets, and the reason list **expires** — an entry whose builder now sets the field is itself a violation, so the reasons cannot outlive their subject. **The row existed under the rule's name**, which is T2.10's situation again and the second instance in one pass: SP9 strips comments and `describe` titles, so a rule that *is* an invariant's mechanical form covers it completely and names it nowhere a row can be read.
 - **T2.19** (I25): SS48's fabricated violation — a second `paint(` call in a file holding a `Composed` — fires, and the rule's declared `spec` is compared **by equality** against `C22 I54 · C24 I25`. The equality is the half that matters: a rule retargeted at a different spec would keep firing on its fabrication and stop being this invariant's form, and nothing else would notice.
+- **T2.21** (I34): every `Owner["member"]` in the example apps' sources is resolved to the member's declared type name, and a name `src/` declares must be published by some entry point. **The row's subject is the resolution and not the count**, so it carries its own controls: `Series["tone"]` clears because `Tone` is published and `TerminalCapabilities["imageProtocol"]` clears because nothing is declared under that name — two clearances by two different arms, and a resolver that returned nothing would pass by finding nothing. The non-vacuity guard is that the scan finds index expressions at all, since an app rewritten without one empties the population while leaving the assertion green (SS26). **Four arms, and only the third can fail on the surface**: the population guard, the residue, the resolution of the finding's own two names against the published set, and a fabricated one-line surface — which is where the resolver's second defect was found, since every type in `src/` spans lines and a line-start anchor resolves the whole corpus while missing its own fabrication.
 - **T2.20** (I11): the surface signal is **reported and never gated** — `index.mjs` computes it after the violation set is closed, never pushes it into `violations`, and enforce exits 0 today with a residue in the hundreds. That last figure is what makes the absence a decision rather than a tree with nothing to report. The rest of I11 is a claim about another repository and a release cadence, which nothing here can hold; what is checkable is the disposition, and the disposition is the half that could silently change.
 
 ### Tier 3 — edge cases
@@ -1203,6 +1259,8 @@ the renderer's, and the reason has to say so on its own rather than by counting 
 ### Tier 6 — fail-on-revert
 
 - **T6.16** (I32): renaming `lastFrame` to `frame`, or filling it with the frame being composed → T1.10 fails on the second frame, and every consumer drawing it reports a number taken before the work it names. **The state that distinguishes the two is a pair of frames with different costs**; two frames of equal cost agree under both readings, which is the convenient fixture and the one that finds nothing. The reverted figure is a real duration of a real frame, one frame early — which is why no arithmetic check reaches it.
+
+- **T6.17** (I34): dropping `Camera` or `PlotForm` from the runtime entry → T2.21's **resolution** arm fails, and the consumer's spelling of a *view* becomes a property of a plot again. **Which arm fails is the part worth writing down, because it was measured and it is not the obvious one.** The residue arm — *no app indexes for a name `src/` declares* — stays **green** under that revert: closing the finding deleted the index expressions, so its population no longer holds them and cannot hold them again until an app re-indexes. A residue watches the consumers; the surface is watched by resolving `Plot.form` and `Plot.camera` against the published set by name. **The revert that reads as tidiness**: nothing else breaks, and the only other evidence is an alias reappearing in an app file under a framework name.
 
 - **T6.1** (I2): exporting one of the eleven absent components → T2.1 fails, and the layering starts leaking.
 - **T6.12** (I15): dropping a builder's `gapBefore` default → T2.9 fails on that kind. Without the enumeration the surfaces render dense while the S-series draws them spaced, which is the gap the audit found.

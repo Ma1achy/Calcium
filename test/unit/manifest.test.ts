@@ -593,3 +593,5 @@ function enumFlag(source: Bag, index: number): Bag {
 function promoteArg(source: Bag): Bag {
   return (toolAt(source, 3)["args"] as Bag[])[0]!;
 }
+
+it.todo("T1.22 (C04 I114, F995): a required field absent and a required field of the wrong type are two sentences — not deferred on a component: the row lands with C04 I114's implementation in this round's code commit");

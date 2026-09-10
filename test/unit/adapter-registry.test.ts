@@ -696,3 +696,5 @@ describe("I22 (T1.21) — an overflowed result is a notice, never meta.truncated
     expect(cut(doc)).toHaveLength(1);
   });
 });
+
+it.todo("T1.22 (I23, §7a): all four cells, and the set that moves is exactly the two with no output — not deferred on a component: the row lands with C07 I23's implementation in this round's code commit");
