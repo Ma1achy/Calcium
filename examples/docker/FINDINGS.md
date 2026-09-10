@@ -45837,3 +45837,97 @@ Error: Test timed out in 1ms.
 
 `budget.ts` restored from a copy, md5 compared. The row runs in **2 309 ms**
 alone and 6 936 ms inside the suite, against sixty.
+
+## F1094 — a missing package arrived as a colour reading of minus one, twice, and this reader had already been wrong this way once ★★★★
+
+| | |
+|---|---|
+| **Surface** | `.github/workflows/ci.yml`'s `full` job · `test/e2e/image-protocol.test.ts:199` |
+| **Reached for** | the first `full` job this branch's work has ever had, on pull request 46 |
+| **Verdict** | **open** |
+
+### What the runner said
+
+```
+AssertionError: the red picture drew: expected -1 to be greater than 1000
+AssertionError: the red frame is shown more than once: expected 0 to be greater than 2
+```
+
+Two rows that drive a real kitty under Xvfb and count coloured pixels. The
+sentence is about a terminal that failed to draw. **The fact is a package that
+was never installed.**
+
+### The mechanism, and every step of it is deliberate
+
+`test/e2e/image-protocol.test.ts` screenshots the root window with ImageMagick's
+`import` and counts colours with `convert`. The `full` job installs
+`xvfb xdotool xterm kitty` and **neither of those**. Both are spawned with
+`stdio: "ignore"`, so a missing binary is silent; no PNG is written; and the
+reader's sentinel for *no screenshot* is
+
+```ts
+shots.push(existsSync(png) ? tally(png) : { red: -1, green: -1, blue: -1 });
+```
+
+`-1` then reaches `expect(at(0).red).toBeGreaterThan(1000)`. **Nothing here is a
+bug on its own.** The ignore is deliberate, the sentinel is honest, the
+assertion is right. What is wrong is that the sentinel covers more failures than
+it names.
+
+### Deterministic, which is what separated it from the noise in the same job
+
+`full` failed twice on this head, and **the failing set moved between the two
+samples** — a kitty CSI-u row was red in the first and green in the second, and
+a scroll row was green in the first and red in the second. These two were red in
+both, with the same numbers. The stable pair is the environmental one; the
+moving set is F812's.
+
+### Invisible in the devcontainer because the image has both
+
+```
+$ which import convert
+/usr/bin/import
+/usr/bin/convert
+```
+
+So the rows are green locally every time, and this is the same shape as F1087
+and F1093: **a fact about the machine, discoverable only on the machine that was
+never allowed to disagree.** Third in a day.
+
+### And the reader had already been wrong this way once
+
+`drive`'s own comment records this file's first instance:
+
+> a latin1 write turns every cell into `?`, and **the first run of this probe
+> read zero coloured pixels in every case including the controls**
+
+Same reader, same silence, different cause. **Three distinct failures reach one
+number**: no screenshotter, no screenshot, and a screenshot with no colour. A
+sentinel that cannot separate those is a reader that reports on itself and
+attributes it to its subject.
+
+### Remedy
+
+The package in the job, and a precondition that refuses **by name** before
+anything is driven. `-1` keeps the meaning it should have — *no screenshot*,
+which is a real outcome worth distinguishing from a black one — and loses the
+one it should never have carried, *no screenshotter*, which is knowable before a
+single byte is written to a PTY.
+
+Driven rather than asserted: with a shim `import` that exits 1 on `PATH`, the
+rows now fail with
+
+```
+Error: import (ImageMagick) is not on PATH — this row reads pixels, so it
+cannot run without it. Install `imagemagick`; CI does so in the `full` job.
+```
+
+### What would falsify this
+
+- **ImageMagick arriving from another step.** The job has one `apt-get install`
+  line and it is the one quoted.
+- **The rows failing for a kitty reason.** kitty starts and answers keys on the
+  runner — the CSI-u row passed in the second sample — and the next `full` run
+  is the test of this.
+- **The devcontainer lacking the tools**, which would make the local greens
+  something else. `which` finds both.

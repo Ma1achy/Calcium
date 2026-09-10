@@ -118,7 +118,38 @@ type Result = Readonly<{ inks: readonly (readonly Ink[])[]; replies: readonly st
  * One display per run, never reused — `x-emulator.ts`'s own rule, for its own
  * reason: a second run's server would race the first's shutdown for the socket.
  */
+/**
+ * **The tools this reads pixels with, checked before anything is driven** (F1094).
+ *
+ * `import` and `convert` are ImageMagick, and both are spawned with
+ * `stdio: "ignore"` — so a missing binary is silent, no PNG is written, and the
+ * honest sentinel below for *no screenshot* is `-1`. That sentinel then reaches
+ * an assertion about redness and reports `expected -1 to be greater than 1000`,
+ * which describes the wrong thing: not a terminal that failed to draw, a
+ * package that was never installed. It ran twice on CI saying exactly that.
+ *
+ * **The sentinel is right and its reach was wrong.** `-1` still means *no
+ * screenshot*, which is a real outcome worth distinguishing from a black one.
+ * What it must not stand for is *no screenshotter*, because that is a fact about
+ * the machine and it is knowable before a single byte is driven. The comment on
+ * `drive` already records this file's first instance of the same shape — zero
+ * coloured pixels in every case including the controls, that time a latin1
+ * write — and one reader with one sentinel could not tell those apart either.
+ */
+function requireImageMagick(): void {
+  for (const tool of ["import", "convert"] as const) {
+    const probe = spawnSync(tool, ["-version"], { encoding: "utf8" });
+    if (probe.status !== 0) {
+      throw new Error(
+        `${tool} (ImageMagick) is not on PATH — this row reads pixels, so it cannot run without it. ` +
+          `Install \`imagemagick\`; CI does so in the \`full\` job.`,
+      );
+    }
+  }
+}
+
 async function drive(steps: readonly Step[]): Promise<Result> {
+  requireImageMagick();
   const work = mkdtempSync(join(tmpdir(), "c09-kitty-"));
   const display = `:${String(700 + (process.pid % 200))}`;
   const env = { ...process.env, DISPLAY: display, LIBGL_ALWAYS_SOFTWARE: "1", LANG: "C.UTF-8" };
