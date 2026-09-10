@@ -26,6 +26,7 @@ import type { Graph } from "../../src/data/viewmodel/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { refOf } from "../../src/presentation/plot/marks.js";
 import { sankeyArea, sankeyLayout } from "../../src/presentation/plot/sankey.js";
+import type { SankeyCell } from "../../src/presentation/plot/sankey.js";
 import { plotToSvg } from "../../src/presentation/plot/svg.js";
 import { b } from "../../src/shell/builders/index.js";
 import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
@@ -311,11 +312,55 @@ describe("SK — the sankey, one geometry and two painters (C12 I110, I111)", ()
     expect(() => b.plot(spec)).not.toThrow();
     expect(() => b.plot({ ...spec, form: "line" } as never), "and still refuses it off both forms").toThrow(/I69/u);
   });
-});
 
-// C12 I125's row lands with its code, in the commit after this one.
-describe("C12 §7 — `SankeyCell` is a discriminated union", () => {
-  it.todo(
-    "SK13 (C12 I125, §7): two `@ts-expect-error` rows as the subject, so reverting the union to the wide record fails compilation with an unused-directive error at both sites rather than failing an assertion — not deferred on a component: the row lands with the union in the commit that follows this spec",
-  );
+  it("SK13 (C12 I125, F1054): the type refuses what one `if` was holding", () => {
+    // **F717's residue.** `SankeyCell` was one wide record inhabiting both the
+    // label cells and the picture cells, so *a background never lands on a
+    // character a reader reads* (C10 I21) was a property of one branch in
+    // `sankeyArea` and nothing stated it. The union states it, and the second
+    // arm demands a `PictureGlyph` — a brand whose only constructor runs
+    // `assertPictureGlyph`, so the keeper is on the path to the type rather
+    // than beside the construction.
+    //
+    // **The refusals are the subject and compilation is the gate.** A
+    // `@ts-expect-error` that stops being needed is an *error* under
+    // `tsc --noEmit`, so a union that quietly widened again fails the check
+    // rather than passing this row — which is the fabricated violation the
+    // structural half owes, checked by the compiler instead of by an assertion.
+    const ref = refOf(0);
+    const other = refOf(1);
+
+    // The admitted set: a label character, and a cell with one owner.
+    const label: SankeyCell = { text: "A" };
+    const owned: SankeyCell = { text: "\u2588", ref };
+    expect([label.text, owned.text]).toEqual(["A", "\u2588"]);
+
+    // @ts-expect-error — a background may not be attached to a plain string (C12 I125)
+    const refused: SankeyCell = { text: "A", ref, background: other };
+    // @ts-expect-error — nor to a label cell that names no owner at all
+    const alsoRefused: SankeyCell = { text: " ", background: other };
+    expect([refused, alsoRefused].length, "both forms are constructed and both are refused").toBe(2);
+
+    // **Read the frame, not only the type.** Every cell the arm draws with a
+    // background carries a fill glyph — the property, taken off the cells the
+    // constructor produced rather than asserted about the constructor.
+    const twoOwners = graph(
+      ["a", "b", "c", "x", "y"],
+      [["a", "x", 5], ["a", "y", 1], ["b", "y", 3], ["c", "x", 2]],
+    );
+    const painted = sankeyArea(twoOwners, 5, 80, FULL_CAPS).rows
+      .flat()
+      .filter((c) => c.background !== undefined);
+    expect(painted.length, "the fixture responds — five rows is where two owners share cells").toBe(77);
+    expect([...new Set(painted.map((c) => c.text))], "and every one of them is a fill").toEqual(["\u2580"]);
+
+    // The control that says which fixture responds: the same call on a graph
+    // whose layers never share a cell draws no background at all, so asserting
+    // the property there would have been vacuous.
+    const noSharing = graph(["src", "hub", "p", "q"], [["src", "hub", 6], ["hub", "p", 10], ["hub", "q", 6]]);
+    expect(
+      sankeyArea(noSharing, 5, 80, FULL_CAPS).rows.flat().filter((c) => c.background !== undefined),
+      "the vacuous fixture, named rather than avoided",
+    ).toEqual([]);
+  });
 });

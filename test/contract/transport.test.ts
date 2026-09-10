@@ -510,12 +510,64 @@ describe("C06 §3 — the world stays app-side, behind a function", () => {
     expect(files.length, "the corpus is not empty").toBeGreaterThan(3);
     expect(apps.test('import type { DockerWorld } from "../../world.js";'), "the pattern can fire").toBe(true);
   });
-});
 
-// C06 I26's row lands with its code, in the commit after this one. The spec
-// commits alone; SP9 wants the invariant paired the day it is declared.
-describe("C06 §6 — `busy` is declared", () => {
-  it.todo(
-    "T2.13 (C06 I26, §6): the router's export set asserted by equality, so the alternative to declaring `busy` — exporting the guard's binding — fails rather than passing under a worse name — not deferred on a component: the row lands with the assertion in the commit that follows this spec",
-  );
+  it("T2.13 (I26): `busy` is the guard's only observable, so the member is the claim", async () => {
+    // **F1053.** The member sat on `UNCONSUMED_MEMBERS` because two sentences
+    // said the tree had already recorded its deletion. Both were homonyms of
+    // C16's `RouterDeps.busy` — one of them in a file with the same basename —
+    // and the ruling they deferred had been taken the other way by C16 §5 and
+    // C23 I5. What keeps the member is that the guard is a closure binding, so
+    // I13 has nothing else a tier can read.
+    //
+    // **A behavioural row alone would not be this row.** Asserting `true` then
+    // `false` restates I13 and says nothing about whether the member has to
+    // exist — which is the question. So the structural half is the subject and
+    // the behavioural half is its control.
+    const types = code("src/data/transport/types.ts");
+    const declaration = /interface TransportRouter \{([\s\S]*?)\n\}/.exec(types);
+    expect(declaration, "the interface's declaration").not.toBeNull();
+    const members = [...declaration![1]!.matchAll(/^\s*(?:readonly\s+)?([a-zA-Z][A-Za-z0-9]*)\s*[(:]/gm)]
+      .map((m) => m[1]);
+    expect([...new Set(members)].sort(), "the whole public surface of the router").toEqual([
+      "busy",
+      "for",
+      "inFlight",
+    ]);
+
+    // **There is no second way to observe the guard.** `router.ts` holds it in
+    // a closure and exports one function, so a reader that wanted the fact
+    // without the member would have to be given the binding — the same member
+    // under a worse name. Compared by equality so a new export cannot slip in
+    // and quietly make the member optional.
+    const router = code("src/data/transport/router.ts");
+    const exported = [...router.matchAll(/^export (?:async )?(?:function|class|const) ([A-Za-z0-9_]+)/gm)]
+      .map((m) => m[1]);
+    expect(exported.sort(), "one factory and one named error").toEqual([
+      "TransportBusyError",
+      "createRouter",
+    ]);
+    expect(/\binFlight\b/.test(declaration![1]!), "`inFlight` is the verb name, not the binding").toBe(true);
+
+    // **The patterns can fire** — both would report nothing at all against a
+    // file that had drifted, which is the shape that passes for the wrong
+    // reason (`a fabricated violation can be vacuous`).
+    expect(/^\s*(?:readonly\s+)?([a-zA-Z][A-Za-z0-9]*)\s*[(:]/m.test("  readonly pending: boolean;")).toBe(true);
+    expect(/^export (?:async )?(?:function|class|const) ([A-Za-z0-9_]+)/m.test("export const inFlightBinding = 1;")).toBe(true);
+
+    // The control: the two readings I13 is stated over, taken through the only
+    // member that can express them.
+    const clock = fakeClock();
+    const held = createRouter({
+      default: createSubprocessTransport({
+        binary: "widget",
+        clock: clockOf(clock),
+        runner: fakeRunner(() => ({ stdout: ["{}"], exit: { code: 0, signal: null } })),
+      }),
+    });
+    expect(held.busy, "idle before").toBe(false);
+    const pending = held.for("ps").invoke(invocation());
+    expect(held.busy, "held during").toBe(true);
+    await pending;
+    expect(held.busy, "released after").toBe(false);
+  });
 });

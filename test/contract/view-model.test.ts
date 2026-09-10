@@ -36,6 +36,9 @@ import {
   formatReport,
 } from "../../src/testing/measurement-conformance.js";
 import { ASCII_CAPS, measurable } from "../support/render.js";
+import { fullRegistry } from "../../src/testing/expect-document.js";
+import { HAS_HIDEABLE_SERIES } from "../../src/data/viewmodel/types.js";
+import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { patchDefinition } from "../../src/presentation/patch/index.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/types.js";
@@ -870,16 +873,119 @@ describe("C04 §7 — the update model and the view state, checked rather than c
       );
     }
   });
-});
 
-// C04 I116 and I117's rows land with their code, in the commit after this one.
-// The spec commits alone so its diff is readable without the implementation
-// beside it, and SP9 wants an invariant paired the day it is declared.
-describe("C04 §3 — the windowing set and the size channel", () => {
-  it.todo(
-    "T2.127 (C04 I116, §3): the set of kinds declaring `window` asserted by equality through the registry — seven, not the five the kinds directory returns — plus the `ViewPatch` op set by equality, which is what F141's falsified premise needed watching it — not deferred on a component: the row lands with the assertion in the commit that follows this spec",
-  );
-  it.todo(
-    "T2.128 (C04 I117, §3): the bubble's size channel read off the frame — hiding the entry the legend names removes a rasterisation while the sizes keep sizing and keep owning the axis — and the count of forms carrying a channel inside `series` pinned at one, so a second form fails a row rather than passing silently — not deferred on a component: the row lands with the assertion in the commit that follows this spec",
-  );
+  it("T2.127 (I116): the reason `logs` is declared, and the condition that falsified the old one", () => {
+    // **F1055.** F141 kept `logs` against removal on two reasons, and its
+    // *deciding* one — *`logs` is the only kind in the tree that implements
+    // `window` … and `raw` has none* — stopped being true in `f7a95bc5`
+    // (2026-09-04). Nothing noticed, because the sentence was in a surfaces
+    // document and the commit was in C09.
+    //
+    // **This row watches the condition, not the remedy.** A row that asserted
+    // *`logs` is unconsumed* would be green for exactly as long as the defect
+    // is; the set below moves the day any kind gains or loses a window, which
+    // is what would have caught the premise going false.
+    //
+    // **Taken from the registry, not from `blocks/kinds/`.** Grepping that
+    // directory returns five: `table` and `patch` register from C11 and C25, so
+    // a scan over one directory undercounts by two — which is `a set over sites
+    // is blind to redistribution` arriving in the instrument that would have
+    // watched it.
+    const reg = fullRegistry();
+    const ALL_KINDS = [
+      "rule", "notice", "keyValue", "table", "steps", "logs", "events", "plot",
+      "progress", "code", "comparison", "patch", "pills", "tip", "panel", "group",
+      "scroll", "mosaic", "image", "status", "terminal", "raw",
+    ] as const;
+    expect(ALL_KINDS.filter((k) => reg.get(k) === undefined), "every kind resolves").toEqual([]);
+    const windowed = ALL_KINDS.filter(
+      (k) => typeof (reg.get(k) as { window?: unknown } | undefined)?.window === "function",
+    );
+    expect([...windowed].sort(), "seven kinds window, and `raw` is one of them").toEqual([
+      "code", "keyValue", "logs", "patch", "raw", "table", "terminal",
+    ]);
+
+    // **What is left of the residue, and it is C04's.** No `ViewPatch` arm
+    // appends a line, so a growing log is `replace` with the whole block per
+    // tick — which is why the streaming route declines the kind. Compared by
+    // equality against the declaration, so the arm that would close this cannot
+    // land without this row reporting it.
+    const types = readFileSync("src/data/viewmodel/types.ts", "utf8");
+    const union = /export type ViewPatch =([\s\S]*?);\n/.exec(types);
+    expect(union, "the patch union's declaration").not.toBeNull();
+    const ops = [...union![1]!.matchAll(/op: "([a-zA-Z]+)"/g)].map((m) => m[1]);
+    expect([...new Set(ops)].sort(), "no arm appends a line").toEqual([
+      "append", "expand", "merge", "replace", "reserve", "status",
+    ]);
+    expect(/op: "([a-zA-Z]+)"/.test('| Readonly<{ op: "appendLine"; blockId: string }>'), "the pattern can fire").toBe(true);
+
+    // **The reason that survives, read off the frame rather than asserted about
+    // the type.** `levelTone` has one caller — the `logs` renderer — so the same
+    // three strings through `raw` draw the level in body colour, and the columns
+    // are baked into the text instead of re-aligned at the width.
+    const line = { ts: "14:23:01.882", level: "warn", message: "disk 91% full" };
+    const asLogs = { kind: "logs", id: "lg", lines: [line] } as never;
+    const asRaw = { kind: "raw", id: "rw", text: `${line.ts} ${line.level} ${line.message}` } as never;
+    const kit = measurable();
+    const [logRow] = kit.renderToLines(asLogs, 60);
+    const [rawRow] = kit.renderToLines(asRaw, 60);
+    const sgrs = (l: string): number => (l.match(/\u001b\[/gu) ?? []).length;
+    expect(sgrs(logRow ?? ""), "the level carries its own tone").toBeGreaterThan(sgrs(rawRow ?? ""));
+    expect((logRow ?? "").includes(line.message), "and it is the same three strings").toBe(true);
+  });
+
+  it("T2.128 (I117): the size channel's four symptoms, and the count that says when it gets worse", () => {
+    // **F1051.** `FS3` asserts F271's disagreement on purpose, so it is green
+    // for exactly as long as the defect is and says nothing when the defect
+    // grows. This row is the other half: the *count* of forms whose `series`
+    // carries something that is not a position, and the fourth symptom that
+    // count exists to catch.
+    const bubble = {
+      kind: "plot", id: "bb", form: "bubble", height: 8, axes: true, legend: "right",
+      series: [
+        { label: "value", values: [10, 40, 25] },
+        { label: "size", values: [1, 4, 2] },
+      ],
+    } as never;
+
+    // **Symptom 4, and it is a control doing the wrong thing rather than a
+    // figure looking wrong.** `bubble` is in `HAS_HIDEABLE_SERIES`, so C22 I78's
+    // reader-facing toggle reaches the size channel — and hiding it removes a
+    // rasterisation the reader never asked to see while the sizes go on sizing
+    // the value bubbles, because `bubbleRows` reads `block.series[1]` directly
+    // and never asks `seriesHidden`. Read off the frame, not off a flag.
+    expect(HAS_HIDEABLE_SERIES.bubble, "the toggle reaches a channel").toBe(true);
+    const draw = (hidden?: number): readonly string[] =>
+      measurable({
+        definitions: [plotDefinition as never],
+        ...(hidden === undefined
+          ? {}
+          : { seriesVisibility: { bb: { [hidden]: true } } as never }),
+      })
+        .renderToLines(bubble, 72)
+        .map((l) => l.replace(/\u001b\[[0-9;]*m/gu, ""));
+
+    const all = draw();
+    const noSizes = draw(1);
+    expect(noSizes, "hiding the channel changes the frame").not.toEqual(all);
+    // The fixture responds in both directions, and the two hides differ — a
+    // shape that reported byte-identical frames while the option was being
+    // passed in the wrong form, which is how a collision hides a dropped input.
+    expect(draw(0), "hiding the value series is a different frame again").not.toEqual(noSizes);
+    // And the gutter is unchanged by the hide, because the hidden channel still
+    // sets the extent: the floor is a *size*, at 0, not the smallest value.
+    const gutter = (rows: readonly string[]): readonly string[] =>
+      rows.map((r) => r.slice(0, 3).trimEnd()).filter((r) => r !== "");
+    expect(gutter(noSizes), "the hidden channel still owns the axis").toEqual(gutter(all));
+
+    // **The count, which is what watches the condition.** One form, and the day
+    // a second gains a channel inside `series` it inherits all four symptoms and
+    // this row reports it — where `FS3`, asserting only the bubble's own
+    // normalisation, would stay green.
+    const CHANNEL_IN_SERIES: readonly string[] = ["bubble"];
+    expect(CHANNEL_IN_SERIES.length, "one form breaks the rule, and it is recorded (C04 I117)").toBe(1);
+    const src = readFileSync("src/presentation/plot/definition.ts", "utf8");
+    const positional = [...src.matchAll(/const s2 = block\.series\[1\]|block\.series\[1\]/g)].length;
+    expect(positional, "two reads of `series[1]`: `dumbbell`'s second position, and the bubble's channel").toBe(2);
+  });
 });
