@@ -6,8 +6,15 @@ name: mutation-sweep
 # is how 18 of 283 anchors went stale with two controls among them (F980).
 # Six shards, round-robin over the sorted list, so one shard is about an hour.
 # The anchors sweep runs first in every shard and a red one runs nothing.
-# The runs drive vitest over tiers 1-4 and a few over tier 5, so the job
-# carries the same terminals `full` installs and a build for `dist/`.
+# The runs drive vitest over tiers 1-4 and a few over tier 5, so the job carries
+# the four terminals those rows need and a build for `dist/`. **Not the same
+# list `full` installs**, which this comment used to claim: `full` gained
+# `imagemagick` at `dab8bbc1` for two rows that screenshot a real kitty, and no
+# run under `tools/mutate/runs/` reaches them — measured, not assumed, `grep -rln
+# image-protocol` there is empty. The day one does, F1094's precondition refuses
+# by name rather than reporting a colour of minus one, so the mechanism is what
+# speaks and not the package list. Claiming parity with another job's list was a
+# claim no gate resolved, which is F1095 and is why SS62 exists.
 
 on:
   schedule:
