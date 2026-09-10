@@ -17,7 +17,7 @@ import { SWEEP_BUDGET_MS } from "../support/budget.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
-import { ANCHORS, RUNS_DIR, discoverRuns, knownStale, parseArgs, plan, shardOf, summarise, verdict } from "../../tools/mutate/sweep.mjs";
+import { ANCHORS, RUNS_DIR, discoverRuns, knownStale, parseArgs, plan, redTails, shardOf, summarise, verdict } from "../../tools/mutate/sweep.mjs";
 
 type Summary = Readonly<{ caught: number; elsewhere: number; survived: number; anchorMissed: number; unbuilt: number; noSummary: number; expected: number; staleExemption: number }>;
 type Args = { shard: { k: number; n: number } | null; only: string | null; list: boolean; out: string; skipAnchors: boolean };
@@ -140,5 +140,62 @@ describe("MS6: `--list` plans and runs nothing", () => {
     } finally {
       rmSync(out, { recursive: true, force: true });
     }
+  });
+});
+
+describe("MS7: a red run prints the tail of its own log (F1097)", () => {
+  // The logs were written beside `summary.json` and nothing read them back, so
+  // the two reds of the first sweep this repository ever ran each produced one
+  // summary line and no reason — and both diagnoses came from reproducing them
+  // on a machine that keeps the file. The disk is injected because a row cannot
+  // manufacture a red run of the real sweep, which is this row's stated limit:
+  // it drives the formatter and the path, and the wiring into `main` is proven
+  // by running the sweep with the catalogue moved aside.
+  const log = ["one", "two", "three", "four", "EXIT=1 SECONDS=9"].join("\n");
+
+  it("MS7a: the header names the run and both counts, and every body line is prefixed", () => {
+    const lines = redTails([{ run: "c12-x.mjs" }], "out/mutate-sweep", () => log, 3);
+    expect(lines[0], "the run and the arithmetic of what was cut").toContain(
+      "c12-x.mjs, last 3 of 5 lines",
+    );
+    expect(lines.slice(1), "the last three, each prefixed").toEqual([
+      "  │ three",
+      "  │ four",
+      "  │ EXIT=1 SECONDS=9",
+    ]);
+  });
+
+  it("MS7b: the tail is a cap rather than a count — a short log prints whole", () => {
+    const lines = redTails([{ run: "c12-x.mjs" }], "out", () => "only", 30);
+    expect(lines[0], "and says so").toContain("last 1 of 1 lines");
+    expect(lines.slice(1)).toEqual(["  │ only"]);
+  });
+
+  it("MS7c: it reads each run's own log, at the path the sweep wrote it to", () => {
+    const seen: string[] = [];
+    redTails([{ run: "a.mjs" }, { run: "b.mjs" }], "somewhere", (f: string) => {
+      seen.push(f);
+      return "x";
+    });
+    expect(seen, "one read per red run, under `--out`").toEqual([
+      "somewhere/a.mjs.log",
+      "somewhere/b.mjs.log",
+    ]);
+  });
+
+  it("MS7d: a log that cannot be read is skipped, not reported as empty", () => {
+    // `--list` leaves an empty directory behind, and the run's own row is
+    // already printed above this. An unreadable log producing a header with no
+    // body would read as a run that said nothing, which is the opposite of what
+    // the whole repair is for.
+    expect(
+      redTails([{ run: "gone.mjs" }], "out", () => {
+        throw new Error("ENOENT");
+      }),
+    ).toEqual([]);
+  });
+
+  it("MS7e: no red runs, no output — the green path is unchanged", () => {
+    expect(redTails([], "out", () => "x")).toEqual([]);
   });
 });

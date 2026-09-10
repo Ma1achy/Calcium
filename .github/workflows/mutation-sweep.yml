@@ -6,8 +6,15 @@ name: mutation-sweep
 # is how 18 of 283 anchors went stale with two controls among them (F980).
 # Six shards, round-robin over the sorted list, so one shard is about an hour.
 # The anchors sweep runs first in every shard and a red one runs nothing.
-# The runs drive vitest over tiers 1-4 and a few over tier 5, so the job
-# carries the same terminals `full` installs and a build for `dist/`.
+# The runs drive vitest over tiers 1-4 and a few over tier 5, so the job carries
+# the four terminals those rows need and a build for `dist/`. **Not the same
+# list `full` installs**, which this comment used to claim: `full` gained
+# `imagemagick` at `dab8bbc1` for two rows that screenshot a real kitty, and no
+# run under `tools/mutate/runs/` reaches them — measured, not assumed, `grep -rln
+# image-protocol` there is empty. The day one does, F1094's precondition refuses
+# by name rather than reporting a colour of minus one, so the mechanism is what
+# speaks and not the package list. Claiming parity with another job's list was a
+# claim no gate resolved, which is F1095 and is why SS62 exists.
 
 on:
   schedule:
@@ -39,9 +46,20 @@ jobs:
       - run: make install
       - run: sudo apt-get update -q && sudo apt-get install -y -q xvfb xdotool xterm kitty
       - run: npm run build
-      - run: node tools/mutate/sweep.mjs --shard ${{ matrix.shard }}/6 ${{ inputs.only != '' && format('--only {0}', inputs.only) || '' }}
+      # **The target, not the command.** A04 §5: *CI runs the same targets a
+      # developer runs. Not equivalent commands — the same ones.* This step
+      # invoked the script directly, so `make mutate`'s `catalogue`
+      # prerequisite never ran and two shards of the first sweep went red on a
+      # gitignored directory rather than on a survivor (F1097).
+      - run: make mutate SHARD=${{ matrix.shard }}/6 ${{ inputs.only != '' && format('ONLY={0}', inputs.only) || '' }}
         env:
           TERM: xterm-256color
-      # The per-run logs and `summary.json` under `out/mutate-sweep/` are in
-      # the job log above; nothing is uploaded, so no artifact action version
-      # is a thing this workflow can be wrong about.
+      # `summary.json` and the per-run logs are written under
+      # `out/mutate-sweep/` and **a red run now prints the tail of its own
+      # log**, which is the only reason any of it reaches a reader here.
+      # This comment used to say the logs *are in the job log above*: they
+      # were not, so the first two reds this workflow ever produced gave one
+      # summary line each and no reason, and both diagnoses came from
+      # reproducing them on a machine that keeps the file (F1097). Nothing
+      # is uploaded, so no artifact action version is a thing this workflow
+      # can be wrong about — that half of the old comment was true.

@@ -18,6 +18,7 @@ import {
 } from "./module-graph.mjs";
 import { checkSourceScans, checkMarks, checkControlBytes, checkAllowLists, checkEmojiBases } from "./source-scans.mjs";
 import { checkDependencies, checkPhantomImports } from "./dependencies.mjs";
+import { checkWorkflows } from "./workflows.mjs";
 import { checkRefusals, REFUSALS, unverifiableRefusals } from "./refusals.mjs";
 import {
   ACKNOWLEDGED_BACKLOG,
@@ -196,6 +197,12 @@ const violations = [
   ...checkEmojiBases(files),
   ...checkDependencies(),
   ...checkPhantomImports(files),
+  // SS62 — the workflows against their record. Its own function rather than a
+  // `SCANS` row for SS31's reason: the subject is two documents disagreeing,
+  // not a line matching a regex. `grep -rln '\.github' tools/ Makefile` returned
+  // nothing before this line existed, and four findings in one day had come out
+  // of that directory (F1095).
+  ...checkWorkflows(),
   // The specs are enforced too. A03 governs the source; SP1 governs the
   // documents the source is written against, because a commitment nothing
   // enforces diverges from the implementation without anything going red.

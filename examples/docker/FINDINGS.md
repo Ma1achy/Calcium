@@ -45285,7 +45285,7 @@ budgets exist at all.
 |---|---|
 | **Surface** | `.github/workflows/mutation-sweep.yml:12-19` · `ci.yml:108,143,177` · A04 §6's table |
 | **Reached for** | F812, whose disposition has read *the next run is the measurement* since it was filed, and whose measurement lives in the one job a working branch cannot reach |
-| **Verdict** | **open** |
+| **Verdict** | **closed** — the merge registered both triggers, and the dispatch fired six shards on demand |
 
 ### Going to find out how to run the expensive tier, and finding a workflow that cannot run at all
 
@@ -45416,6 +45416,40 @@ until it is merged.
 - **The repository being private**, which would revive the cost argument.
   `gh repo view --json isPrivate` → `false`.
 - **`billable` being absent rather than zero.** It is present, with `jobs: 5`.
+
+### Closed — the merge, and then the trigger fired
+
+`148c1df6` merged pull request 46. The two readings that had said the workflow
+was unregistered now say the opposite, from the same commands:
+
+```
+$ gh workflow list --all
+ci               active  322506113
+mutation-sweep   active  355239969
+
+$ gh api /repos/{owner}/{repo}/actions/workflows --jq .total_count
+2
+```
+
+**One was `1` and the other was `HTTP 404: workflow mutation-sweep.yml not found
+on the default branch`.** Neither file changed; the ref did.
+
+**Registering is not running, and this finding is the ninth form of a gate that
+exists and is not run** — so the close-out is a dispatch rather than a listing:
+
+```
+$ gh workflow run mutation-sweep -f only=c12-a
+https://github.com/{owner}/{repo}/actions/runs/34525436331
+```
+
+Six shards, the `only` input reaching the sweep, and the job body working end to
+end — checkout, `make install`, the terminals, `npm run build`, the sweep. **The
+first time that workflow has ever run**, and its cron is still ahead of it: the
+schedule registers from the same merge and fires on the first Sunday after it.
+
+**A listing would have closed the wrong half.** The finding's own words are *the
+first form where the gate is unregistered rather than unrun* — so proving it
+registered leaves it exactly where the eight earlier forms were.
 
 ## F1090 — the branch-push row promises two minutes, names five stages, and the job runs seven in nine minutes ★★★
 
@@ -45844,7 +45878,7 @@ alone and 6 936 ms inside the suite, against sixty.
 |---|---|
 | **Surface** | `.github/workflows/ci.yml`'s `full` job · `test/e2e/image-protocol.test.ts:199` |
 | **Reached for** | the first `full` job this branch's work has ever had, on pull request 46 |
-| **Verdict** | **open** |
+| **Verdict** | **closed** — two rows, 29.2 s green on the runner, twice, with `imagemagick` in the job and a precondition that refuses by name |
 
 ### What the runner said
 
@@ -45931,3 +45965,589 @@ cannot run without it. Install `imagemagick`; CI does so in the `full` job.
   is the test of this.
 - **The devcontainer lacking the tools**, which would make the local greens
   something else. `which` finds both.
+
+---
+
+### Closed — on the machine that produced it, twice
+
+```
+✓ test/e2e/image-protocol.test.ts (2 tests) 29215ms
+```
+
+Pull request 46's `full` job, and `main`'s own run after the merge. Both rows,
+both times, on the runner that had reported `-1`.
+
+**A fact about a machine is closed by that machine and by nothing else**, which
+is what F1087 and F1093 both had to wait for and is the whole reason this class
+took three instances in a day to see. The devcontainer's greens were as green
+before the fix as after it.
+
+The precondition earns its place separately from the package: with a shim
+`import` that exits 1 on `PATH`, the rows fail naming the tool rather than
+reporting a colour, so the sentinel now stands for the outcome it honestly names
+and for nothing else. `mutation-sweep.yml` deliberately does **not** get the
+package — see F1095, where that decision is the sixth instance and the mechanism
+is what covers it.
+
+## F1095 — the two files that decide whether any gate runs are read by no gate ★★★★
+
+| | |
+|---|---|
+| **Surface** | `.github/workflows/ci.yml`, `.github/workflows/mutation-sweep.yml` · `docs/architecture/A04_repo_scaffolding.md` §5, §6 · `tools/enforce/` |
+| **Reached for** | the merge that unblocked F1086 and F1089, and reading `mutation-sweep.yml` in order to dispatch it |
+| **Verdict** | **closed** — SS62 wired, four hand mutations each killing a row, and `proof` in A04 §6; the two blind spots are named residue |
+
+### The measurement is one line and it is empty
+
+```
+$ grep -rln '\.github' tools/ Makefile
+$
+```
+
+`make enforce` runs sixty-one source scans, a module graph, a commitment audit, a
+findings-register check and a todo-expiry sweep. **Not one of them opens either
+of the two files that decide whether any of it runs**, and no Makefile target
+names the directory.
+
+### Four findings in one day came out of that directory
+
+| finding | what was wrong | how long it stood | what would have reported it |
+|---|---|---|---|
+| F1086 | `on: push: branches: [main]` — a branch push fired nothing | 44 days | a runner, once someone pushed a branch and noticed the absence of a run |
+| F1089 | `mutation-sweep.yml` on a feature branch has neither of its two triggers | since `887de60d` | `gh workflow list --all`, run by hand |
+| F1090 | §6's stage list names five, the job runs seven | 29 days | a green run whose steps someone totalled |
+| F1094 | the `full` job installs four packages and its rows need five | since the rows were written | the runner |
+
+Three of the four are **absences**, and the fifth column is the finding: every
+one was found by a person going to look, and none by a gate. That is
+`a gate that exists and is not run` inverted — here the gates run and the
+subject is outside all of them.
+
+### The fifth instance, found by the draft rule before it was wired
+
+Every `make` target a job in `.github/workflows/` runs, checked against §6:
+
+```
+  ok   audit      ok   check      ok   e2e       ok   enforce    ok   golden
+  ok   install    ok   instruments  MISS proof   ok   regime     ok   test
+```
+
+**`make proof` is a whole CI job** — `if: pull_request || main || tags`, its own
+runner, `bash tools/proof.sh` — and **§6 does not name it**. `proof` appears
+twice in A04, at §1 as a noun in the repo table and at §3 as a description of
+what packing checks; the section that is CI's record has no row for it, no
+mention in the arrow, and nothing in the pull-request row's *the above plus
+`golden → e2e → [repo-specific]`* that resolves to it.
+
+It is F1090's defect a third time and the largest: not a stage missing from a
+list of stages, but a job missing from the account of the jobs. And F807 is the
+reason it matters — `proof` was **CI-only in practice**, the first instance the
+gate-not-run note records, red on an npm crash for as long as the fast job hid
+it.
+
+### A sixth, live, and vacuous today — which is why it is worth writing down
+
+`mutation-sweep.yml` says of its own environment:
+
+> The runs drive vitest over tiers 1-4 and a few over tier 5, so the job
+> carries **the same terminals `full` installs** and a build for `dist/`.
+
+The two lines, measured:
+
+```
+ci.yml:129              xvfb xdotool xterm kitty imagemagick
+mutation-sweep.yml:40   xvfb xdotool xterm kitty
+```
+
+They diverged at `dab8bbc1`, F1094's fix, which put the package in one of the
+two jobs that claim to carry the same set. **Vacuous today, measured rather than
+assumed**: `grep -rln image-protocol tools/mutate/runs/` is empty, and the only
+two runs naming `test/e2e` drive `mouse.test.ts` and `lifecycle.test.ts`. So
+nothing in the sweep reaches a row that needs ImageMagick, and the claim is
+false without yet being costly.
+
+**The repair is the comment rather than the package**, and the direction is worth
+stating because the other one is more obvious. Adding `imagemagick` to the sweep
+buys parity with a claim nobody needs, on six shards, for rows that do not exist;
+correcting the comment to name what the job installs and why costs nothing and
+stops asserting something no gate resolves. And the day a mutation run does reach
+those rows, F1094's own remedy is what speaks: a precondition that refuses **by
+name** before anything is driven. The instance is closed by the mechanism the
+previous finding already built, which is the argument for building mechanisms.
+
+### Why this is SS31's shape and not a new idea
+
+`DEPENDENCIES.md` is a document about `package.json`, and SS31 compares them in
+both directions — a declared dependency with no entry, an entry with nothing
+installed. That rule exists because a document about a file drifts from it, and
+the drift is invisible to a reader holding either one.
+
+**A04 §5 and §6 are documents about the Makefile and about
+`.github/workflows/`**, and there is no SS31 for them. §5's own table is the
+second measurement:
+
+```
+Makefile targets   all audit catalogue check clean e2e enforce golden help
+                   hooks install instruments mutate profile proof refdiff
+                   regime roadmap test
+A04 §5 names       all audit check conformance enforce golden hooks install
+                   record test
+```
+
+Eight of this repository's targets are absent from the table that is supposed to
+be the Makefile contract — `catalogue`, `instruments`, `mutate`, `profile`,
+`proof`, `refdiff`, `regime`, `roadmap` — and two the table names are other
+repositories' (`conformance`, `record`), which is what makes §5 a **cross-repo**
+contract and stops a two-way comparison from being the right rule there.
+
+### Remedy
+
+**SS62 — every `make` target a job in `.github/workflows/` runs is named in A04
+§6.** One direction, not two: §6 names `make all`, which is a developer target
+and not a job's, so the reverse comparison would fire on the convention rather
+than on a defect. Scoped to §6 rather than to the whole document, because
+scoping it to the document makes it vacuous — `proof` is named at §3 and the
+rule would pass today, which is the exact failure `a fabricated violation can be
+vacuous` is about.
+
+Measured over the corpus before being wired: ten targets, nine pass, one fires,
+and the one that fires is a defect rather than a convention.
+
+### Stated blind spot, and it is the larger half
+
+**A trigger's reach is a property of the ref a file is on, not of the file.**
+Nothing in `.github/workflows/ci.yml` distinguishes F1086's tree from the fixed
+one to a scan that has never seen a second version, and nothing at all in
+`mutation-sweep.yml` says whether it is registered — F1089's whole subject is
+that the file is *correct, complete and on the wrong ref*. Neither is reachable
+locally by any rule, and the line that separates them is `gh workflow list
+--all`, which needs a network and an authenticated remote.
+
+So SS62 covers the fifth instance and the third, and covers neither of the two
+that hid best. The instrument for those is the habit §6 already carries in
+prose: **`gh workflow list --all` belongs in the close-out of any change to that
+table.**
+
+### What would falsify this
+
+- **A gate that does read the workflows.** `grep -rln '\.github' tools/ Makefile`
+  is the whole search and it is empty; `make enforce`'s modules are the sixteen
+  files under `tools/enforce/` and none names the path.
+- **`proof` being named in §6 under another word.** Searched: `grep -n proof` over
+  the section returns nothing, and over the document returns §1's noun and §3's
+  sentence about packing.
+- **The sweep reaching an ImageMagick row**, which would make the sixth instance
+  a defect rather than a false comment. `grep -rln image-protocol tools/mutate/runs/`
+  is empty.
+
+### Closed — the rule, its mutations, and the instance the draft found
+
+`tools/enforce/workflows.mjs`, wired into `make enforce` beside SS31 for SS31's
+reason: the subject is two documents disagreeing, not a line matching a regex.
+
+Five rows in `test/unit/enforce-workflows.test.ts` — the vacuity control first,
+the fabricated violation, the prose control, both empty arms, and the readers.
+**Four hand mutations, each killing a row:**
+
+| mutation | what went red |
+|---|---|
+| `names()` returns `true` | the fabricated violation |
+| `targetsRun` returns `[]` | the fabrication and the readers |
+| the no-workflows arm passes | both empty arms |
+| the missing-§6 arm passes | both empty arms |
+
+And a fifth, one file out: renaming the fabrication's title so it no longer says
+*fires* turns the new registration row red with `SS62 has no test asserting it
+fires`. That row exists because **SS62 spent one chain in exactly the state it
+was written to prevent** — inventoried in A03, implemented in a module the
+reconciliation could not see, `make enforce` green and `make test` red on *A03
+inventories SS62 and nothing implements them*. The gate that caught it is in the
+suite rather than in `enforce`, which is `run the whole suite, not a chosen
+subset` arriving on this finding's own rule.
+
+A04 §6 gains the `proof` row in its own commit before the code, and the sweep's
+comment stops claiming a parity no gate resolved. The corpus reads ten of ten.
+
+**The two blind spots are residue, named rather than closed.** Nothing local
+separates F1086's tree from the fixed one, and nothing at all reports whether a
+workflow is registered — `schedule` and `workflow_dispatch` come from the default
+branch, and `gh workflow list --all` is the only line that tells a gate that
+cannot run from a gate with nothing to say. That line is in §6's prose as a
+habit, which is what a rule cannot be here.
+
+---
+
+## F1096 — the wait was right to exist and wrong about why, and it is the wait that says so ★★★★
+
+| | |
+|---|---|
+| **Surface** | `test/e2e/emulator.test.ts` T5.21 · `test/support/execution.ts`'s `settled` |
+| **Reached for** | `main`'s own CI run after the merge — the fifth `full` sample on this head |
+| **Verdict** | **closed** — the instrument answered on its first firing, and the answer is a framework defect with a deterministic row |
+
+### The repair, and the sentence it rested on
+
+`d2e57aaa` put a five-second poll under T5.21's tail assertion, on this premise:
+
+> `settled` waits for the guard to be taken and released, which is the route
+> finishing — and **the patch carrying the child's last chunk can land a turn
+> after that**.
+
+A race. Reasonable, unmeasured, and consistent with two runner samples that had
+shown the blocks serialised with no `200` in them.
+
+### What the runner said with the poll in place
+
+```
+× T5.21 … 5043ms
+AssertionError: and the tail is the last line the child wrote:
+  expected '[{"kind":"scroll","id":"term-scroll-2…' to contain '200'
+```
+
+**5043 ms against a 5 000 ms deadline** — the poll ran to its end. And the
+received value is not truncated by the logger; it closes properly:
+
+```
+…{"text":"33"},{"text":"34"}]}],"follow":true}]
+```
+
+**Lines 1 to 34 of 200, and the JSON is complete.** Five seconds of polling
+moved it nowhere.
+
+### Which falsifies the premise the poll was written from
+
+A patch landing *a turn late* is fixed by waiting a turn. A feed that delivers 34
+lines and stops is not fixed by waiting at all, and five seconds is a long way
+past a turn. **The repair was right to exist and wrong about why** — and the only
+reason the distinction is known is that the repair itself produced the figure.
+
+This is `a fix that changes nothing indicts the diagnosis` with the sign
+reversed: the fix changed something, and what it changed was the evidence.
+
+### Two readings remain, they want opposite repairs, and no sample separates them
+
+| reading | what `first → last` would look like | the repair it wants |
+|---|---|---|
+| the feed **stops** | 34 → 34, grew by 0 | a drain the route does not perform before it releases the guard |
+| the feed is **slow** | 12 → 34, grew by 22 | a longer wait, which is the bound this row already widened once |
+
+Every sample so far reports only the final state, which both readings produce.
+So the row now reports the pair rather than choosing, and the next runner sample
+carries its own diagnosis:
+
+```
+and the tail is the last line the child wrote · 200 → 200 numbered lines of 200
+in 5010 ms, 1 patches, grew by 0
+```
+
+That is the local reading, driven with a value that cannot arrive. Two things in
+it are worth keeping. **The transcript is already complete before the poll
+begins** — `first` is 200, so locally the wait has never once been load-bearing.
+And **one patch**: the whole two hundred lines arrive in a single patch here, so
+a runner holding 34 may be holding one short chunk rather than a sequence that
+stalled.
+
+### This machine cannot produce either reading
+
+Green in the devcontainer every time, at 876 ms. Including with `settled`'s
+phase-one budget — twenty milliseconds for the route to take the guard, on a
+runner measured at 2.7× to 4.1× this container — **starved to zero**, which was
+the obvious candidate and is not it: the poll underneath covers for an early
+`settled` locally, so the mutation cannot separate them here either.
+
+Same shape as F1087, F1093 and F1094: a fact about the machine, discoverable
+only on the machine that was never allowed to disagree. The difference is that
+those three were repaired from the runner's own message and this one is not,
+because the message named a state rather than a mechanism.
+
+### Remedy
+
+**No bound is widened.** The row keeps its five seconds and gains the two
+figures that separate the readings, so the next red is a diagnosis rather than a
+repetition — `a red row carries its verdict`, applied before the next red rather
+than after it.
+
+The comment in the row is corrected in the same edit: a premise that has been
+falsified must not stay in the file as the reason for the code beneath it, which
+is the whole of `ask where a settled claim is written down` pointed at a claim of
+my own.
+
+### Closed — the instrument answered on its first firing
+
+```
+AssertionError: and the tail is the last line the child wrote ·
+  46 → 46 numbered lines of 200 in 5013 ms, 1 patches, grew by 0
+```
+
+**`grew by 0`.** Not a slow feed — a stopped one. Five seconds and not one line
+more, and `1 patches` where the local reading is also one, so the route
+delivered a single patch carrying part of the output and nothing followed. The
+previous sample cut at 34 and this one at 46, **a cut point that moves**, which
+is a chunk boundary rather than a cap.
+
+The table said the two readings wanted opposite repairs. The row picked one on
+its first red, which is the whole argument for reporting instead of choosing.
+
+### The mechanism, and it is one flag carrying two conditions
+
+`execution.ts`'s write path queues each chunk onto a promise chain:
+
+```ts
+const onChunk = (chunk: string): void => {
+  if (!accepting) return;
+  writes = writes.then(async () => {
+    if (!accepting) return;          // ← the defect
+    await emulator.write(chunk);
+    …
+  });
+};
+```
+
+and the exit path is
+
+```ts
+accepting = false;   // "the gate closes before the drain, not after it"
+await writes;        // the drain
+finished = true;
+…
+emulator.dispose();
+```
+
+**`accepting` means two things** — *the child may still write* and *the emulator
+is still alive* — and only the second is a reason to drop anything. The outer
+check wants the first: nothing more will come, so stop queueing, and closing
+early is right. The inner check wants the second, and reads the first.
+
+So every link queued before the exit and not yet run when it fired **returned
+without writing**, and `await writes` awaited a chain of no-ops. On this machine
+a `seq` finishes before the exit is observed, so the window never opens; on a
+runner it opens wherever the exit catches the chain.
+
+**And C23 I67 was satisfied by it, word for word.** The clause read *every write
+is awaited before the final snapshot*. Every write was awaited. None of them
+wrote. A wording that names the mechanism is satisfied by a mechanism that does
+nothing — A03 §2's vacuity class arriving in an invariant, and the same thing the
+mutation pass says about a sentence. I67 now names the observable: *every chunk
+the child wrote before it exited has reached the screen*.
+
+### The rows, and the one the guard never had
+
+**T3.80** constructs the window rather than racing for it: emit every line, then
+settle the child in the same turn, so the links are pending when the gate
+closes. No sleep, no load, no timing. It fails on the old flag with the runner's
+own sentence and passes on the new one, and it asserts the **count** as well as
+the tail, because a row looking only for `"200"` passes on a screen that dropped
+the middle.
+
+**T3.80b** is the control the guard was missing. Removing `if (finished) return;`
+**failed nothing across all five emulator suites — 95 rows green** — so the guard
+the code credits with catching a CI-only crash was witnessed by no row at all.
+Its hazard is the opposite of T3.80's, a link running *after* the disposal, and
+it is reachable through an `exited` that rejects with chunks still queued.
+Without the guard, that row's file fails with
+
+```
+Emulator.write: called after dispose — the screen is gone, and returning the
+last one would hide the bug
+```
+
+**The two rows together are why the flag changed rather than went.** One says the
+drain must deliver; the other that the disposal must stop it. A single flag could
+not say both, which is the finding stated as a shape rather than as a line
+number.
+
+### What this cost and what it bought
+
+The first repair was wrong about why and **produced the number that said so**.
+The second is founded on that number. A tier-5 red that reproduces only under
+load is a lottery; the same defect is now driven in the devcontainer in
+milliseconds, which is what a red on a machine you cannot reach is owed.
+
+### What would falsify this
+
+- **The received value being truncated by the log.** It is not: `"follow":true}]`
+  closes the array, and 645 bytes reached the log where the cap is far higher.
+- **The row being slow rather than stopped**, which is one of the two readings
+  and is what the new figures are for.
+- **`settled` returning early being the whole of it.** Starved to zero locally,
+  the row is green — which does not clear it, and is why it is a reading rather
+  than a conclusion.
+
+---
+
+## F1097 — the sweep's first run ever went red on two shards, and both reds are the job rather than the tree ★★★★
+
+| | |
+|---|---|
+| **Surface** | `.github/workflows/mutation-sweep.yml` · `Makefile`'s `mutate` target · `tools/mutate/sweep.mjs` |
+| **Reached for** | dispatching the workflow to close F1089 — the trigger's first firing |
+| **Verdict** | **partly** — the catalogue and the log are repaired and driven; the per-run timeout is measured and left, because it is a cost model rather than a constant |
+
+### What the first run said
+
+```
+sweep (5)  red  c12-ascii-alphabet.mjs   exit 1     10s  caught 0  survived 0  expected 0
+sweep (4)  red  c12-arm-seam.mjs         exit -2  2700s  caught 0  survived 0  expected 0
+                                          LEFT THE TREE MUTATED — 2 file(s) restored from the snapshot
+```
+
+Four shards green, two red, on a workflow that had never run — F980's *18 of 283
+anchors stale* said the pass finds things, and its first firing found two.
+**Neither is a survivor.** Both rows say `caught 0 survived 0 expected 0`, which
+is a run that measured nothing at all.
+
+### The first: a gitignored directory the job never generates
+
+`c12-ascii-alphabet` drives `test/unit/plot-catalogue.test.ts`. `docs/catalogue/`
+is **generated and gitignored**, and `make test` carries `catalogue` as a
+prerequisite with the reason written beside it:
+
+> **A prerequisite, not a step in `all`** — the degraded jobs run `make test`
+> alone and PC11 lives in the suite too, so the dependency has to travel with the
+> target.
+
+**It did not travel, because the job does not go through a target.** The step is
+
+```yaml
+- run: node tools/mutate/sweep.mjs --shard ${{ matrix.shard }}/6 …
+```
+
+and `make mutate` exists, whose own comment says *Runs weekly in CI as
+`mutation-sweep`, six shards*. A04 §5 forbids exactly this, in its own words:
+
+> **CI runs the same targets a developer runs.** Not equivalent commands — the
+> same ones. A CI pipeline that invokes something else is a second build nobody
+> tests.
+
+**And going through the target would not have been enough**: `make mutate` has no
+prerequisites at all, so the catalogue is missing from it too. Two records, one
+of them claiming CI uses it, and neither carrying the dependency.
+
+**Reproduced exactly.** With `docs/catalogue` moved aside:
+
+```
+red  c12-ascii-alphabet.mjs  exit 1  9s  caught 0  survived 0  expected 0
+```
+
+against the runner's `exit 1  10s`. Restored, the same run is green at 82 s with
+6 caught. And the reason, from the per-run log:
+
+```
+BlindHarnessError: mutation harness is not live: the unmutated suite already
+fails, so no row below means anything
+```
+
+**The guard worked and the job made the suite red.** That sentence is the
+harness's own vacuity check doing precisely its job — refusing to report on a
+pass whose baseline is already failing — and it never reached anyone.
+
+This is F1087's shape with a different directory: a generated path every
+developer machine has and a fresh checkout does not.
+
+### The second: a per-run timeout sized on a desk
+
+`c12-arm-seam` was killed at `exit -2` after 2700 s, which is `sweep.mjs:168`'s
+own `timeout: 45 * 60 * 1000`. Measured here:
+
+```
+green  c12-arm-seam.mjs  exit 0  2237s  caught 90  survived 0
+```
+
+**2 237 s against a 2 700 s bound is 83 % of the budget on the only regime the
+author could see**, and the runner is measured at 2.7× to 4.1× this container —
+so 101 to 154 minutes against a 45-minute bound. **The kill is arithmetic, not a
+hang**, and the run cannot pass on a runner at any load.
+
+F1088's ruling applies unchanged and is already in this repository: a *timeout*
+is not a product claim, so it must hold on the slowest regime that runs it. The
+run itself is healthy — 90 caught, 0 survived, tree clean afterwards.
+
+**The snapshot net held.** `LEFT THE TREE MUTATED — 2 file(s) restored from the
+snapshot` is a report of the recovery working, not of a leak: `sweep.mjs:180`
+compares every captured file and rewrites what moved. This is the one place the
+first run confirmed something rather than finding it.
+
+**And it is bigger than one constant, which is why the remedy stops short.** The
+workflow says *six shards … so one shard is about an hour*, and one run of
+thirty-two in a shard costs 37 minutes here. Whether the sweep's cost model
+survives contact with a runner is a measurement of its own, and changing the
+shape of the pass is a decision rather than a repair.
+
+### The third, and it is why the first two looked alike
+
+`sweep.mjs:173` writes every run's log to `out/mutate-sweep/<run>.log` and
+`:190` writes `summary.json`. The workflow says of them:
+
+> The per-run logs and `summary.json` under `out/mutate-sweep/` **are in the job
+> log above**; nothing is uploaded, so no artifact action version is a thing this
+> workflow can be wrong about.
+
+**They are not in the job log.** Nothing prints them and nothing uploads them, so
+a red shard produces one summary line and no reason. The `BlindHarnessError`
+above — the whole diagnosis of the first red — exists only because the run was
+reproduced on a machine that keeps the file.
+
+The clause about artifacts is a real argument for not uploading, paired with a
+false premise about where the content already is. Third instance in this file of
+F1095's shape: a claim written in a workflow that no gate resolves. The anchors
+arm one line up does it right, printing `see out/mutate-sweep/anchors.log` —
+which names a file that is also unreachable on a runner, but at least says so.
+
+### Remedy
+
+- **`make mutate` gains `catalogue`**, the prerequisite `make test` carries for
+  the reason already written beside it.
+- **The job runs the target.** One non-target command stays — `npm run build`,
+  which has no target of its own and appears inside three — and is named here
+  rather than left as residue nobody wrote down.
+- **A red run prints the tail of its own log**, so the next red is a diagnosis
+  rather than a line. This is `a red row carries its verdict` applied to the
+  instrument that produces the rows.
+- **The timeout is not raised.** 2 237 s is recorded against the 2 700 s bound
+  with both figures and the runner's ratio, and the cost model is named as the
+  question it is.
+
+### Partly — two of three repaired and driven, one measured and left
+
+**The catalogue.** `make mutate` gains `catalogue` and the job runs the target.
+Driven both ways rather than asserted: `make -n mutate SHARD=2/6 ONLY=c12-x`
+prints the three generators and then `node tools/mutate/sweep.mjs --shard 2/6
+--only c12-x`, so the pass-through is exact; and a real run through the target
+regenerates 2 440 frames and comes back green at 78 s with 6 caught.
+
+**The log.** `redTails` takes an injected `readFile`, for the reason every rule
+in `tools/enforce/` does — a row cannot manufacture a red run of the real sweep,
+so five rows in `MS7` drive the formatter and the path, and three hand mutations
+each kill one: the slice taken from the head, the skip arm emitting a header
+instead of skipping, and the path dropping `--out`. The wiring is proven by
+running the sweep with the catalogue moved aside, which now prints
+
+```
+  ── c12-ascii-alphabet.mjs, last 14 of 14 lines ──
+  │ BlindHarnessError: mutation harness is not live: the unmutated suite
+  │ already fails, so no row below means anything
+```
+
+— the sentence that previously cost a local reproduction to obtain.
+
+**The timeout is not raised, and this is the part that stays open.** 2 237 s
+against 2 700 s is a ratio, and F1088's ruling would put the bound at the
+runner's 4.1× — about 9 200 s. But a shard runs thirty-two of these, the job's
+own timeout is 300 minutes, and the workflow says *one shard is about an hour*.
+**A bound that admits this run breaks the shard**, so the number cannot be
+chosen without measuring what a whole shard costs on a runner, which is the
+first thing the next full sweep will report now that it can run at all.
+
+Recorded rather than bumped, with both figures and the ratio, which is what
+`a guard whose trigger did not fire keeps its place on asymmetry` asks for: the
+next person to read this finds the measurement rather than a constant they
+cannot reproduce.
+
+### What would falsify this
+
+- **The catalogue existing on a runner.** `git check-ignore -v docs/catalogue`
+  returns `.gitignore:18`, and `git ls-files` returns nothing.
+- **`c12-arm-seam` being slow only here.** It is 2 237 s in the devcontainer with
+  the tree clean and 90 mutations caught, and the runner killed it at the bound.
+- **The per-run logs being printed somewhere.** `sweep.mjs` writes them and no
+  line reads them back; the job log carries the summary line alone.

@@ -237,10 +237,29 @@ install → check → enforce → audit → test → golden → e2e → [repo-sp
 | Trigger | Stages |
 |---|---|
 | Every push to a branch | `install → check → enforce → audit → test` — **nine minutes on the runner, measured**, and Calcium's job adds `instruments` and `regime` to that list (F1090) |
-| **Pull request**, push to `main`, and tags | The above plus `golden → e2e → [repo-specific]` |
+| **Pull request**, push to `main`, and tags | The above plus `golden → e2e → [repo-specific]`, and **`proof` in a job of its own** — the reuse claim, which is not a stage in the chain (F807, F1095) |
 | **Weekly** (Sunday 03:00 UTC), and on dispatch | `mutation-sweep` — every run under `tools/mutate/runs/` through `tools/mutate/sweep.mjs`, six shards, the anchors sweep first. A survivor, a stale exemption, an anchor miss off the debt list or a run that leaves the tree mutated is red where nobody was running the pass by hand (F952, F990) |
 
 `enforce` stays on every push regardless: it costs five seconds locally and ten on the runner, and it catches the violations that become load-bearing fastest.
+
+**`proof` was in no row of this table, and it is a job rather than a stage.**
+`make proof` packs the real tarball, installs it into a tree that has never seen
+this repository and runs the app's suite against it (§3) — R01 R4.4's reuse
+claim, and the one gate here whose subject is what a consumer gets rather than
+what this tree does. It runs on the same guard as `full`, on its own runner, and
+until F1095 it appeared in A04 only at §1 as a noun in the repo table and at §3
+as a sentence about packing. **A stage missing from a list of stages is F1090;
+a job missing from the account of the jobs is this**, and it is the larger of
+the two because a reader totalling the section's stages finds nothing to be
+short by. F807 is why it matters: `proof` was CI-only in practice — the first
+instance the gate-not-run note records — and it was red on an npm crash for as
+long as the fast job hid it, which is a job nobody was reading being described
+by a section that did not mention it.
+
+**It is named beside the arrow rather than spliced into it**, for F1090's
+reason: the arrow is the shape all three repositories share, and this is
+Calcium's. The `docker-tui` row in §1 already carries the same word for its own
+last stage.
 
 **The first row's figure is measured rather than intended, and it used to say two minutes.** That number was in this table from the initial commit on 2026-07-28 and was never taken on a runner; F1090 is the first green branch-push run there, and it reads:
 

@@ -401,6 +401,113 @@ describe("C23 — the shell route as a live screen, spec-first rows", () => {
     expect(text, "the lines written before the press").toContain("Collecting 128 items");
     expect(text, "including the last of them").toContain("running ...");
   });
+  it("T3.80 (C23 I64, I67): every chunk queued before the child exits reaches the screen", async () => {
+    // **The window the runner opens and this machine never does** (F1096).
+    //
+    // `onChunk` queues each chunk onto a promise chain and the exit path closes
+    // the gate before draining it. The gate is one flag carrying two conditions
+    // — *the child may still write* and *the emulator is still alive* — and only
+    // the second is a reason to drop anything. A chunk queued while the first
+    // held, whose link runs after the exit, is discarded by the drain that was
+    // written to deliver it.
+    //
+    // Constructed rather than raced: every line is emitted, then the child
+    // settles in the same turn, so the links are pending when the gate closes.
+    // No sleep, no load, no timing — the state the assertion claims is the state
+    // the row builds.
+    //
+    // T5.21 measured it on a runner at `46 → 46 numbered lines of 200 in 5013
+    // ms, 1 patches, grew by 0`, twice with different cut points, and could not
+    // be reproduced here at any load. This row is what a tier-5 red is owed: the
+    // same defect where it can be driven.
+    let emit!: (c: string) => void;
+    let settleChild!: (e: { code: number | null; signal: string | null }) => void;
+    const h = pipelineHarness({
+      hasPty: true,
+      spawnPty: () => ({
+        pid: 4243,
+        exited: new Promise((r) => {
+          settleChild = r as (e: { code: number | null; signal: string | null }) => void;
+        }),
+        running: true,
+        onData: (cb) => {
+          emit = cb;
+        },
+        write: () => undefined,
+        resize: () => undefined,
+        signal: () => true,
+      }),
+    });
+
+    h.pipeline.submit("!seq 200");
+    await settled();
+
+    for (let i = 1; i <= 200; i += 1) emit(`${String(i)}\r\n`);
+    settleChild({ code: 0, signal: null });
+    await settled(h.pipeline);
+
+    const text = JSON.stringify(h.transcript.entries[0]?.doc.blocks);
+    const lines = text.match(/\{"text":"\d+"\}/gu)?.length ?? 0;
+    // **The count, not the last line.** A row asserting only `"200"` passes on a
+    // screen that dropped the middle, and the scrollback cap is the one thing
+    // that may legitimately eat the head — so the tail and the count together
+    // are what say the drain delivered.
+    expect(text, "the last line the child wrote").toContain('"200"');
+    expect(lines, "and every line before it, none dropped by the gate").toBe(200);
+  });
+
+  it("T3.80b (C23 I67, C27 §6): a link that runs after the disposal writes nothing, and nothing throws", async () => {
+    // **The control for T3.80's guard, and it had none** (F1096). Removing
+    // `if (finished) return;` from the write link failed nothing across all five
+    // emulator suites — 95 rows green — so the guard the comment credits with
+    // catching a CI-only crash was witnessed by no row at all.
+    //
+    // Its hazard is the opposite of T3.80's: a link running *after* the emulator
+    // is gone rather than one dropped before it. The path that reaches it is the
+    // one that disposes without draining — `exited` rejecting with chunks still
+    // queued — and it is constructible for the same reason T3.80 is, by emitting
+    // and settling in one turn.
+    //
+    // The two rows together are why the flag had to change rather than go: one
+    // says the drain must deliver, the other that the disposal must stop it.
+    let emit!: (c: string) => void;
+    let failChild!: (cause: unknown) => void;
+    const h = pipelineHarness({
+      hasPty: true,
+      spawnPty: () => ({
+        pid: 4244,
+        exited: new Promise((_r, reject) => {
+          failChild = reject;
+        }),
+        running: true,
+        onData: (cb) => {
+          emit = cb;
+        },
+        write: () => undefined,
+        resize: () => undefined,
+        signal: () => true,
+      }),
+    });
+
+    h.pipeline.submit("!seq 5");
+    await settled();
+
+    for (let i = 1; i <= 5; i += 1) emit(`${String(i)}\r\n`);
+    failChild(new Error("the child went away"));
+    await settled(h.pipeline);
+    // A floating rejection lands a turn later than the settle, so the row waits
+    // one more before reading — an unhandled one fails the file rather than this
+    // assertion, which is the strongest form the check can take here.
+    await new Promise((r) => void setTimeout(r, 0));
+
+    const entry = h.transcript.entries[0];
+    expect(entry?.doc.status, "the card settles failed").toBe("error");
+    expect(
+      JSON.stringify(entry?.doc.blocks),
+      "naming the spawn stage rather than a screen the disposal took away",
+    ).toContain("the child went away");
+  });
+
   // **T3.63 is written and running in `test/unit/emulator.test.ts`**, asserting
   // both halves the deferral asked for — the card settles `error` naming `pty`,
   // and `spawnShell` is never called. The deferral said *lands with the route's

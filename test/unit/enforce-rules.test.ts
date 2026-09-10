@@ -64,6 +64,7 @@ import {
 } from "../../tools/enforce/refusals.mjs";
 import type { Refusal } from "../../tools/enforce/refusals.d.mts";
 import { checkDependencies, DEPENDENCY_RULES } from "../../tools/enforce/dependencies.mjs";
+import { WORKFLOW_RULES } from "../../tools/enforce/workflows.mjs";
 import { SPEC_RULES } from "../../tools/enforce/commitments.mjs";
 import { COMPONENT_SOURCES, defaultIsImplemented } from "../../tools/enforce/todo-expiry.mjs";
 
@@ -763,6 +764,7 @@ const implemented = [
   ...STANDALONE_SCANS,
   ...MODULE_GRAPH_RULES,
   ...DEPENDENCY_RULES,
+  ...WORKFLOW_RULES,
   ...SPEC_RULES,
 ];
 
@@ -846,6 +848,12 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       // rather than editing one.
       "MG29",
       ...DEPENDENCY_RULES,
+      // SS62 likewise, and one file further out: its subject is two documents
+      // disagreeing — a workflow's `run: make …` lines against A04 §6 — so the
+      // one-file `FABRICATED` shape has nothing to hold. Its fabrication is in
+      // `enforce-workflows.test.ts`, beside the readers it exercises, and the
+      // row after the SP one reads that file for the same reason.
+      ...WORKFLOW_RULES,
       // The SP family's fabrications are in `enforce-commitments.test.ts`,
       // beside the parser they exercise. Listing them here without checking that
       // would be commitment 14 satisfied by assertion, so the next test reads
@@ -2093,6 +2101,23 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     for (const rule of SPEC_RULES) {
       expect(
         titles.some((t) => t.startsWith(rule) && /\bfails\b|\bfires\b/.test(t)),
+        `${rule} has no test asserting it fires`,
+      ).toBe(true);
+    }
+  });
+
+  it("every workflow rule has a fabrication in the file that owns the readers", () => {
+    // SS62's claim above, made checkable, for the reason the SP row exists:
+    // adding an id to `WORKFLOW_RULES` would otherwise satisfy commitment 14 by
+    // being named in a set. This is the same failure as *inventoried and never
+    // implemented*, moved one file across — which is the state SS62 itself was
+    // in when `make enforce` was green and `make test` was not (F1095).
+    const suite = readFileSync("test/unit/enforce-workflows.test.ts", "utf8");
+    const titles = [...suite.matchAll(/\bit\("([^"]+)"/g)].map((m) => m[1] ?? "");
+
+    for (const rule of WORKFLOW_RULES) {
+      expect(
+        titles.some((t) => t.includes(rule) && /\bfails\b|\bfires\b/.test(t)),
         `${rule} has no test asserting it fires`,
       ).toBe(true);
     }

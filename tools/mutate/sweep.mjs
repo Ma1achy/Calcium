@@ -33,6 +33,9 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+
+/** Lines of a red run's log to print. Enough for a throw and its stack, or a survivor table. */
+const LOG_TAIL = 30;
 import { join } from "node:path";
 
 export const RUNS_DIR = "tools/mutate/runs";
@@ -136,6 +139,38 @@ function digest(files) {
   return h.digest("hex");
 }
 
+/**
+ * **A red run's own log, tailed** (F1097). The logs are written beside
+ * `summary.json` and nothing read them back, so a red shard on a runner produced
+ * one line — `exit 1  10s  caught 0  survived 0` — while the sentence explaining
+ * it sat in a file that goes away with the workspace. Both reds of the first
+ * sweep this repository ever ran were diagnosed by reproducing them locally,
+ * which is a reproduction spent on something the run already knew.
+ *
+ * Tailed rather than printed whole: a run's log is a vitest transcript per
+ * mutation, and the reason a pass is red is at the end of it — a throw, a
+ * survivor table, or the harness refusing because the baseline already failed.
+ *
+ * `readFile` is injected for the reason every rule in `tools/enforce/` injects
+ * it: this is only known to work once it has been shown to produce the lines,
+ * and a row cannot manufacture a red run of the real sweep.
+ *
+ * A log that cannot be read is skipped rather than reported — the run's own row
+ * is already printed above it, and a missing log is what `--list` leaves behind.
+ */
+export function redTails(red, out, readFile, tail = LOG_TAIL) {
+  const lines = [];
+  for (const r of red) {
+    let log;
+    try { log = readFile(`${out}/${r.run}.log`); } catch { continue; }
+    const body = log.trimEnd().split("\n");
+    const shown = Math.min(tail, body.length);
+    lines.push(`\n  ── ${r.run}, last ${String(shown)} of ${String(body.length)} lines ──`);
+    for (const line of body.slice(-tail)) lines.push(`  │ ${line}`);
+  }
+  return lines;
+}
+
 export function plan(args, all) {
   const filtered = args.only === null ? all : all.filter((r) => r.includes(args.only));
   return args.shard === null ? filtered : shardOf(filtered, args.shard.k, args.shard.n);
@@ -189,6 +224,8 @@ function main() {
   const knownStaleRows = rows.filter((r) => r.state === "known-stale");
   writeFileSync(join(root, args.out, "summary.json"), JSON.stringify({ label, only: args.only, rows }, null, 2));
   console.log(`\n${String(rows.length)} runs · ${String(rows.length - red.length - knownStaleRows.length)} green · ${String(knownStaleRows.length)} known-stale · ${String(red.length)} red${red.length > 0 ? `\n  red: ${red.map((r) => r.run).join(", ")}` : ""}`);
+
+  for (const line of redTails(red, args.out, (f) => readFileSync(join(root, f), "utf8"))) console.log(line);
   return red.length > 0 ? 1 : 0;
 }
 
