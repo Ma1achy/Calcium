@@ -268,8 +268,20 @@ export type LiveSpec = BlockOpts &
      * `compute` throws like a `render` and not like a `fetch` — deterministic, so
      * it does not retry, and the version is not consumed because a fold that
      * threw has not advanced.
+     *
+     * **`attempts` is the third parameter** (F1023, C23 §3c, C23 I47, C23 commitment 40).
+     * A fold could not tell a first reading from the seventh retry of a source
+     * that had been failing for a minute: it runs only on success, so a run of
+     * failures reaches it as a gap it cannot see. `refresh.ts` has passed the
+     * count since Lane E's change and **this declaration did not move with it**,
+     * so the argument was delivered at run time and no app could name it — the
+     * paired-artefact shape, with nothing asking the question in either
+     * direction. Additive, so every existing fold compiles unchanged.
      */
-    derive?: Readonly<{ key: string; compute: (data: unknown, prev: unknown) => unknown }>;
+    derive?: Readonly<{
+      key: string;
+      compute: (data: unknown, prev: unknown, attempts: number) => unknown;
+    }>;
     /**
      * **The producer context arrives as a second parameter** (C07 §3, C24 §5).
      *

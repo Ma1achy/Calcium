@@ -100,7 +100,7 @@ import type {
   StepInput,
 } from "./types.js";
 import { rememberLive } from "./live.js";
-import { FigureBuilder } from "./figure.js";
+import { FigureBuilder, type FigureChainOpts } from "./figure.js";
 
 // --- the two shared decisions ---------------------------------------------
 
@@ -1771,8 +1771,14 @@ export const b = {
   plot,
   spark,
   progress,
-  figure: (opts?: { title?: string; height?: number; axes?: boolean; yFormat?: Plot["yFormat"]; yMin?: number; yMax?: number }) =>
-    new FigureBuilder(opts),
+  // **The chain's option type, not a hand-copy of half of it** (F1028). This was
+  // six fields written out here while `FigureOpts` declared twelve and
+  // `FigureBuilder.build()` spread all twelve — so `colormap`, `xScale`,
+  // `yScale`, `plotStyle`, `plotDetail` and `plotCorners` were forwarded to the
+  // block by a builder no caller could tell about them. `FigureChainOpts` is
+  // `FigureOpts` less the two whose refusals this file owns and the chain does
+  // not; `figure.ts` carries which two and why, with the grep that expires it.
+  figure: (opts?: FigureChainOpts) => new FigureBuilder(opts),
   code,
   comparison,
   patch,
