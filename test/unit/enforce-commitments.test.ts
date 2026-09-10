@@ -2066,4 +2066,79 @@ describe("withoutTodos — the deferral filter behind the coverage signal (F907)
     }
     expect(survivedOld, "the old filter left deferred rows in the corpus").toBeGreaterThan(survivedNew);
   });
+
+  it("EC5 (F1077): a describe title over a block that runs nothing goes, and the same title over a row stays", () => {
+    // **The fabricated violation is the shape F907 found and fixed by hand.**
+    // Its instance was `describe("C28 I45 — per-kind input gauges")` over pure
+    // todos: the todos stripped correctly, the title survived, and the invariant
+    // read as covered with nothing running behind it. The file was edited; the
+    // class was not, so the signal has been blind to it ever since.
+    const hollow = [
+      "describe('T9.7 (C99 I20): the gauges', () => {",
+      `  ${OPEN}"T9.8 (C99 I21): deferred", );`,
+      "});",
+    ].join("\n");
+    expect(withoutTodos(hollow), "nothing runs beneath it, so the title is not coverage").not.toContain("C99 I20");
+
+    // **The control, and it is what the qualification is for.** A filter that
+    // blanked every title would pass the arm above completely — and it would be
+    // wrong about 37 titles in this repository that cite an invariant over rows
+    // which do run, taking the reported figure from 33 to 70 on a corpus with no
+    // holes in it. Coverage written one level up is still coverage.
+    const live = [
+      "describe('T9.9 (C99 I22): the gauges', () => {",
+      "  it('T9.10: a row that runs', () => {});",
+      "});",
+    ].join("\n");
+    expect(withoutTodos(live), "a row runs beneath it, so the title stands").toContain("C99 I22");
+  });
+
+  it("EC6 (F1077): the corpus — an independent reader of the block agrees on every describe in test/", () => {
+    // **Two implementations rather than one restated.** The filter finds the
+    // block's end by indentation; this walks brace depth with string spans
+    // blanked, which is a different mechanism and not a rebuild of the same
+    // intent — a probe rebuilt from intent agrees with a transcription defect.
+    // Asserted as agreement rather than as a count, so it stays true as tests
+    // are written; the split is printed because movement is what it is good for.
+    const ROW = /^\s*(?:it|test)(?:\.each)?\s*[(`]/u;
+    const OPENER = /^\s*describe(?:\.\w+)?\s*[(.]/u;
+    const byBrace = (lines: readonly string[], at: number): boolean => {
+      let depth = 0;
+      let started = false;
+      for (let i = at; i < lines.length; i++) {
+        const bare = (lines[i] ?? "").replace(/(["'`])(?:\\.|(?!\1)[^\\])*\1/gu, '""');
+        if (i > at && started && ROW.test(lines[i] ?? "")) return true;
+        for (const ch of bare) {
+          if (ch === "{") { depth++; started = true; } else if (ch === "}") depth--;
+        }
+        if (started && depth <= 0) return false;
+      }
+      return false;
+    };
+
+    let blocks = 0;
+    let live = 0;
+    for (const f of walkTests()) {
+      const text = readFileSync(f, "utf8");
+      const raw = text.split("\n");
+      const stripped = withoutTodos(text).split("\n");
+      // **Openers are located in `raw` and judged in `stripped`**, because a
+      // hollow one has been blanked and cannot be found in the output that
+      // blanked it. The walk runs over a third array — the stripped text with
+      // every opener put back — so comments and todos are gone from it and no
+      // block starts on a line the filter removed. `withoutTodos` pushes one
+      // entry per input line on every branch, which is what makes the indices
+      // line up.
+      const forWalk = stripped.map((l, i) => (OPENER.test(raw[i] ?? "") ? (raw[i] ?? "") : l));
+      raw.forEach((line, i) => {
+        if (!OPENER.test(line)) return;
+        blocks++;
+        const kept = (stripped[i] ?? "").trim().length > 0;
+        if (kept) live++;
+        expect(kept, `${f}:${String(i + 1)} — the filter and the brace walk disagree`).toBe(byBrace(forWalk, i));
+      });
+    }
+    console.log(`describe blocks ${String(blocks)} · a row runs beneath ${String(live)} · hollow ${String(blocks - live)}`);
+    expect(blocks, "the corpus is not empty — a filter that blanked everything would agree with a walk that found nothing").toBeGreaterThan(100);
+  });
 });

@@ -1607,6 +1607,50 @@ const UNCITED_INVARIANTS = Object.freeze([
  * and `)` — most of them cite `(C28 I45)` — so a lazy match to the first `)`
  * stops inside the citation and leaves the rest of the title behind.
  */
+/**
+ * A row that runs. `it.todo` is already gone by the time this is asked, and
+ * `.skip` is absent by construction rather than by a clause: `it.skip(` does not
+ * match, because a row that does not run cannot stand behind an invariant. The
+ * corpus holds no live `.skip`, `.only` or `describe.skip`, so no clause here is
+ * carrying a case nothing can produce.
+ */
+const ROW = /^\s*(?:it|test)(?:\.each)?\s*[(`]/u;
+const DESCRIBE = /^\s*describe(?:\.\w+)?\s*[(.]/u;
+
+/**
+ * Whether the block opened at `at` holds a row that runs, by indentation — the
+ * block ends at the first non-blank line indented no further than its opener.
+ * Measured against an independent brace-depth walk over all **1129** `describe`s
+ * in `test/`: no disagreement, which is why the simpler reader is the one here.
+ */
+function blockRunsARow(lines, at) {
+  const indent = (lines[at] ?? "").search(/\S/u);
+  for (let i = at + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim().length === 0) continue;
+    if (line.search(/\S/u) <= indent) return false;
+    if (ROW.test(line)) return true;
+  }
+  return false;
+}
+
+/**
+ * **A `describe` title is not a row either — the third clause of the sentence
+ * below, and the one F907 ruled and did not build.** Its instance was
+ * `describe("C28 I45 — per-kind input gauges")` over a block of pure `it.todo`s:
+ * the todos stripped correctly, the title survived, and the invariant read as
+ * covered with nothing running behind it. That *file* was edited by hand and the
+ * class was left standing, which is what makes this the instance-not-class shape
+ * rather than an oversight (F1077).
+ *
+ * **Blanked only where the block runs nothing**, and that qualification is the
+ * whole of it. **37** titles in `test/` cite an invariant over rows that do run —
+ * coverage written one level up — and reporting those as *no row runs* would take
+ * the figure from 33 to 70 on a corpus with no holes in it. The hollow shape has
+ * **zero** instances today, so this is a rule whose subject is currently empty:
+ * EC5 fabricates one, and EC6 asserts the 37 against it, because a filter that
+ * blanked every title would pass EC5 and read as thorough.
+ */
 export function withoutTodos(text) {
   const out = [];
   let depth = 0;
@@ -1647,6 +1691,9 @@ export function withoutTodos(text) {
     // todo would go with it; none does, and a formatter that produced one would
     // be writing `);foo()`.
     out.push("");
+  }
+  for (let i = 0; i < out.length; i++) {
+    if (DESCRIBE.test(out[i]) && !blockRunsARow(out, i)) out[i] = "";
   }
   return out.join("\n");
 }
