@@ -40611,6 +40611,8 @@ frame, and every `greeting-first` run has them.
   lead's 1.5 s typing that is diff-first, which is their configuration exactly. One mechanism
   covers both, and the number moving is why it looked like two findings.
 
+**Closed** by C22 I99 — see the section below.
+
 **So F813 and F158 are one finding**, and F158 already carries the right sentence — *"a fixed
 1.5 s against an async opening … later content above earlier, header scrolled off"*. F813 is
 that with a different verb and a worse reading. `TYPE_AT = 6.0` is the same weaker fix twice.
@@ -40642,6 +40644,47 @@ other symptom — *`/ps` never echoed, and the command sat in the prompt unsubmi
 input-path finding, not this one, and saying so is the limit rather than the strength.
 
 ---
+
+
+### Closed — C22 I99, and the fix is the one this entry named
+
+`session.ts` reserves a streaming entry through C23's ordinary append path
+*before* it awaits `config.greeting`, and `pipeline.greeting(doc, slot)` settles
+into that id. A submission made while the producer is in flight lands below the
+reservation whatever the daemon does, which is this entry's own prescription
+built without amendment.
+
+**The reservation is invisible, and that was measured before it was ruled**
+rather than read off the source: `commandRows("", 80, …)` is `[]`,
+`measureSequence([], 80)` is `0`, and `entryLayout([], 80)` is one run with
+`blank: false`. 458 golden frames move by zero.
+
+**It is the opposite ruling to C23's step 3, for the opposite reason.** Step 3
+was `compose({ blocks: [] })` once, and the finding against it was that
+*nothing drew a running indicator*: a verb must say it is running. An app's
+welcome must not, because S02 grants it no chrome and a placeholder at startup
+is a frame the app never asked for.
+
+**Two clauses the diagnosis did not have, both found by walking the seam before
+building it.** A producer that *rejects* must release the slot, because C13
+never evicts a streaming entry (C13 I6) and an unsettled reservation would sit
+under the cap for the life of the process — so `abandonGreeting` bare-settles
+it, which moves no `rev` and leaves C14's `(entryId, rev, width)` cache
+describing what it holds. And a `/clear` between the reserve and the settle
+destroys the slot: `settle` answers `unknown`, and that `PatchOutcome` was
+being discarded at this call site, so the greeting would have vanished with no
+refusal anywhere. It appends instead.
+
+**C22 I44's own sentence was falsified by the fix and is corrected in place.**
+*A rejection or a hang produces no entry* was true until the slot existed; a
+rejection now leaves an entry that is empty, settled and evictable, and a hang
+leaves one empty and streaming. Neither reaches the screen.
+
+Four rows, each mutated until it failed and each failing alone: T3.40 (the
+order, read as row indices off a 60-row frame — `entries.length` is green for
+the defect too), C23 T3.72 (the fill), T3.73 (the release), T3.74 (the emptied
+slot). Dropping the reserve puts the greeting at row 54 against the result at
+41, which is the finding reproduced from the other side.
 
 ## F1025 — the residue's largest shape was the sweep reading a nested document flat, and under it sat an abscissa with no abut rule ★★★★☆
 
@@ -44152,3 +44195,72 @@ configuration rather than in a rule.
 - `dist/` being linted was not only noise. It is the reason the two warnings existed, and a
   `dist/` carrying a syntax error — a truncated build, a killed `tsc` — would have failed the gate
   with a message about generated output. That is now impossible and was never observed.
+
+## F1080 — the register's own summary is a third record of the open set, and only one of the three is gated ★★★☆
+
+| | |
+|---|---|
+| **Surface** | `examples/docker/TRIAGE.md` — the group table at the top, the `## N ·` group headings, and the keyed rows |
+| **Reached for** | closing F158 and F1024, which needed two group headings recomputed |
+| **Verdict** | **open** — the divergence is measured and the open column is corrected; the mechanism that let it drift is not |
+
+### What was measured
+
+SP12 gates the open **set** by equality, and it is the only record of the three
+that anything reads. The other two are prose: each group heading carries
+`N open · M closed · K with no verdict`, and the table at the top carries
+`N open · M unread` per group. Nothing compares them to the rows.
+
+The three open findings sit in groups 1, 11 and 12 — F405, F271, F812 — which
+SP12's own equality check settles. So the table's open column read:
+
+| group | table said | rows say |
+|---|---|---|
+| 2 | 3 open | closed |
+| 7 | 1 open | closed |
+| 8 | 4 open | closed |
+| 9 | 1 open | closed |
+| 11 | 2 open | 1 open |
+
+Four groups claimed open work they did not have, and the fifth was out by one.
+
+### And the third record was already out by one, caught in the act
+
+Group 11's heading read `396 entries: 1 open · 308 closed · 87 with no verdict`
+— internally consistent, 1 + 308 + 87 = 396 — while the table's total column
+read **395** for the same group. Two counts of one group, differing by one,
+before this entry added anything to either. SP6 sums that column and was
+**green**, because it gates the sum against `keyed.size` and not the groups
+against themselves: the column was reconciled once (F142) and the +1 here is
+cancelled elsewhere in the table. A total that is right in aggregate and wrong
+per row is what a summed gate cannot see, and it is the second thing the sibling
+rule has to check.
+
+### Why this is not the status-column finding again
+
+A row's status column being stale is one record disagreeing with its own body.
+This is a **summary** disagreeing with the sections beneath it, which is F86,
+F89 and F92's mechanism — *a claim is falsified by being summarised, not by
+being wrong* — arriving in the document that records those findings. The
+sections were right the whole time.
+
+**And the corrected column will go stale again on the next closure**, which is
+the actual finding: closing a finding today means editing a keyed row, a group
+heading and a table cell, and exactly one of the three is checked.
+
+### The remedy, and what is not yet known
+
+SP12 already walks every row and calls `dispositionOf`; what it discards is the
+group boundary. A sibling that tracks the `## N ·` headings and compares all
+three records by equality is a small extension of a function that exists.
+
+**Stated blind spot, and the reason the other two columns were left alone.** A
+count taken by walking lines with a per-group counter disagreed with the table's
+`total` and `unread` columns in six groups — g7 by 10, g8 by 1, g11 by 1 the
+other way — and that method is not the one `keyedRows` uses: it takes the first
+line per id across the whole document, so a per-group walk double-counts an id
+mentioned in two groups. The open column was corrected because SP12's equality
+gate settles it independently; `total` and `unread` were not, because the number
+that would replace them has not been measured with the tool's own reader. That
+is the first thing the sibling rule has to fix, and it is why this entry is open
+rather than closed.
