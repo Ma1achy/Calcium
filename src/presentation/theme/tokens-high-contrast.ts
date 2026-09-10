@@ -176,11 +176,23 @@ export const HIGH_CONTRAST: ThemeTokens = Object.freeze({
      * one bit are the same value to every caller (C10 I30, FINDINGS F179).
      *
      * **The same eight as the dark variant, and that is a ruling rather than a
-     * copy.** They are Okabe–Ito, chosen for distinguishability under the three
-     * common colour-vision deficiencies — which is precisely the property this
-     * theme exists to maximise, and a set solved for luminance alone would be
-     * worse at it. The ground differs by `#1a1a1a` against `#000000`, which
-     * raises every ratio rather than lowering it.
+     * copy.** The ground differs by `#1a1a1a` against `#000000`, which raises
+     * every ratio rather than lowering it — measured, and still true.
+     *
+     * **What this comment used to claim, and could not.** It said *they are
+     * Okabe–Ito, chosen for distinguishability under the three common
+     * colour-vision deficiencies — which is precisely the property this theme
+     * exists to maximise.* The property is Okabe-Ito's; this set keeps **three
+     * of its eight colours**, and the substitutions were chosen against the dark
+     * ground rather than for separation. Measured (F1017, C10 I39): canonical
+     * clears ΔE2000 7.9 under every model and **this palette has seven pairs
+     * under the floor**, worst 1.5 at tritan `c2`/`c3`. On the theme a reader
+     * chooses when they most need to tell things apart, which is why it is
+     * written here in as many words rather than left to the debt list.
+     *
+     * A set solved for luminance alone would still be worse, and that is not a
+     * defence of this one. The list is `test/contract/theme.test.ts` T2.38,
+     * compared by equality; C10 §4j says why it is a list and not a refusal.
      *
      * **Decoration, so no floor applies** (§2, and `resolve.ts` skips the
      * contrast gate for `carries !== "meaning"`). Stated here rather than

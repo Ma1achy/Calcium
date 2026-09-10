@@ -18,8 +18,11 @@ import {
   resolveBackground,
   resolveTone,
   textSurfaces,
+  collisions,
+  OKABE_ITO_CANONICAL,
   type ColourRef,
 } from "../../src/presentation/theme/index.js";
+import { OKABE_ITO } from "../../src/data/colormaps/qualitative/okabe-ito.js";
 import { plotToSvg } from "../../src/presentation/plot/svg.js";
 import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
 import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
@@ -845,12 +848,82 @@ describe("C10 §2 — the shipped default is a working value", () => {
 });
 
 /**
- * **C10 §4j — the debt list, compared by equality.** §4j.3 rules that this is a
- * row and not `validatePalette`: every shipped theme fails the floor, so a
- * load-time throw would refuse the framework's own themes. These two rows land
- * with `src/presentation/theme/cvd.ts` in the commit that follows this one.
+ * **C10 §4j — the debt list, compared by equality.**
+ *
+ * §4j.3 rules that this is a row and not `validatePalette`: every shipped theme
+ * fails the floor, so a load-time throw would refuse the framework's own themes
+ * and lowering the floor until they pass is the same edit under another number.
+ * What a row can do instead is hold the failure *exactly*, so the day one is
+ * repaired the list has to move with it.
  */
 describe("C10 §4j — the categorical separation debt", () => {
-  it.todo("T2.38 (C10 I39, §4j.3): every shipped theme's collisions over categorical.slots equal its debt-list entry exactly, compared as a set in both directions — seven pairs on each of light, dark and high-contrast, high-contrast's asserted identical to dark's rather than merely as long, with canonical Okabe-Ito's empty list as the control — not deferred on a component: it lands with cvd.ts in the next commit");
-  it.todo("T2.38a (C10 I39, §4j.1): the colormap variant keeps seven canonical slots and substitutes #3cbf9a for black, and that one substitution is the whole of its debt — exactly one collision, tritan m2/m8 at 1.5, where the canonical set has none; the only variant where cause and effect are separable — not deferred on a component: it lands with cvd.ts in the next commit");
+  /**
+   * **The list is `KNOWN_STALE`'s shape and it is here for that list's reason.**
+   * A subset check would let a cleared collision outlive its reason unread — the
+   * failure mode `compare-exemption-lists-by-equality` was written for. Both
+   * directions: a new pair fails this row and a repaired one fails it too.
+   */
+  const DEBT: Readonly<Record<string, readonly string[]>> = {
+    light: [
+      "protan c1/c4 2.6", "deutan c1/c4 0.6", "deutan c1/c6 3.5", "deutan c4/c6 4.0",
+      "tritan c1/c7 5.3", "tritan c2/c3 5.1", "tritan c6/c7 6.5",
+    ],
+    dark: [
+      "protan c2/c5 5.4", "deutan c1/c6 6.3", "deutan c2/c5 3.4", "tritan c1/c7 6.8",
+      "tritan c2/c3 1.5", "tritan c2/c5 6.5", "tritan c3/c5 5.1",
+    ],
+    "high-contrast": [
+      "protan c2/c5 5.4", "deutan c1/c6 6.3", "deutan c2/c5 3.4", "tritan c1/c7 6.8",
+      "tritan c2/c3 1.5", "tritan c2/c5 6.5", "tritan c3/c5 5.1",
+    ],
+  };
+
+  it("T2.38 (I39, §4j): every shipped theme's collisions are its debt list exactly", () => {
+    // The variant set itself, by equality — a theme added with no entry would
+    // otherwise be measured by nothing, which is I30's shape one level out.
+    expect(SHIPPED.map(([v]) => v).sort(), "the debt list covers every shipped theme")
+      .toEqual(Object.keys(DEBT).sort());
+
+    for (const [variant, tokens] of SHIPPED) {
+      const slots = tokens.palettes.categorical?.slots ?? {};
+      const found = collisions(slots).map((c) => `${c.vision} ${c.a}/${c.b} ${c.deltaE.toFixed(1)}`);
+      expect(found, `${variant} — a new collision fails here and a repaired one fails here too`)
+        .toEqual(DEBT[variant]);
+    }
+
+    // **`high-contrast` ships `dark`'s list and not a list of the same length.**
+    // The theme exists to maximise distinguishability and its palette is the
+    // dark theme's, so the two are asserted identical rather than separately
+    // correct — a divergence in either is a finding about a deliberate copy.
+    expect(DEBT["high-contrast"], "the same pairs, not merely as many").toEqual(DEBT["dark"]);
+
+    // The control. Without it a floor of seven and a floor of seventy are the
+    // same rule here: every shipped palette fails both.
+    expect(collisions(OKABE_ITO_CANONICAL), "canonical Okabe-Ito, the calibrating set").toEqual([]);
+  });
+
+  /**
+   * **T2.38a (C10 I39, §4j.1) — one substitution, and it is the whole debt.**
+   *
+   * The three variants diverge from canonical by very different amounts, and
+   * the smallest divergence is the one that shows the mechanism. The colormap
+   * keeps seven canonical slots and swaps `#3cbf9a` in for black; that swap is
+   * the entirety of its collision list. It is the only variant where cause and
+   * effect are separable, which is why the row is here rather than folded into
+   * the sweep above.
+   */
+  it("T2.38a (I39, §4j): the colormap's single substitution is the whole of its debt", () => {
+    const hex = (t: readonly [number, number, number]): string =>
+      `#${t.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+    const slots: Record<string, string> = {};
+    OKABE_ITO.forEach((t, i) => { slots[`m${String(i + 1)}`] = hex(t); });
+
+    const canonical = new Set(Object.values(OKABE_ITO_CANONICAL).map((v) => v.toLowerCase()));
+    const novel = Object.entries(slots).filter(([, v]) => !canonical.has(v.toLowerCase()));
+    expect(novel, "seven canonical slots and one substitution").toEqual([["m8", "#3cbf9a"]]);
+
+    // And the substitution is the whole debt: one pair, and `m8` is in it.
+    expect(collisions(slots).map((c) => `${c.vision} ${c.a}/${c.b} ${c.deltaE.toFixed(1)}`))
+      .toEqual(["tritan m2/m8 1.5"]);
+  });
 });

@@ -1564,6 +1564,10 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   // `styleOf` or `lineOf` in `snapshot.ts` — MG24 asks whether a name appears
   // *elsewhere in `src/`*, and for a port cut from a dependency the answer is
   // structurally no and always will be.
+  "Collision.vision":
+    "C10 §4j.3 — `cvd.ts` measures and does not gate. Every shipped theme fails the separation floor, so a load-time refusal would reject the framework's own themes and lowering the floor until they pass is the same edit under another number; the ruling is that the check is a **row** (T2.38, by equality) and not `validatePalette`. So there is no `src/` consumer by design rather than by omission, and the member is read where the debt list is read. Removing it would leave a verdict that cannot say which model or which pair, which T1.41 exists to forbid",
+  "Collision.deltaE":
+    "C10 §4j.3 — `cvd.ts` measures and does not gate. Every shipped theme fails the separation floor, so a load-time refusal would reject the framework's own themes and lowering the floor until they pass is the same edit under another number; the ruling is that the check is a **row** (T2.38, by equality) and not `validatePalette`. So there is no `src/` consumer by design rather than by omission, and the member is read where the debt list is read. Removing it would leave a verdict that cannot say which model or which pair, which T1.41 exists to forbid",
   "CellLike.getChars":
     "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
     + "can be tested against a hand-built buffer and the package stays confined to one file "

@@ -16,6 +16,11 @@ import {
   resolveTone,
   quantisedHex,
   validatePaintedFloors,
+  collisions,
+  separation,
+  OKABE_ITO_CANONICAL,
+  SEPARATION_FLOOR,
+  VISIONS,
 } from "../../src/presentation/theme/index.js";
 import { floorFor } from "../../src/presentation/theme/index.js";
 import { REQUIRED_SLOTS } from "../../src/presentation/theme/contrast.js";
@@ -609,11 +614,100 @@ describe("C10 §4c.1 — the picture cell's alphabet", () => {
 
 /**
  * **C10 §4j — hue as the only channel.** F676 discharged the picture cell's
- * 1.00 with *legible only by hue* and four documents repeated it. C10 I39 is
- * that clause measured; these two rows land with `src/presentation/theme/cvd.ts`
- * in the commit that follows this one.
+ * 1.00 with *legible only by hue* and four documents repeated it. These rows
+ * are that clause measured: the metric, its control, and the shape of the
+ * verdict the debt list is compared against.
  */
 describe("C10 §4j — separation under dichromacy", () => {
-  it.todo("T1.40 (C10 I39, §4j.1): separation reproduces the reference under each of the four vision models, and canonical Okabe-Ito — the set the floor is calibrated on — clears 7 with a worst pair of 7.9 at tritan orange/reddishPurple; the control is the load-bearing half, because without it a floor of seven and a floor of seventy are the same rule over palettes that fail both — not deferred on a component: it lands with cvd.ts in the next commit");
-  it.todo("T1.41 (C10 I39, §4j.3): collisions returns a verdict and not a count — the model and both slot keys per entry, two models and not four for the light theme's c1/c4, and an empty list for the canonical set, which is the assertion rather than a precondition — not deferred on a component: it lands with cvd.ts in the next commit");
+  /**
+   * **T1.40 (C10 I39, §4j.1) — the metric, and the control that gives the floor
+   * a meaning.**
+   *
+   * The pairs are hand-checked against the Python reference in `out/`, which is
+   * an independent implementation of the same two papers — a figure this file
+   * and that one both produce is a figure neither transcribed.
+   *
+   * **The canonical control is the load-bearing half.** Without it a floor of
+   * seven is indistinguishable from a floor of seventy: every shipped palette
+   * fails both, so a suite indexed by the shipped palettes agrees with either.
+   * A rule nothing can satisfy passes review exactly like one nothing violates,
+   * which is A03 §2's vacuity class arriving in a threshold.
+   */
+  it("T1.40 (I39, §4j): separation reproduces the reference, and canonical Okabe-Ito clears the floor", () => {
+    // Identical colours are zero under every model, including the dichromacies
+    // — the degenerate case, asserted because a matrix that dropped a channel
+    // would also return zero here and the next row is what tells them apart.
+    for (const vision of VISIONS) {
+      expect(separation("#e69f00", "#e69f00", vision), `identity under ${vision}`).toBeCloseTo(0, 6);
+    }
+
+    // **The pair that carries the whole finding, and it is one hue pair twice.**
+    // Canonical orange against canonical yellow clears every model with room —
+    // 11.7 at its worst. The light theme darkens both to clear its own ground
+    // and ships them as `c1` and `c4`, where the same two hues measure **0.6**.
+    // Orange and yellow differ mostly in the channel a deuteranope has lost, so
+    // what is left to separate them is lightness — and the ground floor is a
+    // constraint on exactly that. The adaptation did not fail to preserve the
+    // property; it removed a pair canonical had handled with 67% of headroom.
+    expect(separation("#e69f00", "#f0e442", "deutan"), "canonical orange/yellow, deutan").toBeCloseTo(11.7, 1);
+    expect(separation("#8a5f00", "#7a6a00", "deutan"), "the same hues, darkened, deutan").toBeCloseTo(0.6, 1);
+    expect(separation("#8a5f00", "#7a6a00", "normal"), "and separated to a trichromat").toBeGreaterThan(9);
+
+    // A pair that survives every model — the control for the control: a
+    // simulation that collapsed everything would satisfy the rows above.
+    expect(separation("#000000", "#f0e442", "deutan"), "black vs yellow, deutan").toBeGreaterThan(50);
+
+    // **The floor is calibrated on this set and on nothing else.** 7.9 is its
+    // worst pair, so seven is the largest integer it clears and eight would
+    // refuse the reference every shipped palette claims its property from.
+    const names = Object.keys(OKABE_ITO_CANONICAL);
+    let worst = Number.POSITIVE_INFINITY;
+    let where = "";
+    for (const vision of VISIONS) {
+      for (let i = 0; i < names.length; i += 1) {
+        for (let j = i + 1; j < names.length; j += 1) {
+          const [a, b] = [names[i] as string, names[j] as string];
+          const d = separation(OKABE_ITO_CANONICAL[a] as string, OKABE_ITO_CANONICAL[b] as string, vision);
+          if (d < worst) { worst = d; where = `${vision} ${a}/${b}`; }
+        }
+      }
+    }
+    expect(where, "the canonical set's tightest pair").toBe("tritan orange/reddishPurple");
+    expect(worst, "the control clears the floor").toBeGreaterThan(SEPARATION_FLOOR);
+    expect(worst, "and would not clear eight").toBeLessThan(8);
+    expect(worst).toBeCloseTo(7.9, 1);
+  });
+
+  /**
+   * **T1.41 (C10 I39, §4j.3) — `collisions` returns a verdict and not a count.**
+   *
+   * T2.14b's form and its reason: the rule this feeds compares a **list** by
+   * equality, so a pair that disappears is as much a change to look at as one
+   * that appears, and a count cannot say which. The empty result on the
+   * canonical set is the assertion, not a precondition.
+   */
+  it("T1.41 (I39, §4j): collisions names the model and both slots, and is empty for the control", () => {
+    // Two slots a deuteranope cannot separate — the light theme's own pair.
+    const collapsed = collisions({ c1: "#8a5f00", c4: "#7a6a00" });
+    // **Two of four models and not all four**, which is the row's real content:
+    // the pair is separated to a trichromat at 9.7 and under tritanopia at 7.2,
+    // so a reader looking at the frame sees two colours and the entry names the
+    // two models where they are one. A verdict that said only *collides* would
+    // be satisfied by a simulation that collapsed every model equally.
+    expect(collapsed.map((c) => `${c.vision} ${c.a}/${c.b}`), "the models that cannot separate them")
+      .toEqual(["protan c1/c4", "deutan c1/c4"]);
+    expect(collapsed[0]?.deltaE, "protan").toBeCloseTo(2.6, 1);
+    expect(collapsed[1]?.deltaE, "deutan").toBeCloseTo(0.6, 1);
+
+    // The control: the set the floor is calibrated on has no pair under it, and
+    // the empty list is what is asserted — an `expect(...).toHaveLength(0)` on
+    // a reader that returned nothing at all would pass identically, which is
+    // why the row above drives the same function to a non-empty answer first.
+    expect(collisions(OKABE_ITO_CANONICAL), "canonical Okabe-Ito").toEqual([]);
+
+    // A floor the caller supplies, so the debt list is not the only reading —
+    // canonical's own worst pair is 7.9, so a floor of eight finds it.
+    expect(collisions(OKABE_ITO_CANONICAL, 8).map((c) => `${c.vision} ${c.a}/${c.b}`), "at a floor of eight")
+      .toEqual(["tritan orange/reddishPurple"]);
+  });
 });
