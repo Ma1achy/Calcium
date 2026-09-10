@@ -1,4 +1,5 @@
 // C09 tier 1 — the registry's state machine, and each kind's documented height.
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { displayCells } from "../../src/presentation/text.js";
 import { block, validateBlock } from "../../src/data/viewmodel/index.js";
@@ -163,10 +164,62 @@ describe("C09 §6 — the registry's transition table", () => {
     ).toHaveLength(2);
   });
 
-  it("T1.4: each of the nineteen kinds measures its documented height", () => {
-    // §3's table, read back as assertions. The fixture is the canonical one, so
-    // a change to a kind's height rule fails here with the kind named rather
-    // than as one line of a conformance report.
+  /**
+   * §3's table, read from the document rather than restated.
+   *
+   * **This row's name claimed a source it did not read** (F1016). The
+   * `documented` record below carried the comment *§3's table, read back as
+   * assertions* and was compared to `DEFAULT_DEFINITIONS` — the test's own
+   * literal against the registry, never against the table — so §3 could lose a
+   * row and this row stayed green. It had lost two: `image`, a registered
+   * default with no row at all, and `patch`, whose two peers `table` and `plot`
+   * were both present. That is F228's sentence one level up: *a coverage set
+   * drawn from the test's own table covers the table*, and the set had moved
+   * from the cases to the record they are drawn from.
+   */
+  const SPEC = "docs/components/C09_block_library.md";
+
+  /** The spelled-out numbers §3's heading can hold; an unknown word fails. */
+  const NUMBER_WORDS: Readonly<Record<string, number>> = {
+    fifteen: 15,
+    sixteen: 16,
+    seventeen: 17,
+    eighteen: 18,
+    nineteen: 19,
+    twenty: 20,
+    "twenty-one": 21,
+    "twenty-two": 22,
+    "twenty-three": 23,
+    "twenty-four": 24,
+    "twenty-five": 25,
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+  };
+
+  /** Kind → its `Measure` cell, in the order §3 lists them. */
+  const specTable = (source: string): ReadonlyMap<string, string> => {
+    const lines = source.split("\n");
+    const header = lines.indexOf("| Kind | Measure | Notes on render |");
+    // **A reader that finds nothing must say so.** An empty map satisfies no
+    // equality below, but it would report the absence as nineteen missing
+    // kinds rather than as a parser that stopped matching its own document.
+    expect(header, `${SPEC} holds §3's table header`).toBeGreaterThan(-1);
+
+    const rows = new Map<string, string>();
+    for (const line of lines.slice(header + 2)) {
+      if (!line.startsWith("|")) break;
+      const cells = line.split("|");
+      const kind = /^\s*`([A-Za-z]+)`\s*$/.exec(cells[1] ?? "")?.[1];
+      expect(kind, `§3's first cell names a kind: ${line.slice(0, 48)}`).toBeDefined();
+      rows.set(kind ?? "", (cells[2] ?? "").trim());
+    }
+    return rows;
+  };
+
+  it("T1.4 (§3): §3's table is read from the document — its rows are the registry plus the three delegated — and each registered kind measures its documented height", () => {
     const kit = measurable();
     const documented: Readonly<Record<string, number>> = {
       rule: 1, // a rule is one row at any width
@@ -190,6 +243,57 @@ describe("C09 §6 — the registry's transition table", () => {
       terminal: 2, // lines, plus a row for the dropped count where one exists (C27 I7)
     };
 
+    const source = readFileSync(SPEC, "utf8");
+    const table = specTable(source);
+
+    // The corpus, asserted before anything is asserted against it — a
+    // fabricated violation that empties the reader proves nothing.
+    expect(table.size, "§3's table has rows").toBeGreaterThan(15);
+
+    const delegated = new Map<string, string>();
+    const registered: string[] = [];
+    for (const [kind, measure] of table) {
+      const owner = /^delegated to (C\d\d)$/.exec(measure)?.[1];
+      if (owner === undefined) registered.push(kind);
+      else delegated.set(kind, owner);
+    }
+
+    // **The gate this row's name always claimed.** §3's non-delegated rows and
+    // `DEFAULT_DEFINITIONS` name the same kinds, by equality in both
+    // directions: a kind that joins the registry and never joins the table
+    // fails here — `image` did, and nothing said so — and so does a row for a
+    // kind the registry does not have.
+    expect(
+      registered.slice().sort(),
+      "§3's non-delegated rows and DEFAULT_DEFINITIONS name the same kinds",
+    ).toEqual(DEFAULT_DEFINITIONS.map((d) => d.kind).sort());
+
+    // **The three that register from outside, with their owners.** `patch` had
+    // no row while `table` and `plot` both did, so the table's own evidence for
+    // the extension mechanism being real rather than privileged — *three
+    // components using the same public `register`* — was two thirds of a trio
+    // (C09 §3, C04 §3).
+    expect(
+      Object.fromEntries([...delegated].sort()),
+      "§3's delegated rows name C11, C12 and C25",
+    ).toEqual({ patch: "C25", plot: "C12", table: "C11" });
+
+    // **§3's heading counts its own table, and the count is compared rather
+    // than read.** A count in prose beside the list it counts is the one
+    // artefact no gate compares (F1009); this is that gate, for one heading.
+    // An unrecognised number word fails rather than being skipped.
+    const heading =
+      /^## 3\. The ([a-z-]+) kinds — ([a-z-]+) registered here, ([a-z-]+) delegated$/m.exec(source);
+    expect(heading, "§3's heading is in the form its counts are read from").not.toBeNull();
+    const asNumber = (word: string): number => {
+      expect(NUMBER_WORDS[word], `"${word}" is a number word this row can read`).toBeDefined();
+      return NUMBER_WORDS[word] ?? -1;
+    };
+    expect(
+      [asNumber(heading?.[1] ?? ""), asNumber(heading?.[2] ?? ""), asNumber(heading?.[3] ?? "")],
+      "§3's heading counts its own table: total, registered, delegated",
+    ).toEqual([table.size, registered.length, delegated.size]);
+
     // **Compared to the registry by equality, and the guard below runs the other
     // way** (F228). *Every listed kind has a fixture* was added after a rename
     // left seven entries measuring against `undefined`; it says nothing about a
@@ -206,6 +310,27 @@ describe("C09 §6 — the registry's transition table", () => {
       Object.keys(documented).sort(),
       "§3's table and DEFAULT_DEFINITIONS name the same kinds",
     ).toEqual(DEFAULT_DEFINITIONS.map((d) => d.kind).sort());
+
+    // **The bridge from the table's prose to a measured number, and it reaches
+    // two rows of nineteen** — stated because an unrecorded limit reads as
+    // strength. A `Measure` cell that is a bare integer can be compared to the
+    // height measured below; every other cell is a formula — `ceil(cells(text)
+    // / w)`, `children + 2`, `` `height`, exactly `` — and nothing here
+    // evaluates one against a fixture. So membership is watched in both
+    // directions and a **wrong formula beside a right membership is not**.
+    // The set is asserted by equality so that a row losing its integer, or a
+    // formula collapsing to one, is a finding rather than a smaller loop.
+    const literal = registered.filter((k) => /^\d+$/.test(table.get(k) ?? ""));
+    expect(literal.slice().sort(), "the §3 rows whose measure is a bare integer").toEqual([
+      "progress",
+      "rule",
+    ]);
+    for (const kind of literal) {
+      expect(
+        Number(table.get(kind)),
+        `§3 gives ${kind} the height this row measures`,
+      ).toBe(documented[kind]);
+    }
 
     for (const [kind, height] of Object.entries(documented)) {
       const fixture = ONE_PER_KIND[kind as "raw"];
