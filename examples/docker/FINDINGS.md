@@ -44510,7 +44510,7 @@ green run spawns no `ps`.
 |---|---|
 | **Surface** | `src/data/viewmodel/validate.ts` against `Plot` in `types.ts` |
 | **Reached for** | the by-hand walk for F271, asking what a channel loses by leaving `series` |
-| **Verdict** | **open** — the instance F271 would have created is fixed; the class is a coverage table and a check per uncovered member |
+| **Verdict** | **closed** — C04 I120: sixty-nine of sixty-nine members carry a row or a stated reason, and the four the sweep could not see are the reusable half |
 
 ### What the walk asked
 
@@ -44626,6 +44626,98 @@ the middle, with the real series — `1 3 2 5 4` — nowhere in it. Arithmetical
 self-consistent, and describing a different document than the one it holds. The
 same block with `yMin: "x"` becomes a visible ERROR card, so the **mistyped**
 value is the loud one and the **swapped** value is the silent one.
+
+### Closed — C04 I120, and the four members the sweep could not see
+
+Every member now has a row in a table compared to `Plot`'s declaration by
+equality in both directions, or a reason on an exemption list that is itself
+driven. Re-running the sweep that found the twenty: **sixty-six of sixty-six
+refused**, and the forty-eight fixtures still validate clean.
+
+**The measured twenty was a floor too, by four, and the reason is the
+predicate.** The sweep asked *is this member refused by some form for some of
+five wrong values* — existential over both axes — and four members answered
+*yes* while remaining unchecked for a **specific** wrong value:
+
+| member | why the sweep called it covered |
+|---|---|
+| `axes` | some other value tripped a different rule |
+| `annotations` | as above |
+| `light3` | as above |
+| **`origin3`** | **its only refusal is a pair rule** |
+
+`origin3` is the one worth keeping. Its sole rule is *`origin3` with `axes3` of
+anything but `"origin"`*, which is a claim about **co-occurrence** — so the sweep
+was answered by a rule about something else, and satisfying the pair left the
+value unchecked again. That is *gated behind a sibling* a fourth time, and it is
+why a per-value table finds what an existential sweep cannot.
+
+**A third *read then skipped*, in a function that greps as a check.**
+`checkAnnotations` opened its loop with `if (!isRecord(a)) continue;` — it reads
+every element and says nothing about the ones it cannot understand. `yMin` and
+`startDate` were the first two; this one is in a different function and cites a
+different invariant, which is what makes it a shape rather than a coincidence.
+
+### The control refused eight of my own values, which is what it is for
+
+T1.44 offers each member a **legitimate** value, because without it the table is
+satisfied by a gate that refuses everything. Eight of sixty-eight were refused,
+every one by a correct rule naming a constraint the table did not know:
+`plotDetail` needs a form with a ladder of rungs, `colourBy` is `plot3d`'s alone,
+`origin3` needs `axes3: "origin"`, `yCallout` needs a right gutter to write in,
+`align` needs a `width` or an `aspect`, `calendarUnit` needs one series,
+`hierarchy`'s root needs its own value, and `surfaces3` needs its ranges. The
+control is the half that found the author wrong.
+
+### The mutation survivor was the finding
+
+Seven mutations by hand, six killed. The survivor: **removing the `facets` arm
+from `childBlocksOf` left all three rows green.** The table's own wrong value for
+`facets` is `["__unlikely__"]`, refused by the member check for not being a
+record — which says nothing whatever about whether anything descends. So the
+recursion this entry named, *every rule in the file stops at the first nesting*,
+was the half nothing tested, and only the mutation asked. What separates them is
+a **well-formed facet with a bad member inside**; the row now carries that, a
+facet reusing its parent's id, and the control.
+
+**And the exemption list was an unchecked way to silence a member**, found by
+reasoning about a mutation before running it: moving a member from the table to
+the list drops it out of *both* loops, and nothing failed. Each stated exemption
+is now driven and has to hold — `kind`'s does, because an unknown kind is skipped
+rather than refused (C04 I119), which is the one member whose wrong value is a
+different block and not a fault.
+
+### `BarSpec.format`, and closing the form rather than the member
+
+`Plot["yFormat"]` is written three times. `Plot.xFormat` is closed by the table
+and by MG31 (F1085); `AxisSpec3.format` by `isAxisSpec3`; and `BarSpec.format` is
+the third, on a nested type belonging to `Cell` and `TableRow`, so MG31's subject
+does not reach it and never will. It **is** read — `bar.ts:77` hands it to
+`formatReadout`, whose last arm passes an unknown value through to `formatValue`
+— so a wrong one printed a wrongly formatted number and said nothing, which is
+`matrixAnchor` falling through to `window` (F1076) on a different type. Checked
+at both the row and the cell site.
+
+### A finding this entry nearly acquired, and the measurement that removed it
+
+`ONE_PER_FORM` carries **19 of 69** members, which reads as *the drawing corpus
+exercises 28% of the type* and was one sentence from being filed. Measured over
+the whole corpus that produces frames — `plot-forms.ts`, the golden suite's
+vertical set, `catalogue-forms.ts` and the plots example — it is **67 of 69**.
+The two never drawn are `graphLayout`, half of whose single-value union C04 §3e.2
+already calls vacuous, and **`xFormat`**, which is this round's subject and was
+therefore unchecked *and* undrawn. A corpus chosen for a property may not have
+it, pointed at my own claim.
+
+### And a citation that went red on an insertion 800 lines above it
+
+`CALCIUM_ROADMAP.md` entry 3 cites `src/data/viewmodel/validate.ts:2328` for
+`PLOT_FORM_MEMBERS`. At HEAD that line was `const a3 = b["axes3"] ?? "corner";`
+and the symbol was at 2919 — **wrong before this change**, and green because the
+verifier checks the cited line for being non-blank and nothing more. Adding a
+function above it made the line blank and the gate fired on a citation that had
+never been right. F904 owns the class; thirty-four more line citations are
+reported adrift and not gated.
 
 ### Why it is invisible
 
@@ -44762,7 +44854,7 @@ the quotient.
 |---|---|
 | **Surface** | `tools/enforce/module-graph.mjs` `checkPlotUnions`, against `Plot` in `types.ts` |
 | **Reached for** | F1082's behavioural sweep, asking which `Plot` members survive a wrong value |
-| **Verdict** | **open** — the rule is right, the sentence that bounds it is false, and the member it hides is unchecked |
+| **Verdict** | **closed** — MG31 resolves the reference, `xFormat` is in the table, and the corpus is a count the rule takes rather than a claim a reader trusts |
 
 ### The sentence
 
@@ -44859,3 +44951,35 @@ The widened rule still reads text. A member whose type is a named alias with a
 non-literal arm — `xScale?: ScaleType`, where `ScaleType` admits `{ log: number }` —
 is outside its subject by construction and stays outside it; that member is one
 of F1082's twenty and is closed there, by a check, not by this gate.
+
+### Closed
+
+`plotByReferenceMembers` is exported and shared by the rule and its row, so the
+two cannot drift. Three fabricated violations fire and the control is silent:
+the entry missing from the table, its values disagreeing with the referent's,
+and a reference whose referent is not itself a union — reported rather than
+skipped, because from the table's side an unresolvable reference reads exactly
+like a member needing no entry. `xFormat` is in `PLOT_UNIONS`, so the table is
+**25** entries against `Plot`'s **24** inline unions: two counts, not a
+disagreement, and both are now held and asserted separately.
+
+**The corpus is counted rather than asserted absent**, which is the whole
+correction. T2.132 pins `Plot`'s by-reference members at exactly
+`[{ member: "xFormat", referent: "yFormat" }]`, so the resolution arm cannot pass
+by having nothing to resolve — the exact way the sentence it replaces was true
+and useless.
+
+**The mutation that locks the pair**: removing `declared.set(member, values)`
+fails T2.132 twice **and turns `make enforce` red over the real tree in the other
+direction**, `xFormat` in the table naming no union. The entry and the resolution
+cannot drift apart, because losing either is loud.
+
+### The residue, stated because it is permanent rather than pending
+
+`Plot["yFormat"]` is written three times and only one of them is on `Plot`.
+`AxisSpec3.format` and `BarSpec.format` are on nested types, and MG31's subject
+is `Plot`'s own members — so the gate closes the form **where it can reach**, and
+the other two are closed by hand checks (`isAxisSpec3`, and both `BarSpec` sites)
+under F1082. The class is closed; the *gate* covers a third of it, and that is a
+limit rather than a gap. What is left of the stated blind spot is the multi-line
+member, and the corpus holds none — counted, not asserted.
