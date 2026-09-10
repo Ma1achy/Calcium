@@ -11,6 +11,7 @@ import {
   atLeastOne,
   block,
   childWidths,
+  descendants,
   document,
   groupChildWidths,
   type Share,
@@ -25,6 +26,11 @@ import {
   type ViewDocument,
 } from "../../src/data/viewmodel/index.js";
 import { ADVERSARIAL, doc, tableOf } from "../support/blocks.js";
+// C04 I98's dispatcher clause is C04's rule and C23's code (F1015) — T3.83 is
+// the one row here that reaches L4, and it does so through the real store so the
+// assertion is the document rather than the id an arm passed.
+import { createActionDispatcher } from "../../src/shell/actions.js";
+import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { measurable, visible } from "../support/render.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { cells } from "../../src/presentation/text.js";
@@ -899,6 +905,174 @@ describe("C04 §3 both axes — the frames (I100–I103)", () => {
   });
 });
 
+// C04 §4a, I115 — a `blockId` resolves at every depth, and the rule belongs to
+// the *field* rather than to a list of ops (F1015).
+//
+// **Indexed by the arms that could disagree, not by the containers.** One row per
+// container would be four restatements of *`rewrite` recurses*; what the walk
+// found is a cell where two correct statements overlap — *every op addresses a
+// block by id* meets *`expand` is view state and rebuilds in place* — so the
+// assertions are `expand` **beside** its three siblings on one document. Measured
+// at HEAD before the fix: `expand` `{ok: false}` in all three containers,
+// `replace`, `merge` and `reserve` `{ok: true}` on the same block.
+describe("C04 §4a — every op that names a block finds it wherever it lives", () => {
+  const nest = (wrap: (t: Table) => Block): ViewDocument =>
+    doc({ blocks: [wrap(tableOf(3, "tbl"))] });
+
+  /** The three containers `childBlocks` answers for, one per shape it has. */
+  const CONTAINERS: ReadonlyArray<[string, ViewDocument]> = [
+    ["a group", nest((t) => block({ kind: "group", id: "g", direction: "column", children: [t] }))],
+    ["a panel", nest((t) => block({ kind: "panel", id: "p", title: "T", children: [t] }))],
+    [
+      "another table's detail",
+      nest((t) =>
+        block({
+          kind: "table",
+          id: "outer",
+          columns: [{ key: "name", label: "N", align: "left", priority: 1, minWidth: 4, sortable: false }],
+          rows: [{ id: "o1", cells: { name: { text: "o" } }, detail: [t] }],
+        }),
+      ),
+    ],
+  ];
+
+  /** The four arms of `ViewPatch` that carry a `blockId`, against one id. */
+  const ARMS: ReadonlyArray<[string, Parameters<typeof applyPatch>[1]]> = [
+    ["expand", { op: "expand", blockId: "tbl", rowId: "r1", expanded: true }],
+    ["replace", { op: "replace", blockId: "tbl", block: tableOf(1, "tbl") }],
+    ["merge", { op: "merge", blockId: "tbl", rows: [{ id: "r1", cells: { name: { text: "x" } } }] }],
+    ["reserve", { op: "reserve", blockId: "tbl", rows: 4 }],
+  ];
+
+  it("T3.81 (C04 I115, F1015): the four arms answer one question, in every container", () => {
+    for (const [where, d] of CONTAINERS) {
+      for (const [arm, patch] of ARMS) {
+        const r = applyPatch(d, patch);
+        expect(r.ok, `${arm} inside ${where}: ${r.ok ? "" : r.error.message}`).toBe(true);
+      }
+    }
+
+    // **The expansion is asserted on the block, not on `ok`.** `{ok: true}` is
+    // satisfied by a rewrite that reached nothing — the exact failure `rewrite`'s
+    // own comment records against `table` — so the row reads the row back out.
+    for (const [where, d] of CONTAINERS) {
+      const after = unwrap(applyPatch(d, { op: "expand", blockId: "tbl", rowId: "r1", expanded: true }));
+      const found = [...after.blocks, ...after.blocks.flatMap((x) => [...descendants(x)])].find(
+        (x): x is Table => x.kind === "table" && x.id === "tbl",
+      );
+      expect(found?.rows[0]?.expanded, `the row inside ${where} is open`).toBe(true);
+      expect(found?.rows[1]?.expanded, `and its sibling is untouched`).toBeUndefined();
+    }
+
+    // The control, without which every assertion above passes against an
+    // `applyPatch` that answers `ok` to anything: an id no container holds is
+    // refused by all four, and each says so.
+    const absent = doc({ blocks: [block({ kind: "raw", id: "only", text: "x" })] });
+    for (const [arm, patch] of ARMS) {
+      const r = applyPatch(absent, patch);
+      expect(r.ok, `${arm} against a document with no such block`).toBe(false);
+      if (!r.ok) expect(r.error.message, `${arm} names the id`).toContain("tbl");
+    }
+  });
+
+  it("T3.82 (C04 I115, I14): a duplicate id — one copy nested — is refused by `expand` as by its siblings", () => {
+    // I14 says there is no correct target, and a top-level `find` returns the
+    // first of two and reports success. That is the case the spec declares
+    // impossible, which is the case a document arriving from an adapter can be —
+    // F1010's second hole, one component down.
+    const twice = doc({
+      blocks: [
+        tableOf(3, "tbl"),
+        block({ kind: "panel", id: "p", title: "T", children: [tableOf(3, "tbl")] }),
+      ],
+    });
+
+    for (const [arm, patch] of ARMS) {
+      const r = applyPatch(twice, patch);
+      expect(r.ok, `${arm} against a duplicated id`).toBe(false);
+      if (!r.ok) {
+        expect(r.error.message, `${arm} gives I14's sentence`).toContain("appears more than once");
+      }
+    }
+
+    // And the document really does hold two, or the row above is asserting a
+    // refusal against a shape the walk never saw (`test/support/README.md`).
+    const all = [...twice.blocks, ...twice.blocks.flatMap((x) => [...descendants(x)])];
+    expect(all.filter((x) => x.id === "tbl")).toHaveLength(2);
+  });
+
+  it("T3.83 (C04 I98, §3c S5, F1015): the dispatcher finds the block holding a row at any depth", () => {
+    // **The dispatcher's half of the same rule, and it lives here because C04
+    // I98 is the invariant that states the search** — rows first, then blocks,
+    // both at any depth. Driven through a real `TranscriptStore`, so the
+    // assertion is the row in the held document rather than the id the arm
+    // passed: the two halves compound, and a proxy would have gone green on
+    // either fix alone (F1015's *two blockers read as one*).
+    const wrapped = block({
+      kind: "panel",
+      id: "p",
+      title: "T",
+      children: [tableOf(3, "tbl")],
+    });
+    const store = createTranscriptStore();
+    const id = store.append(doc({ blocks: [wrapped] }));
+
+    const said: string[] = [];
+    const dispatch = createActionDispatcher({
+      transcript: store,
+      editor: { setText: () => undefined },
+      scheduler: { commit: () => undefined },
+      openUrl: async () => undefined,
+      submit: () => undefined,
+      refuse: (_from, text) => said.push(text),
+      notify: (text) => said.push(text),
+      pushView: () => null,
+    });
+
+    dispatch({ kind: "expand", label: "open", target: "r1" }, id);
+
+    const held = store.entries.find((e) => e.id === id)?.doc;
+    const table = [...(held?.blocks ?? [])]
+      .flatMap((x) => [x, ...descendants(x)])
+      .find((x): x is Table => x.kind === "table" && x.id === "tbl");
+    expect(said, "nothing was refused or notified").toEqual([]);
+    expect(table?.rows[0]?.expanded, "the nested row opened").toBe(true);
+    expect(table?.rows[1]?.expanded, "and only that one").toBeUndefined();
+
+    // The fold arm reads the same `reachable`, so the row asserts both halves of
+    // the search rather than the one it was written for — one walk read twice is
+    // the ruling, and two that happen to agree is not.
+    const folded = block({
+      kind: "scroll",
+      id: "fold",
+      height: 2,
+      collapsed: true,
+      children: [block({ kind: "raw", id: "f1", text: "x" })],
+    });
+    const store2 = createTranscriptStore();
+    const id2 = store2.append(
+      doc({ blocks: [block({ kind: "panel", id: "p2", title: "T", children: [folded] })] }),
+    );
+    const dispatch2 = createActionDispatcher({
+      transcript: store2,
+      editor: { setText: () => undefined },
+      scheduler: { commit: () => undefined },
+      openUrl: async () => undefined,
+      submit: () => undefined,
+      refuse: () => undefined,
+      notify: (text) => said.push(text),
+      pushView: () => null,
+    });
+    dispatch2({ kind: "expand", label: "open", target: "fold" }, id2);
+    const after = store2.entries.find((e) => e.id === id2)?.doc;
+    const scroll = [...(after?.blocks ?? [])]
+      .flatMap((x) => [x, ...descendants(x)])
+      .find((x) => x.id === "fold");
+    expect(said, "and the fold arm said nothing either").toEqual([]);
+    expect((scroll as { collapsed?: boolean } | undefined)?.collapsed).toBe(false);
+  });
+});
+
 // C04 §5b — the two cells the classification table rules on (I114, F995).
 describe("C04 absence, null, and the round trip", () => {
   function about(b: unknown, key: string): string[] {
@@ -936,16 +1110,4 @@ describe("C04 absence, null, and the round trip", () => {
     // every notice, and all three sentences above would be equally meaningless.
     expect(validateBlock({ ...notice, tone: "info" }).ok).toBe(true);
   });
-});
-
-/**
- * **C04 I115 — a `blockId` resolves at every depth, and the rule belongs to the
- * field.** The three rows land with `patch.ts`'s and `actions.ts`'s repair in
- * the commit that follows this one; the invariant is here first because the
- * enumeration it replaces was a spec sentence before it was a `find`.
- */
-describe("C04 §4a — a blockId is an address and not a path", () => {
-  it.todo("T3.81 (C04 I115, F1015): replace, merge, reserve and expand all answer one question — each resolves its blockId inside a group, inside a panel and inside a table's detail, three containers rather than one because group alone cannot distinguish does not descend from does not descend into a group — not deferred on a component: it lands with patch.ts and actions.ts in the next commit");
-  it.todo("T3.82 (C04 I115, I14): a duplicate id with one copy nested is refused by expand as it is by its three siblings, because I14 makes an id unique nested children included and a top-level find silently returns the first of the two — not deferred on a component: it lands with patch.ts in the next commit");
-  it.todo("T3.83 (C04 I98, §3c S5, F1015): the dispatcher finds a row on a table inside a container, driven through a real TranscriptStore and asserted on the row in the held document rather than on which blockId the arm passed — a proxy assertion would go green on either half of the repair alone — not deferred on a component: it lands with actions.ts in the next commit");
 });
