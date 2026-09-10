@@ -276,8 +276,10 @@ export const CATALOGUE: Readonly<Record<PlotForm, Entry>> = Object.freeze({
     series: [s(wave(8, p, 8, 0.5, 0.1), "acf")], ...x }) },
   slope: { says: "before against after", at: (p, h, x) => plot("slope", h, {
     axes: true, series: [s([12 + p % 5, 21], "north"), s([19, 9 + p % 4], "south"), s([7, 15], "east")], ...x }) },
+  // **The size is `sizes` and not a second series** (C04 I117): a bubble draws
+  // one position channel, and the magnitude beside it is not a position.
   bubble: { says: "a third reading as area", at: (p, h, x) => plot("bubble", h, {
-    axes: true, series: [s(wave(14, p, 9, 8, 16), "load"), s(magnitudes(14, p, 10, 2), "size")], ...x }) },
+    axes: true, series: [s(wave(14, p, 9, 8, 16), "load")], sizes: magnitudes(14, p, 10, 2), ...x }) },
   stackedarea: { says: "parts of a whole over time", at: (p, h, x) => plot("stackedarea", h, {
     axes: true, series: STAGES.map((n, i) => s(magnitudes(20, p, 11 + i, 6), n)), ...x }) },
   streamgraph: { says: "the same fold, centred", at: (p, h, x) => plot("streamgraph", h, {
