@@ -2,7 +2,7 @@
 // A03 — the enforcement suite. `make enforce`.
 // Every failure names: the rule, the file, what it prevents, and the spec.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { checkFindings, checkTriageInventory } from "./findings.mjs";
+import { checkFindings, checkOpenSet, checkTriageInventory } from "./findings.mjs";
 import {
   checkExportedArguments,
   checkFunctionConsumers,
@@ -97,6 +97,7 @@ const sectionTargets = new Set(
 // SP9's own numbers, computed once and reported beside the gate — the list is
 // the evidence and the count is what a reader watches move.
 const coverage = checkInvariantCoverage(specs, walk("test"));
+const openSet = checkOpenSet();
 
 // **The same gate, run again with deferrals invisible** (F896). SP9 asks whether
 // an invariant is *named*, and `it.todo("T3.6 (C28 I15): …")` is a line that
@@ -218,6 +219,11 @@ const violations = [
   // against a real, unrelated finding with enforce green.
   ...checkFindings(),
   ...checkTriageInventory(),
+  // SP12 — the register's open set, readable and compared by equality. SP6
+  // records the neighbouring gap in its own comment and stops at *keyed*;
+  // this is the next word along, and the measurement that forced it is that a
+  // `**Open**` grep answers 16 where the set is 39 (F1031).
+  ...openSet,
   // SP9 — an invariant nothing names is a claim no row was written against, and
   // it reads exactly like one that is satisfied. SP1 paired a commitment to an
   // invariant and nothing paired an invariant to a check, so *every invariant is

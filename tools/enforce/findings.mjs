@@ -384,3 +384,203 @@ export function checkTriageInventory(io) {
   violations.keyed = keyed.size;
   return violations;
 }
+
+// --- SP12 — the register's open set, readable and compared by equality -------
+//
+// **The register is the document that says what is left to do, and its open set
+// could not be read.** SP6 already records the neighbouring problem in its own
+// comment — *"keyed" has no definition strong enough yet* — and stops there.
+// This is the next word along: not which rows are keyed, but which are **open**.
+//
+// **Measured, and the measurement is this session's own mistake.** Surveying the
+// register to decide what work remained, a grep for the bolded marker returned
+// **16** open findings, and lanes were dispatched against those sixteen. The
+// answer is **33**. The seventeen that were missed are not obscure entries; they
+// are rows that write the same fact in a different form:
+//
+//   `**Open**`            the common form
+//   `**OPEN**`            F405
+//   `| open |`            F50 — a bare lowercase cell, and a real open defect
+//   `Open ·  … **Closed**` F79 — a superseded marker left in place, which reads
+//                          as open to any matcher that does not take the last
+//
+// That is the *a matcher that sees one encoding* class, landing on the register
+// itself: the reader reports absence when the value merely changes form, and it
+// is worst exactly where the forms accumulated over a long document's life.
+//
+// **The cost is not hypothetical and it is not the count.** A count that is
+// wrong low sends nobody anywhere. What it did was leave seventeen open findings
+// undispatched while the survey read as complete — including F50, a column that
+// never grows, sitting open and uncounted beside F701, the finding about the same
+// columns that *was* dispatched. A register nobody can query is a register that
+// reports whatever the querier's regex happens to spell.
+//
+// **The vocabulary, and why the last token wins.** Dispositions here are
+// *appended* rather than replaced: a row records `Open` when filed and gains
+// `**Closed** (F991)` when the sweep resolves it, both left in place because the
+// history is the evidence. So the current disposition is the last one written,
+// and any reader that takes the first — or that asks whether "open" appears —
+// answers about the row's past.
+//
+// **What this does not reach, stated because an unrecorded limit reads as
+// strength.** 208 of 1004 keyed rows state no disposition at all. They are not
+// gated here and they are not assumed closed: they are reported as a count, on
+// SP6's own precedent that a gate red on arrival is a gate edited to fit. The
+// honest reading of those is *unstated*, and turning them into a fourth answer
+// is a sweep over the document rather than a rule over it. Second limit: the
+// vocabulary is closed by this file, so a row inventing a fifth word reads as
+// unstated rather than as a violation — loud in the safe direction, quiet in the
+// other, which is the same asymmetry MG24 carries and for the same reason.
+
+/**
+ * **The register's open set** — what is left to do, as a list rather than as a
+ * query nobody could write correctly.
+ *
+ * Thirty-nine, against the sixteen a `**Open**` grep returns. **Eighteen of the
+ * difference are `**Partly**`**, a disposition invented for findings whose
+ * remedy landed in part, which every reader in this repository was silently
+ * counting as done — the third-state problem the mutation harness has twice
+ * (F897, F949), arriving in the document that says what remains.
+ *
+ * Ordered by number, which is the order a reader walks it in.
+ */
+export const TRIAGE_OPEN = Object.freeze([
+  "F23", "F50", "F129", "F137", "F140", "F141", "F158", "F163", "F181", "F213",
+  "F218", "F271", "F279", "F359", "F364", "F405", "F414", "F421", "F427", "F557",
+  "F606", "F608", "F624", "F701", "F717", "F733", "F753", "F774", "F800", "F812",
+  "F813", "F857", "F871", "F873", "F882", "F897", "F899", "F929", "F934",
+]);
+
+/** The words a disposition may be written with. */
+export const DISPOSITION_WORDS = ["open", "closed", "fixed", "absorbed", "retracted", "withdrawn", "partly", "superseded"];
+
+/** The ones that mean **not done**. `partly` counts as open: part of it is. */
+const OPEN_WORDS = new Set(["open", "partly"]);
+
+/**
+ * **A marker, and not merely the word.** The first reader here matched the
+ * vocabulary anywhere in the row and was wrong in both directions on real rows:
+ * F8 ends *"the shell refuses to open"* after a `**Closed**` and read as open,
+ * and F247's trailing cell `**gate open**` is a column value rather than a
+ * disposition. Prose containing a word is not a claim about the finding's state.
+ *
+ * So a marker is one of exactly two shapes, both of which a writer chooses
+ * deliberately:
+ *
+ *   a **bold span whose first word** is one of the vocabulary — `**Open**`,
+ *   `**Closed** (F991)`, `**Closed by F1017**`, `**OPEN**`
+ *
+ *   a **table cell holding nothing else** — `| open |`, `| fixed |`
+ *
+ * `**gate open**` is neither, because its first word is `gate`; *"refuses to
+ * open"* is neither, because it is not bold and not alone in a cell.
+ */
+const BOLD_MARKER = /\*\*\s*([A-Za-z]+)[^*]*\*\*/gu;
+
+/**
+ * A keyed row's **current** disposition, or `null` where it states none.
+ *
+ * Exported so the rule and its test cannot drift apart, and so a reader who
+ * wants the open set gets the same answer the gate has.
+ *
+ * **The last marker wins**, because dispositions here are appended rather than
+ * replaced: a row records `Open` when filed and gains `**Closed** (F991)` when
+ * the sweep resolves it, both left in place because the history is the evidence.
+ * A reader taking the first answers about the row's past.
+ */
+export function dispositionOf(row) {
+  // **One scan in document order, and not two passes.** The first draft matched
+  // bold spans, then cells, and let the second overwrite the first — so two
+  // readers of one row could disagree and the later loop won regardless of which
+  // marker the writer put last. `F229` is the row that showed it: a bold
+  // `**fixed**` and a cell `closed`, agreeing on the answer and disagreeing on
+  // the path. They agreed here; nothing made them.
+  const marks = [];
+  for (const m of row.matchAll(BOLD_MARKER)) {
+    const w = m[1].toLowerCase();
+    if (DISPOSITION_WORDS.includes(w)) marks.push([m.index ?? 0, w]);
+  }
+  let at = 0;
+  for (const cell of row.split("|")) {
+    const w = cell.trim().toLowerCase();
+    if (DISPOSITION_WORDS.includes(w)) marks.push([at, w]);
+    at += cell.length + 1;
+  }
+  if (marks.length === 0) return null;
+  marks.sort((a, b) => a[0] - b[0]);
+  const last = marks[marks.length - 1]?.[1];
+  return last !== undefined && OPEN_WORDS.has(last) ? "open" : "closed";
+}
+
+/**
+ * Each finding's **own** keyed row — the line that opens with its id, in either
+ * of the document's two shapes.
+ *
+ * A mention inside another entry's prose is not this finding's disposition, and
+ * reading one is how F79 first measured as open: its id appears in a sentence
+ * belonging to F86, which carries its own marker.
+ */
+export function keyedRows(triage) {
+  const rows = new Map();
+  for (const line of triage.split("\n")) {
+    const m = /^(?:\| )?\*\*F(\d+[a-z]?)\*\*[ |]/u.exec(line.trimStart());
+    if (m !== null && !rows.has(m[1])) rows.set(m[1], line);
+  }
+  return rows;
+}
+
+/**
+ * SP12 — the open set is a list, compared by equality.
+ *
+ * `expected` is the register's open set as the last person to change it left it.
+ * **Equality and not containment**: a finding that closes must be struck from
+ * this list, and one that opens must be added, and a subset check in either
+ * direction is silent about the other — measured, in both directions, on C10
+ * I39's debt list (T6.97).
+ */
+export function checkOpenSet(io, expected = TRIAGE_OPEN) {
+  const readText = io?.read ?? ((f) => readFileSync(f, "utf8"));
+  const violations = [];
+  const rows = keyedRows(readText(TRIAGE));
+
+  const found = [];
+  let unstated = 0;
+  for (const [id, row] of rows) {
+    const d = dispositionOf(row);
+    if (d === null) unstated += 1;
+    else if (d === "open") found.push(`F${id}`);
+  }
+  found.sort((a, b) => Number(a.slice(1).replace(/\D/gu, "")) - Number(b.slice(1).replace(/\D/gu, "")));
+
+  const listed = [...expected].sort((a, b) => Number(a.slice(1).replace(/\D/gu, "")) - Number(b.slice(1).replace(/\D/gu, "")));
+  const appeared = found.filter((x) => !listed.includes(x));
+  const cleared = listed.filter((x) => !found.includes(x));
+
+  if (appeared.length > 0) {
+    violations.push({
+      rule: "SP12",
+      file: TRIAGE,
+      spec: "A03 §7a · FINDINGS",
+      message:
+        `${String(appeared.length)} finding(s) read as open and are not on the register's ` +
+        `open set — ${appeared.join(", ")}. The set is what says what is left; a row that ` +
+        `opens without joining it is work nobody can query for.`,
+    });
+  }
+  if (cleared.length > 0) {
+    violations.push({
+      rule: "SP12",
+      file: "tools/enforce/findings.mjs",
+      spec: "A03 §7a · FINDINGS",
+      message:
+        `${String(cleared.length)} entr(y/ies) on the open set no longer read as open — ` +
+        `${cleared.join(", ")}. Compared by equality so the list can only shrink deliberately; ` +
+        `a subset check would let a closed finding sit on it unread.`,
+    });
+  }
+
+  violations.open = found.length;
+  violations.unstated = unstated;
+  violations.rows = rows.size;
+  return violations;
+}

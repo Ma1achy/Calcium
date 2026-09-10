@@ -587,8 +587,11 @@ The suite governs the source. **SP1 governs the documents the source is written 
 | SP9 | Every invariant is named by at least one test row; the uncited are an exemption list compared **by equality** | `docs/components/` against `test/**/*.ts` | A03 §7a · FINDINGS |
 | SP10 | A mnemonic test-row label — `SK10`, `HZ4` — is unique **within one document**; reuse across specs is legitimate and not gated | `docs/components/` | A03 §2 · A03 §7a |
 | SP11 | A commitment's number is unique within its spec; the duplicates outstanding are a debt list compared **by equality** | `docs/components/` | A03 §2 · A03 §7a |
+| SP12 | The register's **open set** — every keyed row whose current disposition reads *open* or *partly* — is a list compared **by equality**; rows stating no disposition are counted and reported, not gated | `examples/docker/TRIAGE.md` | A03 §2 · A03 §7a |
 
-They run in `make enforce` and their fire-tests are `test/unit/enforce-commitments.test.ts`.
+They run in `make enforce` and their fire-tests are `test/unit/enforce-commitments.test.ts`, and SP12's are `test/unit/enforce-open-set.test.ts`.
+
+**SP12's blind spots, and the second is the one to watch.** It reads a *marker* and not the word — a bold span whose first word is one of the vocabulary, or a table cell holding nothing else — so a row inventing a fifth spelling reads as **unstated** rather than as a violation. That is loud in the safe direction and quiet in the other, the asymmetry MG24 carries for the same reason. And **332 of 1008 keyed rows state no disposition at all**; they are counted and reported rather than gated, on SP6's own precedent that a gate red on arrival is a gate edited to fit. The honest reading of those rows is *unstated*, and turning them into a fourth answer is a sweep over the document rather than a rule over it.
 
 **SP9 meets the spec-first rule at every new invariant, and the two rulings commits before the
 rule was written down resolved the meeting by landing red.** A spec commit lands alone, before
