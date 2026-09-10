@@ -220,26 +220,67 @@ describe("C09 §5a — the cluster step is linear, and one glyph does not segmen
     ).toBeLessThan(LINEAR_AT_8X_WITH_MARGIN);
   });
 
-  it("T3.85 (C09 I63, F955): a 200-cell row holding one glyph fits in under a sixth of the time a 200-cell CJK row does", () => {
-    // **The transcript's 60 µs a row, as a ratio a loaded machine can still
-    // reproduce.** Every patch row carries one `│` in its gutter, and that one
-    // glyph sent the whole row through the segmenter — a segment object per
-    // ASCII character, forty of the sixty microseconds (F955). The CJK row
-    // beside it is the row that *must* segment every cluster, so the ratio
-    // between them is the number of clusters that reach the segmenter: one
-    // against a hundred. Measured: 2.8× before the fix, 12× after; the bound
-    // at 6 sits between. Each operand is a batch of at least 20 ms (F8), and
-    // the control is that the CJK row costs more at all.
+  it("T3.85 (C09 I63, F955, F1084): a 200-cell row holding one glyph asks the segmenter for one cluster, a CJK row for a hundred", () => {
+    // **The transcript's 60 µs a row, counted rather than timed.** Every patch
+    // row carries one `│` in its gutter, and that one glyph sent the whole row
+    // through the segmenter — a segment object per ASCII character, forty of
+    // the sixty microseconds (F955). The CJK row beside it is the row that
+    // *must* segment every cluster, so what separates them is the number of
+    // clusters reaching the segmenter: one against a hundred.
+    //
+    // **This gated on the ratio of two durations and the ratio is fragile in
+    // one direction** (F1084). The comment here read *a ratio a loaded machine
+    // can still reproduce*, which is true only when both operands scale with
+    // the load. Measured at 200, 800 and 3 200 cells the gutter row is
+    // sub-linear — 0.0065, 0.0117, 0.0211 ms, sixteen times the cells for 3.2×
+    // the time — because `plainRun` skips the ASCII run and what is left is a
+    // fixed floor, while the CJK row is linear. Most of the 200-cell
+    // denominator is that floor, so additive noise compresses the quotient
+    // toward one, and the bound was a floor: it fell to 5.7 against 6 inside a
+    // full `make all` with the fix fully in place, the pre-fix figure being 2.8.
+    //
+    // `clusterAt` is the only caller of `Segments.prototype.containing`, so
+    // patching that prototype counts exactly what I63 is about. **Two per
+    // cluster and not one**, kept rather than divided away: `fitStyled` asks
+    // once to find the cluster and `pieceCells` asks again to measure it.
+    const proto = Object.getPrototypeOf(new Intl.Segmenter().segment("")) as {
+      containing: (i: number) => unknown;
+    };
+    const real = proto.containing;
+    const asked = (fn: () => unknown): number => {
+      let calls = 0;
+      proto.containing = function (this: unknown, i: number): unknown {
+        calls += 1;
+        return real.call(this, i);
+      };
+      // Restored whatever happens: this is a global, and a leaked patch would
+      // make every later row in the process measure this one's counter.
+      try {
+        fn();
+      } finally {
+        proto.containing = real;
+      }
+      return calls;
+    };
+
     const gutter = gutterRow(200);
     const cjk = cjkRow(200);
+    const gutterAsks = asked(() => fitStyled(gutter, 201, SGR_RESET));
+    const cjkAsks = asked(() => fitStyled(cjk, 201, SGR_RESET));
+    expect(proto.containing, "the patch is restored").toBe(real);
+    expect(gutterAsks, "one glyph, found once and measured once").toBe(2);
+    expect(cjkAsks, "a hundred clusters, each found once and measured once").toBe(200);
+
+    // **The timing is kept as evidence and no longer as the gate.** The control
+    // it always had still holds — a row that must segment every cluster costs
+    // more than one that segments a single glyph — and that comparison has no
+    // denominator to compress.
     const gutterMs = perCall(() => fitStyled(gutter, 201, SGR_RESET));
     const cjkMs = perCall(() => fitStyled(cjk, 201, SGR_RESET));
-    const ratio = cjkMs / gutterMs;
-    expect(cjkMs, `CJK took ${cjkMs.toFixed(4)} ms against ${gutterMs.toFixed(4)} for the gutter row`).toBeGreaterThan(gutterMs);
     expect(
-      ratio,
-      `a 200-cell CJK row cost ${ratio.toFixed(1)}× a 200-cell row holding one glyph (${cjkMs.toFixed(4)} ms against ${gutterMs.toFixed(4)}); ` +
-        "a row segmented whole for its one glyph measured 2.8×, the fix 12×, and the bound is 6×",
-    ).toBeGreaterThan(6);
+      cjkMs,
+      `CJK took ${cjkMs.toFixed(4)} ms against ${gutterMs.toFixed(4)} for the gutter row ` +
+        `(${(cjkMs / gutterMs).toFixed(1)}×, reported not gated — F1084)`,
+    ).toBeGreaterThan(gutterMs);
   });
 });
