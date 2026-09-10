@@ -663,3 +663,11 @@ describe("C28 I44 — the cheap tier records everything cheap", () => {
     none.dispose();
   });
 });
+
+describe("C28 I55 — every computed section of the report comes from a check/format pair", () => {
+  // **Spec-first** (F1099). `checkElements`, `checkEntries` and their formatters
+  // land in the next commit; these three rows become real there.
+  it.todo("T1.105 (C28 I55): one node measured once and rendered once is not flagged, and one measured twice is — not deferred on a component, this is spec-first and lands with the harness pair");
+  it.todo("T1.106 (C28 I55): the per-entry count is byEntry's closes and the heading says so — not deferred on a component, this is spec-first and lands with the harness pair");
+  it.todo("T1.107 (C28 I55): the threshold is a published member, and a node exactly at it is quiet — not deferred on a component, this is spec-first and lands with the harness pair");
+});
