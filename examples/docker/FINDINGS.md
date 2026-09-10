@@ -46281,3 +46281,146 @@ my own.
 - **`settled` returning early being the whole of it.** Starved to zero locally,
   the row is green — which does not clear it, and is why it is a reading rather
   than a conclusion.
+
+---
+
+## F1097 — the sweep's first run ever went red on two shards, and both reds are the job rather than the tree ★★★★
+
+| | |
+|---|---|
+| **Surface** | `.github/workflows/mutation-sweep.yml` · `Makefile`'s `mutate` target · `tools/mutate/sweep.mjs` |
+| **Reached for** | dispatching the workflow to close F1089 — the trigger's first firing |
+| **Verdict** | **open** |
+
+### What the first run said
+
+```
+sweep (5)  red  c12-ascii-alphabet.mjs   exit 1     10s  caught 0  survived 0  expected 0
+sweep (4)  red  c12-arm-seam.mjs         exit -2  2700s  caught 0  survived 0  expected 0
+                                          LEFT THE TREE MUTATED — 2 file(s) restored from the snapshot
+```
+
+Four shards green, two red, on a workflow that had never run — F980's *18 of 283
+anchors stale* said the pass finds things, and its first firing found two.
+**Neither is a survivor.** Both rows say `caught 0 survived 0 expected 0`, which
+is a run that measured nothing at all.
+
+### The first: a gitignored directory the job never generates
+
+`c12-ascii-alphabet` drives `test/unit/plot-catalogue.test.ts`. `docs/catalogue/`
+is **generated and gitignored**, and `make test` carries `catalogue` as a
+prerequisite with the reason written beside it:
+
+> **A prerequisite, not a step in `all`** — the degraded jobs run `make test`
+> alone and PC11 lives in the suite too, so the dependency has to travel with the
+> target.
+
+**It did not travel, because the job does not go through a target.** The step is
+
+```yaml
+- run: node tools/mutate/sweep.mjs --shard ${{ matrix.shard }}/6 …
+```
+
+and `make mutate` exists, whose own comment says *Runs weekly in CI as
+`mutation-sweep`, six shards*. A04 §5 forbids exactly this, in its own words:
+
+> **CI runs the same targets a developer runs.** Not equivalent commands — the
+> same ones. A CI pipeline that invokes something else is a second build nobody
+> tests.
+
+**And going through the target would not have been enough**: `make mutate` has no
+prerequisites at all, so the catalogue is missing from it too. Two records, one
+of them claiming CI uses it, and neither carrying the dependency.
+
+**Reproduced exactly.** With `docs/catalogue` moved aside:
+
+```
+red  c12-ascii-alphabet.mjs  exit 1  9s  caught 0  survived 0  expected 0
+```
+
+against the runner's `exit 1  10s`. Restored, the same run is green at 82 s with
+6 caught. And the reason, from the per-run log:
+
+```
+BlindHarnessError: mutation harness is not live: the unmutated suite already
+fails, so no row below means anything
+```
+
+**The guard worked and the job made the suite red.** That sentence is the
+harness's own vacuity check doing precisely its job — refusing to report on a
+pass whose baseline is already failing — and it never reached anyone.
+
+This is F1087's shape with a different directory: a generated path every
+developer machine has and a fresh checkout does not.
+
+### The second: a per-run timeout sized on a desk
+
+`c12-arm-seam` was killed at `exit -2` after 2700 s, which is `sweep.mjs:168`'s
+own `timeout: 45 * 60 * 1000`. Measured here:
+
+```
+green  c12-arm-seam.mjs  exit 0  2237s  caught 90  survived 0
+```
+
+**2 237 s against a 2 700 s bound is 83 % of the budget on the only regime the
+author could see**, and the runner is measured at 2.7× to 4.1× this container —
+so 101 to 154 minutes against a 45-minute bound. **The kill is arithmetic, not a
+hang**, and the run cannot pass on a runner at any load.
+
+F1088's ruling applies unchanged and is already in this repository: a *timeout*
+is not a product claim, so it must hold on the slowest regime that runs it. The
+run itself is healthy — 90 caught, 0 survived, tree clean afterwards.
+
+**The snapshot net held.** `LEFT THE TREE MUTATED — 2 file(s) restored from the
+snapshot` is a report of the recovery working, not of a leak: `sweep.mjs:180`
+compares every captured file and rewrites what moved. This is the one place the
+first run confirmed something rather than finding it.
+
+**And it is bigger than one constant, which is why the remedy stops short.** The
+workflow says *six shards … so one shard is about an hour*, and one run of
+thirty-two in a shard costs 37 minutes here. Whether the sweep's cost model
+survives contact with a runner is a measurement of its own, and changing the
+shape of the pass is a decision rather than a repair.
+
+### The third, and it is why the first two looked alike
+
+`sweep.mjs:173` writes every run's log to `out/mutate-sweep/<run>.log` and
+`:190` writes `summary.json`. The workflow says of them:
+
+> The per-run logs and `summary.json` under `out/mutate-sweep/` **are in the job
+> log above**; nothing is uploaded, so no artifact action version is a thing this
+> workflow can be wrong about.
+
+**They are not in the job log.** Nothing prints them and nothing uploads them, so
+a red shard produces one summary line and no reason. The `BlindHarnessError`
+above — the whole diagnosis of the first red — exists only because the run was
+reproduced on a machine that keeps the file.
+
+The clause about artifacts is a real argument for not uploading, paired with a
+false premise about where the content already is. Third instance in this file of
+F1095's shape: a claim written in a workflow that no gate resolves. The anchors
+arm one line up does it right, printing `see out/mutate-sweep/anchors.log` —
+which names a file that is also unreachable on a runner, but at least says so.
+
+### Remedy
+
+- **`make mutate` gains `catalogue`**, the prerequisite `make test` carries for
+  the reason already written beside it.
+- **The job runs the target.** One non-target command stays — `npm run build`,
+  which has no target of its own and appears inside three — and is named here
+  rather than left as residue nobody wrote down.
+- **A red run prints the tail of its own log**, so the next red is a diagnosis
+  rather than a line. This is `a red row carries its verdict` applied to the
+  instrument that produces the rows.
+- **The timeout is not raised.** 2 237 s is recorded against the 2 700 s bound
+  with both figures and the runner's ratio, and the cost model is named as the
+  question it is.
+
+### What would falsify this
+
+- **The catalogue existing on a runner.** `git check-ignore -v docs/catalogue`
+  returns `.gitignore:18`, and `git ls-files` returns nothing.
+- **`c12-arm-seam` being slow only here.** It is 2 237 s in the devcontainer with
+  the tree clean and 90 mutations caught, and the runner killed it at the bound.
+- **The per-run logs being printed somewhere.** `sweep.mjs` writes them and no
+  line reads them back; the job log carries the summary line alone.
