@@ -14,7 +14,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { checkFindings, checkTriageInventory } from "../../tools/enforce/findings.mjs";
+import { checkFindingIds, checkFindings, checkOpenSet, checkTriageInventory } from "../../tools/enforce/findings.mjs";
 import {
   checkSectionReferences,
   checkCommitments,
@@ -782,6 +782,7 @@ describe("A03 SP10 — a mnemonic test-row label is unique within its spec", () 
       SP9: "checkInvariantCoverage",
       SP10: "checkMnemonicRowIds",
       SP11: "checkCommitmentNumbers",
+      SP12: "checkOpenSet",
     };
 
     // Equality, so a rule added to `SPEC_RULES` without a carrier fails here
@@ -1047,17 +1048,36 @@ describe("A03 SP3 — invariant references resolve outside the specs too", () =>
     // **The fabrication is the real defect**, copied from the call site rather
     // than invented (A03 commitment 14a). `test/integration/capabilities.test.ts`
     // cited a bare `I13` about aborting before first paint — C01's rule, in a
-    // file about C02 — and had done since the file was written. That id is as it
-    // stood then; C01's is `I14` after the renumber, and the fixture below is the
-    // original text rather than a translation of it.
+    // file about C02 — and had done since the file was written.
+    //
+    // **It stopped fabricating on 2026-09-10, and nothing said so.** The row
+    // held `I13` deliberately, as the original text rather than a translation
+    // of it, and that was right for as long as **C02 had no I13**: the whole
+    // defect is that a bare number in a C02 file resolves against C02, and a
+    // number C02 lacks is what makes the resolution fail loudly. Then F1021
+    // gave C02 a real I13 — the detection record's `sources` member — so the
+    // citation became legal, the fixture stopped constructing a violation, and
+    // the row went red asserting a length of 1 against 0.
+    //
+    // **That is the vacuous-fabrication class arriving from the outside.** The
+    // usual form is a fixture that was always vacuous; this one was correct for
+    // months and was disarmed by a spec edit two components away, with nothing
+    // connecting the two. It failed loudly, which is the safe direction and the
+    // only reason it was found — a fabrication that quietly starts passing for
+    // the same reason would read as a clean gate. FINDINGS F1041.
+    //
+    // Translated to `I14` — C01's number for the same rule after the renumber,
+    // and absent from C02 — so the fixture is still the real defect and not an
+    // invented one. It expires again the day C02 declares an I14, which is the
+    // limit and is why the number is stated here rather than derived.
     const read = at(
-      "    // I13, and the reason it is stated as \"aborts before first paint\".\n",
+      "    // I14, and the reason it is stated as \"aborts before first paint\".\n",
       "test/integration/capabilities.test.ts",
     );
     const { violations } = checkReferences(["test/integration/capabilities.test.ts"], read, {});
 
     expect(violations).toHaveLength(1);
-    expect(violations[0]?.message).toContain("cites C02 I13 (bare, by owner)");
+    expect(violations[0]?.message).toContain("cites C02 I14 (bare, by owner)");
   });
 
   it("SP3 fires: a bare reference in a file nothing owns", () => {
@@ -1466,6 +1486,77 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
     const at = "examples/docker/NOTES.md";
     const v = checkSectionReferences([at], citing(at, "See §4b for the ordering."));
     expect(v.violations.map((x) => x.message).join(" ")).toContain("bare §4b");
+  });
+
+  it("SP5: the ledger's ids are unique, and the reader counted something", () => {
+    // **The counters, because emptiness is the same answer as did-not-read.**
+    // A regex that matches nothing gives 0 headings, 0 duplicates and a clean
+    // gate, which is the shape this register has three named instances of.
+    const v = checkFindingIds();
+    expect(v.headings, "headings read").toBeGreaterThan(500);
+    expect(v.followUps, "and the continuations are among them").toBe(4);
+    expect(v.headings, "every heading is an id or a continuation").toBe(v.ids + v.followUps);
+    expect(v.map((x) => x.message), "SP5 uniqueness").toEqual([]);
+  });
+
+  it("SP5 fires: one id, two sections — the collision a Set cannot see", () => {
+    // The real defect, copied from the call site: an aborted write left a
+    // heading and a two-row table above the real entry, and every citation of
+    // that id resolved to the stub. `declared()` answers *does this exist*, so
+    // it was green throughout.
+    const ledger = readFileSync("examples/docker/FINDINGS.md", "utf8");
+    const dup = `${ledger}\n\n## F164 — a second section under a live id\n`;
+    const v = checkFindingIds({ read: () => dup });
+    expect(v).toHaveLength(1);
+    expect(v[0]?.rule).toBe("SP5");
+    expect(v[0]?.message).toContain("F164");
+    expect(v[0]?.message).toContain("more than one section");
+  });
+
+  it("SP5 fires: a continuation heading that is not on the stated list", () => {
+    // The other arm, and the reason the convention is a list rather than a
+    // pattern: matching any heading with text before the dash would excuse a
+    // real duplicate written the same way.
+    const ledger = readFileSync("examples/docker/FINDINGS.md", "utf8");
+    const extra = `${ledger}\n\n## F164 revisited — a fifth continuation nobody decided on\n`;
+    const v = checkFindingIds({ read: () => extra });
+    expect(v).toHaveLength(1);
+    expect(v[0]?.message).toContain("not the stated set");
+    expect(v[0]?.message).toContain("F164 revisited");
+  });
+
+  it("SP12: the real tree is clean, and the rule actually read it", () => {
+    // **The rule this test exists for was written because a grep answered 16
+    // where the set is 39.** The clean arm asserts the counters as well as the
+    // emptiness, because a reader that resolves no rows at all satisfies
+    // `toEqual([])` exactly as a document with nothing wrong does — the
+    // same-green-for-clean-and-did-not-run shape this register has three
+    // instances of. F1031.
+    const clean = checkOpenSet();
+    expect(clean.rows, "rows read").toBeGreaterThan(500);
+    expect(clean.unstated, "and rows stating no disposition are counted, not dropped").toBeGreaterThan(0);
+    expect(clean.map((x) => x.message), "SP12").toEqual([]);
+  });
+
+  it("SP12 fires: a finding closed and left on the open set", () => {
+    // The direction that actually happens — work lands, the row gains a
+    // closing marker, and the list nobody re-derives keeps the id. Compared by
+    // **equality**, so this is a violation rather than a silent pass.
+    expect(checkOpenSet().map((x) => x.message), "the list and the register agree today").toEqual([]);
+    // A finding the register does not read as open, asserted to be open.
+    const v = checkOpenSet(undefined, ["F1", "F2"]);
+    expect(v.length, "two ids stated open that the register does not").toBeGreaterThan(0);
+    expect(v.map((x) => x.message).join(" ")).toContain("no longer read as open");
+  });
+
+  it("SP12 fires: a row that became open with nothing stating it", () => {
+    // The other direction, and the one a subset check is silent about. The
+    // register is read for its open set and the stated list is given as empty,
+    // so every open row is unstated — which is what a list that stopped being
+    // maintained looks like from here.
+    const v = checkOpenSet(undefined, []);
+    expect(v.length, "an empty list against a register with open rows").toBeGreaterThan(0);
+    expect(v.map((x) => x.message).join(" ")).toContain("read as open and are not on");
   });
 
   it("SP5: the real tree is clean, and the rule actually read it", () => {

@@ -76,7 +76,9 @@ type Fabrication = { rule: string; file: string; source: string };
  * complete. Compared by equality in the row below.
  */
 const RULE_INVARIANTS: Readonly<Record<string, string>> = {
-  SS48: "C22 I54 · C24 I25",
+  // `FINDINGS F126` added with the rule's own `spec` (F1046): A03's Declared
+  // column has carried it since the rule landed and the code had not.
+  SS48: "C22 I54 · C24 I25 · FINDINGS F126",
   SS37: "C09 I15 · C09 T2.17",
   SS13: "C14 I11 · C14 T2.4",
   MG15: "C17 I10 · C17 I14 · C17 T2.6",
@@ -907,6 +909,168 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     ]);
   });
 
+  it("MG24 does not read a parameter or a local's TYPE as a construction (F1027)", () => {
+    // **The record arm's test was the text `name:`, and that form is neither
+    // necessary nor sufficient.** Not sufficient here: `rungRows(spec, available:
+    // number)` annotates a parameter and builds nothing, and it answered for
+    // `HeapSpace.available` two components away. **6691 of the 18551 `name:`
+    // sites under `src/` sit outside any object literal** — a parameter list, an
+    // array, a local's type — and the arm counted every one as a construction.
+    //
+    // Five published members were in that state when this row was written:
+    // `Grid.mask`, `SankeyLayout.fits`, `EntryRun.indent`, `HeapSpace.available`,
+    // `PhaseRow.ms`. F218 is the instance that made the *other* direction loud —
+    // a `let blocked` failing the build on an undrawn glyph — and that direction
+    // is the cheap one. This one is silent.
+    const decl = "export type HeapSpace = Readonly<{\n  available: number;\n}>;\n";
+    const fired = (consumer: string): readonly string[] => {
+      const files: Record<string, string> = {
+        "src/shell/profiling/node.ts": decl,
+        "src/presentation/plot/definition.ts": consumer,
+      };
+      return checkSeamConsumers(Object.keys(files), (f) => files[f] ?? "", {}).map(
+        (v) => v.message.split(" ")[0] ?? "",
+      );
+    };
+
+    // The fabricated violation: the only `available:` in the tree annotates a
+    // parameter, so the member has no consumer and must be reported.
+    expect(
+      fired("function rungRows(spec: RungSpec, available: number): number {\n  return 1;\n}\n"),
+      "a parameter annotation builds nothing",
+    ).toEqual(["HeapSpace.available"]);
+
+    // **F218's own shape, and the fixture has to be the one it happened in.**
+    // Written first as a top-level `let`, this assertion survived the mutation
+    // that disables the binding-keyword test — because a top-level binding is
+    // outside every brace and the enclosing-bracket test already excludes it.
+    // The two readings agree exactly where the convenient fixture puts them.
+    // Inside a function body they do not: the body **is** a brace, and the
+    // keyword is the only thing left. That is where `let blocked` sat.
+    expect(
+      fired("function draw(): void {\n  let available: number | null = null;\n  void available;\n}\n"),
+      "nor does a local's type inside a body",
+    ).toEqual(["HeapSpace.available"]);
+
+    // **The control, and the row is vacuous without it.** If the two above fired
+    // because the corpus was empty rather than because the site was an
+    // annotation, a real construction would fire too — and it does not.
+    expect(fired("const s = { available: 4 };\n"), "a built member is still consumed").toEqual([]);
+  });
+
+  it("MG24 reads `{ …, name }` as a construction — a record built with no colon (F1027)", () => {
+    // **The other half: `name:` is not necessary either.** `{ ...layout,
+    // callouts }` builds the member in ES2015 shorthand, and the arm was blind
+    // to 538 such sites. Three allow-list entries were held open by that
+    // blindness — `Plot.graphLayout`, `ToolDef.oneShot`,
+    // `CompletionResult.superseded` — each reported unconsumed, correctly by
+    // accident, while a file two directories away built it.
+    const decl = "export type Layout = Readonly<{\n  callouts?: ReadonlyMap<number, string>;\n}>;\n";
+    const fired = (consumer: string): readonly string[] => {
+      const files: Record<string, string> = {
+        "src/presentation/plot/furniture.ts": decl,
+        "src/presentation/plot/definition.ts": consumer,
+      };
+      return checkSeamConsumers(Object.keys(files), (f) => files[f] ?? "", {}).map(
+        (v) => v.message.split(" ")[0] ?? "",
+      );
+    };
+    const signature =
+      "function withCallouts(layout: Layout, callouts: ReadonlyMap<number, string>): Layout {\n";
+
+    expect(fired(`${signature}  return { ...layout, callouts };\n}\n`), "shorthand builds it")
+      .toEqual([]);
+
+    // **The control that makes the line above mean something**, and it is the
+    // reason both halves had to land together: drop the shorthand and the
+    // parameter annotation is *all* that is left. Under the old arm that
+    // annotation cleared the member, so a row asserting only the line above
+    // would have passed against the defect as well as against the fix.
+    expect(fired(`${signature}  return layout;\n}\n`), "the annotation alone does not").toEqual([
+      "Layout.callouts",
+    ]);
+  });
+
+  it("MG24's construction scan is not fooled by an import clause or a template hole (F1027)", () => {
+    // Both were measured against the tree rather than imagined. A named import
+    // clause looks exactly like an object literal — `import { luminance, ratio }
+    // from "./contrast.js"` cleared `VerbRatio.ratio`, a *function* export three
+    // layers away standing in for a member built nowhere. And a `${…}` hole is
+    // code inside a string, so `${subject}` in a message template read as a
+    // shorthand property of `Finding`.
+    const decl = "export type VerbRatio = Readonly<{\n  ratio: number;\n}>;\n";
+    const fired = (consumer: string): readonly string[] => {
+      const files: Record<string, string> = {
+        "src/data/fixtures/provenance.ts": decl,
+        "src/presentation/plot/field.ts": consumer,
+      };
+      return checkSeamConsumers(Object.keys(files), (f) => files[f] ?? "", {}).map(
+        (v) => v.message.split(" ")[0] ?? "",
+      );
+    };
+
+    expect(fired('import { luminance, ratio } from "../theme/contrast.js";\n'), "an import clause")
+      .toEqual(["VerbRatio.ratio"]);
+    expect(fired("function m(ratio: number): string {\n  return `${ratio} of a core`;\n}\n"), "a hole")
+      .toEqual(["VerbRatio.ratio"]);
+
+    // **A template nested inside a hole, which is the case the hole tracking is
+    // actually for** — and the row above is not it. Disabling the `${…}` push
+    // failed nothing against the two assertions above, because a template's text
+    // is skipped either way. What it breaks is `paint.ts:523`: an inner backtick
+    // read as *closing* the outer template puts the rest of the line in code
+    // mode, and `${seq}${base}` then reads as two shorthand properties. Measured
+    // over `src/`: **8 spurious names across 4 files, and one file that stops
+    // balancing** (`tokenise.ts`). A mutation that fails nothing is a finding
+    // about the row, and this is the row it produced.
+    const nested =
+      "function based(line: string, base: string): string {\n" +
+      "  return `${base}${line.replace(RE, (ratio) => `${ratio}${base}`)}`;\n" +
+      "}\n";
+    expect(fired(nested), "an inner template does not open code").toEqual(["VerbRatio.ratio"]);
+
+    // The control: the same two files, with one real construction added. If the
+    // fixture could not clear the member at all, none of the assertions above
+    // would be about the scan.
+    expect(fired("const v = { ratio: 0.5 };\n"), "and a literal still clears it").toEqual([]);
+  });
+
+  it("MG24 reports a file whose construction scan did not balance (F1027)", () => {
+    // **A bracket stack is a failure mode the text test did not have**, so the
+    // rule says how far it got rather than degrading quietly. A regex literal
+    // carrying `[{,(` unbalances a naive scan, and so does `densities[i]! / maxD`
+    // — TypeScript's non-null assertion makes a division look like a regex
+    // opening, fifteen times in `kde.ts` alone. Both are handled; a file that
+    // still does not balance falls back to the old loose test rather than being
+    // accused on a reading known to be wrong, and this is what stops the
+    // fallback being silent. It is 0 of 371 files on the real tree.
+    const files: Record<string, string> = {
+      "src/a.ts": "export type T = Readonly<{\n  q: number;\n}>;\n",
+      "src/b.ts": "const x = {\n  q: 1,\n",
+    };
+    const violations = checkSeamConsumers(Object.keys(files), (f) => files[f] ?? "", {});
+
+    expect(
+      violations.map((v) => v.message).filter((m) => m.includes("did not balance")),
+      "the fallback names itself",
+    ).toHaveLength(1);
+    expect(
+      violations.map((v) => v.message.split(" ")[0]).filter((n) => n === "T.q"),
+      "and the member keeps the loose verdict rather than a wrong strict one",
+    ).toEqual([]);
+
+    // The control: balanced, and the report is gone. Without it the row cannot
+    // tell a working scan from one that reports on every file.
+    const ok: Record<string, string> = {
+      ...files,
+      "src/b.ts": "const x = {\n  q: 1,\n};\nvoid (a[0]! / b);\n",
+    };
+    expect(
+      checkSeamConsumers(Object.keys(ok), (f) => ok[f] ?? "", {}).map((v) => v.message),
+      "a non-null assertion beside a division is not a regex",
+    ).toEqual([]);
+  });
+
   it("MG24's equality arm is not satisfied by a homonym, so an exemption keeps its reason", () => {
     // **The third state the arm's message does not name.** It offers *wired now
     // or gone*; the real disposition here is *still unconsumed, with a homonym
@@ -1445,6 +1609,107 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     ).toBe(true);
   });
 
+  it("MG27 reads every builder file, not a pair named by hand (F1028)", () => {
+    // **The rule opened `types.ts` and `builders/index.ts`, and `figure.ts` is a
+    // builder.** What that cost is F263: ten `BUILDER_OMISSIONS` entries whose
+    // reason — *shorthand lands in step 11* — was true about `b.plot` and was
+    // not the claim the rule enforces, which is *buildable by nothing public*.
+    // A grep answering *is it in this file* read as *is it reachable*.
+    //
+    // Re-derived here rather than restated: the list is **7 entries** today and
+    // **none of them is a `plot.*`**, because F263 removed the ten. What did
+    // **not** change is the scope, so this row is about the mechanism and not
+    // about its symptoms.
+    const types = [
+      "export type Gap = Readonly<{ gapBefore?: boolean }>;",
+      "export type Widget = Readonly<{",
+      '  kind: "widget";',
+      "  id: string;",
+      "  shown: string;",
+      "  viaFigure: number;",
+      "}> & Gap;",
+      "",
+      "export type Block =",
+      "  | Widget;",
+      "",
+    ].join("\n");
+    const index = [
+      "function finish(spec, opts, gapDefault) { return gapBefore; }",
+      "function widget(spec) {",
+      '  return finish({ kind: "widget", id: idOf(spec), shown: spec.shown }, spec, true);',
+      "}",
+    ].join("\n");
+    // A second builder, written the way `figure.ts` is: a class, no `finish<`,
+    // and its construction reached through `.build()`.
+    const figure = [
+      "export class WidgetBuilder {",
+      "  private viaFigure_?: number;",
+      "  setViaFigure(n: number): this { this.viaFigure_ = n; return this; }",
+      "  build(): Widget {",
+      '    return { kind: "widget", id: "x", shown: "y", viaFigure: this.viaFigure_ };',
+      "  }",
+      "}",
+    ].join("\n");
+
+    const read = (f: string): string =>
+      f.endsWith("types.ts") ? types : f.endsWith("index.ts") ? index : figure;
+    const fields = (files: readonly string[]): readonly (string | undefined)[] =>
+      checkBuilderCoverage([...files], read, {}, {}).map(
+        (v) => v.message.match(/`(\w+)` and no builder/u)?.[1],
+      );
+
+    // **The fabricated violation**: the field only the second builder sets, with
+    // the second builder outside the walk. This is what the rule reported for
+    // ten entries.
+    expect(
+      fields(["src/data/viewmodel/types.ts", "src/shell/builders/index.ts"]),
+      "unreachable, when the file that reaches it is not read",
+    ).toEqual(["viaFigure"]);
+
+    // **The control**, and the row is vacuous without it: the same tree with the
+    // file in it. If the fixture could not clear `viaFigure` at all, the line
+    // above would be about the fixture rather than about the scope.
+    expect(
+      fields([
+        "src/data/viewmodel/types.ts",
+        "src/shell/builders/index.ts",
+        "src/shell/builders/figure.ts",
+      ]),
+      "and reachable once the directory is the authority",
+    ).toEqual([]);
+
+    // **The split control — the file scope must not buy coverage-by-mention.**
+    // MG27's whole correction was that a builder's text names a field three
+    // times and only the constructed literal sets it. A second file read whole
+    // would undo that, so a `figure.ts` that names the field *above* its
+    // literal and does not set it must still fire. `figure.ts` has no `finish<`,
+    // so the split falls back to the block's own `kind:` line.
+    const mentionsOnly = [
+      "export class WidgetBuilder {",
+      "  private viaFigure_?: number;",
+      "  setViaFigure(viaFigure: number): this { this.viaFigure_ = viaFigure; return this; }",
+      "  build(): Widget {",
+      '    return { kind: "widget", id: "x", shown: "y" };',
+      "  }",
+      "}",
+    ].join("\n");
+    const readMention = (f: string): string =>
+      f.endsWith("types.ts") ? types : f.endsWith("index.ts") ? index : mentionsOnly;
+    expect(
+      checkBuilderCoverage(
+        [
+          "src/data/viewmodel/types.ts",
+          "src/shell/builders/index.ts",
+          "src/shell/builders/figure.ts",
+        ],
+        readMention,
+        {},
+        {},
+      ).map((v) => v.message.match(/`(\w+)` and no builder/u)?.[1]),
+      "a parameter named for the field is not a builder setting it",
+    ).toEqual(["viaFigure"]);
+  });
+
   it("T2.18 (C24 I20): MG27 fires — a block field no builder sets, and the reason list expires", () => {
     // **Fabricated from the real first run**, where the three below came back:
     // `patch.collapsedAfter` (filed as F41 by a consumer who wanted it),
@@ -1815,12 +2080,27 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     // — the union's members come from one and the builder's literals from the
     // other — so a fabrication that supplies one file with one line gives it
     // nothing to compare. MG24 and MG3 are here for the same reason.
+    // **The fabrication had the same scope the rule had, and that is F1028's
+    // disease one rule along.** It patched `builders/index.ts` alone, because
+    // `checkBuilderCoverage` read one builder file; with the directory as the
+    // authority, `figure.ts` writes `form: this.form` — a parameter path, which
+    // opens every arm — so the one-file patch produces no unreachable arm at
+    // all. Both writers are hardcoded now, or the row is about the scope rather
+    // than about MG28.
+    //
+    // **And it corrects the rule's founding sentence.** A03 said the heatmap was
+    // *constructible only by reaching past `b` into `block()`*. Measured:
+    // `setForm` landed in `figure.ts` on **2026-08-18** (`127f19b1`) and the
+    // `heatmap` arm in `types.ts` on **2026-08-20** (`fc775c04`), so
+    // `b.figure().setForm("heatmap")` reached it from the day the arm existed.
+    // The gap MG28 was written for was real; the *reason* it was invisible was
+    // one builder file being read, which is F263 measured a third time.
     const files = srcFiles();
     const hardcoded = (f: string): string => {
       const src = readFileSync(f, "utf8");
-      return f.endsWith("builders/index.ts")
-        ? src.replace('form: form ?? "line",', 'form: "line",')
-        : src;
+      if (f.endsWith("builders/index.ts")) return src.replace('form: form ?? "line",', 'form: "line",');
+      if (f.endsWith("builders/figure.ts")) return src.replace("form: this.form,", 'form: "line",');
+      return src;
     };
 
     const fired = checkBuilderCoverage(files, hardcoded).filter((v) => v.rule === "MG28");

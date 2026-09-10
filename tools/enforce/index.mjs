@@ -2,7 +2,7 @@
 // A03 — the enforcement suite. `make enforce`.
 // Every failure names: the rule, the file, what it prevents, and the spec.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { checkFindings, checkOpenSet, checkTriageInventory } from "./findings.mjs";
+import { checkFindingIds, checkFindings, checkOpenSet, checkTriageInventory } from "./findings.mjs";
 import {
   checkExportedArguments,
   checkFunctionConsumers,
@@ -218,6 +218,7 @@ const violations = [
   // only one with no citation check. Written after a wrong number resolved
   // against a real, unrelated finding with enforce green.
   ...checkFindings(),
+  ...checkFindingIds(),
   ...checkTriageInventory(),
   // SP12 — the register's open set, readable and compared by equality. SP6
   // records the neighbouring gap in its own comment and stops at *keyed*;

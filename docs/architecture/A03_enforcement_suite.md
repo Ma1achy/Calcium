@@ -231,7 +231,7 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 | MG21 | `presentation/` imports nothing from `terminal/` but `escapes.js`; type-only imports are not edges | C09 I15, T2.17 |
 | MG22 | `presentation/plot/` imports nothing from `presentation/table/` — the C11 → C12 edge is one-directional | A02 §1, C12 §2 |
 | MG23 | A component in L1–L3 imports at most one **store**; several at once is L4's, through C23 | C23 §2, C23 I14, A02 Seam 4 |
-| MG24 | A member of an `export interface` under `src/` is named somewhere else under `src/` — a component complete on its own side of a seam, with nothing on the other | A02 Seam 4, C16 I23, C22 I38, I39 |
+| MG24 | A member of a published object type under `src/` — `export interface` **or** `export type X = Readonly<{…}>` since F84 — is **accessed or built** somewhere else under `src/`: a component complete on its own side of a seam, with nothing on the other. An interface member is consumed by `.name`; a record member by being constructed, which since F1027 means a property of an object literal (`{ name: … }` or the ES2015 shorthand `{ …, name }`) and **not** a `name:` that annotates a parameter or a local | A02 Seam 4, C16 I23, C22 I38, I39 |
 | MG25 | An exported **function or class** under `src/` is named somewhere else under `src/`, comments excluded. MG24's blind spot: a producer expressed as free functions rather than as an interface | A02 Seam 4, C23 §3b, C24 I16 |
 | MG27 | A field a **block type** carries that no builder sets. The reasons live in `BUILDER_OMISSIONS`, keyed `Kind.field`, with the bidirectional arm `UNCONSUMED_MEMBERS` has: an entry the builder now sets is itself a violation | C24 I18, C24 commitment 16, FINDINGS F41 · F114 |
 | MG28 | A **closed string union** on a block field whose builders write only bare literals, reaching some of its arms. Top-level fields only; a builder threading a parameter opens them all | C24 I18, FINDINGS F180 |
@@ -280,7 +280,9 @@ So the arm is on, and the one edge that survives it is named rather than tolerat
 
 **MG29 found three instances and not the one that produced it, which is the honest report.** It exists because `plotToSvg` shipped as *the second renderer* with `ResolvedTheme` and `loadTheme` both interior — published, resolving, uncallable — and **the rule clears that case**, because `RenderContext.theme` is a published route to the type. The route ends inside a synchronous `render`, which is the one place an SVG cannot be rasterised, and reachability cannot ask where a route arrives. What it did find on its first run: `registerGrammar` taking an unexported `LanguageFn`, and `cells`/`truncate` taking an unexported `AmbiguousWidth` — the pair C24 commitment 12 publishes *because a custom block kind cannot be written without them*, callable in one parameter and not the other. **Its first draft also reported `SVG_DEFAULT_LAYOUT`**, a default value read as a type; caught by reading what it named rather than counting how many it found.
 
-**MG28 is MG27's subject read properly, and F84's shape one rule along.** MG27 asks whether a builder's constructed literal *mentions* each field. `form: "line"` mentions `form` — so a closed union with one hardcoded arm satisfies a check about **names** while its other arms are buildable by nothing public. `PlotForm` has three members and the heatmap shipped with a walk, an invariant, a validator arm, a renderer, three golden frames and a mutation pass, constructible only by reaching past `b` into `block()`. MG27 was right about what it checked; what it read as covering was wider.
+**MG28 is MG27's subject read properly, and F84's shape one rule along.** MG27 asks whether a builder's constructed literal *mentions* each field. `form: "line"` mentions `form` — so a closed union with one hardcoded arm satisfies a check about **names** while its other arms are buildable by nothing public. `PlotForm` has three members and the heatmap shipped with a walk, an invariant, a validator arm, a renderer, three golden frames and a mutation pass, reachable from no *documented* route. MG27 was right about what it checked; what it read as covering was wider.
+
+**Corrected 2026-09-10 (F1028), because the sentence said `block()` and the measurement says otherwise.** It read *constructible only by reaching past `b` into `block()`*, and `b.figure(…).setForm("heatmap")` builds one: `setForm` landed in `figure.ts` on 2026-08-18 (`127f19b1`) and the `heatmap` arm in `types.ts` on 2026-08-20 (`fc775c04`), so the chain reached the form from the day the form existed. The gap was real and its *reason* was one builder file being read — F263's class a third time, and the finding was written against the rule's own blind spot rather than measured against the directory. **Two consequences, both landed with F1028's scope fix.** MG28's fabrication patched one file and therefore stopped fabricating anything; it hardcodes both writers now. And MG28's two arms disagreed with each other — the shorthand arm was anchored at an object-literal position and the colon arm was not, so `setForm(form: PlotForm)` read as a non-literal write and opened every arm of the union. That is **MG24's record-arm disease exactly** (F1027): a question about construction answered by a form TypeScript also uses for declaration, invisible for as long as the rule read only a file whose bodies are sliced past every annotation.
 
 **Its population is six and that is deliberate.** Six top-level block fields are closed string unions — `Notice.tone`, `Plot.form`, `Plot.yFormat`, `Plot.colormap`, `Patch.layout`, `Group.direction` — and five thread a parameter and were already correct. A rule that examined two and found nothing is indistinguishable from one that examined twenty, so the figure is asserted in `enforce-rules.test.ts` rather than implied by a green run. **Widening it until the output looks larger is the tuning A03 §2 warns about**: the subject is a vocabulary a consumer picks from, and six of them are.
 
@@ -299,18 +301,18 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | # | Forbidden | Where | Declared |
 |---|---|---|---|
 | SS1 | `Date`, `Date.now`, `performance.now`, `process.hrtime` | anywhere in Calcium outside C22 | C22 T2.4 |
-| SS2 | `Math.random` | anywhere in `src/`; C08 is where it would be reached for | C08 T2.3 |
-| SS3 | `Math.random`, `fs`, `process` — clock reads are SS1's | `src/data/adapters/` | C07 T2.2 |
+| SS2 | `Math.random` | anywhere in `src/`; C08 is where it would be reached for | C08 I4, T2.3 |
+| SS3 | `Math.random`, `fs`, `process` — clock reads are SS1's | `src/data/adapters/` | C07 I1, T2.2 |
 | SS4 | clock reads | `src/viewport/` | C13 I9, T2.2 · C14 T2.4 |
 | SS5 | — folded into SS4 | — | C14 T2.4 |
 | SS6 | — folded into SS1 | — | C16 T2.3 |
 | SS7 | — folded into SS1 | — | C17 T2.3 |
 | SS8 | — folded into SS1 | — | C19 T2.3 |
-| SS9 | `fs`, any dot-directory path literal (`.x`, `~/.x`) — the clock clause dropped, being SS1's | `history/` | C20 T2.4 |
-| SS10 | `process.env`, in any form | anywhere in `src/`, no exceptions — C02 takes the injected record, and the allowance it held for C02's capabilities module was never exercised (SS53) | C02 T2.5 |
-| SS11 | `process.env` | `src/presentation/` | C09 T2.7 |
+| SS9 | `fs`, any dot-directory path literal (`.x`, `~/.x`) — the clock clause dropped, being SS1's | `history/` | C20 I11, I12, T2.4 |
+| SS10 | `process.env`, in any form | anywhere in `src/`, no exceptions — C02 takes the injected record, and the allowance it held for C02's capabilities module was never exercised (SS53) | C02 T2.5, T6.2 |
+| SS11 | `process.env` | `src/presentation/` | C09 T2.7 · C10 T2.6 |
 | SS12 | `process.env` | `theme/` | C10 T2.6 |
-| SS13 | `fs`, clipboard shell-out | `viewport/` | C14 T2.4 |
+| SS13 | `fs`, clipboard shell-out | `viewport/` | C14 I11, T2.4 |
 | SS42 | `.columns` / `.rows` on a stream handle | outside `terminal/lifecycle.ts` | C01 I13, T2.10 |
 | SS44 | `PRISM_TUI_*` | `src/` | C06 I18, C22 I20, C22 T2.9 |
 
@@ -338,8 +340,8 @@ What SS42 buys is that a **second** live reader cannot appear quietly beside the
 | SS17 | Hex, ANSI, named colour | `blocks/` | C09 T2.8 |
 | SS18 | Hex literal | the modules that construct blocks — `src/data/adapters/`, `src/data/fixtures/`, `src/shell/` — the third population beside SS16's types and SS17's renderers. Pending on "the block-producing module list" for the whole life of C10 | C10 I14, T2.9 |
 | SS19 | ANSI index or terminal-specific value | `presentation/theme/`, no exceptions — the four-bit map holds its indices as bare numbers the pattern cannot see, so its allowance was never load-bearing (SS53) | C10 I13, T2.5 |
-| SS20 | `syntax` palette reference | outside `presentation/theme/`, `blocks/kinds/code.ts` and `presentation/patch/` | C10 T2.8 |
-| SS21 | `spectrum` palette reference | anywhere in `src/`, no exceptions — the art is declared through the palette record, not by name, and the theme directory's allowance matched nothing in ten files (SS53) | C10 T2.8 |
+| SS20 | `syntax` palette reference | outside `presentation/theme/`, `blocks/kinds/code.ts` and `presentation/patch/` | C10 I16, T2.8 |
+| SS21 | `spectrum` palette reference | anywhere in `src/`, no exceptions — the art is declared through the palette record, not by name, and the theme directory's allowance matched nothing in ten files (SS53) | C10 I16, T2.8 |
 | SS22 | Literal verb, flag or enum list | `src/interaction/completion/`, no exceptions — `SLOT_KINDS` is quoted one per line and the list arm never matched it (SS53) | C19 I4, T2.6, T4.1 |
 
 **SS22 is the anti-drift check**, and it became real on the day `completion/` did. A hardcoded enum in completion is how the manifest stops being the source of truth, and it looks harmless in review — the list is *correct* on the day it is written, which is why nothing else in the suite would notice it. C19 T4.1 keeps passing against a literal list, because the fixture manifest still holds the same values.
@@ -358,13 +360,13 @@ Two shapes, because there are two ways to write one: a `"--flagname"` literal is
 |---|---|---|---|
 | SS23 | `.length`, `charAt`, `slice` on display text | `src/presentation/`, allowing `presentation/theme/` | C09 T2.9 |
 | SS40 | The same, in the editor | `src/interaction/`, allowing `router/decode.ts`, `interaction/parser/`, `completion/context.ts` and `completion/sources.ts` by name, and six of C20's seven — `history/codec.ts`, `history/navigate.ts`, `history/persist.ts`, `history/redact.ts`, `history/search.ts`, `history/store.ts` — with the seventh, the layer builder, left in scope, being the one that measures display width | C17 I2, T2.4 |
-| SS24 | Mutable module state | `src/presentation/table/`, `plot/`, `patch/`, `src/interaction/parser/` | C11 T2.6, C12 T2.5, C25 T2.4, C18 T2.2 |
-| SS25 | Exit-code mapping or `ErrorLike` construction | `transport/` | C06 T2.3 |
+| SS24 | Mutable module state | `src/presentation/table/`, `plot/`, `patch/`, `src/interaction/parser/` | C11 I11, T2.6, C12 T2.5, C25 T2.4, C18 T2.2 |
+| SS25 | Exit-code mapping or `ErrorLike` construction | `transport/` | C06 I2, T2.3 |
 | SS26 | Writes to real `process.stdout` | `process/` | C21 T2.2 · **pending, see below** |
 | SS27 | Timer or escalation logic, including a `SIGTERM` literal | `process/` | C21 I8, I11, T2.4 |
 | SS41 | `process.env` or `process.stdin` | `process/` | C21 I14, T2.7 |
 | SS28 | Scheduler calls | `src/interaction/`, allowing `history/types.ts`, `history/persist.ts` and `history/store.ts`, whose `flush` is C20's write to disk and not C03's frame | C16 T2.6, C17 T2.6, C18 T2.4, C19 T2.5, C20 T2.6 |
-| SS30 | A second implementation of a shared text primitive — tokeniser, quoter, edit distance | `src/`, allowing `interaction/parser/tokenise.ts`, `data/manifest/validate.ts` and `blocks/kinds/code.ts` | C18 T2.3, C18 T2.10, C19 T2.4, C05 T2.9 |
+| SS30 | A second implementation of a shared text primitive — tokeniser, quoter, edit distance | `src/`, allowing `interaction/parser/tokenise.ts`, `data/manifest/validate.ts` and `blocks/kinds/code.ts` | C18 I11, I23, T2.3, T2.10 · C19 T2.4 · C05 I18, T2.9 |
 | SS31 | A runtime dependency absent from `DEPENDENCIES.md` | `package.json` | A04 §2 |
 | SS32 | A `postinstall`, `preinstall` or `prepare` script in any dependency | the install tree | A04 §3 |
 | SS33 | `console.*` | `src/` | C01 I9, A04 §2 |
@@ -387,7 +389,7 @@ Two shapes, because there are two ways to write one: a `"--flagname"` literal is
 | SS55 | A binding filtering on the kitty keyboard protocol's `event` type — `event: "press"`, `"repeat"` or `"release"` — with no `// none-fallback: <action>` on the same line naming what fires under `keyboardProtocol: "none"`. **Vacuous on landing and says so**: `Binding.key` has no `event` member and no row names one, so the rule has nothing to be wrong about until the first release binding arrives; its fabricated violation is a binding on `event: "release"` alone. *Stated blind spots*: the fallback is named, not resolved; a filter spelled otherwise passes; one file | `src/interaction/router/keymap.ts` | C02 I12 · C16 §2 |
 | SS51 | One of the four encoding vocabularies named by `RAMP_VOCABULARIES` — `RAMP_UNICODE`, `RAMP_ASCII`, `RAMP_BRAILLE`, `RAMP_DENSITY` | `src/` outside `src/presentation/plot/ramp.ts` | C12 §3c · C12 I21 |
 | SS57 | **A glyph with an emoji presentation form** — a non-ASCII code point inside a string literal that is a base of an emoji variation sequence, against `text.ts`'s `EMOJI_VARIATION_BASES` (derived from `emoji-variation-sequences.txt` 17.0.0), comments blanked. Found eleven on its first run — `⏺` U+23FA, `ℹ` U+2139, the `arrow` spinner's four diagonals, `▪ ▫ ◼ ◻` in two bar styles, a `⚠` in the fixtures report (F823, F832, F833); no allow-list | `src/` | C09 I45, T2.112 |
-| SS56 | **A hand-composed notice** — `kind: "notice"` as an object-literal value — anywhere the L4 family (`documents.ts`'s `noticeDoc`, `builders/`' `b.notice`) is meant to be called instead. Sixteen files carried the literal at landing and every one was allowed **by name with its reason in the rule's comment**: two are the family, two are the kind's declaration and definition (`viewmodel/types.ts`, `blocks/kinds/simple.ts`), eight are below L4 where the family is unreachable (A02 — four adapters, markdown, the cap marker, the history layer, `art.ts`), and **four were L4 surfaces that owed a migration** — fourteen sites, allowed so that SS53 would retire each entry when its last literal went. **It did** (2026-09-05, F777): every site calls `b.notice`, SS53 failed four times with the entries still present, the entries left, and `test/contract/notice-family.test.ts` holds the frames the literals drew and asserts the family draws the same bytes. Twelve entries remain. *Stated blind spots*: a notice built through a helper the rule does not know, the kind held in a constant, or a spread from elsewhere all pass; it is per line and cannot tell a composition from an object-literal type guard; it does not say which member of the family a site should call | `src/`, allowing by name — the family `src/shell/documents.ts` and `src/shell/builders/`; the kind `src/data/viewmodel/types.ts` and `src/presentation/blocks/kinds/simple.ts`; below L4 `src/data/adapters/fallback.ts`, `src/data/adapters/mapping.ts`, `src/data/adapters/overflow.ts`, `src/data/adapters/registry.ts`, `src/data/viewmodel/markdown.ts`, `src/viewport/transcript/cap.ts`, `src/interaction/history/layers.ts`, `src/presentation/art.ts` | C22 T2.40 · C24 I5 · FINDINGS F739 |
+| SS56 | **A hand-composed notice** — `kind: "notice"` as an object-literal value — anywhere the L4 family (`documents.ts`'s `noticeDoc`, `builders/`' `b.notice`) is meant to be called instead. Sixteen files carried the literal at landing and every one was allowed **by name with its reason in the rule's comment**: two are the family, two are the kind's declaration and definition (`viewmodel/types.ts`, `blocks/kinds/simple.ts`), eight are below L4 where the family is unreachable (A02 — four adapters, markdown, the cap marker, the history layer, `art.ts`), and **four were L4 surfaces that owed a migration** — fourteen sites, allowed so that SS53 would retire each entry when its last literal went. **It did** (2026-09-05, F777): every site calls `b.notice`, SS53 failed four times with the entries still present, the entries left, and `test/contract/notice-family.test.ts` holds the frames the literals drew and asserts the family draws the same bytes. Twelve entries remain. *Stated blind spots*: a notice built through a helper the rule does not know, the kind held in a constant, or a spread from elsewhere all pass; it is per line and cannot tell a composition from an object-literal type guard; it does not say which member of the family a site should call | `src/`, allowing by name — the family `src/shell/documents.ts` and `src/shell/builders/`; the kind `src/data/viewmodel/types.ts` and `src/presentation/blocks/kinds/simple.ts`; below L4 `src/data/adapters/fallback.ts`, `src/data/adapters/mapping.ts`, `src/data/adapters/overflow.ts`, `src/data/adapters/registry.ts`, `src/data/viewmodel/markdown.ts`, `src/viewport/transcript/cap.ts`, `src/interaction/history/layers.ts`, `src/presentation/art.ts` | C22 T2.40 · C24 I5 · C23 I61 |
 | SS36 | A string literal assigned to a `colour` field | `src/` | C10 I24, T2.19 |
 | SS37 | An Ink `color=` or `backgroundColor=` prop | `src/presentation/` | C09 I15, T2.17 |
 | SS39 | A character literal in a `glyph` position | `src/` outside C09's glyph table | C04 I6, C09 §4 |
@@ -580,7 +582,7 @@ The suite governs the source. **SP1 governs the documents the source is written 
 | SP2 | Invariants are numbered 1..n, in order, a lettered variant beside its base | `docs/components/` | A02 §1 |
 | SP3 | Every invariant reference resolves against the spec that owns it | `src/`, `test/`, `tools/`, `docs/` outside `components/` and `archive/` | A02 §1 |
 | SP4 | A02 Seam 4 and each owner's orchestration table hold the same rows, **both directions** | A02 Seam 4 · C22 §3c · C23 §4 | A02 §Seam 4 |
-| SP5 | Every `Fnn` citation resolves against a finding that exists | FINDINGS · CLAUDE.md §Ask where a settled claim is written down | A03 §7a |
+| SP5 | Every `Fnn` citation resolves against a finding that exists, **and every finding id names exactly one section** — the four continuation headings are a list compared by equality | `src/`, `docs/`, `tools/`, `test/`, `examples/docker/`, the root's own documents · FINDINGS · CLAUDE.md §Ask where a settled claim is written down | A03 §7a |
 | SP6 | Every finding is keyed in `TRIAGE.md`, and its declared total is compared by equality | FINDINGS F142 · F87 | A03 §7a |
 | SP7 | A test row's number is unique within its spec; `Tn.x` placeholders exempt | `docs/components/` | A03 §2 · A03 §7a |
 | SP8 | Every `§` reference resolves against the document that owns it — **reported, not gated** | `src/`, `test/`, `tools/`, `docs/` outside `notes/` | A02 §1 · A03 §7a |
@@ -589,7 +591,15 @@ The suite governs the source. **SP1 governs the documents the source is written 
 | SP11 | A commitment's number is unique within its spec; the duplicates outstanding are a debt list compared **by equality** | `docs/components/` | A03 §2 · A03 §7a |
 | SP12 | The register's **open set** — every keyed row whose current disposition reads *open* or *partly* — is a list compared **by equality**; rows stating no disposition are counted and reported, not gated | `examples/docker/TRIAGE.md` | A03 §2 · A03 §7a |
 
-They run in `make enforce` and their fire-tests are `test/unit/enforce-commitments.test.ts`, and SP12's are `test/unit/enforce-open-set.test.ts`.
+They run in `make enforce` and their fire-tests are `test/unit/enforce-commitments.test.ts`, and SP12's reader tests are `test/unit/enforce-open-set.test.ts`.
+
+**A rule's fabrication lives in `enforce-commitments.test.ts`, and the meta-row that checks this reads only that file.** SP12 landed with its reader tested in a file of its own, and the row asserting *every SP rule has a fabrication in the file that owns the parser* went red — correctly, and only because it was scoped to one file, so a fabrication elsewhere is invisible to it rather than merely elsewhere. SP12 also landed without a `carriers` entry, which the same suite's equality arm caught. Both are recorded here because the commit had been verified in a worktree against `tsc` and `enforce` and **neither reads a test file**; running the suite is what spoke. FINDINGS F1041.
+
+**SSD (`test/unit/enforce-declared.test.ts`)** — **A03's *Declared* column and each `SCANS` row's own `spec` are one fact and are compared by equality.** Two records with nothing joining them is the class this section already names for A02 Seam 4; here it produced a rule pointing at the wrong invariant (SS37, F934) and four more that had their answer on the record and never reached the code (SS33, SS35, SS48, SS59 — F1046). It normalises A03's implied-prefix notation (`C21 I8, I11, T2.4`) against the code's (`C21 I8 · C21 I11 · C21 T2.4`); the residue is `DECLARED_DEBT`, compared by equality in both directions **and** on the tokens that separate each pair, so a rule drifting further along a gap it already has fails rather than sitting still. The list is **empty** as of the commit that applied its twelve entries to §4's tables, and stays as the place the next divergence is recorded with a reason. *Stated blind spots*: it compares citation strings and not aim, so two records agreeing on a wrong invariant are silent — the state SS37 was in; it covers `SS` and not `MG`, whose `spec` is built inline in `checkModuleGraph` rather than held in a table, leaving 30 of A03's 90 rule rows unreconciled; and it is a test row rather than an `index.mjs` rule.
+
+| the 47 implemented scans against A03 §4's tables | A03 §2, §7a · CLAUDE.md §compare exemption lists by equality |
+
+**SP5 answers existence and, since F1047, uniqueness — and the second arm exists because the first cannot imply it.** `declared()` collects ids into a `Set`, which is right for *does this exist* and blind to *how many sections claim it*: two `## F164` headings resolve every citation and the gate stays green while a reader following one lands on whichever comes first. One such duplicate was found in 1 055 headings, an aborted write that left a heading and a two-row table above the real entry. **It is also the failure mode a double-allocated finding number produces**, which happened in the same session from the other end — two lanes handed one number, and SP5 passing on both. The corpus was widened to `tools/` and `test/` in the same commit: **2 462 citations, 19% of the repository's**, measured clean before the widening so that it lands green rather than red on arrival.
 
 **SP12's blind spots, and the second is the one to watch.** It reads a *marker* and not the word — a bold span whose first word is one of the vocabulary, or a table cell holding nothing else — so a row inventing a fifth spelling reads as **unstated** rather than as a violation. That is loud in the safe direction and quiet in the other, the asymmetry MG24 carries for the same reason. And **332 of 1008 keyed rows state no disposition at all**; they are counted and reported rather than gated, on SP6's own precedent that a gate red on arrival is a gate edited to fit. The honest reading of those rows is *unstated*, and turning them into a fourth answer is a sweep over the document rather than a rule over it.
 
@@ -969,6 +979,25 @@ They are named in `UNCONSUMED_MEMBERS` with their owners rather than deleted, be
 
 **Run before C24 deliberately.** C24's whole job is exporting things for external consumption, so a rule landing after it would fire on every public export and need either an allow-list the size of the API or a scope carved around the façade. Run now, the baseline is meaningful and C24 lands into a tree where the rule already holds.
 
+#### The record arm asked for `name:`, and that is neither necessary nor sufficient (F1027)
+
+**F84 widened the walk to `export type X = Readonly<{…}>` and gave the new keyword its own consumer test** — a record is consumed by being *built*, so `{ placed: … }` counts with no dot in front of it. The test was the text `name:` in another file, and it answers a question about **construction** with a form that TypeScript also uses for **annotation**.
+
+| | measured over `src/` |
+|---|---|
+| `name:` sites in total | 18551 |
+| of those, inside an object literal | 11860 |
+| of those, **outside any brace** — a parameter list, an array, a local's type | **6691 (36%)** |
+| `{ …, name }` shorthand sites the arm could not see at all | 538 |
+
+**Two errors, and they cancel**, which is why a clean run looked identical either way. F218 is the loud half: a `let blocked: Owner | null` in `pointlabels.ts` failed the build on `GlyphSet.blocked`, an undrawn glyph two directories away. That half **no longer reproduces** — the equality arm's `owned` scoping landed afterwards and re-fabricating the rename gives 0 violations — and it was the cheap direction anyway. The quiet half was never fixed: **seven members read as consumed on evidence that constructs nothing**, five of them unexempt, so MG24 had stopped asking about them. `Grid.mask`, `SankeyLayout.fits`, `EntryRun.indent`, `HeapSpace.available`, `PhaseRow.ms`, and `Identity.groups` / `Finding.subject` which were exempt for a reason that had stopped being the reason.
+
+**And three exemptions were held open by the blindness to shorthand** — `Plot.graphLayout`, `ToolDef.oneShot`, `CompletionResult.superseded`, each reported unconsumed correctly by accident while another file built it. One of the three crosses a component seam and its exemption was simply wrong; the other two are built by their own component's factory, which the file-scoped arm counts and the component-scoped reading would not. That is the narrow/wide trade this section already records, arriving with three measured instances.
+
+**This is not F105/F160's class and none of their four refused tightenings reaches it.** Those all move the *consumer scope* — files naming the owner, `(owner, name)` keying, import reachability — and each fails because a legitimate consumer gets caught. Nothing legitimate is caught here: a parameter annotation is not a construction in any architecture, and the shorthand form is one in every architecture. Name collision between two *types* remains the standing residue, still printed by the exactness line and still not gated.
+
+**Its new blind spot, because a rule that resolves by structure has different limits and not none.** The scan is a bracket stack over stripped source, and it can be wrong in ways the text test could not be. A regex literal carrying `[{,(` unbalances it, and so does `densities[i]! / maxD` — a non-null assertion makes a division look like a regex opening, fifteen times in `kde.ts` alone. Both are handled; what is *not* is a construct nobody has written yet, so the rule **reports its own reach**: a file whose scan does not balance keeps the old loose test and is named on the violation list rather than being accused on a reading known to be wrong. It is 0 of 371 files today. Two limits stay open by choice — a member of an inline type literal or a class body still sits inside a brace and counts as built, which is F105's collision class one syntax along; and a hole in a template is code that the scan deliberately declines to read, so a member constructed only inside a `${…}` reads as unconsumed. Both are loud rather than quiet, which is the direction F218 argues for.
+
 **A note on where the rows for new rules live.** SS and MG rows are inventoried in §4 and §3 *with their implementation*, not ahead of it — commitment 14b makes an inventoried-and-unbuilt rule fail on the commit that inventories it, which is deliberate and is the opposite of the usual spec-first order. This section is prose, so it lands with the finding; the row lands with the code.
 
 ### MG27 — a block field no builder can set
@@ -1015,6 +1044,27 @@ request; the sentence had named three omissions two years after the first left.)
   authority, so a gap in *C04* is outside its subject.
 - Both are the frame-read's job. Neither is how a field has actually gone
   missing: every measured case is a field nobody typed into the builder.
+- **It read one of the builder files and there are six** (F181, F263, closed by
+  F1028). `checkBuilderCoverage` opened `types.ts` and `builders/index.ts`, and
+  `figure.ts` builds a `kind: "plot"` block it never saw — so ten
+  `BUILDER_OMISSIONS` entries read *shorthand lands in step 11*, a sentence true
+  about `b.plot` and not the claim the rule enforces. **A grep answering *is it
+  in this file* was read as *is it reachable*.** F263 removed the ten; the scope
+  stayed, which is why the entry survived its own symptoms. Re-derived at the
+  fix: the list is **7 entries and none of them a `plot.*`**, so the change moves
+  no violation today and closes the mechanism rather than the instance.
+
+  **A hand-named pair is F228's shape in a scope** — the same failure the base-
+  field list had when `"gapBefore"` was a literal in the loop — so the directory
+  is the authority now, and a seventh builder file is covered on the day it is
+  written. Two corrections came with it: `figure.ts` builds from a class method
+  and has no `finish<`, so the constructed-literal split falls back to the
+  block's own `kind:` line, which sits below every annotation and every private
+  field; and a builder file that opens with no top-level `function` or `const`
+  used to contribute **no text at all**, which is a rule passing because it read
+  nothing. Measured on `figure.ts`: the constructed literal covers 25 `Plot`
+  fields and the whole file covers the same 25, so the split costs nothing here
+  and is what keeps the mention-is-not-a-setting correction alive across files.
 
 **Two parsing corrections it needed before it was trustworthy**, and both had
 produced false rows on the first run. `Hunk.lines[].kind` is

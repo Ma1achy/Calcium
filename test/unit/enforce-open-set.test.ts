@@ -110,18 +110,31 @@ describe("SP12 — the register's open set", () => {
     const clean = checkOpenSet(io(real()));
     expect(clean.length, "the register as it stands").toBe(0);
 
+    // **The fabricated ids are derived, not written.** Two literal `F9999xx`
+    // constants stood here and SP5 read them as citations of findings the
+    // ledger does not have — a fixture that fabricates a violation for one rule
+    // becoming a real violation of another. Derived from the ledger's own
+    // maximum, they are non-existent by construction and invisible to a
+    // citation resolver, which is SP6's fabrication's precedent: its id was a
+    // literal `F999` until the ledger reached F999 and the row then failed
+    // while the gate was correct. FINDINGS F1041.
+    const ledger = readFileSync("examples/docker/FINDINGS.md", "utf8");
+    const top = Math.max(0, ...[...ledger.matchAll(/^## F(\d+)/gmu)].map((m) => Number(m[1])));
+    const absent = `F${String(top + 1)}`;
+    const alsoAbsent = `F${String(top + 2)}`;
+
     // **Appeared** — a keyed row reads open and the list does not carry it.
-    const opened = `${real()}\n\n| **F999999** | a fabricated finding | **Open** |\n`;
+    const opened = `${real()}\n\n| **${absent}** | a fabricated finding | **Open** |\n`;
     const a = checkOpenSet(io(opened));
     expect(a.length, "an unlisted open row").toBe(1);
     expect(a[0]?.rule).toBe("SP12");
-    expect(a[0]?.message, "names the finding").toContain("F999999");
+    expect(a[0]?.message, "names the finding").toContain(absent);
 
     // **Cleared** — the list carries a finding whose row no longer reads open.
-    const b = checkOpenSet(io(real()), [...TRIAGE_OPEN, "F999998"]);
+    const b = checkOpenSet(io(real()), [...TRIAGE_OPEN, alsoAbsent]);
     expect(b.length, "a listed finding that is not open").toBe(1);
     expect(b[0]?.rule).toBe("SP12");
-    expect(b[0]?.message, "names the entry").toContain("F999998");
+    expect(b[0]?.message, "names the entry").toContain(alsoAbsent);
   });
 
   /**

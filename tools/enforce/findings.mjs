@@ -80,11 +80,96 @@ const inCitedScope = (f) =>
   f === LEDGER || !f.includes("/") || CITED_FROM.some((p) => f.startsWith(p));
 
 /** The headings, which are the only declaration of what exists. */
+/**
+ * The four continuation headings, named rather than matched away.
+ *
+ * A follow-up section shares its finding's id — `## F37 closed` — and is the
+ * recorded convention, so it is not a duplicate. Matching *any* heading with
+ * text between the id and the dash would excuse a real duplicate written the
+ * same way, and the convention is four sections rather than a pattern, so it is
+ * a list. Compared by equality below, so a fifth follow-up is a decision and a
+ * deleted one is a failure.
+ */
+const FOLLOW_UPS = Object.freeze(["F37 confirmed at a cost", "F24 corrected", "F37 closed", "F374 closed"]);
+
 function declared() {
   const text = readFileSync(LEDGER, "utf8");
   const ids = new Set();
   for (const m of text.matchAll(/^##\s+(F\d+[a-z]?)\b/gmu)) ids.add(m[1]);
   return ids;
+}
+
+/**
+ * SP5's other half — **the ledger's ids are unique, and a `Set` cannot say so.**
+ *
+ * `declared()` collects into a `Set` because the question it answers is *does
+ * this id exist*. That makes a duplicate heading invisible: two `## F164`
+ * sections resolve every citation to F164 and the rule is green, while the
+ * register holds two different findings under one number and a reader following
+ * a citation lands on whichever comes first.
+ *
+ * **Measured, and it had happened.** One duplicate in 1 055 headings — an
+ * aborted write that left a heading, a two-row table and nothing else, above the
+ * real entry with a different title. Deleted; the count is now 1 054 headings
+ * over 1 050 ids, and the four remaining are the named follow-ups.
+ *
+ * **This is the failure mode a double-allocated finding number produces**, and
+ * that happened in the same session, from the other end: two lanes were handed
+ * one number and SP5 would have passed on both, because it can see an absence
+ * and not a collision. FINDINGS F1047, F1041.
+ */
+export function checkFindingIds(io) {
+  const readText = io?.read ?? ((f) => readFileSync(f, "utf8"));
+  const violations = [];
+  const seen = new Map();
+  const followUps = [];
+
+  for (const m of readText(LEDGER).matchAll(/^##\s+(F\d+[a-z]?)(\s[^—\n]*?)?\s+[—-]/gmu)) {
+    const id = m[1];
+    const tail = (m[2] ?? "").trim();
+    if (tail !== "") {
+      followUps.push(`${id} ${tail}`);
+      continue;
+    }
+    seen.set(id, (seen.get(id) ?? 0) + 1);
+  }
+
+  const dupes = [...seen.entries()].filter(([, n]) => n > 1).map(([id]) => id);
+  if (dupes.length > 0) {
+    violations.push({
+      rule: "SP5",
+      file: LEDGER,
+      message:
+        `${String(dupes.length)} finding id(s) carry more than one section: ${dupes.join(" ")}. ` +
+        `A citation resolves to whichever comes first, and \`declared()\` collects into a Set, ` +
+        `so the rule that checks citations cannot see this at all — it answers existence, not ` +
+        `uniqueness. Merge them, or give the later one its own number (F1047).`,
+      spec: "A03 §7a · FINDINGS",
+    });
+  }
+
+  // The convention, compared by equality — a fifth continuation is a decision,
+  // and a deleted one is a failure rather than a quietly shorter list.
+  const unexpected = followUps.filter((f) => !FOLLOW_UPS.includes(f));
+  const gone = FOLLOW_UPS.filter((f) => !followUps.includes(f));
+  if (unexpected.length > 0 || gone.length > 0) {
+    violations.push({
+      rule: "SP5",
+      file: LEDGER,
+      message:
+        `the continuation headings are not the stated set` +
+        `${unexpected.length > 0 ? ` — new: ${unexpected.join(" · ")}` : ""}` +
+        `${gone.length > 0 ? ` — gone: ${gone.join(" · ")}` : ""}. ` +
+        `A follow-up shares its finding's id deliberately; the list is what keeps that ` +
+        `distinguishable from a duplicate written the same way (F1047).`,
+      spec: "A03 §7a · FINDINGS",
+    });
+  }
+
+  violations.headings = [...seen.values()].reduce((a, b) => a + b, 0) + followUps.length;
+  violations.ids = seen.size;
+  violations.followUps = followUps.length;
+  return violations;
 }
 
 /**
@@ -174,6 +259,23 @@ export function checkFindings(io) {
         ...walk("src"),
         ...walk("docs"),
         ...walk("examples/docker"),
+        // **`tools/` and `test/`, added after they were measured rather than
+        // before.** They hold **2 462 finding citations, 19% of the
+        // repository's**, and every one was outside this rule until now — the
+        // same *scope excludes its subject* class as `examples/docker/src`
+        // above, arriving on the two directories where the instruments live.
+        // The instruments are the artefacts that cite findings most densely
+        // after the register itself, because every rule here carries the
+        // finding that produced it.
+        //
+        // **Measured before widening, so that it lands green rather than red.**
+        // A gate red on arrival is a gate edited to fit; this one was clean on
+        // arrival apart from the round's own unfiled numbers and two
+        // fabrication sentinels, and the sentinels were derived from the
+        // ledger's maximum rather than exempted, so the corpus has no
+        // exceptions to name. FINDINGS F1047, F1041.
+        ...walk("tools"),
+        ...walk("test"),
         // The root's own documents, not recursed — `walk` would descend into
         // every example and package. The five that cite this ledger live here
         // beside `CLAUDE.md`, which used to be the only one named. F84.
@@ -395,8 +497,8 @@ export function checkTriageInventory(io) {
 // **Measured, and the measurement is this session's own mistake.** Surveying the
 // register to decide what work remained, a grep for the bolded marker returned
 // **16** open findings, and lanes were dispatched against those sixteen. The
-// answer is **33**. The seventeen that were missed are not obscure entries; they
-// are rows that write the same fact in a different form:
+// answer is **39**. The twenty-three that were missed are not obscure entries;
+// they are rows that write the same fact in a different form:
 //
 //   `**Open**`            the common form
 //   `**OPEN**`            F405
@@ -408,8 +510,18 @@ export function checkTriageInventory(io) {
 // itself: the reader reports absence when the value merely changes form, and it
 // is worst exactly where the forms accumulated over a long document's life.
 //
+// **This comment said 33 and seventeen on the day it landed, beside a list of
+// 39.** Both numbers came from a draft taken before the reader was finished, and
+// 16 + 17 = 33 is self-consistent, which is the whole reason it survived review —
+// the arithmetic offered as evidence agrees with itself, exactly as SP6's own
+// comment says of the sentence it was written against. The figure is corrected
+// here from `TRIAGE_OPEN.length`, which is the only copy anything runs, and the
+// mistake is left recorded rather than tidied because it is this rule's own
+// subject: **a claim is falsified by being summarised, not by being wrong**, and
+// the summary above a correct list is where to look for it. FINDINGS F1031.
+//
 // **The cost is not hypothetical and it is not the count.** A count that is
-// wrong low sends nobody anywhere. What it did was leave seventeen open findings
+// wrong low sends nobody anywhere. What it did was leave twenty-three open findings
 // undispatched while the survey read as complete — including F50, a column that
 // never grows, sitting open and uncounted beside F701, the finding about the same
 // columns that *was* dispatched. A register nobody can query is a register that
@@ -445,10 +557,8 @@ export function checkTriageInventory(io) {
  * Ordered by number, which is the order a reader walks it in.
  */
 export const TRIAGE_OPEN = Object.freeze([
-  "F23", "F50", "F129", "F137", "F140", "F141", "F158", "F163", "F181", "F213",
-  "F218", "F271", "F279", "F359", "F364", "F405", "F414", "F421", "F427", "F557",
-  "F606", "F608", "F624", "F701", "F717", "F733", "F753", "F774", "F800", "F812",
-  "F813", "F857", "F871", "F873", "F882", "F897", "F899", "F929", "F934",
+  "F140", "F141", "F158", "F213", "F271", "F364", "F405", "F414", "F557",
+  "F717", "F753", "F800", "F812", "F882", "F1024", "F1029", "F1035", "F1039",
 ]);
 
 /** The words a disposition may be written with. */

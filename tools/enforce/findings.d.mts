@@ -120,3 +120,23 @@ export type OpenSetResult = Violation[] & {
 
 /** SP12 — the register's open set is a list compared by equality. */
 export declare function checkOpenSet(io?: FindingsIo, expected?: readonly string[]): OpenSetResult;
+
+/** `checkFindingIds`' counters — headings read, distinct ids, named continuations. */
+export type FindingIdsResult = Violation[] & {
+  headings: number;
+  ids: number;
+  followUps: number;
+};
+
+/**
+ * SP5's uniqueness arm — the ledger's ids are unique and its continuation
+ * headings are the stated set.
+ *
+ * **Declared here in the same commit as the `.mjs`, deliberately.** SP12 shipped
+ * four exports that existed, that the suite imported and ran, and that the module
+ * `tsc` sees did not have — because nothing checks this pair in either direction
+ * and neither `npm run enforce` nor the suite reads a declaration file. The only
+ * command that speaks is `npx tsc --noEmit`, and the only moment it speaks about
+ * a commit rather than a working tree is from a worktree. FINDINGS F1031, F1041.
+ */
+export declare function checkFindingIds(io?: FindingsIo): FindingIdsResult;
