@@ -13560,6 +13560,35 @@ failing rather than by memory.
 else to live — the same shape `segments` already has. Until then every form with a second channel
 inherits all three symptoms, and `bubble` is the only one that has one.
 
+### Closed — C04 I117, and what the cost estimate could not name
+
+`sizes?: readonly (number | null)[]`, required on `bubble` and refused on every other form; `bubble`
+refuses a second `series`. All four symptoms go **by construction** rather than by four fixes, because
+each is a correct rule about `series` applied to something that was not one.
+
+**The cost was named before it was paid and it was the cost**: eleven golden frames and the
+`plot-forms` snapshot moved, and nothing else did. Read rather than counted, the catalogue's frame
+says all of it — the gutter runs `20 · 30 · 40 · 50 · 60` for data spanning 20–60 where it ran
+`0 · 20 · 40 · 60`, there is one set of bubbles, and there is no *value · size* legend.
+
+**Three things the estimate could not name.** None came from the plan; each came from a gate or from
+the by-hand walk:
+
+| what | how it was found |
+|---|---|
+| `sizes` needs its own `requireFiniteNumbers` — leaving `series` leaves the loop that checked it | the walk's classification table, row 10, before the field existed |
+| `b.plot` must be able to pass it | MG27 refused the commit: a field no consumer can reach is a surface the spec describes and the API does not |
+| `bubbleRows`' ASCII arm had **never run** — it chose `RAMP_DOTS` and folded braille | the catalogue's ASCII row went red the moment one series routed the frame through it |
+
+The third is the one worth keeping. Two series had sent every bubble frame down `overlaidRows`'
+shared-cells path, so the arm was **selected and unreachable** — which reads exactly like selected and
+correct (A03 §2), and only the change that made it reachable could say so. Its repair is the sibling's
+own line: `ascii ? foldRamp(grid, ladderFor("height", caps).steps) : foldBraille(grid)`.
+
+**A cost estimate is a lower bound on the diff and never on the findings.** Eleven frames was right
+about the diff to the byte and silent about all three of these, and it is the second kind that decides
+whether a deferral was worth taking.
+
 ---
 
 ## F272 — a bar chart of signed data draws no negative bars, in either orientation ★★★★☆
