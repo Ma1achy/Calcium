@@ -42823,11 +42823,22 @@ against the block kind. It is evidence against the patch vocabulary, one layer d
 two are indistinguishable from the caller's side — which is why the entry survived being read
 carefully for as long as it did.
 
+**And running *ask where this is written down* on this entry before filing it found a home.**
+The logs surface document already carries it, in the paragraph immediately after the one
+F1055 came to correct: *there is no operation that appends a line to a `logs` block … growing
+one means `replace` with a larger one every tick, re-sending every line each time, which is
+why the reference app's `/logs -f` emits one `raw` block per line and is right to. The
+incremental operation is owed and is additive.* So this is not a homeless claim, and the
+entry is weaker and truer for saying so: what the register adds is that the **surface
+document's word for it is *owed*, and nothing was watching that**, which is the deferral
+class again — the condition is written where the deferral is.
+
 **Filed rather than ruled**, because the ruling is C04's and it has a real cost on both
 sides: a line-append op is a second way to write a block, and every consumer of the patch
 stream would have to hold the accumulated text. The measurement that would decide it is the
 one nobody has: how large a `logs` block gets in practice, and what a whole-block replace
-costs at that size.
+costs at that size. The surface document's own case — one `raw` block per line — is the
+working alternative, and it is evidence the op is a convenience rather than a blocker.
 
 ### What would falsify this
 
