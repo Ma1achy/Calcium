@@ -42447,7 +42447,7 @@ sites it did find, which is the figure the habit rests on.
 |---|---|
 | **Surface** | `src/shell/transmit-image.ts` — the `c=`/`r=` box · `src/shell/session.ts` — `visibleRows` · C22 §6j.4 |
 | **Reached for** | F1026's repair, which fixed one half of the pair and recorded the other in a commit message with no home — F1061's second instance |
-| **Verdict** | **Open**, and latent rather than live: the two computations disagree only above 297 columns, which is where `placementRows` refuses |
+| **Verdict** | **Closed** — ruled and repaired as C22 I98, commitment 68 and T1.60. **And *latent* was wrong**: the box disagrees at 80 columns, which is the ordinary width, and only the *refusal* half is bounded above 297 |
 
 F1026 moved the gather so `visibleRows` measures each image **at the run's width**, which is
 right and is what made the 32-cell-at-80-columns case correct. The transmission seam still
@@ -42455,15 +42455,48 @@ computes its `c=`/`r=` box at the **frame's** width, and a card's body renders a
 `width − 4` (C22 §6j.4). So the two halves of one decision are taken against two different
 widths.
 
-**Nothing can observe it today.** The disagreement matters only when one of the two crosses
+**Nothing can observe it today.** ~~The disagreement matters only when one of the two crosses
 297 and the other does not, and a card-nested image that wide needs a terminal at least 302
-columns across. Measured over the 770 width-and-shape combinations F1026's sweep used, the
+columns across.~~ Measured over the 770 width-and-shape combinations F1026's sweep used, the
 column axis is reachable at 298, 400 and 600 and nowhere below.
 
-**Recorded as open rather than repaired, and the reason is that the remedy is a seam and not
-a line.** `transmitFrame` receives the *document*; to agree with the gather it needs the
-*layout*, which is a different argument from a different producer. That is a change to what
-C22 hands the transmitter, and it wants a ruling in the spec before it wants code.
+**That paragraph is false and the correction is the finding.** It is true of the **refusal**
+half — `placesAtProtocol` is the only thing bounded at 297 — and the sweep it cites was over
+the *refusal*, so the sentence generalised a measurement of one arm to both. Measured directly,
+over a card holding a 2000×100 picture, with the body's indent at 4:
+
+| frame | runs | seam box · places | run box · places |
+|---|---|---|---|
+| 80 | 80, 76 | 80×2 · yes | **76**×2 · yes |
+| 296 | 296, 292 | 296×7 · yes | **292**×7 · yes |
+| 298 | 298, 294 | 298×7 · **no** | 294×7 · **yes** |
+| 300 | 300, 296 | 300×8 · **no** | **296**×**7** · **yes** |
+| 302 | 302, 298 | 302×8 · no | 298×7 · no |
+
+**The box disagrees at 80 columns**, and the symptom is not a refusal: the picture is
+transmitted into a placement four cells wider than anything addresses it, so the right 5% of
+the image is never drawn — a wrong picture rather than none, which is the harder one to notice
+and is this file's own warning arriving through the box. The refusal disagrees only in the
+four-column window **298–301**, where the seam refuses and the renderer places, and there the
+placeholders address a transmission that never happened. The `rows` half named in the blind
+spot below also moves, at 300 and 301: 8 against 7.
+
+**A bound stated without the ordinary case measured is how a live defect is filed as latent**,
+and the tell is that the figure quoted came from a sweep of the *other* arm.
+
+**Ruled and repaired.** `transmitFrame` takes one `PlacementGroup` per non-blank `EntryRun`,
+each declaring the width its blocks render at — one group per run rather than a width beside
+the document, because an entry is two runs at two widths and a single number cannot describe
+it. The frame's width stays as the parameter and is the fallback for a group declaring none.
+C22 I98, commitment 68, T1.60, and IK12 extended to watch the caller's half; three mutations,
+each failing the row written for it.
+
+**And the fixture is a finding inside the finding.** The row's first draft built the picture as
+`{ kind: "image", data, height }`, which has no `digest` — `imageKey` returns `undefined` for
+it, which is exactly what an empty `sent` map returns, so the seam `continue`s and emits
+**nothing**. Every assertion would have been made against `""`, two of them `not.toContain`.
+*A fixture must be shown to respond to the thing under test before it is asserted against*, and
+the row now transmits once and checks the length before reading a box off it.
 
 ### What would falsify this
 
@@ -42473,9 +42506,18 @@ so raising the cap widens the window rather than the defect.
 
 ### Blind spot
 
-The width is the axis measured. `rows` is the other half of the same box and the gather and
+~~The width is the axis measured. `rows` is the other half of the same box and the gather and
 the seam may disagree there too; F1026's sweep did not vary the block's declared height
-against a card, so that half is unmeasured rather than measured-and-clear.
+against a card, so that half is unmeasured rather than measured-and-clear.~~ **Measured on the
+way to the repair**: `rows` moves too, 8 against 7 at frame widths 300 and 301, for the same
+reason and fixed by the same line — both numbers come from one `imageCells` call and only the
+width handed to it moved.
+
+**What is still unasserted.** T1.60 drives `transmitFrame` with groups it builds itself, and
+IK12 asserts the caller builds them the same way by reading its source. Nothing drives a real
+session at 300 columns with a card-nested image, so the two halves are checked separately and
+their meeting is checked by a regex. That is the trade F889's row already took on the same
+call site, taken again knowingly rather than inherited.
 
 ## F1051 — the bubble's size channel has a fourth symptom, and it is a control that does the wrong thing ★★★★☆
 
