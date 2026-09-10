@@ -39060,3 +39060,116 @@ away from the neutral axis where a categorical palette lives, so it would have t
 Or a reading under which a picture cell's two owners are never both categorical slots, which
 `sankey.ts` and `scatter3.ts` both falsify by construction. The copied-comment half is not at risk
 in either direction: three figures true of `#1a1a1a` are printed against `#fafafa`.
+
+---
+
+## F1031 — the register's open set could not be read, and a third disposition nobody's reader knew about was most of what went missing ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `examples/docker/TRIAGE.md` — the document that says what is left to do; new `SP12` in `tools/enforce/findings.mjs` |
+| **Reached for** | *do all the open stuff* — a survey of the register to decide what work remained |
+| **Verdict** | **the survey was wrong by 23 of 39, and the register had no way to tell me.** Eighteen of the twenty-three are `**Partly**`, a disposition meaning *not done* that every reader in this repository was counting as done |
+
+The register's dispositions have accumulated four spellings over a long document's life,
+and there is no reader that knows all of them:
+
+| the shape | where | what a `**Open**` grep does |
+|---|---|---|
+| `**Open**` | the common form | sees it |
+| `**OPEN**` | F405, F528, F537, F547 | **misses it** |
+| `\| open \|`, a bare cell | F50 | **misses it** |
+| `**Partly** (F991) — <the half that stands>` | eighteen rows | **misses it** |
+
+**And two shapes that fool the obvious repair.** Matching the *word* rather than a marker is
+wrong in the other direction: F8's row ends *"the shell refuses to open"* after a `**Closed**`,
+and F247's trailing cell is `**gate open**`, a column value. Prose containing a word is not a
+claim about a finding's state, and the first reader written here read both as open.
+
+**The cost is measured and it is this session's own.** Surveying the register to decide what
+remained, a `**Open**` grep answered **16**, and lanes were dispatched against those sixteen.
+The set is **39**. Seventeen open findings sat undispatched while the survey read as complete —
+including **F50**, *a column with no `flex` gets its minimum and nothing more*, open and
+uncounted beside F701, the finding about the same columns that had been dispatched. Two
+findings about one component's column widths, one visible and one not, separated by nothing but
+the case of a word.
+
+### `Partly` is a third state and this is the third time
+
+Eighteen of the twenty-three missed are `**Partly**`. Every one names a real residue —
+*the design half is closed at S12 §1; the consumer half stands*; *the exemption is gone; C06
+still owes the ruling*; *xterm 398 measured under Xvfb; Ghostty, kitty, WezTerm and iTerm2 are
+owed* — and every one reads, to a reader with two answers, as done.
+
+**That is the mutation harness's own defect arriving in the register.** F897 is a run reporting
+SURVIVED where the truth is *the suite crashed and I cannot tell*; F949 is `0 rows` where the
+truth is *did not run*. Here a disposition was invented for *some of it landed* and the readers
+were never told, so a state that exists became invisible rather than wrong. A reader with two
+outcomes cannot report a third that exists, and in each case the third state collapses onto the
+answer that means **nothing more to do**.
+
+### The rule, and what it refuses to gate
+
+**SP12** — the open set is a list compared **by equality**. A finding that closes must be struck
+and one that opens must be added; a subset check in either direction is silent about the other,
+which was measured in both directions on C10 I39's debt list this same session.
+
+A disposition is a **marker** and not a word: a bold span whose *first* word is one of the
+vocabulary, or a table cell holding nothing else. **The last marker wins**, because dispositions
+here are appended rather than replaced — a row records its state when filed and gains
+`**Closed** (F991)` when the sweep resolves it, and both stay because the history is the
+evidence. That is load-bearing on **five real rows**, all of the shape `**OPEN** · **Closed**
+(F991)`, where a first-marker reader reports a closed finding as open.
+
+**332 of 1008 keyed rows state no disposition at all**, and they are counted and reported rather
+than gated. That is SP6's own precedent — *a gate red on arrival is a gate edited to fit* — and
+the honest reading of those rows is *unstated*, not *closed*. Turning them into a fourth answer
+is a sweep over the document rather than a rule over it.
+
+### The reader was rewritten four times and each time by a measured false positive
+
+Worth recording because the instrument is the finding here, and the sequence is the argument for
+never trusting the first one:
+
+| draft | what it did | what falsified it |
+|---|---|---|
+| 1 | `**Open**`, bolded, exact case | F50's bare cell, F405's `**OPEN**`, eighteen `**Partly**` |
+| 2 | the word anywhere in the row | F79 — *"Open · **Closed**"* — read as open |
+| 3 | the *last* word anywhere | F8's *"refuses to open"*, F247's `**gate open**` |
+| 4 | last **marker**, bold-first-word or whole cell | two passes that could disagree — F229 has a bold `fixed` and a cell `closed`, agreeing by luck |
+| 5 | one scan in document order | stable at 39 |
+
+### The mutation pass found a row that could not fail
+
+Four mutations of the rule, four distinct failing sets, no survivors — **and the second one
+indicted a test rather than passing.** `T1.1`'s superseded-marker case read
+`Open · **Closed** (F991)`, where the `Open` is unbolded prose the reader correctly ignores. One
+marker, so first and last are the same, so a reader taking the *first* survived the row written
+to catch exactly that. It reads as a test of last-wins and forbids nothing.
+
+Repaired to `**OPEN** · **Closed** (F991)` — F547's and F537's real shape — and the same mutation
+now fails it. **A fabricated case is about the reader; the corpus control is about the document**,
+so T1.2 also asserts that rows of that shape exist here today, which is what makes the reader's
+choice load-bearing rather than defensive.
+
+**Measured**
+
+| | |
+|---|---|
+| keyed rows in the register | **1008** |
+| open, by a `**Open**` grep · by the reader | **16** · **39** |
+| of the difference, `**Partly**` | **18** |
+| spellings of a disposition in use | **4** |
+| shapes that fool a word-match | 2 — prose, and a bold span whose first word is not the marker |
+| rows where first-marker and last-marker give different answers | **5** |
+| rows stating no disposition at all | **332**, reported not gated |
+| reader drafts before it was stable | **5** |
+| mutations · distinct failing sets · survivors | 4 · 4 · **0** |
+| vacuous rows the mutation pass found | **1**, repaired and re-mutated |
+
+**What would falsify this**: a reading under which `**Partly**` means done — which every one of
+the eighteen bodies refutes in its own words, each naming what still stands. Or a fifth spelling
+in the register that this reader also misses, which would not overturn the finding but would
+enlarge it; SP12 reads such a row as *unstated* rather than as a violation, loud in the safe
+direction and quiet in the other, and that asymmetry is recorded at A03 §7a rather than only
+here.
