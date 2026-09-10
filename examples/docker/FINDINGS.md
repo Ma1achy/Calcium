@@ -45080,7 +45080,7 @@ its own row, not folded into this one.
 |---|---|
 | **Surface** | `test/contract/process.test.ts:202` (C21 I2) |
 | **Reached for** | the first CI run ever made on this branch, which F1086 enabled |
-| **Verdict** | **open** — the directory is created here; the class is that no target creates it and three other files name the path |
+| **Verdict** | **closed** — the row makes the directory it writes into, reproduced in a worktree with no `out/` and green with the fix in the same worktree |
 
 ### The failure, and it is not about processes
 
@@ -45126,13 +45126,27 @@ nobody was watching.
   against that path; the three other files naming `out/` use it as a **string**
   in a fixture or a `captureDir` the profiler creates recursively.
 
+### Closed, and the reproduction is the part worth keeping
+
+Not diagnosed and fixed — **reproduced**. A worktree at the filing commit, with
+no `out/` created in it, gives the runner's line back exactly:
+
+```
+AssertionError: the child ran to completion: expected 1 to be +0
+  ❯ test/contract/process.test.ts:202:54
+```
+
+Copying the fixed file into that same worktree turns it green. So the row is
+shown to respond to the thing under test, in the state the runner has, rather
+than asserted to.
+
 ## F1088 — `CORPUS_BUDGET_MS` is sized against the devcontainer, and the runner is 4.1× ★★★★
 
 | | |
 |---|---|
 | **Surface** | `test/support/budget.ts`, against `test/edge/{editor,transcript,process}.test.ts` |
 | **Reached for** | the same first run — T3.15 timed out at exactly the budget |
-| **Verdict** | **open** — raised here from the measured ratio; the row's own runner figure is the next run's to print |
+| **Verdict** | **closed** — raised from the measured ratio, and the same mechanism found on a second constant with three figures against it |
 
 ### The failure
 
@@ -45201,3 +45215,37 @@ under 2 000 ms and the ratio under 3, both asserted in the row.
 - **The row being slow for a reason other than the regime.** Its own assertions
   are ratios and they are unaffected by a uniformly slower machine; the next run
   prints the two figures and that is the check.
+
+### The same mechanism on a second constant, and this one has three figures
+
+`make test` went red twice running while `CORPUS_BUDGET_MS` was being repaired,
+on two rows that are nothing to do with editors: **MA4** and **MS3**, which each
+shell the whole 192-run mutation sweep out to a child process. Not the
+unstable-under-load class — it reproduced two of two, and the sweep run alone is
+**green**, reporting *25 known stale, and no run drifted from what the list says*.
+
+| | |
+|---|---|
+| `node tools/mutate/anchors.mjs` alone | **9.4 s** |
+| MA4 inside the last green `make all` | **25.1 s** |
+| MA4 on the very next run | **30.3 s** |
+| the global `testTimeout` it ran under | 30 s |
+
+**25.1 against 30 is 1.19×**, which is the sentence `budget.ts` opens with about
+a different row — *3.2 s against a 5 s default is not a margin*. The row had been
+green at 84% of its budget, and this session's own additions were enough. Nothing
+about the sweep changed.
+
+`SWEEP_BUDGET_MS` is 120 s: a little under 5× the loaded figure, the ratio
+`SCAN_BUDGET_MS` takes over its worst row, and a hang still surfaces inside two
+minutes. MS3 pays the same sweep a second time; the duplication is recorded and
+not fixed here.
+
+### And a default restated in prose, which had drifted
+
+`budget.ts`'s headroom table read *vitest's 5 s default*, and `vitest.config.ts`
+has set `testTimeout: 30_000` since 2026-08-22 — with its own argument, *the
+number is the asymmetry, not the odds*. F967's class: a file that restates
+another file's default is a copy that goes stale in one commit. Labelled rather
+than rewritten, because those sentences are the record of why the explicit
+budgets exist at all.
