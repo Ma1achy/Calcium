@@ -45285,7 +45285,7 @@ budgets exist at all.
 |---|---|
 | **Surface** | `.github/workflows/mutation-sweep.yml:12-19` · `ci.yml:108,143,177` · A04 §6's table |
 | **Reached for** | F812, whose disposition has read *the next run is the measurement* since it was filed, and whose measurement lives in the one job a working branch cannot reach |
-| **Verdict** | **open** |
+| **Verdict** | **closed** — the merge registered both triggers, and the dispatch fired six shards on demand |
 
 ### Going to find out how to run the expensive tier, and finding a workflow that cannot run at all
 
@@ -45416,6 +45416,40 @@ until it is merged.
 - **The repository being private**, which would revive the cost argument.
   `gh repo view --json isPrivate` → `false`.
 - **`billable` being absent rather than zero.** It is present, with `jobs: 5`.
+
+### Closed — the merge, and then the trigger fired
+
+`148c1df6` merged pull request 46. The two readings that had said the workflow
+was unregistered now say the opposite, from the same commands:
+
+```
+$ gh workflow list --all
+ci               active  322506113
+mutation-sweep   active  355239969
+
+$ gh api /repos/{owner}/{repo}/actions/workflows --jq .total_count
+2
+```
+
+**One was `1` and the other was `HTTP 404: workflow mutation-sweep.yml not found
+on the default branch`.** Neither file changed; the ref did.
+
+**Registering is not running, and this finding is the ninth form of a gate that
+exists and is not run** — so the close-out is a dispatch rather than a listing:
+
+```
+$ gh workflow run mutation-sweep -f only=c12-a
+https://github.com/{owner}/{repo}/actions/runs/34525436331
+```
+
+Six shards, the `only` input reaching the sweep, and the job body working end to
+end — checkout, `make install`, the terminals, `npm run build`, the sweep. **The
+first time that workflow has ever run**, and its cron is still ahead of it: the
+schedule registers from the same merge and fires on the first Sunday after it.
+
+**A listing would have closed the wrong half.** The finding's own words are *the
+first form where the gate is unregistered rather than unrun* — so proving it
+registered leaves it exactly where the eight earlier forms were.
 
 ## F1090 — the branch-push row promises two minutes, names five stages, and the job runs seven in nine minutes ★★★
 
@@ -45844,7 +45878,7 @@ alone and 6 936 ms inside the suite, against sixty.
 |---|---|
 | **Surface** | `.github/workflows/ci.yml`'s `full` job · `test/e2e/image-protocol.test.ts:199` |
 | **Reached for** | the first `full` job this branch's work has ever had, on pull request 46 |
-| **Verdict** | **open** |
+| **Verdict** | **closed** — two rows, 29.2 s green on the runner, twice, with `imagemagick` in the job and a precondition that refuses by name |
 
 ### What the runner said
 
@@ -45934,13 +45968,34 @@ cannot run without it. Install `imagemagick`; CI does so in the `full` job.
 
 ---
 
+### Closed — on the machine that produced it, twice
+
+```
+✓ test/e2e/image-protocol.test.ts (2 tests) 29215ms
+```
+
+Pull request 46's `full` job, and `main`'s own run after the merge. Both rows,
+both times, on the runner that had reported `-1`.
+
+**A fact about a machine is closed by that machine and by nothing else**, which
+is what F1087 and F1093 both had to wait for and is the whole reason this class
+took three instances in a day to see. The devcontainer's greens were as green
+before the fix as after it.
+
+The precondition earns its place separately from the package: with a shim
+`import` that exits 1 on `PATH`, the rows fail naming the tool rather than
+reporting a colour, so the sentinel now stands for the outcome it honestly names
+and for nothing else. `mutation-sweep.yml` deliberately does **not** get the
+package — see F1095, where that decision is the sixth instance and the mechanism
+is what covers it.
+
 ## F1095 — the two files that decide whether any gate runs are read by no gate ★★★★
 
 | | |
 |---|---|
 | **Surface** | `.github/workflows/ci.yml`, `.github/workflows/mutation-sweep.yml` · `docs/architecture/A04_repo_scaffolding.md` §5, §6 · `tools/enforce/` |
 | **Reached for** | the merge that unblocked F1086 and F1089, and reading `mutation-sweep.yml` in order to dispatch it |
-| **Verdict** | **open** |
+| **Verdict** | **closed** — SS62 wired, four hand mutations each killing a row, and `proof` in A04 §6; the two blind spots are named residue |
 
 ### The measurement is one line and it is empty
 
@@ -46084,6 +46139,41 @@ table.**
 - **The sweep reaching an ImageMagick row**, which would make the sixth instance
   a defect rather than a false comment. `grep -rln image-protocol tools/mutate/runs/`
   is empty.
+
+### Closed — the rule, its mutations, and the instance the draft found
+
+`tools/enforce/workflows.mjs`, wired into `make enforce` beside SS31 for SS31's
+reason: the subject is two documents disagreeing, not a line matching a regex.
+
+Five rows in `test/unit/enforce-workflows.test.ts` — the vacuity control first,
+the fabricated violation, the prose control, both empty arms, and the readers.
+**Four hand mutations, each killing a row:**
+
+| mutation | what went red |
+|---|---|
+| `names()` returns `true` | the fabricated violation |
+| `targetsRun` returns `[]` | the fabrication and the readers |
+| the no-workflows arm passes | both empty arms |
+| the missing-§6 arm passes | both empty arms |
+
+And a fifth, one file out: renaming the fabrication's title so it no longer says
+*fires* turns the new registration row red with `SS62 has no test asserting it
+fires`. That row exists because **SS62 spent one chain in exactly the state it
+was written to prevent** — inventoried in A03, implemented in a module the
+reconciliation could not see, `make enforce` green and `make test` red on *A03
+inventories SS62 and nothing implements them*. The gate that caught it is in the
+suite rather than in `enforce`, which is `run the whole suite, not a chosen
+subset` arriving on this finding's own rule.
+
+A04 §6 gains the `proof` row in its own commit before the code, and the sweep's
+comment stops claiming a parity no gate resolved. The corpus reads ten of ten.
+
+**The two blind spots are residue, named rather than closed.** Nothing local
+separates F1086's tree from the fixed one, and nothing at all reports whether a
+workflow is registered — `schedule` and `workflow_dispatch` come from the default
+branch, and `gh workflow list --all` is the only line that tells a gate that
+cannot run from a gate with nothing to say. That line is in §6's prose as a
+habit, which is what a rule cannot be here.
 
 ---
 
