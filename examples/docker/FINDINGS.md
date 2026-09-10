@@ -43736,3 +43736,100 @@ That is true of `check` and `test` and of nothing else in `all`.
   row this file does not have and the fix would be a second case, not a different literal.
 - The 23-commit figure is the distance from `43a58fd9` to HEAD. It is the age of the *break*, not
   of the substitution, which is older and undated.
+
+## F1076 — a class named by enumeration is the size of the enumeration: five named, twenty-four declared, eight unchecked ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `src/data/viewmodel/types.ts` — `Plot`'s 24 string-literal unions · `src/data/viewmodel/validate.ts` — `PLOT_UNIONS`, `plotUnionErrors`, `isKnownPlotValue` · `tools/enforce/module-graph.mjs` MG31 · C04 I118, commitment 106 |
+| **Reached for** | F213 — *five unions named as protected by F172's argument, and none of them checked*, whose own last paragraph asks for **a rule rather than five clauses** |
+| **Verdict** | **Closed, and the finding's five were an example read as the class.** `Plot` declares 24 such members; **eight** had no membership rule, five of which appear in no document |
+
+### The count, before the build
+
+C04's `colormap` clause names `plotFrame`, `legend`, `plotDetail`, `orientation` and
+`matrixAnchor` as *unions for the same reason*. F213 measured those five, found none checked, and
+wrote the class down as *a public union whose values are checked nowhere*. Parsing `Plot`'s own
+declaration:
+
+| | |
+|---|---|
+| string-literal union members on `Plot` | **24** |
+| named in C04's clause | 5 |
+| with no membership rule at the document gate | **8** |
+| of those eight, named in **no** document | **5** — `layout`, `binning`, `box3`, `axes3`, `colourBy` |
+
+**Five clauses would have closed a third of it**, and the twenty-fifth member would have been
+unchecked on the day it landed. That is the reusable half: *a class named by enumeration is the
+size of the enumeration*, and the enumeration is the part a reader can check, which is what makes
+it read as the class.
+
+### Two of F213's five were already closed, and its row never said so
+
+`matrixAnchor` gained its check with the calendar, which F213 records. **`plotDetail` was checked
+on 2026-08-21 by F220** — `802f4957`, *`plotDetail` was accepted on forty-four forms and read by
+two* — and F213's row still says it renders *silently `auto`'s arm*. Third instance of F1073's
+class in two rounds: a disposition closed by a neighbouring finding, with nothing resolving it
+back. So the residue was three, not four, and the class was twenty-four.
+
+### Why no textual rule could have found this, measured
+
+The obvious gate is *every literal of every union appears in `validate.ts`*. Run over the corpus
+before wiring it, as a first draft must be:
+
+- It **misses** `plotDetail`, whose three values are `auto`, `compact` and `full` — common enough
+  words that all three appear for unrelated reasons.
+- It **fires falsely** on `yFormat`, `plotStyle` and `graphLayout`, which are checked through a
+  `Set` or against a single literal rather than by comparison.
+
+Wrong in both directions on one corpus, which is the argument for the gate reading a **structure**
+rather than prose — and the same argument `docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass makes
+about citations.
+
+### The build
+
+`PLOT_UNIONS` is the class as data: 24 members and their values, looped by `plotUnionErrors`
+before any form rule runs. The sixteen bespoke membership checks collapsed to a one-line
+`isKnownPlotValue` guard each, so the table **is** the mechanism and cannot be a list beside one —
+a member in it is checked by construction, and a form rule below it stays silent about a value the
+document does not contain. **MG31** compares the table's keys and values to `Plot`'s declaration by
+equality in both directions.
+
+**Both directions matter and a subset check is silent about the other.** A member in the type and
+not the table is unchecked; a member in the table and not the type is a rule with no subject,
+which reads exactly like a rule that is satisfied.
+
+### Mutations
+
+| # | mutation | fails |
+|---|---|---|
+| N1 | a table entry deleted (`legend`) | T1.35, T1.37 and T2.128 — three rows, and the gate |
+| N2 | `isKnownPlotValue` always true | **four of five**, and T1.36 stays green |
+| N3 | `isKnownPlotValue` always false | **T1.36 alone** — the control, and the other four pass |
+
+N3 is the argument for T1.36 existing: a gate that refuses everything satisfies every row that
+asserts a refusal, and only the control can tell it from one that works.
+
+### Three mutation runs were re-anchored, and two were found by the sweep rather than by me
+
+`c04-yformat.mjs` anchored on the `Y_FORMATS` comparison this removed, and I caught that one
+because `tsc` reported the set as unread. `c12-annotate.mjs` and `c12-detail-scope.mjs` (two
+anchors) were caught by **MA4/MS3**, the anchors sweep, on the first full run — a line moved under
+each of them and nothing else in the suite could see it. `c12-annotate`'s is now anchored on the
+call itself rather than on the arm's opening line, so a line added above it is not a third
+re-anchor.
+
+### What would falsify this
+
+- MG31 compares two declarations and says nothing about whether the table is **read**. The loop is
+  what makes an entry a check, and that is T1.35–T1.38's job; a scan can see a table and cannot see
+  a loop over it.
+- The parse is textual: a member written across two lines, or a union built by reference rather
+  than by literals, is invisible to it. Neither form is in `Plot` today, and the rule reports
+  rather than passes when it parses nothing, which is the arm that would otherwise make it vacuous.
+- The sixteen migrated messages changed form where they were `must be one of X, Y` — `yFormat` and
+  `plotStyle`. One suite row asserts a message of this class (`plot-tree.test.ts`, `treeLayout`) and
+  it asserts the form that survived.
+- `construct.ts` keeps its own `Y_FORMATS` copy for the builder's half. That is a second list with
+  the same values, which is the shape this finding is about one layer along, and it is **not**
+  closed here.
