@@ -10,6 +10,7 @@ import {
   applyPatch,
   block,
   BlockShapeError,
+  deepFreeze,
   validateBlock,
   validateDocument,
   type MergeRow,
@@ -69,6 +70,87 @@ describe("C04 immutability", () => {
       (table.rows[0]?.cells["a"] as { text: string }).text = "mutated";
     }).toThrow();
     expect(table.rows[0]?.cells["a"]?.text).toBe("x");
+  });
+
+  it("T1.39 (C04 I1, F1065): a subtree already deep-frozen is walked once, and is frozen at depth either way", () => {
+    // **The observable is a count of reads, not a duration** (F929). A timing
+    // assertion on a shared runner measures the runner, and this property is
+    // exact: the walk either reaches the subtree a second time or it does not.
+    //
+    // An accessor is a synthetic shape — blocks are plain data — and it is the
+    // only way to watch a walk from inside the thing being walked.
+    let reads = 0;
+    const watched: Record<string, unknown> = { text: "x" };
+    Object.defineProperty(watched, "seen", {
+      enumerable: true,
+      configurable: true,
+      get: () => {
+        reads++;
+        return "y";
+      },
+    });
+
+    const tree = { a: { b: [watched] } };
+    deepFreeze(tree);
+    const afterFirst = reads;
+    deepFreeze(tree);
+
+    expect(afterFirst, "the first walk reached the accessor").toBeGreaterThan(0);
+    expect(reads, "and the second did not walk it again").toBe(afterFirst);
+
+    // **The freeze the memo claims is real**, asserted rather than assumed: a
+    // memo that skipped the walk *before* freezing would satisfy the count and
+    // leave the tree mutable, which is the failure mode worth naming.
+    expect(Object.isFrozen(tree.a.b), "the array").toBe(true);
+    expect(Object.isFrozen(tree.a.b[0]), "and the object inside it").toBe(true);
+  });
+
+  it("T1.40 (C04 I1, F1065): the control — something else's shallow freeze is still walked to depth", () => {
+    // **This is the row that separates the memo from `Object.isFrozen`.** The
+    // tree shallow-freezes objects in a dozen places — every `Object.freeze({ … })`
+    // in a builder — and a shallow freeze says nothing about depth. Reading one
+    // as a memo hit passes T1.39 completely and leaves `blocks[0].rows[2]`
+    // mutable, which is the exact failure I1 opens with, reintroduced by the
+    // optimisation written for it.
+    const inner = { deep: ["a", "b"] };
+    const shallow = Object.freeze({ inner });
+
+    expect(Object.isFrozen(shallow), "the fixture is shallow-frozen").toBe(true);
+    expect(Object.isFrozen(inner), "and only shallowly — the fixture responds").toBe(false);
+
+    deepFreeze(shallow);
+
+    expect(Object.isFrozen(inner), "the walk went inside it").toBe(true);
+    expect(Object.isFrozen(inner.deep), "and to the bottom").toBe(true);
+  });
+
+  it("T1.41 (C04 I1, F1065): the array fast path's narrowing is what it says it is", () => {
+    // **A limit that is tested is a limit; one that is only written down is a
+    // hope.** Arrays walk by index because `Object.getOwnPropertyNames` on an
+    // n-element array allocates n strings per node per walk, and a document of
+    // blocks and lines is mostly array nodes. The cost of that choice is exactly
+    // this shape, and the row exists so a later reader meets it here rather than
+    // in a mutation.
+    const stray = { deep: ["x"] };
+    const arr: unknown[] & { meta?: unknown } = [{ a: 1 }];
+    arr.meta = stray;
+
+    deepFreeze({ blocks: arr });
+
+    expect(Object.isFrozen(arr), "the array itself").toBe(true);
+    expect(Object.isFrozen(arr[0]), "and its elements, which is the whole hot path").toBe(true);
+
+    // The freeze still covers it — it cannot be replaced …
+    expect(() => {
+      arr.meta = 1;
+    }).toThrow();
+    expect(arr.meta, "still the object it was").toBe(stray);
+
+    // … and its interior is what the fast path does not reach. Asserted as
+    // `false` deliberately: were the walk changed back, this row fails and says
+    // the documented limit has moved, which is the only way a stated limit
+    // stays true.
+    expect(Object.isFrozen(stray), "the stated narrowing").toBe(false);
   });
 
   it("T1.1b (I1): a cyclic literal freezes rather than hanging the constructor", () => {
