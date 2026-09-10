@@ -45523,7 +45523,7 @@ its own cost argument, which is a different change from this one.
 |---|---|
 | **Surface** | `test/edge/editor.test.ts:96` (C17 T3.15) |
 | **Reached for** | a red `make all` on a tree whose only changes were register and spec prose |
-| **Verdict** | **open** |
+| **Verdict** | **closed** — the count is the assertion, both controls shown to fire, and the row is cheaper than the ratio it replaces |
 
 ### The assertion and its headroom
 
@@ -45615,3 +45615,20 @@ luck, which detects nothing and reports constantly.
 - **The count being a tautology against `graphemes`.** Both sides use the same
   segmenter, and the doubled call still fails it — so the assertion is about
   the loop's trip count, not about the segmentation.
+
+### Closed, with both controls shown to fire
+
+Not asserted to work — driven. The doubled visit fails the count row naming it,
+`expected 2000064 to be 1000032`; removing the `drawAs` call entirely fails the
+row that says *the counter fires at all*, `expected 0 to be greater than 0`,
+which is the assertion an equality against zero would have satisfied in silence.
+`src/` was restored from a copy and its md5 compared both times.
+
+Three runs of the repaired row read **500016 → 1000032 visits** identically,
+with the printed durations at ratios of 1.24, 1.94 and 1.89 — a spread that
+makes the case for the change better than any argument does.
+
+**And it is cheaper**: 4.78 s to **3.04 s** alone, because the count costs two
+walks and two segmentations where the minimum over three cost six walks. A third
+of the pressure F1088 put on `CORPUS_BUDGET_MS` handed back by the row that
+caused it.
