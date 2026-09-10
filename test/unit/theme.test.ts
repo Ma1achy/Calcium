@@ -606,3 +606,14 @@ describe("C10 §4c.1 — the picture cell's alphabet", () => {
     expect(fires(scatterSrc, /colour, background: bg/u), "stripper control").toBe(true);
   });
 });
+
+/**
+ * **C10 §4j — hue as the only channel.** F676 discharged the picture cell's
+ * 1.00 with *legible only by hue* and four documents repeated it. C10 I39 is
+ * that clause measured; these two rows land with `src/presentation/theme/cvd.ts`
+ * in the commit that follows this one.
+ */
+describe("C10 §4j — separation under dichromacy", () => {
+  it.todo("T1.40 (C10 I39, §4j.1): separation reproduces the reference under each of the four vision models, and canonical Okabe-Ito — the set the floor is calibrated on — clears 7 with a worst pair of 7.9 at tritan orange/reddishPurple; the control is the load-bearing half, because without it a floor of seven and a floor of seventy are the same rule over palettes that fail both — not deferred on a component: it lands with cvd.ts in the next commit");
+  it.todo("T1.41 (C10 I39, §4j.3): collisions returns a verdict and not a count — the model and both slot keys per entry, two models and not four for the light theme's c1/c4, and an empty list for the canonical set, which is the assertion rather than a precondition — not deferred on a component: it lands with cvd.ts in the next commit");
+});

@@ -756,7 +756,7 @@ Two of the six cells are ones no reader checking statements one at a time reache
 
 **Ten sites, not two, and four of them are in the arm the findings did not name.** The terminal draws the same callout in the same slot, which is D11 holding — so a ruling that moved the *sites* would have to move ten of them in two arms, and a ruling that moves the *check* moves one function. That is the sweep's finding and it decides the arm below.
 
-**And the cells that are not text, recorded so the next reader does not count them as instances.** `sankey.ts`'s half-block puts one owner's slot in the foreground and the lower owner's in the **background**, and `scatter3.ts`'s braille and quadrant cells do the same; **neither goes through `slot()`** — `sankey.ts` names refs and `definition.ts` resolves them, and `scatter3.ts` holds resolved values by the time a cell is built (§4c.1 corrects this sentence, which said both did). They are art and carry no glyph a reader reads — and the margin says how much rests on that: `categorical × categorical` is **1.00** at worst, so the cell is invisible in greyscale and legible only by hue. **The alphabet now enforces it** (§4c.1): both constructors refuse a background on a glyph outside `U+0020`, Block Elements and Braille Patterns. What is still owed is the *type* — see below.
+**And the cells that are not text, recorded so the next reader does not count them as instances.** `sankey.ts`'s half-block puts one owner's slot in the foreground and the lower owner's in the **background**, and `scatter3.ts`'s braille and quadrant cells do the same; **neither goes through `slot()`** — `sankey.ts` names refs and `definition.ts` resolves them, and `scatter3.ts` holds resolved values by the time a cell is built (§4c.1 corrects this sentence, which said both did). They are art and carry no glyph a reader reads — and the margin says how much rests on that: `categorical × categorical` is **1.00** at worst, so the cell is invisible in greyscale and legible only by hue. **That last clause is measured in §4j and does not hold**: the light palette's worst pair is ΔE2000 **0.6** under deuteranopia and every shipped theme has seven pairs under the floor, so for a reader who is not trichromatic the hue is not there either. **The alphabet now enforces it** (§4c.1): both constructors refuse a background on a glyph outside `U+0020`, Block Elements and Braille Patterns. What is still owed is the *type* — see below.
 
 ### 4g.2 — the classification table: which rule owns a cell
 
@@ -803,6 +803,152 @@ Three of the seven are rows no reader checking statements one at a time reaches:
 
 ---
 
+
+## 4j. Hue as the only channel — the clause that discharged the 1.00 figure, measured (F676, F1017)
+
+§4c.1, §4f, §4g.4 and I35 all reach the same number and dismiss it the same way. The worst
+`categorical × categorical` pair is **1.00**, and the sentence that follows it is *invisible in
+greyscale and legible only by hue*; I35's form of it is *because a categorical palette is authored
+for hue*. The argument is sound as far as it goes — a picture cell has no ink and no ground, so
+`ratio` has nothing to measure and hue is what is left to carry the distinction.
+
+**Nothing measured the hue.** Every floor this component holds is a luminance ratio, and a palette
+whose whole job is that eight things look different from one another is checked for the one property
+none of those floors is about. The clause was written into four places and was a measurement in
+none of them: it is the sixth blind spot's shape, a claim carried across documents until the
+repetition reads as corroboration.
+
+### 4j.1 — the measurement, before the ruling
+
+Viénot, Brettel & Mollon (1999): one matrix per dichromacy applied in linear RGB, then **CIEDE2000**
+between the two simulated colours. The floor is **7**, calibrated on a control rather than chosen —
+canonical Okabe-Ito, the set every shipped palette claims its property from, measures 7.9 at its
+worst, so seven is the largest integer the reference clears and eight would refuse it.
+
+| palette | worst ΔE2000, over four vision models | pairs under 7 | canonical slots kept |
+|---|---|---|---|
+| canonical Okabe-Ito, the control | **7.9** (tritan, orange / reddishPurple) | none | 8 of 8 |
+| shipped `light` | **0.6** (deutan, `c1` / `c4`) | **7** | **0 of 8** |
+| shipped `dark` | **1.5** (tritan, `c2` / `c3`) | **7** | 3 of 8 |
+| shipped `high-contrast` | **1.5** (tritan, `c2` / `c3`) | **7** — the same slots as `dark` | 3 of 8 |
+| `colormaps/qualitative/okabe-ito.ts` | **1.5** (tritan, `m2` / `m8`) | **1** | 7 of 8 |
+
+`light`'s seven are protan `c1`/`c4` 2.6; deutan `c1`/`c4` 0.6, `c1`/`c6` 3.5, `c4`/`c6` 4.0; tritan
+`c1`/`c7` 5.3, `c2`/`c3` 5.1, `c6`/`c7` 6.5. `dark` and `high-contrast` share protan `c2`/`c5` 5.4;
+deutan `c1`/`c6` 6.3, `c2`/`c5` 3.4; tritan `c1`/`c7` 6.8, `c2`/`c3` 1.5, `c2`/`c5` 6.5, `c3`/`c5`
+5.1. **`c1` and `c4` on `light` are orange and yellow, and under deuteranopia they are one colour** —
+that is what a 0.6 is, against a just-noticeable difference of about 2.3.
+
+**And that pair is the mechanism in one row, because it is one hue pair twice.** Canonical orange
+against canonical yellow clears every model with room — **11.7** at its worst. `light` darkens both
+to clear its own ground and ships them as `c1` and `c4`, where the same two hues measure **0.6**.
+Orange and yellow differ mostly in the channel a deuteranope has lost, so what is left to separate
+them is lightness — and a ground-contrast floor is a constraint on exactly that. The adaptation did
+not fail to preserve the property; **it removed a pair canonical had handled with 67% of headroom**,
+and it did so by satisfying the other floor. The two floors are not independent, which is the fact
+§4a's family of rules has no place to record.
+
+**Where the property went, and the colormap isolates it to one substitution.** The three variants
+diverge from canonical by very different amounts, and the smallest divergence is the one that shows
+the mechanism: the colormap keeps **7 of 8** and swaps `#3cbf9a` in for black, and that single swap
+takes the set from 7.9 to 1.5, because `#3cbf9a` sits beside skyBlue under tritanopia. It is not a
+drift across many small choices. One colour did it. The themes are further out — `dark` and
+`high-contrast` keep three canonical slots and `light` keeps none — and every one of those
+substitutions was justified against the **ground**, which they do clear. The effect on the property
+the palette is named for was never re-measured, which is how the numbers moved with nobody choosing
+to move them.
+
+**And `light`'s justification comment is `dark`'s, copied.** `tokens-light.ts` carries, verbatim,
+*its black is 1.21 against this ground and its blue 3.36 … Every slot clears 6.2 here, measured.*
+Against `#fafafa` those measure **20.12**, **4.97**, and a worst slot of **5.17** (`c4`), with `c1`
+at 5.41 and `c2` at 5.96 also under 6.2. All three are true of `#1a1a1a` — black 1.21, blue 3.36,
+worst slot 6.26. Three measurable claims travelled to a theme where each is false. Nothing is in
+violation: the floor these slots owe is I35's 4.5 and they clear it. What is wrong is that a comment
+saying *measured* was not.
+
+### 4j.2 — the classification table: which rule owns a cell
+
+Two rules holding at rest with no event between them, which is the structural shape rather than the
+event-mediated one — so this is a table and not a trace.
+
+| the pair | I17 — two slots equal | I35 — slot × text surface at 4.5 | I39 — slot × slot at ΔE2000 7 | owner |
+|---|---|---|---|---|
+| two slots with the same hex | refuses at load | silent, not a text pair | would refuse, ΔE 0 | **I17**, and it fires first because it is narrower |
+| two slots at ratio 1.00, different hue | silent — they are not *equal* | silent | fires | **I39**, and this is the cell the section exists for |
+| two slots separated in normal vision, collapsed under a dichromacy | silent | silent | fires | **I39** — where all twenty-one shipped pairs are |
+| a slot painted as text on a surface | silent | fires at 4.5 | silent, not a slot pair | **I35** |
+| a picture cell's two owners, fg and bg both slots | silent | silent — §4c.1 admits it *because* it carries no text | fires | **I39**, which is F676's cell and the reason it reopens |
+| a ninth slot a theme declares | silent | outside the derived pairing | outside the derived pairing | **nothing**, exactly as I30 records |
+| one slot against a colormap stop behind it | silent | silent | silent — not two slots | **nothing**, and §4g.4 already owes this to C12 |
+
+The two `nothing` rows are as much the table's point as the three `I39` rows: a partition covering
+every cell would be one somebody had widened to look complete.
+
+### 4j.3 — the ruling
+
+**The floor is measured and the failures are a list, not a refusal.** Three arms. One is refused by
+measurement, one was refused by a measurement that turned out to be about the instrument, and the
+correction is why the third is the one taken.
+
+- **Refuse at load, the way every other floor here works.** This rejects all three shipped themes on
+  arrival, seven pairs each. A gate red on the day it lands is a gate edited to fit, which is F896's
+  own wording about SP9 and applies unchanged.
+- **Recolour the palettes until they clear it — and the first refusal of this arm was wrong.** It was
+  refused on a measurement: a search reached 14.8 holding the ground floor, better than canonical,
+  and produced eight near-blacks, which read as *two floors are satisfiable together and satisfying
+  them does not make a palette*. **That search could only darken.** Its one free parameter was a
+  scale factor per canonical hue toward the ground, so a dark result was its search space and not its
+  finding. Freed to move in sRGB it reaches **33.3** with saturation kept, which refutes the refusal
+  outright.
+- **What actually bounds the automated remedy is the metric, and that too is measured.** The 33.3 is
+  **8.9** under ΔE2000, against canonical's 7.9: the optimiser bought its number in the saturated
+  blues, where CIE76 over-states, by putting three of eight slots there. A hill-climb found the
+  metric's weak region in twenty thousand steps. So the instrument is sharp enough to say *these two
+  collapsed* and not sharp enough to rank two palettes that both pass — and nothing here knows
+  whether eight colours read as a *set*, which is the property a person supplies.
+- **Measure it, list the debt, compare the list by equality.** Taken. `collisions(slots)` returns
+  every pair under the floor; the shipped debt is asserted as an exact set, so a new collision fails
+  a row and a cleared one fails the same row from the other side. This is `KNOWN_STALE`'s shape and
+  `UNCITED_INVARIANTS`', and for their reason: a subset check lets a cleared entry outlive its reason
+  unread.
+
+**The check is a row and not `validatePalette`**, and that is the ruling's cost stated rather than
+hidden. Every other floor in this component throws at load, so a reader who knows §4a will expect
+this one to. It does not, because the shipped palettes fail it — and the alternative to a list is
+either refusing the framework's own themes or lowering the floor until they pass, which is the same
+edit wearing a different number.
+
+**The metric was chosen by being wrong first.** The module's first draft used CIE76 and said in its
+own docblock that *at the floor this rule uses the two formulae agree on every pair either would call
+a collision*. Run, that is false: `dark` has two pairs under CIE76's floor and **seven** under
+ΔE2000's, and only tritan `c2`/`c3` is in both lists. The two agree on the ordering of the shipped
+palettes and disagree on the membership of every debt list, which is the half a reader acts on.
+
+### 4j.4 — what the ruling leaves behind
+
+- **A pairwise metric cannot see a set.** Twenty-eight pairs clearing a floor is not eight colours
+  that read as a palette, and no figure in this module is about the second. It is why the debt is
+  worked down by a person and why `separation` is exported beside `collisions` — the figure tells
+  them whether a choice helped, and not whether it was a good one.
+- **Anomalous trichromacy is not modelled**, and it is the commoner condition — deuteranomaly runs to
+  about 5% of men against deuteranopia's 1%. The dichromat matrices are the worst case, so this
+  under-reports the population affected and over-reports how badly. Recorded because a limit nobody
+  writes down reads as strength.
+- **The floor is one figure resting on one control.** Seven is defensible because canonical
+  Okabe-Ito clears it and would not clear eight. A second reference set would make it an interval
+  rather than a point, and there is not one here.
+- **`high-contrast` is where this matters most and it ships `dark`'s seven collisions.** The theme
+  exists to maximise distinguishability, and its comment claims the property from a set it keeps
+  three of eight of. Corrected in place; the collisions are on the list and owed.
+- **The picture cell is measured and still not typed.** §4g.4 owes the compile-time refusal and this
+  section does not change it. What changes is that the cell's hazard has a number instead of a
+  clause. **F676 closes here, and its second half is the part that was never checked** — the first,
+  *nothing enforces the alphabet*, was closed by `isPictureGlyph`.
+- **A palette a consumer supplies is unmeasured.** The list covers the three shipped themes because
+  those are the slots the framework can resolve, exactly as I35's pairing is derived. An application
+  declaring its own `categorical` gets no row and no warning.
+
+---
 
 ## 4i. A child's colours — a literal `ColourValue` on the same ladder
 
@@ -1015,11 +1161,12 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 - **I33** — **A span's attributes are set by the renderer from the span, never resolved from a slot; they compose with the resolved tone by spread; where a depth cannot show them they are lost and not compensated; and a span touches colour only through a named slot, resolved as any tone is, or through the block's colormap, resolved as any map is.** The merge `{ ...tone, ...spanAttrs }` writes at most `bold`, `italic`, `underline` and never `colour` or `background`; the tone it spreads onto is the block's, or the span's own `tone` resolved by the same `resolveTone` call and replacing the block's for the run (C04 I89); a `value` writes `background` through `continuousColour` and nothing below 8-bit (C04 I90, I31). So a span never enters `MONO`, the ladder or a floor **on its own account** — it names a slot or a reading, and the owner of each does the entering (§4e). At 1-bit a bold span on an emphasised-class block is absorbed — no fallback onto `underline` (C25 I10's) and no return to literal markers (C04 I85). The `unicode` axis gates glyphs and not attributes: SGR 3 is written at `ascii` exactly as at `full` (§4e, C04 §3am).
 - **I34** — **A renderer that paints its own page paints it in a surface `textSurfaces` holds, and `surface.bg` is the one it has.** §4's exclusion of `bgDeep` names a trigger — *if a surface ever paints text on it* — and the SVG plot arm was that surface for as long as it has existed: page, sankey halo, tile-label ink and separator stroke all read one constant, and every axis tick, legend row, callout, notice and node label lands on it (C12 §3ap.7's note owed, F632). **Measured before the ruling, all three themes and all 27 slots against both grounds**: against `bg` everything clears; against `bgDeep` dark and high-contrast clear and **light fails twelve times**, `tone.muted` at 2.44 under its own 2.5 floor and `syntax.comment` at 2.89 under 3 — because dark's `bgDeep` recesses *away* from its tones and light's recesses *toward* them, and a surface outside the check is a surface whose polarity nobody constrained. **The surface moved, not the floor and not the check**: widening `textSurfaces` would bind `tone`, `categorical` *and* `syntax` to a page only one arm paints — `categorical` because a callout at a line's end takes its series' colour (F382) — which is §4a's twelve-slot argument inverted, and it would cost a recolouring of light's whole equal-luminance family, every slot of which sits within 0.03 of 5.04. A third surface `surfaces.page` is worse than either: it must be in `textSurfaces` anyway, so its value is constrained to `bg`; it is a tenth surface every rung must answer (F240); and its only freedom is a page that differs from the transcript's, which is what D11's two-arm agreement exists to forbid. **The cost is named rather than absorbed**: dark loses 5.5% uniformly — `muted` 3.02 → 2.85, a node label 12.43 → 11.74 — and light gains 17%, high-contrast 23%. 2.85 is `muted`'s own number against `bg`, so the page now clears a floor that is checked on every load instead of a better one that was checked never (§4f, → C12 I112, → I19).
 
-- **I35** — **A `decoration` slot the framework paints as text clears the meaning floor against both text surfaces, and the pairing is derived from the slots the framework can resolve.** `decorationTextPairs` is `categorical.c1`–`c8` × `textSurfaces`, at 4.5 : 1, checked at load like every other floor — a **fourth** named pairing beside §4a's diff surfaces, §4b's wash and §4d's tag, and a sibling of them rather than an entry in any. **F652 and F653 are one pairing and not two**: `ratio` is symmetric, so a callout painted in a series' slot on the page and a tile label painted in the page's ground *over* that slot are the same two colours, which is why §4f.1's last two rows print the same three figures. **The sweep is what decides the arm**: ten text sites in four figure families and both arms take a `categorical` slot as ink or as ground — the SVG callout, tile label, graph node label, outline label and unboxed hierarchy label, and the terminal's callout column, flame and icicle frame names, pie legend rows and run labels — so moving the sites means moving ten of them across a seam D11 requires to agree, and moving the check means one function. **It is not vacuous**: light `c4` measures 4.74 against `bgElev`, 5% over its floor and the tightest margin the framework ships, and the palette itself has no luminance discipline — the worst pair *within* `categorical` is **1.00** on all three themes, because a categorical palette is authored for hue. **The two wider arms are refused by measurement**: dropping `validatePalette`'s `decoration` skip binds `spectrum` and rejects the light theme on 7 of its 9 stops, worst 2.36 (I31's own measurement from the colormap's side); a third `carries` value is F240's shape and re-opens `classes` for slots with no meaning to collapse to. **What it does not reach, stated because an unrecorded limit reads as strength**: a ninth `categorical` slot a theme declares (I30's limit, inherited); a picture cell's background, where I21 admits a palette ref for a cell carrying no text and *carrying no text* is the caller's property rather than the type's — `sankey.ts` and `scatter3.ts` both reach it through `slot()`, and the worst pair there is 1.00; and `surface.bgElev`, which nothing in `src/` resolves, so half the pairing is a claim about where blocks land rather than a measured site (§4g).
+- **I35** — **A `decoration` slot the framework paints as text clears the meaning floor against both text surfaces, and the pairing is derived from the slots the framework can resolve.** `decorationTextPairs` is `categorical.c1`–`c8` × `textSurfaces`, at 4.5 : 1, checked at load like every other floor — a **fourth** named pairing beside §4a's diff surfaces, §4b's wash and §4d's tag, and a sibling of them rather than an entry in any. **F652 and F653 are one pairing and not two**: `ratio` is symmetric, so a callout painted in a series' slot on the page and a tile label painted in the page's ground *over* that slot are the same two colours, which is why §4f.1's last two rows print the same three figures. **The sweep is what decides the arm**: ten text sites in four figure families and both arms take a `categorical` slot as ink or as ground — the SVG callout, tile label, graph node label, outline label and unboxed hierarchy label, and the terminal's callout column, flame and icicle frame names, pie legend rows and run labels — so moving the sites means moving ten of them across a seam D11 requires to agree, and moving the check means one function. **It is not vacuous**: light `c4` measures 4.74 against `bgElev`, 5% over its floor and the tightest margin the framework ships, and the palette itself has no luminance discipline — the worst pair *within* `categorical` is **1.00** on all three themes, because a categorical palette is authored for hue. **That last clause was the discharge and it is now I39's subject**: authored for hue is a claim about a property no floor here measures, and measured (§4j) it fails on every shipped theme. **The two wider arms are refused by measurement**: dropping `validatePalette`'s `decoration` skip binds `spectrum` and rejects the light theme on 7 of its 9 stops, worst 2.36 (I31's own measurement from the colormap's side); a third `carries` value is F240's shape and re-opens `classes` for slots with no meaning to collapse to. **What it does not reach, stated because an unrecorded limit reads as strength**: a ninth `categorical` slot a theme declares (I30's limit, inherited); a picture cell's background, where I21 admits a palette ref for a cell carrying no text and *carrying no text* is the caller's property rather than the type's — `sankey.ts` and `scatter3.ts` both reach it through `slot()`, and the worst pair there is 1.00; and `surface.bgElev`, which nothing in `src/` resolves, so half the pairing is a claim about where blocks land rather than a measured site (§4g).
 - **I36** — **`rampColour(ramp, t, theme, caps)` is the one entry point for a ramp's sample; it adds no ladder, and each backing degrades on the ladder its slot or map already has: a slot pair mixes linearly in sRGB at 24-bit, quantises through `nearestAnsi256` at 8-bit, steps to two at 4-bit (`t < 0.5` → `from`, else `to`) and resolves to `from` at 1-bit; a colormap is `continuousColour` unchanged; a palette is the categorical slot; and `animate` resolves to `none` below 8-bit.** `undefined` means *say nothing* and the run paints as its neighbours do (I31). Not three steps at 4-bit and not a midpoint at 1-bit, each with its reason in §4h.
 - **I37** — **`CATEGORY_REFS` and `refOf` live in `theme/categorical.ts`, one copy, re-exported by C12's `marks.ts`; a palette ramp cycles them and no data palette; and `theme/` imports nothing from `blocks/` or `plot/`.** The move is a homing — a slot table is this component's and two components read it — and not a cycle avoidance: the claimed cycle was disproved by the row written to assert it (§4h). A move and not a copy because F382 measured two copies disagreeing. C10 I16's one categorical palette is what makes `palette` a fill with no name (C04 I106, F837).
 - **I38** — **`degradeColour(value, caps)` is the one entry point for a literal colour, takes no theme, and adds no rung: `rgb` steps down through `nearestAnsi256` then `nearestAnsi16`, `ansi256` steps to `nearestAnsi16`, `ansi16` passes through unchanged above 1-bit, and at 1-bit every colour is dropped while every attribute is kept.** A child's `\x1b[31m` names the user's red, so resolving it to a hex would substitute ours; and a colour with no slot has no dark/light form, which is why the theme is not a parameter.
 
+- **I39** — **Two `categorical` slots are separated by at least `SEPARATION_FLOOR` under every vision model this component simulates, and the palettes that fail it are a list compared by equality rather than a load-time refusal.** `separation(a, b, vision)` is Viénot/Brettel/Mollon (1999) in linear RGB followed by CIEDE2000; `collisions(slots)` returns every pair below the floor as a whole verdict rather than a count, because a debt list has to say *which* pair. **The floor is 7 and it is calibrated on a control**: canonical Okabe-Ito measures 7.9 at worst, so seven is the largest integer the reference set clears and eight would refuse it. **The shipped debt is seven pairs on each of `light`, `dark` and `high-contrast`** — `light` worst 0.6 (deutan `c1`/`c4`), the other two worst 1.5 (tritan `c2`/`c3`) — and one on the colormap variant. **It is not a gate at load and §4j.3 says why**: every shipped theme fails, so a load-time throw refuses the framework's own themes and lowering the floor until they pass is the same edit under another number. **The metric is the second measurement and not an assumption**: CIE76 was the first draft, its docblock claimed the two formulae agree at the floor, and they do not — `dark` is two pairs under one and seven under the other with one pair in common. **What it does not reach, stated because an unrecorded limit reads as strength**: a pairwise floor says nothing about whether eight colours read as a set, which is why the debt is worked down by a person; anomalous trichromacy is not modelled, so the figures are the dichromat worst case over a smaller population than the one affected; a ninth slot a theme declares is outside the derived pairing (I30's limit, inherited); and a `categorical` palette an application supplies gets no row.
 
 ## 8. Commitments
 
@@ -1055,6 +1202,7 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 30. **A renderer's own page is a surface `textSurfaces` holds** (I34, §4f). §4's exclusion named a trigger and nothing watched it; the SVG arm had been painting every label on `bgDeep` since it was written, and light's `muted` measured 2.44 there against a 2.5 floor no check could see. The page becomes `surface.bg`, the exclusion stays true, no floor moves, and the row that keeps it asserts the page's fill is a hex some member of `textSurfaces` carries — so the next ground that is not a text surface fails rather than waiting for someone to notice.
 32. **A ramp is sampled here and adds no ladder** (I36, I37). One entry point, each backing on the rung its slot or map already has, two departures from the brief recorded with their reasons, the categorical cycle moved down once so two components share one copy (`CALCIUM_INK_RAMPS_DESIGN.md` Q7, Q11).
 31. **A palette that carries no meaning still clears a floor where it is painted as text** (I35, §4g). `decoration` exempts a palette from the check over *every* surface, and it was read as exempting it from every floor — so `categorical` names a series at ten sites in two arms and was measured by nothing on any theme. The pairing is `categorical` × the text surfaces at the meaning floor, a fourth sibling of §4a, §4b and §4d rather than a widening of any; the two arms that would have covered more are refused by the light theme's `spectrum` failing 7 of 9 stops; and the two findings behind it are one pairing, because a ratio is symmetric and a ground used as ink is its own pair read backwards.
+34. **A palette authored for hue is measured for hue** (I39, §4j). Four documents discharged the worst `categorical × categorical` pair with *legible only by hue*, and every floor this component holds is a luminance ratio — so the one property the palette exists for was the one nothing checked. Measured under three dichromacies it fails on all three shipped themes, seven pairs each, the light theme's orange and yellow at 0.6 against a just-noticeable 2.3. It lands as a debt list compared by equality and not as a load-time floor, because every shipped theme fails it; and the automated repair is refused by the metric rather than by the arithmetic — a search maximising the first draft's CIE76 reached three times canonical's separation and measures 8.9 under ΔE2000, having bought the number in the blues where that formula over-states.
 33. **A colour the theme did not choose still degrades here** (I38). One entry point, the existing rungs, no theme parameter — and `ansi16` left alone, because the child named the user's palette rather than a colour.
 
 ---
@@ -1094,6 +1242,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.37** (I21, §4c.1): **the fabricated violation, at both constructors.** A sankey cell built with a lower owner and a letter in it, and a `plot3d` mixed cell built with a background and a letter in it, are each **refused** — and the same call with the alphabet's own glyph is accepted, which is the control the refusal needs to not be vacuous. Asserted at the constructor rather than through a rendered figure, because no figure the tree can produce reaches the guard; that is the point of it.
 - **T1.22** (I33): for each of `bold`, `italic`, `underline` and for each tone at depths 24, 8, 4 and 1, merging a span onto the resolved tone yields a `Style` whose `colour` and `background` are **identical** to the tone's and whose attribute is set — asserted on the pair, so a merge that routed through a slot fails on the colour and one that dropped the tone fails on the same line. **The tone arm** (C04 I89): for each pair of tones at each depth, a run whose span names the second tone paints with the second tone's `colour` — the object `resolveTone` returns, by reference — with the attribute still set on top, and the block's tone nowhere on the run.
 - **T1.39** (I38): `degradeColour` on `{kind:"rgb", hex:"#0ac81e"}` returns the hex at 24-bit, an `ansi256` index at 8-bit, an `ansi16` index at 4-bit and undefined at 1-bit; on `{kind:"ansi16", index:1}` it returns index 1 at 24-bit, 8-bit and 4-bit, and undefined at 1-bit.
+- **T1.40** (I39, §4j.1): `separation` reproduces a fixed table of hand-checked pairs under each of the four vision models, and **the control is the row that gives the floor meaning** — canonical Okabe-Ito's twenty-eight pairs all clear 7 under every model, worst 7.9 at tritan orange/reddishPurple. Without it a floor of 7 would be indistinguishable from a floor of 70: every shipped palette fails both, and a rule nothing can satisfy passes review exactly like one nothing violates.
+- **T1.41** (I39, §4j.3): `collisions` returns a **verdict and not a count** — for a two-slot palette at ΔE 0.6 the entry names the vision model and both slot keys, and for the canonical set the list is empty. The empty list is the assertion, T2.14b's form: a debt list is read for which pair moved, and a count cannot say.
 
 ### Tier 2 — contract / interface
 
@@ -1133,6 +1283,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.36** (I38): `degradeColour`'s signature takes no theme, asserted at compile time; and a source scan finds no theme reference in its module.
 
 - **T2.37** (I18): every variant of `defaultTheme` loads with no overrides and yields a current palette. T2.4 is the contrast half and it is already over `SHIPPED`, which *is* `defaultTheme` — what is owed here is the other clause, that the one required config field has a working value to fill it with, which no assertion about ratios can see. A framework whose only required field has no working value is a framework nobody starts.
+- **T2.38** (I39, §4j.3): every shipped theme's `collisions` over `categorical.slots` equals its debt-list entry **exactly**, compared as a set in both directions — a new collision fails it and a cleared one fails it too. Seven pairs on each of the three, and `high-contrast`'s seven are `dark`'s, asserted as the same list rather than as two lists of the same length. `KNOWN_STALE`'s shape and its reason: a subset check lets a cleared entry outlive its reason unread.
+- **T2.38a** (I39, §4j.1, → C12): `colormaps/qualitative/okabe-ito.ts` keeps seven canonical slots and substitutes one, and that substitution is the **whole** of its debt — exactly one collision, tritan `m2`/`m8` at 1.5, where the canonical set has none. The row that says the property was lost to one colour rather than to a drift, and the only variant where that is separable.
 ### Tier 3 — edge cases
 
 - **T3.1**: an override naming an unknown tone → ignored, no throw.
@@ -1213,6 +1365,9 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.85** (I33, C04 I89, C04 I90): composing a span's tone *with* the block's (`{ ...block, ...spanTone }`) rather than replacing it → T1.22's tone arm still passes on `colour` and **T2.26 fails at 1-bit**, where the `ok` block's `bold` survives under the `identifier` run — the row that shows composition and replacement differ only where a tone carries an attribute; painting a valued background at 4-bit through `nearestAnsi16` or a fixed index → T2.26's 4-bit pair fails, and C09 T3.66's 4-bit identity with it; a valued background written through `withBackground` from a surface ref → T2.26's 8-bit arm fails on the index.
 - **T6.95** (I38): resolving `ansi16` through a hex round trip → T1.39's second row returns a different index and a child's red becomes ours.
 - **T6.96** (I38): dropping attributes with the colour at 1-bit → T3.72 fails and an inverse cursor becomes invisible.
+- **T6.97** (I39, §4j.3): comparing the debt list by subset instead of by equality → **T2.38 passes**, and it passes in *both* directions, which is measured rather than argued. With the list required to be contained in the findings, two entries deleted from it pass; with the findings required to be contained in the list, a stale entry for a collision that does not exist passes. Each direction is silent about the other side, and equality is the only comparison that is silent about neither.
+- **T6.98** (I39, §4j.1): dropping the dichromat simulation and measuring in normal vision only → **T1.40 fails on the control**, because canonical Okabe-Ito is separated in normal vision by construction and the other three models are the entire question. The mutation a suite indexed by the shipped palettes would survive: they fail either way.
+- **T6.99** (I39, §4j.3): swapping CIEDE2000 back for CIE76 with the floor left at 7 → **T2.38 fails on `dark` and `high-contrast`**, whose lists go from seven pairs to none, and T1.40's control passes throughout. The row that holds the metric, and the reason it is here: the first draft's docblock claimed the two formulae agree at the floor, which review could not falsify and a run could.
 
 ---
 

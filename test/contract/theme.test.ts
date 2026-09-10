@@ -843,3 +843,14 @@ describe("C10 §2 — the shipped default is a working value", () => {
     expect(SHIPPED.length, "and it carries more than one variant").toBeGreaterThan(1);
   });
 });
+
+/**
+ * **C10 §4j — the debt list, compared by equality.** §4j.3 rules that this is a
+ * row and not `validatePalette`: every shipped theme fails the floor, so a
+ * load-time throw would refuse the framework's own themes. These two rows land
+ * with `src/presentation/theme/cvd.ts` in the commit that follows this one.
+ */
+describe("C10 §4j — the categorical separation debt", () => {
+  it.todo("T2.38 (C10 I39, §4j.3): every shipped theme's collisions over categorical.slots equal its debt-list entry exactly, compared as a set in both directions — seven pairs on each of light, dark and high-contrast, high-contrast's asserted identical to dark's rather than merely as long, with canonical Okabe-Ito's empty list as the control — not deferred on a component: it lands with cvd.ts in the next commit");
+  it.todo("T2.38a (C10 I39, §4j.1): the colormap variant keeps seven canonical slots and substitutes #3cbf9a for black, and that one substitution is the whole of its debt — exactly one collision, tritan m2/m8 at 1.5, where the canonical set has none; the only variant where cause and effect are separable — not deferred on a component: it lands with cvd.ts in the next commit");
+});

@@ -14,7 +14,9 @@
 
 ## 1. Purpose
 
-C09 is where a `Block` becomes rows on a screen. It owns the **registry** — the pairing of each block kind with a `measure` and a `render` — and ships **sixteen** default kinds; `table`, `plot` and `patch` bring the union to **nineteen**.
+C09 is where a `Block` becomes rows on a screen. It owns the **registry** — the pairing of each block kind with a `measure` and a `render` — and ships **nineteen** default kinds; `table`, `plot` and `patch` bring the union to **twenty-two**.
+
+**This sentence held the pair F1009 corrected one file away, for as long as that file held it.** It said *sixteen* and *nineteen* — three short and three short — while `defaults.ts` said *sixteen* and *seventeen* directly above an array of nineteen. F1009 corrected the array's comment and three figures in this document and did not reach this one, which is the class it named arriving inside its own repair: a count in prose is checked by nothing, so correcting the instances a grep returns leaves the ones phrased differently. **§3's heading is now the count a row compares** (T1.4); this line and the paragraph under §3's table are not, and are named in F1016 as unwatched.
 
 The registry lives here rather than in C04 because `render` needs theme (L1) and capabilities (L0 terminal), and a registry at L0 data would import upward and sideways. C04 owns the schema and the measurement *contract*; C09 owns the implementations that satisfy it.
 
@@ -378,7 +380,7 @@ The registry's `width(block, w)` clamps whatever a definition returns into `[1, 
 and reports a value outside it through `onError` (I8's shape): a definition that answers wider than
 its cell has described a block the cell cannot hold.
 
-## 3. The nineteen kinds
+## 3. The twenty-two kinds — nineteen registered here, three delegated
 
 Each is a `measure`/`render` pair. The measurement column restates C04 §3 as an obligation on the implementation.
 
@@ -392,15 +394,17 @@ Each is a `measure`/`render` pair. The measurement column restates C04 §3 as an
 | `status` | `height` | **A bordered box the registry draws, never the definition** (I31). One of three contents — a failed render, a first fetch in flight, a backoff counting down. **Two ladders, one on each axis**, and neither may change the row count. No `window` (I27) |
 | `logs` | lines | **Never wrapped.** Timestamp and level are fixed-width; the **message** takes the residual and truncates. Predictable height is what makes a tail scroll smoothly |
 | `events` | events | Timestamp, type, message on one row; message truncated |
-| `plot` | delegated to C12 | Registered by C12 |
+| `plot` | delegated to C12 | Registered by C12, not here |
 | `progress` | 1 | Label, bar, percentage; bar takes the residual width. **The bar is bounded by its cells and the number is not** — see below |
 | `code` | lines, or wrapped lines when `wrap`; **the lines in `lineRange`** when a window set one | Syntax highlighting via the **`syntax` palette** (C10 §2), not tones — eight roles do not fit ten semantic slots. Truncates by default; wraps when `wrap: true`. A token boundary inside a grapheme cluster moves on to the cluster's end, as a span's does (I64). **Windows by source line with `text` kept whole and `lineRange` pinned** (I25a, C04 I82) |
 | `comparison` | rows + 1 | Field, a, b, comparator; three equal columns |
+| `patch` | delegated to C25 | Registered by C25, not here |
 | `pills` | `ceil(totalCells / w)` | One logical row that may wrap |
 | `tip` | `ceil(cells(text) / w)` | Dim, with fill actions |
 | `panel` | children + 2 | Border, title and footer; children measured at `w - 2` |
 | `scroll` | `height`, plus one residue row when the content overflows | A bounded box: `height` rows of content, and the marker is chrome the container adds on top (C04 I47, C04 I49). **Declares `elements` at block level and no `window`** — a region whose height is declared cannot measure less without becoming a different box |
 | `mosaic` | `height`, exactly | A declared grid of absolutely positioned cells (C04 I71). **Not a bounded box in `scroll`'s sense**: every cell bounds its own child, so I1 holds through an over-tall child rather than diverging (I35) |
+| `image` | `height`, and the reduced row count where `columnsForAspect(height, aspect)` exceeds `w` | **Four rungs on two axes** (§4c): a kitty placement on the protocol axis, then half blocks, braille and the ASCII ramp on the glyph axis. **The geometry is the guarantee and a clip is not a backstop** (C04 I73, I35) — a placeholder outside its rectangle addresses part of an image the terminal is not drawing there, so the width is clamped and the rows follow it. **No `window`**: an image scales, it does not slice |
 | `group` | sum or max of children | `column` sums children measured at `w`; `row` takes the max of children measured at `floor((w - gaps) / n)`, one cell of gutter between each pair (C04 §3) |
 | `raw` | lines | Pre-formatted, emitted as-is with control characters stripped. **Windows by line**, with no pin — nothing is derived from lines outside the slice (I25) |
 | `terminal` | `lines.length`, plus one row when `dropped` is present | A child's screen (C04 §3i). **Never wrapped and never stripped**: each line is one row, truncated at `width`, and the containment gate (C04 I110) is what makes emitting the text safe. Runs paint literal colour through C10 §4i's ladder; the cursor cell — the cluster covering the cursor's column, which is a cell column (C27 I4) — is drawn `inverse` (I56, I64). **Windows** |
@@ -2445,7 +2449,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.1**: `register` in open state → `get` returns it, `kinds` includes it.
 - **T1.2**: `seal` → `sealed` true, existing kinds still resolve.
 - **T1.3**: `measure`/`render` after seal → work normally.
-- **T1.4**: each of the nineteen kinds measures its documented height on a canonical fixture — **one case per registered kind, and the set is compared to `DEFAULT_DEFINITIONS` by equality**. A hand-written list is what this row was, and it drifted: `scroll` shipped as a default and was in neither the table above nor this row's fourteen cases, so the kind with no documented height also had no case asserting one (F228). The row already guarded the other direction — every listed kind must have a fixture, added after a rename made seven entries pass against `undefined` — and a guard in one direction is what let the other drift.
+- **T1.4**: **§3's table is read from the document**, and each registered kind measures its documented height on a canonical fixture. Three equalities over the parsed table — its non-delegated rows against `DEFAULT_DEFINITIONS`, its `delegated to Cnn` rows against `{table: C11, plot: C12, patch: C25}`, and §3's heading's three counts against the parsed table's own — then one case per registered kind. **The row's name used to claim a source it did not read** (F1016): the `documented` record was commented *§3's table, read back as assertions* and was compared to the registry, never to the table, so §3 could lose a row and the row stayed green — and it had lost two, `image` and `patch`. **Stated blind spot: the Measure column is prose and only its bare integers are compared** — two rows of nineteen — so a wrong *formula* beside a right membership is still invisible. Before either guard the cases were a hand-written list, and it drifted: `scroll` shipped as a default and was in neither the table above nor this row's fourteen cases, so the kind with no documented height also had no case asserting one (F228). The row already guarded the other direction — every listed kind must have a fixture, added after a rename made seven entries pass against `undefined` — and a guard in one direction is what let the other drift.
 - **T1.5**: `keyValue` key column caps at 20 cells; longer keys truncate, values still align.
 - **T1.6**: `logs` line longer than `w` → one row, ending in the truncation marker.
 - **T1.6b**: a `code` block with `wrap: false` truncates; the same content with `wrap: true` wraps, and both measure to their rendered height.

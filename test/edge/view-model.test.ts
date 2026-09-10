@@ -937,3 +937,15 @@ describe("C04 absence, null, and the round trip", () => {
     expect(validateBlock({ ...notice, tone: "info" }).ok).toBe(true);
   });
 });
+
+/**
+ * **C04 I115 — a `blockId` resolves at every depth, and the rule belongs to the
+ * field.** The three rows land with `patch.ts`'s and `actions.ts`'s repair in
+ * the commit that follows this one; the invariant is here first because the
+ * enumeration it replaces was a spec sentence before it was a `find`.
+ */
+describe("C04 §4a — a blockId is an address and not a path", () => {
+  it.todo("T3.81 (C04 I115, F1015): replace, merge, reserve and expand all answer one question — each resolves its blockId inside a group, inside a panel and inside a table's detail, three containers rather than one because group alone cannot distinguish does not descend from does not descend into a group — not deferred on a component: it lands with patch.ts and actions.ts in the next commit");
+  it.todo("T3.82 (C04 I115, I14): a duplicate id with one copy nested is refused by expand as it is by its three siblings, because I14 makes an id unique nested children included and a top-level find silently returns the first of the two — not deferred on a component: it lands with patch.ts in the next commit");
+  it.todo("T3.83 (C04 I98, §3c S5, F1015): the dispatcher finds a row on a table inside a container, driven through a real TranscriptStore and asserted on the row in the held document rather than on which blockId the arm passed — a proxy assertion would go green on either half of the repair alone — not deferred on a component: it lands with actions.ts in the next commit");
+});
