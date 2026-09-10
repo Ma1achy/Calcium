@@ -93,27 +93,37 @@ export function stepRows(
  * Below that the channel does not exist, which is honest — a 1.4-cell bubble is a
  * 1-cell bubble and pretending otherwise is a size axis that reports nothing.
  *
- * `sizes` is the second series, read positionally against the first.
+ * `sizes` is `block.sizes`, read positionally against the value series — a
+ * channel and not a member of `series` (C04 I117, F271).
+ *
+ * **The ASCII arm below had never run until that ruling landed.** It chose
+ * `RAMP_DOTS` and then folded braille, so the two halves of the capability
+ * decision disagreed — but a bubble had two series, and `overlaidRows` sent a
+ * two-series frame down its shared-cells path instead of calling this. One
+ * series routes here, the arm ran, and the catalogue's ascii frame came out in
+ * braille. Selected but unreachable reads exactly like selected and correct
+ * (A03 §2), and only the change that made it reachable could say so.
  */
 export function bubbleRows(
   series: Series,
-  sizes: Series | undefined,
+  sizes: readonly (number | null)[] | undefined,
   range: Range,
   width: number,
   rows: number,
-  _caps: Caps,
+  caps: Caps,
   facing: Facing,
 ): readonly string[] {
   // **The grid is in dots, not cells** — `createGrid(w, h)` made a grid one dot
   // per cell, so six of seven bubbles landed on the same four dots and two marks
   // came out of seven points. `scatterRows` multiplies by the dot geometry one
   // line above its own `createGrid` and this did not.
-  const dots = _caps.unicode === "ascii" ? RAMP_DOTS : BRAILLE_DOTS;
+  const ascii = caps.unicode === "ascii";
+  const dots = ascii ? RAMP_DOTS : BRAILLE_DOTS;
   const w = Math.max(1, Math.floor(width)) * dots.x; // cells-ok — a dot column count
   const h = Math.max(1, Math.floor(rows)) * dots.y; // cells-ok — a dot row count
   const grid = createGrid(w, h);
   const vals = series.values;
-  const sv = sizes?.values ?? [];
+  const sv = sizes ?? [];
   const maxSize = Math.max(1, ...sv.filter((v): v is number => v !== null && Number.isFinite(v)));
 
   for (const [i, v] of vals.entries()) {
@@ -135,5 +145,7 @@ export function bubbleRows(
       }
     }
   }
-  return foldBraille(grid);
+  // **The sibling's own line** — `scatterRows` and `stepRows` both end this way,
+  // and this one ended `foldBraille(grid)` unconditionally.
+  return ascii ? foldRamp(grid, ladderFor("height", caps).steps) : foldBraille(grid);
 }

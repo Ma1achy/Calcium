@@ -2907,10 +2907,16 @@ const FORM_ROWS: Readonly<
    *
    * The fourth encoding axis, and the one a terminal has least room for: a cell
    * is the smallest mark there is, so size is spent on *how many cells* rather
-   * than on a radius. Two series, read as (position, magnitude).
+   * than on a radius.
+   *
+   * **One series and a channel beside it** (C04 I117, F271). It was two series
+   * read as (position, magnitude), and every rule written about a series then
+   * applied to the magnitude: the ordinate spanned it, `overlaidRows` drew it,
+   * the legend named it, and the reader's toggle reached it. `sizes` is not a
+   * series, so none of the four is a decision this form has to make.
    */
   bubble: (block, width, ctx) => positionalForm(block, width, ctx, (sr, range, aw, rows, caps, facing) =>
-    bubbleRows(sr, block.series[1], range, aw, rows, caps, facing)),
+    bubbleRows(sr, block.sizes, range, aw, rows, caps, facing)),
 
   /**
    * An autocorrelation plot — one bar per lag, with a confidence band.

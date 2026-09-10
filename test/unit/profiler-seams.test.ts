@@ -1077,11 +1077,29 @@ describe("C24 — the public surface", () => {
       "and the predicate can see a callable when there is one",
     ).toBeGreaterThan(0);
 
-    // No timer, no observer, no handle. The count is the process's own, so the
-    // control below is what says the reading can move at all.
-    expect(after, "importing it registers no timer").toBe(before);
+    // No timer, no observer, no handle.
+    //
+    // **A bound and not an equality, because the count is the process's and the
+    // process is not still** (F1083). The comment above records the *total*
+    // moving on its own across this same `await` and narrows the reading to
+    // timers — which lowered the rate and kept the shape: measured, three runs
+    // of three inside the suite gave `after` 2 against `before` 3, a foreign
+    // `Timeout` firing while the dynamic import awaited. Green alone every
+    // time, which is what a row measuring the process rather than its subject
+    // looks like from outside.
+    //
+    // A timer this import registers can only *raise* the count, so `<=` is the
+    // invariant with the race taken out rather than a weaker claim about it.
+    // **Its blind spot, stated**: an import that registers one in the same
+    // window as a foreign one expiring nets to zero and passes. Nothing here
+    // can separate those, because `getActiveResourcesInfo` returns kinds and
+    // not identities — and the structural assertion above, that the namespace
+    // publishes nothing callable, is what makes that case unreachable in
+    // practice: a module with no callable export has nothing to arm a timer
+    // from.
+    expect(after, "importing it registers no timer").toBeLessThanOrEqual(before);
     const timer = setInterval(() => {}, 60_000);
-    expect(timers(), "and the counter responds to one that does").toBe(before + 1);
+    expect(timers(), "and the counter responds to one that does").toBe(after + 1);
     clearInterval(timer);
 
     // What is left is the tier order — names, ordered, and frozen. It is the one

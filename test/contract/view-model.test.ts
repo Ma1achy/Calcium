@@ -934,27 +934,27 @@ describe("C04 §7 — the update model and the view state, checked rather than c
     expect((logRow ?? "").includes(line.message), "and it is the same three strings").toBe(true);
   });
 
-  it("T2.128 (I117): the size channel's four symptoms, and the count that says when it gets worse", () => {
-    // **F1051.** `FS3` asserts F271's disagreement on purpose, so it is green
-    // for exactly as long as the defect is and says nothing when the defect
-    // grows. This row is the other half: the *count* of forms whose `series`
-    // carries something that is not a position, and the fourth symptom that
-    // count exists to catch.
+  it("T2.130 (I117): the size channel is not a series, and the count that says if one comes back", () => {
+    // **F271 and F1051, closed.** This row watched the *condition* — the count
+    // of forms whose `series` carries something that is not a position — rather
+    // than the remedy, and it asserted all four symptoms so that landing the
+    // ruling turned it red instead of leaving it green over a fixed defect. It
+    // is now the closed form of the same watch: the count is zero, and the day
+    // a form gains a channel inside `series` it inherits all four symptoms and
+    // this fails.
     const bubble = {
       kind: "plot", id: "bb", form: "bubble", height: 8, axes: true, legend: "right",
-      series: [
-        { label: "value", values: [10, 40, 25] },
-        { label: "size", values: [1, 4, 2] },
-      ],
+      series: [{ label: "value", values: [10, 40, 25] }],
+      sizes: [1, 4, 2],
     } as never;
 
-    // **Symptom 4, and it is a control doing the wrong thing rather than a
-    // figure looking wrong.** `bubble` is in `HAS_HIDEABLE_SERIES`, so C22 I78's
-    // reader-facing toggle reaches the size channel — and hiding it removes a
-    // rasterisation the reader never asked to see while the sizes go on sizing
-    // the value bubbles, because `bubbleRows` reads `block.series[1]` directly
-    // and never asks `seriesHidden`. Read off the frame, not off a flag.
-    expect(HAS_HIDEABLE_SERIES.bubble, "the toggle reaches a channel").toBe(true);
+    // **Symptom 4 was a control doing the wrong thing**: `bubble` is in
+    // `HAS_HIDEABLE_SERIES`, so C22 I78's reader-facing toggle reached the size
+    // channel — hiding it removed a rasterisation the reader never asked to see
+    // while the sizes went on sizing the value bubbles. The table is unchanged
+    // and it is right: its membership rule is *positional*, and `bubble` still
+    // is one. What changed is what the toggle can reach, which is data.
+    expect(HAS_HIDEABLE_SERIES.bubble, "the toggle reaches the one series there is").toBe(true);
     const draw = (hidden?: number): readonly string[] =>
       measurable({
         definitions: [plotDefinition as never],
@@ -966,26 +966,66 @@ describe("C04 §7 — the update model and the view state, checked rather than c
         .map((l) => l.replace(/\u001b\[[0-9;]*m/gu, ""));
 
     const all = draw();
-    const noSizes = draw(1);
-    expect(noSizes, "hiding the channel changes the frame").not.toEqual(all);
-    // The fixture responds in both directions, and the two hides differ — a
-    // shape that reported byte-identical frames while the option was being
-    // passed in the wrong form, which is how a collision hides a dropped input.
-    expect(draw(0), "hiding the value series is a different frame again").not.toEqual(noSizes);
-    // And the gutter is unchanged by the hide, because the hidden channel still
-    // sets the extent: the floor is a *size*, at 0, not the smallest value.
+    // **Hiding index 1 is now hiding nothing**, because there is no index 1 —
+    // which is the assertion this row used to make in the opposite direction.
+    expect(draw(1), "there is no second series to hide").toEqual(all);
+    // The fixture still responds, so the equality above is a fact about the
+    // document and not about a hide request that never arrived (F1051's
+    // collision: two different requests once produced byte-identical frames).
+    expect(draw(0), "and hiding the one there is changes the frame").not.toEqual(all);
+    // And the gutter is the *values'* extent now. It ran `0 · 20 · 40 · 60` for
+    // data spanning 20–60 because a size set the floor; nothing in `series`
+    // sets it but a position.
     const gutter = (rows: readonly string[]): readonly string[] =>
       rows.map((r) => r.slice(0, 3).trimEnd()).filter((r) => r !== "");
-    expect(gutter(noSizes), "the hidden channel still owns the axis").toEqual(gutter(all));
+    expect(gutter(all).some((g) => g === "0"), "no size owns the axis floor").toBe(false);
 
-    // **The count, which is what watches the condition.** One form, and the day
-    // a second gains a channel inside `series` it inherits all four symptoms and
+    // **The count, which is what watches the condition.** Zero forms, and the
+    // day one gains a channel inside `series` it inherits all four symptoms and
     // this row reports it — where `FS3`, asserting only the bubble's own
     // normalisation, would stay green.
-    const CHANNEL_IN_SERIES: readonly string[] = ["bubble"];
-    expect(CHANNEL_IN_SERIES.length, "one form breaks the rule, and it is recorded (C04 I117)").toBe(1);
+    const CHANNEL_IN_SERIES: readonly string[] = [];
+    expect(CHANNEL_IN_SERIES.length, "no form breaks the rule (C04 I117)").toBe(0);
     const src = readFileSync("src/presentation/plot/definition.ts", "utf8");
     const positional = [...src.matchAll(/const s2 = block\.series\[1\]|block\.series\[1\]/g)].length;
-    expect(positional, "two reads of `series[1]`: `dumbbell`'s second position, and the bubble's channel").toBe(2);
+    expect(positional, "one read of `series[1]`: `dumbbell`'s second position, and no channel").toBe(1);
+  });
+
+  it("T2.131 (I117): the three refusals, and the check the move would have deleted", () => {
+    const doc = (over: object): readonly string[] => {
+      const r = validateDocument(
+        docOf([{ kind: "plot", id: "s", form: "bubble", height: 6, series: [{ values: [1, 2] }], sizes: [1, 2], ...over }]),
+      );
+      return r.ok ? [] : r.error;
+    };
+    // **The control first**, or every row below passes against a gate that
+    // refuses everything.
+    expect(doc({}), "the ordinary bubble validates").toEqual([]);
+
+    expect(doc({ form: "line", sizes: [1, 2] }).join(" "), "off the form")
+      .toMatch(/"sizes" on form "line" \(C04 I117\)/u);
+    expect(doc({ sizes: undefined }).join(" "), "and the form with no channel")
+      .toMatch(/form "bubble" has no "sizes" \(C04 I117\)/u);
+    // **Named as the move and not as an unrelated count**, because a caller
+    // written for the old shape gets both this and the one above, and the two
+    // have to read as one instruction.
+    const two = doc({ series: [{ values: [1, 2] }, { values: [3, 4] }] }).join(" ");
+    expect(two, "the second series").toMatch(/form "bubble" has 2 series \(C04 I117\)/u);
+    expect(two, "and it says where the values go").toMatch(/move its values to "sizes"/u);
+
+    // **The rule the move would have deleted.** As `series[1]` the channel was
+    // checked by the loop over `series`; a member outside it is checked by
+    // whatever someone wrote, and this is what was written (F1082).
+    expect(doc({ sizes: [1, Number.NaN] }).join(" "), "a non-finite size")
+      .toMatch(/sizes\[1\] is number/u);
+    expect(doc({ sizes: "up" }).join(" "), "and sizes that is not an array")
+      .toMatch(/"sizes" must be an array of finite numbers or null/u);
+
+    // **A short `sizes` is legal**, and says what a trailing `null` says: no
+    // size from there on. Both renderers read it positionally and both already
+    // draw a missing reading as no size, so a length rule here would refuse a
+    // document they draw correctly.
+    expect(doc({ series: [{ values: [1, 2, 3] }], sizes: [1] }), "a short channel is not a fault").toEqual([]);
+    expect(doc({ sizes: [1, null] }), "and a null is a sample with no size").toEqual([]);
   });
 });

@@ -1650,6 +1650,7 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
     plotHierarchyErrors(b, e, at, form);
     plotGraphErrors(b, e, at, form);
     plotAxisErrors(b, e, at, form);
+    plotBubbleErrors(b, e, at, form);
     plotFieldErrors(b, e, at, form);
     plotHorizonErrors(b, e, at, form);
     plotSizeErrors(b, e, at);
@@ -2091,6 +2092,58 @@ function plotHorizonErrors(
       `"${name}" is ${map.kind} (C12 I52) — the fold mirrors, so the sign rides ` +
       `the map's two halves and a one-sided ramp draws a trough as a peak`,
   );
+}
+
+/**
+ * A bubble's size channel, and the three refusals that keep it out of `series`
+ * (C04 I117, F271, F1051).
+ *
+ * **Two rules and not one**, because the channel leaving `series` and the form
+ * refusing a second `series` are different claims: without the second, a caller
+ * can supply `sizes` *and* the old second series, and the four symptoms come
+ * back for the series that is still there.
+ *
+ * **`requireFiniteNumbers` is the rule the move would otherwise have deleted.**
+ * As `series[1]` the channel was checked by the loop over `series`, which calls
+ * it on every member's `values`. Nothing carries that over — a member outside
+ * `series` is validated by whatever someone wrote for it, and this is what was
+ * written. `offsets` and `totals` are the same shape and have nothing at all,
+ * which is F1082 rather than this rule's business.
+ *
+ * **A short `sizes` is legal and means what a trailing `null` means**: no size
+ * from there on. `bubbleRows` and `scatterFigure` both read it positionally and
+ * both already treat a missing reading as no size, so a length rule here would
+ * refuse a document the renderers draw correctly.
+ */
+function plotBubbleErrors(
+  b: Record<string, unknown>,
+  e: string[],
+  at: string,
+  form: unknown,
+): void {
+  const sizes = b["sizes"];
+  if (sizes !== undefined && form !== "bubble") {
+    e.push(
+      `${at}: "sizes" on form "${String(form)}" (C04 I117) — only a bubble has a ` +
+        `size channel, and a size on anything else names nothing`,
+    );
+  }
+  if (form === "bubble" && sizes === undefined) {
+    e.push(
+      `${at}: form "bubble" has no "sizes" (C04 I117) — the size channel is what ` +
+        `makes a bubble one, and it was the second series until it became its own ` +
+        `member`,
+    );
+  }
+  requireFiniteNumbers(sizes, e, at, "sizes");
+  const series = b["series"];
+  if (form === "bubble" && isArray(series) && series.length > 1) { // cells-ok — a series count
+    e.push(
+      `${at}: form "bubble" has ${String(series.length)} series (C04 I117) — a bubble ` +
+        `draws one position channel, and the second series was the size channel: ` +
+        `move its values to "sizes"`,
+    );
+  }
 }
 
 function plotFieldErrors(

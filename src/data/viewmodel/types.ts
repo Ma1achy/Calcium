@@ -1470,6 +1470,33 @@ export type Plot = Readonly<{
   bands?: number;
   facets?: readonly Plot[];
   segments?: readonly Segment[];
+  /**
+   * A bubble's size channel — **the fourth encoding, and not a position**
+   * (C04 I117, F271, F1051).
+   *
+   * One reading per sample of `series[0]`, spent on *how many cells* a mark
+   * takes rather than on a radius, because a cell is the smallest mark a
+   * terminal has. `null` is a sample with no size, which draws a single dot;
+   * an array shorter than the values says the same thing about every sample
+   * past its end.
+   *
+   * **Outside `series` because it is not a position, and that is the whole
+   * ruling.** It was `series[1]` and inherited every rule written about a
+   * series: `seriesRange` stretched the ordinate over it, so a plot of data
+   * spanning 20–60 drew a gutter running `0 · 20 · 40 · 60`; `overlaidRows`
+   * rasterised it, so the sizes were drawn as bubbles sized by themselves in
+   * their own colour; `identityOf` named it, so the legend read *value ·
+   * size*; and `HAS_HIDEABLE_SERIES` reached it, so the reader's toggle
+   * removed a rasterisation nobody asked to see while the sizes went on
+   * sizing the value bubbles and setting the axis. Four symptoms, one cause,
+   * and none of them a rule that was wrong — every one is a correct rule about
+   * `series` applied to something that was not one.
+   *
+   * Required on `bubble` and refused on every other form, which is the shape
+   * `segments`, `quartiles`, `ohlc` and `vectors` already have; `bubble`
+   * refuses a second `series` for the same reason.
+   */
+  sizes?: readonly (number | null)[];
   xScale?: ScaleType;
   yScale?: ScaleType;
   /**

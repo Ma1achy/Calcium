@@ -246,18 +246,20 @@ describe("FS — the scatter family's figure (C12 §3ak.7)", () => {
   });
 
   it("FS3 (C12 I62, §3ak.1): a bubble's size IS data, so it crosses normalised", () => {
-    // `bubbleRows` reads `block.series[1]` positionally against the first and
-    // divides by `max(1, …finite sizes)`. Same normalisation here, or the two
-    // arms scale the size channel differently and every bubble is a different
-    // size in each.
-    // **The value series is the larger one on purpose.** With sizes above the
-    // values, `seriesRange` — which spans every member of `series`, F271 — makes
-    // the niced maximum *equal* the size maximum, and the mutation that divides
-    // by the wrong one survives. The convenient fixture is the one where both
-    // readings agree, and the mutation pass is what said so.
+    // `bubbleRows` reads `block.sizes` positionally against the value series
+    // and divides by `max(1, …finite sizes)`. Same normalisation here, or the
+    // two arms scale the size channel differently and every bubble is a
+    // different size in each.
+    // **The value series is the larger one on purpose.** It was on purpose
+    // before the channel left `series` too, and for a reason that has since
+    // changed: `seriesRange` then spanned the channel, so equal maxima let the
+    // mutation dividing by the wrong one survive. It no longer spans it, so the
+    // two maxima are 100 and 4 and the mutation is caught by a wide margin —
+    // the fixture is kept because a margin is worth more than a coincidence,
+    // and because losing it is how the survivor came back last time.
     const f = scatterFigure(plot({
       form: "bubble", height: 8,
-      series: [{ values: [1, 100, 50] }, { values: [4, 2, null] }],
+      series: [{ values: [1, 100, 50] }], sizes: [4, 2, null],
     }));
     const own = f.marks.filter((d) => d.seriesIndex === 0);
     const sizes = own.map((d) => (d.mark.kind === "point" ? d.mark.size : "not a point"));
@@ -265,14 +267,15 @@ describe("FS — the scatter family's figure (C12 §3ak.7)", () => {
     // **`undefined` rather than `0`**, because a zero radius is a dot the
     // terminal draws and *absent* is not the same statement.
     expect(sizes[2]).toBeUndefined();
-    // **F271, asserted rather than described.** The size channel is a member of
-    // `series`, so the terminal rasterises it as a second bubble series and the
-    // figure says so — correcting it here would be a silent divergence inside a
-    // refactor. The day the channel stops being a series, this row fails and the
-    // finding is closed by the failure rather than by memory.
+    // **F271, closed by this row failing.** It asserted the disagreement on
+    // purpose — two marks at `seriesIndex` 1 and a legend of two — so that the
+    // day the channel stopped being a series it went red rather than staying
+    // green over a fixed defect. That day is C04 I117: `sizes` is not a member
+    // of `series`, so there is no second series to rasterise, to span the
+    // ordinate with, or to name.
     expect(f.marks.filter((d) => d.seriesIndex === 1).length,
-      "the channel is drawn as a series — F271, owed").toBe(2);
-    expect(f.identity, "and named as one in the legend").toEqual(["series 1", "series 2"]);
+      "no second series, because a size is not one (C04 I117)").toBe(0);
+    expect(f.identity, "and the legend names the one series there is").toEqual(["series 1"]);
   });
 });
 

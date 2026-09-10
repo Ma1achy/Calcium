@@ -355,10 +355,12 @@ const results = runPass({
       expect: "golden",
     },
     {
-      // **A bubble's size channel scaled against the wrong maximum.** `sizes` is
-      // the second series read positionally, and `bubbleRows` divides by
-      // `max(1, …finite)`. Dividing by the *value* series' maximum keeps every
-      // bubble a plausible size and makes none of them the size it is.
+      // **A bubble's size channel scaled against the wrong maximum.** `sizes`
+      // is read positionally against the value series, and `bubbleRows`
+      // divides by `max(1, …finite)`. Dividing by the *value* series' maximum
+      // keeps every bubble a plausible size and makes none of them the size it
+      // is. The margin widened when the channel left `series` (C04 I117): the
+      // two maxima used to be niced into agreement and are now 100 and 4.
       name: "the size channel is normalised against the value series",
       file: FIGURE,
       from: "    const maxSize = Math.max(1, ...finite);",
@@ -366,19 +368,23 @@ const results = runPass({
       expect: "FS3",
     },
     {
-      // **F271 silently corrected**, which is the mutation this family most
-      // needs: dropping the channel from the figure is the *right* chart and the
-      // wrong commit — no frame moves, the two arms disagree at step 4, and
-      // nothing announces it. The row exists so the divergence cannot be made by
-      // accident.
+      // **The figure stops reading the channel**, which is the mutation this
+      // family most needs and which had to be rewritten when F271 closed.
+      //
+      // It used to slice `block.series` to its first member — *F271 silently
+      // corrected*, the right chart and the wrong commit. Landing C04 I117 made
+      // that anchor a no-op: a bubble now has exactly one series, so slicing to
+      // one changes nothing and the row would have reported SURVIVED for ever
+      // while reading as a live control. A mutation whose subject moved is not
+      // a mutation, and only re-reading it on the day the subject moved says so.
+      //
+      // The divergence now available is the plain one: the figure ignores
+      // `sizes` and every mark loses its radius while the terminal keeps
+      // drawing them, which is the two arms disagreeing at step 4.
       name: "THE DIVERGENCE: the figure quietly stops drawing the size channel",
       file: FIGURE,
-      // **Two lines, because one is ambiguous** — both families iterate the
-      // series identically and the sweeper said so. An ambiguous anchor reports
-      // as SURVIVED, which routes to *write a test* rather than *fix the anchor*
-      // (F219).
-      from: "    block.series.forEach((series, seriesIndex) => {\n      const span = Math.max(1, series.values.length - 1); // cells-ok — a sample count",
-      to: "    block.series.slice(0, 1).forEach((series, seriesIndex) => {\n      const span = Math.max(1, series.values.length - 1); // cells-ok — a sample count",
+      from: '    const sizes = block.form === "bubble" ? block.sizes : undefined;',
+      to: "    const sizes = undefined;",
       expect: "FS3",
     },
     {

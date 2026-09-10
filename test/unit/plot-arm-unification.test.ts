@@ -398,7 +398,11 @@ describe("U — the seam, asserted from both arms", () => {
     // would re-derive the figure D13 closed against. Recorded, not narrowed.
     // **46 → 53**: the legend names annotations now (C12 I109) — `annotation-label`
     // and its kin — and the fixtures for unreached rules bring legends of their own.
-    expect(legendDrawn, "documents drawing a legend label — D13").toBe(53); // cells-ok — a document count
+    // **53 → 52**: `bubble` lost its second entry with its second series (C04
+    // I117, F271). The legend read *value · size* over one series and one
+    // channel, so the count included a document whose legend named something
+    // that was never a series; one series draws no legend at all here.
+    expect(legendDrawn, "documents drawing a legend label — D13").toBe(52); // cells-ok — a document count
     // 44 → 46: two of the twenty density variants carry more than one series
     // into shared cells, which is what `SHARES_CELLS` auto-enables a legend for.
     // The other eighteen are single-series and gain none (F383).
@@ -427,8 +431,12 @@ describe("U — the seam, asserted from both arms", () => {
     // terminal draws too. So the eight proportion documents that name their
     // segments are invisible here, and the limit is stated rather than left as a
     // number that looks like a gap.
+    // **89 → 88**: `bubble` again (C04 I117, F271). Its identity was
+    // `["value", "size"]` because `identityOf` names every member of `series`
+    // and the size channel was one; naming a channel in the legend was symptom
+    // three of four, and one series draws no identity string here.
     // 81 → 89: the drawing fixtures for unreached rules that carry identities.
-    expect(identityDrawn, "documents drawing an identity string — D10").toBe(89); // cells-ok — a document count
+    expect(identityDrawn, "documents drawing an identity string — D10").toBe(88); // cells-ok — a document count
     // **60 → 81, and 20 of the 21 are the density family** — 19 violin and 1
     // ridgeline, counted per form rather than inferred from the total (F383).
     // Both forms are `ROW_IS_AN_IDENTITY` without a position axis, so each band
@@ -668,6 +676,13 @@ describe("U — the seam, asserted from both arms", () => {
     // hold. Both rungs are in §3ak.3's table and the split between them is per
     // form, not per family.
     //
+    // **22 → 21 `layout`, and 22 → 23 `colour`: `bubble` stopped stacking**
+    // (C04 I117, F271). Stacking is what a *multi-series* positional form does
+    // below the floor, and a bubble had two series because its size channel was
+    // one — so a channel that is not a position was deciding the geometry at a
+    // colour rung. The paragraph above was already the reason and already said
+    // *21*; the cell moving is the sentence and the figure agreeing again.
+    //
     // **`layout` at the unicode edges is the rasteriser, not the geometry**: a
     // braille curve falling to `-` inks a different set of cells for the same
     // figure, which is §2's legitimate column. The classifier cannot tell that
@@ -707,7 +722,7 @@ describe("U — the seam, asserted from both arms", () => {
     // `sankeyAlphabet` swaps `▀ ▄ █ ▒` for `# - =` in one expression.
     expect(tally).toEqual([
       { same: 1, colour: 47, glyph: 0, layout: 0 },
-      { same: 1, colour: 22, glyph: 3, layout: 22 },
+      { same: 1, colour: 23, glyph: 3, layout: 21 },
       { same: 0, colour: 0, glyph: 39, layout: 9 },
       { same: 0, colour: 0, glyph: 39, layout: 9 },
     ]);

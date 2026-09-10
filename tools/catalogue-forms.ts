@@ -1414,10 +1414,8 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
   bubble: {
     default: {
       form: "bubble", height: 10, axes: true,
-      series: [
-        s([20, 45, 30, 60, 38, 52, 25], "value"),
-        s([2, 9, 4, 14, 6, 11, 3], "size"),
-      ],
+      series: [s([20, 45, 30, 60, 38, 52, 25], "value")],
+      sizes: [2, 9, 4, 14, 6, 11, 3],
     },
   },
   autocorrelation: {
