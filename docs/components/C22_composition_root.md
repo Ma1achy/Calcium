@@ -1755,9 +1755,31 @@ protocol hold at rest (the table); a wake, a scroll, an eviction and a stop are 
   `transmitFrame` is handed `graph.lifecycle.size().columns` for every image in the document, while
   a card's body renders four cells in (§6l.4 D) — so an image inside a card whose natural width
   exceeds the run's has its `c=`/`r=` computed at one width and its placeholders at another. The
-  gather takes the run's width and is right; the seam takes the frame's and is not. Recorded here
-  rather than repaired, because the remedy is the seam receiving the layout rather than the
-  document, which is a change to what `transmitFrame` is given (F1026).
+  gather takes the run's width and is right; the seam takes the frame's and is not.
+
+  **Ruled and repaired: the seam is handed the layout** (I98, F1062). `transmitFrame` takes one
+  group per `EntryRun`, each declaring the width its blocks render at, so `imageCells` and
+  `placesAtProtocol` at the seam are called with the number `visibleRows` renders at rather than
+  with the frame's.
+
+  **And the residue's own bound was false in the ordinary case.** It was recorded as latent —
+  *the two computations disagree only above 297 columns, which is where `placementRows` refuses* —
+  and that is true of the **refusal** half and of nothing else. Measured over a card holding a
+  2000×100 picture, the indent is 4 and both halves move:
+
+  | frame | runs | seam box · places | run box · places |
+  |---|---|---|---|
+  | 80 | 80, 76 | 80×2 · yes | **76**×2 · yes |
+  | 296 | 296, 292 | 296×7 · yes | **292**×7 · yes |
+  | 300 | 300, 296 | 300×8 · **no** | **296**×**7** · **yes** |
+  | 302 | 302, 298 | 302×8 · no | 298×7 · no |
+
+  So the box disagrees at **80 columns**, which is the ordinary width, and the picture is drawn
+  into a placement four cells wider than anything addresses it — the right 5% of the image is
+  never drawn, a wrong picture rather than none. The refusal disagrees only in the four-column
+  window `298–301`, and there the renderer draws placeholders for a transmission that never
+  happened, which is this file's own warning arriving through the box. A bound stated without the
+  ordinary case measured is how a live defect is filed as latent (F1062).
 - **One of the two protocol readings is measured now** (C09 §4c, F1036): `v=1` on `a=a` does loop —
   twelve shots at 300 ms alternate across six turns of a one-second loop in kitty 0.41.1. The other
   is unread: Ghostty implements no animation extension, so a terminal without `a=f` keeping frame 0
@@ -2309,6 +2331,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I95** — **A capture is written under `stateDir`**, so I67's self-ignoring directory covers it and no consuming project's ignore rules need to have anticipated a heap snapshot (→ C28 I17). **The resolution is the root's**, which is the only place that knows both: the recorder keeps a literal for a profiler constructed without a session, and a session supplies `` `${stateDir}/profile` `` so the two cannot disagree about which directory the ignore rule covers. The resolved value is on the report as `regime.captureDir` — a condition of the run like `node` and `cpus`, and the only place the resolution is observable at all.
 - **I96** — **The overlays are laid out once per frame, and the rows and the cursor read the same layout.** `renderFrame` takes `placedLayers(deps)` once and hands the result to `paint` and to `cursorFor`; each lays out for itself only when handed nothing. The layout is a value the frame path holds, not a thunk each reader pulls, so the top layer the cursor reads is the top layer the composite drew by identity rather than by agreement, and `spans.overlays.count` is `frames` (C28 T1.61) where it was `2 × frames` and asserted so on purpose (F941).
 - **I97** — **Every chip `makeDefaultChrome` builds names its own tone, and the header's identity does not resolve to the ink of the path beside it.** `simple.ts` resolves a chip's tone as `chip?.tone ?? "muted"`, so an omitted tone is C22 inheriting an appearance C09 owns — a change to *that* default would repaint every Calcium app's chrome with nothing in C22 moving. All eight chips carry one; `name` carries `default` where the other seven are `muted` or `warn`. Asserted on the **resolved ink** through `tone(…, theme, caps)` and not on the two words, because `tone: "muted"` on `name` spells a difference and paints none, which is the defect rather than the spelling it arrived in. Five of the seven `muted`s each move zero golden frames alone and are not five inert words: they are one property, and the chip that opted out of it was the one whose intended tone differed (F1029 disposition 2, F1072; → §6l.6 J).
+- **I98** — **The transmission seam is handed the entry's layout, and each group declares the width its blocks render at.** `transmitFrame` takes one `PlacementGroup` per non-blank `EntryRun` — `scope` the entry's id, `width` the run's — so the seam's `imageCells` and `placesAtProtocol` are called with the number `visibleRows` renders at. The frame's width remains the parameter and is the fallback for a group declaring none, which is the only shape a caller holding no layout can produce. Before this the seam took `lifecycle.size().columns` for every image in the document while a card's body renders four cells in, and **both halves of the box moved**: at 80 columns a card-nested picture was declared 80 cells wide and addressed across 76, so its right 5% was never drawn; between 298 and 301 the seam refused a placement the renderer then drew placeholders for. One group per run rather than a width beside the document, because an entry is two runs at two widths and a single number cannot describe it (F1026, F1062; → §6j.4, C09 I66, I67).
 
 
 
@@ -2403,6 +2426,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 65. **A capture lands where the directory already ignores itself** (I95, → C28 I17). `stateDir` is created holding a `.gitignore` of `*` (I67), so a heap snapshot cannot be committed by a project that never anticipated one.
 66. **A frame lays its overlays out once** (I96). The layout is a value `renderFrame` holds, and the rows and the cursor are both read from it.
 67. **Chrome names its own appearance** (I97). Every chip carries a tone, so C09's default cannot repaint chrome everywhere with nothing here moving — and the header's identity is not the ink of the path beside it.
+68. **The seam and the renderer take one width** (I98). The transmitter is given the layout, so the two halves of one decision cannot be taken against two numbers.
 
 41. **A frame that cannot hold what it was given complains rather than dies** (I70, F230). The per-entry trim was reconciling two components' answers in silence and taking the next block with it; it reports through the sink that already exists for a block giving way, and it does not refuse — the region check one level up can refuse only because nothing can reach it.
 
@@ -2746,6 +2770,7 @@ PTY harness.
 - **T1.47** (I87, §6l.7 row 21): a default frame at 24×80 painted → row `HEADER_ROWS` is byte-identical to the rule above the prompt, `region.top` is `HEADER_ROWS + HEADER_RULE_ROWS`, `heightsSum` holds, and `MAX_FOOTER_ROWS` is `MIN_ROWS − HEADER_ROWS − HEADER_RULE_ROWS − RULE_ROWS − ⌊MIN_ROWS / 2⌋ − 1` — three.
 - **T1.48** (I88, §6l.8 row 22): a card `[step, notice]` whose body wraps to three rows at 40 renders row 0 as `  ⎿ ` and rows 1–2 as `  │ ` before the body's text in unicode, `  | ` in ASCII and at `WIDE_CAPS`; `measureEntry` is the same number as before the bar; a body of one row draws no bar.
 - **T1.49** (I89, §6l.8 rows 23–25): a card whose body is three `group` columns each headed by a `step` renders `  ⎿ ` then `├─`, `├─`, `└─` at column `BODY_INDENT` with a `│` on the rows of the first child's body and none under the last; one child renders `⎿` alone; a `step` column at depth 3 renders as text with no gutter; at ASCII the branches are `+-`; `GUTTER_UNIT === BODY_INDENT` by equality.
+- **T1.60** (I98, §6j.4): a card `[step, image]` holding a 2000×100 picture, transmitted through `transmitFrame` at a frame width of 80 → the emitted APC carries `c=76`, the body run's width, and not `c=80`; at a frame width of **300** the same document transmits, where the frame's number is past `MAX_PLACEHOLDER_SPAN` and the run's is not, and the renderer's placeholder span and the declared `c` are the same number; the group list the seam receives is one entry per non-blank run, the head's width and the body's differing by the card's indent; and a document that is not a card transmits exactly as it did.
 - **T1.50** (I90, §6l.8 row 26): `elementsOfEntry` with `command: "/ps --all"` yields a head element whose `copy` is `/ps --all` and body elements whose `copy` is each block's own; `copyElement` over the whole card yields the command first.
 - **T1.43** (§6l.4 E): the default footer is one `pills` row naming `/help` and the snapshot's `cwd` with `$HOME` folded to `~`, gaining `stopping` when the snapshot says so and carrying no key name.
 - **T2.40** (SS56): the source scan finds no hand-composed `kind: "notice"` under `src/` outside the sixteen files the rule excuses by name — two are the family (`documents.ts`, `builders/`), two the kind's declaration and definition, eight below L4 where the family is unreachable (A02), four L4 surfaces **owed** a migration and allowed so SS53 retires each entry when its last literal goes. The rule is imported from the enforcement tool, not restated (C01 T2.10's shape), and its fabricated violation is a notice literal in `src/shell/keys.ts`.

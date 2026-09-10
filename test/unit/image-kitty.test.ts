@@ -379,6 +379,15 @@ describe("IK — the kitty arm, as properties", () => {
   });
 });
 
+// C22's §6j.4 ruling, I98, commitment 68 and T1.60 land in this commit; the row
+// lands in the next one, with the seam and the call site it asserts. Nothing is
+// waited on — the code is one commit behind the sentence that describes it.
+describe("C22 §6j.4 — the seam takes the layout's width (I98)", () => {
+  it.todo(
+    "T1.60 (C22 I98, §6j.4, F1062): the declared box is the run's width, and a card transmits where the frame's width would refuse — not deferred on a component",
+  );
+});
+
 describe("C09 §4c — the placement's identity is not the picture's (I66)", () => {
   it("T1.41 (I66): with a scope the id is a function of (scope, block id) alone, and without one it is the picture's", () => {
     // **The whole ruling in one function.** A placement id that moves with the
