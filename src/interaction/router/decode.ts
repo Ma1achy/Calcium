@@ -51,6 +51,60 @@ export const ESC_DISAMBIGUATION_MS = 50;
 
 const CSI_FINAL = /[A-Za-z~]/;
 
+/**
+ * ECMA-48's five **control string** introducers, by the byte after `ESC`
+ * (C16 §2a, I32).
+ *
+ * DCS `P`, SOS `X`, OSC `]`, PM `^`, APC `_`. Each opens a string that runs to
+ * `ST` — `ESC \` — and, for OSC alone, to `BEL`. Before this set existed the
+ * Meta arm claimed all five, so a terminal's answer to a query arrived as a
+ * **bindable** key with its payload typed into the prompt behind it: measured
+ * at 164 events from eight real replies captured from XTerm(398) and kitty
+ * 0.41.1 (F1035, F1043).
+ *
+ * **Five and not the three that had been asked.** F1035 found the hole through
+ * APC (the graphics reply), DCS (`XTVERSION`) and OSC (a colour query), which
+ * are the protocols something happened to query. SOS and PM are in the set
+ * because the set is the introducers; a set named for its first members becomes
+ * a membership rule, and no terminal has to send one for the arm to be right.
+ */
+const STRING_INTRODUCERS: ReadonlySet<string> = new Set(["P", "X", "]", "^", "_"]);
+
+/**
+ * How far the string arm scans before deciding the terminator is not coming.
+ *
+ * **The cap is this arm's own hazard rather than a defect it repairs** (§2a row
+ * f). An unterminated `CSI` ends on the next typed letter — `CSI_FINAL` matches
+ * any of them, and `ESC [ 1 ; 2` followed by `hello` emits `e l l o` with the
+ * `h` taken as the final. A control string has no such bound, so without a cap
+ * an introducer whose terminator never arrives would hold every later keystroke
+ * in `pending` for the rest of the session. At HEAD before this arm the same
+ * bytes decoded as keys at once and nothing wedged.
+ *
+ * **The cap is the backstop and not the usual recovery.** A stray `ESC` ends the
+ * string as malformed (`stringLength`), and every escape sequence supplies one:
+ * an arrow key, an `Esc`, and — inside a bracketed paste — the `CSI 201~` end
+ * marker itself. So an unterminated introducer un-wedges on the reader's next
+ * non-printable, and the cap only bites on a run of printables with nothing else
+ * in it.
+ *
+ * **256, and the argument rests on the direction it can be wrong.** The longest
+ * reply measured here is kitty's `EBADPNG:Not a PNG file` at 30 bytes;
+ * `XTVERSION` is 17 and a colour query 24, so 256 is 8.5× the longest. Too small
+ * truncates a real reply and its tail types into the prompt — which is exactly
+ * what happened before this arm existed, so it is bounded by no-worse-than-today.
+ * Too large loses the reader's keystrokes **silently**, which reads as a hung
+ * application. The second failure is the worse one, so the number is chosen small
+ * rather than generous, and it is the length of a reply nothing in `src/` asks
+ * for: no query is sent today (§2a), and whoever sends the first one owns this
+ * number.
+ *
+ * The recovery is the SS3 arm's: **the introducer is discarded and the payload
+ * decodes on** (row g) — the one disposition that cannot swallow what the
+ * reader typed.
+ */
+const STRING_MAX_BYTES = 256;
+
 /** `ESC [ A` and friends — the arrows, and Home/End in their letter form. */
 const CSI_LETTER_KEYS: Readonly<Record<string, string>> = Object.freeze({
   A: "up",
@@ -290,6 +344,33 @@ export function createDecoder(options: DecoderOptions): Decoder {
   }
 
   /**
+   * I12 at every `ESC` arm: while a bracketed paste buffers, a sequence is
+   * payload and not a key (§2b, F1045).
+   *
+   * **This check lived inside `decodeCsi` and nowhere else**, so I12 held on one
+   * arm of four: a pasted OSC-8 hyperlink dispatched `Alt-]`, `Alt-\`, `Alt-]`,
+   * `Alt-\` **before** the paste event and reached the consumer with its `]` and
+   * `\` gone; `ESC O A` in a payload emitted `up`; `ESC z` emitted `Alt-z`; and a
+   * trailing lone `ESC` emitted `escape` at the next `poll()`. `ls
+   * --hyperlink=auto`, `gh` and any terminal-aware pager emit OSC 8, and a `PS1`
+   * line carries OSC 0 — so the hole §2a found from the reply side is reachable
+   * with nothing asking a terminal anything.
+   *
+   * One helper called by four arms rather than four copies: the CSI arm calls it
+   * too, because a reimplemented rule keeps its birthday clauses and this is how
+   * the CSI arm came to be the only one that had it.
+   */
+  function bufferPayload(i: number, consumed: number): boolean {
+    if (paste.mode !== "buffering") return false;
+    paste = Object.freeze({
+      mode: "buffering",
+      text: paste.text + pending.slice(i, i + consumed),
+      since: paste.since,
+    });
+    return true;
+  }
+
+  /**
    * A printable on the heuristic path: buffer it, opening the window if closed.
    *
    * The window is stamped from the **first** buffered character and never
@@ -345,6 +426,13 @@ export function createDecoder(options: DecoderOptions): Decoder {
     const rest = pending.slice(i + 1);
 
     if (rest.length === 0) {
+      // **I12's fourth arm** (§2b, T3.19). While a bracketed paste buffers this
+      // `ESC` may be the head of the `CSI 201~` end marker, so it is not yet
+      // decidable — and answering it as a key here emits a keystroke out of a
+      // paste, which is the one thing I12 forbids. Waiting is safe because the
+      // paste has its own backstop: T3.4's 1 s timeout flushes a paste that
+      // stops arriving, and `nextDeadline` already carries it.
+      if (paste.mode === "buffering") return 0;
       // Nothing after it yet. Either a lone Escape or the head of a sequence
       // still in flight, and only time tells them apart (T1.2).
       if (escSince === null) escSince = now();
@@ -359,11 +447,27 @@ export function createDecoder(options: DecoderOptions): Decoder {
 
     if (rest[0] === "O") {
       if (rest.length < 2) return 0;
+      // Before the name lookup, so a *malformed* SS3 inside a paste is payload
+      // too — the discard below is a decision about a key, and there is no key
+      // here to decide about (§2b, I12).
+      if (bufferPayload(i, 3)) return 3;
       const name = CSI_LETTER_KEYS[rest[1] as string];
       if (name === undefined) return 3; // malformed SS3: discard, decode on (T3.13)
       flushHeuristic(out);
       return out.push(key(name, `\u001b O${rest[1] as string}`)), 3;
     }
+
+    // **A control string is consumed whole and emits nothing** (I32, §2a). This
+    // sits above the Meta arm because the Meta arm is the fallback: every
+    // introducer has to be taken out of it by name, and until they were, a
+    // terminal's answer to a query arrived as `Alt-_`, `Alt-P` or `Alt-]` with
+    // its payload typed into the prompt and `Alt-\` — or `Ctrl-G`, on XTerm's
+    // `BEL`-terminated form — closing.
+    //
+    // **`ESC \` with no opener is not a string and stays `Alt-\`** (§2a row b):
+    // `\` is not an introducer, so the arm never claims it, and declining a byte
+    // leaves no state behind to remember having declined it.
+    if (STRING_INTRODUCERS.has(rest[0] as string)) return decodeString(i, rest, out);
 
     // ESC + printable is Meta (T1.1). Ink 7 no longer sets meta on a bare
     // Escape, which is why that case is decided above by the window and not here.
@@ -375,6 +479,8 @@ export function createDecoder(options: DecoderOptions): Decoder {
     // and it resolved against an event nothing could produce: the same defect
     // as `\n` decoding to `enter`, one path over, and both were found by
     // pressing the bindings rather than by reading the decoder.
+    // I12's third arm (§2b, T3.19): `ESC z` inside a paste is payload.
+    if (bufferPayload(i, 2)) return 2;
     flushHeuristic(out);
     const metaChar = rest[0] as string;
     const named = namedControl(metaChar);
@@ -397,10 +503,9 @@ export function createDecoder(options: DecoderOptions): Decoder {
     }
 
     // Anything reaching here is not paste content, so a run of typing ends.
-    if (paste.mode === "buffering") {
-      paste = Object.freeze({ mode: "buffering", text: paste.text + sequence, since: paste.since });
-      return consumed;
-    }
+    // The buffering branch is `bufferPayload`'s now rather than this arm's own
+    // copy: it was the only arm that had it, and three others needed it (§2b).
+    if (bufferPayload(i, consumed)) return consumed;
     flushHeuristic(out);
 
     if (body.startsWith("<")) return mouse(body, final, consumed, out);
@@ -470,6 +575,72 @@ export function createDecoder(options: DecoderOptions): Decoder {
     const name = CSI_LETTER_KEYS[final];
     if (name === undefined) return consumed;
     return out.push(key(name, sequence, mods)), consumed;
+  }
+
+  /**
+   * A control string — `ESC P|X|]|^|_ … ST` — consumed whole, emitting nothing
+   * (I32, §2a).
+   *
+   * **Nothing, not something harmless.** The CSI arm has answered a DECRQM reply
+   * with no event since it was written, and this is the same answer for the
+   * shapes it does not cover. Making a reply *readable* is a reply channel, and
+   * a reply channel is C02's (C02 §8) — a ruling that names an operation checks
+   * the operation exists first, and there is no seam here to report a graphics
+   * error through. So `q=1` becomes safe to send; it does not become useful.
+   */
+  function decodeString(i: number, rest: string, out: InputEvent[]): number {
+    const consumed = stringLength(rest);
+    if (consumed === 0) return 0; // incomplete: wait for the terminator (trace 1)
+    // While a paste buffers, the string is payload — including the malformed and
+    // capped dispositions, which lose bytes from a payload if they are skipped.
+    if (bufferPayload(i, consumed)) return consumed;
+    // §7's escape cell, exactly as the CSI arm applies it: an escape means the
+    // accumulated run was typing, and typed characters are keys. A reply is not
+    // typing, and the alternative is a `paste` event with a terminal's answer
+    // inside it.
+    flushHeuristic(out);
+    return consumed;
+  }
+
+  /**
+   * How many characters of `pending` the control string occupies, counting the
+   * `ESC`; `0` when it is not yet decidable.
+   *
+   * `rest` is everything after the `ESC`, so `rest[0]` is the introducer and
+   * every index below carries `+1` for the `ESC` that is not in it.
+   *
+   * Three terminations and a wait, each a cell of §2a's classification table:
+   *
+   * - **`BEL`, for OSC alone** (row d). Measured 2026-09-10: XTerm(398) mirrors
+   *   the query's terminator — three `BEL`-terminated OSC queries came back
+   *   `BEL`-terminated — while its `XTVERSION`, a DCS reply with no `BEL` form,
+   *   came back `ST`-terminated in the same capture; kitty 0.41.1 answers `ST`
+   *   whatever it is asked. Both forms occur, so an arm reading one is wrong on
+   *   one of the two emulators installed here. DCS, SOS, PM and APC carry
+   *   arbitrary payloads — kitty's graphics data is base64 — and a `BEL` inside
+   *   one of those is payload, which is the narrower rule and the one that
+   *   cannot eat a reply in half.
+   * - **`ST`**, the `ESC \` pair.
+   * - **A stray `ESC`** (row e): ECMA-48 §8.3.14 makes the only `ESC` legal
+   *   inside a control string the one that opens `ST`, so anything else ends the
+   *   string as malformed and decodes on its own. `test/support/pty.ts`'s
+   *   `ESCAPE_ALTERNATIVES` is the same ruling already in this repository, and
+   *   it was found by looking for one rather than by deriving it.
+   * - **A trailing `ESC`** is not yet decidable: it may be half of an `ST`.
+   */
+  function stringLength(rest: string): number {
+    const admitsBel = rest[0] === "]";
+    for (let j = 1; j < rest.length; j += 1) {
+      const c = rest[j] as string;
+      if (admitsBel && c === "\u0007") return j + 2;
+      if (c !== "\u001b") continue;
+      if (j + 1 >= rest.length) return 0;
+      return rest[j + 1] === "\\" ? j + 3 : j + 1;
+    }
+    // No terminator yet. `2` discards the `ESC` and the introducer and lets the
+    // payload decode on — the SS3 arm's disposition, and the only recovery that
+    // cannot swallow what the reader typed (§2a row g).
+    return rest.length > STRING_MAX_BYTES ? 2 : 0;
   }
 
   /**
