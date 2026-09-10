@@ -44613,3 +44613,60 @@ touches no timer, no import and no profiler; it shifted the suite's timing
 enough to flip this row three times running. A verdict that moves under a change
 that cannot reach its subject is a reading about the harness, and that is the
 finding — the flake is the symptom.
+
+## F1084 — a ratio is fragile in one direction, and the row gating on one said the opposite ★★★☆
+
+| | |
+|---|---|
+| **Surface** | `test/edge/text-cursor.test.ts` T3.85 (C09 I63, F955) |
+| **Reached for** | `make all` red on it at 5.7 against a bound of 6, with the fix it guards fully in place |
+| **Verdict** | **closed** — the count the ratio was a proxy for is measured directly; the timing stays as evidence |
+
+### The row's own sentence, and why it is backwards
+
+> **The transcript's 60 µs a row, as a ratio a loaded machine can still
+> reproduce.**
+
+A quotient is robust against load only when **both** operands scale with it. Measured
+at three sizes, on a quiet container:
+
+| cells | gutter row | CJK row | ratio |
+|---|---|---|---|
+| 200 | 0.0065 ms | 0.0564 ms | 8.7 |
+| 800 | 0.0117 | 0.2868 | 24.5 |
+| 3 200 | 0.0211 | 0.9385 | 44.4 |
+
+The gutter row is **sub-linear** — sixteen times the cells for 3.2× the time — because
+`plainRun` skips an ASCII run and what is left is a fixed floor. The CJK row is linear.
+So at 200 cells most of the denominator is a constant, and any additive per-call cost a
+busy machine adds compresses the quotient toward one. The bound is a **floor**, so the
+compression is in the failing direction: 5.7 against 6, with the pre-fix figure at 2.8.
+
+### The count, which is what the row was always about
+
+Its own comment names the subject:
+
+> the ratio between them is the number of clusters that reach the segmenter: one
+> against a hundred
+
+That is countable. `clusterAt` is the only caller of `Segments.prototype.containing`, so
+patching that prototype and restoring it in a `finally` counts exactly the clusters the
+segmenter is asked for:
+
+| row | `containing` calls |
+|---|---|
+| 200-cell gutter, one `│` | **2** |
+| 200-cell CJK | **200** |
+
+**Two per cluster, not one**, and the doubling is worth keeping rather than dividing
+away: `fitStyled` asks once to find the cluster and `pieceCells` asks again to measure
+it. One cluster against a hundred, each found once and measured once.
+
+Exact, load-free, and a stronger claim than any duration — a duration says the fix is
+*probably* in; a count of 2 says the segmenter saw one cluster.
+
+### What is kept
+
+The timing is still measured and still reported in the message, and the control the row
+always had — that the CJK row costs more at all — still gates. What no longer gates is
+the quotient.
