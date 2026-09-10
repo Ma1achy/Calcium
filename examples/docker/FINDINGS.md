@@ -42799,6 +42799,20 @@ An explicit `--dir out` still collects, because the pattern is matched against p
 to that base and there is no `out/` inside `out/`. That is the deliberate case; the
 accidental one is what this closes.
 
+### The other half of the same habit, measured in the same session
+
+A detached worktree is how a commit gets verified in isolation here, and **it is not the same
+environment**. Running the test tiers in one at HEAD gave six failures; **two were the
+worktree** and not the tree: a row that writes into `out/`, which a fresh worktree does not
+have, and two rows shelling to `git ls-files`, which does not answer the same way from a
+detached checkout whose `.git` is a file pointer. Both pass in the main tree.
+
+So the verification worktree is wrong in **both** directions — it adds files the runner
+collects and removes conditions rows depend on — and the honest reading of a failure inside
+one is *check it in the main tree first*. That is the same instrument-manufactures-evidence
+class as the collection defect above, in the opposite direction, and it is why the six were
+triaged by re-running rather than by diagnosing.
+
 ### What would falsify this
 
 A directory named `out` under `test/` or `src/` holding real rows, which would make the
@@ -42845,3 +42859,233 @@ working alternative, and it is evidence the op is a convenience rather than a bl
 A consumer that wants the whole block every tick — a viewport that re-wraps at each width
 would, since it holds no accumulated state of its own. That is the argument against the
 op, and it has not been weighed against the argument for it.
+
+## F1057 — the reply channel's blocker was never the input path, and the record is spent before a reply is readable ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `docs/components/C02_capability_detection.md` §3 and §8, I14, commitment 17 · `src/presentation/image/kitty.ts` · T2.10, T5.9, T6.16 |
+| **Reached for** | F414's *`q=2` suppresses every reply including errors*, whose stated blocker — an arm in `decode.ts` — was met an hour before this was written |
+| **Verdict** | The arm landed, **nothing about detection moved**, and the reason is one no entry had named: raw mode comes after the record, so a measured capability has nowhere to go |
+
+### What is still true, re-derived
+
+Five `q=2` tokens in `kitty.ts`. F1035's q-token table re-derived on real kitty 0.41.1 under
+Xvfb through the **shipped** transmission with only the token rewritten — a probe rebuilt from
+intent cannot find a transcription defect. Six rows, identical: `q=2` silent both ways, `q=1`
+silent on success and reporting `EBADPNG` on a corrupt payload, `q=0` reporting both.
+
+### What is not true, and it is the whole finding
+
+**A reply is unreadable until raw mode.** Four queries — DECRQM, the keyboard-protocol query,
+the graphics query, and DA1 as a sentinel — put to both emulators:
+
+| line discipline | reader gets | elapsed |
+|---|---|---|
+| canonical · XTerm(398) | **0 bytes** | 1 508.5 ms, timed out |
+| canonical · kitty 0.41.1 | **0 bytes** | 1 500.7 ms, timed out |
+| raw · XTerm(398) | all four, DA1 last | 0.89 / 0.94 / 0.99 ms |
+| raw · kitty 0.41.1 | all four, DA1 last | 13.3 / 15.9 / 22.6 / 23.4 ms |
+
+**And the bytes are held, not dropped — and echoed while they wait.** Through a pty, a reply
+written 250 ms before raw mode is entered reaches the child as nothing, then arrives *in full*
+the instant raw mode is entered. Meanwhile the line discipline echoes it in control-picture
+form: an OSC colour reply comes back as 26 **printable** characters. **That is F414's
+symptom** — a reply landing where the reader is looking — by a mechanism no entry named, in
+the one window early enough for a probe to matter. Wrong in both directions again: the
+consequence is real, not for its reason, and not in its window.
+
+**Raw mode is `acquire()`'s, and by then the record is spent.** `setRawMode` is called in one
+file in `src/`; `acquire()` has one call site, which runs after the session graph is built.
+The record is constructed at step 2, read at **eleven** sites, and handed into **six** objects
+built at construction. C22 I58's render-cache key omits it **because** it never moves.
+
+**So a capability answered from the wire has nowhere to go**, and the two reasons a reader
+would expect the refusal to rest on are both measurably weak — which is why both figures are
+in the spec rather than omitted. It is **not danger**: C16 I32 makes a reply harmless and
+`q=1` is free of consequence today. It is **not latency**: a DA1-terminated burst is one round
+trip, and XTerm's two *silent* queries delayed its DA1 by nothing measurable. **A
+justification the next reader checks and cannot reproduce is one they delete.**
+
+**Where a channel goes if it is built**: before construction, a function the app calls with
+its own streams — take raw, one burst closed by DA1, restore — whose answers arrive as
+configuration overrides, where they win and are recorded as declared. That keeps the record
+constant and needs no arbitration with C16, because nothing else is subscribed while it runs
+and a late reply reaches the decoder and is consumed. **The entry point is C24's public
+surface**, so C02 rules the shape and refuses the location.
+
+### The watch, on the condition and not the remedy
+
+The row scans `src/` for **every route into raw mode** — the call, the tty device, and both
+terminal-attribute utilities — allowing one file. A reply reader must pay raw mode, which is
+what the canonical measurement licenses. A row asserting `q=2` on every transmission would
+watch the remedy and stay green for exactly as long as the silence.
+
+### The mutation that survived, which is the finding inside the finding
+
+Five run by hand, four killed. Deleting the raw-mode call from the one allowed file
+**survived**, because the control asserted the bare symbol fires there — and that file *wraps*
+the syscall in a local helper its two callers name, so the pattern matched the **wrapper's
+call sites** and reported a non-empty corpus after the mechanism had been deleted. **A control
+that matches the wrapper has stopped watching the thing it is about.** Repaired to name the
+stream, then killed.
+
+The same scan went red on its first run against a test fake that *declares* the member to
+satisfy a Node interface. **A rule over a bare symbol cannot tell a declaration from a call**,
+and the honest repair is the call shape rather than an allow-list entry that would become a
+hole.
+
+### What would falsify this
+
+A bounded synchronous read of a tty in Node — then a probe could run inside `acquire()` and
+the ordering argument goes. A terminal whose replies survive canonical mode; they are the tty
+driver's to hold rather than the emulator's, which is why one emulator plus its raw control is
+the measurement rather than two. A C22 that makes the record re-derivable, which its cache
+key currently forbids. And a consumer wanting a **per-transmission** verdict rather than a
+capability — the image-error fallback — which is a different channel with a different lifetime
+and is untouched by this ruling.
+
+## F1058 — the planned probe's window prices the terminal's silence, and a sentinel prices the capability's ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `docs/components/C02_capability_detection.md` §8, both interactive-probe rows |
+| **Reached for** | §3's *the refusal rests on the terminal that answers nothing, which needs a window* |
+| **Verdict** | The 50 ms was never measured, and a DA1 sentinel makes it unnecessary for every terminal that is a terminal |
+
+§8 has said *an opportunistic 50 ms query* since it was written. Measured: one burst closed by
+DA1 resolves when the slowest **answering** query has answered — under 1 ms on XTerm(398),
+13.3–23.4 ms on kitty under software rasterisation, which is an upper bound. **A silent
+capability costs nothing**: XTerm answered neither the graphics query nor the keyboard one,
+and its DA1 came back in the same read.
+
+So a fixed window prices the *terminal's* silence where what needs pricing is the
+*capability's*, and only a terminal answering no DA1 at all pays it. The number is also tight
+where it matters — 50 ms is **barely twice** kitty's measured local worst case with no network
+in between, in a file whose colour-depth paragraph names remote sessions as the motivating
+environment. **A short window does not fail loudly. It keeps the guess.**
+
+### What would falsify this
+
+A terminal that answers a capability query and not DA1 — neither emulator here does. Or a DA1
+round trip over a real remote hop measured slower than the window a sentinel design would
+still want as its backstop, which is reasoned here rather than measured.
+
+## F1059 — the plan's own choice of query is what put the plan behind the missing arm ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `docs/components/C02_capability_detection.md` §8, the interactive-probes row |
+| **Reached for** | §8's stated blocker — *the version query's own reply being DCS-shaped and therefore unreadable until an arm exists* |
+| **Verdict** | True, and self-inflicted. It is the only one of the four whose reply is DCS-shaped, and it answers a **name** where DECRQM answers the capability |
+
+*Identification is not capability* is C02's own §3 heading, and §8 does not apply it to §8.
+The version query returns the terminal stating its own name, which in C02's vocabulary moves
+`inferred` to `stated` and stops there. DECRQM answers the capability itself, is CSI-shaped,
+and **§3's own table already measured it answering on both emulators** — including the reply
+that means *not recognised*, which is still a reply.
+
+So the anchor query was the one query that both needed an arm nothing had **and** bought the
+weaker kind of answer. Anchored on DECRQM the plan would never have been blocked on the
+decoder at all: the CSI arm has swallowed a DECRQM reply since it was written.
+
+### What would falsify this
+
+A terminal that answers the version query and refuses DECRQM — none in this container — or a
+capability with no direct query, which neither of the two in question is.
+
+## F1060 — the deferral has an instrument, the instrument has an output file, and the file has no reader ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/terminal/capabilities.ts` — the image-protocol table's doc comment · `tools/terminal-probe/` and its result file |
+| **Reached for** | *WezTerm and Windows Terminal are `none`, owed and not claimed … the expiry is an instrument rather than a hope — run the probe there and read the verdict* |
+| **Verdict** | **Open.** The verdict lands in a file the repository holds, and nothing compares it to the table it is the evidence for |
+
+The probe writes its report to a path given on the command line, and the repository holds the
+Ghostty 1.3.1 run that put that terminal on the kitty arm. **Nothing in `src/` or the suite
+reads it**: the only mentions outside the tool are two lines of ledger prose, and the probe's
+own eight test rows assert the *build script's source text* rather than any verdict. A single
+output path also means a second terminal's run overwrites the only evidence the table
+currently rests on.
+
+So the comment's distinction — *a deferral with an instrument rather than a deferral with a
+hope* — is right about the instrument and silent about the loop. The expiry still depends on a
+person noticing, which is exactly what the deferral rule says goes unwatched.
+
+**Not landed.** Closing it wants a per-terminal results directory and a row that fails when a
+recorded verdict disagrees with the table, which is a build rather than a ruling and changes
+the probe's output contract.
+
+## F1070 — a source-text assertion lives in a different file from its subject, and three of seven cross a component ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `test/support/source.ts` and its five callers · `test/unit/theme.test.ts` T1.37 · new `test/unit/source-subjects.test.ts` |
+| **Reached for** | Nothing. A full-suite pass over a tree whose lane gates were all green |
+| **Verdict** | **Invisible to the discipline every lane follows**, and it is not hypothetical — a correct, strengthening change went red in a neighbouring component's suite |
+
+**The instance.** C12 I125 moved a runtime assertion out of a constructor call and into
+`pictureGlyph()`, the sole constructor of a branded type — strictly stronger, because the
+keeper is now on the path to the type rather than beside one construction. A row in **C10's**
+suite asserted the *old call text* on stripped source and went red. The lane ran the four
+files it edited and every one was green; the row that broke is in neither its component nor
+its diff.
+
+**Measured over the suite**: five files import the source helper, naming **seven** subjects.
+
+| asserting suite | subject | crosses |
+|---|---|---|
+| C10's theme rows | C12's sankey renderer | **yes** |
+| C10's theme rows | C12's 3-D scatter | **yes** |
+| C12's SVG-colour rows | C10's dark token table | **yes** |
+| C12's SVG-path rows | C12's SVG arm | no |
+| the catalogue-tool rows | three `tools/` scripts | no |
+
+**Three of seven cross, and two of the three are a mutual crossing**: C10's suite asserts
+about C12's source while C12's suite asserts about C10's. Neither lane editing either
+component would run the other's file.
+
+### The row that broke was asserting the spelling, not the property
+
+Its own comment is honest about why it reads source — neither guard is reachable from a
+public surface, so *the honest row is that the call is there*. But **an assertion that a guard
+exists is satisfied by a guard nothing goes through**, and it is hostage to how the code is
+spelled. The repair asserts what the design actually claims, in three parts because the first
+two are separately satisfiable: the guard is the body of the brand's only constructor; the
+file holds **exactly one** cast that mints the brand, so nothing routes around it; and the
+background-bearing cell is built by calling it. **Part two is the one with content** — a
+second cast anywhere would route around the guard while leaving part one true. Fabricated in
+that direction: replacing the call with a bare cast fails on the count, and on nothing else.
+
+### The remedy is a list, because no rule over the code can answer the question
+
+What a lane needs is *which file asserts about mine*, which is a reverse index. It is compared
+by equality in both directions — subset-of-declared lets a new crossing land unlisted,
+declared-subset-of-found lets an entry outlive its row — and both directions were fabricated
+and both fire.
+
+**The scan sees one encoding and the other is declared beside it.** A path written as a
+literal is derivable; one arriving as a walk variable or through a constant is not. C02's
+raw-mode scan is the second kind, and it is **counted and named** with the reason rather than
+excluded: its subject is the whole tree, so there is no entry a lane could look itself up in.
+
+### Two things the index found about itself on its first run
+
+**Its own prose matched its own pattern.** The doc comment wrote the call shape out to explain
+itself and the matcher counted it as an eighth subject — the documented class exactly, where
+the best-explained file fails hardest. The remedy was already in the tree: the row now reads
+**stripped** source through the very helper it is an index of.
+
+**And the index indexes itself.** Its reader control asserts about `theme.test.ts`'s text,
+which makes that suite a subject like any other — so reordering its calls breaks a row two
+files away, and the table is where a reader finds that out.
+
+### Blind spot
+
+The index answers *who asserts about this file*, not *is that assertion still about the right
+thing*. T1.37 was listed nowhere and would not have been listed here either before it broke;
+what the index buys is that the next such row is found by looking rather than by a full-suite
+pass noticing after the fact. And it covers only the shared helper — four other suites strip
+comments inline, which `test/support/source.ts` already names as residue, and none of them is
+in this table.

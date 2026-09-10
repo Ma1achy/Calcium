@@ -103,9 +103,26 @@ const results = runPass({
     {
       // **The guard whose removal every frame agrees with.** Measured: 313 of
       // 314 rows green with this applied, the one failure being T1.37.
+      //
+      // **Re-anchored when C12 I125 landed, and it is a relocation rather than
+      // a deletion.** The call used to sit inline in the half-block
+      // constructor as `assertPictureGlyph(text, "sankeyArea")`. It is now the
+      // body of `pictureGlyph()`, which is the branded type's **only**
+      // constructor — so the statement this row mutates is unchanged and is
+      // strictly stronger: removing the assertion still lets the cast through
+      // and still produces an unchecked glyph.
+      //
+      // **What the harness cannot reach, stated rather than left implied.**
+      // The same change added a second keeper that is not a runtime one: a
+      // caller hand-building a background-bearing cell now fails to compile.
+      // Mutating `SankeyCell` back to the wide record makes SK13's two
+      // `@ts-expect-error` directives unused and `tsc` reports TS2578 — but
+      // this harness rewrites source and runs vitest, so a row whose verdict is
+      // the compiler's cannot be expressed here. It is verified beside SK13
+      // instead, and named here so its absence is not read as a gap.
       name: "SANKEY-UNGUARDED: the half-block constructor stops checking",
       file: SANKEY,
-      from: '  assertPictureGlyph(text, "sankeyArea");\n',
+      from: "  assertPictureGlyph(glyph, site);\n",
       to: "",
       expect: "T1.37",
     },

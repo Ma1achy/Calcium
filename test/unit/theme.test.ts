@@ -602,8 +602,38 @@ describe("C10 §4c.1 — the picture cell's alphabet", () => {
     // T6.92 is what says removing it is invisible in every other result.
     const sankeySrc = sourceOf("src/presentation/plot/sankey.ts");
     const scatterSrc = sourceOf("src/presentation/plot/scatter3.ts");
-    expect(fires(sankeySrc, /assertPictureGlyph\(text, "sankeyArea"\)/u), "sankey's cell").toBe(true);
     expect(fires(scatterSrc, /assertPictureGlyph\(glyph, "plot3d mixedRows"\)/u), "plot3d's span").toBe(true);
+
+    // **Sankey's half of this row is stronger than a call site now, and the
+    // change is what broke the old assertion** — C12 I125 moved the call out of
+    // the constructor and into `pictureGlyph()`, the sole constructor of the
+    // branded type the background arm demands. So the honest assertion is no
+    // longer *the call is there*; it is that **the brand has exactly one
+    // construction path and the guard is on it**. Three parts, because the
+    // first two are satisfiable separately:
+    //
+    //   1 · the guard is inside `pictureGlyph`;
+    //   2 · the file holds exactly **one** `as PictureGlyph`, so nothing else
+    //       mints the brand — a second cast anywhere would route around the
+    //       guard while leaving part 1 true;
+    //   3 · the background-bearing cell is built by calling it, not from a bare
+    //       string.
+    //
+    // Part 2 is the one with content, and it is the reason this reads as a
+    // count rather than as a presence: an assertion that a guard exists is
+    // satisfied by a guard nothing goes through.
+    expect(
+      fires(sankeySrc, /function pictureGlyph\([^)]*\): PictureGlyph \{\s*assertPictureGlyph\(glyph, site\);/u),
+      "sankey's guard is the body of the brand's constructor",
+    ).toBe(true);
+    expect(
+      (sankeySrc.match(/as PictureGlyph/gu) ?? []).length,
+      "exactly one cast mints the brand, so nothing routes around the guard",
+    ).toBe(1);
+    expect(
+      fires(sankeySrc, /text: pictureGlyph\(text, "sankeyArea"\)/u),
+      "sankey's cell is built through it",
+    ).toBe(true);
     // The control for the stripper: both files still hold the construction the
     // guard sits in front of, so a stripper that ate the code would fail here
     // rather than pass over an empty string.
