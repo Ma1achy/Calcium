@@ -44081,3 +44081,74 @@ because a suite indexed by correctness cannot see a cost.
   an append *is* a copy, and no operation removes that.
 - Both figures are single-machine and taken on a quiet container, which is where the ratios matter
   and the absolute numbers do not (F929).
+
+## F1079 — half of `make check` had no corpus, and the procedure that verifies a commit doubles it ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `eslint.config.js` · A03 §7 · `test/unit/enforce-rules.test.ts` T2.129 |
+| **Reached for** | nothing — `make check` went red on a scratch probe with one stray paren, and the question was why a file under `out/` was in the gate at all |
+| **Verdict** | **Closed.** The corpus is named: **745 files → 282**, and **999 → 282** while a verification worktree exists |
+
+### The measurement
+
+`eslint .` lints every `.js`/`.mjs` it can reach and the config carried **no `ignores` at all**.
+
+| corpus | files |
+|---|---|
+| as it stood | **745** — 371 `dist/`, 87 scratch under `out/` |
+| as it stood, with `out/verify` in place | **999** |
+| with the ignores named | **282** |
+
+So 62% of what decided this gate was build output or scratch, and **71% during the one
+procedure this repository uses to check that a commit is green** — `git worktree add out/verify
+<sha>`, which is written down in the session memory as the way to catch a red commit and puts a
+whole second copy of the tree under the linter.
+
+### Why it had never fired, and then did
+
+**The rules do not reach any of it; parsing does.** The single rule block is
+`files: ["tools/**/*.mjs"]`, and flat-config patterns are relative to the config's own
+directory — so `out/verify/tools/enforce/index.mjs` matches nothing and gets no rules. Driven:
+a fabricated `var x = 1; if (x == 1) { … }` placed there fires **nothing**, with `prefer-const`,
+`no-var` and `eqeqeq` all configured.
+
+A **syntax error** is not a rule, and fires wherever eslint can see a file. That is how this
+surfaced: a scratch probe left under `out/probe/` from a botched string replacement took
+`make check` red on a tree whose sources were clean, and the failure named a file that has never
+been part of this repository.
+
+The two `dist/` warnings the gate had been printing all along — *unused eslint-disable directive*
+in generated output — are the same fact in its quiet form, and were read as noise for as long as
+they had been there.
+
+### The corpus is named, not derived
+
+`.gitignore` was the obvious source and it is the wrong one: **`out/` is not in it**, and *what
+may be committed* and *what should be linted* are different questions that happen to overlap.
+A derived list would have left the worktree in the gate while looking principled.
+
+### The row asks eslint, not the file
+
+T2.129 calls `ESLint.isPathIgnored` on six generated and scratch paths and three sources. Reading
+`ignores` and matching strings would be measuring the prose — the pattern language is eslint's,
+and a config object carrying only `ignores` means something particular that no string comparison
+knows.
+
+| # | mutation | fails |
+|---|---|---|
+| M1 | `ignores: ["**/*"]` — ignore everything | T2.129, on the control arm |
+| M2 | `ignores: ["dist/**"]` — `out/` left in | T2.129, on `out/` |
+
+M1 is the row's whole reason: ignoring everything satisfies every *exclusion* assertion and turns
+the lint half of `make check` into a no-op, which is A03 §2's vacuity class arriving in a gate's
+configuration rather than in a rule.
+
+### What would falsify this
+
+- The ignore list is named and can go stale: a generated directory added later and not added here
+  re-enters the corpus. That is the same shape as every exemption list in this repository and has
+  the same remedy — T2.129 grows a row when one is added.
+- `dist/` being linted was not only noise. It is the reason the two warnings existed, and a
+  `dist/` carrying a syntax error — a truncated build, a killed `tsc` — would have failed the gate
+  with a message about generated output. That is now impossible and was never observed.
