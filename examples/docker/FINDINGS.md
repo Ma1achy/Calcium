@@ -45931,3 +45931,156 @@ cannot run without it. Install `imagemagick`; CI does so in the `full` job.
   is the test of this.
 - **The devcontainer lacking the tools**, which would make the local greens
   something else. `which` finds both.
+
+---
+
+## F1095 — the two files that decide whether any gate runs are read by no gate ★★★★
+
+| | |
+|---|---|
+| **Surface** | `.github/workflows/ci.yml`, `.github/workflows/mutation-sweep.yml` · `docs/architecture/A04_repo_scaffolding.md` §5, §6 · `tools/enforce/` |
+| **Reached for** | the merge that unblocked F1086 and F1089, and reading `mutation-sweep.yml` in order to dispatch it |
+| **Verdict** | **open** |
+
+### The measurement is one line and it is empty
+
+```
+$ grep -rln '\.github' tools/ Makefile
+$
+```
+
+`make enforce` runs sixty-one source scans, a module graph, a commitment audit, a
+findings-register check and a todo-expiry sweep. **Not one of them opens either
+of the two files that decide whether any of it runs**, and no Makefile target
+names the directory.
+
+### Four findings in one day came out of that directory
+
+| finding | what was wrong | how long it stood | what would have reported it |
+|---|---|---|---|
+| F1086 | `on: push: branches: [main]` — a branch push fired nothing | 44 days | a runner, once someone pushed a branch and noticed the absence of a run |
+| F1089 | `mutation-sweep.yml` on a feature branch has neither of its two triggers | since `887de60d` | `gh workflow list --all`, run by hand |
+| F1090 | §6's stage list names five, the job runs seven | 29 days | a green run whose steps someone totalled |
+| F1094 | the `full` job installs four packages and its rows need five | since the rows were written | the runner |
+
+Three of the four are **absences**, and the fifth column is the finding: every
+one was found by a person going to look, and none by a gate. That is
+`a gate that exists and is not run` inverted — here the gates run and the
+subject is outside all of them.
+
+### The fifth instance, found by the draft rule before it was wired
+
+Every `make` target a job in `.github/workflows/` runs, checked against §6:
+
+```
+  ok   audit      ok   check      ok   e2e       ok   enforce    ok   golden
+  ok   install    ok   instruments  MISS proof   ok   regime     ok   test
+```
+
+**`make proof` is a whole CI job** — `if: pull_request || main || tags`, its own
+runner, `bash tools/proof.sh` — and **§6 does not name it**. `proof` appears
+twice in A04, at §1 as a noun in the repo table and at §3 as a description of
+what packing checks; the section that is CI's record has no row for it, no
+mention in the arrow, and nothing in the pull-request row's *the above plus
+`golden → e2e → [repo-specific]`* that resolves to it.
+
+It is F1090's defect a third time and the largest: not a stage missing from a
+list of stages, but a job missing from the account of the jobs. And F807 is the
+reason it matters — `proof` was **CI-only in practice**, the first instance the
+gate-not-run note records, red on an npm crash for as long as the fast job hid
+it.
+
+### A sixth, live, and vacuous today — which is why it is worth writing down
+
+`mutation-sweep.yml` says of its own environment:
+
+> The runs drive vitest over tiers 1-4 and a few over tier 5, so the job
+> carries **the same terminals `full` installs** and a build for `dist/`.
+
+The two lines, measured:
+
+```
+ci.yml:129              xvfb xdotool xterm kitty imagemagick
+mutation-sweep.yml:40   xvfb xdotool xterm kitty
+```
+
+They diverged at `dab8bbc1`, F1094's fix, which put the package in one of the
+two jobs that claim to carry the same set. **Vacuous today, measured rather than
+assumed**: `grep -rln image-protocol tools/mutate/runs/` is empty, and the only
+two runs naming `test/e2e` drive `mouse.test.ts` and `lifecycle.test.ts`. So
+nothing in the sweep reaches a row that needs ImageMagick, and the claim is
+false without yet being costly.
+
+**The repair is the comment rather than the package**, and the direction is worth
+stating because the other one is more obvious. Adding `imagemagick` to the sweep
+buys parity with a claim nobody needs, on six shards, for rows that do not exist;
+correcting the comment to name what the job installs and why costs nothing and
+stops asserting something no gate resolves. And the day a mutation run does reach
+those rows, F1094's own remedy is what speaks: a precondition that refuses **by
+name** before anything is driven. The instance is closed by the mechanism the
+previous finding already built, which is the argument for building mechanisms.
+
+### Why this is SS31's shape and not a new idea
+
+`DEPENDENCIES.md` is a document about `package.json`, and SS31 compares them in
+both directions — a declared dependency with no entry, an entry with nothing
+installed. That rule exists because a document about a file drifts from it, and
+the drift is invisible to a reader holding either one.
+
+**A04 §5 and §6 are documents about the Makefile and about
+`.github/workflows/`**, and there is no SS31 for them. §5's own table is the
+second measurement:
+
+```
+Makefile targets   all audit catalogue check clean e2e enforce golden help
+                   hooks install instruments mutate profile proof refdiff
+                   regime roadmap test
+A04 §5 names       all audit check conformance enforce golden hooks install
+                   record test
+```
+
+Eight of this repository's targets are absent from the table that is supposed to
+be the Makefile contract — `catalogue`, `instruments`, `mutate`, `profile`,
+`proof`, `refdiff`, `regime`, `roadmap` — and two the table names are other
+repositories' (`conformance`, `record`), which is what makes §5 a **cross-repo**
+contract and stops a two-way comparison from being the right rule there.
+
+### Remedy
+
+**SS62 — every `make` target a job in `.github/workflows/` runs is named in A04
+§6.** One direction, not two: §6 names `make all`, which is a developer target
+and not a job's, so the reverse comparison would fire on the convention rather
+than on a defect. Scoped to §6 rather than to the whole document, because
+scoping it to the document makes it vacuous — `proof` is named at §3 and the
+rule would pass today, which is the exact failure `a fabricated violation can be
+vacuous` is about.
+
+Measured over the corpus before being wired: ten targets, nine pass, one fires,
+and the one that fires is a defect rather than a convention.
+
+### Stated blind spot, and it is the larger half
+
+**A trigger's reach is a property of the ref a file is on, not of the file.**
+Nothing in `.github/workflows/ci.yml` distinguishes F1086's tree from the fixed
+one to a scan that has never seen a second version, and nothing at all in
+`mutation-sweep.yml` says whether it is registered — F1089's whole subject is
+that the file is *correct, complete and on the wrong ref*. Neither is reachable
+locally by any rule, and the line that separates them is `gh workflow list
+--all`, which needs a network and an authenticated remote.
+
+So SS62 covers the fifth instance and the third, and covers neither of the two
+that hid best. The instrument for those is the habit §6 already carries in
+prose: **`gh workflow list --all` belongs in the close-out of any change to that
+table.**
+
+### What would falsify this
+
+- **A gate that does read the workflows.** `grep -rln '\.github' tools/ Makefile`
+  is the whole search and it is empty; `make enforce`'s modules are the sixteen
+  files under `tools/enforce/` and none names the path.
+- **`proof` being named in §6 under another word.** Searched: `grep -n proof` over
+  the section returns nothing, and over the document returns §1's noun and §3's
+  sentence about packing.
+- **The sweep reaching an ImageMagick row**, which would make the sixth instance
+  a defect rather than a false comment. `grep -rln image-protocol tools/mutate/runs/`
+  is empty.
