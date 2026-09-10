@@ -45073,3 +45073,131 @@ its own row, not folded into this one.
   *"Pull request, push to `main`, and tags"* on the next line, so "a branch" is
   the complement of those.
 - **Runs existing on this branch.** Measured: none.
+
+## F1087 — a contract row writes to `out/`, which a fresh checkout does not have ★★★
+
+| | |
+|---|---|
+| **Surface** | `test/contract/process.test.ts:202` (C21 I2) |
+| **Reached for** | the first CI run ever made on this branch, which F1086 enabled |
+| **Verdict** | **open** — the directory is created here; the class is that no target creates it and three other files name the path |
+
+### The failure, and it is not about processes
+
+```
+AssertionError: the child ran to completion: expected 1 to be +0
+  ❯ test/contract/process.test.ts:202:54
+```
+
+The row spawns a **real** child — deliberately, because *facts a fake cannot
+supply* is the whole argument for it — and the child's last statement is
+
+```js
+fs.writeFileSync("out/handoff-<pid>.json", JSON.stringify({ pgid, dev, ino, rdev }))
+```
+
+`out/` is neither tracked nor in `.gitignore`: it is simply a scratch directory
+every developer machine grows and **a fresh checkout does not have**. The child
+throws `ENOENT`, exits 1, and the assertion reports a process fact — *the child
+ran to completion* — about a missing directory. Reproduced directly: the same
+`writeFileSync` in an empty directory throws `ENOENT` and the process exits 1.
+
+### It is the fourth form again, with a different file
+
+*A gate that exists and is not run* records this exact shape at 2026-09-05: two
+`instruments` fixtures read gitignored output, green on every developer machine
+and `ENOENT` on every runner. Same mechanism, and the remedy there split by what
+the file is — regenerable output gets a target that makes it. Here it is smaller:
+the row makes the directory it writes into.
+
+### Why it had never fired
+
+`edge/editor` and `contract/process` run inside `make test`, which is in the
+`fast` job — which, until F1086, never ran on a branch. On `main` and on pull
+requests the workspace has usually been through a `full` job that creates `out/`,
+and the ordering across test files is not fixed, so this has been a coin toss
+nobody was watching.
+
+### What would falsify this
+
+- **`out/` being tracked or created by a target.** `git ls-files out` returns
+  nothing and no `Makefile` recipe makes it.
+- **Another test creating it first.** `mkdirSync` appears nowhere in `test/`
+  against that path; the three other files naming `out/` use it as a **string**
+  in a fixture or a `captureDir` the profiler creates recursively.
+
+## F1088 — `CORPUS_BUDGET_MS` is sized against the devcontainer, and the runner is 4.1× ★★★★
+
+| | |
+|---|---|
+| **Surface** | `test/support/budget.ts`, against `test/edge/{editor,transcript,process}.test.ts` |
+| **Reached for** | the same first run — T3.15 timed out at exactly the budget |
+| **Verdict** | **open** — raised here from the measured ratio; the row's own runner figure is the next run's to print |
+
+### The failure
+
+```
+Error: Test timed out in 10000ms.
+  ❯ test/edge/editor.test.ts:17:3   T3.15 · a 1 MB paste … displayRows stays linear
+```
+
+### The measurement was already in the run, printed by the instrument built for it
+
+`budget.ts` ends with *a budget is a claim about a regime, and a runner is not
+this regime*, and `make regime` exists to say so in a run's own output. It ran in
+the same job, thirty seconds before the failure:
+
+```
+files scanned            371
+this machine             361 ms/pass · ~15.5 s across the suite's 43 passes
+recorded (an idle developer machine, in the devcontainer)
+  after                    89 ms/pass · 3.8 s
+this machine / recorded  4.1×
+```
+
+**The runner is 4.1× the machine every figure in `budget.ts` was taken on**, and
+the notice beside it says *if a scan row goes red here, read this ratio before
+touching the budget*. Read.
+
+### The arithmetic, and it says the row could never have passed there
+
+T3.15 records its own cost in its own comment: *3 × 430 ms + 3 × 260 ms* —
+**4.78 s against `CORPUS_BUDGET_MS`'s 10 s, measured**. At 4.1× that is **≈19.6 s
+against a 10 s timeout**. Not marginal: twice the bound.
+
+And the same ratio puts `edge/transcript` — 3.2 s worst in `budget.ts`'s own
+table — at **13.1 s**, also over. Two of the three files that share this budget
+are above it on the runner.
+
+### A correct repair, sized against the wrong regime
+
+The 4.78 s is **new**. F1014 found that `layout`'s memo had made the row's
+minimum-of-five a minimum over four cache hits — *0.00 → 0.00, ratio 6.75* — and
+the repair gives each reading its own editor so every timed call is a miss. That
+is right, and it made the row **three times more expensive**, from one walk of
+each size to three. The new cost was measured, recorded, and compared against a
+bound taken on a developer machine — on a branch where no runner could disagree.
+
+**This is what F1086 costs when it is left open**: not a missing gate, but a
+budget re-derived correctly against the only regime the author could see.
+
+### The remedy, and what it deliberately is not
+
+`budget.ts`'s standing instruction is *do not raise these without knowing what
+they measure — re-measure instead*. The re-measurement is the 4.1×, and it says
+the number is wrong rather than the work. `CORPUS_BUDGET_MS` is a **timeout** by
+that file's own taxonomy — *how long a test may take before it is called stuck* —
+against `DOCUMENT_BUDGET_MS`, which is a product claim and asserted. A timeout
+has to hold on the slowest regime that runs it, and that regime is measured.
+
+**The performance claim is untouched**, and it is where it always was: `insertMs`
+under 2 000 ms and the ratio under 3, both asserted in the row.
+
+### What would falsify this
+
+- **The runner not being 4.1×.** It printed the figure itself, in the same job.
+- **T3.15 having passed on the runner recently.** `main`'s last run predates
+  F1014's repair; the branch has never had a run at all until now.
+- **The row being slow for a reason other than the regime.** Its own assertions
+  are ratios and they are unaffected by a uniformly slower machine; the next run
+  prints the two figures and that is the check.
