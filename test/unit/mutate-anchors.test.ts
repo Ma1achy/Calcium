@@ -16,6 +16,7 @@
 //   MA4 — the debt list is compared by **equality**. An entry that starts
 //         resolving again fails, so a dead excuse cannot outlive its reason.
 import { execFileSync } from "node:child_process";
+import { SWEEP_BUDGET_MS } from "../support/budget.js";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -327,7 +328,10 @@ const MUTATIONS = [
     // would send the reader to a run file for a defect in `src/`.
   });
 
-  it("MA4 (the equality arm): the real tree matches the list exactly", () => {
+  // The whole sweep in a child process, and its budget carries the three
+  // measurements (F1088): 9.4 s alone, 25.1 s inside a green `make all`,
+  // against the 30 s global it was running under. 1.19× is not a margin.
+  it("MA4 (the equality arm): the real tree matches the list exactly", { timeout: SWEEP_BUDGET_MS }, () => {
     // **Both directions.** A new stale anchor fails because it is not on the
     // list; a repaired one fails because the list still claims it. The second is
     // the one a subset check would miss, and it is how an excuse outlives its

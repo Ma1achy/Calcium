@@ -13,6 +13,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { SWEEP_BUDGET_MS } from "../support/budget.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
@@ -64,7 +65,8 @@ describe("MS2: shards partition the plan", () => {
 });
 
 describe("MS3: the debt list the sweep tolerates is the one `anchors.mjs` enforces", () => {
-  it("every entry names a run that exists, and the total is the total the anchors sweep prints", () => {
+  // The same sweep MA4 runs, paid a second time (F1088).
+  it("every entry names a run that exists, and the total is the total the anchors sweep prints", { timeout: SWEEP_BUDGET_MS }, () => {
     const list = stale(readFileSync(ANCHORS as string, "utf8"));
     const runs = new Set(discover());
     expect(Object.keys(list).length).toBeGreaterThan(0); // cells-ok — an entry count

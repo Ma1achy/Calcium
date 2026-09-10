@@ -7,7 +7,7 @@
 // the build — which makes it the one assertion here that a passing run of this
 // file would not catch on its own.
 import { execSync } from "node:child_process";
-import { fstatSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { fstatSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { SCAN_BUDGET_MS } from "../support/budget.js";
 
@@ -187,6 +187,14 @@ describe("C21 §4 — handoff's stdio and its process group", () => {
     // (I2, T6.1), so *shares our group* is a decision this route makes rather
     // than a default it inherited.
     const runner = createProcessRunner({ env: process.env, stdin: {} });
+    // **`out/` is not tracked and not gitignored — it is a directory every
+    // developer machine grows and a fresh checkout does not have** (F1087). The
+    // child's last statement writes here, so without this the child throws
+    // `ENOENT`, exits 1, and the assertion below reports a *process* fact —
+    // "the child ran to completion" — about a missing directory. Red on the
+    // first CI run this branch ever had, green on every machine that has ever
+    // run a probe.
+    mkdirSync("out", { recursive: true });
     const report = `out/handoff-${String(process.pid)}.json`;
     // `process.getpgrp` does not exist in Node, so the child asks `ps` — the
     // same question `groupMembers` asks, from the other side of the spawn.

@@ -126,7 +126,16 @@
  * | budget | worst row | headroom |
  * |---|---|---|
  * | `SCAN_BUDGET_MS` 15 s | T2.8, 1.05 s | **14×** |
- * | vitest's 5 s default | T3.13, 3.02 s | 1.7× |
+ * | vitest's default | T3.13, 3.02 s | 1.7× at the 5 s this row was written against |
+ *
+ * **That row's *default* moved and this table did not** (F1088, F967's class).
+ * `vitest.config.ts` has set `testTimeout: 30_000` since 2026-08-22, with its
+ * own argument — *the number is the asymmetry, not the odds*. A file that
+ * restates another file's default is a copy that goes stale in one commit,
+ * and the paragraph above still reads *3.2 s against a 5 s default is not a
+ * margin*, which was true when written and is history now. Both are left in
+ * place and labelled rather than rewritten, because the sentences are the
+ * record of why the explicit budgets below exist.
  * | tier 5's 75 s | T5.6 and T5.2, **60.4 s** | **1.25×** |
  *
  * **Tier 5's margin is not a multiple of a measured cost and that is why it
@@ -163,10 +172,81 @@ export const SCAN_BUDGET_MS = 15_000;
 /**
  * For a file whose work is bounded by its own fixture rather than by the
  * repository — a 1 MB paste, ten thousand blocks, a handful of real
- * subprocesses. Smaller than the scan budget because that work does not grow
- * underneath the number the way a tree walk does.
+ * subprocesses. It does not grow underneath the number the way a tree walk
+ * does, which is the reason it used to be *smaller* than the scan budget.
+ *
+ * **10 s until the runner was allowed to disagree, and it disagreed at once**
+ * (F1088, and F1086 is why it took this long). T3.15 timed out at exactly
+ * 10 000 ms on the first CI run this branch has ever had — and the measurement
+ * was already in the same job, printed thirty seconds earlier by `make regime`,
+ * which exists for this:
+ *
+ * ```
+ * this machine             361 ms/pass · ~15.5 s across the suite's 43 passes
+ * recorded (an idle developer machine, in the devcontainer)
+ *   after                    89 ms/pass · 3.8 s
+ * this machine / recorded  4.1×
+ * ```
+ *
+ * **The arithmetic says the row could never have passed there.** T3.15 records
+ * its own cost in its own comment — *3 × 430 ms + 3 × 260 ms*, **4.78 s
+ * measured** — and 4.78 × 4.1 is **≈19.6 s against a 10 s timeout**. Twice the
+ * bound, not a margin. The same ratio puts `edge/transcript`'s 3.2 s worst row
+ * at **13.1 s**, so two of the three files sharing this number were above it.
+ *
+ * **A correct repair sized against the wrong regime.** The 4.78 s is new: F1014
+ * found `layout`'s memo had turned this row's minimum-of-five into a minimum
+ * over four cache hits, and giving each reading its own editor made every timed
+ * call a miss — right, and three times the cost. It was measured and recorded
+ * against the only regime its author could see, because CI did not run on
+ * branches.
+ *
+ * **60 s, and the argument is the taxonomy above rather than the arithmetic.**
+ * This is a *timeout* — how long a test may take before it is called stuck —
+ * not `DOCUMENT_BUDGET_MS`'s claim about the product, so it has to hold on the
+ * slowest regime that runs it and buy nothing else. 60 s is 3× the measured
+ * runner cost, the same headroom `SCAN_BUDGET_MS` takes over its worst row, and
+ * a hang still surfaces inside a minute. **The performance claim is untouched
+ * and is where it always was**: T3.15 asserts `insertMs` under 2 000 ms and the
+ * ratio under 3, and those are what go red if the walk regresses.
+ *
+ * The next run prints T3.15's own runner figure beside the 4.78 s; when it does,
+ * the estimate above becomes a measurement and this comment should say so.
  */
-export const CORPUS_BUDGET_MS = 10_000;
+export const CORPUS_BUDGET_MS = 60_000;
+
+/**
+ * For the two rows that shell out to `tools/mutate/anchors.mjs` — MA4 and MS3,
+ * which each run the whole 192-run sweep in a child process.
+ *
+ * **Measured three ways, because the spread is the point** (F1088):
+ *
+ * | | |
+ * |---|---|
+ * | the sweep alone, `node tools/mutate/anchors.mjs` | **9.4 s** |
+ * | MA4 inside a green `make all` | **25.1 s** |
+ * | MA4 on the run after the raise, same load | **30.3 s** |
+ * | the global `testTimeout` it was running under | 30 s |
+ *
+ * **25.1 against 30 is 1.19× and it is not a margin** — the same sentence the
+ * top of this file opens with, about a row that was then given an explicit
+ * budget. It went red on two consecutive `make test` runs the moment this
+ * session added a test file and a validation pass; nothing about the sweep
+ * changed, and `anchors.mjs` run alone reports *25 known stale, and no run
+ * drifted from what the list says*.
+ *
+ * **A timeout, so it is sized for the slowest regime that runs it** — the
+ * taxonomy `DOCUMENT_BUDGET_MS` below is contrasted against. 120 s is a little
+ * under 5× the loaded measurement, which is the ratio `SCAN_BUDGET_MS` takes
+ * over its worst row, and a hang still surfaces inside two minutes. What this
+ * removes is a row whose verdict is a function of how much else the suite is
+ * doing.
+ *
+ * **The duplication is recorded and not fixed here**: MA4 and MS3 each pay the
+ * full sweep, so the suite runs it twice for two different assertions about the
+ * same output. Worth one child process and a shared fixture, in its own change.
+ */
+export const SWEEP_BUDGET_MS = 120_000;
 
 /**
  * For C06 T5.1 — a real binary emitting a large document, spawned, parsed,
