@@ -352,6 +352,80 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
     240_000,
   );
 
+  // **T5.9 — I14's premise, executed rather than described** (F1057).
+  //
+  // C02 refuses a reply channel, and the reason on record was false twice: F414
+  // said the reply would be typed into the prompt (C16 I32 consumes it), and §3
+  // said the refusal rests on a terminal that answers nothing (a DA1 sentinel
+  // prices that at one round trip). What replaces them is an ordering — a reply
+  // is unreadable until raw mode, raw mode is `acquire()`'s, and by then the
+  // record is built and four objects hold it. **That premise is a sentence
+  // until a row runs it**, and this is the row: the test plays the terminal,
+  // the child plays the framework, and the pty's line discipline is the real
+  // one rather than a model of it.
+  it(
+    "T5.9 (C02 I14): a reply is unreadable before raw mode, is held rather than dropped, and is echoed to the display meanwhile",
+    async () => {
+      // The child reports what it has read at two moments: while the tty is
+      // canonical, which is every moment before C01's `acquire()`, and again
+      // just after `setRawMode(true)`. No single quotes — it travels through
+      // `sh -c`.
+      const CHILD = [
+        `console.log("READY");`,
+        `let seen = "";`,
+        `process.stdin.on("data", (d) => { seen += d.toString("latin1"); });`,
+        `setTimeout(() => { console.log("COOKED=" + JSON.stringify(seen)); process.stdin.setRawMode(true); }, 400);`,
+        `setTimeout(() => { console.log("RAW=" + JSON.stringify(seen)); process.exit(0); }, 900);`,
+      ].join(" ");
+      // A DECRQM reply, which is what `synchronisedUpdate` would be answered
+      // from — the cheapest of the four §3 measures and the one both emulators
+      // answer.
+      const REPLY = "\x1b[?2026;2$y";
+
+      const pty = interactivePty(`node -e '${CHILD}'`);
+      try {
+        await pty.waitFor(/READY/u, 20_000);
+        pty.type(REPLY);
+        await pty.done(20_000);
+      } finally {
+        pty.kill();
+      }
+
+      const cooked = /COOKED=("(?:[^"\\]|\\.)*")/u.exec(pty.output)?.[1] ?? "";
+      const raw = /RAW=("(?:[^"\\]|\\.)*")/u.exec(pty.output)?.[1] ?? "";
+      // Located rather than assumed: a row that reads `""` out of a stream that
+      // never carried the marker is asserting about nothing.
+      expect(cooked, "the COOKED marker was in the output").not.toBe("");
+      expect(raw, "the RAW marker was in the output").not.toBe("");
+
+      // **1. Nothing.** The reply was written 250 ms earlier and the reader has
+      // it not at all — this is every moment before `acquire()`, which is every
+      // moment in which the capability record is still being built and handed
+      // out — C22's step 2, eleven read sites in `construct.ts`, six of them
+      // handing it into an object built there.
+      expect(JSON.parse(cooked), "a reply reached a reader in canonical mode").toBe("");
+
+      // **2. Held, not dropped.** The same bytes arrive whole the instant raw
+      // mode is entered, so a query asked too early does not vanish — it answers
+      // into whatever reads next, which is C16's decoder, which discards it —
+      // C16 I32. That is the arm's real relationship to a reply channel, and it is
+      // not the one F414 named.
+      expect(JSON.parse(raw), "the held reply was delivered on setRawMode(true)").toBe(REPLY);
+
+      // **3. And echoed, which is F414's symptom by a mechanism no entry
+      // named.** While the tty is canonical it echoes what it received back to
+      // the display, `ECHOCTL`-style: the `ESC` returns as the two printable
+      // characters `^[`. So a probe that runs before raw mode does not merely
+      // read nothing — it paints its own reply where the reader is looking.
+      //
+      // Asserted on the *master's* bytes, which is the display's side. The
+      // child's own report cannot show this: it prints the reply JSON-escaped,
+      // so `[?2026;2$y` appears there too and only the `^[` separates them.
+      expect(pty.output, "the canonical-mode echo reached the display").toContain("^[[?2026;2$y");
+    },
+    60_000,
+  );
+
   it(
     "T5.4b: inside tmux, keyboard navigation of a table works end to end",
     async () => {

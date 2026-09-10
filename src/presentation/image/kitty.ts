@@ -227,8 +227,15 @@ function chunked(opts: string, body: string): string {
  * The transmit-and-create-a-virtual-placement escape.
  *
  * `f=100` is PNG, which is the only format the codec reads; `q=2` suppresses the
- * terminal's reply, for C02's own reason — this framework does not run
- * interactive probes and a response would arrive as input nobody asked for.
+ * terminal's reply — and **the reason on record was false, so it is replaced
+ * rather than added to** (F414, F1057). It was *a response would arrive as input
+ * nobody asked for*: C16 I32 consumes every string-terminated reply and emits
+ * nothing, so `q=1` is harmless today and flipping the token changes nothing
+ * observable. The reason that survives being checked is that **nothing could
+ * read one** — a reply is unreadable until raw mode, raw mode is C01's
+ * `acquire()`, and by then the capability record is complete and four objects
+ * hold it (C02 I14). `q=1` would buy a diagnostic no seam reports, so the token
+ * stays and the finding closes on the ruling rather than on the flip.
  * `U=1` says the placement is addressed by Unicode placeholders rather than
  * drawn at the cursor, which is the whole distinction from iTerm2 and sixel.
  */
