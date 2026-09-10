@@ -83,10 +83,17 @@ const results = runPass({
     },
     {
       // The validator's half, the other way round.
+      //
+      // **Re-anchored on `PLOT_UNIONS`** (F213). `yFormat` had its own
+      // `Y_FORMATS` set and its own clause here; membership for all 24 of
+      // `Plot`'s string-literal unions is one table and one loop now, so the
+      // mutation that removes this arm removes the member's row rather than its
+      // `if`. `mutate.mjs` asserts the anchor matched, which is the only reason
+      // this was noticed rather than silently passing over a line that is gone.
       name: "the validator stops checking the arm",
       file: "src/data/viewmodel/validate.ts",
-      from: '    if (format !== undefined && !(isString(format) && Y_FORMATS.has(format))) {',
-      to: "    if (false) {",
+      from: '  yFormat: Object.freeze(["number", "fraction", "percent", "bytes", "duration"]),\n',
+      to: "",
       expect: "T1.16b",
     },
   ],

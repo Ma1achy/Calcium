@@ -35,7 +35,7 @@ export function componentOf(file) {
  * the vacuity suite can assert every one of them has been shown to fire; a rule
  * added here without a fabricated violation fails A03 commitment 14.
  */
-export const MODULE_GRAPH_RULES = ["MG1", "MG2", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22", "MG23", "MG24", "MG25", "MG26", "MG27", "MG28", "MG29", "MG30"];
+export const MODULE_GRAPH_RULES = ["MG1", "MG2", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22", "MG23", "MG24", "MG25", "MG26", "MG27", "MG28", "MG29", "MG30", "MG31"];
 
 /**
  * MG6 is a **third kind of rule**, and saying so is the point of this comment.
@@ -3429,6 +3429,87 @@ export function checkDevEntryIsolation(files, readFile = (f) => readFileSync(f, 
  * member named only in the prose explaining why it is dead would otherwise
  * count as its own opener (F84's class).
  */
+/**
+ * MG31 — **every string-literal union `Plot` declares is in `PLOT_UNIONS`, with
+ * the same values** (C04 I118, F213, F1076).
+ *
+ * **The rule exists because the enumeration was mistaken for the class.** C04's
+ * `colormap` clause names five members as *unions for the same reason*, and the
+ * five were read as the set. `Plot` declares **24**, of which eight had no
+ * membership rule anywhere — three of the five, plus `layout`, `binning`,
+ * `box3`, `axes3` and `colourBy`, which appear in no document. Five clauses
+ * would have closed a third of it, and the twenty-fifth member would have been
+ * unchecked on the day it landed.
+ *
+ * **Both directions, by equality.** A member in the type and not the table is
+ * unchecked; a member in the table and not the type is a rule with no subject,
+ * which reads exactly like a rule that is satisfied. The values are compared the
+ * same way, so a union gaining a value fails here rather than being silently
+ * refused by a gate that has not heard of it.
+ *
+ * **The blind spot, stated because an unrecorded one reads as strength**: this
+ * compares two declarations and says nothing about whether the table is *read*.
+ * `plotUnionErrors` looping it is what makes an entry a check, and that is
+ * asserted by T2.x's rows in `test/unit/` rather than here — a scan can see a
+ * table and cannot see a loop over it. And the parse is textual: a member
+ * written across two lines, or a union built by reference rather than by
+ * literals, is invisible to it. Both forms are absent from `Plot` today and the
+ * corpus count below is what a reader checks that against.
+ */
+export function checkPlotUnions(files, readFile = (f) => readFileSync(f, "utf8")) {
+  const TYPES = "src/data/viewmodel/types.ts";
+  const VALIDATE = "src/data/viewmodel/validate.ts";
+  if (!files.includes(TYPES) || !files.includes(VALIDATE)) return [];
+  const fail = (message) => [{ rule: "MG31", file: TYPES, message, spec: "A03 §3, MG31 · C04 I118" }];
+
+  const types = readFile(TYPES);
+  const start = types.indexOf("export type Plot = Readonly<{");
+  if (start === -1) return fail("no `export type Plot = Readonly<{` to read — the rule's corpus is the declaration itself, so one it cannot find makes it vacuous rather than satisfied (C04 I118)");
+  const end = types.indexOf("\n}>;", start);
+  const body = types.slice(start, end === -1 ? undefined : end);
+
+  // `  name?: "a" | "b" | false;` — two-space indent, so a nested type's members
+  // are not read as `Plot`'s.
+  const MEMBER = /^ {2}(\w+)\?: ((?:"[^"]+"|false)(?: \| (?:"[^"]+"|false))*);$/gmu;
+  const declared = new Map();
+  for (const m of body.matchAll(MEMBER)) {
+    declared.set(m[1], m[2].split(" | ").map((v) => (v === "false" ? false : v.slice(1, -1))));
+  }
+  if (declared.size === 0) return fail("`Plot` declares no string-literal union member, which it has 24 of — the member pattern has stopped matching and the rule is now vacuous over an empty set (C04 I118)");
+
+  const table = readFile(VALIDATE);
+  const tStart = table.indexOf("export const PLOT_UNIONS");
+  if (tStart === -1) return fail("no `export const PLOT_UNIONS` in validate.ts — the table is the membership mechanism and a rule comparing against nothing agrees with everything (C04 I118)");
+  const tEnd = table.indexOf("\n});", tStart);
+  const tBody = table.slice(tStart, tEnd === -1 ? undefined : tEnd);
+  const ENTRY = /^ {2}(\w+): Object\.freeze(?:<[^>]*>)?\(\[([^\]]*)\]\),$/gmu;
+  const listed = new Map();
+  for (const m of tBody.matchAll(ENTRY)) {
+    listed.set(m[1], m[2].split(",").map((v) => v.trim()).filter((v) => v !== "").map((v) => (v === "false" ? false : v.slice(1, -1))));
+  }
+
+  const show = (vs) => vs.map((v) => (v === false ? "false" : `"${v}"`)).join(", ");
+  const problems = [];
+  for (const [name, values] of declared) {
+    const have = listed.get(name);
+    if (have === undefined) {
+      problems.push(`\`${name}\` is a union in the type and not in the table — nothing refuses a value outside it, and being a union is a compile-time fact this gate's subject does not have`);
+      continue;
+    }
+    if (show(have) !== show(values)) {
+      problems.push(`\`${name}\` admits ${show(values)} in the type and ${show(have)} in the table`);
+    }
+  }
+  for (const name of listed.keys()) {
+    if (!declared.has(name)) problems.push(`\`${name}\` is in the table and is not a string-literal union on \`Plot\` — a rule with no subject reads exactly like one that is satisfied`);
+  }
+  if (problems.length === 0) return [];
+  return fail(
+    `PLOT_UNIONS and \`Plot\` disagree in ${String(problems.length)} place(s): ${problems.join("; ")}. `
+      + `The table is what \`plotUnionErrors\` loops, so a member missing from it is a member no document gate checks (C04 I118, F213).`,
+  );
+}
+
 export function checkSpanNamesOpened(files, readFile = (f) => readFileSync(f, "utf8")) {
   const TYPES = "src/shell/profiling/types.ts";
   if (!files.includes(TYPES)) return [];

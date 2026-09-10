@@ -100,6 +100,12 @@ export declare function checkFunctionConsumers(
   allowed?: Readonly<Record<string, string>>,
 ): Violation[];
 
+/** MG31 — every string-literal union on `Plot` is in `PLOT_UNIONS` (C04 I118, F213). */
+export declare function checkPlotUnions(
+  files: readonly string[],
+  readFile?: (f: string) => string,
+): Violation[];
+
 /** MG30 — a `SpanName` member nothing opens under `src/` (C28 I39). */
 export declare function checkSpanNamesOpened(
   files: readonly string[],

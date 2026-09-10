@@ -22,6 +22,7 @@
 // second, the existence check the third; no one of them catches the others,
 // which is why all three are here (A03 §2, commitment 14).
 import { existsSync, globSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { PLOT_UNIONS } from "../../src/data/viewmodel/validate.js";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -34,6 +35,7 @@ import {
   MODULE_GRAPH_RULES,
   checkExportedArguments,
   checkFunctionConsumers,
+  checkPlotUnions,
   checkSpanNamesOpened,
   checkBuilderCoverage,
   checkSeamConsumers,
@@ -796,6 +798,13 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       // against call sites in every other, so a fabrication is a *set* — the
       // union plus the files that do and do not open its members.
       "MG30",
+      // MG31 likewise, and for MG30's reason with the halves swapped: the
+      // declaration it reads is a *type* in one file and the table it compares
+      // against is a frozen object in another, so a fabrication is a pair of
+      // files. Its own rows below, and both directions of the equality are
+      // driven — a union the table omits, and a table entry the type does not
+      // declare.
+      "MG31",
       // SS47 likewise: its subject is a string literal's contents rather than a
       // line, and its exemptions carry reasons the shared shape has nowhere to put.
       "SS47",
@@ -1835,6 +1844,84 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     ).toBe(true);
   });
 
+  // --- MG31 (C04 I118, F213, F1076) ---------------------------------------
+  //
+  // A fabricated tree in both directions and a control, because a rule that
+  // compares two declarations agrees with everything when it can parse neither.
+  const plotTree = (members: string, table: string): Record<string, string> => ({
+    "src/data/viewmodel/types.ts": `export type Plot = Readonly<{\n  form: PlotForm;\n${members}}>;\n`,
+    "src/data/viewmodel/validate.ts":
+      `export const PLOT_UNIONS: Readonly<Record<string, readonly (string | false)[]>> = Object.freeze({\n${table}});\n`,
+  });
+  const runPlotUnions = (tree: Record<string, string>): ReturnType<typeof checkPlotUnions> =>
+    checkPlotUnions(Object.keys(tree), (f: string) => tree[f] ?? "");
+
+  it("T2.128 (C04 I118, MG31) fires: a union in the type that the table does not carry", () => {
+    // **The shape the rule exists for.** `Plot` gained a union member and no
+    // membership rule reached it — eight members were in this state when the
+    // table was written, five of them named in no document (F1076).
+    const v = runPlotUnions(plotTree(
+      '  legend?: "above" | "below";\n  plotFrame?: "box" | "rule";\n',
+      '  legend: Object.freeze(["above", "below"]),\n',
+    ));
+    expect(v).toHaveLength(1);
+    expect(v[0]?.rule).toBe("MG31");
+    expect(v[0]?.message, "names the member").toContain("`plotFrame` is a union in the type and not in the table");
+    expect(v[0]?.message, "and not the one that is fine").not.toContain("`legend` is a union");
+  });
+
+  it("T2.128 (MG31) fires the other way: a table entry naming no union, and a values disagreement", () => {
+    // **Both directions, because a subset check is silent about the other**
+    // (F1076). A table entry with no subject is a rule that cannot be violated,
+    // and a union that gains a value the table has not heard of is refused by a
+    // gate that thinks it is doing its job.
+    const v = runPlotUnions(plotTree(
+      '  legend?: "above" | "below" | "left";\n',
+      '  legend: Object.freeze(["above", "below"]),\n  ghost: Object.freeze(["x"]),\n',
+    ));
+    expect(v).toHaveLength(1);
+    expect(v[0]?.message).toContain('`legend` admits "above", "below", "left" in the type and "above", "below" in the table');
+    expect(v[0]?.message).toContain("`ghost` is in the table and is not a string-literal union");
+  });
+
+  it("T2.128 (MG31) control: agreement is silent, and `false` survives the round trip", () => {
+    // The control says the fixture can be seen at all — and carries `false`,
+    // because three of `Plot`'s unions admit it and a reader that quoted it
+    // would disagree with the type on all three while looking correct.
+    expect(runPlotUnions(plotTree(
+      '  legend?: "above" | false;\n',
+      '  legend: Object.freeze<readonly (string | false)[]>(["above", false]),\n',
+    ))).toEqual([]);
+  });
+
+  it("T2.128 (MG31) reports rather than passes when it cannot parse either side", () => {
+    // A03 §2's vacuity class, asked of this rule: two declarations it cannot
+    // find agree perfectly.
+    const noType = runPlotUnions({
+      "src/data/viewmodel/types.ts": "export type Other = Readonly<{}>;\n",
+      "src/data/viewmodel/validate.ts": "export const PLOT_UNIONS = Object.freeze({\n});\n",
+    });
+    expect(noType).toHaveLength(1);
+    expect(noType[0]?.message).toContain("vacuous rather than satisfied");
+
+    const noTable = runPlotUnions({
+      "src/data/viewmodel/types.ts": 'export type Plot = Readonly<{\n  legend?: "above";\n}>;\n',
+      "src/data/viewmodel/validate.ts": "const nothing = 1;\n",
+    });
+    expect(noTable).toHaveLength(1);
+    expect(noTable[0]?.message).toContain("agrees with everything");
+  });
+
+  it("T2.128 (MG31): the real tree is clean, and the corpus it read is 24 members", () => {
+    // **The population, because an exit status is the same bit for clean and
+    // for did-not-run.** The rule reports nothing over the tree; the count is
+    // what says it had something to report nothing about.
+    expect(runPlotUnions({
+      "src/data/viewmodel/types.ts": readFileSync("src/data/viewmodel/types.ts", "utf8"),
+      "src/data/viewmodel/validate.ts": readFileSync("src/data/viewmodel/validate.ts", "utf8"),
+    })).toEqual([]);
+    expect(Object.keys(PLOT_UNIONS), "the class is 24, and the spec named five").toHaveLength(24);
+  });
   it("MG30 fires: a SpanName member nothing opens", () => {
     // **The shape this rule exists for**: a member added to the union and never
     // wired. `PHASE_GROUP` is total over `SpanName`, so it still gets a phase

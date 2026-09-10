@@ -47,8 +47,11 @@ const results = runPass({
       // absence of this row was invisible for the life of the component.
       name: "the document gate accepts the member on every form",
       file: VAL,
-      from: "    } else if (HAS_DETAIL_RUNGS[form as PlotForm] === false) {",
-      to: "    } else if (false) {",
+      // Re-anchored when membership moved to `PLOT_UNIONS` (F213): the arm was
+      // `else if` under the member's own value check and is now a plain `if`
+      // under `isKnownPlotValue`. The mutation is unchanged.
+      from: "    if (HAS_DETAIL_RUNGS[form as PlotForm] === false) {",
+      to: "    if (false) {",
       expect: "PD1",
     },
     {
@@ -73,10 +76,15 @@ const results = runPass({
     {
       // The value check dropped, so an unknown rung name is carried into a
       // renderer that compares it against three literals and takes the default.
+      //
+      // **Re-anchored on the table** (F213). `plotDetail` had its own three
+      // comparisons here; membership for all 24 of `Plot`'s string-literal
+      // unions is one row and one loop now, so removing the check means removing
+      // the row. The mutation is the same deletion at the layer that owns it.
       name: "an unknown value is accepted where a ladder exists",
       file: VAL,
-      from: '    if (pd !== "auto" && pd !== "compact" && pd !== "full") {',
-      to: "    if (false) {",
+      from: '  plotDetail: Object.freeze(["auto", "compact", "full"]),\n',
+      to: "",
       expect: "PD1",
     },
     {

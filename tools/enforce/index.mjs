@@ -6,6 +6,7 @@ import { checkFindingIds, checkFindings, checkOpenSet, checkTriageInventory } fr
 import {
   checkExportedArguments,
   checkFunctionConsumers,
+  checkPlotUnions,
   checkSpanNamesOpened,
   checkLayerCycles,
   checkModuleGraph,
@@ -163,6 +164,8 @@ const violations = [
   ...checkSeamConsumers(files),
   ...checkFunctionConsumers(files),
   ...checkSpanNamesOpened(files),
+  // MG31 — every string-literal union on `Plot` is in `PLOT_UNIONS` (C04 I118).
+  ...checkPlotUnions(files),
   // MG29 — a published function whose parameter type is interior (C24 I29, §8c).
   ...checkExportedArguments(files),
   ...checkSourceScans(files),

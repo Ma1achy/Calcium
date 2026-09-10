@@ -123,16 +123,124 @@ function checkColormapName(b: Record<string, unknown>, e: string[], at: string):
     e.push(`${at}: "colormap" must be one of ${COLORMAP_NAMES.join(", ")} (C10 I31, C04 I90)`);
   }
 }
+/**
+ * **Every string-literal union `Plot` declares, and the values each admits**
+ * (C04 I118, F213, F1076).
+ *
+ * **A table because the class is 24 and the enumeration said five.** C04's
+ * `colormap` clause names `plotFrame`, `legend`, `plotDetail`, `orientation`
+ * and `matrixAnchor` as *unions for the same reason*, and that list was read as
+ * the class. Measured: `Plot` declares **24** members whose type is a union of
+ * string literals, **eight** of which no membership rule reached — the three of
+ * the five still open, plus `layout`, `binning`, `box3`, `axes3` and `colourBy`,
+ * which appear in no document. A class named by enumeration is the size of the
+ * enumeration, and the five clauses the finding asked for would have closed a
+ * third of it.
+ *
+ * **Being a union is a compile-time fact and this gate's subject is a document.**
+ * A `Plot` built in TypeScript cannot hold a bad value; a `Plot` arriving as JSON
+ * from the far side is exactly what this file exists for. The sentence is true
+ * about the type and was read as true about the check.
+ *
+ * **The table is the mechanism, not a list beside one.** `plotUnionErrors` loops
+ * it and every form rule below asks `isKnownPlotValue` before it speaks, so a
+ * member cannot be in this table and unchecked, and a member added to `Plot`
+ * fails `make enforce` until it is here — MG-PU compares these keys and values
+ * against the type's own declaration by equality, in both directions.
+ *
+ * **What an unchecked value did, measured from the consumer rather than
+ * reasoned**: `matrixAnchor` fell through to `window` and rendered
+ * right-anchored with a blank fringe; `legend` reserved zero rows on a plot that
+ * asked for one; `plotFrame` took the frame renderer's default arm; and
+ * `orientation` — the only one of them that produced an error — refused a `pie`
+ * carrying `"vertial"` with a message about a *vertical arm* the caller never
+ * asked for.
+ */
+export const PLOT_UNIONS: Readonly<Record<string, readonly (string | false)[]>> = Object.freeze({
+  align: Object.freeze(["left", "centre", "right"]),
+  axes3: Object.freeze<readonly (string | false)[]>(["corner", "origin", "centre", false]),
+  binning: Object.freeze(["sturges", "freedman-diaconis", "scott"]),
+  box3: Object.freeze(["none", "back", "full"]),
+  calendarUnit: Object.freeze(["hour", "day", "week", "month"]),
+  colourBy: Object.freeze(["depth", "value", "series"]),
+  fieldDim: Object.freeze(["none", "floor"]),
+  glyphInk: Object.freeze(["own", "contrast"]),
+  graphLayout: Object.freeze(["layered"]),
+  layout: Object.freeze(["overlap", "grouped", "stacked", "normalised"]),
+  legend: Object.freeze<readonly (string | false)[]>(["above", "below", "left", "right", false]),
+  matrixAnchor: Object.freeze(["stretch", "window", "left", "uniform"]),
+  orientation: Object.freeze(["horizontal", "vertical"]),
+  plotBox: Object.freeze(["solid", "line"]),
+  plotCorners: Object.freeze(["rounded", "sharp"]),
+  plotDetail: Object.freeze(["auto", "compact", "full"]),
+  plotFill: Object.freeze(["none", "solid"]),
+  plotFrame: Object.freeze(["box", "corners", "grid", "rule"]),
+  plotGrid: Object.freeze(["polygon", "circle"]),
+  plotStyle: Object.freeze(["auto", "braille", "line", "candlestick", "solid", "marker"]),
+  treeLayout: Object.freeze(["auto", "topDown", "leftRight", "outline"]),
+  yAxis: Object.freeze<readonly (string | false)[]>(["left", "right", "both", false]),
+  yCallout: Object.freeze(["none", "last", "name", "both"]),
+  yFormat: Object.freeze(["number", "fraction", "percent", "bytes", "duration"]),
+});
+
+/**
+ * The member-specific citation a refusal carries beside I118's.
+ *
+ * **Only where one exists**, because a citation resolving against the wrong
+ * invariant is the class `docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass says
+ * no mechanism catches. A member with no rule of its own cites the table's, which
+ * is the invariant that makes its refusal exist.
+ */
+const PLOT_UNION_CITES: Readonly<Record<string, string>> = Object.freeze({
+  align: "C04 I62",
+  calendarUnit: "C04 I62",
+  colourBy: "C04 I76",
+  graphLayout: "C04 I70",
+  legend: "C04 I52",
+  matrixAnchor: "C04 I50b",
+  plotBox: "C12 I46",
+  plotDetail: "C12 I34",
+  plotFill: "C04 I59",
+  treeLayout: "C04 I65",
+  yCallout: "C04 I60",
+  yFormat: "C04 I41",
+});
+
+/**
+ * Whether a value is in a member's union — **the one place membership is
+ * decided** (C04 I118).
+ *
+ * Every form rule that used to open with its own comparison asks this instead,
+ * so a bad value is refused once and the form rule below it stays silent rather
+ * than reporting a second fault about a value the document does not contain.
+ */
+export function isKnownPlotValue(member: string, value: unknown): boolean {
+  const values = PLOT_UNIONS[member];
+  return values !== undefined && values.some((v) => v === value);
+}
+
+/** `"a", "b" or false` — the form every one of these refusals already used. */
+function unionList(values: readonly (string | false)[]): string {
+  const shown = values.map((v) => (v === false ? "false" : `"${v}"`));
+  const last = shown[shown.length - 1] ?? "";
+  return shown.length < 2 ? last : `${shown.slice(0, -1).join(", ")} or ${last}`;
+}
+
+/** C04 I118 — every union member of a `plot` block, checked in one loop. */
+function plotUnionErrors(b: Record<string, unknown>, e: string[], at: string): void {
+  for (const [member, values] of Object.entries(PLOT_UNIONS)) {
+    const value = b[member];
+    if (value === undefined || isKnownPlotValue(member, value)) continue;
+    const cite = PLOT_UNION_CITES[member];
+    e.push(
+      `${at}: "${member}" must be ${unionList(values)} `
+        + `(${cite === undefined ? "C04 I118" : `${cite}, C04 I118`})`,
+    );
+  }
+}
+
 const TRANSPORTS: ReadonlySet<string> = new Set(["emulated", "fixture", "subprocess", "local"]);
 const ORIGINS: ReadonlySet<string> = new Set(["user", "action", "agent", "refresh", "defect"]);
-/** C04 I41 — the arms, named for the unit that arrives, not the unit rendered. */
-const Y_FORMATS: ReadonlySet<string> = new Set([
-  "number",
-  "fraction",
-  "percent",
-  "bytes",
-  "duration",
-]);
 
 // --- small total helpers --------------------------------------------------
 
@@ -359,10 +467,9 @@ function checkTreeLayout(
 ): void {
   const tl = b["treeLayout"];
   if (tl === undefined) return;
-  if (tl !== "auto" && tl !== "topDown" && tl !== "leftRight" && tl !== "outline") {
-    e.push(`${at}: "treeLayout" must be "auto", "topDown", "leftRight" or "outline" (C04 I65)`);
-    return;
-  }
+  // C04 I118 — membership is `plotUnionErrors`'; this returns so the form rule
+  // below says nothing about a value the document does not contain.
+  if (!isKnownPlotValue("treeLayout", tl)) return;
   if (form !== "tree") {
     e.push(
       `${at}: "treeLayout" on form ${JSON.stringify(form)} (C04 I65) — only a tree has more ` +
@@ -391,10 +498,7 @@ function plotGraphErrors(
 ): void {
   const gl = b["graphLayout"];
   if (gl !== undefined) {
-    if (gl !== "layered") {
-      e.push(`${at}: "graphLayout" must be "layered" (C04 I70)`);
-      return;
-    }
+    if (!isKnownPlotValue("graphLayout", gl)) return; // C04 I118
     if (form !== "graph" && form !== "sankey") {
       e.push(
         `${at}: "graphLayout" on form ${JSON.stringify(form)} (C04 I70) — only a graph takes ` +
@@ -1347,6 +1451,10 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
   logs: (b, e, at) => requireArray(b, "lines", e, at),
   events: (b, e, at) => requireArray(b, "events", e, at),
   plot: (b, e, at) => {
+    // **Before every form rule** (C04 I118). A rule that reads a member's value
+    // and finds it outside the union would otherwise report a second fault about
+    // a value the document does not contain — which is what `orientation` did.
+    plotUnionErrors(b, e, at);
     checkAnnotations(b["annotations"], e, at, b["legend"]);
     // **An unknown colormap is refused rather than ignored** (C10 I31). A name
     // that resolves to nothing renders uncoloured and green, which is F172's
@@ -1466,14 +1574,7 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     // It was unvalidated, so a typo rendered plain numbers and said nothing; the
     // `fraction`/`percent` rename is exactly the event that produces one, because
     // `percentage` is what a reader guesses.
-    const format = b["yFormat"];
-    if (format !== undefined && !(isString(format) && Y_FORMATS.has(format))) {
-      e.push(`${at}: "yFormat" must be one of ${[...Y_FORMATS].join(", ")} (C04 I41)`);
-    }
     const ps = b["plotStyle"];
-    if (ps !== undefined && !PLOT_STYLES.has(String(ps))) {
-      e.push(`${at}: "plotStyle" must be one of ${[...PLOT_STYLES].join(", ")}`);
-    }
     // **C04 I57 — the geometry is refused wherever the bars are**, not only
     // under the style that draws them. A wick that does not contain its body is
     // not a candle drawn oddly; it is not a candle, and a document carrying one
@@ -1532,9 +1633,6 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     // interior alphabet, so `█` inside `╭──╮` is a third figure rather than the
     // same one filled.
     const pf = b["plotFill"];
-    if (pf !== undefined && pf !== "none" && pf !== "solid") {
-      e.push(`${at}: "plotFill" must be "none" or "solid"`);
-    }
     if (pf === "solid" && ps === "line") {
       e.push(
         `${at}: "plotFill" is "solid" with "plotStyle" of "line" (C04 I59) — a box-drawing ` +
@@ -1542,22 +1640,10 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
           `around a body in another rather than the same figure filled`,
       );
     }
-    const pc = b["plotCorners"];
-    if (pc !== undefined && pc !== "rounded" && pc !== "sharp") {
-      e.push(`${at}: "plotCorners" must be "rounded" or "sharp"`);
-    }
     // C12 I45 — the radar's ring shape. A member on a form that has no rings is
     // ignored rather than refused, as `plotCorners` is: the union is the claim.
-    const pg = b["plotGrid"];
-    if (pg !== undefined && pg !== "polygon" && pg !== "circle") {
-      e.push(`${at}: "plotGrid" must be "polygon" or "circle"`);
-    }
     // C12 I46 — the compact box's run. Ignored where a form has no box, as
     // `plotCorners` and `plotGrid` are: the union is the claim.
-    const pb = b["plotBox"];
-    if (pb !== undefined && pb !== "solid" && pb !== "line") {
-      e.push(`${at}: "plotBox" must be "solid" or "line"`);
-    }
     plotHierarchyErrors(b, e, at, form);
     plotGraphErrors(b, e, at, form);
     plotAxisErrors(b, e, at, form);
@@ -2016,12 +2102,6 @@ function plotFieldErrors(
   const layers = b["layers"];
   const levels = b["levels"];
 
-  if (dim !== undefined && dim !== "none" && dim !== "floor") {
-    e.push(`${at}: "fieldDim" must be "none" or "floor"`);
-  }
-  if (ink !== undefined && ink !== "own" && ink !== "contrast") {
-    e.push(`${at}: "glyphInk" must be "own" or "contrast"`);
-  }
   if (levels !== undefined && (!Array.isArray(levels) || levels.some((v) => typeof v !== "number"))) {
     e.push(`${at}: "levels" must be an array of numbers`);
   }
@@ -2509,9 +2589,6 @@ function plotSizeErrors(b: Record<string, unknown>, e: string[], at: string): vo
   if (aspect !== undefined && (!isFiniteNumber(aspect) || aspect <= 0)) {
     e.push(`${at}: "aspect" must be a finite number above zero (C04 I62)`);
   }
-  if (align !== undefined && align !== "left" && align !== "centre" && align !== "right") {
-    e.push(`${at}: "align" must be "left", "centre" or "right" (C04 I62)`);
-  }
   if (align !== undefined && width === undefined && aspect === undefined) {
     e.push(
       `${at}: "align" with neither "width" nor "aspect" (C04 I62) — a figure that fills its ` +
@@ -2625,24 +2702,9 @@ function plotCalendarErrors(
   at: string,
   form: unknown,
 ): void {
-  const anchor = b["matrixAnchor"];
-  if (
-    anchor !== undefined
-    && anchor !== "stretch" && anchor !== "window" && anchor !== "left" && anchor !== "uniform"
-  ) {
-    e.push(
-      `${at}: "matrixAnchor" must be "stretch", "window", "left" or "uniform" (C04 I50b, F213) — ` +
-        `an unknown anchor falls through to "window", so the matrix renders right-anchored with a ` +
-        `blank fringe and nothing says the value was not understood`,
-    );
-  }
-
   const unit = b["calendarUnit"];
   if (unit === undefined) return;
-  if (unit !== "hour" && unit !== "day" && unit !== "week" && unit !== "month") {
-    e.push(`${at}: "calendarUnit" must be "hour", "day", "week" or "month" (C04 I62)`);
-    return;
-  }
+  if (!isKnownPlotValue("calendarUnit", unit)) return; // C04 I118
   if (form !== "calendar") {
     e.push(
       `${at}: "calendarUnit" on form "${String(form)}" (C04 I62, C12 §3ae) — only a calendar has a ` +
@@ -2685,10 +2747,7 @@ function plotAxisErrors(
 ): void {
   const ya = b["yAxis"];
   const yc = b["yCallout"];
-  const known = ya === "left" || ya === "right" || ya === "both" || ya === false;
-  if (ya !== undefined && !known) {
-    e.push(`${at}: "yAxis" must be "left", "right", "both" or false`);
-  }
+  const known = isKnownPlotValue("yAxis", ya); // C04 I118 — membership is the table's
   const DRAWS = new Set(["last", "name", "both"]);
   // **The member had no scope until `HAS_DETAIL_RUNGS`** (F220). One reader in
   // `src/`, three call sites, and nothing refused it anywhere — so it was
@@ -2696,10 +2755,8 @@ function plotAxisErrors(
   // *accepted at construction and ignored at render* in a member rather than a
   // record.
   const pd = b["plotDetail"];
-  if (pd !== undefined) {
-    if (pd !== "auto" && pd !== "compact" && pd !== "full") {
-      e.push(`${at}: "plotDetail" must be "auto", "compact" or "full" (C12 I34)`);
-    } else if (HAS_DETAIL_RUNGS[form as PlotForm] === false) {
+  if (pd !== undefined && isKnownPlotValue("plotDetail", pd)) {
+    if (HAS_DETAIL_RUNGS[form as PlotForm] === false) {
       e.push(
         `${at}: "plotDetail" is ${JSON.stringify(pd)} on form ${JSON.stringify(form)} ` +
           `(C12 I34) — that form has one figure and no ladder of rungs to pick from`,
@@ -2725,9 +2782,6 @@ function plotAxisErrors(
           `beneath its plot area for a title to sit under`,
       );
     }
-  }
-  if (yc !== undefined && yc !== "none" && !DRAWS.has(yc as string)) {
-    e.push(`${at}: "yCallout" must be "none", "last", "name" or "both"`);
   }
   if (ya !== undefined && known && ya !== "left" && HAS_Y_GUTTER[form as PlotForm] === false) {
     e.push(
