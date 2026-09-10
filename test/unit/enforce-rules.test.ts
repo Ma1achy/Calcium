@@ -3255,3 +3255,48 @@ describe("SS52 — a NUL makes a file invisible to every search", () => {
     }
   });
 });
+
+describe("make check — the lint corpus is the repository's own sources (F1079)", () => {
+  it("T2.129 (F1079): eslint itself says the generated and scratch trees are out, and the sources are in", async () => {
+    // **Asked of eslint rather than read off the config.** A row that matched
+    // `ignores` against a list of strings would be measuring the prose: the
+    // pattern language is eslint's, `ignores` in a config object with no other
+    // key means something particular, and neither is checkable by reading. This
+    // asks the resolver the question the gate asks it.
+    //
+    // What it is for: `eslint .` had no `ignores` at all, so **745** files
+    // decided `make check` — 371 of them `dist/`, 87 scratch under `out/` — and
+    // **999** with the verification worktree in place, which is the procedure
+    // this repository uses to check a commit. The rule block is `tools/**`
+    // relative to the config, so nested copies got no rules; what fires
+    // everywhere is a **parsing** error, and a scratch probe with one stray
+    // paren took the gate red.
+    const { ESLint } = await import("eslint");
+    const linter = new ESLint();
+
+    for (const path of [
+      "dist/index.js",
+      "dist/interaction/parser/parse.js",
+      "out/probe/anything.mjs",
+      // The verification worktree, which `git worktree add out/verify <sha>`
+      // puts a whole second copy of the tree into.
+      "out/verify/tools/enforce/index.mjs",
+      "out/verify/src/index.js",
+      "coverage/lcov-report/index.js",
+    ]) {
+      expect(await linter.isPathIgnored(path), `${path} must not decide this gate`).toBe(true);
+    }
+
+    // **The control, and it is the whole row.** Ignoring everything satisfies
+    // every assertion above and turns `make check`'s lint half into a no-op —
+    // which is A03 §2's vacuity class arriving in a gate's configuration rather
+    // than in a rule.
+    for (const path of [
+      "tools/enforce/index.mjs",
+      "tools/instruments.mjs",
+      "eslint.config.js",
+    ]) {
+      expect(await linter.isPathIgnored(path), `${path} is a source and must be linted`).toBe(false);
+    }
+  });
+});
