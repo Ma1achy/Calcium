@@ -44990,7 +44990,7 @@ member, and the corpus holds none — counted, not asserted.
 |---|---|
 | **Surface** | `.github/workflows/ci.yml` `on:` against A04 §6's trigger table |
 | **Reached for** | F812, asking why a finding blocked on *the next run is the measurement* had waited |
-| **Verdict** | **open** — the trigger is fixed here; the measurement F812 wants is the first run, and a run is not a claim until it exists |
+| **Verdict** | **closed** — the trigger is fixed and the branch has a green run, which is the measurement the entry asked for |
 
 ### Three records, two of them agreeing and wrong
 
@@ -45082,6 +45082,26 @@ waiting to happen: *somebody looked, diagnosed it right, and fixed the ref they
 were standing on*. Recorded here rather than discovered from `main` in a
 fortnight. The close-out reads `gh run list --branch main --limit 1` after the
 merge, not the branch's own green.
+
+### Closed, on the second run this branch has ever had
+
+The first was the fix's own push and it was red — two rows, F1087 and F1088,
+neither of which had anything to do with the trigger and both of which had been
+waiting for a runner to see them. The second is green:
+
+```
+run 34497559553 · fast · success · eight minutes fifty-nine
+install → enforce → check → instruments → audit → regime → test
+```
+
+**So the entry's own measurement was two findings deep before it could report on
+itself**, which is the argument for the trigger rather than against it: those two
+rows had been in the tree for as long as the branch, green on every developer
+machine, and the only thing that had ever been wrong was that nothing on a
+runner had read them.
+
+`degraded`, `full`, `proof` and `publish` skipped, which is the design — and
+what F1089 is about.
 
 ## F1087 — a contract row writes to `out/`, which a fresh checkout does not have ★★★
 
@@ -45403,7 +45423,7 @@ until it is merged.
 |---|---|
 | **Surface** | `docs/architecture/A04_repo_scaffolding.md` §6, the table's first row |
 | **Reached for** | the first green CI run this branch has ever had, which is F1086's closing measurement |
-| **Verdict** | **open** |
+| **Verdict** | **closed** — the row carries the runner's figures and names the two stages it actually runs |
 
 ### The row
 
@@ -45482,3 +45502,17 @@ at the sentence it came in for.**
   294 s for the same five stages, so two runs bracket the figure.
 - **`make instruments` being new to the job.** `git log -S` puts it in `fast`
   from 2026-08-12, twenty-nine days before this reading.
+
+### Closed, and what the row says now
+
+§6's first row takes the measured nine minutes and names the two stages beside
+it rather than splicing them into the arrow, because that arrow is the shape all
+three repos share. The step table is in the section under it, with the dates and
+the commit that moved one record and not the other.
+
+**What the promise was for is restated rather than deleted.** The row is the
+inner loop, so what belongs in it is what changes a decision *within the push*.
+That test survives the figure being wrong, and it is the thing a future reader
+needs — a budget in seconds would only have gone stale again. Whether
+`instruments` clears that bar is left open in the spec as a live question with
+its own cost argument, which is a different change from this one.
