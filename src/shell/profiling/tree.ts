@@ -91,6 +91,21 @@ export function closeNode(node: OpenNode, at: number): number {
   return self;
 }
 
+/**
+ * Which seam entered an element's span (C28 I31).
+ *
+ * **Required, and that is the finding.** The registry decoration opens a span in
+ * the `measure` wrapper and another in the `render` wrapper, both keyed on
+ * `kind#id` alone — so one counter held both, and the ratio built on it was
+ * printed as *measured more than once per frame* over a figure whose floor is 2
+ * for every block that is both measured and rendered. Measured over a 35-frame
+ * session: `group#chrome.header` is 0 measures against 35 renders and
+ * `table#profile-table` is 67 against 0, a spread no single counter can express
+ * (F1098). An optional parameter with a default would have kept every existing
+ * call site compiling and recorded a lie for each one.
+ */
+export type ElementOp = "measure" | "render";
+
 /** One node's totals across the session. */
 export type NodeStat = Readonly<{
   key: string;
@@ -100,12 +115,37 @@ export type NodeStat = Readonly<{
    *
    * **Part of the identity, not a label.** A block id is unique within its own
    * document (C04 I14) and a transcript holds many, so `kind#id` alone merges
-   * two components into one row — and the merged row's `calls / frames` is the
-   * sum of their numerators over one denominator, which is the layout-thrash
-   * signal `calls` exists to produce. Measured at 2.3 per frame true against
+   * two components into one row — and the merged row's `measures / frames` is
+   * the sum of their numerators over one denominator, which is the layout-thrash
+   * signal the count exists to produce. Measured at 2.3 per frame true against
    * 5.3 reported (F892).
    */
   entry?: string;
+  /**
+   * Opens of the `measure` seam — **the thrash figure's numerator** (C28 I31).
+   *
+   * `measures / frames` above 1 is the same block measured twice inside one
+   * frame, which is repeated work whatever it cost. This is the reading I31 has
+   * always claimed to publish and `calls / frames` could not give, because that
+   * quotient's floor is 2 for a block that is drawn at all.
+   */
+  measures: number;
+  /**
+   * Opens of the `render` seam — the same defect on the other side.
+   *
+   * Beside `measures` rather than folded into it: a block rendered twice in a
+   * frame is repeated work too, and a reader who cannot see which seam repeated
+   * cannot tell a height pass from a paint pass.
+   */
+  renders: number;
+  /**
+   * `measures + renders` — how often the registry was entered for this block at
+   * all.
+   *
+   * Kept, because it is a real question and `panes.ts` asks it: the seam-entry
+   * count is what says a node was *reached* more than its siblings. It is not
+   * the thrash figure and no marker reads it (F1098).
+   */
   calls: number;
   self: number;
   total: number;
@@ -117,28 +157,48 @@ export type NodeStat = Readonly<{
 /**
  * Per-key totals, bounded by the number of distinct keys.
  *
- * `frames` is separate from `calls` on purpose. A node measured once per frame
- * over forty frames and a node measured forty times in one frame have the same
- * `calls` and are completely different defects; the ratio is the one that says
- * *this was recomputed within a single frame*, which is the layout-thrash
- * reading and the whole reason the count is kept beside the duration.
+ * `frames` is separate from the counts on purpose. A node measured once per
+ * frame over forty frames and a node measured forty times in one frame have the
+ * same `measures` and are completely different defects; the ratio is the one
+ * that says *this was recomputed within a single frame*, which is the
+ * layout-thrash reading and the whole reason the count is kept beside the
+ * duration.
+ *
+ * **And the ratio's numerator must be one population.** `calls / frames` was the
+ * figure a formatter printed under that sentence for as long as this class
+ * existed, and it sums a measure with a render, so its floor is 2 for a block
+ * that is drawn — a rate neither population has (F1098, and F892's symptom from
+ * a second merge).
  */
 export class Aggregate {
   readonly #rows = new Map<string, {
     key: string; entry: string | null;
-    calls: number; self: number; total: number; max: number; frames: number; lastFrame: number;
+    measures: number; renders: number;
+    self: number; total: number; max: number; frames: number; lastFrame: number;
   }>();
 
-  add(key: string, entry: string | null, self: number, total: number, frame: number): void {
+  add(
+    key: string,
+    entry: string | null,
+    op: ElementOp,
+    self: number,
+    total: number,
+    frame: number,
+  ): void {
     const at = entry === null ? key : `${entry}\u0000${key}`;
     const row = this.#rows.get(at);
     if (row === undefined) {
       this.#rows.set(at, {
-        key, entry, calls: 1, self, total, max: self, frames: 1, lastFrame: frame,
+        key,
+        entry,
+        measures: op === "measure" ? 1 : 0,
+        renders: op === "render" ? 1 : 0,
+        self, total, max: self, frames: 1, lastFrame: frame,
       });
       return;
     }
-    row.calls += 1;
+    if (op === "measure") row.measures += 1;
+    else row.renders += 1;
     row.self += self;
     row.total += total;
     if (self > row.max) row.max = self;
@@ -169,7 +229,10 @@ export class Aggregate {
       out.push(Object.freeze({
         key: r.key,
         ...(r.entry === null ? {} : { entry: r.entry }),
-        calls: r.calls, self: r.self, total: r.total, max: r.max, frames: r.frames,
+        measures: r.measures,
+        renders: r.renders,
+        calls: r.measures + r.renders,
+        self: r.self, total: r.total, max: r.max, frames: r.frames,
       }));
     }
     out.sort((a, b) => b.self - a.self);

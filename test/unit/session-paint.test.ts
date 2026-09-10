@@ -752,7 +752,7 @@ describe("C22 §4a — one overlay layout per frame, shared by the rows and the 
     expect(calls, "the thunk answered once for both").toBe(1);
   });
 
-  it("T4.64 (C09 I61, C22 I86; C28 I31): a real session's chrome children are measured once per registry call — header 2.0 calls per frame, footer one more for compose's own call", async () => {
+  it("T4.64 (C09 I61, C22 I86; C28 I31): a real session's chrome children are measured once per registry call — the header pair once per frame and the footer pair twice, for compose's own call", async () => {
     let seen: ProfileReport | null = null;
     const { tui } = await buildSession({
       profile: {
@@ -775,17 +775,25 @@ describe("C22 §4a — one overlay layout per frame, shared by the rows and the 
       return found;
     };
 
-    // **`calls` counts the registry seam — one measure and one render is the
-    // floor for a rendered block** (C28 I31). The header's children read 3.0 and
-    // the footer's 4.0 before the registry answered a `(block, width)` once per
-    // call (F940): the group's `measure` asked, its `render`'s placements asked
-    // again, and the child's own render committed a third.
+    // **The two seams, apart** (C28 I31). `calls` is `measures + renders`, so it
+    // was 2 for a block measured once and rendered once — and for as long as one
+    // counter held both, this file was the only place the composition was
+    // written down while the report divided the sum by `frames` and printed
+    // *measured more than once per frame* against it (F1098). The header's
+    // children read 3.0 and the footer's 4.0 before the registry answered a
+    // `(block, width)` once per call (F940): the group's `measure` asked, its
+    // `render`'s placements asked again, and the child's own render committed a
+    // third.
     const header = node("group", "chrome.header");
     const headerLeft = node("pills", "chrome.header.left");
     const headerRight = node("pills", "chrome.header.right");
-    expect(header.calls, "the header group is rendered once per frame and measured by nobody").toBe(header.frames);
-    expect(headerLeft.calls, "one measure and one render per frame").toBe(2 * headerLeft.frames);
-    expect(headerRight.calls, "one measure and one render per frame").toBe(2 * headerRight.frames);
+    expect(header.renders, "the header group is rendered once per frame").toBe(header.frames);
+    expect(header.measures, "and measured by nobody — 0, not a small number").toBe(0);
+    for (const pills of [headerLeft, headerRight]) {
+      expect(pills.measures, "measured once per frame").toBe(pills.frames);
+      expect(pills.renders, "and rendered once").toBe(pills.frames);
+      expect(pills.calls, "which is where the sum's floor of 2 comes from").toBe(2 * pills.frames);
+    }
 
     // **The footer is one call more, and the call is compose's** (C22 I82):
     // `footerRows` is measured through `measureSequence` before the frame is
@@ -796,9 +804,18 @@ describe("C22 §4a — one overlay layout per frame, shared by the rows and the 
     const footer = node("group", "chrome.footer");
     const footerLeft = node("pills", "chrome.footer.left");
     const footerRight = node("pills", "chrome.footer.right");
-    expect(footer.calls, "compose's measure and paint's render").toBe(2 * footer.frames);
-    expect(footerLeft.calls, "the header's two plus compose's one").toBe(3 * footerLeft.frames);
-    expect(footerRight.calls, "the header's two plus compose's one").toBe(3 * footerRight.frames);
+    expect(footer.measures, "compose measures the footer group").toBe(footer.frames);
+    expect(footer.renders, "and paint renders it").toBe(footer.frames);
+    // **The one genuine intra-frame repetition on the default chrome**, and the
+    // reading `measures / frames` exists to produce: 2 against the header pair's
+    // 1, in the same session. Under the merged counter both pairs sat above the
+    // marker's threshold and the difference between them was one step of a floor
+    // the table never stated.
+    for (const pills of [footerLeft, footerRight]) {
+      expect(pills.measures, "measured twice — compose's pass and paint's").toBe(2 * pills.frames);
+      expect(pills.renders, "and rendered once").toBe(pills.frames);
+      expect(pills.calls, "the header's two plus compose's one").toBe(3 * pills.frames);
+    }
   });
 });
 

@@ -129,10 +129,10 @@ describe("C28 — profiler, tier 6 spec-first rows", () => {
     const p = createProfiler({ tier: "spans" }, { elapsed: () => now });
     p.beginFrame("input");
     {
-      using _outer = p.element("group", "g1");
+      using _outer = p.element("group", "g1", "measure");
       now += 2;
       {
-        using _inner = p.element("plot", "pl-1");
+        using _inner = p.element("plot", "pl-1", "measure");
         now += 30;
       }
       now += 1;
@@ -187,7 +187,7 @@ describe("C28 — profiler, tier 6 spec-first rows", () => {
     const p = createProfiler({ tier: "off" }, { elapsed: () => now });
     p.commit("input", false);
     p.beginFrame("input");
-    { using _e = p.element("plot", "pl-1"); now += 5; }
+    { using _e = p.element("plot", "pl-1", "measure"); now += 5; }
     now = 20;
     p.endFrame("frame");
 
@@ -277,7 +277,7 @@ describe("C28 — profiler, tier 6 spec-first rows", () => {
     p.beginFrame("input");
     {
       using _e = p.entry("e1");
-      using _b = p.element("table", "t1");
+      using _b = p.element("table", "t1", "measure");
       now += 3;
     }
     p.endFrame("frame");
@@ -296,7 +296,7 @@ describe("C28 — profiler, tier 6 spec-first rows", () => {
   it("T6.11 (C28 I42): kind#id is an identity within one document and only there", () => {
     // **The revert is what a reader writes believing the key is unique.** It is
     // — within a document (C04 I14) — and a transcript holds many, so the merged
-    // row's `calls / frames` is the sum of two numerators over one denominator.
+    // row's `measures / frames` is the sum of two numerators over one denominator.
     // Measured on a real session at 2.3 per frame true against 5.3 reported.
     let now = 0;
     const p = createProfiler({ tier: "spans" }, { elapsed: () => now });
@@ -305,7 +305,7 @@ describe("C28 — profiler, tier 6 spec-first rows", () => {
       p.beginFrame("input");
       for (const id of ["e1", "e2"]) {
         using _e = p.entry(id);
-        using _b = p.element("table", "t1");
+        using _b = p.element("table", "t1", "measure");
         now += 1;
       }
       p.endFrame("frame");
@@ -317,7 +317,7 @@ describe("C28 — profiler, tier 6 spec-first rows", () => {
     // a repair that split the rows and left `frames` shared passes that and
     // still reports the ratio nobody's block has.
     expect(
-      rows.map((n) => n.calls / n.frames),
+      rows.map((n) => n.measures / n.frames),
       "and no row claims to be measured twice per frame",
     ).toStrictEqual([1, 1]);
 

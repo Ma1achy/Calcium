@@ -459,7 +459,7 @@ describe("C28 — profiler, tier 3 spec-first rows", () => {
     c.at(30);
     p.commit("input", false);
     p.beginFrame("input");
-    { using _e = p.element("plot", "pl-1"); }
+    { using _e = p.element("plot", "pl-1", "measure"); }
     { using _n = p.entry("e-1"); }
     p.endFrame("frame");
     p.setTier("alloc");

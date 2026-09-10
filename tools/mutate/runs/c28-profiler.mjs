@@ -97,7 +97,7 @@ const results = runPass({
   run,
   control: {
     file: REC,
-    from: "      const { node, ctx } = begin(`${kind}#${id}`);\n      return new ElementHandle(node, ctx, kind, currentEntry);",
+    from: "      const { node, ctx } = begin(`${kind}#${id}`);\n      return new ElementHandle(node, ctx, kind, op, currentEntry);",
     to: "      return NO_SPAN;",
     why: "no element is ever opened, so the per-element table is empty — a run where this survives cannot see a kill",
   },
@@ -162,8 +162,8 @@ const results = runPass({
       // ordered.
       name: "AGGREGATE-TOTAL: the per-key row records inclusive time as self",
       file: REC,
-      from: "      nodes.add(this.node.name, this.entry, spent, this.node.total ?? spent, seq);",
-      to: "      nodes.add(this.node.name, this.entry, this.node.total ?? spent, this.node.total ?? spent, seq);",
+      from: "      nodes.add(this.node.name, this.entry, this.op, spent, this.node.total ?? spent, seq);",
+      to: "      nodes.add(this.node.name, this.entry, this.op, this.node.total ?? spent, this.node.total ?? spent, seq);",
       expect: "T1.34",
     },
     {
@@ -671,14 +671,14 @@ const results = runPass({
     {
       // **The key, which is F892's whole subject.** A block id is unique within
       // its document and a transcript holds many; without the entry, two
-      // components are one row and the row's `calls / frames` is the sum of two
+      // components are one row and the row's `measures / frames` is the sum of two
       // numerators over one denominator. Measured on a real session at 2.3 per
       // frame true against 5.3 reported — and the report stays well-formed,
       // ordered and plausible throughout, which is this file's whole premise.
       name: "ENTRY-DROPPED: the aggregate keys by the block id alone",
       file: REC,
-      from: "      nodes.add(this.node.name, this.entry, spent, this.node.total ?? spent, seq);",
-      to: "      nodes.add(this.node.name, null, spent, this.node.total ?? spent, seq);",
+      from: "      nodes.add(this.node.name, this.entry, this.op, spent, this.node.total ?? spent, seq);",
+      to: "      nodes.add(this.node.name, null, this.op, spent, this.node.total ?? spent, seq);",
       expect: "T1.67",
     },
     {
@@ -689,6 +689,19 @@ const results = runPass({
       from: "    const at = entry === null ? key : `${entry}\\u0000${key}`;",
       to: "    const at = key;",
       expect: "T1.67",
+    },
+    {
+      // **The same harm from the other merge** (F1098). F1092's — F892's — was
+      // two entries under one key; this is two *operations* under one counter,
+      // and the symptom is identical: a ratio whose numerator is a union names
+      // a rate neither population has. The report stays well-formed, every row
+      // is present and ordered, and every drawn block reads 2 per frame under
+      // the words *measured more than once per frame*.
+      name: "OPS-MERGED: the render seam increments the measure counter",
+      file: TREE,
+      from: '    if (op === "measure") row.measures += 1;\n    else row.renders += 1;',
+      to: "    row.measures += 1;",
+      expect: "T1.33b",
     },
     {
       // Unattributed work filed under a name, which is the wrong attribution
@@ -954,8 +967,8 @@ const results = runPass({
     {
       name: "INCLUSIVE-AS-SELF: a container is charged its children's time",
       file: REC,
-      from: "      nodes.add(this.node.name, this.entry, spent, this.node.total ?? spent, seq);",
-      to: "      nodes.add(this.node.name, this.entry, this.node.total ?? spent, this.node.total ?? spent, seq);",
+      from: "      nodes.add(this.node.name, this.entry, this.op, spent, this.node.total ?? spent, seq);",
+      to: "      nodes.add(this.node.name, this.entry, this.op, this.node.total ?? spent, this.node.total ?? spent, seq);",
       expect: "T6.4",
     },
     {

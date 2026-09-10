@@ -10,9 +10,15 @@
  * `this.render` resolve through. `renderChild` is `this.render` exactly;
  * `measureChild` is the registry's `#measureChild` since C09 I61, which reads
  * the call's height memo first and reaches `this.measure` only on a miss — so
- * a wrapper installed here is entered for every child that had to be
- * *answered*, at every depth, and the `calls` column counts questions rather
- * than reads (F940). Not one line changes in `src/presentation/`.
+ * a wrapper installed here is entered for every child the registry had to
+ * **work out**, at every depth, and **never for one it read back from the
+ * memo** (F940). Not one line changes in `src/presentation/`.
+ *
+ * That last clause used to read *counts questions rather than reads*, which
+ * admits both senses — *questions in place of reads*, and *questions, reads
+ * included* — and a finding was filed on the second, against a memo hit that
+ * cannot reach here. `registry.ts:231` says the same thing unambiguously and
+ * always did (F1098).
  *
  * MG1 is what makes that safe rather than clever: `src/shell/profiling/` is
  * rank 4, nothing below it can import it, and the registry never learns a
@@ -98,13 +104,19 @@ export function instrumentRegistry(registry: ProbeableRegistry, prof: Profiler):
   // disabled path allocates nothing. This matters here and not in a block
   // definition because the subject is 0.6 µs; an array allocation is invisible
   // beside a 2 ms plot render and dominates a rule's measure.
+  // **The operation is passed, and it is the difference between a rate and a
+  // sum.** Both of these open a span on `kind#id`; under one counter a block
+  // measured once and rendered once reported 2.0 per frame under the words
+  // *measured more than once per frame*, so the marker fired on eight rows of
+  // nine and the two nodes genuinely measured twice sat one step above a floor
+  // the table never stated (C28 I31, F1098).
   const measured = (block: Block, width: number): number => {
-    using _s = prof.element(block.kind, block.id);
+    using _s = prof.element(block.kind, block.id, "measure");
     return measure(block, width);
   };
 
   const rendered = (block: Block, ctx: unknown): unknown => {
-    using _s = prof.element(block.kind, block.id);
+    using _s = prof.element(block.kind, block.id, "render");
     return render(block, ctx);
   };
 

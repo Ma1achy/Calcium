@@ -276,18 +276,40 @@ console.log(formatPhases(phases));
 
 // --- which component ---------------------------------------------------------
 
+// **Two seams, and the marker reads one of them** (C28 I31, F1098).
+//
+// The registry decoration opens a span in the `measure` wrapper and another in
+// the `render` wrapper, both on `kind#id`. Under a single counter this table
+// divided their sum by `frames` and printed *measured more than once per frame*
+// against it — so a block that is both measured and rendered had a floor of 2.0
+// and the marker fired on eight of the nine rows a real session produces, while
+// the two nodes genuinely measured twice inside a frame read 3.0, one step above
+// a floor the table never stated.
+//
+// The cost was not hypothetical. C28's plan lists *a group measures every child
+// 3×* as an open defect, this table flagged exactly that shape, and F940's memo
+// had already fixed it — `registry.ts`'s memo header records the before at 3.0
+// and 4.0 per frame, so the flagged number and the fixed number were the same
+// number, one lower, in the same units, under a caption saying *measured*.
 console.log(`\n## Slowest elements — per instance, measured (C28 I31)\n`);
-console.log("| entry | element | total ms | self ms | calls | frames | calls/frame |");
-console.log("|---|---|---|---|---|---|---|");
+console.log(
+  "`measures / frames` above 1 is the same block measured twice inside one frame, which is\n" +
+    "repeated work whatever it cost. The two seams are separate columns because their sum has a\n" +
+    "floor of 2 for any block that is drawn, so a marker reading the sum fires on nearly every\n" +
+    "row and says nothing — that sum is `NodeStat.calls`, kept in the report and shown in the\n" +
+    "profiler's own pane, and left out here because it is these two columns added up (F1098).\n",
+);
+console.log("| entry | element | total ms | self ms | measures | renders | frames | measures/frame |");
+console.log("|---|---|---|---|---|---|---|---|");
 const worst = [...report.nodes].sort((a, x) => x.self - a.self).slice(0, 10);
 for (const n of worst) {
   // **Against the node's own `frames`, not the session's** — the field's own
   // comment says so. A node on screen for 5 frames of 14, measured twice in
   // each, is thrashing at 2.0; divided by the session it reads 0.7 and looks
   // fine. The first draft divided by the session.
-  const per = n.frames === 0 ? 0 : n.calls / n.frames;
+  const per = n.frames === 0 ? 0 : n.measures / n.frames;
   console.log(
-    `| ${n.entry === undefined ? "*chrome*" : `\`${n.entry}\``} | \`${n.key}\` | ${n.total.toFixed(2)} | ${n.self.toFixed(2)} | ${String(n.calls)} | ${String(n.frames)} | ${per.toFixed(1)}${per > 1.05 ? " <-- measured more than once per frame" : ""} |`,
+    `| ${n.entry === undefined ? "*chrome*" : `\`${n.entry}\``} | \`${n.key}\` | ${n.total.toFixed(2)} | ${n.self.toFixed(2)} | ${String(n.measures)} | ${String(n.renders)} | ${String(n.frames)} | ${per.toFixed(1)}${per > 1.05 ? " <-- measured more than once per frame" : ""} |`,
   );
 }
 

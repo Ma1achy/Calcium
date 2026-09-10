@@ -25,6 +25,7 @@ import type { Profiler } from "../../src/shell/profiling/types.js";
 import type { Group } from "../../src/data/viewmodel/index.js";
 import type { BlockRegistry } from "../../src/presentation/blocks/index.js";
 import type { ProfileReport } from "../../src/shell/profiling/types.js";
+import type { ElementOp } from "../../src/shell/profiling/types.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import { DARK_THEME, FULL_CAPS } from "../support/render.js";
 
@@ -258,16 +259,54 @@ describe("C28 I31 — an element's cost is measured, never divided out of a tota
 
     const rule = prof.report().nodes.find((n) => n.key === "rule#r1");
     expect(rule?.frames, "one frame was open for all three passes").toBe(1);
-    expect(rule?.calls, "three sequence passes reached the same block").toBeGreaterThanOrEqual(3);
+    expect(rule?.measures, "three sequence passes reached the same block").toBeGreaterThanOrEqual(3);
+    expect(rule?.renders, "and nothing was rendered — three measure passes only").toBe(0);
     expect(
-      (rule?.calls ?? 0) / (rule?.frames ?? 1),
+      (rule?.measures ?? 0) / (rule?.frames ?? 1),
       "above 1 is work repeated inside one frame",
     ).toBeGreaterThan(1);
   });
 
-  // **Spec-first**: C28 T1.33b lands with I31's split, and this row becomes real
-  // in the commit that gives `element` its operation (F1098).
-  it.todo("T1.33b (C28 I31): one measure and one render in one frame reads 1 and 1, and 2 only in the sum — not deferred on a component, this is spec-first and lands with I31's split");
+  it("T1.33b (C28 I31): one measure and one render in one frame reads 1 and 1, and 2 only in the sum", () => {
+    // **The union control.** The registry decoration opens a span in the
+    // `measure` wrapper and another in the `render` wrapper, both on `kind#id`.
+    // Under one counter this block reported 2 per frame and the report printed
+    // *measured more than once per frame* against it — a floor, not a defect,
+    // and the marker fired on eight of the nine rows a real session produces
+    // (F1098).
+    //
+    // **Both halves are asserted**, because each alone is satisfied by a wrong
+    // repair: the split alone passes a row checking only `measures`, and
+    // dropping the sum passes a row checking only the two parts while leaving
+    // `panes.ts`'s seam-entry column with nothing behind it.
+    const clock = fakeClock();
+    const prof = profiler(clock.now);
+
+    prof.beginFrame("input");
+    {
+      using _m = prof.element("table", "t1", "measure");
+      clock.advance(2);
+    }
+    {
+      using _r = prof.element("table", "t1", "render");
+      clock.advance(3);
+    }
+    prof.endFrame("frame");
+
+    const row = prof.report().nodes.find((n) => n.key === "table#t1");
+    expect(row?.frames, "one frame").toBe(1);
+    expect(row?.measures, "measured once").toBe(1);
+    expect(row?.renders, "rendered once").toBe(1);
+    expect(row?.calls, "and the seam was entered twice").toBe(2);
+    expect(
+      (row?.measures ?? 0) / (row?.frames ?? 1),
+      "so the thrash figure is 1 — this block was not recomputed",
+    ).toBe(1);
+    expect(
+      (row?.calls ?? 0) / (row?.frames ?? 1),
+      "while the sum reads 2, which is the floor every drawn block sits at",
+    ).toBe(2);
+  });
 
   it("T1.34 (C28 I31): a parent reports self time, so a child is not counted twice", () => {
     // An inclusive parent makes the outermost node the widest bar in every tree
@@ -277,10 +316,10 @@ describe("C28 I31 — an element's cost is measured, never divided out of a tota
 
     prof.beginFrame("input");
     {
-      using _outer = prof.element("group", "g");
+      using _outer = prof.element("group", "g", "measure");
       clock.advance(2); // the parent's own work
       {
-        using _inner = prof.element("plot", "p");
+        using _inner = prof.element("plot", "p", "measure");
         clock.advance(8);
       }
       clock.advance(1);
@@ -316,9 +355,9 @@ describe("C28 I31 — what each tier costs the seam it decorates", () => {
     return new Proxy(prof, {
       get(target, key) {
         if (key === "element") {
-          return (kind: string, id: string): Disposable => {
+          return (kind: string, id: string, op: ElementOp): Disposable => {
             tally.element += 1;
-            return target.element(kind, id);
+            return target.element(kind, id, op);
           };
         }
         const value = Reflect.get(target, key, target);
@@ -392,7 +431,7 @@ describe("C28 I32 — a tree per frame, retained only for the worst", () => {
 
     for (const cost of [1, 50]) {
       prof.beginFrame("input");
-      using _s = prof.element("plot", "p");
+      using _s = prof.element("plot", "p", "measure");
       clock.advance(cost);
       _s[Symbol.dispose]();
       prof.endFrame("frame");

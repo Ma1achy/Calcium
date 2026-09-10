@@ -146,7 +146,7 @@ describe("C28 — the trace document", () => {
     clock.at(0);
     prof.beginFrame("input");
     {
-      using _el = prof.element("plot", "pl-1");
+      using _el = prof.element("plot", "pl-1", "measure");
       clock.at(3);
       {
         using _phase = prof.span("plot.area");
