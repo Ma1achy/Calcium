@@ -548,17 +548,26 @@ export function checkTriageInventory(io) {
  * **The register's open set** — what is left to do, as a list rather than as a
  * query nobody could write correctly.
  *
- * Thirty-nine, against the sixteen a `**Open**` grep returns. **Eighteen of the
- * difference are `**Partly**`**, a disposition invented for findings whose
- * remedy landed in part, which every reader in this repository was silently
- * counting as done — the third-state problem the mutation harness has twice
- * (F897, F949), arriving in the document that says what remains.
+ * **Thirty-nine when this rule was written**, against the sixteen a `**Open**`
+ * grep returns. **Eighteen of the difference are `**Partly**`**, a disposition
+ * invented for findings whose remedy landed in part, which every reader in this
+ * repository was silently counting as done — the third-state problem the
+ * mutation harness has twice (F897, F949), arriving in the document that says
+ * what remains.
+ *
+ * **The count moves and this sentence must not be read as the current one.**
+ * That is this rule's own subject arriving in its own prose: a figure written
+ * once and left to read as present tense is exactly what the register did to
+ * itself. The only current answer is the list below, and the row that checks it
+ * derives the number rather than restating it — which is why that row stays
+ * green while this paragraph ages. The thirty-nine is kept because the
+ * *difference* is the finding, not the total.
  *
  * Ordered by number, which is the order a reader walks it in.
  */
 export const TRIAGE_OPEN = Object.freeze([
-  "F140", "F141", "F158", "F213", "F271", "F364", "F405", "F414", "F557",
-  "F717", "F812", "F882", "F1024", "F1029", "F1062",
+  "F140", "F158", "F213", "F271", "F405", "F414", "F812",
+  "F1024", "F1029", "F1062", "F1065",
 ]);
 
 /** The words a disposition may be written with. */

@@ -333,12 +333,31 @@ describe("roadmap-status — the Order column's verifier", () => {
     const m = /grep reach · (\d+)\/(\d+) confirmed-OPEN/u.exec(r.out);
     expect(m, "the signal line").not.toBeNull();
     const [carried, total] = [Number(m?.[1]), Number(m?.[2])];
-    // **The floor was 10 and the population reached 10 by entries landing.**
-    // A bound pinned near today's count fails on success, which is the one
-    // direction a roadmap assertion must not fail in — so it is set where the
-    // ratio stops meaning anything rather than where the number happens to be.
-    expect(total, "the confirmed-OPEN population is worth taking a ratio of").toBeGreaterThan(4);
-    expect(carried, "some entries do carry their own symbol").toBeGreaterThan(0);
+    // **The floor failed on success three times and the third one is the finding
+    // (F1063).** It was 10, was moved to 4 because *a bound pinned near today's
+    // count fails on success*, and went red at exactly 4 on the session that
+    // closed the entries. Each repair chose a better number, and the number was
+    // never the problem: **an assertion whose subject is a population's size
+    // cannot be made safe by choosing a better size**, because the work this
+    // repository does moves that size in one direction.
+    //
+    // So the floor is gone, and what replaces it is a relation the run states
+    // twice and this row never checked: **the reach signal's denominator is the
+    // whole confirmed-OPEN population and not a sample of it.** That is the claim
+    // a reader takes from the line — `4/4 confirmed-OPEN entries` reads as *all
+    // four of them* — and it holds at any population including zero, so it cannot
+    // fail on success. It is also the one thing here a wrong implementation could
+    // actually get wrong: RS9's own note records the first draft counting 4 of 19
+    // by measuring the Order row instead of the source text.
+    const header = /·\s*(\d+) confirmed OPEN\b/u.exec(r.out);
+    expect(header, "the header's own confirmed-OPEN count").not.toBeNull();
+    expect(
+      total,
+      "the reach signal's denominator is the whole confirmed-OPEN population, not a sample of it",
+    ).toBe(Number(header?.[1]));
+    // `carried > 0` went with the floor for the same reason: at a population of
+    // zero no entry carries a symbol, so it is the same bound wearing a different
+    // number. The subset relation below survives both regimes.
     // **The ratio inverted 2026-09-04 and the assertion had to invert with it.**
     // It read `carried < total` — *most rest on a blanket claim, that is the
     // finding* — which was true at 5/8 and is a pin on a defect, so it went red

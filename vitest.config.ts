@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
@@ -6,6 +6,39 @@ export default defineConfig({
     // (`--dir test/golden`, `--dir test/e2e`). Anchoring these at `test/`
     // instead makes every `--dir` invocation match nothing.
     include: ["**/*.test.ts", "**/*.test.tsx"],
+    // **`out/` is the repository's scratch directory and the suite was reading
+    // it** (F1064). It is not in `.gitignore`, vitest 4's default exclude is only
+    // `node_modules` and `.git`, and every `npm run` script scopes itself with
+    // `--dir` — so the four gates were never affected and every *targeted* run
+    // was. That is the whole blast radius, and it is the runs lanes actually make.
+    //
+    // Measured at HEAD with no worktree present: **19 loose test files in `out/`,
+    // 2 of them failing and 1 row red**, so a bare `vitest run` was red on files
+    // nobody was asserting anything with. With a verification worktree present it
+    // is **384 more**, a second copy of the whole tree.
+    //
+    // **Both directions are the defect and the passing one is worse.** A stale
+    // copy that fails sends a reader diagnosing a defect the tree does not have —
+    // it did, twice in one session, once to a lane and once here. A stale copy
+    // that passes is counted as coverage for rows that no longer exist.
+    //
+    // The pattern is anchored at any depth rather than at the root, so it holds
+    // under every `--dir` base. Checked before widening: no directory named `out`
+    // under `test/` or `src/`, and `examples/docker/out` holds no test file.
+    //
+    // **The limit, stated because an unrecorded one reads as strength**: an
+    // explicit `--dir out` still collects, because the pattern is matched
+    // against paths relative to that base and there is no `out/` inside `out/`.
+    // That is the deliberate case — someone pointing the runner at the scratch
+    // directory — and the accidental one is what this closes. Measured after:
+    // a bare run collects **384 files, 360 of them under `test/` and 0 under
+    // `out/`**.
+    //
+    // **These are line comments and not a doc block on purpose** — the glob
+    // itself contains the sequence that closes one, so the first draft of this
+    // comment terminated inside the pattern it was describing and the config
+    // failed to parse.
+    exclude: [...configDefaults.exclude, "**/out/**"],
     environment: "node",
     // Every timing test runs on a fake clock (A03 SS1). Real timers here
     // would make the suite flaky in exactly the components that inject one.

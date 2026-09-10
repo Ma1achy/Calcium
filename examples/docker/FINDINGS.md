@@ -42466,3 +42466,371 @@ so raising the cap widens the window rather than the defect.
 The width is the axis measured. `rows` is the other half of the same box and the gather and
 the seam may disagree there too; F1026's sweep did not vary the block's declared height
 against a card, so that half is unmeasured rather than measured-and-clear.
+
+## F1051 — the bubble's size channel has a fourth symptom, and it is a control that does the wrong thing ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/data/viewmodel/types.ts` — `Plot.series` · C22 I78's reader-facing toggle over it |
+| **Reached for** | F271's *the fix is a C04 ruling — a channel that is not a member of `series`* |
+| **Verdict** | **Ruled and costed, not landed** — and the row written to watch the condition found a symptom F271 does not name |
+
+Driven at 72 columns over `[{label:"value",values:[10,40,25]},{label:"size",values:[1,4,2]}]`,
+all three of F271's symptoms reproduce at HEAD: `seriesRange` gives `{min:1,max:40}`, so the
+ordinate's **floor is a size**; three marks are rasterised at each `seriesIndex`, six in all;
+and `identityOf` gives `["value","size"]`, so the legend names it.
+
+**The fourth is in no entry.** `HAS_HIDEABLE_SERIES.bubble` is `true`, so C22 I78's
+`seriesVisibility` reaches the channel. The reader asks to hide `size`; what goes is a
+rasterisation they never asked to see, and **the sizes keep sizing the value bubbles and keep
+owning the axis**, because `bubbleRows` reads `block.series[1]` directly and never asks
+`seriesHidden`. That is not a figure that looks wrong. It is a **control acting on a symptom
+of the defect rather than on data**, which is the class F271's own test cannot see.
+
+**The harness nearly hid it.** The first two runs of the hide probe returned *byte-identical
+frames* for index 0 and index 1 — a collision, because `seriesVisibility` is
+`Record<blockId, Record<index, boolean>>` and the probe passed an array of `{index,hidden}`.
+Both calls degenerated to *nothing hidden* and no per-property comparison could have seen it.
+
+**Ruled**: `sizes?: readonly (number | null)[]` on `Plot`, refused on every form but `bubble`
+and required there — the shape `segments`, `quartiles`, `ohlc` and `vectors` already have —
+with `bubble` refusing a second `series`.
+
+**Not landed, and the cost is the reason.** Eleven golden frames, the `plot-forms` snapshot,
+four fixture and tool files, six C12 suites and five source sites across `definition.ts`,
+`figure.ts` and `svg.ts`. Landing half of it leaves the arms disagreeing with nothing
+announcing it, which is what F271 refused for the same reason.
+
+**What watches the condition, since F271's row watches the remedy.** That row is green for
+exactly as long as the defect is: a fifth symptom, or a second form with a channel inside
+`series`, passes it silently. **T2.128** asserts the fourth symptom off the frame *and* pins
+the count of forms breaking the rule at one, so a second form fails a row.
+
+### What would falsify this
+
+If `bubbleRows` consulted `seriesHidden`, symptom four would be a legend inconsistency rather
+than a control error and the ruling's urgency would drop. Measured: it does not — hiding
+index 1 leaves the value bubbles at their sized radii.
+
+## F1052 — F364's leak is twelve block kinds wide, and the operation its fix would call does not exist ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | C12 I54 and its catalogue assertion, and every block kind that draws a caller's string |
+| **Reached for** | F364's *the ruling on degrading caller-supplied text is owed* |
+| **Verdict** | **Refused at C12, with the reason replaced rather than added to** — the class is C09's and the finding named the wrong subject |
+
+**The class is not C12's.** One `…` driven through thirteen text-bearing kinds through the
+published document surface: `raw`, `notice`, `code`, `events`, `comparison`, `tip`, `pills`,
+`steps`, `keyValue`, `table`, `logs` and `plot` all leak it; `progress`'s fixture did not
+respond. **Twelve of twelve.** F364's five members are five instances of a framework-wide
+class, and its sentence — *the renderer degrades its own glyph tables and passes the caller's
+words through* — is **true about the renderer and names the wrong subject**. A correct
+sentence justifying the wrong decision, and it made a C09 question a C12 one.
+
+**The operation does not exist.** `asciify|foldTo|deunicode|unidecode` returns **zero** hits
+across `src/` and `tools/`. The one `…` substitution in the tree swaps the marker **the
+framework appends when it truncates**, not a character a caller wrote.
+
+**And I54 never said what F364 quotes.** F364 opens with *C12 I54: every frame at
+`unicode: "ascii"` is ASCII*. I54 says an **alphabet** is chosen by capability and every
+**sub-cell repertoire** has a stated substitute. The stronger sentence is the catalogue
+assertion's own — true over the catalogue, false in general. A claim is falsified by being
+summarised, arriving here in the citation rather than in the body.
+
+**Refused with the cost.** A general fold is a transliteration table — a dependency row with
+five justification parts, or a hand table — and it is lossy exactly where it matters: a
+CJK name and an emoji have no ASCII image, so the honest output is `??`, which is worse than
+the terminal's own replacement glyph and silently destroys a name. Degrading in one component
+alone draws one string two ways in one document. Reopen when a fold exists as an operation
+and C09 rules for the class.
+
+**The control caught four vacuous passes on its way.** Looking for a kind that already
+degrades caller text found none — and found four rows where a wrong builder call put a
+framework error row on screen and the absent ellipsis read as *degraded*.
+
+## F1053 — the two sentences that kept `busy` exempt are homonyms of another component's member ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/data/transport/types.ts`, the module graph's unconsumed-member exemptions, C06 §6 |
+| **Reached for** | F882's *C06 still owes the ruling on whether `busy` should be declared* |
+| **Verdict** | **The ruling was never C06's to make, and both premises are in the wrong file** |
+
+The exemption's reason — carried in the gate, in the triage and in F882's body — is that
+`router.ts` records a guard replacing the member and `construct.ts` counts seventeen call
+sites until it, *so the tree documents the deletion twice*.
+
+| the carried premise | measured at HEAD |
+|---|---|
+| *`router.ts` records that a guard replaced the member* | grepping `src/data/transport/router.ts` gives **0 hits**. The sentence is in **C16's input router** — a different member on a different interface, **in a file of the same basename** |
+| *`construct.ts` counts seventeen call sites until it* | that line reads *"C16's sixteen pulls … seventeen until `busy` and `shellChild` became one `inFlight`"*. Also C16's |
+
+So *documented twice* was one file that never said it and one file about another component's
+member. **A count of consumers is an argument only if the consumers share a shape**, and here
+neither citation shares a component with its subject.
+
+**And the ruling had already been taken, the other way.** C16 §5 and C23 I5 settle that
+C23's guard is authoritative and C06's is a backstop. What C16 removed is its **own**
+`RouterDeps.busy`, because a boolean sourced from a backstop could not tell an `app` route
+from a `shell` one. Nothing there asked C06 to stop reporting, and C16 §5 records the
+opposite, refusing to make the shell spawn set C06's.
+
+**What keeps the member.** The guard is a closure binding, so C06 I13 — *at most one
+non-streaming invocation is in flight; every settlement path releases the guard* — is a claim
+about a private variable. `busy` is the only thing that makes it assertable: six rows read
+it, and the row driving a hundred invocations across every settlement path has nothing else
+to compare. Delete it and the fail-on-revert row for *releasing the guard only on success*
+passes.
+
+**Why it is written in the spec rather than left to a gate.** The unconsumed-member rule can
+no longer ask: C28's transport decorator has to *be* a router, so it re-exposes every member
+and the rule sees a reader. That is F882's own general form, and it is why the answer belongs
+in C06 §6 and not in an exemption list.
+
+## F1054 — `SankeyCell` is two arms now, and the runtime keeper is on the only path to the type ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/sankey.ts` and `definition.ts` |
+| **Reached for** | F717's *the structural guarantee is enforced at the call; `SankeyCell` is still the wide record* |
+| **Verdict** | **Closed** — and the blocker F717 named was lane ownership, which the lane that closed it had |
+
+F717 left the union owed because `definition.ts` reads three fields off it *"so that union
+cannot land without editing a file this lane does not own"*. **Both files are
+`src/presentation/plot/`.** The condition was satisfied by the partition rather than by a
+commit — the deferral shape where the condition is written where the deferral is and the
+thing that meets it is written somewhere else.
+
+The union's second arm carries a branded glyph whose only constructor wraps the runtime
+assertion, so **the keeper is on the path to the type** rather than beside one construction:
+a later caller hand-building a background-bearing cell gets a compile error where it used to
+get a green suite and a wrong frame. **The brand is on the channel, not the alphabet** —
+the ASCII repertoire's top glyph is a rule character rather than a fill, and an
+alphabet-level brand would have had to admit it.
+
+**Frame read rather than counted**: at five rows over the default graph, **77** cells carry a
+background and every one is the upper-half block. The control is the fixture that does not
+respond — a graph whose layers never share a cell gives **0** backgrounds, and asserting the
+property there would have been vacuous.
+
+Its row is two compile-error directives, so the fabricated violation is checked by
+compilation itself: reverting the union to the wide record makes both directives unused and
+`tsc` fails.
+
+## F1055 — the reason `logs` was kept stopped being true six days after it was written ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `Logs` in `src/data/viewmodel/types.ts` and the logs surface document |
+| **Reached for** | F141's *`b.logs`'s only caller in the tree is a contract row* |
+| **Verdict** | **The residue is real and its stated cause is false at HEAD** |
+
+The residue re-derives exactly: the builder verb has **one** caller in the whole tree, a
+contract row. Every other call is a local helper building the block literal.
+
+**But F141's deciding reason is false.** The surface document still reads, at HEAD, that
+`logs` is the only kind implementing `window` and that `raw` has none — *a surface built to
+scroll a long log specified the one kind that cannot be scrolled*. `Raw.window` landed on
+2026-09-04. Measured through the registry today: **seven** kinds window — `keyValue`,
+`table`, `logs`, `code`, `patch`, `terminal`, `raw`. A `raw` block scrolls.
+
+**And the count is a second lesson.** Grepping the block-kinds directory returns **five**,
+because two of the seven register from other components — *a set over sites is blind to
+redistribution*, in the instrument that would have watched it. Five went into the spec first
+and the registry measurement corrected it before it shipped.
+
+**What survives** of the reason to keep the kind: the three-column record re-aligned at each
+width, and the level tone, whose only caller is the `logs` renderer — so the same three
+strings through `raw` draw their level in body colour.
+
+**What is left of the residue is C04's**, and it is filed as **F1065**: no patch operation
+appends a line, so a growing log is a whole-block replace per tick. The kind's missing
+consumer is the streaming route declining an operation that does not exist, not a surface
+declining the kind.
+
+Its row asserts the windowing set **by equality** — the watch that would have caught the
+premise going false — plus the patch op set by equality and the surviving reason read off two
+frames.
+
+## F1056 — measured already closed; the number is spent
+
+F557's residue said the `typescript-eslint` decision was *owed and unowned*. Both halves are
+false at HEAD and have been since **2026-09-03**: the decision is recorded with all five
+justification parts and `npm view` figures, and it is watched by two refusal rows — one
+keyed on the package's absence, one on the TypeScript major it would be reopened for. The
+package is not in `devDependencies`.
+
+F557 and the entry that decided it are the **same day**, seven commits apart. F557's sentence
+was true when written and false by the end of that day, and the pass that swept the register
+carried it forward as a residue without re-deriving it.
+
+**Nothing was written and nothing should be.** The number is recorded here so it cannot be
+issued again, on F1040's precedent.
+
+One observation for whoever owns the dependency manifest: that row **opens** with the
+87-package figure and corrects it four paragraphs later. A refusal accumulates reasons, and
+the number that was disproved is still the first thing a reader meets.
+
+## F1063 — a bound whose subject is a population's size cannot be made safe by choosing a better size ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `test/unit/roadmap-status.test.ts` — RS9 |
+| **Reached for** | Nothing. It went red in a verification run of a tree whose only change was closing entries |
+| **Verdict** | **Third failure on success, and the row's own comment records the first two** |
+
+RS9 guards a ratio with a population floor. The comment above the assertion carries its
+history, written by the people it caught:
+
+> *The floor was 10 and the population reached 10 by entries landing. A bound pinned near
+> today's count fails on success, which is the one direction a roadmap assertion must not
+> fail in — so it is set where the ratio stops meaning anything rather than where the number
+> happens to be.*
+
+It was then set to 4. The confirmed-OPEN population reached **exactly 4** on the session that
+closed the entries, and the row went red for the third time with `expected 4 to be greater
+than 4`.
+
+**Each repair chose a better number, and the number was never the problem.** The direction is
+structural: this repository's work moves that population one way. Any floor is a date, and
+the assertion says nothing except *we have not finished yet*.
+
+**And the floor was guarding a claim the row had stopped making.** The same comment records
+that on 2026-09-04 the ratio inverted and the assertion inverted with it, from *most rest on
+a blanket claim* to *the count is a subset of the population*. **A subset relation is
+meaningful at any population, zero included** — so the floor's whole purpose went with that
+edit and nobody removed it. That is the third instance of *a refusal accumulates reasons*
+pointed at a guard: the reason for the bound expired and the bound stayed.
+
+**What replaces it is a relation the run states twice and the row never checked**: the reach
+signal's denominator equals the header's own confirmed-OPEN count — the signal covers the
+**whole** population and does not silently sample a subset. That is the claim a reader takes
+from the line, it holds at any population, and it is the one thing here a wrong
+implementation could get wrong. RS9's own note records the first draft counting 4 of 19 by
+measuring the roadmap's status column instead of the source text.
+
+`carried > 0` went with the floor for the same reason: at a population of zero no entry
+carries a symbol, so it is the same bound wearing a different number.
+
+### The second instance, found the same hour, and it is what makes this a rule
+
+The register's own open-set row asserted `actual > bolded` — *the reader sees more open
+findings than a naive `**Open**` grep* — with a comment recording the measurement that forced
+it: **16 against 39, eighteen of the difference `**Partly**`**. Closing a `**Partly**` row
+**appends** `**Closed**` and leaves the old marker in place, because the history is the
+evidence. So as findings close, the grep stops under-counting and starts over-counting, and
+the relation inverts. It went red on the session that worked the register through, with
+`expected 11 to be greater than 14`.
+
+**Same mechanism, different pair**: a bound whose truth is a property of how much work is
+outstanding, asserted as though it were a property of the code. The first instance compares a
+count to a literal; this one compares two counts; both are green only while the job is
+unfinished.
+
+**And the sign was hiding the size.** Measured over 1 052 keyed rows:
+
+| reader | count |
+|---|---|
+| a naive `**Open**` grep | 14 |
+| the register's reader | 11 |
+| open rows the grep misses | 6 |
+| closed rows the grep counts | 9 |
+
+**Fifteen individual disagreements nearly cancelling into three**, which is the two-population
+residue class: the totals agree far better than the rows do, and comparing totals is what
+made that invisible. The repair asserts each residue **by set**, so neither can cancel the
+other, and gates the *reader* against two rows constructed in the test — one `**Partly**`, one
+superseded `**Open** … **Closed**`. Those hold at any corpus, including an empty one. The
+corpus figures are reported rather than gated, because a register that becomes tidy drives
+either residue to zero, and a bound that fails when the document improves is the bound being
+removed.
+
+### Blind spot
+
+The roadmap replacement is a two-counter agreement, and both counters are computed by the same
+tool in the same pass. A defect that miscounts the population identically in both places
+passes. The mutation row beside it moves one of them, which is what makes the pair worth
+asserting; nothing here reaches a shared miscount.
+
+## F1064 — the suite collects the repository's scratch directory, and a stale copy that passes is worse than one that fails ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `vitest.config.ts` — no `exclude` |
+| **Reached for** | Nothing. Three readers hit it independently in one session before any of them named it |
+| **Verdict** | **Live and pre-existing.** 19 stray test files at HEAD with no worktree present, 2 of them failing; 384 more whenever a verification worktree exists |
+
+`out/` is this repository's scratch directory — probes, backups taken before a hand mutation,
+staged copies of test files, and the detached worktrees used to verify a commit in isolation.
+It is **not in `.gitignore`**, vitest 4's default exclude is only `node_modules` and `.git`,
+and the config set `include` without ever setting `exclude`.
+
+**Every `npm run` script scopes itself with `--dir`, so the gates were never affected and
+every targeted run was.** That is the whole blast radius, and it is precisely the runs a lane
+makes while working.
+
+| what was collected | count |
+|---|---|
+| loose probes in `out/` at HEAD, no worktree | 19 files · 78 rows · **2 files failing, 1 row red** |
+| a detached verification worktree | **384** more — a second copy of the whole tree |
+
+**Three independent encounters in one session, none of which named the mechanism.** A lane
+reported *"vitest picked up a second copy of the suite from `out/verify/` — an old
+`mouse.test.ts` with the pre-repair row ran green beside the real one"*. A second lane
+reported duplicate failures from the same directory. And a repair verified here reported
+`FAIL` on a row that had actually passed — the failing path was the worktree's stale copy,
+and reading the path rather than the verdict is the only thing that stopped a correct repair
+being reverted.
+
+**Both directions are the defect and the passing one is worse.** A stale copy that fails
+sends a reader diagnosing a defect the tree does not have. A stale copy that **passes** is
+counted as coverage for rows that no longer exist — the suite reporting green about a file
+whose subject was deleted, which is the shape no per-row assertion can see.
+
+**Fixed by excluding the directory at any depth**, keeping vitest's defaults. Verified in
+both directions: a deliberately failing file placed in `out/` is not collected, and the same
+file is collected and fails when the exclude is overridden. After: a bare run collects 384
+files, 360 under `test/` and **0** under `out/`.
+
+### Blind spot
+
+An explicit `--dir out` still collects, because the pattern is matched against paths relative
+to that base and there is no `out/` inside `out/`. That is the deliberate case; the
+accidental one is what this closes.
+
+### What would falsify this
+
+A directory named `out` under `test/` or `src/` holding real rows, which would make the
+pattern too wide. Checked before widening: there is none, and the one `out/` inside an
+example holds no test file.
+
+## F1065 — no patch operation appends a line, so a growing log is a whole-block replace per tick ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `ViewPatch`'s op set in `src/data/viewmodel/types.ts` |
+| **Reached for** | F1055, which answered F141's stated reason and left this behind rather than in a commit message |
+| **Verdict** | **Open** — and it is what is actually left of F141, once the windowing half turned out to be false |
+
+The op set is exactly `append`, `replace`, `merge`, `status`, `expand` and `reserve`, asserted
+by equality. `append` appends a **block**; nothing appends a **line to a block**. So a log
+that grows by one line is delivered as `replace` carrying the whole block, every tick.
+
+**The kind's missing consumer is the streaming route declining an operation that does not
+exist, not a surface declining the kind.** F141 read the absence of callers as evidence
+against the block kind. It is evidence against the patch vocabulary, one layer down, and the
+two are indistinguishable from the caller's side — which is why the entry survived being read
+carefully for as long as it did.
+
+**Filed rather than ruled**, because the ruling is C04's and it has a real cost on both
+sides: a line-append op is a second way to write a block, and every consumer of the patch
+stream would have to hold the accumulated text. The measurement that would decide it is the
+one nobody has: how large a `logs` block gets in practice, and what a whole-block replace
+costs at that size.
+
+### What would falsify this
+
+A consumer that wants the whole block every tick — a viewport that re-wraps at each width
+would, since it holds no accumulated state of its own. That is the argument against the
+op, and it has not been weighed against the argument for it.

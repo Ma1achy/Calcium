@@ -140,25 +140,58 @@ describe("SP12 — the register's open set", () => {
   /**
    * **T1.4 — the measurement that forced the rule, held as an assertion.**
    *
-   * A `**Open**` grep answers 16 where the set is 39, and **eighteen of the
-   * difference are `**Partly**`** — a disposition invented for a finding whose
+   * A `**Open**` grep answered 16 where the set was 39, and **eighteen of the
+   * difference were `**Partly**`** — a disposition invented for a finding whose
    * remedy landed in part, which every reader in this repository was counting as
-   * done. This row is what stops `partly` quietly rejoining the closed side: the
-   * two counts are asserted apart, so a reader that stopped distinguishing them
-   * fails here rather than shrinking the open set by eighteen.
+   * done. This row is what stops `partly` quietly rejoining the closed side.
+   *
+   * **It used to assert that apart as `actual > bolded`, and that relation
+   * inverted the day the register was worked through** (F1063, second
+   * instance). Closing a `**Partly**` row appends `**Closed**` and leaves the
+   * old marker in place, because the history is the evidence — so as the work
+   * lands, the naive grep stops *under*-counting and starts *over*-counting, and
+   * a row asserting the sign of the difference goes red on success. The first
+   * instance of that shape was a roadmap population floor repaired the same
+   * hour; this is the same mechanism between two counts instead of against a
+   * literal.
+   *
+   * **And the sign was hiding the size.** Measured 2026-09-10 over 1 052 keyed
+   * rows: the grep answers **14**, the reader **11** — a difference of three,
+   * standing for **six** open rows the grep misses and **nine** closed rows it
+   * counts. Fifteen individual disagreements nearly cancelling into three, which
+   * is why the residues are asserted here by *set* and the totals are not
+   * compared at all.
+   *
+   * The corpus figures are reported rather than gated, on SP6's precedent: a
+   * register that becomes tidy would drive either residue to zero, and a bound
+   * that fails when the document improves is the bound this row just removed.
+   * What is gated is the **reader**, against rows constructed here — which holds
+   * at any corpus, including an empty one.
    */
-  it("T1.4 (SP12): partly is open, and it is most of what a naive grep misses", () => {
+  it("T1.4 (SP12): partly is open, and the naive grep is wrong in both directions", () => {
     const text = real();
     const rows = keyedRows(text);
 
-    const bolded = [...rows.values()].filter((r) => /\*\*Open\*\*/u.test(r)).length;
-    const actual = [...rows.values()].filter((r) => dispositionOf(r) === "open").length;
-    expect(actual, "the reader sees more than the naive grep").toBeGreaterThan(bolded);
-
-    const partly = [...rows.values()].filter((r) => /\*\*Partly\*\*/u.test(r)).length;
-    expect(partly, "partly entries exist and are open").toBeGreaterThan(0);
+    // The reader, against rows written here rather than found. Both of the
+    // naive grep's failure modes, one per row.
     expect(dispositionOf("| **F1** | a thing · **Partly** (F991) — the half that stands |"), "partly means not done")
       .toBe("open");
+    expect(
+      dispositionOf("| **F2** | a thing · **Open** — measured · **Closed** (F991) — landed |"),
+      "a superseded Open is not open, and the literal is still in the row",
+    ).toBe("closed");
+
+    // The residues, by set. Each is a row the grep and the reader disagree
+    // about, so neither can be cancelled by the other.
+    const values = [...rows.values()];
+    const missedByGrep = values.filter((r) => dispositionOf(r) === "open" && !/\*\*Open\*\*/u.test(r));
+    const overcountedByGrep = values.filter((r) => dispositionOf(r) !== "open" && /\*\*Open\*\*/u.test(r));
+    const bolded = values.filter((r) => /\*\*Open\*\*/u.test(r)).length;
+    const actual = values.filter((r) => dispositionOf(r) === "open").length;
+    expect(
+      bolded - overcountedByGrep.length + missedByGrep.length,
+      "the two readers differ by exactly the two residues, in opposite directions",
+    ).toBe(actual);
 
     expect(TRIAGE_OPEN.length, "the list is the reader's own answer").toBe(actual);
   });
