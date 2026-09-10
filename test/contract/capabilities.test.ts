@@ -243,3 +243,12 @@ describe("C02 contract", () => {
     }
   });
 });
+
+// C02 I14's row lands with its scan, in the commit after this one. The spec
+// commits alone so its diff is readable without the implementation beside it,
+// and SP9 wants an invariant paired the day it is declared.
+describe("C02 §3 — nothing reads what the terminal says back", () => {
+  it.todo(
+    "T2.10 (C02 I14, §3): `src/` is scanned for every route into raw mode — the call named on its stream, the tty device, and both terminal-attribute utilities — and only the lifecycle file may take one, because a reply reader must pay raw mode and raw mode arrives after the record is spent. Watches the condition rather than the `q=2` token, which would stay green for exactly as long as the silence — not deferred on a component: the row lands with the scan in the commit that follows this spec",
+  );
+});

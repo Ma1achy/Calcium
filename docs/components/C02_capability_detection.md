@@ -281,33 +281,54 @@ terminal that answers **nothing**: the graphics query and `CSI ? u` produced no 
 xterm, so any probe needs a window, and a startup hang is worse than a wrong guess that can be
 overridden. The cost is now stated rather than assumed.
 
-#### The reply channel, and why one capability is further from a fact than the other three
+#### The reply channel, ruled — and the blocker four documents named was never the one in the way
 
-**The framework cannot read most of what a terminal says back, and the shape of the reply decides
-which.** `src/interaction/router/decode.ts` has an arm for `ESC [` and one for `ESC O`; everything
-else lands in the Meta arm, which names `ESC x` as `Alt-x` and types the remainder into the prompt.
-Measured, the real decoder on real bytes:
+**This subsection used to say two of the three inferred capabilities were *one C02 ruling away from
+being measured*, with the ruling blocked on a decoder arm.** The arm landed — C16 I32, every
+string-terminated reply consumed whole and emitting nothing — and **nothing about detection moved**,
+because the input path was never what stood in the way (I14, F1057). What follows is the reason that
+replaces it, measured on 2026-09-10 rather than reasoned from the protocol.
 
-| reply | shape | what the decoder produces |
+**A reply is unreadable until raw mode.** The four queries §3 measures — DECRQM `CSI ? 2026 $ p`,
+`CSI ? u`, the graphics query, and DA1 as a sentinel — put to XTerm(398) and to kitty 0.41.1 under
+Xvfb:
+
+| the tty's line discipline | what the reader gets | how long |
 |---|---|---|
-| `CSI ? 2026 ; 2 $ y` | CSI | **nothing — 0 events**, consumed and dropped |
-| `CSI ? 0 u` | CSI | **nothing — 0 events** |
-| `CSI ? 62 ; c` | CSI | **nothing — 0 events** |
-| `APC _G i=31;OK ST` | APC | **10 events**: `Alt-_`, then `G i = 3 1 ; O K` typed, then `Alt-\` |
-| `DCS > \| kitty(0.41.1) ST` | DCS | **17 events**: `Alt-P`, the version typed, `Alt-\` |
-| `OSC 11 ; rgb:… ST` | OSC | **23 events**: `Alt-]`, the colour typed, `Alt-\` |
+| canonical — XTerm(398) | **0 bytes** | 1500 ms window, timed out |
+| canonical — kitty 0.41.1 | **0 bytes** | 1500 ms window, timed out |
+| raw — XTerm(398) | all four answered, DA1 last | **0.89 / 0.94 / 0.99 ms**, three runs |
+| raw — kitty 0.41.1 | all four answered, DA1 last | **13.3 / 15.9 / 22.6 / 23.4 ms**, four runs |
 
-**So `synchronisedUpdate` and `keyboardProtocol` are one C02 ruling away from being measured, and
-`imageProtocol` is two.** Their replies are CSI-shaped and the decoder already swallows them; the
-only thing in the way is this component's own I2. `imageProtocol`'s reply is APC, and until an APC
-arm exists a query for it trades a silent failure for text in the prompt. That is FINDINGS F414's
-blocker, and it is **wider than F414 states** — the hole is every string-terminated reply, not the
-graphics protocol's, so `XTVERSION` and every `OSC` answer are behind the same arm.
+**And the bytes are not discarded in the meantime — they are held, and they are echoed.** Through a
+pty: a reply written 250 ms before `setRawMode(true)` reaches the child as the empty string and then
+arrives *in full* the moment raw mode is entered, so a query asked too early answers into whatever
+reads next. While it waits, the line discipline echoes it back to the display in `ECHOCTL` form —
+`ESC ] 11 ; rgb:1234/5678/9abc ST` returns as the 26 printable characters `^[]11;rgb:1234/5678/9abc^[\`.
+**That is F414's symptom** — a reply landing where the reader is looking — arriving by a mechanism no
+entry named, in the one window early enough for a probe to matter.
 
-**F414's own prediction is wrong in the direction that matters, and it is corrected here rather
-than in the finding it came from**: it reads *it would reach the line editor as a lone `ESC` and
-literal text*, and there is **no lone `ESC`** — the Meta arm consumes it and emits `Alt-_`, a
-**bindable** key, with `Alt-\` closing. A keymap that binds either fires on a graphics error.
+**Raw mode is `acquire()`'s, and by then the record is spent.** `stdin.setRawMode` is called in one
+file in `src/` — C01's `lifecycle.ts`, inside `acquire()`'s `take("rawMode")` — and `acquire()` is
+reached from one call site, C22's `session.ts` `#open()`. The record is built at C22's step 2 and read
+at **eleven** sites before that; **six** of them hand it into an object built there — the lifecycle,
+the frame scheduler, the profile view, the pipeline, C16's decoder and the session graph itself — and
+C22 I58's render-cache key omits it *because* it never moves (T4.18d). **So a capability answered from the wire has nowhere to go.**
+
+**The refusal rests on that and on neither of the two things it reads as.** It is not danger: C16 I32
+makes a reply harmless, and `q=1` on C09's transmissions is free of consequence today. It is not
+latency: one burst terminated by DA1 costs a single round trip, and a capability that answers
+*nothing* costs nothing extra — XTerm's silence on the graphics query and on `CSI ? u` did not delay
+its DA1 by a measurable microsecond. Both figures are above so that the next reader can check them
+and finds the argument does not stand on them.
+
+**Where a reply channel goes if one is ever built.** Before construction: a function the application
+calls with its own streams, which takes raw mode, sends one burst terminated by DA1, restores, and
+hands its answers to `TuiConfig.capabilities` — where I4 already makes them win and I13 already
+records them `declared`. That keeps I2 intact, keeps the record constant, and needs no arbitration
+with C16 at all: nothing else is subscribed while it runs, and a reply that arrives after its window
+closes reaches the decoder and is consumed by C16 I32. **The entry point is C24's public surface, not
+this component's**, which is why C02 rules the shape and does not grow the seam.
 
 ### Ghostty, and how the second list came to be kept up
 
@@ -518,6 +539,8 @@ Alternate screen is the sole hard requirement (D28). A fullscreen application on
 
 - **I13** — **Every field carries how its answer was reached, and the source is produced by the rule that produced the value.** `declared` is the reader's override, `stated` a variable whose value carries the fact, `inferred` a name matched against the identification's table, `assumed` `TERM`'s presence or shape, and `unreachable` a claim withheld because the sequence does not reach the emulator (§3, I11). **The five classify what would falsify an answer and are not a precedence order** — `TERM=dumb` with `COLORTERM=truecolor` answers 1, so an `assumed` rung outranks a `stated` one, and a reader taking the list as a lattice is wrong at the first row (T3.3). **A rejected override keeps the detected source with the detected value**, because I4 says an out-of-domain value is not an override and this is where that sentence becomes observable (T3.14). **Not a table beside the rules**: a second map from field to source is the fourth list in a component repaired for having three, so each rule returns the pair and no edit can move one without the other (T1.14, T6.14). Four fields are `inferred` and their failure mode is one thing — the name is wrong — which is the distinction the record did not carry and F418 named without ruling.
 
+- **I14** — **Nothing in the framework reads what the terminal says back, and the record's lifetime is the reason.** A reply is unreadable until raw mode — measured, four queries against XTerm(398) and kitty 0.41.1 give **0 bytes in 1500 ms** of canonical mode against 0.89–0.99 ms and 13.3–23.4 ms in raw — and raw mode is entered in one place, C01's `acquire()`, which C22 reaches after the record has been built at its step 2, read at eleven sites and handed into six objects built there — the lifecycle, the frame scheduler, the profile view, the pipeline, C16's decoder and the session graph. C22 I58's cache key omits the record **because** it never moves (T4.18d). So a capability answered from the wire would have to move a record six objects already hold, which is C22's to allow and not this component's to do. **The reason is neither of the two it reads as, and both are measured in §3 so that a reader who checks finds the argument does not rest on them**: C16 I32 makes a reply harmless, and a burst terminated by DA1 prices a probe at one round trip with a silent capability costing nothing. A reply channel, if one is built, runs **before construction** and arrives as `TuiConfig.capabilities` overrides — I4 makes them win, I13 records them `declared`, and the entry point is C24's. **The watch is on the condition and not on the remedy** (T2.10): raw mode is the entry price a reply reader cannot avoid, so a scan for every route into it fails the day one exists, where a row asserting `q=2` on C09's transmissions would be green for exactly as long as the silence is (F414, F1057).
+
 ---
 
 ## 6. Commitments
@@ -538,6 +561,7 @@ Alternate screen is the sole hard requirement (D28). A fullscreen application on
 15. **`keyboardProtocol` is the identification's second column, pushed by C01 as `CSI > 3 u` and popped as `CSI < u`, and nothing is reachable only with it** — a lone `Esc` and a modified Enter arrive whole, a repeat or release is an optional field on the event, and every affordance the protocol improves has a route that works at `"none"` (I12). The bits *not* pushed are stated with their reasons in §3, and the one that would report a lone modifier is among them.
 16. **The record says how each field was answered, in the same expression that answered it** — five kinds, named for what would falsify the answer, so `imageProtocol: "none"` inside a multiplexer and `imageProtocol: "none"` on an unnamed terminal stop being one value with two remedies (I13). Four fields are inferred from a name and six are not, and nothing in the record used to distinguish them; the kinds are a classification and **not** a precedence order, which is the sentence a reader would otherwise write and `TERM=dumb` falsifies.
 14. **The emulator is identified once, every capability consults that identification, and the identification is gated by `TMUX` before any of them see it** — `synchronisedUpdate` and `imageProtocol` read it, and `colourDepth` reads it too but is outranked by `COLORTERM`, because that variable is the terminal speaking for itself where a name is us inferring (I11). **Identification is not capability**, and the second question — *does a sequence reach it* — is asked in one place rather than by each reader: measured, tmux consumes both an unwrapped APC and `ESC [ ? 2026 h`, and the wrapped form is what survives (§3, FINDINGS F432).
+17. **A terminal's answer is never read, and the reason is the record's lifetime rather than the input path** — a reply is unreadable until raw mode, raw mode is `acquire()`'s, and by then six objects built at C22's construction hold the record; so a probe would run before construction and arrive as an override, on C24's surface and not this component's (I14). Neither of the reasons the file used to give survives being checked: C16 I32 makes a reply harmless where F414 said it would be typed into the prompt, and a DA1-terminated burst makes a probe one round trip where §3 said it needed a window — **both are measured in §3 for that reason**, because a justification the next reader cannot reproduce is one they delete.
 
 ---
 
@@ -576,6 +600,7 @@ A table of `env` fixtures. No mocks, no terminal.
 - **T2.6** (I6): every capability field appears in the §4 degradation table with a named owner, and the table names no field the record does not have — a bijection over §4's `Field` column, parsed at test time, so both adding a field without a fallback and leaving a stale row behind fail the build. Each row's owner must match the implementation's table for the field it names.
 - **T2.8** (I1, I6): **§2's interface block and the record are a bijection too**, parsed at test time from the fenced TypeScript exactly as T2.6 parses §4's table. Separate from T2.6 because the two tables fail separately and one of them already had: `ambiguousWidth` shipped with a §3 subsection, a §4 row, an invariant and a commitment, and §2 declaring seven fields — T2.6 was green throughout, because the bijection it checks is the *other* table (F214). A field added to the record without being declared in §2 fails here.
 - **T2.9** (I1, I13): **`sources` and the record are a bijection, and §3's table is parsed for the closed set of kinds.** Every key of the record has a source, no source names a field the record lacks, and every value is one of the five §3 declares — parsed from the spec at test time, as T2.6 and T2.8 parse their tables, so a kind invented in code without a row here fails the build. The map is frozen, like the record.
+- **T2.10** (I14): **a source scan over `src/` finds exactly one entry into raw mode, and it is C01's.** `stdin.setRawMode` in `terminal/lifecycle.ts` and nothing else — no `/dev/tty` opened, no `stty` spawned, no `tcsetattr`. **The rule is the routes and not the symbol**, because a reply reader that opens `/dev/tty` for itself never touches `setRawMode` and a scan named for that one call would not see it — which is exactly what `tools/terminal-probe/probe.py` does, so the evasion is a shipped shape rather than an invented one. The lifecycle's own call is asserted **present**, because a scan whose corpus is empty passes for the wrong reason. This is the watch I14 owes its own condition: a reply reader must pay raw mode, and the day one does this row names the file.
 - **T2.7** (I8): no warning is emitted. Across every T1 fixture and the T3.5 bad-override case, neither `stdout` nor `stderr` is written to; the rejected override appears in the returned `warnings` instead.
 
 ### Tier 3 — edge cases
@@ -620,8 +645,11 @@ PTY harness with a controlled environment.
 
 - **T5.8** (I13, I11): **the identification's four claims put to a real emulator** — kitty 0.41.1 and XTerm(398) under Xvfb, driven by XTEST, the bytes read from the emulator's own pty. DECRQM `CSI ? 2026 $ p` answers `;2` on kitty and **`;0` — not recognised** — on xterm; the kitty graphics query answers `OK` on kitty and nothing on xterm; `CSI ? u` answers `CSI ? 0 u` on kitty and nothing on xterm. All three agree with what `inferred` claims for each, which is the first time `imageProtocol` has been run against a terminal in this repository's own suite (F415 shipped it having never been). **And the reply channel measured beside them**: the same replies pushed through the real decoder give **0 events** for every CSI shape and a burst opening with `Alt-_` for the APC one — so two of the three queries are already safe to ask and one is not, which is FINDINGS F414's blocker resolved to a shape rather than to a protocol. Every capture carries a control keystroke, and the emulator's absence skips the row **by name** in its title.
 
+- **T5.9** (I14): **the refusal's premise, executed rather than described** — a real pty, the test playing the terminal. A DECRQM-shaped reply written into the master reaches the child as the **empty string** while the tty is canonical; the same bytes arrive **in full** the moment `setRawMode(true)` is called, so they were held rather than dropped; and in between the line discipline **echoes** them to the display in `ECHOCTL` form, which is asserted on the master's own bytes. Three assertions and not one, because *not delivered* and *never sent* are the same empty string and only the echo says which — the same reason F808 gives every capture a control byte. The echo is also F414's symptom arriving by the mechanism no entry named.
+
 ### Tier 6 — fail-on-revert
 
+- **T6.16** (I14): giving C02 a probe that opens `/dev/tty` and reads a reply — the shape `tools/terminal-probe/probe.py` already has, and one that never calls `setRawMode` → **T2.10 fails naming the file**, while a row asserting `q=2` on every C09 transmission passes unchanged. That contrast is the row's content: one watches the condition and the other watches the remedy, and the second is green for exactly as long as the silence is.
 - **T6.1** (I2): adding an interactive probe with an await → T2.4 fails.
 - **T6.2** (I5): reading `process.env.TERM` from a renderer → the source scan in T2.5 fails, naming the file.
 - **T6.3** (I4): making detection win over overrides for any field → T1.9 fails.
@@ -649,6 +677,6 @@ PTY harness with a controlled environment.
 | The minimum-size threshold (60 × 16) | An app policy, not a terminal capability — L4 |
 | Tone → colour resolution | C10 |
 | The ASCII glyph substitutions themselves | C09, C12 |
-| Interactive capability probes | Phase 1B — an opportunistic 50 ms `XTVERSION` that upgrades the record if it answers and is ignored if it does not. **Now priced rather than assumed** (§3): DECRQM answers on both emulators in the container and distinguishes *unrecognised* from *supported*, and the CSI-shaped replies cost the input path nothing — the refusal rests on the terminal that answers **nothing**, which needs a window, and on `XTVERSION`'s own reply being DCS-shaped and therefore unreadable until an APC/DCS arm exists |
-| Querying the keyboard protocol | Phase 1B — `CSI ? u`, to which a supporting terminal answers `CSI ? flags u` and any other says nothing. It would replace `keyboardProtocol`'s table with a measurement and would have to share `XTVERSION`'s window and its I2 exemption; until then the table is the answer and its errors run in the safe direction (§3) |
+| Interactive capability probes | Phase 1B, and **not here whatever phase it is** (I14): the record is complete and six objects hold it before a reply is readable, so the seam is a pre-construction function whose answers arrive as overrides, on C24's surface. **Two of this row's three stated parameters were wrong** (2026-09-10). Its *blocker* — `XTVERSION`'s reply being DCS-shaped and unreadable — is void: C16 I32 consumes every string-terminated reply and emits nothing. Its *anchor* was the wrong query: `XTVERSION` answers a **name**, so it replaces one inference with a better-sourced inference, and it is the only one of the four whose reply is DCS-shaped — **the plan's own choice of query is what put the plan behind the missing arm**, where DECRQM is CSI-shaped, has always decoded to nothing, and answers the capability itself (F1059). Its *window* is a guess: a burst terminated by DA1 resolves at the slowest **answering** query and a silent capability costs nothing, measured at 0.89–0.99 ms on XTerm(398) and 13.3–23.4 ms on kitty 0.41.1, so a fixed 50 ms prices the **terminal's** silence and is barely twice kitty's local worst case with no network in between (F1058) |
+| Querying the keyboard protocol | Phase 1B — `CSI ? u`, to which a supporting terminal answers `CSI ? flags u` and any other says nothing. **`nothing` is the reading a sentinel makes cheap**: DA1 comes back from a terminal that declined the question, so *unsupported* is decided at one round trip rather than at a window's expiry (§3). It would replace `keyboardProtocol`'s table with a measurement and would share the burst above and its entry point; until then the table is the answer and its errors run in the safe direction (§3) |
 | Using the image protocol | Phase 1B |
