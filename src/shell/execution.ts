@@ -778,9 +778,24 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     const onChunk = (chunk: string): void => {
       if (!accepting) return;
       writes = writes.then(async () => {
-        // Re-checked inside the link: `accepting` closes between the queue and
-        // the run, which is the whole of the window above.
-        if (!accepting) return;
+        // **Re-checked on `finished`, not on `accepting`** (F1096). The two
+        // flags close at different moments and the inner guard needs the later
+        // one: `accepting` closes *before* the drain, so a chunk queued while
+        // the child was still writing — the ordinary case — found the gate shut
+        // by the time its link ran and returned without writing. The drain
+        // drained nothing, and the screen kept whatever had got through.
+        //
+        // Measured on a runner: `46 → 46 numbered lines of 200 in 5013 ms, 1
+        // patches, grew by 0`, and 34 on the run before it — a cut point that
+        // moves, because it is wherever the exit caught the chain. Never here,
+        // where a `seq` finishes before the exit is observed.
+        //
+        // `finished` is set after `await writes` and before `dispose()`, so it
+        // names the condition the guard is actually for — the emulator is gone —
+        // rather than the one that happens to be true first. `accepting` still
+        // stops the queue growing past the drain, which is the outer check's
+        // job and the reason it closes early.
+        if (finished) return;
         await emulator.write(chunk);
         if (!deps.scheduler.pending) draw();
       });
