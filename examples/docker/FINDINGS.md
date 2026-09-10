@@ -16074,6 +16074,69 @@ tree**: the casts are visible, commented, and fail the moment the union gains an
 
 ---
 
+
+### Closed — C04 I119 and C24 I35, and the ruling was three-quarters already taken
+
+**The stated blocker resolved at HEAD before anything was built.** *Widening
+`Block` decides how `childBlocksOf` walks an app's kind and whether measurement
+conformance binds it* — each of those was already decided, at its own site,
+citing F1. `validateBlock` skips an unknown kind: `if (KNOWN_KINDS.has(kind))`.
+`childBlocksOf` takes `Record<string, unknown>`, asks `tree.ts` **by name**, and
+refuses to descend into an app kind's `children` because they may not be blocks.
+`uncoveredKinds` takes `string` and not `BlockKind`, deliberately, so a
+registry's app kinds are the ones most likely reported missing a fixture. Three
+rulings stood as one finding's blocker for as long as nobody carried them back —
+the deferral shape CLAUDE.md records, where the condition is written at the
+deferral and what satisfies it is written somewhere else.
+
+**Proved before it was ruled.** A miniature of the shape compiles with no casts
+and still narrows on `b.kind`; and `declare module "@fmx/calcium"` from
+`examples/plots` merges with the real declaration rather than opening a new one
+— TS2428, *all declarations must have identical type parameters*, is a merge
+complaining rather than a resolution failing.
+
+`Block` is `BlockKinds[keyof BlockKinds] & Gap & Floor` over a closed
+`KnownBlockKinds`. `faulty.ts` compiles with **no casts at all**; it carried
+**three**, and this entry counted two — the third is on the constructor.
+
+**`AnyBlockDefinition` is the half the entry did not see.** `TuiConfig.blocks`
+was `readonly BlockDefinition[]`, which asks each element to handle *any* block.
+Five `as unknown as BlockDefinition` casts in `src/` become **one**, at the line
+storing into a `Map` keyed by kind.
+
+### Three things the build found that the walk did not
+
+- **The variance runs the other way.** The ruling said `BlockDefinition<B>` puts
+  `B` in return position and is invariant, and predicted a surviving cast. `B`
+  is in parameter position only — the type is *contravariant* — so the cast does
+  not survive and the fix is a union over kinds. Corrected in the spec in place.
+- **Every declared kind carries `Gap & Floor`**, because the layout reads
+  `gapBefore` and `minHeight` off any block. 41 errors on the first augmentation
+  written inside this program. Declaring it in `Block` makes it a contract the
+  compiler holds rather than a sentence an app must remember.
+- **MG27 and MG28 went vacuous, and their fabricated violation is what said so.**
+  `checkBuilderCoverage` reads the union textually — `export type Block =\n`
+  and a `|`-separated list — so rewriting the declaration left it matching
+  nothing and returning zero violations, which reads exactly like a clean tree.
+  It now reads `KnownBlockKinds`, and a missing subject is a **violation**
+  rather than `return []`.
+
+### Both consumers are inside this repository, on purpose
+
+An app type-checks its own sources against emitted declarations and never
+re-checks `src/`, so an example cannot see a contract the framework breaks —
+measured: `examples/plots` compiles **clean** against a table reverted to the
+open union, while this repository's build fails with three errors. T4.2's
+`banner` and T1.42's `gauge` augment `BlockKinds` from `test/`, which is what
+made the missing base visible and what makes T6.101 a real revert.
+
+**What is still true and now written where it belongs**: `expectDocument`'s
+second half was never about the union. The helper held `fullRegistry()` with no
+way to add a definition, and the failure was not an error — a registered kind
+fell back to `raw` and rendered as one row, a plausible number that every
+assertion below it accepted. `expectDocument(doc, blocks?)` takes exactly what
+`TuiConfig.blocks` takes.
+
 ## F403 — a guard called stale on the strength of its doc comment ★★★☆☆
 
 C12 §3ak.37 records the violin's SVG refusal and says the blocker is where the resolution comes
