@@ -44983,3 +44983,93 @@ the other two are closed by hand checks (`isAxisSpec3`, and both `BarSpec` sites
 under F1082. The class is closed; the *gate* covers a third of it, and that is a
 limit rather than a gap. What is left of the stated blind spot is the multi-line
 member, and the corpus holds none — counted, not asserted.
+
+## F1086 — A04 §6 promises CI on every branch push, the job guards are written for it, and the trigger excludes it ★★★★
+
+| | |
+|---|---|
+| **Surface** | `.github/workflows/ci.yml` `on:` against A04 §6's trigger table |
+| **Reached for** | F812, asking why a finding blocked on *the next run is the measurement* had waited |
+| **Verdict** | **open** — the trigger is fixed here; the measurement F812 wants is the first run, and a run is not a claim until it exists |
+
+### Three records, two of them agreeing and wrong
+
+A04 §6 splits CI by cost, and the first row of its table reads:
+
+| Trigger | Stages |
+|---|---|
+| Every push to a branch | `install → check → enforce → audit → test` — under two minutes |
+
+The workflow's trigger is:
+
+```yaml
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+```
+
+**A push to a branch that is not `main` fires nothing at all.** Not the fast
+chain, not `enforce` — which §6 says "stays on every push regardless: it costs
+five seconds and catches the violations that become load-bearing fastest".
+
+And the second record agrees with the spec rather than with the trigger. `full`,
+`proof` and `degraded` each carry
+
+```yaml
+if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || …
+```
+
+which exists **to hold the expensive tier back on a branch push** — a distinction
+with no subject unless branch pushes trigger the workflow. `fast` has no `if:` at
+all, because on the design as written it is the thing a branch push runs.
+
+So two records describe a two-minute chain on every branch push, and the third —
+the only one the runner reads — never starts it. **The agreement is why it was
+invisible**: a reader who checks the guards against the spec finds them
+consistent, and the `on:` block is four lines nobody re-reads.
+
+### Measured
+
+`gh run list --branch feat/profiler` returns **nothing**. The branch carries the
+whole profiler arc and every commit of this round, pushed. `gh run list --branch
+main` returns runs — the workflow works, through pull requests, which is the path
+that happens to satisfy the trigger.
+
+### Why this is F812's blocker and not merely beside it
+
+F812's disposition is *the fixture is hardened … and the next run is the
+measurement*. It has sat that way while the branch doing the work could not
+produce a run, and nothing said so: the spec promised one on every push. **A
+finding waiting on evidence a mechanism cannot generate reads exactly like a
+finding waiting on someone's time.**
+
+### The class, and it is a fifth form
+
+*A gate that exists and is not run* has four recorded forms. This is a fifth and
+it is the most self-concealing: **the gate exists, its internal guards are
+written for the case, and the trigger excludes the case** — so every artefact a
+reader would check to find the gap corroborates the gap's absence.
+
+### The remedy, and one consequence it carries
+
+`on: push:` without a branch filter is what A04 §6 already specifies, and the
+existing `if:` guards then do exactly the job they were written for: a branch
+push runs `fast` and stops. **No spec edit** — the spec is the record that is
+right.
+
+**The consequence, named rather than discovered**: with `push` unrestricted and
+`pull_request` both live, a push to a branch with an open PR runs `fast` twice,
+once per event. That is the design A04 §6 describes and its cost is two minutes;
+a `concurrency` group would trim superseded runs and is a different change with
+its own row, not folded into this one.
+
+### What would falsify this
+
+- **The workflow triggering on branch pushes some other way.** There is no other
+  `on:` key, no `workflow_dispatch`, no `workflow_call`.
+- **A04 §6 meaning something narrower by "a branch".** It contrasts the row with
+  *"Pull request, push to `main`, and tags"* on the next line, so "a branch" is
+  the complement of those.
+- **Runs existing on this branch.** Measured: none.
