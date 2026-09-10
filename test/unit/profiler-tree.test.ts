@@ -265,6 +265,10 @@ describe("C28 I31 — an element's cost is measured, never divided out of a tota
     ).toBeGreaterThan(1);
   });
 
+  // **Spec-first**: C28 T1.33b lands with I31's split, and this row becomes real
+  // in the commit that gives `element` its operation (F1098).
+  it.todo("T1.33b (C28 I31): one measure and one render in one frame reads 1 and 1, and 2 only in the sum — not deferred on a component, this is spec-first and lands with I31's split");
+
   it("T1.34 (C28 I31): a parent reports self time, so a child is not counted twice", () => {
     // An inclusive parent makes the outermost node the widest bar in every tree
     // ever drawn, which tells a reader what they already knew before opening it.
