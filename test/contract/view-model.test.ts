@@ -871,3 +871,15 @@ describe("C04 §7 — the update model and the view state, checked rather than c
     }
   });
 });
+
+// C04 I116 and I117's rows land with their code, in the commit after this one.
+// The spec commits alone so its diff is readable without the implementation
+// beside it, and SP9 wants an invariant paired the day it is declared.
+describe("C04 §3 — the windowing set and the size channel", () => {
+  it.todo(
+    "T2.127 (C04 I116, §3): the set of kinds declaring `window` asserted by equality through the registry — seven, not the five the kinds directory returns — plus the `ViewPatch` op set by equality, which is what F141's falsified premise needed watching it — not deferred on a component: the row lands with the assertion in the commit that follows this spec",
+  );
+  it.todo(
+    "T2.128 (C04 I117, §3): the bubble's size channel read off the frame — hiding the entry the legend names removes a rasterisation while the sizes keep sizing and keep owning the axis — and the count of forms carrying a channel inside `series` pinned at one, so a second form fails a row rather than passing silently — not deferred on a component: the row lands with the assertion in the commit that follows this spec",
+  );
+});

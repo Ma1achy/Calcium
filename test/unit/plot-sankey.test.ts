@@ -312,3 +312,10 @@ describe("SK — the sankey, one geometry and two painters (C12 I110, I111)", ()
     expect(() => b.plot({ ...spec, form: "line" } as never), "and still refuses it off both forms").toThrow(/I69/u);
   });
 });
+
+// C12 I125's row lands with its code, in the commit after this one.
+describe("C12 §7 — `SankeyCell` is a discriminated union", () => {
+  it.todo(
+    "SK13 (C12 I125, §7): two `@ts-expect-error` rows as the subject, so reverting the union to the wide record fails compilation with an unused-directive error at both sites rather than failing an assertion — not deferred on a component: the row lands with the union in the commit that follows this spec",
+  );
+});

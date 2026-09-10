@@ -658,3 +658,10 @@ describe("catalogue-png — the parser that failed silently", () => {
     expect([...unknown], "every SGR code in the catalogue has an arm").toEqual([]);
   });
 });
+
+// C12 I124's row lands with its code, in the commit after this one.
+describe("C12 §7 — caller-supplied text is not degraded", () => {
+  it.todo(
+    "AA1c (C12 I124, §7): the set of kinds leaking a caller's non-ASCII character asserted by equality at `unicode: \"ascii\"`, with the kinds that respond to the fixture as the control — the refusal's subject, so a kind that starts degrading fails the row rather than quietly proving the refusal wrong — not deferred on a component: the row lands with the assertion in the commit that follows this spec",
+  );
+});

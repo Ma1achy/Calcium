@@ -242,6 +242,23 @@ Streams are exempt — a `--watch` is a subscription, not a command, and holding
 
 The guard lives here rather than in L4 because it is mechanical and because the router is the only place that sees every invocation.
 
+### `busy` is declared, and this is the ruling F882 asked for
+
+`TransportRouter.busy` sat on `UNCONSUMED_MEMBERS` for months with a reason in two halves, and **both halves were homonyms** — measured at HEAD on 2026-09-10, and neither is about this component:
+
+| the carried premise | what is actually there |
+|---|---|
+| *"`router.ts` records that a guard replaced the member"* | `grep -n replac src/data/transport/router.ts` → **0 hits**. The sentence lives in `src/interaction/router/router.ts:78`, C16's input router, about `RouterDeps.busy` — a different member on a different interface in a file with the same basename |
+| *"`construct.ts` counts seventeen call sites until `busy`"* | `src/shell/construct.ts:2922` reads *"C16's sixteen pulls … seventeen until `busy` and `shellChild` became one `inFlight`"*. Also C16's, also `RouterDeps` |
+
+So *the tree documents the deletion twice* was **one file that never said it and one file about another component's member**. The exemption's reason had no source, and the ruling it deferred was never C06's to make in the first place — C16 §5 and C23 I5 already took it, in the other direction: *C23's guard is authoritative; C06's is a backstop*. What C16 removed is its own `RouterDeps.busy`, because a boolean sourced from a backstop could not tell an `app` route from a `shell` one. Nothing there asked C06 to stop reporting.
+
+**`busy` stays declared, and the reason is that it is the only observable I13 has.** The guard is a closure variable — `inFlight` in `createRouter` — so *at most one non-streaming invocation is in flight, and every settlement path releases it* is a claim about a private binding. `busy` is what makes it a claim a test can take: T1.1, T1.2, T2.6, T3.1, T3.2 and T3.3 all read it, and T2.6's hundred invocations across every settlement path have nothing else to assert against. Delete the member and I13 becomes unstateable, T2.6 unwritable and T6.7 — *releasing the guard only on success* — passes.
+
+**What would remove it**: a reader that can see the guard without the member. There is none and there should not be one, because the alternative is exporting `inFlight`'s binding, which is the same member under a worse name. **What would make it wrong**: a second guard at the same scope. C23's is at a different one and `router.ts`'s header says so in the same words, deliberately, *so that neither is tidied away by someone who finds the second one*.
+
+**And MG24 can no longer ask the question** (F882): C28's transport decorator has to *be* a `TransportRouter`, so it re-exposes `busy` and the rule sees a reader. That is why this is written here rather than left to a gate — a forwarding wrapper answers *yes, consumed* for every member of every interface it decorates, so the seams the profiler touches are exactly the ones the rule went quiet on.
+
 ### Router state machine
 
 | From ↓ / call → | `invoke` | `stream` | invocation settles |
@@ -280,6 +297,7 @@ Settling covers success, failure, cancellation and timeout alike — every path 
 - **I23** — `createEmulatedTransport` takes a handler closure and C06 references no app type. The world stays app-side behind a function, which is what lets `prism-tui` and `docker-tui` each have one without the framework knowing either exists.
 - **I24** — The parity suite compares the **complete** `RawResult`, not a chosen subset, on both the settled path and inside the terminal `end` patch. Fields that cannot match across transports are named individually with a reason, and that list is closed: a field is exempt by being on it, never by not being looked at.
 - **I25** — **Which tokens ask for JSON travels on the `Invocation`, and C06 still does not read C05.** The caller resolves the verb's `jsonFlag` against the manifest's — the verb whole, never merged — and hands C06 a sequence; absent means `["--json"]`, and `[]` means append nothing. This is `Invocation.streams`' seam exactly, for the same reason: a transport that read a manifest would be a transport that knows what a verb is (F1, F1006, C05 I26).
+- **I26** — **`busy` is I13's only observable, and it is declared for that reason alone.** The guard is a closure binding inside `createRouter`; without the member, *at most one invocation is in flight* is a claim about a private variable and no tier can take it. Six rows read it — T1.1, T1.2, T2.6, T3.1, T3.2, T3.3 — and T6.7's revert is caught by none of them if it goes. It is **not** a second guard: C23 I5's is authoritative and covers every foreground route, this one covers direct transport misuse, and the two scopes are stated in both files so neither is tidied away by a reader who finds the other. **An exemption list is not where this belongs**, because a decorator that must satisfy the interface manufactures a reader for every member it wraps and the rule goes quiet (F882, §6).
 
 ---
 
@@ -307,6 +325,7 @@ Settling covers success, failure, cancellation and timeout alike — every path 
 20. Replay reports what was recorded, verbatim (I20). `meta.argv` is a historical fact about the data — what actually ran — not a reproduction hint, so a corpus recorded against one binary says so even when the app now spawns another. `meta.transport` disambiguates; the two fields together are honest.
 21. The parity suite compares the complete `RawResult` (I24). A suite that picks fields is a suite with holes exactly where nobody looked.
 22. **The JSON tokens are the far side's and arrive on the invocation** (I4, I25, → C05 I26). `--json` stays the default and stops being a claim about every binary; the dedupe reads the first token so a user who supplied the flag with another value is not overridden.
+23. **`busy` is declared because I13 has no other observable**, not because a caller wants it (I26). The two premises that kept it on `UNCONSUMED_MEMBERS` were homonyms of C16's `RouterDeps.busy` in a file of the same basename, and the ruling they deferred had already been taken the other way by C16 §5 and C23 I5 (§6, F882, F1053).
 
 ---
 
@@ -353,6 +372,7 @@ Six tiers. Every cell of the §6 transition table is covered. `ProcessRunner` is
 - **T2.4** (I9): for a matrix of terminations — clean exit, non-zero exit, cancel, timeout, spawn failure, malformed stream — exactly one `end` patch is emitted, and it is last.
 - **T2.5**: `AsyncIterable` contract — early `break` by the consumer terminates the child and still settles.
 - **T2.6** (I13): after a hundred invocations across every settlement path, `busy` is false.
+- **T2.13** (I26): **`busy` is on the interface, and it is the whole of what a caller can see of the guard.** The row asserts the member is declared and reports `true` inside an invocation and `false` outside it — the two readings I13 is stated over — and then the part that makes it a watch rather than a restatement: the router's *public* surface is `for`, `busy`, `inFlight` and nothing else, so there is no second way to observe the guard and removing the member removes the observation. The control is the negative: a router with the member deleted from the type fails to compile the five rows that read it, which is why this one is about the declaration and not about a value.
 
 - **T2.12, T2.12b** (I23): the handler is driven as a closure over an app's own mutable world — the mutation lands on the caller's object and on the second reply, so the state is the app's and the transport is the thing with nowhere to put it. T2.12b is the structural half, because a closure that happens to be generic looks exactly like a seam that is: `FixtureHandler`'s declaration names `Invocation`, `RawResult`, `RawPatch` and `AsyncIterable` and nothing else, compared **by equality**, and no file under `src/data/transport/` names an app in an import or a literal.
 ### Tier 3 — edge cases

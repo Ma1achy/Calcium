@@ -511,3 +511,11 @@ describe("C06 §3 — the world stays app-side, behind a function", () => {
     expect(apps.test('import type { DockerWorld } from "../../world.js";'), "the pattern can fire").toBe(true);
   });
 });
+
+// C06 I26's row lands with its code, in the commit after this one. The spec
+// commits alone; SP9 wants the invariant paired the day it is declared.
+describe("C06 §6 — `busy` is declared", () => {
+  it.todo(
+    "T2.13 (C06 I26, §6): the router's export set asserted by equality, so the alternative to declaring `busy` — exporting the guard's binding — fails rather than passing under a worse name — not deferred on a component: the row lands with the assertion in the commit that follows this spec",
+  );
+});
