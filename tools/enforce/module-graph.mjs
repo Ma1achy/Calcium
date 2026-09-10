@@ -1753,6 +1753,20 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "subject from the other side**: the rule is scoped to `src/`, and a member " +
     "whose whole purpose is to be called from outside it cannot satisfy that scope " +
     "however many consumers it has",
+  "TuiInstance.openSurface":
+    "application boundary — an embedding app opens its own surface; wiring this " +
+    "from another framework component would make Calcium invent application UI",
+  "SurfaceActionEvent.fidelity":
+    "application boundary — the surface consumer visibly distinguishes native " +
+    "and reduced-fidelity legacy input",
+  "SurfaceActionEvent.phase":
+    "application boundary — the surface consumer maps native or synthesized " +
+    "press/repeat/release phases onto application actions",
+  "PushedSurface.onClose":
+    "application boundary — the surface owner releases its process and model state " +
+    "when Calcium reports closure",
+  "PushedSurfaceHandle.inputFidelity":
+    "application boundary — the app renders the reduced-fidelity disclosure",
 
   // **The second entry of that category, and it arrived by a satisfier going
   // away rather than by anything new being published** — which is the shape

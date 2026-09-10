@@ -51,6 +51,19 @@ export type {
   TuiConfig,
   TuiInstance,
 } from "./shell/types.js";
+export { SurfaceError } from "./shell/surface.js";
+export type {
+  PushedSurface,
+  PushedSurfaceHandle,
+  SurfaceActionEvent,
+  SurfaceCloseOutcome,
+  SurfaceContext,
+  SurfaceFault,
+  SurfaceInputFidelity,
+  SurfaceInputPhase,
+  SurfaceKeyBinding,
+  SurfaceKeyChord,
+} from "./shell/surface.js";
 
 /**
  * The cursor's shape, for `TuiConfig.cursor` (C22 I63, C01 I20).

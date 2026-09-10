@@ -31,6 +31,8 @@ type Key = Readonly<{
   meta:     boolean;                  // alt
   shift:    boolean;
   sequence: string;                   // the raw bytes, for diagnostics
+  phase?:   "press" | "repeat" | "release" | "unphased";
+  encoding?: "legacy" | "csi-u";
 }>;
 
 type InputEvent =
@@ -91,6 +93,12 @@ of consistent. One constant, one behaviour, one bug report.
 `reset()` discards the pending bytes, the paste buffer and the escape window, and **emits nothing**: the flush rule that turns accumulated printables into keys (§7) is about a window closing, and this window did not close, it stopped mattering. The call is the shell's, on resume, because C01 delivers bytes and interprets none and C16 owns no timer — neither of them knows a suspension ended. That makes it C22's orchestration, and §4's ordering is where it is written down.
 
 **Most terminals send no key-up events and repeat held keys as fresh presses**, so there is no chord support beyond modifiers, and a keymap must not be designed around one. Under C02's `keyboardProtocol: "kitty"` (C01 pushes `CSI > 3 u`) a key arrives as `CSI code ; mods : event u` and the decoder carries the event type as an **optional** `event` field on the `kind: "key"` record — `"press"`, `"repeat"` or `"release"` when the sequence says, **absent** otherwise, so every consumer that ignores it is unchanged and `toEqual` records written before it exist unchanged. **Nothing may be reachable only through that field** (C02 I12): a binding that names an `event` filter without a fallback that fires under `"none"` is A03 SS55's violation, and the rule is vacuous today because no binding names one. The same arm decodes `CSI 27 u` as `escape` **whole** — under the protocol a lone `Esc` is never a prefix and the 50 ms window never runs — and names the modifier key codes `57441`–`57452` (`shift`, `ctrl`, `alt`, `super`) so a terminal that sends them produces a named key rather than a private-use glyph, though the flags C01 pushes do not ask for them (C02 §3's table). The arm's modifier bits are kitty's: shift 1, alt 2, ctrl 4; **bit 8 is folded into nothing** — it is xterm's Meta and kitty's Super, and `⌘` arriving as `Alt` is the live-binding class below — and kitty's meta, bit 32, joins alt in `meta` as the `CSI 1;m X` arm already folds them. Stated blind spot: an xterm at `formatOtherKeys=1` loses a Meta modifier through this arm; its default format keeps it.
+
+The application-surface boundary preserves those native phases. It also marks
+complete CSI-u keys with their wire family so a phase-less native press is not
+mistaken for a legacy key. A legacy surface receives deterministic synthesized
+release events and a visible reduced-fidelity label; Calcium's own command
+bindings remain edge-triggered and ignore release.
 
 ### `modifiersOf` read three bits of four, and the fourth collapsed onto a live binding
 

@@ -111,7 +111,8 @@ const CSI_TILDE_KEYS: Readonly<Record<string, string>> = Object.freeze({
  * the keymap.
  */
 function modifiersOf(param: string | undefined): Pick<Key, "ctrl" | "meta" | "shift"> {
-  const bits = param === undefined ? 0 : Math.max(0, Number(param) - 1);
+  const encoded = param?.split(":", 1)[0];
+  const bits = encoded === undefined ? 0 : Math.max(0, Number(encoded) - 1);
   return {
     shift: (bits & 1) !== 0,
     meta: (bits & 2) !== 0 || (bits & 8) !== 0,
@@ -176,6 +177,7 @@ function key(
   sequence: string,
   mods: Partial<Pick<Key, "ctrl" | "meta" | "shift">> = {},
   event?: "press" | "repeat" | "release",
+  encoding?: Key["encoding"],
 ): InputEvent {
   const k = Object.freeze({
     name,
@@ -183,6 +185,7 @@ function key(
     meta: mods.meta ?? false,
     shift: mods.shift ?? false,
     sequence,
+    ...(encoding === undefined ? {} : { encoding }),
   });
   // The field is *absent*, not `undefined`, when the sequence carried no event
   // type: `toStrictEqual` tells the two apart and every record above is legacy.
@@ -437,7 +440,7 @@ export function createDecoder(options: DecoderOptions): Decoder {
       const name = KITTY_MODIFIER_KEYS[code] ?? otherKeyName(codeParam);
       if (name === null) return consumed;
       const event = eventParam === undefined ? undefined : KITTY_EVENT[eventParam];
-      return out.push(key(name, sequence, kittyModifiersOf(modParam), event)), consumed;
+      return out.push(key(name, sequence, kittyModifiersOf(modParam), event, "csi-u")), consumed;
     }
 
     if (final === "~") {

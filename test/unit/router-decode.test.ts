@@ -93,7 +93,17 @@ describe("C16 §2 — key decoding", () => {
     const { d } = decoder();
 
     expect(feed(d, "[13;2u")).toEqual([
-      { kind: "key", key: { name: "enter", ctrl: false, meta: false, shift: true, sequence: "[13;2u" } },
+      {
+        kind: "key",
+        key: {
+          name: "enter",
+          ctrl: false,
+          meta: false,
+          shift: true,
+          sequence: "[13;2u",
+          encoding: "csi-u",
+        },
+      },
     ]);
     expect(feed(d, "[27;2;13~")).toEqual([
       { kind: "key", key: { name: "enter", ctrl: false, meta: false, shift: true, sequence: "[27;2;13~" } },
@@ -102,8 +112,29 @@ describe("C16 §2 — key decoding", () => {
     // And an ordinary letter through the same branch, so the fix is a codepoint
     // path rather than an Enter special case.
     expect(feed(d, "[97;5u")).toEqual([
-      { kind: "key", key: { name: "a", ctrl: true, meta: false, shift: false, sequence: "[97;5u" } },
+      {
+        kind: "key",
+        key: {
+          name: "a",
+          ctrl: true,
+          meta: false,
+          shift: false,
+          sequence: "[97;5u",
+          encoding: "csi-u",
+        },
+      },
     ]);
+
+    expect(feed(d, "[97;1:2u")[0]).toMatchObject({
+      kind: "key",
+      key: { name: "a", encoding: "csi-u" },
+      event: "repeat",
+    });
+    expect(feed(d, "[97;1:3u")[0]).toMatchObject({
+      kind: "key",
+      key: { name: "a", encoding: "csi-u" },
+      event: "release",
+    });
   });
 
   it("T1.3p (C16 §2, C02 I12): the kitty `CSI u` arm — whole records, event type optional", () => {
@@ -113,7 +144,7 @@ describe("C16 §2 — key decoding", () => {
     // carry *no* field, not an undefined one.
     const { d } = decoder();
     const k = (name: string, sequence: string, over: Partial<{ ctrl: boolean; meta: boolean; shift: boolean }> = {}) =>
-      ({ name, ctrl: false, meta: false, shift: false, sequence, ...over });
+      ({ name, ctrl: false, meta: false, shift: false, sequence, encoding: "csi-u", ...over });
 
     // Shift-Enter pressed — the row T1.3j already has, unchanged in shape.
     expect(feed(d, "\x1b[13;2u")).toStrictEqual([{ kind: "key", key: k("enter", "\x1b[13;2u", { shift: true }) }]);

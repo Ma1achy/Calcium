@@ -14,6 +14,8 @@ export type Key = Readonly<{
   shift: boolean;
   /** The raw bytes, for diagnostics. */
   sequence: string;
+  /** The wire family, when a complete enhanced-keyboard sequence supplied it. */
+  encoding?: "csi-u";
 }>;
 
 /**
