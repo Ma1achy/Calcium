@@ -6481,6 +6481,38 @@ would have made a pre-existing defect read as a regression the fix caused.
 prints the named message and exits 1 — measured, twice. It bites only the author who catches
 `start()` and carries on, which is a narrow case and a real one.
 
+**Closed 2026-09-10, and the first thing done was to reproduce it.** The entry is from an
+earlier round and its evidence was a reading rather than a run, so the fix began with a PTY and
+a script that catches the rejection and carries on. It hung: `CAUGHT UnusableTerminalError`,
+`FELL-THROUGH`, and then **6 s and counting** until the probe gave up. With `stop("fault")`
+before the throw, the same script exits 0 in **744 ms**.
+
+**Two things were learnt getting there and only one of them is the finding.** The first probe
+came back with an *empty capture* and timed out, which reads exactly like the hang it was
+looking for — and was not. C01 redirects `stdout.write` into its debug sink at construction
+(C01 I3), so every `console.log` after `createTui` went somewhere nobody reads. A probe that
+reports through the channel its subject owns is measuring the subject's sink. It now writes to
+fd 2.
+
+**The reason it survived is that the uncaught path is fine.** Node prints the named message and
+exits 1 — with the history file, the stores and §3b's timers all still held. So the defect is
+invisible on the path everybody takes and total on the one that matters, and no assertion in
+tiers 1–4 could have seen it either: vitest's worker is itself the thing keeping the process
+alive, so a leaked handle is unobservable from inside it. T5.8 is tier 5 for that reason and
+not for realism.
+
+**The mutation is the row's argument, and it is measured.** With the `stop()` removed and the
+tree rebuilt, T5.8 times out at 15 s where it takes 778 ms — and **T5.8b and all seven of tier
+3's gate rows stay green**, because those rows call `stop()` themselves. A framework that never
+stopped was green everywhere the gate is tested, which is what a suite indexed by what it
+already suspects looks like from outside.
+
+**And one clause had to be made more precise rather than reversed.** C22 I4 says *`signal` and
+`fault` are C01's … so `stop` cannot run there*, which is true of the **handler** — C01 exits
+inside it and exposes no hook. Read as *`fault` never reaches `stop`* it forbids this fix, and
+a sentence that forbids the repair to a defect it does not know about is the shape MG24's
+scope had (F84): correct, carefully stated, and about a neighbouring question.
+
 **A claim I made here was wrong, and it is left standing as the correction rather than
 deleted.** Four of F8's rows refuse, so each left a constructed graph alive in the vitest
 worker, and when C17 T3.15 — a wall-clock paste budget in another file — went from green to

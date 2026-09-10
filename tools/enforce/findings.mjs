@@ -593,7 +593,7 @@ export function checkTriageInventory(io) {
  * Ordered by number, which is the order a reader walks it in.
  */
 export const TRIAGE_OPEN = Object.freeze([
-  "F140", "F158", "F271", "F405", "F812",
+  "F158", "F271", "F405", "F812",
   "F1024", "F1065",
 ]);
 
