@@ -439,6 +439,9 @@ describe("C22 §13a — a live part hosted by a pushed view", () => {
       },
       commit: () => undefined,
       append: () => undefined,
+      // C23 I70's sink. Nothing here refuses a patch — the view arm answers one
+      // boolean — so this is the shape and not a subject.
+      fault: () => undefined,
       stopping: () => false,
     visible: () => true,
       producerContext: () => producerContext(),

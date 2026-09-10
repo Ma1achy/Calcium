@@ -5,6 +5,7 @@ import { CORPUS_BUDGET_MS } from "../support/budget.js";
 
 
 import { createEditor } from "../../src/interaction/editor/index.js";
+import type { LineEditor } from "../../src/interaction/editor/index.js";
 
 // This file builds a large corpus; `budget.ts` carries the measurement and
 // why the 5 s default is not a margin. Re-measure before raising it.
@@ -28,7 +29,7 @@ describe("C17 §6 — large input", () => {
     expect(e.text.length, "a megabyte, near enough").toBeGreaterThan(1_000_000); // graphemes-ok
     expect(insertMs, "one paste, one edit").toBeLessThan(2000);
 
-    const half = createEditor({ text: text.slice(0, Math.floor(text.length / 2)) }); // graphemes-ok
+    const halfText = text.slice(0, Math.floor(text.length / 2)); // graphemes-ok
 
     // **The ratio is the assertion, so the measurement has to be quieter than
     // the gap it has to see.** Linear is 2 and quadratic is 4; the bound sits at
@@ -47,19 +48,45 @@ describe("C17 §6 — large input", () => {
     //
     // Five runs after: 2.18, 2.49, 1.99, 1.73, 2.11. The bound is unchanged,
     // because the bound was never the thing that was wrong.
-    const best = (fn: () => number): { rows: number; ms: number } => {
+    //
+    // **And then the memo landed and the minimum stopped measuring the walk**
+    // (F1014). `displayRows` returns `this.layout(width, gutter).length`, and
+    // `layout` caches on text, width and gutter — so readings two through five
+    // are cache hits and `Math.min` takes one of them. The figures above are
+    // the tell: 320–390 ms became **0.00 → 0.00, ratio 6.75** against a bound
+    // of 3, two numbers below the timer's resolution divided by each other.
+    // The row went green or red on noise, and it had been green by luck.
+    //
+    // The comment three paragraphs up names the premise that broke: the
+    // minimum of N is the least-contended estimate **of a deterministic
+    // computation**, which a memoised one stops being. So each reading gets
+    // its own editor, built outside the timed region, and every timed call is
+    // a miss.
+    //
+    // **Three rather than five, and the cost is why.** Every reading is now a
+    // real walk, so the row pays 3 × 430 ms + 3 × 260 ms where it used to pay
+    // one of each: **4.78 s against `CORPUS_BUDGET_MS`'s 10 s**, measured. Five
+    // would be 6.2 s and no quieter — the tail this removes is a descheduled
+    // slice, and a minimum over three has already dropped it.
+    const best = (make: () => LineEditor): { rows: number; ms: number } => {
+      const editors = Array.from({ length: 3 }, make);
       let rows = 0;
       let ms = Number.POSITIVE_INFINITY;
-      for (let i = 0; i < 5; i += 1) {
+      for (const ed of editors) {
         const start = performance.now();
-        rows = fn();
+        rows = ed.displayRows(80, G);
         ms = Math.min(ms, performance.now() - start);
       }
       return { rows, ms };
     };
 
-    const small = best(() => half.displayRows(80, G));
-    const big = best(() => e.displayRows(80, G));
+    const small = best(() => createEditor({ text: halfText }));
+    const big = best(() => createEditor({ text }));
+
+    // **The instrument has to be shown to be measuring anything at all.** Two
+    // readings under the clock's resolution divide to any ratio at all, which
+    // is how this row passed for as long as it did.
+    expect(small.ms, "the smaller walk is above the clock's resolution").toBeGreaterThan(1);
 
     console.log(
       `T3.15 · ${small.ms.toFixed(2)} ms → ${big.ms.toFixed(2)} ms, ratio ${(big.ms / small.ms).toFixed(2)} against a bound of 3`,

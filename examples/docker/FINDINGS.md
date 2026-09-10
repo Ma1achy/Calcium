@@ -38512,3 +38512,91 @@ measurement line and no picture*, so the row reading requires the contrast to be
 the wording does not forbid it outright. Under that reading the count is still wrong and the
 corpus figure still inverts the appeal, so the repair stands and only the middle row of the first
 table falls.
+
+## F1014 — a memo turned a timing row's instrument into a cache-hit timer, and the row kept passing because two numbers below the clock's resolution divide to anything ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `test/edge/editor.test.ts` T3.15, against `src/interaction/editor/editor.ts`'s `displayRows` |
+| **Reached for** | a full-suite run that went red on a row green ten minutes earlier, and green again when run alone |
+| **Verdict** | **the row had stopped measuring its subject**, and the previous repair's own comment names the premise that broke |
+
+T3.15 asserts that laying out a megabyte is **linear** rather than quadratic: time the
+half-size document, time the full one, and require the ratio under 3. It reports its
+figures, and that is what gave it away.
+
+    T3.15 · 0.00 ms → 0.00 ms, ratio 6.75 against a bound of 3
+
+**Both readings are below two decimal places and the ratio is noise.** The row's own
+comment, three paragraphs above the helper, records the measurements it was built on —
+*these measurements are 320–390 ms and 645–880 ms, where one millisecond is 0.3 %* — so
+the file carries the before and the after of its own decay and nobody read them together.
+
+### The premise the earlier repair wrote down, and what falsified it
+
+The helper takes the **minimum of five** readings, and the comment justifies it exactly:
+
+> The minimum of N is the least-contended estimate **of a deterministic computation**,
+> which is what removes the tail.
+
+`displayRows` returns `this.layout(width, gutter).length`, and `layout` memoises on text,
+width and gutter — a cache added later, for its own good reasons, with its own comment.
+So readings two through five are **cache hits**, and `Math.min` over five takes one of
+them. Measured with the readings forced to share an editor: **0.0005 ms**, against 260 ms
+for the same call on a fresh one — **five orders of magnitude**, which is why the figure
+rounds to `0.00` rather than looking merely fast.
+
+**A memoised computation is not a deterministic one in the sense the sentence needed.**
+The word did the work and the distinction it named was between *computation* and *noise*,
+not between *first call* and *later call*. Nothing in the editor's change could have known
+it was falsifying a sentence in a test file two directories away, and nothing looked.
+
+### Why no gate saw it
+
+**It passed.** A ratio of two sub-resolution numbers is any number at all, and it landed
+under 3 on most runs — the suite was green on this row ten minutes before it went red, on
+the identical tree. The row is in triage group 12, *a time-based assertion under
+contention*, which is the diagnosis it invites and the wrong one: contention is not what
+moved it, the memo is, and contention only decides which side of the bound the noise lands.
+
+**And the row's *other* assertion still worked**, which is what kept the file honest-looking:
+`big.rows / small.rows` is close to 2 on every run, because a row count is not a timing.
+One assertion measuring its subject beside one measuring nothing reads exactly like two
+working assertions.
+
+### The repair, and the guard that would have caught it
+
+Each reading gets **its own editor**, built outside the timed region, so every timed call
+is a miss. Three rather than five, because each is now a real walk: **4.78 s against
+`CORPUS_BUDGET_MS`'s 10 s**, where five would be 6.2 s and no quieter.
+
+And the row now asserts that its instrument measured anything at all:
+
+```ts
+expect(small.ms, "the smaller walk is above the clock's resolution").toBeGreaterThan(1);
+```
+
+**Fabricated violation**: reverting the three editors to one shared editor fails on that
+line at `0.0005` against a bound of 1 — the cache-hit cost, named. Without it the reverted
+row goes green or red on noise, which is the state it was found in.
+
+**This is the general shape and it is worth the sentence.** A row that divides two
+measurements needs a floor on the denominator, because a ratio hides the scale that makes
+it meaningful. `expect(ratio).toBeLessThan(3)` is satisfied by two zeroes.
+
+**Measured**
+
+| | |
+|---|---|
+| the row's recorded figures, when built | 320–390 ms · 645–880 ms |
+| the same readings at HEAD | **0.00 ms · 0.00 ms**, ratio 6.75 |
+| one call on a fresh editor · a repeat on the same one | 259.53 ms · **0.0005 ms** |
+| after: small · big · ratio | 259.53 ms · 428.44 ms · **1.65** |
+| the row's cost, before · after | 1.6 s · **4.78 s** of a 10 s budget |
+| readings per size, before · after | 5 · 3 |
+| assertions in the row that still worked | 1 of 2 — the row count, which is not a timing |
+
+**What would falsify this**: a run where a fresh editor's `displayRows` is also below the
+one-millisecond floor, which would mean the guard is now the flake rather than the ratio —
+the measured margin is 260× and the corpus is fixed at a megabyte, so it would take a
+machine two orders of magnitude faster than this one.
