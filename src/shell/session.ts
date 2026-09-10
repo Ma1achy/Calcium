@@ -573,7 +573,26 @@ class Session implements TuiInstance {
     // session never runs. A warning routed there is unread by construction:
     // the same silence with more machinery. Measured under a PTY.
     if (!isUsable(this.#graph.capabilities)) {
-      throw new UnusableTerminalError(unusableCause(this.config.env));
+      // **Torn down before the throw, because the graph outlives the refusal
+      // otherwise** (F140). `constructGraph` has already run: a history file is
+      // open, the transport's stores are live, and §3b's timers are armed. An
+      // author who catches this rejection and carries on therefore has a process
+      // that never exits — measured under a PTY at 6 s and counting, with the
+      // rejection caught and the next line printed.
+      //
+      // **Uncaught it looks fine, which is why it survived**: node prints the
+      // named message and exits 1 with the handles still held, so the defect is
+      // invisible on the path everyone takes and total on the one that matters.
+      //
+      // `fault` for its exit code — 1, the same code the uncaught path gives —
+      // and it is the fourth of the five reasons to reach `stop()` rather than
+      // the third (I4). C01's own `fault` still does not arrive here; this one
+      // is C22's, taken before anything was acquired, so `release()` finds
+      // `held` empty and emits nothing (C01 I8, I20) — which is what T3.20's
+      // *nothing was acquired* assertion continues to hold.
+      const cause = unusableCause(this.config.env);
+      await this.stop("fault");
+      throw new UnusableTerminalError(cause);
     }
 
     const size = this.#graph.lifecycle.size();

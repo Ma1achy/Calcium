@@ -234,6 +234,61 @@ switch (mode) {
     break;
   }
 
+  // --- C22 tier 5 ----------------------------------------------------------
+  //
+  // **Gate 3b from the side that shows the defect** (C22 I61, I4; F140).
+  //
+  // The session is refused after `constructGraph` has run, the rejection is
+  // **caught**, and the process is then left to end on its own. It ends only if
+  // the framework stopped what it built: a history file is open, the transport's
+  // stores are live and §3b's timers are armed, and node keeps a process alive
+  // for any one of them. Uncaught, this same path exits 1 with the handles still
+  // held — which is why the defect was invisible on the path everybody takes.
+  //
+  // **The report goes to fd 2 rather than through `console.log`**: C01 redirects
+  // `stdout.write` into its debug sink at construction (C01 I3), so anything
+  // logged after `createTui` lands in a sink nobody reads. Measured as an empty
+  // capture, which is indistinguishable from a hang — the first run of this
+  // probe timed out with no output at all and the cause was the sink, not the
+  // leak it was looking for.
+  case "caught-refusal": {
+    const { createTui } = await import("../../dist/shell/session.js");
+    const { defaultTheme } = await import("../../dist/presentation/theme/index.js");
+    const { mkdtempSync, writeSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+
+    const say = (line) => void writeSync(2, `${line}\n`);
+
+    const tui = createTui({
+      name: "prism",
+      binary: "widget",
+      manifest: { schema: "tui.manifest/1", binary: "widget", version: "1.0.0", tools: [] },
+      theme: defaultTheme,
+      stateDir: mkdtempSync(join(tmpdir(), "calcium-refusal-")),
+      // The PTY's `TERM` decides which arm this is, so one mode drives the
+      // refusal and its control — `runInPty` puts `opts.env.TERM` on the device
+      // itself, which is the only place C02 can read it from.
+      env: process.env,
+    });
+
+    try {
+      await tui.start();
+      // **The control's arm, and it has to be positive.** A gate that refused
+      // every terminal would satisfy the timing assertion by exiting fast, so
+      // the row needs a run that reaches a session and says so.
+      say("OPENED");
+      await tui.stop("exit");
+    } catch (err) {
+      say(`CAUGHT ${err.constructor.name}`);
+    }
+
+    // Nothing below keeps the loop alive. Whether the process ends here is the
+    // whole of the assertion.
+    say("FELL-THROUGH");
+    break;
+  }
+
   // --- C03 tier 5 ----------------------------------------------------------
   //
   // Real timers, a real terminal and the default `schedule` — the one place
