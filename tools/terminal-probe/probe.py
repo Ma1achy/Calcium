@@ -1,6 +1,16 @@
 #!/usr/bin/env python3
 """The terminal read's machine half — what the terminal ANSWERS.
 
+    python3 probe.py              # -> results/<terminal>.txt, the read corpus
+    python3 probe.py <path>       # -> <path>, unchanged since this was written
+
+**The bare form is the one that closes the loop** (F1060): `results/` is read
+back by `test/unit/terminal-probe.test.ts`, which fails when a recorded verdict
+disagrees with `src/terminal/capabilities.ts`'s image-protocol table. Before it
+existed the table's expiry was *run the probe there and read the verdict* with
+nothing reading the verdict, and one output path meant the second terminal's run
+overwrote the first's. See `report_path` for why the argument kept its meaning.
+
 This cannot see a picture. It asks the terminal questions that have byte
 answers, which covers exactly the checks that are about protocol conformance
 rather than appearance:
@@ -11,11 +21,13 @@ rather than appearance:
 
 Everything else in the ten needs eyes.
 """
-import os, sys, json, select, termios, tty, time
+import os, re, sys, json, select, termios, tty, time
 
 TTY = open("/dev/tty", "r+b", buffering=0)
 FD = TTY.fileno()
-DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bytes")
+HERE = os.path.dirname(os.path.abspath(__file__))
+DIR = os.path.join(HERE, "bytes")
+RESULTS = os.path.join(HERE, "results")
 OUT = []
 
 
@@ -66,12 +78,79 @@ def kitty_reply(raw):
     return msg.decode("ascii", "replace").strip() or "EMPTY"
 
 
+def xtversion():
+    """What the terminal calls *itself* — `CSI > 0 q`, answered `DCS > | name ST`.
+
+    **Asked because two of the three terminals measured so far put no version in
+    the environment at all.** kitty and XTerm set neither `TERM_PROGRAM` nor
+    `TERM_PROGRAM_VERSION`, so a record identified from the environment says
+    `xterm-kitty` and nothing more — and a results *file* named from that is
+    overwritten by the next kitty release, which is the same defect the per
+    terminal directory exists to fix, one level down. Ghostty's record predates
+    this line and is identified by `TERM_PROGRAM` instead, so the reader treats
+    it as optional rather than required.
+    """
+    raw = ask(b"\x1b[>0q", b"\x1b\\", 2.0)
+    if b"\x1bP>|" not in raw:
+        return "?"
+    body = raw.split(b"\x1bP>|")[-1].split(b"\x1b\\")[0]
+    return body.decode("ascii", "replace").strip() or "?"
+
+
+def report_path(argv, env, emulator):
+    """Where the report goes. **The contract, decided rather than inherited.**
+
+    `probe.py <path>` writes to `<path>` and means exactly what it has always
+    meant — a file name is a public surface for anyone who has ever run this,
+    and the alternative considered was redefining the argument to name the
+    results *directory*. That was refused: an invocation whose shape does not
+    change and whose meaning does is the worst kind of break, and it would put a
+    directory where the caller expected a file with nothing reporting a conflict.
+
+    **With no argument the report goes to `results/<terminal>.txt`**, which is
+    the corpus `test/unit/terminal-probe.test.ts` reads back. The new behaviour
+    is the default rather than the argument because the person who has an
+    invocation memorised keeps their file, and the person who runs it bare — who
+    is the one who has not read this — gets the loop. Bare was previously an
+    `IndexError` raised *after* the whole terminal read had finished and before
+    a line of it was printed, so the reading was lost; measured, not recalled.
+
+    **The name is for a human and the record's own header is what the reader
+    parses.** Renaming a file therefore breaks nothing, and two records for one
+    terminal are read as two records rather than silently merged. Two runs of the
+    same terminal at the same version overwrite each other, which is intended:
+    the newest reading of `kitty 0.41.1` *is* the reading of `kitty 0.41.1`.
+    """
+    if len(argv) > 1:
+        return argv[1]
+    # **Three sources in one order, and the order is the argument.**
+    # `TERM_PROGRAM` first because it is what C02 itself identifies a terminal
+    # by, and because it arrives with a version beside it. The terminal's own
+    # `XTVERSION` answer second, because it is present in exactly the case the
+    # environment is silent — kitty and XTerm set no `TERM_PROGRAM` at all, so
+    # without this arm both would be named for their terminfo entry and every
+    # release would overwrite the last. `TERM` last: it names a terminfo entry
+    # rather than an emulator, and `xterm` is the name half the world claims.
+    program = env.get("TERM_PROGRAM", "").strip()
+    if program:
+        stem = f"{program} {env.get('TERM_PROGRAM_VERSION', '').strip()}"
+    elif emulator and emulator != "?":
+        stem = emulator
+    else:
+        stem = env.get("TERM", "") or "unknown"
+    slug = re.sub(r"[^A-Za-z0-9._-]+", "-", stem).strip("-.").lower()
+    os.makedirs(RESULTS, exist_ok=True)
+    return os.path.join(RESULTS, (slug or "unknown") + ".txt")
+
+
 log("=" * 72)
 log("the terminal read — the machine half")
 log("=" * 72)
 log()
 log(f"TERM             {os.environ.get('TERM', '?')}")
 log(f"TERM_PROGRAM     {os.environ.get('TERM_PROGRAM', '?')} {os.environ.get('TERM_PROGRAM_VERSION', '')}")
+EMULATOR = xtversion()
+log(f"EMULATOR         {EMULATOR}")
 sz = os.get_terminal_size()
 log(f"size             {sz.columns} x {sz.lines} cells")
 log()
@@ -181,8 +260,9 @@ log()
 log("=" * 72)
 
 text = "\n".join(OUT)
-with open(sys.argv[1], "w") as fh:
+path = report_path(sys.argv, os.environ, EMULATOR)
+with open(path, "w") as fh:
     fh.write(text + "\n")
-sys.stdout.write("\x1b[0m\r\n" + text + "\r\n\r\nwritten. this window stays open 3s.\r\n")
+sys.stdout.write("\x1b[0m\r\n" + text + f"\r\n\r\nwritten to {path}\r\nthis window stays open 3s.\r\n")
 sys.stdout.flush()
 time.sleep(3)

@@ -83,7 +83,7 @@ const header =
     clusters(
       "chrome.header",
       [
-        { label: name },
+        { label: name, tone: "default" },
         { label: binary, tone: "muted" },
         // **Not optional, and not a footer hint.** Copy mode is the one mode
         // whose whole effect is that things stop responding — the mouse goes

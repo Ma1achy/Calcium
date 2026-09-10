@@ -27,6 +27,9 @@ import type { Placed } from "../../src/viewport/overlay/index.js";
 import type { ProfileReport } from "../../src/shell/profiling/types.js";
 import { registry as measurer, rows as contentRows } from "../support/overlay.js";
 import { buildSession } from "../support/session.js";
+import { makeDefaultChrome } from "../../src/shell/chrome.js";
+import { tone } from "../../src/presentation/blocks/paint.js";
+import type { Block, Pills } from "../../src/data/viewmodel/index.js";
 
 /** C09's measurer, for the footer's height (C22 I82). */
 const MEASURE = createBlockRegistry({ defaults: true }).measureSequence;
@@ -797,12 +800,102 @@ describe("C22 §4a — one overlay layout per frame, shared by the rows and the 
     expect(footerLeft.calls, "the header's two plus compose's one").toBe(3 * footerLeft.frames);
     expect(footerRight.calls, "the header's two plus compose's one").toBe(3 * footerRight.frames);
   });
+});
 
-  // The spec's I97 and T1.46b land in this commit; the row itself lands in the
-  // next one, with `chrome.ts` and the nineteen golden frames it moves. Nothing
-  // is waited on here — the code exists and is one commit behind the sentence
-  // that describes it, which is what spec-first means.
-  it.todo(
-    "T1.46b (C22 I86, I97, §6l.6 J, F1029, F1072): every chip names its tone, and the name is not the binary's ink — not deferred on a component",
-  );
+describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => {
+  /**
+   * Every chip the default chrome emits, with all three conditional ones up.
+   *
+   * **`copyMode`, `stopping` and `lastFrame` are all set** because each gates a
+   * chip, and a corpus assembled from the quiet session is three chips short —
+   * two of which are the only two in the file whose tone is not the default, so
+   * a walk over the quiet session would be a walk over the inert ones alone.
+   */
+  function chips(): readonly Pills["chips"][number][] {
+    const chrome = makeDefaultChrome("calcium", "/usr/local/bin/prism");
+    const ctx = {
+      session: {
+        cwd: "/home/ada/work",
+        env: Object.freeze({ HOME: "/home/ada" }),
+        lastUuid: null,
+        identity: null,
+        cluster: "fmx-prod",
+        health: "live" as const,
+        version: "1.0.0",
+        retained: null,
+        stopping: true,
+      } satisfies SessionSnapshot,
+      now: 1_700_000_000_000,
+      columns: 80,
+      copyMode: true,
+      lastFrame: 12.4,
+    };
+    const out: Pills["chips"][number][] = [];
+    const walk = (b: Block): void => {
+      if (b.kind === "pills") out.push(...b.chips);
+      if (b.kind === "group") b.children.forEach(walk);
+    };
+    [...chrome.header(ctx), ...chrome.footer(ctx)].forEach(walk);
+    return out;
+  }
+
+  it("T1.46b (C22 I86, I97, §6l.6 J, F1029): every chip names its tone, and the name is not the binary's ink", () => {
+    // **C22 pins its chrome's appearance rather than inheriting C09's default**,
+    // and that is why five explicit `tone: "muted"`s which each equal the default
+    // are not five inert words: they are one property, and this is the row that
+    // makes it one. `simple.ts` resolves `chip?.tone ?? "muted"`, so a change to
+    // *that* default would otherwise repaint every chrome row in every Calcium
+    // app with nothing in C22 moving and nothing here going red.
+    //
+    // **F1029 found one of the five and read it as a word to delete.** Measured
+    // here: dropping the clock's `tone: "muted"` moves 0 of 46 golden snapshots,
+    // exactly as dropping the binary's does — so the vacuity was never about
+    // that one chip. What was actually wrong is that **one chip of eight opted
+    // out of the pinning**, and it happened to be the one whose intended tone
+    // differed from the default.
+    //
+    // **The spec now carries it** — §6l.6 J's tone clause, I97 and T1.46b, all
+    // landed ahead of this row. The comment stays because what it names is the
+    // reason the row is T1.46's sibling: I86 is the geometry of the same two
+    // clusters, and a tone is appearance and never geometry, which is why the
+    // golden diff for this change touches every style map and no grid.
+    const all = chips();
+    // The corpus, before anything is asserted over it: a walk that found nothing
+    // satisfies every for-loop below it (`an exit status is the same bit for
+    // clean and for did-not-run`).
+    expect(all.map((c) => c.label), "eight chips, with all three conditional ones up").toEqual([
+      "calcium",
+      "/usr/local/bin/prism",
+      "COPY",
+      "22:13:20",
+      "/help",
+      "stopping",
+      "last  12.4ms",
+      "~/work",
+    ]);
+    for (const chip of all) {
+      expect(chip.tone, `${chip.label} inherits C09's default instead of naming its own`).toBeDefined();
+    }
+
+    // **And the sentence F1029 found could not be violated.** `{ label: name },
+    // { label: binary, tone: "muted" }` reads as *the binary is dimmer than the
+    // name* and rendered both at one ink, because `muted` **is** the default.
+    // Asserted on the resolved ink rather than on the two words: giving the name
+    // `tone: "muted"` spells a difference and paints none, and that is the defect
+    // this row exists for rather than the spelling it happened to arrive in.
+    const [name, binary] = all;
+    for (const theme of [DARK_THEME, LIGHT_THEME]) {
+      const ofName = tone(name?.tone ?? "muted", theme, FULL_CAPS);
+      const ofBinary = tone(binary?.tone ?? "muted", theme, FULL_CAPS);
+      expect(ofName, "the header's identity and the path it drives resolve to one ink").not.toEqual(ofBinary);
+    }
+    // The control: two chips that *are* meant to share an ink still do, so the
+    // assertion above is about these two and not about any two chips differing.
+    // (The `?? "muted"` arms are unreachable past the loop above, which is where
+    // an undefined tone is reported; they are here because `Tone` has no member
+    // that could stand for *absent*.)
+    expect(tone(all[3]?.tone ?? "muted", DARK_THEME, FULL_CAPS), "the clock and the cwd are both chrome").toEqual(
+      tone(all[7]?.tone ?? "muted", DARK_THEME, FULL_CAPS),
+    );
+  });
 });

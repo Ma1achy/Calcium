@@ -382,11 +382,28 @@ function identifyTerminal(
  * for a corrupted control, so the protocol is present and success is
  * distinguishable from failure (F415).
  *
+ * **And kitty is, since F1060.** kitty 0.41.1 under Xvfb answers `OK` for all
+ * seven cases and `EBADPNG:bad adaptive filter value` for the corrupt control;
+ * XTerm 398, which speaks no graphics protocol at all, answers `NO RESPONSE` to
+ * every one and falls through this table to `none`. Two records that agree with
+ * a table say nothing on their own — what they are for is that the arm which
+ * *refuses* is exercised by a real terminal, so the row reading them is not one
+ * that has only ever seen agreement. Note the two terminals name the same
+ * failure differently, which is why nothing matches on the error text.
+ *
  * **WezTerm and Windows Terminal are `none`, owed and not claimed.** Neither has
  * been measured here and the asymmetry decides it: placeholders addressing an
  * image the terminal never received draw *nothing*, where a wrong `none` draws a
- * dither. The expiry is an instrument rather than a hope — run the probe there
- * and read the verdict.
+ * dither.
+ *
+ * **The expiry is a row that goes red, not an instruction to a reader** (F1060).
+ * Run `tools/terminal-probe/probe.py` in one of them with no argument: the
+ * report lands in `tools/terminal-probe/results/`, and `terminal-probe.test.ts`
+ * TP7 reads every record there back through `detectCapabilities` and fails
+ * naming the file when a recorded verdict disagrees with this table. Before that
+ * row this comment said *run the probe there and read the verdict* while nothing
+ * read the verdict — a deferral with an instrument, an output file, and no
+ * reader, which is a deferral with a hope wearing a tool's clothes.
  *
  * **`synchronisedUpdate` and `colourDepth` have no table of their own**, because
  * the membership criterion for the map above *is* being an emulator modern enough
