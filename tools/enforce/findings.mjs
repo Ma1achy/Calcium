@@ -594,7 +594,7 @@ export function checkTriageInventory(io) {
  */
 export const TRIAGE_OPEN = Object.freeze([
   "F158", "F271", "F405", "F812",
-  "F1024", "F1065",
+  "F1024",
 ]);
 
 /** The words a disposition may be written with. */

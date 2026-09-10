@@ -42949,11 +42949,49 @@ one nobody has: how large a `logs` block gets in practice, and what a whole-bloc
 costs at that size. The surface document's own case — one `raw` block per line — is the
 working alternative, and it is evidence the op is a convenience rather than a blocker.
 
+### The measurement, taken — and it answers *no*
+
+**Ruled 2026-09-10.** The deciding measurement this entry named is done, and all three of its
+premises moved.
+
+| 8 000 ticks of a growing log | before | after F1078 |
+|---|---|---|
+| `logs`, whole-block `replace` | 4 502 ms | **496 ms** |
+| `raw`, one block per line | 9 430 ms | **5 138 ms** |
+| the producer's array copy, alone | 36 ms | 36 ms |
+
+1. **The endorsed alternative is the slower arm, by ten times.** S12 says the reference app's
+   `/logs -f` emits one `raw` block per line *and is right to*. It is not: `append` grows the
+   **document**, so every subsequent patch walks a document of n blocks, where `replace` walks one
+   block of n lines and pays less per item. The sentence has been corrected rather than deleted.
+2. **A line-append operation would buy 36 ms of 532.** Under deep immutability an append **is** a
+   copy — `{...block, lines: [...block.lines, line]}` — so moving it from the producer into the
+   store moves the same allocation across a seam. The op is O(lines) per tick exactly as `replace`
+   is, and the producer's copy is 7% of the tick.
+3. **What was actually costing was neither.** `deepFreeze` re-walked already-frozen lines on every
+   patch, and `Object.getOwnPropertyNames` allocated an n-string array per array node. That is
+   **F1078**, worth 9× end to end and 200× on a re-sent block, with no change to any vocabulary.
+
+**Closed as *no operation*.** The residue is real and is the shape rather than the op: both arms
+stay quadratic, because an immutable append over a plain array cannot be anything else. An
+unbounded stream wants a **bounded block** — which S12 already specifies, at 50 000 lines FIFO —
+rather than a new patch arm, and the block kind's own `window` is what makes a bounded one
+affordable.
+
+**The premise was reversed in both directions**, which is this register's recurring shape: the op
+was not owed for the reason given, and the workaround was not right for the reason given. The
+entry survived being read carefully because both sentences are about *the vocabulary*, and the
+cost was in the walk underneath it — one layer down, exactly as this entry says F141's was.
+
 ### What would falsify this
 
 A consumer that wants the whole block every tick — a viewport that re-wraps at each width
 would, since it holds no accumulated state of its own. That is the argument against the
-op, and it has not been weighed against the argument for it.
+op, and it was never weighed against the argument for it, because the argument for it did not
+survive being measured.
+
+The figures are single-machine, on a quiet container. What carries is the ratio between the arms
+and not the absolute numbers (F929); a machine that reversed the 10× would reopen this.
 
 ## F1057 — the reply channel's blocker was never the input path, and the record is spent before a reply is readable ★★★★☆
 
@@ -43963,3 +44001,83 @@ mechanism from indentation.
 - **The 37 are not asserted anywhere.** EC6 asserts the *agreement*, not the split, so the count
   drifts as tests are written and nothing goes red — deliberately, because this is a reported
   signal and a count assertion would make it a gate by the back door.
+
+## F1078 — the walk that establishes immutability re-walked what it had already frozen, on every patch ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `src/data/viewmodel/construct.ts` — `deepFreeze` · C04 I1, T1.39–T1.41, T6.100 |
+| **Reached for** | F1065's named measurement — *how large a `logs` block gets in practice, and what a whole-block replace costs at that size* |
+| **Verdict** | **Closed.** The walk memoises its own completed subtrees and walks arrays by index: **4 502 ms → 496 ms** over 8 000 streaming ticks, and **200×** on a re-sent block |
+
+### The measurement, and it was not the one being looked for
+
+F1065 asks whether `ViewPatch` is owed a line-append operation. Answering it meant timing a
+growing `logs` block, and the timing pointed somewhere else entirely.
+
+`applyPatch` deep-freezes the document it returns (C04 I1). `deepFreeze` took a `seen` WeakSet
+**constructed fresh on every call** — a cycle guard, correct for that, and carrying nothing
+between calls. So every patch re-walked every line of the block, whether or not those lines had
+been frozen by the previous nine thousand patches.
+
+Isolated by holding the block at a fixed size and re-sending **the same array object**, so
+nothing about it changes between ticks:
+
+| lines in the block | ms per 1 000 patches, before | after |
+|---|---|---|
+| 1 | 5.7 | 7.7 |
+| 100 | 17.0 | 3.9 |
+| 1 000 | 132.6 | 3.3 |
+| 4 000 | 567.2 | 5.3 |
+| 8 000 | **1 140.1** | **5.7** |
+
+Linear in the block's content, flat afterwards. `applyPatch` alone goes 1 076.8 ms to 4.3 ms per
+thousand calls at 8 000 lines.
+
+### `Object.isFrozen` is the wrong memo, and it passes the obvious test
+
+The cheap version — *if it is frozen, stop* — is wrong, and wrong in the direction that
+reintroduces the defect I1 exists to prevent. The tree shallow-freezes objects in a dozen places;
+every `Object.freeze({ … })` in a builder is one. A shallow freeze says nothing about depth, so
+reading one as a memo hit leaves `blocks[0].rows[2]` mutable — **which is the failure I1's own
+doc comment opens with.** What is memoised is this function's *own* completed walks, in a module
+`WeakSet`, recorded **after** the freeze rather than before: it is a claim that the subtree is
+done, and a walk that threw part-way would otherwise leave that claim standing over an unfrozen
+tree.
+
+T1.40 is the row that separates the two. M2 below is the measurement that it does.
+
+### A second cost, and it was the allocation rather than the loop
+
+`Object.getOwnPropertyNames` on an n-element array builds an n-string array to iterate, once per
+array node per walk — and a document of blocks and lines is mostly array nodes. Arrays now walk
+by index. End to end over 8 000 ticks of a growing `logs` block: **4 502 → 2 069 → 496 ms**.
+
+**Its one narrowing is stated and tested rather than assumed** (T1.41): an array's own *non-index*
+property is no longer walked. It is still frozen with the array, so it cannot be replaced; what is
+no longer reached is its interior. Nothing in a `ViewDocument` has one and `JSON.parse` cannot
+produce one. A limit that is tested is a limit; one that is only written down is a hope.
+
+### Mutations
+
+| # | mutation | fails |
+|---|---|---|
+| M1 | the memo removed | **T1.39 alone** |
+| M2 | `Object.isFrozen` as the memo | **T1.40 alone** |
+| M3 | arrays back to `getOwnPropertyNames` | **T1.41 alone** |
+
+Three mutations, three rows, one each — and before these rows existed **the whole suite was green
+over the unmemoised walk for the component's entire life**. 6 111 tests pass either way. A defect
+costing 200× at the size the surface document itself specifies, invisible to every one of them,
+because a suite indexed by correctness cannot see a cost.
+
+### What would falsify this
+
+- The memo is unbounded in principle. A `WeakSet` holds weakly, so a document that is collected
+  drops out of it; nothing accumulates. What it cannot do is shrink while a document is alive,
+  which is the same lifetime the document already has.
+- **The shape is unchanged.** A block that genuinely grows still costs a walk of its own spine per
+  tick, so a streaming log stays quadratic — 9× cheaper and the same curve. Under deep immutability
+  an append *is* a copy, and no operation removes that.
+- Both figures are single-machine and taken on a quiet container, which is where the ratios matter
+  and the absolute numbers do not (F929).
