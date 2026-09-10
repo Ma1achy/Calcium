@@ -19,7 +19,13 @@ import { describe, expect, it } from "vitest";
 import { interactivePty } from "../support/pty.js";
 import { createDecoder } from "../../src/interaction/router/decode.js";
 import { MOUSE, MOUSE_ANY } from "../../src/terminal/escapes.js";
-import { captureFromEmulator, emulatorMissing, sleep } from "../support/x-emulator.js";
+import {
+  captureFromEmulator,
+  type Emulator,
+  emulatorMissing,
+  installedPrograms,
+  sleep,
+} from "../support/x-emulator.js";
 
 const FIXTURE = "node test/support/fixture.mjs session";
 const PROMPT = /❯/;
@@ -202,12 +208,35 @@ describe("C16 e2e — the mouse through a PTY (I31, §4a)", () => {
   );
 });
 
-describe("C16 §2 / C01 I21 — the mouse modes, answered by the reference emulator (F808)", () => {
-  // **F808's hand measurement, as a gate.** xterm is the implementation of the
-  // document C01 §5 cites; under Xvfb it answers in bytes. Three rests, a drag,
-  // a typed `k` as the control in every capture. Skips by name where xterm,
-  // Xvfb or xdotool is absent.
-  const xtermMissing = emulatorMissing("xterm");
+/**
+ * **The five emulators F753 and F800 owe, and what each is here** (F1039, F1044).
+ *
+ * Counted rather than excluded: a row that lists only what it measured cannot
+ * say whether the remainder is owed, unpayable, or forgotten.
+ *
+ * | | |
+ * |---|---|
+ * | `xterm` | **measured** — `398-1` in this container, the implementation of the document C01 §5 cites |
+ * | `kitty` | **measured** — `0.41.1-2+deb13u2` |
+ * | `ghostty` | no candidate in Debian trixie: a third-party repository or a source build, and a change to `.devcontainer/` |
+ * | `wezterm` | no candidate in Debian trixie, as above |
+ * | iTerm2 | **a permanent limit, not a deferral** — macOS-only, so it cannot run in this container ever. Its row expires on a macOS runner or never, which is why it is not in the probe below: a deferral names a condition something can watch, and there is nothing here that could ever satisfy this one |
+ *
+ * **Two emulators is a pair, not a survey**, and both are xterm-lineage in their
+ * SGR encoding. They agree because they implement the same document; agreement
+ * is evidence the decoder reads *ctlseqs* correctly and not that every terminal
+ * encodes this way. The one place they differ is the one place it does not say.
+ */
+const OWED_EMULATORS = ["xterm", "kitty", "ghostty", "wezterm"] as const;
+
+/** The two the rows below drive, compared against what is installed **by equality**. */
+const MEASURED: readonly Emulator[] = ["kitty", "xterm"];
+
+describe("C16 §2 / C01 I21 — the mouse modes, answered by two emulators (F808, F1039)", () => {
+  // **F808's hand measurement, as a gate**, now on a second emulator (F1039).
+  // Under Xvfb both answer in bytes. Three rests, a drag, a typed `k` as the
+  // control in every capture. Skips by name where the emulator, Xvfb or xdotool
+  // is absent.
   const gesture = async (xdo: (...a: readonly string[]) => void, w: string): Promise<void> => {
     for (const x of ["100", "130", "160"]) { xdo("mousemove", "--window", w, x, "100"); await sleep(200); }
     xdo("mousedown", "1"); await sleep(150);
@@ -219,42 +248,147 @@ describe("C16 §2 / C01 I21 — the mouse modes, answered by the reference emula
   const REST = /\x1b\[<35;\d+;\d+M/gu;
   const DRAG = /\x1b\[<32;\d+;\d+M/gu;
 
-  it.skipIf(xtermMissing !== null)(
-    `T5.9 (C01 I21, C16 I30; F808): 1003 alone reports rests and drags, 1002 alone drags only, and after \`1003l\` nothing — one tracking mode, either release clears it${xtermMissing === null ? "" : ` — skipped: ${xtermMissing}`}`,
+  const bothMissing = emulatorMissing("xterm") ?? emulatorMissing("kitty");
+
+  it.skipIf(bothMissing !== null)(
+    `T5.9 (C01 I21, C16 I30; F808, F1039): on XTerm(398) and kitty 0.41.1 alike, 1003 alone reports rests, 1002 alone reports none, and after \`1003l\` nothing — one tracking mode, either release clears it${bothMissing === null ? "" : ` — skipped: ${bothMissing}`}`,
     async () => {
-      const only1003 = await captureFromEmulator({
-        program: "xterm", enter: MOUSE_ANY.enter, leave: MOUSE_ANY.leave,
-        drive: async (xdo, w, phase) => { if (phase === 1) await gesture(xdo, w); },
-      });
-      expect(only1003.a, "the control byte").toContain("k");
-      expect(count(only1003.a, REST), "rests are reported under 1003 — `Cb & 3 === 3`, motion with no button").toBeGreaterThan(0);
-      expect(count(only1003.a, DRAG), "and the drag").toBeGreaterThan(0);
+      // **The set, by equality, before anything is driven.** A loop over
+      // *whatever is installed* is the same green with one emulator as with
+      // three; this makes a Ghostty arriving in `.devcontainer/` a failure that
+      // names itself rather than a quietly shorter loop.
+      expect(
+        installedPrograms(OWED_EMULATORS).sort(),
+        "the emulators this container can drive — a third one is a row to write, not a pass",
+      ).toEqual([...MEASURED].sort());
 
-      const only1002 = await captureFromEmulator({
-        program: "xterm", enter: MOUSE.enter, leave: MOUSE.leave,
-        drive: async (xdo, w, phase) => { if (phase === 1) await gesture(xdo, w); },
-      });
-      expect(only1002.a).toContain("k");
-      expect(count(only1002.a, REST), "1002 reports no rest").toBe(0);
-      expect(count(only1002.a, DRAG), "but the drag").toBeGreaterThan(0);
+      const drove: Emulator[] = [];
+      for (const program of MEASURED) {
+        drove.push(program);
 
-      // 1002 then 1003, then 1003 released: if the terminal held two modes, 1002 would still
-      // report the drag in phase b — in SGR or, with 1006 released too, in the legacy encoding;
-      // either is bytes, and the assertion is that there are none but the control. The pairs
-      // are composed from `escapes.ts`, the one owner of every mode literal (C01 T2.8).
-      const order = await captureFromEmulator({
-        program: "xterm", enter: MOUSE.enter + MOUSE_ANY.enter, mid: MOUSE_ANY.leave, leave: MOUSE.leave,
-        drive: async (xdo, w) => { await gesture(xdo, w); },
-      });
-      expect(count(order.a, REST), "1003 in force: the later select wins").toBeGreaterThan(0);
-      expect(order.b, "after `1003l`, only the control byte — 1002 was not left behind").toBe("k");
+        const only1003 = await captureFromEmulator({
+          program, enter: MOUSE_ANY.enter, leave: MOUSE_ANY.leave,
+          drive: async (xdo, w, phase) => { if (phase === 1) await gesture(xdo, w); },
+        });
+        expect(only1003.a, `${program}: the control byte`).toContain("k");
+        expect(count(only1003.a, REST), `${program}: rests are reported under 1003 — \`Cb & 3 === 3\`, motion with no button`).toBeGreaterThan(0);
 
-      // **The decoder, on the emulator's rest byte** (C16 I30): `35` is no button.
-      const rest = /\x1b\[<35;\d+;\d+M/u.exec(only1003.a)?.[0] ?? "";
-      const d = createDecoder({ capabilities: { bracketedPaste: true, mouse: true }, now: () => 0 });
-      const ev = d.push(new TextEncoder().encode(rest))[0];
-      expect(ev?.kind === "mouse" ? ev.button : ev?.kind, "the rest decodes as `button: \"none\"`").toBe("none");
+        const only1002 = await captureFromEmulator({
+          program, enter: MOUSE.enter, leave: MOUSE.leave,
+          drive: async (xdo, w, phase) => { if (phase === 1) await gesture(xdo, w); },
+        });
+        expect(only1002.a, `${program}: the control byte`).toContain("k");
+        expect(count(only1002.a, REST), `${program}: 1002 reports no rest`).toBe(0);
+
+        // 1002 then 1003, then 1003 released: if the terminal held two modes, 1002 would still
+        // report the drag in phase b — in SGR or, with 1006 released too, in the legacy encoding;
+        // either is bytes, and the assertion is that there are none but the control. The pairs
+        // are composed from `escapes.ts`, the one owner of every mode literal (C01 T2.8).
+        const order = await captureFromEmulator({
+          program, enter: MOUSE.enter + MOUSE_ANY.enter, mid: MOUSE_ANY.leave, leave: MOUSE.leave,
+          drive: async (xdo, w) => { await gesture(xdo, w); },
+        });
+        expect(count(order.a, REST), `${program}: 1003 in force, the later select wins`).toBeGreaterThan(0);
+        expect(order.b, `${program}: after \`1003l\`, only the control byte — 1002 was not left behind`).toBe("k");
+
+        // **The decoder, on this emulator's own rest byte** (C16 I30): `35` is
+        // no button. Two emulators now write the byte the arm was built for.
+        const rest = /\x1b\[<35;\d+;\d+M/u.exec(only1003.a)?.[0] ?? "";
+        const d = createDecoder({ capabilities: { bracketedPaste: true, mouse: true }, now: () => 0 });
+        const ev = d.push(new TextEncoder().encode(rest))[0];
+        expect(ev?.kind === "mouse" ? ev.button : ev?.kind, `${program}: the rest decodes as \`button: "none"\``).toBe("none");
+
+        // **The drag arm is xterm's alone, and the reason is the harness.** The
+        // same `xdotool` gesture that gives xterm `0M 32M 32M 0m` gives kitty a
+        // press and a release at every position and never a button-1 motion, so
+        // `drags` is 0 and the pointer moves are `Cb=35`. The window is fine and
+        // the moves are reported: the button is not held during them. Extending
+        // this arm to kitty by copying the gesture fails on `xdotool`'s pointer
+        // handling while reading as *kitty does not report drags* — a harness
+        // defect wearing the subject's face (F1039). Holding Shift to suppress
+        // `--clearmodifiers` was tried and collapsed the gesture on **both**
+        // emulators to a single `35M`, so it settles nothing.
+        if (program === "xterm") {
+          expect(count(only1003.a, DRAG), "xterm: and the drag, under 1003").toBeGreaterThan(0);
+          expect(count(only1002.a, DRAG), "xterm: and the drag, under 1002").toBeGreaterThan(0);
+        }
+      }
+      expect(drove.sort(), "every declared emulator was driven, not merely listed").toEqual([...MEASURED].sort());
     },
-    120_000,
+    360_000,
+  );
+
+  it.skipIf(bothMissing !== null)(
+    `T5.10 (C16 I30, §2; F753, F1039): the wheel is \`64 65 66 67\` on both emulators — and xterm reports the horizontal wheel twice where kitty reports it once${bothMissing === null ? "" : ` — skipped: ${bothMissing}`}`,
+    async () => {
+      // **F753's residue, answered on a wire.** `WHEEL_DIRECTIONS` is indexed by
+      // `Cb & 3` and its order was taken from *ctlseqs*; this is the order two
+      // terminals actually send. Buttons 4–7 are the wheel's four directions.
+      //
+      // The drive runs in **both capture phases**, so the two runs the claim
+      // needs cost no extra Xvfb: phase b's byte sequence is asserted equal to
+      // phase a's.
+      const wheel = async (xdo: (...a: readonly string[]) => void, w: string): Promise<void> => {
+        xdo("mousemove", "--window", w, "100", "100"); await sleep(250);
+        for (const b of ["4", "5", "6", "7"]) { xdo("click", b); await sleep(250); }
+        xdo("type", "k"); await sleep(250);
+      };
+      /** Every SGR report in the capture as `<Cb><final>`, wheel bit set only. */
+      const wheelReports = (s: string): string[] =>
+        [...s.matchAll(/\x1b\[<(\d+);\d+;\d+([Mm])/gu)]
+          .filter((m) => (Number(m[1]) & 64) !== 0)
+          .map((m) => `${m[1] as string}${m[2] as string}`);
+
+      const seen = new Map<Emulator, readonly string[]>();
+      for (const program of MEASURED) {
+        const cap = await captureFromEmulator({
+          program, enter: MOUSE_ANY.enter, leave: MOUSE_ANY.leave, drive: wheel,
+        });
+        expect(cap.a, `${program}: the control byte in phase a`).toContain("k");
+        expect(cap.b, `${program}: the control byte in phase b`).toContain("k");
+        const a = wheelReports(cap.a);
+        expect(wheelReports(cap.b), `${program}: the second run is byte-identical to the first`).toEqual(a);
+        seen.set(program, a);
+      }
+      expect([...seen.keys()].sort(), "both emulators, by equality").toEqual([...MEASURED].sort());
+
+      // **The four presses, in the array's order, on both.** Asserted as the
+      // whole press sequence rather than as membership: a decoder with the pair
+      // swapped satisfies *64 and 65 are present* and fails this.
+      for (const [program, reports] of seen) {
+        expect(
+          reports.filter((r) => r.endsWith("M")),
+          `${program}: buttons 4–7 are Cb 64, 65, 66, 67 in that order`,
+        ).toEqual(["64M", "65M", "66M", "67M"]);
+      }
+
+      // **The press/release asymmetry is its own assertion, not a tolerance.**
+      // A row phrased as *at least the four presses* is satisfied by both
+      // terminals and records nothing. xterm emits a release for buttons 6 and
+      // 7 and none for 4 and 5; kitty emits none at all. Nothing masks the
+      // finals, so one horizontal notch is two `wheelLeft` events on xterm and
+      // one on kitty — latent while `construct.ts` acts on the vertical pair
+      // only, and a scroll-speed constant to whoever binds the horizontal one.
+      expect(
+        (seen.get("xterm") ?? []).filter((r) => r.endsWith("m")),
+        "xterm reports a release for the horizontal wheel and none for the vertical",
+      ).toEqual(["66m", "67m"]);
+      expect(
+        (seen.get("kitty") ?? []).filter((r) => r.endsWith("m")),
+        "kitty reports no wheel release at all",
+      ).toEqual([]);
+
+      // **And the decoder on those bytes** — the four names in the array's
+      // order, from the emulator's own report rather than a hand-built string.
+      const d = createDecoder({ capabilities: { bracketedPaste: true, mouse: true }, now: () => 0 });
+      const names = ["64", "65", "66", "67"].map((cb) => {
+        const [ev] = d.push(new TextEncoder().encode(`\u001b[<${cb};1;1M`));
+        return ev?.kind === "mouse" ? ev.button : ev?.kind;
+      });
+      expect(names, "`WHEEL_DIRECTIONS` indexed by `Cb & 3`, confirmed against a wire").toEqual([
+        "wheelUp", "wheelDown", "wheelLeft", "wheelRight",
+      ]);
+    },
+    240_000,
   );
 });
