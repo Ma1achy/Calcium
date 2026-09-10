@@ -25,6 +25,13 @@
 // three instruments made in one session, each reporting a completion it never
 // observed. Every fixture prints `name — n/m rows`; this reads the counter.
 //
+// **And a run can report fewer tests than it collected** (F897, F1018). A
+// worker that dies mid-file writes `Tests  2 passed (6)`, and read against the
+// exit status alone that is *every row green under a non-zero exit* — which is
+// false. The bracket is the collected count F929 went looking for outside the
+// run, per fixture, needing no golden total to drift; `lost rows` is the state
+// it makes expressible.
+//
 // **And a summary naming a failure is a counter, not an absence** (F949). vitest
 // writes `Tests  1 failed | 5 passed (6)` when a row fails, and the first reader
 // matched `Tests N passed` — digits straight after the word — so the runs with
@@ -287,14 +294,31 @@ export function readCounter(out) {
   const py = /— (\d+)\/(\d+) rows/.exec(clean);
   if (py !== null) {
     const rows = Number(py[2]);
-    return { rows, failed: rows - Number(py[1]) };
+    // A python fixture prints what it ran; there is no second number saying
+    // what it meant to run, so `collected` is `reported` by construction.
+    return { rows, failed: rows - Number(py[1]), reported: rows, collected: rows };
   }
   const ts = /^\s*Tests\s+(.*)$/m.exec(clean);
   if (ts === null || !/\d+ (passed|failed)/.test(ts[1])) return null;
   const count = (word) => Number(new RegExp(`(\\d+) ${word}`).exec(ts[1])?.[1] ?? 0);
   const passed = count("passed");
   const failed = count("failed");
-  return { rows: passed + failed, failed };
+  // **And the bracket, which is the count F929 went looking for outside the
+  // run** (F1018). `reported` is every bucket vitest names and `collected` is
+  // the total it prints beside them; a healthy run has them equal — measured
+  // against a green run, a failing run, one with a `todo` and two `skip`s, and
+  // a `-t`-filtered run — and a worker that dies mid-file reports
+  // `Tests  2 passed (6)`. `rows` stays the rows that *ran*, since a todo did
+  // not, so the two numbers answer different questions and neither can be
+  // derived from the other. A line with no bracket gets `collected: null`: a
+  // sheared capture cannot be asked whether anything was lost.
+  const bracket = /\((\d+)\)$/.exec(ts[1].trimEnd());
+  return {
+    rows: passed + failed,
+    failed,
+    reported: passed + failed + count("skipped") + count("todo"),
+    collected: bracket === null ? null : Number(bracket[1]),
+  };
 }
 
 /**
@@ -311,6 +335,15 @@ export function readCounter(out) {
  */
 export function stateOf(ok, counter) {
   if (counter === null || counter.rows === 0) return ok ? "no rows" : "did not run";
+  // **The sixth, and it is F929's own symptom read correctly at last** (F1018).
+  // A worker that dies mid-file takes its remaining tests with it, and the
+  // buckets vitest prints are the ones that finished. Read against the exit
+  // status alone that is `errored after its rows` — *every row green under a
+  // non-zero exit* — which is false: four rows were collected and never ran.
+  // Asked before the failure count, because a run that lost rows cannot be
+  // read either way; the row it would have diverged on may be one of the ones
+  // that never executed.
+  if (counter.collected !== null && counter.reported < counter.collected) return "lost rows";
   if (counter.failed > 0) return "diverged";
   return ok ? "ok" : "errored after its rows";
 }
@@ -318,6 +351,9 @@ export function stateOf(ok, counter) {
 /** What a failing row says after its file, so the reader is told which state it was. */
 const NOTE = Object.freeze({
   diverged: (c) => `← ${String(c.failed)} of ${String(c.rows)} failed — the fixture ran and disagreed`,
+  "lost rows": (c) =>
+    `← ${String(c.reported)} of the ${String(c.collected)} tests it collected were reported — a ` +
+    "worker died or the run was cut short, so neither a pass nor a failure can be read off it",
   "did not run": () =>
     "← exit non-zero and no counter — the child died before its first row: starved, or its file did not load",
   "no rows": () => "← exit 0 and no counter — a fixture that ran nothing and called it clean",
@@ -343,7 +379,13 @@ function main() {
     process.exit(1);
   }
 
-  const tally = { diverged: 0, "did not run": 0, "no rows": 0, "errored after its rows": 0 };
+  const tally = {
+    diverged: 0,
+    "did not run": 0,
+    "no rows": 0,
+    "errored after its rows": 0,
+    "lost rows": 0,
+  };
   let rowsTotal = 0;
   for (const [file, cmd] of COVERED) {
     if (cmd === null) continue;

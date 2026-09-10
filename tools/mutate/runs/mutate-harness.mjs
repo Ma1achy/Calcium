@@ -87,6 +87,92 @@ const results = runPass({
       expect: "MH4",
     },
     {
+      // **F897's mechanism, and the branch is where it can be lost** (F1018).
+      // `incomplete` stays correct, `report` stays correct, and every run that
+      // lost a worker reads SURVIVED again — which is the whole of F897.
+      name: "a run that reported fewer tests than it collected is a survivor again",
+      file: FILE,
+      from: "          : incomplete(output)",
+      to: "          : false",
+      expect: "MH9e",
+    },
+    {
+      // The predicate answering the reported count against itself — F929's
+      // reader in this file's vocabulary. Every crashed run then sums to its
+      // own bracket and nothing is ever lost.
+      name: "the collected count is read as the reported one",
+      file: FILE,
+      from: "  return t !== null && t.reported < t.collected;",
+      to: "  return t !== null && t.reported < t.reported;",
+      expect: "MH9",
+    },
+    {
+      // The blind spot inverted: a summary with no bracket read as a loss
+      // rather than as unanswerable. Every truncated capture in the fixture
+      // turns indeterminate while every assertion still passes.
+      name: "a summary with no total is read as an incomplete run",
+      file: FILE,
+      from: "  if (total === null) return null;",
+      to: "  if (total === null) return { reported: 0, collected: 1 };",
+      expect: "MH9d",
+    },
+    {
+      // The first of the three moments. A baseline that lost rows is not the
+      // corpus, and nothing below it is measured against anything known.
+      name: "the clean run is not asked whether it lost rows",
+      file: FILE,
+      from: "  if (incomplete(clean)) {",
+      to: "  if (false) {",
+      expect: "MH9f",
+    },
+    {
+      // The worst of the three: the control pair, the harness's own guard
+      // against blindness, satisfied by a blind run.
+      name: "the control's run is not asked whether it lost rows",
+      file: FILE,
+      from: "  if (incomplete(controlRun)) {",
+      to: "  if (false) {",
+      expect: "MH9f",
+    },
+    {
+      // The summary line contradicting the rows above it — the compression
+      // class in a tool's own output, which this file has paid for twice.
+      name: "an indeterminate row is counted as a survivor in the summary",
+      file: FILE,
+      from: "    (r) => !r.killed && !r.noSummary && !r.anchorMissed && !r.unbuilt && !r.indeterminate,",
+      to: "    (r) => !r.killed && !r.noSummary && !r.anchorMissed && !r.unbuilt,",
+      expect: "MH9e",
+    },
+    {
+      // **F277's own sentence, mechanised** (F1037). The report could not tell
+      // an ambiguous anchor from a unique one, and the two want opposite
+      // repairs; without the count the row is silent about which it is.
+      name: "a survivor's anchor multiplicity is not recorded",
+      file: FILE,
+      from: '      const hits = hitsOf(originals.get(m.file) ?? "", m.from);',
+      to: "      const hits = 1;",
+      expect: "MH10",
+    },
+    {
+      // The count recorded and never printed — F768's shape one arm over: the
+      // number is right and nothing says it.
+      name: "the anchor multiplicity is recorded and never printed",
+      file: FILE,
+      from: "          ? `   \u2190 its anchor matches ${String(r.hits)}x \u2014 replace() took the first`",
+      to: '          ? ""',
+      expect: "MH10",
+    },
+    {
+      // The survivor line back to two dispositions, which is how a mutation
+      // whose subject moved routes to *write a test* against a test that is
+      // right.
+      name: "the survivor line names two dispositions again",
+      file: FILE,
+      from: "            `were written from, or about the mutation. **Ask why the mutation cannot reach the ` +",
+      to: "            `were written from. **Do not ask why the mutation cannot reach the ` +",
+      expect: "MH10",
+    },
+    {
       // **This survived on its first run, and the survivor was a finding about
       // the fixture.** Every row above mutates one file, and each write is
       // `originals + this mutation`, so the previous row is overwritten anyway

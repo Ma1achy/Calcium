@@ -13,16 +13,60 @@ import {
   AnchorError,
   apply,
   BlindHarnessError,
+  hitsOf,
+  incomplete,
   killed,
   report,
   runPass,
   strip,
+  tally,
   unbuilt,
 } from "../../tools/mutate/mutate.mjs";
 
 /** vitest's real summary line, colours and all. */
 const FAILED = "[2m Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[32m5 passed[39m";
 const PASSED = "[2m Tests [22m [1m[32m6 passed[39m[22m";
+
+/**
+ * **A crashed worker, as bytes** — captured 2026-09-10 from vitest 4.1.10 over
+ * two files, the second of which calls `process.kill(process.pid, "SIGKILL")`
+ * in its third test. Six tests were collected across the two files and two of
+ * them reported; the other four went with the worker.
+ *
+ * This is the block F897 saw once, wrote down, and shipped nothing against
+ * because it would not come back. It comes back on demand.
+ */
+const E = "\u001b";
+const CRASHED =
+  `${E}[2m Test Files ${E}[22m ${E}[1m${E}[32m1 passed${E}[39m${E}[22m${E}[90m (2)${E}[39m\n` +
+  `${E}[2m      Tests ${E}[22m ${E}[1m${E}[32m2 passed${E}[39m${E}[22m${E}[90m (6)${E}[39m\n` +
+  `${E}[2m     Errors ${E}[22m ${E}[1m${E}[31m1 error${E}[39m${E}[22m`;
+
+/**
+ * The same crash beside a genuinely failing row in the other file — F897's own
+ * shape, which printed a `Failed Tests` section above a summary that had lost
+ * four tests. Here `killed` is true and the run is still not one to read.
+ */
+const CRASHED_WITH_KILL =
+  `${E}[31m\u23af\u23af\u23af${E}[39m${E}[1m${E}[41m Failed Tests 1 ${E}[49m${E}[22m\n` +
+  `${E}[2m Test Files ${E}[22m ${E}[1m${E}[31m1 failed${E}[39m${E}[22m${E}[90m (2)${E}[39m\n` +
+  `${E}[2m      Tests ${E}[22m ${E}[1m${E}[31m1 failed${E}[39m${E}[22m${E}[2m | ${E}[22m` +
+  `${E}[1m${E}[32m1 passed${E}[39m${E}[22m${E}[90m (6)${E}[39m\n` +
+  `${E}[2m     Errors ${E}[22m ${E}[1m${E}[31m1 error${E}[39m${E}[22m`;
+
+/**
+ * Healthy summaries carrying a total, from the same capture session: a green
+ * run, a failing run, and one with a `todo` and two `skip`s. **The control set
+ * for the arithmetic** — every one of these sums to its own bracket, so a
+ * predicate that fires on any of them is reading something other than loss.
+ */
+const WHOLE_GREEN = `${E}[2m      Tests ${E}[22m ${E}[1m${E}[32m2 passed${E}[39m${E}[22m${E}[90m (2)${E}[39m`;
+const WHOLE_FAILED =
+  `${E}[2m      Tests ${E}[22m ${E}[1m${E}[31m1 failed${E}[39m${E}[22m${E}[2m | ${E}[22m` +
+  `${E}[1m${E}[32m2 passed${E}[39m${E}[22m${E}[90m (3)${E}[39m`;
+const WHOLE_DEFERRED =
+  `${E}[2m      Tests ${E}[22m ${E}[1m${E}[32m2 passed${E}[39m${E}[22m${E}[2m | ${E}[22m` +
+  `${E}[33m2 skipped${E}[39m${E}[2m | ${E}[22m${E}[90m1 todo${E}[39m${E}[90m (5)${E}[39m`;
 
 describe("mutation harness", () => {
   it("MH1: reads a kill through the colour codes — the defect, restored", () => {
@@ -315,5 +359,189 @@ describe("mutation harness", () => {
     expect(text, "and the anchor miss is reported as what it is").toMatch(
       /1 anchor\(s\) did not match/,
     );
+  });
+
+  it("MH9 (F897, F1018): a crashed worker's summary is not a survivor — the real bytes, and every other predicate says it is", () => {
+    // **The row F897 could not write, and the reason it could not was wrong.**
+    // The finding said the fix waited on a reproduction; a summary reader is a
+    // pure function over a string, and F897's own entry held the string. The
+    // fixture above is better than that: bytes captured from the installed
+    // vitest, on demand, 2026-09-10.
+    //
+    // Every predicate this file already had answers *correctly* here, and the
+    // three correct answers compose into SURVIVED for a run that lost four of
+    // its six tests. That is the interaction, and it is why no row indexed by
+    // one predicate would find it.
+    expect(strip(CRASHED), "there is a summary").toContain("Tests  2 passed (6)");
+    expect(killed(CRASHED), "and no test failed").toBe(false);
+    expect(unbuilt(CRASHED), "and no file failed to load").toBe(false);
+    // The two lines the harness never read: the collected count, and the gap.
+    expect(tally(CRASHED)).toEqual({ reported: 2, collected: 6 });
+    expect(incomplete(CRASHED), "four tests were collected and never reported").toBe(true);
+  });
+
+  it("MH9b (F1018): the control set — a green, a failing and a deferred summary all report everything they collected", () => {
+    // **The fabricated violation owes a corpus that is not empty**, and this is
+    // it: three healthy shapes vitest writes, each summing to its own bracket.
+    // A predicate that fires on any of these is reading something other than
+    // loss, and every row in every pass would change state.
+    for (const [name, out] of [
+      ["green", WHOLE_GREEN],
+      ["failing", WHOLE_FAILED],
+      ["with a todo and two skips", WHOLE_DEFERRED],
+    ] as const) {
+      const t = tally(out);
+      expect(t, `${name}: the line carries a total`).not.toBeNull();
+      expect(t?.reported, `${name}: the buckets sum to the bracket`).toBe(t?.collected);
+      expect(incomplete(out), `${name} is a whole run`).toBe(false);
+    }
+    // And the arithmetic is read rather than assumed: change the bracket and
+    // the predicate must move, or it is agreeing with itself.
+    expect(incomplete(WHOLE_DEFERRED.replace("(5)", "(9)"))).toBe(true);
+  });
+
+  it("MH9c (F1018): a kill inside an incomplete run is not a kill you can attribute", () => {
+    // **The cell where two correct statements overlap.** `killed` is true — a
+    // row really did fail — and four tests never ran, so the row this mutation
+    // was aimed at may be one of them. Reporting `caught` here is the same
+    // error as reporting SURVIVED, pointed the other way: it reads as coverage.
+    //
+    // Ruled INDETERMINATE rather than `caught`, and the alternative is named:
+    // *the crash itself is what failed the row, so call it caught*. The cost of
+    // being wrong that way is a mutation believed covered and not; the cost of
+    // this way is a re-run.
+    expect(killed(CRASHED_WITH_KILL), "a row did fail").toBe(true);
+    expect(incomplete(CRASHED_WITH_KILL), "and the run lost four tests").toBe(true);
+    expect(tally(CRASHED_WITH_KILL)).toEqual({ reported: 2, collected: 6 });
+  });
+
+  it("MH9d (F1018): a summary with no total cannot answer, and says so rather than guessing", () => {
+    // **The stated blind spot, as a row.** `maxBuffer` shearing and a SIGPIPE
+    // both truncate, and a `Tests` line cut before its bracket has no total to
+    // compare against — so *were rows lost* is unanswerable, not `yes`. `ran`
+    // owns truncation; this predicate must not claim it.
+    //
+    // It is also what keeps the fixtures above this line meaning what they
+    // meant: `PASSED` and `FAILED` are captures without a bracket, and a
+    // predicate firing on absence would turn every row in this file
+    // indeterminate while every assertion still passed.
+    expect(tally(PASSED), "no bracket, no answer").toBeNull();
+    expect(tally(FAILED)).toBeNull();
+    expect(incomplete(PASSED)).toBe(false);
+    expect(incomplete(FAILED)).toBe(false);
+    expect(tally(""), "and nothing at all is not an incomplete run").toBeNull();
+    expect(incomplete("TIMED OUT after 600000ms"), "nor is a timeout — it has no Tests line").toBe(
+      false,
+    );
+  });
+
+  it("MH9e (F1018): the wiring — an incomplete row reads INDETERMINATE, claims no survivor, and its figures are on the line", () => {
+    // **A test that calls the mechanism misses the wiring.** MH9 asks the
+    // predicate; a branch missing from `runPass` leaves `incomplete` correct,
+    // `report` correct, and every row back to SURVIVED.
+    const files = new Map([["a.ts", "const x = 1;"]]);
+    const answers = (): string => {
+      const src = files.get("a.ts") as string;
+      if (src.includes("BROKEN")) return `${FAILED} (6)\n  \u00d7 T1.1 asserts x`;
+      if (src.includes("2")) return CRASHED;
+      return WHOLE_GREEN;
+    };
+    const live = runPass({
+      mutations: [{ name: "m", file: "a.ts", from: "1", to: "2", expect: "T1.1" }],
+      control: { file: "a.ts", from: "const x", to: "const BROKEN", why: "renames the export" },
+      read: (f) => files.get(f) as string,
+      write: (f, v) => void files.set(f, v),
+      run: answers,
+    });
+
+    expect(live[0]?.indeterminate, "the pass says it could not tell").toBe(true);
+    expect(live[0]?.killed, "and does not call it a kill").toBe(false);
+
+    const text = report(live);
+    expect(text).toContain("INDETERMINATE");
+    expect(text, "with the figures, so nobody re-derives them from the log").toContain(
+      "2 of 6 tests reported",
+    );
+    expect(text, "and no survivor claimed").not.toMatch(/\d+ survived/);
+    expect(text, "nor a clean sweep").not.toContain("every mutation was caught");
+    expect(text).toContain("reported fewer tests than they collected");
+  });
+
+  it("MH9f (F1018): the clean run and the control run are two more moments, and the same bytes mean something else at each", () => {
+    // **The sequence trace, and neither row is reachable from the table.** The
+    // classification table asks which predicate claims which output; these two
+    // are about *when* the output arrives. `run` is called at three kinds of
+    // moment and the harness read only the third.
+    const files = new Map([["a.ts", "const x = 1;"]]);
+    const opts = (run: () => string) => ({
+      mutations: [{ name: "m", file: "a.ts", from: "1", to: "2", expect: "T1.1" }],
+      control: { file: "a.ts", from: "const x", to: "const BROKEN", why: "renames the export" },
+      read: (f: string) => files.get(f) as string,
+      write: (f: string, v: string) => void files.set(f, v),
+      run,
+    });
+
+    // The clean run lost rows: the baseline is not the corpus, so no row below
+    // is measured against anything known.
+    expect(() => runPass(opts(() => CRASHED))).toThrow(/is not the corpus/);
+
+    // And the control run lost rows while still reporting its kill. `killed` is
+    // true, so the pair passed — the harness's own guard against blindness,
+    // satisfied by a blind run. The refusal names the incompleteness rather
+    // than the control's `why`, or the reader goes to the wrong file.
+    let calls = 0;
+    const staggered = (): string => {
+      calls += 1;
+      return calls === 1 ? WHOLE_GREEN : CRASHED_WITH_KILL;
+    };
+    expect(() => runPass(opts(staggered))).toThrow(/the pair proved nothing/);
+    expect(calls, "it refused at the control, not before it").toBe(2);
+    expect(files.get("a.ts"), "and the tree is left as it was found").toBe("const x = 1;");
+  });
+
+  it("MH10 (F219, F277, F1037): a survivor says whether its anchor was unique, because the two survivors want opposite repairs", () => {
+    // **F277's own sentence is that the report cannot tell them apart.** One
+    // mutation matching two sites is F219 and wants the duplicate extracted; a
+    // unique, present, textually correct anchor on a line whose callers moved
+    // is F277 and wants the anchor followed. Both print `SURVIVED`. The
+    // multiplicity is the thing the row was not carrying, and `anchors.mjs` has
+    // known it all along in a file nobody reads beside the pass.
+    expect(hitsOf("const x = 1;\nconst x = 2;\n", "const x"), "two sites").toBe(2);
+    expect(hitsOf("const x = 1;", "const x"), "one site").toBe(1);
+
+    // Two rows against one file: `y` appears once, `dup` twice. Neither is
+    // covered, so both survive, and only one of them is ambiguous.
+    const files = new Map([["a.ts", "const x = 1;\nconst y = 2;\nconst dup = 3;\nconst dup2 = 3;\n"]]);
+    const run = (): string =>
+      files.get("a.ts")?.includes("const x = 1;") ? WHOLE_GREEN : `${FAILED}\n  \u00d7 T1.1 asserts x`;
+
+    const results = runPass({
+      mutations: [
+        { name: "unique", file: "a.ts", from: "const y = 2;", to: "const y = 9;", expect: "T1.2" },
+        { name: "ambiguous", file: "a.ts", from: "const dup", to: "const DUP", expect: "T1.3" },
+      ],
+      control: { file: "a.ts", from: "const x = 1;", to: "const x = 0;", why: "T1.1 asserts x" },
+      read: (f) => files.get(f) as string,
+      write: (f, v) => void files.set(f, v),
+      run,
+    });
+
+    expect(results.map((r) => [r.name, r.killed, r.hits])).toEqual([
+      ["unique", false, 1],
+      ["ambiguous", false, 2],
+    ]);
+
+    const text = report(results);
+    expect(text, "the ambiguous one says so on its own line").toContain(
+      "its anchor matches 2x",
+    );
+    // **The control**, and it is the whole of what makes the line above mean
+    // something: a report that annotated every survivor would say nothing. The
+    // unique row must carry no such note.
+    const unique = text.split("\n").find((l) => l.includes("unique")) ?? "";
+    expect(unique, "and the unique one does not").not.toContain("anchor matches");
+    // And the survivor line names the third disposition, which is F277's own
+    // habit: ask why the mutation cannot reach the test before rewriting it.
+    expect(text).toContain("Ask why the mutation cannot reach the test");
   });
 });

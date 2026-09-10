@@ -6,7 +6,7 @@
 // of SS26, which scoped itself to a directory that did not exist and reported
 // compliance for a day. A rule with nothing to be wrong about passes exactly
 // like a rule that is satisfied.
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   ACKNOWLEDGED_BACKLOG,
@@ -500,6 +500,30 @@ describe("todo expiry", () => {
     const NO_ROW_YET: Readonly<Record<string, string>> = Object.freeze({
       C26: "navigation is spread across four shell files; which one holds the behaviour is a reading of C26 (F873)",
     });
+
+    // **The reason is watched, not merely written.** Every other instrument
+    // here checks that the exemption list is the right shape; nothing asked
+    // whether its one entry still needs to be on it. C26's reason names a
+    // symbol — `src/interaction/navigation/` — in three places (this map, the
+    // doc comment above `COMPONENT_SOURCES`, and C26's Status line), and the
+    // day that directory lands, all three become false together and no gate
+    // says so. That is the deferral class CLAUDE.md records four instances of,
+    // and the shape they share is that the condition is written where the
+    // deferral is while the thing satisfying it is written somewhere else.
+    //
+    // So the exemption expires by assertion. A directory appearing here fails
+    // this row with a message naming the remedy, rather than leaving three
+    // documents quietly wrong. It is deliberately an existence check on the
+    // **directory** and not on a file within it: the refusal is *C26 owns no
+    // directory*, and the moment it owns one the reason is spent whatever is
+    // inside. F1041.
+    expect(
+      existsSync("src/interaction/navigation"),
+      "C26's exemption above is justified by `src/interaction/navigation/` not existing. " +
+        "It exists now, so C26 owns a directory, the refusal is spent, and three places say " +
+        "otherwise: this map, `COMPONENT_SOURCES`' doc comment, and C26's Status line. Give " +
+        "C26 a row and delete the exemption.",
+    ).toBe(false);
 
     const specced = readdirSync("docs/components")
       .map((f) => /^(C\d\d)_/.exec(f)?.[1])

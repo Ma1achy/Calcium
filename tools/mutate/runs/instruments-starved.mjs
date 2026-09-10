@@ -41,8 +41,8 @@ const results = runPass({
       // two rows for `1 failed | 1 passed`.
       name: "F929: rows are the passed count alone",
       file: RUNNER,
-      from: "  return { rows: passed + failed, failed };",
-      to: "  return { rows: passed, failed };",
+      from: "    rows: passed + failed,",
+      to: "    rows: passed,",
       expect: "IN3",
     },
     {
@@ -72,6 +72,43 @@ const results = runPass({
       from: '  if (counter.failed > 0) return "diverged";',
       to: '  if (counter.failed > 0 && !ok) return "diverged";',
       expect: "IN6",
+    },
+    {
+      // **F897's shape in this reader** (F1018). The bracket never read, so a
+      // run that collected six tests and reported two sums to itself and comes
+      // back as `errored after its rows` — every word of which is false.
+      name: "the collected count is the reported one",
+      file: RUNNER,
+      from: "    collected: bracket === null ? null : Number(bracket[1]),",
+      to: "    collected: passed + failed + count(\"skipped\") + count(\"todo\"),",
+      expect: "IN8",
+    },
+    {
+      // The state that makes the loss expressible, removed. `readCounter`
+      // stays correct and every crashed run reads as an error after the rows.
+      name: "rows lost is not a state",
+      file: RUNNER,
+      from: '  if (counter.collected !== null && counter.reported < counter.collected) return "lost rows";',
+      to: "  if (false) return \"lost rows\";",
+      expect: "IN8",
+    },
+    {
+      // The blind spot inverted: a `Tests` line sheared before its bracket read
+      // as a loss rather than as unanswerable.
+      name: "a summary with no bracket is read as a lost-rows run",
+      file: RUNNER,
+      from: "  if (counter.collected !== null && counter.reported < counter.collected) return \"lost rows\";",
+      to: '  if ((counter.collected ?? counter.reported + 1) > counter.reported) return "lost rows";',
+      expect: "IN8b",
+    },
+    {
+      // `reported` counting only what ran, so every deferred row reads as a
+      // lost one — the arm IN2 exists to hold.
+      name: "a todo is counted as a test that never reported",
+      file: RUNNER,
+      from: '    reported: passed + failed + count("skipped") + count("todo"),',
+      to: "    reported: passed + failed,",
+      expect: "IN8b",
     },
     {
       // The escapes left in place — the defect this file's own first run had:

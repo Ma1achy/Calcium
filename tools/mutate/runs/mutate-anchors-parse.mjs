@@ -1,4 +1,4 @@
-// `tools/mutate/anchors.mjs` — the parse arm (F997).
+// `tools/mutate/anchors.mjs` — the parse arms (F997, F1030).
 //
 // **The sweep is the thing you run instead of the pass**, so its own blind spots
 // are worth a pass. This one is about the question a text sweep cannot answer
@@ -15,6 +15,19 @@
 // is an expected survivor in this container, where `node` on the PATH is the same
 // binary, and a row that cannot fail is worse than no row. What it guards is a
 // second runtime on a developer's PATH answering for the one that runs the pass.
+//
+// **And the second parse arm** (F279, F1030): the sweep read `{file, from}` and
+// never the `to` beside it, so a re-anchoring that left the old replacement
+// behind spliced a statement into an object literal and reported `no drift`
+// minutes before every suite failed to transform. Three rows below are that arm
+// — the check off, the counter, and the replacement quoted in the message.
+//
+// **The fourth clause has no row and the reason is the residue, not an
+// oversight.** `parseOf(body) === null` keeps the blame on the mutation rather
+// than on a source that was already broken, and no fixture here can break a
+// source: `--dir` fabricates a *runs* directory and every `file:` in it still
+// resolves against the real tree. A mutation nothing can catch survives exactly
+// like a test gap, so it is recorded here instead of shipped as a row.
 //
 // Anchors checked for uniqueness before the pass (F219); the atomic `fsIo` (F237).
 import { execSync } from "node:child_process";
@@ -73,8 +86,8 @@ const results = runPass({
       // right and the status is zero.
       name: "a parse error is composed and never gated on",
       file: SWEEP,
-      from: "const problems = [...unparseable, ...unresolvable, ...unreachable];",
-      to: "const problems = [...unresolvable, ...unreachable];",
+      from: "const problems = [...unparseable, ...malformed, ...splices, ...unresolvable, ...unreachable];",
+      to: "const problems = [...malformed, ...splices, ...unresolvable, ...unreachable];",
       expect: "MA8",
     },
     {
@@ -86,6 +99,36 @@ const results = runPass({
       from: "  return at === null ? why : `${why} (line ${at[1]})`;",
       to: "  return why;",
       expect: "MA8",
+    },
+    {
+      // **The arm off** (F1030). `parseOf` stays correct, the counter keeps
+      // counting, and every mutation whose `to` is not a program is reported as
+      // clean — which is the whole of F279.
+      name: "the applied result is never handed to the parser",
+      file: SWEEP,
+      from: "        const why = parseOf(body.replace(from, to));",
+      to: "        const why = null;",
+      expect: "MA9",
+    },
+    {
+      // **The counter**, on the row above's own argument one step out: an arm
+      // that applies nothing exits 0 exactly as a clean one does, and MA9's
+      // control is the number rather than the absence of a complaint.
+      name: "the applied count is not incremented",
+      file: SWEEP,
+      from: "        applied += 1;\n",
+      to: "",
+      expect: "MA9",
+    },
+    {
+      // **The replacement quoted.** A message naming the run and not the pair
+      // sends the reader to a file of thirty mutations to find which one — the
+      // `missingWhat` argument this file has already paid for once.
+      name: "the splice message drops the replacement it is about",
+      file: SWEEP,
+      from: "              `${why}\\n      to ${JSON.stringify(to).slice(0, 88)}`,",
+      to: "              `${why}`,",
+      expect: "MA9",
     },
     {
       // **The abandonment.** Reading on through a file that cannot start stacks

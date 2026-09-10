@@ -319,6 +319,99 @@ for (const [entry] of [...marked].sort((a, b) => Number(a[0]) - Number(b[0]))) {
   for (const p of problems) fail.push(`entry ${entry}: ${p}`);
 }
 
+// --- 1a. the body's `path:line` citations, existence and blank line only -----
+//
+// **The corpus, and why this is not the widening the header refuses.** That one
+// is *check 1 over the body* — the identifier arm included — and it does not
+// work: 23 of 30 body citations are bare basenames used as prose (`paint.ts`,
+// `session.ts`), so the rule would fire on a convention rather than on
+// staleness, which is a violation describing the document instead of a defect.
+//
+// **The first draft claimed these arms cannot see a bare basename, and the
+// measurement said otherwise.** The body writes `session.ts:367` — the prose
+// convention *with* a line number — so `locate`, which tries the path as written
+// and under `src/`, resolved none of them and the run came back with 30-odd
+// *the file does not exist*. That is exactly the fire-on-the-convention failure
+// the header refuses, reached by a different route, and it was caught by running
+// the widening rather than by reasoning about it.
+//
+// **So the basename is resolved rather than refused.** A bare basename that
+// matches exactly one file under `src/`, `tools/` or `test/` is that file; one
+// matching several is genuinely ambiguous and is **counted, not failed**, since
+// a rule that guessed would be wrong silently. That turns the convention into
+// something readable instead of something exempted, which is the difference
+// between covering the corpus and excusing it.
+//
+// Measured on arrival: **63 of 145 citations in this document were outside the
+// checker's corpus**, 43 % of its own subject unread — the
+// gate-phrased-over-a-corpus class. FINDINGS F1048.
+//
+// Reported the same way the table's are, so a body citation that goes stale is a
+// named line rather than a count.
+let bodyCitationCount = 0;
+let bodyAmbiguous = 0;
+
+/**
+ * A bare basename resolved against the tree, or `null` when it is not unique.
+ *
+ * The evidence table writes `shell/paint.ts:241`; the body writes `paint.ts:137`.
+ * Two conventions for one fact, and the second is the older one. Resolving it is
+ * what lets the arms above read the body without firing on how it is written —
+ * and `null` for a name matching two files is the honest answer, counted rather
+ * than guessed.
+ */
+const BASENAME_ROOTS = ["src", "tools", "test"];
+const basenameIndex = new Map();
+for (const root of BASENAME_ROOTS) {
+  const stack = [root];
+  while (stack.length > 0) {
+    const dir = stack.pop();
+    if (dir === undefined || !existsSync(join(ROOT, dir))) continue;
+    for (const e of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
+      const at = `${dir}/${e.name}`;
+      if (e.isDirectory()) stack.push(at);
+      else basenameIndex.set(e.name, (basenameIndex.get(e.name) ?? []).concat(at));
+    }
+  }
+}
+function byBasename(path) {
+  if (path.includes("/")) return null;
+  const hits = basenameIndex.get(path) ?? [];
+  return hits.length === 1 ? (hits[0] ?? null) : null;
+}
+
+{
+  let ambiguous = 0;
+  const tableLines = new Set(
+    text
+      .split("\n")
+      .filter((l) => /^\| \d+ \| (?:BUILT|PART|RULED|OPEN) \|/u.test(l))
+      .map((l) => l),
+  );
+  let bodyCites = 0;
+  for (const line of text.split("\n")) {
+    if (tableLines.has(line)) continue;
+    for (const [, path, at] of line.matchAll(CITE)) {
+      if (at === undefined) continue;
+      bodyCites += 1;
+      const found = locate(path) ?? byBasename(path);
+      if (found === null) {
+        ambiguous += 1;
+        continue;
+      }
+      const lines = readFileSync(join(ROOT, found), "utf8").split("\n");
+      const n = Number(at);
+      if (n > lines.length) {
+        fail.push(`body: ${path}:${at} — the file has ${String(lines.length)} lines`);
+      } else if ((lines[n - 1] ?? "").trim() === "") {
+        fail.push(`body: ${path}:${at} is blank`);
+      }
+    }
+  }
+  bodyCitationCount = bodyCites;
+  bodyAmbiguous = ambiguous;
+}
+
 // --- 1b. the two records of one entry's status agree -------------------------
 //
 // **Two records of the same fact, and nothing compared them** (F667). The Order
@@ -722,6 +815,12 @@ console.log(
   `  negative-symbol gates · ${String(gates)} symbols declared absent and resolved against the tree · ` +
     `${String(unverifiable.length)} confirmed-OPEN entries ruled unverifiable by a symbol` +
     (unverifiable.length === 0 ? "" : ` — ${unverifiable.sort((x, y) => Number(x) - Number(y)).join(", ")}`),
+);
+console.log(
+  `  body citations · ${String(bodyCitationCount)} \`path:line\` citations outside the evidence table, ` +
+    `checked for the file existing and the line being non-blank only; ${String(bodyAmbiguous)} name ` +
+    `no unique file and are counted rather than guessed. The identifier arm is deliberately not run ` +
+    `over the body, where the citations are bare basenames used as prose (F1048)`,
 );
 // F904 — the citation-anchorage signal. See `anchorage` above for why this is a
 // figure and not a rule.

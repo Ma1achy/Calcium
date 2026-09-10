@@ -276,6 +276,57 @@ describe("tools/mutate/anchors.mjs", () => {
     // short of executing the module sees it, and executing a run is the pass.
   });
 
+  it("MA9 (F279, F1030): a mutation whose `to` is not a program fails, and one that is does not", () => {
+    // **The half this sweep did not read.** A mutation is a pair; `anchorsOf`
+    // extracted `{file, from}`, found `from` present, and reported `no drift`
+    // — a sentence about a corpus that was true of half of it. Re-anchoring is
+    // the operation that breaks the unchecked half.
+    //
+    // **The bytes are F279's own.** Step 4 moved a row from `svg.ts` to
+    // `figure.ts`, changing `file:` and `from:` and keeping the SVG arm's
+    // replacement — `const inverted = block.form !== "icicle";` — which splices
+    // a statement into an object literal. Every suite failed to *transform*,
+    // and this sweep had run clean minutes before. The `from` here is a
+    // different object-literal property, chosen because it does not move; the
+    // `to` is the line that was actually left behind, and the shape it produces
+    // is the shape that shipped.
+    const splice = `
+const SRC = "src/data/viewmodel/tree.ts";
+const MUTATIONS = [
+  {
+    file: SRC,
+    from: "  panel: true,",
+    to: "  const inverted = block.form !== \\"icicle\\";",
+  },
+];
+`;
+    const bad = run(runsDir("fake.mjs", splice));
+    expect(bad.ok, "a statement in an object literal is not a program").toBe(false);
+    expect(bad.out).toContain("fake.mjs");
+    expect(bad.out, "and the sweep says what it applied, not only that it looked").toContain(
+      "leaves something that is not a program",
+    );
+    expect(bad.out, "with the replacement quoted, so the reader is sent to the pair").toContain(
+      "const inverted",
+    );
+
+    // **The control, and it is what makes the row above mean anything**: a
+    // parser that refuses everything reports every run broken and fails
+    // identically. `resolving`'s own `to` is a legal signature.
+    const good = run(runsDir("fake.mjs", resolving));
+    expect(good.ok, good.out).toBe(true);
+    // **And the counter** (MA5b's argument): an arm that applies nothing exits
+    // 0 exactly as a clean one does, so the number that says it ran is asserted.
+    expect(good.out, "the pair was applied and re-parsed, not skipped").toMatch(
+      /· 1 applied\+parsed ·/u,
+    );
+
+    // **A source that was already broken is not blamed on the mutation it
+    // carries.** The clean file is parsed only when the mutated one refuses, so
+    // the arm reports a splice and never a pre-existing syntax error — which
+    // would send the reader to a run file for a defect in `src/`.
+  });
+
   it("MA4 (the equality arm): the real tree matches the list exactly", () => {
     // **Both directions.** A new stale anchor fails because it is not on the
     // list; a repaired one fails because the list still claims it. The second is
@@ -288,6 +339,11 @@ describe("tools/mutate/anchors.mjs", () => {
     // **And the counter, for the reason MA5b gives.** A scan reading no test
     // path exits 0 exactly as a clean one does.
     expect(r.out, "the real sweep read its subject").toMatch(/· \d{2,} test paths ·/u);
+    // **MA9's control over the tree rather than a fixture** (F1030): every
+    // unique anchor's `to` applied and handed to the parser. Measured
+    // 2026-09-10: 1984 anchors, 1938 applied and parsed, 2 whose subject is not
+    // a language this parses, zero splices — and 6.8 s of the sweep's runtime.
+    expect(r.out, "and applied the half it used to skip").toMatch(/· \d{3,} applied\+parsed ·/u);
     // MA8's control over the real corpus rather than a fixture: every run in the
     // tree handed to `node --check`, all of them parsing. A fabricated directory
     // proves the arm can fire; this proves it fires over the tree.

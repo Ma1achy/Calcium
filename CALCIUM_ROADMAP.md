@@ -711,7 +711,7 @@ drag-select and copy the way they can in any other terminal program.
   `NAV`/`EDIT` does).
 
   **And it needs the toggle, which does not exist.** `MOUSE` is a single mode string
-  (`escapes.ts:37`) with no way to leave tracking off and come back, and `router.ts:271` gates
+  (`escapes.ts:49`) with no way to leave tracking off and come back, and `router.ts:271` gates
   mouse routing on `mouseEnabled()`, which reads **capabilities, not copy mode**. So *"turns
   tracking off"* describes a mechanism this entry would **add**, with its own reason — it is
   not a behaviour of the tree that copy mode would inherit. Measured 2026-08-13. The argument
@@ -2600,7 +2600,7 @@ sites and every one of them would need its own answer:
 
 | reader | what it does with the string |
 |---|---|
-| `shell/construct.ts:1215` | `pipeline?.submit(stores.editor.text)` — **C23 takes a string** |
+| `shell/construct.ts:2523` | `pipeline?.submit(stores.editor.resolved)` — **C23 takes a string**, and `resolved` is declared `readonly resolved: string` |
 | `shell/keys.ts:293`, `:563` | `contextAt(text, cursor, manifest)` — C19 completes against it |
 | `shell/keys.ts:612`, `:800` | `history.previous(text)`, `searchOpen(text)` — **C20 stores strings** |
 | `shell/session.ts:549`, `:579` | `selectionSpans(text, …)` — C09's wash |
@@ -2631,7 +2631,7 @@ and the moment a chip precedes one of them the pair disagrees. Completion would 
 wrong offset and the selection wash would paint the wrong run — **both silently, and both only
 in a frame.**
 
-**So resolution is at the submission site and nowhere else** (`construct.ts:1215`), and the
+**So resolution is at the submission site and nowhere else** (`construct.ts:2523`), and the
 sentinel is therefore visible to `contextAt`, `selectionSpans` and C20. Each has to tolerate it,
 and each tolerates it differently:
 
@@ -2655,7 +2655,7 @@ string change*.
 ##### The submission ruling, and the tree makes it forced rather than likely
 
 **A chip resolves to its content at submission.** Not *almost certainly right* — the alternative
-is not reachable from here: `construct.ts:1215` hands C23 a `string`, C18 classifies a string,
+is not reachable from here: `construct.ts:2523` hands C23 a `string`, C18 classifies a string,
 C20 stores strings, and C05's manifest describes `argv`. *The manifest gains a way to carry a
 block* is therefore a change to four components to deliver something the transport cannot take,
 since the far side receives argv either way.
@@ -3712,7 +3712,7 @@ PART  30 paste as a chip          Claude Code's idea; Calcium can reference a BL
                                    moment a chip precedes one — completion at the wrong offset
                                    and the wash on the wrong run, both only in a frame. A CHIP RESOLVES TO
                                    ITS CONTENT AT SUBMISSION, and the tree makes that forced
-                                   rather than likely: `construct.ts:1215` hands C23 a string,
+                                   rather than likely: `construct.ts:2523` hands C23 a string,
                                    C18 classifies a string, C20 stores strings, and the far
                                    side receives argv either way. The *render it as what it is*
                                    half is the ENTRY's document, which is C23's business and
@@ -4153,7 +4153,7 @@ BUILT 46 SCROLLABLE CONTAINERS     a container scrolls IF IT IS FOCUSABLE and it
                                    WERE CLEARED, which is the residue's stated direction
                                    paying out: a candidate is where to look and not what
                                    is wrong
-      49 GOLDEN HAS NEVER SEEN A     `test/golden/README.md` says "frames at 4 widths x 2
+BUILT 49 GOLDEN HAS NEVER SEEN A     `test/golden/README.md` says "frames at 4 widths x 2
          FRAME ★★                    themes x 2 unicode modes" and NOT ONE OF THEM IS A
                                    FRAME: blocks, table, patch and plot all go through
                                    renderToLines, and no golden test imports from src/shell/.
@@ -4180,7 +4180,26 @@ BUILT 46 SCROLLABLE CONTAINERS     a container scrolls IF IT IS FOCUSABLE and it
                                    selection wash, height arithmetic, cursor sequences,
                                    write-as-a-diff. IT ALSO WENT THE WAY THE ENTRY PREDICTS —
                                    the frame was written because a mark's PLACEMENT was wrong
-                                   in a way every block-indexed assertion passed
+                                   in a way every block-indexed assertion passed.
+                                   BUILT AT F1029: `test/golden/session-frame.test.ts`, 45
+                                   snapshots over 15 scene-arms driven through `buildSession`
+                                   into a real `Session` and read back three ways — grid,
+                                   style map, bytes — with the theme arm taken from
+                                   `Object.keys(defaultTheme)`, which is how `high-contrast`
+                                   reaches a golden frame for the first time. All eight named
+                                   things are covered. `test/golden/corpus.test.ts` asserts the
+                                   README against the directory BY EQUALITY, so the count
+                                   claim cannot go stale a third time without a red row.
+                                   AND THE FIRST THING IT CAUGHT WAS A GUARD THE SUITE HAD A
+                                   ROW FOR AND COULD NOT CONSTRUCT: `paint.ts`'s
+                                   `shows(window, span.row)` survives being dropped, along
+                                   with 48 rows across three files, because T4.26's single
+                                   span is inside the window and the guard cannot bind — and
+                                   T4.26 calls itself *the row the mutation pass demanded*.
+                                   RESIDUE: `promptWindow`'s cap===1 and cap===2 branches,
+                                   copy mode, overlays and a multi-row footer are constructed
+                                   by no scene; three dispositions are owed in files the lane
+                                   did not own
 BUILT 50 INLINE EMPHASIS          span-level styling, which the vocabulary has NO
          (span-level styling)      REPRESENTATION FOR at any depth: tone attaches to a block,
                                    a Cell, a keyValue row, an events row or a pill and never
@@ -4482,7 +4501,7 @@ what landed**.
 | 16 | BUILT | **four steps, and step 3 found two shipped defects.** Step 1: the choices are a table — `choiceBlock` at `src/shell/confirm.ts:101` — so the marker is a `bullet` slot L1 resolves and `ConfirmDeps` no longer takes a capability record at all. Step 2: `assertPlaceable` at `src/viewport/overlay/manager.ts:167` refuses a centred layer with no width at **both** entry points (C15 I20), which found the tree's second instance — `clearConfirmLayer` at `src/interaction/history/layers.ts:95` declared none — and `AskOptions.placement` at `src/shell/local/registry.ts:44` is a choice between placements, resolved by `placementOf` in `src/shell/confirm.ts`. Step 4: `createChoiceSelection` at `src/shell/choice-selection.ts:36`, with `defaultStart` supplying the confirm's start and `Esc`'s answer alike. Step 3: `menuWindow` at `src/interaction/completion/menu.ts:186` windows the list to what the placement holds, and `refreshAnchors` in `src/shell/keys.ts` re-places the anchored layers on a resize. T1.21, T1.22, T4.12–T4.18, T4.28–T4.33 | — |
 | 15 | BUILT | **four steps and a step 0, and the mode is a target throughout.** Copy mode: `#setCopyMode` holds the state at `src/shell/session.ts:586`, C03 gains `suspend`/`resume` at `src/terminal/frame-scheduler.ts:263` (§4a), C01 gains `setMouseTracking` at `src/terminal/lifecycle.ts:424` because nowhere else writes an escape. The prompt: an anchor plus the cursor, with `⌥a`/`⇧←`/`⇧Home` bound after `modifiersOf` — `src/interaction/router/decode.ts:113` — learned xterm's fourth bit. One clipboard: `copyText`, `src/interaction/editor/editor.ts:481`, written by `⌥w` and by the transcript's `copyElement`, `src/shell/keys.ts:1024`, over a range held by `extendRow`, `src/interaction/router/focus.ts:283`, copying `rowCopyText`'s source text, `src/presentation/table/definition.ts:447`. The wash is entry 23 | OSC 52 is a separate axis and is not built: whether a copy **also** reaches the system clipboard is a capability question about the terminal, and it changes nothing about where the text lands in-process |
 | 24 | BUILT | **the mechanism ships and `high-contrast` uses it.** `ThemeSet` is `Readonly<Record<string, ThemeTokens>>` — `src/presentation/theme/types.ts:125` — and the store switches by name: `setTheme` at `src/presentation/theme/store.ts:104`, with `names` beside it. `validateVariant` in `src/presentation/theme/contrast.ts:224` checks the declaration against `luminance(bg)`, which nothing did. `withThemeNames` — `src/data/manifest/parse.ts:570` — supplies `/theme`'s `enum` where the composition root holds both facts, and the parse declares none, so a manifest that skips it refuses every invocation rather than quietly accepting two. The premise is closed too: `light` declares `background: "surface"` at `src/presentation/theme/tokens-light.ts:22`, and `HIGH_CONTRAST` — `src/presentation/theme/tokens-high-contrast.ts:52` — is the set's first consumer, solved to 7 : 1 with A01 A.1 carrying every measured ratio. C10 §5a walks it in both artefacts; I27 and I28, commitments 24–25, T1.20, T1.21, T1.21a, T2.22, T2.23, T4.35, T4.36, T6.24–T6.26; `tools/mutate/runs/c10-named-set.mjs` | **a theme cannot declare a floor above the framework's minimum.** `high-contrast`'s 7 : 1 is authored and checked by one row, and `validateTokens` would accept a later edit dropping any slot to 4.5. Named as the next theme-with-a-promise's argument (C10 §5a.6). A solarised-alike and a neutral low-saturation set are unbuilt and are not blocked on anything |
-| 49 | OPEN | none, and that is the finding: **no file under `test/golden/` imports from `src/shell/`**, so nothing there reaches `paint.ts`. `test/golden/README.md` says *frames*. F163 | the whole entry — a golden frame category does not exist |
+| 49 | BUILT | `test/golden/session-frame.test.ts` with `test/support/frame-golden.ts` — 45 snapshots over 15 scene-arms driven through `buildSession` into a real `Session`, read back three ways (grid, style map, bytes), with the theme arm derived from `Object.keys(defaultTheme)`. All eight named things are covered and F163's second instance closes as a frame. `test/golden/corpus.test.ts` asserts `README.md` against the directory by equality (GC1–GC5), and the README was rewritten — its old line was false in all three clauses and had survived the file's only edit. F1029 | residue: `promptWindow`'s `cap === 1` and `cap === 2` branches, copy mode, overlays and a multi-row footer are constructed by no scene. Three dispositions are owed outside the lane that found them — `chrome.ts`'s inert `tone: "muted"`, `paint.ts`'s unasserted `shows` guard, and the harness's symmetric-camera default |
 | 43 | PART | `imageProtocol: "none" \| "iterm2" \| "kitty" \| "sixel"` detected — `src/terminal/capabilities.ts:19`; **and the renderer** — `src/presentation/blocks/kinds/image.ts`, `src/presentation/image/` (six files: codec, dither, halfblock, kitty, overlay, index), `src/shell/transmit-image.ts`, eight `test/unit/image-*.test.ts` (this cell said *no renderer*; re-measured 2026-09-03) | `sixel` detected and not emitted, correctly; the sample-grid kind and an image inside a `Cell` — see `docs/notes/CALCIUM_NOTE_AUDIT.md` §7 |
 
 **Checked and confirmed OPEN**, which is evidence rather than an absence of it. **The blanket
@@ -4547,6 +4566,13 @@ exception — is inexpressible, because `prefixPolicy("")` makes every token a v
 (`src/interaction/parser/policy.ts:33`), and what it needs is a ruling about where the default
 route lives rather than a field. **Gate**: `defaultRoute` occurs zero times in `src/` — measured
 2026-09-04, and red the day the name appears, whichever way the ruling goes.
+
+**Below the list rather than in it, because it is no longer confirmed-OPEN.** The clause is kept
+rather than deleted: it is the record of what was measured three times and how each measurement
+moved, and `roadmap-status` reads bold numbers within the paragraph above, so leaving it there
+would put entry 49 in two of the three status sets at once — the two-records-of-one-fact defect
+this document's own checker exists to name (F667, F1048).
+
 **49** — re-measured 2026-09-04 and **the count claim was stale in the direction that flatters the
 tree**: `test/golden/` holds **twelve** test files, not five, and **two** import from `src/shell/`
 — `continuation.test.ts` (`commandRows`, `noticeDoc`, `PROMPT_GUTTER`) and `patch.test.ts` (`b`,
@@ -4556,7 +4582,13 @@ has met before and the reason the figure is imports and not matches. **The gap i
 of eight**: chrome rows are covered and the background base, the prompt window, the elision
 markers, the selection wash, the height arithmetic, the cursor sequences and the write-as-a-diff
 are not — so seven golden files were added without a frame among them, which is the entry
-demonstrating itself a second time rather than being restated. F163.
+demonstrating itself a second time rather than being restated. F163. **Closed 2026-09-10 at
+F1029**, and the count claim was stale a third time before it was: F1029 re-derived twelve, of
+which eleven reach `renderToLines` and **none composed a frame** — the same figure this note
+records, arrived at independently, with `svg-baseline.test.ts` reaching no terminal renderer at
+all. The entry is now covered at eight of eight, and `corpus.test.ts` asserts the README's table
+against the directory **by equality**, so the next drift in this count is a red row rather than a
+fourth re-measurement.
 
 **3 left this list on 2026-09-04, and the record was disagreeing with itself in three places.**
 The evidence table said `| 3 | PART |`, the Order column said nothing — which means OPEN — and this
