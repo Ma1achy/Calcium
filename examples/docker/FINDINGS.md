@@ -44196,71 +44196,117 @@ configuration rather than in a rule.
   `dist/` carrying a syntax error — a truncated build, a killed `tsc` — would have failed the gate
   with a message about generated output. That is now impossible and was never observed.
 
-## F1080 — the register's own summary is a third record of the open set, and only one of the three is gated ★★★☆
+
+## F1080 — the group heading is a second record of the open set, and nothing checks it ★★★☆
 
 | | |
 |---|---|
-| **Surface** | `examples/docker/TRIAGE.md` — the group table at the top, the `## N ·` group headings, and the keyed rows |
-| **Reached for** | closing F158 and F1024, which needed two group headings recomputed |
-| **Verdict** | **open** — the divergence is measured and the open column is corrected; the mechanism that let it drift is not |
+| **Surface** | `examples/docker/TRIAGE.md` — the `## N ·` group headings against the keyed rows beneath them, and against the `ids keyed` column above |
+| **Reached for** | closing F158 and F1024, which required two group headings to be recomputed by hand |
+| **Verdict** | **closed** — SP14, green on arrival, and it found a stale figure and four unparseable headings on its first run |
 
 ### What was measured
 
-SP12 gates the open **set** by equality, and it is the only record of the three
-that anything reads. The other two are prose: each group heading carries
-`N open · M closed · K with no verdict`, and the table at the top carries
-`N open · M unread` per group. Nothing compares them to the rows.
+SP12 gates the open **set** by equality and is the only thing that reads a
+disposition. Each group also carries its own tally in its heading —
+`N open · M closed · K with no verdict` — and nothing compares it to the rows it
+heads. Closing two findings meant editing group 8 from `1 open · 48 closed` to
+`closed · 49 closed` and group 9 from `1 open · 67 closed` to `closed · 68
+closed`, entirely by hand, with nothing anywhere that would have gone red had
+neither been touched.
 
-The three open findings sit in groups 1, 11 and 12 — F405, F271, F812 — which
-SP12's own equality check settles. So the table's open column read:
+**A second pair of records, one level up.** Group 11's heading read `396
+entries` against **395** in the ranking table's `ids keyed` column for the same
+group. Both count ids in group 11 and they differed by one before this entry
+added anything. SP6 was **green** throughout, because it sums that column
+against `keyed.size` rather than checking each group against itself: an error of
++1 in one row cancelled against −1 in another. A total right in aggregate and
+wrong per row is what a summed gate cannot see, and it is the second thing the
+sibling rule has to check.
 
-| group | table said | rows say |
-|---|---|---|
-| 2 | 3 open | closed |
-| 7 | 1 open | closed |
-| 8 | 4 open | closed |
-| 9 | 1 open | closed |
-| 11 | 2 open | 1 open |
+### The misreading this entry made first, which is the register's own class
 
-Four groups claimed open work they did not have, and the fifth was out by one.
+The first draft of this finding said the **ranking table** claimed open findings
+in four groups that had none, with a five-row table of figures. It was wrong.
+That column is headed **consumers**, not findings — the table's own header, four
+lines above it, reads `rank | mechanism | ids keyed | consumers | ⚠ |
+disposition`, and §The ranking's prose says *the ranking is consumer count*. Its
+`N open · M unread` is open and unread **consumers**.
 
-### And the third record was already out by one, caught in the act
+**A conflation rather than a mistake**, and the same shape as F58's: both
+readings are about *open*, nothing in the cell forces a choice, and the cell is
+five columns from the word that disambiguates it. Four cells were rewritten
+before the tell was read — group 8 said `4 open` against a group with **1** open
+finding, and a disposition column cannot be out by three.
 
-Group 11's heading read `396 entries: 1 open · 308 closed · 87 with no verdict`
-— internally consistent, 1 + 308 + 87 = 396 — while the table's total column
-read **395** for the same group. Two counts of one group, differing by one,
-before this entry added anything to either. SP6 sums that column and was
-**green**, because it gates the sum against `keyed.size` and not the groups
-against themselves: the column was reconciled once (F142) and the +1 here is
-cancelled elsewhere in the table. A total that is right in aggregate and wrong
-per row is what a summed gate cannot see, and it is the second thing the sibling
-rule has to check.
+**The instrument that answers it in one step is the one already written down.**
+*Ask where a settled claim is written down*: the column's meaning is defined in
+the table header, and going to look would have cost the length of one `sed`.
+This is the third thing the sibling rule has to get right — it must read the
+heading tallies and the `ids keyed` column, and must **not** compare the
+consumers column to anything, because `unread` there is not `with no verdict`.
 
-### Why this is not the status-column finding again
+### The remedy
 
-A row's status column being stale is one record disagreeing with its own body.
-This is a **summary** disagreeing with the sections beneath it, which is F86,
-F89 and F92's mechanism — *a claim is falsified by being summarised, not by
-being wrong* — arriving in the document that records those findings. The
-sections were right the whole time.
+`checkOpenSet` already walks every row and calls `dispositionOf`; what it
+discards is the group boundary. A sibling that tracks `## N ·` headings and
+compares, by equality:
 
-**And the corrected column will go stale again on the next closure**, which is
-the actual finding: closing a finding today means editing a keyed row, a group
-heading and a table cell, and exactly one of the three is checked.
+- each heading's `N open · M closed · K with no verdict` against the rows it heads;
+- each heading's entry count against that group's `ids keyed` cell,
 
-### The remedy, and what is not yet known
+is a small extension of a function that exists, and it closes both the record
+this entry started from and the one it found on the way.
 
-SP12 already walks every row and calls `dispositionOf`; what it discards is the
-group boundary. A sibling that tracks the `## N ·` headings and compares all
-three records by equality is a small extension of a function that exists.
+### Built as SP14, and what it found on its first run over the corpus
 
-**Stated blind spot, and the reason the other two columns were left alone.** A
-count taken by walking lines with a per-group counter disagreed with the table's
-`total` and `unread` columns in six groups — g7 by 10, g8 by 1, g11 by 1 the
-other way — and that method is not the one `keyedRows` uses: it takes the first
-line per id across the whole document, so a per-group walk double-counts an id
-mentioned in two groups. The open column was corrected because SP12's equality
-gate settles it independently; `total` and `unread` were not, because the number
-that would replace them has not been measured with the tool's own reader. That
-is the first thing the sibling rule has to fix, and it is why this entry is open
-rather than closed.
+Only the **first** of the two comparisons was built. The `ids keyed` half is
+left to `checkTriageInventory`'s recorded non-gate, which stands on its own
+argument: *keyed* has no definition strong enough, and a gate over numbers
+nobody maintains is red on arrival and edited to fit. A **disposition** has one,
+so the tally half is exactly derivable today and SP14 is green on arrival with
+nothing edited to fit.
+
+Run before wiring, as a first draft must be:
+
+| what it found | where |
+|---|---|
+| a tally out by one on `with no verdict` | §13 — 2 stated, 1 in the rows |
+| a heading stating no verdict count at all | §12 |
+| a heading stating only a total — `**closed**, all 5` | §4, §6 |
+| a heading spelling the field `unread` | §3 |
+
+All five were repaired and the shapes normalised. **A heading that states no
+tally is a violation rather than a pass**, which is A03 §2 applied to a parser:
+a reader that shrugs at a missing number is a rule with a way to opt out of
+itself, and two headings in the corpus were already using it.
+
+**Its first real use was this entry's own closure.** Marking F1080 closed moved
+a row from open to closed in group 11 and SP14 went red — `open 2 against 1;
+closed 308 against 309` — before the commit was written. That is the whole
+argument for the rule in one line: the edit it caught is exactly the edit it was
+written about, made by someone who had just spent a round on the subject.
+
+**`unread` is deliberately not read**, and F1080's own first draft is the
+fabricated violation for that clause: the ranking table's `consumers` column
+spells its second field `unread`, and reading one as the other is what rewrote
+four cells.
+
+### And a fifth form of *a gate that exists and is not run*
+
+Mutating SP14's wiring two ways separated them: deleting both the binding and
+the spread fails the meta-row that checks every SP rule is called, and deleting
+**only the spread** — leaving `const groupTallies = checkGroupTallies();` in
+place — failed **nothing**, with the whole family green. A checker whose result
+is computed and never read is a gate that runs and does not gate, and it was the
+row's own stated limit, recorded with its reason.
+
+Closed in the same commit, because the measurement was in hand: the row now
+requires each carrier's result to reach `violations`, by the spread of the call
+or of any identifier bound from it — destructured bindings included, which the
+first draft did not reach and which reported SP3 unwired. `SP8` is named as the
+one rule deliberately reported without gating, in a list compared by equality,
+and removing it from that list fails the row. The reader must be
+`keyedRows`' own — first line per id, across the whole document — or a group
+walk double-counts an id mentioned twice; measured with that reader the groups
+sum to 1071 against 12 ids keyed before the first heading.

@@ -14,7 +14,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { checkFindingIds, checkFindings, checkOpenSet, checkTriageInventory } from "../../tools/enforce/findings.mjs";
+import { checkFindingIds, checkFindings, checkGroupTallies, checkOpenSet, checkTriageInventory } from "../../tools/enforce/findings.mjs";
 import {
   checkSectionReferences,
   checkCommitments,
@@ -786,6 +786,7 @@ describe("A03 SP10 — a mnemonic test-row label is unique within its spec", () 
       SP11: "checkCommitmentNumbers",
       SP12: "checkOpenSet",
       SP13: "checkCommitmentOrder",
+      SP14: "checkGroupTallies",
     };
 
     // Equality, so a rule added to `SPEC_RULES` without a carrier fails here
@@ -818,6 +819,43 @@ describe("A03 SP10 — a mnemonic test-row label is unique within its spec", () 
 
     for (const [rule, fn] of Object.entries(carriers)) {
       expect(runner, `${rule}: the gate never calls ${fn}`).toMatch(new RegExp(`\\b${fn}\\(`));
+    }
+
+    // **The stated limit above, closed, because it was measured again on a
+    // fifteenth rule and it is a fifth form of *a gate that exists and is not
+    // run*.** Calling a checker and never spreading its result computes a
+    // violation list nobody reads: mutating SP14 by deleting `...groupTallies,`
+    // while leaving `const groupTallies = checkGroupTallies();` in place failed
+    // **nothing** here, and the whole family passed. Deleting both lines fails
+    // the loop above, so the two mutations differ by exactly the spread.
+    //
+    // `SP8` is the one rule deliberately computed and reported without gating
+    // (A03 §9), so it is named rather than excluded — a list compared by
+    // equality, so a rule that stops gating has to say so here.
+    const reportOnly = ["SP8"];
+    expect(
+      reportOnly.every((r) => r in carriers),
+      "every report-only rule is a rule",
+    ).toBe(true);
+    const spread = runner.match(/\.\.\.[A-Za-z][\w.]*/gu)?.join(" ") ?? "";
+    expect(spread.length, "the runner spreads something").toBeGreaterThan(20);
+    for (const [rule, fn] of Object.entries(carriers)) {
+      if (reportOnly.includes(rule)) continue;
+      // The result reaches `violations` either as the spread of a named
+      // binding or as the spread of the call itself.
+      // **The binding may be destructured**, which the first draft did not
+      // reach: SP3 is `const { violations: refViolations, resolved } =
+      // checkReferences(…)`, and a matcher written for `const x = fn(` reported
+      // it unwired. So the whole left-hand side is taken and every identifier
+      // in it is a candidate — over-generous by design, because this arm is
+      // asking whether the result reaches the gate at all.
+      const lhs = new RegExp(`(?:const|let)\\s+([^=]+?)\\s*=\\s*(?:await\\s+)?${fn}\\(`, "u")
+        .exec(runner)?.[1];
+      const named = lhs === undefined ? [] : (lhs.match(/[A-Za-z][\w]*/gu) ?? []);
+      const reaches =
+        new RegExp(`\\.\\.\\.${fn}\\(`, "u").test(runner) ||
+        named.some((n) => new RegExp(`\\.\\.\\.${n}\\b`, "u").test(runner));
+      expect(reaches, `${rule}: ${fn} is called and its result never reaches the gate`).toBe(true);
     }
   });
 
@@ -1748,6 +1786,56 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
     const v = checkOpenSet(undefined, []);
     expect(v.length, "an empty list against a register with open rows").toBeGreaterThan(0);
     expect(v.map((x) => x.message).join(" ")).toContain("read as open and are not on");
+  });
+
+  it("SP14: the real register is clean, and the rule actually read it", () => {
+    // **The counter, because a reader that finds no groups satisfies
+    // `toEqual([])` exactly as a reconciled document does** — SP12's own
+    // same-green shape, one rule over. Fifteen groups today; the floor is well
+    // under it so a new group does not move the row.
+    const clean = checkGroupTallies();
+    expect(clean.groups, "groups read").toBeGreaterThanOrEqual(10);
+    expect(clean.map((x) => x.message), "SP14").toEqual([]);
+  });
+
+  it("SP14 fires: a heading that overstates and one that understates", () => {
+    // Both directions, because a rule tested on one arm is tested on half of
+    // itself. The register is fabricated rather than touched: two rows under
+    // one heading, one open and one closed, and the heading is written wrong
+    // each way in turn.
+    const doc = (tally: string) =>
+      ["## 1 · A fabricated group — " + tally, "", "**F1** — a thing · **Open** — not done", "**F2** — another · **Closed** — done", ""].join("\n");
+
+    const clean = checkGroupTallies({ read: () => doc("**1 open** · 1 closed · none with no verdict") });
+    expect(clean.map((x) => x.message), "the control — the tally the rows actually have").toEqual([]);
+
+    const over = checkGroupTallies({ read: () => doc("**3 open** · 1 closed · none with no verdict") });
+    expect(over.map((x) => x.message).join(" "), "more open than the rows hold").toContain("open 3 against 1");
+
+    const under = checkGroupTallies({ read: () => doc("**closed** · 1 closed · none with no verdict") });
+    expect(under.map((x) => x.message).join(" "), "and the direction that hides work").toContain("open 0 against 1");
+  });
+
+  it("SP14 fires: a heading that states no tally at all", () => {
+    // **The vacuity arm, and it is why the rule refuses rather than shrugs.**
+    // Two headings in the corpus read `**closed**, all 5` and `9 closed · new
+    // at F80` — each omitting a field — and a parser that treats a missing
+    // number as zero lets a heading opt out of being checked. Both were
+    // normalised; this row is what stops them coming back.
+    const bare = ["## 1 · A fabricated group — **closed**, all 2", "", "**F1** — a thing · **Closed** — done", ""].join("\n");
+    const v = checkGroupTallies({ read: () => bare });
+    expect(v.map((x) => x.message).join(" "), "no tally is a violation, not a pass").toContain("states no tally");
+  });
+
+  it("SP14: `unread` is the ranking table's word for a consumer and is not read here", () => {
+    // **F1080's own first draft is the fabrication.** It read the ranking
+    // table's `consumers` column — `N open · M unread` — as a disposition
+    // column and rewrote four cells; group 8's `4 open` against one open
+    // finding was the tell. So a heading spelling its third field `unread`
+    // must not resolve: the word means something else four columns away.
+    const doc = ["## 1 · A fabricated group — **closed** · 1 closed · none unread", "", "**F1** — a thing · **Closed** — done", ""].join("\n");
+    const v = checkGroupTallies({ read: () => doc });
+    expect(v.map((x) => x.message).join(" "), "`unread` does not spell a verdict count").toContain("states no tally");
   });
 
   it("SP5: the real tree is clean, and the rule actually read it", () => {

@@ -140,3 +140,12 @@ export type FindingIdsResult = Violation[] & {
  * a commit rather than a working tree is from a worktree. FINDINGS F1031, F1041.
  */
 export declare function checkFindingIds(io?: FindingsIo): FindingIdsResult;
+
+/**
+ * SP14 — each `## N ·` group heading tallies the rows it heads, compared by
+ * equality. `io.read` is injectable so the fabricated violation can drive both
+ * directions without touching the register.
+ */
+export declare function checkGroupTallies(
+  io?: { read?: (file: string) => string },
+): import("./source-scans.d.mts").Violation[] & { groups: number };

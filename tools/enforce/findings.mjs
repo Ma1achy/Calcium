@@ -594,7 +594,6 @@ export function checkTriageInventory(io) {
  */
 export const TRIAGE_OPEN = Object.freeze([
   "F271", "F405", "F812",
-  "F1080",
 ]);
 
 /** The words a disposition may be written with. */
@@ -620,6 +619,18 @@ const OPEN_WORDS = new Set(["open", "partly"]);
  *
  * `**gate open**` is neither, because its first word is `gate`; *"refuses to
  * open"* is neither, because it is not bold and not alone in a cell.
+ *
+ * **Two shapes in a row's prose desynchronise the pairing, and both are the
+ * writer's to avoid.** `[^*]*` cannot cross a `*`, so a bold span containing
+ * one — `**Closed — ruled *no operation*…**` — is not a marker at all and the
+ * previous disposition stands. And a bold span whose first character is not a
+ * letter — `**1**` in *against **1** open finding* — fails `([A-Za-z]+)`, so
+ * its **closing** `**` opens the next match and every marker after it is
+ * mis-paired: F1080's row read *open* with `**Closed**` written at the front
+ * of its disposition. Both were caught by SP12, which compares the set by
+ * equality and is therefore loud in both directions — but the row is the thing
+ * to fix, not the regex. In a keyed row, write a number as a word and keep `*`
+ * out of a bold span.
  */
 const BOLD_MARKER = /\*\*\s*([A-Za-z]+)[^*]*\*\*/gu;
 
@@ -684,6 +695,117 @@ export function keyedRows(triage) {
  * direction is silent about the other — measured, in both directions, on C10
  * I39's debt list (T6.97).
  */
+/**
+ * SP14 — each group heading's tally equals the rows it heads.
+ *
+ * **The second record of the open set, and it was the only one nobody read.**
+ * SP12 gates the set; each `## N ·` heading carries `X open · Y closed · Z with
+ * no verdict` for its own section, and closing a finding means editing both.
+ * Closing F158 and F1024 meant editing two headings by hand with nothing that
+ * would have gone red had neither been touched (F1080).
+ *
+ * **Why this is gated where `checkTriageInventory`'s per-group counts are
+ * not**, which is a live decision recorded above with two reconciliation passes
+ * behind it: *keyed* has no definition strong enough, so a gate over it would
+ * be red on arrival and edited to fit. A **disposition** has one —
+ * `dispositionOf`, which SP12 already compares by equality — so the tallies are
+ * exactly derivable today. Run over the corpus before wiring: 14 of 15 headings
+ * agreed, the fifteenth (§13) was out by one on `with no verdict`, and four
+ * stated a field not at all. Those five were repaired and the shapes
+ * normalised, so this is green on arrival with nothing edited to fit.
+ *
+ * **A heading that states no tally is a violation rather than a pass**, which
+ * is the whole of A03 §2 applied to a parser: `**closed**, all 5` and `9 closed
+ * · new at F80` each omitted a field, and a reader that shrugs at a missing
+ * number is a rule with a way to opt out of itself.
+ *
+ * `readText` is a parameter so the fabricated violation can drive both arms —
+ * a heading that overstates and one that understates — without touching the
+ * register.
+ */
+export function checkGroupTallies(io) {
+  const readText = io?.read ?? ((f) => readFileSync(f, "utf8"));
+  const violations = [];
+  const lines = readText(TRIAGE).split("\n");
+
+  // `keyedRows`' own model — the first line per id, across the whole document —
+  // because a per-group walk that counts every occurrence double-counts an id
+  // mentioned in a second group's prose, and the two readings differ (F1080).
+  const seen = new Set();
+  const groups = [];
+  let current = null;
+  for (const line of lines) {
+    const head = /^## (\d+|Singles)(?: · |\b)/u.exec(line);
+    if (head !== null) {
+      current = { name: head[1], heading: line, open: 0, closed: 0, none: 0 };
+      groups.push(current);
+      continue;
+    }
+    const row = /^(?:\| )?\*\*F(\d+[a-z]?)\*\*[ |]/u.exec(line.trimStart());
+    if (row === null || seen.has(row[1])) continue;
+    seen.add(row[1]);
+    if (current === null) continue;
+    const d = dispositionOf(line);
+    if (d === "open" || d === "partly") current.open += 1;
+    else if (d !== null) current.closed += 1;
+    else current.none += 1;
+  }
+
+  for (const g of groups) {
+    const stated = groupTally(g.heading);
+    if (stated === null) {
+      violations.push({
+        rule: "SP14",
+        file: TRIAGE,
+        spec: "A03 §7a · FINDINGS",
+        message:
+          `group ${g.name}'s heading states no tally. A heading with no numbers in it cannot ` +
+          `disagree with its rows, which is the vacuity class one list over: write ` +
+          `\`X open · Y closed · Z with no verdict\`, spelling a zero as \`none\`.`,
+      });
+      continue;
+    }
+    const wrong = [];
+    if (stated.open !== g.open) wrong.push(`open ${String(stated.open)} against ${String(g.open)}`);
+    if (stated.closed !== g.closed) wrong.push(`closed ${String(stated.closed)} against ${String(g.closed)}`);
+    if (stated.none !== g.none) wrong.push(`with no verdict ${String(stated.none)} against ${String(g.none)}`);
+    if (wrong.length > 0) {
+      violations.push({
+        rule: "SP14",
+        file: TRIAGE,
+        spec: "A03 §7a · FINDINGS",
+        message:
+          `group ${g.name}'s heading disagrees with the rows it heads — ${wrong.join("; ")}. ` +
+          `The heading is the second record of the open set and SP12 gates the first; a group ` +
+          `whose tally is stale reads as settled work and is the reason a closure has to edit ` +
+          `two places (F1080).`,
+      });
+    }
+  }
+
+  violations.groups = groups.length;
+  return violations;
+}
+
+/**
+ * A heading's stated tally, or `null` when it states none.
+ *
+ * `**closed**` spells zero open, which is how thirteen of the fifteen headings
+ * read and is worth keeping — a reader scanning for work looks for a word, not
+ * a digit. `none` spells zero anywhere a count is expected. Deliberately **not**
+ * reading `unread`: that is the ranking table's vocabulary for a *consumer*, and
+ * the first draft of F1080 rewrote four cells having read one as the other.
+ */
+function groupTally(heading) {
+  const open = /(?:^|[^\d])(\d+|none) open\b/u.exec(heading);
+  const closed = /(?:^|[^\d])(\d+|none) closed\b/u.exec(heading);
+  const none = /(?:^|[^\d])(\d+|none) with no verdict\b/u.exec(heading);
+  const zeroOpen = /\*\*closed\*\*/u.test(heading);
+  if ((open === null && !zeroOpen) || closed === null || none === null) return null;
+  const count = (m) => (m === null || m[1] === "none" ? 0 : Number(m[1]));
+  return { open: count(open), closed: count(closed), none: count(none) };
+}
+
 export function checkOpenSet(io, expected = TRIAGE_OPEN) {
   const readText = io?.read ?? ((f) => readFileSync(f, "utf8"));
   const violations = [];

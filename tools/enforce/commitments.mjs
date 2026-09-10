@@ -2158,5 +2158,5 @@ export function checkReferences(
 // That is A03 §2's own subject reaching the list that enforces it.
 export const SPEC_RULES = [
   "SP1", "SP2", "SP3", "SP4", "SP5", "SP6", "SP7", "SP8", "SP9", "SP10", "SP11",
-  "SP12", "SP13",
+  "SP12", "SP13", "SP14",
 ];
