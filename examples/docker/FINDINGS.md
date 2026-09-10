@@ -46183,7 +46183,7 @@ habit, which is what a rule cannot be here.
 |---|---|
 | **Surface** | `test/e2e/emulator.test.ts` T5.21 · `test/support/execution.ts`'s `settled` |
 | **Reached for** | `main`'s own CI run after the merge — the fifth `full` sample on this head |
-| **Verdict** | **open** |
+| **Verdict** | **closed** — the instrument answered on its first firing, and the answer is a framework defect with a deterministic row |
 
 ### The repair, and the sentence it rested on
 
@@ -46271,6 +46271,97 @@ The comment in the row is corrected in the same edit: a premise that has been
 falsified must not stay in the file as the reason for the code beneath it, which
 is the whole of `ask where a settled claim is written down` pointed at a claim of
 my own.
+
+### Closed — the instrument answered on its first firing
+
+```
+AssertionError: and the tail is the last line the child wrote ·
+  46 → 46 numbered lines of 200 in 5013 ms, 1 patches, grew by 0
+```
+
+**`grew by 0`.** Not a slow feed — a stopped one. Five seconds and not one line
+more, and `1 patches` where the local reading is also one, so the route
+delivered a single patch carrying part of the output and nothing followed. The
+previous sample cut at 34 and this one at 46, **a cut point that moves**, which
+is a chunk boundary rather than a cap.
+
+The table said the two readings wanted opposite repairs. The row picked one on
+its first red, which is the whole argument for reporting instead of choosing.
+
+### The mechanism, and it is one flag carrying two conditions
+
+`execution.ts`'s write path queues each chunk onto a promise chain:
+
+```ts
+const onChunk = (chunk: string): void => {
+  if (!accepting) return;
+  writes = writes.then(async () => {
+    if (!accepting) return;          // ← the defect
+    await emulator.write(chunk);
+    …
+  });
+};
+```
+
+and the exit path is
+
+```ts
+accepting = false;   // "the gate closes before the drain, not after it"
+await writes;        // the drain
+finished = true;
+…
+emulator.dispose();
+```
+
+**`accepting` means two things** — *the child may still write* and *the emulator
+is still alive* — and only the second is a reason to drop anything. The outer
+check wants the first: nothing more will come, so stop queueing, and closing
+early is right. The inner check wants the second, and reads the first.
+
+So every link queued before the exit and not yet run when it fired **returned
+without writing**, and `await writes` awaited a chain of no-ops. On this machine
+a `seq` finishes before the exit is observed, so the window never opens; on a
+runner it opens wherever the exit catches the chain.
+
+**And C23 I67 was satisfied by it, word for word.** The clause read *every write
+is awaited before the final snapshot*. Every write was awaited. None of them
+wrote. A wording that names the mechanism is satisfied by a mechanism that does
+nothing — A03 §2's vacuity class arriving in an invariant, and the same thing the
+mutation pass says about a sentence. I67 now names the observable: *every chunk
+the child wrote before it exited has reached the screen*.
+
+### The rows, and the one the guard never had
+
+**T3.80** constructs the window rather than racing for it: emit every line, then
+settle the child in the same turn, so the links are pending when the gate
+closes. No sleep, no load, no timing. It fails on the old flag with the runner's
+own sentence and passes on the new one, and it asserts the **count** as well as
+the tail, because a row looking only for `"200"` passes on a screen that dropped
+the middle.
+
+**T3.80b** is the control the guard was missing. Removing `if (finished) return;`
+**failed nothing across all five emulator suites — 95 rows green** — so the guard
+the code credits with catching a CI-only crash was witnessed by no row at all.
+Its hazard is the opposite of T3.80's, a link running *after* the disposal, and
+it is reachable through an `exited` that rejects with chunks still queued.
+Without the guard, that row's file fails with
+
+```
+Emulator.write: called after dispose — the screen is gone, and returning the
+last one would hide the bug
+```
+
+**The two rows together are why the flag changed rather than went.** One says the
+drain must deliver; the other that the disposal must stop it. A single flag could
+not say both, which is the finding stated as a shape rather than as a line
+number.
+
+### What this cost and what it bought
+
+The first repair was wrong about why and **produced the number that said so**.
+The second is founded on that number. A tier-5 red that reproduces only under
+load is a lottery; the same defect is now driven in the devcontainer in
+milliseconds, which is what a red on a machine you cannot reach is owed.
 
 ### What would falsify this
 
