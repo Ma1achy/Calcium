@@ -43089,3 +43089,170 @@ what the index buys is that the next such row is found by looking rather than by
 pass noticing after the fact. And it covers only the shared helper — four other suites strip
 comments inline, which `test/support/source.ts` already names as residue, and none of them is
 in this table.
+
+## F1066 — the ordering half of the commitments list was refused on a figure that was wrong when it was written, and three commitments went in out of order while the refusal stood ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `tools/enforce/commitments.mjs` — SP11's docstring, and SP13 · `docs/architecture/A03_enforcement_suite.md` §7a and §9 · `docs/components/C10_theme_resolution.md`, `C28_profiler.md` |
+| **Reached for** | *enforce has a rule for invariant ordering and nothing for commitments; a lane inserted three commitments out of order and enforce stayed silent* |
+| **Verdict** | **Not a missing axis — a refused one**, refused in a docstring and in the architecture document with a figure that was already false, and the reason beside it constrains the **repair** rather than the **check** |
+
+**The gap was already covered under another name, and the name was a refusal.** Two files
+agreed, citing a count: *order is not gated, and that is a ruling with a figure behind it —
+**eleven of twenty-eight specs** declare their commitments out of order today, C04 and C12 at
+102 and 109 items — so the ordering half is a renumber of two of the largest documents in the
+project and every citation of every number that moves.* **A count, a ruling and two documents
+are what a ruling looks like from outside.**
+
+**Re-measured at the commit that wrote the sentence**, not at HEAD, because only that reading
+separates a corpus that drifted from a claim that was never true:
+
+| ref | specs out of order by descent | not exactly `1..n` |
+|---|---|---|
+| the commit that wrote the claim | **9** | 10 |
+| the commit that restated it | 9 | 10 |
+| HEAD | 9 | 10 |
+
+Neither reading is eleven, and **the count is the argument**, because the argument is about
+how much repair the rule would demand. The tenth spec by the second reading declares a
+duplicate and never descends, which is the *other* rule's subject.
+
+**And the reason is a correct sentence justifying a different decision.** *A renumber of two
+of the largest documents and every citation of every number that moves* is a reason to refuse
+the **repair**. It says nothing about the **check** — because a debt list separates them,
+which is exactly what the rule forty lines up already does, for a defect it also could not
+repair. The asymmetry between the two halves of one numbered list was never argued; it was
+inherited from how much work each half looked like.
+
+**What the gap cost, measured as a set rather than as a count.** Descent keys went from 32 to
+34 between that commit and HEAD: two are new and one existing displacement widened. **Three
+commitments written out of document order with the gate green on every one.** The refusal was
+not a dormant question; it was a live hole with instances arriving into it.
+
+### The shape is not the invariant rule's, and that decided the new rule's unit
+
+The invariant rule reports a *first divergence*, which suits a list that drifted one insertion
+at a time. Here it is 43 items out of place across 34 descents, and only one spec of nine is
+adjacent transpositions: one commitment sits **25 positions** from home, and a four-item block
+sits 24. So the unit is the **descent pair**, not a first divergence — and the new rule
+deliberately does not reuse the older one's diagnosis, whose four arms bring in a subject the
+reader cannot see.
+
+**Two specs renumbered** — both citation-free — taking the corpus from 34 descents across
+nine specs to 28 across seven. The other seven are listed with a reason each, and the
+load-bearing one is that **three of them are the duplicate-run rule's subject**, so the two
+debt lists cannot be paid down independently.
+
+### The mutation that survived, and it is about a different rule
+
+Five of six killed. The survivor: the carriers row matched a function name **anywhere** in the
+index file, and every carrier is *named in a comment beside its call* — so commenting a call
+out kept the gate green. Comments are 57% of that file. Stripped, re-mutated, it fails.
+
+### What would falsify this
+
+A reading under which the eleven counted something else — a spec whose commitments are not
+`1..n` for a reason other than descent, say. Both readings were computed and neither reaches
+eleven at any of the three commits.
+
+## F1067 — a part that never agreed with its own total, restated in two documents ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `tools/enforce/commitments.mjs` — the duplicate-run rule's docstring · `docs/architecture/A03_enforcement_suite.md` §7a |
+| **Reached for** | reading a rule's stated blind spot before inheriting it into a new one |
+| **Verdict** | The **total is right and the part is wrong**, and the arithmetic that disproves it is on the same line |
+
+The lettered-commitment blind spot is real and correctly totalled at **22** across four specs
+— but the sentence says one of them holds **sixteen**, and the true breakdown is 2 + 1 + **18**
++ 1. Sixteen and 22 cannot both be true with the other three holding four between them, and
+both numbers sit in one sentence in both documents.
+
+Corrected with the count and the reason beside them, and **asserted rather than written**: the
+new rule's blind-spot row asserts the eighteen against the live file, so the figure fails if it
+drifts and the limit expires the day the shared pattern widens.
+
+**A note the next reader wants**: that spec's lettered run is itself out of order — one letter
+before its predecessor, and a four-item descent — which is **four descents no rule can see**,
+on top of the six the new rule reports for the same document.
+
+## F1068 — a fabrication disarmed from outside for the second time in one day, and its stated limit is the mechanism ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `test/unit/enforce-commitments.test.ts` — the citation rule's fabricated violation |
+| **Reached for** | It went red mid-gate-run, and the cause was a spec edit two components away |
+| **Verdict** | The row carried its own expiry condition in a comment — *it expires again the day C02 declares an I14* — and **C02 declared I14 the same day, in the same session** |
+
+The fixture cites a bare invariant number in a file the citation rule attributes to C02, so
+the reference fails to resolve. That works for exactly as long as C02 lacks the number. The
+first expiry is already on record: a lane gave C02 an I13 and the row went red, and the repair
+**translated the number to I14 and wrote the new expiry condition into the comment**. Another
+lane's C02 rulings added I14 hours later.
+
+**Two instances of one class in one day, both caught only by the row failing.** A stated limit
+names a condition and nothing watches it — the deferral rule arriving inside a test fixture.
+The repair closes the class: the number is now **derived** as the lowest one C02 does not
+declare, asserted absent before use, so no spec edit two components away can disarm it again.
+What the architecture document asks for is preserved — the *shape* is still copied from the
+real call site. **The digit never was the defect.**
+
+### What would falsify this
+
+If the row's subject were the specific number rather than the shape. It is not: the rule's
+message names the owner and the assertion tracks the derived id, and **the row failed
+identically for I13 and for I14**, which is the evidence.
+
+## F1069 — a scope was widened in the walk and not in the filter, so 645 files were added and removed three lines apart ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `tools/enforce/findings.mjs` — the cited-scope predicate against the corpus the rule builds |
+| **Reached for** | A lane's own citations firing from `docs/` and not from the four `tools/` and `test/` files carrying the same number |
+| **Verdict** | The walk adds two directories; the filter three lines later drops every file from them, and the comment above the walk reads as though the widening landed |
+
+| | |
+|---|---|
+| files walked from `tools/` and `test/` | **645** |
+| of those, kept by the predicate | **0** |
+| finding citations inside them | **2 688** across 423 files |
+| files the rule actually scanned | 592 |
+
+**A step that names an effect and has no mechanism — and the justification is correct, which
+is why nobody looked.** Five sentences above the walk explain the widening and give its
+figure, and then say *measured before widening, so that it lands green rather than red*. That
+measurement was real. It never reached the predicate that decides. **Nothing could have told
+the two states apart: a walk that adds 645 files and a filter that removes them reports
+exactly what a correct scope reports.**
+
+**And the one document that was right had nothing joining it to the code.** The architecture
+document's row for this rule already lists all five directories as its scope. The test that
+reconciles that column against the code is scoped to the **other** rule family — which is that
+reconciliation's own stated blind spot, arriving one family over.
+
+**Repaired, and measured before applying it rather than after**, on the precedent the comment
+itself claims: with both directories genuinely in scope the rule reports **11 violations
+against 3, and all eight of the difference are the round's own unfiled numbers. Zero
+pre-existing violations in the 645 files.**
+
+### The widening created one new interaction, and it is worth stating
+
+**The rule's corpus now contains the file that fabricates the rule's violations.** The first
+draft of the new row wrote a five-digit sentinel id as a literal and the count went to 19,
+three of them the row's own source and comment. The sentinel is now built from the ledger's
+maximum at run time and exists only in memory. **The limit is on the fixture and not on the
+rule**: a finding id may never be written out in a file this rule reads.
+
+**Its fabricated violation is for the *scope*, not for the rule** — the real corpus, the real
+walk, one file's text replaced — because injecting the file list answers the question by
+assuming it, which is how the state above survived a round. Both halves are asserted
+separately so one directory landing does not read as both, and the control run reverts the
+predicate and watches the row fail.
+
+### What would falsify this
+
+A reading under which the two directories were deliberately excluded after the walk was
+written. There is no such comment and the comment that exists argues the opposite. Or a count
+showing the dropped set holds no citations; it holds 2 688 by a loose regex, and the rule's
+own matcher resolves eleven violations' worth of real ones today.
