@@ -43833,3 +43833,101 @@ re-anchor.
 - `construct.ts` keeps its own `Y_FORMATS` copy for the builder's half. That is a second list with
   the same values, which is the shape this finding is about one layer along, and it is **not**
   closed here.
+
+## F1077 — the deferral signal was repaired in one file and left blind to the class ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `tools/enforce/commitments.mjs` — `withoutTodos`, `blockRunsARow` · `test/unit/enforce-commitments.test.ts` EC5, EC6 |
+| **Reached for** | F907, whose own text rules that *a describe title is not a row either* and whose remedy was to edit the one file where it mattered |
+| **Verdict** | **Closed.** The filter now blanks a `describe` title whose block runs nothing. Zero effect on today's figure, and that is the finding rather than an excuse for it |
+
+### What F907 ruled, and what it built
+
+F896 put a figure beside SP9: *N invariants are named by no row that runs*. F907 found the
+filter behind it could not see a wrapped `it.todo`, fixed that with a paren-depth walk, and — in
+the same paragraph — found a **second** hole:
+
+> with the todos correctly stripped the invariant *still* read as covered, from
+> `describe("C28 I45 — per-kind input gauges")`. A describe title is not a row either. The file
+> now cites the invariant only inside the todo titles, and says why in a comment.
+
+**The file was edited. The filter was not.** The comment written into `withoutTodos` states all
+three clauses — a todo title, a describe title, a comment — and the code implements two. So the
+ruling was correct, recorded, cited, and the instrument went on reading a describe title as a row
+for as long as anyone cared to write one.
+
+### How it surfaced: by using the instrument, not by auditing it
+
+A spec-alone commit for C04 I118 landed its rows as `it.todo` under
+`describe("C04 I118 — Plot's string-literal unions")`, per A03 §7a. Nothing ran behind I118 at
+that tree and the reported figure **did not move** — 33 before, 33 after. `withoutTodos` blanked
+the four todos and the header comment, and the `describe` line carried the citation straight
+through.
+
+This is the sixth blind spot arriving from the other side: *ask where a settled claim is written
+down* usually finds a belief with no record. Here the record exists, is exact, and is the thing
+that was not built.
+
+### The corpus splits three ways, and the wording picks none of them
+
+| | count |
+|---|---|
+| `describe` blocks in `test/` | **1129** |
+| blocks that hold a row which runs | 1124 |
+| **hollow** — nothing runs beneath them | **5** |
+| invariants named *only* by a describe title, over a block that does run | **37** |
+| the reported figure, todos and comments stripped | 33 |
+| the figure if every title were stripped | **70** |
+
+**So stripping all titles would be wrong in the other direction.** Those 37 have rows beneath
+them that run — coverage written one level up — and reporting them as *no row runs* would take
+33 to 70 on a corpus that has no holes in it. The claim the number makes is about whether
+anything runs, and something does. What separates F907's case from those 37 is the block, not
+the title, which is why the fix reads the block.
+
+### Why the figure did not move when the fix landed
+
+The five hollow blocks carry four citations between them, and only one is an invariant:
+`C16 §2 / C01 I21` on `test/e2e/mouse.test.ts:235`, a block of pure todos (F808, F1039). `C01
+I21` has running rows in `router-decode.test.ts:536` and `session-mouse.test.ts:834`, so
+blanking the title changes nothing. The other four titles cite sections — `C09 §4c`, `C15 §2b`,
+`C26 §5c` — which this signal does not count, and one is `describe.todo` inside
+`todo-expiry.test.ts`'s own fixture.
+
+**A repair with no measurable effect is exactly the shape that argues for a fabricated
+violation**, and that is what EC5 is: the class has zero live instances, so a row driven by the
+corpus alone would be vacuous. EC6 is the other half — a filter that blanked every title passes
+EC5 completely and is wrong about all 37.
+
+### Mutations
+
+| # | mutation | fails |
+|---|---|---|
+| M1 | `blockRunsARow` always true — every title survives | EC5 and EC6 |
+| M2 | `blockRunsARow` always false — every title blanked | EC5 and EC6 |
+| M3 | the pass deleted from `withoutTodos`, which **is** the defect | EC5 and EC6 |
+
+M2 is the one worth reading: it is the whole-corpus wrong answer that a subset check would
+accept, and it is caught by EC5's second arm and by all 1129 of EC6's blocks.
+
+### The block's end
+
+By indentation, checked against an independent brace-depth walk with string spans blanked, over
+all **1129** blocks: **no disagreement**. Two implementations rather than one restated — a probe
+rebuilt from the same intent agrees with a transcription defect, and brace depth is a different
+mechanism from indentation.
+
+### What would falsify this
+
+- The filter reads `it`, `test` and `.each` as rows and nothing else. `it.skip` is excluded by
+  construction rather than by a clause, because `it.skip(` does not match the pattern; the corpus
+  holds no live `.skip`, `.only` or `describe.skip`, so no clause here carries a case nothing can
+  produce.
+- A block whose only running row is generated — inside a `for` or a helper that calls `it` — reads
+  as hollow. None exists in `test/` today; the 1129-block agreement is what would break first.
+- The signal still counts a citation anywhere on a non-describe line, including inside a string
+  fixture. That is F907's own residue and is unchanged here.
+- **The 37 are not asserted anywhere.** EC6 asserts the *agreement*, not the split, so the count
+  drifts as tests are written and nothing goes red — deliberately, because this is a reported
+  signal and a count assertion would make it a gate by the back door.
