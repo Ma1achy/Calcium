@@ -38600,3 +38600,463 @@ it meaningful. `expect(ratio).toBeLessThan(3)` is satisfied by two zeroes.
 one-millisecond floor, which would mean the guard is now the flake rather than the ratio —
 the measured margin is 260× and the corpus is fixed at a megabyte, so it would take a
 machine two orders of magnitude faster than this one.
+
+---
+
+## F1015 — `expand` was the arm that did not descend, and its refusal was a false statement about the document ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/data/viewmodel/patch.ts` — `applyPatch`'s `expand` arm; `src/shell/actions.ts` — the `expand` dispatcher's row lookup |
+| **Reached for** | the residue F1010 named and did not close — *`applyPatch`'s `expand` arm is the odd sibling, and its refusal states something false* |
+| **Verdict** | **real, in both places, and the two compound.** The dispatcher cannot name a nested table and `applyPatch` would refuse it if it could, so each half alone changes nothing a user sees. The spec licensed both: §4a stated the addressing rule over a **list of two ops**, and §3c S5 put *at any depth* on one of the search's two arms |
+
+Four ops of `ViewPatch` carry a `blockId`. Three resolve it through `countId`/`rewrite` —
+`tree.ts`'s one compiler-checked question — and `reserve`'s comment says why in its own words:
+*through `rewrite` rather than a top-level scan, so a block inside a `panel` or a `scroll` can
+be floored*. `expand` did `doc.blocks.find(…)` and `doc.blocks.map(…)`, and when the find
+missed it said:
+
+```
+expand: no block "tbl" in the document
+```
+
+about a document holding `tbl`. **Not merely a refusal — a false statement about the
+document, in the file that owns the walk.** The dispatcher's half says the same thing in its
+own register: *nothing to expand — no row or folded block `r1`*, about an entry whose table
+has a row `r1`.
+
+### The rule was stated over an enumeration, and that is the mechanism
+
+`tree.ts` exists because `scroll` was a defect in six places at once, and its own comment names
+what went wrong: *the defence was against duplication and the failure was **enumeration***. The
+same failure happened one layer up, in prose. C04 §4a said:
+
+> `replace` and `merge` both address blocks by `id` …
+
+Two ops, written when there were two. `reserve` arrived later and argued its own case in a
+comment at its call site; `expand` arrived and nobody argued anything, because §4a had already
+been read and did not mention it. `countId`'s doc comment carries the same list — *because
+`replace` and `merge` must find a block wherever it lives* — so the rule was recorded twice
+and both records named the same two subjects.
+
+**A second list of subjects for one walk is the same defect as a second copy of the walk**, and
+neither `tree.ts` nor F1010 was pointed at it, because both are about the walk. The fix is to
+state the rule over the **field**: a `blockId` resolves at every depth, and containment is not
+part of an address, because I14 already makes ids unique *nested children included*.
+
+### C23 §3a held the correct sentence that justified the wrong decision
+
+This is the MG24 shape, and it survived being read carefully for the reason that class always
+does — the sentence is **true**:
+
+> `expand` needed no resolution — it names a row on the entry it came from, which the
+> dispatcher already holds.
+
+True about the **entry**, and false about the **block**. A row does not carry its table's id, so
+the arm still has to find the block holding it — and it did that with a top-level `find` for as
+long as the sentence stood. Review checks whether a justification is true and this one is.
+
+**And the argument that reaches it is one paragraph away, about the other kind:**
+
+> **Within the entry it resolves at any depth** … a `panel` is what `b.live` and I34 both
+> produce, so a top-level `find` refuses the arrangement the framework itself builds (I31).
+
+That clause is `view`'s, and it is `expand`'s whole case, verbatim. **The deferral's condition
+and its satisfier in the same section, neither half wrong, nobody holding one looking at the
+other** — CLAUDE.md's fourth instance of that shape, at a distance of five paragraphs rather
+than forty lines.
+
+### F1010's asymmetry, inside a single function
+
+`actions.ts`'s `expand` case has two arms. The row arm scanned `entry.doc.blocks`; the fold arm
+**forty lines below, in the same function**, already read
+`[...blocks, ...blocks.flatMap((b) => [...descendants(b)])]`. One walk was present, correct,
+and read by one of the two arms that needed it. C04 §3c S5 records the order — *rows first,
+then blocks at any depth* — and the depth qualifier is written on the second half of a sentence
+about a single search.
+
+The fix hoists the expression the fold arm already had into one `reachable` and has both arms
+read it. **One walk read twice, not two that agree** — which is checkable: M5 below takes the
+fold arm off the shared walk and reddens a row written for the other arm.
+
+### Two blockers read as one
+
+Each half alone is invisible end to end. With `patch.ts` fixed and `actions.ts` reverted the
+dispatcher never names the nested table; with `actions.ts` fixed and `patch.ts` reverted it
+names it and `applyPatch` refuses. **A row asserting which `blockId` the arm passed would have
+gone green on either fix alone** — so T3.83 drives a real `TranscriptStore` and asserts the row
+in the held document, which is the artefact rather than a proxy.
+
+### Measured
+
+At HEAD, one table with one detail row, through `dist/` built from HEAD. Before and after are
+the same probe, rebuilt between (`out/f1015-probe.mjs`).
+
+| | before | after |
+|---|---|---|
+| `expand` · top level | `{ok: true}` | `{ok: true}` |
+| `expand` · inside a `group` | `{ok: false}` — *expand: no block "tbl" in the document* | `{ok: true}` |
+| `expand` · inside a `panel` | `{ok: false}` — same sentence | `{ok: true}` |
+| `expand` · in a table's `detail` | `{ok: false}` — same sentence | `{ok: true}` |
+| `replace` · inside a `group` | `{ok: true}` | `{ok: true}` |
+| `merge` · inside a `group` | `{ok: true}` | `{ok: true}` |
+| `reserve` · inside a `group` | `{ok: true}` | `{ok: true}` |
+| dispatcher, row `r1` · top level | `op: "expand"` on `tbl` | `op: "expand"` on `tbl` |
+| dispatcher, row `r1` · inside a `group` | *nothing to expand — no row or folded block `r1`* | `op: "expand"` on `tbl` |
+| dispatcher, row `r1` · inside a `panel` | *nothing to expand — no row or folded block `r1`* | `op: "expand"` on `tbl` |
+
+Three containers rather than one, because `group` alone cannot distinguish *does not descend*
+from *does not descend into a group*; the third is a table's own `detail`, which is the shape
+`childBlocks` enumerates separately and the one an `expand` reveals.
+
+**It closes a second hole nobody had filed**, exactly as F1010's did. `doc.blocks.find` silently
+returns the first of two blocks sharing an id, where I14 says there is no correct target and
+`replace`, `merge` and `reserve` all refuse. The duplicate arm arrives with the walk rather than
+beside it, so `expand` now gives I14's own sentence — and the case the spec declares impossible
+is the case a document arriving from an adapter can be.
+
+**32 non-comment lines added, 26 removed, no new recursion.** F1010's ruling is why: the two
+sides agree because they ask one question, not because two enumerations happen to list the same
+container kinds today.
+
+### The mutation pass
+
+Each mutation applied by hand from a copy, `md5` compared before and after every restore, run
+against `test/edge/view-model.test.ts` + `test/unit/actions-expand.test.ts` (49 rows).
+
+| the revert | rows red | of |
+|---|---|---|
+| **M1** — `patch.ts`'s `expand` arm back to `doc.blocks.find` / `.map` | T3.81, T3.82, T3.83 | 3 / 49 |
+| **M2** — `actions.ts`'s row arm back to `entry.doc.blocks` | T3.83 | 1 / 49 |
+| **M3** — both, which is HEAD's own state | T3.81, T3.82, T3.83 | 3 / 49 |
+| **M4** — `expand`'s duplicate-id refusal removed | T3.82 | 1 / 49 |
+| **M5** — the fold arm taken off the shared `reachable` | T3.83, **T4.63** | 2 / 49 |
+| restore | none | 49 / 49 |
+
+No survivors, and five distinct failing sets. **M5 is the one worth keeping**: it reddens
+`T4.63`, a row written months earlier for the *other* arm, which is what makes *one walk read
+twice* a checkable claim rather than a description of the diff.
+
+**What would falsify this**: a reading of C04 §3c S5 under which *at any depth* was always meant
+to govern only the block arm — that a row inside a nested table is deliberately unreachable
+while a folded scroll inside the same `panel` is not. Nothing states that, and the arrangement
+in question is the one `b.live` produces, so the reading would have to argue that `expand`
+works on the documents the framework does not build and refuses the ones it does. The measured
+half is not at risk: the sentence *no block "tbl" in the document* was false about a document
+holding `tbl`, whatever the intended scope of the search.
+
+---
+
+## F1016 — the row's name named §3's table and its assertions named the registry, so the two rows the table had lost were the two nothing could see ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `docs/components/C09_block_library.md` §1 and §3 · `test/unit/blocks.test.ts` T1.4 |
+| **Reached for** | F1009's residue — *C09 §3's own table has no row for `image` or `patch` while T1.4 compares its own literal against the registry rather than against the table it says it reads* |
+| **Verdict** | **built.** The residue's two halves are one mechanism: T1.4 was the only artefact that could have watched §3's table, and the reason it did not is the reason the table could lose two rows unremarked |
+
+F1009 wrote the two halves as separate entries and its own closing line hedged that they might
+collapse to one — *if `image` turns out to be documented somewhere §3's table is not*. It does not
+collapse that way. `image` **is** documented elsewhere — §4c is a whole section on it, four rungs on
+two axes — and none of it is a measure/render row, so the obligation §3's table exists to state was
+stated nowhere. What collapses instead is the other direction: **the row is the missing gate**, and
+the table is what it was named after.
+
+### Re-derived rather than restated, and the record was right
+
+Every figure the residue carried holds:
+
+```
+§3's table                          20 rows   18 of DEFAULT_DEFINITIONS, plus `table` and `plot`
+DEFAULT_DEFINITIONS                 19 entries
+C04's `Block` union                 22 members
+```
+
+F1013's Measured table had already recorded *19 · 19 · **20***, and the F1009 residue reached the
+same numbers from a different direction. Three independent statements agreeing, and all three
+correct, so nothing in the count needed correcting — which is worth writing down because the
+instrument that checks the record has more often disproved a claim than confirmed one.
+
+### What T1.4 compared, read rather than trusted
+
+The row was `it("T1.4: each of the nineteen kinds measures its documented height", …)` with a
+`documented` record commented ***§3's table, read back as assertions***. It read no file. The record
+is a literal, and the guard beneath it was
+
+```ts
+expect(Object.keys(documented).sort(), "§3's table and DEFAULT_DEFINITIONS name the same kinds")
+  .toEqual(DEFAULT_DEFINITIONS.map((d) => d.kind).sort());
+```
+
+— the test's own literal against **the registry**, under a message naming **the table**. So the
+literal is in equality with the registry, the registry is in equality with nothing in the document,
+and §3 can lose any row at all without moving a single assertion. It had lost two.
+
+**And the comment four lines below it states the class.** That comment is F228's: *a coverage set
+drawn from the test's own table covers the table*. F228 had moved the set from the cases to the
+record they are drawn from; nothing moved it the last step, from the record to the document the
+record is named after. The sentence was in the file, correct, and about the defect one level down.
+
+### The two rows, and the delegation wording
+
+`image` is a registered default with no row. `patch` is delegated like `table` and `plot`, and its
+absence cost something specific: §3's own paragraph argues that three components registering through
+the same public `register` is *the proof that the extension mechanism is real rather than
+privileged*, and *That it is three rather than one matters* — beside a table showing two. The
+argument was two thirds present in the artefact that carries it.
+
+`plot`'s notes said `Registered by C12` where `table`'s said `Registered by C11, not here`. All
+three now read the same, which is a one-word normalisation and the reason the three read as one
+mechanism from the table alone.
+
+### The gate, and the two things it cannot see
+
+T1.4 now parses §3's table out of the document and asserts, in this order: the header was found;
+every table row's first cell names a kind; the corpus is non-empty; **the non-delegated rows and
+`DEFAULT_DEFINITIONS` name the same kinds, by equality**; **the `delegated to Cnn` rows are
+`{table: C11, plot: C12, patch: C25}`, by equality**; §3's heading's three spelled-out counts equal
+the parsed table's own; the `documented` keys equal the registry's kinds; and each kind measures its
+documented height at width 80. Eleven `expect` sites read the document where none did.
+
+**Stated blind spot, because an unrecorded limit reads as strength.** The Measure column is prose —
+`ceil(cells(text) / w)`, `children + 2`, `` `height`, exactly `` — and nothing here evaluates a
+formula against a fixture. Only a cell that is a **bare integer** can be compared to the height
+measured below, and that is **two rows of nineteen**, `rule` and `progress`. So membership is
+watched in both directions and **a wrong formula beside a right membership is not**. The set of
+bare-integer rows is itself asserted by equality, so a row losing its integer is a finding rather
+than a quietly smaller loop.
+
+The second limit is the heading. §3's now reads *The twenty-two kinds — nineteen registered here,
+three delegated* and a row compares all three numbers, failing on a number word it cannot read
+rather than skipping it. That is one heading. **§1's sentence and §3's closing paragraph carry the
+same count and no row compares them**, and they are named below rather than left implied.
+
+### The fabricated violations, twelve, each over the real document
+
+Each mutates `docs/components/C09_block_library.md`, waits for the container to see the mutated
+bytes, runs the row, restores from a copy and compares md5. A mutation is asserted to have changed
+the text before the row runs — a fabrication that changed nothing is not a fabrication — and the two
+that empty the reader are the ones that check the fabrication is not itself vacuous.
+
+| the fabrication | what fired |
+|---|---|
+| the `image` row deleted — the defect as it shipped | `§3's non-delegated rows and DEFAULT_DEFINITIONS name the same kinds: expected […(16)] to deeply equal […(17)]` |
+| the `patch` row deleted — the defect as it shipped | `§3's delegated rows name C11, C12 and C25: expected { plot: 'C12', table: 'C11' } …` |
+| a row for a kind the registry does not have | the same equality, `…(18)` against `…(17)` — the direction a subset check passes |
+| `patch` delegated to C26 | `expected { patch: 'C26', … } to deeply equal { patch: 'C25', … }` |
+| §3's table header removed | `docs/components/C09_block_library.md holds §3's table header: expected -1 to be greater than -1` |
+| a row's first cell stops naming a kind | `§3's first cell names a kind: \| tip \| …: expected undefined to be defined` |
+| the table cut to three rows | `§3's table has rows: expected 3 to be greater than 15` |
+| the heading back to `The nineteen kinds` | `§3's heading is in the form its counts are read from: expected null not to be null` |
+| the heading's total off by one | `§3's heading counts its own table: expected [21, 19, 3] to deeply equal [22, 19, 3]` |
+| the heading spelled `twentytwo` | `"twentytwo" is a number word this row can read: expected undefined to be defined` |
+| `rule`'s measure spelled `one` | `the §3 rows whose measure is a bare integer: expected ['progress'] to deeply equal ['progress', 'rule']` |
+| `rule` documented at `2` | `§3 gives rule the height this row measures: expected 2 to be 1` |
+
+**Twelve of twelve red, exit 1 each.** The two that empty the reader — the header removed, the table
+cut to three — report the parse rather than nineteen missing kinds, which is what stops a broken
+reader from reading as a document that lost its rows.
+
+Two further mutations of the row's own literal, because a document-side fabrication says nothing
+about the height half: `image: 3 → 4` gives `image at width 80: expected 3 to be 4`, and deleting
+`image` from `documented` gives the registry equality. Both red.
+
+### F1009 corrected three counts in this file and walked past the fourth, and the census was short by six
+
+§1's opening sentence read *ships **sixteen** default kinds; `table`, `plot` and `patch` bring the
+union to **nineteen*** — the same pair `defaults.ts` carried, three short and three short. F1009's
+commit is `c7b2504d` and it corrected exactly three figures in this document — §3's closing
+paragraph, §9's T1.4 row, §9's T2.6 row — and did not touch line 17. It is in neither of F1009's
+lists: not among the five it says it corrected, not among the five it names as remaining. **It is
+the eleventh instance of a census that counted ten**, in the file the lane owned, three words from a
+number it had just corrected.
+
+Swept at HEAD over `<number word> + default|defaults|kinds`, all five F1009 named as remaining now
+read the corrected value — four in `f3bab8b3`, C25's in `c7b2504d`. And **six live instances are
+wrong at HEAD that appear in neither list**:
+
+| site | says | measured |
+|---|---|---|
+| `docs/components/C09_block_library.md:17` | *sixteen* defaults, union *nineteen* | 19 · 22 — **fixed here** |
+| `docs/reference-app/R01_reference_app_docker.md:63` | *the sixteen defaults* | 19 |
+| `docs/surfaces/HEIGHT_AUDIT.md:3` | *the fourteen kinds it owns* | 19 |
+| `docs/surfaces/HEIGHT_AUDIT.md:456` | *all seventeen kinds are registered (C09 T2.6)* | 22 |
+| `src/shell/transcript-persist.ts:22` | *a rendered document has eighteen kinds* | 22 |
+| `docs/components/C13_transcript_store.md:285` | *a rendered document has eighteen kinds and none* | 22 |
+
+**`eighteen` is a fourth wrong value**, where F1009 recorded three — *fourteen, sixteen,
+seventeen* — and it is the one that reaches a source file. The last two are one sentence written
+twice, and the source copy is the one a reader meets first.
+
+**The census's shape decided its count.** F1009 said *grepping the class found eight more live
+instances*; a grep for three known-wrong words cannot find a fourth, and cannot find a sentence that
+puts the number after the noun. The remedy is not a wider grep, because the next wrong value is not
+in it either — it is that the count nearest the list it counts is now compared by a row, and the
+rest are named rather than corrected in silence.
+
+### The repair that introduced a claim its own measurement falsified
+
+`docs/components/C25_patch_renderer.md:41` reads *C09 §3 gives all **nineteen** kinds a measure/render
+row*. F1013 wrote that, replacing *sixteen kinds each have one*, and F1013's own Measured table
+records the table as ***20 rows** — 18 defaults, `image` missing*. On the day it landed §3 gave a
+measure/render row to **eighteen** of the nineteen, and the finding that repaired the sentence held
+the evidence against it one table down. **This change makes it true for the first time.** Under the
+other reading of *nineteen kinds* — the whole of §3's subject — the table is twenty-two rows and the
+sentence wants a different number; F1013's own falsification line already flags that ambiguity, and
+it is C25's to settle. Not touched here.
+
+**Measured**
+
+| | |
+|---|---|
+| §3's table rows, before · after | **20 · 22** |
+| of them, members of `DEFAULT_DEFINITIONS`, before · after | **18 · 19** |
+| delegated rows, before · after | **2 · 3** — `patch` was the missing third |
+| `DEFAULT_DEFINITIONS` entries · `Block` union members | **19 · 22** (both re-derived; both agree with F1009 and F1013) |
+| `expect` sites in T1.4 reading the document, before · after | **0 · 11** |
+| `documented` record entries | 19, unchanged |
+| Measure cells a row can compare to a measured height | **2 of 19** — `rule`, `progress`; the rest are formulas |
+| fabricated violations over the document | **12 of 12 red**, exit 1 each |
+| mutations of the row's own literal | **2 of 2 red** |
+| `npx tsc --noEmit` | exit **0** |
+| `test/unit/blocks.test.ts` | **37 of 37** green, 191 ms |
+| `test/unit/enforce-commitments.test.ts` | **90 of 91**; the failure is SP5 with 14 messages — 12 from another lane's `F1015`, **2 this lane's `F1016`**, all clearing when the ledger holds them |
+| F1009's census of the stale count | **10**; live instances wrong at HEAD in neither of its lists: **6** |
+| wrong values the class has taken | **4** — *fourteen, sixteen, seventeen*, and **eighteen**, which F1009 did not record |
+
+**What would falsify this**: a kind in `DEFAULT_DEFINITIONS` with no row in §3, or a §3 row for a
+kind the registry cannot resolve, or a delegated row naming a component that does not register it —
+all three are now the row's own failure and it is red rather than green in each case. The weaker
+claim is the blind spot's: a §3 Measure cell stating the wrong **formula** beside a correct
+membership passes, everywhere but `rule` and `progress`, and nothing in this change would say so.
+---
+
+## F1017 — the clause that discharged a hazard in four documents was never a measurement, and this finding's own first two instruments were wrong ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/theme/tokens-{light,dark,high-contrast}.ts` and `src/data/colormaps/qualitative/okabe-ito.ts`; C10 §4c.1, §4f, §4g.1, §4g.4 and I35 |
+| **Reached for** | F676's second half — the worst `categorical × categorical` pair is 1.00, *so the cell is invisible in greyscale and legible only by hue* |
+| **Verdict** | **F676's first half is closed and its second half was never checked.** Checked, the hue is not there either: every shipped theme has seven slot pairs a dichromat cannot separate, the light theme's orange and yellow at ΔE2000 **0.6** against a just-noticeable 2.3 |
+
+F676 has two halves and they aged in opposite directions. *Nothing enforces that a picture cell
+carries no text* was closed by `isPictureGlyph`, which refuses a background on a glyph outside
+`U+0020`, Block Elements and Braille Patterns at both constructors. The other half is the sentence
+the whole entry rests on, and it is the one nobody ran.
+
+**Every floor C10 holds is a luminance ratio.** A picture cell has no ink and no ground, so `ratio`
+has nothing to measure, and *legible only by hue* is what the argument falls back on. It is written
+in four places — §4c.1's frame reading, §4f, §4g.1's sweep and I35's own limits, where it reads
+*because a categorical palette is authored for hue*. Four restatements of an unmeasured claim are
+one unmeasured claim, and this is the instrument's fifth disproof.
+
+### Measured
+
+Viénot/Brettel/Mollon (1999) per dichromacy in linear RGB, then CIEDE2000, floor **7** — calibrated
+on canonical Okabe-Ito at 7.9, the largest integer the reference set clears.
+
+| palette | worst ΔE2000 | pairs under 7 | canonical slots kept |
+|---|---|---|---|
+| canonical Okabe-Ito, the control | **7.9** tritan orange/reddishPurple | none | 8 of 8 |
+| shipped `light` | **0.6** deutan `c1`/`c4` | **7** | **0 of 8** |
+| shipped `dark` | **1.5** tritan `c2`/`c3` | **7** | 3 of 8 |
+| shipped `high-contrast` | **1.5** tritan `c2`/`c3` | **7**, the same pairs as `dark` | 3 of 8 |
+| `colormaps/qualitative/okabe-ito.ts` | **1.5** tritan `m2`/`m8` | **1** | 7 of 8 |
+
+**The colormap isolates the mechanism to one colour.** It keeps seven canonical slots and swaps
+`#3cbf9a` in for black, and that single swap takes the set from 7.9 to 1.5, because `#3cbf9a` sits
+beside skyBlue under tritanopia. Not a drift across many small choices — one substitution.
+
+**And the light theme's worst pair shows the two floors are not independent, which nothing here had
+a place to record.** `c1` and `c4` are canonical orange and canonical yellow, darkened to clear
+`#fafafa`. The canonical pair measures **11.7** under deuteranopia; the darkened pair measures
+**0.6**. Orange and yellow differ mostly in the channel a deuteranope has lost, so what is left to
+separate them is lightness — and a ground-contrast floor is a constraint on exactly that. **The
+adaptation did not fail to preserve the property; it destroyed a pair canonical handled with 67% of
+headroom, by satisfying the other floor.** Every per-theme substitution was justified against the
+ground, which they all clear, and the cost was never re-measured.
+
+### The light theme's justification is the dark theme's, copied, and three of its claims are false there
+
+`tokens-light.ts` carries verbatim *its black is 1.21 against this ground and its blue 3.36 … Every
+slot clears 6.2 here, measured.*
+
+| the claim | on `#fafafa` | on `#1a1a1a`, where it is true |
+|---|---|---|
+| canonical black is 1.21 | **20.12** | 1.21 |
+| canonical blue is 3.36 | **4.97** | 3.36 |
+| every slot clears 6.2 | worst **5.17** (`c4`); `c1` 5.41 and `c2` 5.96 also under | worst 6.26 |
+
+Nothing is in violation — the floor these slots owe is I35's 4.5 and they clear it. What is wrong is
+that a comment saying *measured* was not. `tokens-high-contrast.ts` carries the other shape: *They
+are Okabe–Ito, chosen for distinguishability under the three common colour-vision deficiencies*,
+about a set it keeps three of eight of, on the theme that exists to maximise the property.
+
+### This finding's own first two instruments were wrong, and the second is the interesting one
+
+**The refusal that was a search space.** The first ruling refused recolouring on a measurement: a
+hill-climb reached 14.8 holding the ground floor, better than canonical, and produced eight muddy
+near-blacks — read as *two floors are satisfiable together and satisfying them does not make a
+palette*. That search's only free parameter was a scale factor per canonical hue **toward the
+ground**. It could only darken, so a dark result was its search space and not its finding. Freed to
+move in sRGB it reaches **33.3** with saturation kept, which refutes the refusal outright.
+
+**The metric that could be gamed.** That 33.3 is **8.9** under ΔE2000 against canonical's 7.9: the
+optimiser bought the number in the saturated blues, where CIE76 over-states, by putting three of
+eight slots there. And the module's own docblock had asserted, unrun, that *at the floor this rule
+uses the two formulae agree on every pair either would call a collision*. Run: `dark` has **two**
+pairs under CIE76's floor and **seven** under ΔE2000's, and only tritan `c2`/`c3` is in both. The
+two agree on the ordering of the shipped palettes and disagree on the membership of every debt list,
+which is the half a reader acts on.
+
+**Both are the same class as the finding itself** — a claim written into an artefact and never asked
+whether it could be violated — and neither was reachable by reading. What reached the first was
+asking what the optimiser was allowed to vary; what reached the second was running the sentence.
+
+### The ruling
+
+The floor is measured and the failures are a **list compared by equality**, not a load-time refusal.
+Every other floor in C10 throws at load; this one cannot, because all three shipped themes fail it,
+and lowering the floor until they pass is the same edit under another number. It is `KNOWN_STALE`'s
+shape: a subset check would let a cleared collision outlive its reason unread. What bounds the
+automated remedy is the metric rather than the arithmetic — sharp enough to say *these two
+collapsed*, not sharp enough to rank two palettes that both pass, and blind to whether eight colours
+read as a set at all.
+
+### The mutation pass
+
+Applied by hand from a copy of `cvd.ts`, `md5` compared after every restore, run against
+`test/unit/theme.test.ts` + `test/contract/theme.test.ts` (64 rows).
+
+| the revert | rows red | of |
+|---|---|---|
+| **M1** — the floor raised past the control, 7 → 8 | T1.40, T1.41, T2.38, T2.38a | 4 / 64 |
+| **M2** — the dichromat simulation dropped, every model seen as normal | T1.40, T1.41, T2.38, T2.38a | 4 / 64 |
+| **M3** — CIEDE2000 back to CIE76, floor unchanged | T1.40, T1.41, T2.38, T2.38a | 4 / 64 |
+| **M4** — the protan and deutan matrices exchanged | T1.40, T1.41, T2.38 | 3 / 64 |
+| **M5** — every collision labelled `normal` | T1.41, T2.38, T2.38a | 3 / 64 |
+| restore | none | 64 / 64 |
+
+No survivors, four distinct failing sets. **Both survivals are principled and neither indicts a
+row**: T2.38a survives M4 because the colormap's only collision is tritan, which a protan/deutan
+exchange does not touch; T1.40 survives M5 because it drives `separation` directly and never reads a
+`Collision.vision`.
+
+**And the equality comparison was mutated in both directions**, because a subset check is the revert
+that looks like a simplification. With the list required to be contained in the findings, two entries
+deleted from it pass. With the findings required to be contained in the list, a stale entry for a
+collision that does not exist passes. Each direction is silent about the other side; equality is the
+only comparison silent about neither. That is T6.97 and it is measured rather than argued.
+
+**Where**: new `src/presentation/theme/cvd.ts`; C10 §4j, I39, commitment 34, T1.40, T1.41, T2.38,
+T2.38a, T6.97–T6.99; corrected clauses in C10 §4g.1 and I35; corrected comments in the three token
+files and the colormap; two `UNCONSUMED_MEMBERS` entries carrying §4j.3's ruling as their reason.
+**F676 closes here.**
+
+**What would falsify this**: a vision model under which the shipped pairs separate — Brettel's
+two-plane method rather than Viénot's single matrix would move the figures, and it agrees closely
+away from the neutral axis where a categorical palette lives, so it would have to move 0.6 past 7.
+Or a reading under which a picture cell's two owners are never both categorical slots, which
+`sankey.ts` and `scatter3.ts` both falsify by construction. The copied-comment half is not at risk
+in either direction: three figures true of `#1a1a1a` are printed against `#fafafa`.
