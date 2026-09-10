@@ -66,6 +66,54 @@ describe("C02 edge cases", () => {
     expect(warnings[0]).toContain("12");
   });
 
+  it("T3.14 (C02 I4, I13): a rejected override keeps the detected source, an accepted one takes `declared`", () => {
+    // **I4 already says an out-of-domain value *is not an override*.** This is
+    // where that sentence becomes observable: all three cases below keep the
+    // detected *value* 24, so nothing but the source can tell an override that
+    // was applied from one that was refused, and a rule written as "the key is
+    // present in `overrides`" answers `declared` for all three (T6.15).
+    const env = { TERM: "xterm-kitty" };
+
+    const accepted = detectCapabilities(env, { colourDepth: 8 });
+    expect([accepted.capabilities.colourDepth, accepted.sources.colourDepth]).toEqual([8, "declared"]);
+    expect(accepted.warnings).toEqual([]);
+
+    const rejected = detectCapabilities(env, {
+      colourDepth: 12,
+    } as unknown as Partial<TerminalCapabilities>);
+    expect([rejected.capabilities.colourDepth, rejected.sources.colourDepth]).toEqual([24, "inferred"]);
+
+    // **And the warning names the source it kept**, which is what makes it
+    // actionable: *keeping the detected 24* tells a reader nothing, where
+    // *inferred from the terminal's identity* says the framework guessed from a
+    // name and declaring the field is the fix.
+    expect(rejected.warnings).toHaveLength(1);
+    expect(rejected.warnings[0]).toContain("inferred from the terminal's identity");
+
+    // `undefined` is skipped by the loop and is neither applied nor rejected —
+    // the third case, and the one a `hasOwn` test alone gets wrong silently.
+    // `as unknown as` for the same reason T3.5 needs it: `undefined` is not
+    // expressible in the override type, and the branch that skips it exists
+    // because an override arrives from a config file rather than from a caller.
+    const absent = detectCapabilities(env, {
+      colourDepth: undefined,
+    } as unknown as Partial<TerminalCapabilities>);
+    expect([absent.capabilities.colourDepth, absent.sources.colourDepth]).toEqual([24, "inferred"]);
+    expect(absent.warnings).toEqual([]);
+
+    // An override is `declared` whatever the detected source was — including
+    // over an `unreachable` one, where the reader is overruling a measurement
+    // rather than a guess.
+    const overTmux = detectCapabilities(
+      { TERM: "xterm-kitty", TMUX: "/tmp/x" },
+      { imageProtocol: "kitty" },
+    );
+    expect([overTmux.capabilities.imageProtocol, overTmux.sources.imageProtocol]).toEqual([
+      "kitty",
+      "declared",
+    ]);
+  });
+
   it("T3.5b: a bad override never produces an invalid record, whatever the field", () => {
     const { capabilities, warnings } = detectCapabilities({ TERM: "xterm" }, {
       unicode: "utf8",

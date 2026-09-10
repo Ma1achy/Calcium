@@ -7,6 +7,17 @@
 // `c02-tmux-gate.mjs`'s: a tenth column that forgot the identification's gate
 // answers correctly outside tmux and wrongly inside it, and every row naming the
 // column alone passes.
+//
+// **Eight anchors across four runs moved when C02 gained `sources`** (F1021).
+// Every rule in `capabilities.ts` now returns `Answer<T> = [value, source]`
+// instead of a bare value, so every `from:` on a `return` moved — and so did
+// every `to:`, which is the half a sweep does not read (F279). A `to:` still
+// returning a bare string is **not** a weaker mutation: `detectCapabilities`
+// destructures the pair, so `"narrow"` yields value `"n"` and source `"a"`,
+// and the run would measure a shape defect rather than the behaviour named.
+// All eight are *the code moved and the mutation still has a subject*; none
+// lost its subject and none moved its `expect:`.
+
 import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
@@ -45,8 +56,12 @@ const results = runPass({
     {
       name: "GATE-PER-READER: the tenth column reads the ungated identification",
       file: CAPS,
-      from: '    keyboardProtocol: terminal === null ? "none" : KEYBOARD_PROTOCOL[terminal],',
-      to: '    keyboardProtocol: identified === null ? "none" : KEYBOARD_PROTOCOL[identified],',
+      // **The gate is inside `fromIdentity` now** (F1021), so the per-reader
+      // defect is fabricated by handing it the ungated identification twice
+      // rather than by writing a second ternary. Same defect, same `expect:`:
+      // the tenth column answers from a name inside a multiplexer.
+      from: "    keyboardProtocol: fromIdentity(identified, terminal, KEYBOARD_PROTOCOL, \"none\"),",
+      to: "    keyboardProtocol: fromIdentity(identified, identified, KEYBOARD_PROTOCOL, \"none\"),",
       expect: "T1.13",
     },
     {

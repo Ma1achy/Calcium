@@ -16,6 +16,7 @@ import { interactivePty, runInPty, type PtyRun } from "../support/pty.js";
 import { displayCells } from "../../src/presentation/text.js";
 import { KITTY_KEYBOARD } from "../../src/terminal/escapes.js";
 import { createDecoder } from "../../src/interaction/router/decode.js";
+import { detectCapabilities } from "../../src/terminal/capabilities.js";
 import { captureFromEmulator, emulatorMissing, sleep } from "../support/x-emulator.js";
 
 const FIXTURE = "node test/support/fixture.mjs caps";
@@ -221,6 +222,134 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
       expect(keys).toEqual(["escape", "escape/release", "enter+shift", "enter+shift/release", "k", "k/release"]);
     },
     60_000,
+  );
+
+  // **T5.8 — the identification's claims put to the terminals they are about.**
+  // Every row above asserts what the framework *sends*; this asserts what a
+  // terminal *answers*, which is the only thing that can tell an `inferred`
+  // capability from a fact (C02 I13). kitty is the emulator the table names and
+  // xterm is the one it declines to, so the two arms are a claim and its control
+  // rather than one measurement read twice.
+  const bothMissing = emulatorMissing("kitty") ?? emulatorMissing("xterm");
+  it.skipIf(bothMissing !== null)(
+    `T5.8 (C02 I13, I11): kitty answers DECRQM 2026, the graphics query and \`CSI ? u\`; XTerm answers the first as *not recognised* and the other two not at all — and the reply channel is measured beside them${bothMissing === null ? "" : ` — skipped: ${bothMissing}`}`,
+    async () => {
+      // Three queries in one capture per emulator: the terminal answers them in
+      // order and a second Xvfb costs more than the assertions are worth.
+      //
+      // **The graphics query goes last, and that ordering is load-bearing.** Its
+      // ST is `ESC \\`, and the fixture hands the string to `printf`, which reads
+      // the `\\` as an escaped backslash and swallows the `ESC` of whatever
+      // follows. Written in the reading order — DECRQM, graphics, keyboard — the
+      // third query never left the shell and the row failed as *kitty does not
+      // answer `CSI ? u`*, which is a harness defect wearing the subject's face.
+      const DECRQM = "\x1b[?2026$p";
+      const KEYBOARD = "\x1b[?u";
+      // **BEL-terminated on purpose** (C16 §2a row d, F1043). XTerm mirrors the
+      // query's terminator, so this is the one query in the capture whose reply
+      // is `BEL`-closed on one emulator and `ST`-closed on the other — the two
+      // forms in one row, which is what the arm has to read. It also carries no
+      // backslash, so unlike `GRAPHICS` it can sit anywhere in the string.
+      const COLOUR = "\x1b]11;?\x07";
+      const GRAPHICS = "\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\";
+
+      const ask = async (program: "kitty" | "xterm"): Promise<string> => {
+        const { a } = await captureFromEmulator({
+          program,
+          enter: DECRQM + KEYBOARD + COLOUR + GRAPHICS,
+          leave: "",
+          seconds: 2,
+          drive: async (xdo, _window, phase) => {
+            if (phase !== 1) return;
+            await sleep(500);
+            // The control, and `z` appears in none of the replies below — the
+            // first probe used `K` and ate the `K` of `OK`.
+            xdo("type", "z");
+          },
+        });
+        expect(a, `${program}: the control byte arrived, so the capture read`).toContain("z");
+        return a.replace(/z/gu, "");
+      };
+
+      const kitty = await ask("kitty");
+      // **DECRQM answers on a terminal that implements the mode**: `;2` is
+      // reset-but-recognised, which is what `synchronisedUpdate: true` claims.
+      expect(kitty, "kitty recognises 2026").toContain("\x1b[?2026;2$y");
+      // **The graphics protocol, answered by the terminal rather than by a
+      // name** — `imageProtocol` shipped once having never run against one.
+      expect(kitty, "kitty answers the graphics query").toMatch(/\x1b_Gi=31;OK\x1b\\/u);
+      // **And the keyboard protocol**, whose flags are 0 before anything pushes.
+      expect(kitty, "kitty answers `CSI ? u`").toMatch(/\x1b\[\?\d+u/u);
+
+      const xterm = await ask("xterm");
+      // **`;0` is *not recognised*, and it is a reply.** That is what makes this
+      // capability interrogable at all: a terminal without the mode still says
+      // so, where the two queries below produce nothing and would need a window.
+      expect(xterm, "XTerm answers 2026 as not recognised").toContain("\x1b[?2026;0$y");
+      expect(xterm, "XTerm sends no graphics reply").not.toContain("\x1b_G");
+      expect(xterm, "XTerm sends no keyboard-protocol reply").not.toMatch(/\x1b\[\?\d+u/u);
+
+      // **All four agree with what the identification claims for each**, which
+      // is the row's verdict rather than a spot check: the table is right about
+      // the two emulators that can be run here, and `inferred` still names the
+      // failure it always named — that this is not kitty and the name says it is.
+      const claim = (env: NodeJS.ProcessEnv): unknown[] => {
+        const { capabilities, sources } = detectCapabilities(env);
+        return [
+          capabilities.synchronisedUpdate,
+          capabilities.imageProtocol,
+          capabilities.keyboardProtocol,
+          sources.imageProtocol,
+        ];
+      };
+      expect(claim({ TERM: "xterm-kitty" })).toEqual([true, "kitty", "kitty", "inferred"]);
+      expect(claim({ TERM: "xterm-256color" })).toEqual([false, "none", "none", "inferred"]);
+
+      // **The reply channel, on the emulator's own bytes** (FINDINGS F414,
+      // F1035, F1043). **This block used to assert the defect** — `Alt-_`
+      // opening, `Alt-\` closing, `> 5` events typed into the prompt — because
+      // there was an `ESC [` arm, an `ESC O` arm and nothing for a
+      // string-terminated reply. A row that asserts a disagreement is green for
+      // exactly as long as the defect is; the arm is C16 I32 and this now
+      // asserts it.
+      const decode = (bytes: string): string[] => {
+        const d = createDecoder({ capabilities: { bracketedPaste: true, mouse: true }, now: () => 0 });
+        return d.push(new TextEncoder().encode(bytes)).map((e) =>
+          e.kind === "key" ? `${e.key.name}${e.key.meta ? "+meta" : ""}${e.key.ctrl ? "+ctrl" : ""}` : e.kind,
+        );
+      };
+      // Located in the capture rather than reconstructed: a probe rebuilt from
+      // intent agrees with itself and cannot find a transcription defect.
+      const csi = /\x1b\[\?2026;\d+\$y/u.exec(kitty)?.[0] ?? "";
+      const apc = /\x1b_Gi=31;[^\x1b]*\x1b\\/u.exec(kitty)?.[0] ?? "";
+      // **Both terminator forms, one per emulator, from one query.** XTerm
+      // mirrors the `BEL` it was asked with; kitty answers `ST` regardless.
+      const oscBel = /\x1b\]11;[^\x1b\x07]*\x07/u.exec(xterm)?.[0] ?? "";
+      const oscSt = /\x1b\]11;[^\x1b\x07]*\x1b\\/u.exec(kitty)?.[0] ?? "";
+      expect(csi, "the DECRQM reply was located in the capture").not.toBe("");
+      expect(apc, "the APC reply was located in the capture").not.toBe("");
+      expect(oscBel, "XTerm's OSC reply is BEL-terminated — the query's own form").not.toBe("");
+      expect(oscSt, "kitty's OSC reply is ST-terminated whatever it was asked").not.toBe("");
+
+      // **All four reach the application as nothing.** The CSI row is the
+      // control and always passed; the three string-terminated ones are what
+      // F414's `q=2` deferral was waiting on, and the pair of OSC rows is the
+      // reason the arm reads two terminators rather than one.
+      for (const [what, bytes] of [
+        ["a CSI reply", csi],
+        ["kitty's APC graphics reply", apc],
+        ["XTerm's BEL-terminated OSC reply", oscBel],
+        ["kitty's ST-terminated OSC reply", oscSt],
+      ] as const) {
+        expect(decode(bytes), `${what} reaches the line editor as nothing`).toEqual([]);
+      }
+
+      // **The control that proves the fixture can still move**, because four
+      // `toEqual([])` rows are also what a decoder that swallowed everything
+      // would produce. `ESC Q` is not an introducer and is still Meta.
+      expect(decode("\x1bQ"), "the decoder has not simply stopped emitting").toEqual(["Q+meta"]);
+    },
+    240_000,
   );
 
   it(

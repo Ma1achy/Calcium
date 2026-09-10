@@ -34,6 +34,18 @@ export function emulatorMissing(program: Emulator): string | null {
   return missing.length === 0 ? null : `${missing.join(", ")} not installed`;
 }
 
+/**
+ * Which of `candidates` are on `PATH`, in the order given.
+ *
+ * Exported so a row can compare the emulators it *could* drive against the ones
+ * it *does* — by equality, not by subset (F1044). A loop written as *for each
+ * emulator present* is the same green with one emulator as with three, and the
+ * day a third arrives in `.devcontainer/` the row that should have grown a
+ * column instead grows nothing and says nothing.
+ */
+export const installedPrograms = (candidates: readonly string[]): string[] =>
+  candidates.filter((p) => has(p));
+
 export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 /** Captures made by this process so far — part of the display number. */

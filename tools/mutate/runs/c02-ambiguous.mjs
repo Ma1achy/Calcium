@@ -4,6 +4,17 @@
 // wrong in one place.** That is the shape the finding had before it was found:
 // `RAMP_UNICODE` shipped for months with a comment saying its glyphs were one
 // cell wide, and every test agreed because every test ran narrow.
+//
+// **Eight anchors across four runs moved when C02 gained `sources`** (F1021).
+// Every rule in `capabilities.ts` now returns `Answer<T> = [value, source]`
+// instead of a bare value, so every `from:` on a `return` moved — and so did
+// every `to:`, which is the half a sweep does not read (F279). A `to:` still
+// returning a bare string is **not** a weaker mutation: `detectCapabilities`
+// destructures the pair, so `"narrow"` yields value `"n"` and source `"a"`,
+// and the run would measure a shape defect rather than the behaviour named.
+// All eight are *the code moved and the mutation still has a subject*; none
+// lost its subject and none moved its `expect:`.
+
 import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 
@@ -32,16 +43,16 @@ const MUTATIONS = [
     // the users it exists for — the failure the spec argues against in prose.
     name: "the capability is declared but never detected",
     file: CAPS,
-    from: "  if (locale === undefined) return \"narrow\";\n  const subtag",
-    to: "  if (locale !== undefined) return \"narrow\";\n  const subtag",
+    from: "  if (locale === undefined) return [\"narrow\", \"assumed\"];\n  const subtag",
+    to: "  if (locale !== undefined) return [\"narrow\", \"assumed\"];\n  const subtag",
     expect: "T2.50",
   },
   {
     // A substring test where a subtag test belongs. `jam_JM` is Jamaican.
     name: "the locale is matched as a substring",
     file: CAPS,
-    from: "  const subtag = locale.toLowerCase().split(/[_.@-]/u)[0] ?? \"\";\n  return WIDE_AMBIGUOUS_LANGUAGES.includes(subtag) ? \"wide\" : \"narrow\";",
-    to: "  const lower = locale.toLowerCase();\n  return WIDE_AMBIGUOUS_LANGUAGES.some((l) => lower.startsWith(l)) ? \"wide\" : \"narrow\";",
+    from: "  const subtag = locale.toLowerCase().split(/[_.@-]/u)[0] ?? \"\";\n  return [WIDE_AMBIGUOUS_LANGUAGES.includes(subtag) ? \"wide\" : \"narrow\", \"stated\"];",
+    to: "  const lower = locale.toLowerCase();\n  return [WIDE_AMBIGUOUS_LANGUAGES.some((l) => lower.startsWith(l)) ? \"wide\" : \"narrow\", \"stated\"];",
     expect: "T2.50",
   },
   {

@@ -189,6 +189,38 @@ describe("C02 contract", () => {
     expect(declared).toEqual(Object.keys(capabilities));
   });
 
+  it("T2.9 (I1, I13): sources and the record are a bijection, over the kinds §3 declares", () => {
+    // **The closed set is parsed from the spec, not restated here.** A kind
+    // invented in code and never written down is exactly the drift this field
+    // exists to stop happening to a *value*; restating the list in the test
+    // would make the two agree with each other and with nothing else.
+    const spec = readFileSync("docs/components/C02_capability_detection.md", "utf8");
+    const table = spec.split("| kind | the answer came from | wrong when |")[1]?.split("\n\n")[0];
+    expect(table, "§3's kinds table not found").toBeDefined();
+    const kinds = [...table!.matchAll(/^\|\s*`([a-z]+)`\s*\|/gmu)].map((m) => m[1]!);
+    // Parsed something, and each once — a regex matching nothing makes every
+    // assertion below vacuous in the direction that matters (a fabricated
+    // violation can be vacuous).
+    expect(kinds.length, "kinds parsed from §3").toBe(5);
+    expect(new Set(kinds).size).toBe(kinds.length);
+
+    for (const env of FIXTURES) {
+      const { capabilities, sources } = detectCapabilities(env);
+      expect(Object.keys(sources).sort(), JSON.stringify(env)).toEqual(
+        Object.keys(capabilities).sort(),
+      );
+      for (const field of FIELDS) {
+        expect(kinds, `${field} in ${JSON.stringify(env)}`).toContain(sources[field]);
+      }
+      expect(Object.isFrozen(sources), "the map is frozen like the record").toBe(true);
+    }
+
+    // The control: the corpus is not one kind repeated. Four of the five appear
+    // across the fixtures above — `declared` needs an override and is T3.14's.
+    const seen = new Set(FIXTURES.flatMap((env) => Object.values(detectCapabilities(env).sources)));
+    expect([...seen].sort()).toEqual(["assumed", "inferred", "stated", "unreachable"]);
+  });
+
   it("T2.7 (I8): no warning is emitted — every warning is returned", () => {
     const out = vi.spyOn(process.stdout, "write").mockReturnValue(true);
     const err = vi.spyOn(process.stderr, "write").mockReturnValue(true);

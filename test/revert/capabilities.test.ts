@@ -152,6 +152,77 @@ describe("C02 fail-on-revert", () => {
     expect([...all].sort()).toEqual(["dark", "light", "unknown"]);
   });
 
+  it("T6.14 (C02 I13): sources computed from a table beside the rules → T1.14 fails on the tmux column alone", () => {
+    // **The mutation that *agrees* everywhere else**, on T6.11's argument: a
+    // second list that disagrees proves nothing about single-sourcing. This is
+    // the hand-written map a reader would reach for — correct for a named
+    // terminal and correct for an unnamed one, and unable to express a field
+    // whose kind moves with the environment.
+    const BESIDE: Readonly<Record<string, string>> = {
+      colourDepth: "inferred",
+      unicode: "stated",
+      ambiguousWidth: "stated",
+      backgroundPolarity: "stated",
+      synchronisedUpdate: "inferred",
+      bracketedPaste: "assumed",
+      mouse: "assumed",
+      imageProtocol: "inferred",
+      keyboardProtocol: "inferred",
+      altScreen: "assumed",
+    };
+
+    // It agrees with the real thing on the environment it was written from…
+    const named = detectCapabilities({
+      TERM: "xterm-kitty",
+      LANG: "en_GB.UTF-8",
+      COLORFGBG: "0;15",
+    }).sources;
+    expect(BESIDE, "the static map agrees where it was written").toEqual({ ...named });
+
+    // …and is wrong for five of ten inside a multiplexer, which is the column
+    // T1.14 asserts and the reason the pair is returned by the rule.
+    //
+    // **The same locale and `COLORFGBG`**, so the only variable between the two
+    // environments is `TMUX`. The first draft dropped them and six fields moved,
+    // which would have passed a looser assertion while attributing three of the
+    // moves to a gate that had nothing to do with them.
+    const inside = detectCapabilities({
+      TERM: "xterm-kitty",
+      LANG: "en_GB.UTF-8",
+      COLORFGBG: "0;15",
+      TMUX: "/tmp/x",
+    }).sources;
+    const wrong = Object.keys(inside).filter((f) => BESIDE[f] !== inside[f as never]);
+    expect(wrong.sort()).toEqual([
+      "colourDepth",
+      "imageProtocol",
+      "keyboardProtocol",
+      "mouse",
+      "synchronisedUpdate",
+    ]);
+  });
+
+  it("T6.15 (C02 I4, I13): marking any field named in `overrides` as `declared` → T3.14 fails on two of three", () => {
+    // The three cases are identical in the record and differ only in the
+    // source, which is the asymmetry the row exists for. Asserted as the three
+    // sources a `hasOwn`-only rule would produce against the three it must.
+    const env = { TERM: "xterm-kitty" };
+    const beforeValidation = (o: Partial<TerminalCapabilities>): string =>
+      Object.hasOwn(o, "colourDepth") ? "declared" : "inferred";
+
+    const cases: readonly Partial<TerminalCapabilities>[] = [
+      { colourDepth: 8 },
+      { colourDepth: 12 } as unknown as Partial<TerminalCapabilities>,
+      { colourDepth: undefined } as unknown as Partial<TerminalCapabilities>,
+    ];
+    expect(cases.map(beforeValidation)).toEqual(["declared", "declared", "declared"]);
+    expect(cases.map((o) => detectCapabilities(env, o).sources.colourDepth)).toEqual([
+      "declared",
+      "inferred",
+      "inferred",
+    ]);
+  });
+
   it("T6.10 (I1): a field declared in §4 and not in §2 → T2.8 fails and T2.6 does not", () => {
     // **F214, as a row.** This is the state `ambiguousWidth` shipped in: §3, §4,
     // an invariant, a commitment, ten test rows, and §2 declaring seven fields.
