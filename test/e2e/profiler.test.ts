@@ -36,6 +36,19 @@ import {
 const FIXTURE = "node test/support/fixture.mjs";
 
 /**
+ * The slow far side T5.1d records behind — **two of the readout's wake periods,
+ * not one and a fifth** (F1081).
+ *
+ * `ELAPSED_TICK_MS` is 1 000, so a 1 200 ms sleep put exactly one wake inside
+ * the call with 222 ms of margin, measured, and lost it once inside a full
+ * `make instruments`. Two periods means losing a wake still leaves a wake, and
+ * the last one sits ~1 500 ms ahead of the answer rather than a fifth of a
+ * second. It is not free: the replay waits for a timer-drawn frame on the same
+ * real timer, so the row costs about what the sleep does.
+ */
+const FAR_SIDE_SLOW_MS = 2_500;
+
+/**
  * A recording, with what the harness measured while taking it.
  *
  * **The timings are the harness's clock and nothing in the recording carries
@@ -219,6 +232,52 @@ function timeline(rec: Recording): string {
 }
 
 /**
+ * What the harness measured, as message lines — the half of {@link explain}
+ * that needs no verdict.
+ *
+ * **Extracted because the half that needs one was unreachable where it was most
+ * wanted** (F1081). T5.1d's three assertions run *before* the replay and its
+ * red left `expected false to be true` under an event order with no times in
+ * it, on a row whose whole subject is a race. These lines are what said so:
+ * the wake at +1085 ms against an answer at +1307.
+ */
+function harness(recd: Recorded, rec: Recording): readonly string[] {
+  return [
+    `took prompt=${String(recd.took.prompt)}ms answer=${String(recd.took.answer)}ms ` +
+      `exit=${recd.took.exit === null ? "killed" : `${String(recd.took.exit)}ms`}`,
+    `reads after submit  ${recd.took.reads}`,
+    `recorded  ${timeline(rec)}`,
+  ];
+}
+
+/** The machine, when something is wrong with a run: load, and an earlier file's leftovers. */
+function machine(): readonly string[] {
+  return [
+    `load ${loadavg()
+      .map((l) => l.toFixed(2))
+      .join(" ")}`,
+    `fixture processes alive: ${strays()}`,
+  ];
+}
+
+/** Everything the harness knows before a replay has run — the message for the rows that assert first. */
+function sofar(row: string, recd: Recorded): string {
+  const rec = parseRecording(readFileSync(recd.path, "utf8"));
+  return [`${row} · recording ${recd.path}`, ...harness(recd, rec), ...machine()].join("\n");
+}
+
+/**
+ * The message for an assertion whose verdict is already in hand.
+ *
+ * **Built only in the failing branch.** `sofar` re-reads the recording and
+ * `machine` shells out to `ps`; an eager template argument pays both on every
+ * green run, which is the reason `explain` gates its own machine lines too.
+ */
+function unless(ok: boolean, build: () => string): string {
+  return ok ? "" : build();
+}
+
+/**
  * Everything a red replay row can say about itself, as the assertion message.
  *
  * **The first assertion used to be `expect(out.identical).toBe(true)` and the
@@ -239,14 +298,6 @@ function explain(row: string, recd: Recorded, out: Verdict): string {
   const rec = parseRecording(readFileSync(recd.path, "utf8"));
   const back = parseRecording(readFileSync(out.mirror, "utf8"));
   const wrong = !out.identical || out.stalled > 0 || out.exhaustedAt !== null;
-  const machine = wrong
-    ? [
-        `load ${loadavg()
-          .map((l) => l.toFixed(2))
-          .join(" ")}`,
-        `fixture processes alive: ${strays()}`,
-      ]
-    : [];
   const lines = [
     `${row} · recording ${recd.path}`,
     `mirror ${out.mirror}`,
@@ -256,12 +307,9 @@ function explain(row: string, recd: Recorded, out: Verdict): string {
       `consumed wall=${String(out.consumed.wall)} mono=${String(out.consumed.mono)} · ` +
       `mirrored wall=${String(back.wall.length)} mono=${String(back.mono.length)} · ` +
       `overrun wall=${String(out.overrun.wall)} mono=${String(out.overrun.mono)}`,
-    `took prompt=${String(recd.took.prompt)}ms answer=${String(recd.took.answer)}ms ` +
-      `exit=${recd.took.exit === null ? "killed" : `${String(recd.took.exit)}ms`}`,
-    `reads after submit  ${recd.took.reads}`,
-    `recorded  ${timeline(rec)}`,
+    ...harness(recd, rec),
     `replayed  ${timeline(back)}`,
-    ...machine,
+    ...(wrong ? machine() : []),
   ];
   const log = process.env["CALCIUM_VERDICT_LOG"];
   if (log !== undefined && log !== "") {
@@ -548,25 +596,55 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
       // recording has it, after that frame (F974). On the tree before these
       // landed, the replay diverged at frame 5 with three stalls: wall 54
       // against 59, mono 2 906 against 2 994.
-      const recd = await record({ farSideDelayMs: 1_200 });
+      const recd = await record({ farSideDelayMs: FAR_SIDE_SLOW_MS });
       const rec = parseRecording(readFileSync(recd.path, "utf8"));
       const plain = (f: Uint8Array): string =>
         Buffer.from(f).toString("utf8").replace(/\u001b\[[0-9;?]*[A-Za-z]/gu, "");
       const frames = rec.frames.map(plain);
-      // **The fixture is shown to respond**: the far side really was slow, so
-      // the recording holds both the wake's frame and the settled figure.
-      expect(recd.took.answer, "the far side took over a second").toBeGreaterThan(1_000);
+      // **The frames drawn while the call was in flight**, which is where F974
+      // says the wake's sits: `far` is recorded when the answer *arrives*, not
+      // when the call is made — measured, the echo frames land at +42 and
+      // +50 ms and the wake at +1085, all three ahead of it. Searching every
+      // frame instead is a proxy that happens to be equivalent here — measured:
+      // dropping the `break` fails nothing, because no running head is ever
+      // drawn after the answer settles. So this is the claim restated where the
+      // code can be read, and not a check that catches anything today.
+      const inFlight: string[] = [];
+      for (const e of rec.timeline) {
+        if (e.t === "far") break;
+        if (e.t === "frame") inFlight.push(plain(Buffer.from(e.b64, "base64")));
+      }
+      // **The fixture is shown to respond**, and against the sleep rather than
+      // against a round number below it: a wrapper that never ran answers in
+      // 335 ms and a `> 1_000` written beside a 1 200 ms sleep would not have
+      // said so (F973).
+      expect(recd.took.answer, "the far side took its sleep").toBeGreaterThan(FAR_SIDE_SLOW_MS);
       expect(rec.truncated, "and the recording is whole").toBe(false);
+      const woke = inFlight.some((f) => /ps\(--limit 20\) · \S+ \d+s/u.test(f));
       expect(
-        frames.some((f) => /ps\(--limit 20\) · \S+ 1s/u.test(f)),
-        `the wake drew the running head with its figure\n${timeline(rec)}`,
+        woke,
+        unless(woke, () => `the wake drew the running head with its figure\n${sofar("T5.1d", recd)}`),
       ).toBe(true);
-      const head = " · 1s · 20 rows";
+      // **The second is read out of the frame and never pinned** (F1081). The
+      // literal `" · 1s · 20 rows"` this used to hold is the other half of the
+      // same race: `elapsed()` floors, and under load the answer was measured
+      // at 1 959 ms — 41 ms from drawing `2s` and failing here instead. Which
+      // second it lands in is a fact about the harness's sleep; that the head
+      // carries a whole-second figure and a row count is the claim.
+      const settled = frames
+        .map((f) => /ps\(--limit 20\)( · \d+s · 20 rows)/u.exec(f))
+        .find((m) => m !== null);
       expect(
-        frames.some((f) => f.includes(`ps(--limit 20)${head}`)),
-        `and the settled head carries the whole-second figure\n${timeline(rec)}`,
+        settled !== undefined,
+        unless(
+          settled !== undefined,
+          () => `and the settled head carries a whole-second figure\n${sofar("T5.1d", recd)}`,
+        ),
       ).toBe(true);
-      // **And no mask excuses it**: byte-identity here is over the figure.
+      // **And no mask excuses it**: byte-identity here is over the figure — and
+      // over the string the frame actually drew, rather than over a literal
+      // beside it that can drift from it.
+      const head = settled?.[1] ?? "";
       for (const pattern of CLOCK_DERIVED) {
         expect(head.replace(new RegExp(pattern.source, pattern.flags), "▮"), `not excused by ${pattern.source}`).toBe(head);
       }

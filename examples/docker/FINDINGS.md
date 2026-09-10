@@ -44445,7 +44445,10 @@ still green.
   `frames.some` over every frame was a proxy that happens to be equivalent
   here. `far` is recorded when the answer arrives, which the green read log
   settles: the wake at +1085 precedes it and the echo frames at +42 and +50 do
-  not.
+  not. **This third one is a restatement and not a check**, and the mutation
+  pass says so: dropping the `break` fails nothing, because no running head is
+  ever drawn after the answer settles. It is here so the code reads as the
+  claim does, which is worth something and is not worth calling a repair.
 
 ### What is recorded and not diagnosed
 
