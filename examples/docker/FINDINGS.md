@@ -39152,6 +39152,27 @@ now fails it. **A fabricated case is about the reader; the corpus control is abo
 so T1.2 also asserts that rows of that shape exist here today, which is what makes the reader's
 choice load-bearing rather than defensive.
 
+### The commit that fixed it was red on its own typecheck, and every gate was green
+
+`tsc` does not read `tools/enforce/findings.mjs`. It reads
+`tools/enforce/findings.d.mts`, a hand-written declaration beside it, and **nothing checks the
+two against each other in either direction**. So SP12's first commit shipped four exports that
+existed, that the suite imported and ran, and that the module `tsc` saw did not have. The
+working tree was red for the same reason and said nothing, because the only command that would
+have spoken was the one not run — `npm run enforce` passes over a type error, and the suite
+passes because vitest transpiles through esbuild and never typechecks.
+
+**Found by checking the commit out into a worktree and running the gate against it**, which is
+the second thing that instrument caught in this session: the earlier one was a spec-alone commit
+naming C04 I115 with its rows a commit away. Both are invisible from a working tree that already
+holds the other half, which is precisely why *run enforce before committing* proves nothing about
+the commit.
+
+It is a paired-artefact defect and it belongs beside the others: **a declaration is the contract
+and the module is the behaviour, and the question is asked in neither direction.** The four lines
+were added; the declaration now says in as many words that the pair is unchecked, because the
+alternative — adding four lines quietly — leaves the next person to find it the same way.
+
 **Measured**
 
 | | |
@@ -39166,6 +39187,7 @@ choice load-bearing rather than defensive.
 | reader drafts before it was stable | **5** |
 | mutations · distinct failing sets · survivors | 4 · 4 · **0** |
 | vacuous rows the mutation pass found | **1**, repaired and re-mutated |
+| commits verified in a worktree · found red | 2 · **1** |
 
 **What would falsify this**: a reading under which `**Partly**` means done — which every one of
 the eighteen bodies refutes in its own words, each naming what still stands. Or a fifth spelling
