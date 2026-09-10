@@ -73,8 +73,8 @@ const MUTATIONS = [
     // the statement constrains anything.
     name: "the parameter is read as the bitfield, not bitfield plus one",
     file: DECODE,
-    from: "  const bits = param === undefined ? 0 : Math.max(0, Number(param) - 1);",
-    to: "  const bits = param === undefined ? 0 : Math.max(0, Number(param));",
+    from: "  const bits = encoded === undefined ? 0 : Math.max(0, Number(encoded) - 1);",
+    to: "  const bits = encoded === undefined ? 0 : Math.max(0, Number(encoded));",
     expect: "T1.3e",
   },
 ];
@@ -95,7 +95,7 @@ const results = await runPass({
   run,
   control: {
     file: DECODE,
-    from: "  const bits = param === undefined ? 0 : Math.max(0, Number(param) - 1);",
+    from: "  const bits = encoded === undefined ? 0 : Math.max(0, Number(encoded) - 1);",
     to: "  const bits = 0;",
     why:
       "no sequence carries any modifier at all — if this survives, nothing in the suite reaches " +

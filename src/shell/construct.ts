@@ -104,6 +104,7 @@ import {
 import type { ResolvedConfig } from "./config.js";
 import { anyBlinking, CURSOR_BLINK_MS } from "./cursor-style.js";
 import { createSessionStore, type SessionStore } from "./state.js";
+import { createSurfaceHost, type SurfaceHost } from "./surface.js";
 
 /** Where the chosen variant lives (I40). One value, one file. */
 /**
@@ -502,6 +503,7 @@ export type Graph = Readonly<{
   lifecycle: TerminalLifecycle;
   scheduler: ReturnType<typeof createFrameScheduler>;
   router: ReturnType<typeof createRouter>;
+  surface: SurfaceHost;
   /**
    * `ctx.ask`'s host, exposed because **C22 raises the exit confirm** (C23 I36).
    *
@@ -2807,6 +2809,23 @@ export async function constructGraph(
     lifecycle.onInput((chunk) => void deliver(decoded(() => decoder.push(chunk))));
   });
 
+  const surface = createSurfaceHost({
+    overlays: stores.overlays,
+    router,
+    lifecycle,
+    context: () => {
+      const region = deps.frame.overlayRegion();
+      return Object.freeze({
+        ...pipeline.producerContext(),
+        width: region.width,
+        height: region.height,
+      });
+    },
+    now: config.clock,
+    schedule: config.schedule,
+    invalidate: () => void scheduler.commit("input"),
+  });
+
   return Object.freeze({
     /**
      * I51 — the router's precedence, for the one other reader of it.
@@ -2880,6 +2899,7 @@ export async function constructGraph(
     lifecycle,
     scheduler,
     router,
+    surface,
     focus,
     pipeline,
     session,

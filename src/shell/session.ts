@@ -60,6 +60,7 @@ import {
   type TuiConfigInput,
   type TuiInstance,
 } from "./types.js";
+import type { PushedSurface, PushedSurfaceHandle } from "./surface.js";
 
 /**
  * §8 step 4 — the caller's code, per caller.
@@ -417,6 +418,13 @@ class Session implements TuiInstance {
 
   get session(): SessionSnapshot {
     return this.#graph?.session.snapshot ?? emptySnapshot(this.config);
+  }
+
+  openSurface(surface: PushedSurface): PushedSurfaceHandle {
+    if (this.#state !== "running" || this.#graph === null) {
+      throw new SessionStateError("openSurface", this.#state);
+    }
+    return this.#graph.surface.open(surface);
   }
 
   async start(): Promise<void> {
@@ -792,6 +800,7 @@ class Session implements TuiInstance {
     // stopping the timers alongside it is what makes the promise hold. Same
     // ordering argument as `killAll()` before `history.drain()` at step 2a.
     graph.pipeline.dispose();
+    void graph.surface.close("session");
 
     // **1a — C28, and it had no call site at all** (C28 I2). `createProfiler`
     // was constructed in `start()` and disposed by nothing, so

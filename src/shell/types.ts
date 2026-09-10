@@ -37,6 +37,7 @@ import type { OverlayManager } from "../viewport/overlay/index.js";
 import type { TranscriptStore } from "../viewport/transcript/index.js";
 import type { LocalContext, LocalHandler } from "./local/registry.js";
 import type { ExecutionWrites } from "./state.js";
+import type { PushedSurface, PushedSurfaceHandle } from "./surface.js";
 
 /** The five triggers of §8. Three reach `stop`; two are C01's (I4). */
 export type StopReason = "exit" | "eof" | "interrupt" | "signal" | "fault";
@@ -803,6 +804,8 @@ export type TuiConfigInput<C extends TuiConfig> = C & {
 
 export interface TuiInstance {
   start(): Promise<void>;
+  /** Opens the application-owned full-region surface. The session must be running. */
+  openSurface(surface: PushedSurface): PushedSurfaceHandle;
   /** Resolves with the exit code. */
   stop(reason: StopReason): Promise<number>;
   readonly session: SessionSnapshot;
