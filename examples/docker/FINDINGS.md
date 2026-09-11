@@ -45673,7 +45673,7 @@ caused it.
 |---|---|
 | **Surface** | `CALCIUM_ROADMAP.md` entry 30's reader table · `tools/roadmap-status.mjs`'s body-citation arm |
 | **Reached for** | `make instruments` red after merging `main`, with exactly one problem |
-| **Verdict** | **open** |
+| **Verdict** | **closed** (F1101, F1102, F1103) — thirty-six citations re-pointed; the residue is five and all one class, the citation right and the cell's symbols naming something else |
 
 ### One problem reported
 
@@ -46902,3 +46902,179 @@ sample would be a repair aimed at one reading.
 - **The row being red under load for an unrelated reason.** `stalled`,
   `exhaustedAt` and `fixture processes alive` are all in the verdict and all
   clean, which is the ruling-out F963 did by counter rather than by argument.
+
+---
+
+## F1101 — the anchorage matcher reads one of three spellings, and fifty-four spans were invisible to it ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `tools/roadmap-status.mjs:202` (`IDENT`) · `CALCIUM_ROADMAP.md` · F904, F1092 |
+| **Reached for** | explaining why five citations were still adrift after F1092's repair, rather than closing the campaign on a count |
+| **Verdict** | **closed** — the pattern takes the call and private-field forms; three of the citations that became visible were real drift |
+
+### The pattern
+
+```js
+const IDENT = /`([A-Za-z_][\w$]*(?:\.[A-Za-z_][\w$]*)*)`/g;
+```
+
+A bare backticked identifier. The roadmap writes a symbol three ways — `cells`,
+`cells()` and `#anchor` — and this reads one of them. Counted rather than
+assumed: **47 call-form spans and 7 `#`-prefixed spans**, two of the latter being
+palette cells rather than fields.
+
+### The window is a judgement; the spelling is not
+
+F904 refuses to widen the six-line radius and is right to — *any radius is a
+judgement, and a rule that guesses one gets widened until it says nothing.* These
+are a different axis. `body()` names `body`; `#setCopyMode` is written with its
+hash in `session.ts`. Dropping the `()` and keeping the `#` is **how each appears
+in `src/`**, so neither guesses.
+
+### A cell with no readable symbol was not in the population at all
+
+`if (c.line === null || idents.length === 0) continue` — so the signal was silent
+about every cell whose symbols were only ever written in the two forms it could
+not read. Widening took the population from **75 to 78**, and all three arrivals
+were adrift:
+
+| citation | the cell's symbol | where it is |
+|---|---|---|
+| `viewport.ts:347` | `#afterContent()` | declared at **387**, called at 329 |
+| `paint.ts:303` | `ghost()` | on the deps type at 116, read at **444** |
+| `keys.ts:441` (×2) | `afterEdit()` | declared at **530**, called at 1190 |
+
+**Nothing else in the repo reaches those.** All three lines exist and are
+non-blank, which is the whole of what the gated arm checks, and all three
+symbols appear somewhere in their cited file, which is the whole of what the
+symbol arm checks. F904's shape exactly — two correct checks over one citation,
+satisfied by different facts, with nothing joining them.
+
+### The cost, and the control
+
+`#fafafa` matches the private-field shape and is a colour. Excluded **by shape
+rather than by name** — the CSS lengths, so a field called `#anchor` is still a
+symbol — because a palette cell is written the same way a field is and neither
+can be listed in advance. The `problems` arm is gated and resolves every
+newly-extracted ident against its cited files: it found none missing, so the
+widening added three findings and no red.
+
+---
+
+## F1102 — a citation repaired onto a second wrong line reads exactly like one repaired correctly ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `CALCIUM_ROADMAP.md` entry 19 · `src/viewport/viewport/viewport.ts:224` · F1092, F904 |
+| **Reached for** | writing down *why* each of the five residual adrift citations is acceptable |
+| **Verdict** | **closed** — `:224` → `:237`; the mechanism is named and no gate reaches it |
+
+### The repair that was wrong
+
+F1092's campaign moved entry 19's citation from `viewport.ts:197` to `:224`.
+Line 224 is
+
+```ts
+if (size.width === this.#width && size.height === this.#height) return;
+```
+
+— step 0's guard. The cell's sentence is *`…:224` rebuilds **only when the width
+changed***, and the width-gated rebuild is at **237**. The cell names step 0
+separately, in its own clause three lines later: *step 0 refuses a resize to the
+size already held (C14 I21)*. **The repair anchored the sentence on the line
+belonging to the neighbouring clause.**
+
+### The signal cannot see it
+
+`resize` is declared at 209 and is the cell's only extracted symbol. Both
+`224 ± 6` and `237 ± 6` miss it, so the citation was adrift before the repair and
+adrift after, with byte-identical output. A campaign driven by the count would
+have declared it done; a campaign driven by *adrift reaching zero* would have
+been pushed to widen the window, which is the failure F904 refuses by name.
+
+### What found it
+
+Closing a campaign on *thirty-five to five* takes a number. Writing down **why
+these five are acceptable** takes reading each cell's sentence against its site,
+and that is a different act with a different reach. Four of the five survived it
+— the citation is right and the cell's symbols name something other than the
+site. The fifth did not.
+
+### The general form
+
+**A repair verified by the instrument that prompted it is verified against that
+instrument's blind spot too.** The anchorage signal answers *is one of this
+cell's symbols near this line*. It does not answer *is this the line the sentence
+is about*, and a repair that moves a citation from one line to another inside the
+blind region changes neither answer. The rule that reaches it is already written
+down — *ask where a settled claim is written down* — run on **a repair** rather
+than on a finding.
+
+---
+
+## F1103 — a correction to a population left the sub-count over that same population untouched, and the member it added is the row the correction called strongest ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `CALCIUM_ROADMAP.md` entry 30 · `src/shell/construct.ts:2524` · `src/shell/keys.ts:486` · F1092 |
+| **Reached for** | closing F1092 by going to its four named restatements, rather than trusting the note that said they were corrected |
+| **Verdict** | **closed** — nine in all four places, five index readers named, `:2523` → `:2525`, and the comment in `src/` corrected |
+
+### The fourth place
+
+F1092's remedy reads *the count corrected in all four places*. Three were. The
+fourth — entry 30's indented design block, eleven hundred lines below the table
+— still said **seven sites**, and going there turned up three more stale claims
+in the same paragraph that F1092 named none of.
+
+| claim | was | is |
+|---|---|---|
+| the population | *seven sites* | **nine** |
+| the index sub-count | *THREE OF THE SEVEN* | **FIVE OF THE NINE** |
+| the submission site | `construct.ts:2523` | **`:2525`** |
+| the same sub-count, in `src/` | *because three of them read an index alongside it* | **five** |
+
+### The sub-count contradicted its own parenthetical
+
+> THREE OF THE SEVEN READ A BUFFER INDEX ALONGSIDE THE STRING (`contextAt` three
+> times, `selectionSpans`)
+
+The list has four members and the number says three — a sentence carrying its own
+counter-example, in the document whose finding is a miscount.
+
+### The fifth member is F1092's own strongest row
+
+`keys.ts:486`, `applyEdit`:
+
+```ts
+const before = deps.editor.text;
+deps.editor.setText(
+  before.slice(0, edit.start) + edit.text + before.slice(edit.end),
+  edit.start + edit.text.length,
+);
+```
+
+`edit` comes from `accept(ctx, candidate, whole)` where `ctx = contextAt(text,
+cursor, manifest)`, so `start` and `end` are offsets into the **unresolved**
+string. Under the resolving `text` getter §8a refuses, the other four read at a
+wrong offset; **this one writes at one.** F1092 called it *the row bearing
+hardest on the entry's whole question and the one nobody listed* — and then
+listed it as a reader without noticing it belongs to the sub-count the question
+is actually about.
+
+### The mechanism
+
+**A correction lands on the sentence that was measured and stops there.** The
+population was measured — nine — so its four restatements were chased. The
+sub-count is *taken over that same population* and was never itself measured, so
+nothing pointed at it, and it survived in two documents and one source comment.
+A count derived from a corrected count is not corrected by the correction.
+
+### What no instrument reaches
+
+The anchorage signal reads this block and is silent: `construct.ts:2523` is a
+comment line, so non-blank, and the cell's symbols appear in the file. F1092
+established that `2523` had **never once** been the submission site — about the
+table — and did not carry it to the prose eleven hundred lines below. Neither
+did the gate, because neither check it runs can fail on a comment.
