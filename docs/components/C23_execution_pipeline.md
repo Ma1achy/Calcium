@@ -150,16 +150,40 @@ This is also what distinguishes `/debug` from `{ } json`, which several surfaces
 #### `/profile` — the profiler's view
 
 ```
-/profile              open the profiler view on its `overview` pane
-/profile <pane>       open it on `overview`, `frame`, `distribution` or `memory`
+/profile                 open the profiler view on its first card
+/profile <section>       open it on that section
+/profile snapshot [card] append the card on screen, stamped, once
+/profile live [card]     append the card as a part that refreshes itself
 ```
 
-**It opens a view and appends a notice; it never appends the report** (I68, I69). The panes are
-C28's (`profilePane`, C28 §3c), drawn in a `kind: "view"` layer the view refreshes on a timer, and
-the entry this verb appends says which pane opened and nothing more. A document holding the panes
-would freeze one report into the transcript's record and be stale on the next frame — I18's
-stale-data shape with the framework's own figures — and the entry sits under the view anyway, read
-after `Esc`.
+**Opening appends a notice and never the live panes** (I68, I69). The cards are C28's
+(`profilePane`, C28 §3c), drawn in a `kind: "view"` layer the view refreshes on a timer, and the
+entry `/profile` appends says which section opened and nothing more — the entry sits under the
+view anyway, read after `Esc`.
+
+**The other two put figures in the transcript, and what makes that safe is not the view** (I69,
+amended). The objection this rule was written against is a reading that *claims* to be current:
+a document holding a report would be stale on the next frame, which is I18's shape with the
+framework's own figures inside it. That is true of an unstamped, never-refreshed document, and it
+is the only document the rule considered. The framework has two answers to it and this verb used
+neither.
+
+- **`/profile snapshot [card]`** appends the card **stamped** — the frame range, the elapsed time
+  it was taken at, the tier and the ring's reset point, in the panel's own title. It claims the
+  opposite of current, on its face, for as long as it exists.
+- **`/profile live [card]`** appends it as a `b.live` part on the sampler's cadence, so it is
+  current because it is refreshed, which is the same answer the view gives.
+
+**The hazard that replaces staleness is the tier.** A view raises to `spans` on open and restores
+on close (C28 I50); **a transcript part has no close**. So a live card that raised the tier would
+pin it for the rest of the session, and a raise resets the ring (C28 I18) — a verb that quietly
+turns the profiler on and empties what was already recorded. A live card therefore **never calls
+`setTier`**: it draws what the session is already recording, and where that is nothing it draws
+C28's *raise the tier* notice rather than raising it.
+
+The overlay is one screen and does not scroll, which is the whole reason these exist: an icicle of
+a 47 ms frame or an `ecdf` over 512 samples is cramped in the view and right in scrollback, where
+two can be compared and one can go in a bug report.
 
 **Three arms, and each answers through the local route rather than throwing** (I2). With no profiler
 configured — a session built without `TuiConfig.profile`, which is every session that did not ask
@@ -1149,7 +1173,7 @@ Per submission.
 - **I66** — **The shell route registers a cancel, and the screen survives it.** The ladder's first rung signals the child's group and the card settles `cancelled` holding what it had drawn.
 - **I67** — **Every chunk the child wrote before it exited has reached the screen before the final snapshot is taken, and a settled terminal block carries no cursor, and what it keeps is decided by the screen flag: the scrollback in `lines` mode, the grid in `grid` mode.** Two artefacts, and the flag the child itself set says which one it left behind. **The first clause used to read *every write is awaited*, and the defect it was written against satisfied that exactly** (F1096): the route awaits a chain of links, each link re-checked a gate that closes *before* the drain, and a link whose gate had shut returned without writing. Every write was awaited and none of them wrote — the drain drained nothing, and the screen kept whatever had got through. Measured on a runner at `46 → 46 numbered lines of 200 in 5013 ms, 1 patches, grew by 0`, with the cut point moving between runs because it is wherever the exit caught the chain, and never reproducible on a machine where a `seq` finishes before the exit is observed. **A wording that names the mechanism is satisfied by a mechanism that does nothing**, which is A03 §2's vacuity class arriving in an invariant: *awaited* is true of a no-op, and *has reached the screen* is not. The clause now names the observable.
 - **I68** — **`/profile [pane]` opens C28's view through the local route, and every refusal is a document on that route rather than a throw**: a `warn` notice naming `TuiConfig.profile` when no profiler exists, a usage notice naming C28's four panes and the token typed when the pane is not one of them, and the view's own *close what is open* when another layer is up. The pane is read from `ctx.args` and never from `argv[0]`, except to quote the token on the failure arm (C22 I66). The view is reached through `HandlerDeps`, as `/exit` reaches `stop`, and `LocalContext.profile` stays the report and only the report.
-- **I69** — **What `/profile` appends is a notice naming the pane, never the panes.** The report is drawn in the view and refreshed there; a document carrying it would freeze one report into the transcript's record and read as current on every later frame, which is I18's stale-data shape with the framework's own figures inside it.
+- **I69** — **A profile document is stamped or live; it is never a reading presented as current, and a live one never raises the tier.** `/profile` itself appends a notice naming the section and never the live panes — those are drawn in the view and refreshed there. The rule read *never the panes* until the amendment, and the sentence behind it was true about the only document it considered: an unstamped, never-refreshed copy of a report reads as current on every later frame, which is I18's stale-data shape with the framework's own figures inside it. **What it forbade was the capability rather than the defect**, and the framework already answers the defect twice — a `b.live` part is current because it is refreshed, and a stamp naming the frame range, the elapsed time, the tier and the ring's reset point claims the opposite of current on its face. So `/profile snapshot` and `/profile live` are admitted and the constraint moves to where the real hazard is: **a transcript part has no close**, so a live card that raised the tier would pin it for the session and reset the ring doing it (C28 I50, C28 I18). A live card calls no `setTier` — it draws what is already being recorded, and draws the *raise the tier* notice where that is nothing.
 - **I70** — **A refused patch stops the part and never the host, and a refusal the host still holds the block for is recorded as a fault.** `PatchOutcome`'s arms answer two different questions — *is the host gone* and *was the patch refused* — and a driver reading `outcome.ok` answers only the first, so the shell building a patch C04 cannot take took the same silent teardown as an evicted entry: every sibling part on that host and the entry's elapsed readout (I53) stopped with it, and the exact diagnosis was discarded at the one place that could report it (§8h, F1002). A refused part is given the dead source I43 already defines, so it stops **without a second teardown path** (I32) and the host is released by the sweep once nothing on it still polls. **The report is a fault and not the part's own panel**, which is §5a's first sentence one component along — the reporting path is the path that failed, and I43's refusal can draw in the panel only because it is refused *before* a patch is needed.
 
 
@@ -1214,7 +1238,7 @@ Per submission.
 56. **A parent's head is written by nobody** (I62). Derived from the children in start order, its own `elapsed` figure, and never the sum.
 57. **A command's output is a screen, live** (I63, I64, I66, I67). One arm chosen and kept, one snapshot per frame, a cancel that works, and a settled block that keeps what the child left rather than what the route captured.
 58. **`/profile` opens the profiler's view, and refuses in a document** (I68). No profiler, an unknown pane and an occupied stack each answer through the route the verb came in on.
-59. **The transcript records that the view opened, not what it showed** (I69). The figures live where they are refreshed.
+59. **A figure reaching the transcript says when it was taken or keeps itself current, and never raises the tier to do either** (I69). `/profile` still records that the view opened and nothing more; `snapshot` stamps and `live` refreshes.
 60. **A refused patch stops the part, not the host, and says what was refused** (I70). Three arms, two questions: the host is released when C13 has dropped the entry, and the part alone when the document refuses what the shell built — with `applyPatch`'s message on §5a's two channels.
 
 ---
@@ -2125,7 +2149,9 @@ Fake transport, fake stores.
 - **T1.63** (C23 I13): MG23 is run over the real `src/shell` tree and reports nothing. Its fabricated violation is asserted in `enforce-rules.test.ts`; what is owed here is that the rule is **live on the tree**, because a rule that fires on a fabrication and is scoped to nothing reports zero for both reasons.
 - **T1.64** (I68): `shippedHandlers` with a view handed in whose `open` refuses naming `TuiConfig.profile` → `/profile` answers a `warn` notice carrying that name, and the view's `open` was called once with `overview`; `shippedHandlers` with **no** view handed in → the map holds the six and no `profile` key, so a tree without the manifest row registers nothing I27 would refuse. **Both arms**, because the transitional conditional is a birthday clause and this is the row that watches it.
 - **T1.65** (I68, C22 I66): `/profile frame` with `args: { pane: "frame" }` → the view opened on `frame` and the notice names it; `/profile foo` with `args` empty and `argv: ["foo"]` → a usage notice naming all four of C28's `PANES` and the token `foo`, and the view's `open` was not called. **The pane is asserted to come from `args`**: a handler reading `argv[0]` passes the first arm and is caught by the second only because the usage text quotes the token — so the row also feeds `argv: ["memory"]` with `args: { pane: "frame" }` and expects `frame`.
-- **T1.66** (I69): the document `/profile` appends holds one `notice` and no block whose id is one of the panes' — no `ov-`, `fr-`, `di-` or `me-` prefixed id and no `plot` — asserted over the document's block tree rather than its length, because a notice wrapping a panel of plots is one block too.
+- **T1.66** (I69): the document bare `/profile` appends holds one `notice` and no card — no block whose id carries a card's prefix and no `plot` — asserted over the document's block tree rather than its length, because a notice wrapping a panel of plots is one block too.
+- **T1.66b** (I69): `/profile snapshot` appends a document whose panel title carries all four stamp fields — the frame range, the elapsed time, the tier and the ring's reset point — and which holds no live part; `/profile live` appends one that is a live part with a cadence and **no** stamp. Asserted by reading the title's fields rather than by matching the rendered string, so a reworded stamp fails only when a field goes missing.
+- **T1.66c** (I69): `/profile live` at every tier calls `setTier` zero times, and at `off` the appended part's first render is C28's *raise the tier* notice rather than a figure. The second half is what makes the first testable — a verb that raises nothing and also draws nothing would satisfy the count and answer nobody.
 - **T1.67** (I68, C05 §3): `FRAMEWORK_TOOLS`' `profile` row is `local`, takes one optional `enum` argument named `pane`, and its `values` equal C28's `PANES` member for member; and the seven names are the six and `profile`. The L0 copy of an L4 list, held equal by the only file that may import both.
 ### Tier 2 — contract / interface
 

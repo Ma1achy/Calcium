@@ -166,6 +166,12 @@ describe("C23 — /profile, the local route", () => {
     expect(notices(doc.blocks)[0]?.text).toBe("profiler: distribution");
   });
 
+  // **Spec-first, so the rows are here and unbuilt.** C23 I69's amendment admits two
+  // verbs this file will assert once they exist; a spec row with no test is the
+  // same shape as an invariant with no row, which is the signature A03 §2 names.
+  it.todo("T1.66b (C23 I69): `/profile snapshot` appends a panel whose title carries the frame range, the elapsed time, the tier and the ring's reset point, and holds no live part; `/profile live` appends a live part with a cadence and no stamp — read as fields, so a reworded stamp fails only when one goes missing — not deferred on a component; the two verbs land with this round's cards");
+  it.todo("T1.66c (C23 I69): `/profile live` calls setTier zero times at every tier, and at `off` its first render is C28's raise-the-tier notice rather than a figure — the second half being what makes the first testable, since a verb that raises nothing and draws nothing satisfies the count and answers nobody — not deferred on a component; it lands with this round's cards");
+
   it("T1.67 (C23 I68, C05 §3): the manifest's `pane` values are C28's `PANES`, written down at L0 and held equal here", () => {
     // L0 may not import L4, so `framework.ts` carries the four names as
     // literals; this is the row that fails the day either list moves.
