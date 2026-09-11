@@ -47330,7 +47330,7 @@ non-zero run. Named rather than fixed here.
 |---|---|
 | **Surface** | `.github/workflows/mutation-sweep.yml` · `tools/mutate/sweep.mjs` · `tools/mutate/runs/c12-arm-seam.mjs` · F1097, F980 |
 | **Reached for** | reading run 34550613146, which F1097 named as the measurement it was waiting for |
-| **Verdict** | **open** — the census is taken and the timeout question is answered; the eighteen reds are named and one of them is closed |
+| **Verdict** | **open** — the census is taken and the timeout question is answered; the eighteen reds are named and **seven are closed** (F1104, F1108, F1116 ×2, F1117 ×3), so **eleven remain** |
 
 ### The census
 
@@ -47713,6 +47713,14 @@ land after the lifecycle's in `log`, which is a reorder and not a rename.
 
 **`c09-image` is green** — every mutation caught — so F1105's seventeen reds are
 sixteen. Its last survivor was not a weak test either: F1108.
+
+**Sixteen became eleven.** F1116 took `c04-kv-bar` and `c12-value-bar`, whose
+cause was the ambiguity and never their tests; F1117 took `c12-layer-merge`,
+`c22-gate3b` and `c22-spinner`, whose anchors were named constants and so were
+invisible to the sweep — one of the three a **control**, which made its run
+unstartable. **Five of the seven closed so far were an instrument's defect rather
+than a test's**, which is the figure to hold against the next reading of this
+list.
 
 ---
 
@@ -48266,3 +48274,110 @@ branch for. `T1.105` does the ascii arm, with the Unicode arm as its control.
 `c12-value-bar` takes `plot-mutations.test.ts` into its corpus and two mutations
 that reach the arms directly. Both caught, by T1.104 and T1.105 rather than by
 the fill's row.
+
+---
+
+## F1117 — the anchor reader's fourth blind spot: a `from:` naming a constant is not a stale anchor, it is not an anchor ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `tools/mutate/anchors.mjs` · `tools/mutate/runs/{c12-layer-merge,c22-gate3b,c22-spinner}.mjs` · `test/unit/mutate-anchors.test.ts` MA1c · F1105, F1109, F232, F173 |
+| **Reached for** | F1113's disambiguation touched ten runs and the sweep's anchor count barely moved — a count that does not respond to an edit of its subject |
+| **Verdict** | **closed** — the reader resolves a name against the file's own `const` declarations, four broken anchors came out of it, and three of F1105's eighteen close |
+
+### The form, and why it is worse than a stale anchor
+
+A run may hoist an anchor into a constant, because two mutations share it or
+because it is long:
+
+```js
+const PICK = '      const pick = peers[x % peers.length]!; // cells-ok — a cell column';
+…
+{ name: "the first peer keeps every cell it contends", from: PICK, to: "      const pick = peers[0]!;" }
+```
+
+The reader's pattern required a **string literal** in the `from:` position. A
+name is not one, so the pattern did not match — and the mutation did not become
+an anchor that failed to resolve. **It fell out of the corpus.** The run's line
+in the report then carried a count taken over a set that never held it, and
+`0 missing` said the run had not drifted.
+
+This is the difference the other three blind spots did not have. F173 (double
+quotes only), F232 (`+`-joined sequences) and F1109 (backticks) each lost a
+*form* of literal, and an anchor the reader skipped was silently absent. Here the
+skipped anchors are the ones a run author chose to **share between two
+mutations**, or to hoist because the text is large — which selects for the
+load-bearing ones, and for the **control**.
+
+### Measured, both readers over the identical corpus
+
+| | anchors | missing | runs | interpolated |
+|---|---|---|---|---|
+| the reader as it stood | 2027 | 24 | 16 | 4 |
+| resolving names | **2049** | **28** | **19** | 6 |
+
+**Twenty-two anchors it could not see**, which is exactly the 22 `from:` names in
+the tree — 24 `from:`/`to:` identifier references across **10 of 194 runs**. And
+**four of the twenty-two were broken**, against 23 known-stale in the 2027 it
+watched: **18% against 1.1%**, sixteen times the rate, on a subset nobody chose —
+only the one the pattern happened to exclude.
+
+The four, and how long each had been broken:
+
+| run | anchor | the source moved | days unseen |
+|---|---|---|---|
+| `c12-layer-merge` | `PICK` | the turn's key went from a column to a contested-cell counter (`417ba142`, 20 Aug) | 22 |
+| `c22-spinner` | `COMMIT_FROM`, `SUPPLY_FROM` | the commit moved into `#animate` and its reason became conditional (`56a8efd9`, 4 Sep) | 7 |
+| `c22-gate3b` | the **control** | the refusal grew a teardown between the guard and the throw (`d409f8fe`, 10 Sep) | 1 |
+
+`c22-gate3b`'s is the one that matters most: a control that cannot apply throws
+in `runPass`, so the **whole run was unstartable** — the worst state a run can be
+in — while the sweep that exists to say so reported it clean.
+
+### Six names do not resolve, and they are reported rather than dropped
+
+`TREEMAP_GUARD`, `B_GEOMETRY`, `SUM`, `PLACE_KIDS` and `c22-gate3b`'s `SPAN` and
+`MOVED` are computed from a `readFileSync` slice rather than written out. The
+reader names them — *names `SPAN`, which is not a literal here* — and counts them
+as `interpolated`, which is F1109's ruling applied one form along: **refuse what
+it will not guess at, and say which**. The count went 4 → 6.
+
+### Closed
+
+`anchorsOf` collects the file's own single-line `const NAME = <literals>;`
+declarations first and resolves a name in `file:`, `from:` or `to:` against them.
+It stays textual, because **importing a run file executes the pass** (F1091).
+
+MA1c is the fixture: a named anchor is counted, a stale named anchor is
+*reported* — the control, because a reader that resolved a name and then stopped
+checking would satisfy the first row — and a computed name yields `1 interpolated`
+and **not** `1 anchor(s) missing`, since the two dispositions have opposite
+remedies. `mutate-anchors-parse.mjs` carries two mutations against it: removing
+the name alternative from the pattern, and returning an empty string for an
+unresolvable name instead of refusing. Both caught.
+
+All three runs were re-anchored **and run** — `KNOWN_STALE`'s rule, that a
+repaired anchor never run is a mutation that applies and asserts nothing. All
+three are green, so **three of F1105's eighteen close**: `c12-layer-merge`,
+`c22-gate3b`, `c22-spinner`. With F1104's `docker-dashboard`, `c09-image` and
+F1116's two, **eleven remain**.
+
+`c22-gate3b`'s control was re-derived onto a literal rather than repaired as a
+name: the throw is the gate's whole purpose and one line of it, so the anchor is
+short, unique, and rots only when its subject does. `GATE` itself is now computed
+from a head and a tail **with both ends asserted before the slice** — an
+`indexOf` returning −1 makes `slice` read from the end of the file and produces
+an anchor that matches nothing, which is a script reporting success having found
+nothing, and the rule this repo applies to its own edit scripts.
+
+### What the fourth instance says about the first three
+
+Each widening fixed the form in front of it and stopped there. The reader now
+takes three quote characters, `+`-joined sequences, and names — and there is no
+argument that the list is complete, because none of the four was predicted. What
+is buildable is the **response**: a count that does not move when its subject is
+edited is the tell, and it is what was noticed here. **F1113's commit re-anchored
+ten mutations across ten run files and the sweep's anchor total moved by one** —
+2046 to 2047, the widened reader run over both corpora so the delta is one
+instrument's. Ten edits to the reader's own subject, and its headline figure
+moved by one.
