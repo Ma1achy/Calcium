@@ -608,8 +608,12 @@ describe("mutation harness", () => {
     expect(text, "the row says which state it is in").toContain("DID NOT TYPE");
     expect(text, "with the compiler's own line beside it").toContain("error TS2345");
     // **The disposition, which is the point of counting it apart**: the reader
-    // is sent to the `to` rather than to the tests.
-    expect(text).toContain("the tree that ran is not the tree the mutation describes");
+    // is sent to the `to` rather than to the tests. And the claim is the narrow
+    // one — *suspect*, not *unmeasured*. Types are erased, so the mutated code
+    // ran exactly as written; what the error says is that the `to` could not
+    // have been written against this tree.
+    expect(text).toContain("not expressible");
+    expect(text).toContain("suspect rather than weak");
     expect(text).toContain("Read the `to`");
     // And the summary does not claim a survivor it did not measure.
     expect(text, "no survivor was found").not.toMatch(/\d+ survived/u);
@@ -700,7 +704,19 @@ describe("mutation harness", () => {
       writeFileSync(
         join(dir, "tsconfig.json"),
         JSON.stringify({
-          compilerOptions: { strict: true, noEmit: true, skipLibCheck: true, types: [] },
+          // **The flags the check's behaviour depends on, not a minimal set.**
+          // Without `noUnusedLocals` this project cannot emit a TS6133 at all,
+          // so both exclusion arms below passed with the filter removed — the
+          // mutation pass found it, and a fixture has to be shown to respond to
+          // the thing under test before it is asserted against.
+          compilerOptions: {
+            strict: true,
+            noEmit: true,
+            skipLibCheck: true,
+            types: [],
+            noUnusedLocals: true,
+            noUnusedParameters: true,
+          },
           include: ["a.ts"],
         }),
       );
@@ -725,6 +741,32 @@ describe("mutation harness", () => {
           "  return area.w + area.rows;\n}\nexport const v = f({ w: 24, rows: 8 });\n",
       );
       expect(check(), "and a tree it accepts answers null").toBeNull();
+
+      // **The unused family does not count, and the corpus is the argument.**
+      // Applying all 224 mutations in F1105's seventeen red runs gives 61 that
+      // do not type-check and **44 of those are TS6133** — a binding left with
+      // no reader. Every one is a good mutation that orphaned something. An
+      // unused binding is erased, so it cannot change what runs; the check is
+      // about whether the `to` is expressible, not about house style.
+      writeFileSync(
+        join(dir, "a.ts"),
+        "export function f(area: Readonly<{ w: number; rows: number }>): number {\n" +
+          "  const orphan = area.rows;\n  return area.w;\n}\n" +
+          "export const v = f({ w: 24, rows: 8 });\n",
+      );
+      expect(check(), "a binding with no reader is not a rotted `to`").toBeNull();
+
+      // **The control for that exclusion**, which is what stops it swallowing
+      // the subject: a tree carrying both an orphan and a real error reports the
+      // real one.
+      writeFileSync(
+        join(dir, "a.ts"),
+        "export function f(area: Readonly<{ w: number; rows: number }>): number {\n" +
+          "  const orphan = area.rows;\n  return area.w;\n}\nexport const v = f(24);\n",
+      );
+      const both = check();
+      expect(both, "the real error still comes back").toContain("error TS2345");
+      expect(both, "and not the one that cannot reach runtime").not.toContain("error TS6133");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

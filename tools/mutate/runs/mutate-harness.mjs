@@ -230,6 +230,27 @@ const results = runPass({
       to: '        ? ""',
       expect: "MH11",
     },
+    {
+      // **The unused family counted again.** 44 of the 61 reds in the corpus
+      // measurement were TS6133, every one a good mutation that orphaned a
+      // binding — so a check that counts them reclassifies the majority of its
+      // own hits as rotted `to`s.
+      name: "an orphaned binding counts as a `to` that will not type-check",
+      file: FILE,
+      from: '      const real = errors.filter((l) => !/error TS(?:6133|6192|6196)\\b/u.test(l));',
+      to: "      const real = errors;",
+      expect: "MH11d",
+    },
+    {
+      // The other direction, and the one that makes the exclusion dangerous: a
+      // filter that swallows everything answers `null` to a tree the project
+      // would refuse, which is the blindness the whole row exists against.
+      name: "the type-check finds nothing worth reporting in any tree",
+      file: FILE,
+      from: "      return real[0] ?? null;",
+      to: "      return null;",
+      expect: "MH11d",
+    },
   ],
 });
 

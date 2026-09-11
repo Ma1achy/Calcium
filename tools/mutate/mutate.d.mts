@@ -56,10 +56,11 @@ export type Outcome = Readonly<{
   /** The figures behind `indeterminate`, so the row can say them. */
   tally?: { reported: number; collected: number } | null;
   /**
-   * The mutated tree did not type-check — the first `error TS…` line. `unbuilt`
-   * covers a `to` that does not parse; this covers one that parses and does not
-   * type-check, which runs a green suite and reads exactly like a weak test
-   * (F1106). The tree that ran is not the tree the mutation describes.
+   * The mutated tree did not type-check — the first `error TS…` line that is not
+   * an unused binding. `unbuilt` covers a `to` that does not parse; this covers
+   * one that parses and does not type-check, which runs a green suite and reads
+   * exactly like a weak test (F1106). The `to` is not expressible against this
+   * tree, which is evidence it was written against an older one.
    */
   untyped?: string;
   /**

@@ -296,20 +296,29 @@ export function fsIo(root) {
  * `undefined` inside the injected draw. `tsc --noEmit` names it —
  * `scatter3.ts(999,45): error TS2345` — and nine of nine tests pass.
  *
- * **The claim is not that the mutation did nothing.** A `number` read as an
- * object gives `undefined` fields, which is a real change; what is not true is
- * that the tree which ran is the tree the mutation describes. So the row
- * measured nothing about the test it names, which is the same disposition
- * `unbuilt` carries for the parse half.
+ * **What the signal is, stated exactly — the first wording was wrong.** It read
+ * *the tree that ran is not the tree the mutation describes*, and types are
+ * erased: the mutated code always runs exactly as written, LN6 included. What a
+ * type error actually says is that the `to` **is not expressible against the
+ * current tree**, which is strong evidence it was written against an older one.
+ * LN6 ran precisely as written — it passed a number and the callee read `.w`
+ * off it — and the defect is that its author wrote it against a signature that
+ * had changed. The row is *suspect*, not *unmeasured*.
  *
- * **Stated blind spot, and it has two halves.** `noUnusedLocals` is on, so a
- * mutation that deletes the only reader of a binding fails this check while
- * being a perfectly good mutation — the disposition is still *read the `to`*,
- * and sometimes the answer is *the `to` is fine*. And it reaches nothing about
- * an **additive** mutation: LN6's second defect is that it inserts a draw
- * before the loop while the real call four hundred lines below still runs
- * after, so the later draw wins. That type-checks perfectly and is inert for a
- * reason no compiler can see.
+ * **The unused family is excluded, and the corpus is why.** Applying every
+ * mutation in F1105's seventeen red runs — 224 of them — and type-checking each
+ * gives **61 red, and 44 of those are TS6133**, a binding left with no reader.
+ * The blind spot was stated as an edge and is the majority. An unused binding is
+ * erased and runs identically, so `noUnusedLocals` is a house rule about source
+ * and never a statement about behaviour; that is the line this filter draws, and
+ * it is the only class that provably cannot reach runtime. TS18047 stays in:
+ * a deleted null guard is a legal mutation *and* the compiler is right that the
+ * code may now throw.
+ *
+ * **The remaining blind spot has no mechanical answer.** An **additive**
+ * mutation type-checks perfectly and is inert for a reason no compiler can see
+ * — LN6's second defect is that it inserts a draw before the loop while the real
+ * call four hundred lines below still runs after, so the later draw wins.
  *
  * Costs 1.3 s on this tree (`skipLibCheck`, 372 files), and only on a survivor.
  */
@@ -324,10 +333,16 @@ export function tscTypecheck(root) {
       return null;
     } catch (e) {
       const out = `${e.stdout ?? ""}${e.stderr ?? ""}`;
-      return (
-        out.split("\n").find((l) => /error TS\d+/u.test(l)) ??
-        "tsc exited non-zero and named no error — the type-check itself did not run"
-      );
+      const errors = out.split("\n").filter((l) => /error TS\d+/u.test(l));
+      if (errors.length === 0) {
+        return "tsc exited non-zero and named no error — the type-check itself did not run";
+      }
+      // TS6133 / TS6192 / TS6196: a declaration, import or label with no reader.
+      // Erased, so it cannot change what runs — 44 of the 61 reds in the corpus
+      // measurement, and every one of them a good mutation that orphaned a
+      // binding. If nothing else is wrong, the `to` is fine.
+      const real = errors.filter((l) => !/error TS(?:6133|6192|6196)\b/u.test(l));
+      return real[0] ?? null;
     }
   };
 }
@@ -563,7 +578,8 @@ export function report(results) {
   // `to` that does not parse, because the suites fail to load and say so. A `to`
   // that parses and does not type-check runs a green suite — esbuild strips
   // types without checking them — so the row read SURVIVED and sent the reader
-  // to the tests. The tree that ran is not the tree the mutation describes.
+  // to the tests. The `to` is not expressible against this tree, which is
+  // evidence it was written against an older one: suspect, not weak.
   const untyped = results.filter((r) => r.untyped);
   const survivors = results.filter(isSurvivor).filter((r) => !r.untyped);
   const unsureNote =
@@ -578,10 +594,10 @@ export function report(results) {
   const untypedNote =
     untyped.length === 0
       ? ""
-      : `\n${untyped.length} mutation(s) did not type-check — the tree that ran is not the tree ` +
-        `the mutation describes, so those rows measured nothing about the tests they name. ` +
-        `**Read the \`to\`** (F1106); \`noUnusedLocals\` is on, so sometimes the answer is that ` +
-        `the \`to\` is fine and the binding it orphaned is not`;
+      : `\n${untyped.length} mutation(s) did not type-check — the \`to\` is not expressible ` +
+        `against this tree, which is evidence it was written against an older one. Those rows ` +
+        `are suspect rather than weak: **Read the \`to\`** (F1106). An unused binding does not ` +
+        `count, because it is erased and cannot change what runs`;
   const brokeNote =
     broke.length === 0
       ? ""
