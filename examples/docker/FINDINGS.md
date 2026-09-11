@@ -46828,3 +46828,77 @@ reader adding one would be — beside the two `format*` calls that replaced the
 last two — and that is a habit rather than a gate. The scan that would close it
 has to tell a section that *computes* from one that quotes, which is the
 distinction I55 draws in prose and a line-regex cannot.
+
+## F1100 — F963's stated-not-fixed residue reproduced on the runner, with its own named precondition met ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `test/e2e/profiler.test.ts:562` (T5.1c) · `src/shell/profiling/replay.ts` · F963 |
+| **Reached for** | reading a CI red that was green on the same commit in the other run |
+| **Verdict** | **open** — recorded, not diagnosed: the two extra reads are named as a candidate and not traced |
+
+### The red
+
+`fast` went red on PR #48's `pull_request` run and green on its `push` run, **on
+the same SHA** (`9eb54b95`). One row, and it left its whole verdict:
+
+```
+clock reads recorded wall=56 mono=2999 · consumed wall=54 mono=2998 · mirrored wall=54 mono=2996 · overrun wall=0 mono=1
+took prompt=741ms answer=2658ms exit=killed
+recorded  ... input:"\u0004" frame:174 end
+replayed  ... input:"\u0004" frame:322 end
+load 1.40 0.71 0.28
+fixture processes alive: none
+```
+
+T5.1c asserts `consumed.wall === recorded.wall`. It is **54 against 56** — two
+wall positions recorded that the replay never consumed.
+
+### F963 predicted this, by name, and did not assert it
+
+Its *Not fixed, stated* paragraph carries three residues, and the second is:
+
+> the transcript head's duration figure (`deps.clock() - startedAt`) is
+> wall-derived and unmasked — **invisible below one second, and a far-side call
+> of a second or more would diverge** under any residual misalignment
+
+**The precondition was met by 2.6 times over.** F963's own recordings run
+`answer` at **84-159 ms**; this run's answer took **2658 ms**, under `load 1.40`.
+So the figure that is invisible below a second had 2.6 seconds to be visible in.
+
+That is what makes this worth a number rather than a re-run: a residue stated as
+*would diverge if X*, with nothing watching X, and a runner that supplied X.
+
+### What is measured and what is not
+
+**Measured**: the shortfall is 2 on the wall clock and 1 on mono (2999 against
+2998), the load, the answer's duration, no stray fixture processes, and the
+divergence falling on the **last** frame — 174 bytes recorded against 322
+replayed, the frame after `\u0004`, with `exit=killed`.
+
+**Not measured**: whether the two reads are the head's duration figure.
+`exit=killed` means the harness ended the session rather than the session ending,
+so the recorded tail may be short of what a clean replay produces — a second
+candidate for the last frame's size, with nothing in this sample separating it
+from the first. **Two candidates and one observation**, which is why the verdict
+says recorded rather than diagnosed.
+
+### Why it is not repaired here
+
+The remedy F963 names for this residue is *mirroring on mono as well*, which
+needs C06 to measure `durationMs` on `elapsed` rather than on the wall clock —
+and its own sentence calls that a C06 design question rather than a replay one.
+It is not this branch's subject, and a parity change made from a single runner
+sample would be a repair aimed at one reading.
+
+### What would falsify this
+
+- **The shortfall being independent of the answer's duration.** Every recording
+  F963 was written against runs `answer` under 160 ms and none showed it; this one
+  at 2658 ms did. One sample each way, which is why this is open.
+- **`exit=killed` being the whole of it.** That would make the last frame's size
+  the finding and the two wall reads a coincidence. The two numbers are
+  independent, so a killed run with `consumed.wall === recorded.wall` settles it.
+- **The row being red under load for an unrelated reason.** `stalled`,
+  `exhaustedAt` and `fixture processes alive` are all in the verdict and all
+  clean, which is the ruling-out F963 did by counter rather than by argument.
