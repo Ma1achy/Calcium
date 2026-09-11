@@ -47475,5 +47475,94 @@ no survivors among the rows that ran
 failed. It could have been caught for the wrong reason, which is a real and
 weaker harm; asking every mutation instead of every survivor is 2002 checks
 against 13, and the anchors sweep is where a whole-corpus check would belong if
-that harm is ever measured rather than supposed.
+that harm is ever measured rather than supposed. **It has since been measured —
+F1107 — and the harm is real: `c22-construct` has a row whose `to` calls a
+function that is in no file.**
+
+### Two corrections, both from measuring the thing that had just shipped
+
+**The claim was overbroad and the first wording was wrong.** It read *the tree
+that ran is not the tree the mutation describes*, and **types are erased**: the
+mutated code always runs exactly as written, LN6 included. LN6 ran precisely as
+written — it passed a number and the callee read `.w` off it. What a type error
+actually says is that the `to` **is not expressible against the current tree**,
+which is strong evidence it was written against an older one. The row is
+*suspect*, not *unmeasured*. Nothing about the mechanism changes; the sentence
+justifying it does, and a sentence that overclaims is how a later reader stops
+reading the `to`.
+
+**And the blind spot stated as an edge is the majority.** Applying every mutation
+in F1105's seventeen red runs — 224 with a `to` — and type-checking each gives
+**61 red, of which 44 are TS6133**, a binding left with no reader. So the check
+now excludes the unused family (TS6133 / TS6192 / TS6196) on a principled line
+rather than a convenient one: **an unused binding is erased and cannot change
+what runs**, so `noUnusedLocals` is a house rule about source and never a
+statement about behaviour. TS18047 stays in — a deleted null guard is a legal
+mutation *and* the compiler is right that the code may now throw.
+
+**Both arms of that exclusion were vacuous when written, and the mutation pass is
+what said so.** MH11d's temporary project set `strict` and not `noUnusedLocals`,
+so it could not emit a TS6133 at all; the row asserting *an orphan is not a
+rotted `to`* passed with the filter removed. A fixture has to be shown to respond
+to the thing under test before it is asserted against, and the instance is the
+fixture written **for** the check, on the same day.
+
+### The number that is not 61 minus 44
+
+Re-running the census through the harness's own `tscTypecheck` — imported rather
+than rebuilt — gives **18**, not the 17 that subtracting gives. One run carried a
+real `TS2339: Property 'drawn' does not exist on type 'never'` **behind** an
+excluded TS6133 on the same line, because the reader takes the first error line.
+A count derived from a corrected count is not corrected by the correction, twice
+in one finding.
+
+---
+
+## F1107 — the corpus, type-checked: 224 mutations, 18 whose `to` is not expressible, and one that calls a function in no file ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `tools/mutate/runs/*.mjs` · F1105's seventeen red runs |
+| **Reached for** | F1106 built the check; this points it at the corpus once |
+| **Verdict** | **open** — the census is taken and one instance is confirmed by reading source; the other seventeen are candidates and nobody has read them |
+
+### The measurement
+
+Every mutation with a `to` in F1105's seventeen red runs, applied one at a time
+against a tree confirmed green first, type-checked, restored. **224 applied · 61
+red to `tsc` · 18 red after the unused family is excluded**, spread over ten of
+the seventeen runs. The parser is `anchors.mjs`'s own `anchorsOf`, lifted
+verbatim, and cross-checked against the anchor count the gate prints before
+anything is measured — the first draft hardcoded 2002, refused at 2006, and was
+right to: four mutations had been added since the number was copied.
+
+| code | count | what it is |
+|---|---|---|
+| TS6133 / 6192 / 6196 | 44 | a binding with no reader — **excluded**, erased, cannot change what runs |
+| TS18047 | 4 | a deleted null guard — the mutation's own point, and the compiler is right |
+| TS2345 | 3 | an argument the signature refuses |
+| TS2741, TS2322 | 4 | a field or type the shape refuses |
+| TS2677, TS7053, TS2698, TS2488, TS2339, TS7019, TS2304 | 7 | one each |
+
+### The one that is confirmed
+
+`c22-construct`'s *construct the lifecycle before the stores (I1)* replaces
+`at("runner", …)` with `atLate("runner", …)`, and **`atLate` is in no file in
+`src/`**. At run time that is a `ReferenceError` at call time, so the row is
+caught by a crash rather than by the ordering it names, and its `expect: "T1.2"`
+is a claim about which instrument caught it that is not true. This is precisely
+the *caught for the wrong reason* harm F1106 named as real-but-weaker and did not
+measure — measured here, and the answer is that it exists.
+
+### What is not established
+
+**Seventeen candidates, unread.** Four are TS18047 and are probably legitimate
+mutations whose guard was the point. The rest want the same treatment `atLate`
+got: go to the symbol and ask whether it exists. That is a reading per row, not a
+run, so it is cheap — and it is the shape of work F1105's reds want anyway.
+
+**And the census says nothing about the seventeen reds' actual survivors**, which
+is what F1105 owns. A type error on a *caught* row is a weaker harm; this entry
+measured the whole population because the whole population is what a `tsc` pass
+can reach without running a suite.
 
