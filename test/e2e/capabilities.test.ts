@@ -197,7 +197,7 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
   it.skipIf(kittyMissing !== null)(
     `T5.7 (C02 I12; C16 I30): kitty receives KITTY_KEYBOARD.enter and answers \`CSI 27 u\` for a lone Esc, \`CSI 13;2:3 u\` for Shift-Enter released — and the real decoder reads both${kittyMissing === null ? "" : ` — skipped: ${kittyMissing}`}`,
     async () => {
-      const { a } = await captureFromEmulator({
+      const { a, flags } = await captureFromEmulator({
         program: "kitty",
         enter: KITTY_KEYBOARD.enter,
         leave: KITTY_KEYBOARD.leave,
@@ -240,20 +240,46 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
       // CI run was spent on `expected '2' to be '1'`. The sequences go in the
       // message now: they cost nothing when green and they are the whole of what
       // the fifth recurrence can leave behind.
+      // **Fifth recurrence, 2026-09-11 on pull request 53, and it went red on the
+      // arm with no evidence on it** (F812). The fourth put the sequences in a
+      // message saying they *are the whole of what the fifth recurrence can
+      // leave behind* — and attached them to the stray-modifier assertion,
+      // which passed. The mode-not-live assertion beside it went red carrying a
+      // sentence. **A record belongs on every arm that can go red**, not on the
+      // first one; one arm instrumented is the same blindness one assertion
+      // along, and it cost a reproduction that only the runner can produce.
       const seqs = [...a.matchAll(/\x1b\[[0-9;:]*[A-Za-z~]/gu)]
         .slice(0, 12)
         .map(([m]) => `CSI ${m.slice(2)}`)
         .join(" ");
+      const record = `· flags ${flags === "" ? "never answered" : flags} · ${seqs}`;
+
+      // **The precondition, measured rather than inferred from the bytes after
+      // the fact.** `CSI ? u` answers with the flag set that is live and cannot
+      // be answered before the push has taken — the pty is ordered — so this is
+      // the state at the moment the drive began. `3` is `KITTY_KEYBOARD.enter`'s
+      // own value; an empty reading is a terminal that never answered, which
+      // fails here naming itself rather than passing quietly.
+      expect(
+        flags,
+        `kitty had not entered the keyboard mode when the drive began (F812) — the fifth ` +
+          `recurrence's arm, and the first repair aimed at something other than a held ` +
+          `modifier ${record}`,
+      ).toBe("3");
+
       const strayEsc = /\x1b\[27;(\d+)/u.exec(a);
       expect(
         strayEsc === null ? "1" : strayEsc[1],
         `Esc reached kitty with a modifier held — the harness's clear did not take, and this is ` +
           `the X session rather than the protocol (F812). The clear and \`--clearmodifiers\` were ` +
-          `both in place, so it is not a held X modifier · ${seqs}`,
+          `both in place, so it is not a held X modifier ${record}`,
       ).toBe("1");
+      // The same claim read from the bytes, kept beside the handshake because it
+      // needs nothing of the terminal: a legacy `\x1b` followed by a release in
+      // the new mode is the push arriving between the two.
       expect(
         a.startsWith("\x1b\x1b") ? "the mode was not live when the first key arrived" : "live",
-        "the first key was sent before kitty entered the keyboard mode (F812)",
+        `the first key was sent before kitty entered the keyboard mode (F812) ${record}`,
       ).toBe("live");
 
       expect(a, "a lone Esc is `CSI 27 u` — not a prefix").toContain("\x1b[27u");
