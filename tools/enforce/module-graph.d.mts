@@ -169,3 +169,15 @@ export declare function publicSurfaceUseSignal(
   testOnly: number;
   concentrated: string[];
 };
+
+/** MG24's name-exactness figures — reported, never gated (F105, F160; declared F1113). */
+export declare function nameExactnessSignal(
+  files: readonly string[],
+  readFile?: (f: string) => string,
+): { members: number; exact: number; shared: string[] };
+
+/** The dev entry points, held apart from the published surface (declared F1113). */
+export declare function checkDevEntryIsolation(
+  files: readonly string[],
+  readFile?: (f: string) => string,
+): Violation[];

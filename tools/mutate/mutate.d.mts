@@ -35,12 +35,25 @@ export declare class BlindHarnessError extends Error {
   constructor(reason: string);
 }
 
+/** One textual edit: the unit `apply` takes and `editsOf` yields. */
+export type Edit = Readonly<{ file: string; from: string; to: string }>;
+
 export type Mutation = Readonly<{
   name: string;
   file: string;
   from: string;
   to: string;
   expect: string;
+  /**
+   * Further edits applied with this one, for **two wirings each sufficient
+   * alone** (F227): a revert row about a pair has to break the pair, or the
+   * mutation goes red for a reason it does not name.
+   *
+   * Supported by `editsOf` since F227 and declared here since F1113 — the run
+   * files are `.mjs` and unchecked, so the first typed caller was the fixture
+   * row written to prove the refusal reaches an `also` edge.
+   */
+  also?: readonly Edit[];
 }>;
 
 /** A mutation whose kill is not in doubt, and why it cannot survive. */
@@ -84,6 +97,25 @@ export type Outcome = Readonly<{
    */
   hits?: number;
 }>;
+
+/**
+ * Every edit a mutation makes: its own, then any `also` beside it (F227).
+ *
+ * Declared since F1113 — the module has exported it since `also` landed and no
+ * typed caller could name it.
+ */
+export declare function editsOf(m: Mutation): Edit[];
+
+/**
+ * `read`/`write` against a real tree under `root`, writing atomically.
+ *
+ * Imported by name from the run files, which are `.mjs` and unchecked — so the
+ * declaration was missing for as long as it has had consumers (F1113).
+ */
+export declare function fsIo(root: string): {
+  read: (f: string) => string;
+  write: (f: string, s: string) => void;
+};
 
 /** How many places an anchor matches — `replace` takes the first (F219, F1037). */
 export declare function hitsOf(src: string, from: string): number;

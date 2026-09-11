@@ -222,3 +222,16 @@ export declare function checkSeamFour(
   readFile?: (f: string) => string,
   seam?: readonly { effect: string; owner: string }[],
 ): Violation[];
+
+/** Every `§`-addressable section heading in `file`, as a set of ids (F1113). */
+export declare function sectionsOf(
+  file: string,
+  readFile?: (f: string) => string,
+): Set<string>;
+
+/** Every section citation in `src`, with the line, the id and the document it names (F1113). */
+export declare function scanSections(
+  file: string,
+  src: string,
+  options?: Readonly<{ owner?: string | null; code?: boolean }>,
+): { line: number; id: string; spec: string | null; qualified: boolean }[];
