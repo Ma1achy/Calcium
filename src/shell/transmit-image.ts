@@ -27,7 +27,7 @@
 import { imageKey, payload, placementIdOf, transmit, transmitAnimation, transmitRgba } from "../presentation/image/kitty.js";
 import { compositeOverlay } from "../presentation/image/overlay.js";
 import { decodeImage } from "../presentation/image/index.js";
-import { imageCells, placesAtProtocol } from "../presentation/blocks/kinds/image.js";
+import { imageCells, placesAtProtocol, transmits } from "../presentation/blocks/kinds/image.js";
 import type { Block, Image } from "../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
 import type { Probe } from "../data/viewmodel/index.js";
@@ -97,18 +97,22 @@ function imagesIn(block: Block, out: Image[]): void {
  *
  * **Exported so the caller can skip building its argument, not so it can decide
  * anything.** `transmitImage` reads it too, on its first line, so there is one
- * implementation and the two cannot drift — the alternative is a second
- * `imageProtocol !== "kitty"` in `session.ts`, which is the shape C09 I1 exists
- * to forbid.
+ * implementation and the two cannot drift.
+ *
+ * **That sentence was false for as long as it stood, and the cause is the layer
+ * rule** (F1108). `placesAtProtocol` — called from the loop below, four lines in
+ * — opened with a literal `imageProtocol !== "kitty"`, because it is L1 and this
+ * file is L4, so the predicate it was told not to duplicate was the one thing it
+ * could not import. The comment named `session.ts` as where a second comparison
+ * would appear; it was in `presentation/blocks/kinds/image.ts`, which is where
+ * the predicate now lives and where this file imports it from.
  *
  * The argument it lets the caller skip is a `flatMap` over **every block in
  * every transcript entry**, built every frame and handed to a function that
  * returns `""` on its first line: 90 µs per frame at two thousand entries, and
  * an eight-thousand-element array of garbage with it (F889).
  */
-export function transmits(capabilities: TerminalCapabilities): boolean {
-  return capabilities.imageProtocol === "kitty";
-}
+export { transmits };
 
 export function transmitImage(
   blocks: readonly Block[],

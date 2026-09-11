@@ -47568,7 +47568,7 @@ in one finding.
 |---|---|
 | **Surface** | `tools/mutate/runs/*.mjs` · F1105's seventeen red runs |
 | **Reached for** | F1106 built the check; this points it at the corpus once |
-| **Verdict** | **open** — the census is taken and one instance is confirmed by reading source; the other seventeen are candidates and nobody has read them |
+| **Verdict** | **open** — all eighteen are read and disposed; five were rotted, three are repaired and verified, and the two that remain are named |
 
 ### The measurement
 
@@ -47609,4 +47609,139 @@ run, so it is cheap — and it is the shape of work F1105's reds want anyway.
 is what F1105 owns. A type error on a *caught* row is a weaker harm; this entry
 measured the whole population because the whole population is what a `tsc` pass
 can reach without running a suite.
+
+### All eighteen, read
+
+One is not a candidate at all: `c19-menu-window`'s row is the **control**, which
+`runPass` never type-checks — a control is meant to break everything, and only
+the probe reached it. Seventeen remain.
+
+| disposition | n | what it is |
+|---|---|---|
+| **rotted `to`** | **5** | LN6, `atLate`, FM3, FM4, IO3's overlay |
+| dead-code idiom | 5 | the `to` inserts `false &&` or `if (false)`, and the type error is *inside the block it just made unreachable* |
+| narrowing lost | 7 | a literal or a removed guard widens a type — `const sizes = undefined`, `if (true)`, `bars: []` — and the runtime value is the intended one |
+
+**The twelve share the reason TS6133 was excluded**: the error cannot change what
+runs, either because the code is unreachable or because the value is identical.
+That is not mechanically separable the way an unused binding is, so they stay in
+and the disposition stays *read the `to`*. Recorded as the residue rather than
+narrowed on a guess.
+
+### Three rotted `to`s, repaired and verified
+
+Each was checked the only way that means anything: the mutated tree type-checks,
+**and** the row it names catches it.
+
+- **FM4** — the anchor was widened to `extent,\n identity: …` for uniqueness and
+  the `to` dropped `extent,`, so the mutation deleted a required field of the
+  returned figure as well as changing the identity. Repaired; `tsc` clean; caught
+  by FM4.
+- **FM3** — the same edit, the same file: widened to
+  `orientation: ORIENTATION_UNUSED,\n facing: …` and the `to` dropped the
+  orientation, so the row was caught by a figure with no orientation rather than
+  by a matrix drawn upside down. Repaired; `tsc` clean; caught by FM3.
+- **IO3's overlay** — the `to` returned `{ kind: "ansi", index: 1 }`, and
+  `ColourValue`'s variants are `rgb`, `ansi256` and `ansi16`. There is no `ansi`.
+
+**A widening is a change to the `from` alone only if the `to` restores what it
+added.** FM3 and FM4 are one edit's two halves, and both comments say *Widened:
+`fieldFigure` emits the matrix's cell shape verbatim* — the reason is right, the
+`to` was not carried, and the anchors sweep cannot see it because the `from`
+matches perfectly.
+
+### The repair that turned a kill into a survivor, which is the whole argument
+
+Repairing IO3's `to` to `ansi16` made the mutation **survive** — 93 tests across
+the run's whole corpus, green. It had been killed by a colour no arm matches.
+
+The cause is in the row's own helper. `runs` extracts foregrounds with
+`\x1b[38;2;R;G;B` and `\x1b[38;5;N`, and a 16-colour foreground is **neither** —
+it is `30`–`37` and `90`–`97`. So the matcher was blind to the one encoding a
+*fallback below the floor* would most naturally emit, which is the exact rung IO3
+exists to refuse. Widened; the clean tree still passes, and the repaired mutation
+now fails with the encoding on the line: `expected [ '31', '31', … ] to have a
+length of +0`.
+
+**Third instance of the class, in the helper the second one created.** The
+comment above `runs` is about this very failure — *a matcher that sees one
+encoding cannot tell the rung is absent from the rung is a different escape* —
+written when `38;2;` alone was widened to include `38;5;`. It stopped one form
+short, and the mutation that would have said so was rotted.
+
+### What remains
+
+**LN6** and **`atLate`**, both of which want a mutation designed rather than
+patched: LN6 needs the frame *moved* rather than added, which is C12's 3-D
+carrier and wants the by-hand walk; `atLate`'s row needs the runner's step to
+land after the lifecycle's in `log`, which is a reorder and not a rename.
+
+**`c09-image` is green** — every mutation caught — so F1105's seventeen reds are
+sixteen. Its last survivor was not a weak test either: F1108.
+
+---
+
+## F1108 — two implementations of one predicate, because the layer rule put the copy where the original could not be imported ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/transmit-image.ts` · `src/presentation/blocks/kinds/image.ts` · `test/unit/image-kitty.test.ts` IK12 |
+| **Reached for** | `c09-image`'s last survivor, once F1107 had cleared the rotted `to`s off the run |
+| **Verdict** | **closed** — the predicate moved to the lowest layer that asks it, `placesAtProtocol` asks it, and IK12 gates one comparison over all of `src/` with a fabricated violation in a file neither old assertion read |
+
+### The survivor
+
+`c09-image`'s *the seam transmits at every protocol* removes
+`if (!transmits(capabilities)) return "";` from `transmitImage`'s first line and
+survived. IK7 asserts that a non-kitty capability set yields `""`, so the row
+looked weak.
+
+It is not. Four lines into the loop, `placesAtProtocol(image, capabilities, …)`
+opens with a **literal `imageProtocol !== "kitty"`**, so removing the first guard
+changes nothing any caller can see.
+
+### The sentence it falsifies, and why the sentence could not have been true
+
+`transmits`'s own doc comment:
+
+> Exported so the caller can skip building its argument, not so it can decide
+> anything. `transmitImage` reads it too, on its first line, **so there is one
+> implementation and the two cannot drift** — the alternative is a second
+> `imageProtocol !== "kitty"` in `session.ts`, which is the shape C09 I1 exists
+> to forbid.
+
+There were two implementations the whole time, and **the layer rule required
+it**: `placesAtProtocol` is L1 and `transmits` was L4, so the predicate the
+comment told it not to duplicate was the one thing it could not import. The
+comment even named where a second comparison would appear — `session.ts` — and
+it was in a third file.
+
+**This is not a rule being broken. It is a rule being obeyed with the predicate
+on the wrong side of it**, which reads as compliance from every direction.
+
+### Two instruments looked and neither could see it
+
+- **IK12** scans for a second comparison and reads `transmit-image.ts` and
+  `session.ts` — the two files someone thought of — then asserts the first
+  *holds the only comparison*. A gate phrased over the files you suspect tests
+  each one against itself and agrees.
+- **The mutation** removed L4's guard and survived, which is a duplication
+  arriving as a report about a weak test. F277's question — *ask why the mutation
+  cannot reach the test* — is what found it, and the answer was a second guard.
+
+### The repair
+
+`transmits` now lives in `presentation/blocks/kinds/image.ts`, beside the copy
+that could not call it, and `placesAtProtocol` asks it. `transmit-image.ts`
+imports it — an edge that already existed for `imageCells` and
+`placesAtProtocol` — and re-exports it, so every consumer keeps its import.
+
+IK12 now walks all of `src/` and asserts **exactly one site** compares the
+protocol, and that it is the predicate's own body, with a control that the walk
+read more than a hundred files. The fabricated violation was put in
+`presentation/image/kitty.ts` — a file neither old assertion read — and the row
+goes red naming two sites where it expects one.
+
+The mutation keeps its pair: both call sites still return early on their own, so
+it breaks them together through `also`, which is what `also` is for (F227).
 

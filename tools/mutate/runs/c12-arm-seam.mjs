@@ -233,8 +233,16 @@ const results = runPass({
       file: FIGURE,
       // Widened: `fieldFigure` emits the matrix's cell shape verbatim, so this
       // line alone matches two emitters (C12 §3ak.29).
+      //
+      // **And the `to` carries the widening back** (F1107). It did not: the
+      // anchor gained `extent,` for uniqueness and the replacement dropped it,
+      // so the mutation deleted a required field of the returned figure as well
+      // as changing the identity. `tsc` said so — *Property 'extent' is missing*
+      // — and the row was caught by a figure with no extent rather than by a
+      // gutter with the wrong names. **A widening is a change to the `from`
+      // alone only if the `to` restores what it added.**
       from: "    extent,\n    identity: block.series.map((sr) => sr.label ?? \"\"),",
-      to: "    identity: identityOf(block),",
+      to: "    extent,\n    identity: identityOf(block),",
       expect: "FM4",
     },
     {
@@ -249,9 +257,14 @@ const results = runPass({
       name: "THE DEFECT: a matrix stops honouring its origin and draws flipped",
       file: FIGURE,
       // Widened: `fieldFigure` emits the matrix's cell shape verbatim, so this
-      // line alone matches two emitters (C12 §3ak.29).
+      // line alone matches two emitters (C12 §3ak.29) — **and the `to` carries
+      // the widening back** (F1107), which it did not: the anchor gained
+      // `orientation: ORIENTATION_UNUSED,` and the replacement dropped it, so
+      // the row was caught by a figure with no orientation rather than by a
+      // matrix drawn upside down. Same defect as FM4's, in the same file, from
+      // the same edit.
       from: "    orientation: ORIENTATION_UNUSED,\n    facing: facingOf(block, FACING_MATRIX),",
-      to: "    facing: FACING_DEFAULT,",
+      to: "    orientation: ORIENTATION_UNUSED,\n    facing: FACING_DEFAULT,",
       expect: "FM3",
     },
     {

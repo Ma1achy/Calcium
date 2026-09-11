@@ -51,11 +51,26 @@ const glyphs = (blk: Block, caps = FULL_CAPS, w = 40): readonly string[] =>
  * 8-bit — where `continuousColour` quantises to the 256-cube and emits `38;5;N`.
  * A matcher that sees one encoding cannot tell *the rung is absent* from *the
  * rung is a different escape*, which is the reading IO3 exists to make.
+ *
+ * **And the widening stopped one form short** (F1107). The 16-colour foreground
+ * is not a `38;` sequence at all — it is `30`–`37` and `90`–`97` — so the
+ * matcher was blind to the one encoding a *fallback below the floor* would
+ * most naturally emit, which is the exact rung IO3 is written to refuse. The
+ * mutation that proves it exists and could not: `c09-image`'s IO3 row returned
+ * `{ kind: "ansi", index: 1 }`, a variant `ColourValue` does not have, so it was
+ * killed by a colour no arm matches and the blind spot stayed covered. Repairing
+ * the `to` to `ansi16` turned the kill into a survivor, and this widening is
+ * what makes the row see it. Third instance of the class, in the helper the
+ * second one created.
  */
 const runs = (blk: Block, caps = FULL_CAPS, w = 40): readonly string[] =>
   lines(blk, caps, w)
-    .flatMap((l) => [...l.matchAll(new RegExp(ESC + String.raw`\[38;(?:2;(\d+;\d+;\d+)|5;(\d+))m`, "gu"))])
-    .map((m) => m[1] ?? m[2] ?? "");
+    .flatMap((l) => [
+      ...l.matchAll(
+        new RegExp(ESC + String.raw`\[(?:38;(?:2;(\d+;\d+;\d+)|5;(\d+))|(3[0-7]|9[0-7]))m`, "gu"),
+      ),
+    ])
+    .map((m) => m[1] ?? m[2] ?? m[3] ?? "");
 
 const plain = b.image({ id: "p", data: PIC, height: 6, alt: "stripes" });
 const over = b.image({ id: "o", data: PIC, height: 6, alt: "stripes", overlay: { values: BLOB } });
