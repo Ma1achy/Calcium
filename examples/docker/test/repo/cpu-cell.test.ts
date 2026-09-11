@@ -17,7 +17,7 @@ import { readFileSync } from "node:fs";
 import { cells } from "@fmx/calcium";
 import type { Block, Panel, Table } from "@fmx/calcium";
 import { parseNdjson } from "../../src/ndjson.ts";
-import { COLUMNS, isLive, join, livePanelBody, percent } from "../../src/dashboard.ts";
+import { BAR_CELLS, COLUMNS, GLYPH_SLOT, isLive, join, livePanelBody, percent } from "../../src/dashboard.ts";
 import type { Joined, Snapshot } from "../../src/dashboard.ts";
 import { measurable } from "../../../../test/support/render.ts";
 import { tableDefinition } from "../../../../src/presentation/table/index.ts";
@@ -105,16 +105,30 @@ describe("the CPU cell, read from the frame", () => {
     expect(row, "the run is full at the ceiling").toContain("█");
   });
 
-  it("C4 (F174): the widest value walk A4 permits is not elided", () => {
-    // **Deliberately not the arithmetic.** The row this replaces compared
-    // `minWidth` against a string the same module padded *to* `CPU_WIDTH`, so
-    // both sides moved together and removing the glyph slot failed nothing —
-    // step 1's `STATUS` defect, made again in the file documenting it. The
-    // rendered cell has no such symmetry.
+  it("C4 (F174, F1104): the widest value walk A4 permits is not elided, and the run is the width it claims", () => {
+    // **Deliberately not the arithmetic — and the second draft was arithmetic
+    // anyway.** The row this replaced compared `minWidth` against a string the
+    // same module padded *to* `CPU_WIDTH`, so both sides moved together and
+    // removing the glyph slot failed nothing. Its replacement sliced the frame
+    // to `cpuWidth()` and asserted the slice was at most `cpuWidth()` — the
+    // same symmetry, moved out of the module and into this file's own reader,
+    // satisfied by construction for every value (F1104). Step 1's `STATUS`
+    // defect, made three times in the file documenting it.
+    //
+    // **`BAR_CELLS` is the side that does not move.** `CPU_WIDTH` is built from
+    // it, so measuring the rendered run against it breaks the symmetry:
+    // removing `GLYPH_SLOT` shortens the column and leaves this number alone.
     const widest: readonly Joined[] = [{ ...live[0]!, cpu: 999.9, name: "widest" }];
     const [row] = cpuCells(widest, 120);
     expect(row).toContain("999.9%");
     expect(row, "the cell must not truncate its own number").not.toContain("…");
-    expect(cells(row!.trimEnd())).toBeLessThanOrEqual(cpuWidth());
+
+    // The mark C04 I6 obliges and C11 I23 draws, at the head of the cell.
+    expect(row, "a container this hot carries its mark").toMatch(/^\S /u);
+    // And the run is exactly what `BAR_CELLS` says, which is only true because
+    // the slot beside it was reserved: `▲ ████████ 999.9%` is 2 + 8 + 1 + 6.
+    const run = row!.slice(GLYPH_SLOT).replace(/\s*999\.9%\s*$/u, "");
+    expect(cells(run), "the run is the width the module claims for it").toBe(BAR_CELLS);
+    expect(cells(row!.trimEnd()), "inside the column, as the plan says").toBeLessThanOrEqual(cpuWidth());
   });
 });

@@ -47078,3 +47078,282 @@ comment line, so non-blank, and the cell's symbols appear in the file. F1092
 established that `2523` had **never once** been the submission site — about the
 table — and did not carry it to the prose eleven hundred lines below. Neither
 did the gate, because neither check it runs can fail on a comment.
+
+---
+
+## F1104 — C04 obliges a glyph on a `warn` cell, C11's bar branch returns before reading it, and four goldens record the absence ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/table/cells.ts:173` · `examples/docker/src/dashboard.ts:173` · `test/golden/__snapshots__/states.test.ts.snap` · `tools/mutate/runs/docker-dashboard.mjs` C4 |
+| **Reached for** | a mutation survivor on the first automated sweep — *the glyph slot is not reserved, so the column reflows when a container gets hot* |
+| **Verdict** | **closed** — C11 I23, commitment 21, T1.26–T1.28, T3.21, T6.18; `c11-cell-glyph.mjs` with three mutations and `docker-dashboard.mjs`'s C4 now caught |
+
+### The survivor, and why it is right to survive
+
+`docker-dashboard.mjs`'s C4 removes `GLYPH_SLOT` from `CPU_WIDTH` and no row
+notices. Three things had to be measured before the mutation could be judged, and
+the harness's own message is the one that asks for it — *ask why the mutation
+cannot reach the test before rewriting the test* (F277).
+
+**The mutation's subject is inert.** `cells.ts`:
+
+```ts
+if (cell?.bar !== undefined) {
+  spans.push({
+    text: valueBar(cell.bar, planned.width, ctx.capabilities),
+    style: tone(cell.tone ?? "accent", ctx.theme, ctx.capabilities),
+  });
+  return;
+}
+```
+
+It returns **forty lines above** `const glyph = cell?.glyph === undefined ? "" :
+glyphFor(...)`. A bar cell's glyph has never been drawn. `spark` is the same
+early return, eight lines up.
+
+### C04 I6 obliges the thing C11 discards
+
+> **I6** — Any `Notice` or `Cell` toned `error` or `warn` carries a glyph […]
+> Lint over block construction, satisfying D29 at the source rather than at the
+> renderer.
+
+Enforced at construction, so `examples/docker` **must** supply one — `cpu: { text:
+"", bar: {…}, ...loadTone(c.cpu) }`, and `loadTone` returns `glyph: "warn"` above
+`BUSY`. The producer is obliged, the renderer drops it, and no spec anywhere says
+it may: C11 says nothing about a bar cell's glyph, and C04 I50c says only that
+`Cell.bar` *replaces the cell's text and takes the planned width*. **Text and
+glyph are different things** — the ordinary path is explicit that a glyph is
+"part of the cell's width, not an addition to it", so it is not text and I50c
+does not reach it.
+
+### The goldens recorded it, four times, twice with no colour
+
+```
+── table · table-value-bar            (dark-ascii at 40)
+NAME      CPU
+api       #............ 4.2%
+worker    ########### 101.2%
+```
+
+`worker` is `tone: "error", glyph: "warn"` (`test/support/states.ts:223`). **At
+ASCII there is no colour**, so the severity band is carried by nothing — which is
+C12 I25 in C11's file: *two things a reader must tell apart differ by mark or by
+name, never by tone alone*. A 59% bar and a 61% bar differ by one cell of fill and
+by nothing else, and 60 is where the app declares the band.
+
+*A snapshot records, it does not check.* Second instance in this register.
+
+### The consumer paid for the slot and the framework never spent it
+
+`dashboard.ts:166`:
+
+> The glyph slot, **reserved whether or not a glyph is drawn.** […] a column that
+> grows two cells the moment load crosses 60% is a table that reflows because a
+> container got hot.
+
+`GLYPH_SLOT = 2` is in `CPU_WIDTH` and in `minWidth` for both `cpu` and `mem`.
+And the app's own comment records the predecessor: the hand-drawn nine lines
+rendered `✗ ████████ 101.2%`. **The glyph was lost when `Cell.bar` took the
+drawing (C04 I50c), the width reservation stayed, and nobody read the frame.**
+
+**The slot is not blank — the run eats it, and the first reading of this finding
+said otherwise.** Reproducing the figure corrected it. The cell measured from the
+frame:
+
+```
+cpuWidth=17   [██████████ 780.0%]   run 10, separator 1, number 6
+cpuWidth=15   [████████ 780.0%]     run  8, separator 1, number 6   ← GLYPH_SLOT removed
+```
+
+`valueBar` is handed `planned.width` and **re-derives the split itself**, so the
+two reserved cells are spent on the run: the app's `GLYPH_SLOT + BAR_CELLS + 1 +
+6` names a layout the renderer does not produce, and `BAR_CELLS = 8` is not the
+run's width at either setting. **That is why the mutation survives** — removing
+the slot shortens the run by two and changes nothing else, so nothing truncates
+and no assertion about elision or about `…` can see it. The glyph has nowhere to
+go because the bar already occupies every cell.
+
+*The first draft of this entry read the column as nineteen against a minimum of
+seventeen and called the fixture slack. It is neither: `COLUMN_GAP` is 2, C11 I22
+allocates a non-flex column exactly its `minWidth`, and the two extra cells were
+the gap to `MEM`. Both wrong legs came from a probe printing `indexOf("MEM") −
+indexOf("CPU")` and calling it a width — a finding's own example is checked by
+nothing, and the check is to reproduce the figure rather than re-read the
+reasoning.*
+
+### Two more defects fall out of measuring it
+
+**The replacement row is a tautology.** `test/repo/cpu-cell.test.ts` slices the
+frame to `cpuWidth()` and then asserts the slice is at most `cpuWidth()`:
+
+```ts
+return visible.slice(header + 1).map((l) => l.slice(start, start + cpuWidth()));
+…
+expect(cells(row!.trimEnd())).toBeLessThanOrEqual(cpuWidth());
+```
+
+Satisfied by construction, for every value. Its own comment says it was written
+to escape exactly this: *the row this replaces compared `minWidth` against a
+string the same module padded to `CPU_WIDTH`, so both sides moved together […]
+The rendered cell has no such symmetry.* **The symmetry moved out of the module
+and into the test's own reader.** A03 §2's vacuity class, in the file documenting
+it, for the second time.
+
+**And the constants name a layout nothing produces.** `BAR_CELLS = 8` is
+documented as the run — *the width here is bar + separator + `100.0%`* — and the
+run is 10 cells at `CPU_WIDTH`, 8 only once the glyph slot is removed. Three
+constants add to a number and the renderer then re-derives the split from it, so
+each name is a claim about cells that no frame honours. This is what makes the
+remedy a C11 change rather than an app one: the app cannot reserve anything from
+out there.
+
+### Remedy
+
+A bar or spark cell draws its glyph as a **lead run inside the planned width**,
+and the run takes the rest — which is how an ordinary cell already spends it, and
+what makes I50c's *takes the planned width* true of the cell rather than of the
+bar. `spark` has no toned consumer in the tree today and the arm is written the
+same way rather than left as the next instance.
+
+### Three rulings, and the frame falsified two of them
+
+**The too-narrow clause.** I23's first form dropped the mark *where the plan
+leaves no room for both*, because *a mark would replace the quantity with a
+severity and the quantity is the cell*. Rendered at 3, a toned cell draws `▲ …`
+where an untoned one draws `10…` for 101.2 — and C12 I20 has already ruled on
+that comparison in its other arm: **a truncated number is a different number**.
+`10…` is not the quantity the clause protects. The mark is now dropped only where
+it does not fit, which is a width and not a judgement.
+
+**The per-cell lead**, and the constant that started this said so all along:
+*reserved whether or not a glyph is drawn … the slot is sometimes blank*. Spent
+per cell, a container at 59% draws its run in ten cells and one at 61% in eight,
+so the runs stop being comparable exactly at the band boundary. **C12 I20 rules
+this of the other allowance in the same cell** — *the number's allowance belongs
+to the chart rather than to the row, because taken per row it inverts: 99 draws
+37 and 100 draws 36, every count right.* The lead is the same allowance and the
+same inversion. It is now the column's: reserved on every series cell of a column
+any of whose rows carries a mark, blank where there is none.
+
+**And a row that could not fail.** T3.21 was written for a two-cell glyph at
+`ambiguousWidth: "wide"`, and C09 I48 resolves an Ambiguous slot to its ASCII
+half there, so every glyph is one cell either way. Its blind spot is stated
+rather than papered over: the day a token's renderings differ in width it is C09
+T2.5 that goes red. The first draft of T1.28 made the twin mistake twice in four
+lines — the number is right-aligned in the cell, so *both numbers begin at the
+same cell* passes under a per-cell lead exactly as well. The observable is **where
+the run begins**, and it is read as an offset rather than by counting run
+characters, which are `█░` at one rung and braille at another.
+
+### What the frame says now
+
+```
+▲ ████████ 780.0%          the real consumer, at CPU_WIDTH = 17
+  ██████████ 4.2%          an unmarked row in the same column, slot blank
+```
+
+`GLYPH_SLOT + BAR_CELLS + 1 + 6` **describes the frame for the first time**: the
+run is `BAR_CELLS` on every row of the column, which is the sentence the module
+has carried since the hand-drawn version and which nothing honoured. C4 is
+rewritten against `BAR_CELLS` rather than against `cpuWidth()` — the one figure
+in the module that does *not* move when `GLYPH_SLOT` is removed, which is what
+makes the row able to fail, and `docker-dashboard.mjs`'s C4 is now caught.
+
+### Residue, stated
+
+Reserving the slot costs the run two cells in every fixture whose column was
+sized before I23. In `test/support/states.ts` the `cpu` column is 18, so `api` at
+4.2% falls from one filled cell to none — 4.2% of eleven rounds below half, and
+`valueBar` has no minimum-ink step for `fill` the way C12 I16 has one for a ramp.
+So 4.2% and 0.0% now draw alike **in that fixture**. It is not the real
+consumer's problem — `examples/docker` sized `CPU_WIDTH` for exactly this — and
+it is C12's question rather than C11's, because what is missing is a floor on a
+non-zero run. Named rather than fixed here.
+
+---
+
+## F1105 — the sweep's first complete run: 192 runs, 18 red, and the extrapolation the durations falsify ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `.github/workflows/mutation-sweep.yml` · `tools/mutate/sweep.mjs` · `tools/mutate/runs/c12-arm-seam.mjs` · F1097, F980 |
+| **Reached for** | reading run 34550613146, which F1097 named as the measurement it was waiting for |
+| **Verdict** | **open** — the census is taken and the timeout question is answered; the eighteen reds are named and one of them is closed |
+
+### The census
+
+Six shards, 192 runs, ~84 minutes wall and 326 job-minutes.
+
+| | |
+|---|---|
+| green | 163 |
+| known-stale | 11 |
+| **red** | **18** |
+| survivors | 13, one of them expected |
+| stale anchors | 12, **two of them ambiguous** — *its anchor matches 2x, `replace()` took the first* |
+
+The reds: `c04-kv-bar` · `c09-image` · `c10-colormap` · `c12-arm-seam` ·
+`c12-histogram-series` · `c12-layer-merge` · `c12-lines3d` · `c12-origin` ·
+`c12-svg-callout-row` · `c12-value-bar` · `c19-menu-window` · `c22-construct` ·
+`c22-gate3b` · `c22-spinner` · `c23-faults` · `c25-intraline` ·
+`c26-focus-target` · `docker-dashboard`.
+
+**This is F980's argument paid in one run.** By hand a pass is a session per
+component, which is how 18 of 283 anchors went stale with two controls among
+them. Nothing here came from a test written to look for it.
+
+### The duration question F1097 was waiting on
+
+> The number cannot be chosen without measuring what a whole shard costs on a
+> runner, which is the first thing the next full sweep reports.
+
+All 192 runs:
+
+| | |
+|---|---|
+| median | **33 s** |
+| mean | 100 s |
+| p90 | **116 s** |
+| second slowest | 1922 s (`c23-running-card`) — **71%** of the bound |
+| third | 1604 s (`c28-profiler`) — 59% |
+| slowest | **2700 s — the bound itself**, `c12-arm-seam`, killed |
+
+**So the number is the number already there.** 45 minutes is 23× the p90 and
+admits 191 of 192. What fails is one run, and it fails because it is an outlier
+by sixty times the median: `c12-arm-seam.mjs` carries **90 mutations**, more than
+any other file in the catalogue.
+
+### The extrapolation, and what the durations say about it
+
+F1097 sized the problem by ratio: *measured here at 2237 s against 2700 — 83% of
+the budget on the only regime the author could see, and the runner is 2.7 to 4.1
+times this container, so **101 to 154 minutes** against forty-five.*
+
+The direction held — the run was killed on the runner too, `exit -2, 2700s,
+caught 0`, with the snapshot net restoring one file. **The magnitude is
+unmeasurable from this run and the ratio is the wrong instrument for it**: a
+2.7–4.1× machine ratio was measured on a render-cost row, and the runs it is
+applied to here land at a median of 33 s with the third-slowest at 27 minutes
+against a 37-minute in-container figure — *faster* on the runner, not three times
+slower. A ratio measured on one workload is about that workload.
+
+**The remedy the measurement points at is a split, not a bound.** Raising the
+per-run bound to 154 minutes would put one run at half a 300-minute job and break
+the shard; splitting the 90-mutation file leaves the bound governing 192 runs
+that do not need it. `c23-running-card` at 71% and `c28-profiler` at 59% are the
+next two, so there is one run's headroom and no more.
+
+### Residue
+
+The eighteen reds are a campaign and this entry owns the list. One is closed:
+`docker-dashboard.mjs` — its `C4` survivor was F1104, and its two stale anchors
+were one edit each (`summaryLine(live)` and the `emptyMessage` literal both
+gaining a `unicode` argument), so its `KNOWN_STALE` entry is gone.
+
+**The two ambiguous anchors are their own class** and the harness already names
+it: an anchor that matches twice has `replace()` take the first, so the mutation
+applies somewhere the author did not choose and the row that would catch it never
+runs. That is `assert s.count(old) == 1` — the rule this repo applies to its own
+edit scripts — missing from the mutation harness.
+
