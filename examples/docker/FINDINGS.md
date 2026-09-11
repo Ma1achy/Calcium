@@ -47330,7 +47330,7 @@ non-zero run. Named rather than fixed here.
 |---|---|
 | **Surface** | `.github/workflows/mutation-sweep.yml` · `tools/mutate/sweep.mjs` · `tools/mutate/runs/c12-arm-seam.mjs` · F1097, F980 |
 | **Reached for** | reading run 34550613146, which F1097 named as the measurement it was waiting for |
-| **Verdict** | **open** — the census is taken and the timeout question is answered; the eighteen reds are named and **thirteen are closed** (F1104, F1108, F1116 ×2, F1117 ×3, F1118 ×4, F1120, F1122), so **five remain** |
+| **Verdict** | **open** — the census is taken and the timeout question is answered; the eighteen reds are named and **sixteen are closed** (F1104, F1108, F1116 ×2, F1117 ×3, F1118 ×4, F1120, F1122, F1123 ×3), so **two remain** |
 
 ### The census
 
@@ -47727,12 +47727,14 @@ whose subject had moved. Two were the thing the sweep exists to find:
 `docker-dashboard`'s `C4` survivor (F1104) and `c09-image`'s (F1108). That ratio
 is the figure to hold against the next reading of this list.
 
-**Five remain**: `c10-colormap`, `c12-arm-seam`, `c12-histogram-series`,
-`c12-lines3d`, `c25-intraline`. Three are recorded survivors wanting F277's
-question asked; `c12-arm-seam` hits the 45-minute bound with ninety mutations and
-wants splitting; `c12-lines3d`'s LN6 is a rotted `to` that does not type, and it
-is the one that needs the frame *moved* rather than added — F1107's residue, and
+**Two remain**: `c12-arm-seam`, which hits the 45-minute bound with ninety
+mutations and wants splitting, and `c12-lines3d`, whose LN6 is a rotted `to` that
+does not type and needs the frame *moved* rather than added — F1107's residue, and
 the by-hand walk of C12's 3-D carrier.
+
+The three recorded survivors are closed by F1123, and **none of them was a weak
+assertion**: two rows never reached the branch the mutation rewrites, and one was
+satisfied by the overflow notice standing where the axis should have been.
 
 **Eleven of the thirteen closed were an instrument's defect rather than a
 test's** — a wrong-site anchor, an anchor the reader could not see, an anchor
@@ -48669,6 +48671,77 @@ ordering that was never wrong.
 `c23-faults` is green: every mutation caught, T4.27's move among them. **Two more
 of F1105's eighteen close** — `c12-svg-callout-row` and `c23-faults` — leaving
 five.
+
+---
+
+## F1123 — the last three survivors, and not one was a weak assertion ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `test/contract/colormap.test.ts` · `test/edge/patch-intraline.test.ts` T3.19 · `test/unit/plot-histogram-series.test.ts` HS4 · F277, F1105 |
+| **Reached for** | F1105's last three recorded survivors, each asked F277's question before its test was touched |
+| **Verdict** | **closed** — all three runs green, and three of F1105's eighteen close, leaving two |
+
+**F277's rule is *ask why the mutation cannot reach the test before rewriting the
+test*, and it was right three times out of three.** Not one of these was a row
+that asserts too little about what it sees. Two are rows that never see the code
+at all, and one is a row whose assertion is satisfied by a neighbour.
+
+### Shape one — the branch has no caller
+
+**`c10-colormap`: the colour window is left-anchored.** The mutation rewrites
+`columnMap`'s `"window"` arm, and `MATRIX_LAYOUT.heatmap` is `"stretch"` — every
+reading gets a column — so that arm is reached only when a caller passes
+`matrixAnchor: "window"`, and nothing in the corpus did. Measured on the frame:
+27 painted cells spanning the whole map for 60 readings, which is a stretch and
+not a window. The row is **named for the anchor** — *the colour window is the
+glyph window, on the same anchor* — and drives the path that has none.
+
+A row now sets `matrixAnchor: "window"` and puts a **maximum at index 0**, a
+reading only a left-anchored window can include. Right-anchored it is dropped with
+the rest of the oldest; left-anchored it is the first painted cell and the top of
+the map. The comparison is against the legend's high swatch — the frame's own
+answer — so nothing in the row knows what viridis holds, and the control renders a
+16-reading series to show the sentinel is paintable at all.
+
+**`c25-intraline`: `windowRows` copies lines member by member.** The mutation
+rewrites the branch that pushes a run lying **whole** inside the window; T3.19's
+cut lands *inside* a run, which takes the row-wise slice one branch below. Same
+shape, one function along. The row now windows the whole patch as well, and
+asserts the spans survive there too — with a control that the fixture has spans to
+lose.
+
+### Shape two — the assertion is satisfied by a neighbour
+
+**`c12-histogram-series`: every vertical band carries the composite label.** HS4
+asserted `rows[last].trim() !== ""` and `not.toContain("·")`, and the source's own
+comment predicts what the mutation does: *a band three cells wide has room for
+nothing, so composing the same label under a column drops **every** label.*
+Measured, clean against mutated:
+
+| | tick row | label row |
+|---|---|---|
+| clean | `└──┬───────┬───────┬──…┘` (9 ticks) | `20.0 25.1 30.2 … 60.9 +9` |
+| mutated | `└──────────────────────┘` (none) | `+18` |
+
+**The axis came back empty and the assertion passed**, because `+18` is the
+overflow notice — the artefact that *says* the labels are gone — and it keeps the
+row non-blank. The `·` half passes for the same reason: the composite never fits,
+so the separator never reaches the row.
+
+The row now strips a trailing `+N` before reading the label row, and counts the
+`┬` on the tick row. **A notice is not the thing it is a notice about**, and an
+assertion that cannot tell them apart is satisfied hardest on the day it becomes
+false.
+
+### What the three have in common
+
+Each row named its subject correctly and measured something adjacent to it: the
+default layout instead of the requested one, the row-wise branch instead of the
+whole-run one, the notice instead of the axis. **None of the three is visible from
+a green suite, and all three were visible the moment a mutation was pointed at the
+line the row claims to cover** — which is the argument for the pass being a
+scheduled step rather than a diligence.
 
 ### The other row that read the same list, and it went red
 
