@@ -47330,7 +47330,7 @@ non-zero run. Named rather than fixed here.
 |---|---|
 | **Surface** | `.github/workflows/mutation-sweep.yml` · `tools/mutate/sweep.mjs` · `tools/mutate/runs/c12-arm-seam.mjs` · F1097, F980 |
 | **Reached for** | reading run 34550613146, which F1097 named as the measurement it was waiting for |
-| **Verdict** | **open** — the census is taken and the timeout question is answered; the eighteen reds are named and **sixteen are closed** (F1104, F1108, F1116 ×2, F1117 ×3, F1118 ×4, F1120, F1122, F1123 ×3), so **two remain** |
+| **Verdict** | **open** — the census is taken and the timeout question is answered; the eighteen reds are named and **seventeen are closed** (F1104, F1108, F1116 ×2, F1117 ×3, F1118 ×4, F1120, F1122, F1123 ×3, F1124), so **one remains** |
 
 ### The census
 
@@ -47727,10 +47727,10 @@ whose subject had moved. Two were the thing the sweep exists to find:
 `docker-dashboard`'s `C4` survivor (F1104) and `c09-image`'s (F1108). That ratio
 is the figure to hold against the next reading of this list.
 
-**Two remain**: `c12-arm-seam`, which hits the 45-minute bound with ninety
-mutations and wants splitting, and `c12-lines3d`, whose LN6 is a rotted `to` that
-does not type and needs the frame *moved* rather than added — F1107's residue, and
-the by-hand walk of C12's 3-D carrier.
+**One remains**: `c12-lines3d`, whose LN6 is a rotted `to` that does not type and
+needs the frame *moved* rather than added — F1107's residue, and the by-hand walk
+of C12's 3-D carrier. `c12-arm-seam` is closed by F1124: three shards of thirty,
+ninety of ninety caught, and the sweep's expectation count unmoved across the cut.
 
 The three recorded survivors are closed by F1123, and **none of them was a weak
 assertion**: two rows never reached the branch the mutation rewrites, and one was
@@ -48543,6 +48543,35 @@ MA3 is four arms now, and each is reachable with the real list empty:
 `mutate-anchors-parse.mjs` carries both mutations: the supplied list ignored, and
 the dead-entry loop emptied. Both caught by MA3.
 
+### The other row that read the same list, and it went red
+
+**Two rows depended on `KNOWN_STALE` being non-empty, and they failed in opposite
+directions.** `make instruments` found the second one — MS3, in
+`mutate-sweep.test.ts`, which cross-checks the list the sweep *tolerates* against
+the list `anchors.mjs` *enforces*. Its first line is
+`expect(Object.keys(list).length).toBeGreaterThan(0)`, a guard against a reader
+that returns nothing, and it went **red** the moment the list emptied.
+
+| | MA3 | MS3 |
+|---|---|---|
+| what it read | the list, as a corpus for a fabrication | the list, as the population of a bound |
+| corpus assertion | none | `> 0` entries |
+| when the list emptied | **green**, having nothing to inherit | **red**, saying so |
+
+**The corpus assertion is the whole difference**, and it is the same instrument
+that catches a scan reading no file and a sweep reading no test path. A row that
+has one says *my subject is gone*; a row without one says nothing at all, and is
+indistinguishable from a row that is still working. That is the practical rule
+this finding leaves: **a fabrication over a list needs an assertion that the list
+was read, and the population it is taken over must not be the one the work is
+shrinking.**
+
+MS3's bound moved onto `discover()` — the run corpus, which does not shrink — and
+its two arms (*every entry names a run that exists*, and an entry naming nothing)
+are driven with a fabricated source rather than read off a list that may be empty.
+The cross-check against the sweep's printed total stays over the real list, where
+0 = 0 is the correct answer today.
+
 ---
 
 ## F1120 — a control written to be invisible, against a harness that requires a kill, so the run has never started ★★★★☆
@@ -48743,31 +48772,107 @@ a green suite, and all three were visible the moment a mutation was pointed at t
 line the row claims to cover** — which is the argument for the pass being a
 scheduled step rather than a diligence.
 
-### The other row that read the same list, and it went red
+---
 
-**Two rows depended on `KNOWN_STALE` being non-empty, and they failed in opposite
-directions.** `make instruments` found the second one — MS3, in
-`mutate-sweep.test.ts`, which cross-checks the list the sweep *tolerates* against
-the list `anchors.mjs` *enforces*. Its first line is
-`expect(Object.keys(list).length).toBeGreaterThan(0)`, a guard against a reader
-that returns nothing, and it went **red** the moment the list emptied.
+## F1124 — the split is a bound, and the first cut was shaped by the artefact instead ★★★★
 
-| | MA3 | MS3 |
-|---|---|---|
-| what it read | the list, as a corpus for a fabrication | the list, as the population of a bound |
-| corpus assertion | none | `> 0` entries |
-| when the list emptied | **green**, having nothing to inherit | **red**, saying so |
+| | |
+|---|---|
+| **Surface** | `tools/mutate/runs/c12-arm-seam-{1,2,3}.mjs` · `tools/mutate/anchors.mjs` · `sweep.mjs`'s per-run bound · F1105, F1097, F287, F1117 |
+| **Reached for** | F1105's last structural red: the one run of one hundred and ninety-two that cannot finish inside the bound |
+| **Verdict** | **closed** — three shards of thirty, ninety of ninety caught, and F1105 is down to one |
 
-**The corpus assertion is the whole difference**, and it is the same instrument
-that catches a scan reading no file and a sweep reading no test path. A row that
-has one says *my subject is gone*; a row without one says nothing at all, and is
-indistinguishable from a row that is still working. That is the practical rule
-this finding leaves: **a fabrication over a list needs an assertion that the list
-was read, and the population it is taken over must not be the one the work is
-shrinking.**
+`c12-arm-seam.mjs` carried **ninety mutations**, more than any file in the
+catalogue, and F1105 ruled the remedy: *split it, rather than raise the bound* —
+a shard runs thirty-odd runs against a three-hundred-minute job, so a bound that
+admits this one breaks the shard.
 
-MS3's bound moved onto `discover()` — the run corpus, which does not shrink — and
-its two arms (*every entry names a run that exists*, and an entry naming nothing)
-are driven with a fabricated source rather than read off a list that may be empty.
-The cross-check against the sweep's printed total stays over the real list, where
-0 = 0 is the correct answer today.
+### What the cut had to preserve, and the figure that says it did
+
+The sweep reports five totals. Four of them **must** move by exactly what a cut
+into three predicts, and one must not move at all:
+
+| | before | after | why |
+|---|---|---|---|
+| runs | 194 | 196 | one file became three |
+| anchors | 2054 | 2056 | two more controls; `anchorsOf` counts the control |
+| test paths | 489 | 513 | two more copies of the same twelve-suite command |
+| tails | 194 | 196 | one `node --check` per file |
+| **expectations** | **1849** | **1849** | **ninety went in and ninety came out** |
+
+**The expectation count is the totality proof**, and it is the only figure in the
+five that a lost mutation would move. It is the F1113 tell used deliberately
+rather than found: a cut that dropped a row would have left every other number
+looking right.
+
+### Two designs refused, each for a measured reason
+
+**A shared module for the common half.** The header, the nine `const` file names,
+the command, the control and the helpers are identical in all three, which is
+about a hundred and thirty lines duplicated twice. Refused, because
+`anchors.mjs` is **textual** — importing a run executes the pass — and resolves a
+`from:` naming a `const` against *the file's own* declarations. Moving the names
+into a sibling module puts every `file: FIGURE` beyond the reader, and ninety
+anchors fall out of the corpus while the sweep reports a count that never counted
+them. **That is F1117, rebuilt on purpose**, and it is the whole argument for
+paying the duplication.
+
+**A per-shard command.** Narrowing each shard to the suites its own rows name
+would be materially faster: the twelve-suite command is twenty seconds and the
+two goldens are most of it. Refused — it is F287 one level down. A command that
+covers one arm makes every row in it inherit the gap at once, and no reading of a
+`from`/`to` shows it.
+
+### The measurement that changed the cut
+
+The list is ordered by family, so the first cut took the family boundaries:
+**41 / 30 / 19**, which ran **888 / 675 / 388 s** in this container, ninety of
+ninety caught.
+
+That is a green result, and the largest shard sits at **33 % of the bound on the
+only regime that measured it**. The bound is a runner's, and the only ratio
+measured for *this* run is a lower bound: F1105 timed the whole file at 2237 s
+here and the runner killed it past 2700, so ≥ 1.21. At the 2.7 the register
+entertains elsewhere, a 41-row shard is **89 %** — which is the defect being
+repaired, one third smaller.
+
+Recut to **30 / 30 / 30**: **614 / 632 / 640 s**, within four per cent of each
+other, ninety of ninety caught again. About **21.5 s a mutation** across both
+configurations, which is what makes the arithmetic predictive rather than hopeful.
+
+**The first split was shaped by the artefact and the second by the bound, and the
+bound is what the split is for.** A family boundary is a real seam and it is not
+this decision's seam; taking it because it was the visible one put the risk in
+the largest shard. So the membership rule in the files is **position, not
+family** — a name that reads as a taxonomy becomes the membership rule, and the
+odd member then goes in unexamined.
+
+`shardOf` is round-robin over the sorted names, so three adjacent files land in
+three different jobs rather than stacking in one.
+
+### And the cut found an owner that was really a neighbour
+
+`make enforce` went red on the recut with four SP3 violations, all in the last
+shard: *cites a bare `I73` and nothing before it says which spec owns it.* The
+same four comments were green in the original, and the reason is worth the
+paragraph.
+
+SP3 resolves a bare `I…` by an **owner** (a path row, a basename topic, a spec
+naming itself) and, where there is no owner, by **scope** — the last `Cnn` seen,
+reset at every blank line. **No `c12` row exists in `OWNERS`**, and the mutation
+list has no blank lines in it, so one `C12 §3ak.29` in a mutation comment near the
+top owned every bare id below it: seventeen references in the original, resolved
+by a neighbour rather than by the file. Cutting the list three ways sent those
+mentions to the first two shards and left the third with four bare ids and nothing
+above them.
+
+**Nothing was wrong before and nothing is wrong now** — which is why it took a
+cut to show. The row `{ path: "tools/mutate/runs/c12", spec: "C12" }` makes the
+ownership that the filename already states, on the argument written above the
+three rows that were already there, and it covers **fifty-eight** `c12-*` runs
+rather than these three. It also moves 120 section citations in those runs from
+*names no document* to resolving against C12, with no new dangling section.
+
+**What is still unmeasured, and it is the figure that matters**: no shard has run
+on a runner. 614 s here is 23 % of the bound at ratio 1, 62 % at 2.7. The next
+sweep reports it, and this is recorded as the claim it is rather than folded in.
