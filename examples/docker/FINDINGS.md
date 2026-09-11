@@ -46886,7 +46886,7 @@ distinction I55 draws in prose and a line-regex cannot.
 |---|---|
 | **Surface** | `test/e2e/profiler.test.ts:562` (T5.1c) · `src/shell/profiling/replay.ts` · F963 |
 | **Reached for** | reading a CI red that was green on the same commit in the other run |
-| **Verdict** | **open** — recorded, not diagnosed: the two extra reads are named as a candidate and not traced |
+| **Verdict** | **open** — both stated candidates are now falsified by twelve deliberate samples; what remains is the regime rather than the duration, and the next sample is wanted from a runner |
 
 ### The red
 
@@ -46954,6 +46954,48 @@ sample would be a repair aimed at one reading.
   `exhaustedAt` and `fixture processes alive` are all in the verdict and all
   clean, which is the ruling-out F963 did by counter rather than by argument.
 
+### The second sample, produced on purpose — and both candidates fall
+
+**The entry named the experiment that settles the second candidate and nobody ran
+it**: *a killed run with `consumed.wall === recorded.wall` settles it*. The harness
+already has the knob for the first — `record({ farSideDelayMs })` writes a far side
+that sleeps and then execs the real one — so T5.1c's exact shape with a 2 500 ms
+far side is one line.
+
+**Twelve runs: six on a quiet container and six under an eight-way CPU load
+(loadavg 5.58), every one green and every one byte-identical.**
+
+| | |
+|---|---|
+| `answer` | 2 589 – 2 670 ms (the runner's red was 2 658) |
+| `exit` | `null` on all twelve — the `^D` confirm is never answered, so **every** run ends by the kill |
+| wall | 59 / 59 |
+| mono | 3 088 / 3 088 |
+| `compared` · `stalled` | 10 · 0 |
+
+**Candidate two is settled by the entry's own test.** `exit` is `null` on all
+twelve, which is what the harness's comment already said and measured — *C16 I16
+makes `^D` at an empty prompt open a confirm rather than exit*, so the keystroke
+draws a frame and the session waits for an answer nobody types. **`exit=killed`
+describes every sample, the green ones included**, so it cannot be what
+distinguishes the red one.
+
+**Candidate one is falsified as sufficient.** T5.1d has asserted wall parity on a
+2 500 ms far side since it landed, and these twelve reproduce the *red run's own
+duration* in the *red run's own shape* and stay in parity — with the figures
+identical to the digit across all twelve, so the recording is fully deterministic
+here.
+
+**What is left is the regime and not the duration**, and the distinction is the
+finding. The runner's answer was slow because the **machine** was slow — a 2-core
+box under load — and a sleeping wrapper makes the far side slow while everything
+else runs at full speed. **A wrapper reproduces the duration and not the
+contention**, so twelve green runs at 2.6 s say the threshold F963 named was the
+wrong axis, and say nothing about a loaded 2-core runner. Eight hogs on eleven
+cores is 0.5 per core against the runner's 0.7 and is still not that machine.
+
+**Still open**, and better founded: one candidate instead of two, the axis named as
+the regime, and the next sample wanted from a runner rather than from here.
 ---
 
 ## F1101 — the anchorage matcher reads one of three spellings, and fifty-four spans were invisible to it ★★★☆☆
