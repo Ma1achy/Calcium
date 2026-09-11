@@ -47365,7 +47365,7 @@ edit scripts — missing from the mutation harness.
 |---|---|
 | **Surface** | `tools/mutate/runs/c12-lines3d.mjs` (LN6) · `tools/mutate/anchors.mjs` · `src/presentation/plot/scatter3.ts:1178` |
 | **Reached for** | the second survivor of the sweep's first complete run (F1105) |
-| **Verdict** | **open** — the two defects in this mutation are measured; the remedy is named and the right replacement mutation is not |
+| **Verdict** | **closed** — the check is built, gated on the survivor, and proved end to end on the survivor that produced it; its two blind spots are stated and LN6's replacement mutation is F1105's |
 
 ### The survivor
 
@@ -47410,7 +47410,14 @@ F1104's answer was *the subject is inert*.
 **Type-check a survivor's mutated tree.** A mutation that survives and does not
 compile is a broken mutation rather than a finding, and `tsc` would have caught
 this one exactly — `number` against `Readonly<{ w; rows }>` is TS2345. Running it
-only on survivors keeps it cheap: the survivor set is 13 of 192.
+only on survivors keeps it cheap: F1105's census counted **13 survivor rows** across the
+whole sweep — 192 runs and 2002 mutations — so almost nothing pays.
+
+**The figure this sentence first carried was `13 of 192`, and that ratio does not
+exist.** 13 is a count of rows and 192 a count of runs; the denominator a survivor
+rate wants is the 2002 mutations. Nobody would have caught it downstream, because
+both numbers are real and both come from F1105 — which is the derived-claim form of
+*a correction stops at its own sentence*, arriving in a finding written the same day.
 
 **It does not reach the second defect.** An additive mutation type-checks
 perfectly and is inert for a reason no compiler can see. That half has no
@@ -47431,4 +47438,42 @@ guard is either unconstrained by any row or LN6 is not about it. Recorded rather
 than diagnosed, because the right replacement mutation for LN6 depends on the
 answer and C12's 3-D carrier wants the by-hand walk rather than a guess — this
 was one hypothesis, cheaply tested, and falsified.
+
+### What was built
+
+`tscTypecheck(root)` in `tools/mutate/mutate.mjs`, and `runPass` asks it **of a
+survivor and nothing else** — the mutated tree is still on disk at that point,
+which is exactly where the reader is about to be told the tests are weak. A row
+that fails it reads `DID NOT TYPE` with the compiler's own line beside it, is
+counted apart from the survivors, and still fails the gate.
+
+**The baseline is measured rather than assumed**, lazily: the first type error
+restores the tree and asks the same question of it, and a red answer is a
+`BlindHarnessError` naming the tree. The clean-*suite* guard at the top of
+`runPass` does not cover this, because a tree that does not type-check runs a
+green suite — which is the whole of the finding.
+
+| row | what it holds |
+|---|---|
+| MH11 | a survivor whose tree does not type-check is not a survivor, and the row carries the error |
+| MH11b | when the clean tree is red too, the refusal names the tree and not the mutation |
+| MH11c | only a survivor pays, and a green one is still a survivor |
+| MH11d | **the instrument itself** — real `tsc` over a real two-file tree, red then green, 454 ms |
+
+Four permanent mutations in `runs/mutate-harness.mjs`, all caught; five hand
+mutations during the build, all caught. And the end-to-end proof is the row that
+produced the finding: `c12-lines3d` said `1 survived — a finding about the tests`
+and now says
+
+```
+DID NOT TYPE     LN6      the frame is drawn before the data   ← src/presentation/plot/scatter3.ts(999,45): error TS2345: …
+no survivors among the rows that ran
+```
+
+**Scoped to survivors on purpose, and the argument is not only cost.** A rotted
+`to` on a *caught* row misleads nobody — the row is green and the named test
+failed. It could have been caught for the wrong reason, which is a real and
+weaker harm; asking every mutation instead of every survivor is 2002 checks
+against 13, and the anchors sweep is where a whole-corpus check would belong if
+that harm is ever measured rather than supposed.
 
