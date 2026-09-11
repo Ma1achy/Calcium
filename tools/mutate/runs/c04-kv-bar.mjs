@@ -101,8 +101,10 @@ const results = runPass({
       // where this fired** (F1105's ambiguous class). `extentFor` carries the
       // same line twenty lines above, `String.replace` takes the first match,
       // and so a mutation named for the fill pair has been disabling the extent
-      // vocabulary for its whole life — caught by `states` either way, which is
-      // why nothing reported it. The return line joins the anchor because it is
+      // vocabulary for its whole life — and **surviving there**, because that
+      // function's arms had no row until T1.104, which is what put this run on
+      // F1105's red list reading as a weak test (F1116). The return line joins
+      // the anchor because it is
       // what gives the arm its identity: if that payload changes, the mutation's
       // meaning changes with it and a stale anchor is the right answer.
       name: "THE SHIPPED DEFECT: the fill pair ignores the ambiguous width",

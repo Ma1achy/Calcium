@@ -48038,10 +48038,16 @@ function.
 
 ### Why no instrument could see it
 
-**The outcome is identical either way.** The mutation applies, the expected row
-catches it, the pass prints `caught` and exits 0. F1037's annotation — *its
-anchor matches 2x, `replace()` took the first* — rides a `SURVIVED` row, and
-neither of these survived.
+**The *name* of the outcome is the same either way**, and that is as far as this
+entry was written before the outcome itself was measured — see F1116, which says
+what actually happened and is the stronger half. Nothing in a pass compares a
+mutation's subject with the site it lands on, so the two dispositions a reader is
+offered — `caught` and `SURVIVED` — are both about whatever `replace` reached.
+
+F1037's annotation — *its anchor matches 2x, `replace()` took the first* — rides
+a `SURVIVED` row and would have carried the count in both these cases. **It was
+never printed**, because `KNOWN_AMBIGUOUS` was a list and not a report: the sweep
+that knew the number named a **run** and not an **anchor**.
 
 So the count was recorded, printed on the one disposition that could not occur,
 and the sweep that knew the number named a **run** and not an **anchor**: a
@@ -48073,8 +48079,9 @@ left it can be. The disposition is determined rather than annotated.
 
 ### The ten, each pass re-run
 
-Two were wrong-site and are above. The other eight were right by luck: the
-first match happened to be the site the row named, and nothing said so.
+Two were wrong-site and are above; **both were also surviving there, and that is
+F1116.** The other eight were right by luck: the first match happened to be the
+site the row named, and nothing said so.
 
 `c04-ohlc` is the shape worth recording — `const drawn = form ?? "line";` five
 times in one function, a copy this file's own comment defends (*a one-line
@@ -48209,3 +48216,53 @@ family reasons from it — *green here, red there, so the runner is the slow one
 A container drifting further from a clean pid table every day is not a fixed
 reference, and ten days is how long this one has been drifting without anyone
 looking.
+
+---
+
+## F1116 — the two wrong-site anchors were surviving there, and disambiguating them hid the gap they were exposing ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/ramp.ts` `extentFor` · `test/unit/plot-mutations.test.ts` T1.104, T1.105 · `tools/mutate/runs/c12-value-bar.mjs` · F1113, F1105 |
+| **Reached for** | two of F1105's eighteen red runs going green after F1113's re-anchoring, which is a result nothing had predicted |
+| **Verdict** | **closed** — the arms have rows, the run has mutations that reach them, and two of F1105's eighteen close with a cause |
+
+### The measurement F1113 was written without
+
+F1113 said the ambiguous anchors were a hygiene problem: *the outcome is
+identical either way, the mutation kills, only the subject is wrong.* Pointing
+each anchor at `extentFor` **uniquely** and running the pass says otherwise.
+
+    SURVIVED   T1.27    the alphabet ignores the capability
+    SURVIVED   states   THE SHIPPED DEFECT: the fill pair ignores the ambiguous width
+
+**`extentFor`'s two capability arms had no row at all.** Every test that calls it
+calls it with `FULL_CAPS`. So the mutations were not merely landing on the wrong
+function — they were landing on an **uncovered** one, reporting `SURVIVED`, and
+sending a reader to write a test for a function the mutation was never about.
+
+**That is why `c04-kv-bar` and `c12-value-bar` were on F1105's red list.** Two of
+the eighteen close here, and their cause was never the tests they named.
+
+### And the repair removed the only thing pointing at the gap
+
+Disambiguating moved each mutation onto `pairFor`, where it kills. Both runs went
+green. **The coverage gap did not move** — it lost the one accident that was
+reporting it.
+
+Two green runs and an uncovered function is a worse state than the red one, and
+nothing in the repair says so: a survivor that becomes a kill reads as progress
+everywhere it is recorded. **So a re-anchoring owes the question *what was the
+old site, and is anything covering it now?*** — which is the same question
+`KNOWN_STALE`'s note asks about a repaired anchor never run, one property along.
+
+### Closed the way the gap was found
+
+`T1.104` asserts the property the wide arm exists for — every glyph the extent
+draws is **one cell at the width it was asked for** — with the control beside it:
+the narrow arm's glyphs measure **two** at `wide`, which is what there is to
+branch for. `T1.105` does the ascii arm, with the Unicode arm as its control.
+
+`c12-value-bar` takes `plot-mutations.test.ts` into its corpus and two mutations
+that reach the arms directly. Both caught, by T1.104 and T1.105 rather than by
+the fill's row.

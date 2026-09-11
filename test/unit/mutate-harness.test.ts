@@ -535,11 +535,15 @@ describe("mutation harness", () => {
     // reader which repair they were looking at *after* the pass had already
     // mutated the first of several sites and reported an outcome about it — and
     // where the mutation happens to kill, the row reads `caught` and says
-    // nothing at all. Both measured instances were that shape: a mutation named
-    // for `pairFor` firing on `extentFor`, caught either way, with only the
-    // subject wrong. `assert s.count(old) == 1` is this repo's rule for its own
-    // edit scripts, and the tool that edits the tree two hundred times a pass
-    // did not have it.
+    // nothing at all.
+    //
+    // **And the two measured instances were worse than that** (F1116). Both
+    // named `pairFor` and fired on `extentFor`, whose capability arms had no
+    // row — so both reported `SURVIVED`, and `c04-kv-bar` and `c12-value-bar`
+    // sat on F1105's red list being read as weak tests about a function the
+    // mutation was never on. `assert s.count(old) == 1` is this repo's rule for
+    // its own edit scripts, and the tool that edits the tree two hundred times
+    // a pass did not have it.
     expect(hitsOf("const x = 1;\nconst x = 2;\n", "const x"), "two sites").toBe(2);
     expect(hitsOf("const x = 1;", "const x"), "one site").toBe(1);
 
