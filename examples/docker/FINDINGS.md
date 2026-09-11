@@ -29433,8 +29433,33 @@ touch, each change right on its own:
 this entry is written before it so the prediction is on record: rows green means a state the fixture
 now clears; `27;2u` again means the drive itself, and the reproduction has to move onto the runner.
 
+### The prediction, answered — fourth recurrence, 2026-09-11 on pull request 51
+
+`27;2u` again, so the recorded prediction resolves to its second arm: **the drive
+itself**, and the reproduction has to move onto the runner. Four recurrences, and
+this one rules out the whole class of remedy the earlier three reached for.
+
+**Both repairs were in place at once.** The clear was already the last thing
+before the drive with `super` in it — the third recurrence's move, whose comment
+says in as many words that it is *not a claim that the move is the cure* — **and**
+the Escape keydown itself carried `--clearmodifiers`, because `x-emulator.ts`
+gives the flag to any input verb that is not a modifier while the drive holds
+nothing. So the stray bit survived a per-command suppression and an explicit
+release of all four modifiers, milliseconds apart. **Whatever sets it, it is not a
+held X modifier**, and every fix attempted so far aims at one.
+
+**And four reproductions have left one digit between them.** The row asserted on
+`strayEsc[1]` and printed nothing else, so each rare red — each costing a CI run,
+on a symptom that does not reproduce in the container — was spent on
+`expected '2' to be '1'`. The escape sequences are in the message now: on a dirty
+capture it reads `CSI 27;2u CSI 27;2:3u CSI 13;2u CSI 13;2:3u`, which says at a
+glance whether Shift was on the Esc alone or on every key — the distinction this
+finding's own title turns on and that no recurrence has been able to confirm.
+A diagnosis in an assertion message is not evidence, and this row had the first
+and withheld the second.
+
 **Where**: `test/support/x-emulator.ts`; `docs/catalogue/lanes8/emu-probe.sh` (the bash transcription,
-gitignored); `gh run view 33975158167`.
+gitignored); `gh run view 33975158167`; `gh run view 34564209971` (the fourth).
 
 ---
 
