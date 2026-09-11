@@ -296,4 +296,64 @@ describe("plot — the polyline carrier", () => {
     expect(new Set(shot(true).map((c) => c.colour)), "in its own colour")
       .toContain(slotRgb("categorical.c2"));
   });
+
+  it("LN7 (C12 I102, F452, F1125): a tie is the carrier's, and the count says how many ties there are", () => {
+    // **LN6 asserts a direction and the tie is a magnitude**, which is why
+    // removing the guard that encodes it failed nine rows and none of them
+    // noticed (F1106, F1125). Most of a coincident stroke is *strictly* nearer
+    // than the box rather than tied with it, and those cells are the carrier's
+    // whatever the guard says — so `the frame loses cells` stays true with the
+    // rule inverted, at 4 cells instead of 6.
+    const corners: Point3[] = [];
+    for (const x of [-1, 1]) for (const y of [-1, 1]) for (const z of [-1, 1]) corners.push({ x, y, z });
+    const edge = [seg({ x: -1, y: -1, z: -1 }, { x: -1, y: -1, z: 1 })];
+    const shot = (box: "full" | "none"): { text: string; colour: string | null }[] => cellsOf(frame(
+      { form: "plot3d", height: 12, series: [], box3: box, axes3: false,
+        colourBy: "series", points3: [{ points: corners }], lines3: edge },
+      capsFor("24bit"), 80,
+    ));
+    const held = (box: "full" | "none"): number =>
+      shot(box).filter((c) => c.colour === slotRgb("categorical.c2")).length; // cells-ok — a cell count
+    /** Where each colour sits, by cell, so two shots can be compared by position. */
+    const at = (box: "full" | "none", ref: string): Set<string> => {
+      const rows2 = frame(
+        { form: "plot3d", height: 12, series: [], box3: box, axes3: false,
+          colourBy: "series", points3: [{ points: corners }], lines3: edge },
+        capsFor("24bit"), 80,
+      ) as readonly string[];
+      const want = slotRgb(ref);
+      const out = new Set<string>();
+      for (const [r, line] of rows2.entries()) {
+        let col = 0; // cells-ok — a cell offset
+        for (const run of runsOf(line)) {
+          for (const ch of [...run.text]) {
+            if (ch !== " " && run.colour === want) out.add(`${String(r)},${String(col)}`);
+            col += 1; // cells-ok — a cell offset
+          }
+        }
+      }
+      return out;
+    };
+
+    // **The control, and it is what makes the two counts comparable** — and the
+    // first form of it was wrong in a way worth keeping: comparing the *count*
+    // of marker cells gave 24 against 15, because the box occludes nine of them.
+    // That is the same phenomenon the row is measuring, not a statement about
+    // the projection. **Positions answer it and counts cannot**: every marker
+    // cell that survives the box is at a cell the box-less shot also marks, so
+    // `box3` decides what is drawn over the scene and not how it is projected.
+    const markedFull = at("full", "categorical.c1");
+    const markedNone = at("none", "categorical.c1");
+    expect(markedFull.size, "the box does occlude some of the cloud").toBeLessThan(markedNone.size);
+    expect([...markedFull].filter((k) => !markedNone.has(k)), "and the rest are where they were")
+      .toEqual([]);
+
+    // **Thirteen cells alone, ten under the box.** The three it loses are cells
+    // where a frame stroke is *strictly* nearer than the path — legitimate
+    // occlusion, and not what the guard is about. The ten it keeps are the rest,
+    // and two of them are exact ties: with the guard removed the count is 8, so
+    // this row is the only thing in the suite that can see the rule.
+    expect(held("none"), "the stroke's own cells, with nothing to occlude it").toBe(13);
+    expect(held("full"), "and the box takes only what it is strictly in front of").toBe(10);
+  });
 });
