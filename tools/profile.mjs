@@ -28,7 +28,7 @@
 import { writeFileSync } from "node:fs";
 
 import { b, createTui, defaultTheme } from "../dist/index.js";
-import { checkBudget, checkLeaks, checkPhases, formatBudget, formatLeaks, formatPhases } from "../dist/testing/index.js";
+import { checkBudget, checkElementCost, checkEntryCost, checkLeaks, checkPhases, formatBudget, formatElementCost, formatEntryCost, formatLeaks, formatPhases } from "../dist/testing/index.js";
 import { fakeStdin, fakeStdout, screenRows } from "./bench/fakes.mjs";
 import { liveness } from "./bench/liveness.mjs";
 
@@ -274,73 +274,25 @@ const phases = checkPhases(report);
 console.log();
 console.log(formatPhases(phases));
 
-// --- which component ---------------------------------------------------------
-
-// **Two seams, and the marker reads one of them** (C28 I31, F1098).
+// --- which component, and which entry ---------------------------------------
 //
-// The registry decoration opens a span in the `measure` wrapper and another in
-// the `render` wrapper, both on `kind#id`. Under a single counter this table
-// divided their sum by `frames` and printed *measured more than once per frame*
-// against it — so a block that is both measured and rendered had a floor of 2.0
-// and the marker fired on eight of the nine rows a real session produces, while
-// the two nodes genuinely measured twice inside a frame read 3.0, one step above
-// a floor the table never stated.
+// **Both tables come from the harness now** (C28 I55, F1099). They were built
+// here, inline, and they are the two of the report's six sections that were
+// wrong: the element table's ratio summed a measure with a render under the
+// words *measured more than once per frame* (F1098), and the per-entry table
+// printed the same union as *elements measured* — 203 for one entry against 202
+// measures. Neither was catchable from out here, because a number interpolated
+// into a template string on its way to `stdout` leaves nothing assertable but
+// the whole line. `tools/instruments.mjs` runs this file against a fixture and
+// reads its exit code; none of its nine rows can see a column heading.
 //
-// The cost was not hypothetical. C28's plan lists *a group measures every child
-// 3×* as an open defect, this table flagged exactly that shape, and F940's memo
-// had already fixed it — `registry.ts`'s memo header records the before at 3.0
-// and 4.0 per frame, so the flagged number and the fixed number were the same
-// number, one lower, in the same units, under a caption saying *measured*.
-console.log(`\n## Slowest elements — per instance, measured (C28 I31)\n`);
-console.log(
-  "`measures / frames` above 1 is the same block measured twice inside one frame, which is\n" +
-    "repeated work whatever it cost. The two seams are separate columns because their sum has a\n" +
-    "floor of 2 for any block that is drawn, so a marker reading the sum fires on nearly every\n" +
-    "row and says nothing — that sum is `NodeStat.calls`, kept in the report and shown in the\n" +
-    "profiler's own pane, and left out here because it is these two columns added up (F1098).\n",
-);
-console.log("| entry | element | total ms | self ms | measures | renders | frames | measures/frame |");
-console.log("|---|---|---|---|---|---|---|---|");
-const worst = [...report.nodes].sort((a, x) => x.self - a.self).slice(0, 10);
-for (const n of worst) {
-  // **Against the node's own `frames`, not the session's** — the field's own
-  // comment says so. A node on screen for 5 frames of 14, measured twice in
-  // each, is thrashing at 2.0; divided by the session it reads 0.7 and looks
-  // fine. The first draft divided by the session.
-  const per = n.frames === 0 ? 0 : n.measures / n.frames;
-  console.log(
-    `| ${n.entry === undefined ? "*chrome*" : `\`${n.entry}\``} | \`${n.key}\` | ${n.total.toFixed(2)} | ${n.self.toFixed(2)} | ${String(n.measures)} | ${String(n.renders)} | ${String(n.frames)} | ${per.toFixed(1)}${per > 1.05 ? " <-- measured more than once per frame" : ""} |`,
-  );
-}
-
-// --- per transcript entry ----------------------------------------------------
-
-// **The other partition of the same population** (C28 I42). Every element close
-// lands in one bucket of `byKind` and at most one of `byEntry`, so `Σ byKind` is
-// `Σ nodes.self` exactly and `Σ byEntry` falls short by what belongs to no entry.
-// That shortfall is printed rather than absorbed: a table omitting the chrome
-// reads as *the chrome is free*, and the chrome is measured every frame.
-const nodeSelf = report.nodes.reduce((sum, n) => sum + n.self, 0);
-const entries = Object.entries(report.byEntry).sort((a, x) => x[1].sum - a[1].sum);
-const entrySelf = entries.reduce((sum, [, h]) => sum + h.sum, 0);
-
-console.log(`\n## Cost per transcript entry — what is on screen, not what kind it is (C28 I42)\n`);
-console.log("| entry | self ms | share of element work | elements measured | slowest element |");
-console.log("|---|---|---|---|---|");
-for (const [id, h] of entries) {
-  const slowest = report.nodes
-    .filter((n) => n.entry === id)
-    .reduce((best, n) => (best === null || n.self > best.self ? n : best), null);
-  console.log(
-    `| \`${id}\` | ${h.sum.toFixed(2)} | ${nodeSelf === 0 ? "—" : `${((h.sum / nodeSelf) * 100).toFixed(1)}%`} | ` +
-      `${String(h.count)} | ${slowest === null ? "—" : `\`${slowest.key}\` ${slowest.self.toFixed(2)} ms`} |`,
-  );
-}
-console.log(
-  `| *no entry* | ${(nodeSelf - entrySelf).toFixed(2)} | ` +
-    `${nodeSelf === 0 ? "—" : `${(((nodeSelf - entrySelf) / nodeSelf) * 100).toFixed(1)}%`} | — | ` +
-    `chrome, prompt and overlays — measured every frame and belonging to no entry |`,
-);
+// This is the second time that argument has been made and the first time it has
+// been carried through: the phase table moved for it at F888, and these two were
+// left where they were.
+console.log();
+console.log(formatElementCost(checkElementCost(report)));
+console.log();
+console.log(formatEntryCost(checkEntryCost(report)));
 
 console.log(`\n${formatLeaks(checkLeaks(report))}`);
 

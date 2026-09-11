@@ -691,6 +691,52 @@ const results = runPass({
       expect: "T1.67",
     },
     {
+      // **The union put back at the table**, one layer above `OPS-MERGED`. That
+      // one indicts the aggregate; this indicts the reading built on it, and the
+      // report stays well-formed either way — every row present, ordered, with a
+      // plausible small integer against it. It is what eight of nine rows of a
+      // real session carried (F1098, F1099).
+      name: "TABLE-READS-THE-SUM: the element table divides the union by frames",
+      file: BUDGET,
+      from: "    n.frames === 0 ? 0 : n.measures / n.frames;",
+      to: "    n.frames === 0 ? 0 : (n.measures + n.renders) / n.frames;",
+      expect: "T1.105",
+    },
+    {
+      // **A share taken over the wrong population.** `repeated` counted after
+      // the truncation says *3 of 10* about a table of ten and means it about
+      // the ten — a number a reader cannot tell from the right one. The
+      // fixture is twelve nodes with the repeated one cheapest, because any
+      // population of ten or fewer makes the two counts agree and the mutation
+      // vacuous; and measuring a node twice doubles its self time, so the
+      // obvious fixture puts it third rather than last (F1099).
+      name: "REPEATED-OVER-SHOWN: the flagged count is taken over the rows drawn",
+      file: BUDGET,
+      from: "  for (const n of report.nodes) if (perFrame(n) > threshold) repeated += 1;",
+      to: "  for (const n of report.nodes.slice(0, opts.top ?? 10)) if (perFrame(n) > threshold) repeated += 1;",
+      expect: "T1.105",
+    },
+    {
+      // **An absence drawn as a zero**, on the row that has no bucket to count.
+      // Beside a positive duration it reads as *the chrome was never measured*,
+      // which is C28 I11's class arriving in a table rather than a histogram.
+      name: "UNCLAIMED-ZEROED: the row no entry claims reports a count of none",
+      file: BUDGET,
+      from: '      closes: null,\n      note: "chrome, prompt and overlays',
+      to: '      closes: 0,\n      note: "chrome, prompt and overlays',
+      expect: "T1.106",
+    },
+    {
+      // **The threshold made inclusive**, so exactly-once-per-frame plus a
+      // rounding is called repeated work. The margin is against integer
+      // division, not a tolerance, and only a node landing on it can say so.
+      name: "THRESHOLD-INCLUSIVE: a ratio exactly at the figure is flagged",
+      file: BUDGET,
+      from: "        repeated: perFrame(n) > threshold,",
+      to: "        repeated: perFrame(n) >= threshold,",
+      expect: "T1.107",
+    },
+    {
       // **The same harm from the other merge** (F1098). F1092's — F892's — was
       // two entries under one key; this is two *operations* under one counter,
       // and the symptom is identical: a ratio whose numerator is a union names
