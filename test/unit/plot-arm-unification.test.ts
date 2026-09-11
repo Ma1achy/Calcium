@@ -148,7 +148,7 @@ describe("U — the seam, asserted from both arms", () => {
    * `block.plotFrame` to its layout directly, so the terminal's `frame: "moves"`
    * is exactly that. **The negative direction is sound**: an arm that did not
    * move read neither. So the `still` cells are this row's findings and the
-   * `moves` cells are `c12-arm-seam.mjs`'s subject (F287).
+   * `moves` cells are `c12-arm-seam-{1,2,3}.mjs`'s subject (F287).
    */
   const PERTURBATION = {
     value: { form: "bar", patch: { yMax: 400 } },
