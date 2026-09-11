@@ -2521,7 +2521,7 @@ export async function constructGraph(
         // **The one resolution site** (roadmap 30). C23 takes a string, C18
         // classifies one and C05 describes `argv`, so a chip becomes its content
         // here and no sentinel reaches the far side. Every other reader sees the
-        // buffer as it is, because three of them read an index alongside it.
+        // buffer as it is, because five of them read an index alongside it.
         pipeline?.submit(stores.editor.resolved);
         return true;
       }

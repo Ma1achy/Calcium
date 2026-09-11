@@ -162,8 +162,22 @@ describe("roadmap-status — the Order column's verifier", () => {
   it("RS2b: a citation to a file that is gone, and to a line past its end", () => {
     expect(run(mutate("`src/shell/render-cache.ts`", "`src/shell/render-cache-old.ts`")).out)
       .toContain("src/shell/render-cache-old.ts does not exist");
-    expect(run(mutate("`src/shell/paint.ts:303`", "`src/shell/paint.ts:99999`")).out)
-      .toMatch(/src\/shell\/paint\.ts:99999 — the file has \d+ lines/u);
+
+    // **The fifth anchor expiry in this file, and the rule that ends it is one
+    // this file already wrote down** (RS9b). The line half quoted
+    // `paint.ts:303` until F1092's campaign repointed it to 444, and the row
+    // went red on a repair that was *correct* — a test asserting a document's
+    // defect expires the day the defect is fixed, which is the wrong day for a
+    // fabrication to fail. What is asserted is the arm firing, never which
+    // citation fired it, so take any Order-row citation that occurs once.
+    const span = ROADMAP.split("\n")
+      .filter((l) => /^\| \d+ \| /u.test(l))
+      .flatMap((l) => [...l.matchAll(/`src\/[\w./-]+\.ts:\d+`/gu)].map(([m]) => m))
+      .find((m) => ROADMAP.split(m).length === 2);
+    expect(span, "an Order row cites a line exactly once").not.toBeUndefined();
+    const path = (span ?? "").slice(1, -1).split(":")[0] ?? "";
+    expect(run(mutate(span ?? "", `\`${path}:99999\``)).out)
+      .toMatch(new RegExp(`${path.replaceAll(".", "\\.")}:99999 — the file has \\d+ lines`, "u"));
   });
 
   it("RS3: a row with a status and no evidence at all fails", () => {
@@ -311,6 +325,47 @@ describe("roadmap-status — the Order column's verifier", () => {
     // the citation rather than the edit.
     const back = run(mutate(anchoredCite, "`src/shell/confirm.ts:102`"));
     expect(Number(/citation anchorage · (\d+)\//u.exec(back.out)?.[1]), "the control").toBe(anchored);
+  });
+
+  it("RS14b (F1101): the call and private-field spellings name the same symbol, and a colour names none", () => {
+    // **The silent half is the population, not the verdict.** `resolve` skips a
+    // cell with no idents *before* judging it, so a cell whose symbols are only
+    // ever written `foo()` or `#foo` had no citations in the signal at all —
+    // not adrift, absent. Widening the pattern moved the count from 75 to 78
+    // and every one of the three arrivals was drift nothing else could reach.
+    const anchorage = (out: string): readonly [number, number] => {
+      const m = /citation anchorage · (\d+)\/(\d+) line citations/u.exec(out);
+      expect(m, "the signal line").not.toBeNull();
+      return [Number(m?.[1]), Number(m?.[2])];
+    };
+    const [anchored, total] = anchorage(run().out);
+
+    // Entry 25's cell is the live instance: it writes `ghost()` and cites
+    // `paint.ts:444`, where `deps.ghost()` is read. **The bare form must change
+    // neither number** — one symbol, two spellings.
+    const bare = run(mutate("reads `ghost()` fresh per paint", "reads `ghost` fresh per paint"));
+    expect(anchorage(bare.out), "the two spellings are one symbol").toEqual([anchored, total]);
+
+    // **The negative, and it moves the population rather than the verdict.**
+    // A spelling the pattern cannot read empties the cell's ident list, so its
+    // citation leaves the signal entirely: the total falls, which is the shape
+    // an absent cell has and an adrift one does not.
+    const [wa, wt] = anchorage(run(mutate("reads `ghost()` fresh per paint", "reads the ghost helper fresh per paint")).out);
+    expect(wt, "the cell leaves the population").toBe(total - 1);
+    expect(wa, "taking its anchored citation with it").toBe(anchored - 1);
+
+    // **`#fafafa` is a palette cell written the way a field is**, and the
+    // exclusion is by shape rather than by name because neither population can
+    // be listed in advance. The gated arm demands every ident appear in a cited
+    // file, so a colour read as a symbol turns the build red.
+    const colour = run(mutate("reads `ghost()` fresh per paint", "reads `ghost()` `#fafafa` fresh per paint"));
+    expect(colour.ok, "a colour is not a symbol to resolve").toBe(true);
+
+    // The control in the other direction, so the exclusion is not a hole: a
+    // private field that is not four hex digits still reaches the gate.
+    const field = run(mutate("reads `ghost()` fresh per paint", "reads `ghost()` `#anchor` fresh per paint"));
+    expect(field.ok, "and a real field is still demanded of the file").toBe(false);
+    expect(field.out, "by name").toContain("#anchor");
   });
 
   it("RS9: the grep-reach signal counts the sweep's own evidence, not the Order row", () => {
