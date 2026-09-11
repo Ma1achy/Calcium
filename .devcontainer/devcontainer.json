@@ -26,6 +26,22 @@
     // deliberate both times.
   },
 
+  // **`--init`, because pid 1 here is `sleep infinity` and it never reaps**
+  // (F1115). The devcontainer CLI's override command holds the container open
+  // and calls `wait()` on nothing, so every orphan reparented to it becomes a
+  // permanent zombie: measured at **28,015 of 28,039 processes**, 13,310 of them
+  // `esbuild` and 10,824 `node`, the oldest ten days old, against a `pid_max` of
+  // 99,999. Each vitest run leaves its esbuild service behind and each emulator
+  // capture its `kitten`; nothing in the container ever takes them away, and the
+  // only cure without this flag is a rebuild.
+  //
+  //     docker exec calcium-dev ps -e -o stat= | cut -c1 | sort | uniq -c
+  //
+  // `--init` makes Docker run `tini` as pid 1, which forwards signals and reaps
+  // what it inherits. It takes effect on the next rebuild; a container already
+  // running keeps what it has accumulated.
+  "runArgs": ["--init"],
+
   // A04 §4 — required for development, never required for consumption.
   // `git clone && npm install && make all` must work without this container.
 

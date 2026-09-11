@@ -48151,3 +48151,61 @@ undeclared export is.
 `TD-D4` fabricates the violation four ways, including the `async` form that got
 past the first sweep; removing `fsIo`'s declaration from the real tree fails
 `TD-D2` naming the file and the member.
+
+---
+
+## F1115 — the devcontainer's pid 1 is `sleep infinity`, so 28,015 of its 28,039 processes are zombies it can never reap ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `.devcontainer/devcontainer.json` |
+| **Reached for** | three `test/e2e/profiler.test.ts` rows timing out inside `make all` and passing 9/9 alone, which sent a reader to `ps` |
+| **Verdict** | **closed** — `runArgs: ["--init"]`, which takes effect on the next rebuild |
+
+### The measurement
+
+    $ docker exec calcium-dev ps -e -o stat= | cut -c1 | sort | uniq -c
+      28015 Z
+         25 S
+          1 R
+
+| | |
+|---|---|
+| `esbuild` | 13,310 |
+| `node` | 10,824 |
+| `sleep` | 1,478 |
+| `cat` | 864 |
+| `kitten` | 511 |
+| oldest | **ten days** |
+| `pid_max` | 99,999 — so **28% of the pid space** |
+
+Every one has `ppid` 1, and pid 1 is `sleep infinity`: the devcontainer CLI's
+override command, which holds the container open and calls `wait()` on nothing.
+A zombie is reaped by its parent; when the parent dies the zombie is reparented
+to pid 1, and here pid 1 never collects it.
+
+So each vitest run leaves its esbuild service behind, each emulator capture its
+`kitten`, each `timeout … cat` in `x-emulator.ts`'s inner script its `cat` — and
+**nothing in the container has ever taken one away.** `runArgs: ["--init"]` puts
+`tini` at pid 1, which reaps what it inherits.
+
+### What this does not explain, and the number that says so
+
+**The three profiler rows.** They failed inside a full `make e2e` — *never saw
+`❯`*, empty output, 20 s — and passed 9 of 9 alone **at the same zombie count**,
+which is the measurement that rules pid pressure out rather than in. 28% of the
+pid space is not a fork failure, and the re-run demonstrates it.
+
+That regime is F963's — *red only inside a full `make e2e`, green alone seven of
+seven* — with a different symptom: F963 was a **divergence** between recording
+and replay, and this is a session that produced no bytes at all. Recorded here
+because the next instance should start from both facts rather than from this
+`ps` output, which is the one that is easy to find and reads like an answer.
+
+### Why it is worth a rebuild anyway
+
+**"Green in the devcontainer" is a claim about a machine**, and F812's whole
+family reasons from it — *green here, red there, so the runner is the slow one*.
+A container drifting further from a clean pid table every day is not a fixed
+reference, and ten days is how long this one has been drifting without anyone
+looking.
