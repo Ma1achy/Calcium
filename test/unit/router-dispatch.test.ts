@@ -816,4 +816,9 @@ describe("C16 §5 — Ctrl-D, and the one thing C16 stores", () => {
     expect(body, "every arm is a location keyed by `at`").toMatch(/at:\s*"prompt"/u);
     expect(body).toMatch(/at:\s*"liveBlock"/u);
   });
+
+  // **Spec-first, and the row is here unbuilt** (SP9). The section gesture lands
+  // with the three owners that answer it; C16 I33's claim is about all three, so
+  // the row cannot be written against one of them arriving alone.
+  it.todo("T1.3q (C16 I33): tab and shift-tab resolve to viewNextSection/viewPrevSection at pushedView and to entryNext/entryPrev at liveBlock from the one keymap, with a view up and with none; and each owner answers the call — a fake at its last section and a fake with one section both return false, and the row asserts the header text differs, because the return cannot tell them apart — not deferred on a component; it lands with the three owners");
 });
