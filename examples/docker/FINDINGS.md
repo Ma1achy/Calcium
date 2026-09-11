@@ -47357,3 +47357,78 @@ applies somewhere the author did not choose and the row that would catch it neve
 runs. That is `assert s.count(old) == 1` — the rule this repo applies to its own
 edit scripts — missing from the mutation harness.
 
+---
+
+## F1106 — a mutation's `from` is checked and its `to` is not, so a rotted mutation reads exactly like a weak test ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `tools/mutate/runs/c12-lines3d.mjs` (LN6) · `tools/mutate/anchors.mjs` · `src/presentation/plot/scatter3.ts:1178` |
+| **Reached for** | the second survivor of the sweep's first complete run (F1105) |
+| **Verdict** | **open** — the two defects in this mutation are measured; the remedy is named and the right replacement mutation is not |
+
+### The survivor
+
+`c12-lines3d.mjs`'s LN6 — *the frame is drawn before the data* — survived. Its
+`from` anchors on the data loop and matches, so nothing reported a problem.
+**Its `to` is broken in two independent ways.**
+
+**One: the call no longer type-checks.** It injects
+
+```js
+frameOf(block, scene, grid, rows, depth, ctx, (i, m) => { … })
+```
+
+and the real call four hundred lines below passes `{ w, rows }`, because the
+fourth parameter is `area: Readonly<{ w: number; rows: number }>`. That
+parameter's shape changed at F489 / C12 I100 — *`rows` was already here and `w`
+was not, and the asymmetry is the defect* — and the mutation was written against
+the old signature. So `area.w` and `area.rows` are `undefined` inside the
+injected draw.
+
+**Two: it adds a draw where the defect was a move.** The data loop is at line 999
+and the real `frameOf` call is at 1178, and the mutation inserts *before* the
+loop without removing the call after it. The later draw wins, so even with the
+right arguments the net effect is nothing. The defect F452 recorded was the frame
+drawn **instead of** last.
+
+Either one alone makes the mutation unable to fail.
+
+### The class
+
+**The anchors sweep checks that a mutation can be applied and never that what it
+applies still means what it meant.** `from` is matched against the tree — that is
+the whole of what `KNOWN_STALE` counts — and `to` is an opaque string. A
+mutation whose `to` has rotted applies cleanly, runs the suite, and reports
+`SURVIVED`, which is indistinguishable from a row that is genuinely weak. F277's
+rule says to ask why a mutation cannot reach the test before rewriting the test;
+this is the answer being *the mutation* for the second time in one sweep, after
+F1104's answer was *the subject is inert*.
+
+### The remedy, and its blind spot
+
+**Type-check a survivor's mutated tree.** A mutation that survives and does not
+compile is a broken mutation rather than a finding, and `tsc` would have caught
+this one exactly — `number` against `Readonly<{ w; rows }>` is TS2345. Running it
+only on survivors keeps it cheap: the survivor set is 13 of 192.
+
+**It does not reach the second defect.** An additive mutation type-checks
+perfectly and is inert for a reason no compiler can see. That half has no
+mechanical answer, and the honest form is the one the harness already prints:
+when a mutation survives, read the `to` before reading the test.
+
+### A separate thing the reproduction turned up
+
+Replacing the tie guard in the same file —
+
+```ts
+if (!nearer && mark[i] === undefined) return;
+```
+
+— with an unconditional fall-through **fails nothing**: all nine rows of
+`plot-lines3d.test.ts` pass with the frame taking every cell it reaches. So the
+guard is either unconstrained by any row or LN6 is not about it. Recorded rather
+than diagnosed, because the right replacement mutation for LN6 depends on the
+answer and C12's 3-D carrier wants the by-hand walk rather than a guess — this
+was one hypothesis, cheaply tested, and falsified.
+
