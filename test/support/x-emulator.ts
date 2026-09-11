@@ -51,7 +51,7 @@ export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeou
 /** Captures made by this process so far — part of the display number. */
 let captures = 0;
 
-export type Capture = Readonly<{ a: string; b: string }>;
+export type Capture = Readonly<{ a: string; b: string; flags: string }>;
 
 export type Drive = (
   xdo: (...args: readonly string[]) => void,
@@ -101,9 +101,30 @@ export async function captureFromEmulator(opts: {
   const work = mkdtempSync(join(tmpdir(), "x-emulator-"));
   const env = { ...process.env, DISPLAY: display, LIBGL_ALWAYS_SOFTWARE: "1", LANG: "C.UTF-8" };
   const sh = (s: string): string => s.replace(/\x1b/gu, "\\e");
+  // **The handshake phase one never had** (F812, fifth recurrence). `b.started`
+  // has marked the second capture's reader since the fixture was written and
+  // phase one has only a sleep, which is why every recurrence is in `a`: nothing
+  // waited for the mode push to be *applied*, only for a window to be mapped.
+  //
+  // `CSI ? u` asks kitty for the flag set that is live, and the reply cannot
+  // precede the push taking effect — a pty is a byte stream processed in order.
+  // Measured in the container: `\e[?3` after `CSI > 3 u` and `\e[?0` after
+  // `CSI < u`, so the answer names the mode rather than merely arriving. Asked
+  // only where the `enter` pushes the keyboard protocol, so the mouse rows pay
+  // nothing; `read -t 2` bounds a terminal that does not answer, and the empty
+  // `a.flags` that leaves is what the row asserts against.
+  const pushesKeyboard = /\x1b\[>[0-9;]*u/u.test(opts.enter);
   writeFileSync(join(work, "inner.sh"), [
     "stty raw -echo",
     `printf '${sh(opts.enter)}'`,
+    ...(pushesKeyboard
+      ? [
+          "printf '\\e[?u'",
+          "read -r -t 2 -d 'u' KITTY_FLAGS",
+          `printf '%s' "$KITTY_FLAGS" | tr -dc '0-9' > ${join(work, "a.flags")}`,
+        ]
+      : []),
+    `touch ${join(work, "a.started")}`,
     `timeout --foreground ${String(seconds)} cat > ${join(work, "a.bin")}`,
     `printf '${sh(opts.mid ?? "")}'`,
     `touch ${join(work, "b.started")}`,
@@ -168,6 +189,20 @@ export async function captureFromEmulator(opts: {
         `--- ${opts.program} stderr\n${read("term.log")}\n--- Xvfb stderr\n${read("xvfb.log")}`,
       );
     }
+    // **The script, not the window.** A mapped window says the emulator drew;
+    // it says nothing about how far its child shell has got, and on a loaded
+    // runner bash's start plus `stty` outlasts the 300 ms that used to stand in
+    // for it. The wait is `b.started`'s, one phase earlier.
+    //
+    // **And the marker is touched after the handshake, which is what couples
+    // the two.** `read` sits on the same pty the drive types into, so a
+    // keystroke sent before the query is answered is eaten by the `read` and
+    // never reaches `a.bin` — the flag reading would then be a keystroke rather
+    // than a reply. Waiting here makes that ordering impossible rather than
+    // unlikely, and it is the reason neither half stands alone.
+    for (let i = 0; i < 100 && !existsSync(join(work, "a.started")); i += 1) await sleep(100);
+    // Kept rather than removed: it held for every green run, and dropping it
+    // would be an unmeasured change riding a measured one.
     await sleep(300);
     xdo("windowfocus", "--sync", window);
     // **No modifier is held when the drive begins.** The runner's kitty reported
@@ -212,7 +247,7 @@ export async function captureFromEmulator(opts: {
     await sleep(200);
     await opts.drive(xdo, window, 2);
     await exited;
-    return { a: read("a.bin"), b: read("b.bin") };
+    return { a: read("a.bin"), b: read("b.bin"), flags: read("a.flags") };
   } finally {
     xvfb.kill();
     // The server's exit is awaited so nothing of this capture outlives the call.
