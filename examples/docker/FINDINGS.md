@@ -47408,6 +47408,15 @@ applies somewhere the author did not choose and the row that would catch it neve
 runs. That is `assert s.count(old) == 1` — the rule this repo applies to its own
 edit scripts — missing from the mutation harness.
 
+**Answered, and the count was ten rather than two — F1113.** `apply` refuses
+anything but one match, the ten are disambiguated with every pass re-run, and
+`KNOWN_AMBIGUOUS` is empty. **Two of the ten were firing on the wrong function
+and said so in their own names**, which is the half this entry did not expect:
+the sentence above reads as bookkeeping, and the debt list's own argument —
+*the first match may well be the site the run names* — was false for a fifth of
+its entries. A green run cannot show it, because a mutation on the wrong site
+still kills.
+
 ---
 
 ## F1106 — a mutation's `from` is checked and its `to` is not, so a rotted mutation reads exactly like a weak test ★★★★☆
@@ -47996,3 +48005,84 @@ fourth recurrence's comment had already named as *the keyboard mode not yet live
 when the first key went in*, and the reason F1111 is confident. But **no reader
 has seen those bytes.** The finding is recorded with the inference visible rather
 than written as though it were read.
+
+---
+
+## F1113 — `assert s.count(old) == 1` is this repo's rule for an edit script, and the tool that edits the tree two hundred times a pass did not have it ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `tools/mutate/mutate.mjs` · `tools/mutate/anchors.mjs` · ten run files · F1105, F219, F277, F1037 |
+| **Reached for** | F1105's residue — *the two ambiguous anchors are their own class, and that is `assert s.count(old) == 1` missing from the mutation harness* |
+| **Verdict** | **closed** — ten disambiguated with every pass re-run, `apply` refuses, and the debt list is empty rather than absent |
+
+### The debt list's own argument was wrong, and two of ten say so in their names
+
+`KNOWN_AMBIGUOUS` carried ten anchors with a sentence: *these are not broken
+runs — the harness replaces the first match, and for every one of them the first
+match may well be the site the run names.*
+
+It was not.
+
+| run | the mutation calls itself | it fired on |
+|---|---|---|
+| `c04-kv-bar` | *THE SHIPPED DEFECT: **the fill pair** ignores the ambiguous width* | `extentFor`, 222 lines above `pairFor` |
+| `c12-value-bar` | ***Re-anchored onto `pairFor`**, where the capability read moved* | `extentFor`, 210 lines above |
+
+`ramp.ts` carries `if (caps.unicode === "ascii") {` in both functions and
+`if (caps.ambiguousWidth === "wide") {` in both, so `String.replace` took
+`extentFor`'s in each case. **The second is the one to read twice**: its comment
+records a deliberate re-anchoring onto a named function, ends *the mutation still
+kills, run rather than assumed* — and the run it describes killed on a different
+function.
+
+### Why no instrument could see it
+
+**The outcome is identical either way.** The mutation applies, the expected row
+catches it, the pass prints `caught` and exits 0. F1037's annotation — *its
+anchor matches 2x, `replace()` took the first* — rides a `SURVIVED` row, and
+neither of these survived.
+
+So the count was recorded, printed on the one disposition that could not occur,
+and the sweep that knew the number named a **run** and not an **anchor**: a
+stale anchor printed its file and its first eighty-eight characters, and an
+ambiguous one printed `1`. The kind whose remedy is *extend this anchor* was the
+kind that would not say which.
+
+### The refusal, and where it belongs
+
+`apply` counts and refuses anything but one. That is deliberately one layer
+below the sweep:
+
+- the sweep reads text, and cannot see an anchor whose body interpolates;
+- the sweep reads `m.from`, and the old count did too — so an **`also`** edge,
+  which is half of a pair that must break together, was never counted at all;
+- the **control** is applied outside the loop, and a control matching twice
+  proves the pass can see a kill somewhere other than where it claims, which
+  makes every row beneath it meaningless.
+
+All three go through `apply`. `AMBIGUOUS ANCHOR` is a sixth state that is not a
+survivor, and the summary says what to do rather than what happened.
+
+### What it makes true of every other row
+
+**A survivor is F277 by construction.** F277's own sentence is that the report
+cannot tell it from F219; with F219 refused, a `SURVIVED` row's anchor is unique,
+present and textually correct, and *a line whose callers moved* is the only thing
+left it can be. The disposition is determined rather than annotated.
+
+### The ten, each pass re-run
+
+Two were wrong-site and are above. The other eight were right by luck: the
+first match happened to be the site the row named, and nothing said so.
+
+`c04-ohlc` is the shape worth recording — `const drawn = form ?? "line";` five
+times in one function, a copy this file's own comment defends (*a one-line
+predicate written twice can be compared by eye*). One mutation reaches one copy;
+**the other four are covered by nothing**, and the anchor could not have said
+which even if someone had asked.
+
+`c10-named-set` is the other shape: the anchor's second site is **T2.23's
+quotation of it**, because that row asserts on the source text. A mutation
+landing there would change what the assertion looks for rather than what the
+suite covers.
