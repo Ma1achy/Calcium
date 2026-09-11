@@ -49030,3 +49030,188 @@ the box-less shot also marks, which a rescale would break and an occlusion canno
 The general form is worth the entry: **a control must be measured in a quantity the
 thing under test does not move.** It read as a natural control precisely because it
 was the same measurement one colour over.
+
+---
+
+## F1126 — one rule at two gates, and the validator's own message contradicts its condition ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/builders/index.ts:668` · `src/data/viewmodel/validate.ts:509` · C04 I70 |
+| **Reached for** | choosing a `sankey` for C28's flow card, and checking the member list against both gates before writing it |
+| **Verdict** | **open** — the divergence is measured; which arm is right is C04's ruling |
+
+`graphLayout` is refused by the builder on anything but `graph`:
+
+    if (graphLayout !== undefined && drawn !== "graph")
+
+and by the validator only when the form is neither `graph` nor `sankey`:
+
+    if (form !== "graph" && form !== "sankey")
+
+So **`graphLayout` on a `sankey` passes the validator and throws at the builder.** A
+document read back from disk is accepted and the same document built locally is
+refused — the two gates C04 keeps deliberately in step, out of step.
+
+**Which arm is intended is not in doubt**, which is what makes this cheap to fix and
+worth recording rather than guessing: the builder's own comment two lines above says
+*"`sankey` takes `graph` on `graph`'s own rule … and `graphLayout` stays `graph`'s
+alone"*, and C04 I70 reads the same way.
+
+**The tell is inside the loose arm.** The validator's message is
+
+    "graphLayout" on form "sankey" (C04 I70) — only a graph takes a graph layout
+
+which is a sentence that cannot be emitted: the condition that produces it has
+already excluded `sankey`. **The text and the predicate disagree in one function**,
+and the text is the one that agrees with the invariant. A reader checking the message
+against I70 finds them identical and moves on — the same shape as F398, where two
+copies of the `IS_MATRIX` rule disagreed under a comment asserting they were one.
+
+**Distinct from SK10.** `test/unit/plot-sankey.test.ts:311` is a deferred row about
+the `graph` *member* on `sankey`, which both gates now admit. This is the sibling
+member, and nothing watches it.
+
+---
+
+## F1127 — one span name, two populations, and both cards are right ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `src/shell/profiling/recorder.ts:251`, `:684` · `ProfileReport.spans` against `ProfileReport.timeline` |
+| **Reached for** | C28's front end, deciding which cards can carry a distribution |
+| **Verdict** | **open** — the fix is a label on every card, and the label has to be specified before the cards are written |
+
+`record()` feeds two stores from one close:
+
+    hist(spanHists, node.name).add(self);
+    frameSpans[node.name] = (frameSpans[node.name] ?? 0) + self;
+
+The histogram is **unbounded since the last tier reset**. The frame record goes into
+a ring of **512**. So at frame 600 the report holds `spans.measure.count === 600` and
+`timeline.length === 512`, over the same name, in the same report.
+
+**Nothing in the report says so.** `dropped.frames` counts what the ring discarded and
+is the only trace, and it is a property of `timeline` sitting nowhere near `spans`.
+
+**The cost is a front end that disagrees with itself and is not wrong anywhere.** A
+`dotplot` of `measure`'s p50 reads the histogram; a `boxplot` of `measure` computes
+real quartiles from the 512 per-frame samples — which is the only way to get `q1` and
+`q3`, the histogram having neither. Two cards, one span, two medians, and a reader
+comparing them has no way to learn why.
+
+**It is not a bug in either store.** The histogram is right to be unbounded — it is
+what survives the ring — and the ring is right to be bounded. What is missing is that
+**a figure never names the population it was taken over**, so the two are silently
+interchangeable at the point of use.
+
+Ruled for C28's deck: every card states its population in the panel footer — *over the
+last 512 frames* or *over all 600 since the reset at 12.1 s* — and the kit's two
+extractors are named for their population rather than for their shape.
+
+---
+
+## F1128 — the worst set is recomputed per report, so a card indexed into it changes underneath the reader ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `src/shell/profiling/recorder.ts:684` · C28 I32 · C28 §3c's 1 s refresh |
+| **Reached for** | C28's flame and icicle cards, deciding what a card is addressed by |
+| **Verdict** | **open** — ruled for the deck; the ruling is what the spec edit carries |
+
+`report()` computes the retained set fresh, every call:
+
+    const worst = [...drawn].sort((a, b) => b.work - a.work).slice(0, worstKeep);
+
+This is correct and I32 says why — *which frames are worst is not known until later*.
+What follows from it had no reader until there was a card per retained frame.
+
+**The view refreshes every second.** So a card addressed as *the third worst frame*
+is a **different frame** at the next tick whenever a slower frame arrives or an older
+one falls out of the 512-frame ring. A reader looking at a flame graph of a 31 ms
+frame looks up and is looking at a 28 ms one, with nothing changed on screen but the
+numbers.
+
+**The naive design is the one that fails**, and it fails silently: an index into
+`worst` is the obvious address, it is stable in every fixture with fewer than ten
+frames, and it is wrong the moment the session is busy enough to be worth profiling.
+
+Ruled: **a card is addressed by the frame's `seq`, never by its position**, re-resolved
+against `worst` on each draw. A `seq` that has left the set is said so and the card
+clamps to the nearest rather than silently redrawing a different frame — because the
+frame leaving the worst set is itself a reading.
+
+---
+
+## F1129 — `NodeStat` has no ordinal, so *cost against position* is not constructible ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/profiling/tree.ts`'s `NodeStat` and `Aggregate` · `ProfileReport.byEntry` |
+| **Reached for** | C28's *does cost rise with position in the document* card |
+| **Verdict** | **open** — the card is deferred, and its blocker is `NodeStat.firstFrame` |
+
+The question is a real one and the framework's `scatter` is the form for it: plot each
+entry's cost against where it sits in the transcript, and a slope is an O(n) nobody
+declared.
+
+**The report cannot express the abscissa.** `byEntry` is a `Record<string, Histogram>`
+keyed by entry id, and `NodeStat` is
+`{key, entry?, measures, renders, calls, self, total, max, frames}` — nine members and
+**not one of them is ordinal**. `snapshot()` sorts by `self`, so even the map's
+insertion order is gone by the time a consumer sees it.
+
+**`Aggregate` holds the answer privately.** Its rows carry `lastFrame`, kept to decide
+whether to increment `frames`, and it is never published. A `firstFrame` beside it
+would be one assignment and would make the card constructible.
+
+Recorded rather than built, because the round that found it is the front end and the
+change is to the backend's published type — and a card that fabricated an ordering
+from the sort it happens to receive would be a figure whose x axis is a rendering
+artefact. **Deferred, blocker `NodeStat.firstFrame`**, so picking the entry up begins
+by grepping the symbol.
+
+---
+
+## F1130 — the view has no failure path, and the forms it is about to draw refuse rather than degrade ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `src/shell/profile-view.ts`'s `arm` and `paneBlocks` · `b.plot`'s forty construction refusals |
+| **Reached for** | C28's deck, asking what a card does when the region is too small for its form |
+| **Verdict** | **open** — it cannot fire today, and the deck is what arms it |
+
+`profile-view.ts` contains **no `try` and no `catch`**. The refresh is
+
+    timer = deps.schedule(() => {
+      timer = null;
+      const at = state;
+      if (at === null) return;
+      at.blocks = paneBlocks(profiler, at.pane);
+      render(profiler, at, "stream");
+      arm(profiler);
+    }, VIEW_REFRESH_MS);
+
+**`arm` is the last statement.** So anything `paneBlocks` throws escapes a scheduled
+callback *and* takes the re-arm with it: the timer is already `null`, nothing
+re-schedules, and the view stops refreshing — with the tier still raised, because the
+restore runs from `pop()` and the ring reset that raised it already happened.
+
+**The failure is worse than a crash because it looks like nothing.** A frozen pane
+showing a one-second-old report is indistinguishable from a quiet session.
+
+**It cannot fire today**, and that is the reason it has never been seen: the four
+panes build `bar` and `line` with two series and computed heights, and `b.plot`'s
+refusals are all about the members and shapes those two never carry.
+
+**The deck arms it.** `b.plot` throws — not degrades — on a `violin` with fewer than
+two rows per band, a `boxplot` with fewer rows than bands, a ninth series on a
+non-matrix form, a second series on a `bubble`, `width` with `aspect`, and thirty-five
+more. Every one is a function of the region, the report's shape, or both, and the
+region is not bounded below.
+
+Ruled for the deck: **the kit refuses above the form.** A card declares the floor its
+form needs, the kit compares it to the region before building, and a card that cannot
+be drawn draws a notice saying which. The `try` is the second line of defence and not
+the first — a caught throw one second later is still a pane that cannot draw itself,
+and the notice is the honest version of that.
