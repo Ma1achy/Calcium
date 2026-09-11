@@ -74,6 +74,15 @@ const ROOT = process.cwd();
 const argDir = process.argv.indexOf("--dir");
 const DIR = argDir === -1 ? "tools/mutate/runs" : process.argv[argDir + 1];
 const OWN = argDir === -1;
+// **A debt list the fixture can supply, and only a foreign one** (F1119). MA3's
+// claim is that `KNOWN_STALE` does not excuse a run outside this repository's
+// runs directory — and the only way it could ever be *shown* was to name a run
+// the real list held. The list is empty now, so the fabrication's corpus is
+// empty with it, and the row passes by having nothing to inherit rather than by
+// the gate holding. This flag is the other arm: the same fabricated run is
+// excused when a list is handed in, and never by the tree's own.
+const argStale = process.argv.indexOf("--stale");
+const SUPPLIED = argStale === -1 ? null : JSON.parse(process.argv[argStale + 1]);
 
 /**
  * Anchors that do not resolve **today**, with the run they belong to.
@@ -257,6 +266,33 @@ function silenceOf(src) {
   return printed ? "no exit" : exits ? "unprinted" : "unprinted, no exit";
 }
 
+/**
+ * The debt list, and it is **empty** (F1118, 2026-09-11).
+ *
+ * Kept rather than deleted, for `KNOWN_AMBIGUOUS`'s reason: an absent map reads
+ * as a mechanism nobody built, and an empty one reads as a debt that has been
+ * paid. Every entry below is a headstone saying what rotted and what was done
+ * about it, because a re-anchoring that nobody can read is a re-anchoring
+ * nobody can check.
+ *
+ * **Seventeen across eleven runs were paid in one round**, and the split is the
+ * thing to carry forward: **seven were re-anchored** — a rename, a reflow, a
+ * clause added beside the subject — and **ten were re-derived**, meaning the
+ * mutation itself had to be rewritten because the code it was about had moved
+ * somewhere else or changed direction. `c22-construct`'s T4.6 is the sharpest:
+ * its subject was deleted from the tree on purpose, and its row now stands
+ * against that line being *added back*, so the mutation adds it.
+ *
+ * **And a mutation whose subject is a line's whole text rots for reasons that
+ * are not about it.** Three of the seventeen were one cache-key line that grew
+ * three axes; each mutation names one axis and each anchor reached to the end of
+ * the line, so all three broke every time a fourth arrived. They are fragments
+ * now — the axis and its neighbour — which is unique, drops exactly what the
+ * mutation is about, and survives the next axis landing beside it.
+ *
+ * **A repaired anchor is never trusted without running the pass.** All eleven
+ * runs were run; every mutation was caught by the row that names it.
+ */
 const KNOWN_STALE = {
   // `docker-dashboard.mjs` was 2 and is gone (F1104). Both were the same edit
   // — `summaryLine(live)` and the `emptyMessage` literal each gained a
@@ -264,27 +300,30 @@ const KNOWN_STALE = {
   // the pass, because re-anchoring without running it produces a mutation that
   // applies and asserts nothing. The pass was run: both are caught, and so is
   // the `C4` survivor beside them, which is what the sweep was for.
-  "c15-centred-width.mjs": 1,
-  "c19-menu-window.mjs": 1,
-  // **`c12-origin.mjs` is new debt that is older than the entry** (F1109). Its
-  // anchor is a template literal, so this reader could not see it until the
-  // backtick widening — it was not counted stale, it was not counted at all.
-  // The subject restructured rather than moved: `facing.y === "down" ? clamped
-  // : 1 - clamped` became `range.ts`'s `invert ? 1 - clamped : clamped`, with
-  // the test lifted into a parameter, so re-pointing it is re-deriving the
-  // mutation and not re-anchoring it. Listed rather than guessed at, on the
-  // standing rule that a repaired anchor nobody ran asserts nothing.
-  "c12-origin.mjs": 1,
-  // **Two, and both restructured rather than moved** (F1109). T1.4b's anchor
-  // was a template literal this reader could not see and is repaired; T1.1's
-  // call gained an argument and is repaired. What is left is `T4.6`, whose
-  // `stores.viewport.resize(...)` is no longer in the file at all, and `T4.8`,
-  // whose `scheduler.commit("input")` left the wheel handler — the handler now
-  // returns `true` and something above commits. Each is a mutation to re-derive,
-  // not an anchor to re-point, so both stay listed.
-  "c22-construct.mjs": 2,
-  "c22-frame-session.mjs": 2,
-  "c22-selection-wash.mjs": 1,
+  // `c15-centred-width.mjs` was 1 and is gone (F1118): `selected` became a
+  // thunk, so the line above the subject gained a call. The pass was run.
+  // `c19-menu-window.mjs` was 1 and is gone (F1118): `selected` became
+  // `selection.at`, a rename rather than a restructure. The pass was run.
+  // `c12-origin.mjs` was 1 and is gone (F1118). It was debt older than its own
+  // entry — a template literal this reader could not see until F1109's backtick
+  // widening — and the subject had restructured rather than moved: the clamp
+  // and mirror went into L0's `normalisedOf`, which takes *invert* as a boolean
+  // because §3ac rules `Facing` the renderer's vocabulary. So the mutation is
+  // now the argument rather than the expression, which is re-derivation and not
+  // re-anchoring. The pass was run: OR1 catches it.
+  // `c22-construct.mjs` was 2 and is gone (F1118). Both were re-derived rather
+  // than re-pointed, and **one of them inverted**: `T4.6`'s
+  // `stores.viewport.resize(...)` is not in the tree because C03 I15 removed it
+  // as a second writer, and the row now stands against one being *added back*,
+  // so the mutation adds it. `T4.8`'s commit left the wheel handler for the read
+  // loop under C22 I27 — one commit per decoded batch, the handler's return not
+  // gating it — so the mutation is `deliver`'s. The pass was run.
+  // `c22-frame-session.mjs` was 2 and is gone (F1118): the `ctx` literal was
+  // reflowed when `copyMode` and `lastFrame` joined it, and the overlay region's
+  // height became the transcript's (I28) rather than the terminal's. Both are
+  // re-anchored onto what the mutation is actually about. The pass was run.
+  // `c22-selection-wash.mjs` was 1 and is gone (F1118): the local was inlined
+  // into the `set`. The pass was run.
   // `c23-refresh.mjs` was 10 and is gone (F1011): all ten were re-anchored and
   // the pass runs 17 of 17 caught, control killed. Nine were one rework — the
   // thing that polls is the source, not the part — and the tenth was a mutation
@@ -303,8 +342,12 @@ const KNOWN_STALE = {
   // the reason at the head of this list: repairing an anchor without running the
   // pass produces a mutation that applies and asserts nothing, which reads as
   // coverage from the summary line.
-  "c10-categorical.mjs": 1,
-  "c26-elements.mjs": 1,
+  // `c10-categorical.mjs` was 1 and is gone (F1118): the cap gained `!matrix &&`
+  // beside it. The pass was run.
+  // `c26-elements.mjs` was 1 and is gone (F1118): re-derived rather than
+  // re-pointed — the descent stopped being a list of kinds and became a question
+  // asked of the definition, so the mutation is the walk returning before it
+  // descends. The pass was run.
 
   // **Five runs moved under C26 §4g and C22 I76 on 2026-09-03, none of them
   // run that day.** `c04-scroll` and `c22-camera` anchor on the render slot,
@@ -313,7 +356,10 @@ const KNOWN_STALE = {
   // `c26-semantic-copy` on `focus.ts`'s stored shape, which gained `entryId`.
   // Each is a one-token repair, and listed rather than repaired for the reason
   // at the head of this list: the repair belongs to whoever runs the pass.
-  "c04-scroll.mjs": 1,
+  // `c04-scroll.mjs` was 1 and is gone (F1118): the slot key grew three axes
+  // after the anchor was written, so a whole-line anchor rotted for reasons that
+  // had nothing to do with the offsets. Re-anchored onto the fragment that names
+  // the axis and its neighbour. The pass was run.
   // **`c22-camera` went from one to three and `c22-cursor` joined, under C22 I77
   // on 2026-09-04, neither run that day** (lane V). The render slot gained an
   // eighth axis (`framesKey`), the commit reason became `orbits.length > 0 ||
@@ -321,11 +367,23 @@ const KNOWN_STALE = {
   // = … ? ORBIT_MS : ORBIT_MS_TORN`); `c22-cursor`'s slot fragment moved with the
   // first. One-token repairs each, listed rather than repaired for the reason at
   // the head of this list — the lane could not run the pass.
-  "c22-camera.mjs": 3,
-  "c22-cursor.mjs": 1,
-  "c26-address.mjs": 3,
-  "c26-focus-target.mjs": 2,
-  "c26-semantic-copy.mjs": 2,
+  // `c22-camera.mjs` was 3 and is gone (F1118): the slot key (fragment now),
+  // the commit reason (I77 put animated frames beside the orbits) and the
+  // capability cap (reflowed onto one line). The pass was run.
+  // `c22-cursor.mjs` was 1 and is gone (F1118): the slot key again, re-anchored
+  // onto the axis and its successor. The pass was run.
+  // `c26-address.mjs` was 3 and is gone (F1118). One was re-anchored — §4g row b
+  // put an inner guard between the outer condition and the `toPrompt()` — and
+  // two were re-derived: `rowDown` writes `next ?? elements[i]` back because I16
+  // made a motion that stops collapse the range, so the ring is the fallback and
+  // the block edge is the guard on the move. The pass was run.
+  // `c26-focus-target.mjs` was 2 and is gone (F1118): the `interaction` gate
+  // grew a fourth clause reading `deps.liveEntry.id`, so dropping the liveness
+  // test now means dropping two, and `focusRow`'s `rowId` became `entryId` with
+  // `element` and `anchor` beside it. The pass was run.
+  // `c26-semantic-copy.mjs` was 2 and is gone (F1118): the stored record gained
+  // `entryId`, and `extendRowUp`'s null test moved up to guard the store repair
+  // that runs before the boundary is tested. The pass was run.
 
   // **The statement is gone, not moved** (C04 I81, 2026-09-03). "a log domain
   // is spaced linearly" mutated `xPositionOf`'s own log arm — `if (!isLog || …)
@@ -337,7 +395,9 @@ const KNOWN_STALE = {
   // (`c12-layer-merge`, `c12-plot3d`, `c12-shared-geometry` ×2, `c22-camera`'s
   // `elements` guard) were re-anchored instead, each onto the same statement
   // one token wider.
-  "c12-x-axis.mjs": 1,
+  // `c12-x-axis.mjs` was 1 and is gone (F1118): re-derived — the early return
+  // went when `pickAxis` began dispatching on the scale, and the positivity test
+  // moved into `niceLogAxis`. The pass was run.
 };
 
 /**
@@ -859,7 +919,12 @@ for (const [run, names] of Object.entries(OWN ? CROSS_TIER : {})) {
 }
 
 // The equality arm, both directions.
-const LIST = OWN ? KNOWN_STALE : {};
+//
+// **`OWN` decides which list, and a supplied one is never the tree's** (F1119):
+// the canonical directory reads `KNOWN_STALE` and ignores `--stale`, a foreign
+// one reads only what it was handed. So MA3 can construct both arms — excused
+// when supplied, checked when not — whatever `KNOWN_STALE` happens to hold.
+const LIST = OWN ? KNOWN_STALE : (SUPPLIED ?? {});
 const named = (run) => (missingWhat[run] ?? []).map((a) => `\n      ${a}`).join("");
 for (const [run, n] of Object.entries(missing)) {
   const known = LIST[run];

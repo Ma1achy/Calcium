@@ -52,10 +52,18 @@ const results = runPass({
     {
       // **The vertical half ignored.** Every plot draws the way it always did
       // and the member reads as unimplemented on two of its four corners.
+      //
+      // **Re-derived rather than re-pointed** (F1109's ruling, paid here). The
+      // clamp-and-mirror moved into L0's `normalisedOf`, which takes the one
+      // fact this needs as a boolean because §3ac rules `Facing` the renderer's
+      // vocabulary — so the arithmetic is not in this file any more and the
+      // mutation is the *argument* rather than the expression. `true` is the
+      // old unconditional `1 - clamped`, which is what shipping one corner of
+      // four looked like.
       name: "rowOf ignores the facing",
       file: SCALE,
-      from: `  return Math.round((facing.y === "down" ? clamped : 1 - clamped) * last);`,
-      to: "  return Math.round((1 - clamped) * last);",
+      from: `  return Math.round(normalisedOf(v, range, facing.y !== "down") * last);`,
+      to: "  return Math.round(normalisedOf(v, range, true) * last);",
       expect: "OR1",
     },
     {

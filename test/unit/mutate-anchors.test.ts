@@ -24,8 +24,11 @@ import { describe, expect, it } from "vitest";
 
 const DIR = mkdtempSync(join(tmpdir(), "mutate-anchors-"));
 
-function run(dir?: string): { ok: boolean; out: string } {
-  const args = dir === undefined ? [] : ["--dir", dir];
+function run(dir?: string, stale?: Readonly<Record<string, number>>): { ok: boolean; out: string } {
+  const args = [
+    ...(dir === undefined ? [] : ["--dir", dir]),
+    ...(stale === undefined ? [] : ["--stale", JSON.stringify(stale)]),
+  ];
   try {
     return {
       ok: true,
@@ -184,14 +187,45 @@ const MUTATIONS = [
     );
   });
 
-  it("MA3: the debt list does not travel to a foreign directory", () => {
+  it("MA3 (F1119): the debt list does not travel to a foreign directory, and a supplied one does", () => {
     // A list naming runs in *this* repository must not excuse a fabricated one,
     // or the fixture above passes by inheriting an excuse it was never given.
+    //
+    // **This row was vacuous the day the debt list was paid off** (F1119). Its
+    // only way of *showing* the gate was to name a run `KNOWN_STALE` held —
+    // `c23-refresh` was chosen for that and had already been removed — so with
+    // the list empty the fabrication has an empty corpus, and the row passes by
+    // there being nothing to inherit rather than by `OWN` holding. **An
+    // exemption list must be driven**, and the only list a fixture can drive is
+    // one it hands in.
     const named = resolving.replace("fake", "c23-refresh");
     const broken = named.replace("export function hasChildren", "export function noSuchThing");
-    const r = run(runsDir("c23-refresh.mjs", broken));
+    const dir = runsDir("c23-refresh.mjs", broken);
 
+    const r = run(dir);
     expect(r.ok, "a run sharing a listed name is still checked").toBe(false);
+
+    // **The other arm, and it is what makes the first one mean something**: the
+    // same run, the same stale anchor, excused by a list that was handed in. A
+    // gate that refused everything would fail here too and the row above would
+    // read exactly the same.
+    const excused = run(dir, { "c23-refresh.mjs": 1 });
+    expect(excused.ok, excused.out).toBe(true);
+    expect(excused.out, "and it says how many it is excusing").toMatch(/1 known stale/u);
+
+    // **And the count that is wrong is not excused either** (the equality arm,
+    // over a supplied list rather than the tree's).
+    const wrong = run(dir, { "c23-refresh.mjs": 2 });
+    expect(wrong.ok, "a list that claims the wrong number fails").toBe(false);
+    expect(wrong.out).toContain("the list says 2");
+
+    // The dead-entry direction, which `KNOWN_STALE` being empty leaves
+    // unreachable over the tree: an entry for a run whose anchors all resolve.
+    const clean = run(runsDir("c23-refresh.mjs", resolving.replace("fake", "c23-refresh")), {
+      "c23-refresh.mjs": 1,
+    });
+    expect(clean.ok, "an entry that has stopped being true fails").toBe(false);
+    expect(clean.out).toContain("every anchor resolves — remove it");
   });
 
   it("MA5: a run naming a test file that is not there fails, and says so", () => {

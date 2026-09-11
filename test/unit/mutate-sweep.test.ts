@@ -69,7 +69,27 @@ describe("MS3: the debt list the sweep tolerates is the one `anchors.mjs` enforc
   it("every entry names a run that exists, and the total is the total the anchors sweep prints", { timeout: SWEEP_BUDGET_MS }, () => {
     const list = stale(readFileSync(ANCHORS as string, "utf8"));
     const runs = new Set(discover());
-    expect(Object.keys(list).length).toBeGreaterThan(0); // cells-ok — an entry count
+
+    // **The corpus assertion is over the runs, not over the list** (F1119). It
+    // used to be `Object.keys(list).length > 0` — a guard against a reader that
+    // returns nothing — and it **went red the day the debt list was paid**,
+    // which is the honest half of the pair: MA3 had no corpus assertion at all
+    // and went *green* for the same reason. A bound over a population the work
+    // is shrinking fails when the work succeeds, so it moves to the population
+    // that does not shrink.
+    expect(runs.size, "the sweep's own corpus").toBeGreaterThan(100); // cells-ok — a run count
+
+    // **And the reader is driven rather than read off a list that may be
+    // empty.** Both arms of *every entry names a run that exists* are here, on
+    // a fabricated source, so they stay reachable whatever the tree holds.
+    const fabricated = stale('const KNOWN_STALE = {\n  "c22-camera.mjs": 3,\n  "no-such-run.mjs": 1,\n};\n');
+    expect(fabricated, "the reader takes entries and their counts").toEqual({
+      "c22-camera.mjs": 3,
+      "no-such-run.mjs": 1,
+    });
+    expect(runs.has("c22-camera.mjs"), "a real run is found").toBe(true);
+    expect(runs.has("no-such-run.mjs"), "and an entry naming nothing is not").toBe(false);
+
     for (const run of Object.keys(list)) expect(runs.has(run), run).toBe(true);
     const total = Object.values(list).reduce((a, b) => a + b, 0);
     // The cross-check: the sweep's own summary line carries the same number,

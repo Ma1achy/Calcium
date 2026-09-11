@@ -58,15 +58,22 @@ const results = runPass({
     {
       name: "frame: read the clock per chrome function instead of per frame",
       file: "src/shell/frame.ts",
-      from: "  const ctx = { session, now, columns: size.columns };",
-      to: "  const ctx = { session, get now() { return deps.now(); }, columns: size.columns };",
+      // **Re-anchored** (F1118): the literal grew `copyMode` and a spread
+      // `lastFrame` and was reflowed, so the one-line anchor rotted for reasons
+      // that had nothing to do with the clock. Anchored on the three lines the
+      // mutation is about.
+      from: "  const ctx = {\n    session,\n    now,",
+      to: "  const ctx = {\n    session,\n    get now() { return deps.now(); },",
       expect: "T4.11",
     },
     {
       name: "frame: read the size again for the overlay region",
       file: "src/shell/frame.ts",
-      from: "    overlayRegion: Object.freeze({ width: size.columns, height: size.rows }),",
-      to: "    overlayRegion: Object.freeze({ width: deps.size().columns, height: deps.size().rows }),",
+      // **Re-anchored** (F1118): the region's height is the transcript's now
+      // (I28) rather than the terminal's, so only the width still comes from
+      // the sample. One re-read is the whole of what T4.11b counts.
+      from: "    overlayRegion: Object.freeze({ width: size.columns, height }),",
+      to: "    overlayRegion: Object.freeze({ width: deps.size().columns, height }),",
       expect: "T4.11b",
     },
     {

@@ -56,7 +56,10 @@ const MUTATIONS = [
     // checked one gate would pass.
     name: "the validator does not refuse a ninth series",
     file: VALID,
-    from: '      if (b["series"].length > CATEGORY_LIMIT) {',
+    // **Re-anchored** (F1118): the guard gained `!matrix &&` — a matrix form
+    // has no series list to cap — which is a clause beside the cap rather than
+    // a change to it.
+    from: '      if (!matrix && b["series"].length > CATEGORY_LIMIT) {',
     to: "      if (false) {",
     expect: "T2.63",
   },

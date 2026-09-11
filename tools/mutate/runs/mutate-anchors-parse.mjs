@@ -185,6 +185,26 @@ const results = runPass({
       expect: "MA1c",
     },
     {
+      // **The gate MA3 could not construct until a list could be handed in**
+      // (F1119). With `KNOWN_STALE` empty, a foreign run had nothing to inherit
+      // and the row passed on an empty corpus; supplying the list is what makes
+      // *excused when given, checked when not* two arms rather than one.
+      name: "a supplied debt list is ignored, so the excuse arm cannot fire",
+      file: SWEEP,
+      from: "const LIST = OWN ? KNOWN_STALE : (SUPPLIED ?? {});",
+      to: "const LIST = OWN ? KNOWN_STALE : {};",
+      expect: "MA3",
+    },
+    {
+      // The equality arm's **second** direction — an entry that has stopped
+      // being true — which the tree cannot exercise while the list is empty.
+      name: "a dead entry is left on the list instead of failing",
+      file: SWEEP,
+      from: "for (const [run, n] of Object.entries(LIST)) {",
+      to: "for (const [run, n] of Object.entries({})) {",
+      expect: "MA3",
+    },
+    {
       // A name this file does not declare is **counted**, not dropped: an
       // exemption that is not counted is an exclusion, and a dropped row is an
       // anchor nothing will ever report stale.

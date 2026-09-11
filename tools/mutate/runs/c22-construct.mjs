@@ -45,17 +45,43 @@ const results = runPass({
       expect: "T1.1",
     },
     {
-      name: "let C14 hear the resize itself instead of being handed it",
+      // **Re-derived, and the direction inverted** (F1118). The old mutation
+      // deleted `stores.viewport.resize(...)` from the resize handler; C03 I15
+      // deleted it from the tree, because it was a **second writer** of a
+      // quantity `render-frame.ts` already sets, whose only effect was to
+      // re-measure the whole transcript per `SIGWINCH` rather than per frame —
+      // 544 ms for a 30-event drag at a thousand entries (F423).
+      //
+      // T4.6's claim inverted with it, and its own comment says what the row
+      // now stands against: *it is the one that fails if a second writer is ever
+      // added back.* So the mutation adds one. The harness stubs `render` with a
+      // counter, so no frame is ever composed — which is what makes a write from
+      // anywhere else observable at all.
+      name: "add the second writer of the viewport's size back to the resize handler",
       file: "src/shell/construct.ts",
-      from: "      stores.viewport.resize({ width: size.columns, height: size.rows });",
-      to: "      // the viewport is left to find out on its own",
+      from: "      refreshAnchors();",
+      to:
+        "      const sigwinchSize = lifecycle.size();\n" +
+        "      stores.viewport.resize({ width: sigwinchSize.columns, height: sigwinchSize.rows });\n" +
+        "      refreshAnchors();",
       expect: "T4.6",
     },
     {
-      name: "commit the scroll from nowhere — C14 moves and nothing paints",
+      // **Re-derived onto the loop** (F1118). The old anchor took the commit out
+      // of the wheel handler, and C22 I27 took it out of every handler: one
+      // commit per decoded batch, issued by `deliver`, and the handler's return
+      // does not gate it. T4.8 was moved to drive the read loop for the same
+      // reason — *this test asserted the handler's, which was the mechanism it
+      // happened to find, and it passed unchanged while the handler and the loop
+      // would both have committed.*
+      //
+      // So *C14 moves and nothing paints* is no longer constructible from a
+      // handler, and the batch's commit is the whole of what makes a scroll
+      // reach the screen.
+      name: "the decoded batch moves the viewport and commits nothing",
       file: "src/shell/construct.ts",
-      from: "      move(stores.viewport);\n      scheduler.commit(\"input\");",
-      to: "      move(stores.viewport);",
+      from: "        stampInput();\n        scheduler.commit(\"input\");",
+      to: "        stampInput();",
       expect: "T4.8",
     },
     {

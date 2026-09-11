@@ -136,8 +136,13 @@ const results = await runPass({
       // arrives with auto-orbit.
       name: "the slot drops the camera axis",
       file: SESSION,
-      from: "    const slot = `${key}\\u0000${range}\\u0000${offsets}\\u0000${orbitKey}${animated}`;",
-      to: "    const slot = `${key}\\u0000${range}\\u0000${offsets}${animated}`;",
+      // **Re-anchored onto a fragment** (F1118). The slot grew three axes —
+      // `cursorKey`, `framesKey`, `seriesKey` — so the whole-line anchor rotted
+      // three times over while naming one axis. A fragment naming the axis and
+      // its neighbour is unique, drops exactly what the mutation is about, and
+      // survives the next axis arriving beside it.
+      from: "\\u0000${orbitKey}\\u0000${cursorKey}",
+      to: "\\u0000${cursorKey}",
       expect: "T4.17g",
     },
 
@@ -154,7 +159,10 @@ const results = await runPass({
       // rotation falls from ~15 renders per 990 ms to ~5.
       name: "the orbit commits `spinner`, with the interval left at 33 ms",
       file: SESSION,
-      from: '    graph.scheduler.commit(orbits.length > 0 ? "stream" : "spinner");',
+      // **Re-anchored** (F1118): I77 put animated frames beside the orbits, so
+      // the reason now asks about both. The mutation is unchanged — the reason
+      // is forced to `spinner` while the interval stays at 33 ms.
+      from: '    graph.scheduler.commit(orbits.length > 0 || frames.length > 0 ? "stream" : "spinner");',
       to: '    graph.scheduler.commit("spinner");',
       expect: "T4.17j",
     },
@@ -163,8 +171,10 @@ const results = await runPass({
       // cap which always applies fails as loudly as one that never does.
       name: "the cap ignores synchronisedUpdate and always takes the stream rate",
       file: SESSION,
-      from: "          : ORBIT_MS_TORN;",
-      to: "          : ORBIT_MS;",
+      // **Re-anchored** (F1118): the ternary was reflowed onto one line when
+      // I77's `framesMs` joined it. The cap is the same choice.
+      from: "? ORBIT_MS : ORBIT_MS_TORN;",
+      to: "? ORBIT_MS : ORBIT_MS;",
       expect: "T4.17k",
     },
     {

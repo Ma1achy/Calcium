@@ -77,8 +77,13 @@ const MUTATIONS = [
     // read the same −1 as "start again at the top".
     name: "↑ leaves to the prompt on a stale address, as indexOf's −1 did",
     file: KEYS,
-    from: "      if (i === null || i === 0) {\n        deps.focus.toPrompt();",
-    to: "      if (i === null || i === 0 || current.element === null || !elements.some((p) => p.blockId === current.element?.blockId && p.element.id === current.element?.elementId)) {\n        deps.focus.toPrompt();",
+    //
+    // **Re-anchored** (F1118): §4g row b put an inner guard between the outer
+    // condition and the `toPrompt()` — only the live entry's head neighbours the
+    // prompt — so the two lines are no longer adjacent. The outer line is the
+    // subject and is unique.
+    from: "      if (i === null || i === 0) {",
+    to: "      if (i === null || i === 0 || current.element === null || !elements.some((p) => p.blockId === current.element?.blockId && p.element.id === current.element?.elementId)) {",
     expect: "T1.17",
   },
   {
@@ -95,10 +100,16 @@ const MUTATIONS = [
     // is beyond the tail*: treat the sequence as a ring. It passes every row
     // about stepping and every row about the head, because a ring and a line
     // differ at exactly one cell.
+    //
+    // **Re-derived** (F1118). `rowDown` no longer moves only when there *is* a
+    // next: I16 made a motion that stops collapse the range too, so it writes
+    // `next ?? elements[i]` back and `focusRow` gained the resolved entry. The
+    // ring is therefore one token — the fallback at the tail — rather than the
+    // `??` the old mutation added.
     name: "the tail wraps to the head instead of stopping",
     file: KEYS,
-    from: "      const next = elements[i + 1];\n      if (next !== undefined) deps.focus.focusRow(addressOf(next));",
-    to: "      const next = elements[i + 1] ?? elements[0];\n      if (next !== undefined) deps.focus.focusRow(addressOf(next));",
+    from: "      const target = next ?? elements[i];",
+    to: "      const target = next ?? elements[0];",
     expect: "T1.18",
   },
   {
@@ -106,10 +117,15 @@ const MUTATIONS = [
     // recorded and §4c measured against the tree. It is the mutation the
     // vocabulary would have forced: if the boundary were the kind's, stepping
     // would have to stop where one kind ends and another begins.
+    //
+    // **Re-derived** (F1118), onto the same statement's other half: the guard
+    // that decides whether the move happens at all. At the tail `target` is
+    // `elements[i]`, so the added clause holds and the collapse still runs —
+    // which is what keeps this mutation about the *edge* and not about the tail.
     name: "stepping stops at a block's edge",
     file: KEYS,
-    from: "      const next = elements[i + 1];\n      if (next !== undefined) deps.focus.focusRow(addressOf(next));",
-    to: "      const next = elements[i + 1];\n      if (next !== undefined && next.blockId === elements[i]?.blockId) deps.focus.focusRow(addressOf(next));",
+    from: "      if (target !== undefined) deps.focus.focusRow(entry, addressOf(target));",
+    to: "      if (target !== undefined && target.blockId === elements[i]?.blockId) deps.focus.focusRow(entry, addressOf(target));",
     expect: "T1.18",
   },
 ];

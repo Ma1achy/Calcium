@@ -34,8 +34,14 @@ const MUTATIONS = [
     // behavioural row about a top-level table still passes.
     name: "elementsIn stops at the top level, as the three walks did",
     file: REG,
-    from: '        if (block.kind === "panel" || block.kind === "group") {',
-    to: "        if (false) {",
+    //
+    // **Re-derived** (F1118). The descent stopped being a list of kinds: C26
+    // §4b cell 3 asks the **definition** whether it owns its elements, which is
+    // the form that stays right when a fifth container arrives. So the mutation
+    // is no longer *drop two kinds from a list* — it is the walk returning
+    // before it descends at all, which is what the three walks did.
+    from: "      if (!hasChildren(block) || own.owned) return;",
+    to: "      return;",
     expect: "T2.21",
   },
   {
