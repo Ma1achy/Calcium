@@ -21,11 +21,25 @@
 //     fixture at `height: 40` — pitch 15.29 px — from that survival. The
 //     mutation pass indicted the fixture rather than the rule.
 //
-// **The control is `<` widened to `<=`** rather than the mechanism deleted. The
-// corpus's closest *contended* pair is 2.415 px and its closest *uncontested*
-// pair 15.29 px, so a boundary that moves by nothing is a change to the rule
-// that the corpus genuinely cannot see — which is what a control has to be.
-// `< 0` was tried first and is not one: it kills four rows.
+// **The control was written the wrong way round, and the sentence justifying it
+// is true** (F1120). It said: the corpus's closest *contended* pair is 2.415 px
+// and its closest *uncontested* pair 15.29 px, so widening `<` to `<=` moves the
+// boundary by nothing the corpus can see — *which is what a control has to be*.
+// Both measurements are real and the conclusion is inverted. `runPass`'s control
+// is a mutation that **must be caught**: it is the pass's proof that it can see a
+// kill at all, and one the corpus cannot see makes the run throw
+// `BlindHarnessError` before a single mutation is applied.
+//
+// So this file has **never started** — it landed on 2026-09-04 with five
+// mutations nobody has ever checked, five weeks after `runPass` began requiring
+// a killed control, and the sweep could not say so because every anchor resolves.
+//
+// **`< 0` is the control**, and the old header rejected it in the same breath
+// for the reason that qualifies it: *it kills four rows*. The guard can then
+// never fire, every right-hand label is drawn, and the overprints come back.
+// It is behaviourally mutation 1 by another route, which is what a control
+// should be — the strongest change in the file, so that its survival means the
+// pass can see nothing.
 import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
@@ -53,8 +67,8 @@ const results = runPass({
   control: {
     file: SVG,
     from: "Math.abs(r - y) < SVG_FONT_SIZE)",
-    to: "Math.abs(r - y) <= SVG_FONT_SIZE)",
-    why: "the boundary moves by nothing the corpus contains — contended pairs sit at 2.415 px and uncontested ones at 15.29",
+    to: "Math.abs(r - y) < 0)",
+    why: "the guard can never fire, so every right-hand label is drawn and the overprints return — measured at four rows, and a run where this survives is a run that cannot see a kill at all",
   },
   mutations: [
     {
