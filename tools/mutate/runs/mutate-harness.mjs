@@ -139,8 +139,13 @@ const results = runPass({
       // class in a tool's own output, which this file has paid for twice.
       name: "an indeterminate row is counted as a survivor in the summary",
       file: FILE,
-      from: "    (r) => !r.killed && !r.noSummary && !r.anchorMissed && !r.unbuilt && !r.indeterminate,",
-      to: "    (r) => !r.killed && !r.noSummary && !r.anchorMissed && !r.unbuilt,",
+      // **The predicate moved and the row follows it** (F1106). The five
+      // not-a-survivor states became one named `isSurvivor`, because the
+      // type-check has to ask the same question at a second site — so the
+      // anchor now names the function rather than the filter, and the mutation
+      // reaches both readers at once. The claim MH9e makes is unchanged.
+      from: "  return !o.killed && !o.noSummary && !o.anchorMissed && !o.unbuilt && !o.indeterminate;",
+      to: "  return !o.killed && !o.noSummary && !o.anchorMissed && !o.unbuilt;",
       expect: "MH9e",
     },
     {
@@ -183,6 +188,47 @@ const results = runPass({
       from: "    } finally {\n      restore();\n    }",
       to: "    } finally {\n    }",
       expect: "MH7",
+    },
+    {
+      // **The type-check asked of every row** (F1106). It is gated on the
+      // survivor because that is where the reader is about to be told the
+      // tests are weak; asked of a kill it costs 1.3 s for an answer nobody
+      // reads, and MH11c counts the calls for exactly this reason.
+      name: "the type-check is asked of every row, not only a survivor",
+      file: FILE,
+      from: "      if (isSurvivor(outcome)) {\n        const err = typecheck();",
+      to: "      if (true) {\n        const err = typecheck();",
+      expect: "MH11c",
+    },
+    {
+      // **A baseline nobody measured**, which is the failure every guard in
+      // this file exists against — arriving inside the guard that was added to
+      // catch it. A tree already red attributes its own error to the first
+      // mutation that survives.
+      name: "the clean tree is assumed to type-check rather than asked",
+      file: FILE,
+      from: "          const base = typecheck();",
+      to: "          const base = null;",
+      expect: "MH11b",
+    },
+    {
+      // The summary counting a row it did not measure — the same compression
+      // class as the indeterminate row above, two states later.
+      name: "a row that did not type-check is counted as a survivor",
+      file: FILE,
+      from: "  const survivors = results.filter(isSurvivor).filter((r) => !r.untyped);",
+      to: "  const survivors = results.filter(isSurvivor);",
+      expect: "MH11",
+    },
+    {
+      // The compiler's own line dropped, leaving a state with no reason on it
+      // — which routes the reader back to the tests it was written to route
+      // them away from.
+      name: "the untyped row carries no error line",
+      file: FILE,
+      from: "        ? `   ← ${r.untyped.trim()}`",
+      to: '        ? ""',
+      expect: "MH11",
     },
   ],
 });
