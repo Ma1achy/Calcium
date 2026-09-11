@@ -168,9 +168,31 @@ const results = runPass({
       // reports as stale, so a `null` piece has to poison the whole join.
       name: "a refused piece is dropped from the join instead of poisoning it",
       file: SWEEP,
-      from: "      return parts.some((x) => x === null) ? null : parts.join(\"\");",
-      to: '      return parts.join("");',
+      from: "    return parts.some((x) => x === null) ? null : parts.join(\"\");",
+      to: '    return parts.join("");',
       expect: "MA1b",
+    },
+    {
+      // **The fourth form of an anchor is a name** (F1117), and the reader that
+      // could not see one did not report it stale — the mutation fell out of
+      // the corpus entirely, because the pattern requires a literal in that
+      // position. Twenty-four across ten runs, and one of them was a run's
+      // **control**.
+      name: "a `from:` naming a constant is not an anchor again",
+      file: SWEEP,
+      from: "      String.raw`(${VALUE})` +",
+      to: "      String.raw`((?:(?:${LITERAL})\\s*\\+?\\s*)+)` +",
+      expect: "MA1c",
+    },
+    {
+      // A name this file does not declare is **counted**, not dropped: an
+      // exemption that is not counted is an exclusion, and a dropped row is an
+      // anchor nothing will ever report stale.
+      name: "an unresolvable name is dropped instead of counted",
+      file: SWEEP,
+      from: "    if (!(t in consts)) return { text: null, why: `names \\`${t}\\`, which is not a literal here` };",
+      to: "    if (!(t in consts)) return { text: \"\", why: null };",
+      expect: "MA1c",
     },
   ],
 });

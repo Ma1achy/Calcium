@@ -26,7 +26,18 @@ const run = () => {
   }
 };
 
-const GATE = "    if (!isUsable(this.#graph.capabilities)) {\n      throw new UnusableTerminalError(unusableCause(this.config.env));\n    }";
+// **The gate's body grew and the pasted copy rotted with nothing watching**
+// (F140 added the teardown, F1117 found it). `from: GATE` is a *name*, and the
+// anchor reader required a literal in that position — so this was not a stale
+// anchor, it was **not an anchor**: the mutation fell out of the corpus and this
+// run's control threw at its first `apply`, unstartable, while the sweep said no
+// run had drifted.
+//
+// Computed from both ends now rather than pasted, so the comment block the
+// teardown brought with it cannot rot it again. The ends are short, unique and
+// load-bearing: the predicate, and the throw the gate exists to reach.
+const GATE_HEAD = "    if (!isUsable(this.#graph.capabilities)) {";
+const GATE_TAIL = "      throw new UnusableTerminalError(cause);\n    }";
 
 // **The span, computed rather than pasted**, because "the gate runs after
 // acquire" has to *move* it and a mutation that only adds one leaves the
@@ -36,18 +47,33 @@ const GATE = "    if (!isUsable(this.#graph.capabilities)) {\n      throw new Un
 // halves of the move in one replacement.
 const SRC = readFileSync(`${ROOT}/src/shell/session.ts`, "utf8");
 const OPEN = "    this.#open();\n  }";
-const SPAN = SRC.slice(SRC.indexOf(GATE), SRC.indexOf(OPEN) + OPEN.length);
+// **Both ends asserted before the slice.** `indexOf` returning −1 makes
+// `slice` read from the end of the file and produces an anchor that matches
+// nothing — a script that reports success having found nothing, which is the
+// rule this repo applies to its own edit scripts.
+const GATE_AT = SRC.indexOf(GATE_HEAD);
+const GATE_TO = SRC.indexOf(GATE_TAIL, GATE_AT);
+if (GATE_AT === -1 || GATE_TO === -1) {
+  throw new Error("c22-gate3b: the gate's head or tail is no longer in session.ts — re-derive both before running");
+}
+const GATE = SRC.slice(GATE_AT, GATE_TO + GATE_TAIL.length);
+const SPAN = SRC.slice(GATE_AT, SRC.indexOf(OPEN) + OPEN.length);
 const MOVED = SPAN.slice(GATE.length).replace(OPEN, `${GATE}\n${OPEN}`).replace(/^\n+/, "");
 
 const results = runPass({
   read,
   write,
   run,
+  // **A literal, so the sweep watches it** (F1117). The control was `from: GATE`
+  // — a name — and that is the one form the anchor reader could not see, which
+  // is how it sat stale long enough for the run to be unstartable. The throw is
+  // the gate's whole purpose and one line of it, so the anchor is short, unique
+  // and rots only when the thing it is about changes.
   control: {
     file: "src/shell/session.ts",
-    from: GATE,
+    from: "      throw new UnusableTerminalError(cause);",
     to: "",
-    why: "with the gate gone nothing refuses an empty `env`, so T3.20 cannot pass — a run where this survives is a run that cannot see a kill at all",
+    why: "with the throw gone nothing refuses an empty `env` — `start()` resolves — so T3.20 cannot pass, and a run where this survives is a run that cannot see a kill at all",
   },
   mutations: [
     {

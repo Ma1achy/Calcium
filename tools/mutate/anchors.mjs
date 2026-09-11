@@ -388,9 +388,6 @@ function unquote(body, quote) {
  * MA4 arm asserts equality against the tree and this comment records the figure.
  */
 function anchorsOf(src) {
-  const consts = {};
-  for (const m of src.matchAll(/^const ([A-Z_][A-Z_0-9]*) = (["'])([^"']+)\2;/gm)) consts[m[1]] = m[3];
-
   const out = [];
   // **A branch per quote style rather than a backreference**, because a class
   // cannot exclude `\2`: one pattern over both would have to allow the delimiter
@@ -414,24 +411,66 @@ function anchorsOf(src) {
   // narrows. So it is a trailing optional group, and the rows without one are
   // counted rather than dropped: `to: null` reaches the caller, which reports
   // the number.
+  // **A name is a fourth form, beside the three quote characters** (F1117). It
+  // is resolved against the file's own `const` declarations rather than by
+  // importing the module — importing a run **executes the pass**, which is why
+  // this reader is textual in the first place.
+  const VALUE = String.raw`[A-Z_][A-Z_0-9]*|(?:(?:${LITERAL})\s*\+?\s*)+`;
   const re = new RegExp(
     String.raw`file:\s*([A-Z_][A-Z_0-9]*|"[^"]*"|'[^']*')\s*,\s*\n\s*(?:\/\/[^\n]*\n\s*)*from:\s*` +
-      String.raw`((?:(?:${LITERAL})\s*\+?\s*)+)` +
-      String.raw`(?:,\s*\n\s*(?:\/\/[^\n]*\n\s*)*to:\s*((?:(?:${LITERAL})\s*\+?\s*)+))?`,
+      String.raw`(${VALUE})` +
+      String.raw`(?:,\s*\n\s*(?:\/\/[^\n]*\n\s*)*to:\s*(${VALUE}))?`,
     "g",
   );
   const pieces = new RegExp(LITERAL, "g");
+  // `null` from any piece poisons the join: a half-read anchor is worse than
+  // an unread one, because it matches nothing and reports as stale.
+  const join = (blob) => {
+    const parts = (blob.match(pieces) ?? []).map((lit) => unquote(lit.slice(1, -1), lit[0]));
+    return parts.some((x) => x === null) ? null : parts.join("");
+  };
+
+  // **The declarations, read with the same machinery as the anchors** (F1117).
+  // The old reader took `const NAME = "…";` on one line in one of two quotes,
+  // and served `file:` alone — so a `from: GATE` was not a stale anchor, an
+  // ambiguous one or an unreadable one. It was **not an anchor**: the pattern
+  // requires a literal in that position, so the whole mutation fell out of the
+  // corpus and its run reported a number that never counted it. Twenty-four
+  // across ten runs, and `c22-gate3b`'s **control** was among them — stale, so
+  // the run threw at its first `apply` and could not start at all, with the
+  // sweep saying no run had drifted.
+  const consts = {};
+  for (const m of src.matchAll(
+    new RegExp(String.raw`^const ([A-Z_][A-Z_0-9]*) =\s*((?:(?:${LITERAL})\s*\+?\s*)+);`, "gm"),
+  )) {
+    consts[m[1]] = join(m[2]);
+  }
+
+  /**
+   * A `from:`/`to:` value: a literal sequence, or a name this file declares.
+   *
+   * Three outcomes rather than two. A string is read; `null` with a reason is
+   * **counted by name**, because an exemption that is not counted is an
+   * exclusion; and a name that resolves to an interpolated body is the
+   * interpolation case, which is F1109's and not this one.
+   */
+  const value = (blob) => {
+    if (blob === undefined) return { text: null, why: null };
+    const t = blob.trim();
+    if (!/^[A-Z_][A-Z_0-9]*$/u.test(t)) {
+      const text = join(t);
+      return { text, why: text === null ? "interpolates" : null };
+    }
+    if (!(t in consts)) return { text: null, why: `names \`${t}\`, which is not a literal here` };
+    return { text: consts[t], why: consts[t] === null ? "interpolates" : null };
+  };
+
   for (const m of src.matchAll(re)) {
     const raw = m[1];
     const file = raw.startsWith('"') || raw.startsWith("'") ? raw.slice(1, -1) : consts[raw];
-    if (file === undefined) continue;
-    // `null` from any piece poisons the join: a half-read anchor is worse than
-    // an unread one, because it matches nothing and reports as stale.
-    const join = (blob) => {
-      const parts = (blob.match(pieces) ?? []).map((lit) => unquote(lit.slice(1, -1), lit[0]));
-      return parts.some((x) => x === null) ? null : parts.join("");
-    };
-    out.push({ file, from: join(m[2]), to: m[3] === undefined ? null : join(m[3]) });
+    if (file === undefined || file === null) continue;
+    const from = value(m[2]);
+    out.push({ file, from: from.text, why: from.why, to: value(m[3]).text });
   }
   return out;
 }

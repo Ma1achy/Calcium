@@ -113,6 +113,57 @@ const MUTATIONS = [
     expect(refused.out, "and not reported as a missing anchor").not.toMatch(/1 anchor\(s\) missing/u);
   });
 
+  it("MA1c (F1117): an anchor that names a constant is read, and one that names something else is counted by name", () => {
+    // **The fourth form, and the only one that was not a stale anchor.** The
+    // pattern required a literal after `from:`, so `from: GATE` matched nothing
+    // and the whole mutation fell out of the corpus — not stale, not ambiguous,
+    // not unreadable: **not an anchor**. Its run then reported a count that had
+    // never counted it. Twenty-four across ten runs on the tree, and one of them
+    // was a run's **control**, so that run threw at its first `apply` and could
+    // not start while the sweep said no run had drifted.
+    const named = `
+const SRC = "src/data/viewmodel/tree.ts";
+const GUARD = "export function hasChildren(block: Block): block is ContainerBlock {";
+const MUTATIONS = [
+  {
+    file: SRC,
+    from: GUARD,
+    to: "export function hasChildren(block: Block): boolean {",
+  },
+];
+`;
+    const seen = run(runsDir("fake.mjs", named));
+    expect(seen.ok, seen.out).toBe(true);
+    expect(seen.out, "counted, not skipped").toMatch(/· 1 anchors/u);
+
+    // **The control**: the same declaration, stale. A reader that dropped the
+    // row rather than resolving it would pass the line above by finding nothing
+    // — which is what the tree did for twenty-four anchors.
+    const staleNamed = named.replace("hasChildren(block: Block): block is", "hasChildren(b: Block): b is");
+    const missed = run(runsDir("fake.mjs", staleNamed));
+    expect(missed.ok, "a stale named anchor is reported").toBe(false);
+    expect(missed.out).toContain("fake.mjs");
+
+    // **A name this file does not declare as a literal is counted, not dropped.**
+    // `SPAN` below is computed from the source at load — genuinely beyond a
+    // textual reader — and the honest answer is to say so by name rather than to
+    // guess or to lose the row. An exemption that is not counted is an exclusion.
+    const computed = `
+const SRC = "src/data/viewmodel/tree.ts";
+const SPAN = readFileSync(SRC, "utf8").slice(0, 40);
+const MUTATIONS = [
+  {
+    file: SRC,
+    from: SPAN,
+    to: "",
+  },
+];
+`;
+    const unread = run(runsDir("fake.mjs", computed));
+    expect(unread.out, "counted by name, never as stale").toMatch(/1 interpolated/u);
+    expect(unread.out, "and not reported as a missing anchor").not.toMatch(/1 anchor\(s\) missing/u);
+  });
+
   it("MA2: one stale anchor fails, and the run is named", () => {
     // **The fabricated violation.** The anchor is a sentence that could plausibly
     // have been in the file and is not — which is exactly what a rotted mutation

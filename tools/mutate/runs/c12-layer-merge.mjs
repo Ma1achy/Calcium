@@ -17,7 +17,12 @@ const DEFN = "src/presentation/plot/definition.ts";
 /** The guard the whole partition hangs on — spelled once (C12 I44). */
 const GUARD = '        if (dots === null || cellKind !== layer.kind) continue;';
 /** The turn: which contending peer this cell goes to (C12 I44). */
-const PICK = '      const pick = peers[x % peers.length]!; // cells-ok — a cell column';
+// **Stale, and the sweep could not say so** (F1117): `from: PICK` is a *name*,
+// and the anchor reader required a literal there — so this mutation was never in
+// the corpus and its `ANCHOR MISSED` was never printed. The key moved from a
+// column to a contested-cell counter under it (I44's amendment), which is the
+// change the mutation is about, and the `cells-ok` note moved with it.
+const PICK = '      const pick = peers[(rowIndex + turns) % peers.length]!; // cells-ok — a layer count';
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
