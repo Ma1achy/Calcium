@@ -476,6 +476,8 @@ describe("C11 tier 1 — planColumns", () => {
     );
   });
 
+  it.todo("T1.28 (I23): one column, one marked row and one not, draws both runs the same length — not deferred on a component");
+
   it("T1.27 (I23): the mark is dropped where it does not fit, and at no width above that", () => {
     // **A sweep rather than a chosen width**, because a chosen width is the
     // judgement this invariant stopped making. I23's first form dropped the mark

@@ -52,7 +52,7 @@ const results = runPass({
       // **The plausible half-fix.** The mark appears, every assertion about it
       // passes, and the cell is two cells wider than the column planned — so
       // every column to its right starts two cells late and the header
-      // disagrees with the rows beneath it (I21). Only a width assertion sees it.
+      // disagrees with the rows beneath it (C11 I21). Only a width assertion sees it.
       name: "the lead is drawn beside the plan rather than inside it",
       file: FILE,
       from: "      spans.push({ text: valueBar(cell.bar, room, ctx.capabilities), style });",
