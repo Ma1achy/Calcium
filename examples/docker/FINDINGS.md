@@ -48086,3 +48086,68 @@ which even if someone had asked.
 quotation of it**, because that row asserts on the source text. A mutation
 landing there would change what the assertion looks for rather than what the
 suite covers.
+
+---
+
+## F1114 — a `.d.mts` is a second record of what a `.mjs` exports, and seven names had drifted out of it ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `tools/mutate/mutate.d.mts` · `tools/enforce/{commitments,module-graph}.d.mts` · `tools/capture-foreign.d.mts` · `test/unit/tool-declarations.test.ts` |
+| **Reached for** | `make check` going red on a fixture row written for F1113 |
+| **Verdict** | **closed** — six declared, one exemption named with its reason, and a gate with a fabricated violation on the real tree |
+
+### Found by a build, and only because a typed caller finally reached for it
+
+`Mutation` has carried `name`, `file`, `from`, `to` and `expect` since the
+harness was written. `editsOf` has read `m.also` since F227. The declaration has
+never had an `also` field.
+
+Nothing noticed, because **the callers are the run files and they are `.mjs`**.
+The first typed caller was MH10b — a row written to prove F1113's refusal reaches
+an `also` edge — and it failed `make check` after two mutation passes and a green
+suite had already been read.
+
+### The sweep found six more, and two have consumers
+
+| module | undeclared | consumed from |
+|---|---|---|
+| `mutate.mjs` | `fsIo` | four run files, by name |
+| `module-graph.mjs` | `nameExactnessSignal` | `enforce/index.mjs` |
+| `mutate.mjs` | `editsOf` | its own module |
+| `commitments.mjs` | `scanSections`, `sectionsOf` | their own module |
+| `module-graph.mjs` | `checkDevEntryIsolation` | its own module |
+
+**A missing name costs nothing until someone reaches for it from a `.ts` file**,
+and by then the module has been right for a year. That is the whole mechanism:
+the `.mjs` is the record everything runs and the `.d.mts` is the record only
+TypeScript reads, so the two can disagree for as long as no typed consumer
+appears.
+
+### The instrument written to find the class was blind to a fifth of it
+
+The first sweep matched `^export (function|class|const|let) NAME` and reported
+**none missing** for `capture-foreign.mjs`. Ten of the corpus's exports are
+`export async function`, and **both** of that file's undeclared names are of
+that form.
+
+So the file with the most missing was the one the instrument called clean. A
+matcher that sees one encoding reports absence when the value changes form —
+here inside the work closing the class, which is the cheapest place to find it
+and the easiest place to miss it.
+
+### And that file's absence is deliberate, which is what makes this a rule rather than a tightening
+
+`capture-foreign.d.mts` opens *only the three*, with the reason: the rest of the
+file is a driver — `node-pty`, `sharp`, argument parsing — and declaring it would
+invite a test to import the driver, which is *an entry that starts on import is
+untestable*.
+
+Had the sweep seen those two, a blanket rule would have declared them and made
+the tree worse. So the gate carries an exemption **compared by equality both
+ways**: an entry that starts being declared is a failure exactly as an
+undeclared export is.
+
+`TD-D4` fabricates the violation four ways, including the `async` form that got
+past the first sweep; removing `fsIo`'s declaration from the real tree fails
+`TD-D2` naming the file and the member.
