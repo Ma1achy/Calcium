@@ -21,6 +21,35 @@ const S = "src/presentation/plot/scatter3.ts";
 const P = "src/presentation/plot/project3.ts";
 const V = "src/data/viewmodel/validate.ts";
 
+/**
+ * **The frame's draw, taken from the tree rather than written out** (F1125).
+ *
+ * LN6's defect is a **move** and not an addition: the call sits four hundred
+ * lines below the data loop, and inserting a second one leaves the later draw
+ * winning, so the net effect is nothing — which is half of why the old mutation
+ * could not fail (F1106). The other half was a `to` written against the
+ * signature before F489 split `{ w, rows }` out of `rows`.
+ *
+ * Slicing it out of the source is `c22-gate3b`'s pattern and has its cost: a
+ * `from` computed this way is `interpolated` to the anchor sweep, which cannot
+ * check it. The head and tail are checked here instead, and a run that cannot
+ * find either refuses to start rather than mutating something else.
+ */
+const FRAME_HEAD =
+  "  const labels = frameOf(block, scene, grid, { w, rows }, depth, ctx, " +
+  "(i, m, axisInk, px, py, from, nearer) => {";
+const FRAME_TAIL = "    glyph[i] = -1;\n  });\n";
+const SRC = readFileSync(`${ROOT}/${S}`, "utf8");
+const FRAME_AT = SRC.indexOf(FRAME_HEAD);
+const FRAME_TO = FRAME_AT === -1 ? -1 : SRC.indexOf(FRAME_TAIL, FRAME_AT);
+if (FRAME_AT === -1 || FRAME_TO === -1) {
+  throw new Error(
+    "c12-lines3d: the frame draw's head or tail is no longer in scatter3.ts — re-derive both before running",
+  );
+}
+const FRAME_CALL = SRC.slice(FRAME_AT, FRAME_TO + FRAME_TAIL.length);
+const DATA_LOOP = "  for (const d of drawn) {\n    const tier = tierOf(d.depth, nearD, farD);";
+
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
 const run = () => {
@@ -101,11 +130,32 @@ const results = await runPass({
     {
       // **The frame back in front** (F452, §6g). It drew first for the whole of
       // step 4 under a comment saying the order did not decide occlusion.
+      //
+      // **A move is two edits and the removal goes first** (F1121). Removing
+      // before inserting is what keeps both anchors unique: the other order
+      // puts a second copy of the call in the file and `apply` refuses the
+      // ambiguity it then has (F1113).
       name: "the frame is drawn before the data",
       file: S,
-      from: "  for (const d of drawn) {\n    const tier = tierOf(d.depth, nearD, farD);",
-      to: "  const early = frameOf(block, scene, grid, rows, depth, ctx, (i, m) => { ink[i] = frameInk; mark[i] = m; glyph[i] = -1; });\n  void early;\n  for (const d of drawn) {\n    const tier = tierOf(d.depth, nearD, farD);",
+      from: FRAME_CALL,
+      to: "",
+      also: [{ file: S, from: DATA_LOOP, to: `${FRAME_CALL}\n${DATA_LOOP}` }],
       expect: "LN6",
+    },
+    {
+      // **The tie itself, which nothing constrained** (F1125). The guard is
+      // what `drawing last` is *for*: the frame paints on equal-or-nearer so
+      // its own meetings join, and refuses a tie on a cell no frame mark owns,
+      // which is a carrier's. Removing it fails nine rows and none of them
+      // notices — LN6 asserts a **direction** and the direction survives,
+      // because most of a coincident stroke is strictly nearer than the box
+      // rather than tied with it. Measured: the frame's loss goes 6 cells to 4
+      // and the carrier holds 8 of its 13 instead of 10. LN7 is the row.
+      name: "the frame takes a cell tied with a carrier",
+      file: S,
+      from: "    if (!nearer && mark[i] === undefined) return;",
+      to: "    void nearer;",
+      expect: "LN7",
     },
     {
       // **One colour a segment** (C12 I93, §6g row 7) — the reading taken at

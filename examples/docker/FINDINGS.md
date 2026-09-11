@@ -46886,7 +46886,7 @@ distinction I55 draws in prose and a line-regex cannot.
 |---|---|
 | **Surface** | `test/e2e/profiler.test.ts:562` (T5.1c) · `src/shell/profiling/replay.ts` · F963 |
 | **Reached for** | reading a CI red that was green on the same commit in the other run |
-| **Verdict** | **open** — recorded, not diagnosed: the two extra reads are named as a candidate and not traced |
+| **Verdict** | **open** — both stated candidates are now falsified by twelve deliberate samples; what remains is the regime rather than the duration, and the next sample is wanted from a runner |
 
 ### The red
 
@@ -46954,6 +46954,48 @@ sample would be a repair aimed at one reading.
   `exhaustedAt` and `fixture processes alive` are all in the verdict and all
   clean, which is the ruling-out F963 did by counter rather than by argument.
 
+### The second sample, produced on purpose — and both candidates fall
+
+**The entry named the experiment that settles the second candidate and nobody ran
+it**: *a killed run with `consumed.wall === recorded.wall` settles it*. The harness
+already has the knob for the first — `record({ farSideDelayMs })` writes a far side
+that sleeps and then execs the real one — so T5.1c's exact shape with a 2 500 ms
+far side is one line.
+
+**Twelve runs: six on a quiet container and six under an eight-way CPU load
+(loadavg 5.58), every one green and every one byte-identical.**
+
+| | |
+|---|---|
+| `answer` | 2 589 – 2 670 ms (the runner's red was 2 658) |
+| `exit` | `null` on all twelve — the `^D` confirm is never answered, so **every** run ends by the kill |
+| wall | 59 / 59 |
+| mono | 3 088 / 3 088 |
+| `compared` · `stalled` | 10 · 0 |
+
+**Candidate two is settled by the entry's own test.** `exit` is `null` on all
+twelve, which is what the harness's comment already said and measured — *C16 I16
+makes `^D` at an empty prompt open a confirm rather than exit*, so the keystroke
+draws a frame and the session waits for an answer nobody types. **`exit=killed`
+describes every sample, the green ones included**, so it cannot be what
+distinguishes the red one.
+
+**Candidate one is falsified as sufficient.** T5.1d has asserted wall parity on a
+2 500 ms far side since it landed, and these twelve reproduce the *red run's own
+duration* in the *red run's own shape* and stay in parity — with the figures
+identical to the digit across all twelve, so the recording is fully deterministic
+here.
+
+**What is left is the regime and not the duration**, and the distinction is the
+finding. The runner's answer was slow because the **machine** was slow — a 2-core
+box under load — and a sleeping wrapper makes the far side slow while everything
+else runs at full speed. **A wrapper reproduces the duration and not the
+contention**, so twelve green runs at 2.6 s say the threshold F963 named was the
+wrong axis, and say nothing about a loaded 2-core runner. Eight hogs on eleven
+cores is 0.5 per core against the runner's 0.7 and is still not that machine.
+
+**Still open**, and better founded: one candidate instead of two, the axis named as
+the regime, and the next sample wanted from a runner rather than from here.
 ---
 
 ## F1101 — the anchorage matcher reads one of three spellings, and fifty-four spans were invisible to it ★★★☆☆
@@ -47330,7 +47372,7 @@ non-zero run. Named rather than fixed here.
 |---|---|
 | **Surface** | `.github/workflows/mutation-sweep.yml` · `tools/mutate/sweep.mjs` · `tools/mutate/runs/c12-arm-seam.mjs` · F1097, F980 |
 | **Reached for** | reading run 34550613146, which F1097 named as the measurement it was waiting for |
-| **Verdict** | **open** — the census is taken and the timeout question is answered; the eighteen reds are named and **sixteen are closed** (F1104, F1108, F1116 ×2, F1117 ×3, F1118 ×4, F1120, F1122, F1123 ×3), so **two remain** |
+| **Verdict** | **closed** — the census is taken, the timeout question is answered, and **all eighteen reds are closed**: F1104, F1108, F1116 ×2, F1117 ×3, F1118 ×4, F1120, F1122, F1123 ×3, F1124, F1125 |
 
 ### The census
 
@@ -47603,7 +47645,7 @@ in one finding.
 |---|---|
 | **Surface** | `tools/mutate/runs/*.mjs` · F1105's seventeen red runs |
 | **Reached for** | F1106 built the check; this points it at the corpus once |
-| **Verdict** | **open** — all eighteen are read and disposed; five were rotted, three are repaired and verified, and the two that remain are named |
+| **Verdict** | **closed** — all eighteen are read and disposed, and all five rotted `to`s are repaired and verified: three here, `atLate` by F1110 and LN6 by F1125 |
 
 ### The measurement
 
@@ -47706,10 +47748,28 @@ short, and the mutation that would have said so was rotted.
 
 ### What remains
 
-**LN6** and **`atLate`**, both of which want a mutation designed rather than
-patched: LN6 needs the frame *moved* rather than added, which is C12's 3-D
-carrier and wants the by-hand walk; `atLate`'s row needs the runner's step to
-land after the lifecycle's in `log`, which is a reorder and not a rename.
+**Nothing.** Both were answered, and the second one was answered **in this
+document, by a finding whose own header names it**.
+
+**LN6 is closed by F1125.** It wanted the frame *moved* rather than added, and the
+move is two edits whose order is forced from outside: F1113's ambiguity refusal
+means the removal has to go first, or the insertion's second copy makes the
+removal's anchor match twice. The walk it asked for also answered the question
+F1106 recorded and left open — why removing the tie guard fails nothing.
+
+**`atLate` was closed by F1110**, whose *Reached for* line reads *F1107's second
+unrepaired rotted `to` — `atLate`, a function in no file*, and whose verdict reads
+*the mutation is now `log.push("stores")` deleted, it type-checks, and T1.2 catches
+it*. Verified rather than read: `c22-construct` runs green with T1.2 caught.
+
+**This section carried it as open through five subsequent findings**, and the
+reason is the one thing no instrument checks — *ask where a settled claim is
+written down*, run on a **residue** rather than on a claim. A remainder list is a
+claim like any other and it is the kind nobody re-derives, because restating it is
+how it gets carried. It survived being edited for LN6 in this same session: the
+sentence naming both was rewritten to name one, and the half that was rewritten was
+checked while the half beside it came along unread. That is
+*a correction stops at its own sentence*, on a list rather than on a paragraph.
 
 **`c09-image` is green** — every mutation caught — so F1105's seventeen reds are
 sixteen. Its last survivor was not a weak test either: F1108.
@@ -47727,10 +47787,11 @@ whose subject had moved. Two were the thing the sweep exists to find:
 `docker-dashboard`'s `C4` survivor (F1104) and `c09-image`'s (F1108). That ratio
 is the figure to hold against the next reading of this list.
 
-**Two remain**: `c12-arm-seam`, which hits the 45-minute bound with ninety
-mutations and wants splitting, and `c12-lines3d`, whose LN6 is a rotted `to` that
-does not type and needs the frame *moved* rather than added — F1107's residue, and
-the by-hand walk of C12's 3-D carrier.
+**None remain.** `c12-arm-seam` is closed by F1124 — three shards of thirty,
+ninety of ninety caught, the sweep's expectation count unmoved across the cut —
+and `c12-lines3d` by F1125, whose LN6 is the frame *moved* rather than added and
+whose second half is the diagnosis F1106 left open: the tie guard was unconstrained
+because LN6 asserts a direction and the tie is worth two cells.
 
 The three recorded survivors are closed by F1123, and **none of them was a weak
 assertion**: two rows never reached the branch the mutation rewrites, and one was
@@ -48543,6 +48604,35 @@ MA3 is four arms now, and each is reachable with the real list empty:
 `mutate-anchors-parse.mjs` carries both mutations: the supplied list ignored, and
 the dead-entry loop emptied. Both caught by MA3.
 
+### The other row that read the same list, and it went red
+
+**Two rows depended on `KNOWN_STALE` being non-empty, and they failed in opposite
+directions.** `make instruments` found the second one — MS3, in
+`mutate-sweep.test.ts`, which cross-checks the list the sweep *tolerates* against
+the list `anchors.mjs` *enforces*. Its first line is
+`expect(Object.keys(list).length).toBeGreaterThan(0)`, a guard against a reader
+that returns nothing, and it went **red** the moment the list emptied.
+
+| | MA3 | MS3 |
+|---|---|---|
+| what it read | the list, as a corpus for a fabrication | the list, as the population of a bound |
+| corpus assertion | none | `> 0` entries |
+| when the list emptied | **green**, having nothing to inherit | **red**, saying so |
+
+**The corpus assertion is the whole difference**, and it is the same instrument
+that catches a scan reading no file and a sweep reading no test path. A row that
+has one says *my subject is gone*; a row without one says nothing at all, and is
+indistinguishable from a row that is still working. That is the practical rule
+this finding leaves: **a fabrication over a list needs an assertion that the list
+was read, and the population it is taken over must not be the one the work is
+shrinking.**
+
+MS3's bound moved onto `discover()` — the run corpus, which does not shrink — and
+its two arms (*every entry names a run that exists*, and an entry naming nothing)
+are driven with a fabricated source rather than read off a list that may be empty.
+The cross-check against the sweep's printed total stays over the real list, where
+0 = 0 is the correct answer today.
+
 ---
 
 ## F1120 — a control written to be invisible, against a harness that requires a kill, so the run has never started ★★★★☆
@@ -48743,31 +48833,174 @@ a green suite, and all three were visible the moment a mutation was pointed at t
 line the row claims to cover** — which is the argument for the pass being a
 scheduled step rather than a diligence.
 
-### The other row that read the same list, and it went red
+---
 
-**Two rows depended on `KNOWN_STALE` being non-empty, and they failed in opposite
-directions.** `make instruments` found the second one — MS3, in
-`mutate-sweep.test.ts`, which cross-checks the list the sweep *tolerates* against
-the list `anchors.mjs` *enforces*. Its first line is
-`expect(Object.keys(list).length).toBeGreaterThan(0)`, a guard against a reader
-that returns nothing, and it went **red** the moment the list emptied.
+## F1124 — the split is a bound, and the first cut was shaped by the artefact instead ★★★★
 
-| | MA3 | MS3 |
-|---|---|---|
-| what it read | the list, as a corpus for a fabrication | the list, as the population of a bound |
-| corpus assertion | none | `> 0` entries |
-| when the list emptied | **green**, having nothing to inherit | **red**, saying so |
+| | |
+|---|---|
+| **Surface** | `tools/mutate/runs/c12-arm-seam-{1,2,3}.mjs` · `tools/mutate/anchors.mjs` · `sweep.mjs`'s per-run bound · F1105, F1097, F287, F1117 |
+| **Reached for** | F1105's last structural red: the one run of one hundred and ninety-two that cannot finish inside the bound |
+| **Verdict** | **closed** — three shards of thirty, ninety of ninety caught, and F1105 is down to one |
 
-**The corpus assertion is the whole difference**, and it is the same instrument
-that catches a scan reading no file and a sweep reading no test path. A row that
-has one says *my subject is gone*; a row without one says nothing at all, and is
-indistinguishable from a row that is still working. That is the practical rule
-this finding leaves: **a fabrication over a list needs an assertion that the list
-was read, and the population it is taken over must not be the one the work is
-shrinking.**
+`c12-arm-seam.mjs` carried **ninety mutations**, more than any file in the
+catalogue, and F1105 ruled the remedy: *split it, rather than raise the bound* —
+a shard runs thirty-odd runs against a three-hundred-minute job, so a bound that
+admits this one breaks the shard.
 
-MS3's bound moved onto `discover()` — the run corpus, which does not shrink — and
-its two arms (*every entry names a run that exists*, and an entry naming nothing)
-are driven with a fabricated source rather than read off a list that may be empty.
-The cross-check against the sweep's printed total stays over the real list, where
-0 = 0 is the correct answer today.
+### What the cut had to preserve, and the figure that says it did
+
+The sweep reports five totals. Four of them **must** move by exactly what a cut
+into three predicts, and one must not move at all:
+
+| | before | after | why |
+|---|---|---|---|
+| runs | 194 | 196 | one file became three |
+| anchors | 2054 | 2056 | two more controls; `anchorsOf` counts the control |
+| test paths | 489 | 513 | two more copies of the same twelve-suite command |
+| tails | 194 | 196 | one `node --check` per file |
+| **expectations** | **1849** | **1849** | **ninety went in and ninety came out** |
+
+**The expectation count is the totality proof**, and it is the only figure in the
+five that a lost mutation would move. It is the F1113 tell used deliberately
+rather than found: a cut that dropped a row would have left every other number
+looking right.
+
+### Two designs refused, each for a measured reason
+
+**A shared module for the common half.** The header, the nine `const` file names,
+the command, the control and the helpers are identical in all three, which is
+about a hundred and thirty lines duplicated twice. Refused, because
+`anchors.mjs` is **textual** — importing a run executes the pass — and resolves a
+`from:` naming a `const` against *the file's own* declarations. Moving the names
+into a sibling module puts every `file: FIGURE` beyond the reader, and ninety
+anchors fall out of the corpus while the sweep reports a count that never counted
+them. **That is F1117, rebuilt on purpose**, and it is the whole argument for
+paying the duplication.
+
+**A per-shard command.** Narrowing each shard to the suites its own rows name
+would be materially faster: the twelve-suite command is twenty seconds and the
+two goldens are most of it. Refused — it is F287 one level down. A command that
+covers one arm makes every row in it inherit the gap at once, and no reading of a
+`from`/`to` shows it.
+
+### The measurement that changed the cut
+
+The list is ordered by family, so the first cut took the family boundaries:
+**41 / 30 / 19**, which ran **888 / 675 / 388 s** in this container, ninety of
+ninety caught.
+
+That is a green result, and the largest shard sits at **33 % of the bound on the
+only regime that measured it**. The bound is a runner's, and the only ratio
+measured for *this* run is a lower bound: F1105 timed the whole file at 2237 s
+here and the runner killed it past 2700, so ≥ 1.21. At the 2.7 the register
+entertains elsewhere, a 41-row shard is **89 %** — which is the defect being
+repaired, one third smaller.
+
+Recut to **30 / 30 / 30**: **614 / 632 / 640 s**, within four per cent of each
+other, ninety of ninety caught again. About **21.5 s a mutation** across both
+configurations, which is what makes the arithmetic predictive rather than hopeful.
+
+**The first split was shaped by the artefact and the second by the bound, and the
+bound is what the split is for.** A family boundary is a real seam and it is not
+this decision's seam; taking it because it was the visible one put the risk in
+the largest shard. So the membership rule in the files is **position, not
+family** — a name that reads as a taxonomy becomes the membership rule, and the
+odd member then goes in unexamined.
+
+`shardOf` is round-robin over the sorted names, so three adjacent files land in
+three different jobs rather than stacking in one.
+
+### And the cut found an owner that was really a neighbour
+
+`make enforce` went red on the recut with four SP3 violations, all in the last
+shard: *cites a bare `I73` and nothing before it says which spec owns it.* The
+same four comments were green in the original, and the reason is worth the
+paragraph.
+
+SP3 resolves a bare `I…` by an **owner** (a path row, a basename topic, a spec
+naming itself) and, where there is no owner, by **scope** — the last `Cnn` seen,
+reset at every blank line. **No `c12` row exists in `OWNERS`**, and the mutation
+list has no blank lines in it, so one `C12 §3ak.29` in a mutation comment near the
+top owned every bare id below it: seventeen references in the original, resolved
+by a neighbour rather than by the file. Cutting the list three ways sent those
+mentions to the first two shards and left the third with four bare ids and nothing
+above them.
+
+**Nothing was wrong before and nothing is wrong now** — which is why it took a
+cut to show. The row `{ path: "tools/mutate/runs/c12", spec: "C12" }` makes the
+ownership that the filename already states, on the argument written above the
+three rows that were already there, and it covers **fifty-eight** `c12-*` runs
+rather than these three. It also moves 120 section citations in those runs from
+*names no document* to resolving against C12, with no new dangling section.
+
+**What is still unmeasured, and it is the figure that matters**: no shard has run
+on a runner. 614 s here is 23 % of the bound at ratio 1, 62 % at 2.7. The next
+sweep reports it, and this is recorded as the claim it is rather than folded in.
+
+---
+
+## F1125 — a direction survives an inverted rule, and the control was drawn from the same quantity as the subject ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `tools/mutate/runs/c12-lines3d.mjs` LN6 · `test/unit/plot-lines3d.test.ts` LN7 · `src/presentation/plot/scatter3.ts`'s tie guard · F1106, F1107, F452 |
+| **Reached for** | F1105's eighteenth and last red run, and F1106's *separately measured and not diagnosed* |
+| **Verdict** | **closed** — ten of ten caught, and **F1105's eighteen are all closed** |
+
+### The mutation, repaired as a move
+
+F1106 named LN6's `to` as broken twice over: it called `frameOf` with the
+pre-F489 signature, and it **added** a draw where the defect was a **move** — the
+data loop is at line 999, the real call at 1178, so an inserted copy is overwritten
+by the later one and the net effect is nothing.
+
+Expressed properly it is two edits, and **the order is forced by a rule from a
+different finding.** F1121 says a move is an add and a remove; F1113 says `apply`
+refuses an anchor that matches twice. Inserting first puts a second copy of a
+thirty-two-line call in the file and the removal is then ambiguous — so the
+**removal goes first** and the insertion is the `also`. The call itself is sliced
+out of the source with a head and a tail (`c22-gate3b`'s pattern), which costs the
+anchor sweep its check — the `from` reads as `interpolated` — so the run refuses to
+start if either end has moved.
+
+Measured: the move type-checks and **LN6 fails on it**.
+
+### The diagnosis F1106 left open
+
+F1106 recorded, without diagnosing it, that replacing the tie guard
+`if (!nearer && mark[i] === undefined) return;` with an unconditional
+fall-through **fails nothing** — nine rows, all green.
+
+The reason is that **LN6 asserts a direction and the tie is a magnitude.**
+
+| | frame's cells, no path | with the path | carrier holds |
+|---|---|---|---|
+| the rule as written | 77 | 71 | 10 of 13 |
+| the guard removed | 79 | 75 | 8 of 13 |
+
+`mutedCells(true) < mutedCells(false)` is 71 < 77 and 75 < 79. **Both true**, so
+the row passes with the rule inverted. What carries the sign is that a coincident
+stroke is mostly *strictly nearer* than the box rather than tied with it: those
+cells are the carrier's whatever the guard says, and only two of the thirteen are
+exact ties. A row sensitive to a sign cannot see a rule worth two cells.
+
+LN7 is the row: the stroke draws **13** cells with the box off and holds **10**
+with it on, the three lost being cells a frame stroke is strictly in front of.
+The guard removed, it is 8, and the run carries that mutation.
+
+### The control was drawn from the same quantity as the subject
+
+Comparing two shots needs a control that they are the same projection, and the
+first one was a **count of marker cells** — 24 with the box off against 15 with it
+on. It failed, and it was right to: the box occludes nine of the cloud's cells.
+
+**That is the phenomenon the row measures, not a statement about the projection.**
+A count of visible cells is exactly as sensitive to occlusion as the subject is, so
+it can never separate *the scene moved* from *the box covered some of it*. The
+control has to be **positional**: every marker cell surviving the box is at a cell
+the box-less shot also marks, which a rescale would break and an occlusion cannot.
+
+The general form is worth the entry: **a control must be measured in a quantity the
+thing under test does not move.** It read as a natural control precisely because it
+was the same measurement one colour over.

@@ -886,7 +886,7 @@ export function descentsOf(file, readFile = (f) => readFileSync(f, "utf8")) {
  *     `DUPLICATE_COMMITMENTS` fail its equality arm. The two lists cannot be
  *     paid down independently; whoever takes one takes the other.
  *   - **C12** — commitments 64 and 68 are cited by `plot-shared-geometry.test.ts`
- *     and `tools/mutate/runs/c12-arm-seam.mjs`, and `64>63` moves both.
+ *     and `tools/mutate/runs/c12-arm-seam-{1,2,3}.mjs`, and `64>63` moves both.
  *   - **C01, C09** — no citations, but C01's repair is not a renumber: `20a.` is
  *     declared two positions from its base, so a positional renumber renames it
  *     `23a` and invents a variant of a commitment about mouse hover. C09 moves
@@ -1180,6 +1180,16 @@ export const OWNERS = [
   // own component's I1 and there is no single owner for the directory.
   { path: "tools/mutate/runs/c01", spec: "C01" },
   { path: "tools/mutate/runs/c09", spec: "C09" },
+  // **C12's row is here because splitting a run exposed what was holding it up**
+  // (F1124). The thirty-odd `c12-*` runs had no row and were green on
+  // *proximity*: `scope` is reset by a blank line and otherwise carries the last
+  // `Cnn` seen, so one `C12 §3ak.29` in an unbroken mutation list owned every
+  // bare `I…` below it — seventeen references in `c12-arm-seam.mjs`, resolved by
+  // a neighbour rather than by the file. Cutting the list three ways left the
+  // last shard with four bare ids and no mention above them, and SP3 said so.
+  // A row makes the ownership the filename already states, which is the reason
+  // written above for the other three.
+  { path: "tools/mutate/runs/c12", spec: "C12" },
   { path: "tools/mutate/runs/c22", spec: "C22" },
   { path: "src/testing", spec: "C09" },
   // C24's builders sit under `src/shell/` because `b` is L4's surface and

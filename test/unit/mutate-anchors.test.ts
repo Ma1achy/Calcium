@@ -362,9 +362,10 @@ const MUTATIONS = [
   it("MA8 (F997): a run node cannot parse fails, and the file that parses does not", () => {
     // **The fabricated violation is the instance that produced the finding**,
     // not a shape invented for the test (A03 commitment 14a). Three rows were
-    // being added to `c12-arm-seam.mjs` and a `const STACK` went in at line 84
-    // beside the one already at 88, so `node tools/mutate/runs/c12-arm-seam.mjs`
-    // died before its first mutation. This sweep said *1005 anchors · 937
+    // being added to `c12-arm-seam.mjs` — since split three ways under F1124 —
+    // and a `const STACK` went in at line 84 beside the one already at 88, so
+    // `node tools/mutate/runs/c12-arm-seam.mjs` died before its first mutation.
+    // This sweep said *1005 anchors · 937
     // expectations · no run drifted from what the list says* — every anchor did
     // resolve, and the sentence was true of a file that cannot start.
     const parses = `const STACK = "src/presentation/blocks/plot3d.ts";\n${resolving}`;
