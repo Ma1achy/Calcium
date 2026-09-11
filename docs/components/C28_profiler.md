@@ -107,14 +107,15 @@ export type PhaseGroup = "compute" | "draw" | "output" | "input" | "far side" | 
 export const PHASE_GROUP: Readonly<Record<SpanName, PhaseGroup>>;
 
 /** Log-linear buckets. `error` is the relative bound, stated because a percentile
- *  quoted without one cannot be compared across runs (I10). */
+ *  quoted without one cannot be compared across runs (I10). `q1` and `q3` are here
+ *  so a summary is a five-number summary and not three-fifths of one (I56). */
 export type Histogram = Readonly<{
-  count: number; min: number; p50: number; p95: number; p99: number;
-  max: number; sum: number; error: number;
+  count: number; min: number; q1: number; p50: number; q3: number;
+  p95: number; p99: number; max: number; sum: number; mean: number; error: number;
 }>;
 
 export type MissReason =
-  | "rev" | "width" | "theme" | "focus" | "range" | "evicted" | "nothing-changed";
+  | "absent" | "rev" | "width" | "theme" | "focus" | "range" | "evicted" | "nothing-changed";
 
 export type GcKind = "minor" | "major" | "incremental" | "weakcb";
 
@@ -659,6 +660,8 @@ histograms describes neither, and the report states the point at which it was re
 - **I54** — **`timeline` filters by cause; the durations filter by cause *and* outcome; they are two filters because they answer two questions.** `timeline` is every frame the session's reader caused, in commit order, whatever its `outcome` — what happened. `latency`, `byReason` and `worst` are the frames that composed — what it cost. A self-inflicted frame is on neither, because the axis the two filters share is **who caused the frame** and the profiler's own redraw is the instrument's, not the session's (I12, I34). **Nothing may be summed across the two**: `excluded` counts for the session's life and `timeline` is a window on a bounded ring that a tier change resets, so a frame in `excluded.fallback` need not be on `timeline`, and a self-inflicted fallback is counted there and never is — the recorder's exclusion is a ladder rather than a partition (§9c P4). What the ruling leaves behind is stated rather than discovered: a fallback reaches `timeline` with its `spans` and **without its `tree`**, because it is never in `worst` and I32 retains a tree nowhere else (§9c Q2).
 - **I55** — **Every section of the report a tool prints comes from a `check*` paired with a `format*`, and the figure a marker is taken at is a published member rather than a literal.** A `check*` returns a value a row can assert and a `format*` renders it; a number interpolated into a template string on its way to `stdout` leaves nothing assertable but the whole line, which is why nobody writes that row. This is I37's convention stated as a rule over the whole report rather than about one table, and it is the second time it has had to be applied: the phase table moved into the harness because a reading computed in a script is a reading no row can be written against, which is how a residue of **−460.5 ms** went unasserted (F888, I41). **The two tables beside it stayed in the script and they are the two that were wrong** — `make profile` prints six sections, three from the harness and three inline, and the element table's ratio was labelled `measured` over a union of two seams while the per-entry table's close count was labelled `elements measured` over the same union: 203 for one entry, which is 68 + 1 + 67 + 67 to the unit (F1098, F1099). So the rule is not inferred from a correlation of six; it is a ruling that was taken once and applied to one of the three sections it covered. **What it does not reach**: `formatLeaks`'s prose paragraph and the two overhead lines are sentences about published members rather than tables of derived figures, and a pair for a sentence would be an indirection with no reading behind it — the rule is about a section that *computes*, and a section that only quotes is exempt by name rather than by omission.
 
+- **I56** — **A published summary carries the five numbers a summary figure is built from, or every such figure fabricates two of them.** `Histogram` held `min`, `p50`, `p95`, `p99` and `max`; every distribution form in C12 — `boxplot`, `violin`, `forest`, and `bullet`'s bands — takes a `QuartileSummary` of `{min, q1, median, q3, max}`. The two sets overlap in three places and the missing pair is not derivable, so a consumer drawing a span's shape had exactly two honest options: compute real quartiles from `timeline`'s per-frame samples, which exist only for **frame-site** spans (I41), or put `p95` where `q3` belongs. `Hist` already computes an arbitrary quantile to answer `p50`, so this is the same call twice more and no new state. **The alternative is the deferral that gets paid for at every call site**: each figure over a session-site span working around the gap in its own way, in a currency nobody totals. The percentiles stay — `q3` and `p95` answer different questions and a summary that dropped either would be narrower than the one it replaced.
+
 ---
 
 ## 9. Commitments
@@ -973,6 +976,7 @@ machine noise closes, on a runner measured at 2.7× this host's timings (F809). 
 - **T1.105** (I55, **the union control at the report seam**): a report holding one node measured once and rendered once, and a second measured twice and rendered once → `checkElements` reports `perFrame` 1 and 2 and flags **only the second**, with `repeated` at 1 of 2. This is F1098's control one layer up from T1.33b's: that row asserts the aggregate keeps the two seams apart, and this asserts the table built on it reads the right one. Under the merged counter the first node's ratio is 2 and both rows flag, which is the reading eight of nine rows of a real session carried.
 - **T1.106** (I55): `checkEntries` over a report whose entry holds a node with renders as well as measures → the row's count is `byEntry`'s close count and the formatter's heading is **`element closes`**, not *elements measured*. Measured over the scripted session at **203** for one entry, which is 68 + 1 + 67 + 67; the two figures differ only when a seam other than `measure` closed inside the scope, so a fixture with renders is the one that can fail (F1099).
 - **T1.107** (I55): the threshold `checkElements` flags at is a published member of its report, and a node exactly at it is quiet while one above it is flagged. **A literal written twice is the defect this forbids** — the marker's figure lived in `tools/profile.mjs` and in no type, so a row asserting the flag had to restate it and would have agreed with a drifted copy.
+- **T1.108** (I56): a `Hist` fed a known population answers `q1` and `q3` at the quartiles of that population, and a `QuartileSummary` built from the snapshot is accepted by `b.plot` on `boxplot`, `violin`, `forest` and `bullet` — the four forms that take one. The second half is the point: a five-number summary that the form refuses is three numbers and a type error waiting for a caller.
 
 ### Tier 2 — contract
 

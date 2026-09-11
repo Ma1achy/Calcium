@@ -855,4 +855,9 @@ describe("C28 I55 — every computed section of the report comes from a check/fo
     // The threshold travels with the report rather than being restated here.
     expect(at(2).threshold, "published on what the check returns").toBe(REPEATED_ABOVE);
   });
+
+  // **Spec-first, so the row is here and unbuilt** (SP9). `q1`/`q3` land with the
+  // front end that needs them; the row exists now because an invariant with no
+  // row is the signature A03 §2 is written about.
+  it.todo("T1.108 (C28 I56): a Hist answers q1 and q3 at the population's quartiles, and the summary built from a snapshot is accepted by b.plot on boxplot, violin, forest and bullet — not deferred on a component; the pair is exercised by this round's own cards and lands with them");
 });
