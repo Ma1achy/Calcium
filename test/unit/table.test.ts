@@ -23,7 +23,7 @@ import { MONO_UNICODE_CAPS, measurable, visible } from "../support/render.js";
 import { glyphFor } from "../../src/presentation/blocks/glyphs.js";
 import { cells } from "../../src/presentation/text.js";
 import type { Cell, ColumnDef, Table } from "../../src/data/viewmodel/index.js";
-import type { TerminalCapabilities } from "../../src/terminal/index.js";
+import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 
 /** Σ visible widths + gaps, computed here rather than taken from the plan. */
 function occupied(plan: ReturnType<typeof planColumns>): number {
@@ -476,7 +476,59 @@ describe("C11 tier 1 — planColumns", () => {
     );
   });
 
-  it.todo("T1.28 (I23): one column, one marked row and one not, draws both runs the same length — not deferred on a component");
+  it("T1.28 (I23): the slot is the column's, so one marked row does not shorten its own run alone", () => {
+    // **The equality is the assertion, not either number.** Spent per cell the
+    // marked row gets a run two shorter than its neighbour, every count right,
+    // and the band boundary becomes where the axis changes length — which is
+    // C12 I20's *99 draws 37 and 100 draws 36* in the other allowance.
+    //
+    // Read as an **offset in the frame** rather than by counting run
+    // characters: a run is `█░` at one rung and braille at another, so a matcher
+    // for either reports absence when the value changes form.
+    const both = (marked: boolean): readonly string[] => {
+      const kit = measurable({ definitions: [tableDefinition], capabilities: MONO_UNICODE_CAPS });
+      const block: Table = {
+        kind: "table",
+        id: "i23-col",
+        columns: [{ key: "cpu", label: "CPU", align: "left", priority: 1, minWidth: 17, sortable: false }],
+        rows: [
+          {
+            id: "hot",
+            cells: {
+              cpu: marked
+                ? { text: "", bar: { value: 85.2, max: 100, format: "percent" }, tone: "error", glyph: "warn" }
+                : { text: "", bar: { value: 85.2, max: 100, format: "percent" } },
+            },
+          },
+          { id: "cool", cells: { cpu: { text: "", bar: { value: 45.2, max: 100, format: "percent" } } } },
+        ],
+      };
+      return kit.renderToLines(block, 40).slice(1).map((l) => visible(l));
+    };
+
+    const [hot, cool] = both(true);
+    expect(hot, "two rows drew").toBeDefined();
+    expect(cool).toBeDefined();
+    expect(cells(hot ?? ""), "the plan holds on the marked row").toBe(17);
+    expect(cells(cool ?? ""), "and on the one beside it").toBe(17);
+    expect(hot, "the mark C04 I6 obliges").toContain(glyphFor("warn", MONO_UNICODE_CAPS));
+    expect(cool, "and the row beside it has none").not.toContain(glyphFor("warn", MONO_UNICODE_CAPS));
+    // **Where the run begins, not where the number sits.** The number is
+    // right-aligned inside the cell, so it does not move for the lead and an
+    // assertion on its offset passes under a per-cell lead exactly as well —
+    // the first draft of this row made that mistake twice in four lines.
+    const lead = cells(`${glyphFor("warn", MONO_UNICODE_CAPS)} `);
+    const runsAt = (l: string): number => l.search(/\S/u);
+    expect(runsAt(cool ?? ""), "the unmarked row's slot is blank and its run starts after it").toBe(lead);
+    expect(runsAt(hot ?? ""), "where the marked row's mark starts").toBe(0);
+
+    // **The control**, so the row cannot pass by measuring a column that
+    // reserves nothing: with neither cell marked the slot is not spent and both
+    // runs begin at the first cell.
+    const [plainHot, plainCool] = both(false);
+    expect(runsAt(plainHot ?? ""), "nothing is reserved").toBe(0);
+    expect(runsAt(plainCool ?? ""), "on either row").toBe(0);
+  });
 
   it("T1.27 (I23): the mark is dropped where it does not fit, and at no width above that", () => {
     // **A sweep rather than a chosen width**, because a chosen width is the

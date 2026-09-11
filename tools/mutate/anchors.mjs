@@ -270,13 +270,12 @@ function silenceOf(src) {
 }
 
 const KNOWN_STALE = {
-  // **Re-anchoring is not always the fix, and this one shows both halves.**
-  // `summaryLine(live)` gained a `unicode` argument, so the statement is still
-  // there and the anchor is one token short — trivially repairable. It is on
-  // the list anyway, because repairing an anchor without running the pass
-  // produces a mutation that applies and asserts nothing, and that reads as
-  // coverage from the summary line. The repair belongs to whoever runs it.
-  "docker-dashboard.mjs": 2,
+  // `docker-dashboard.mjs` was 2 and is gone (F1104). Both were the same edit
+  // — `summaryLine(live)` and the `emptyMessage` literal each gained a
+  // `unicode` argument — and the entry said the repair belonged to whoever ran
+  // the pass, because re-anchoring without running it produces a mutation that
+  // applies and asserts nothing. The pass was run: both are caught, and so is
+  // the `C4` survivor beside them, which is what the sweep was for.
   "c15-centred-width.mjs": 1,
   "c19-menu-window.mjs": 1,
   "c22-construct.mjs": 3,

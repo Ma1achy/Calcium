@@ -160,8 +160,14 @@ export const isLive = (c: Joined): boolean => LIVE_STATES.has(c.state);
  * truncated. So the width here is bar + separator + `100.0%` — six characters,
  * because walk A4 permits values over 100 — and the test asserts the **rendered**
  * cell rather than this arithmetic.
+ *
+ * **Exported for C4, which is the one row that can tell this number from the
+ * column it is added into.** Measuring the rendered run against `CPU_WIDTH`
+ * moves both sides together, which is how the row this replaced came to assert
+ * nothing (F1104); measuring it against `BAR_CELLS` does not, because removing
+ * `GLYPH_SLOT` moves the column and leaves this alone.
  */
-const BAR_CELLS = 8;
+export const BAR_CELLS = 8;
 /**
  * The glyph slot, **reserved whether or not a glyph is drawn**.
  *
@@ -169,8 +175,22 @@ const BAR_CELLS = 8;
  * one once the container is busy — and a column that grows two cells the moment
  * load crosses 60% is a table that reflows because a container got hot. The
  * width is constant and the slot is sometimes blank.
+ *
+ * **This described the frame for the first time on 2026-09-11** (F1104). C11's
+ * bar branch returned before the line that reads a cell's glyph, so no mark was
+ * ever drawn: the slot was reserved here and spent on the run out there, and
+ * `BAR_CELLS` was not the run's width at any setting — ten cells at `CPU_WIDTH`,
+ * eight only once this constant was removed. C11 I23 draws the mark as a lead
+ * inside the planned width and reserves the same lead on every row of the
+ * column, so the run is now `BAR_CELLS` on every row and the arithmetic below is
+ * the layout: `▲ ████████ 780.0%` is 2 + 8 + 1 + 6.
+ *
+ * **Per column and not per cell, which is what this comment always said and the
+ * first implementation did not.** Spent per cell, a container at 59% would draw
+ * its run in ten cells and one at 61% in eight — a larger value and a shorter
+ * bar, which is C12 I20's own inversion in the other allowance.
  */
-const GLYPH_SLOT = 2;
+export const GLYPH_SLOT = 2;
 const CPU_WIDTH = GLYPH_SLOT + BAR_CELLS + 1 + 6;
 
 /**

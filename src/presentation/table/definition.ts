@@ -27,7 +27,7 @@ import type { Block, MeasureFn, Table, TableRow } from "../../data/viewmodel/ind
 import { cells } from "../text.js";
 import { clampSpans, paint, selectionStyle, tone, type Span } from "../blocks/paint.js";
 import type { BlockDefinition, NavElement, RenderContext, Windowed } from "../blocks/types.js";
-import { emptySpans, headerSpans, rowSpans } from "./cells.js";
+import { emptySpans, headerSpans, markedSeriesColumns, rowSpans } from "./cells.js";
 import { detailBlocks, isExpandable } from "./detail.js";
 import { planColumns } from "./plan.js";
 import { sortedRows } from "./sort.js";
@@ -311,6 +311,10 @@ export const tableDefinition: BlockDefinition<Table> = {
     // frame, so one per row would report the instrument. The per-row figure that
     // is wanted is `table.rows` above divided into this.
     using _rows = probe?.span("table.rows") ?? NO_SPAN;
+    // **Once per render, not once per row** (I23). The glyph slot is the
+    // column's allowance, so the answer is a property of the block; deriving it
+    // inside the loop would be quadratic and memoising it would be state (I11).
+    const marked = markedSeriesColumns(block);
     for (const row of sortedRows(block)) {
       const expandable = isExpandable(row, plan);
       const isHead = focused !== null && focused === row.id;
@@ -319,7 +323,7 @@ export const tableDefinition: BlockDefinition<Table> = {
       // extent draw exactly as no selection with no branch on the count (I14).
       const isSelected = !isHead && selected.has(row.id);
       const spans = clampSpans(
-        rowSpans(block, row, plan, ctx, { expandable, focused: isHead, selected: isSelected }),
+        rowSpans(block, row, plan, ctx, { expandable, focused: isHead, selected: isSelected, marked }),
         width,
         ctx.capabilities,
       );

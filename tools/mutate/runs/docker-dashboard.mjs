@@ -136,7 +136,7 @@ const results = runPass({
     {
       name: "the summary leaves the body, so nothing recomputes it per tick",
       file: "src/dashboard.ts",
-      from: "    b.notice(\"muted\", summaryLine(live)),",
+      from: "    b.notice(\"muted\", summaryLine(live, unicode)),",
       to: "    b.notice(\"muted\", \"containers\"),",
       expect: "C1 (F16)",
     },
@@ -161,7 +161,7 @@ const results = runPass({
     {
       name: "zero running renders no table at all",
       file: "src/dashboard.ts",
-      from: '      emptyMessage: "nothing running · every container is stopped",',
+      from: '      emptyMessage: `nothing running ${dot(unicode)} every container is stopped`,',
       to: '      emptyMessage: "",',
       expect: "A9",
     },
