@@ -80,10 +80,15 @@ export declare function apply(
 ): string;
 
 /**
- * Does the mutated tree type-check? `null` if it does, the first error line if
- * not — see mutate.mjs for the two halves of its blind spot (F1106).
+ * Does the mutated tree type-check? `null` if it does, the first error line that
+ * is not an unused binding if not — see mutate.mjs for what the signal is and
+ * where it is blind (F1106).
+ *
+ * `root` is where `npx` resolves the compiler from; `project` is the tsconfig it
+ * checks. Separate, because `npx` walks up from its `cwd` and a temporary
+ * directory has nothing to walk to.
  */
-export declare function tscTypecheck(root: string): () => string | null;
+export declare function tscTypecheck(root: string, project?: string): () => string | null;
 
 export declare function runPass(opts: {
   mutations: readonly Mutation[];

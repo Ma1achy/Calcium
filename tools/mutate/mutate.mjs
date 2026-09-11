@@ -321,11 +321,26 @@ export function fsIo(root) {
  * call four hundred lines below still runs after, so the later draw wins.
  *
  * Costs 1.3 s on this tree (`skipLibCheck`, 372 files), and only on a survivor.
+ *
+ * **`root` is where the compiler comes from and `project` is what it checks, and
+ * the two had to be separated.** `npx` resolves a binary by walking up from its
+ * `cwd`, so running it inside a temporary directory finds `tsc` only on a machine
+ * that happens to have one elsewhere. The devcontainer does — a global at
+ * `/usr/local/share/npm-global/bin/tsc` — and the CI runner does not, so MH11d
+ * went green here and red there with *the type-check itself did not run*, a
+ * refusal that named the right thing and gave no reason.
+ *
+ * **The local answer was right by coincidence.** Both compilers are 7.0.2, so
+ * the green was correct and not for any reason the test controlled: the day the
+ * image and the lockfile disagree, an instrument that decides whether a mutation
+ * is rotted would be answering with a compiler the project does not use, and
+ * nothing would say so. The binary is the repository's now; the project is a
+ * parameter.
  */
-export function tscTypecheck(root) {
+export function tscTypecheck(root, project = "tsconfig.json") {
   return () => {
     try {
-      execSync("npx tsc --noEmit -p tsconfig.json 2>&1", {
+      execSync(`npx tsc --noEmit -p ${project} 2>&1`, {
         cwd: root,
         encoding: "utf8",
         maxBuffer: 64 * 1024 * 1024,
@@ -335,7 +350,12 @@ export function tscTypecheck(root) {
       const out = `${e.stdout ?? ""}${e.stderr ?? ""}`;
       const errors = out.split("\n").filter((l) => /error TS\d+/u.test(l));
       if (errors.length === 0) {
-        return "tsc exited non-zero and named no error — the type-check itself did not run";
+        // **With the reason on it.** The first version of this line said only
+        // that the check did not run, and that is exactly what a reader needs a
+        // reason for: on the CI runner it was `npx` failing to resolve `tsc`,
+        // and the message made the diagnosis a guess.
+        const tail = out.trim().split("\n").slice(-2).join(" · ").trim();
+        return `tsc exited non-zero and named no error — the type-check itself did not run: ${tail}`;
       }
       // TS6133 / TS6192 / TS6196: a declaration, import or label with no reader.
       // Erased, so it cannot change what runs — 44 of the 61 reds in the corpus

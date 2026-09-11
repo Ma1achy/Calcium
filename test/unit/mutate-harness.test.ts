@@ -720,7 +720,12 @@ describe("mutation harness", () => {
           include: ["a.ts"],
         }),
       );
-      const check = tscTypecheck(dir);
+      // **The compiler from the repository, the project from the temp dir.**
+      // `npx` walks up from its `cwd` to find a binary, so `tscTypecheck(dir)`
+      // found a *global* `tsc` in the devcontainer and nothing on the CI runner
+      // — green here, red there. Both happen to be 7.0.2, so the green was right
+      // by coincidence rather than by construction, which is the worse half.
+      const check = tscTypecheck(process.cwd(), join(dir, "tsconfig.json"));
 
       writeFileSync(
         join(dir, "a.ts"),

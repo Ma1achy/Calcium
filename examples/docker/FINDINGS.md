@@ -47507,6 +47507,25 @@ rotted `to`* passed with the filter removed. A fixture has to be shown to respon
 to the thing under test before it is asserted against, and the instance is the
 fixture written **for** the check, on the same day.
 
+### The third correction: the instrument resolved its compiler from outside the project
+
+MH11d went **green in the devcontainer and red on the CI runner**, with the
+harness's own refusal — *the type-check itself did not run* — and no reason on it.
+`npx` resolves a binary by walking up from its `cwd`, and the row ran it inside a
+temporary directory: the container has a global at
+`/usr/local/share/npm-global/bin/tsc` to find, and the runner has nothing.
+
+**The local green was right by coincidence.** Both compilers are 7.0.2, so the
+answer was correct for a reason the test did not control — and the day the image
+and the lockfile disagree, an instrument deciding whether a mutation is rotted
+would be answering with a compiler the project does not use, silently. So `root`
+is now where `npx` resolves the compiler and `project` is what it checks: the
+binary is the repository's, the project is a parameter.
+
+And the refusal carries the tail of the output now. *The type-check itself did not
+run* named the right thing and made the diagnosis a guess, which is the same
+shape as every refusal in this file that had to be taught to name its subject.
+
 ### The number that is not 61 minus 44
 
 Re-running the census through the harness's own `tscTypecheck` — imported rather
