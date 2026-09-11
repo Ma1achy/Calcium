@@ -33,8 +33,8 @@ const results = runPass({
   run,
   control: {
     file: FILE,
-    from: "export function apply(src, { file, from, to }) {\n  if (!src.includes(from)) throw new AnchorError(file, from);",
-    to: "export function apply(src, { file, from, to }) {\n  if (false) throw new AnchorError(file, from);",
+    from: "  if (hits === 0) throw new AnchorError(file, from);",
+    to: "  if (false) throw new AnchorError(file, from);",
     why: "MH3 asserts an unmatched anchor throws; an `apply` that never throws cannot satisfy it, so a run where this survives cannot see a kill",
   },
   mutations: [
@@ -144,28 +144,42 @@ const results = runPass({
       // type-check has to ask the same question at a second site — so the
       // anchor now names the function rather than the filter, and the mutation
       // reaches both readers at once. The claim MH9e makes is unchanged.
-      from: "  return !o.killed && !o.noSummary && !o.anchorMissed && !o.unbuilt && !o.indeterminate;",
-      to: "  return !o.killed && !o.noSummary && !o.anchorMissed && !o.unbuilt;",
+      from: "  return !o.killed && !o.noSummary && !o.anchorMissed && !o.ambiguous && !o.unbuilt && !o.indeterminate;",
+      to: "  return !o.killed && !o.noSummary && !o.anchorMissed && !o.ambiguous && !o.unbuilt;",
       expect: "MH9e",
     },
     {
-      // **F277's own sentence, mechanised** (F1037). The report could not tell
-      // an ambiguous anchor from a unique one, and the two want opposite
-      // repairs; without the count the row is silent about which it is.
-      name: "a survivor's anchor multiplicity is not recorded",
+      // **F277's own sentence, mechanised — and then answered** (F1037, F1113).
+      // The report could not tell an ambiguous anchor from a unique one, so the
+      // count was written onto the survivor's row; the count is a **refusal**
+      // now, because a mutation that kills on the wrong site reads `caught` and
+      // the annotation never appears at all. Losing the refusal puts the pass
+      // back to mutating whichever copy `replace` reaches first.
+      name: "an ambiguous anchor is applied to its first site again",
       file: FILE,
-      from: '      const hits = hitsOf(originals.get(m.file) ?? "", m.from);',
-      to: "      const hits = 1;",
+      from: "  if (hits > 1) throw new AmbiguousAnchorError(file, from, hits);",
+      to: "",
       expect: "MH10",
     },
     {
-      // The count recorded and never printed — F768's shape one arm over: the
-      // number is right and nothing says it.
-      name: "the anchor multiplicity is recorded and never printed",
+      // The refusal recorded and never printed — F768's shape one arm over: the
+      // state is right and the row says nothing about what to do.
+      name: "the refused anchor's count is recorded and never printed",
       file: FILE,
-      from: "          ? `   \u2190 its anchor matches ${String(r.hits)}x \u2014 replace() took the first`",
-      to: '          ? ""',
+      from: "            ? `   \u2190 its anchor matches ${String(r.hits)}x \u2014 extend it until it is unique`",
+      to: '            ? ""',
       expect: "MH10",
+    },
+    {
+      // **The refusal in the wrong place**, which is the shape it was in before:
+      // a count taken over `m.from` alone never saw an `also` edit, so a pair
+      // whose second wiring was ambiguous applied to a site nobody chose with
+      // nothing anywhere reporting it. `apply` is where every edit passes.
+      name: "the control and the `also` edits escape the refusal",
+      file: FILE,
+      from: "  const hits = hitsOf(src, from);\n  if (hits === 0) throw new AnchorError(file, from);",
+      to: "  const hits = 1;\n  if (!src.includes(from)) throw new AnchorError(file, from);",
+      expect: "MH10b",
     },
     {
       // The survivor line back to two dispositions, which is how a mutation

@@ -120,36 +120,24 @@ const CROSS_TIER = {
 };
 
 /**
- * Anchors that resolve to **more than one site** today, with the run they
- * belong to — a debt list, on `KNOWN_STALE`'s terms and for its reasons (F219).
+ * Anchors that resolve to **more than one site** — and there are none (F1113).
  *
- * These are not broken runs: the harness replaces the **first** match, and for
- * every one of them the first match may well be the site the run names. What
- * they are is *unchecked* — nothing said which site was mutated, so the run's
- * name and the run's subject were never compared.
+ * It was a debt list of ten, on `KNOWN_STALE`'s terms, carrying the argument
+ * that *the first match may well be the site the run names*. It was not:
+ * `c04-kv-bar`'s row is called **the fill pair** and fired on `extentFor`, and
+ * `c12-value-bar`'s comment says **re-anchored onto `pairFor`** and fired on
+ * `extentFor` too, twenty lines above. Two of ten, and both named their subject
+ * in the mutation, which is as close to a reader being told as a file gets.
  *
- * **Eleven on the sweep's first run, across five components, one of them 5×.**
- * They pre-date the check by a long way, which is the argument for recording
- * them by count rather than fixing them inside the commit that found them: a
- * repair here is a repair to a mutation nobody is running today, and repairing
- * an anchor without running its pass produces a mutation that applies and
- * asserts nothing — `KNOWN_STALE`'s own note, one property along.
+ * **A green run could never have shown it**, because the mutation kills either
+ * way — `caught`, by the expected row, on the wrong function. That is why the
+ * remedy is a refusal in `apply` rather than a note on a report, and why this
+ * map is empty rather than absent: ten disambiguated, each pass re-run, and an
+ * entry appearing here again is a failure the way a stale anchor is.
  *
- * Compared by **equality**, both directions: an entry that becomes unique is a
- * failure too, because a list nobody prunes outlives its reason unread.
+ * Compared by **equality**, both directions.
  */
-const KNOWN_AMBIGUOUS = {
-  "c04-kv-bar.mjs": 1,
-  "c04-ohlc.mjs": 1,
-  "c04-round-trip.mjs": 1,
-  "c10-categorical.mjs": 1,
-  "c10-colormap.mjs": 1,
-  "c10-named-set.mjs": 1,
-  "c12-annotate.mjs": 1,
-  "c12-calendar.mjs": 1,
-  "c12-origin.mjs": 1,
-  "c12-value-bar.mjs": 1,
-};
+const KNOWN_AMBIGUOUS = {};
 
 /**
  * Run files whose tail **runs and says nothing** (F768), by the shape of the
@@ -576,7 +564,7 @@ const missing = {};
 const missingWhat = {};
 /** Anchors matching more than once — see the note in the loop below (F219). */
 const interpolated = [];
-const ambiguous = [];
+const ambiguousWhat = {};
 const ambiguousBy = {};
 const unresolvable = [];
 /** Runs whose tail runs and says nothing (F768), by run — see `silenceOf`. */
@@ -740,12 +728,20 @@ for (const run of runs) {
     }
     else {
       ambiguousBy[run] = (ambiguousBy[run] ?? 0) + 1;
-      ambiguous.push(`${run}: an anchor matches ${String(hits)}x in ${file} — replace() takes the first`);
+      // **Named, on `missing`'s terms** (F1113). This list was built and read
+      // only for its length: a stale anchor printed its file and its first
+      // eighty-eight characters and an ambiguous one printed a count, so the
+      // kind whose remedy is *extend this anchor* was the kind that did not say
+      // which anchor. Ten of them sat unrepaired while the report said a number.
+      (ambiguousWhat[run] ??= []).push(
+        `${file} · ${String(hits)}x · ${JSON.stringify(from).slice(0, 88)}`,
+      );
     }
   }
 }
 
 const runsWith = Object.keys(missing).length;
+const ambiguousTotal = Object.values(ambiguousBy).reduce((a, n) => a + n, 0);
 const total = Object.values(missing).reduce((a, n) => a + n, 0);
 // **A clause rather than a rewrite.** `test/unit/mutate-sweep.test.ts` MS3 reads
 // the *last* line's total and the fixture reads `· n test paths ·` out of this
@@ -764,7 +760,7 @@ console.log(
     `${toless > 0 ? ` · ${String(toless)} with no readable to:` : ""}` +
     `${foreign > 0 ? ` · ${String(foreign)} not a language this parses` : ""}` +
     `${interpolated.length > 0 ? ` · ${String(interpolated.length)} interpolated` : ""}` +
-    `${ambiguous.length > 0 ? ` · ${String(ambiguous.length)} ambiguous` : ""}` +
+    `${ambiguousTotal > 0 ? ` · ${String(ambiguousTotal)} ambiguous` : ""}` +
     `${Object.keys(silent).length > 0 ? ` · ${String(Object.keys(silent).length)} silent` : ""}`,
 );
 
@@ -802,8 +798,9 @@ for (const [run, how] of Object.entries(SILENT)) {
 const AMBIG = OWN ? KNOWN_AMBIGUOUS : {};
 for (const [run, n] of Object.entries(ambiguousBy)) {
   const known = AMBIG[run];
-  if (known === undefined) problems.push(`${run}: ${String(n)} ambiguous anchor(s) and it is not on the list`);
-  else if (known !== n) problems.push(`${run}: ${String(n)} ambiguous anchor(s), the list says ${String(known)}`);
+  const named = (ambiguousWhat[run] ?? []).map((a) => `\n      ${a}`).join("");
+  if (known === undefined) problems.push(`${run}: ${String(n)} ambiguous anchor(s) and it is not on the list${named}`);
+  else if (known !== n) problems.push(`${run}: ${String(n)} ambiguous anchor(s), the list says ${String(known)}${named}`);
 }
 for (const [run, n] of Object.entries(AMBIG)) {
   if (ambiguousBy[run] === undefined) {

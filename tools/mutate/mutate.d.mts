@@ -26,6 +26,11 @@ export declare function unbuilt(output: string): boolean;
 export declare class AnchorError extends Error {
   constructor(file: string, from: string);
 }
+/** An anchor matching more than once, refused rather than applied (F1113). */
+export declare class AmbiguousAnchorError extends Error {
+  constructor(file: string, from: string, hits: number);
+  readonly hits: number;
+}
 export declare class BlindHarnessError extends Error {
   constructor(reason: string);
 }
@@ -47,6 +52,11 @@ export type Outcome = Readonly<{
   killed: boolean;
   byNamedTest?: boolean;
   anchorMissed?: boolean;
+  /**
+   * The anchor matched more than once and was refused — `replace()` would take
+   * the first, so the row would measure a site nobody chose (F1113).
+   */
+  ambiguous?: boolean;
   /** The run produced no summary line — the harness went blind mid-pass. */
   noSummary?: boolean;
   /** The suites did not load — the mutation did not compile, so nothing was measured. */
@@ -64,9 +74,13 @@ export type Outcome = Readonly<{
    */
   untyped?: string;
   /**
-   * How many sites the mutation's own anchor matched. A survivor with more than
-   * one is F219's disposition (extract the duplicate); a survivor with exactly
-   * one may still be F277's (the anchor is perfect and its callers moved).
+   * How many sites the mutation's own anchor matched, set when `ambiguous`.
+   *
+   * It used to annotate a `SURVIVED` row, because the pass applied the mutation
+   * to the first of several sites and the reader had to be told which of F219's
+   * and F277's opposite repairs they were looking at. The pass refuses now
+   * (F1113), so this rides the refusal and **a survivor is F277 by
+   * construction**: its anchor is unique, present and textually correct.
    */
   hits?: number;
 }>;

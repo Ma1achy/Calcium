@@ -524,18 +524,27 @@ describe("mutation harness", () => {
     expect(files.get("a.ts"), "and the tree is left as it was found").toBe("const x = 1;");
   });
 
-  it("MH10 (F219, F277, F1037): a survivor says whether its anchor was unique, because the two survivors want opposite repairs", () => {
-    // **F277's own sentence is that the report cannot tell them apart.** One
-    // mutation matching two sites is F219 and wants the duplicate extracted; a
-    // unique, present, textually correct anchor on a line whose callers moved
-    // is F277 and wants the anchor followed. Both print `SURVIVED`. The
-    // multiplicity is the thing the row was not carrying, and `anchors.mjs` has
-    // known it all along in a file nobody reads beside the pass.
+  it("MH10 (F219, F277, F1037, F1113): an ambiguous anchor is refused rather than applied to a site nobody chose", () => {
+    // **F277's own sentence was that the report could not tell them apart.**
+    // One mutation matching two sites is F219 and wants the duplicate
+    // extracted; a unique, present, textually correct anchor on a line whose
+    // callers moved is F277 and wants the anchor followed. Both printed
+    // `SURVIVED`, so F1037 annotated the row with the multiplicity.
+    //
+    // **The annotation was the wrong half of the answer** (F1113). It told a
+    // reader which repair they were looking at *after* the pass had already
+    // mutated the first of several sites and reported an outcome about it — and
+    // where the mutation happens to kill, the row reads `caught` and says
+    // nothing at all. Both measured instances were that shape: a mutation named
+    // for `pairFor` firing on `extentFor`, caught either way, with only the
+    // subject wrong. `assert s.count(old) == 1` is this repo's rule for its own
+    // edit scripts, and the tool that edits the tree two hundred times a pass
+    // did not have it.
     expect(hitsOf("const x = 1;\nconst x = 2;\n", "const x"), "two sites").toBe(2);
     expect(hitsOf("const x = 1;", "const x"), "one site").toBe(1);
 
-    // Two rows against one file: `y` appears once, `dup` twice. Neither is
-    // covered, so both survive, and only one of them is ambiguous.
+    // Two rows against one file: `y` appears once, `dup` twice. The unique one
+    // is uncovered and survives; the ambiguous one never runs.
     const files = new Map([["a.ts", "const x = 1;\nconst y = 2;\nconst dup = 3;\nconst dup2 = 3;\n"]]);
     const run = (): string =>
       files.get("a.ts")?.includes("const x = 1;") ? WHOLE_GREEN : `${FAILED}\n  \u00d7 T1.1 asserts x`;
@@ -552,23 +561,78 @@ describe("mutation harness", () => {
       run,
     });
 
-    expect(results.map((r) => [r.name, r.killed, r.hits])).toEqual([
-      ["unique", false, 1],
-      ["ambiguous", false, 2],
+    expect(results.map((r) => [r.name, r.killed, r.ambiguous, r.hits])).toEqual([
+      ["unique", false, undefined, undefined],
+      ["ambiguous", false, true, 2],
     ]);
 
     const text = report(results);
-    expect(text, "the ambiguous one says so on its own line").toContain(
-      "its anchor matches 2x",
+    expect(text, "the refused row is its own state").toContain("AMBIGUOUS ANCHOR");
+    expect(text, "with the count and what to do about it").toContain(
+      "its anchor matches 2x — extend it until it is unique",
+    );
+    expect(text, "and the summary says the rows did not run").toContain(
+      "matched more than once and were refused",
     );
     // **The control**, and it is the whole of what makes the line above mean
     // something: a report that annotated every survivor would say nothing. The
     // unique row must carry no such note.
     const unique = text.split("\n").find((l) => l.includes("unique")) ?? "";
-    expect(unique, "and the unique one does not").not.toContain("anchor matches");
+    expect(unique, "the unique one carries neither").not.toContain("anchor matches");
+    expect(unique, "and is an ordinary survivor").toContain("SURVIVED");
+    // **A refused row is not a survivor**, on the same terms as every other
+    // non-survivor: the count is what a reader acts on.
+    expect(text, "one survivor, not two").toContain("1 survived");
     // And the survivor line names the third disposition, which is F277's own
     // habit: ask why the mutation cannot reach the test before rewriting it.
     expect(text).toContain("Ask why the mutation cannot reach the test");
+  });
+
+  it("MH10b (F1113): the refusal reaches an `also` edit and the control, which is where a silent one is worst", () => {
+    // **The control is applied outside the loop**, so an ambiguous control
+    // throws out of `runPass` rather than becoming a row — which is right: a
+    // control that fires on a site nobody chose proves the pass can see a kill
+    // somewhere other than where it claims, and every row beneath it is then
+    // measured against a pair that did not hold.
+    const files = new Map([["a.ts", "const dup = 1;\nconst dup = 2;\n"]]);
+    expect(() =>
+      runPass({
+        typecheck: TYPED,
+        mutations: [],
+        control: { file: "a.ts", from: "const dup", to: "const DUP", why: "T1.1" },
+        read: (f) => files.get(f) as string,
+        write: (f, v) => void files.set(f, v),
+        run: () => WHOLE_GREEN,
+      }),
+    ).toThrow(/matches 2x/u);
+
+    // **And an `also` edit, which is the half a count on `m.from` never saw.**
+    // The old bookkeeping measured the mutation's own anchor and nothing else,
+    // so a pair whose second wiring was ambiguous applied to a site nobody
+    // chose with no note anywhere — `apply` is where the check belongs because
+    // every edit goes through it.
+    const both = new Map([["a.ts", "const x = 1;\nconst y = 2;\nconst dup = 3;\nconst dup2 = 3;\n"]]);
+    const results = runPass({
+      typecheck: TYPED,
+      mutations: [
+        {
+          name: "pair", file: "a.ts", from: "const y = 2;", to: "const y = 9;", expect: "T1.2",
+          also: [{ file: "a.ts", from: "const dup", to: "const DUP" }],
+        },
+      ],
+      control: { file: "a.ts", from: "const x = 1;", to: "const x = 0;", why: "T1.1 asserts x" },
+      read: (f) => both.get(f) as string,
+      write: (f, v) => void both.set(f, v),
+      run: () => (both.get("a.ts")?.includes("const x = 1;") ? WHOLE_GREEN : `${FAILED}\n  \u00d7 T1.1 asserts x`),
+    });
+    expect(results.map((r) => [r.name, r.ambiguous, r.hits])).toEqual([["pair", true, 2]]);
+
+    // **The tree is restored**, which a throw mid-edit is the way to lose: the
+    // `also` is refused after the first edit has been staged, and staging is
+    // not writing — but the `finally` runs either way.
+    expect(both.get("a.ts"), "nothing of the refused pair is on the tree").toBe(
+      "const x = 1;\nconst y = 2;\nconst dup = 3;\nconst dup2 = 3;\n",
+    );
   });
 
   it("MH11 (F1106): a survivor whose tree does not type-check is not a survivor, and the row carries the error", () => {

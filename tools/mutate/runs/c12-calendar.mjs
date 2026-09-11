@@ -73,8 +73,10 @@ const results = runPass({
       // a February that has no fifth week.
       name: "`week` is modular like the other three units",
       file: CAL,
-      from: '  if (unit === "week") {',
-      to: "  if (false) {",
+      // `cellOf`'s arm — the grid placement CL2a is about — and not
+      // `calendarColumnLabel`'s identical line sixty below.
+      from: '): Readonly<{ row: number; column: number }> {\n  if (unit === "week") {',
+      to: '): Readonly<{ row: number; column: number }> {\n  if (false) {',
       expect: "CL2a",
     },
     {

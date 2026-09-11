@@ -83,10 +83,18 @@ const results = runPass({
       // encoding rule landed and `ALPHABET` became the `fill` pair. Stale for a
       // commit and invisible while it was — a single-quoted anchor, F173's blind
       // spot. The mutation still kills, run rather than assumed.
+      // **And the re-anchoring did not take** (F1105's ambiguous class). The
+      // note above says *re-anchored onto `pairFor`, where the capability read
+      // moved* — and `extentFor` has the identical line two hundred lines
+      // above, so `String.replace` took that one and the deliberate move landed
+      // on a different function. The mutation killed either way, which is why
+      // *run rather than assumed* could not see it: the outcome is the same and
+      // the subject is not. The signature line joins the anchor, because that
+      // is the thing the move was about.
       name: "the alphabet ignores the capability",
       file: RAMP,
-      from: '  if (caps.unicode === "ascii") {\n',
-      to: "  if (false) {\n",
+      from: 'export function pairFor(caps: Caps): Pair {\n  if (caps.unicode === "ascii") {',
+      to: 'export function pairFor(caps: Caps): Pair {\n  if (false) {',
       expect: "T1.27",
     },
     {

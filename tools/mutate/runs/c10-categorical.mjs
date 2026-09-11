@@ -44,8 +44,11 @@ const MUTATIONS = [
     // curated 16-colour map had none.
     name: "two categorical slots take one 4-bit index",
     file: "src/presentation/theme/four-bit.ts",
-    from: '  "categorical.c5": 12,',
-    to: '  "categorical.c5": 3,',
+    // The **dark** map: `c4` is 11 there and 3 in the high-contrast one, which
+    // is what tells the two `c5: 12` lines apart. T2.61 reads all three maps,
+    // so either would have killed — and only one is the map this row is about.
+    from: '  "categorical.c4": 11,\n  "categorical.c5": 12,',
+    to: '  "categorical.c4": 11,\n  "categorical.c5": 3,',
     expect: "T2.61",
   },
   {

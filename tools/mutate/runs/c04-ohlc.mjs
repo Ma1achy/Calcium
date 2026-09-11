@@ -88,8 +88,12 @@ const results = runPass({
       // call that omits it. This mutation makes the default disagree.
       name: "the builder resolves an omitted form to something it then refuses",
       file: BUILDERS,
-      from: '    const drawn = form ?? "line";',
-      to: '    const drawn = form ?? "pie";',
+      // Unique at the `plotStyle` gate, which is where it fired: the predicate
+      // is written out five times on purpose — this file's own note says a
+      // one-line predicate written twice can be compared by eye — so the anchor
+      // has to say which copy. The other four are uncovered by any mutation.
+      from: '  if (plotStyle !== undefined && plotStyle !== "auto") {\n    const drawn = form ?? "line";',
+      to: '  if (plotStyle !== undefined && plotStyle !== "auto") {\n    const drawn = form ?? "pie";',
       expect: "T3.26",
     },
     {

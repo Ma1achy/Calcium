@@ -113,8 +113,11 @@ const results = runPass({
       // move no frames moved eight.
       name: "a refused matrix form falls back to the curve's facing",
       file: HEAT,
-      from: "  const facing = facingOf(block, FACING_MATRIX);",
-      to: "  const facing = facingOf(block, { x: \"right\", y: \"up\" });",
+      // `matrixRows`, which draws the data — `matrixFurniture` reads the same
+      // line ninety below and the anchor could not say which (F1105's
+      // ambiguous class). The loop header is what tells them apart.
+      from: "  const facing = facingOf(block, FACING_MATRIX);\n  for (let r = 0; r < visible; r += 1) {",
+      to: "  const facing = facingOf(block, { x: \"right\", y: \"up\" });\n  for (let r = 0; r < visible; r += 1) {",
       expect: "contour",
     },
     {

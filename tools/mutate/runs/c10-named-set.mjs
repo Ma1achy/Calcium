@@ -131,8 +131,13 @@ const MUTATIONS = [
     // restored: eleven rows loop it and a third theme joins none of them.
     name: "the contrast suite writes its own coverage set",
     file: CONTRACT,
-    from: "const VARIANTS = Object.keys(defaultTheme);",
-    to: 'const VARIANTS = ["dark", "light"];',
+    // **The declaration, not T2.23's quotation of it.** The row asserts on the
+    // source text, so the same line appears inside its own expectation — and a
+    // mutation landing there would change what the assertion looks for rather
+    // than what the suite covers. The leading newline is the whole difference:
+    // the quoted copy is indented inside a string.
+    from: "\nconst VARIANTS = Object.keys(defaultTheme);",
+    to: '\nconst VARIANTS = ["dark", "light"];',
     expect: "T2.23",
   },
   {

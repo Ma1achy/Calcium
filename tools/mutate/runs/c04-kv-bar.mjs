@@ -97,10 +97,18 @@ const results = runPass({
       // cells and `truncate` eats the number — the one thing a bar exists to
       // say. It shipped, and the golden corpus recorded it for a whole state's
       // lifetime without anyone reading the frame.
+      // **Re-anchored onto `pairFor`, which is what the name says and is not
+      // where this fired** (F1105's ambiguous class). `extentFor` carries the
+      // same line twenty lines above, `String.replace` takes the first match,
+      // and so a mutation named for the fill pair has been disabling the extent
+      // vocabulary for its whole life — caught by `states` either way, which is
+      // why nothing reported it. The return line joins the anchor because it is
+      // what gives the arm its identity: if that payload changes, the mutation's
+      // meaning changes with it and a stale anchor is the right answer.
       name: "THE SHIPPED DEFECT: the fill pair ignores the ambiguous width",
       file: RAMP,
-      from: '  if (caps.ambiguousWidth === "wide") {\n',
-      to: "  if (false) {\n",
+      from: '  if (caps.ambiguousWidth === "wide") {\n    return Object.freeze({ encodes: "fill", filled: "\\u28ff", empty: "\\u2804", absent: "-" } as const);',
+      to: '  if (false) {\n    return Object.freeze({ encodes: "fill", filled: "\\u28ff", empty: "\\u2804", absent: "-" } as const);',
       expect: "states",
     },
     {
