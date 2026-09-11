@@ -47330,7 +47330,7 @@ non-zero run. Named rather than fixed here.
 |---|---|
 | **Surface** | `.github/workflows/mutation-sweep.yml` · `tools/mutate/sweep.mjs` · `tools/mutate/runs/c12-arm-seam.mjs` · F1097, F980 |
 | **Reached for** | reading run 34550613146, which F1097 named as the measurement it was waiting for |
-| **Verdict** | **open** — the census is taken and the timeout question is answered; the eighteen reds are named and **seventeen are closed** (F1104, F1108, F1116 ×2, F1117 ×3, F1118 ×4, F1120, F1122, F1123 ×3, F1124), so **one remains** |
+| **Verdict** | **closed** — the census is taken, the timeout question is answered, and **all eighteen reds are closed**: F1104, F1108, F1116 ×2, F1117 ×3, F1118 ×4, F1120, F1122, F1123 ×3, F1124, F1125 |
 
 ### The census
 
@@ -47603,7 +47603,7 @@ in one finding.
 |---|---|
 | **Surface** | `tools/mutate/runs/*.mjs` · F1105's seventeen red runs |
 | **Reached for** | F1106 built the check; this points it at the corpus once |
-| **Verdict** | **open** — all eighteen are read and disposed; five were rotted, three are repaired and verified, and the two that remain are named |
+| **Verdict** | **open** — all eighteen are read and disposed; five were rotted, four are repaired and verified (LN6 by F1125), and the one that remains is `atLate` |
 
 ### The measurement
 
@@ -47706,10 +47706,14 @@ short, and the mutation that would have said so was rotted.
 
 ### What remains
 
-**LN6** and **`atLate`**, both of which want a mutation designed rather than
-patched: LN6 needs the frame *moved* rather than added, which is C12's 3-D
-carrier and wants the by-hand walk; `atLate`'s row needs the runner's step to
-land after the lifecycle's in `log`, which is a reorder and not a rename.
+**`atLate`**, whose row needs the runner's step to land after the lifecycle's in
+`log` — a reorder and not a rename.
+
+**LN6 is closed by F1125.** It wanted the frame *moved* rather than added, and the
+move is two edits whose order is forced from outside: F1113's ambiguity refusal
+means the removal has to go first, or the insertion's second copy makes the
+removal's anchor match twice. The walk it asked for also answered the question
+F1106 recorded and left open — why removing the tie guard fails nothing.
 
 **`c09-image` is green** — every mutation caught — so F1105's seventeen reds are
 sixteen. Its last survivor was not a weak test either: F1108.
@@ -47727,10 +47731,11 @@ whose subject had moved. Two were the thing the sweep exists to find:
 `docker-dashboard`'s `C4` survivor (F1104) and `c09-image`'s (F1108). That ratio
 is the figure to hold against the next reading of this list.
 
-**One remains**: `c12-lines3d`, whose LN6 is a rotted `to` that does not type and
-needs the frame *moved* rather than added — F1107's residue, and the by-hand walk
-of C12's 3-D carrier. `c12-arm-seam` is closed by F1124: three shards of thirty,
-ninety of ninety caught, and the sweep's expectation count unmoved across the cut.
+**None remain.** `c12-arm-seam` is closed by F1124 — three shards of thirty,
+ninety of ninety caught, the sweep's expectation count unmoved across the cut —
+and `c12-lines3d` by F1125, whose LN6 is the frame *moved* rather than added and
+whose second half is the diagnosis F1106 left open: the tie guard was unconstrained
+because LN6 asserts a direction and the tie is worth two cells.
 
 The three recorded survivors are closed by F1123, and **none of them was a weak
 assertion**: two rows never reached the branch the mutation rewrites, and one was
@@ -48876,3 +48881,70 @@ rather than these three. It also moves 120 section citations in those runs from
 **What is still unmeasured, and it is the figure that matters**: no shard has run
 on a runner. 614 s here is 23 % of the bound at ratio 1, 62 % at 2.7. The next
 sweep reports it, and this is recorded as the claim it is rather than folded in.
+
+---
+
+## F1125 — a direction survives an inverted rule, and the control was drawn from the same quantity as the subject ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `tools/mutate/runs/c12-lines3d.mjs` LN6 · `test/unit/plot-lines3d.test.ts` LN7 · `src/presentation/plot/scatter3.ts`'s tie guard · F1106, F1107, F452 |
+| **Reached for** | F1105's eighteenth and last red run, and F1106's *separately measured and not diagnosed* |
+| **Verdict** | **closed** — ten of ten caught, and **F1105's eighteen are all closed** |
+
+### The mutation, repaired as a move
+
+F1106 named LN6's `to` as broken twice over: it called `frameOf` with the
+pre-F489 signature, and it **added** a draw where the defect was a **move** — the
+data loop is at line 999, the real call at 1178, so an inserted copy is overwritten
+by the later one and the net effect is nothing.
+
+Expressed properly it is two edits, and **the order is forced by a rule from a
+different finding.** F1121 says a move is an add and a remove; F1113 says `apply`
+refuses an anchor that matches twice. Inserting first puts a second copy of a
+thirty-two-line call in the file and the removal is then ambiguous — so the
+**removal goes first** and the insertion is the `also`. The call itself is sliced
+out of the source with a head and a tail (`c22-gate3b`'s pattern), which costs the
+anchor sweep its check — the `from` reads as `interpolated` — so the run refuses to
+start if either end has moved.
+
+Measured: the move type-checks and **LN6 fails on it**.
+
+### The diagnosis F1106 left open
+
+F1106 recorded, without diagnosing it, that replacing the tie guard
+`if (!nearer && mark[i] === undefined) return;` with an unconditional
+fall-through **fails nothing** — nine rows, all green.
+
+The reason is that **LN6 asserts a direction and the tie is a magnitude.**
+
+| | frame's cells, no path | with the path | carrier holds |
+|---|---|---|---|
+| the rule as written | 77 | 71 | 10 of 13 |
+| the guard removed | 79 | 75 | 8 of 13 |
+
+`mutedCells(true) < mutedCells(false)` is 71 < 77 and 75 < 79. **Both true**, so
+the row passes with the rule inverted. What carries the sign is that a coincident
+stroke is mostly *strictly nearer* than the box rather than tied with it: those
+cells are the carrier's whatever the guard says, and only two of the thirteen are
+exact ties. A row sensitive to a sign cannot see a rule worth two cells.
+
+LN7 is the row: the stroke draws **13** cells with the box off and holds **10**
+with it on, the three lost being cells a frame stroke is strictly in front of.
+The guard removed, it is 8, and the run carries that mutation.
+
+### The control was drawn from the same quantity as the subject
+
+Comparing two shots needs a control that they are the same projection, and the
+first one was a **count of marker cells** — 24 with the box off against 15 with it
+on. It failed, and it was right to: the box occludes nine of the cloud's cells.
+
+**That is the phenomenon the row measures, not a statement about the projection.**
+A count of visible cells is exactly as sensitive to occlusion as the subject is, so
+it can never separate *the scene moved* from *the box covered some of it*. The
+control has to be **positional**: every marker cell surviving the box is at a cell
+the box-less shot also marks, which a rescale would break and an occlusion cannot.
+
+The general form is worth the entry: **a control must be measured in a quantity the
+thing under test does not move.** It read as a natural control precisely because it
+was the same measurement one colour over.
