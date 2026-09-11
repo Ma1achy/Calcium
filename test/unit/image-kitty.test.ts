@@ -13,6 +13,9 @@
  *   the grid's dimensions equal to what the block committed
  *   every placeholder carrying the diacritic pair its position implies
  */
+import { readdirSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 import { Box, Text, renderToString } from "ink";
 import { createElement } from "react";
@@ -359,7 +362,32 @@ describe("IK — the kitty arm, as properties", () => {
     // `imageProtocol !== "kitty"` in `session.ts` is the drift C09 I1 forbids.
     const seam = strip(readFileSync("src/shell/transmit-image.ts", "utf8"));
     expect(seam, "the seam asks the same predicate").toMatch(/if \(!transmits\(capabilities\)\) return "";/);
-    expect(seam, "and holds the only comparison").not.toMatch(/imageProtocol !== "kitty"/);
+
+    // **Over every file, not the two someone thought of** (F1108). This pair
+    // read `transmit-image.ts` and `session.ts` and asserted the first *holds
+    // the only comparison* — while `placesAtProtocol`, four lines into the loop
+    // the seam runs, opened with a literal `imageProtocol !== "kitty"`. It could
+    // not call the predicate: it is L1 and the predicate was L4, so the one
+    // thing the comment forbade was the one thing the layer rule required. Both
+    // instruments looked and neither could see it — a scan blind to the file it
+    // lives in, and a mutation that removed the seam's guard and survived, which
+    // is a duplication reported as a weak test.
+    //
+    // So the corpus is `src/` and the allowance is a site, not a file: exactly
+    // one comparison, and it is the predicate's own body.
+    const walk = (dir: string): readonly string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory() ? walk(join(dir, e.name)) : e.name.endsWith(".ts") ? [join(dir, e.name)] : [],
+      );
+    const compares = walk("src").filter((f) =>
+      /imageProtocol\s*[!=]==\s*"kitty"/u.test(strip(readFileSync(f, "utf8"))),
+    );
+    expect(compares, "one site compares the protocol, and it is `transmits`").toEqual([
+      join("src", "presentation", "blocks", "kinds", "image.ts"),
+    ]);
+    // **The control**, because a walk that finds nothing satisfies the line
+    // above by being empty: the corpus has to be able to see a comparison.
+    expect(walk("src").length, "and the walk read the tree").toBeGreaterThan(100);
 
     // **The ordering is the row.** Reverting the caller to an unconditional
     // call restores the cost with no output change at all, on every terminal

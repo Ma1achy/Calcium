@@ -126,10 +126,30 @@ const results = runPass({
     {
       // **The protocol guard removed**, so every terminal receives an APC it
       // cannot read — printed as text on anything but kitty.
+      //
+      // **It survived alone, and the reason is a second guard** (F1108). Inside
+      // the loop, `placesAtProtocol` opens with a literal
+      // `imageProtocol !== "kitty"`, so removing the seam's own first line
+      // changes nothing a caller can see. Two wirings each sufficient on their
+      // own is what `also` is for (F227) — a revert row about a pair has to
+      // break the pair, and breaking one half of it reads as a weak test.
+      //
+      // **The duplication is gone and the pair is not.** `transmits` now lives
+      // at L1 beside `placesAtProtocol`, which asks it instead of copying it —
+      // so there is one comparison in `src/` and IK12 gates that over the whole
+      // tree. Two call sites remain, and each still returns early on its own,
+      // which is what keeps this an `also` rather than a single edit.
       name: "the seam transmits at every protocol",
       file: SEAM,
       from: "): string {\n  if (!transmits(capabilities)) return \"\";\n  const found: Image[] = [];",
       to: "): string {\n  if (false) return \"\";\n  const found: Image[] = [];",
+      also: [
+        {
+          file: "src/presentation/blocks/kinds/image.ts",
+          from: "  if (!transmits(capabilities)) return false;",
+          to: "  if (false) return false;",
+        },
+      ],
       expect: "IK7",
     },
     {
@@ -200,7 +220,14 @@ const results = runPass({
       name: "the overlay draws a fixed tone below the colour floor",
       file: OVERLAY,
       from: "  return map === undefined ? undefined : continuousColour(map, t, caps);",
-      to: '  return map === undefined ? undefined : (continuousColour(map, t, caps) ?? { kind: "ansi", index: 1 });',
+      // **`ansi` is not a `ColourValue` variant** (F1107). The three are `rgb`,
+      // `ansi256` and `ansi16`, so the old `to` returned a colour nothing can
+      // render rather than a fixed tone, and the row was caught by a value no
+      // arm matches rather than by a floor that draws. `tsc` named it —
+      // *Type '{ kind: "ansi"; index: number; }' is not assignable* — and a
+      // literal naming a variant that does not exist is the third way a `to`
+      // rots, after a signature that moved and a symbol that went.
+      to: '  return map === undefined ? undefined : (continuousColour(map, t, caps) ?? { kind: "ansi16", index: 1 });',
       expect: "IO3",
     },
     {

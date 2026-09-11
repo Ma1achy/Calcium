@@ -182,13 +182,34 @@ export function imageCells(
  * body is four cells in (C22 §6l.4 D) and `imageCells` reads the width, which is
  * the whole of F380.
  */
+/**
+ * The one condition under which the seam writes anything.
+ *
+ * **It lives here because this is the lowest layer that asks it** (F1108). It
+ * was L4's, in `shell/transmit-image.ts`, under a comment saying *`transmitImage`
+ * reads it too, so there is one implementation and the two cannot drift* — and
+ * there were two: `placesAtProtocol` opened with a literal
+ * `imageProtocol !== "kitty"` because L1 may not import L4, so the predicate was
+ * unreachable from the file that copied it. The comment named the drift it
+ * forbade and named `session.ts` as where it would appear; it was already here.
+ *
+ * **Nothing found it for a year, and two instruments both looked.** IK12 scans
+ * for a second comparison and reads `transmit-image.ts` and `session.ts` — the
+ * two files someone thought of. And `c09-image`'s *the seam transmits at every
+ * protocol* removed L4's guard and survived, which is the duplication reported
+ * as a weak test.
+ */
+export function transmits(capabilities: Pick<RenderContext["capabilities"], "imageProtocol">): boolean {
+  return capabilities.imageProtocol === "kitty";
+}
+
 export function placesAtProtocol(
   block: Image,
   capabilities: RenderContext["capabilities"],
   width: number,
   probe?: Probe,
 ): boolean {
-  if (capabilities.imageProtocol !== "kitty") return false;
+  if (!transmits(capabilities)) return false;
   const { cols, rows } = imageCells(block, width, probe);
   return placementFits(cols, rows);
 }
