@@ -46996,6 +46996,32 @@ cores is 0.5 per core against the runner's 0.7 and is still not that machine.
 
 **Still open**, and better founded: one candidate instead of two, the axis named as
 the regime, and the next sample wanted from a runner rather than from here.
+
+### And what a deliberate hunt costs, because *the next run is the measurement* has no number in it
+
+Five re-runs of `main`'s workflow were fired to look for it. **All five green** —
+which is the expected outcome and not evidence.
+
+The workflow has executed the expensive tier **234 times** (every `pull_request`
+run plus every push to `main`). T5.1c's parity has gone red **once** in all of
+them.
+
+| | rate | P(caught in 5) | runs for 90 % |
+|---|---|---|---|
+| F1100 · T5.1c wall parity | 0.43 % | **2.1 %** | **538** |
+| F812 · `27;2u`, four recurrences | 1.71 % | 8.3 % | 134 |
+
+So five green runs move the belief by almost nothing, and closing either by brute
+force is not a thing anyone should spend. **The denominator is an upper bound** —
+the fixtures were hardened during that history, so a rate taken over the runs that
+carried the *current* row is higher and the true figure sits above these.
+
+**What this changes is the disposition rather than the diagnosis.** F1086's
+criticism was that *a finding waiting on evidence a mechanism cannot generate reads
+exactly like a finding waiting on someone's time*; the same is true of one waiting
+on a 0.43 % event with no number beside it. This one waits for a recurrence **in
+the ordinary course of work**, and the thing worth protecting until then is the
+instrument, not the hunt.
 ---
 
 ## F1101 — the anchorage matcher reads one of three spellings, and fifty-four spans were invisible to it ★★★☆☆
