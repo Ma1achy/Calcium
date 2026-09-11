@@ -24,6 +24,51 @@ function gapSpan(gap: number): Span {
 }
 
 /**
+ * The lead a `bar` or `spark` cell spends on its glyph (I23).
+ *
+ * **C04 I6 obliges the mark and this is where it is paid for.** A cell toned
+ * `error` or `warn` carries a glyph, enforced at construction, so a surface
+ * drawing a load bar must supply one — and both series branches used to return
+ * before the line that reads it, so no bar cell has ever drawn one. Four golden
+ * frames recorded the absence and two are ASCII, where the tone is the only
+ * other carrier and there is none (F1104).
+ *
+ * **Inside the planned width, never beside it** — the same rule the text path
+ * states, *part of the cell's width, not an addition to it*. The series is then
+ * handed what the mark leaves, so C12 I13 and I20's *exactly `width` cells and
+ * one row* holds by construction and C04 I50c's *takes the planned width* stays
+ * a claim about the cell.
+ *
+ * **The separator is unconditional here where the text path makes it
+ * conditional**: there an empty text would leave a glyph-only column two cells
+ * wide, and here there is always a series after the mark.
+ *
+ * **The mark is dropped only where it does not fit**, and never on a judgement
+ * about how narrow is too narrow. That clause was in I23's first form and the
+ * frame falsified it: at a planned width of 3 a toned cell draws `▲ …` where an
+ * untoned one draws `10…` for a value of 101.2, and C12 I20 has already ruled on
+ * that comparison in its other arm — a truncated number is a different number.
+ * How a series degrades is C12's (I20, I13), so reaching for it here would put
+ * one decision in two components.
+ *
+ * **The lead is two cells at every convention**, because C09 I48 resolves an
+ * Ambiguous slot to its ASCII half at `"wide"` and both renderings of every slot
+ * are one cell. `cells()` states that rule rather than measuring a variable —
+ * a literal 2 here would be the second source, and C09 T2.5 is what goes red the
+ * day a token's two renderings differ.
+ */
+function seriesLead(
+  cell: Cell,
+  width: number,
+  ctx: RenderContext,
+): Readonly<{ lead: string; room: number }> {
+  if (cell.glyph === undefined) return { lead: "", room: width };
+  const lead = `${glyphFor(cell.glyph, ctx.capabilities)} `;
+  const room = width - cells(lead, ctx.capabilities.ambiguousWidth);
+  return room >= 0 ? { lead, room } : { lead: "", room: width };
+}
+
+/**
  * Exactly `width` cells **at the session's convention** — truncated if long,
  * padded if short (I21).
  *
@@ -156,10 +201,12 @@ export function rowSpans(
     // the series is already the width, and truncating it would drop the most
     // recent samples — the ones it was shown for.
     if (cell?.spark !== undefined) {
-      spans.push({
-        text: sparkline(cell.spark, planned.width, ctx.capabilities),
-        style: tone(cell.tone ?? "accent", ctx.theme, ctx.capabilities),
-      });
+      const { lead, room } = seriesLead(cell, planned.width, ctx);
+      const style = tone(cell.tone ?? "accent", ctx.theme, ctx.capabilities);
+      // The mark is its own run for the reason the text path gives: a span's
+      // offsets stay offsets into the series rather than into a spliced string.
+      if (lead !== "") spans.push({ text: lead, style });
+      spans.push({ text: sparkline(cell.spark, room, ctx.capabilities), style });
       return;
     }
 
@@ -171,10 +218,10 @@ export function rowSpans(
     // C04 I50c refuses a cell carrying both, so the order of these two branches
     // decides nothing.
     if (cell?.bar !== undefined) {
-      spans.push({
-        text: valueBar(cell.bar, planned.width, ctx.capabilities),
-        style: tone(cell.tone ?? "accent", ctx.theme, ctx.capabilities),
-      });
+      const { lead, room } = seriesLead(cell, planned.width, ctx);
+      const style = tone(cell.tone ?? "accent", ctx.theme, ctx.capabilities);
+      if (lead !== "") spans.push({ text: lead, style });
+      spans.push({ text: valueBar(cell.bar, room, ctx.capabilities), style });
       return;
     }
 

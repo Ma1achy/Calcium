@@ -19,9 +19,11 @@ const drawnOrder = (block: Table, width = 160): readonly string[] =>
   tableElements(block, width, registry.measure).map((e) => e.id);
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { psColumns, psTable } from "../support/blocks.js";
-import { measurable, visible } from "../support/render.js";
+import { MONO_UNICODE_CAPS, measurable, visible } from "../support/render.js";
+import { glyphFor } from "../../src/presentation/blocks/glyphs.js";
 import { cells } from "../../src/presentation/text.js";
-import type { ColumnDef, Table } from "../../src/data/viewmodel/index.js";
+import type { Cell, ColumnDef, Table } from "../../src/data/viewmodel/index.js";
+import type { TerminalCapabilities } from "../../src/terminal/index.js";
 
 /** Σ visible widths + gaps, computed here rather than taken from the plan. */
 function occupied(plan: ReturnType<typeof planColumns>): number {
@@ -436,12 +438,93 @@ describe("C11 tier 1 — planColumns", () => {
    * day someone takes it, which is what makes that a decision rather than a
    * drift — T2.7's argument, one field over.
    */
-  // C11 I23 — a bar or spark cell draws its glyph inside the planned width.
-  // Spec-first: the invariant landed at the commit above this one and these are
-  // the rows it is named by, not deferred on a component.
-  it.todo("T1.26 (I23): a toned bar cell draws its mark and the series takes the rest — not deferred on a component");
-  it.todo("T1.27 (I23): a column too narrow for both drops the mark and keeps the series — not deferred on a component");
-  it.todo("T3.21 (I23): a two-cell glyph at ambiguousWidth wide shortens the series by two — not deferred on a component");
+  /** A one-column table of a single bar cell, planned at `width`. */
+  const barCell = (width: number, cell: Cell): Table => ({
+    kind: "table",
+    id: "i23",
+    columns: [{ key: "cpu", label: "CPU", align: "left", priority: 1, minWidth: width, sortable: false }],
+    rows: [{ id: "r", cells: { cpu: cell } }],
+  });
+
+  /** The cell alone, with the header dropped and the styling stripped. */
+  const drawn = (block: Table, caps: TerminalCapabilities, trim = true): string => {
+    const kit = measurable({ definitions: [tableDefinition], capabilities: caps });
+    const line = kit.renderToLines(block, 40)[1];
+    expect(line, "the table drew a row").toBeDefined();
+    return trim ? visible(line ?? "").trimEnd() : visible(line ?? "");
+  };
+
+  it("T1.26 (I23): a toned bar cell draws its mark, and the series takes what the mark leaves", () => {
+    // **At 1-bit with Unicode**, which is the rung the claim is about: a fixture
+    // that also drops Unicode moves two capabilities and cannot say which one
+    // the behaviour follows. With no colour the mark is the whole of what
+    // separates a busy container from a quiet one (C12 I25).
+    const bar = { value: 101.2, max: 100, format: "percent" } as const;
+    const toned = drawn(barCell(17, { text: "", bar, tone: "error", glyph: "warn" }), MONO_UNICODE_CAPS);
+    expect(cells(toned), "exactly the planned width").toBe(17);
+    expect(toned, "the mark C04 I6 obliges").toContain(glyphFor("warn", MONO_UNICODE_CAPS));
+    expect(toned, "and the number the bar is for").toContain("101.2%");
+
+    // **The control is the same cell with no glyph**, and it is what says the
+    // lead came out of the series rather than out of the column: same width,
+    // longer run. Before I23 the two were byte-identical.
+    const bare = drawn(barCell(17, { text: "", bar }), MONO_UNICODE_CAPS);
+    expect(cells(bare), "the column is unmoved").toBe(17);
+    const run = (l: string): number => (l.match(/[█░]/gu) ?? []).length;
+    expect(run(bare) - run(toned), "the mark is paid for out of the run").toBe(
+      cells(`${glyphFor("warn", MONO_UNICODE_CAPS)} `),
+    );
+  });
+
+  it("T1.27 (I23): the mark is dropped where it does not fit, and at no width above that", () => {
+    // **A sweep rather than a chosen width**, because a chosen width is the
+    // judgement this invariant stopped making. I23's first form dropped the mark
+    // wherever "the plan leaves no room for both" and the frame falsified it: at
+    // 3 a toned cell draws `▲ …` where an untoned one draws `10…` for 101.2, and
+    // C12 I20 already ruled on that comparison — a truncated number is a
+    // different number.
+    const mark = glyphFor("warn", MONO_UNICODE_CAPS);
+    const lead = cells(`${mark} `);
+    const held: number[] = [];
+    for (let w = 1; w <= 20; w += 1) {
+      const cell = drawn(barCell(w, { text: "", bar: { value: 101.2, max: 100, format: "percent" }, tone: "error", glyph: "warn" }), MONO_UNICODE_CAPS, false);
+      expect(cells(cell), `the plan is the plan at ${String(w)}`).toBe(w);
+      if (cell.includes(mark)) held.push(w);
+    }
+    // Every width that holds the lead, and only those — the boundary is an
+    // arithmetic rather than a taste.
+    expect(held, "the mark is present from the first width that fits it").toEqual(
+      Array.from({ length: 20 - lead + 1 }, (_, i) => i + lead),
+    );
+  });
+
+  it("T3.21 (I23): the cell holds its plan across a convention change", () => {
+    // **Stated blind spot.** This was written for a two-cell glyph at
+    // `ambiguousWidth: "wide"` and no such glyph exists: C09 I48 resolves an
+    // Ambiguous slot to its ASCII half there, so both renderings of every slot
+    // are one cell and the lead is two at either arm. What is asserted is that
+    // the cell holds its plan and the lead still comes out of the series at
+    // both — the day a token's two renderings differ in width it is C09 T2.5
+    // that goes red, not this row. Kept because the arm it covers is the one
+    // C12 I24's four crooked gutters were made of.
+    const bar = { value: 101.2, max: 100, format: "percent" } as const;
+    const wide = { ...MONO_UNICODE_CAPS, ambiguousWidth: "wide" as const };
+    for (const caps of [MONO_UNICODE_CAPS, wide]) {
+      const toned = drawn(barCell(17, { text: "", bar, tone: "error", glyph: "warn" }), caps, false);
+      const bare = drawn(barCell(17, { text: "", bar }), caps, false);
+      const at = caps.ambiguousWidth;
+      expect(cells(toned, at), `the plan holds at ${at}`).toBe(17);
+      expect(cells(bare, at), `and for the control at ${at}`).toBe(17);
+      // **What this can see, and what it cannot.** Once the cell is 17 and ends
+      // with the same number, *the run is shorter by the lead* is arithmetic
+      // rather than an observation — asserting it is decoration. The three
+      // independent claims are the width, the mark and the number whole: a fix
+      // that made room by dropping the value would hold the first two.
+      expect(toned, `the mark at ${at}`).toContain(glyphFor("warn", caps));
+      expect(toned, `and the value whole at ${at}`).toContain("101.2%");
+      expect(bare, `the control carries it too at ${at}`).toContain("101.2%");
+    }
+  });
 
   it("T1.25 (I22): `maxWidth` on a column with no `flex` cannot change a plan, at any width", () => {
     const drop = (c: ColumnDef): ColumnDef => {
