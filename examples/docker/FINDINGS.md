@@ -47603,7 +47603,7 @@ in one finding.
 |---|---|
 | **Surface** | `tools/mutate/runs/*.mjs` · F1105's seventeen red runs |
 | **Reached for** | F1106 built the check; this points it at the corpus once |
-| **Verdict** | **open** — all eighteen are read and disposed; five were rotted, four are repaired and verified (LN6 by F1125), and the one that remains is `atLate` |
+| **Verdict** | **closed** — all eighteen are read and disposed, and all five rotted `to`s are repaired and verified: three here, `atLate` by F1110 and LN6 by F1125 |
 
 ### The measurement
 
@@ -47706,14 +47706,28 @@ short, and the mutation that would have said so was rotted.
 
 ### What remains
 
-**`atLate`**, whose row needs the runner's step to land after the lifecycle's in
-`log` — a reorder and not a rename.
+**Nothing.** Both were answered, and the second one was answered **in this
+document, by a finding whose own header names it**.
 
 **LN6 is closed by F1125.** It wanted the frame *moved* rather than added, and the
 move is two edits whose order is forced from outside: F1113's ambiguity refusal
 means the removal has to go first, or the insertion's second copy makes the
 removal's anchor match twice. The walk it asked for also answered the question
 F1106 recorded and left open — why removing the tie guard fails nothing.
+
+**`atLate` was closed by F1110**, whose *Reached for* line reads *F1107's second
+unrepaired rotted `to` — `atLate`, a function in no file*, and whose verdict reads
+*the mutation is now `log.push("stores")` deleted, it type-checks, and T1.2 catches
+it*. Verified rather than read: `c22-construct` runs green with T1.2 caught.
+
+**This section carried it as open through five subsequent findings**, and the
+reason is the one thing no instrument checks — *ask where a settled claim is
+written down*, run on a **residue** rather than on a claim. A remainder list is a
+claim like any other and it is the kind nobody re-derives, because restating it is
+how it gets carried. It survived being edited for LN6 in this same session: the
+sentence naming both was rewritten to name one, and the half that was rewritten was
+checked while the half beside it came along unread. That is
+*a correction stops at its own sentence*, on a list rather than on a paragraph.
 
 **`c09-image` is green** — every mutation caught — so F1105's seventeen reds are
 sixteen. Its last survivor was not a weak test either: F1108.
