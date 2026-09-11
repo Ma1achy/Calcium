@@ -64,10 +64,32 @@ const results = runPass({
     },
     // --- T6.49 — the ordering C22 I6 is about --------------------------------
     {
+      // **The move is two edits now, because `if (false)` cost the narrowing**
+      // (F1121). The old `to` prepended the drain and swallowed the original
+      // with a trailing `if (false)` — and TypeScript treats the then-branch of
+      // a literal `false` as **unreachable**, where every narrowing reverts to
+      // the declared type. `graph` is nullable at the top of `stop()`, so the
+      // swallowed statement stopped compiling: `TS18047: 'graph' is possibly
+      // null`, on a line the mutation does not change and would never run.
+      //
+      // A `to` that does not type-check is not expressible against this tree,
+      // which is evidence it was written against an older one — so the row read
+      // `DID NOT TYPE` and asserted nothing (F1106). The claim is a **move**, so
+      // the mutation moves it: added above the release, removed from below it.
+      // The second anchor carries the blank line and the comment beneath, which
+      // is what keeps it unique once the first edit has put a second copy of the
+      // statement in the file.
       name: "drain the diagnostics before the release",
       file: "src/shell/session.ts",
       from: "    graph.lifecycle.release();",
-      to: "    for (const line of graph.diagnostics()) this.config.stdout.write(`${line}\\n`);\n    graph.lifecycle.release();\n    if (false)",
+      to: "    for (const line of graph.diagnostics()) this.config.stdout.write(`${line}\\n`);\n    graph.lifecycle.release();",
+      also: [
+        {
+          file: "src/shell/session.ts",
+          from: "    for (const line of graph.diagnostics()) this.config.stdout.write(`${line}\\n`);\n\n    // **The sixth channel",
+          to: "\n    // **The sixth channel",
+        },
+      ],
       expect: "T4.27",
     },
     // --- T6.50 — the statement the catch abandoned ---------------------------

@@ -47330,7 +47330,7 @@ non-zero run. Named rather than fixed here.
 |---|---|
 | **Surface** | `.github/workflows/mutation-sweep.yml` · `tools/mutate/sweep.mjs` · `tools/mutate/runs/c12-arm-seam.mjs` · F1097, F980 |
 | **Reached for** | reading run 34550613146, which F1097 named as the measurement it was waiting for |
-| **Verdict** | **open** — the census is taken and the timeout question is answered; the eighteen reds are named and **eleven are closed** (F1104, F1108, F1116 ×2, F1117 ×3, F1118 ×4), so **seven remain** |
+| **Verdict** | **open** — the census is taken and the timeout question is answered; the eighteen reds are named and **sixteen are closed** (F1104, F1108, F1116 ×2, F1117 ×3, F1118 ×4, F1120, F1122, F1123 ×3), so **two remain** |
 
 ### The census
 
@@ -47727,11 +47727,22 @@ whose subject had moved. Two were the thing the sweep exists to find:
 `docker-dashboard`'s `C4` survivor (F1104) and `c09-image`'s (F1108). That ratio
 is the figure to hold against the next reading of this list.
 
-**Seven remain**: `c10-colormap`, `c12-arm-seam`, `c12-histogram-series`,
-`c12-lines3d`, `c12-svg-callout-row`, `c23-faults`, `c25-intraline`. Two are
-broken harnesses rather than findings — `c12-svg-callout-row`'s control no longer
-kills, and `c12-arm-seam` hits the 45-minute bound with ninety mutations and wants
-splitting — and two are rotted `to`s that do not type (F1107's residue).
+**Two remain**: `c12-arm-seam`, which hits the 45-minute bound with ninety
+mutations and wants splitting, and `c12-lines3d`, whose LN6 is a rotted `to` that
+does not type and needs the frame *moved* rather than added — F1107's residue, and
+the by-hand walk of C12's 3-D carrier.
+
+The three recorded survivors are closed by F1123, and **none of them was a weak
+assertion**: two rows never reached the branch the mutation rewrites, and one was
+satisfied by the overflow notice standing where the axis should have been.
+
+**Eleven of the thirteen closed were an instrument's defect rather than a
+test's** — a wrong-site anchor, an anchor the reader could not see, an anchor
+whose subject had moved, a control that could not kill, a `to` that no longer
+compiled. Two were the thing the sweep exists to find: `docker-dashboard`'s `C4`
+survivor (F1104) and `c09-image`'s (F1108). And one of the eleven, F1122, turned
+into a real finding about a test the moment its instrument was repaired — which is
+the argument for repairing them rather than exempting them.
 
 ---
 
@@ -48286,6 +48297,15 @@ branch for. `T1.105` does the ascii arm, with the Unicode arm as its control.
 that reach the arms directly. Both caught, by T1.104 and T1.105 rather than by
 the fill's row.
 
+**And the correction stopped one file short.** It reached FINDINGS, TRIAGE,
+`c04-kv-bar.mjs`, `c12-value-bar.mjs` and MH10's comment, and not
+`AmbiguousAnchorError`'s own doc comment in `mutate.mjs`, which still read *the
+outcome is identical either way — the mutation kills, the row is caught, and only
+the subject is wrong.* That is the sentence with the most weight on it: it is what
+a reader of the refusal is sent to. Both sites in that file now say the narrow
+thing — **the name of the outcome is the same, the outcome is not** — which is
+the wording the measurement supports.
+
 ---
 
 ## F1117 — the anchor reader's fourth blind spot: a `from:` naming a constant is not a stale anchor, it is not an anchor ★★★★★
@@ -48522,6 +48542,206 @@ MA3 is four arms now, and each is reachable with the real list empty:
 
 `mutate-anchors-parse.mjs` carries both mutations: the supplied list ignored, and
 the dead-entry loop emptied. Both caught by MA3.
+
+---
+
+## F1120 — a control written to be invisible, against a harness that requires a kill, so the run has never started ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `tools/mutate/runs/c12-svg-callout-row.mjs` · `runPass`'s control contract · F1105, F84 |
+| **Reached for** | F1105's census listed it red with `BlindHarnessError`, and the sweep could not say why: every anchor resolves |
+| **Verdict** | **closed** — the control is `< 0`, which the old header had already measured as killing four rows, and all five mutations are caught |
+
+### The sentence is true and the conclusion is inverted
+
+The file's header argued its control this way:
+
+> The corpus's closest *contended* pair is 2.415 px and its closest *uncontested*
+> pair 15.29 px, so a boundary that moves by nothing is a change to the rule that
+> the corpus genuinely cannot see — **which is what a control has to be**.
+> `< 0` was tried first and is not one: it kills four rows.
+
+Both measurements are real. `runPass`'s control is a mutation that **must be
+caught** — it is the pass's proof that it can see a kill at all — so a control the
+corpus cannot see throws `BlindHarnessError` before a single mutation is applied.
+The header rejected the one candidate that qualifies, **in the same breath, for
+the reason that qualifies it**.
+
+**This is MG24's shape** (F84): a correct sentence attached to the wrong decision
+survives being read carefully, because review checks whether a justification is
+true and this one is. The question that reaches it is *does this sentence
+constrain the decision it is attached to* — and here it argues for the opposite
+of what the contract requires.
+
+### It has never started
+
+The run landed on 2026-09-04. `runPass` began requiring a killed control on
+2026-07-31, five weeks earlier. So its **five mutations have never been checked**,
+and nothing said so for six days: `anchors.mjs` reports that every anchor
+resolves, which is true and is a different question. F1105's sweep is what found
+it, which is the argument for the sweep in one line.
+
+Run with `< 0` as the control: all five caught, first time.
+
+---
+
+## F1121 — `if (false)` to swallow a statement costs the narrowing, and the `to` stops compiling ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `tools/mutate/runs/c23-faults.mjs` T4.27 · `src/shell/session.ts` · F1106 |
+| **Reached for** | `DID NOT TYPE T4.27 — session.ts(848,24): TS18047: 'graph' is possibly 'null'` |
+| **Verdict** | **closed** — a move is two edits, so the mutation moves the statement rather than wrapping the one it displaces |
+
+The mutation's claim is an **ordering**: drain the diagnostics *before*
+`lifecycle.release()` rather than after, which is what C22 I6 forbids. Its `to`
+prepended the drain and swallowed the original by appending a trailing
+`if (false)` — a neat trick that costs more than it looks.
+
+**TypeScript treats the then-branch of a literal `false` as unreachable, and in
+unreachable code every narrowing reverts to the declared type.** `graph` is
+nullable at the top of `stop()`, so the swallowed statement — a line the mutation
+does not change and which would never run — stopped compiling the day the
+narrowing came in.
+
+A `to` that does not type-check is **not expressible against the current tree**,
+which is evidence it was written against an older one (F1106), so the row reported
+`DID NOT TYPE` and asserted nothing. The repair is to say what the mutation means:
+the statement is **added** above the release and **removed** from below it, which
+is `also`'s whole purpose. The second anchor carries the blank line and the
+comment beneath it, which is what keeps it unique once the first edit has put a
+second copy of the statement in the file.
+
+---
+
+## F1122 — an ordering assertion satisfied by a second sink carrying the same text ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `test/integration/session.test.ts` T4.27 · `src/shell/session.ts` steps 2–3 · C22 I6, C23 I48 · F1001 |
+| **Reached for** | the repaired T4.27 mutation compiled, applied — and **survived** |
+| **Verdict** | **closed** — the row searches for the drain's own line rather than a substring both channels carry |
+
+### What the row believed
+
+T4.27 asserts C22 I6's ordering directly, and its comment says it was written
+*from* a mutation pass:
+
+```ts
+expect(after.indexOf("running")).toBeGreaterThan(after.indexOf(LEAVE_ALT));
+```
+
+A diagnostic written before `lifecycle.release()` goes to the alternate screen and
+is discarded with it — the dev sees a flash and an empty shell — so *it appears
+somewhere after `stop()` began* is satisfied by both orders, and the row went
+further than that on purpose.
+
+### What the bytes say
+
+Moving the drain above the release leaves the row **green**. Measured, on the
+same scenario, with the whole of `after` printed:
+
+| | `after` |
+|---|---|
+| clean | `…?1049l` + `appendAndCommit: TranscriptError: … id "running" appears 2 times …` |
+| moved | `…?1049l` + `debug: appendAndCommit: TranscriptError: … id "running" appears 2 times …` |
+
+**The same message, on a different channel, still after `LEAVE_ALT`.**
+`graph.diagnostics()` moved above the release runs *before the fault is recorded*
+— the failing append happens inside `beforeRelease` — so it yields nothing, and
+the identical text then comes out on `#debug`, the sixth channel (F1001), which
+the mutation does not touch.
+
+`indexOf` takes the **first** match and the row had no way to tell the two apart,
+so what it pinned was the position of a sink it does not name. **Two channels
+carrying one message is exactly the state a substring assertion cannot see**, and
+the row that names C23 I48 was being held up by F1001's sink throughout.
+
+### Closed
+
+The two are distinguishable in the bytes and the row now says which: the drain
+writes the message bare, `#debug` writes it behind `DEBUG_PREFIX`. So the row
+searches for an occurrence that is **not** prefixed, asserts it exists at all —
+*the fault came out on C23's own drain, not only on the debug sink* — and then
+asserts its position. Under the mutation the un-prefixed occurrence is absent and
+the search returns −1, so the row fails on the first of the two rather than on an
+ordering that was never wrong.
+
+`c23-faults` is green: every mutation caught, T4.27's move among them. **Two more
+of F1105's eighteen close** — `c12-svg-callout-row` and `c23-faults` — leaving
+five.
+
+---
+
+## F1123 — the last three survivors, and not one was a weak assertion ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `test/contract/colormap.test.ts` · `test/edge/patch-intraline.test.ts` T3.19 · `test/unit/plot-histogram-series.test.ts` HS4 · F277, F1105 |
+| **Reached for** | F1105's last three recorded survivors, each asked F277's question before its test was touched |
+| **Verdict** | **closed** — all three runs green, and three of F1105's eighteen close, leaving two |
+
+**F277's rule is *ask why the mutation cannot reach the test before rewriting the
+test*, and it was right three times out of three.** Not one of these was a row
+that asserts too little about what it sees. Two are rows that never see the code
+at all, and one is a row whose assertion is satisfied by a neighbour.
+
+### Shape one — the branch has no caller
+
+**`c10-colormap`: the colour window is left-anchored.** The mutation rewrites
+`columnMap`'s `"window"` arm, and `MATRIX_LAYOUT.heatmap` is `"stretch"` — every
+reading gets a column — so that arm is reached only when a caller passes
+`matrixAnchor: "window"`, and nothing in the corpus did. Measured on the frame:
+27 painted cells spanning the whole map for 60 readings, which is a stretch and
+not a window. The row is **named for the anchor** — *the colour window is the
+glyph window, on the same anchor* — and drives the path that has none.
+
+A row now sets `matrixAnchor: "window"` and puts a **maximum at index 0**, a
+reading only a left-anchored window can include. Right-anchored it is dropped with
+the rest of the oldest; left-anchored it is the first painted cell and the top of
+the map. The comparison is against the legend's high swatch — the frame's own
+answer — so nothing in the row knows what viridis holds, and the control renders a
+16-reading series to show the sentinel is paintable at all.
+
+**`c25-intraline`: `windowRows` copies lines member by member.** The mutation
+rewrites the branch that pushes a run lying **whole** inside the window; T3.19's
+cut lands *inside* a run, which takes the row-wise slice one branch below. Same
+shape, one function along. The row now windows the whole patch as well, and
+asserts the spans survive there too — with a control that the fixture has spans to
+lose.
+
+### Shape two — the assertion is satisfied by a neighbour
+
+**`c12-histogram-series`: every vertical band carries the composite label.** HS4
+asserted `rows[last].trim() !== ""` and `not.toContain("·")`, and the source's own
+comment predicts what the mutation does: *a band three cells wide has room for
+nothing, so composing the same label under a column drops **every** label.*
+Measured, clean against mutated:
+
+| | tick row | label row |
+|---|---|---|
+| clean | `└──┬───────┬───────┬──…┘` (9 ticks) | `20.0 25.1 30.2 … 60.9 +9` |
+| mutated | `└──────────────────────┘` (none) | `+18` |
+
+**The axis came back empty and the assertion passed**, because `+18` is the
+overflow notice — the artefact that *says* the labels are gone — and it keeps the
+row non-blank. The `·` half passes for the same reason: the composite never fits,
+so the separator never reaches the row.
+
+The row now strips a trailing `+N` before reading the label row, and counts the
+`┬` on the tick row. **A notice is not the thing it is a notice about**, and an
+assertion that cannot tell them apart is satisfied hardest on the day it becomes
+false.
+
+### What the three have in common
+
+Each row named its subject correctly and measured something adjacent to it: the
+default layout instead of the requested one, the row-wise branch instead of the
+whole-run one, the notice instead of the axis. **None of the three is visible from
+a green suite, and all three were visible the moment a mutation was pointed at the
+line the row claims to cover** — which is the argument for the pass being a
+scheduled step rather than a diligence.
 
 ### The other row that read the same list, and it went red
 

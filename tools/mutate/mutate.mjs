@@ -200,11 +200,19 @@ export class AnchorError extends Error {
  * `extentFor`; `c12-value-bar`'s comment says *re-anchored onto `pairFor`* and
  * fired on `extentFor` too, twenty lines above.
  *
- * **Neither was findable from a green run**, because the outcome is identical
- * either way — the mutation kills, the row is caught, and only the subject is
- * wrong. A refusal is the only thing that separates them, and it belongs here
- * rather than in the sweep: the sweep reads text and cannot see an anchor whose
- * body interpolates.
+ * **Neither was findable from a green run, and the reason is not the one this
+ * comment first gave** (F1116). It said *the outcome is identical either way —
+ * the mutation kills, the row is caught, only the subject is wrong.* Measured,
+ * that is false: pointed at `extentFor` uniquely, **both SURVIVED**, because the
+ * function they had been landing on had no test row at all. What is identical is
+ * the **name** of the outcome — nothing in a pass compares a mutation's subject
+ * with the site it lands on, so whichever disposition a reader is offered is
+ * about whatever `replace` reached.
+ *
+ * A refusal is the only thing that separates them, and it belongs here rather
+ * than in the sweep: the sweep reads text and cannot see an anchor whose body
+ * interpolates, reads `m.from` alone so an `also` edge is never counted, and
+ * never sees the **control** at all.
  */
 export class AmbiguousAnchorError extends Error {
   constructor(file, from, hits) {
@@ -633,8 +641,10 @@ export function report(results) {
   // **The sixth row that is not a survivor** (F1113), and the one that used to
   // be a survivor with a footnote. An anchor matching twice applies to a site
   // nobody chose, so the row measures something other than what it names — and
-  // the outcome is identical to measuring the right one, which is why ten of
-  // them sat on a debt list rather than being findable.
+  // the **name** of the outcome is the same whichever site that is, which is why
+  // ten of them sat on a debt list rather than being findable. The outcomes
+  // themselves were not the same: two of the ten SURVIVED where they landed, on
+  // a function no row covers (F1116).
   const ambiguous = results.filter((r) => r.ambiguous);
   // **The third row that is not a survivor**, and the newest. A `to` that does
   // not parse takes the suites down with it, so nothing was measured — the

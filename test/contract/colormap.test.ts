@@ -79,6 +79,11 @@ describe("C10 I31 — a colormap is data, a channel, and vacuous below 8-bit", (
   });
 
   it("T2.31 (C10 I31): the colour window is the glyph window, on the same anchor", () => {
+    // **This row drives `stretch`, which is the heatmap's default, and the row
+    // below is the one about the anchor** (F1123). Named for the window and
+    // reached through the path that has none — so the mutation that anchors
+    // `columnMap`'s `"window"` arm left had no caller here, applied cleanly and
+    // survived, which reads exactly like a weak row.
     const values = Array.from({ length: 60 }, (_, i) => i);
     const heat = block({
       kind: "plot", id: "h", form: "heatmap", height: 1, yMin: 0, yMax: 59,
@@ -112,6 +117,56 @@ describe("C10 I31 — a colormap is data, a channel, and vacuous below 8-bit", (
     expect(first).toBeDefined();
     expect(last!.rgb[0], "the newest reading is the top of the map").toBeGreaterThan(first!.rgb[0]);
     expect(last!.rgb[2], "and not its blue end").toBeLessThan(first!.rgb[2]);
+  });
+
+  it("T2.31 (C10 I31): the window anchor keeps the newest readings, and drops the oldest", () => {
+    // **The arm the row above cannot reach** (F1123). `MATRIX_LAYOUT.heatmap` is
+    // `"stretch"` — every reading gets a column — so `columnMap`'s `"window"`
+    // arm is reached only when a caller asks for it, and nothing in this corpus
+    // did. A mutation anchoring that arm **left** was therefore textually
+    // perfect, applied cleanly and survived, which is F277's shape exactly.
+    //
+    // **The sentinel is a maximum at index 0** — a reading only a left-anchored
+    // window can include. Right-anchored it is dropped with the rest of the
+    // oldest, so the first painted cell is somewhere in the middle of the map;
+    // left-anchored it *is* the first painted cell, and the top of the map.
+    // Nothing here knows what viridis holds: the legend's high swatch is the
+    // last cell on the row, so the comparison is against the frame's own answer.
+    const values = [59, ...Array.from({ length: 59 }, (_, i) => i)];
+    const paint = (vs: readonly number[]): readonly (readonly number[])[] => {
+      const b = block({
+        kind: "plot", id: "h", form: "heatmap", height: 1, yMin: 0, yMax: 59,
+        colormap: "viridis", matrixAnchor: "window", series: [{ values: vs, label: "r" }],
+      } as never);
+      const l = measurable({ definitions: [plotDefinition as never], capabilities: FULL_CAPS })
+        .renderToLines(b, 30)
+        .join("");
+      const a = l.slice(Math.max(l.lastIndexOf("│"), l.lastIndexOf("┤")));
+      return [...a.matchAll(/48;2;(\d+);(\d+);(\d+)m/gu)].map((m) => [
+        Number(m[1]), Number(m[2]), Number(m[3]),
+      ]);
+    };
+
+    const cells = paint(values);
+    expect(cells.length, "the matrix is painted").toBeGreaterThan(4); // cells-ok — a cell count
+    const top = cells[cells.length - 1]; // cells-ok — the legend's high swatch
+    const first = cells[0];
+    expect(top).toBeDefined();
+    expect(first).toBeDefined();
+    expect(
+      first,
+      "the oldest reading was dropped, so the first painted cell is not the top of the map",
+    ).not.toEqual(top);
+
+    // **The control**: the same sentinel is drawn when the window holds the
+    // whole series, so the assertion above is about the anchor and not about a
+    // colour this fixture cannot produce. Sixteen readings fit inside the area,
+    // `pad` is positive, and reading 0 is painted.
+    const short = paint(values.slice(0, 16));
+    expect(
+      short.some((c) => top !== undefined && c[0] === top[0] && c[1] === top[1] && c[2] === top[2]),
+      "the sentinel is paintable — it is drawn when the window holds it",
+    ).toBe(true);
   });
 
   it("T2.31 (C10 I31): below the floor the ramp carries it, and nothing is painted", () => {

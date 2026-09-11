@@ -823,10 +823,24 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
     // screen and is discarded with it — the dev sees a flash and an empty
     // shell. "It appears somewhere after `stop()` began" is satisfied by both
     // orders, which is what the mutation pass showed.
+    //
+    // **And the substring is satisfied by a second sink carrying the same
+    // text** (F1122). This row read `after.indexOf("running")`, and moving the
+    // drain above `release()` left it green: `graph.diagnostics()` runs before
+    // the fault is recorded and yields nothing, and the identical message then
+    // comes out on `#debug` — the sixth channel (F1001), which the move does not
+    // touch — still after `LEAVE_ALT`. `indexOf` takes the first match and the
+    // row could not tell the two apart, so what it pinned was the position of a
+    // sink it does not name.
+    //
+    // The two are distinguishable in the bytes and the row now says which: the
+    // drain writes the message bare, `#debug` writes it behind `DEBUG_PREFIX`.
     const LEAVE_ALT = "\u001b[?1049l";
     expect(after, "the terminal was released on this path").toContain(LEAVE_ALT);
+    const drained = after.search(/(?<!debug: )appendAndCommit: TranscriptError/u);
+    expect(drained, "the fault came out on C23's own drain, not only on the debug sink").toBeGreaterThan(-1);
     expect(
-      after.indexOf("running"),
+      drained,
       "and again at exit, on the restored primary screen",
     ).toBeGreaterThan(after.indexOf(LEAVE_ALT));
   });
