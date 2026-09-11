@@ -24,8 +24,11 @@ import { describe, expect, it } from "vitest";
 
 const DIR = mkdtempSync(join(tmpdir(), "mutate-anchors-"));
 
-function run(dir?: string): { ok: boolean; out: string } {
-  const args = dir === undefined ? [] : ["--dir", dir];
+function run(dir?: string, stale?: Readonly<Record<string, number>>): { ok: boolean; out: string } {
+  const args = [
+    ...(dir === undefined ? [] : ["--dir", dir]),
+    ...(stale === undefined ? [] : ["--stale", JSON.stringify(stale)]),
+  ];
   try {
     return {
       ok: true,
@@ -113,6 +116,57 @@ const MUTATIONS = [
     expect(refused.out, "and not reported as a missing anchor").not.toMatch(/1 anchor\(s\) missing/u);
   });
 
+  it("MA1c (F1117): an anchor that names a constant is read, and one that names something else is counted by name", () => {
+    // **The fourth form, and the only one that was not a stale anchor.** The
+    // pattern required a literal after `from:`, so `from: GATE` matched nothing
+    // and the whole mutation fell out of the corpus — not stale, not ambiguous,
+    // not unreadable: **not an anchor**. Its run then reported a count that had
+    // never counted it. Twenty-four across ten runs on the tree, and one of them
+    // was a run's **control**, so that run threw at its first `apply` and could
+    // not start while the sweep said no run had drifted.
+    const named = `
+const SRC = "src/data/viewmodel/tree.ts";
+const GUARD = "export function hasChildren(block: Block): block is ContainerBlock {";
+const MUTATIONS = [
+  {
+    file: SRC,
+    from: GUARD,
+    to: "export function hasChildren(block: Block): boolean {",
+  },
+];
+`;
+    const seen = run(runsDir("fake.mjs", named));
+    expect(seen.ok, seen.out).toBe(true);
+    expect(seen.out, "counted, not skipped").toMatch(/· 1 anchors/u);
+
+    // **The control**: the same declaration, stale. A reader that dropped the
+    // row rather than resolving it would pass the line above by finding nothing
+    // — which is what the tree did for twenty-four anchors.
+    const staleNamed = named.replace("hasChildren(block: Block): block is", "hasChildren(b: Block): b is");
+    const missed = run(runsDir("fake.mjs", staleNamed));
+    expect(missed.ok, "a stale named anchor is reported").toBe(false);
+    expect(missed.out).toContain("fake.mjs");
+
+    // **A name this file does not declare as a literal is counted, not dropped.**
+    // `SPAN` below is computed from the source at load — genuinely beyond a
+    // textual reader — and the honest answer is to say so by name rather than to
+    // guess or to lose the row. An exemption that is not counted is an exclusion.
+    const computed = `
+const SRC = "src/data/viewmodel/tree.ts";
+const SPAN = readFileSync(SRC, "utf8").slice(0, 40);
+const MUTATIONS = [
+  {
+    file: SRC,
+    from: SPAN,
+    to: "",
+  },
+];
+`;
+    const unread = run(runsDir("fake.mjs", computed));
+    expect(unread.out, "counted by name, never as stale").toMatch(/1 interpolated/u);
+    expect(unread.out, "and not reported as a missing anchor").not.toMatch(/1 anchor\(s\) missing/u);
+  });
+
   it("MA2: one stale anchor fails, and the run is named", () => {
     // **The fabricated violation.** The anchor is a sentence that could plausibly
     // have been in the file and is not — which is exactly what a rotted mutation
@@ -133,14 +187,45 @@ const MUTATIONS = [
     );
   });
 
-  it("MA3: the debt list does not travel to a foreign directory", () => {
+  it("MA3 (F1119): the debt list does not travel to a foreign directory, and a supplied one does", () => {
     // A list naming runs in *this* repository must not excuse a fabricated one,
     // or the fixture above passes by inheriting an excuse it was never given.
+    //
+    // **This row was vacuous the day the debt list was paid off** (F1119). Its
+    // only way of *showing* the gate was to name a run `KNOWN_STALE` held —
+    // `c23-refresh` was chosen for that and had already been removed — so with
+    // the list empty the fabrication has an empty corpus, and the row passes by
+    // there being nothing to inherit rather than by `OWN` holding. **An
+    // exemption list must be driven**, and the only list a fixture can drive is
+    // one it hands in.
     const named = resolving.replace("fake", "c23-refresh");
     const broken = named.replace("export function hasChildren", "export function noSuchThing");
-    const r = run(runsDir("c23-refresh.mjs", broken));
+    const dir = runsDir("c23-refresh.mjs", broken);
 
+    const r = run(dir);
     expect(r.ok, "a run sharing a listed name is still checked").toBe(false);
+
+    // **The other arm, and it is what makes the first one mean something**: the
+    // same run, the same stale anchor, excused by a list that was handed in. A
+    // gate that refused everything would fail here too and the row above would
+    // read exactly the same.
+    const excused = run(dir, { "c23-refresh.mjs": 1 });
+    expect(excused.ok, excused.out).toBe(true);
+    expect(excused.out, "and it says how many it is excusing").toMatch(/1 known stale/u);
+
+    // **And the count that is wrong is not excused either** (the equality arm,
+    // over a supplied list rather than the tree's).
+    const wrong = run(dir, { "c23-refresh.mjs": 2 });
+    expect(wrong.ok, "a list that claims the wrong number fails").toBe(false);
+    expect(wrong.out).toContain("the list says 2");
+
+    // The dead-entry direction, which `KNOWN_STALE` being empty leaves
+    // unreachable over the tree: an entry for a run whose anchors all resolve.
+    const clean = run(runsDir("c23-refresh.mjs", resolving.replace("fake", "c23-refresh")), {
+      "c23-refresh.mjs": 1,
+    });
+    expect(clean.ok, "an entry that has stopped being true fails").toBe(false);
+    expect(clean.out).toContain("every anchor resolves — remove it");
   });
 
   it("MA5: a run naming a test file that is not there fails, and says so", () => {

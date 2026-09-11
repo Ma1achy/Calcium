@@ -74,8 +74,11 @@ const MUTATIONS = [
     // is most of them, nothing looks wrong.
     name: "the span's editor row is used as the painted row",
     file: PAINT,
-    from: "    const at = span.row - window.first + window.offset;",
-    to: "    const at = span.row;",
+    //
+    // **Re-anchored** (F1118): the local was inlined into the `set`, so there is
+    // no `at` to assign any more. The mutation is the same arithmetic dropped.
+    from: "    if (shows(window, span.row)) spans.set(span.row - window.first + window.offset, span);",
+    to: "    if (shows(window, span.row)) spans.set(span.row, span);",
     expect: "T4.26",
   },
   {

@@ -115,8 +115,15 @@ const results = runPass({
       // **The other clause that was wrong when written.**
       name: "a log domain is spaced linearly",
       file: AXES,
-      from: "  if (!isLog || range.min <= 0 || range.max <= 0) return linear;",
-      to: "  return linear;",
+      // **Re-derived** (F1118). The early return went: `pickAxis` dispatches on
+      // the scale, and the positivity test moved into `niceLogAxis` with the
+      // range. Dropping the `"log"` alternative sends a log domain to
+      // `niceAxis`, which is the same defect one layer along — ticks chosen
+      // linearly for a domain that declares itself logarithmic — and leaves
+      // `log2`, `ln` and the explicit base alone, so the row that fails is the
+      // one about placement.
+      from: '  if (scale === "log" || scale === "log2" || scale === "ln" || (typeof scale === "object" && "log" in scale)) {',
+      to: '  if (scale === "log2" || scale === "ln" || (typeof scale === "object" && "log" in scale)) {',
       expect: "XA8",
     },
   ],

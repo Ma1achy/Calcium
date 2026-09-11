@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
-import { ASCII_CAPS, FULL_CAPS, MONO_CAPS, MONO_UNICODE_CAPS, measurable } from "../support/render.js";
+import { ASCII_CAPS, DITHER_CAPS, FULL_CAPS, MONO_CAPS, MONO_UNICODE_CAPS, measurable } from "../support/render.js";
 import { HIERARCHY_ROLE, block, type Plot, type QuartileSummary } from "../../src/data/viewmodel/index.js";
 import { bubbleRows, scatterRows, stepRows } from "../../src/presentation/plot/scatter.js";
 import { boxplotBand, boxplotColumn, bulletRow, forestRow, lagRow, timelineRow } from "../../src/presentation/plot/glyph-row.js";
@@ -3513,5 +3513,59 @@ describe("C12 §3ad — axisCross, and the two conditions that are not one condi
     const off = draw(two, 46, MONO_CAPS);
     const on = draw({ ...two, axisCross: "zero" }, 46, MONO_CAPS);
     expect(on.join("\n")).toBe(off.join("\n"));
+  });
+
+  // **`extentFor`'s two capability arms had no row, and were covered by accident
+  // for as long as two mutations aimed at `pairFor` were landing here** (F1113,
+  // F1116). `ramp.ts` carries `if (caps.unicode === "ascii") {` and
+  // `if (caps.ambiguousWidth === "wide") {` in both functions; `String.replace`
+  // took `extentFor`'s, and both mutations reported `SURVIVED` — which is why
+  // `c04-kv-bar` and `c12-value-bar` sat on F1105's red list being read as weak
+  // tests about the fill pair.
+  //
+  // **Disambiguating the anchors moved the mutation onto `pairFor`, where it
+  // kills — and took the only thing pointing at this gap with it.** Two green
+  // runs and an uncovered function is a worse state than the red one, so the
+  // arms get rows of their own and the runs get mutations that reach them.
+  it("T1.104 (C12 I21, §3aq; F176): every glyph the extent draws is one cell at the width it was asked for", () => {
+    // **The property, not the vocabulary.** `█` and the left-eighths are
+    // `East_Asian_Width=Ambiguous` — one cell at `narrow`, two at `wide` —
+    // measured by the framework's own measurer, so at `wide` an extent run
+    // occupies twice its declared cells and `truncate` eats whatever the run
+    // was drawn beside. That is the whole of what the branch buys.
+    for (const grows of ["rightward", "leftward"] as const) {
+      const wide = extentFor(DITHER_CAPS, grows);
+      for (const g of [wide.solid, ...wide.partials]) {
+        expect(cells(g, "wide"), `${JSON.stringify(g)} at a wide ambiguous width`).toBe(1);
+      }
+
+      // **The control, and it is what makes the row above mean something**: the
+      // narrow arm is a different vocabulary *because* its glyphs double here.
+      // A row asserting only the wide arm would pass with one arm for both.
+      const narrow = extentFor(FULL_CAPS, grows);
+      expect(
+        [narrow.solid, ...narrow.partials].some((g) => cells(g, "wide") === 2),
+        "the narrow arm is the one that doubles — otherwise there is nothing to branch for",
+      ).toBe(true);
+      expect(narrow.solid, "so the two arms are not the same vocabulary").not.toBe(wide.solid);
+    }
+  });
+
+  it("T1.105 (C12 I21, C12 I25; F176): at `ascii` the extent is ASCII, and it is not the Unicode arm with a different tip", () => {
+    for (const grows of ["rightward", "leftward"] as const) {
+      const ascii = extentFor(ASCII_CAPS, grows);
+      for (const g of [ascii.solid, ascii.absent, ...ascii.partials]) {
+        // `LANG=C` cannot draw a code point above U+007F at all, so the arm is
+        // about what the terminal *has* rather than about what it measures.
+        expect([...g].every((c) => c.codePointAt(0)! < 0x80), `${JSON.stringify(g)} is ASCII`).toBe(true);
+      }
+      // The control: the full arm is not ASCII, so the assertion above is about
+      // the branch and not about every arm agreeing.
+      const full = extentFor(FULL_CAPS, grows);
+      expect(
+        [...full.solid].some((c) => c.codePointAt(0)! >= 0x80),
+        "the full arm is Unicode — otherwise the ascii arm asserts nothing",
+      ).toBe(true);
+    }
   });
 });

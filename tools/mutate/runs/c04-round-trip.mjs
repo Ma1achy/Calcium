@@ -89,8 +89,10 @@ const MUTATIONS = [
     // its place rather than being a courtesy.
     name: "the sweep runs over nothing",
     file: CONTRACT,
-    from: "    for (const b of CORPUS) {",
-    to: "    for (const b of []) {",
+    // `let ran = 0;` is T2.18's own counter, and it is what tells this loop
+    // from T2.5's three hundred lines below (F1105's ambiguous class).
+    from: "    let ran = 0;\n    for (const b of CORPUS) {",
+    to: "    let ran = 0;\n    for (const b of []) {",
     expect: "T2.18",
   },
   {

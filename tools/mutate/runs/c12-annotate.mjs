@@ -66,8 +66,11 @@ const results = runPass({
       // folded by ink weight came out as `# # # #` — heavier than the curve.
       name: "at ascii the line goes through the height fold again",
       file: ANN,
-      from: '  if (caps.unicode === "ascii") {',
-      to: "  if (false) {",
+      // `annotationRows`' arm — the line, which is what the name is about.
+      // `confidenceRows` and `whiskersRows` carry the identical line below it
+      // and neither is reached by any mutation (F1105's ambiguous class).
+      from: '  const edges = edgesOf(annotation).filter((v) => drawn(v, range));\n\n  if (caps.unicode === "ascii") {',
+      to: '  const edges = edgesOf(annotation).filter((v) => drawn(v, range));\n\n  if (false) {',
       expect: "T1.30",
     },
     {

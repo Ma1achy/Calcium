@@ -188,6 +188,36 @@ export class AnchorError extends Error {
   }
 }
 
+/**
+ * An anchor that matches more than once, refused rather than applied.
+ *
+ * **`assert s.count(old) == 1` — this repo's own rule for an edit script,
+ * missing from the tool that edits the tree two hundred times a pass** (F1105,
+ * F1113). `String.replace` takes the **first** match, so an ambiguous anchor
+ * mutates a site the author did not choose, and the row that would catch the
+ * one they meant never runs. Both measured instances named their subject in the
+ * mutation: `c04-kv-bar`'s row is called *the fill pair* and fired on
+ * `extentFor`; `c12-value-bar`'s comment says *re-anchored onto `pairFor`* and
+ * fired on `extentFor` too, twenty lines above.
+ *
+ * **Neither was findable from a green run**, because the outcome is identical
+ * either way — the mutation kills, the row is caught, and only the subject is
+ * wrong. A refusal is the only thing that separates them, and it belongs here
+ * rather than in the sweep: the sweep reads text and cannot see an anchor whose
+ * body interpolates.
+ */
+export class AmbiguousAnchorError extends Error {
+  constructor(file, from, hits) {
+    super(
+      `mutation anchor matches ${String(hits)}x in ${file}: ${JSON.stringify(from.slice(0, 60))} — ` +
+        `replace() would take the first, so this mutation would run against a site nobody chose. ` +
+        `Extend the anchor until it is unique`,
+    );
+    this.name = "AmbiguousAnchorError";
+    this.hits = hits;
+  }
+}
+
 export class BlindHarnessError extends Error {
   constructor(reason) {
     super(`mutation harness is not live: ${reason}`);
@@ -196,12 +226,18 @@ export class BlindHarnessError extends Error {
 }
 
 export function apply(src, { file, from, to }) {
-  if (!src.includes(from)) throw new AnchorError(file, from);
+  const hits = hitsOf(src, from);
+  if (hits === 0) throw new AnchorError(file, from);
+  if (hits > 1) throw new AmbiguousAnchorError(file, from, hits);
   return src.replace(from, to);
 }
 
 /**
  * How many places an anchor matches — `replace` takes the first (F219).
+ *
+ * **Read by `apply`, which refuses anything but one** (F1113). What follows is
+ * why the count exists; the refusal is why it is no longer a footnote on a
+ * survivor.
  *
  * **The report could not tell F219 and F277 apart, and this is the half that
  * makes it able to** (F1037). Both arrive as `SURVIVED` and they want opposite
@@ -369,7 +405,7 @@ export function tscTypecheck(root, project = "tsconfig.json") {
 
 /** The four states that are not survivors, asked as one predicate. */
 function isSurvivor(o) {
-  return !o.killed && !o.noSummary && !o.anchorMissed && !o.unbuilt && !o.indeterminate;
+  return !o.killed && !o.noSummary && !o.anchorMissed && !o.ambiguous && !o.unbuilt && !o.indeterminate;
 }
 
 export function runPass({
@@ -468,9 +504,6 @@ export function runPass({
         staged.set(edit.file, apply(staged.get(edit.file) ?? originals.get(edit.file), edit));
       }
       for (const [f, src] of staged) write(f, src);
-      // Read off the tree as found, not off the staged copy: an `also` edit to
-      // the same file would have already changed it.
-      const hits = hitsOf(originals.get(m.file) ?? "", m.from);
       const output = run();
       // **`unbuilt` is asked before `incomplete`, deliberately.** Both can hold
       // at once — a mutation that takes three suites down and kills a worker in
@@ -495,7 +528,6 @@ export function runPass({
                 expect: m.expect,
                 killed: killed(output),
                 byNamedTest: output.includes(m.expect),
-                hits,
               };
       // **Only a survivor pays for this, and only a failure pays twice**
       // (F1106). The mutated tree is still on disk here — `finally` has not
@@ -524,8 +556,15 @@ export function runPass({
         }
       }
     } catch (err) {
-      if (!(err instanceof AnchorError)) throw err;
-      outcome = { name: m.name, expect: m.expect, killed: false, anchorMissed: true };
+      // **Two ways an anchor fails and they want opposite repairs** (F1113): a
+      // missing one is re-pointed or its mutation re-derived; an ambiguous one
+      // means the source has two copies of something and the anchor has to say
+      // which. Counted apart for the reason every other non-survivor is.
+      if (err instanceof AmbiguousAnchorError) {
+        outcome = { name: m.name, expect: m.expect, killed: false, ambiguous: true, hits: err.hits };
+      } else if (err instanceof AnchorError) {
+        outcome = { name: m.name, expect: m.expect, killed: false, anchorMissed: true };
+      } else throw err;
     } finally {
       restore();
     }
@@ -544,6 +583,8 @@ export function report(results) {
       ? "DID NOT BUILD   "
       : r.anchorMissed
       ? "ANCHOR MISSED   "
+      : r.ambiguous
+      ? "AMBIGUOUS ANCHOR"
       : r.indeterminate
       ? "INDETERMINATE   "
       : r.untyped
@@ -554,17 +595,22 @@ export function report(results) {
           : "CAUGHT ELSEWHERE"
         : "SURVIVED        ";
     // The figures, because *I could not tell* with no number beside it is a
-    // verdict the reader has to go and re-derive from the log. And a survivor
-    // whose anchor is not unique says so on its own line (F219, F277, F1037):
-    // `replace` took the first of several sites, so the row may be reporting on
-    // a site nobody chose.
+    // verdict the reader has to go and re-derive from the log.
+    //
+    // **The multiplicity moved from an annotation to a refusal** (F219, F277,
+    // F1037, F1113). It used to be a note on a `SURVIVED` row, because the pass
+    // applied the mutation to the first of several sites and the reader had to
+    // be told which of two opposite repairs they were looking at. The pass
+    // refuses now, so the count is on its own row and **a survivor is F277 by
+    // construction**: its anchor is unique, present and textually correct, and
+    // the line whose callers moved is the only thing left it can be.
     const why =
       r.untyped
         ? `   ← ${r.untyped.trim()}`
         : r.indeterminate && r.tally
           ? `   ← ${String(r.tally.reported)} of ${String(r.tally.collected)} tests reported`
-          : !r.killed && typeof r.hits === "number" && r.hits > 1
-            ? `   ← its anchor matches ${String(r.hits)}x — replace() took the first`
+          : r.ambiguous
+            ? `   ← its anchor matches ${String(r.hits)}x — extend it until it is unique`
             : "";
     return `${state} ${String(r.expect).padEnd(8)} ${r.name}${why}`;
   });
@@ -584,6 +630,12 @@ export function report(results) {
   //
   // Both still fail the gate. What changes is what the one line says happened.
   const stale = results.filter((r) => r.anchorMissed);
+  // **The sixth row that is not a survivor** (F1113), and the one that used to
+  // be a survivor with a footnote. An anchor matching twice applies to a site
+  // nobody chose, so the row measures something other than what it names — and
+  // the outcome is identical to measuring the right one, which is why ten of
+  // them sat on a debt list rather than being findable.
+  const ambiguous = results.filter((r) => r.ambiguous);
   // **The third row that is not a survivor**, and the newest. A `to` that does
   // not parse takes the suites down with it, so nothing was measured — the
   // finding is about the mutation and not about the tests it names.
@@ -611,6 +663,12 @@ export function report(results) {
     stale.length === 0
       ? ""
       : `\n${stale.length} anchor(s) did not match — those rows ran nothing and are not survivors`;
+  const ambiguousNote =
+    ambiguous.length === 0
+      ? ""
+      : `\n${ambiguous.length} anchor(s) matched more than once and were refused — \`replace()\` ` +
+        `would take the first, so the row would measure a site nobody chose. Extend the anchor, ` +
+        `then run the pass (F1113)`;
   const untypedNote =
     untyped.length === 0
       ? ""
@@ -628,7 +686,7 @@ export function report(results) {
       ? `\n${blind.length} run(s) produced no summary — the harness went blind mid-pass. ` +
           `Nothing above those rows means anything`
       : (survivors.length === 0
-          ? stale.length + broke.length + unsure.length + untyped.length === 0
+          ? stale.length + ambiguous.length + broke.length + unsure.length + untyped.length === 0
             ? "\nevery mutation was caught"
             : "\nno survivors among the rows that ran"
           : `\n${survivors.length} survived — a finding about the tests, about the sentence they ` +
@@ -637,6 +695,7 @@ export function report(results) {
             `name a line whose callers moved, which reads exactly like a weak row`) +
         unsureNote +
         staleNote +
+        ambiguousNote +
         brokeNote +
         untypedNote,
   );

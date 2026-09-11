@@ -26,9 +26,17 @@ export declare function unbuilt(output: string): boolean;
 export declare class AnchorError extends Error {
   constructor(file: string, from: string);
 }
+/** An anchor matching more than once, refused rather than applied (F1113). */
+export declare class AmbiguousAnchorError extends Error {
+  constructor(file: string, from: string, hits: number);
+  readonly hits: number;
+}
 export declare class BlindHarnessError extends Error {
   constructor(reason: string);
 }
+
+/** One textual edit: the unit `apply` takes and `editsOf` yields. */
+export type Edit = Readonly<{ file: string; from: string; to: string }>;
 
 export type Mutation = Readonly<{
   name: string;
@@ -36,6 +44,16 @@ export type Mutation = Readonly<{
   from: string;
   to: string;
   expect: string;
+  /**
+   * Further edits applied with this one, for **two wirings each sufficient
+   * alone** (F227): a revert row about a pair has to break the pair, or the
+   * mutation goes red for a reason it does not name.
+   *
+   * Supported by `editsOf` since F227 and declared here since F1113 — the run
+   * files are `.mjs` and unchecked, so the first typed caller was the fixture
+   * row written to prove the refusal reaches an `also` edge.
+   */
+  also?: readonly Edit[];
 }>;
 
 /** A mutation whose kill is not in doubt, and why it cannot survive. */
@@ -47,6 +65,11 @@ export type Outcome = Readonly<{
   killed: boolean;
   byNamedTest?: boolean;
   anchorMissed?: boolean;
+  /**
+   * The anchor matched more than once and was refused — `replace()` would take
+   * the first, so the row would measure a site nobody chose (F1113).
+   */
+  ambiguous?: boolean;
   /** The run produced no summary line — the harness went blind mid-pass. */
   noSummary?: boolean;
   /** The suites did not load — the mutation did not compile, so nothing was measured. */
@@ -64,12 +87,35 @@ export type Outcome = Readonly<{
    */
   untyped?: string;
   /**
-   * How many sites the mutation's own anchor matched. A survivor with more than
-   * one is F219's disposition (extract the duplicate); a survivor with exactly
-   * one may still be F277's (the anchor is perfect and its callers moved).
+   * How many sites the mutation's own anchor matched, set when `ambiguous`.
+   *
+   * It used to annotate a `SURVIVED` row, because the pass applied the mutation
+   * to the first of several sites and the reader had to be told which of F219's
+   * and F277's opposite repairs they were looking at. The pass refuses now
+   * (F1113), so this rides the refusal and **a survivor is F277 by
+   * construction**: its anchor is unique, present and textually correct.
    */
   hits?: number;
 }>;
+
+/**
+ * Every edit a mutation makes: its own, then any `also` beside it (F227).
+ *
+ * Declared since F1113 — the module has exported it since `also` landed and no
+ * typed caller could name it.
+ */
+export declare function editsOf(m: Mutation): Edit[];
+
+/**
+ * `read`/`write` against a real tree under `root`, writing atomically.
+ *
+ * Imported by name from the run files, which are `.mjs` and unchecked — so the
+ * declaration was missing for as long as it has had consumers (F1113).
+ */
+export declare function fsIo(root: string): {
+  read: (f: string) => string;
+  write: (f: string, s: string) => void;
+};
 
 /** How many places an anchor matches — `replace` takes the first (F219, F1037). */
 export declare function hitsOf(src: string, from: string): number;

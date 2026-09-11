@@ -47330,7 +47330,7 @@ non-zero run. Named rather than fixed here.
 |---|---|
 | **Surface** | `.github/workflows/mutation-sweep.yml` · `tools/mutate/sweep.mjs` · `tools/mutate/runs/c12-arm-seam.mjs` · F1097, F980 |
 | **Reached for** | reading run 34550613146, which F1097 named as the measurement it was waiting for |
-| **Verdict** | **open** — the census is taken and the timeout question is answered; the eighteen reds are named and one of them is closed |
+| **Verdict** | **open** — the census is taken and the timeout question is answered; the eighteen reds are named and **eleven are closed** (F1104, F1108, F1116 ×2, F1117 ×3, F1118 ×4), so **seven remain** |
 
 ### The census
 
@@ -47407,6 +47407,15 @@ it: an anchor that matches twice has `replace()` take the first, so the mutation
 applies somewhere the author did not choose and the row that would catch it never
 runs. That is `assert s.count(old) == 1` — the rule this repo applies to its own
 edit scripts — missing from the mutation harness.
+
+**Answered, and the count was ten rather than two — F1113.** `apply` refuses
+anything but one match, the ten are disambiguated with every pass re-run, and
+`KNOWN_AMBIGUOUS` is empty. **Two of the ten were firing on the wrong function
+and said so in their own names**, which is the half this entry did not expect:
+the sentence above reads as bookkeeping, and the debt list's own argument —
+*the first match may well be the site the run names* — was false for a fifth of
+its entries. A green run cannot show it, because a mutation on the wrong site
+still kills.
 
 ---
 
@@ -47705,6 +47714,25 @@ land after the lifecycle's in `log`, which is a reorder and not a rename.
 **`c09-image` is green** — every mutation caught — so F1105's seventeen reds are
 sixteen. Its last survivor was not a weak test either: F1108.
 
+**Sixteen became seven.** F1116 took `c04-kv-bar` and `c12-value-bar`, whose
+cause was the ambiguity and never their tests; F1117 took `c12-layer-merge`,
+`c22-gate3b` and `c22-spinner`, whose anchors were named constants and so were
+invisible to the sweep — one of the three a **control**, which made its run
+unstartable; F1118 took `c12-origin`, `c22-construct`, `c26-focus-target` and
+`c19-menu-window` along with the whole eleven-run known-stale bucket.
+
+**Nine of the eleven closed so far were an instrument's defect rather than a
+test's** — a wrong-site anchor, an anchor the reader could not see, an anchor
+whose subject had moved. Two were the thing the sweep exists to find:
+`docker-dashboard`'s `C4` survivor (F1104) and `c09-image`'s (F1108). That ratio
+is the figure to hold against the next reading of this list.
+
+**Seven remain**: `c10-colormap`, `c12-arm-seam`, `c12-histogram-series`,
+`c12-lines3d`, `c12-svg-callout-row`, `c23-faults`, `c25-intraline`. Two are
+broken harnesses rather than findings — `c12-svg-callout-row`'s control no longer
+kills, and `c12-arm-seam` hits the 45-minute bound with ninety mutations and wants
+splitting — and two are rotted `to`s that do not type (F1107's residue).
+
 ---
 
 ## F1108 — two implementations of one predicate, because the layer rule put the copy where the original could not be imported ★★★★☆
@@ -47996,3 +48024,530 @@ fourth recurrence's comment had already named as *the keyboard mode not yet live
 when the first key went in*, and the reason F1111 is confident. But **no reader
 has seen those bytes.** The finding is recorded with the inference visible rather
 than written as though it were read.
+
+---
+
+## F1113 — `assert s.count(old) == 1` is this repo's rule for an edit script, and the tool that edits the tree two hundred times a pass did not have it ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `tools/mutate/mutate.mjs` · `tools/mutate/anchors.mjs` · ten run files · F1105, F219, F277, F1037 |
+| **Reached for** | F1105's residue — *the two ambiguous anchors are their own class, and that is `assert s.count(old) == 1` missing from the mutation harness* |
+| **Verdict** | **closed** — ten disambiguated with every pass re-run, `apply` refuses, and the debt list is empty rather than absent |
+
+### The debt list's own argument was wrong, and two of ten say so in their names
+
+`KNOWN_AMBIGUOUS` carried ten anchors with a sentence: *these are not broken
+runs — the harness replaces the first match, and for every one of them the first
+match may well be the site the run names.*
+
+It was not.
+
+| run | the mutation calls itself | it fired on |
+|---|---|---|
+| `c04-kv-bar` | *THE SHIPPED DEFECT: **the fill pair** ignores the ambiguous width* | `extentFor`, 222 lines above `pairFor` |
+| `c12-value-bar` | ***Re-anchored onto `pairFor`**, where the capability read moved* | `extentFor`, 210 lines above |
+
+`ramp.ts` carries `if (caps.unicode === "ascii") {` in both functions and
+`if (caps.ambiguousWidth === "wide") {` in both, so `String.replace` took
+`extentFor`'s in each case. **The second is the one to read twice**: its comment
+records a deliberate re-anchoring onto a named function, ends *the mutation still
+kills, run rather than assumed* — and the run it describes killed on a different
+function.
+
+### Why no instrument could see it
+
+**The *name* of the outcome is the same either way**, and that is as far as this
+entry was written before the outcome itself was measured — see F1116, which says
+what actually happened and is the stronger half. Nothing in a pass compares a
+mutation's subject with the site it lands on, so the two dispositions a reader is
+offered — `caught` and `SURVIVED` — are both about whatever `replace` reached.
+
+F1037's annotation — *its anchor matches 2x, `replace()` took the first* — rides
+a `SURVIVED` row and would have carried the count in both these cases. **It was
+never printed**, because `KNOWN_AMBIGUOUS` was a list and not a report: the sweep
+that knew the number named a **run** and not an **anchor**.
+
+So the count was recorded, printed on the one disposition that could not occur,
+and the sweep that knew the number named a **run** and not an **anchor**: a
+stale anchor printed its file and its first eighty-eight characters, and an
+ambiguous one printed `1`. The kind whose remedy is *extend this anchor* was the
+kind that would not say which.
+
+### The refusal, and where it belongs
+
+`apply` counts and refuses anything but one. That is deliberately one layer
+below the sweep:
+
+- the sweep reads text, and cannot see an anchor whose body interpolates;
+- the sweep reads `m.from`, and the old count did too — so an **`also`** edge,
+  which is half of a pair that must break together, was never counted at all;
+- the **control** is applied outside the loop, and a control matching twice
+  proves the pass can see a kill somewhere other than where it claims, which
+  makes every row beneath it meaningless.
+
+All three go through `apply`. `AMBIGUOUS ANCHOR` is a sixth state that is not a
+survivor, and the summary says what to do rather than what happened.
+
+### What it makes true of every other row
+
+**A survivor is F277 by construction.** F277's own sentence is that the report
+cannot tell it from F219; with F219 refused, a `SURVIVED` row's anchor is unique,
+present and textually correct, and *a line whose callers moved* is the only thing
+left it can be. The disposition is determined rather than annotated.
+
+### The ten, each pass re-run
+
+Two were wrong-site and are above; **both were also surviving there, and that is
+F1116.** The other eight were right by luck: the first match happened to be the
+site the row named, and nothing said so.
+
+`c04-ohlc` is the shape worth recording — `const drawn = form ?? "line";` five
+times in one function, a copy this file's own comment defends (*a one-line
+predicate written twice can be compared by eye*). One mutation reaches one copy;
+**the other four are covered by nothing**, and the anchor could not have said
+which even if someone had asked.
+
+`c10-named-set` is the other shape: the anchor's second site is **T2.23's
+quotation of it**, because that row asserts on the source text. A mutation
+landing there would change what the assertion looks for rather than what the
+suite covers.
+
+---
+
+## F1114 — a `.d.mts` is a second record of what a `.mjs` exports, and seven names had drifted out of it ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `tools/mutate/mutate.d.mts` · `tools/enforce/{commitments,module-graph}.d.mts` · `tools/capture-foreign.d.mts` · `test/unit/tool-declarations.test.ts` |
+| **Reached for** | `make check` going red on a fixture row written for F1113 |
+| **Verdict** | **closed** — six declared, one exemption named with its reason, and a gate with a fabricated violation on the real tree |
+
+### Found by a build, and only because a typed caller finally reached for it
+
+`Mutation` has carried `name`, `file`, `from`, `to` and `expect` since the
+harness was written. `editsOf` has read `m.also` since F227. The declaration has
+never had an `also` field.
+
+Nothing noticed, because **the callers are the run files and they are `.mjs`**.
+The first typed caller was MH10b — a row written to prove F1113's refusal reaches
+an `also` edge — and it failed `make check` after two mutation passes and a green
+suite had already been read.
+
+### The sweep found six more, and two have consumers
+
+| module | undeclared | consumed from |
+|---|---|---|
+| `mutate.mjs` | `fsIo` | four run files, by name |
+| `module-graph.mjs` | `nameExactnessSignal` | `enforce/index.mjs` |
+| `mutate.mjs` | `editsOf` | its own module |
+| `commitments.mjs` | `scanSections`, `sectionsOf` | their own module |
+| `module-graph.mjs` | `checkDevEntryIsolation` | its own module |
+
+**A missing name costs nothing until someone reaches for it from a `.ts` file**,
+and by then the module has been right for a year. That is the whole mechanism:
+the `.mjs` is the record everything runs and the `.d.mts` is the record only
+TypeScript reads, so the two can disagree for as long as no typed consumer
+appears.
+
+### The instrument written to find the class was blind to a fifth of it
+
+The first sweep matched `^export (function|class|const|let) NAME` and reported
+**none missing** for `capture-foreign.mjs`. Ten of the corpus's exports are
+`export async function`, and **both** of that file's undeclared names are of
+that form.
+
+So the file with the most missing was the one the instrument called clean. A
+matcher that sees one encoding reports absence when the value changes form —
+here inside the work closing the class, which is the cheapest place to find it
+and the easiest place to miss it.
+
+### And that file's absence is deliberate, which is what makes this a rule rather than a tightening
+
+`capture-foreign.d.mts` opens *only the three*, with the reason: the rest of the
+file is a driver — `node-pty`, `sharp`, argument parsing — and declaring it would
+invite a test to import the driver, which is *an entry that starts on import is
+untestable*.
+
+Had the sweep seen those two, a blanket rule would have declared them and made
+the tree worse. So the gate carries an exemption **compared by equality both
+ways**: an entry that starts being declared is a failure exactly as an
+undeclared export is.
+
+`TD-D4` fabricates the violation four ways, including the `async` form that got
+past the first sweep; removing `fsIo`'s declaration from the real tree fails
+`TD-D2` naming the file and the member.
+
+---
+
+## F1115 — the devcontainer's pid 1 is `sleep infinity`, so 28,015 of its 28,039 processes are zombies it can never reap ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `.devcontainer/devcontainer.json` |
+| **Reached for** | three `test/e2e/profiler.test.ts` rows timing out inside `make all` and passing 9/9 alone, which sent a reader to `ps` |
+| **Verdict** | **closed** — `runArgs: ["--init"]`, which takes effect on the next rebuild |
+
+### The measurement
+
+    $ docker exec calcium-dev ps -e -o stat= | cut -c1 | sort | uniq -c
+      28015 Z
+         25 S
+          1 R
+
+| | |
+|---|---|
+| `esbuild` | 13,310 |
+| `node` | 10,824 |
+| `sleep` | 1,478 |
+| `cat` | 864 |
+| `kitten` | 511 |
+| oldest | **ten days** |
+| `pid_max` | 99,999 — so **28% of the pid space** |
+
+Every one has `ppid` 1, and pid 1 is `sleep infinity`: the devcontainer CLI's
+override command, which holds the container open and calls `wait()` on nothing.
+A zombie is reaped by its parent; when the parent dies the zombie is reparented
+to pid 1, and here pid 1 never collects it.
+
+So each vitest run leaves its esbuild service behind, each emulator capture its
+`kitten`, each `timeout … cat` in `x-emulator.ts`'s inner script its `cat` — and
+**nothing in the container has ever taken one away.** `runArgs: ["--init"]` puts
+`tini` at pid 1, which reaps what it inherits.
+
+### What this does not explain, and the number that says so
+
+**The three profiler rows.** They failed inside a full `make e2e` — *never saw
+`❯`*, empty output, 20 s — and passed 9 of 9 alone **at the same zombie count**,
+which is the measurement that rules pid pressure out rather than in. 28% of the
+pid space is not a fork failure, and the re-run demonstrates it.
+
+That regime is F963's — *red only inside a full `make e2e`, green alone seven of
+seven* — with a different symptom: F963 was a **divergence** between recording
+and replay, and this is a session that produced no bytes at all. Recorded here
+because the next instance should start from both facts rather than from this
+`ps` output, which is the one that is easy to find and reads like an answer.
+
+### Why it is worth a rebuild anyway
+
+**"Green in the devcontainer" is a claim about a machine**, and F812's whole
+family reasons from it — *green here, red there, so the runner is the slow one*.
+A container drifting further from a clean pid table every day is not a fixed
+reference, and ten days is how long this one has been drifting without anyone
+looking.
+
+---
+
+## F1116 — the two wrong-site anchors were surviving there, and disambiguating them hid the gap they were exposing ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/ramp.ts` `extentFor` · `test/unit/plot-mutations.test.ts` T1.104, T1.105 · `tools/mutate/runs/c12-value-bar.mjs` · F1113, F1105 |
+| **Reached for** | two of F1105's eighteen red runs going green after F1113's re-anchoring, which is a result nothing had predicted |
+| **Verdict** | **closed** — the arms have rows, the run has mutations that reach them, and two of F1105's eighteen close with a cause |
+
+### The measurement F1113 was written without
+
+F1113 said the ambiguous anchors were a hygiene problem: *the outcome is
+identical either way, the mutation kills, only the subject is wrong.* Pointing
+each anchor at `extentFor` **uniquely** and running the pass says otherwise.
+
+    SURVIVED   T1.27    the alphabet ignores the capability
+    SURVIVED   states   THE SHIPPED DEFECT: the fill pair ignores the ambiguous width
+
+**`extentFor`'s two capability arms had no row at all.** Every test that calls it
+calls it with `FULL_CAPS`. So the mutations were not merely landing on the wrong
+function — they were landing on an **uncovered** one, reporting `SURVIVED`, and
+sending a reader to write a test for a function the mutation was never about.
+
+**That is why `c04-kv-bar` and `c12-value-bar` were on F1105's red list.** Two of
+the eighteen close here, and their cause was never the tests they named.
+
+### And the repair removed the only thing pointing at the gap
+
+Disambiguating moved each mutation onto `pairFor`, where it kills. Both runs went
+green. **The coverage gap did not move** — it lost the one accident that was
+reporting it.
+
+Two green runs and an uncovered function is a worse state than the red one, and
+nothing in the repair says so: a survivor that becomes a kill reads as progress
+everywhere it is recorded. **So a re-anchoring owes the question *what was the
+old site, and is anything covering it now?*** — which is the same question
+`KNOWN_STALE`'s note asks about a repaired anchor never run, one property along.
+
+### Closed the way the gap was found
+
+`T1.104` asserts the property the wide arm exists for — every glyph the extent
+draws is **one cell at the width it was asked for** — with the control beside it:
+the narrow arm's glyphs measure **two** at `wide`, which is what there is to
+branch for. `T1.105` does the ascii arm, with the Unicode arm as its control.
+
+`c12-value-bar` takes `plot-mutations.test.ts` into its corpus and two mutations
+that reach the arms directly. Both caught, by T1.104 and T1.105 rather than by
+the fill's row.
+
+---
+
+## F1117 — the anchor reader's fourth blind spot: a `from:` naming a constant is not a stale anchor, it is not an anchor ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `tools/mutate/anchors.mjs` · `tools/mutate/runs/{c12-layer-merge,c22-gate3b,c22-spinner}.mjs` · `test/unit/mutate-anchors.test.ts` MA1c · F1105, F1109, F232, F173 |
+| **Reached for** | F1113's disambiguation touched ten runs and the sweep's anchor count barely moved — a count that does not respond to an edit of its subject |
+| **Verdict** | **closed** — the reader resolves a name against the file's own `const` declarations, four broken anchors came out of it, and three of F1105's eighteen close |
+
+### The form, and why it is worse than a stale anchor
+
+A run may hoist an anchor into a constant, because two mutations share it or
+because it is long:
+
+```js
+const PICK = '      const pick = peers[x % peers.length]!; // cells-ok — a cell column';
+…
+{ name: "the first peer keeps every cell it contends", from: PICK, to: "      const pick = peers[0]!;" }
+```
+
+The reader's pattern required a **string literal** in the `from:` position. A
+name is not one, so the pattern did not match — and the mutation did not become
+an anchor that failed to resolve. **It fell out of the corpus.** The run's line
+in the report then carried a count taken over a set that never held it, and
+`0 missing` said the run had not drifted.
+
+This is the difference the other three blind spots did not have. F173 (double
+quotes only), F232 (`+`-joined sequences) and F1109 (backticks) each lost a
+*form* of literal, and an anchor the reader skipped was silently absent. Here the
+skipped anchors are the ones a run author chose to **share between two
+mutations**, or to hoist because the text is large — which selects for the
+load-bearing ones, and for the **control**.
+
+### Measured, both readers over the identical corpus
+
+| | anchors | missing | runs | interpolated |
+|---|---|---|---|---|
+| the reader as it stood | 2027 | 24 | 16 | 4 |
+| resolving names | **2049** | **28** | **19** | 6 |
+
+**Twenty-two anchors it could not see**, which is exactly the 22 `from:` names in
+the tree — 24 `from:`/`to:` identifier references across **10 of 194 runs**. And
+**four of the twenty-two were broken**, against 23 known-stale in the 2027 it
+watched: **18% against 1.1%**, sixteen times the rate, on a subset nobody chose —
+only the one the pattern happened to exclude.
+
+The four, and how long each had been broken:
+
+| run | anchor | the source moved | days unseen |
+|---|---|---|---|
+| `c12-layer-merge` | `PICK` | the turn's key went from a column to a contested-cell counter (`417ba142`, 20 Aug) | 22 |
+| `c22-spinner` | `COMMIT_FROM`, `SUPPLY_FROM` | the commit moved into `#animate` and its reason became conditional (`56a8efd9`, 4 Sep) | 7 |
+| `c22-gate3b` | the **control** | the refusal grew a teardown between the guard and the throw (`d409f8fe`, 10 Sep) | 1 |
+
+`c22-gate3b`'s is the one that matters most: a control that cannot apply throws
+in `runPass`, so the **whole run was unstartable** — the worst state a run can be
+in — while the sweep that exists to say so reported it clean.
+
+### Six names do not resolve, and they are reported rather than dropped
+
+`TREEMAP_GUARD`, `B_GEOMETRY`, `SUM`, `PLACE_KIDS` and `c22-gate3b`'s `SPAN` and
+`MOVED` are computed from a `readFileSync` slice rather than written out. The
+reader names them — *names `SPAN`, which is not a literal here* — and counts them
+as `interpolated`, which is F1109's ruling applied one form along: **refuse what
+it will not guess at, and say which**. The count went 4 → 6.
+
+### Closed
+
+`anchorsOf` collects the file's own single-line `const NAME = <literals>;`
+declarations first and resolves a name in `file:`, `from:` or `to:` against them.
+It stays textual, because **importing a run file executes the pass** (F1091).
+
+MA1c is the fixture: a named anchor is counted, a stale named anchor is
+*reported* — the control, because a reader that resolved a name and then stopped
+checking would satisfy the first row — and a computed name yields `1 interpolated`
+and **not** `1 anchor(s) missing`, since the two dispositions have opposite
+remedies. `mutate-anchors-parse.mjs` carries two mutations against it: removing
+the name alternative from the pattern, and returning an empty string for an
+unresolvable name instead of refusing. Both caught.
+
+All three runs were re-anchored **and run** — `KNOWN_STALE`'s rule, that a
+repaired anchor never run is a mutation that applies and asserts nothing. All
+three are green, so **three of F1105's eighteen close**: `c12-layer-merge`,
+`c22-gate3b`, `c22-spinner`. With F1104's `docker-dashboard`, `c09-image` and
+F1116's two, **eleven remain**.
+
+`c22-gate3b`'s control was re-derived onto a literal rather than repaired as a
+name: the throw is the gate's whole purpose and one line of it, so the anchor is
+short, unique, and rots only when its subject does. `GATE` itself is now computed
+from a head and a tail **with both ends asserted before the slice** — an
+`indexOf` returning −1 makes `slice` read from the end of the file and produces
+an anchor that matches nothing, which is a script reporting success having found
+nothing, and the rule this repo applies to its own edit scripts.
+
+### What the fourth instance says about the first three
+
+Each widening fixed the form in front of it and stopped there. The reader now
+takes three quote characters, `+`-joined sequences, and names — and there is no
+argument that the list is complete, because none of the four was predicted. What
+is buildable is the **response**: a count that does not move when its subject is
+edited is the tell, and it is what was noticed here. **F1113's commit re-anchored
+ten mutations across ten run files and the sweep's anchor total moved by one** —
+2046 to 2047, the widened reader run over both corpora so the delta is one
+instrument's. Ten edits to the reader's own subject, and its headline figure
+moved by one.
+
+---
+
+## F1118 — the debt list paid in full: twenty-three anchors, fifteen runs, and ten of them were re-derivations rather than re-anchorings ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `tools/mutate/anchors.mjs` `KNOWN_STALE` · fifteen files under `tools/mutate/runs/` · F1105, F1109, F173 |
+| **Reached for** | F1117 emptied the *invisible* debt, which left the visible one with no excuse |
+| **Verdict** | **closed** — `0 missing across 0 run(s)` over 2051 anchors, every one of the fifteen runs re-run, and `KNOWN_STALE` is empty rather than absent |
+
+### What the list was, and what paying it cost
+
+`KNOWN_STALE` is a **debt list and not an exemption** — compared by equality both
+ways, so an entry that stops being true fails as loudly as a new stale anchor.
+Twenty-three entries across fifteen runs, the oldest arriving with F173's
+widening in a batch that *had already been stale when the checker could not see
+them*.
+
+The split is the number worth carrying:
+
+| | |
+|---|---|
+| **re-anchored** — a rename, a reflow, a clause added beside the subject | 16 |
+| **re-derived** — the mutation itself rewritten, because its subject moved or changed direction | 7 |
+
+**A re-derivation is a different job and the list's own note said so**: *each is a
+mutation to re-derive, not an anchor to re-point.* `c22-construct`'s T4.6 is the
+sharpest case and it **inverted**. Its subject — `stores.viewport.resize(...)` in
+the `SIGWINCH` handler — is not in the tree because C03 I15 deleted it as a
+**second writer** of a quantity `render-frame.ts` already sets, whose only effect
+was to re-measure the whole transcript per signal rather than per frame: 544 ms
+for a 30-event drag at a thousand entries (F423). T4.6's claim inverted with it,
+and the row's own comment says what it now stands against — *it is the one that
+fails if a second writer is ever added back.* **So the mutation adds one.**
+
+The others: `c12-origin`'s clamp-and-mirror moved into L0's `normalisedOf`, which
+takes *invert* as a boolean because §3ac rules `Facing` the renderer's vocabulary,
+so the mutation is the **argument** rather than the expression. `c26-elements`'
+descent stopped being a list of kinds and became a question asked of the
+definition (§4b cell 3), so the mutation is the walk returning before it descends
+at all. `c12-x-axis`'s early return went when `pickAxis` began dispatching on the
+scale. `c26-address`'s two T1.18 rows had to move onto a statement that did not
+exist when they were written: `rowDown` writes `next ?? elements[i]` back because
+I16 made a motion that stops collapse the range, so the ring is the **fallback**
+and the block edge is the **guard on the move**.
+
+### An anchor that reaches to the end of a line rots for reasons that are not about it
+
+**Three of the twenty-three were one line.** `session.ts`'s render cache key grew
+from four axes to seven — `cursorKey`, `framesKey`, `seriesKey` — and
+`c04-scroll`, `c22-camera` and `c22-cursor` each drop **one** axis from it. Every
+one of their anchors reached to the end of the line, so all three broke every
+time a fourth axis landed, and none of the three breakages had anything to do
+with the axis the mutation names.
+
+They are **fragments** now — the axis and its neighbour, `\u0000${offsets}\u0000${orbitKey}`
+and the two like it. Unique, drops exactly what the mutation is about, and
+survives the next axis arriving beside it. That is the general form: **anchor on
+what the mutation changes plus the least context that makes it unique**, and not
+on the statement it happens to live in.
+
+### Closed
+
+`0 missing across 0 run(s)` across 194 runs and 2051 anchors. Every one of the
+fifteen runs was **run**, not merely repaired — `KNOWN_STALE`'s standing rule,
+that a re-anchored mutation nobody ran applies and asserts nothing, which reads as
+coverage from the summary line. Every mutation was caught by the row that names
+it; the three recorded survivors in `c19-menu-window` and the one in
+`c26-focus-target` are `EXPECTED_SURVIVORS` entries and unchanged.
+
+`KNOWN_STALE` stays as an empty map with a header, on `KNOWN_AMBIGUOUS`'s
+argument: an absent map reads as a mechanism nobody built, and an empty one reads
+as a debt that has been paid.
+
+**Four of F1105's eighteen reds close** — `c12-origin`, `c22-construct`,
+`c26-focus-target`, `c19-menu-window` — and its eleven known-stale runs with them.
+**Seven reds remain**: `c10-colormap`, `c12-arm-seam`, `c12-histogram-series`,
+`c12-lines3d`, `c12-svg-callout-row`, `c23-faults`, `c25-intraline`.
+
+---
+
+## F1119 — paying a debt list empties the fixture that guards it ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `test/unit/mutate-anchors.test.ts` MA3 · `test/unit/mutate-sweep.test.ts` MS3 · `tools/mutate/anchors.mjs` `--stale` · `tools/mutate/runs/mutate-anchors-parse.mjs` · F1118 |
+| **Reached for** | asking what MA4's equality arm still compares once `KNOWN_STALE` is `{}` |
+| **Verdict** | **closed** — MA3 hands in its own list and MS3's bound moves off the shrinking population; two rows read that list and only the one with a corpus assertion said so |
+
+### The vacuity
+
+MA3 says *the debt list does not travel to a foreign directory*: a list naming
+runs in this repository must not excuse a fabricated one, or MA2 passes by
+inheriting an excuse it was never given. It fabricates a run called
+`c23-refresh.mjs` — a name chosen because `KNOWN_STALE` held it — with a stale
+anchor, and asserts the sweep still fails.
+
+**The moment the list emptied, the row's corpus emptied with it.** A foreign run
+now has nothing to inherit, so the assertion passes because there is nothing to
+excuse rather than because the gate holds. And it had been weaker than it read
+for longer than that: `c23-refresh`'s entry was removed by F1011, so the row has
+been naming a run the list did not hold since then.
+
+**This is the exemption-list class arriving from the other side.** The rule
+already written down is that moving a subject *onto* an allow list drops it from
+the fabrication's corpus. Here the subject was moved **off**, by the work
+succeeding — which is the direction nobody watches, because it looks like
+progress everywhere it is recorded (F1116's shape, one instrument along).
+
+### Closed by driving the list
+
+`anchors.mjs` takes `--stale <json>` beside the `--dir` the fixture already uses,
+and `LIST` reads it **only** for a foreign directory: `OWN ? KNOWN_STALE :
+(SUPPLIED ?? {})`. The canonical run ignores it entirely, so the tree's own gate
+cannot be softened from a command line.
+
+MA3 is four arms now, and each is reachable with the real list empty:
+
+- the same fabricated run, **checked** with no list handed in;
+- **excused** when one is, which is what makes the first arm mean something — a
+  gate that refused everything would fail here and the first arm would read
+  identically;
+- a list claiming the **wrong count** fails;
+- an entry for a run whose anchors **all resolve** fails — the equality arm's
+  second direction, which the tree cannot exercise at all while the list is
+  empty.
+
+`mutate-anchors-parse.mjs` carries both mutations: the supplied list ignored, and
+the dead-entry loop emptied. Both caught by MA3.
+
+### The other row that read the same list, and it went red
+
+**Two rows depended on `KNOWN_STALE` being non-empty, and they failed in opposite
+directions.** `make instruments` found the second one — MS3, in
+`mutate-sweep.test.ts`, which cross-checks the list the sweep *tolerates* against
+the list `anchors.mjs` *enforces*. Its first line is
+`expect(Object.keys(list).length).toBeGreaterThan(0)`, a guard against a reader
+that returns nothing, and it went **red** the moment the list emptied.
+
+| | MA3 | MS3 |
+|---|---|---|
+| what it read | the list, as a corpus for a fabrication | the list, as the population of a bound |
+| corpus assertion | none | `> 0` entries |
+| when the list emptied | **green**, having nothing to inherit | **red**, saying so |
+
+**The corpus assertion is the whole difference**, and it is the same instrument
+that catches a scan reading no file and a sweep reading no test path. A row that
+has one says *my subject is gone*; a row without one says nothing at all, and is
+indistinguishable from a row that is still working. That is the practical rule
+this finding leaves: **a fabrication over a list needs an assertion that the list
+was read, and the population it is taken over must not be the one the work is
+shrinking.**
+
+MS3's bound moved onto `discover()` — the run corpus, which does not shrink — and
+its two arms (*every entry names a run that exists*, and an entry naming nothing)
+are driven with a fabricated source rather than read off a list that may be empty.
+The cross-check against the sweep's printed total stays over the real list, where
+0 = 0 is the correct answer today.

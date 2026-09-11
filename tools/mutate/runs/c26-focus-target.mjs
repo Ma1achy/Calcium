@@ -73,19 +73,40 @@ const MUTATIONS = [
     // **Freezing is a mode exit nobody signals.** Drop the gate and a settled
     // entry keeps every keystroke: the prompt stops receiving input and the
     // block cannot act on it either.
+    //
+    // **Re-anchored, and the gate is two clauses now** (F1118). The condition
+    // grew `deps.stored.entryId === deps.liveEntry.id` under §4g row d — a
+    // settled entry can hold focus with the mode stored — and that clause reads
+    // `deps.liveEntry.id`, so removing only the null check would not compile.
+    // Dropping the liveness test means dropping both: what shipped without it
+    // is a stored mode answering `interaction` for an entry that is gone.
     name: "the liveEntry gate dropped, so a frozen entry stays interactable",
     file: FOCUS,
-    from: '&& deps.stored.mode === "interact" && deps.liveEntry !== null',
-    to: '&& deps.stored.mode === "interact"',
+    from:
+      '    deps.stored.mode === "interact" &&\n' +
+      '    deps.liveEntry !== null &&\n' +
+      '    deps.stored.entryId === deps.liveEntry.id\n' +
+      "  ) {",
+    to: '    deps.stored.mode === "interact"\n  ) {',
     expect: "T1.3e",
   },
   {
     // Carrying the mode across a row move makes `↓` mean two different things
     // depending on how the reader arrived at the row.
+    //
+    // **Re-anchored** (F1118). `rowId` became `entryId` and the record gained
+    // `element` and `anchor` under §5c, so the pasted line stopped matching. The
+    // trailing `/**` is load-bearing rather than decoration: `enterLiveBlock`
+    // writes the identical record three lines above, and an anchor without it
+    // matches twice — which `apply` now refuses (F1113).
     name: "focusRow carries the interaction mode to the next row",
     file: FOCUS,
-    from: '      stored = Object.freeze({ at: "liveBlock", rowId, mode: "navigate" });\n    },\n    setMode(mode) {',
-    to: '      stored = Object.freeze({ at: "liveBlock", rowId, mode: stored.mode });\n    },\n    setMode(mode) {',
+    from:
+      '      stored = Object.freeze({ at: "liveBlock", entryId, element, anchor: null, mode: "navigate" });\n' +
+      "    },\n\n    /**",
+    to:
+      '      stored = Object.freeze({ at: "liveBlock", entryId, element, anchor: null, mode: stored.mode });\n' +
+      "    },\n\n    /**",
     expect: "T1.3f",
   },
   {

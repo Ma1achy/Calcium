@@ -113,8 +113,10 @@ const results = runPass({
       // `mix` reads `undefined` — a colour computed from `NaN` channels.
       name: "sampling does not clamp, so a value past the ceiling leaves the table",
       file: MAP,
-      from: "  const clamped = t < 0 ? 0 : t > 1 ? 1 : t;",
-      to: "  const clamped = t;",
+      // `sample`'s clamp, not `continuousColour`'s forty lines below — the
+      // non-finite guard above is what tells them apart (F1105's ambiguous class).
+      from: "  if (!Number.isFinite(t)) return rgbHex(data[0]!);\n  const clamped = t < 0 ? 0 : t > 1 ? 1 : t;",
+      to: "  if (!Number.isFinite(t)) return rgbHex(data[0]!);\n  const clamped = t;",
       expect: "T2.31",
     },
     {

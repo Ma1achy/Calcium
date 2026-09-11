@@ -42,9 +42,26 @@ const run = () => {
   }
 };
 
-/** The two halves of the pair, removed together — see the header. */
-const COMMIT_FROM = '      this.#graph?.scheduler.commit("spinner");';
-const SUPPLY_FROM = "        tick,\n        scrollOffsets: graph.scrollOffsets.forEntry(entry.id),";
+/**
+ * The two halves of the pair, removed together — see the header.
+ *
+ * **Both were stale and the sweep could not say so** (F1117). A `from:` naming a
+ * constant was not a stale anchor — the reader required a literal in that
+ * position, so neither mutation was in the corpus at all and this run's count
+ * was taken over a set that never held them. Both sites had moved underneath:
+ * the commit into `#animate`, where I73 made the reason depend on what is on
+ * screen, and the supply out by two spaces.
+ *
+ * **The commit mutation is a rewrite rather than a deletion now, and that is the
+ * faithful form.** Deleting the line removes the `stream` commit too, which is a
+ * later wiring and not what F227 measured. What shipped was `commit("spinner")`
+ * called from nowhere in `src/` while everything else stood — so the orbit arm
+ * keeps its commit and the spinner arm loses its.
+ */
+const COMMIT_FROM =
+  '    graph.scheduler.commit(orbits.length > 0 || frames.length > 0 ? "stream" : "spinner");';
+const COMMIT_TO = '    if (orbits.length > 0 || frames.length > 0) graph.scheduler.commit("stream");';
+const SUPPLY_FROM = "          tick,\n          scrollOffsets: graph.scrollOffsets.forEntry(entry.id),";
 
 const results = runPass({
   read,
@@ -64,12 +81,12 @@ const results = runPass({
       name: "the spinner commit and the counter supply are both removed",
       file: SESSION,
       from: COMMIT_FROM,
-      to: "",
+      to: COMMIT_TO,
       also: [
         {
           file: SESSION,
           from: SUPPLY_FROM,
-          to: "        scrollOffsets: graph.scrollOffsets.forEntry(entry.id),",
+          to: "          scrollOffsets: graph.scrollOffsets.forEntry(entry.id),",
         },
       ],
       expect: "T4.35",

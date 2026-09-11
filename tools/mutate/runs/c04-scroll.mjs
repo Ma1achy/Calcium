@@ -104,8 +104,14 @@ const MUTATIONS = [
     // **Never re-anchor without running the pass** — a re-pointed anchor can sit
     // on a line that has changed meaning, which is the one thing this instrument
     // cannot see.
-    from: "\\u0000${offsets}\\u0000${orbitKey}${animated}`;",
-    to: "\\u0000${orbitKey}${animated}`;",
+    //
+    // **Re-anchored onto a fragment** (F1118). Three axes joined the slot
+    // after this was written, so an anchor reaching to the end of the line
+    // rotted for reasons that had nothing to do with the offsets. The
+    // fragment names the axis and its neighbour, drops the offsets and
+    // nothing else — which is what the comment above already promised.
+    from: "\\u0000${offsets}\\u0000${orbitKey}",
+    to: "\\u0000${orbitKey}",
     expect: "T4.41",
   },
   {

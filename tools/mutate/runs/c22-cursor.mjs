@@ -41,8 +41,12 @@ const results = runPass({
     {
       name: "the seventh axis dropped from the slot",
       file: "src/shell/session.ts",
-      from: "\\u0000${orbitKey}\\u0000${cursorKey}${animated}",
-      to: "\\u0000${orbitKey}${animated}",
+      // **Re-anchored onto a fragment** (F1118). `framesKey` and `seriesKey`
+      // arrived after the cursor axis, so the old anchor's tail was about
+      // them. This one drops the seventh axis by naming it and its
+      // successor, and stays true when an eighth lands.
+      from: "\\u0000${cursorKey}\\u0000${framesKey}",
+      to: "\\u0000${framesKey}",
       expect: "T4.17p",
     },
     {

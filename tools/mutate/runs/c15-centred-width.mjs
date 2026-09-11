@@ -117,8 +117,12 @@ const MUTATIONS = [
     // *the shell froze*, three components from here.
     name: "an anchored question becomes dismissable",
     file: CONFIRM,
-    from: "        content: render(opts, selected),\n        dismissable: false,",
-    to: "        content: render(opts, selected),\n        dismissable: opts.placement === \"anchored\",",
+    //
+    // **Re-anchored** (F1118): `selected` became a thunk read at render time,
+    // so the line above the one this mutation changes gained a call. The
+    // `dismissable` line is the subject and is untouched.
+    from: "        content: render(opts, selected()),\n        dismissable: false,",
+    to: "        content: render(opts, selected()),\n        dismissable: opts.placement === \"anchored\",",
     expect: "T4.18",
   },
 ];

@@ -88,10 +88,13 @@ const MUTATIONS = [
     //
     // It sits beside *a narrowed menu keeps the previous fit*, below, which
     // this file first deleted as dead and tier 5 restored.
+    //
+    // **Re-anchored** (F1118): `selected` became `selection.at`, a rename with
+    // nothing to re-derive — the argument the mutation is about is the third.
     name: "the window takes one row more than the placement holds",
     file: KEYS,
-    from: "    const w = menuWindow(candidates.length, selected, fits);",
-    to: "    const w = menuWindow(candidates.length, selected, fits + 1);",
+    from: "    const w = menuWindow(candidates.length, selection.at, fits);",
+    to: "    const w = menuWindow(candidates.length, selection.at, fits + 1);",
     expect: "T4.9",
   },
   {

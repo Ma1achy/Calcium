@@ -71,8 +71,13 @@ const MUTATIONS = [
     // keys and `y` copies rows the reader walked away from.
     name: "focusRow no longer collapses the range",
     file: FOCUS,
-    from: "      stored = Object.freeze({ at: \"liveBlock\", element, anchor: null, mode: \"navigate\" });\n    },\n\n    /**\n     * `⇧↑`/`⇧↓`",
-    to: "      stored = Object.freeze({ at: \"liveBlock\", element, anchor: stored.anchor, mode: \"navigate\" });\n    },\n\n    /**\n     * `⇧↑`/`⇧↓`",
+    //
+    // **Re-anchored** (F1118): the record gained `entryId`. The trailing heading
+    // stays load-bearing — `enterLiveBlock` writes the identical record three
+    // lines above, and without it the anchor matches twice, which `apply` now
+    // refuses (F1113).
+    from: "      stored = Object.freeze({ at: \"liveBlock\", entryId, element, anchor: null, mode: \"navigate\" });\n    },\n\n    /**\n     * `⇧↑`/`⇧↓`",
+    to: "      stored = Object.freeze({ at: \"liveBlock\", entryId, element, anchor: stored.anchor, mode: \"navigate\" });\n    },\n\n    /**\n     * `⇧↑`/`⇧↓`",
     expect: "T1.44",
   },
   {
@@ -81,8 +86,12 @@ const MUTATIONS = [
     // belong.
     name: "extendRowUp leaves the block at the first element",
     file: KEYS,
-    from: "      if (i === null || i === 0) return;\n      const prev = elements[i - 1];",
-    to: "      if (i === null) return;\n      if (i === 0) return deps.focus.toPrompt();\n      const prev = elements[i - 1];",
+    //
+    // **Re-anchored** (F1118): the null test moved up to guard the store repair
+    // that now runs before the boundary is tested, so what is left beside `prev`
+    // is the stop alone.
+    from: "      if (i === 0) return;\n      const prev = elements[i - 1];",
+    to: "      if (i === 0) return deps.focus.toPrompt();\n      const prev = elements[i - 1];",
     expect: "T1.45",
   },
   {

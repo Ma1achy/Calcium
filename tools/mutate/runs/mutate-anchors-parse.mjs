@@ -168,9 +168,51 @@ const results = runPass({
       // reports as stale, so a `null` piece has to poison the whole join.
       name: "a refused piece is dropped from the join instead of poisoning it",
       file: SWEEP,
-      from: "      return parts.some((x) => x === null) ? null : parts.join(\"\");",
-      to: '      return parts.join("");',
+      from: "    return parts.some((x) => x === null) ? null : parts.join(\"\");",
+      to: '    return parts.join("");',
       expect: "MA1b",
+    },
+    {
+      // **The fourth form of an anchor is a name** (F1117), and the reader that
+      // could not see one did not report it stale — the mutation fell out of
+      // the corpus entirely, because the pattern requires a literal in that
+      // position. Twenty-four across ten runs, and one of them was a run's
+      // **control**.
+      name: "a `from:` naming a constant is not an anchor again",
+      file: SWEEP,
+      from: "      String.raw`(${VALUE})` +",
+      to: "      String.raw`((?:(?:${LITERAL})\\s*\\+?\\s*)+)` +",
+      expect: "MA1c",
+    },
+    {
+      // **The gate MA3 could not construct until a list could be handed in**
+      // (F1119). With `KNOWN_STALE` empty, a foreign run had nothing to inherit
+      // and the row passed on an empty corpus; supplying the list is what makes
+      // *excused when given, checked when not* two arms rather than one.
+      name: "a supplied debt list is ignored, so the excuse arm cannot fire",
+      file: SWEEP,
+      from: "const LIST = OWN ? KNOWN_STALE : (SUPPLIED ?? {});",
+      to: "const LIST = OWN ? KNOWN_STALE : {};",
+      expect: "MA3",
+    },
+    {
+      // The equality arm's **second** direction — an entry that has stopped
+      // being true — which the tree cannot exercise while the list is empty.
+      name: "a dead entry is left on the list instead of failing",
+      file: SWEEP,
+      from: "for (const [run, n] of Object.entries(LIST)) {",
+      to: "for (const [run, n] of Object.entries({})) {",
+      expect: "MA3",
+    },
+    {
+      // A name this file does not declare is **counted**, not dropped: an
+      // exemption that is not counted is an exclusion, and a dropped row is an
+      // anchor nothing will ever report stale.
+      name: "an unresolvable name is dropped instead of counted",
+      file: SWEEP,
+      from: "    if (!(t in consts)) return { text: null, why: `names \\`${t}\\`, which is not a literal here` };",
+      to: "    if (!(t in consts)) return { text: \"\", why: null };",
+      expect: "MA1c",
     },
   ],
 });
