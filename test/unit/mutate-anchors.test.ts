@@ -66,6 +66,53 @@ describe("tools/mutate/anchors.mjs", () => {
     expect(r.out, "and it says how many it looked at").toMatch(/1 anchors|· 1 anchors/u);
   });
 
+  it("MA1b (F1109): a backtick anchor is read, and an interpolated one is refused by name", () => {
+    // **The third quote character.** `LITERAL` matched `"…"` and `'…'`, so a
+    // template literal matched nothing and its anchor was not counted stale —
+    // it was not counted at all. That is the form an author reaches for when the
+    // anchor contains a `"`, which is when an anchor is most awkward and most
+    // likely to rot. Measured on the tree: 23 of them across 5 runs, two stale.
+    const backtick = `
+const SRC = "src/data/viewmodel/tree.ts";
+const MUTATIONS = [
+  {
+    file: SRC,
+    from: \`export function hasChildren(block: Block): block is ContainerBlock {\`,
+    to: \`export function hasChildren(block: Block): boolean {\`,
+  },
+];
+`;
+    const seen = run(runsDir("fake.mjs", backtick));
+    expect(seen.ok, seen.out).toBe(true);
+    expect(seen.out, "counted, not skipped").toMatch(/· 1 anchors/u);
+
+    // **The control**: the same anchor, backticked, and stale. A reader that
+    // silently dropped the row would pass the line above by finding nothing.
+    const staleTick = backtick.replace("hasChildren(block: Block): block is", "hasChildren(b: Block): b is");
+    const missed = run(runsDir("fake.mjs", staleTick));
+    expect(missed.ok, "a stale backtick anchor is reported").toBe(false);
+    expect(missed.out).toContain("fake.mjs");
+
+    // **Interpolation is refused rather than guessed at.** `${GUARD}` is a value
+    // this reader does not have, so reading the body as its own source text
+    // would yield an anchor matching nothing — reported as *stale*, which is a
+    // fabricated finding rather than a missing one.
+    const interpolated = `
+const SRC = "src/data/viewmodel/tree.ts";
+const GUARD = "block is ContainerBlock";
+const MUTATIONS = [
+  {
+    file: SRC,
+    from: \`export function hasChildren(block: Block): \${GUARD} {\`,
+    to: \`export function hasChildren(block: Block): boolean {\`,
+  },
+];
+`;
+    const refused = run(runsDir("fake.mjs", interpolated));
+    expect(refused.out, "counted by name, never as stale").toMatch(/1 interpolated/u);
+    expect(refused.out, "and not reported as a missing anchor").not.toMatch(/1 anchor\(s\) missing/u);
+  });
+
   it("MA2: one stale anchor fails, and the run is named", () => {
     // **The fabricated violation.** The anchor is a sentence that could plausibly
     // have been in the file and is not — which is exactly what a rotted mutation
