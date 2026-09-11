@@ -29433,8 +29433,33 @@ touch, each change right on its own:
 this entry is written before it so the prediction is on record: rows green means a state the fixture
 now clears; `27;2u` again means the drive itself, and the reproduction has to move onto the runner.
 
+### The prediction, answered — fourth recurrence, 2026-09-11 on pull request 51
+
+`27;2u` again, so the recorded prediction resolves to its second arm: **the drive
+itself**, and the reproduction has to move onto the runner. Four recurrences, and
+this one rules out the whole class of remedy the earlier three reached for.
+
+**Both repairs were in place at once.** The clear was already the last thing
+before the drive with `super` in it — the third recurrence's move, whose comment
+says in as many words that it is *not a claim that the move is the cure* — **and**
+the Escape keydown itself carried `--clearmodifiers`, because `x-emulator.ts`
+gives the flag to any input verb that is not a modifier while the drive holds
+nothing. So the stray bit survived a per-command suppression and an explicit
+release of all four modifiers, milliseconds apart. **Whatever sets it, it is not a
+held X modifier**, and every fix attempted so far aims at one.
+
+**And four reproductions have left one digit between them.** The row asserted on
+`strayEsc[1]` and printed nothing else, so each rare red — each costing a CI run,
+on a symptom that does not reproduce in the container — was spent on
+`expected '2' to be '1'`. The escape sequences are in the message now: on a dirty
+capture it reads `CSI 27;2u CSI 27;2:3u CSI 13;2u CSI 13;2:3u`, which says at a
+glance whether Shift was on the Esc alone or on every key — the distinction this
+finding's own title turns on and that no recurrence has been able to confirm.
+A diagnosis in an assertion message is not evidence, and this row had the first
+and withheld the second.
+
 **Where**: `test/support/x-emulator.ts`; `docs/catalogue/lanes8/emu-probe.sh` (the bash transcription,
-gitignored); `gh run view 33975158167`.
+gitignored); `gh run view 33975158167`; `gh run view 34564209971` (the fourth).
 
 ---
 
@@ -47356,4 +47381,232 @@ it: an anchor that matches twice has `replace()` take the first, so the mutation
 applies somewhere the author did not choose and the row that would catch it never
 runs. That is `assert s.count(old) == 1` — the rule this repo applies to its own
 edit scripts — missing from the mutation harness.
+
+---
+
+## F1106 — a mutation's `from` is checked and its `to` is not, so a rotted mutation reads exactly like a weak test ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `tools/mutate/runs/c12-lines3d.mjs` (LN6) · `tools/mutate/anchors.mjs` · `src/presentation/plot/scatter3.ts:1178` |
+| **Reached for** | the second survivor of the sweep's first complete run (F1105) |
+| **Verdict** | **closed** — the check is built, gated on the survivor, and proved end to end on the survivor that produced it; its two blind spots are stated and LN6's replacement mutation is F1105's |
+
+### The survivor
+
+`c12-lines3d.mjs`'s LN6 — *the frame is drawn before the data* — survived. Its
+`from` anchors on the data loop and matches, so nothing reported a problem.
+**Its `to` is broken in two independent ways.**
+
+**One: the call no longer type-checks.** It injects
+
+```js
+frameOf(block, scene, grid, rows, depth, ctx, (i, m) => { … })
+```
+
+and the real call four hundred lines below passes `{ w, rows }`, because the
+fourth parameter is `area: Readonly<{ w: number; rows: number }>`. That
+parameter's shape changed at F489 / C12 I100 — *`rows` was already here and `w`
+was not, and the asymmetry is the defect* — and the mutation was written against
+the old signature. So `area.w` and `area.rows` are `undefined` inside the
+injected draw.
+
+**Two: it adds a draw where the defect was a move.** The data loop is at line 999
+and the real `frameOf` call is at 1178, and the mutation inserts *before* the
+loop without removing the call after it. The later draw wins, so even with the
+right arguments the net effect is nothing. The defect F452 recorded was the frame
+drawn **instead of** last.
+
+Either one alone makes the mutation unable to fail.
+
+### The class
+
+**The anchors sweep checks that a mutation can be applied and never that what it
+applies still means what it meant.** `from` is matched against the tree — that is
+the whole of what `KNOWN_STALE` counts — and `to` is an opaque string. A
+mutation whose `to` has rotted applies cleanly, runs the suite, and reports
+`SURVIVED`, which is indistinguishable from a row that is genuinely weak. F277's
+rule says to ask why a mutation cannot reach the test before rewriting the test;
+this is the answer being *the mutation* for the second time in one sweep, after
+F1104's answer was *the subject is inert*.
+
+### The remedy, and its blind spot
+
+**Type-check a survivor's mutated tree.** A mutation that survives and does not
+compile is a broken mutation rather than a finding, and `tsc` would have caught
+this one exactly — `number` against `Readonly<{ w; rows }>` is TS2345. Running it
+only on survivors keeps it cheap: F1105's census counted **13 survivor rows** across the
+whole sweep — 192 runs and 2002 mutations — so almost nothing pays.
+
+**The figure this sentence first carried was `13 of 192`, and that ratio does not
+exist.** 13 is a count of rows and 192 a count of runs; the denominator a survivor
+rate wants is the 2002 mutations. Nobody would have caught it downstream, because
+both numbers are real and both come from F1105 — which is the derived-claim form of
+*a correction stops at its own sentence*, arriving in a finding written the same day.
+
+**It does not reach the second defect.** An additive mutation type-checks
+perfectly and is inert for a reason no compiler can see. That half has no
+mechanical answer, and the honest form is the one the harness already prints:
+when a mutation survives, read the `to` before reading the test.
+
+### A separate thing the reproduction turned up
+
+Replacing the tie guard in the same file —
+
+```ts
+if (!nearer && mark[i] === undefined) return;
+```
+
+— with an unconditional fall-through **fails nothing**: all nine rows of
+`plot-lines3d.test.ts` pass with the frame taking every cell it reaches. So the
+guard is either unconstrained by any row or LN6 is not about it. Recorded rather
+than diagnosed, because the right replacement mutation for LN6 depends on the
+answer and C12's 3-D carrier wants the by-hand walk rather than a guess — this
+was one hypothesis, cheaply tested, and falsified.
+
+### What was built
+
+`tscTypecheck(root)` in `tools/mutate/mutate.mjs`, and `runPass` asks it **of a
+survivor and nothing else** — the mutated tree is still on disk at that point,
+which is exactly where the reader is about to be told the tests are weak. A row
+that fails it reads `DID NOT TYPE` with the compiler's own line beside it, is
+counted apart from the survivors, and still fails the gate.
+
+**The baseline is measured rather than assumed**, lazily: the first type error
+restores the tree and asks the same question of it, and a red answer is a
+`BlindHarnessError` naming the tree. The clean-*suite* guard at the top of
+`runPass` does not cover this, because a tree that does not type-check runs a
+green suite — which is the whole of the finding.
+
+| row | what it holds |
+|---|---|
+| MH11 | a survivor whose tree does not type-check is not a survivor, and the row carries the error |
+| MH11b | when the clean tree is red too, the refusal names the tree and not the mutation |
+| MH11c | only a survivor pays, and a green one is still a survivor |
+| MH11d | **the instrument itself** — real `tsc` over a real two-file tree, red then green, 454 ms |
+
+Four permanent mutations in `runs/mutate-harness.mjs`, all caught; five hand
+mutations during the build, all caught. And the end-to-end proof is the row that
+produced the finding: `c12-lines3d` said `1 survived — a finding about the tests`
+and now says
+
+```
+DID NOT TYPE     LN6      the frame is drawn before the data   ← src/presentation/plot/scatter3.ts(999,45): error TS2345: …
+no survivors among the rows that ran
+```
+
+**Scoped to survivors on purpose, and the argument is not only cost.** A rotted
+`to` on a *caught* row misleads nobody — the row is green and the named test
+failed. It could have been caught for the wrong reason, which is a real and
+weaker harm; asking every mutation instead of every survivor is 2002 checks
+against 13, and the anchors sweep is where a whole-corpus check would belong if
+that harm is ever measured rather than supposed. **It has since been measured —
+F1107 — and the harm is real: `c22-construct` has a row whose `to` calls a
+function that is in no file.**
+
+### Two corrections, both from measuring the thing that had just shipped
+
+**The claim was overbroad and the first wording was wrong.** It read *the tree
+that ran is not the tree the mutation describes*, and **types are erased**: the
+mutated code always runs exactly as written, LN6 included. LN6 ran precisely as
+written — it passed a number and the callee read `.w` off it. What a type error
+actually says is that the `to` **is not expressible against the current tree**,
+which is strong evidence it was written against an older one. The row is
+*suspect*, not *unmeasured*. Nothing about the mechanism changes; the sentence
+justifying it does, and a sentence that overclaims is how a later reader stops
+reading the `to`.
+
+**And the blind spot stated as an edge is the majority.** Applying every mutation
+in F1105's seventeen red runs — 224 with a `to` — and type-checking each gives
+**61 red, of which 44 are TS6133**, a binding left with no reader. So the check
+now excludes the unused family (TS6133 / TS6192 / TS6196) on a principled line
+rather than a convenient one: **an unused binding is erased and cannot change
+what runs**, so `noUnusedLocals` is a house rule about source and never a
+statement about behaviour. TS18047 stays in — a deleted null guard is a legal
+mutation *and* the compiler is right that the code may now throw.
+
+**Both arms of that exclusion were vacuous when written, and the mutation pass is
+what said so.** MH11d's temporary project set `strict` and not `noUnusedLocals`,
+so it could not emit a TS6133 at all; the row asserting *an orphan is not a
+rotted `to`* passed with the filter removed. A fixture has to be shown to respond
+to the thing under test before it is asserted against, and the instance is the
+fixture written **for** the check, on the same day.
+
+### The third correction: the instrument resolved its compiler from outside the project
+
+MH11d went **green in the devcontainer and red on the CI runner**, with the
+harness's own refusal — *the type-check itself did not run* — and no reason on it.
+`npx` resolves a binary by walking up from its `cwd`, and the row ran it inside a
+temporary directory: the container has a global at
+`/usr/local/share/npm-global/bin/tsc` to find, and the runner has nothing.
+
+**The local green was right by coincidence.** Both compilers are 7.0.2, so the
+answer was correct for a reason the test did not control — and the day the image
+and the lockfile disagree, an instrument deciding whether a mutation is rotted
+would be answering with a compiler the project does not use, silently. So `root`
+is now where `npx` resolves the compiler and `project` is what it checks: the
+binary is the repository's, the project is a parameter.
+
+And the refusal carries the tail of the output now. *The type-check itself did not
+run* named the right thing and made the diagnosis a guess, which is the same
+shape as every refusal in this file that had to be taught to name its subject.
+
+### The number that is not 61 minus 44
+
+Re-running the census through the harness's own `tscTypecheck` — imported rather
+than rebuilt — gives **18**, not the 17 that subtracting gives. One run carried a
+real `TS2339: Property 'drawn' does not exist on type 'never'` **behind** an
+excluded TS6133 on the same line, because the reader takes the first error line.
+A count derived from a corrected count is not corrected by the correction, twice
+in one finding.
+
+---
+
+## F1107 — the corpus, type-checked: 224 mutations, 18 whose `to` is not expressible, and one that calls a function in no file ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `tools/mutate/runs/*.mjs` · F1105's seventeen red runs |
+| **Reached for** | F1106 built the check; this points it at the corpus once |
+| **Verdict** | **open** — the census is taken and one instance is confirmed by reading source; the other seventeen are candidates and nobody has read them |
+
+### The measurement
+
+Every mutation with a `to` in F1105's seventeen red runs, applied one at a time
+against a tree confirmed green first, type-checked, restored. **224 applied · 61
+red to `tsc` · 18 red after the unused family is excluded**, spread over ten of
+the seventeen runs. The parser is `anchors.mjs`'s own `anchorsOf`, lifted
+verbatim, and cross-checked against the anchor count the gate prints before
+anything is measured — the first draft hardcoded 2002, refused at 2006, and was
+right to: four mutations had been added since the number was copied.
+
+| code | count | what it is |
+|---|---|---|
+| TS6133 / 6192 / 6196 | 44 | a binding with no reader — **excluded**, erased, cannot change what runs |
+| TS18047 | 4 | a deleted null guard — the mutation's own point, and the compiler is right |
+| TS2345 | 3 | an argument the signature refuses |
+| TS2741, TS2322 | 4 | a field or type the shape refuses |
+| TS2677, TS7053, TS2698, TS2488, TS2339, TS7019, TS2304 | 7 | one each |
+
+### The one that is confirmed
+
+`c22-construct`'s *construct the lifecycle before the stores (I1)* replaces
+`at("runner", …)` with `atLate("runner", …)`, and **`atLate` is in no file in
+`src/`**. At run time that is a `ReferenceError` at call time, so the row is
+caught by a crash rather than by the ordering it names, and its `expect: "T1.2"`
+is a claim about which instrument caught it that is not true. This is precisely
+the *caught for the wrong reason* harm F1106 named as real-but-weaker and did not
+measure — measured here, and the answer is that it exists.
+
+### What is not established
+
+**Seventeen candidates, unread.** Four are TS18047 and are probably legitimate
+mutations whose guard was the point. The rest want the same treatment `atLate`
+got: go to the symbol and ask whether it exists. That is a reading per row, not a
+run, so it is cheap — and it is the shape of work F1105's reds want anyway.
+
+**And the census says nothing about the seventeen reds' actual survivors**, which
+is what F1105 owns. A type error on a *caught* row is a weaker harm; this entry
+measured the whole population because the whole population is what a `tsc` pass
+can reach without running a suite.
 

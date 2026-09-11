@@ -39,6 +39,7 @@
 // and it never needed to: a summary reader is a pure function over a string,
 // and the bytes were already written down.
 import { readFileSync, writeFileSync, renameSync } from "node:fs";
+import { execSync } from "node:child_process";
 /** vitest colours its summary; the codes sit between the word and the count. */
 export function strip(output) {
   return output.replace(/\[[0-9;]*m/g, "");
@@ -278,7 +279,107 @@ export function fsIo(root) {
   };
 }
 
-export function runPass({ mutations, control, read, write, run }) {
+/**
+ * Does the mutated tree type-check? `null` if it does, the first error line if
+ * not.
+ *
+ * **The fifth row that is not a survivor, and the one `unbuilt` cannot see**
+ * (F1106). `unbuilt` reads vitest's summary, so it catches a `to` that does not
+ * *parse* — the suites fail to load and the disagreement between the two count
+ * lines says so. A `to` that parses and does not *type-check* goes straight
+ * through: esbuild strips types without checking them, so the suite runs, the
+ * row reads SURVIVED, and the reader is sent to the tests.
+ *
+ * Measured on `c12-lines3d`'s LN6, the survivor that produced this: the
+ * mutation passes `rows` where `frameOf`'s fourth parameter became
+ * `area: Readonly<{ w: number; rows: number }>` at F489, so both fields are
+ * `undefined` inside the injected draw. `tsc --noEmit` names it —
+ * `scatter3.ts(999,45): error TS2345` — and nine of nine tests pass.
+ *
+ * **What the signal is, stated exactly — the first wording was wrong.** It read
+ * *the tree that ran is not the tree the mutation describes*, and types are
+ * erased: the mutated code always runs exactly as written, LN6 included. What a
+ * type error actually says is that the `to` **is not expressible against the
+ * current tree**, which is strong evidence it was written against an older one.
+ * LN6 ran precisely as written — it passed a number and the callee read `.w`
+ * off it — and the defect is that its author wrote it against a signature that
+ * had changed. The row is *suspect*, not *unmeasured*.
+ *
+ * **The unused family is excluded, and the corpus is why.** Applying every
+ * mutation in F1105's seventeen red runs — 224 of them — and type-checking each
+ * gives **61 red, and 44 of those are TS6133**, a binding left with no reader.
+ * The blind spot was stated as an edge and is the majority. An unused binding is
+ * erased and runs identically, so `noUnusedLocals` is a house rule about source
+ * and never a statement about behaviour; that is the line this filter draws, and
+ * it is the only class that provably cannot reach runtime. TS18047 stays in:
+ * a deleted null guard is a legal mutation *and* the compiler is right that the
+ * code may now throw.
+ *
+ * **The remaining blind spot has no mechanical answer.** An **additive**
+ * mutation type-checks perfectly and is inert for a reason no compiler can see
+ * — LN6's second defect is that it inserts a draw before the loop while the real
+ * call four hundred lines below still runs after, so the later draw wins.
+ *
+ * Costs 1.3 s on this tree (`skipLibCheck`, 372 files), and only on a survivor.
+ *
+ * **`root` is where the compiler comes from and `project` is what it checks, and
+ * the two had to be separated.** `npx` resolves a binary by walking up from its
+ * `cwd`, so running it inside a temporary directory finds `tsc` only on a machine
+ * that happens to have one elsewhere. The devcontainer does — a global at
+ * `/usr/local/share/npm-global/bin/tsc` — and the CI runner does not, so MH11d
+ * went green here and red there with *the type-check itself did not run*, a
+ * refusal that named the right thing and gave no reason.
+ *
+ * **The local answer was right by coincidence.** Both compilers are 7.0.2, so
+ * the green was correct and not for any reason the test controlled: the day the
+ * image and the lockfile disagree, an instrument that decides whether a mutation
+ * is rotted would be answering with a compiler the project does not use, and
+ * nothing would say so. The binary is the repository's now; the project is a
+ * parameter.
+ */
+export function tscTypecheck(root, project = "tsconfig.json") {
+  return () => {
+    try {
+      execSync(`npx tsc --noEmit -p ${project} 2>&1`, {
+        cwd: root,
+        encoding: "utf8",
+        maxBuffer: 64 * 1024 * 1024,
+      });
+      return null;
+    } catch (e) {
+      const out = `${e.stdout ?? ""}${e.stderr ?? ""}`;
+      const errors = out.split("\n").filter((l) => /error TS\d+/u.test(l));
+      if (errors.length === 0) {
+        // **With the reason on it.** The first version of this line said only
+        // that the check did not run, and that is exactly what a reader needs a
+        // reason for: on the CI runner it was `npx` failing to resolve `tsc`,
+        // and the message made the diagnosis a guess.
+        const tail = out.trim().split("\n").slice(-2).join(" · ").trim();
+        return `tsc exited non-zero and named no error — the type-check itself did not run: ${tail}`;
+      }
+      // TS6133 / TS6192 / TS6196: a declaration, import or label with no reader.
+      // Erased, so it cannot change what runs — 44 of the 61 reds in the corpus
+      // measurement, and every one of them a good mutation that orphaned a
+      // binding. If nothing else is wrong, the `to` is fine.
+      const real = errors.filter((l) => !/error TS(?:6133|6192|6196)\b/u.test(l));
+      return real[0] ?? null;
+    }
+  };
+}
+
+/** The four states that are not survivors, asked as one predicate. */
+function isSurvivor(o) {
+  return !o.killed && !o.noSummary && !o.anchorMissed && !o.unbuilt && !o.indeterminate;
+}
+
+export function runPass({
+  mutations,
+  control,
+  read,
+  write,
+  run,
+  typecheck = tscTypecheck(process.cwd()),
+}) {
   const files = [
     ...new Set([control.file, ...mutations.flatMap((m) => editsOf(m).map((e) => e.file))]),
   ];
@@ -396,6 +497,32 @@ export function runPass({ mutations, control, read, write, run }) {
                 byNamedTest: output.includes(m.expect),
                 hits,
               };
+      // **Only a survivor pays for this, and only a failure pays twice**
+      // (F1106). The mutated tree is still on disk here — `finally` has not
+      // run — so the check is asked exactly where the reader is about to be
+      // told the tests are weak.
+      //
+      // **A baseline nobody measured is the failure this file guards against
+      // everywhere else**, and the clean-suite guard at the top does not cover
+      // it: a tree that does not type-check runs a green suite, which is the
+      // whole of what this finding is. So when an error appears, restore and
+      // ask the same question of the unmutated tree. Restoring early is safe —
+      // `finally` restores again and the write is idempotent.
+      if (isSurvivor(outcome)) {
+        const err = typecheck();
+        if (err !== null) {
+          restore();
+          const base = typecheck();
+          if (base !== null) {
+            throw new BlindHarnessError(
+              `the unmutated tree does not type-check — ${base}. Every row below is measured ` +
+                `against a tree the project would refuse, so nothing here means anything: fix ` +
+                `the type error first`,
+            );
+          }
+          outcome = { ...outcome, untyped: err };
+        }
+      }
     } catch (err) {
       if (!(err instanceof AnchorError)) throw err;
       outcome = { name: m.name, expect: m.expect, killed: false, anchorMissed: true };
@@ -419,6 +546,8 @@ export function report(results) {
       ? "ANCHOR MISSED   "
       : r.indeterminate
       ? "INDETERMINATE   "
+      : r.untyped
+      ? "DID NOT TYPE    "
       : r.killed
         ? r.byNamedTest
           ? "caught          "
@@ -430,11 +559,13 @@ export function report(results) {
     // `replace` took the first of several sites, so the row may be reporting on
     // a site nobody chose.
     const why =
-      r.indeterminate && r.tally
-        ? `   ← ${String(r.tally.reported)} of ${String(r.tally.collected)} tests reported`
-        : !r.killed && typeof r.hits === "number" && r.hits > 1
-          ? `   ← its anchor matches ${String(r.hits)}x — replace() took the first`
-          : "";
+      r.untyped
+        ? `   ← ${r.untyped.trim()}`
+        : r.indeterminate && r.tally
+          ? `   ← ${String(r.tally.reported)} of ${String(r.tally.collected)} tests reported`
+          : !r.killed && typeof r.hits === "number" && r.hits > 1
+            ? `   ← its anchor matches ${String(r.hits)}x — replace() took the first`
+            : "";
     return `${state} ${String(r.expect).padEnd(8)} ${r.name}${why}`;
   });
   // **A run that did not finish is not a survivor and is not counted as one.**
@@ -463,9 +594,14 @@ export function report(results) {
   // *I could not tell* and *the tests are weak* are opposite findings and the
   // second one costs a session.
   const unsure = results.filter((r) => r.indeterminate);
-  const survivors = results.filter(
-    (r) => !r.killed && !r.noSummary && !r.anchorMissed && !r.unbuilt && !r.indeterminate,
-  );
+  // **The fifth row that is not a survivor** (F1106). `unbuilt` above catches a
+  // `to` that does not parse, because the suites fail to load and say so. A `to`
+  // that parses and does not type-check runs a green suite — esbuild strips
+  // types without checking them — so the row read SURVIVED and sent the reader
+  // to the tests. The `to` is not expressible against this tree, which is
+  // evidence it was written against an older one: suspect, not weak.
+  const untyped = results.filter((r) => r.untyped);
+  const survivors = results.filter(isSurvivor).filter((r) => !r.untyped);
   const unsureNote =
     unsure.length === 0
       ? ""
@@ -475,6 +611,13 @@ export function report(results) {
     stale.length === 0
       ? ""
       : `\n${stale.length} anchor(s) did not match — those rows ran nothing and are not survivors`;
+  const untypedNote =
+    untyped.length === 0
+      ? ""
+      : `\n${untyped.length} mutation(s) did not type-check — the \`to\` is not expressible ` +
+        `against this tree, which is evidence it was written against an older one. Those rows ` +
+        `are suspect rather than weak: **Read the \`to\`** (F1106). An unused binding does not ` +
+        `count, because it is erased and cannot change what runs`;
   const brokeNote =
     broke.length === 0
       ? ""
@@ -485,7 +628,7 @@ export function report(results) {
       ? `\n${blind.length} run(s) produced no summary — the harness went blind mid-pass. ` +
           `Nothing above those rows means anything`
       : (survivors.length === 0
-          ? stale.length + broke.length + unsure.length === 0
+          ? stale.length + broke.length + unsure.length + untyped.length === 0
             ? "\nevery mutation was caught"
             : "\nno survivors among the rows that ran"
           : `\n${survivors.length} survived — a finding about the tests, about the sentence they ` +
@@ -494,7 +637,8 @@ export function report(results) {
             `name a line whose callers moved, which reads exactly like a weak row`) +
         unsureNote +
         staleNote +
-        brokeNote,
+        brokeNote +
+        untypedNote,
   );
   return lines.join("\n");
 }

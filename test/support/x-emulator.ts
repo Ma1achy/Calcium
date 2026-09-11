@@ -194,6 +194,17 @@ export async function captureFromEmulator(opts: {
     // already up costs nothing, and the one not cleared is the one that bites.
     // **The earlier ordering is recorded rather than deleted** — it held for
     // some runs and this is not a claim that the move is the cure.
+    //
+    // **Fourth recurrence, 2026-09-11 on pull request 51, and it falsifies the
+    // move.** `CSI 27;2 u` for a lone Esc again, with the clear already last and
+    // `super` already in it. And the Escape keydown itself carried
+    // `--clearmodifiers`, because the rule above gives the flag to any input verb
+    // that is not a modifier while `held` is empty — so **both** repairs were in
+    // place at once. Every remedy tried across four recurrences aims at a held X
+    // modifier, and the symptom has now outlived all of them: whatever sets that
+    // bit, it is not a key this loop can release. The line stays because it is
+    // cheap and removing it would re-open a state nobody has measured clean;
+    // what it must not do any longer is read as the cure.
     await sleep(200);
     for (const mod of ["shift", "ctrl", "alt", "super"]) xdo("keyup", mod);
     await opts.drive(xdo, window, 1);

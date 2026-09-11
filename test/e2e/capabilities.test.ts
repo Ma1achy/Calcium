@@ -224,10 +224,32 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
       // flaky row green; what it stops is a red run being read as a defect in
       // the subject, which is the whole of F1094's lesson applied to a
       // different sentinel.
+      // **Fourth recurrence, 2026-09-11 on pull request 51, and it rules out the
+      // class of remedy all three earlier ones reached for** (F812). The clear
+      // was already the last thing before the drive, with `super` added — the
+      // third recurrence's move — *and* the Escape keydown itself carried
+      // `--clearmodifiers`, because `x-emulator.ts` gives the flag to any input
+      // verb that is not a modifier while the drive holds nothing. Both were in
+      // place and Shift arrived anyway, so **the stray modifier is not a held X
+      // modifier**: every repair aimed at clearing one has now been tried and
+      // the symptom outlived all of them.
+      //
+      // **And the row left one digit.** Four recurrences, each rare and each on
+      // the runner, and no reader has ever seen the bytes — the message named
+      // the diagnosis and withheld the evidence, so a reproduction that costs a
+      // CI run was spent on `expected '2' to be '1'`. The sequences go in the
+      // message now: they cost nothing when green and they are the whole of what
+      // the fifth recurrence can leave behind.
+      const seqs = [...a.matchAll(/\x1b\[[0-9;:]*[A-Za-z~]/gu)]
+        .slice(0, 12)
+        .map(([m]) => `CSI ${m.slice(2)}`)
+        .join(" ");
       const strayEsc = /\x1b\[27;(\d+)/u.exec(a);
       expect(
         strayEsc === null ? "1" : strayEsc[1],
-        "Esc reached kitty with a modifier held — the harness's clear did not take, and this is the X session rather than the protocol (F812)",
+        `Esc reached kitty with a modifier held — the harness's clear did not take, and this is ` +
+          `the X session rather than the protocol (F812). The clear and \`--clearmodifiers\` were ` +
+          `both in place, so it is not a held X modifier · ${seqs}`,
       ).toBe("1");
       expect(
         a.startsWith("\x1b\x1b") ? "the mode was not live when the first key arrived" : "live",

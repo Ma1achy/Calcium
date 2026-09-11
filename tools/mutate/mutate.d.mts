@@ -56,6 +56,14 @@ export type Outcome = Readonly<{
   /** The figures behind `indeterminate`, so the row can say them. */
   tally?: { reported: number; collected: number } | null;
   /**
+   * The mutated tree did not type-check — the first `error TS…` line that is not
+   * an unused binding. `unbuilt` covers a `to` that does not parse; this covers
+   * one that parses and does not type-check, which runs a green suite and reads
+   * exactly like a weak test (F1106). The `to` is not expressible against this
+   * tree, which is evidence it was written against an older one.
+   */
+  untyped?: string;
+  /**
    * How many sites the mutation's own anchor matched. A survivor with more than
    * one is F219's disposition (extract the duplicate); a survivor with exactly
    * one may still be F277's (the anchor is perfect and its callers moved).
@@ -71,12 +79,25 @@ export declare function apply(
   mutation: Readonly<{ file: string; from: string; to: string }>,
 ): string;
 
+/**
+ * Does the mutated tree type-check? `null` if it does, the first error line that
+ * is not an unused binding if not — see mutate.mjs for what the signal is and
+ * where it is blind (F1106).
+ *
+ * `root` is where `npx` resolves the compiler from; `project` is the tsconfig it
+ * checks. Separate, because `npx` walks up from its `cwd` and a temporary
+ * directory has nothing to walk to.
+ */
+export declare function tscTypecheck(root: string, project?: string): () => string | null;
+
 export declare function runPass(opts: {
   mutations: readonly Mutation[];
   control: Control;
   read: (file: string) => string;
   write: (file: string, src: string) => void;
   run: () => string;
+  /** Asked only of a survivor, and of the clean tree only when one fails. */
+  typecheck?: () => string | null;
 }): Outcome[];
 
 export declare function report(results: readonly Outcome[]): string;

@@ -7,6 +7,10 @@
 //
 // Every fabrication below is the real defect rather than an invented one
 // (A03 commitment 14a). The ANSI case is the output that actually fooled it.
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -20,8 +24,19 @@ import {
   runPass,
   strip,
   tally,
+  tscTypecheck,
   unbuilt,
 } from "../../tools/mutate/mutate.mjs";
+
+/**
+ * **The type-check, stubbed green** (F1106). `runPass`'s default shells out to
+ * `tsc` over the real tree, which is right for the 92 runs and wrong here: every
+ * row below writes a two-line fake file into a `Map` that no compiler can see,
+ * so the real check would answer about this repository instead of about the
+ * subject. MH11 injects a failing one; MH11c is the control that this stub is
+ * not what makes a survivor a survivor.
+ */
+const TYPED = (): string | null => null;
 
 /** vitest's real summary line, colours and all. */
 const FAILED = "[2m Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[32m5 passed[39m";
@@ -103,6 +118,7 @@ describe("mutation harness", () => {
 
     expect(() =>
       runPass({
+        typecheck: TYPED,
         mutations: [{ name: "m", file: "a.ts", from: "1", to: "2", expect: "T1.1" }],
         control: { file: "a.ts", from: "const x", to: "const BROKEN", why: "renames the export" },
         read: (f) => files.get(f) as string,
@@ -119,6 +135,7 @@ describe("mutation harness", () => {
 
     expect(() =>
       runPass({
+        typecheck: TYPED,
         mutations: [],
         control: { file: "a.ts", from: "const x", to: "const BROKEN", why: "renames the export" },
         read: (f) => files.get(f) as string,
@@ -142,6 +159,7 @@ describe("mutation harness", () => {
 
     expect(() =>
       runPass({
+        typecheck: TYPED,
         mutations: [{ name: "m", file: "a.ts", from: "1", to: "2", expect: "T1.1" }],
         control: { file: "a.ts", from: "const x", to: "const BROKEN", why: "renames the export" },
         read: (f) => files.get(f) as string,
@@ -154,6 +172,7 @@ describe("mutation harness", () => {
     // cut before the summary. It reads far more like a real run than `""` does.
     expect(() =>
       runPass({
+        typecheck: TYPED,
         mutations: [{ name: "m", file: "a.ts", from: "1", to: "2", expect: "T1.1" }],
         control: { file: "a.ts", from: "const x", to: "const BROKEN", why: "renames the export" },
         read: (f) => files.get(f) as string,
@@ -184,6 +203,7 @@ describe("mutation harness", () => {
     };
 
     const results = runPass({
+      typecheck: TYPED,
       mutations: [
         { name: "first", file: "a.ts", from: "const x = 1;", to: "const x = 9;", expect: "T1.1" },
         { name: "second", file: "a.ts", from: "const y = 2;", to: "const y = 9;", expect: "T1.2" },
@@ -229,6 +249,7 @@ describe("mutation harness", () => {
     };
 
     runPass({
+      typecheck: TYPED,
       mutations: [
         { name: "a", file: "a.ts", from: "const x", to: "const X", expect: "T1.1" },
         { name: "b", file: "b.ts", from: "const y", to: "const Y", expect: "T1.2" },
@@ -290,6 +311,7 @@ describe("mutation harness", () => {
       return " Tests  6 passed";
     };
     const live = runPass({
+      typecheck: TYPED,
       mutations: [{ name: "m", file: "a.ts", from: "1", to: "2", expect: "T1.1" }],
       control: { file: "a.ts", from: "const x", to: "const BROKEN", why: "renames the export" },
       read: (f) => files.get(f) as string,
@@ -308,6 +330,7 @@ describe("mutation harness", () => {
     const files = new Map([["a.ts", "const x = 1;"]]);
     expect(() =>
       runPass({
+        typecheck: TYPED,
         mutations: [{ name: "m", file: "a.ts", from: "1", to: "2", expect: "T1.1" }],
         control: { file: "a.ts", from: "const x", to: "const BROKEN", why: "renames the export" },
         read: (f) => files.get(f) as string,
@@ -327,6 +350,7 @@ describe("mutation harness", () => {
       files.get("a.ts")?.includes("const x = 1;") ? PASSED : `${FAILED}\n  × T1.1 asserts x`;
 
     const results = runPass({
+      typecheck: TYPED,
       mutations: [
         { name: "covered", file: "a.ts", from: "const x = 1;", to: "const x = 9;", expect: "T1.1" },
         { name: "uncovered", file: "a.ts", from: "const y = 2;", to: "const y = 9;", expect: "T1.2" },
@@ -447,6 +471,7 @@ describe("mutation harness", () => {
       return WHOLE_GREEN;
     };
     const live = runPass({
+      typecheck: TYPED,
       mutations: [{ name: "m", file: "a.ts", from: "1", to: "2", expect: "T1.1" }],
       control: { file: "a.ts", from: "const x", to: "const BROKEN", why: "renames the export" },
       read: (f) => files.get(f) as string,
@@ -516,6 +541,7 @@ describe("mutation harness", () => {
       files.get("a.ts")?.includes("const x = 1;") ? WHOLE_GREEN : `${FAILED}\n  \u00d7 T1.1 asserts x`;
 
     const results = runPass({
+      typecheck: TYPED,
       mutations: [
         { name: "unique", file: "a.ts", from: "const y = 2;", to: "const y = 9;", expect: "T1.2" },
         { name: "ambiguous", file: "a.ts", from: "const dup", to: "const DUP", expect: "T1.3" },
@@ -544,4 +570,210 @@ describe("mutation harness", () => {
     // habit: ask why the mutation cannot reach the test before rewriting it.
     expect(text).toContain("Ask why the mutation cannot reach the test");
   });
+
+  it("MH11 (F1106): a survivor whose tree does not type-check is not a survivor, and the row carries the error", () => {
+    // **The measured instance.** `c12-lines3d`'s LN6 passes `rows` where
+    // `frameOf`'s fourth parameter became `area: Readonly<{ w; rows }>` at
+    // F489. The suite runs nine of nine green, because esbuild strips types
+    // without checking them, and the row read SURVIVED — which sends the reader
+    // to the tests for a defect that is in the mutation.
+    //
+    // `unbuilt` above cannot see it: that predicate reads vitest's summary, so
+    // it catches a `to` that does not *parse* and nothing that merely does not
+    // type-check.
+    const files = new Map([["a.ts", "const x = 1;\nconst y = 2;\n"]]);
+    const run = (): string =>
+      files.get("a.ts")?.includes("const x = 1;") ? WHOLE_GREEN : `${FAILED}\n  \u00d7 T1.1 asserts x`;
+
+    const results = runPass({
+      // The real `tsc` reads a real tree; this row's tree is a `Map`. The stub
+      // stands where it would stand and answers the way it answered for LN6.
+      typecheck: () =>
+        files.get("a.ts")?.includes("const y = 9;") === true
+          ? "src/a.ts(999,45): error TS2345: Argument of type 'number' is not assignable"
+          : null,
+      mutations: [
+        { name: "rotted", file: "a.ts", from: "const y = 2;", to: "const y = 9;", expect: "T1.2" },
+      ],
+      control: { file: "a.ts", from: "const x = 1;", to: "const x = 0;", why: "T1.1 asserts x" },
+      read: (f) => files.get(f) as string,
+      write: (f, v) => void files.set(f, v),
+      run,
+    });
+
+    expect(results[0]?.untyped, "the first error line, verbatim").toContain("error TS2345");
+    expect(results[0]?.killed, "and it is still not a kill").toBe(false);
+
+    const text = report(results);
+    expect(text, "the row says which state it is in").toContain("DID NOT TYPE");
+    expect(text, "with the compiler's own line beside it").toContain("error TS2345");
+    // **The disposition, which is the point of counting it apart**: the reader
+    // is sent to the `to` rather than to the tests. And the claim is the narrow
+    // one — *suspect*, not *unmeasured*. Types are erased, so the mutated code
+    // ran exactly as written; what the error says is that the `to` could not
+    // have been written against this tree.
+    expect(text).toContain("not expressible");
+    expect(text).toContain("suspect rather than weak");
+    expect(text).toContain("Read the `to`");
+    // And the summary does not claim a survivor it did not measure.
+    expect(text, "no survivor was found").not.toMatch(/\d+ survived/u);
+    expect(text).toContain("no survivors among the rows that ran");
+  });
+
+  it("MH11b (F1106): when the clean tree does not type-check either, the refusal names the tree and not the mutation", () => {
+    // **A baseline nobody measured**, which is the failure every other guard in
+    // this file exists against — and the clean-*suite* guard at the top does not
+    // cover it, because a tree that does not type-check runs a green suite.
+    // That is the whole of F1106. So the first type error asks the same question
+    // of the unmutated tree, and a red answer is blindness rather than a finding.
+    const files = new Map([["a.ts", "const x = 1;\nconst y = 2;\n"]]);
+    const run = (): string =>
+      files.get("a.ts")?.includes("const x = 1;") ? WHOLE_GREEN : `${FAILED}\n  \u00d7 T1.1 asserts x`;
+
+    expect(() =>
+      runPass({
+        typecheck: () => "src/b.ts(1,1): error TS2304: Cannot find name 'wat'",
+        mutations: [
+          { name: "any", file: "a.ts", from: "const y = 2;", to: "const y = 9;", expect: "T1.2" },
+        ],
+        control: { file: "a.ts", from: "const x = 1;", to: "const x = 0;", why: "T1.1 asserts x" },
+        read: (f) => files.get(f) as string,
+        write: (f, v) => void files.set(f, v),
+        run,
+      }),
+    ).toThrow(/unmutated tree does not type-check/u);
+
+    expect(files.get("a.ts"), "and the tree is left as it was found").toBe(
+      "const x = 1;\nconst y = 2;\n",
+    );
+  });
+
+  it("MH11c (F1106): only a survivor pays for the check, and a green one is still a survivor", () => {
+    // **Two controls in one row**, and the second is the one that makes MH11
+    // mean something: a check that reclassified every survivor would satisfy
+    // MH11 exactly. A survivor whose tree type-checks must stay a survivor.
+    const files = new Map([["a.ts", "const x = 1;\nconst y = 2;\nconst z = 3;\n"]]);
+    const run = (): string =>
+      files.get("a.ts")?.includes("const z = 3;") === false
+        ? `${FAILED}\n  \u00d7 T1.3 asserts z`
+        : files.get("a.ts")?.includes("const x = 1;") === true
+          ? WHOLE_GREEN
+          : `${FAILED}\n  \u00d7 T1.1 asserts x`;
+
+    let asked = 0;
+    const results = runPass({
+      typecheck: () => {
+        asked += 1;
+        return null;
+      },
+      mutations: [
+        { name: "caught", file: "a.ts", from: "const z = 3;", to: "const z = 9;", expect: "T1.3" },
+        { name: "lives", file: "a.ts", from: "const y = 2;", to: "const y = 9;", expect: "T1.2" },
+      ],
+      control: { file: "a.ts", from: "const x = 1;", to: "const x = 0;", why: "T1.1 asserts x" },
+      read: (f) => files.get(f) as string,
+      write: (f, v) => void files.set(f, v),
+      run,
+    });
+
+    expect(results.map((r) => [r.name, r.killed]), "one kill, one survivor").toEqual([
+      ["caught", true],
+      ["lives", false],
+    ]);
+    // **The cost claim, asserted rather than believed.** The clean run and the
+    // control run are not survivors, and neither is the kill — so 1.3 s is paid
+    // once here rather than four times.
+    expect(asked, "asked of the survivor alone").toBe(1);
+    expect(results[1]?.untyped, "and a green tree leaves the row alone").toBeUndefined();
+    expect(report(results), "which still reads as a survivor").toContain("1 survived");
+  });
+
+  it("MH11d (F1106): the instrument itself, shown to answer — a real tsc over a real tree, red then green", () => {
+    // **MH11 proves the wiring with a stub, and a stub is not the instrument.**
+    // This repo has found five instruments wrong; the check that reclassifies a
+    // survivor has to be shown to respond to the thing it is pointed at, not
+    // only to be cheap. So: a two-file project of its own, with the same
+    // compiler options the tree uses, given the *shape* of LN6's defect — a
+    // number where an object is wanted.
+    //
+    // Its own tsconfig rather than the repo's, because a row that shelled out
+    // over `src` would answer about this repository: it would go red the day
+    // anything else did, and the failure would be attributed here.
+    const dir = mkdtempSync(join(tmpdir(), "mutate-typecheck-"));
+    try {
+      writeFileSync(
+        join(dir, "tsconfig.json"),
+        JSON.stringify({
+          // **The flags the check's behaviour depends on, not a minimal set.**
+          // Without `noUnusedLocals` this project cannot emit a TS6133 at all,
+          // so both exclusion arms below passed with the filter removed — the
+          // mutation pass found it, and a fixture has to be shown to respond to
+          // the thing under test before it is asserted against.
+          compilerOptions: {
+            strict: true,
+            noEmit: true,
+            skipLibCheck: true,
+            types: [],
+            noUnusedLocals: true,
+            noUnusedParameters: true,
+          },
+          include: ["a.ts"],
+        }),
+      );
+      // **The compiler from the repository, the project from the temp dir.**
+      // `npx` walks up from its `cwd` to find a binary, so `tscTypecheck(dir)`
+      // found a *global* `tsc` in the devcontainer and nothing on the CI runner
+      // — green here, red there. Both happen to be 7.0.2, so the green was right
+      // by coincidence rather than by construction, which is the worse half.
+      const check = tscTypecheck(process.cwd(), join(dir, "tsconfig.json"));
+
+      writeFileSync(
+        join(dir, "a.ts"),
+        "export function f(area: Readonly<{ w: number; rows: number }>): number {\n" +
+          "  return area.w + area.rows;\n}\nexport const v = f(24);\n",
+      );
+      const red = check();
+      expect(red, "the compiler saw it").not.toBeNull();
+      expect(red, "and it is the mutation's own shape").toContain("error TS2345");
+      expect(red, "named at its site").toContain("a.ts");
+
+      // **The green arm, which is what makes the red one mean something**: an
+      // instrument that answered `error` to everything would satisfy every
+      // assertion above.
+      writeFileSync(
+        join(dir, "a.ts"),
+        "export function f(area: Readonly<{ w: number; rows: number }>): number {\n" +
+          "  return area.w + area.rows;\n}\nexport const v = f({ w: 24, rows: 8 });\n",
+      );
+      expect(check(), "and a tree it accepts answers null").toBeNull();
+
+      // **The unused family does not count, and the corpus is the argument.**
+      // Applying all 224 mutations in F1105's seventeen red runs gives 61 that
+      // do not type-check and **44 of those are TS6133** — a binding left with
+      // no reader. Every one is a good mutation that orphaned something. An
+      // unused binding is erased, so it cannot change what runs; the check is
+      // about whether the `to` is expressible, not about house style.
+      writeFileSync(
+        join(dir, "a.ts"),
+        "export function f(area: Readonly<{ w: number; rows: number }>): number {\n" +
+          "  const orphan = area.rows;\n  return area.w;\n}\n" +
+          "export const v = f({ w: 24, rows: 8 });\n",
+      );
+      expect(check(), "a binding with no reader is not a rotted `to`").toBeNull();
+
+      // **The control for that exclusion**, which is what stops it swallowing
+      // the subject: a tree carrying both an orphan and a real error reports the
+      // real one.
+      writeFileSync(
+        join(dir, "a.ts"),
+        "export function f(area: Readonly<{ w: number; rows: number }>): number {\n" +
+          "  const orphan = area.rows;\n  return area.w;\n}\nexport const v = f(24);\n",
+      );
+      const both = check();
+      expect(both, "the real error still comes back").toContain("error TS2345");
+      expect(both, "and not the one that cannot reach runtime").not.toContain("error TS6133");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 60_000);
 });
