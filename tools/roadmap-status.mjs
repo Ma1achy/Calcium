@@ -198,8 +198,26 @@ function parse(text) {
  * a genuine ambiguity and there is none.
  */
 const CITE = /`([\w./-]+\.(?:ts|mjs|py|md|yml))(?::(\d+))?`/g;
-/** A backticked identifier — not a path, not a flag, not prose with spaces. */
-const IDENT = /`([A-Za-z_][\w$]*(?:\.[A-Za-z_][\w$]*)*)`/g;
+/**
+ * A backticked identifier — not a path, not a flag, not prose with spaces.
+ *
+ * **Three spellings of one symbol.** `cells()` is the call form and `#anchor` the
+ * private field, and both name something that is in the file under a spelling
+ * this pattern used to refuse: a matcher reading one encoding reports absence
+ * when the prose changes form. The `()` is dropped and the `#` is kept, because
+ * that is how each appears in `src/` — `cells` is declared without parentheses
+ * and `#anchor` is written with its hash. 47 call-form and 7 private-field spans
+ * in the roadmap were invisible here; five of the seven citations this signal
+ * still called adrift after F1092's repair were one of the two (F1101).
+ */
+const IDENT = /`(#?[A-Za-z_][\w$]*(?:\.[A-Za-z_][\w$]*)*)(?:\(\))?`/g;
+
+/**
+ * `#fafafa` is not a private field. Excluded by shape rather than by name — the
+ * CSS lengths, so a field called `#anchor` is still a symbol — because a palette
+ * cell is written the same way a field is and neither can be listed in advance.
+ */
+const HEX = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
 /**
  * Words that are backticked in these cells and are not symbols to resolve: block
@@ -270,7 +288,7 @@ function resolve(cell) {
 
   const idents = [...cell.matchAll(IDENT)]
     .map(([, id]) => id)
-    .filter((id) => !NOT_SYMBOLS.has(id))
+    .filter((id) => !NOT_SYMBOLS.has(id) && !HEX.test(id))
     .map((id) => id.split(".").pop() ?? id);
   for (const c of cites) {
     if (c.line === null || idents.length === 0) continue;
@@ -286,7 +304,7 @@ function resolve(cell) {
   }
 
   for (const [, ident] of cell.matchAll(IDENT)) {
-    if (NOT_SYMBOLS.has(ident)) continue;
+    if (NOT_SYMBOLS.has(ident) || HEX.test(ident)) continue;
     // A member reference resolves on its last segment: `Style.background` is not a
     // string that appears anywhere, and `background` is.
     const needle = ident.split(".").pop() ?? ident;
