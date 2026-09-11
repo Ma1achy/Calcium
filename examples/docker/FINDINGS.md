@@ -46560,7 +46560,7 @@ cannot reproduce.
 |---|---|
 | **Surface** | `src/shell/profiling/recorder.ts:439` · `tree.ts:109` · `tools/profile.mjs:290` · `src/shell/profiling/types.ts:458` · C28 I31 |
 | **Reached for** | closing P11's last item, the one the round's plan said the instrumentation would find |
-| **Verdict** | **open** |
+| **Verdict** | **closed** — `element(kind, id, op)`, `measures` and `renders` beside `calls`, `measures / frames` as the printed ratio; four of nine rows flagged where eight were, and `group#chrome.header` reads 0.0 |
 
 ### The two lines that produce it
 
@@ -46685,13 +46685,41 @@ reading the section against the code.**
 - **`measures / frames` being flat, and so no better than `calls / frames`.** It
   is 1.0 for the header pair against 2.0 for the footer pair in the same session.
 
+### Closed — what landed
+
+| commit | what |
+|---|---|
+| `40bfb5de` | C28 I31 rewritten, I42's second falsehood recorded, commitment 14, T1.33 and T1.33b |
+| `498d07d1` | C22 T4.64 and C09 T6.106, the two spec rows describing the assertions |
+| `5c315f93` | the split, its tests, and the `OPS-MERGED` mutation |
+| `1cd5f405` | the table into the harness, where a row can assert it (F1099) |
+
+The same 35-frame session, before and after:
+
+| | flagged | what the table could not say |
+|---|---|---|
+| before | 8 of 9 | that `group#chrome.header` is measured **0** times per frame |
+| after | 4 of 9 | — it prints 0.0, and the footer pair's 2.0 stands against the header pair's 1.0 |
+
+The four that remain flagged are real: the footer's two pills at compose's
+`measureSequence` plus paint's (C22 I82), and the entry's table and plot at two
+measures per frame with no render through the property.
+
+**The second site was found by adding the two seams up.** The per-entry table's
+*elements measured* column prints `byEntry`'s close count — 203 for the one entry
+this session draws, which is 68 + 1 + 67 + 67 — and it is the same union under
+the same word. Repaired by renaming rather than splitting, because `sum / count`
+is the mean self time per close and a count over one seam against a sum over both
+would be a mean of neither. Asking *why was that the section that was wrong* is
+F1099.
+
 ## F1099 — two of the report's six sections are computed in the script, and both of them carried the mislabel ★★★★
 
 | | |
 |---|---|
 | **Surface** | `tools/profile.mjs:294` and `:339` · `src/testing/profile.ts` · C28 I37, I41 |
 | **Reached for** | asking, after F1098, why *that* section was the one that was wrong |
-| **Verdict** | **open** |
+| **Verdict** | **closed** — `checkElementCost`/`checkEntryCost` and their formatters in `src/testing/profile.ts`, three rows and four mutations |
 
 ### The census
 
@@ -46760,3 +46788,43 @@ to return at the report seam rather than only at the aggregate.
   F1098 was open: budget, phases and leaks all say what they count.
 - **The two script sections having been wrong for unrelated reasons.** They carry
   the same word about the same seam, and one of them is the other's population.
+
+### Closed — and the three rows are the point
+
+`checkElementCost` / `formatElementCost` and `checkEntryCost` / `formatEntryCost`
+landed at `1cd5f405`, with `REPEATED_ABOVE` published so no row restates it.
+
+**The names are `…Cost` because `checkElements` and `ElementReport` are already
+C26's**, in `navigation-conformance.ts`. The compiler refused the second
+definition, which is MG24's name-exactness reading arriving as a
+duplicate-identifier error one layer earlier than the scan.
+
+Three rows, each of which was unwritable before the move:
+
+- **T1.105** — the union control at the report seam. It carries a **twelve-node
+  arm**, and that arm is the finding inside the finding: `repeated` is taken over
+  the whole population, and any fixture of ten or fewer makes that
+  *indistinguishable* from a count taken after the truncation — so the obvious
+  two-node fixture would have passed a mutation modelling the real defect. The
+  crossing node is the **cheapest**, so it falls outside the table and the count
+  is the only thing that says it exists. **And the first draft of that arm was
+  wrong in the way the rule warns about**: measuring a node twice doubles its
+  self time, which put the repeated node *third*, not last — a fixture agreeing
+  with the defect rather than responding to it.
+- **T1.106** — the per-entry count is closes, and the heading says so. Only a
+  fixture with a render in it can fail: an entry holding measures alone agrees
+  with the wrong word.
+- **T1.107** — the threshold is a published member, and 21/20 is quiet where
+  22/20 is flagged. The margin is against integer division, not a tolerance.
+
+Four mutations recorded in `c28-profiler.mjs` and each run by hand: the ratio
+reading the union, the count taken after the truncation, the unclaimed row's
+absent count drawn as a zero, and the threshold made inclusive. Each killed
+exactly the row it names.
+
+**Stated blind spot.** I55 is asserted by rows and enforced by no scan: nothing
+goes red the day a seventh section is added inline. The rule is written where a
+reader adding one would be — beside the two `format*` calls that replaced the
+last two — and that is a habit rather than a gate. The scan that would close it
+has to tell a section that *computes* from one that quotes, which is the
+distinction I55 draws in prose and a line-regex cannot.
