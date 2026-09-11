@@ -846,7 +846,7 @@ this session.
 
 ### The `keyValue` bar is not `Cell`'s bar, and the frame is what says so
 
-**`Cell.bar` replaces the cell's text and takes the planned width** (I50c). Copying that seam
+**`Cell.bar` replaces the cell's text and takes the planned width** (I50c) — the cell's *text*, and not its glyph, which I6 obliges on a `warn` or `error` cell and C11 I23 draws as a lead run inside that same width (F1104). Copying that seam
 here loses information at both measured sites: docker's row reads `████░░░░ 45.2%  1.2GiB /
 4GiB` and S13's `71%  ██████░░░`, and in each the bar sits **beside** a text rather than
 instead of one. So the row keeps `value` and gains the bar next to it.

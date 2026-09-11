@@ -436,6 +436,13 @@ describe("C11 tier 1 — planColumns", () => {
    * day someone takes it, which is what makes that a decision rather than a
    * drift — T2.7's argument, one field over.
    */
+  // C11 I23 — a bar or spark cell draws its glyph inside the planned width.
+  // Spec-first: the invariant landed at the commit above this one and these are
+  // the rows it is named by, not deferred on a component.
+  it.todo("T1.26 (I23): a toned bar cell draws its mark and the series takes the rest — not deferred on a component");
+  it.todo("T1.27 (I23): a column too narrow for both drops the mark and keeps the series — not deferred on a component");
+  it.todo("T3.21 (I23): a two-cell glyph at ambiguousWidth wide shortens the series by two — not deferred on a component");
+
   it("T1.25 (I22): `maxWidth` on a column with no `flex` cannot change a plan, at any width", () => {
     const drop = (c: ColumnDef): ColumnDef => {
       const { maxWidth: _capped, ...rest } = c;
