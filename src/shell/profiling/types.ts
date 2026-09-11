@@ -14,9 +14,9 @@ import type { MissReason, Probe } from "../../data/viewmodel/probe.js";
 import type { CommitReason } from "../../terminal/frame-scheduler.js";
 import type { HeapSpace } from "./node.js";
 import type { LeakStat } from "./leaks.js";
-import type { NodeStat, TreeNode } from "./tree.js";
+import type { ElementOp, NodeStat, TreeNode } from "./tree.js";
 
-export type { CommitReason, HeapSpace, LeakStat, NodeStat, TreeNode, Probe };
+export type { CommitReason, ElementOp, HeapSpace, LeakStat, NodeStat, TreeNode, Probe };
 
 export type Tier = "off" | "counters" | "spans" | "alloc" | "deep";
 
@@ -455,8 +455,10 @@ export type ProfileReport = Readonly<{
    * Per-element totals — the answer to *which component is slow* (C28 I31).
    *
    * Measured per block instance through the registry seam, never divided out of
-   * a sequence total. `calls / frames` above 1 is a node recomputed within a
-   * single frame.
+   * a sequence total. **`measures / frames` above 1 is a node recomputed within a
+   * single frame**; `calls` is `measures + renders` and its floor is 2 for a
+   * block that is drawn at all, so it is the seam-entry count and not the thrash
+   * figure (C28 I31, F1098).
    */
   nodes: readonly NodeStat[];
   byKind: Readonly<Record<string, Histogram>>;
@@ -574,8 +576,13 @@ export interface Profiler extends Probe {
    *
    * The registry wrapper's seam. `kind` aggregates across instances — *what does
    * a plot cost* — and `kind#id` identifies the one to fix.
+   *
+   * **`op` is required** (C28 I31). Both wrappers open on `kind#id`, so without
+   * it the node's count is a measure summed with a render and the ratio built on
+   * it is a rate neither population has — a floor of 2 for every block that is
+   * drawn, printed under the words *measured more than once per frame* (F1098).
    */
-  element(kind: string, id: string): Disposable;
+  element(kind: string, id: string, op: ElementOp): Disposable;
 
   /**
    * Whose work the elements measured inside this belong to (C28 I42).

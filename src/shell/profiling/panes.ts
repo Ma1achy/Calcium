@@ -375,14 +375,22 @@ function frame(r: ProfileReport, sep: string): readonly Block[] {
             b.col("element", { minWidth: 20 }),
             b.col("self", { align: "right", minWidth: 9 }),
             b.col("max", { align: "right", minWidth: 8 }),
+            // **Two seams, two columns** (C28 I31). One counter held both until
+            // F1098, and its quotient's floor is 2 for any block that is drawn —
+            // so the marker built on it fired on nearly every row and said
+            // nothing. The sum stays in `calls` because *how often was the
+            // registry entered for this block at all* is a real question and
+            // this pane is where it is asked.
+            b.col("measures", { align: "right", minWidth: 9 }),
+            b.col("renders", { align: "right", minWidth: 8 }),
             b.col("calls", { align: "right", minWidth: 6 }),
             b.col("frames", { align: "right", minWidth: 7 }),
             // **The column that turns a duration into a defect.** Above 1 means
-            // the element was measured or rendered more than once inside a single
-            // frame, which is repeated work whatever it cost — and it is not
-            // visible in any of the four columns to its left, because a node
-            // measured four times cheaply and one measured once expensively can
-            // carry the same self time.
+            // the element was *measured* more than once inside a single frame,
+            // which is repeated work whatever it cost — and it is not visible in
+            // any of the columns to its left, because a node measured four times
+            // cheaply and one measured once expensively can carry the same self
+            // time.
             b.col("per frame", { align: "right", minWidth: 10 }),
           ],
           rows: r.nodes.slice(0, 20).map((n) =>
@@ -390,9 +398,11 @@ function frame(r: ProfileReport, sep: string): readonly Block[] {
               element: n.key,
               self: `${ms(n.self)} ms`,
               max: `${ms(n.max)} ms`,
+              measures: String(n.measures),
+              renders: String(n.renders),
               calls: String(n.calls),
               frames: String(n.frames),
-              "per frame": n.frames === 0 ? "-" : (n.calls / n.frames).toFixed(1),
+              "per frame": n.frames === 0 ? "-" : (n.measures / n.frames).toFixed(1),
             }),
           ),
         }),

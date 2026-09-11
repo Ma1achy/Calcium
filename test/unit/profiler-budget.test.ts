@@ -15,7 +15,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { BUDGET, checkBudget, checkLeaks, checkPhases, formatBudget, formatLeaks } from "../../src/testing/index.js";
+import { BUDGET, REPEATED_ABOVE, checkBudget, checkElementCost, checkEntryCost, checkLeaks, checkPhases, formatBudget, formatElementCost, formatEntryCost, formatLeaks } from "../../src/testing/index.js";
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
 import { SPAN_SITE } from "../../src/shell/profiling/types.js";
 import type { Histogram, ProfileReport, SpanName, TreeNode } from "../../src/shell/profiling/types.js";
@@ -661,5 +661,198 @@ describe("C28 I44 — the cheap tier records everything cheap", () => {
     }
     expect(none.report().frames, "nothing is recorded at `off`, so zero is true").toBe(0);
     none.dispose();
+  });
+});
+
+describe("C28 I55 — every computed section of the report comes from a check/format pair", () => {
+  /** A profiler over a clock the caller advances, one frame at a time. */
+  function driven(): { prof: ReturnType<typeof createProfiler>; advance: (ms: number) => void } {
+    let now = 0;
+    return {
+      prof: createProfiler({ tier: "spans" }, { elapsed: () => now }),
+      advance: (ms: number) => {
+        now += ms;
+      },
+    };
+  }
+
+  it("T1.105 (C28 I55): one node measured once and rendered once is not flagged, and one measured twice is", () => {
+    // **The union control one layer above T1.33b.** That row asserts the
+    // aggregate keeps the two seams apart; this asserts the table built on it
+    // reads the right one. Under the merged counter `quiet#a` reports 2.0 and
+    // both rows flag, which is the reading eight of nine rows of a real session
+    // carried under the words *measured more than once per frame* (F1098).
+    const { prof, advance } = driven();
+    prof.beginFrame("input");
+    {
+      using _m = prof.element("table", "a", "measure");
+      advance(2);
+    }
+    {
+      using _r = prof.element("table", "a", "render");
+      advance(3);
+    }
+    for (const _pass of [0, 1]) {
+      using _m = prof.element("plot", "b", "measure");
+      advance(1);
+    }
+    {
+      using _r = prof.element("plot", "b", "render");
+      advance(1);
+    }
+    prof.endFrame("frame");
+
+    const elements = checkElementCost(prof.report());
+    const a = elements.rows.find((r) => r.key === "table#a");
+    const bee = elements.rows.find((r) => r.key === "plot#b");
+
+    expect(a?.measures, "measured once").toBe(1);
+    expect(a?.renders, "and rendered once").toBe(1);
+    expect(a?.perFrame, "so the thrash figure is 1").toBe(1);
+    expect(a?.repeated, "and it is not called out").toBe(false);
+
+    expect(bee?.measures, "measured twice").toBe(2);
+    expect(bee?.renders, "and rendered once").toBe(1);
+    expect(bee?.perFrame, "so the thrash figure is 2").toBe(2);
+    expect(bee?.repeated, "and this one is").toBe(true);
+
+    // **Over every node, not over the rows shown.** A count taken after the
+    // truncation says *1 repeated* about a table of ten and means it about the
+    // ten, which a reader cannot see from the number.
+    expect(elements.repeated, "one of the two").toBe(1);
+    expect(elements.nodes, "over both").toBe(2);
+
+    const table = formatElementCost(elements);
+    expect(table, "the flagged row carries the marker").toContain(
+      "<-- measured more than once per frame",
+    );
+    expect(
+      table.split("\n").filter((l) => l.includes("<--")),
+      "exactly one row of two",
+    ).toHaveLength(1);
+    prof.dispose();
+
+    // **The count is over every node, and a two-node fixture cannot say so.**
+    // `rows` is truncated at ten, so a `repeated` taken after the truncation
+    // agrees with one taken before it for any population of ten or fewer —
+    // which is every other fixture in this file. The cheapest population that
+    // can tell them apart is twelve with the repeated one *cheapest*, so it
+    // falls outside the table entirely: the row a reader would go looking for
+    // is the one the table does not show, and the count is the only thing that
+    // says it exists (F1099).
+    const many = driven();
+    many.prof.beginFrame("input");
+    for (let i = 0; i < 12; i += 1) {
+      // **Two passes of 1 ms, not two of its own cost.** Measuring the node
+      // twice doubles its self time, so the obvious fixture puts the repeated
+      // node *third* rather than last — which is the fixture agreeing with the
+      // defect instead of responding to it.
+      const passes = i === 11 ? 2 : 1;
+      for (let pass = 0; pass < passes; pass += 1) {
+        using _m = many.prof.element("rule", `r${String(i)}`, "measure");
+        many.advance(i === 11 ? 1 : 20 - i);
+      }
+    }
+    many.prof.endFrame("frame");
+
+    const wide = checkElementCost(many.prof.report());
+    expect(wide.nodes, "twelve nodes").toBe(12);
+    expect(wide.rows, "ten rows shown").toHaveLength(10);
+    expect(
+      wide.rows.some((r) => r.key === "rule#r11"),
+      "and the repeated one is not among them — it is the cheapest",
+    ).toBe(false);
+    expect(wide.repeated, "the count sees it anyway").toBe(1);
+    expect(
+      wide.rows.filter((r) => r.repeated),
+      "while no drawn row carries the marker",
+    ).toHaveLength(0);
+    expect(formatElementCost(wide), "and the tally under the table says both figures").toContain(
+      "1 of 12 nodes cross",
+    );
+    many.prof.dispose();
+  });
+
+  it("T1.106 (C28 I55): the per-entry count is byEntry's closes and the heading says so", () => {
+    // **A fixture with a render in it is the one that can fail** (F1099). The
+    // two figures differ only when a seam other than `measure` closed inside the
+    // scope, so an entry holding measures alone agrees with the wrong word.
+    const { prof, advance } = driven();
+    prof.beginFrame("input");
+    {
+      using _e = prof.entry("e1");
+      {
+        using _m = prof.element("table", "t1", "measure");
+        advance(2);
+      }
+      {
+        using _r = prof.element("table", "t1", "render");
+        advance(3);
+      }
+    }
+    // Chrome: measured every frame, belonging to no entry.
+    {
+      using _c = prof.element("pills", "chrome.header.left", "measure");
+      advance(5);
+    }
+    prof.endFrame("frame");
+
+    const entries = checkEntryCost(prof.report());
+    const e1 = entries.rows.find((r) => r.entry === "e1");
+    const unclaimed = entries.rows.find((r) => r.entry === null);
+
+    expect(e1?.closes, "two closes, one measure and one render").toBe(2);
+    const node = prof.report().nodes.find((n) => n.key === "table#t1");
+    expect(node?.measures, "against one measure — the two figures are different").toBe(1);
+    expect(e1?.selfMs, "and the entry's work is both closes'").toBe(5);
+
+    // **`null`, not 0.** There is no `byEntry` bucket for what no entry claimed,
+    // and a zero beside a positive duration reads as *the chrome was never
+    // measured*.
+    expect(unclaimed?.closes, "the unclaimed row has no count to report").toBeNull();
+    expect(unclaimed?.selfMs, "and its duration is the chrome's").toBe(5);
+
+    const table = formatEntryCost(entries);
+    expect(table, "the heading says what the column holds").toContain("element closes");
+    expect(table, "and never the word that was wrong").not.toContain("elements measured");
+    prof.dispose();
+  });
+
+  it("T1.107 (C28 I55): the threshold is a published member, and a node exactly at it is quiet", () => {
+    // **A literal written twice agrees with its own drifted copy.** The marker's
+    // figure lived in `tools/profile.mjs` and in no type, so a row asserting the
+    // flag had to restate it (F1099).
+    //
+    // 20 frames, because `measures` and `frames` are integers and 21/20 is the
+    // smallest ratio that lands on 1.05 exactly. The margin is against a
+    // rounding, not a tolerance for repetition, and this is the row that says so.
+    const at = (measuresInFirstFrame: number): ReturnType<typeof checkElementCost> => {
+      const { prof, advance } = driven();
+      for (let frame = 0; frame < 20; frame += 1) {
+        prof.beginFrame("input");
+        const passes = frame === 0 ? measuresInFirstFrame : 1;
+        for (let pass = 0; pass < passes; pass += 1) {
+          using _m = prof.element("rule", "r1", "measure");
+          advance(1);
+        }
+        prof.endFrame("frame");
+      }
+      const out = checkElementCost(prof.report());
+      prof.dispose();
+      return out;
+    };
+
+    expect(REPEATED_ABOVE, "the published figure").toBe(1.05);
+    const exactly = at(2).rows[0];
+    expect(exactly?.measures, "21 over 20 frames").toBe(21);
+    expect(exactly?.perFrame, "is 1.05 exactly").toBeCloseTo(1.05, 10);
+    expect(exactly?.repeated, "which is not above it").toBe(false);
+
+    const above = at(3).rows[0];
+    expect(above?.perFrame, "22 over 20 is 1.1").toBeCloseTo(1.1, 10);
+    expect(above?.repeated, "and that is").toBe(true);
+
+    // The threshold travels with the report rather than being restated here.
+    expect(at(2).threshold, "published on what the check returns").toBe(REPEATED_ABOVE);
   });
 });

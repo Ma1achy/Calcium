@@ -32,7 +32,7 @@ import { createContexts } from "./async-context.js";
 import { Hist, HISTOGRAM_ERROR } from "./histogram.js";
 import { Ring } from "./ring.js";
 import { Leaks } from "./leaks.js";
-import { Aggregate, closeNode, freezeTree, openNode, type OpenNode } from "./tree.js";
+import { Aggregate, closeNode, type ElementOp, freezeTree, openNode, type OpenNode } from "./tree.js";
 import type { Inspector } from "./node.js";
 import {
   TIER_RANK,
@@ -385,6 +385,7 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
       readonly node: OpenNode,
       readonly ctx: { parent: OpenNode | null },
       readonly kind: string,
+      readonly op: ElementOp,
       readonly entry: string | null,
     ) {}
     [Symbol.dispose](): void {
@@ -399,7 +400,11 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
       // not a rounding error: a `byEntry` silently omitting the chrome reads as
       // *the chrome is free* (C28 I42).
       if (this.entry !== null) hist(byEntry, this.entry).add(spent);
-      nodes.add(this.node.name, this.entry, spent, this.node.total ?? spent, seq);
+      // **The operation, so the ratio's numerator is one population.** Both
+      // registry wrappers open a span on `kind#id`, so a single counter is a
+      // measure summed with a render and its quotient is a rate neither has
+      // (C28 I31, F1098).
+      nodes.add(this.node.name, this.entry, this.op, spent, this.node.total ?? spent, seq);
     }
   }
 
@@ -436,10 +441,10 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
       return new SpanHandle(node, ctx);
     },
 
-    element(kind: string, id: string): Disposable {
+    element(kind: string, id: string, op: ElementOp): Disposable {
       if (disposed || !spanning()) return NO_SPAN;
       const { node, ctx } = begin(`${kind}#${id}`);
-      return new ElementHandle(node, ctx, kind, currentEntry);
+      return new ElementHandle(node, ctx, kind, op, currentEntry);
     },
 
     entry(id: string): Disposable {

@@ -93,11 +93,11 @@ describe("C28 I42 — an element belongs to the entry it was drawn for", () => {
     {
       using _e = p.entry("e1");
       {
-        using _a = p.element("table", "t1");
+        using _a = p.element("table", "t1", "measure");
         work(2);
       }
       {
-        using _b = p.element("rule", "r1");
+        using _b = p.element("rule", "r1", "measure");
         work(1);
       }
     }
@@ -123,13 +123,13 @@ describe("C28 I42 — an element belongs to the entry it was drawn for", () => {
     const { profiler: p, work } = stepping();
 
     // Two frames, so `frames` can be wrong in the way the merged form was: a
-    // single frame makes `calls` and `frames` agree by construction and the
+    // single frame makes the count and `frames` agree by construction and the
     // ratio says nothing.
     for (const _frame of [0, 1]) {
       p.beginFrame("input");
       for (const id of ["e1", "e2"]) {
         using _e = p.entry(id);
-        using _b = p.element("table", "t1");
+        using _b = p.element("table", "t1", "measure");
         work(1);
       }
       p.endFrame("frame");
@@ -142,9 +142,12 @@ describe("C28 I42 — an element belongs to the entry it was drawn for", () => {
     // across the pair passes a row asserting only the count, and the ratio is
     // the reading that misleads — 2 calls over 2 frames is 1, and the merged
     // form reported 4 over 2.
-    expect(rows.map((n) => n.calls), "each keeps its own calls").toStrictEqual([2, 2]);
+    expect(rows.map((n) => n.measures), "each keeps its own measures").toStrictEqual([2, 2]);
     expect(rows.map((n) => n.frames), "and its own frames").toStrictEqual([2, 2]);
-    expect(rows.map((n) => n.calls / n.frames), "so nothing is measured twice per frame").toStrictEqual([1, 1]);
+    expect(
+      rows.map((n) => n.measures / n.frames),
+      "so nothing is measured twice per frame",
+    ).toStrictEqual([1, 1]);
 
     p.dispose();
   });
@@ -155,12 +158,12 @@ describe("C28 I42 — an element belongs to the entry it was drawn for", () => {
     p.beginFrame("input");
     {
       using _e = p.entry("e1");
-      using _b = p.element("table", "t1");
+      using _b = p.element("table", "t1", "measure");
       work(2);
     }
     // The chrome: measured every frame, belonging to no entry.
     {
-      using _c = p.element("pills", "chrome.header.left");
+      using _c = p.element("pills", "chrome.header.left", "measure");
       work(5);
     }
     p.endFrame("frame");
@@ -191,7 +194,7 @@ describe("C28 I42 — an element belongs to the entry it was drawn for", () => {
     for (const ms of [2, 3]) {
       p.beginFrame("input");
       using _e = p.entry("e1");
-      using _b = p.element("table", "t1");
+      using _b = p.element("table", "t1", "measure");
       work(ms);
       p.endFrame("frame");
     }
@@ -202,7 +205,7 @@ describe("C28 I42 — an element belongs to the entry it was drawn for", () => {
     expect(r.byEntry.e1?.sum, "the entry totals both frames").toBe(5);
     expect(r.byEntry.e1?.count, "over two closes").toBe(2);
     expect(row?.self, "and the element's own row is the same work, not a second copy").toBe(5);
-    expect(row?.calls, "counted once per close").toBe(2);
+    expect(row?.measures, "counted once per close").toBe(2);
 
     p.dispose();
   });
@@ -222,10 +225,10 @@ describe("C28 I42 — an element belongs to the entry it was drawn for", () => {
       using _outer = p.entry("e1");
       {
         using _inner = p.entry("e2");
-        using _a = p.element("rule", "r1");
+        using _a = p.element("rule", "r1", "measure");
         work(1);
       }
-      using _b = p.element("table", "t1");
+      using _b = p.element("table", "t1", "measure");
       work(4);
     }
     p.endFrame("frame");
@@ -486,13 +489,13 @@ describe("C28 — the frame record, the ring, and the end of a profiler's life",
     set(0);
     p.beginFrame("input");
     {
-      using _parent = p.element("group", "outer");
+      using _parent = p.element("group", "outer", "measure");
       set(2);
       // Three children of three each: the parent's own five is what is left
       // when they are taken out, and the three must differ from it or a row
       // asserting `self` cannot tell subtraction from a coincidence.
       for (const [id, closesAt] of [["a", 5], ["b", 8], ["c", 11]] as const) {
-        using _child = p.element("raw", id);
+        using _child = p.element("raw", id, "measure");
         set(closesAt);
       }
       set(14);
@@ -649,7 +652,7 @@ describe("C28 I1 — at `off`, nothing is armed and nothing accumulates", () => 
       using _s = p.span("compose");
     }
     {
-      using _e = p.element("table", "t1");
+      using _e = p.element("table", "t1", "measure");
     }
     p.beginFrame("input");
     p.endFrame("frame");

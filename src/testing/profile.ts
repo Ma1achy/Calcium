@@ -678,3 +678,247 @@ export function formatLeaks(leaks: LeakReport): string {
   );
   return out.join("\n");
 }
+
+// --- the element table and the per-entry table (C28 I55) ---------------------
+//
+// **Here rather than in `tools/profile.mjs`, for the reason the phase check is
+// here** — and it is the second time that reason has had to be given. A reading
+// computed in a script is a reading no row can be written against: the number
+// goes into a template string on its way to `stdout`, and the only assertable
+// thing left is the whole line. The phase table moved for that (F888, I41); the
+// two tables beside it did not, and they are the two that were wrong.
+//
+// The element table's ratio was a measure summed with a render, printed under
+// the words *measured more than once per frame* (F1098). The per-entry table's
+// count was the same union, printed as *elements measured* — 203 for one entry
+// against 202 measures. Neither could be caught: `tools/instruments.mjs` runs
+// the tool against a fixture and reads its exit code, and none of its nine rows
+// can see a column heading (F1099).
+
+/**
+ * The ratio above which an element is called out as repeated work.
+ *
+ * **Published rather than written twice** (C28 I55). It lived as a literal in
+ * `tools/profile.mjs` and in no type, so a row asserting the flag had to restate
+ * it and would have agreed with a drifted copy. Slightly above 1 because a
+ * node's `measures` and `frames` are integers and exactly-once is the common
+ * case: the margin is against a rounding, not a tolerance for repetition.
+ */
+export const REPEATED_ABOVE = 1.05;
+
+/** One element's row — a block instance, per seam. */
+export type ElementCostRow = Readonly<{
+  key: string;
+  /** Absent for chrome, the prompt and the overlays (C28 I42). */
+  entry?: string;
+  totalMs: number;
+  selfMs: number;
+  measures: number;
+  renders: number;
+  frames: number;
+  /** `measures / frames`, the thrash figure — 0 when the node drew no frame. */
+  perFrame: number;
+  /** `perFrame > REPEATED_ABOVE`. */
+  repeated: boolean;
+}>;
+
+export type ElementCostReport = Readonly<{
+  /** The slowest by self time, longest first, truncated to `top`. */
+  rows: readonly ElementCostRow[];
+  /** Every node in the report, not only the rows shown. */
+  nodes: number;
+  /** How many of those cross the threshold — over the whole population. */
+  repeated: number;
+  /** The figure `repeated` is taken at, so a row need not restate it. */
+  threshold: number;
+}>;
+
+/**
+ * The per-element table (C28 I31, I55).
+ *
+ * **`measures / frames`, never `calls / frames`.** `calls` is `measures +
+ * renders` and its floor is 2 for any block that is both measured and rendered,
+ * so a marker reading the sum fires on nearly every row: measured over a
+ * 35-frame session, eight of nine (F1098).
+ */
+export function checkElementCost(
+  report: ProfileReport,
+  opts: Readonly<{ top?: number; threshold?: number }> = {},
+): ElementCostReport {
+  const threshold = opts.threshold ?? REPEATED_ABOVE;
+  const perFrame = (n: ProfileReport["nodes"][number]): number =>
+    n.frames === 0 ? 0 : n.measures / n.frames;
+  // Over the whole population, not over the rows shown: a count taken after the
+  // truncation would say *3 repeated* about a table of ten and mean it about the
+  // ten, which is the shape a reader cannot see from the number.
+  let repeated = 0;
+  for (const n of report.nodes) if (perFrame(n) > threshold) repeated += 1;
+
+  const rows = [...report.nodes]
+    .sort((a, b) => b.self - a.self)
+    .slice(0, opts.top ?? 10)
+    .map((n) =>
+      Object.freeze({
+        key: n.key,
+        ...(n.entry === undefined ? {} : { entry: n.entry }),
+        totalMs: n.total,
+        selfMs: n.self,
+        measures: n.measures,
+        renders: n.renders,
+        frames: n.frames,
+        perFrame: perFrame(n),
+        repeated: perFrame(n) > threshold,
+      }),
+    );
+  return Object.freeze({
+    rows: Object.freeze(rows),
+    nodes: report.nodes.length,
+    repeated,
+    threshold,
+  });
+}
+
+/** `checkElementCost` as a table. */
+export function formatElementCost(elements: ElementCostReport): string {
+  const out: string[] = [];
+  out.push("## Slowest elements — per instance, measured (C28 I31)");
+  out.push("");
+  if (elements.rows.length === 0) {
+    out.push("No element was measured. At `counters` and below the registry seam opens none.");
+    return out.join("\n");
+  }
+  out.push(
+    "`measures / frames` above " +
+      elements.threshold.toFixed(2) +
+      " is the same block measured twice inside one frame, which is repeated",
+  );
+  out.push(
+    "work whatever it cost. The two seams are separate columns because their sum has a floor of 2",
+  );
+  out.push(
+    "for any block that is drawn, so a marker reading the sum fires on nearly every row and says",
+  );
+  out.push("nothing — that sum is `NodeStat.calls`, in the report and in the profiler's own pane.");
+  out.push("");
+  out.push("| entry | element | total ms | self ms | measures | renders | frames | measures/frame |");
+  out.push("|---|---|---|---|---|---|---|---|");
+  for (const r of elements.rows) {
+    out.push(
+      `| ${r.entry === undefined ? "*chrome*" : `\`${r.entry}\``} | \`${r.key}\` | ` +
+        `${r.totalMs.toFixed(2)} | ${r.selfMs.toFixed(2)} | ${String(r.measures)} | ` +
+        `${String(r.renders)} | ${String(r.frames)} | ${r.perFrame.toFixed(1)}` +
+        `${r.repeated ? " <-- measured more than once per frame" : ""} |`,
+    );
+  }
+  out.push("");
+  out.push(
+    `${String(elements.repeated)} of ${String(elements.nodes)} nodes cross ${elements.threshold.toFixed(2)} — ` +
+      "over every node, not only the rows above.",
+  );
+  return out.join("\n");
+}
+
+/** One transcript entry's share of the element work. */
+export type EntryCostRow = Readonly<{
+  /** `null` for the work no entry claims — chrome, prompt, overlays. */
+  entry: string | null;
+  selfMs: number;
+  /** Share of `Σ nodes.self`, or `null` when there is no element work at all. */
+  share: number | null;
+  /**
+   * Closes of the element seam inside this entry's scope, **measures and
+   * renders together** (C28 I55, F1099).
+   *
+   * `byEntry`'s histogram is fed once per close whatever seam opened it, and it
+   * has to be: `sum / count` is the mean self time per close, and a count over
+   * one seam against a sum over both is a mean of neither. So the honest repair
+   * here was the word, not a split — the column said *elements measured* and
+   * printed 203 for an entry holding 202 measures and one render.
+   */
+  closes: number | null;
+  /** The slowest element inside the scope, absent for the unclaimed row. */
+  slowest?: Readonly<{ key: string; selfMs: number }>;
+  note: string;
+}>;
+
+export type EntryCostReport = Readonly<{
+  rows: readonly EntryCostRow[];
+  /** `Σ nodes.self` — the whole every share is taken of. */
+  elementMs: number;
+  /** What belongs to no entry: `elementMs` minus the entries' own sums. */
+  unclaimedMs: number;
+}>;
+
+/**
+ * Cost per transcript entry, with the unclaimed remainder as a row (C28 I42).
+ *
+ * `byEntry` is a projection of `nodes` and not a second accumulator, so the
+ * shortfall is a reading rather than a discrepancy — a table that omitted it
+ * would read *the chrome is free*.
+ */
+export function checkEntryCost(report: ProfileReport): EntryCostReport {
+  let elementMs = 0;
+  for (const n of report.nodes) elementMs += n.self;
+
+  const rows: EntryCostRow[] = [];
+  let claimed = 0;
+  for (const [id, hist] of Object.entries(report.byEntry)) {
+    const selfMs = hist?.sum ?? 0;
+    claimed += selfMs;
+    const slowest = report.nodes
+      .filter((n) => n.entry === id)
+      .reduce<ProfileReport["nodes"][number] | null>(
+        (best, n) => (best === null || n.self > best.self ? n : best),
+        null,
+      );
+    rows.push(
+      Object.freeze({
+        entry: id,
+        selfMs,
+        share: elementMs === 0 ? null : selfMs / elementMs,
+        closes: hist?.count ?? 0,
+        ...(slowest === null ? {} : { slowest: Object.freeze({ key: slowest.key, selfMs: slowest.self }) }),
+        note: "",
+      }),
+    );
+  }
+  rows.sort((a, b) => b.selfMs - a.selfMs);
+  const unclaimedMs = elementMs - claimed;
+  rows.push(
+    Object.freeze({
+      entry: null,
+      selfMs: unclaimedMs,
+      share: elementMs === 0 ? null : unclaimedMs / elementMs,
+      // **`null`, not 0.** `byEntry` has no bucket for what no entry claimed, so
+      // there is no close count to report and a zero would read as *the chrome
+      // was never measured* beside a positive duration.
+      closes: null,
+      note: "chrome, prompt and overlays — measured every frame and belonging to no entry",
+    }),
+  );
+  return Object.freeze({ rows: Object.freeze(rows), elementMs, unclaimedMs });
+}
+
+/** `checkEntryCost` as a table. */
+export function formatEntryCost(entries: EntryCostReport): string {
+  const out: string[] = [];
+  out.push("## Cost per transcript entry — what is on screen, not what kind it is (C28 I42)");
+  out.push("");
+  out.push("| entry | self ms | share of element work | element closes | slowest element |");
+  out.push("|---|---|---|---|---|");
+  for (const r of entries.rows) {
+    const share = r.share === null ? "—" : `${(r.share * 100).toFixed(1)}%`;
+    const slowest =
+      r.slowest === undefined ? r.note || "—" : `\`${r.slowest.key}\` ${r.slowest.selfMs.toFixed(2)} ms`;
+    out.push(
+      `| ${r.entry === null ? "*no entry*" : `\`${r.entry}\``} | ${r.selfMs.toFixed(2)} | ${share} | ` +
+        `${r.closes === null ? "—" : String(r.closes)} | ${slowest} |`,
+    );
+  }
+  out.push("");
+  out.push(
+    "A **close** is one span on the element seam — a measure or a render — because `byEntry`'s sum is " +
+      "taken over both and a count over one would be a mean of neither (F1099).",
+  );
+  return out.join("\n");
+}

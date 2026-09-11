@@ -2189,6 +2189,49 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "LeakRow.liveShare":
     "C28 I43 - `live / created`, the shape a single run supports where an absolute figure does not " +
     "(the floor is one and means nothing). Read by `formatLeaks` and by `make profile`; asserted by T1.74",
+  // C28 I55 — the element and per-entry tables, moved out of `tools/profile.mjs`
+  // because a reading computed in a script is a reading no row can be written
+  // against (F888, F1099). Every member below is read by its own `format*` in
+  // `testing/profile.ts` and by `make profile`, and `tools/` is outside this
+  // scan — the same standing as `LeakRow` and `PhaseRow` above.
+  "ElementCostRow.totalMs":
+    "C28 I31 — the inclusive figure beside the self one, so a container is visible as a container. " +
+    "Read by `formatElementCost` and by `make profile`; asserted by T1.105",
+  "ElementCostRow.selfMs":
+    "C28 I31 — the element's own work, which is what the table is sorted by. " +
+    "Read by `formatElementCost` and by `make profile`; asserted by T1.105",
+  "ElementCostRow.perFrame":
+    "C28 I31 — `measures / frames`, the thrash figure. Never `calls / frames`, whose floor is 2 for " +
+    "any block that is drawn (F1098). Read by `formatElementCost` and by `make profile`; asserted by " +
+    "T1.105 and T1.107",
+  "ElementCostRow.repeated":
+    "C28 I55 — whether this row crosses the published threshold, so the marker is a decision the " +
+    "check made rather than a comparison the formatter repeats. Asserted by T1.105 and T1.107",
+  "ElementCostReport.repeated":
+    "C28 I55 — how many nodes cross, **over the whole population and not the rows shown**: a count " +
+    "taken after the truncation says *3 of 10* about a table of ten and means it about the ten. " +
+    "Asserted by T1.105's twelve-node arm, where the crossing node is the cheapest and outside the " +
+    "table entirely",
+  "ElementCostReport.threshold":
+    "C28 I55 — the figure `repeated` is taken at, published so a row need not restate it: a literal " +
+    "written twice agrees with its own drifted copy (F1099). Asserted by T1.107",
+  "EntryCostRow.selfMs":
+    "C28 I42 — the entry's share of element work, which is what the table is sorted by. " +
+    "Read by `formatEntryCost` and by `make profile`; asserted by T1.106",
+  "EntryCostRow.closes":
+    "C28 I55 — `byEntry`'s close count, **measures and renders together**, because `sum / count` is " +
+    "the mean self time per close and a count over one seam against a sum over both is a mean of " +
+    "neither. `null` on the unclaimed row, which has no bucket (F1099). Asserted by T1.106",
+  "EntryCostRow.slowest":
+    "C28 I42 — the heaviest element inside the scope, so a row a reader acts on names what to open. " +
+    "Read by `formatEntryCost` and by `make profile`; asserted by T1.106",
+  "EntryCostReport.elementMs":
+    "C28 I42 — `Σ nodes.self`, the whole every share is taken of, published because `Σ byEntry` " +
+    "falls short of it by what no entry claimed and the shortfall is a reading. Asserted by T1.106",
+  "EntryCostReport.unclaimedMs":
+    "C28 I42 — the chrome, the prompt and the overlays: measured every frame, belonging to no entry. " +
+    "Printed rather than absorbed, because a table that omits it reads as *the chrome is free*. " +
+    "Asserted by T1.106",
   "BudgetReport.crossed": "C28 I37 — the crossed rows, for a caller deciding; asserted by T1.28",
   "BudgetReport.unanswered": "C28 I37 — the rows with no answer, which is what makes the verdict `undecided`; asserted by T1.27 and T1.29",
   "ConformanceReport.kindsCovered": "C09 §7 — measurement-conformance coverage, asserted by the harness's own row",

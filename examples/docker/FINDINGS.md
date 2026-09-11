@@ -46551,3 +46551,354 @@ cannot reproduce.
   the tree clean and 90 mutations caught, and the runner killed it at the bound.
 - **The per-run logs being printed somewhere.** `sweep.mjs` writes them and no
   line reads them back; the job log carries the summary line alone.
+
+---
+
+## F1098 — the element count sums two operations, and the ratio built on it is labelled *measured* ★★★★
+
+| | |
+|---|---|
+| **Surface** | `src/shell/profiling/recorder.ts:439` · `tree.ts:109` · `tools/profile.mjs:290` · `src/shell/profiling/types.ts:458` · C28 I31 |
+| **Reached for** | closing P11's last item, the one the round's plan said the instrumentation would find |
+| **Verdict** | **closed** — `element(kind, id, op)`, `measures` and `renders` beside `calls`, `measures / frames` as the printed ratio; four of nine rows flagged where eight were, and `group#chrome.header` reads 0.0 |
+
+### The two lines that produce it
+
+```ts
+const measured = (block, width) => { using _s = prof.element(block.kind, block.id); … };
+const rendered = (block, ctx)   => { using _s = prof.element(block.kind, block.id); … };
+```
+
+`element(kind, id)` opens a span named `${kind}#${id}` and nothing else, so both
+wrappers increment one counter. `NodeStat.calls` is **measure-opens plus
+render-opens**, and `tools/profile.mjs` divides it by `frames` and prints
+
+```js
+per > 1.05 ? " <-- measured more than once per frame" : ""
+```
+
+### Measured — a counter per operation, over the same 35-frame session
+
+| element | measure-opens | render-opens | `calls` | frames | printed | flagged |
+|---|---|---|---|---|---|---|
+| `group#chrome.footer` | 35 | 35 | 70 | 35 | 2.0 | yes |
+| `pills#chrome.footer.left` | **70** | 35 | 105 | 35 | 3.0 | yes |
+| `pills#chrome.footer.right` | **70** | 35 | 105 | 35 | 3.0 | yes |
+| `group#chrome.header` | **0** | 35 | 35 | 35 | 1.0 | no |
+| `pills#chrome.header.left` | 35 | 35 | 70 | 35 | 2.0 | yes |
+| `pills#chrome.header.right` | 35 | 35 | 70 | 35 | 2.0 | yes |
+| `table#profile-table` | 67 | **0** | 67 | 33 | 2.0 | yes |
+| `plot#profile-plot` | 67 | **0** | 67 | 33 | 2.0 | yes |
+| `patch#profile-patch` | 68 | 1 | 69 | 33 | 2.1 | yes |
+
+**A block that is both measured and rendered has a floor of 2.0**, so the marker
+fires on eight of the nine rows and carries no information. The two rows that
+genuinely *are* measured twice inside a frame — the footer's pills — read 3.0,
+one step above a floor the table never states.
+
+### The invariant's own sentence is the false one
+
+C28 I31: *`calls` is kept beside `frames` so a node recomputed **within** one
+frame is distinguishable from one measured once per frame.*
+
+`group#chrome.header` is 0 measures and 35 renders and reads 1.0.
+`pills#chrome.header.left` is 35 and 35 and reads 2.0. Applying I31's sentence to
+the second gives *recomputed within one frame*, and it was measured once. **The
+distinguishing power the invariant claims does not exist**, and no constant
+threshold restores it, because the floor is a property of the node: 1 for the
+header group, 2 for the header pills, 3 for the footer pills.
+
+### It is F892's symptom arriving from a second merge
+
+I42 records F892 — two transcript entries sharing a block id became one row, so
+`calls / frames` summed two numerators over one denominator, and *the ratio the
+formatter labels* measured more than once per frame *goes 2.3 to 5.3, a
+recomputation named at a node where there is none.* That was repaired by keying
+on the pair.
+
+**The same false reading survived the repair, from a different merge.** F892
+merged two *entries*; this merges two *operations*. The formatter's sentence is
+quoted inside I42 as the thing the fix made true, and it was still false. The
+class is **a ratio whose numerator is a union**, and the cheap check is to ask
+what populations the numerator unions before reading the quotient — a question
+neither merge answers from the quotient alone, because both produce a plausible
+small integer.
+
+### What the filing got wrong, and how a hand tally confirmed it anyway
+
+This was filed against the **height memo**: *a question the memo answers costs
+nothing and still counts.* It does not count. `registry.ts`'s own header says so
+in six words — **A hit never reaches the `measure` property** — and the probe
+above confirms it: the header pills' second open is a *render*.
+
+The wrong reading came from one gloss. Two files carry the same phrase:
+
+| file | the sentence |
+|---|---|
+| `registry.ts:231` | a hit never reaches the `measure` property … the `calls` column counts the questions the registry had to answer **and not the ones it read back** |
+| `registry-probe.ts:14` | entered for every child that had to be *answered* … the `calls` column counts **questions rather than reads** |
+
+The first is unambiguous. The second admits both readings — *questions in place
+of reads*, and *questions, reads included* — and the filing took the wrong one.
+Then the hand tally agreed with it, because in this session 35 renders and 35
+memo hits are the same number: **a tally confirms a wrong mechanism whenever the
+two populations happen to be the same size**, and the tally is the instrument
+that is supposed to catch exactly that. What separated them was a counter that
+names the operation, which is also the remedy.
+
+### Remedy
+
+**Split the count; do not rename the column.** `element(kind, id, op)` with `op` a
+required `"measure" | "render"`; `NodeStat` carries `measures` and `renders` with
+`calls` their sum, which is the seam-entry figure `panes.ts` already describes
+correctly. The printed ratio becomes `measures / frames`, which is the figure I31
+has always claimed to publish. Under it this session flags the footer's two pills
+and nothing else — compose's `measureSequence` of `footerRows` before the paint
+pass, which C22 I82 names and `session-paint.test.ts` already asserts.
+
+Renaming the column to `asks` was this finding's first remedy and is refused: it
+makes the table honest and leaves it unable to answer the question the invariant
+says the column exists for.
+
+### The three places that already had it right
+
+The fact is written correctly in the tree and falsified only in the summary,
+which is F86/F89/F92's mechanism on a fourth artefact:
+
+- `registry.ts:231` — *a hit never reaches the `measure` property.*
+- `panes.ts:378` — *above 1 means the element was measured **or rendered** more
+  than once inside a single frame.*
+- `session-paint.test.ts:787` — `toBe(2 * headerLeft.frames)`, message *one
+  measure and one render per frame*.
+
+Three correct statements, one per file, and none of them is the caption a reader
+of `make profile` sees. **Read the abstract against its own section before
+reading the section against the code.**
+
+### What would falsify this
+
+- **The two opens being one operation.** The probe counted them apart:
+  `group#chrome.header` is 0 / 35 and `table#profile-table` is 67 / 0, which no
+  single-operation seam can produce.
+- **The floor being 1.** `session-paint.test.ts` has asserted `2 * frames` for
+  the header pills since it was written.
+- **`measures / frames` being flat, and so no better than `calls / frames`.** It
+  is 1.0 for the header pair against 2.0 for the footer pair in the same session.
+
+### Closed — what landed
+
+| commit | what |
+|---|---|
+| `40bfb5de` | C28 I31 rewritten, I42's second falsehood recorded, commitment 14, T1.33 and T1.33b |
+| `498d07d1` | C22 T4.64 and C09 T6.106, the two spec rows describing the assertions |
+| `5c315f93` | the split, its tests, and the `OPS-MERGED` mutation |
+| `1cd5f405` | the table into the harness, where a row can assert it (F1099) |
+
+The same 35-frame session, before and after:
+
+| | flagged | what the table could not say |
+|---|---|---|
+| before | 8 of 9 | that `group#chrome.header` is measured **0** times per frame |
+| after | 4 of 9 | — it prints 0.0, and the footer pair's 2.0 stands against the header pair's 1.0 |
+
+The four that remain flagged are real: the footer's two pills at compose's
+`measureSequence` plus paint's (C22 I82), and the entry's table and plot at two
+measures per frame with no render through the property.
+
+**The second site was found by adding the two seams up.** The per-entry table's
+*elements measured* column prints `byEntry`'s close count — 203 for the one entry
+this session draws, which is 68 + 1 + 67 + 67 — and it is the same union under
+the same word. Repaired by renaming rather than splitting, because `sum / count`
+is the mean self time per close and a count over one seam against a sum over both
+would be a mean of neither. Asking *why was that the section that was wrong* is
+F1099.
+
+## F1099 — two of the report's six sections are computed in the script, and both of them carried the mislabel ★★★★
+
+| | |
+|---|---|
+| **Surface** | `tools/profile.mjs:294` and `:339` · `src/testing/profile.ts` · C28 I37, I41 |
+| **Reached for** | asking, after F1098, why *that* section was the one that was wrong |
+| **Verdict** | **closed** — `checkElementCost`/`checkEntryCost` and their formatters in `src/testing/profile.ts`, three rows and four mutations |
+
+### The census
+
+`make profile` prints six sections. Three come from the harness as a `check*`
+paired with a `format*`; three are computed in the script:
+
+| section | source | was it wrong |
+|---|---|---|
+| A01 Appendix B | `formatBudget(checkBudget(…))` | no |
+| Where the frame went | `formatPhases(checkPhases(…))` | no |
+| Between frames | the same pair | no |
+| **Slowest elements** | **inline in the script** | **yes — F1098** |
+| **Cost per transcript entry** | **inline in the script** | **yes — the same word** |
+| Objects made and let go | `formatLeaks(checkLeaks(…))` | no |
+
+Both defects are the same defect. `byEntry`'s histogram is fed once per
+`ElementHandle` dispose whatever seam opened it, so its `count` is measures plus
+renders — **203** for the one entry this session draws, which is 68 + 1 + 67 + 67
+to the unit — printed under the column heading *elements measured*.
+
+### The ruling this applies was already taken, once
+
+`tools/profile.mjs`'s own header carries it:
+
+> `@fmx/calcium/profiling` was the third and is no longer needed: the phase table
+> moved into the harness, because **a reading computed in a script is a reading
+> no row can be written against**, which is how its negative residue went
+> unasserted (C28 I41, F888).
+
+F888 is the measured precedent: a script-computed phase table divided
+out-of-frame spans by in-frame work and printed a residue of **−460.5 ms**, and
+nothing caught it, because there was nothing to write a row against. The remedy
+was to move that table into `src/testing/profile.ts`. **The two tables beside it
+were left where they were**, and they are the two that were wrong.
+
+So this is not a rule inferred from a correlation of six. It is a ruling made
+once, for a reason that names the mechanism, and applied to one of the three
+sections it covered.
+
+### Why a script is where a label rots
+
+A `check*` returns a value and a `format*` renders it, so a row can assert the
+value and a second row the rendering. Inline in a script there is no value — the
+number is interpolated into a template string on its way to `stdout`, and the
+only thing a test could assert is the whole line, which is why nobody does.
+`tools/instruments.mjs` runs `tools/profile.mjs` against a fixture and checks it
+produces output; it has 9 rows and not one of them can see a column heading.
+
+### Remedy
+
+`checkElements` / `formatElements` and `checkEntries` / `formatEntries` in
+`src/testing/profile.ts`, matching the three siblings: runner-free, input a
+`ProfileReport`, nothing on the surface a consumer cannot construct (C28 I37).
+The threshold the *measured more than once per frame* marker is taken at becomes
+a published member rather than a literal, so a row can assert it — and the row
+that matters is the one asserting that a report whose blocks are each measured
+once and rendered once produces **no** flagged rows, which is F1098 made unable
+to return at the report seam rather than only at the aggregate.
+
+### What would falsify this
+
+- **A row somewhere already asserting either table's headings.** `grep` for the
+  column words across `test/` returns nothing; the instruments fixture asserts
+  the tool runs and what its exit code is.
+- **The three harness sections having been wrong too.** They were checked while
+  F1098 was open: budget, phases and leaks all say what they count.
+- **The two script sections having been wrong for unrelated reasons.** They carry
+  the same word about the same seam, and one of them is the other's population.
+
+### Closed — and the three rows are the point
+
+`checkElementCost` / `formatElementCost` and `checkEntryCost` / `formatEntryCost`
+landed at `1cd5f405`, with `REPEATED_ABOVE` published so no row restates it.
+
+**The names are `…Cost` because `checkElements` and `ElementReport` are already
+C26's**, in `navigation-conformance.ts`. The compiler refused the second
+definition, which is MG24's name-exactness reading arriving as a
+duplicate-identifier error one layer earlier than the scan.
+
+Three rows, each of which was unwritable before the move:
+
+- **T1.105** — the union control at the report seam. It carries a **twelve-node
+  arm**, and that arm is the finding inside the finding: `repeated` is taken over
+  the whole population, and any fixture of ten or fewer makes that
+  *indistinguishable* from a count taken after the truncation — so the obvious
+  two-node fixture would have passed a mutation modelling the real defect. The
+  crossing node is the **cheapest**, so it falls outside the table and the count
+  is the only thing that says it exists. **And the first draft of that arm was
+  wrong in the way the rule warns about**: measuring a node twice doubles its
+  self time, which put the repeated node *third*, not last — a fixture agreeing
+  with the defect rather than responding to it.
+- **T1.106** — the per-entry count is closes, and the heading says so. Only a
+  fixture with a render in it can fail: an entry holding measures alone agrees
+  with the wrong word.
+- **T1.107** — the threshold is a published member, and 21/20 is quiet where
+  22/20 is flagged. The margin is against integer division, not a tolerance.
+
+Four mutations recorded in `c28-profiler.mjs` and each run by hand: the ratio
+reading the union, the count taken after the truncation, the unclaimed row's
+absent count drawn as a zero, and the threshold made inclusive. Each killed
+exactly the row it names.
+
+**Stated blind spot.** I55 is asserted by rows and enforced by no scan: nothing
+goes red the day a seventh section is added inline. The rule is written where a
+reader adding one would be — beside the two `format*` calls that replaced the
+last two — and that is a habit rather than a gate. The scan that would close it
+has to tell a section that *computes* from one that quotes, which is the
+distinction I55 draws in prose and a line-regex cannot.
+
+## F1100 — F963's stated-not-fixed residue reproduced on the runner, with its own named precondition met ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `test/e2e/profiler.test.ts:562` (T5.1c) · `src/shell/profiling/replay.ts` · F963 |
+| **Reached for** | reading a CI red that was green on the same commit in the other run |
+| **Verdict** | **open** — recorded, not diagnosed: the two extra reads are named as a candidate and not traced |
+
+### The red
+
+`fast` went red on PR #48's `pull_request` run and green on its `push` run, **on
+the same SHA** (`9eb54b95`). One row, and it left its whole verdict:
+
+```
+clock reads recorded wall=56 mono=2999 · consumed wall=54 mono=2998 · mirrored wall=54 mono=2996 · overrun wall=0 mono=1
+took prompt=741ms answer=2658ms exit=killed
+recorded  ... input:"\u0004" frame:174 end
+replayed  ... input:"\u0004" frame:322 end
+load 1.40 0.71 0.28
+fixture processes alive: none
+```
+
+T5.1c asserts `consumed.wall === recorded.wall`. It is **54 against 56** — two
+wall positions recorded that the replay never consumed.
+
+### F963 predicted this, by name, and did not assert it
+
+Its *Not fixed, stated* paragraph carries three residues, and the second is:
+
+> the transcript head's duration figure (`deps.clock() - startedAt`) is
+> wall-derived and unmasked — **invisible below one second, and a far-side call
+> of a second or more would diverge** under any residual misalignment
+
+**The precondition was met by 2.6 times over.** F963's own recordings run
+`answer` at **84-159 ms**; this run's answer took **2658 ms**, under `load 1.40`.
+So the figure that is invisible below a second had 2.6 seconds to be visible in.
+
+That is what makes this worth a number rather than a re-run: a residue stated as
+*would diverge if X*, with nothing watching X, and a runner that supplied X.
+
+### What is measured and what is not
+
+**Measured**: the shortfall is 2 on the wall clock and 1 on mono (2999 against
+2998), the load, the answer's duration, no stray fixture processes, and the
+divergence falling on the **last** frame — 174 bytes recorded against 322
+replayed, the frame after `\u0004`, with `exit=killed`.
+
+**Not measured**: whether the two reads are the head's duration figure.
+`exit=killed` means the harness ended the session rather than the session ending,
+so the recorded tail may be short of what a clean replay produces — a second
+candidate for the last frame's size, with nothing in this sample separating it
+from the first. **Two candidates and one observation**, which is why the verdict
+says recorded rather than diagnosed.
+
+### Why it is not repaired here
+
+The remedy F963 names for this residue is *mirroring on mono as well*, which
+needs C06 to measure `durationMs` on `elapsed` rather than on the wall clock —
+and its own sentence calls that a C06 design question rather than a replay one.
+It is not this branch's subject, and a parity change made from a single runner
+sample would be a repair aimed at one reading.
+
+### What would falsify this
+
+- **The shortfall being independent of the answer's duration.** Every recording
+  F963 was written against runs `answer` under 160 ms and none showed it; this one
+  at 2658 ms did. One sample each way, which is why this is open.
+- **`exit=killed` being the whole of it.** That would make the last frame's size
+  the finding and the two wall reads a coincidence. The two numbers are
+  independent, so a killed run with `consumed.wall === recorded.wall` settles it.
+- **The row being red under load for an unrelated reason.** `stalled`,
+  `exhaustedAt` and `fixture processes alive` are all in the verdict and all
+  clean, which is the ruling-out F963 did by counter rather than by argument.
