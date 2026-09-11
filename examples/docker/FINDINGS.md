@@ -47330,7 +47330,7 @@ non-zero run. Named rather than fixed here.
 |---|---|
 | **Surface** | `.github/workflows/mutation-sweep.yml` · `tools/mutate/sweep.mjs` · `tools/mutate/runs/c12-arm-seam.mjs` · F1097, F980 |
 | **Reached for** | reading run 34550613146, which F1097 named as the measurement it was waiting for |
-| **Verdict** | **open** — the census is taken and the timeout question is answered; the eighteen reds are named and **seven are closed** (F1104, F1108, F1116 ×2, F1117 ×3), so **eleven remain** |
+| **Verdict** | **open** — the census is taken and the timeout question is answered; the eighteen reds are named and **eleven are closed** (F1104, F1108, F1116 ×2, F1117 ×3, F1118 ×4), so **seven remain** |
 
 ### The census
 
@@ -47714,13 +47714,24 @@ land after the lifecycle's in `log`, which is a reorder and not a rename.
 **`c09-image` is green** — every mutation caught — so F1105's seventeen reds are
 sixteen. Its last survivor was not a weak test either: F1108.
 
-**Sixteen became eleven.** F1116 took `c04-kv-bar` and `c12-value-bar`, whose
+**Sixteen became seven.** F1116 took `c04-kv-bar` and `c12-value-bar`, whose
 cause was the ambiguity and never their tests; F1117 took `c12-layer-merge`,
 `c22-gate3b` and `c22-spinner`, whose anchors were named constants and so were
 invisible to the sweep — one of the three a **control**, which made its run
-unstartable. **Five of the seven closed so far were an instrument's defect rather
-than a test's**, which is the figure to hold against the next reading of this
-list.
+unstartable; F1118 took `c12-origin`, `c22-construct`, `c26-focus-target` and
+`c19-menu-window` along with the whole eleven-run known-stale bucket.
+
+**Nine of the eleven closed so far were an instrument's defect rather than a
+test's** — a wrong-site anchor, an anchor the reader could not see, an anchor
+whose subject had moved. Two were the thing the sweep exists to find:
+`docker-dashboard`'s `C4` survivor (F1104) and `c09-image`'s (F1108). That ratio
+is the figure to hold against the next reading of this list.
+
+**Seven remain**: `c10-colormap`, `c12-arm-seam`, `c12-histogram-series`,
+`c12-lines3d`, `c12-svg-callout-row`, `c23-faults`, `c25-intraline`. Two are
+broken harnesses rather than findings — `c12-svg-callout-row`'s control no longer
+kills, and `c12-arm-seam` hits the 45-minute bound with ninety mutations and wants
+splitting — and two are rotted `to`s that do not type (F1107's residue).
 
 ---
 
@@ -48381,3 +48392,162 @@ ten mutations across ten run files and the sweep's anchor total moved by one** �
 2046 to 2047, the widened reader run over both corpora so the delta is one
 instrument's. Ten edits to the reader's own subject, and its headline figure
 moved by one.
+
+---
+
+## F1118 — the debt list paid in full: twenty-three anchors, fifteen runs, and ten of them were re-derivations rather than re-anchorings ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `tools/mutate/anchors.mjs` `KNOWN_STALE` · fifteen files under `tools/mutate/runs/` · F1105, F1109, F173 |
+| **Reached for** | F1117 emptied the *invisible* debt, which left the visible one with no excuse |
+| **Verdict** | **closed** — `0 missing across 0 run(s)` over 2051 anchors, every one of the fifteen runs re-run, and `KNOWN_STALE` is empty rather than absent |
+
+### What the list was, and what paying it cost
+
+`KNOWN_STALE` is a **debt list and not an exemption** — compared by equality both
+ways, so an entry that stops being true fails as loudly as a new stale anchor.
+Twenty-three entries across fifteen runs, the oldest arriving with F173's
+widening in a batch that *had already been stale when the checker could not see
+them*.
+
+The split is the number worth carrying:
+
+| | |
+|---|---|
+| **re-anchored** — a rename, a reflow, a clause added beside the subject | 16 |
+| **re-derived** — the mutation itself rewritten, because its subject moved or changed direction | 7 |
+
+**A re-derivation is a different job and the list's own note said so**: *each is a
+mutation to re-derive, not an anchor to re-point.* `c22-construct`'s T4.6 is the
+sharpest case and it **inverted**. Its subject — `stores.viewport.resize(...)` in
+the `SIGWINCH` handler — is not in the tree because C03 I15 deleted it as a
+**second writer** of a quantity `render-frame.ts` already sets, whose only effect
+was to re-measure the whole transcript per signal rather than per frame: 544 ms
+for a 30-event drag at a thousand entries (F423). T4.6's claim inverted with it,
+and the row's own comment says what it now stands against — *it is the one that
+fails if a second writer is ever added back.* **So the mutation adds one.**
+
+The others: `c12-origin`'s clamp-and-mirror moved into L0's `normalisedOf`, which
+takes *invert* as a boolean because §3ac rules `Facing` the renderer's vocabulary,
+so the mutation is the **argument** rather than the expression. `c26-elements`'
+descent stopped being a list of kinds and became a question asked of the
+definition (§4b cell 3), so the mutation is the walk returning before it descends
+at all. `c12-x-axis`'s early return went when `pickAxis` began dispatching on the
+scale. `c26-address`'s two T1.18 rows had to move onto a statement that did not
+exist when they were written: `rowDown` writes `next ?? elements[i]` back because
+I16 made a motion that stops collapse the range, so the ring is the **fallback**
+and the block edge is the **guard on the move**.
+
+### An anchor that reaches to the end of a line rots for reasons that are not about it
+
+**Three of the twenty-three were one line.** `session.ts`'s render cache key grew
+from four axes to seven — `cursorKey`, `framesKey`, `seriesKey` — and
+`c04-scroll`, `c22-camera` and `c22-cursor` each drop **one** axis from it. Every
+one of their anchors reached to the end of the line, so all three broke every
+time a fourth axis landed, and none of the three breakages had anything to do
+with the axis the mutation names.
+
+They are **fragments** now — the axis and its neighbour, `\u0000${offsets}\u0000${orbitKey}`
+and the two like it. Unique, drops exactly what the mutation is about, and
+survives the next axis arriving beside it. That is the general form: **anchor on
+what the mutation changes plus the least context that makes it unique**, and not
+on the statement it happens to live in.
+
+### Closed
+
+`0 missing across 0 run(s)` across 194 runs and 2051 anchors. Every one of the
+fifteen runs was **run**, not merely repaired — `KNOWN_STALE`'s standing rule,
+that a re-anchored mutation nobody ran applies and asserts nothing, which reads as
+coverage from the summary line. Every mutation was caught by the row that names
+it; the three recorded survivors in `c19-menu-window` and the one in
+`c26-focus-target` are `EXPECTED_SURVIVORS` entries and unchanged.
+
+`KNOWN_STALE` stays as an empty map with a header, on `KNOWN_AMBIGUOUS`'s
+argument: an absent map reads as a mechanism nobody built, and an empty one reads
+as a debt that has been paid.
+
+**Four of F1105's eighteen reds close** — `c12-origin`, `c22-construct`,
+`c26-focus-target`, `c19-menu-window` — and its eleven known-stale runs with them.
+**Seven reds remain**: `c10-colormap`, `c12-arm-seam`, `c12-histogram-series`,
+`c12-lines3d`, `c12-svg-callout-row`, `c23-faults`, `c25-intraline`.
+
+---
+
+## F1119 — paying a debt list empties the fixture that guards it ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `test/unit/mutate-anchors.test.ts` MA3 · `test/unit/mutate-sweep.test.ts` MS3 · `tools/mutate/anchors.mjs` `--stale` · `tools/mutate/runs/mutate-anchors-parse.mjs` · F1118 |
+| **Reached for** | asking what MA4's equality arm still compares once `KNOWN_STALE` is `{}` |
+| **Verdict** | **closed** — MA3 hands in its own list and MS3's bound moves off the shrinking population; two rows read that list and only the one with a corpus assertion said so |
+
+### The vacuity
+
+MA3 says *the debt list does not travel to a foreign directory*: a list naming
+runs in this repository must not excuse a fabricated one, or MA2 passes by
+inheriting an excuse it was never given. It fabricates a run called
+`c23-refresh.mjs` — a name chosen because `KNOWN_STALE` held it — with a stale
+anchor, and asserts the sweep still fails.
+
+**The moment the list emptied, the row's corpus emptied with it.** A foreign run
+now has nothing to inherit, so the assertion passes because there is nothing to
+excuse rather than because the gate holds. And it had been weaker than it read
+for longer than that: `c23-refresh`'s entry was removed by F1011, so the row has
+been naming a run the list did not hold since then.
+
+**This is the exemption-list class arriving from the other side.** The rule
+already written down is that moving a subject *onto* an allow list drops it from
+the fabrication's corpus. Here the subject was moved **off**, by the work
+succeeding — which is the direction nobody watches, because it looks like
+progress everywhere it is recorded (F1116's shape, one instrument along).
+
+### Closed by driving the list
+
+`anchors.mjs` takes `--stale <json>` beside the `--dir` the fixture already uses,
+and `LIST` reads it **only** for a foreign directory: `OWN ? KNOWN_STALE :
+(SUPPLIED ?? {})`. The canonical run ignores it entirely, so the tree's own gate
+cannot be softened from a command line.
+
+MA3 is four arms now, and each is reachable with the real list empty:
+
+- the same fabricated run, **checked** with no list handed in;
+- **excused** when one is, which is what makes the first arm mean something — a
+  gate that refused everything would fail here and the first arm would read
+  identically;
+- a list claiming the **wrong count** fails;
+- an entry for a run whose anchors **all resolve** fails — the equality arm's
+  second direction, which the tree cannot exercise at all while the list is
+  empty.
+
+`mutate-anchors-parse.mjs` carries both mutations: the supplied list ignored, and
+the dead-entry loop emptied. Both caught by MA3.
+
+### The other row that read the same list, and it went red
+
+**Two rows depended on `KNOWN_STALE` being non-empty, and they failed in opposite
+directions.** `make instruments` found the second one — MS3, in
+`mutate-sweep.test.ts`, which cross-checks the list the sweep *tolerates* against
+the list `anchors.mjs` *enforces*. Its first line is
+`expect(Object.keys(list).length).toBeGreaterThan(0)`, a guard against a reader
+that returns nothing, and it went **red** the moment the list emptied.
+
+| | MA3 | MS3 |
+|---|---|---|
+| what it read | the list, as a corpus for a fabrication | the list, as the population of a bound |
+| corpus assertion | none | `> 0` entries |
+| when the list emptied | **green**, having nothing to inherit | **red**, saying so |
+
+**The corpus assertion is the whole difference**, and it is the same instrument
+that catches a scan reading no file and a sweep reading no test path. A row that
+has one says *my subject is gone*; a row without one says nothing at all, and is
+indistinguishable from a row that is still working. That is the practical rule
+this finding leaves: **a fabrication over a list needs an assertion that the list
+was read, and the population it is taken over must not be the one the work is
+shrinking.**
+
+MS3's bound moved onto `discover()` — the run corpus, which does not shrink — and
+its two arms (*every entry names a run that exists*, and an entry naming nothing)
+are driven with a fabricated source rather than read off a list that may be empty.
+The cross-check against the sweep's printed total stays over the real list, where
+0 = 0 is the correct answer today.
