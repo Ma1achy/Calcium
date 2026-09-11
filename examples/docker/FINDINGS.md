@@ -47745,3 +47745,121 @@ goes red naming two sites where it expects one.
 The mutation keeps its pair: both call sites still return early on their own, so
 it breaks them together through `also`, which is what `also` is for (F227).
 
+---
+
+## F1109 — the anchor reader knew two quote characters, and the third is the one an awkward anchor uses ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `tools/mutate/anchors.mjs` `anchorsOf` / `unquote` · `tools/mutate/runs/c22-construct.mjs` · `c12-origin.mjs` |
+| **Reached for** | `c22-construct` reported **4** anchor misses and the gate's debt list said **3**, with the gate printing *no run drifted* |
+| **Verdict** | **closed** — backticks are read, interpolated bodies are refused **and counted**, two anchors that had never been visible are now reported, one repaired here and one listed with why |
+
+### The disagreement
+
+The pass reported four `ANCHOR MISSED` rows in `c22-construct`; `KNOWN_STALE`
+said three, and `anchors.mjs` printed *24 known stale, and no run drifted from
+what the list says*. Both were internally consistent, which is how it survived:
+the gate was not wrong about what it could see.
+
+`anchorsOf`'s `LITERAL` matched `"…"` and `'…'`. A **template literal** matched
+nothing, so a backtick-anchored mutation was not counted stale — **it was not
+counted at all**. The same shape as the roadmap's ident reader: a cell with no
+readable symbol is dropped from the population rather than reported as adrift in
+it.
+
+### The third widening of one blind spot, and the comment that predicted it
+
+- **F173** — `"` alone: **108 of 465** anchors invisible across 30 of 54 runs.
+- **F232** — the `+`-joined sequence: **6 of 838** across 5 runs.
+- **here** — the backtick: **23 anchors across 5 runs**, and 2 of them stale.
+
+F232's own comment says the lesson out loud:
+
+> The same shape as F173 one turn later — a widening that fixed the form in front
+> of it and stopped there — which is why this matches a *sequence* of literals
+> rather than a third alternative.
+
+It generalised over **concatenation** and stopped at the two quote characters it
+had in front of it. And the backtick is not a random third form: it is what an
+author reaches for when the anchor contains a `"` — so the reader was blind
+precisely where an anchor is most awkward, which is where one is most likely to
+rot.
+
+### Refused and counted, not guessed at
+
+Four of the 23 interpolate — `${GUARD}`, `${GATE}` — and this file does not have
+those values. Reading the body as its own source text would produce an anchor
+that matches nothing and reports as **stale**, which is a fabricated finding
+rather than a missing one. They are refused, and the summary line carries
+`4 interpolated` beside the other counted refusals. An exemption that is not
+counted is an exclusion.
+
+### What the widening found
+
+`2009 → 2022` anchors, `23 → 25` missing. Two stale anchors that no instrument
+could ever have reported:
+
+- **`c22-construct` T1.4b** — the anchor paired `at("register", () => {` with the
+  `router.register` beneath it and a doc comment moved in between. `at("register",
+  () => {` is unique in the file, checked, so the second line bought nothing.
+  Re-pointed, **and the pass run**: caught by T1.4b.
+- **`c12-origin` OR1** — listed rather than guessed at. Its subject
+  **restructured**: `facing.y === "down" ? clamped : 1 - clamped` became
+  `range.ts`'s `invert ? 1 - clamped : clamped`, the test lifted into a
+  parameter. That is a mutation to re-derive, not an anchor to re-point.
+
+And one more repaired while the file was open — **T1.1**, whose
+`detectCapabilities(config.env)` gained `config.capabilities` and wrapped onto
+three lines. Re-pointed, pass run, caught.
+
+`c22-construct` now reports **no survivors** and two stale anchors, both of which
+restructured rather than moved: `T4.6`'s `stores.viewport.resize(…)` is not in
+the file at all, and `T4.8`'s `scheduler.commit("input")` left the wheel handler,
+which now returns `true` for something above to commit.
+
+---
+
+## F1110 — T1.2's subject is held by the compiler three ways over, and the mutation was reaching for a helper that never existed ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/construct.ts` · `test/unit/session-construct.test.ts` T1.2 · `tools/mutate/runs/c22-construct.mjs` |
+| **Reached for** | F1107's second unrepaired rotted `to` — `atLate`, a function in no file |
+| **Verdict** | **closed** — the mutation now names the one axis that can be wrong, and is caught by T1.2 |
+
+### Three mechanisms, none of them the test
+
+T1.2 reads `graph.log` for *the stores and the runner precede the lifecycle*
+(C22 I1). Every way of breaking that is refused before a test runs:
+
+1. **`Step` is a closed union.** `at("runner-late", …)` is `TS2345` — measured.
+2. **`at` pushes the step itself**, after `fn()` returns, so the record follows
+   the call order mechanically.
+3. **`beforeRelease` closes eagerly over `runner` and `stores`**, inside a
+   callback `at` invokes at once — so a lifecycle constructed earlier is a
+   temporal-dead-zone error the compiler refuses outright.
+
+**So no mutation of the construction can make T1.2 fail without failing `tsc`
+first.** The row documents an invariant the language already holds.
+
+### What is left, and it is real
+
+Two steps `at` cannot wrap. `stores` and `registries` are `await`ed async IIFEs,
+and `at` is synchronous — its `try`/`catch` cannot reach an async rejection — so
+each hand-rolls the `.catch` **and the `log.push`**. `at`'s guarantee is *the
+step is logged iff `fn` completed*; these two reproduce it by hand, and nothing
+checked that they keep doing so. Losing one in an edit type-checks and leaves a
+log that silently under-reports.
+
+The mutation is now `log.push("stores")` deleted. It type-checks, and T1.2
+catches it.
+
+### The old `to` was the right instinct on the wrong axis
+
+`atLate("runner", …)` — and `atLate` is in no file (F1107), so the row was caught
+by a `ReferenceError` rather than by the ordering it names. Its author was
+reaching for a helper that logs late, which is exactly the right idea: **the
+record is where this row can be wrong.** They were one step from the answer and
+wrote a symbol instead of finding the two places a human writes the log.
+

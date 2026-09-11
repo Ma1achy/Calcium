@@ -278,7 +278,23 @@ const KNOWN_STALE = {
   // the `C4` survivor beside them, which is what the sweep was for.
   "c15-centred-width.mjs": 1,
   "c19-menu-window.mjs": 1,
-  "c22-construct.mjs": 3,
+  // **`c12-origin.mjs` is new debt that is older than the entry** (F1109). Its
+  // anchor is a template literal, so this reader could not see it until the
+  // backtick widening — it was not counted stale, it was not counted at all.
+  // The subject restructured rather than moved: `facing.y === "down" ? clamped
+  // : 1 - clamped` became `range.ts`'s `invert ? 1 - clamped : clamped`, with
+  // the test lifted into a parameter, so re-pointing it is re-deriving the
+  // mutation and not re-anchoring it. Listed rather than guessed at, on the
+  // standing rule that a repaired anchor nobody ran asserts nothing.
+  "c12-origin.mjs": 1,
+  // **Two, and both restructured rather than moved** (F1109). T1.4b's anchor
+  // was a template literal this reader could not see and is repaired; T1.1's
+  // call gained an argument and is repaired. What is left is `T4.6`, whose
+  // `stores.viewport.resize(...)` is no longer in the file at all, and `T4.8`,
+  // whose `scheduler.commit("input")` left the wheel handler — the handler now
+  // returns `true` and something above commits. Each is a mutation to re-derive,
+  // not an anchor to re-point, so both stay listed.
+  "c22-construct.mjs": 2,
   "c22-frame-session.mjs": 2,
   "c22-selection-wash.mjs": 1,
   // `c23-refresh.mjs` was 10 and is gone (F1011): all ten were re-anchored and
@@ -343,8 +359,29 @@ const KNOWN_STALE = {
  * single-quoted body may hold a bare `"` (JSON's delimiter) and a `\'` (not a
  * JSON escape at all), and each is the reason the naive wrap-in-quotes fails.
  */
+/**
+ * A literal's text, or `null` for one this reader will not guess at.
+ *
+ * **The backtick arm is the third widening of the same blind spot** (F1109).
+ * F173 read `"` alone and could not see 108 of 465 anchors; F232 added the
+ * `+`-joined sequence; and the comment written then says the lesson out loud —
+ * *the same shape as F173 one turn later, a widening that fixed the form in
+ * front of it and stopped there* — while stopping at the two quote characters it
+ * had in front of it. A template literal is the form an author reaches for when
+ * the anchor contains a `"`, which is exactly when an anchor is interesting.
+ *
+ * **23 of them, across 5 runs, and 4 interpolate.** Those 4 are refused rather
+ * than guessed at: `${GUARD}` is a value this file does not have, so any text it
+ * produced would be a fabrication. They are counted, on the same argument every
+ * other refusal here is counted on — an exemption that is not counted is an
+ * exclusion.
+ */
 function unquote(body, quote) {
   if (quote === '"') return JSON.parse(`"${body}"`);
+  if (quote === "`") {
+    if (body.includes("${")) return null;
+    return JSON.parse(`"${body.replaceAll("\\`", "`").replaceAll('"', '\\"').replaceAll("\n", "\\n")}"`);
+  }
   return JSON.parse(`"${body.replaceAll("\\'", "'").replaceAll('"', '\\"')}"`);
 }
 
@@ -379,7 +416,10 @@ function anchorsOf(src) {
   // day it was measured. The same shape as F173 one turn later — a widening that
   // fixed the form in front of it and stopped there — which is why this matches a
   // *sequence* of literals rather than a third alternative.
-  const LITERAL = String.raw`"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'`;
+  // **Three quote characters, not two** (F1109). The backtick is the form an
+  // author reaches for when the anchor contains a `"` — so the reader that could
+  // not see it was blind precisely where an anchor is most likely to be awkward.
+  const LITERAL = String.raw`"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\`(?:[^\`\\]|\\.)*\``;
   // **The `to:` half, optional in the pattern on purpose** (F1030). Requiring
   // it would let a row whose replacement this reader cannot see vanish from the
   // anchor count instead of failing — F173's shape exactly, a widening that
@@ -397,8 +437,12 @@ function anchorsOf(src) {
     const raw = m[1];
     const file = raw.startsWith('"') || raw.startsWith("'") ? raw.slice(1, -1) : consts[raw];
     if (file === undefined) continue;
-    const join = (blob) =>
-      (blob.match(pieces) ?? []).map((lit) => unquote(lit.slice(1, -1), lit[0])).join("");
+    // `null` from any piece poisons the join: a half-read anchor is worse than
+    // an unread one, because it matches nothing and reports as stale.
+    const join = (blob) => {
+      const parts = (blob.match(pieces) ?? []).map((lit) => unquote(lit.slice(1, -1), lit[0]));
+      return parts.some((x) => x === null) ? null : parts.join("");
+    };
     out.push({ file, from: join(m[2]), to: m[3] === undefined ? null : join(m[3]) });
   }
   return out;
@@ -531,6 +575,7 @@ const missing = {};
 // moved). The file and the head of the anchor, per run.
 const missingWhat = {};
 /** Anchors matching more than once — see the note in the loop below (F219). */
+const interpolated = [];
 const ambiguous = [];
 const ambiguousBy = {};
 const unresolvable = [];
@@ -634,6 +679,15 @@ for (const run of runs) {
     unreachable.push(`${run}: expects "${e}", which no test path it runs contains`);
   }
   for (const { file, from, to } of anchorsOf(src)) {
+    // **An anchor this reader will not guess at is counted, never skipped**
+    // (F1109). A template literal with `${…}` interpolates a value this file
+    // does not have; reading it as its own source text would produce an anchor
+    // that matches nothing and reports as stale, which is a fabricated finding
+    // rather than a missing one.
+    if (from === null) {
+      interpolated.push(`${run}: an anchor in ${file} interpolates — not read`);
+      continue;
+    }
     const path = rootsFor(file).find((p) => existsSync(p));
     if (path === undefined) {
       unresolvable.push(`${run}: ${file} does not exist under either root`);
@@ -709,6 +763,7 @@ console.log(
     `${splices.length > 0 ? ` · ${String(splices.length)} splice(s)` : ""}` +
     `${toless > 0 ? ` · ${String(toless)} with no readable to:` : ""}` +
     `${foreign > 0 ? ` · ${String(foreign)} not a language this parses` : ""}` +
+    `${interpolated.length > 0 ? ` · ${String(interpolated.length)} interpolated` : ""}` +
     `${ambiguous.length > 0 ? ` · ${String(ambiguous.length)} ambiguous` : ""}` +
     `${Object.keys(silent).length > 0 ? ` · ${String(Object.keys(silent).length)} silent` : ""}`,
 );

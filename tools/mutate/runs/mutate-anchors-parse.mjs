@@ -140,6 +140,38 @@ const results = runPass({
       to: "(F997)`);\n  }",
       expect: "MA8",
     },
+    {
+      // **The third quote character removed again** (F1109). `LITERAL` knew
+      // `"…"` and `'…'`, so a template literal matched nothing and its anchor
+      // was not counted stale — it was not counted at all, which is the form of
+      // blindness a count cannot report. Twenty-three of them across five runs
+      // on the day it was widened, two of them stale.
+      name: "the anchor reader knows two quote characters again",
+      file: SWEEP,
+      from: String.raw`|\`(?:[^\`\\]|\\.)*\``,
+      to: "",
+      expect: "MA1b",
+    },
+    {
+      // **An interpolated body read as its own source text.** `${GUARD}` is a
+      // value this reader does not have, so the text it produces matches
+      // nothing and reports as *stale* — a fabricated finding rather than a
+      // missing one, which is worse than not reading it at all.
+      name: "an interpolated anchor is guessed at rather than refused",
+      file: SWEEP,
+      from: '    if (body.includes("${")) return null;',
+      to: "",
+      expect: "MA1b",
+    },
+    {
+      // A half-read anchor is worse than an unread one: it matches nothing and
+      // reports as stale, so a `null` piece has to poison the whole join.
+      name: "a refused piece is dropped from the join instead of poisoning it",
+      file: SWEEP,
+      from: "      return parts.some((x) => x === null) ? null : parts.join(\"\");",
+      to: '      return parts.join("");',
+      expect: "MA1b",
+    },
   ],
 });
 

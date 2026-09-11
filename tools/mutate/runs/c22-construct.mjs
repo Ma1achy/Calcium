@@ -64,17 +64,46 @@ const results = runPass({
       // over a `pipeline` that is still in its temporal dead zone.
       name: "register the submit handler at step 9, with the router",
       file: "src/shell/construct.ts",
-      from: `  at("register", () => {
-    router.register("prompt", (e) => {`,
-      to: `  ((): void => {
-    router.register("prompt", (e) => {`,
+      // **Re-anchored to the one line it needs** (F1109). The pair was
+      // `at("register", …)` plus the `router.register` beneath it, and a doc
+      // comment moved in between — so the anchor stopped matching while
+      // `anchors.mjs` could not see it at all, because it is a template literal
+      // and the reader knew two quote characters. `at("register", () => {` is
+      // unique in the file, checked, so the second line bought nothing.
+      from: '  at("register", () => {',
+      to: "  ((): void => {",
       expect: "T1.4b",
     },
     {
-      name: "construct the lifecycle before the stores (I1)",
+      // **The one axis of T1.2 that is not held by the compiler** (F1110).
+      //
+      // The row reads `graph.log` for *stores and runner precede lifecycle*, and
+      // three separate mechanisms already make the construction order
+      // unmutatable. `Step` is a closed union, so a label cannot be changed or
+      // invented — `at("runner-late", …)` is TS2345. `at` pushes the step itself,
+      // so the record follows the call order mechanically. And `beforeRelease`
+      // closes **eagerly** over `runner` and `stores`, inside a callback `at`
+      // invokes at once, so a lifecycle constructed earlier is a TDZ error the
+      // compiler refuses outright.
+      //
+      // What is left is the two steps `at` cannot wrap. `stores` and
+      // `registries` are `await`ed async IIFEs, and `at` is synchronous — its
+      // try/catch cannot reach an async rejection — so each hand-rolls the
+      // `.catch` **and the `log.push`**. `at`'s guarantee is *the step is logged
+      // iff `fn` completed*; these two reproduce it by hand, and nothing checks
+      // that they keep doing so. Losing one in an edit type-checks and leaves a
+      // log that silently under-reports.
+      //
+      // **The old `to` was `atLate("runner", …)` and `atLate` is in no file**
+      // (F1107), so the row was caught by a `ReferenceError` rather than by the
+      // ordering it names. Its author was reaching for a helper that would log
+      // late — which is the right instinct and the wrong axis: the record is
+      // where this row can be wrong, and only at the two places a human writes
+      // it.
+      name: "an async step's record is not written by hand (I1)",
       file: "src/shell/construct.ts",
-      from: '  const runner = at("runner", () =>',
-      to: '  const runner = atLate("runner", () =>',
+      from: '  log.push("stores");',
+      to: "",
       expect: "T1.2",
     },
     {
@@ -87,10 +116,15 @@ const results = runPass({
       expect: "T1.4",
     },
     {
+      // Re-anchored (F1109): `detectCapabilities` gained `config.capabilities`
+      // and the call wrapped onto three lines. The mutation is unchanged — the
+      // step stops being logged — and only the text it names moved.
       name: "detect capabilities after the registries are built",
       file: "src/shell/construct.ts",
-      from: '  const detection = at("capabilities", () => detectCapabilities(config.env));',
-      to: "  const detection = detectCapabilities(config.env);",
+      from:
+        '  const detection = at("capabilities", () =>\n' +
+        "    detectCapabilities(config.env, config.capabilities),\n  );",
+      to: "  const detection = detectCapabilities(config.env, config.capabilities);",
       expect: "T1.1",
     },
     {
