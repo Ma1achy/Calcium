@@ -29458,8 +29458,34 @@ finding's own title turns on and that no recurrence has been able to confirm.
 A diagnosis in an assertion message is not evidence, and this row had the first
 and withheld the second.
 
+### Fifth recurrence, 2026-09-11 on pull request 53 — the other arm, and a mechanism
+
+Not `27;2u`. The **mode-not-live** sentinel, added by the fourth recurrence for
+the shape it had seen once: a bare `\x1b` followed by a release in the new mode.
+
+**Two symptoms, and this is the one with a cause.** The fixture waited for a
+*window* and then slept; the push that enters the keyboard protocol is the second
+line of the shell kitty runs, and nothing waited for it. Phase two has had a
+marker since the fixture was written and phase one had three hundred
+milliseconds — which is why every keyboard recurrence is in `a`. That is **F1111**,
+closed by asking kitty which flag set is live and refusing to drive until it
+answers `3`; the answer cannot precede the push taking, because a pty is ordered.
+
+**It closes one arm and not the other.** The mode was live for all four `27;2u`
+recurrences — `27;2u` *is* the new protocol with Shift set — so that half stands
+exactly where the fourth recurrence left it. What it gains is that the next one
+arrives with the flag set beside it, and the push can be ruled out rather than
+suspected.
+
+**And the fifth left no bytes either.** The sequences the fourth recurrence added
+went onto the stray-modifier assertion, which passed; the arm that went red
+carried a sentence. Four reproductions left one digit and the fifth left a
+diagnosis, from a repair written to end exactly that. **F1112** — the record is
+built once and every arm carries it.
+
 **Where**: `test/support/x-emulator.ts`; `docs/catalogue/lanes8/emu-probe.sh` (the bash transcription,
-gitignored); `gh run view 33975158167`; `gh run view 34564209971` (the fourth).
+gitignored); `gh run view 33975158167`; `gh run view 34564209971` (the fourth);
+`gh run view 34596677060` (the fifth).
 
 ---
 
@@ -47863,3 +47889,110 @@ reaching for a helper that logs late, which is exactly the right idea: **the
 record is where this row can be wrong.** They were one step from the answer and
 wrote a symbol instead of finding the two places a human writes the log.
 
+---
+
+## F1111 — the fixture waited for a window and drove a shell that had not reached its first line ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `test/support/x-emulator.ts` · `test/e2e/capabilities.test.ts` T5.7 · F812 |
+| **Reached for** | F812's fifth recurrence, whose sentinel says the keyboard mode was not live when the first key arrived |
+| **Verdict** | **closed** — the drive waits for the script, and for kitty's own answer that the push has taken |
+
+### One phase had a marker and the other had a sleep
+
+`b.started` has marked the second capture's reader since the fixture was
+written. Phase one had a window search and `sleep(300)`.
+
+**A mapped window says the emulator drew. It says nothing about how far its
+child shell has got** — and the push that puts kitty into the keyboard protocol
+is the *second line* of that shell, after `stty raw -echo`. On a two-core runner
+drawing kitty through llvmpipe beside another worker, bash's start outlasts
+three hundred milliseconds, and every keyboard recurrence of F812 is in `a`.
+
+### Copying the marker would not have been enough
+
+`a.started` proves bash reached the line. It does not prove kitty **applied**
+what the line wrote, and that is the precondition the fifth recurrence's
+sentinel names.
+
+`CSI ? u` does. Measured in the container: `\e[?3` after `CSI > 3 u`, `\e[?0`
+after `CSI < u` — the answer names the live flag set rather than merely
+arriving, and it **cannot precede the application**, because a pty is a byte
+stream processed in order. So the fixture asks, and the row asserts `3` at the
+moment the drive begins: a precondition measured, where the sentinel it replaces
+inferred one from the byte shape afterwards.
+
+### Neither half stands alone
+
+The marker is touched **after** the handshake, and that ordering is the point.
+`read` sits on the same pty the drive types into, so a keystroke sent before the
+query is answered is eaten by the `read` and never reaches `a.bin` — the flag
+reading would be a keystroke rather than a reply. Waiting on the marker makes
+that impossible rather than unlikely.
+
+So the wait is not a second guess at the same thing: the query proves the push
+took, and the marker is what guarantees nothing of the drive arrives before it.
+
+Mutated by pinning the handshake off, T5.7 fails naming itself —
+`flags never answered · CSI 27u CSI 27;1:3u CSI 13;2u CSI 13;2:3u CSI 107;1:3u` —
+which is also the first time a reader has seen what a clean capture looks like.
+
+### What this does not claim
+
+**The four `27;2u` recurrences.** The mode was live for those: `27;2u` *is* the
+new protocol, with Shift set. Two symptoms, two causes, and only one of them is
+closed here.
+
+What the other gains is an instrument. The next `27;2u` arrives with the flag
+set beside it, so the push can be **ruled out** rather than suspected — which
+is the whole of what four recurrences spent on a held modifier were missing.
+
+Cost: none measurable, 6.6 s against 6.6 s. The query is emitted only where
+`enter` pushes the keyboard protocol, so the mouse rows pay nothing, and
+`read -t 2` bounds a terminal that never answers.
+
+---
+
+## F1112 — four reproductions left one digit, the fifth left a sentence: the evidence was on the arm that passed ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `test/e2e/capabilities.test.ts` T5.7 · F812 |
+| **Reached for** | reading the fifth recurrence's failure and finding no bytes in it |
+| **Verdict** | **closed** — the record is built once and every arm that can go red carries it |
+
+### The repair named the right remedy and attached it one assertion away
+
+F812's fourth recurrence wrote the sequences into a message saying, in as many
+words, that they *are the whole of what the fifth recurrence can leave behind*.
+They went onto the stray-modifier assertion.
+
+The fifth recurrence fired the **mode-not-live** assertion beside it. That one
+carried a diagnosis and no bytes, so the reproduction was spent on
+
+    expected 'the mode was not live when the first …' to be 'live'
+
+which is the same shape as the `expected '2' to be '1'` the fourth recurrence
+was written to end.
+
+### A row with two sentinels has two ways to go red
+
+Instrumenting the first is the same blindness one assertion along, and nothing
+reports it: both arms read as careful, and the one carrying the record is the
+one you were thinking about when you wrote it.
+
+**The cost is specific to this class of row.** A symptom the container cannot
+produce is reproduced only by a CI run, so each red is a sample that cannot be
+re-taken — which is why *one arm instrumented* is not most of the way there.
+
+The record is a value now, built once from the capture and interpolated into
+every message, so an arm added later cannot be added without it.
+
+### And the fifth recurrence's own diagnosis rests on a shape, not a record
+
+`a.startsWith("\x1b\x1b")` is a legacy `\x1b` followed by a CSI — the shape the
+fourth recurrence's comment had already named as *the keyboard mode not yet live
+when the first key went in*, and the reason F1111 is confident. But **no reader
+has seen those bytes.** The finding is recorded with the inference visible rather
+than written as though it were read.
