@@ -74,6 +74,26 @@ describe("C25 I10 edge — the span stream against the line's other rules", () =
     // The spans travelled as objects, not as re-derived diffs.
     const kept = win.block.hunks[0]?.lines ?? [];
     expect(kept.map((l) => l.spans)).toEqual([whole.hunks[0]?.lines[2]?.spans, whole.hunks[0]?.lines[4]?.spans]);
+
+    // **The other branch, and a mutation is what named it** (F1123). The cut
+    // above lands *inside* a run, so it takes the row-wise slice. A run that
+    // fits **whole** inside the window takes `out.push(...lines)` one branch
+    // above, and that branch had no row: a mutation rebuilding those lines from
+    // their four named members — dropping the fifth, `spans` — applied cleanly
+    // and survived every assertion in this file, which reads as a weak row.
+    const all = windowRows(whole, 120, 0, 20);
+    const allKept = all.block.hunks[0]?.lines ?? [];
+    expect(
+      allKept.map((l) => l.spans),
+      "a run inside the window keeps its spans too",
+    ).toEqual((whole.hunks[0]?.lines ?? []).map((l) => l.spans));
+
+    // **The control**: an assertion over lines that never had spans is satisfied
+    // by a window that drops every one of them.
+    expect(
+      allKept.some((l) => l.spans !== undefined),
+      "the fixture carries spans to lose",
+    ).toBe(true);
   });
 
   it("T3.19 (C25 I10): windowPatch — the fullscreen view's slice — shows the same underline as the whole", () => {

@@ -108,8 +108,27 @@ describe("HS4 (C12 I42): the vertical arm draws columns, not rows", () => {
       kind: "plot", id: "hs4b", form: "histogram", height: 12, axes: true, orientation: "vertical",
       series: [{ values: LOW, label: "before" }, { values: HIGH, label: "after" }],
     }), 76).map(plain);
-    expect(rows[rows.length - 1]!.trim()).not.toBe("");
-    expect(rows[rows.length - 1]!).not.toContain("·");
+    // **The overflow notice kept the row non-blank, and that was the whole of
+    // what `trim() !== ""` read** (F1123). Composing a label under every band
+    // does exactly what the source comment beside it predicts — every label is
+    // dropped — and the axis then comes back as **`+18` alone**: no `┬`, no bin
+    // edges, and the assertion satisfied by the notice that says they are gone.
+    // Clean, the same two rows carry nine ticks and `20.0 … 60.9 +9`.
+    //
+    // So the notice comes off before the row is read, and the ticks are counted:
+    // a label row is what the axis is *for*, and a tick with nothing under it is
+    // the other half of the same frame.
+    const tickRow = rows[rows.length - 2]!;
+    const labelRow = rows[rows.length - 1]!;
+    expect(
+      labelRow.replace(/\s*\+\d+\s*$/u, "").trim(),
+      "the bin edges are on the axis, not only the withheld count",
+    ).not.toBe("");
+    expect(
+      (tickRow.match(/┬/gu) ?? []).length,
+      "and each edge has its tick", // cells-ok — a tick count
+    ).toBeGreaterThan(1);
+    expect(labelRow).not.toContain("·");
   });
 });
 
