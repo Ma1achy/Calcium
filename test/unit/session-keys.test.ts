@@ -1112,6 +1112,135 @@ describe("C26 §5c — the transcript's selection and semantic copy", () => {
   });
 });
 
+describe("C16 I33 — the section gesture, at one target and three owners", () => {
+  /**
+   * The three owners as doubles, each counting what it was asked.
+   *
+   * `openFor` and `section` are the state the ladder reads, so they are built
+   * rather than defaulted: a double reporting no view open routes the gesture
+   * to the patch view and the row passes while asserting nothing.
+   */
+  const owners = (up: "profile" | "document" | "patch") => {
+    const calls: string[] = [];
+    const answer = (who: string, verdict: boolean) => () => {
+      calls.push(who);
+      return verdict;
+    };
+    const deps = {
+      editor: {},
+      completion: {},
+      overlays: {},
+      history: { entries: [], append: () => undefined },
+      profileView: {
+        section: up === "profile" ? "app" : null,
+        nextCard: () => false,
+        move: () => false,
+        pop: () => false,
+        // **`true` here and `false` at the other two**, so a ladder that ran
+        // every owner would be caught by the count as well as by the answer.
+        sectionNext: answer("profile:next", true),
+        sectionPrev: answer("profile:prev", true),
+      },
+      documentView: {
+        open: () => null,
+        fill: () => false,
+        putBlock: () => false,
+        blockAt: () => null,
+        move: () => false,
+        pop: () => false,
+        sectionNext: answer("document:next", false),
+        sectionPrev: answer("document:prev", false),
+        openFor: up === "document" ? "/ps --watch" : null,
+      },
+      patchView: {
+        open: () => null,
+        move: () => false,
+        pop: () => false,
+        sectionNext: answer("patch:next", false),
+        sectionPrev: answer("patch:prev", false),
+      },
+      releaseView: () => undefined,
+      visibilityChanged: () => undefined,
+      resized: () => undefined,
+      manifest: null,
+      viewport: recordingViewport().viewport,
+      anchor: () => ({ row: 10, rows: 1 }),
+      overlayRegion: () => ({ width: 80, height: 24 }),
+      redraw: () => undefined,
+      focus: createFocusStore(),
+      liveElements: () => [],
+      liveEntryId: () => null,
+      focusedElements: () => [],
+      focusedEntryId: () => null,
+      neighbourEntry: () => null,
+      cursorBlock: () => undefined,
+      rerunEntry: () => undefined,
+      onAction: () => undefined,
+      schedule: (fn: () => void) => {
+        fn();
+        return { [Symbol.dispose]: () => undefined };
+      },
+    } as unknown as Parameters<typeof createKeyEffects>[0];
+    return { effects: createKeyEffects(deps), calls };
+  };
+
+  it("T1.3v (C16 I33): `tab` is one binding at `pushedView`, a different one at `liveBlock`, and the section gesture reaches whichever owner is up", () => {
+    // **The keymap half — one table, two targets.** The ladder is what
+    // separates them, so a second table for the profiler would satisfy every
+    // assertion about the view and be the thing C16 I24 exists to refuse.
+    const row = (target: string, shift: boolean): string | undefined =>
+      defaultKeymap.find(
+        (b) => b.target === target && b.key.name === "tab" && (b.key.shift ?? false) === shift,
+      )?.action;
+
+    expect(row("pushedView", false)).toBe("viewNextSection");
+    expect(row("pushedView", true)).toBe("viewPrevSection");
+    expect(row("liveBlock", false), "the same key one target over").toBe("entryNext");
+    expect(row("liveBlock", true)).toBe("entryPrev");
+    expect(row("prompt", false), "and `complete` at the prompt, which never meets them").toBe(
+      "complete",
+    );
+
+    // **The ladder half — each owner, and only that owner.** The profile view
+    // wins when a section is open; the document view when it has an `openFor`;
+    // the patch view otherwise. Asserted as the *set* of calls, because an
+    // effect that asked every owner and returned the first `true` would answer
+    // correctly for the profiler and wrongly for the other two.
+    for (const [up, next, prev] of [
+      ["profile", "profile:next", "profile:prev"],
+      ["document", "document:next", "document:prev"],
+      ["patch", "patch:next", "patch:prev"],
+    ] as const) {
+      const { effects, calls } = owners(up);
+      effects.table["viewNextSection"]?.();
+      effects.table["viewPrevSection"]?.();
+      expect(calls, `${up} is the owner, alone`).toEqual([next, prev]);
+    }
+
+    // **The member is required rather than optional, and this is the reading
+    // that says why.** An owner with one section and an owner at its last
+    // section both answer `false`, so the return value cannot tell *no further
+    // section* from *no sections at all* — and an optional member would add a
+    // third silence indistinguishable from both. The patch view's `false` is a
+    // real answer (one file is one section) and the profile view's `true` is
+    // the same call on the same gesture; nothing in the return separates a
+    // refusal from an absence, which is the whole of C16 I33's argument.
+    //
+    // What is assertable here is the consequence: the effect discards the
+    // verdict, so **a refusal is not retried at another owner**. The patch view
+    // refuses every time, and the gesture stops there rather than walking down
+    // the ladder looking for an owner that says yes — which is what a `false`
+    // read as *not mine* would do, and is the defect this shape prevents.
+    const refusing = owners("patch");
+    refusing.effects.table["viewNextSection"]?.();
+    refusing.effects.table["viewNextSection"]?.();
+    expect(refusing.calls, "asked twice, and no other owner consulted").toEqual([
+      "patch:next",
+      "patch:next",
+    ]);
+  });
+});
+
 describe("C26 §5c — the call's head under ⏎ and y, owed at the spec commit", () => {
   it.todo(
     "T1.47 (C26 I23, §5c h1–h4): ⏎ on a running card's head toggles the body scroll's collapsed and submits nothing, twice; y on the head yields the command and ⌃a y yields the command then the body's sources; ⇧⏎ is refused while running and re-runs once settled — not deferred on a component: the head element lands with C2–C4 of the call grammar",

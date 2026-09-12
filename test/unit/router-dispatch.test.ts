@@ -817,8 +817,9 @@ describe("C16 §5 — Ctrl-D, and the one thing C16 stores", () => {
     expect(body).toMatch(/at:\s*"liveBlock"/u);
   });
 
-  // **Spec-first, and the row is here unbuilt** (SP9). The section gesture lands
-  // with the three owners that answer it; C16 I33's claim is about all three, so
-  // the row cannot be written against one of them arriving alone.
-  it.todo("T1.3q (C16 I33): tab and shift-tab resolve to viewNextSection/viewPrevSection at pushedView and to entryNext/entryPrev at liveBlock from the one keymap, with a view up and with none; and each owner answers the call — a fake at its last section and a fake with one section both return false, and the row asserts the header text differs, because the return cannot tell them apart — not deferred on a component; it lands with the three owners");
+  // **The section gesture's row lives with the owners that answer it** — C16
+  // I33's claim is about all three, and this file has none of them. It is
+  // `T1.3v` in `session-keys.test.ts`, which holds the keymap and the ladder in
+  // one place. The id moved too: `T1.3q` was already this file's mouse-modality
+  // row above, and §9b row k cites it meaning that one.
 });
