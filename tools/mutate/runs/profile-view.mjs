@@ -248,18 +248,18 @@ const results = runPass({
       // C23 I27, the other half — the row without its handler.
       name: "shippedHandlers drops the profile handler",
       file: HANDLERS,
-      from: "    profile: profileHandler(deps.profileView),\n",
+      from: "    profile: profileHandler(deps.profileView, deps.profileReport),\n",
       to: "",
       expect: "T4.66",
     },
     {
-      // C23 T1.67 — the L0 copy of C28's `PANES` drifts by one member. C05 then
-      // rejects `/profile memory` before the handler sees it, and nothing else
-      // in the tree compares the two lists.
+      // C23 T1.67 — the L0 copy of C28's `SECTIONS` drifts by one member. C05
+      // then rejects `/profile framework` before the handler sees it, and
+      // nothing else in the tree compares the two lists.
       name: "the manifest's section values lose a member",
       file: FRAMEWORK,
-      from: '        values: Object.freeze(["verdict", "app", "framework"]),',
-      to: '        values: Object.freeze(["verdict", "app"]),',
+      from: '        values: Object.freeze(["verdict", "app", "framework", "snapshot", "live"]),',
+      to: '        values: Object.freeze(["verdict", "app", "snapshot", "live"]),',
       expect: "T1.67",
     },
   ],
