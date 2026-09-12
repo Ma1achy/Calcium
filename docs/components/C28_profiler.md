@@ -346,6 +346,22 @@ and `horizon` spends one legend row always and refuses `legend: false`. And `hei
 required on **`line` and `heatmap` alone** — every other form silently becomes a one-row plot when
 it is omitted, which is the cheapest way to ship a card that is wrong and renders.
 
+**`height` is the plot area and not the block**, which is the half of that arithmetic `fillHeight`
+does not answer and C12 now publishes `plotHeight` for (F1133). Every `axes: true` form spends three
+more rows on the lid, the axis rule and the x-labels, so a card that asked for its region got a
+block three rows taller than the region — measured at 35 rows in a 32-row region across nineteen of
+the thirty-seven cards. The kit solves for the height whose `plotHeight` fits, using C12's own
+function rather than a constant that agrees with it today.
+
+**And a form whose height is really a declared parameter must be asked for that parameter.** A
+`horizon`'s picture is `bands` rows; a `bullet`'s, a `lollipop`'s and a `gantt`'s is the category
+count; an `icicle`'s is the tree's depth and a `tree`'s its leaf count. Given the region instead,
+each drew its figure and left the rest blank — a four-band horizon in twenty-eight rows, a
+three-row bullet in twenty-one — which reads as **a figure that failed rather than one that is
+small**. So the kit takes a *natural* height beside the region and asks for the smaller, and the
+card reads the number off the datum: `depth(tree)` and `leaves(tree)` differ by an order of
+magnitude on the same tree.
+
 #### The deck
 
 Three groups, contiguous, the app's first. `n`/`p` walk cards, `tab`/`⇧tab` walk groups (C16 I33),
@@ -403,7 +419,7 @@ recomputes nothing.
 | `leaks` | created against finalised | `dumbbell` | the gap is the finding, drawn |
 | `co-variance` | what moves with what | `correlation` | |
 | `the pairs` | the drill | `pairplot` | `facets` lay out as one row of columns, so four panels and not sixteen |
-| `marks` | instants on a wall clock | `timeline` | |
+| `marks` | instants on a wall clock | `dotplot` | a mark is an **instant**, and `timeline` draws an interval from a start, a mid and an end — fed one series it drew the first mark as a full-width bar and the second as nothing (F1135) |
 | `handles` | by type | `bar`, horizontal | the vertical arm drops a colliding name for width and reports a muted `+N` (F374) |
 | `element space` | three quantities at once | `plot3d` | `axes: true` is refused here; the camera is the initial view and a card in an overlay is static |
 | `the instrument` | what the profiler cost and excluded | `kv` | `overhead`, `excluded`, `dropped` |
@@ -429,6 +445,7 @@ difference is the whole of whether a later reader should add a card or trust the
 | `sparkline` | in the contents list and in table cells, never as a card |
 | `step`, `slope` | used — `step` for the cumulative cache card, `slope` only where a replay baseline exists, so it is drawn on `the instrument` and absent otherwise |
 | `bubble` | the `cost per unit` card is a `scatter` with `sizes`, which is the same picture and takes several series where `bubble` takes exactly one. The register found this one itself: the card's own note names `bubble` as the reason it is not used, and naming a form in a note is not dispositioning it (F1132) |
+| `timeline` | **deferred**, blocker `CaptureResult.startedAt`. The form draws intervals on a shared axis and **the report holds no wall-clock interval**: a mark is an instant, and a capture carries `durationMs` with no start. The one interval that does have a start is a span inside a frame, which the `gantt` draws on the frame's own clock (F1135) |
 | `forest` | **deferred**, and its blocker is `Histogram.q1` reaching the report — I56, landing this round |
 | `smallmultiples` | **deferred**, blocker: a second capability arm to put in the second panel |
 | `calendar` | **deferred**, blocker: sessions accumulated across days, which `record`/`replay` could supply and does not |
