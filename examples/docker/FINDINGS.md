@@ -49558,3 +49558,35 @@ The second is the smaller of the two and is where the entry points. **What made 
 findable was driving the motion rather than the member**: every row until T1.115b
 called `move` on a pane and asserted where the window went, and a pane always had two
 blocks to move between.
+
+## F1139 — SP7 reads a spec's declarations, so one number declared once and used twice is invisible ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `tools/enforce/commitments.mjs`'s SP7 · `docs/components/C16_input_router.md` §9, §9b row **k** |
+| **Reached for** | Writing T1.3q's `it.todo` into a row, and finding `T1.3q` already above it in the same file |
+| **Verdict** | **closed** — the instance is fixed; the class is measured and left ungated, with the number that says why |
+
+C16's section-gesture row was numbered **T1.3q**, and `T1.3q` was already
+`router-dispatch.test.ts`'s mouse-modality row a hundred lines above — the row §9b
+row **k** cites. The mouse row was declared in **no** §9 list, so the spec held one
+`T1.3q`, SP7 counted one, and the gate stayed green while the number stopped locating
+anything. A03 §2's failure arriving at the citation rather than at the rule, which is
+what SP7's own comment says it exists to prevent.
+
+**SP7 reads `docs/` and not `test/`**, by construction: `rowIdsOf` matches
+`- **T4.13**` list items in a spec. A number used twice in the tree and declared once
+is outside its corpus in both directions — nothing is missing and nothing dangles.
+
+**The obvious gate is wrong, and the measurement is what says so.** Counting
+`it("T…")` calls per file gives **148** files with a repeated id, because one spec row
+routinely lands as several `it`s — arms split for legibility, `T1.12` seven times in
+`plot.test.ts`. So *two tests share an id* is the convention, not the defect; the
+defect is *two tests about different subjects share an id*, and no mechanical reading
+separates those. This is the class `docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass
+argues against automating, one family over.
+
+**What is cheap is the other half**: the mouse row had no §9 entry at all, and that is
+what let the number be reused without anyone seeing it. Written down now, with the
+gesture renumbered **T1.3v** and moved to `session-keys.test.ts`, where the three
+owners it is about actually live.
