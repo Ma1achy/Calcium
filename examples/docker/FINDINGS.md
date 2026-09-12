@@ -49296,3 +49296,175 @@ discussed — in prose, one table away from the list that is compared.
 Filed at three stars rather than four: the outcome was a row, not a picture. The reason
 it is filed at all is that the same shape at the other register cost a card (F1131), and
 a register whose gaps are only ever found by the register is a register worth having.
+
+---
+
+## F1133 — `fillHeight` is published and its inverse is not, so a card sized to its region overflows it every time ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/height.ts`'s `plotHeight` · `src/presentation/plot/index.ts` |
+| **Reached for** | C28's deck — thirty-seven cards each choosing a figure height from a region |
+| **Verdict** | **closed** — `plotHeight` and `PlotGeometry` published beside `fillHeight` |
+
+`fillHeight(region, fallback, reserve)` is on C12's public surface **because the caller
+is an app choosing a plot height from the region it was handed** — roadmap 38's
+subject, and the comment above it says exactly that. The deck is its second
+consumer, and the second consumer is where the first one's assumptions break.
+
+**`height` is the plot *area*, and the block is taller.** `plotHeight` is
+`plotAreaRows + FURNITURE_ROWS[form] + legendRows + titleRows`, and for every
+`axes: true` form the furniture is three rows: the lid, the axis rule and the
+x-labels. So a card that asked `fillHeight` for its region got back the region,
+built a block three rows taller than the region, and there was **nothing on either
+side of the seam able to say so** — `fillHeight` answers *what should I ask for* and
+nothing answered *how tall will it then be*.
+
+Measured before the fix: **19 of 37 cards at 35 rows in a 32-row region**, every one
+of them an `axes: true` form, every one by exactly three.
+
+**Nothing but reading the frames finds it.** Every card renders, every figure is
+correct, and each is three rows past its box — which a windowing view absorbs by
+scrolling, so it presents as *the deck always pages by a little* rather than as a
+defect. `panes.ts`'s own comment has carried the number for a year — *the lid, the
+axis rule and the x-labels are three more, and they are the plot's own furniture* —
+as a sentence in a comment rather than as a function anyone could call.
+
+**Closed by publishing the inverse**, not by subtracting three. A constant that
+agrees with `FURNITURE_ROWS` today is a second expression of the same rule, and the
+one that drifts is the copy. `plotHeight` and `PlotGeometry` are now exported from
+`plot/index.ts`, and the kit searches down from the region for the largest height
+whose `plotHeight` fits — using the same function the renderer measures with.
+
+### The second half: a form whose height is a declared parameter
+
+The same read found the mirror defect. Several forms do not scale to `height` at all;
+their picture is a *different* number that the caller already holds:
+
+| form | its natural height | what the region gave it |
+|---|---|---|
+| `horizon` | `bands` | four bands in twenty-eight rows |
+| `bullet`, `lollipop`, `dotplot`, `gantt`, `dumbbell` | the category count | three bars in twenty-one rows |
+| `icicle`, `flame` | the tree's depth | three rows of twenty-seven |
+| `tree` | the leaf count | thirteen rows of thirty |
+
+**Blank space is not a smaller figure; it reads as one that failed.** A reader who
+opens a card and sees three bars above eighteen empty rows concludes the plot broke,
+which is the same harm as a zero drawn where a measurement is absent (C28 I11) with
+the arithmetic the other way up. So the kit now takes a *natural* height beside the
+region and asks for the smaller of the two, and each card reads its own number off
+the datum — `depth(tree)` and `leaves(tree)` differ by an order of magnitude on the
+same tree, so neither can stand in for the other.
+
+---
+
+## F1134 — the *no card throws* gate passed over four cards it never built ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `test/unit/profile-deck.test.ts`'s fixtures · C28's `by-kind` card |
+| **Reached for** | a second consumer of the deck, written to read the frames |
+| **Verdict** | **closed** — the fixtures record elements, and the treemap's root carries a value |
+
+T3.20 drives every card of the deck against four report fixtures at two regions and
+asserts that none throws — which is C28 I60's whole subject, because C12 refuses
+rather than degrades and a throw escapes a scheduled callback whose `arm` has already
+run (F1130). It was green.
+
+**Its four fixtures never opened an element span.** `frameOf` recorded `compose`,
+`measure`, `paint` and `write` and called `count`, `gauge`, `hit` and `miss` — so
+`nodes` and `byKind` were empty in all four, and the four cards over them
+(`elements-ranked`, `cost-per-unit`, `by-kind`, `element-space`) returned a *nothing
+measured yet* notice on every row of the cross-product. **The gate was vacuous for
+exactly the four cards it most needed to cover**, and vacuous in the way A03 §2
+describes: a card that is never built passes identically to one that builds.
+
+**A second consumer found it in one run.** A probe written to dump every card for
+reading — the same deck, a different fixture — threw on `by-kind`:
+*`hierarchy.value` must be a number of at least zero.* `hierarchyFault` walks **every**
+node when the form divides space in proportion to value, the root included, and the
+card's root was `{label: "total", children: [...]}` with no value.
+
+**A corpus chosen for a property it did not have.** The fixtures were written to
+exercise the deck and did exercise most of it; nothing in them says *and this one has
+elements in it*, and nothing could have been read off a green run to find out. The
+repair is the fixture rather than the card — `frameOf` now opens a `measure` and a
+`render` element span per kind, so the four cards build on every row — and the card's
+root now carries the sum.
+
+**Both halves matter and only one is a bug.** Fixing the treemap alone would leave a
+gate that cannot see the next one.
+
+---
+
+## F1135 — a mark is an instant and `timeline` draws intervals, so the card was wrong and rendered ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | C28's `marks` card · `ProfileReport.marks` · `CaptureResult` |
+| **Reached for** | reading the deck's frames in colour |
+| **Verdict** | **closed** — the card is a `dotplot`; `timeline` is deferred, blocker `CaptureResult.startedAt` |
+
+`timeline` draws an interval per row from a `start`, a `mid` and an `end` series — the
+catalogue's entry is explicit about it. `report.marks` is
+`{ at: number; label: string }[]`: **instants**, with no extent.
+
+Fed one series per row, the form drew **the first mark as a full-width bar and the
+second as nothing**. Both readings are wrong, neither throws, and the card renders —
+which is why no assertion reached it. The frame did, immediately.
+
+**The first repair made it worse and is the part worth recording.** The card put
+captures on the same axis to give the form its three series, and a `CaptureResult`
+carries `durationMs` and **no start** — so a capture row was anchored at zero and
+drawn against wall-clock instants. Two kinds of row in two coordinate systems, in one
+figure that reads as though they are in one. **That is F1131's class, third instance**,
+and the second time on this deck that a form's second axis met a source that has no
+such axis.
+
+**Closed as a `dotplot`** — one point per mark at its elapsed time, which is exactly
+what the datum is — and `timeline` goes to the deferrals rather than the refusals,
+because the form is right and the report has nothing for it: the only interval with a
+start is a span inside a frame, which the `gantt` already draws on the frame's own
+clock (F1131). The blocker is a symbol, `CaptureResult.startedAt`, so picking the
+entry up begins by grepping it.
+
+---
+
+## F1136 — a budget check is a reading of a report, and it was written where only tests could reach it ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/testing/profile.ts` → `src/shell/profiling/checks.ts` · C28's verdict card |
+| **Reached for** | the verdict card, which **reads** `checkBudget`'s rows rather than recomputing them (C28 I55) |
+| **Verdict** | **closed** — the implementation moved to the shell, `testing/` re-exports it |
+
+C28 I55 is right and so is the ruling it produced: `checkBudget` already returns
+`closed` / `justified` / `undecided`, and a `marginal` flag for a crossing inside the
+histogram's own error, against A01 Appendix B's thresholds quoted verbatim. A second
+expression of that arithmetic is a second expression to keep in step, and **the one
+that drifts is always the one on screen**. So the card reads it.
+
+**It lived in `src/testing/`, which C24 I8 makes a dev-only entry point** — a module
+outside it that imports one puts the whole thing in the production bundle. MG26 said
+so the moment the import landed, which is the rule working exactly as intended and is
+also the only thing that would have caught it: nothing about the import reads as
+wrong, and the file it points at is 924 lines of pure functions over a published type.
+
+**The mistake is in where it was first written, not in the ruling.** A budget check
+takes a `ProfileReport` — a published value a consumer can hold — and returns a
+verdict. It constructs nothing, runs nothing and asserts nothing. The only thing that
+ever made it look like a test helper is that its first consumer was a test, and the
+module's own header says as much: *runner-free and parameterised, like every sibling
+here: it returns a value and the caller asserts.* Every sibling being a test helper is
+not an argument that this one is.
+
+**Closed by moving the implementation to `src/shell/profiling/checks.ts` and leaving
+`src/testing/profile.ts` as the re-export**, so every existing consumer is unchanged
+and the dev-only door still opens. The alternative — the card recomputing six
+thresholds — is what I55 exists to forbid, and it would have been the easy repair.
+
+**The shape to keep**: a helper written beside its first consumer acquires that
+consumer's layer, and nothing revisits it until a second consumer appears in a
+different one. This is the sixth blind spot's neighbour — not *where is this claim
+written down*, but *why is this code where it is*, with the same answer: because of
+who happened to need it first.
