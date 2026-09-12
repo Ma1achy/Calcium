@@ -436,4 +436,26 @@ describe("C28 §3c — the deck, every card", () => {
   });
 });
 
+// C28 §3c — the sampled-stack card, owed at the spec commit (§9b B19-B24, S17-S19).
+describe("C28 — the sampled stack card, spec-first rows", () => {
+  it.todo(
+    "T1.122 (C28 I62, B19): a cpu profile whose samples is empty folds to null on an input whose nodes carries three real function names, the precondition asserted first because a null for want of nodes is the same green as a null for want of samples; and the control, the same nodes with one sample folding to a tree - not deferred on a component: lands with foldCpuProfile",
+  );
+  it.todo(
+    "T1.123 (C28 I62, B21, B22): timeDeltas one shorter than samples folds to null, and a sample pointing at an id no node declares lands in a named residue whose self time equals that sample's delta - the node asserted by name and not the tree's total, since a total is conserved by any redistribution - not deferred on a component: lands with foldCpuProfile",
+  );
+  it.todo(
+    "T1.124 (C28 I63, B20): a profile where (idle) holds more of the window than every real frame together folds to a tree with no synthetic node at any depth and a footer naming the excluded share, with a profile carrying no synthetic frames as the control whose footer carries no such clause - not deferred on a component: lands with foldCpuProfile and the register's sampled member",
+  );
+  it.todo(
+    "T1.125 (C28 I62, B23): a capture whose truncated is true and whose fold succeeded draws the tree and says the file was capped, in two clauses, with nothing in the figure's own sentence calling it partial - not deferred on a component: lands with the sampled-stacks card",
+  );
+  it.todo(
+    "T1.126 (C28 I64; §9b's trace): the card over captures holding a completed cpu capture, an in-flight one appended after it and an abandoned one draws the completed capture's tree in all three arrangements, and names abandoned and none taken as two different sentences - not deferred on a component: lands with the sampled-stacks card",
+  );
+  it.todo(
+    "T1.127 (C28 I34, C28 I62; §9b's trace): the fold's cost is reported and is not inside durationMs - a capture whose fold is made expensive by a deep input leaves durationMs unmoved, which is the assertion a stamp in the wrong place fails - not deferred on a component: lands with foldCpuProfile",
+  );
+});
+
 void WIDTHS;

@@ -184,6 +184,26 @@ export type CaptureResult = Readonly<{
   truncated: boolean;
   droppedBytes: number;
   durationMs: number;
+  /** The session ended while this was running (I17). A field, not `bytes: 0`. */
+  abandoned: boolean;
+  /** The sampled stacks, folded where the profile was produced (I62). `null`
+   *  for a `heap` or `alloc` capture, for an abandoned one, and for a `cpu`
+   *  window in which nothing was sampled — which is a reading and not a zero. */
+  stacks: StackNode | null;
+}>;
+
+/** A sampled call stack. **Not a `TreeNode`** (I62): sampling knows a name, a
+ *  source location and a share of the window, and knows none of `startedAt`,
+ *  `width` or `crossedResize` — a type that asked for them would be a card
+ *  fabricating three of its numbers. Microseconds, as V8 reports them. */
+export type StackNode = Readonly<{
+  name: string;
+  /** `url:line` where V8 had one — `(anonymous)` is common and a location is
+   *  what tells two of them apart. */
+  at: string | null;
+  self: number;
+  total: number;
+  children: readonly StackNode[];
 }>;
 
 export interface Profiler {
@@ -430,6 +450,7 @@ recomputes nothing.
 | `marks` | instants on a wall clock | `dotplot` | a mark is an **instant**, and `timeline` draws an interval from a start, a mid and an end — fed one series it drew the first mark as a full-width bar and the second as nothing (F1135) |
 | `handles` | by type | `bar`, horizontal | the vertical arm drops a colliding name for width and reports a muted `+N` (F374) |
 | `element space` | three quantities at once | `plot3d` | `axes: true` is refused here; the camera is the initial view and a card in an overlay is static |
+| `sampled stacks` | which **function** was on the stack, not which block cost what | `flame` | the one card whose datum is not the framework's own instrumentation: V8's sampler, folded from the `.cpuprofile` the recorder already produces (I62). The element tree measures every element exactly (I31) and can only see what the framework instruments; this sees the process. A capture is asked for rather than always present, so the card is a notice until one exists (I64) |
 | `the instrument` | what the profiler cost and excluded | `kv` | `overhead`, `excluded`, `dropped` |
 
 #### The form register, and why it is a register
@@ -824,6 +845,12 @@ histograms describes neither, and the report states the point at which it was re
 
 - **I61** — **Every key of `ProfileReport` is drawn by a named card or recorded as undrawn with a reason, compared to the type by equality in both directions.** The backend pays for every member on every close, and a member no figure reads is a cost with no reader — invisible to every other instrument here, because nothing that measures the report's *production* can see that its *consumption* stopped. I59 is the same gate on the other axis and they fail in opposite directions: a form with no card is a picture nobody thought of, a key with no card is a measurement nobody reads. Written before the cards, it named `byEntry` on its first run — the per-entry partition of the closes `byKind` already partitions, measured every frame and reaching no figure, because the card that would read it is deferred on an ordinal `NodeStat` does not carry (F1129). **So the register's first entry is a deferral, which is the shape it is for**: the card is a row in a roadmap and the key is a cost the backend pays every frame, and only one of those two is visible from the deck. **The undrawn list is compared by equality rather than as a subset**, so a key whose card is later deleted cannot quietly rejoin it, and an entry that stops being true has to be removed by hand.
 
+- **I62** — **A sampled stack tree is folded where the profile is produced, and a window nothing was sampled in has no tree.** `Profiler.stop` returns the `.cpuprofile` as an object already in hand, so the fold reads it there and not from the file: a card is a pure function of a report and cannot open one, and a fold at the card would put a megabyte parse inside a redraw. Self time is `timeDeltas[i]` attributed to `samples[i]`, which is V8's own convention and DevTools'; a fold that zipped to the shorter of the two would attribute part of the window and return a tree that renders, so **unequal lengths refuse**. A sample whose `nodeId` is in no node is summed into a **named** residue rather than dropped, because a tree that silently loses time still sums to something plausible — and the row asserts the named node, since a conservation assertion is satisfied by redistribution. `nodes` is emitted whole regardless of what was sampled, so a window with no attributed sample yields **no tree at all**, never a tree of real function names at zero: that is I11's *absent, not zeroed* with a picture on it, and it is the shape a reader is least able to doubt. **The file's cap is not the tree's** — `truncated` describes the JSON write and the fold reads the object, so a capped file beside a whole tree is two true statements, and the card states them separately.
+
+- **I63** — **V8's synthetic frames are out of the tree and their share is on the card.** `(idle)`, `(program)`, `(root)` and `(garbage collector)` are frames in which no application code ran. Left in, `(idle)` is the widest tile on almost every capture and the flame answers *the process was idle*, which is true and is not the question anyone opened it for. Taken out silently, the tree stops summing to the window with nothing saying why. So they are excluded **and the excluded share is stated**, as a generated footer clause driven by a register member — the same mechanism as the population clause and the self-inflicted exclusion, and for the reason those are generated: a card that has to remember to state what it dropped is a card that will forget.
+
+- **I64** — **A capture is asked for through a verb that refuses below `deep` and never raises the tier, and the card draws the last capture that completed.** The inspector is constructed only at `deep` (§7), and a verb that raised the tier to get one would reset the ring (I18) — turning *let me look* into *discard what I was watching*, which is C23 I69's clause one verb further out. So `/profile capture` names the tier it needs and does not take it, and says where the file landed. **The card resolves the last completed `cpu` capture on every draw, not the newest entry**: a capture in flight carries no tree, and a card reading `captures.at(-1)` would blank for the length of the window. A capture abandoned at shutdown (I17) has no tree either, and *abandoned* is not the same sentence as *no capture taken*.
+
 ---
 
 ## 9. Commitments
@@ -864,6 +891,9 @@ histograms describes neither, and the report states the point at which it was re
 34. **The frame that gave up is on the record.** A fallback is kept out of the durations and not out of the session's per-frame series, because it is where composition failed and that is the frame a reader opens a profiler to find. Two projections, two filters — `timeline` asks what happened and the durations ask what it cost — and `FrameRecord.outcome` is a member with two observable values because of it. (I54)
 35. **The sampler is off the recorded channel.** Its stamp is `sampleClock`, the untapped `elapsed` the root hands down by identity, and the probe reads no clock; a periodic reader cannot sit on a positional channel. (I53)
 36. **A reading a tool prints is a reading a row can assert.** Every computed section of the report comes from a `check*`/`format*` pair in the harness, and the threshold a marker is taken at is published rather than written twice. (I55)
+37. **A sampled stack is a different measurement from a measured tree, and the types say so.** The element tree is every framework element measured exactly; a `.cpuprofile` is V8's sampler over the whole process. One answers *which block cost what* and the other *which function was on the stack*, and a fold that reused `TreeNode` would have to invent a start, a width and a resize flag sampling cannot know. (I62)
+38. **What a figure drops is drawn with it.** The synthetic frames leave the tree and their share leaves with a sentence, generated from the register rather than written on the card. (I63)
+39. **Asking to look never changes what is being recorded.** The capture verb refuses below the tier that can serve it instead of raising to serve itself, because the raise resets the ring the reader was watching. (I64, I18)
 
 ---
 
@@ -929,7 +959,7 @@ dispose, cleanup after both) · **R-i** C15 I14 (`update` never pushes; `false` 
 `spans`; a pane with no data draws a notice) · **R-l** C23 §2 (a local verb is not gated on
 validation; `args` is empty on the failure arm) · **R-m** C16 focus (the prompt takes no keys while a
 view is top) · **R-n** C09 I49 (the separator is ambiguous-width) · **R-o** C15 I8 (truncation is
-reported, and the owner draws the indicator).
+reported, and the owner draws the indicator) · **R-w** the `.cpuprofile` shape (`nodes` is emitted whole whatever was sampled; self time is `timeDeltas[i]` against `samples[i]`; the synthetic frames are parenthesised names) · **R-z** §7 and F1146 (the inspector exists only at `deep`, and it is one session holding one recording).
 
 **The classification table — structural, two rules at rest.**
 
@@ -953,6 +983,12 @@ reported, and the owner draws the indicator).
 | B16 | two cards over one span | R-q × the ring against the histograms | the histograms are unbounded since the reset and the ring holds 512, so a `dotplot` of p50 and a `boxplot` of quartiles describe different populations of the same name and **both are right**. Nothing in the report distinguishes them. Each card names its population; the kit's extractors are named for their population rather than their shape. → I57, T1.109, F1127 |
 | B17 | `horizon` against the vitals card's row budget | R-t × R-x | `horizon` refuses `legend: false` and always spends a legend row, so four stacked horizons cost eight rows and not four, and the naive *turn the legend off to fit* is a construction error. Budgeted, not discovered. → §3c |
 | B18 | the contents card against a deck whose length changes | R-p × the contents | the flame, icicle and named-tree sections hold one card per retained frame and `worst` is recomputed per report, so a **global ordinal changes under the reader**. A card's address is `(section, index-within-section)` and the header reads `worst 3 of 10`, never `card 14 of 31`. → I58 |
+| B19 | a capture window in which nothing was sampled | R-w × R-k | `nodes` arrives whole regardless, so a fold that trusts it returns a tree of real function names all at zero — *measured, and free*, which is the one reading nobody doubts. **No sample attributed, no tree**, and the card draws the notice. → I62, T1.122 |
+| B20 | `(idle)` and `(program)` among the samples | R-w × I31 | idle is wall time in which nothing ran. Left in it is the widest tile on the card and the flame answers a question nobody asked; taken out silently the tree stops summing to the window. **Excluded and stated**, which means a register member and a generated clause rather than a sentence the card remembers. → I63, T1.124 |
+| B21 | a sample whose `nodeId` is in no node | R-w × conservation | dropping it loses time and leaves a tree that still sums to something plausible. Summed into a **named** residue, and the row asserts that node rather than the total — a conservation assertion is satisfied by redistribution. → I62, T1.123 |
+| B22 | `timeDeltas` shorter than `samples` | R-w × the fold | never emitted by V8 and cheap to be wrong about: zipping to the shorter length attributes part of the window and returns a tree that renders. **Refuses** — no tree, rather than a tree about less than it claims. → I62, T1.123 |
+| B23 | `truncated: true` with a whole tree in hand | I15 × the fold's seam | the cap applies to the JSON write and the fold reads the object before it, so both are true at once and neither implies the other. Two fields and two sentences; the footer must not call the figure partial because the file is. → I62, T1.125 |
+| B24 | two nodes with one `functionName` | R-w × C12 I55 | V8's ids are unique and its names are not — `(anonymous)` many times over. The fold keeps node identity and carries the duplicates as siblings, because merging by name fabricates a call site that was never on the stack. The location travels on `at` for the same reason. → I62 |
 
 **The sequence trace — event-mediated.**
 
@@ -974,6 +1010,10 @@ reported, and the owner draws the indicator).
 | S14 | a live card is in the transcript → the view is opened at `counters` | C23 I69 × R-b × R-c | the view raises to `spans` and the raise **resets the ring**, so the live card's next fetch finds an empty one. It draws what it finds and names the reset point, which the report carries as `regime.ringReset`; a card that drew the empty ring without naming it would report the session as idle at the moment the reader started watching it. The live card itself never calls `setTier`, so the two never fight over the tier. → C23 I69, I18 |
 | S15 | open → a resize → a tick | R-j × R-y × the icicle card | spans open across the resize are tagged `crossedResize`, the tree carries the flag, and **the icicle card's footer names it** — this is the one card where the footer is not optional, because the figures may be wrong and the figure cannot say so itself. → I26, C28 §3c |
 | S16 | `/profile live` typed at an open view | R-m | unreachable — the prompt takes no keys while a view is top — so a live card is always created with the view closed. That is why the live card and the view can never race on the tier, and it is recorded because the property is the focus rule's and not the verb's. → C23 I69 |
+| S17 | a capture completes while the deck is open on the card | R-w × the timer | the card resolves the **last completed** `cpu` capture on every draw. A second capture in flight is an entry with no tree, so a card reading the newest entry blanks for the length of the window and comes back — which reads as the card failing rather than as a capture running. → I64, T1.126 |
+| S18 | shutdown while the capture is sampling | R-h × I17 | the bounded wait already rules this: `abandoned: true`, and **no tree**, because the profile object was never produced. The card says *abandoned*, which is not the sentence *no capture taken* — one of those is a session that ended early and the other is a reader who has not asked yet. → I64, T1.126 |
+| S19 | the fold runs inside `capture()` | R-w × I34 | `durationMs` is stamped around the sampling window and the write, and a fold inside it widens a figure a reader compares across runs. `elapsed()` is in hand at that seam, so the fold is measured rather than assumed — a profiler that does not price itself is the failure class it exists to end. → I34, I62, T1.127 |
+| S20 | the verb pressed twice, the first capture still sampling | R-z | one inspector session holds one recording, so the second `Profiler.stop` finds nothing and rejects; the throw leaves the recorder before `addCapture`, and the report holds **no entry at all** for the second — not abandoned, not truncated, absent. Measured at 2 963 bytes fulfilled against `-32000: No recording profiles found`. **The guard is the recorder's and does not exist**, which is the ruling this row could not make and the finding it produced instead. → F1146, I17 |
 
 **The deck's own additions, and what they changed before any code existed.** B15 and B16 are the
 two that produce findings rather than rulings — a session-site span drawn as a frame's, and two
@@ -1169,6 +1209,13 @@ machine noise closes, on a runner measured at 2.7× this host's timings (F809). 
 - **T1.111** (I59): the cards' forms and the refusal table, unioned, equal `PlotForm` member for member, compared both ways — a form in neither fails, and a refusal for a form that no longer exists fails too. The second direction is what stops a dead entry outliving its subject.
 - **T1.114** (I58, I52): the deck's own shape — ids distinct and shaped as addresses rather than titles, the three groups contiguous and in order so the section gesture has a section to name, the verdict alone and first, every per-frame card reading `worst` so the `seq` it holds can be resolved, and every card declaring a floor above zero. The weak half of I60 and the half that can be asserted before the cards exist; T1.112 is where the floors meet `b.plot`.
 - **T1.113** (I61): the union of every card's `draws` and the undrawn register equals the keys of `ProfileReport`, compared both ways — a key reaching no card fails, and an undrawn entry for a key the type no longer has fails too. The key list is exhaustive at compile time against `keyof ProfileReport`, so the row cannot be satisfied by a list that forgot a member: a hand-written corpus compared against a hand-written corpus is a tally over two populations that agree by being wrong together.
+- **T1.122** (I62; B19): a `cpu` profile whose `samples` is empty folds to **null**, on an input whose `nodes` carries three real function names — the precondition asserted first, because a null for want of nodes is the same green as a null for want of samples. And the control: the same nodes with one sample fold to a tree, so a fold that returned null unconditionally fails rather than passing twice.
+- **T1.123** (I62; B21, B22): `timeDeltas` one shorter than `samples` folds to null; and a sample pointing at an id no node declares lands in a **named** residue whose self time equals that sample's delta — the node asserted by name and not the tree's total, since a total is conserved by any redistribution.
+- **T1.124** (I63; B20): a profile in which `(idle)` holds more of the window than every real frame together folds to a tree with no synthetic node in it at any depth, and the card's footer names the excluded share. The control is a profile with no synthetic frames at all, whose footer carries no such clause — a clause printed unconditionally would satisfy the first half and claim an exclusion that never happened.
+- **T1.125** (I62; B23): a capture whose `truncated` is true and whose fold succeeded draws the tree and says the **file** was capped, in two clauses; nothing in the figure's own sentence calls it partial.
+- **T1.126** (I64; S17, S18): the card over `captures` holding a completed `cpu` capture, an in-flight one appended after it, and an abandoned one — it draws the completed capture's tree in all three arrangements, and names *abandoned* and *none taken* as two different sentences.
+- **T1.127** (I34, I62; S19): the fold's cost is reported and is not inside `durationMs` — a capture whose fold is made expensive by a deep input leaves `durationMs` unmoved, which is the assertion a stamp in the wrong place fails.
+- **T1.128** (I64): `/profile capture` below tier `deep` answers a notice naming the tier and the profiler's `setTier` is never called — the spied recorder, as T1.66c does it, because a verb that raised to serve itself would pass every assertion about the notice.
 - **T1.121** (I57; F1143): every card declaring **both** a span site and `samples` carries both clauses in its footer, driven over the register rather than over `vitals` by name — the population of one is the point, since the day a second card draws two rings is the day a row naming one card stops covering the claim. And the control is a card declaring one of them, whose footer carries that clause and not the other: a footer that printed every clause unconditionally would satisfy the first half and say *0 resource samples* on a card that reads none.
 - **T1.120** (I41, I57; F1142): `frameSamples` answers **empty** for every session-site name, asserted on a report whose `timeline[].spans` actually contains one — the precondition first, because emptiness for want of the name is the same green as emptiness for the filter. **The row reads the extractor and not the label**, which is what the three population rows around it do not: T1.109b asks a card to declare its population, T1.116 asks the footers to differ and T1.109 asks the counts to, and all three are satisfied by a deck whose series came from the wrong population. Removing the filter fails this row and nothing else in the four profiler suites.
 - **T1.112** (I60): every card at a region below its form's floor draws a notice naming the floor and throws nothing — driven over the whole deck rather than a chosen card, because the point is that no card is the exception. And the control: the same deck at a region that meets every floor builds every card, so a kit that refused everything would fail rather than pass twice.

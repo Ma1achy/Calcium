@@ -353,3 +353,10 @@ describe("C23 — /profile, the local route", () => {
     expect(found[0]?.text).toMatch(/TuiConfig\.profile/u);
   });
 });
+
+// C28 §3c — the capture verb, owed at the spec commit (§9b S20).
+describe("C28 I64 — the capture verb, spec-first row", () => {
+  it.todo(
+    "T1.128 (C28 I64): /profile capture below tier deep answers a notice naming the tier and the profiler's setTier is never called - the spied recorder, as T1.66c does it, because a verb that raised to serve itself would pass every assertion about the notice - not deferred on a component: lands with the /profile capture verb",
+  );
+});
