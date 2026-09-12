@@ -49854,3 +49854,98 @@ kind and the path of the one already running, and record the refusal as a
 `CaptureResult` so the report can say a capture was asked for and not taken. Neither
 belongs in the caller: a verb that serialised on its own would leave the same hole for
 the next caller.
+
+## F1147 — the capture samples the capture, because the prompt is idle while it runs ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `/profile capture`'s timing · `src/shell/profiling/panes/framework.ts`'s `sampledStacks` · C28 I64 |
+| **Reached for** | Reading the new card in a real terminal — every frame on the tree was the profiler's own await chain |
+| **Verdict** | **open** — the card is right, the window is wrong, and the remedy is C23's route rather than the card's |
+
+The frame, at 130 columns on the plots example at tier `deep`, after
+`/profile capture 700`:
+
+```
+post
+(anonymous)
+post
+capture
+processTicksAndRejections
+(root)
+V8's sampler · 859 ms capture · 700 ms in (idle) · excluded · 141 ms on the tree
+```
+
+**One hundred per cent of the tree is the capture's own continuation.** The
+shell is at the prompt, so the process is idle; the only thing on the stack for
+the length of the window is `capture` awaiting `Profiler.stop`. The figure is
+correct, every number conserves — 141 + 700 against an 859 ms capture — and it
+answers *the framework spends all its time in `post`*, which is true of that
+window and true of nothing else.
+
+**The card is not the defect and the control says so.** Driven from a probe with
+real work under the sampler, the same fold and the same card drew `burn` at
+149.6 ms self beneath `compose` and `paint`, with `compose` twice `paint`'s
+width against a workload constructed at 2e6 against 1e6 iterations. The tree is
+right whenever there is something in it.
+
+**What is wrong is when the window runs.** A reader can only type the verb at
+the prompt, the prompt takes no keys while a route is in flight (C16 §3), and
+the route is the only time the framework does any work — so the one moment a
+capture can be asked for is the one moment there is nothing to sample. The verb
+as built serves an embedder calling `capture()` during work and nobody else.
+
+The remedy is to **arm** rather than to take: `/profile capture` marks the next
+submitted command, and the sampling window is the route's. That is C23's seam
+and not the card's, it needs a rule for a command that outruns the cap, and it
+is a separate commit. Two smaller ones are worth recording beside it — a capture
+taken while a `b.live` part is polling has something to sample, and an embedder
+already has the honest path.
+
+**And the profiler's own frames are not excluded from the tree, where C28 I12
+excludes its own frames from every duration.** The frame-level rule cannot reach
+a stack sample: excluding by `url` is brittle and wrong the moment the framework
+is bundled. Recorded at the card rather than filtered, with the figure — the
+`capture`/`post` column was about 15% of a 500 ms window on the probe and 100%
+of an idle one here.
+
+## F1148 — a type published under an alias, and the accident that hid it ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `tools/enforce/module-graph.mjs`'s MG29 · `src/index.ts`'s `Region as CardRegion` |
+| **Reached for** | Nine lines added to an unrelated function body turned MG29 red, on two exports neither of which had changed |
+| **Verdict** | **closed** — the alias is resolved; the proximity heuristic that hid it is recorded below and not repaired |
+
+**Two defects in one rule, cancelling.**
+
+The first: `published` keeps the **exported** half of `export type { Region as
+CardRegion }`, which is right for the surface and wrong for the comparison MG29
+makes. A parameter is written in the declaring module's vocabulary, so the check
+asks after `Region` and the set holds `CardRegion`. `profileCard` and
+`profileDeck` were therefore always outside the rule's reach, and its message —
+*a consumer cannot supply the argument* — is false of both: `CardRegion` is on
+the public surface and has been.
+
+The second is what kept it quiet. `reachable` grows by scanning **4000
+characters** forward from each published `export type` for lines shaped like a
+member, and the pattern — `^\s+(?:readonly\s+)?\w+\??:\s*([A-Z]\w+)` — is line
+anchored and indented, so it matches a **function parameter** as readily as a
+member. `Region` was reaching the set off `profileCard(… region: Region, …)`,
+177 lines below an unrelated `export type ProfileSection` and inside the window
+by however much the stripped text happened to allow.
+
+**Adding nine lines to a function body between them ended it.** Nothing about
+either export changed, nothing about `Region` changed, and a rule that had been
+passing for a reason unrelated to its subject went red on unrelated growth.
+
+Closed by resolving the alias: the entry's type re-exports contribute their
+**inner** name to `reachable` as well, which is the true statement — a type
+published under another name is published.
+
+**The proximity heuristic is left as it is, and recorded.** Its own comment
+already says it *under-reports rather than over-reports, deliberately*, and that
+remains the safe direction; what this finding adds is that the window makes the
+rule's verdict a function of how much code sits between two unrelated
+declarations. A repair wants a real member scan bounded by the declaration's own
+braces, which is a parser rather than a regex.

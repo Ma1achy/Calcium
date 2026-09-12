@@ -3196,6 +3196,19 @@ export function checkExportedArguments(files, readFile = (f) => readFileSync(f, 
   // by holding the owner. Under-reports rather than over-reports, deliberately.
   const sources = new Map(files.map((f) => [f, strip(readFile(f))]));
   const reachable = new Set(published);
+  // **A type published under another name is published** (F1148). `published`
+  // keeps the *exported* half of `Region as CardRegion`, which is right for the
+  // surface and wrong for this comparison: a parameter is written in the
+  // declaring module's vocabulary, so the check asks after `Region` and the set
+  // holds `CardRegion`. The rule's message — *a consumer cannot supply the
+  // argument* — is then false, and it was silent only because the member scan
+  // below happened to pick the local name up off a nearby parameter list.
+  for (const m of src.matchAll(/export\s+type\s*\{([^}]*)\}\s*from/g)) {
+    for (const part of m[1].split(",")) {
+      const inner = part.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0]?.trim();
+      if (inner !== undefined && inner !== "") reachable.add(inner);
+    }
+  }
   for (const text of sources.values()) {
     for (const m of text.matchAll(/export\s+(?:type|interface)\s+(\w+)/g)) {
       if (!published.has(m[1])) continue;

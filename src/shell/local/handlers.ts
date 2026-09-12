@@ -243,10 +243,16 @@ const profileHandler =
       ]);
     }
     const idle = Object.values(stacks.excluded).reduce((n: number, us: number) => n + us, 0);
+    // **The measured window, not the asked one.** `setTimeout(r, ms)` is a
+    // floor, and V8's `timeDeltas` describe what actually elapsed: measured at
+    // 700 asked against 710.6 sampled on an idle process, and **839 against the
+    // same 700 under the running TUI**. Printing the ask beside shares of the
+    // real window put two incommensurable figures in one sentence, and read on
+    // the frame as 140 + 699 of 700.
     return doc("/profile capture", [
       b.notice(
         "info",
-        `captured ${String(window)} ms${sep}${ms(stacks.root.total / 1000)} ms on the stack` +
+        `captured over ${ms(result.durationMs)} ms${sep}${ms(stacks.root.total / 1000)} ms on the stack` +
           `${sep}${ms(idle / 1000)} ms in synthetic frames${sep}${result.path}` +
           `${sep}\`/profile framework\` and walk to \`sampled-stacks\``,
         undefined,

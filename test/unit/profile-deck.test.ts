@@ -564,6 +564,33 @@ describe("C28 I64 — which capture the card draws", () => {
         .toMatch(/500 ms capture/u);
     }
 
+    // **The frame exclusions are not this card's**, and the precondition comes
+    // first: a report with no self-inflicted frames satisfies the absence for
+    // the wrong reason. Read on a real frame as *26 self-inflicted frames
+    // excluded* under a tree of stack samples — true, about the frame ring, and
+    // sitting where a caveat on the figure goes.
+    // **A frame the profiler raised itself**, recorded rather than spliced: the
+    // clause is generated off `excluded.selfInflicted`, so a report with the
+    // field set by hand would assert the footer against a number no recorder
+    // produced.
+    const own = createProfiler({ tier: "spans" }, { elapsed: counterClock() });
+    for (let i = 0; i < 6; i += 1) frameOf(own, "input", true, i);
+    own.commit("input", true);
+    own.beginFrame("input");
+    { using _s = own.span("compose"); }
+    own.endFrame("frame");
+    const r: ProfileReport = { ...own.report(), captures: [done] };
+    expect(r.excluded.selfInflicted, "the fixture has a frame to exclude").toBeGreaterThan(0);
+    expect(
+      linesOf(profileCard(r, "sampled-stacks", { w: 120, rows: 20 }, FULL_CAPS), 120).join("\n"),
+      "and the sampled card does not borrow their clause",
+    ).not.toMatch(/self-inflicted frames excluded/u);
+    // The control, on a card drawn from the ring, at the same width.
+    expect(
+      linesOf(profileCard(r, "phases", { w: 120, rows: 20 }, FULL_CAPS), 120).join("\n"),
+      "a frame card still carries it",
+    ).toMatch(/self-inflicted frames excluded/u);
+
     // And the two sentences that are not the same sentence.
     expect(drawn([abandoned]), "abandoned names the session ending").toMatch(/abandoned/u);
     expect(drawn([]), "none taken names the verb").toMatch(/\/profile capture/u);

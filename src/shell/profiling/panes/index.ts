@@ -195,8 +195,17 @@ const footerOf = (spec: CardSpec, ctx: CardContext): string => {
     }
   }
   if (spec.draws.includes("spans") || spec.draws.includes("worst")) parts.push("self time, not total");
-  if (r.excluded.selfInflicted > 0) parts.push(`${String(r.excluded.selfInflicted)} self-inflicted frames excluded`);
-  if (r.excluded.fallback > 0) parts.push(`${String(r.excluded.fallback)} fallback frames excluded`);
+  // **The frame exclusions belong to cards drawn from frames** (C28 I12, and
+  // F1143's shape again). `selfInflicted` and `fallback` are counts over the
+  // frame ring; on the sampled card they sat under a figure taken from V8's
+  // sampler, which has no frames in it at all — read on the frame as
+  // *26 self-inflicted frames excluded* beside a tree of stack samples. A true
+  // sentence about a population the figure above it does not draw is the
+  // clause a reader takes for a caveat on the figure.
+  if (spec.sampled !== true) {
+    if (r.excluded.selfInflicted > 0) parts.push(`${String(r.excluded.selfInflicted)} self-inflicted frames excluded`);
+    if (r.excluded.fallback > 0) parts.push(`${String(r.excluded.fallback)} fallback frames excluded`);
+  }
   if (spec.draws.includes("latency") || spec.draws.includes("spans")) {
     parts.push(`+/-${(r.regime.histogramError * 100).toFixed(1)}% bucket error`);
   }

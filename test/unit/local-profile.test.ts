@@ -403,7 +403,12 @@ describe("C28 I64 — the capture verb", () => {
     );
     const out = await run(handlers, ["capture"], { section: "capture" });
     const text = JSON.stringify(out.blocks);
-    expect(windows, "the default window").toEqual([400]);
+    expect(windows, "the ask, which is the second positional's job").toEqual([400]);
+    // **And the sentence names the measured window, not the ask.** The two
+    // differ — `setTimeout` is a floor and V8's deltas describe what elapsed,
+    // 700 asked against 839 sampled under the running TUI — so a notice that
+    // printed the ask beside shares of the real window read as 140 + 699 of 700.
+    expect(text, "the measured window").toContain("captured over 400 ms");
     expect(text, "the file, so the reader can find it").toContain("/tmp/t.cpuprofile");
     expect(text, "what landed on the tree").toContain("3.00 ms");
     expect(text, "and what did not").toContain("7.00 ms");
