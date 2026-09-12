@@ -49590,3 +49590,81 @@ argues against automating, one family over.
 what let the number be reused without anyone seeing it. Written down now, with the
 gesture renumbered **T1.3v** and moved to `session-keys.test.ts`, where the three
 owners it is about actually live.
+
+## F1140 — the published error is a half-width and the estimator returned an edge ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/profiling/histogram.ts`'s `at` · C28 I10, I56 |
+| **Reached for** | T1.108, asserting `q1` and `q3` against a population whose quartiles are known by construction |
+| **Verdict** | **closed** — the estimate is the bucket's midpoint; both figures below are from the same sweep |
+
+`Histogram.error` is published as **half a sub-bucket at the widest** — `1/(2·SUB)`,
+1.5625% — and every consumer reads it as a `±`. `at(q)` returned `valueOf(k)`, the
+bucket's **lower edge**, so the observation lies in `[edge, edge + width)` and the
+estimate is up to a **full** bucket low and never high. The published figure was
+therefore both too small and the wrong shape: a one-sided interval described as a
+symmetric one.
+
+**Measured, over fifteen populations — 50, 100 and 1000 observations at five
+magnitudes — and five quantiles each:**
+
+| estimator | worst relative error | against the declared 1.5625% |
+|---|---|---|
+| the bucket's lower edge | **2.1329%** (n=1000, q3) | 1.36× over, and low every time |
+| the bucket's midpoint | **1.1200%** (n=50, median) | inside |
+
+The single reading that found it is smaller and sharper: 1 to 100 ms, one observation
+each, `q1` read **24.576** against a true 25 — 1.70%, outside the published bound on a
+population whose quartiles are 25, 50 and 75 by construction.
+
+**The repair is the estimate, not the figure.** Within an octave the buckets are
+evenly spaced, so half a width *is* half a sub-bucket: the midpoint makes the
+published bound exact rather than optimistic, and costs one addition. Clamped into
+`[min, max]`, which are the true observed values, because a top bucket's midpoint can
+otherwise sit past the largest thing ever measured.
+
+**What made it findable was a population with known quartiles.** Every earlier row
+over a histogram asserted an ordering, a count or a bound the figure was already
+inside — all of which the edge satisfies. `error` is the only thing an estimate can
+be checked *against*, and nothing had checked it against one.
+
+## F1141 — the violin's box rung scales a supplied summary to the samples' extent ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/definition.ts`'s `violin` arm · `scale.ts`'s `seriesRange` · C12 §3w |
+| **Reached for** | T1.108's second half — *does the figure respond to the summary it was handed* |
+| **Verdict** | **open** — measured, with the mechanism named; the row asserts what is true today and cites this |
+
+`quartiles` is the datum of five forms, `violin` among them, and its rung ladder falls
+to the **box** exactly when there are too few samples to estimate a density —
+`rungFor`'s own comment says why: *there is only one honest figure below a density,
+the five-number summary, which needs no estimate*. The box is then drawn against
+`shared`, which is `seriesRange(block.series, block)` — **the samples' extent, with
+the quartiles not folded in**.
+
+So the fallback chosen because the samples are too few is scaled by those same few
+samples. Measured, at height 8 and width 40, one category, summary `1 / 25 / 50 / 75 /
+100`:
+
+| samples | drawn |
+|---|---|
+| one, at 50 | a single `◈`. The domain is `[50, 50]`, the whole summary collapses to a point |
+| three, at 40, 50, 60 | a box spanning the **entire** width — the whiskers at 1 and 100 clipped to the axis ends, which says *this span covers everything* while the summary says the opposite |
+| sixty, spanning 1.6 to 96 | correct; the figure responds to the summary |
+
+**Inside the bounds and about a different population**, which is this repository's own
+shape: every assertion of containment passes, and the three-sample figure is the one a
+reader would act on.
+
+**The repair is in the domain and not in the rung.** `seriesRange` folds series values
+and OHLC wicks; a form whose datum is `quartiles` wants them folded too, the way
+`boxplot`, `forest` and `bullet` already derive theirs — those three respond to a
+summary at every sample count, which is the control that says this is the violin's arm
+and not the family's.
+
+**What made it findable was rendering rather than constructing.** The row began as
+`expect(() => b.plot({...})).not.toThrow()` over the four forms, and **all four accept
+`quartiles: []` and a summary whose `q1` is above its `q3`** — so *it did not throw*
+was an assertion over an empty population, A03 §2's vacuity class with a picture on it.
