@@ -377,7 +377,7 @@ recomputes nothing.
 | `elements ranked` | the top twenty by self time | `lollipop` | a bar's ink at twenty rows is heavier than the reading |
 | `cost per unit` | expensive per unit against how many units | `scatter`, log on both axes, `sizes` | the defect is up and to the left; a big block sits bottom-right and is nobody's bug. `sizes` carries total cost, because `bubble` takes exactly one series |
 | `content sizes` | what the app asks the framework to draw | `ridgeline` | the gauges, whose shape is the input the shell does not choose (I45) |
-| `far side` | what the far side did, on a wall clock | `gantt` | `offsets` per start; without them it is a bar chart |
+| `frame on a clock` | where inside the frame each span actually sat | `gantt` | `offsets` from `TreeNode.startedAt` over one retained frame, durations from `total`. **Carried rather than derived**: a parent's children do not tile it — the gaps are its own self time — so laying them out end to end gives a timeline that is well-formed, plausible and not what happened. Without `offsets` it is a bar chart (F1131) |
 | `far side cost` | each far-side span, p50 against p95 | `dotplot` | session-site spans have no per-frame samples, so this is the summary honestly drawn |
 
 **Group B — the framework's.**
@@ -396,7 +396,7 @@ recomputes nothing.
 | `coalescing` | C03's value proposition | `funnel` | commits → coalesced → frames |
 | `by reason` | p50 and p95 per `CommitReason` | `dotplot` | |
 | `caches` | six caches against eight axes | `heatmap` | the eye finds the hot cell; a not-measured cell is drawn as such and the legend says so |
-| `cache over time` | are misses accumulating | `step` | a cumulative counter is a step function and a line interpolates it into a lie |
+| `counters over time` | what has accumulated, and when it jumped | `step` | GC counts, major faults and involuntary switches over the resource ring. A cumulative counter is a step function and a line interpolates it into a lie. **Not the cache misses**: the report is a snapshot and `FrameRecord` carries no counters, so *are misses accumulating* has no carrier (F1131) |
 | `the loop` | a stall is a band, not a percentile | `spectrogram`, `utilisation` | two cards; the p50 is not a reading (I13) |
 | `memory` | composition, and the floor under the sawtooth | `stackedarea` | |
 | `heap spaces` | V8's spaces as a proportion | `waffle` | |
@@ -428,9 +428,39 @@ difference is the whole of whether a later reader should add a card or trust the
 | `line` | kept inside the vitals drill; every series-over-time question here has a form that says more |
 | `sparkline` | in the contents list and in table cells, never as a card |
 | `step`, `slope` | used — `step` for the cumulative cache card, `slope` only where a replay baseline exists, so it is drawn on `the instrument` and absent otherwise |
+| `bubble` | the `cost per unit` card is a `scatter` with `sizes`, which is the same picture and takes several series where `bubble` takes exactly one. The register found this one itself: the card's own note names `bubble` as the reason it is not used, and naming a form in a note is not dispositioning it (F1132) |
 | `forest` | **deferred**, and its blocker is `Histogram.q1` reaching the report — I56, landing this round |
 | `smallmultiples` | **deferred**, blocker: a second capability arm to put in the second panel |
 | `calendar` | **deferred**, blocker: sessions accumulated across days, which `record`/`replay` could supply and does not |
+
+#### The report register, and the key it found
+
+**Every key of `ProfileReport` is drawn by a named card or recorded here with a reason, and the two
+lists are compared to the type by equality in both directions** (I61). The form register asks
+*did the deck consider every way of drawing*; this one asks *did it consider everything there is to
+draw*, and they fail in opposite directions — a form with no card is a picture nobody thought of, a
+key with no card is a **measurement the backend pays for and nobody reads**.
+
+The gate was written before the cards and its first run named one key and two cards.
+
+| undrawn | because |
+|---|---|
+| `byEntry` | **deferred**, blocker `NodeStat.firstFrame`. *Does cost rise with position in the document* is the question and `scatter` is the form, and the report cannot express the abscissa: `byEntry` is keyed by entry id, `NodeStat` carries no ordinal, and `snapshot()` sorts by `self`, so even insertion order is gone. A card that took its x axis from the sort it happens to receive would be a figure whose abscissa is a rendering artefact (F1129) |
+
+**The two cards are the same finding from the other side** (F1131): a question whose data has no
+time axis in the report. *What the far side did, on a wall clock* wants per-span starts and
+session-site spans publish histograms alone; *are misses accumulating* wants a miss series and the
+report is a snapshot — `FrameRecord` carries no counters, and a card is a pure function of one
+report. Both are recut in the tables above onto the carrier that does have the axis: the `gantt`
+onto **one retained frame's span tree**, whose `TreeNode.startedAt` is carried rather than derived
+for exactly this reason, and the `step` onto the **cumulative counters in the resource ring** —
+GC counts, major faults, involuntary switches — where a staircase is what the datum is and a line
+interpolates it into a lie.
+
+**The key is the register's own subject and the cards are not.** Nothing else here would have
+asked whether a card named in a table has a carrier: the form register asks about forms, the
+population rule asks about sites, and a reader checking the deck one row at a time reads *gantt,
+far side, offsets per start* and agrees.
 
 #### What a card must say about itself
 
@@ -766,6 +796,8 @@ histograms describes neither, and the report states the point at which it was re
 - **I58** — **A card that shows one frame is addressed by that frame's `seq`, never by its position in `worst`.** `report()` recomputes the retained set on every call, which I32 requires — *which frames are worst is not known until later* — and the view refreshes every second, so an index into it names a different frame at the next tick whenever a slower frame arrives or an older one leaves the ring. The naive address is the one that fails, and silently: it is stable in every fixture with fewer than ten frames and wrong the moment a session is busy enough to be worth profiling. A card re-resolves its `seq` on each draw and says so when the frame has left the set, because a frame leaving the worst set is itself a reading (F1128).
 - **I59** — **Every member of `PlotForm` is a card or a recorded refusal, compared to the union by equality.** A deck reaching for eighteen forms and leaving thirty unmentioned is indistinguishable from one that considered thirty and rejected them, and the difference decides whether a later reader adds a card or trusts the omission. A form added to C12 fails this gate until it is dispositioned, which is the only mechanism that makes the omissions mean anything. Three entries are **deferrals rather than refusals** and each names its blocker as a symbol.
 - **I60** — **A card declares the floor its form needs and the kit refuses above the form; a card that cannot be drawn draws a notice naming the floor it missed.** C12's contract is *refuse, never ignore*, so `b.plot` throws rather than degrades on a `violin` under two rows per band, a `boxplot` with fewer rows than bands, a ninth series off a matrix form and thirty-five more — every one a function of the region, the report's shape, or both, and the region is not bounded below. `profile-view.ts` has no `try` and no `catch`, and `arm` is the last statement of its own callback, so a throw from `paneBlocks` stops the refresh **with the tier still raised**, leaving a frozen pane indistinguishable from a quiet session (F1130). The `try` is the second line of defence and not the first: a caught throw one second later is still a pane that cannot draw itself.
+
+- **I61** — **Every key of `ProfileReport` is drawn by a named card or recorded as undrawn with a reason, compared to the type by equality in both directions.** The backend pays for every member on every close, and a member no figure reads is a cost with no reader — invisible to every other instrument here, because nothing that measures the report's *production* can see that its *consumption* stopped. I59 is the same gate on the other axis and they fail in opposite directions: a form with no card is a picture nobody thought of, a key with no card is a measurement nobody reads. Written before the cards, it named `byEntry` on its first run — the per-entry partition of the closes `byKind` already partitions, measured every frame and reaching no figure, because the card that would read it is deferred on an ordinal `NodeStat` does not carry (F1129). **So the register's first entry is a deferral, which is the shape it is for**: the card is a row in a roadmap and the key is a cost the backend pays every frame, and only one of those two is visible from the deck. **The undrawn list is compared by equality rather than as a subset**, so a key whose card is later deleted cannot quietly rejoin it, and an entry that stops being true has to be removed by hand.
 
 ---
 
@@ -1108,6 +1140,7 @@ machine noise closes, on a runner measured at 2.7× this host's timings (F809). 
 - **T1.109** (I57): one report drives both extractors for the same span, over a session whose frame count exceeds the ring — the histogram's `count` and the sample series' length differ, and the two cards' footers name different populations. The row asserts the **difference**, not a formatting string: a deck where both footers said the same thing would pass a text match and be the defect.
 - **T1.110** (I58): a card holding the third worst frame's `seq`, then a slower frame arrives and the set is recomputed — the card still shows the frame it named, and a card whose `seq` has left `worst` says so rather than drawing its neighbour. The control is the naive address: an index into the recomputed set silently changes frame, and the row shows both against one report pair.
 - **T1.111** (I59): the cards' forms and the refusal table, unioned, equal `PlotForm` member for member, compared both ways — a form in neither fails, and a refusal for a form that no longer exists fails too. The second direction is what stops a dead entry outliving its subject.
+- **T1.113** (I61): the union of every card's `draws` and the undrawn register equals the keys of `ProfileReport`, compared both ways — a key reaching no card fails, and an undrawn entry for a key the type no longer has fails too. The key list is exhaustive at compile time against `keyof ProfileReport`, so the row cannot be satisfied by a list that forgot a member: a hand-written corpus compared against a hand-written corpus is a tally over two populations that agree by being wrong together.
 - **T1.112** (I60): every card at a region below its form's floor draws a notice naming the floor and throws nothing — driven over the whole deck rather than a chosen card, because the point is that no card is the exception. And the control: the same deck at a region that meets every floor builds every card, so a kit that refused everything would fail rather than pass twice.
 
 ### Tier 2 — contract
