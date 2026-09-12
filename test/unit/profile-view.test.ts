@@ -674,4 +674,12 @@ describe("C28 §3c — the profiler's view", () => {
       expect(typeof api.paneTitle(pane)).toBe("string");
     }
   });
+
+  // **Spec-first, so the four rows are here and unbuilt** (SP9). The deck lands in
+  // the commits after this one; an invariant with no row is the signature A03 §2
+  // is written about, and these are the rows that will be written.
+  it.todo("T1.109 (C28 I57): one report, both extractors, a session past the ring — the histogram count and the sample series length differ and the two cards' footers name different populations; the row asserts the difference, since a deck where both footers agreed would pass a text match and be the defect — not deferred on a component; it lands with this round's cards");
+  it.todo("T1.110 (C28 I58): a card holding the third worst frame's seq still shows that frame after a slower one is recorded, and says so when its seq has left worst; the control is the naive address, which silently changes frame across the same report pair — not deferred on a component; it lands with this round's cards");
+  it.todo("T1.111 (C28 I59): the cards' forms unioned with the refusal table equal PlotForm member for member, compared both ways, so a new form fails until dispositioned and a refusal for a form that no longer exists fails too — not deferred on a component; it lands with this round's cards");
+  it.todo("T1.112 (C28 I60): every card at a region below its form's floor draws a notice naming the floor and throws nothing, driven over the whole deck; and the control is the same deck at a region meeting every floor, where every card builds — so a kit that refused everything fails rather than passing twice — not deferred on a component; it lands with this round's cards");
 });

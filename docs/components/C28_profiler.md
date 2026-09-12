@@ -310,122 +310,222 @@ reaching it, and a computed `[Symbol.dispose]` key in an object literal costs 17
 allocation and the GC cost of intermediate arrays — is a churn question, so `alloc` answers it and
 the snapshot does not.
 
-### 3c. The view — `/profile [pane]`
+### 3c. The view — `/profile [section]`, a deck of single-figure cards
 
 **One layer, `kind: "view"`, `placement: fill`, `dismissable: true`, id `profile-view`**, raised by
 C23's `/profile` local verb (C23 §2) and owned by `src/shell/profile-view.ts`, which follows
-`document-view.ts`: it checks C15's stack before pushing (C15 I1's refusal is a throw, reached from a
-handler with nowhere to report it), updates its one layer in place (C15 I14), and answers a refusal
-as a string the verb turns into a notice.
+`document-view.ts`: it checks C15's stack before pushing (C15 I1's refusal is a throw, reached from
+a handler with nowhere to report it), updates its one layer in place (C15 I14), and answers a
+refusal as a string the verb turns into a notice.
 
-**Its content is `profilePane(report, pane, caps)` with the terminal's capabilities, whole** (C09 I49,
-F828): `·` is `East_Asian_Width=Ambiguous`, so the ASCII default `profilePane` carries for a caller
-with no terminal is the one arm a real terminal must never get. The pane is drawn from
-`profiler.report()`, which is a pull — nothing tells the view a report changed, which is why the
-cadence below is a timer and not an event.
+**Its content is `profilePane(report, section, index, caps)` with the terminal's capabilities,
+whole** (C09 I49, F828): `·` is `East_Asian_Width=Ambiguous`, so the ASCII default `profilePane`
+carries for a caller with no terminal is the one arm a real terminal must never get. The cards are
+drawn from `profiler.report()`, which is a pull — nothing tells the view a report changed, which is
+why the cadence below is a timer and not an event.
 
-**A window on block boundaries, measured through the registry.** A pane is not a screen's worth by
-construction — `frame` puts a table of up to twenty elements under a plot, and the overview as first
-built was 40 rows at twelve frames against the 24-row region the test harness has (the figure below)
-— and C15 clips what does not fit without drawing anything to say so (C15 I8; F947). The view holds
-an offset in blocks, takes blocks from it while the registry's
-`measureSequence` of the candidate sequence fits the region, and always shows at least one; a single
-block taller than the region is shown under a notice saying how many rows are hidden. The same
-`measureSequence` C15 places with, for `document-view.ts`'s reason: a window measured by anything else
-is C09 I1's divergence with a whole view behind it. The projection is `document-view.ts`'s, written a
-second time, and that duplication is recorded here rather than resolved: extracting it is an edit to
-a file this round does not own.
+#### One figure per card
 
-**The overview fits the region it opens in** (I52; F947, F959, F960). The pane a reader opens first
-is the one that has to fit without paging, and the number it has to fit is **23 rows at 80 columns:
-a 24-row terminal, minus the view's one-row header**. Every other pane pages. **The figure F947
-carried was the instrument's, not the pane's**: 26 rows at twelve frames and 28 with spans and a
-counter were measured through a registry with no `plot` and no `table` registered, where both kinds
-fall to `raw` and a plot measures as the wrapped lines of its own JSON. Through the registry
-`construct.ts` builds, the same pane was **40 rows at twelve frames and 51 with spans, a counter and
-two caches**, at 80 and at 120 columns alike, and the view's own rows windowed the JSON rather than
-the plot (F959). The bar plot of commits against frames was also wrong in the direction no fixture
-reached: its `height` grew by one per commit reason while a grouped bar draws two rows per reason,
-so at the type's five reasons it drew six rows and put `stream` and `spinner` — the reasons
-coalescing is about — behind a `+4 more` marker (F960).
+**The first version of this view was four panes, and each stacked six figures.** On a 24-row
+terminal that is six figures too small to read, and the pane that fit did so by moving two tables
+to another pane rather than by being smaller. The deck inverts it: **the first card is a verdict in
+text, and every other card spends the region on exactly one figure.**
 
-**The walk, by hand, before the cut** — every block the overview draws, its rows at 80 columns on
-four reports, and where each row went. Through `measureSequence` with `tableDefinition` and
-`plotDefinition` registered; *E* is an empty ring, *T* twelve frames, *F* twelve frames with three
-spans, a counter and two caches, *R* twenty frames spread over every `CommitReason` with the same.
-Rows include the block's own `gapBefore`.
+Two published helpers make that exact rather than approximate, and neither is re-derived here:
 
-| block | before: E / T / F | after: E / T / F / R | where the rows went |
+- **`b.panel(title, children, { footer })`** costs **children + 2 rows** and draws children at
+  `w - 2`, with the title in the top border and the footer in the bottom (C09 §4). The frame is
+  free, and the footer is where a card states what it excludes.
+- **`fillHeight(region, fallback, reserve)`** is published from C12 **because the caller is an app
+  choosing a plot height from the region it was handed** — roadmap 38's subject, and this is its
+  second consumer.
+
+**Four forms do not take a height and must be budgeted rather than discovered**: `waffle` is always
+ten rows, `sparkline` always one, every `IS_MATRIX` form spends two axis rows even at `axes: false`,
+and `horizon` spends one legend row always and refuses `legend: false`. And `height` is numerically
+required on **`line` and `heatmap` alone** — every other form silently becomes a one-row plot when
+it is omitted, which is the cheapest way to ship a card that is wrong and renders.
+
+#### The deck
+
+Three groups, contiguous, the app's first. `n`/`p` walk cards, `tab`/`⇧tab` walk groups (C16 I33),
+and the header names the group so a reader is never guessing which half they are in.
+
+**Group 0 — the verdict.** One card, and the only one that must not page (I52).
+
+| card | question | form |
+|---|---|---|
+| `verdict` | is it slow, where, and which card answers it | `bullet` over `checkBudget`'s rows, plus the deck's contents |
+
+`bullet` is the form for a budget table — bands behind, the target as a tick, the actual as the bar
+— and its bands are a `QuartileSummary` with `centre` as the target, which is why I56 exists. The
+rows come from `src/testing/profile.ts`, which already returns `closed`/`justified`/`undecided` and
+a `marginal` flag for a crossing inside the histogram's own error: the card **reads** them (I55) and
+recomputes nothing.
+
+**Group A — the app's own cost.**
+
+| card | question | form | note |
 |---|---|---|---|
-| the view's header rule | 2 / 2 / 2 | 1 / 1 / 1 / 1 | the gap before the first block drew a blank first row on every page; off |
-| `ov-cap-regime` rule | 2 / 2 / 2 | — | the kv's own rows carry the qualifiers the caption named |
-| `ov-regime` kv | 7 / 7 / 7 | 4 / 4 / 4 / 4 | `tier`, `frames`, `elapsed` are one `regime` row; `histogram`, `excluded`, `dropped` stay — T1.96 and T4.9 read `excluded` |
-| `ov-no-frames` notice | 2 / — / — | 2 / — / — / — | unchanged |
-| `ov-cap-lat` rule | — / 2 / 2 | — / 1 / 1 / 1 | gap off; the sentence shortened so it is not truncated at 80 |
-| `ov-latency` plot | — / 10 / 10 | — / 7 / 7 / 7 | four categories in four area rows; the two spare rows drew nothing. Three rows of furniture stay: the lid, the axis rule and the x-labels |
-| `ov-cap-coal` rule | — / 2 / 2 | — | the table's header row names the columns |
-| `ov-coalesce` | — / 8 (plot) / 8 (plot) | — / 2 / 2 / 6 (table) | one row per reason, and *saved* — the difference the caption told the reader to take — as a column |
-| `ov-cap-counters` + `ov-counters` | — / — / 2 + 3 | — | moved to `frame` as `fr-cap-counters` + `fr-counters`; no type bounds the row count |
-| `ov-cap-oh` rule | 2 / 2 / 2 | — | the `own cost` label and *an estimate* in the value carry it |
-| `ov-oh` kv | 5 / 5 / 5 | 2 / 2 / 2 / 2 | spans, clock and the estimate on one row; the async store on the other. Every I34 figure is still there |
-| `ov-cap-cache` + `ov-cache` | — / — / 2 + 4 | — | moved to `frame` as `fr-cap-cache` + `fr-cache`; no type bounds the row count |
-| `ov-elsewhere` notice | — | — / — / 1 / 1 | new: one row naming how many counters and caches are on `frame`, drawn only when there are any |
-| **header and pane** | **20 / 40 / 51** | **9 / 17 / 18 / 22** | budget 24; the pane alone is 8 / 16 / 17 / 21 against 23 |
+| `vitals` | what happened, and did the spikes coincide | four `horizon` in a column | bands carry magnitude, so a 48 ms frame does not flatten the other 47; stacked, they share an x domain and the spikes line up — which four sparklines cannot say |
+| `frame cost` | the distribution *at each moment* | `latency` | time across, duration bucket up. A bimodal population is visible here and invisible on a line |
+| `where the frame went` | these 47 ms — where | `waterfall` | `totals` closes it; zero-anchored and offset from the running total, so the figure reads as an accumulation |
+| `the flow` | the same question as a division | `sankey` | frame → phase → the dearest elements, edges weighted |
+| `element tree` | which element, in the nesting | `icicle`, one card per retained frame | `hierarchy` straight from `TreeNode`, whose shape it already is |
+| `flame` | the same datum, root-down | `flame` | its own card rather than a setting hidden from the reader |
+| `named tree` | *which* element, when the tiles are too narrow to say | `tree` | **`icicle` and `flame` drop a tile's name silently and I8's `+N` does not reach it** (C12 I55), so the flagship card can lose the label a reader came for |
+| `elements ranked` | the top twenty by self time | `lollipop` | a bar's ink at twenty rows is heavier than the reading |
+| `cost per unit` | expensive per unit against how many units | `scatter`, log on both axes, `sizes` | the defect is up and to the left; a big block sits bottom-right and is nobody's bug. `sizes` carries total cost, because `bubble` takes exactly one series |
+| `content sizes` | what the app asks the framework to draw | `ridgeline` | the gauges, whose shape is the input the shell does not choose (I45) |
+| `far side` | what the far side did, on a wall clock | `gantt` | `offsets` per start; without them it is a bar chart |
+| `far side cost` | each far-side span, p50 against p95 | `dotplot` | session-site spans have no per-frame samples, so this is the summary honestly drawn |
 
-The same table at 120 columns differs only where a notice stops wrapping. **What the walk ruled and
-the measurement then checked**: the *after* column was written from the block heights before the
-code was, and T1.100 asserts the four totals rather than the bound alone, so the table cannot
-outlive its measurement (F935).
+**Group B — the framework's.**
+
+| card | question | form | note |
+|---|---|---|---|
+| `phases` | does drawing grow with the transcript | `stackedarea` | `PHASE_GROUP` over frame-site spans only (I41) |
+| `composition` | the same when the total swings | `streamgraph` | a centred baseline reads composition where a stack reads total |
+| `by kind` | which of forty kinds costs most | `treemap` | |
+| `span shapes` | which spans are bimodal | `ridgeline` | over the per-frame samples |
+| `one span` | the drill | `violin` | one band, so the two-rows-per-band floor is met at any card height |
+| `spans compared` | five-number summaries, side by side | `boxplot` | real quartiles from the samples |
+| `against the budget` | what share is under 16 ms | `ecdf` with a reference line | the share is read off rather than computed, and the knee is where the population lives |
+| `work against wait` | cost or policy | `density2d` | the two are never summed (I4) and this shows both without summing them |
+| `a periodic stall` | is something beating against the frame window | `autocorrelation` | a 100 ms timer against a 33 ms window is a peak at lag 3, and nothing else in C12 finds it |
+| `coalescing` | C03's value proposition | `funnel` | commits → coalesced → frames |
+| `by reason` | p50 and p95 per `CommitReason` | `dotplot` | |
+| `caches` | six caches against eight axes | `heatmap` | the eye finds the hot cell; a not-measured cell is drawn as such and the legend says so |
+| `cache over time` | are misses accumulating | `step` | a cumulative counter is a step function and a line interpolates it into a lie |
+| `the loop` | a stall is a band, not a percentile | `spectrogram`, `utilisation` | two cards; the p50 is not a reading (I13) |
+| `memory` | composition, and the floor under the sawtooth | `stackedarea` | |
+| `heap spaces` | V8's spaces as a proportion | `waffle` | |
+| `leaks` | created against finalised | `dumbbell` | the gap is the finding, drawn |
+| `co-variance` | what moves with what | `correlation` | |
+| `the pairs` | the drill | `pairplot` | `facets` lay out as one row of columns, so four panels and not sixteen |
+| `marks` | instants on a wall clock | `timeline` | |
+| `handles` | by type | `bar`, horizontal | the vertical arm drops a colliding name for width and reports a muted `+N` (F374) |
+| `element space` | three quantities at once | `plot3d` | `axes: true` is refused here; the camera is the initial view and a card in an overlay is static |
+| `the instrument` | what the profiler cost and excluded | `kv` | `overhead`, `excluded`, `dropped` |
+
+#### The form register, and why it is a register
+
+**Every member of `PlotForm` is a card above or a refusal below, and the two lists are compared to
+the union by equality** (I59). A front end that reached for eighteen forms and left thirty
+unmentioned would be indistinguishable from one that considered thirty and rejected them, and the
+difference is the whole of whether a later reader should add a card or trust the omission.
+
+| refused | because |
+|---|---|
+| `pie` | `waffle` answers the same question better in cells |
+| `radar` | a shape comparison no profiling question asks, and under three categories it silently forces the circle grid |
+| `quiver` | there is no vector field |
+| `contour` | `density2d` carries the same data and reads better at this size |
+| `confusion` | predicted against actual has no profiler meaning |
+| `graph` | the async seam topology is fixed, so drawing it teaches nothing; `sankey` carries the weights that do |
+| `histogram` | the bin count comes from the binning strategy and cannot be checked against `height`, which is how an eleven-bin figure at height eight lost its right tail (C12 I42); `ridgeline` and `boxplot` answer it over the same samples |
+| `density` | the `violin` drill covers it, and it wants five finite samples per band before it is an estimate rather than an artefact |
+| `line` | kept inside the vitals drill; every series-over-time question here has a form that says more |
+| `sparkline` | in the contents list and in table cells, never as a card |
+| `step`, `slope` | used — `step` for the cumulative cache card, `slope` only where a replay baseline exists, so it is drawn on `the instrument` and absent otherwise |
+| `forest` | **deferred**, and its blocker is `Histogram.q1` reaching the report — I56, landing this round |
+| `smallmultiples` | **deferred**, blocker: a second capability arm to put in the second panel |
+| `calendar` | **deferred**, blocker: sessions accumulated across days, which `record`/`replay` could supply and does not |
+
+#### What a card must say about itself
+
+**A figure names the population it was taken over** (I57). `record()` feeds two stores from one
+close: the span histograms are unbounded since the last tier reset, and the frame ring holds 512.
+At frame 600 one report holds `spans.measure.count === 600` and `timeline.length === 512` over the
+same name, and nothing in the report says so. So a `dotplot` of a span's p50 and a `boxplot` of the
+same span's quartiles disagree, both are right, and a reader has no way to learn why (F1127). Every
+card states its population in the panel footer, and the kit's two extractors are named for their
+population rather than for their shape.
+
+**A card that shows one frame is addressed by that frame's `seq`** (I58). `report()` recomputes
+`worst` on every call, which I32 requires — *which frames are worst is not known until later* — and
+the view refreshes every second. A card addressed as *the third worst frame* is therefore a
+different frame at the next tick whenever a slower one arrives or an older one leaves the ring, and
+the reader watching a flame graph of a 31 ms frame is shown a 28 ms one with nothing changed on
+screen but the numbers. The index is the obvious address and it is stable in every fixture with
+fewer than ten frames (F1128). So a card holds a `seq`, re-resolves it against `worst` on each draw,
+and says so when the frame it names has left the set — a frame leaving the worst set is itself a
+reading.
+
+**A card that cannot be drawn draws a notice, and the kit refuses above the form** (I60). `b.plot`
+throws rather than degrades on a `violin` under two rows per band, a `boxplot` with fewer rows than
+bands, a ninth series off a matrix form, a second series on a `bubble`, and thirty-five more — every
+one a function of the region, the report's shape, or both, and the region is not bounded below.
+`profile-view.ts` has no `try` and no `catch`, and `arm` is the last statement of its own callback,
+so a throw from `paneBlocks` stops the refresh with the tier still raised and leaves a frozen pane
+indistinguishable from a quiet session (F1130). So each card declares the floor its form needs, the
+kit compares it to the region before building, and the card that cannot be drawn says which floor it
+missed. A `try` is the second line of defence and not the first: a caught throw one second later is
+still a pane that cannot draw itself, and the notice is the honest version of that.
+
+#### The window, the budget, and the cadence
+
+**A window on block boundaries, measured through the registry.** The view holds an offset in blocks,
+takes blocks from it while the registry's `measureSequence` of the candidate sequence fits the
+region, and always shows at least one; a single block taller than the region is shown under a notice
+saying how many rows are hidden. The same `measureSequence` C15 places with, for `document-view.ts`'s
+reason: a window measured by anything else is C09 I1's divergence with a whole view behind it.
+
+**The verdict card fits the region it opens in** (I52). The pane a reader opens first is the one
+that must not page, and the number is **23 rows at 80 columns** — a 24-row terminal minus the view's
+one-row header. Every other card pages, and a card is one figure, so most do not.
+
+**Every figure in this deck is measured through the registry `construct.ts` builds**, at 80 and at
+120 columns, on the four report fixtures. F959 is why the sentence is here: the figure that condemned
+the first overview was taken through a registry with no `plot` and no `table` registered, where both
+fall to `raw` and a plot measures as the wrapped lines of its own JSON — 26 rows there against 40
+through the real one.
 
 **When it redraws** (I51). On the injected timer — `Ambient.schedule`, the seam the sampler already
 uses (§4) — every `VIEW_REFRESH_MS = 1000` ms, which is the sampler's default cadence
-(`ProfileOptions.sampleMs`) and the 1 Hz readout C23 I64 already runs, so the memory pane is never
+(`ProfileOptions.sampleMs`) and the 1 Hz readout C23 I64 already runs, so the memory cards are never
 more than one sample behind; and on a key. **Never per frame**: a view that redrew on every frame
 would raise the frame that redraws it, and the loop would be the profiler measuring itself. A redraw
 is `overlays.update` on the one id followed by a commit — `stream` from the timer, `input` from a key
-— and every one of them runs inside `profiler.own(() => …)` (I49), so the frame it raises is
-`selfInflicted` and excluded (I12) while the commit seam in `construct.ts` stays exactly as it was: it
-passes `false` for what it knows and reads the bracket.
+— and every one runs inside `profiler.own(() => …)` (I49), so the frame it raises is `selfInflicted`
+and excluded (I12) while the commit seam in `construct.ts` stays exactly as it was.
 
 **The tier** (I50). Opening raises to `spans` only when the tier is below it, and remembers the tier
-it found. Closing calls `setTier` only if opening did — a view opened at `alloc` or `deep` touches the
-tier on neither side, and a view opened at `spans` does not call `setTier("spans")` on close and lean
-on the recorder's *unchanged tier* short-circuit one component away (`recorder.ts`'s `setTier`).
-Where it did raise, the raise resets the ring (I18) and the pane opens on the *no frame has been
-recorded yet* notice rather than a zero plot (I23); the integer counters survive the reset — `resetRing`
-clears the histograms, the rings and the trees and leaves `counters` — so the `frame` pane's counters
-table shows the session so far and the overview names the count and points there (I52), beside a
-latency notice that says nothing has been measured. The restore
-resets again, so the spans watched are gone with the tier that recorded them.
+it found. Closing calls `setTier` only if opening did — a view opened at `alloc` or `deep` touches
+the tier on neither side, and a view opened at `spans` does not call `setTier("spans")` on close and
+lean on the recorder's *unchanged tier* short-circuit one component away. Where it did raise, the
+raise resets the ring (I18) and the deck opens on the *no frame has been recorded yet* notice rather
+than a zero plot (I23); the integer counters survive the reset, so the cards over `counters` show the
+session so far and the verdict names the count and points at them.
 
 **Closing reaches the owner through C15's change stream, whichever caller removed the layer**
 (C15 I25). `Esc` is `viewPop`, which asks the owners in turn and calls this one's `pop()`; but C16's
-ladder answers `⌃c` on a pushed view with `overlays.pop()` (`router.ts`'s `pushedView` rung, through
-`construct.ts`'s `popLayer`) and never calls an owner. The view therefore subscribes at construction
-and runs its teardown — timer disposed, tier restored, one redraw — from any `pop` or `dismiss` change
-carrying its id, and `pop()` is `overlays.dismiss(id)` followed by that same teardown, once. Measured
-before this was built: after the ladder's `pop()` the document view's `openFor` still names its
-command over an empty stack (F944). For this owner that shape would be a tier raised for the rest of
-the session and a timer firing every second into an `update` that returns `false`.
+ladder answers `⌃c` on a pushed view with `overlays.pop()` and never calls an owner. The view
+therefore subscribes at construction and runs its teardown — timer disposed, tier restored, one
+redraw — from any `pop` or `dismiss` change carrying its id, and `pop()` is `overlays.dismiss(id)`
+followed by that same teardown, once.
 
 **At `stop()`** the view's `dispose()` stops the timer and leaves the tier where it is. The session's
-order is `pipeline.dispose()`, drain, `onReport(report())`, `profiler.dispose()`, then release and the
-graph's cleanup (`session.ts`), so by the time cleanup runs `setTier` is a no-op (§7) — and a caller
-disposing the view against a live profiler would otherwise reset a ring nobody has read. The report
-the session hands out describes the raised tier, because that is what was recorded.
+order is `pipeline.dispose()`, drain, `onReport(report())`, `profiler.dispose()`, then release and
+the graph's cleanup, so by the time cleanup runs `setTier` is a no-op (§7) — and a caller disposing
+the view against a live profiler would otherwise reset a ring nobody has read.
 
-**Keys, and none of them new.** The `pushedView` target's seven bindings are shared by every view
-owner (C16 I24; `keys.ts`'s *one target, two owners*), and this is the third owner: `n`/`p` move by
-the view's own unit — a hunk on a patch, a block on a document, and here a **pane**; `g`/`G` and the
-four page keys move the window; `Esc` closes. A pane switch resets the offset and redraws with reason
-`input`. Nothing is added to the keymap, so `/help keys` is unchanged and there is no binding it does
-not show. The prompt takes no keys while a view is top, so `/profile frame` cannot be typed at an open
-view and the pane keys are the only way to switch without closing.
+**Keys.** The `pushedView` target's bindings are shared by every view owner (C16 I24, I33), and this
+is the third owner: `n`/`p` move by the view's own unit — a hunk on a patch, a block on a document,
+and here a **card**; `tab`/`⇧tab` move by its **section**, which here is a group; `g`/`G` and the four
+page keys move the window; `Esc` closes. A card switch resets the offset and redraws with reason
+`input`. The section gesture is new to the keymap and `/help keys` gains its two rows with it — the
+ruling that nothing would be added held while a view had four panes and is withdrawn at thirty cards
+(C16 §6). The prompt takes no keys while a view is top, so `/profile frame` cannot be typed at an
+open view and the keys are the only way to move without closing.
 
-**What `/profile` answers with** is C23 §2's: a muted notice naming the pane that opened, appended
-under the view — never the panes themselves (C23 I69) — or a refusal when no profiler exists, a usage
-line when the pane is not one of `PANES`, and `document-view.ts`'s *close what is open* when another
-layer is up.
+**What `/profile` answers with** is C23 §2's: a muted notice naming the section that opened, appended
+under the view — never the cards themselves (C23 I69) — or a refusal when no profiler exists, a usage
+line when the section is not one of `PANES`, and `document-view.ts`'s *close what is open* when
+another layer is up. **`/profile snapshot` and `/profile live` are the two verbs that do put a card in
+the transcript**, stamped and refreshed respectively, and a live card never raises the tier (C23 I69,
+amended).
+
 
 ---
 
@@ -661,6 +761,11 @@ histograms describes neither, and the report states the point at which it was re
 - **I55** — **Every section of the report a tool prints comes from a `check*` paired with a `format*`, and the figure a marker is taken at is a published member rather than a literal.** A `check*` returns a value a row can assert and a `format*` renders it; a number interpolated into a template string on its way to `stdout` leaves nothing assertable but the whole line, which is why nobody writes that row. This is I37's convention stated as a rule over the whole report rather than about one table, and it is the second time it has had to be applied: the phase table moved into the harness because a reading computed in a script is a reading no row can be written against, which is how a residue of **−460.5 ms** went unasserted (F888, I41). **The two tables beside it stayed in the script and they are the two that were wrong** — `make profile` prints six sections, three from the harness and three inline, and the element table's ratio was labelled `measured` over a union of two seams while the per-entry table's close count was labelled `elements measured` over the same union: 203 for one entry, which is 68 + 1 + 67 + 67 to the unit (F1098, F1099). So the rule is not inferred from a correlation of six; it is a ruling that was taken once and applied to one of the three sections it covered. **What it does not reach**: `formatLeaks`'s prose paragraph and the two overhead lines are sentences about published members rather than tables of derived figures, and a pair for a sentence would be an indirection with no reading behind it — the rule is about a section that *computes*, and a section that only quotes is exempt by name rather than by omission.
 
 - **I56** — **A published summary carries the five numbers a summary figure is built from, or every such figure fabricates two of them.** `Histogram` held `min`, `p50`, `p95`, `p99` and `max`; every distribution form in C12 — `boxplot`, `violin`, `forest`, and `bullet`'s bands — takes a `QuartileSummary` of `{min, q1, median, q3, max}`. The two sets overlap in three places and the missing pair is not derivable, so a consumer drawing a span's shape had exactly two honest options: compute real quartiles from `timeline`'s per-frame samples, which exist only for **frame-site** spans (I41), or put `p95` where `q3` belongs. `Hist` already computes an arbitrary quantile to answer `p50`, so this is the same call twice more and no new state. **The alternative is the deferral that gets paid for at every call site**: each figure over a session-site span working around the gap in its own way, in a currency nobody totals. The percentiles stay — `q3` and `p95` answer different questions and a summary that dropped either would be narrower than the one it replaced.
+
+- **I57** — **A figure names the population it was taken over, because two of them exist and nothing else distinguishes them.** `record()` feeds two stores from one close: the span histograms are **unbounded since the last tier reset** and the frame ring holds **512**, so at frame 600 one report carries `spans.measure.count === 600` and `timeline.length === 512` over the same name. `dropped.frames` is the only trace and it is a property of `timeline` sitting nowhere near `spans`. The consequence is a front end that disagrees with itself and is wrong nowhere — a `dotplot` of a span's p50 reads the histogram, a `boxplot` of its quartiles reads the samples, and the two medians differ for a reason no reader can reach. **Neither store is wrong**: the histogram is right to be unbounded, being what survives the ring, and the ring is right to be bounded. What was missing is the label (F1127).
+- **I58** — **A card that shows one frame is addressed by that frame's `seq`, never by its position in `worst`.** `report()` recomputes the retained set on every call, which I32 requires — *which frames are worst is not known until later* — and the view refreshes every second, so an index into it names a different frame at the next tick whenever a slower frame arrives or an older one leaves the ring. The naive address is the one that fails, and silently: it is stable in every fixture with fewer than ten frames and wrong the moment a session is busy enough to be worth profiling. A card re-resolves its `seq` on each draw and says so when the frame has left the set, because a frame leaving the worst set is itself a reading (F1128).
+- **I59** — **Every member of `PlotForm` is a card or a recorded refusal, compared to the union by equality.** A deck reaching for eighteen forms and leaving thirty unmentioned is indistinguishable from one that considered thirty and rejected them, and the difference decides whether a later reader adds a card or trusts the omission. A form added to C12 fails this gate until it is dispositioned, which is the only mechanism that makes the omissions mean anything. Three entries are **deferrals rather than refusals** and each names its blocker as a symbol.
+- **I60** — **A card declares the floor its form needs and the kit refuses above the form; a card that cannot be drawn draws a notice naming the floor it missed.** C12's contract is *refuse, never ignore*, so `b.plot` throws rather than degrades on a `violin` under two rows per band, a `boxplot` with fewer rows than bands, a ninth series off a matrix form and thirty-five more — every one a function of the region, the report's shape, or both, and the region is not bounded below. `profile-view.ts` has no `try` and no `catch`, and `arm` is the last statement of its own callback, so a throw from `paneBlocks` stops the refresh **with the tier still raised**, leaving a frozen pane indistinguishable from a quiet session (F1130). The `try` is the second line of defence and not the first: a caught throw one second later is still a pane that cannot draw itself.
 
 ---
 
@@ -977,6 +1082,10 @@ machine noise closes, on a runner measured at 2.7× this host's timings (F809). 
 - **T1.106** (I55): `checkEntries` over a report whose entry holds a node with renders as well as measures → the row's count is `byEntry`'s close count and the formatter's heading is **`element closes`**, not *elements measured*. Measured over the scripted session at **203** for one entry, which is 68 + 1 + 67 + 67; the two figures differ only when a seam other than `measure` closed inside the scope, so a fixture with renders is the one that can fail (F1099).
 - **T1.107** (I55): the threshold `checkElements` flags at is a published member of its report, and a node exactly at it is quiet while one above it is flagged. **A literal written twice is the defect this forbids** — the marker's figure lived in `tools/profile.mjs` and in no type, so a row asserting the flag had to restate it and would have agreed with a drifted copy.
 - **T1.108** (I56): a `Hist` fed a known population answers `q1` and `q3` at the quartiles of that population, and a `QuartileSummary` built from the snapshot is accepted by `b.plot` on `boxplot`, `violin`, `forest` and `bullet` — the four forms that take one. The second half is the point: a five-number summary that the form refuses is three numbers and a type error waiting for a caller.
+- **T1.109** (I57): one report drives both extractors for the same span, over a session whose frame count exceeds the ring — the histogram's `count` and the sample series' length differ, and the two cards' footers name different populations. The row asserts the **difference**, not a formatting string: a deck where both footers said the same thing would pass a text match and be the defect.
+- **T1.110** (I58): a card holding the third worst frame's `seq`, then a slower frame arrives and the set is recomputed — the card still shows the frame it named, and a card whose `seq` has left `worst` says so rather than drawing its neighbour. The control is the naive address: an index into the recomputed set silently changes frame, and the row shows both against one report pair.
+- **T1.111** (I59): the cards' forms and the refusal table, unioned, equal `PlotForm` member for member, compared both ways — a form in neither fails, and a refusal for a form that no longer exists fails too. The second direction is what stops a dead entry outliving its subject.
+- **T1.112** (I60): every card at a region below its form's floor draws a notice naming the floor and throws nothing — driven over the whole deck rather than a chosen card, because the point is that no card is the exception. And the control: the same deck at a region that meets every floor builds every card, so a kit that refused everything would fail rather than pass twice.
 
 ### Tier 2 — contract
 
