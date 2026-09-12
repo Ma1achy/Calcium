@@ -163,8 +163,9 @@ describe("C22 — the root's injection, refusal and capture path", () => {
     // "everywhere else".** Written as *outside `src/shell/`* the scan names two
     // files, and both are correct: `src/index.ts` is C24's published surface,
     // which must name the report's types and the pane and export helpers C24 I31
-    // puts on the root, and `src/testing/profile.ts` is the headless harness,
-    // which reads a report exactly as a consumer does. Neither is below L4 —
+    // puts on the root, and `src/testing/profile.ts` is the dev-only door onto
+    // the budget checks, which moved into `shell/profiling/` the day the verdict
+    // card became their second consumer (F1136). Neither is below L4 —
     // they are the surface above it — so the wider reading finds two files that
     // are not the subject and misses nothing that is.
     const LAYERS = ["src/data/", "src/terminal/", "src/presentation/", "src/viewport/", "src/interaction/"];

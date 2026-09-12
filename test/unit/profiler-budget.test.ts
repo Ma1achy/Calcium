@@ -25,7 +25,7 @@ import { fakeStdin } from "../support/fake-terminal.js";
 /** A histogram whose statistics are the ones a row reads, and nothing else. */
 function hist(over: Partial<Histogram> = {}): Histogram {
   return {
-    count: 1, min: 0, p50: 0, p95: 0, p99: 0, max: 0, sum: 0, mean: 0,
+    count: 1, min: 0, q1: 0, p50: 0, q3: 0, p95: 0, p99: 0, max: 0, sum: 0, mean: 0,
     error: 1 / 64,
     ...over,
   };
@@ -118,7 +118,7 @@ describe("C28 — the budget table", () => {
     // unqualified percentile over a truncated ring is wrong in the direction
     // that reassures.
     const hist: Histogram = {
-      count: 40, min: 1, p50: 4, p95: 9, p99: 12, max: 14, sum: 200, mean: 5, error: 1 / 64,
+      count: 40, min: 1, q1: 2, p50: 4, q3: 6, p95: 9, p99: 12, max: 14, sum: 200, mean: 5, error: 1 / 64,
     };
     const truncated = report({
       latency: { work: hist, wait: hist },
@@ -324,7 +324,7 @@ describe("C28 — a part is self time and the whole is the frame's work", () => 
     // negative residue went unasserted (F888). The arithmetic is asserted from
     // the source because the defect is a denominator and a running tool prints
     // only the quotient.
-    const src = readFileSync("src/testing/profile.ts", "utf8");
+    const src = readFileSync("src/shell/profiling/checks.ts", "utf8");
     expect(src, "the whole is latency.work").toContain("report.latency?.work.sum");
     expect(src, "and never the frame span's self time").not.toMatch(
       /work = .*spans\.frame/,

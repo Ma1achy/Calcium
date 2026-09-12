@@ -400,8 +400,8 @@ const FRAMEWORK: readonly CardSpec[] = Object.freeze([
     id: "marks",
     group: "framework",
     question: "instants on a wall clock",
-    form: "timeline",
-    draws: ["marks", "captures"],
+    form: "dotplot",
+    draws: ["marks"],
     site: "none",
     floor: 3,
   }),
@@ -462,7 +462,7 @@ export const FORM_DISPOSITION = {
   horizon: "card", icicle: "card", latency: "card", lollipop: "card",
   pairplot: "card", plot3d: "card", ridgeline: "card", sankey: "card",
   scatter: "card", slope: "card", spectrogram: "card", stackedarea: "card",
-  step: "card", streamgraph: "card", timeline: "card", tree: "card",
+  step: "card", streamgraph: "card", tree: "card",
   treemap: "card", utilisation: "card", violin: "card", waffle: "card",
   waterfall: "card",
 
@@ -473,6 +473,7 @@ export const FORM_DISPOSITION = {
   quiver: "refused", radar: "refused",
 
   calendar: "deferred", forest: "deferred", smallmultiples: "deferred",
+  timeline: "deferred",
 } as const satisfies Readonly<Record<PlotForm, Disposition>>;
 
 /**

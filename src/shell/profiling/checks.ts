@@ -25,13 +25,23 @@
  * `justified` whatever else is blank, because one crossing is sufficient by the
  * appendix's own sentence and an absence is not evidence against it.
  *
- * Runner-free and parameterised, like every sibling here: it returns a value and
- * the caller asserts. Its input is a `ProfileReport`, which is published — a
- * consumer cannot construct a `Profiler` or a `ResourceProbe` and must not need
- * one to read their own budget.
+ * Runner-free and parameterised, like every sibling in `testing/`: it returns a
+ * value and the caller asserts. Its input is a `ProfileReport`, which is
+ * published — a consumer cannot construct a `Profiler` or a `ResourceProbe` and
+ * must not need one to read their own budget.
+ *
+ * **It lives in `shell/profiling/` and is re-exported from `testing/`, which is
+ * the other way round from how it started.** C24 I8 makes `testing/` a dev-only
+ * entry point, so a module outside it that imports one puts it in the production
+ * bundle — and C28's verdict card **reads** these rows rather than recomputing
+ * them (I55), which makes the shell a consumer. A budget check is a *reading of
+ * a report*, not a test helper: it takes a published value and returns a
+ * verdict, and the only thing that made it look like a test helper was where it
+ * was first written. MG26 is what said so, on the day the second consumer
+ * arrived (F1136).
  */
-import { PHASE_GROUP, SPAN_SITE, TIER_RANK } from "../shell/profiling/types.js";
-import type { PhaseGroup, ProfileReport, SpanName } from "../shell/profiling/types.js";
+import { PHASE_GROUP, SPAN_SITE, TIER_RANK } from "./types.js";
+import type { PhaseGroup, ProfileReport, SpanName } from "./types.js";
 
 /** The appendix's rows, in its order. */
 export type BudgetRow =

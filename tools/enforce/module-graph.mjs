@@ -1627,19 +1627,15 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
-  // --- C28's card register, written before the cards it describes ----------
-  //
-  // Three members of one type, and the three are exactly the ones whose names
-  // appear nowhere else in `src/` — `id`, `group`, `form`, `question`, `floor`
-  // and `perFrame` are consumed by this rule's reading because some other owner
-  // declares a member of the same name, which is F105/F160's inexactness and not
-  // evidence that those six are wired and these three are not.
-  "CardSpec.draws":
-    "C28 §3c — the card register is written **before** the cards, which is the whole of why it found anything: a totality gate added after a deck is one the deck already satisfies. Its first run named `byEntry` with no figure (F1129), `bubble` with no disposition (F1132) and two cards whose question has no time axis in the report (F1131). The consumer is `panes/{app,framework,verdict}.ts`, landing next, and **this entry is watched rather than deferred**: MG24's equality arm fails the day a card reads the member, so the exemption cannot outlive its reason unread",
-  "CardSpec.site":
-    "C28 §3c — the card register is written **before** the cards, which is the whole of why it found anything: a totality gate added after a deck is one the deck already satisfies. Its first run named `byEntry` with no figure (F1129), `bubble` with no disposition (F1132) and two cards whose question has no time axis in the report (F1131). The consumer is `panes/{app,framework,verdict}.ts`, landing next, and **this entry is watched rather than deferred**: MG24's equality arm fails the day a card reads the member, so the exemption cannot outlive its reason unread",
+  // --- C28's card register ---------------------------------------------------
   "CardSpec.also":
-    "C28 §3c — the card register is written **before** the cards, which is the whole of why it found anything: a totality gate added after a deck is one the deck already satisfies. Its first run named `byEntry` with no figure (F1129), `bubble` with no disposition (F1132) and two cards whose question has no time axis in the report (F1131). The consumer is `panes/{app,framework,verdict}.ts`, landing next, and **this entry is watched rather than deferred**: MG24's equality arm fails the day a card reads the member, so the exemption cannot outlive its reason unread",
+    "C28 §3c — the member exists so the **form register** can count a form a card "
+    + "draws conditionally: `the instrument` draws a `slope` where a replay baseline "
+    + "exists and nothing otherwise, and I59 compares the cards' forms to `PlotForm` by "
+    + "equality. Its consumer is therefore the gate, which lives in a test by "
+    + "construction — a register asserting its own totality inside `src/` is a gate that "
+    + "ships. F1132 is what the member is for: `bubble` was named in a card's note, "
+    + "correctly, and dispositioned nowhere, and a note is not something a gate can count",
 
   // --- C27's structural port, landing with the emulator ---------------------
   //
@@ -3363,6 +3359,16 @@ export function checkExportedArguments(files, readFile = (f) => readFileSync(f, 
 
 /** Functions whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_FUNCTIONS = Object.freeze({
+  // --- C28's deck, ahead of the view that walks it -------------------------
+  "profileCard":
+    "C28 §3c — the deck's entry point, landing one commit before `profile-view.ts` "
+    + "is rewired onto it. The cards were built and read first on purpose: reading "
+    + "thirty-seven frames is what found a form fed instants where it draws intervals "
+    + "(F1135), a treemap root with no value behind a green gate (F1134) and every "
+    + "`axes: true` card three rows past its region (F1133), and none of those is "
+    + "reachable through a view. **Watched rather than deferred**: MG25's equality arm "
+    + "fails the day `profile-view.ts` names it, so the entry cannot outlive its reason",
+
   // **`createSourceErrorSink` was here and is gone** — wired by `construct.ts`
   // on 2026-09-03 (C19 T3.6's *logged once* given a place to log to, drained by
   // C22 §8 step 3), and the equality arm removed the entry the day it was.

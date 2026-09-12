@@ -64,7 +64,7 @@ export class Hist {
   snapshot(): Histogram {
     if (this.#n === 0) {
       return Object.freeze({
-        count: 0, min: 0, p50: 0, p95: 0, p99: 0, max: 0, sum: 0, mean: 0,
+        count: 0, min: 0, q1: 0, p50: 0, q3: 0, p95: 0, p99: 0, max: 0, sum: 0, mean: 0,
         error: HISTOGRAM_ERROR,
       });
     }
@@ -81,7 +81,17 @@ export class Hist {
     return Object.freeze({
       count: this.#n,
       min: this.#min,
+      // **The two the summary figures need, and the same call twice** (C28 I56).
+      // `Histogram` held five order statistics and every distribution form in
+      // C12 takes a `QuartileSummary` of `{min, q1, median, q3, max}` — the two
+      // sets overlap in three places and the missing pair is not derivable, so
+      // a consumer drawing a session-site span's shape had exactly two honest
+      // options: compute real quartiles from the ring, which holds nothing for
+      // that site, or put `p95` where `q3` belongs. `at` already answered `p50`,
+      // so this is no new state and one more pass over the same keys.
+      q1: at(0.25),
       p50: at(0.5),
+      q3: at(0.75),
       p95: at(0.95),
       p99: at(0.99),
       max: this.#max,

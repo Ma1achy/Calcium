@@ -198,8 +198,32 @@ export const PHASE_GROUP: Readonly<Record<SpanName, PhaseGroup>> = Object.freeze
  * cannot be compared across runs (C28 I10).
  */
 export type Histogram = Readonly<{
-  count: number; min: number; p50: number; p95: number; p99: number;
-  max: number; sum: number; mean: number; error: number;
+  count: number;
+  min: number;
+  /**
+   * The quartiles, beside the percentiles rather than instead of them (C28 I56).
+   *
+   * **Every distribution form in C12 takes a `QuartileSummary`** of
+   * `{min, q1, median, q3, max}`, and this type held `min`, `p50`, `p95`, `p99`
+   * and `max` — the two sets overlap in three places and the missing pair is
+   * not derivable. So a consumer drawing a span's shape had two honest options:
+   * compute real quartiles from `timeline`'s per-frame samples, which exist
+   * only for **frame-site** spans (I41), or put `p95` where `q3` belongs. The
+   * alternative is the deferral that gets paid for at every call site, each
+   * figure working around the gap in its own way.
+   *
+   * `q3` and `p95` answer different questions and both stay: a summary that
+   * dropped either would be narrower than the one it replaced.
+   */
+  q1: number;
+  p50: number;
+  q3: number;
+  p95: number;
+  p99: number;
+  max: number;
+  sum: number;
+  mean: number;
+  error: number;
 }>;
 
 /**
