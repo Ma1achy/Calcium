@@ -189,7 +189,19 @@ export type CaptureResult = Readonly<{
   /** The sampled stacks, folded where the profile was produced (I62). `null`
    *  for a `heap` or `alloc` capture, for an abandoned one, and for a `cpu`
    *  window in which nothing was sampled — which is a reading and not a zero. */
-  stacks: StackNode | null;
+  stacks: SampledStacks | null;
+}>;
+
+export type SampledStacks = Readonly<{
+  /** `(root)` — the container every sample hangs from, kept because it is the
+   *  base of a flame and not a tile competing with the others (I63). */
+  root: StackNode;
+  /** Microseconds per excluded synthetic frame, so the card can say what left
+   *  the tree (I63). Empty when the window held none. */
+  excluded: Readonly<Record<string, number>>;
+  /** What the fold cost. Outside `durationMs`, which is stamped before it, so
+   *  a figure compared across runs does not move with the fold (I34). */
+  foldMs: number;
 }>;
 
 /** A sampled call stack. **Not a `TreeNode`** (I62): sampling knows a name, a
@@ -847,7 +859,7 @@ histograms describes neither, and the report states the point at which it was re
 
 - **I62** — **A sampled stack tree is folded where the profile is produced, and a window nothing was sampled in has no tree.** `Profiler.stop` returns the `.cpuprofile` as an object already in hand, so the fold reads it there and not from the file: a card is a pure function of a report and cannot open one, and a fold at the card would put a megabyte parse inside a redraw. Self time is `timeDeltas[i]` attributed to `samples[i]`, which is V8's own convention and DevTools'; a fold that zipped to the shorter of the two would attribute part of the window and return a tree that renders, so **unequal lengths refuse**. A sample whose `nodeId` is in no node is summed into a **named** residue rather than dropped, because a tree that silently loses time still sums to something plausible — and the row asserts the named node, since a conservation assertion is satisfied by redistribution. `nodes` is emitted whole regardless of what was sampled, so a window with no attributed sample yields **no tree at all**, never a tree of real function names at zero: that is I11's *absent, not zeroed* with a picture on it, and it is the shape a reader is least able to doubt. **The file's cap is not the tree's** — `truncated` describes the JSON write and the fold reads the object, so a capped file beside a whole tree is two true statements, and the card states them separately.
 
-- **I63** — **V8's synthetic frames are out of the tree and their share is on the card.** `(idle)`, `(program)`, `(root)` and `(garbage collector)` are frames in which no application code ran. Left in, `(idle)` is the widest tile on almost every capture and the flame answers *the process was idle*, which is true and is not the question anyone opened it for. Taken out silently, the tree stops summing to the window with nothing saying why. So they are excluded **and the excluded share is stated**, as a generated footer clause driven by a register member — the same mechanism as the population clause and the self-inflicted exclusion, and for the reason those are generated: a card that has to remember to state what it dropped is a card that will forget.
+- **I63** — **V8's synthetic frames are out of the tree and their share is on the card.** `(idle)`, `(program)` and `(garbage collector)` are frames in which no application code ran. **`(root)` is not among them** — it is the container every sample hangs from and the base bar of a flame, not a tile competing with the others, and lifting its children into a node this fold invented would fabricate a frame that was never on a stack. Left in, `(idle)` is the widest tile on almost every capture and the flame answers *the process was idle*, which is true and is not the question anyone opened it for. Taken out silently, the tree stops summing to the window with nothing saying why. So they are excluded **and the excluded share is stated**, as a generated footer clause driven by a register member — the same mechanism as the population clause and the self-inflicted exclusion, and for the reason those are generated: a card that has to remember to state what it dropped is a card that will forget.
 
 - **I64** — **A capture is asked for through a verb that refuses below `deep` and never raises the tier, and the card draws the last capture that completed.** The inspector is constructed only at `deep` (§7), and a verb that raised the tier to get one would reset the ring (I18) — turning *let me look* into *discard what I was watching*, which is C23 I69's clause one verb further out. So `/profile capture` names the tier it needs and does not take it, and says where the file landed. **The card resolves the last completed `cpu` capture on every draw, not the newest entry**: a capture in flight carries no tree, and a card reading `captures.at(-1)` would blank for the length of the window. A capture abandoned at shutdown (I17) has no tree either, and *abandoned* is not the same sentence as *no capture taken*.
 
