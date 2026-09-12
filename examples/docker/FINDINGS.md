@@ -49468,3 +49468,93 @@ consumer's layer, and nothing revisits it until a second consumer appears in a
 different one. This is the sixth blind spot's neighbour — not *where is this claim
 written down*, but *why is this code where it is*, with the same answer: because of
 who happened to need it first.
+
+---
+
+## F1137 — a totality gate keyed by report field is blind to the sentences inside one ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `src/shell/profiling/panes/index.ts` · C28 I61's coverage gate · the four qualifiers |
+| **Reached for** | rewiring the view onto the deck, which deleted the panes the qualifiers lived in |
+| **Verdict** | **closed** — the four are generated in the panel footer, from the register |
+
+**I61 compares `ProfileReport`'s keys against the cards that draw them, by equality in
+both directions.** It is a real gate and it passed. What it cannot see is a *field* of
+a covered key, or a sentence a pane drew beside a figure — and the panes that became a
+deck were carrying four of those:
+
+| what was lost | the invariant | where it lived |
+|---|---|---|
+| `at resolution 10 ms — a floor, not a reading` | I13 | the memory pane's loop rows |
+| `n of them suspended — the series is not continuous` | I27 | the memory pane's caption |
+| `42 timing entries … the profiler raises no marks` | I25 | the memory pane |
+| `raise the tier to \`spans\`` | I11, I23 | the overview and the frame pane |
+
+**Every one is inside a key the gate counts as covered**: the first three are fields of
+`samples`, which sixteen cards draw, and the fourth is a property of `regime`, which
+the verdict reads. `samples` is covered, so `loopDelayResolutionMs` is covered, so
+nothing said the sentence that qualifies it had gone.
+
+**Three of the four were found by a test and one by reading.** T2.3, T3.3 and T3.10
+are rows about what a figure *says*, and they went red because they assert text; the
+tier sentence was found by T1.16b's control, which is the arm that exists because a
+guard on the right branch can print the wrong sentence. **The rows that found them are
+all controls** — the arm asserting the caveat is *absent* on a clean report, the arm
+asserting the tier sentence is *present* below `spans` — which is the shape worth
+noting: a row asserting a sentence appears would have been satisfied by any of the
+thirty-seven cards carrying it, and it was two of thirty-seven that did.
+
+**The repair is generation rather than restoration.** The four are in `footerOf`,
+which builds every card's footer from the register — the population from `site`, the
+resolution from a declared `loopDelay`, the suspended count and the timing entries
+derived from what the card draws. A card that had to remember to state its population
+is a card that will forget (C28 I57's own argument), and the same sentence had already
+been written twice and drifted once: `NO_DURATIONS` ended *which is the one reading a
+profiler must not produce* in `app.ts` and stopped a clause earlier in `framework.ts`,
+with neither reader able to see the other. It is one export in the kit now.
+
+**What this says about the gate**: a coverage rule at the granularity of a type's keys
+measures whether a *datum* reaches a figure, and says nothing about whether a *reading*
+reaches a sentence. The second is where the invariants are. No gate is proposed here —
+the sentences are prose and matching them against invariants is the citation-resolving-
+against-the-wrong-thing class the audit argues against automating (A03) — but the rows
+that caught these four are named in the specs as the instrument, and the footer being
+generated from one place is what makes them non-vacuous.
+
+---
+
+## F1138 — a one-block card cannot be scrolled, so the window's four motions are dead ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/profile-view.ts`'s window · C28 I51 · C15 I8 |
+| **Reached for** | T1.115b, driving `pageDown` at a region the verdict card overflows |
+| **Verdict** | **open** — recorded, with both remedies named; T1.115b is the row |
+
+The view windows **on block boundaries**, which is `document-view.ts`'s projection and
+was right when a pane was six blocks. **A card is one `panel`**, so the windowed
+sequence is one block long, every offset clamps to zero, and `g`, `G`, `pageUp` and
+`pageDown` answer `false` at every card and every region — including the region where
+a card does not fit.
+
+**The overflow is real rather than hypothetical.** The verdict card measures 11 rows
+on an empty ring and its parts do not shrink: two frame rows, a two-row `kv`, a key
+hint and a `bullet` whose height is its category count. At a region of eight the layer
+holds the header, the hidden-rows notice and the card, C15 clips what is past the
+bottom (C15 I8), and the notice says how many rows went — with no gesture that reaches
+them.
+
+**Two remedies, both larger than this round:**
+
+- **A row window through the registry.** The measurement belongs to C09 (C09 I1) and
+  the view has no way to slice a block's rows, so this is a seam that does not exist.
+- **A refusal above the form** (C28 I60). `room()` already compares a form's floor to
+  the region and draws `cannotDraw` — but it measures the *figure*, and a card's
+  non-figure rows (the panel's two, a `kv`, a hint) are outside the comparison. Making
+  the floor account for them would turn this overflow into an honest refusal.
+
+The second is the smaller of the two and is where the entry points. **What made it
+findable was driving the motion rather than the member**: every row until T1.115b
+called `move` on a pane and asserted where the window went, and a pane always had two
+blocks to move between.
