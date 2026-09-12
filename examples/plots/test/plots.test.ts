@@ -381,8 +381,8 @@ describe("every command composes a document the transcript would accept", () => 
     // does not configure a profiler sees. `ProfileReport` is reachable only
     // through `ctx.profile()`: there is no constructor on the public surface and
     // none in `@fmx/calcium/testing`, so the present arm needs a live session
-    // (F917). It is not uncovered — `profilePane` is exercised across every pane
-    // by the framework's own `test/unit/profiler.test.ts`; what this row adds is
+    // (F917). It is not uncovered — `profileCard` is exercised across every card
+    // by the framework's own `test/unit/profile-deck.test.ts`; what this row adds is
     // that the command composes a document the transcript accepts.
     // `FULL` is declared below and closed over rather than repeated: these
     // entries are thunks, so nothing here runs until an `it` does. The absent
