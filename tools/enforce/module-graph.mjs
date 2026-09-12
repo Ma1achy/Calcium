@@ -1627,6 +1627,20 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
+  // --- C28's card register, written before the cards it describes ----------
+  //
+  // Three members of one type, and the three are exactly the ones whose names
+  // appear nowhere else in `src/` — `id`, `group`, `form`, `question`, `floor`
+  // and `perFrame` are consumed by this rule's reading because some other owner
+  // declares a member of the same name, which is F105/F160's inexactness and not
+  // evidence that those six are wired and these three are not.
+  "CardSpec.draws":
+    "C28 §3c — the card register is written **before** the cards, which is the whole of why it found anything: a totality gate added after a deck is one the deck already satisfies. Its first run named `byEntry` with no figure (F1129), `bubble` with no disposition (F1132) and two cards whose question has no time axis in the report (F1131). The consumer is `panes/{app,framework,verdict}.ts`, landing next, and **this entry is watched rather than deferred**: MG24's equality arm fails the day a card reads the member, so the exemption cannot outlive its reason unread",
+  "CardSpec.site":
+    "C28 §3c — the card register is written **before** the cards, which is the whole of why it found anything: a totality gate added after a deck is one the deck already satisfies. Its first run named `byEntry` with no figure (F1129), `bubble` with no disposition (F1132) and two cards whose question has no time axis in the report (F1131). The consumer is `panes/{app,framework,verdict}.ts`, landing next, and **this entry is watched rather than deferred**: MG24's equality arm fails the day a card reads the member, so the exemption cannot outlive its reason unread",
+  "CardSpec.also":
+    "C28 §3c — the card register is written **before** the cards, which is the whole of why it found anything: a totality gate added after a deck is one the deck already satisfies. Its first run named `byEntry` with no figure (F1129), `bubble` with no disposition (F1132) and two cards whose question has no time axis in the report (F1131). The consumer is `panes/{app,framework,verdict}.ts`, landing next, and **this entry is watched rather than deferred**: MG24's equality arm fails the day a card reads the member, so the exemption cannot outlive its reason unread",
+
   // --- C27's structural port, landing with the emulator ---------------------
   //
   // **Sixteen members at once, and the count is the argument rather than a
