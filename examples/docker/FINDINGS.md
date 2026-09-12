@@ -49765,3 +49765,49 @@ behind it.
 **What made it findable was reading the axis rather than the ink.** Every row over
 this card passes: it builds, it draws, it names itself, it refuses below its floor,
 and the register's `draws` list is correct. Nothing asserts what the abscissa *means*.
+
+## F1145 — `yFormat: "duration"` takes seconds, and five cards hand it milliseconds ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/axes.ts`'s `formatDuration` · `src/shell/profiling/panes/framework.ts` ×5 · C04 I41's `Y_FORMATS` |
+| **Reached for** | Reading the framework deck's first card in a real terminal — a four-second session with a y axis topping out at `7m 30s` |
+| **Verdict** | **open** — measured at both ends; the card-side repair is available today and the vocabulary is C04's |
+
+`formatDuration`'s own comment says *"Seconds to a duration"*, and it is right: it
+rounds to whole seconds and climbs a `s → m → h` ladder. `Y_FORMATS` is
+`number · fraction · percent · bytes · duration` — **there is no millisecond unit**,
+and every duration the profiler holds is in milliseconds.
+
+Measured through `dist`:
+
+| value handed in | rendered | what it was |
+|---|---|---|
+| `0.4` | `0s` | 0.4 ms |
+| `18` | `18s` | 18 ms |
+| `400` | `6m 40s` | 400 ms |
+| `969` | `16m 9s` | 969 ms |
+
+Five sites in `framework.ts` pass `yFormat: "duration"` over millisecond values —
+`phases` and `phase-composition` (the phase sums), `spans-compared` (quartiles from
+`frameSamples`), `against-the-budget` (`f.work`), `by-reason` (`byReason`'s p50/p95)
+and `marks-and-captures` (an offset from the first mark). On the captured frame the
+phases card reads a top tick of **`7m 30s` on a session four seconds old**.
+
+**Only the labels are wrong, and uniformly by 1000×.** Every point, band and reference
+line sits where it belongs, because the data and the annotation share the unit — the
+budget line at `16` is still at the sixteenth millisecond of the population. So the
+figure is correct and its axis describes a different quantity, which is the exact
+shape the frame read exists to catch and which no arithmetic assertion reaches.
+
+**Dividing by a thousand at the card is not the repair.** `formatDuration` rounds, so
+every label on every profiler card would become `0s`. The pattern that already works
+is two cards away: `frame-cost` carries no `yFormat` at all and puts the unit in the
+series label — `969 ms` on the captured frame, correct. The two honest options are
+that, applied to all five, or a millisecond member on `Y_FORMATS`, which is a C04
+change with `formatReadout`, the annotation formatter and `xFormat` behind it.
+
+**What made it findable was reading the frame rather than the numbers.** Every row
+over these cards passes — they build, refuse below their floors, declare their
+populations and state their exclusions — and `yFormat` is a member whose value is
+asserted as *declared*, never as *rendered*.
