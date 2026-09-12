@@ -18,6 +18,10 @@ import type { LocalContext } from "../../src/shell/local/registry.js";
 import type { ProfileView } from "../../src/shell/profile-view.js";
 import { SECTIONS } from "../../src/shell/profiling/panes/index.js";
 import type { ProfileSection } from "../../src/shell/profiling/panes/index.js";
+import { liveDeclarations } from "../../src/shell/builders/live.js";
+import { createProfiler } from "../../src/shell/profiling/recorder.js";
+import { TIER_RANK } from "../../src/shell/profiling/types.js";
+import type { ProfileReport, Profiler, Tier } from "../../src/shell/profiling/types.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { pipelineHarness, settled } from "../support/execution.js";
 import { producerContext } from "../support/producer-context.js";
@@ -47,7 +51,10 @@ const fakeView = (
   return { view, opened };
 };
 
-const deps = (view: ProfileView = fakeView().view): HandlerDeps => ({
+const deps = (
+  view: ProfileView = fakeView().view,
+  report: () => ProfileReport | null = () => null,
+): HandlerDeps => ({
   manifest: () => null,
   transcript: createTranscriptStore(),
   // The stubs `execution.test.ts` uses: `/profile` reads none of these.
@@ -61,6 +68,9 @@ const deps = (view: ProfileView = fakeView().view): HandlerDeps => ({
   bindings: () => [],
   stop: () => Promise.resolve(0),
   profileView: view,
+  // `null` by default — the state a session built without `TuiConfig.profile`
+  // is in, and the one every row above this round was written against.
+  profileReport: report,
 });
 
 const ctx = (args: Readonly<Record<string, unknown>> = {}): LocalContext => ({
@@ -103,6 +113,34 @@ const walk = (node: unknown, out: { kind: string; id?: string }[] = []): { kind:
     for (const v of Object.values(o)) walk(v, out);
   }
   return out;
+};
+
+/**
+ * A profiler with a few frames in it and `setTier` counted.
+ *
+ * The spy delegates rather than replacing: `tier` and `own` are closure-backed
+ * getters on the recorder, so a prototype view reads them live and only the
+ * member a row counts is shadowed — the shape `profile-view.test.ts`'s rig uses,
+ * reduced to the one member these rows read.
+ */
+const spiedProfiler = (tier: Tier): { profiler: Profiler; setTierCalls: Tier[] } => {
+  let t = 0;
+  const real = createProfiler({ tier }, { elapsed: () => (t += 1) });
+  for (let i = 0; i < 8; i += 1) {
+    real.commit("input", false);
+    real.beginFrame("input");
+    {
+      using _a = real.span("compose");
+    }
+    real.endFrame("frame");
+  }
+  const setTierCalls: Tier[] = [];
+  const profiler = Object.create(real) as Profiler;
+  profiler.setTier = (next: Tier): void => {
+    setTierCalls.push(next);
+    real.setTier(next);
+  };
+  return { profiler, setTierCalls };
 };
 
 describe("C23 — /profile, the local route", () => {
@@ -172,11 +210,87 @@ describe("C23 — /profile, the local route", () => {
     expect(notices(doc.blocks)[0]?.text).toBe("profiler: framework");
   });
 
-  // **Spec-first, so the rows are here and unbuilt.** C23 I69's amendment admits two
-  // verbs this file will assert once they exist; a spec row with no test is the
-  // same shape as an invariant with no row, which is the signature A03 §2 names.
-  it.todo("T1.66b (C23 I69): `/profile snapshot` appends a panel whose title carries the frame range, the elapsed time, the tier and the ring's reset point, and holds no live part; `/profile live` appends a live part with a cadence and no stamp — read as fields, so a reworded stamp fails only when one goes missing — not deferred on a component; the two verbs land with this round's cards");
-  it.todo("T1.66c (C23 I69): `/profile live` calls setTier zero times at every tier, and at `off` its first render is C28's raise-the-tier notice rather than a figure — the second half being what makes the first testable, since a verb that raises nothing and draws nothing satisfies the count and answers nobody — not deferred on a component; it lands with this round's cards");
+  it("T1.66b (C23 I69): `snapshot` appends a stamped panel and no live part; `live` appends a cadence and no stamp", async () => {
+    const { view, opened } = fakeView();
+    const { profiler } = spiedProfiler("spans");
+    const handlers = shippedHandlers(deps(view, () => profiler.report()));
+
+    // --- the snapshot arm -----------------------------------------------------
+    const snap = await run(handlers, ["snapshot"], { section: "snapshot" });
+    const snapPanel = snap.blocks.find((x) => x.kind === "panel");
+    expect(snapPanel, "one panel").toBeDefined();
+
+    // **Read as fields, not as a sentence.** The stamp is four facts and the
+    // row asserts all four are present; a reworded stamp fails here only when
+    // one of them goes missing, which is the failure worth having. A regex over
+    // the whole string would fail on every wording change and pass on a stamp
+    // that had quietly lost its tier.
+    const title = (snapPanel as { title?: string }).title ?? "";
+    expect(title, "the card it is of").toContain("verdict");
+    expect(title, "the frame range").toMatch(/\d+ frames/u);
+    expect(title, "the elapsed time").toMatch(/captured \d+\.\d s/u);
+    expect(title, "the tier it was recorded at").toMatch(/tier (?:off|counters|spans|full|deep)/u);
+    expect(title, "and how far back the ring reaches").toMatch(/ring (?:reset|never reset)/u);
+
+    // **And it is one-shot**: a stamp and a cadence on one block would be two
+    // claims about the same fact, disagreeing between ticks.
+    expect(liveDeclarations(snap.blocks), "no live part on a snapshot").toEqual([]);
+    expect(opened, "neither verb opens the view").toEqual([]);
+
+    // --- the live arm ---------------------------------------------------------
+    const live = await run(handlers, ["live"], { section: "live" });
+    const declared = liveDeclarations(live.blocks);
+    expect(declared, "one live part").toHaveLength(1);
+    expect(declared[0]?.spec.every, "on the sampler's own cadence").toBe(1000);
+    const liveTitle = declared[0]?.spec.title ?? "";
+    expect(liveTitle, "the card it is of").toContain("verdict");
+    // The stamp's fields, absent — a live part is current because it refetches.
+    expect(liveTitle, "no frame range").not.toMatch(/\d+ frames/u);
+    expect(liveTitle, "no elapsed time").not.toMatch(/captured/u);
+    expect(opened, "and still no view opened").toEqual([]);
+
+    // The card is the one named, when one is named — `cardFor` falls to the
+    // verdict and a row asserting only the default cannot tell the two apart.
+    const named = await run(handlers, ["snapshot"], { section: "snapshot", card: "the-pairs" });
+    expect((named.blocks.find((x) => x.kind === "panel") as { title?: string }).title).toContain(
+      "the-pairs",
+    );
+  });
+
+  it("T1.66c (C23 I69, C28 I50, C28 I18): a live card calls `setTier` zero times at every tier, and below `spans` draws the raise notice rather than a figure", async () => {
+    // **The count and the notice together**, because the count alone is
+    // satisfied by a verb that raises nothing and draws nothing. The second
+    // half is what makes the first worth asserting.
+    // **Every tier, from `TIER_RANK` rather than a list with a birthday**: a
+    // tier added later is asserted here the day it exists rather than the day
+    // someone remembers this row.
+    for (const tier of Object.keys(TIER_RANK) as readonly Tier[]) {
+      const { profiler, setTierCalls } = spiedProfiler(tier);
+      const handlers = shippedHandlers(deps(fakeView().view, () => profiler.report()));
+      const doc = await run(handlers, ["live"], { section: "live" });
+      const spec = liveDeclarations(doc.blocks)[0]?.spec;
+      expect(spec, `a live part at ${tier}`).toBeDefined();
+      if (spec === undefined) continue;
+
+      // Drive the part the way C23's driver does: fetch, then render.
+      const data = await spec.fetch();
+      const drawn = spec.render(data, producerContext());
+
+      if (TIER_RANK[tier] < TIER_RANK.spans) {
+        expect(drawn.kind, `at ${tier} the first render is the notice`).toBe("notice");
+        const text = (drawn as { text?: string }).text ?? "";
+        expect(text, "naming the tier it found").toContain(`\`${tier}\``);
+        expect(text, "and saying who does raise it").toContain("/profile");
+      } else {
+        expect(drawn.kind, `at ${tier} it is a figure`).not.toBe("notice");
+      }
+
+      // **The reader is what makes this unreachable rather than merely
+      // unused**: the handler holds `() => ProfileReport | null` and there is
+      // no recorder behind it to call.
+      expect(setTierCalls, `no tier raised at ${tier}`).toEqual([]);
+    }
+  });
 
   it("T1.67 (C23 I68, C05 §3): the manifest's `section` values are C28's `SECTIONS`, written down at L0 and held equal here", () => {
     // L0 may not import L4, so `framework.ts` carries the three names as
@@ -186,8 +300,17 @@ describe("C23 — /profile, the local route", () => {
     // a reader noticing.
     const row = FRAMEWORK_TOOLS.find((t) => t.name === "profile");
     expect(row?.local).toBe(true);
-    expect(row?.args.map((a) => [a.name, a.type, a.required])).toEqual([["section", "enum", false]]);
-    expect([...(row?.args[0]?.values ?? [])]).toEqual([...SECTIONS]);
+    expect(row?.args.map((a) => [a.name, a.type, a.required])).toEqual([
+      ["section", "enum", false],
+      ["card", "string", false],
+    ]);
+    // **The three sections and the two document verbs, in that order.** The
+    // enum is one argument holding two kinds of value — a section opens the
+    // view, `snapshot` and `live` append a document (C23 I69, amended) — and
+    // the row holds both halves rather than the sections alone, because an
+    // equality against `SECTIONS` would have gone green the day either verb was
+    // dropped from the enum and left the completion menu short of it.
+    expect([...(row?.args[0]?.values ?? [])]).toEqual([...SECTIONS, "snapshot", "live"]);
     expect(FRAMEWORK_TOOLS.map((t) => t.name).sort()).toEqual(SEVEN);
   });
 

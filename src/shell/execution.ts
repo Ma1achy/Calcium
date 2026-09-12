@@ -190,6 +190,13 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // C28 §3c's view, for `/profile` (C23 I68) — the row is in
       // `FRAMEWORK_TOOLS`, so a handler missing here is what `seal()` refuses.
       profileView: deps.profileView,
+      // C23 I69's amended pair — `/profile snapshot` and `/profile live` read
+      // the same reader `LocalContext.profile` carries, and `null` where that
+      // is absent. **The reader, never the recorder**: the two verbs put a card
+      // in the transcript and a transcript part has no close, so a tier raise
+      // from here would pin the tier for the session and reset the ring doing
+      // it (C28 I50, I18). There is nothing to reach it with.
+      profileReport: () => deps.profile?.() ?? null,
     }),
   )) {
     local.register(verb, handler);

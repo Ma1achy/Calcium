@@ -133,14 +133,26 @@ export const FRAMEWORK_TOOLS: readonly ToolDef[] = Object.freeze([
   Object.freeze({
     name: "profile",
     local: true,
-    summary: "open the profiler's view; `/profile framework` opens it on that section",
+    summary: "open the profiler's view; `/profile framework` opens a section, `/profile snapshot [card]` appends one",
     args: [
       Object.freeze({
         name: "section",
         type: "enum" as const,
         required: false,
-        values: Object.freeze(["verdict", "app", "framework"]),
-        summary: "`verdict`, `app` or `framework`; default `verdict`",
+        // **Three sections and two document verbs in one enum**, because they
+        // occupy one positional slot and C05 has to accept both: `/profile app`
+        // opens the view on a group and `/profile snapshot` appends a stamped
+        // card (C23 I69, amended). The alternative was a flag, which would make
+        // `/profile --snapshot` the spelling of a verb and read as a modifier of
+        // an open that does not happen.
+        values: Object.freeze(["verdict", "app", "framework", "snapshot", "live"]),
+        summary: "`verdict`, `app` or `framework` to open the view; `snapshot` or `live` to append a card",
+      }),
+      Object.freeze({
+        name: "card",
+        type: "string" as const,
+        required: false,
+        summary: "which card `snapshot` or `live` draws; default the verdict",
       }),
     ],
     flags: [],

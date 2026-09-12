@@ -21,8 +21,10 @@ import type { HistoryEntry } from "../../interaction/history/types.js";
 import type { ThemeStore } from "../../presentation/theme/index.js";
 import { b } from "../builders/index.js";
 import { blockId, compose, warnNotice } from "../documents.js";
-import { SECTIONS } from "../profiling/panes/index.js";
+import { CARDS, SECTIONS, profileCard } from "../profiling/panes/index.js";
 import type { ProfileSection } from "../profiling/panes/index.js";
+import { TIER_RANK } from "../profiling/types.js";
+import type { ProfileReport } from "../profiling/types.js";
 import type { ProfileView } from "../profile-view.js";
 import type { LocalHandler } from "./registry.js";
 import type { StopReason } from "../types.js";
@@ -61,6 +63,19 @@ export type HandlerDeps = Readonly<{
    * outside the round that wrote it (T1.64's second arm watched that).
    */
   profileView: ProfileView;
+  /**
+   * The report, for `/profile snapshot` and `/profile live` (C23 I69, amended).
+   *
+   * **A reader and not a profiler.** The two verbs put a card in the transcript
+   * and neither may raise the tier — a transcript part has no close, so a raise
+   * would pin the tier for the session and reset the ring doing it (C28 I50,
+   * I18). Handing over `() => ProfileReport | null` rather than the recorder is
+   * what makes `setTier` unreachable from here rather than merely unused.
+   *
+   * `null` when the session was built without `TuiConfig.profile`, which is the
+   * same state `profileView.open` refuses on.
+   */
+  profileReport: () => ProfileReport | null;
 }>;
 
 const isSection = (x: unknown): x is ProfileSection =>
@@ -86,8 +101,119 @@ const isSection = (x: unknown): x is ProfileSection =>
  * view's own strings for *no profiler* and *something is open*, and a usage
  * line for a section that is not one of C28's three.
  */
-const profileHandler = (view: ProfileView): LocalHandler => (argv, ctx) => {
+/**
+ * The stamp (C23 I69, amended).
+ *
+ * **Four fields, and the reason each is there is that a reader a week later
+ * cannot work it out.** The frame range and the elapsed time say *when*; the
+ * tier says what was being recorded, because a figure at `counters` is a count
+ * and not a duration; and the ring's reset point says how far back the window
+ * reaches, since a raise resets it (C28 I18) and a percentile over a reset ring
+ * describes the time since, not the session.
+ *
+ * A stamp claims the opposite of current on its own face, forever, which is the
+ * property I69's first form tried to get by forbidding the document.
+ */
+const stampOf = (r: ProfileReport, card: string): string => {
+  const frames = `${String(r.frames)} frames`;
+  const dropped = r.dropped.frames > 0 ? `, ${String(r.dropped.frames)} past the ring` : "";
+  const elapsed = `${(r.regime.durationMs / 1000).toFixed(1)} s`;
+  const reset = r.regime.ringReset > 0
+    ? `ring reset ${(r.regime.ringReset / 1000).toFixed(1)} s in`
+    : "ring never reset";
+  return `${card} · ${frames}${dropped} · captured ${elapsed} · tier ${r.regime.tier} · ${reset}`;
+};
+
+/** How often a live card refetches — the view's cadence, for the view's reasons. */
+const LIVE_EVERY_MS = 1000;
+
+/**
+ * The rows a snapshot card is drawn at.
+ *
+ * **A figure and not the region**, which is the whole of why the verb exists:
+ * the overlay is one screen and does not scroll, so an icicle of a 47 ms frame
+ * is cramped there and right in scrollback, where it can be scrolled past and
+ * compared with the next one. `ctx.height` is the *viewport's* height and would
+ * reproduce the cramping in the one place that is not bound by it.
+ *
+ * The width is `ctx.width` — that one is a real constraint, and a card drawn
+ * wider than the transcript wraps (C01's width rule, the direction that
+ * corrupts).
+ */
+const SNAPSHOT_ROWS = 32;
+
+/**
+ * The card a document verb draws, named or defaulted.
+ *
+ * **The verdict rather than whatever the view is showing**, and the difference
+ * matters: the prompt takes no keys while a view is top (C16 §3), so a reader
+ * who has walked to `frame on a clock` has to close the view before they can
+ * type `/profile snapshot` — and by then there is no open card to mean. The
+ * card is named on the line or it is the verdict.
+ */
+const cardFor = (wanted: unknown): string =>
+  typeof wanted === "string" && CARDS.some((c) => c.id === wanted) ? wanted : "verdict";
+
+const profileHandler =
+  (view: ProfileView, report: () => ProfileReport | null): LocalHandler =>
+  (argv, ctx) => {
   const wanted = ctx.args["section"];
+  const card = cardFor(ctx.args["card"]);
+
+  // --- the two document verbs (C23 I69, amended) -----------------------------
+  if (wanted === "snapshot" || wanted === "live") {
+    const r = report();
+    if (r === null) {
+      return doc("/profile", [
+        warnNotice(
+          "no profiler to show — this session was built without `TuiConfig.profile`",
+          blockId("profile-refused"),
+        ),
+      ]);
+    }
+    if (wanted === "snapshot") {
+      // **One-shot and stamped**, which is the pair: the document is a reading
+      // taken at a moment and it says which moment on its own title.
+      return doc("/profile snapshot", [
+        b.panel(stampOf(r, card), [...profileCard(r, card, { w: ctx.width, rows: SNAPSHOT_ROWS })], {
+          id: blockId("profile-snapshot"),
+        }),
+      ]);
+    }
+    // **Live and unstamped**, which is the other half: a part that refetches is
+    // current because it is refreshed, so a stamp on it would be a second claim
+    // about the same fact and the two would disagree between ticks.
+    //
+    // **It calls no `setTier`** — there is no recorder here to call it on. At a
+    // tier below `spans` it draws C28's own notice rather than silently turning
+    // the profiler on behind the reader, which is what makes the rule honest
+    // rather than merely observed.
+    return doc("/profile live", [
+      b.live({
+        id: blockId("profile-live"),
+        title: `${card} · live`,
+        every: LIVE_EVERY_MS,
+        fetch: () => Promise.resolve(report()),
+        render: (data, pctx) => {
+          const now = (data as ProfileReport | null) ?? r;
+          if (TIER_RANK[now.regime.tier] < TIER_RANK.spans) {
+            return b.notice(
+              "warn",
+              `the tier is \`${now.regime.tier}\` and a live card never raises it — ` +
+                "open `/profile` to watch the deck, which raises to `spans` while it is open " +
+                "and restores the tier on close (C28 I50)",
+              undefined,
+              { id: `${blockId("profile-live")}-tier` },
+            );
+          }
+          const rows = pctx.height ?? 24;
+          const only = profileCard(now, card, { w: pctx.width, rows })[0];
+          return only ?? b.notice("warn", `no card \`${card}\``, undefined, { id: `${blockId("profile-live")}-gone` });
+        },
+      }),
+    ]);
+  }
+
   const section: ProfileSection | null = isSection(wanted)
     ? wanted
     : argv.length === 0
@@ -96,7 +222,7 @@ const profileHandler = (view: ProfileView): LocalHandler => (argv, ctx) => {
   if (section === null) {
     return doc("/profile", [
       warnNotice(
-        `usage: /profile [${SECTIONS.join("|")}] — got \`${argv[0] ?? ""}\``,
+        `usage: /profile [${SECTIONS.join("|")}|snapshot|live] [card] — got \`${argv[0] ?? ""}\``,
         blockId("profile-usage"),
       ),
     ]);
@@ -359,6 +485,6 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
     },
 
     // The seventh (C23 §2, I68).
-    profile: profileHandler(deps.profileView),
+    profile: profileHandler(deps.profileView, deps.profileReport),
   };
 }
