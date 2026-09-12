@@ -49695,3 +49695,41 @@ instruments pointed at the label and none at the thing labelled.
 The row that closes it asserts the extractor directly and asserts its precondition
 first — the fixture must contain a session-site name inside `timeline[].spans`, or the
 emptiness it checks is emptiness for the wrong reason.
+
+## F1143 — a card with two populations, and a footer chain that names one ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/profiling/panes/index.ts`'s `footerOf` · C28 I57, I27 |
+| **Reached for** | Reading the rendered deck — the first card of group A drew one curve of four |
+| **Verdict** | **closed** — the samples clause is its own `if`; T1.121 is the row |
+
+`vitals` is four horizons sharing an x axis — frame ms, heap, cpu, loop delay — so
+that a spike in one can be read against the others. Two of those come from the frame
+ring and two from the resource ring, and the card declares both: `draws: ["timeline",
+"samples"]`, `site: "frame"`.
+
+`footerOf` names the population in a chain: *frame site*, **else** *session site*,
+**else** *has samples*, **else** *the session so far*. A card declaring a span site
+therefore never reaches the samples clause, so `vitals` — the only card in the deck
+with both — stated the frame ring's bound and **said nothing at all about the resource
+ring**.
+
+**What that looks like on a report with no sampler running**: one curve, three blank
+bands, and a footer reading `frame-site spans · 120 frames in the ring`. Every figure
+correct, every sentence true, and no way to tell *the machine was quiet* from *three
+of these four series have no data*. The card's whole question is *did the spikes
+coincide*, and it was answering it from one series.
+
+**One card of thirty-seven, and it is the first one after the verdict.** The clause
+now stands on its own, and the *no population at all* fallback becomes a question
+about both clauses rather than the tail of one chain: `frame-site spans · 120 frames
+in the ring · 0 resource samples`.
+
+**A chain that names one population hides the other**, which is the generalisation —
+F1137 generated these clauses so a card could not forget to state its population, and
+the generator then made *one* population per card structurally unstateable.
+
+**What made it findable was reading the frame**, not the numbers: every row over this
+card passes, because every row asks whether the footer contains the clause the card is
+*declared* to have.
