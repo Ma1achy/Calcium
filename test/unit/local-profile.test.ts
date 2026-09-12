@@ -54,7 +54,9 @@ const fakeView = (
 const deps = (
   view: ProfileView = fakeView().view,
   report: () => ProfileReport | null = () => null,
+  capture: HandlerDeps["profileCapture"] = null,
 ): HandlerDeps => ({
+  profileCapture: capture,
   manifest: () => null,
   transcript: createTranscriptStore(),
   // The stubs `execution.test.ts` uses: `/profile` reads none of these.
@@ -304,13 +306,14 @@ describe("C23 — /profile, the local route", () => {
       ["section", "enum", false],
       ["card", "string", false],
     ]);
-    // **The three sections and the two document verbs, in that order.** The
-    // enum is one argument holding two kinds of value — a section opens the
-    // view, `snapshot` and `live` append a document (C23 I69, amended) — and
-    // the row holds both halves rather than the sections alone, because an
-    // equality against `SECTIONS` would have gone green the day either verb was
-    // dropped from the enum and left the completion menu short of it.
-    expect([...(row?.args[0]?.values ?? [])]).toEqual([...SECTIONS, "snapshot", "live"]);
+    // **The three sections and the three verbs, in that order.** The enum is
+    // one argument holding two kinds of value — a section opens the view,
+    // `snapshot` and `live` append a document (C23 I69, amended), `capture`
+    // takes a CPU profile (C28 I64) — and the row holds every half rather than
+    // the sections alone, because an equality against `SECTIONS` would have
+    // gone green the day a verb was dropped from the enum and left the
+    // completion menu short of it.
+    expect([...(row?.args[0]?.values ?? [])]).toEqual([...SECTIONS, "snapshot", "live", "capture"]);
     expect(FRAMEWORK_TOOLS.map((t) => t.name).sort()).toEqual(SEVEN);
   });
 
@@ -354,9 +357,62 @@ describe("C23 — /profile, the local route", () => {
   });
 });
 
-// C28 §3c — the capture verb, owed at the spec commit (§9b S20).
-describe("C28 I64 — the capture verb, spec-first row", () => {
-  it.todo(
-    "T1.128 (C28 I64): /profile capture below tier deep answers a notice naming the tier and the profiler's setTier is never called - the spied recorder, as T1.66c does it, because a verb that raised to serve itself would pass every assertion about the notice - not deferred on a component: lands with the /profile capture verb",
-  );
+// C28 §3c — the capture verb (§9b S20).
+describe("C28 I64 — the capture verb", () => {
+  it("T1.128 (C28 I64, C28 I18): below `deep` it names the tier and takes it from nobody", async () => {
+    for (const tier of ["off", "counters", "spans"] as const) {
+      const { profiler, setTierCalls } = spiedProfiler(tier);
+      let taken = 0;
+      const handlers = shippedHandlers(
+        deps(fakeView().view, () => profiler.report(), async (ms) => {
+          taken += 1;
+          return Promise.resolve({
+            kind: "cpu" as const, path: "/x.cpuprofile", bytes: 1, truncated: false,
+            droppedBytes: 0, durationMs: ms, abandoned: false, stacks: null,
+          });
+        }),
+      );
+      const out = await run(handlers, ["capture"], { section: "capture" });
+      const text = JSON.stringify(out.blocks);
+      expect(text, `\`${tier}\` is named in the refusal`).toContain(`\`${tier}\``);
+      expect(text, "and `deep` is named as what it needs").toContain("deep");
+      // **The two counts are the row.** A verb that raised to serve itself
+      // would produce a capture and pass every assertion about the sentence —
+      // and would have reset the ring every figure on the deck is drawn from.
+      expect(setTierCalls, `no tier was taken at \`${tier}\``).toEqual([]);
+      expect(taken, "and no capture was attempted").toBe(0);
+    }
+  });
+
+  it("T1.128b (C28 I64): at `deep` it captures, and says where the file went", async () => {
+    const { profiler, setTierCalls } = spiedProfiler("deep");
+    const windows: number[] = [];
+    const handlers = shippedHandlers(
+      deps(fakeView().view, () => profiler.report(), async (ms) => {
+        windows.push(ms);
+        return Promise.resolve({
+          kind: "cpu" as const, path: "/tmp/t.cpuprofile", bytes: 9, truncated: false,
+          droppedBytes: 0, durationMs: ms, abandoned: false,
+          stacks: {
+            root: { name: "(root)", at: null, self: 0, total: 3_000, children: [] },
+            excluded: { "(idle)": 7_000 },
+            foldMs: 0,
+          },
+        });
+      }),
+    );
+    const out = await run(handlers, ["capture"], { section: "capture" });
+    const text = JSON.stringify(out.blocks);
+    expect(windows, "the default window").toEqual([400]);
+    expect(text, "the file, so the reader can find it").toContain("/tmp/t.cpuprofile");
+    expect(text, "what landed on the tree").toContain("3.00 ms");
+    expect(text, "and what did not").toContain("7.00 ms");
+    expect(setTierCalls, "still nobody's tier").toEqual([]);
+
+    // The window is read from the second positional and clamped to the bounds
+    // the handler states — 20 is under the floor, and a floor that let it
+    // through would return a window with too few samples to be a distribution.
+    await run(handlers, ["capture", "20"], { section: "capture", card: "20" });
+    expect(windows.at(-1), "clamped up to the floor").toBe(50);
+  });
 });

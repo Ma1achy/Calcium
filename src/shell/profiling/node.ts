@@ -56,6 +56,8 @@ import { PerformanceObserver, monitorEventLoopDelay, performance } from "node:pe
 import { Session as InspectorSession } from "node:inspector";
 import { getHeapSnapshot, getHeapSpaceStatistics, getHeapStatistics } from "node:v8";
 
+import { foldCpuProfile } from "./stacks.js";
+import type { CpuProfile, SampledStacks } from "./stacks.js";
 import type { CaptureKind, CaptureResult, GcKind, ResourceProbe, ResourceSample } from "./types.js";
 
 /** V8's numbers are the API and the names are ours (C28 I16). */
@@ -351,6 +353,7 @@ export function createInspector(elapsed: () => number, io: CaptureIo): Inspector
       let bytes = 0;
       let dropped = 0;
 
+      let cpuProfile: CpuProfile | undefined;
       if (kind === "cpu") {
         await post("Profiler.enable");
         await post("Profiler.setSamplingInterval", { interval: 100 });
@@ -361,6 +364,12 @@ export function createInspector(elapsed: () => number, io: CaptureIo): Inspector
         const { profile } = await post("Profiler.stop");
         await post("Profiler.disable");
         ({ bytes, dropped } = writeJson(path, profile, capBytes));
+        // **The object, not the file** (C28 I62). The fold reads what
+        // `Profiler.stop` just handed back; re-reading the `.cpuprofile` would
+        // parse bytes this frame already holds, and would read a file the cap
+        // above may have truncated — so the tree would describe less than the
+        // capture did, with nothing on either side able to say so.
+        cpuProfile = profile as CpuProfile;
       } else if (kind === "alloc") {
         await post("HeapProfiler.enable");
         // 32 KB: V8's own default. A smaller interval samples more allocation
@@ -398,16 +407,29 @@ export function createInspector(elapsed: () => number, io: CaptureIo): Inspector
         dropped = sink.dropped;
       }
 
+      // **Stamped before the fold** (C28 I34, §9b S19). `durationMs` is the
+      // sampling window and the write, and it is compared across runs; a fold
+      // inside it would move a figure for a reason that has nothing to do with
+      // what the capture measured. What the fold cost travels on `foldMs`.
+      const durationMs = elapsed() - at;
+      let stacks: SampledStacks | null = null;
+      if (cpuProfile !== undefined) {
+        const foldAt = elapsed();
+        const folded = foldCpuProfile(cpuProfile);
+        if (folded !== null) stacks = Object.freeze({ ...folded, foldMs: elapsed() - foldAt });
+      }
+
       return Object.freeze({
         kind,
         path,
         bytes,
         truncated: dropped > 0,
         droppedBytes: dropped,
-        durationMs: elapsed() - at,
+        durationMs,
         // A capture that returned is not an abandoned one; only `dispose` sets
         // this, and only for a capture it did not wait out (C28 I17).
         abandoned: false,
+        stacks,
       });
     },
 

@@ -193,7 +193,7 @@ exports[`golden frames — a composed session, not a block > SF1 · transcript �
 14   │ /theme    switch between the dark and light variants                        
 15   │ /history  show recent commands                                              
 16   │ /exit     end the session                                                   
-17   │ /profile  open the profiler's deck; \`snapshot\` and \`live\` append a card     
+17   │ /profile  open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\`      
 18   │                                                                             
 19   │ /help keys   Use                                                            
 20                                                                                 
@@ -222,7 +222,7 @@ exports[`golden frames — a composed session, not a block > SF1 · transcript �
 14   │ /theme    switch between the dark and light variants                        
 15   │ /history  show recent commands                                              
 16   │ /exit     end the session                                                   
-17   │ /profile  open the profiler's deck; \`snapshot\` and \`live\` append a card     
+17   │ /profile  open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\`      
 18   │                                                                             
 19   │ /help keys   Use                                                            
 20                                                                                 
@@ -251,7 +251,7 @@ exports[`golden frames — a composed session, not a block > SF1 · transcript �
 14   │ /theme    switch between the dark and light variants                        
 15   │ /history  show recent commands                                              
 16   │ /exit     end the session                                                   
-17   │ /profile  open the profiler's deck; \`snapshot\` and \`live\` append a card     
+17   │ /profile  open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\`      
 18   │                                                                             
 19   │ /help keys   Use                                                            
 20                                                                                 
@@ -597,7 +597,7 @@ CCCCCCC.........................................................................
 ..B.BBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA........................
 ..B.BBBBBBBB..AAAAAAAAAAAAAAAAAAAA..............................................
 ..B.BBBBBBBB..AAAAAAAAAAAAAAA...................................................
-..B.BBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.....
+..B.BBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA......
 ..B.............................................................................
 ..B.DDDDDDDDDDDDDDDD............................................................
 ................................................................................
@@ -629,7 +629,7 @@ BBCBCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBB
 BBCBCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBB
 BBCBCCCCCCCCBBAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBCBCCCCCCCCBBAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-BBCBCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBB
+BBCBCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBB
 BBCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBCBEEEEEEEEEEEEEEEEBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
@@ -662,7 +662,7 @@ BBCBCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBB
 BBCBCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBB
 BBCBCCCCCCCCBBAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBCBCCCCCCCCBBAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-BBCBCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBB
+BBCBCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBB
 BBCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBCBEEEEEEEEEEEEEEEEBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
@@ -1435,9 +1435,9 @@ ESC[38;5;241m
 ESC[39m
 «» +2sp
 ESC[38;5;188m
-«open the profiler's deck; \`snapshot\` and \`live\` append a card»
+«open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\`»
 ESC[39m
-«» +5sp
+«» +6sp
 ESC[18;1H
 ESC[0m
 «» +2sp
@@ -1605,9 +1605,9 @@ ESC[38;5;247m
 ESC[39m
 «» +2sp
 ESC[38;5;231m
-«open the profiler's deck; \`snapshot\` and \`live\` append a card»
+«open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\`»
 ESC[39m
-«» +5sp
+«» +6sp
 ESC[0m
 ESC[18;1H
 ESC[0m
@@ -1782,9 +1782,9 @@ ESC[38;5;246m
 ESC[39m
 «» +2sp
 ESC[38;5;237m
-«open the profiler's deck; \`snapshot\` and \`live\` append a card»
+«open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\`»
 ESC[39m
-«» +5sp
+«» +6sp
 ESC[0m
 ESC[18;1H
 ESC[0m

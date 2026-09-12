@@ -16,11 +16,13 @@ import { describe, expect, it } from "vitest";
 
 import type { Block } from "../../src/data/viewmodel/index.js";
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
-import type { CommitReason, ProfileReport, Profiler, Tier } from "../../src/shell/profiling/types.js";
+import type { CaptureResult, CommitReason, ProfileReport, Profiler, Tier } from "../../src/shell/profiling/types.js";
 import {
   CARDS, DRAWN_CARD_IDS, REGISTERED_CARD_IDS, SECTIONS, cardsOf, profileCard,
 } from "../../src/shell/profiling/panes/index.js";
 import { frameSamples } from "../../src/shell/profiling/panes/kit.js";
+import { UNATTRIBUTED, foldCpuProfile } from "../../src/shell/profiling/stacks.js";
+import type { StackNode } from "../../src/shell/profiling/stacks.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { ASCII_CAPS, FULL_CAPS, measurable } from "../support/render.js";
@@ -436,26 +438,137 @@ describe("C28 §3c — the deck, every card", () => {
   });
 });
 
-// C28 §3c — the sampled-stack card, owed at the spec commit (§9b B19-B24, S17-S19).
-describe("C28 — the sampled stack card, spec-first rows", () => {
-  it.todo(
-    "T1.122 (C28 I62, B19): a cpu profile whose samples is empty folds to null on an input whose nodes carries three real function names, the precondition asserted first because a null for want of nodes is the same green as a null for want of samples; and the control, the same nodes with one sample folding to a tree - not deferred on a component: lands with foldCpuProfile",
-  );
-  it.todo(
-    "T1.123 (C28 I62, B21, B22): timeDeltas one shorter than samples folds to null, and a sample pointing at an id no node declares lands in a named residue whose self time equals that sample's delta - the node asserted by name and not the tree's total, since a total is conserved by any redistribution - not deferred on a component: lands with foldCpuProfile",
-  );
-  it.todo(
-    "T1.124 (C28 I63, B20): a profile where (idle) holds more of the window than every real frame together folds to a tree with no synthetic node at any depth and a footer naming the excluded share, with a profile carrying no synthetic frames as the control whose footer carries no such clause - not deferred on a component: lands with foldCpuProfile and the register's sampled member",
-  );
-  it.todo(
-    "T1.125 (C28 I62, B23): a capture whose truncated is true and whose fold succeeded draws the tree and says the file was capped, in two clauses, with nothing in the figure's own sentence calling it partial - not deferred on a component: lands with the sampled-stacks card",
-  );
-  it.todo(
-    "T1.126 (C28 I64; §9b's trace): the card over captures holding a completed cpu capture, an in-flight one appended after it and an abandoned one draws the completed capture's tree in all three arrangements, and names abandoned and none taken as two different sentences - not deferred on a component: lands with the sampled-stacks card",
-  );
-  it.todo(
-    "T1.127 (C28 I34, C28 I62; §9b's trace): the fold's cost is reported and is not inside durationMs - a capture whose fold is made expensive by a deep input leaves durationMs unmoved, which is the assertion a stamp in the wrong place fails - not deferred on a component: lands with foldCpuProfile",
-  );
+// C28 §3c — the sampled stack card (§9b B19-B24, S17-S19).
+//
+// **A hand-built `.cpuprofile`, not a captured one.** A real capture samples
+// whatever the machine was doing, so a row over it asserts the machine; these
+// rows are about what the fold does with a shape, and the shape has to be
+// chosen for each one. The real inspector is tier 5's, and `out/render-stacks`
+// is where a frame was read.
+const frame = (id: number, name: string, children?: readonly number[]) => ({
+  id,
+  callFrame: { functionName: name, url: `file:///a.js`, lineNumber: id },
+  ...(children === undefined ? {} : { children }),
+});
+
+/** `(root) → a → b`, with `(idle)` beside them — the shape most rows vary. */
+const NODES = [
+  frame(1, "(root)", [2, 4]),
+  frame(2, "a", [3]),
+  frame(3, "b"),
+  frame(4, "(idle)"),
+];
+
+const captureOf = (
+  stacks: CaptureResult["stacks"],
+  over: Partial<CaptureResult> = {},
+): CaptureResult => Object.freeze({
+  kind: "cpu", path: "out/cap/x.cpuprofile", bytes: 128, truncated: false,
+  droppedBytes: 0, durationMs: 500, abandoned: false, stacks, ...over,
+});
+
+/** A report with captures spliced in — the card reads `captures` and nothing else. */
+const withCaptures = (caps: readonly CaptureResult[]): ProfileReport => ({
+  ...reportOf("full"), captures: caps,
+});
+
+const foldOf = (
+  samples: readonly number[],
+  timeDeltas: readonly number[],
+  nodes: readonly unknown[] = NODES,
+): ReturnType<typeof foldCpuProfile> =>
+  foldCpuProfile({ nodes: nodes as never, samples, timeDeltas });
+
+const named = (n: StackNode, want: string): StackNode | undefined =>
+  n.name === want ? n : n.children.map((c) => named(c, want)).find((x) => x !== undefined);
+
+describe("C28 I62 — the fold", () => {
+  it("T1.122 (C28 I62, B19): an unsampled window folds to null, and the nodes were there to be trusted", () => {
+    // **The precondition first.** A null for want of nodes is the same green as
+    // a null for want of samples, and only one of them is the claim.
+    expect(NODES.filter((n) => !n.callFrame.functionName.startsWith("(")), "real frames in the input").toHaveLength(2);
+    expect(foldOf([], []), "nothing sampled, so nothing to draw").toBeNull();
+
+    // The control: the same nodes, one sample, a tree.
+    const one = foldOf([3], [1_000]);
+    expect(one, "a fold that returned null unconditionally fails here").not.toBeNull();
+    expect(named(one!.root, "b")?.self).toBe(1_000);
+  });
+
+  it("T1.123 (C28 I62, B21, B22): unequal lengths refuse, and an unknown id lands in a named node", () => {
+    expect(foldOf([3, 3], [1_000]), "a zip to the shorter would draw part of the window").toBeNull();
+
+    // **Asserted by name, not by the total.** A conservation assertion is
+    // satisfied by redistribution: a fold that added the orphaned sample to `b`
+    // conserves the total and loses the fact that nothing claimed it.
+    const f = foldOf([3, 99], [1_000, 4_000]);
+    expect(f).not.toBeNull();
+    const orphan = named(f!.root, UNATTRIBUTED);
+    expect(orphan?.self, "the sample no node declared, kept and named").toBe(4_000);
+    expect(named(f!.root, "b")?.self, "and not folded into a real frame").toBe(1_000);
+  });
+
+  it("T1.124 (C28 I63, B20): the synthetic frames leave the tree and the footer says what left", () => {
+    const f = foldOf([3, 4], [1_000, 9_000]);
+    expect(f).not.toBeNull();
+    const all = (n: StackNode): readonly StackNode[] => [n, ...n.children.flatMap(all)];
+    expect(all(f!.root).map((n) => n.name), "(idle) is gone at every depth").not.toContain("(idle)");
+    expect(f!.excluded["(idle)"], "and its share is carried out with it").toBe(9_000);
+    expect(f!.root.total, "the tree is the real frames alone").toBe(1_000);
+
+    const lines = linesOf(
+      profileCard(withCaptures([captureOf({ ...f!, foldMs: 0 })]), "sampled-stacks", { w: 120, rows: 20 }, FULL_CAPS),
+      120,
+    ).join("\n");
+    expect(lines, "the excluded share is on the card").toMatch(/9\.00 ms in \(idle\)/u);
+
+    // **The control**: a window with no synthetic frame says so rather than
+    // printing an exclusion that never happened.
+    const clean = foldOf([3], [1_000]);
+    const cleanLines = linesOf(
+      profileCard(withCaptures([captureOf({ ...clean!, foldMs: 0 })]), "sampled-stacks", { w: 120, rows: 20 }, FULL_CAPS),
+      120,
+    ).join("\n");
+    expect(cleanLines).toContain("no synthetic frames in the window");
+    expect(cleanLines, "and no share is claimed").not.toMatch(/excluded/u);
+  });
+
+  it("T1.125 (C28 I62, B23): a capped file and a whole tree are two statements", () => {
+    const f = foldOf([3], [1_000]);
+    const cap = captureOf({ ...f!, foldMs: 0 }, { truncated: true, droppedBytes: 4_096 });
+    const lines = linesOf(
+      profileCard(withCaptures([cap]), "sampled-stacks", { w: 120, rows: 20 }, FULL_CAPS),
+      120,
+    ).join("\n");
+    // The figure is drawn — the cap applied to the JSON write and the fold read
+    // the object before it, so the tree is whole.
+    expect(lines, "the tree is drawn").toMatch(/\bb\b/u);
+    expect(lines, "and nothing calls the figure partial").not.toMatch(/truncated|partial/u);
+  });
+});
+
+describe("C28 I64 — which capture the card draws", () => {
+  it("T1.126 (C28 I64; §9b's trace): the last completed capture, in three arrangements", () => {
+    const f = foldOf([3], [1_000]);
+    const done = captureOf({ ...f!, foldMs: 0 });
+    const inFlight = captureOf(null);
+    const abandoned = captureOf(null, { abandoned: true, bytes: 0, truncated: true });
+
+    const drawn = (caps: readonly CaptureResult[]): string =>
+      linesOf(profileCard(withCaptures(caps), "sampled-stacks", { w: 120, rows: 20 }, FULL_CAPS), 120).join("\n");
+
+    for (const caps of [[done], [done, inFlight], [done, abandoned]]) {
+      // **Newest-first would blank on two of these three.** A capture in flight
+      // and an abandoned one both carry no tree.
+      expect(drawn(caps), `the completed capture is drawn beside ${String(caps.length - 1)} without a tree`)
+        .toMatch(/500 ms capture/u);
+    }
+
+    // And the two sentences that are not the same sentence.
+    expect(drawn([abandoned]), "abandoned names the session ending").toMatch(/abandoned/u);
+    expect(drawn([]), "none taken names the verb").toMatch(/\/profile capture/u);
+    expect(drawn([abandoned]), "and does not send the reader to take another").not.toMatch(/no capture taken/u);
+  });
 });
 
 void WIDTHS;

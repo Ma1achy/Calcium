@@ -13,9 +13,11 @@ import { PHASE_GROUP } from "../types.js";
 import type { CommitReason, MissReason, SpanName } from "../types.js";
 import type { CardDraw, CardContext } from "./kit.js";
 import {
-  cacheNames, cannotDraw, figureRows, frameSamples, lastRunning, mib, ms,
+  cacheNames, cannotDraw, figureRows, frameSamples, lastRunning, lastSampled, mib, ms,
   namesAt, nothingYet, NO_DURATIONS, plainCounters, quartilesOf, room, spanning,
+  stackHierarchy,
 } from "./kit.js";
+import type { StackNode } from "../stacks.js";
 
 /** The frame-site names with enough per-frame samples to have a shape. */
 const shaped = (ctx: CardContext, least = 5): readonly SpanName[] =>
@@ -238,6 +240,63 @@ const coalescing: CardDraw = (ctx, spec) => {
       id: "coal-funnel", form: "funnel", height: figureRows(ctx, G, 0, 3), axes: true,
       categories: ["commits raised", "frames drawn", "frames kept"],
       series: [{ values: [commits, drawn, ctx.report.frames], label: "count" } satisfies Series],
+      gapBefore: false,
+    }),
+  ];
+};
+
+/**
+ * Which **function** was on the stack — V8's sampler, folded (C28 I62, I64).
+ *
+ * **The one card whose datum is not the framework's own instrumentation.** The
+ * element tree measures every element exactly (C28 I31) and can therefore only
+ * see what the framework instruments; this sees the process, at V8's cadence
+ * and with V8's names. They answer different questions and neither substitutes
+ * for the other, which is why this is a card and not a mode on the flame.
+ *
+ * **The capture samples the profiler taking it**, and that is left in. C28 I12
+ * excludes self-inflicted *frames* and displays the exclusion, and the same move
+ * here would need a path filter over V8's `url` — brittle, and wrong the moment
+ * the framework is bundled. Read on the frame it was the `capture`/`post`
+ * column at about 15% of a 500 ms window, legible as what it is; the honest
+ * remedy is a shorter window rather than a filter that guesses.
+ *
+ * **A capture is asked for rather than always present**, so the card is a
+ * notice until one exists — and the notice names the verb, because a card that
+ * says *nothing here* to a reader who could have something in four hundred
+ * milliseconds is a card that has wasted their time.
+ */
+const sampledStacks: CardDraw = (ctx, spec) => {
+  const cap = lastSampled(ctx.report);
+  if (cap === undefined) {
+    return nothingYet(spec, "no capture taken — `/profile capture` takes one at tier `deep`");
+  }
+  if (cap.abandoned) {
+    return nothingYet(spec, `the capture at ${cap.path} was abandoned when the session ended — it never produced a profile (C28 I17)`);
+  }
+  if (cap.stacks === null) {
+    // **Not the same sentence as *no capture taken***. A window in which
+    // nothing was sampled is a reading — the process was idle, or the window
+    // was shorter than the sampler's interval — and a card that said *none
+    // taken* would send the reader to take another one.
+    return nothingYet(spec, `the capture at ${cap.path} sampled nothing in its ${ms(cap.durationMs)} ms window — every sample fell in a synthetic frame, or none was taken`);
+  }
+  const G = { form: "flame" as const, axes: false };
+  if (!room(ctx, spec, G)) return cannotDraw(ctx, spec);
+
+  // A tree form's natural height is the tree and not the region — the same
+  // reading the element tree's card takes, and for the same reason: a stack is
+  // usually far deeper than a frame's spans, so this one is more often clamped
+  // by the region than short of it.
+  const depth = (n: StackNode): number => 1 + Math.max(0, ...n.children.map(depth));
+
+  return [
+    b.plot({
+      id: "sampled-flame",
+      form: "flame",
+      height: figureRows(ctx, G, 0, depth(cap.stacks.root)),
+      hierarchy: stackHierarchy(cap.stacks.root),
+      series: [],
       gapBefore: false,
     }),
   ];
@@ -675,5 +734,6 @@ export const FRAMEWORK_CARDS: Readonly<Record<string, CardDraw>> = Object.freeze
   "marks": marks,
   "handles": handles,
   "element-space": elementSpace,
+  "sampled-stacks": sampledStacks,
   "the-instrument": theInstrument,
 });

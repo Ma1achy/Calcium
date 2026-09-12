@@ -80,7 +80,7 @@ import { openHistory, SEARCH_ID } from "../interaction/history/index.js";
 import { detectCapabilities, type TerminalCapabilities } from "../terminal/capabilities.js";
 import { glyphs } from "../presentation/blocks/index.js";
 import { createFrameScheduler, type CommitReason } from "../terminal/frame-scheduler.js";
-import type { Profiler, ProfileReport, TraceFn } from "./profiling/types.js";
+import type { CaptureResult, Profiler, ProfileReport, TraceFn } from "./profiling/types.js";
 import { instrumentRegistry, type ProbeableRegistry } from "./profiling/registry-probe.js";
 import { recordWriter, recordTransport, type Recording } from "./profiling/record.js";
 import {
@@ -1503,7 +1503,15 @@ export async function constructGraph(
       // would be the upward edge MG1 exists to refuse.
       ...(deps.profiler === undefined
         ? {}
-        : { profile: (): ProfileReport => deps.profiler?.report() as ProfileReport }),
+        : {
+            profile: (): ProfileReport => deps.profiler?.report() as ProfileReport,
+            // The capture verb's one operation (C28 I64). `cpu` is fixed here:
+            // the card folds `.cpuprofile` stacks and a heap snapshot has no
+            // tree to draw, so a kind argument would be a knob with one useful
+            // value and one that produces a card-shaped nothing.
+            profileCapture: (ms: number): Promise<CaptureResult> =>
+              deps.profiler?.capture("cpu", ms) as Promise<CaptureResult>,
+          }),
       // `for(verb)` is the seam and not the two `invoke` calls, because
       // `VerbTransport` is what execution holds — wrapping the lookup reaches
       // `invoke` and `stream` without either call site changing (C28 I36).

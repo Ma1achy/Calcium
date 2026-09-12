@@ -138,7 +138,7 @@ export const FRAMEWORK_TOOLS: readonly ToolDef[] = Object.freeze([
     // truncated with an ellipsis in `/help`'s column, losing the half that
     // named the two document verbs. The detail lives on the argument's own
     // summary, which `/help` renders on its own line.
-    summary: "open the profiler's deck; `snapshot` and `live` append a card",
+    summary: "open the profiler's deck; also `snapshot`, `live`, `capture`",
     args: [
       Object.freeze({
         name: "section",
@@ -150,14 +150,19 @@ export const FRAMEWORK_TOOLS: readonly ToolDef[] = Object.freeze([
         // card (C23 I69, amended). The alternative was a flag, which would make
         // `/profile --snapshot` the spelling of a verb and read as a modifier of
         // an open that does not happen.
-        values: Object.freeze(["verdict", "app", "framework", "snapshot", "live"]),
-        summary: "`verdict`, `app` or `framework` to open the view; `snapshot` or `live` to append a card",
+        values: Object.freeze(["verdict", "app", "framework", "snapshot", "live", "capture"]),
+        summary: "`verdict`, `app` or `framework` to open the view; `snapshot` or `live` to append a card; `capture` takes a CPU profile",
       }),
       Object.freeze({
         name: "card",
         type: "string" as const,
         required: false,
-        summary: "which card `snapshot` or `live` draws; default the verdict",
+        // **One slot, read two ways**, because `capture` needs a duration and
+        // the alternative is a second positional nobody else can use. The
+        // handler decides which reading applies from the verb, and a value that
+        // is neither a card nor a number is refused by the handler rather than
+        // by C05 — a `string` here is what lets both through (C22 I66).
+        summary: "which card `snapshot` or `live` draws, or `capture`'s window in ms; default the verdict",
       }),
     ],
     flags: [],

@@ -282,6 +282,7 @@ describe("C28 — profiler, tier 3 spec-first rows", () => {
               droppedBytes: 0,
               durationMs: 1,
               abandoned: false,
+              stacks: null,
             }),
           dispose: () => undefined,
         },

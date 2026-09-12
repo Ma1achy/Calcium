@@ -23,7 +23,7 @@ import { APP_CARDS } from "./app.js";
 import { FRAMEWORK_CARDS } from "./framework.js";
 import { VERDICT_CARDS } from "./verdict.js";
 import type { CardDraw, CardContext, Region } from "./kit.js";
-import { ASCII_CAPS, card, contextFor, ms, populationFooter, resolveFrame, spanning } from "./kit.js";
+import { ASCII_CAPS, card, contextFor, lastSampled, ms, populationFooter, resolveFrame, spanning } from "./kit.js";
 
 /** Every card's drawing, by id — the three group modules unioned. */
 const DRAW: Readonly<Record<string, CardDraw>> = Object.freeze({
@@ -123,9 +123,35 @@ const footerOf = (spec: CardSpec, ctx: CardContext): string => {
       );
     }
   }
+  // **A sampled card's population is a capture window, not a span site and not
+  // the session** (C28 I63, I64). Both figures, because the excluded share is
+  // the one a reader must have: `(idle)` measured at 249 ms of a 400 ms window
+  // against 160 ms of real work on the probe this was written against, so a
+  // tree drawn without saying so is a tree missing most of the window with
+  // nothing on the card to notice it by.
+  if (spec.sampled === true) {
+    const cap = lastSampled(r);
+    if (cap?.stacks == null) parts.push("V8's sampler, one capture window");
+    else {
+      const out = Object.entries(cap.stacks.excluded);
+      const dropped = out.reduce((n, [, us]) => n + us, 0);
+      const kept = cap.stacks.root.total;
+      // **`durationMs` is the capture and not the sampling window** — it holds
+      // the protocol round trips and the JSON write as well, and read on the
+      // frame it was 555 ms against a 500 ms window. Naming it *window* would
+      // put a figure 11% out beside a share taken over the true one.
+      parts.push(`V8's sampler${ctx.sep}${ms(cap.durationMs)} ms capture`);
+      parts.push(
+        dropped === 0
+          ? "no synthetic frames in the window"
+          : `${ms(dropped / 1000)} ms in ${out.map(([n]) => n).join(", ")}${ctx.sep}excluded` +
+            `${ctx.sep}${ms(kept / 1000)} ms on the tree`,
+      );
+    }
+  }
   // The fallback is *no population named at all*, which is now a question about
   // both clauses rather than the tail of one chain.
-  if (spec.site === "none" && !spec.draws.includes("samples")) {
+  if (spec.site === "none" && spec.sampled !== true && !spec.draws.includes("samples")) {
     parts.push(`the session so far${ctx.sep}${ms(r.regime.durationMs)} ms`);
   }
   // **The resolution travels beside the figure** (C28 I13). A p50 of 0.00 ms at

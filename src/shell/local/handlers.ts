@@ -24,9 +24,10 @@ import type { ThemeStore } from "../../presentation/theme/index.js";
 import { b } from "../builders/index.js";
 import { blockId, compose, warnNotice } from "../documents.js";
 import { CARDS, SECTIONS, profileCard } from "../profiling/panes/index.js";
+import { ms } from "../profiling/panes/kit.js";
 import type { ProfileSection } from "../profiling/panes/index.js";
 import { TIER_RANK } from "../profiling/types.js";
-import type { ProfileReport } from "../profiling/types.js";
+import type { CaptureResult, ProfileReport } from "../profiling/types.js";
 import type { ProfileView } from "../profile-view.js";
 import type { LocalHandler } from "./registry.js";
 import type { StopReason } from "../types.js";
@@ -78,6 +79,16 @@ export type HandlerDeps = Readonly<{
    * same state `profileView.open` refuses on.
    */
   profileReport: () => ProfileReport | null;
+  /**
+   * `/profile capture`'s one operation, `null` where no profiler exists
+   * (C28 I64).
+   *
+   * **A capability rather than the recorder**, so the verb cannot raise a tier
+   * even by mistake — the raise resets the ring (C28 I18), which turns *let me
+   * look* into *discard what I was watching*. The refusal below `deep` is read
+   * off the report's own `regime.tier` and nothing here can change it.
+   */
+  profileCapture: ((ms: number) => Promise<CaptureResult>) | null;
 }>;
 
 const isSection = (x: unknown): x is ProfileSection =>
@@ -168,11 +179,81 @@ const SNAPSHOT_ROWS = 32;
 const cardFor = (wanted: unknown): string =>
   typeof wanted === "string" && CARDS.some((c) => c.id === wanted) ? wanted : "verdict";
 
+/**
+ * How long `/profile capture` samples for, and what a reader may ask instead.
+ *
+ * **400 ms rather than a second**, because a capture blocks the prompt and the
+ * route shows a stall notice past its own threshold: a window long enough to
+ * hold a few hundred samples at V8's 100 µs interval, and short enough that
+ * pressing it does not read as a hang. The bounds are the honest ones — under
+ * 50 ms a window holds too few samples to be a distribution, and over 10 s the
+ * profile is large enough that the cap starts deciding what it holds.
+ */
+const CAPTURE_MS = 400;
+const CAPTURE_MIN = 50;
+const CAPTURE_MAX = 10_000;
+
 const profileHandler =
-  (view: ProfileView, report: () => ProfileReport | null): LocalHandler =>
-  (argv, ctx) => {
+  (view: ProfileView, report: () => ProfileReport | null,
+   take: ((ms: number) => Promise<CaptureResult>) | null): LocalHandler =>
+  async (argv, ctx) => {
   const wanted = ctx.args["section"];
   const card = cardFor(ctx.args["card"]);
+
+  // --- the capture verb (C28 I64) --------------------------------------------
+  if (wanted === "capture") {
+    const r = report();
+    if (r === null || take === null) {
+      return doc("/profile capture", [
+        warnNotice(
+          "no profiler to capture with — this session was built without `TuiConfig.profile`",
+          blockId("profile-refused"),
+        ),
+      ]);
+    }
+    // **It names the tier and does not take it** (C28 I64, I18). The inspector
+    // exists only at `deep`, and a verb that raised the tier to get one would
+    // reset the ring the reader has been watching — so the refusal is the
+    // whole of the arm, and the sentence says what to change rather than what
+    // went wrong.
+    if (TIER_RANK[r.regime.tier] < TIER_RANK.deep) {
+      return doc("/profile capture", [
+        warnNotice(
+          `a CPU capture needs tier \`deep\` and this session is at \`${r.regime.tier}\` — ` +
+            "set `profile: { tier: \"deep\" }` and restart; raising it from here would reset " +
+            "the ring every figure on the deck is drawn from (C28 I18)",
+          blockId("profile-capture-tier"),
+        ),
+      ]);
+    }
+    const asked = Number(ctx.args["card"] ?? CAPTURE_MS);
+    const window = Number.isFinite(asked)
+      ? Math.min(CAPTURE_MAX, Math.max(CAPTURE_MIN, asked))
+      : CAPTURE_MS;
+    const result = await take(window);
+    const stacks = result.stacks;
+    const sep = sepOf(ctx.capabilities);
+    if (stacks === null) {
+      return doc("/profile capture", [
+        warnNotice(
+          `nothing was sampled in ${String(window)} ms${sep}the process was idle for the ` +
+            `whole window, or every sample fell in a synthetic frame${sep}${result.path}`,
+          blockId("profile-capture-empty"),
+        ),
+      ]);
+    }
+    const idle = Object.values(stacks.excluded).reduce((n: number, us: number) => n + us, 0);
+    return doc("/profile capture", [
+      b.notice(
+        "info",
+        `captured ${String(window)} ms${sep}${ms(stacks.root.total / 1000)} ms on the stack` +
+          `${sep}${ms(idle / 1000)} ms in synthetic frames${sep}${result.path}` +
+          `${sep}\`/profile framework\` and walk to \`sampled-stacks\``,
+        undefined,
+        { id: blockId("profile-capture") },
+      ),
+    ]);
+  }
 
   // --- the two document verbs (C23 I69, amended) -----------------------------
   if (wanted === "snapshot" || wanted === "live") {
@@ -238,7 +319,7 @@ const profileHandler =
   if (section === null) {
     return doc("/profile", [
       warnNotice(
-        `usage: /profile [${SECTIONS.join("|")}|snapshot|live] [card] — got \`${argv[0] ?? ""}\``,
+        `usage: /profile [${SECTIONS.join("|")}|snapshot|live|capture] [card] — got \`${argv[0] ?? ""}\``,
         blockId("profile-usage"),
       ),
     ]);
@@ -501,6 +582,6 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
     },
 
     // The seventh (C23 §2, I68).
-    profile: profileHandler(deps.profileView, deps.profileReport),
+    profile: profileHandler(deps.profileView, deps.profileReport, deps.profileCapture),
   };
 }

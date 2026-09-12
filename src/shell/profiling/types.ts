@@ -14,6 +14,7 @@ import type { MissReason, Probe } from "../../data/viewmodel/probe.js";
 import type { CommitReason } from "../../terminal/frame-scheduler.js";
 import type { HeapSpace } from "./node.js";
 import type { LeakStat } from "./leaks.js";
+import type { SampledStacks } from "./stacks.js";
 import type { ElementOp, NodeStat, TreeNode } from "./tree.js";
 
 export type { CommitReason, ElementOp, HeapSpace, LeakStat, NodeStat, TreeNode, Probe };
@@ -351,6 +352,16 @@ export type CaptureResult = Readonly<{
    * what says why.
    */
   abandoned: boolean;
+  /**
+   * The sampled stacks, folded where the profile was produced (C28 I62).
+   *
+   * `null` for a `heap` or `alloc` capture, for an abandoned one, and for a
+   * `cpu` window in which nothing was sampled — the last of those a reading
+   * rather than a failure, and the reason it is not an empty tree: `nodes` is
+   * emitted whole whatever was sampled, so a tree of real function names at
+   * zero is *measured, and free*, which is the figure nobody doubts.
+   */
+  stacks: SampledStacks | null;
 }>;
 
 /**

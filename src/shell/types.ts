@@ -10,7 +10,7 @@
  * C23 satisfies it structurally when it lands.
  */
 
-import type { ProfileOptions, ProfileReport, TraceFn } from "./profiling/types.js";
+import type { CaptureResult, ProfileOptions, ProfileReport, TraceFn } from "./profiling/types.js";
 import type { ConfirmHost } from "./confirm.js";
 import type { Adapter, AdapterRegistry, ProducerContext } from "../data/adapters/index.js";
 import type { ManifestDocument, ManifestStore } from "../data/manifest/index.js";
@@ -394,6 +394,17 @@ export type PipelineDeps = Readonly<{
   confirm: ConfirmHost;
   /** C28's report, when a profiler exists (C22 I93). Absent otherwise. */
   profile?: () => ProfileReport;
+  /**
+   * One operation from C28's recorder, for `/profile capture` (C28 I64).
+   *
+   * **A capability and not the recorder**, which is the same argument
+   * `profileReport` rests on one layer up: the two document verbs must not be
+   * able to raise a tier, and a verb handed the whole `Profiler` could. A
+   * capture changes nothing the session is recording — it refuses below `deep`
+   * rather than raising to serve itself — and this is the narrowest thing that
+   * lets it happen.
+   */
+  profileCapture?: (ms: number) => Promise<CaptureResult>;
   /**
    * C28 §3c's view, for `/profile`'s handler (C23 I68).
    *

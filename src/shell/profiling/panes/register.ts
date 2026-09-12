@@ -79,6 +79,17 @@ export type CardSpec = Readonly<{
    * resolution bounds only the delay.
    */
   loopDelay?: true;
+  /**
+   * The card's figure comes from V8's sampler rather than from a span, so its
+   * population clause is the capture window and its exclusion clause is the
+   * synthetic frames (C28 I63, I64).
+   *
+   * **A member rather than a sentence in the card**, for the reason every other
+   * clause here is generated: a card that has to remember to say what it
+   * dropped is a card that will forget, and `(idle)` is the thing this figure
+   * drops most of.
+   */
+  sampled?: true;
 }>;
 
 const card = (spec: CardSpec): CardSpec => Object.freeze(spec);
@@ -440,6 +451,19 @@ const FRAMEWORK: readonly CardSpec[] = Object.freeze([
     draws: ["nodes"],
     site: "frame",
     floor: 6,
+  }),
+  card({
+    id: "sampled-stacks",
+    group: "framework",
+    question: "which function was on the stack, not which block cost what",
+    form: "flame",
+    draws: ["captures"],
+    // **Not a span site at all** (C28 I64). The population is V8's sampler over
+    // one capture window, which is neither of the two `SPAN_SITE` answers and
+    // is why `sampled` carries its own clause.
+    site: "none",
+    floor: 4,
+    sampled: true,
   }),
   card({
     id: "the-instrument",

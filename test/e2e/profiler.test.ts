@@ -16,13 +16,15 @@
 // Generated from the spec's own §10 rows, so the two cannot drift apart by
 // transcription; a row edited here and not there is a diff a reader can see.
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { loadavg, tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import { interactivePty } from "../support/pty.js";
+import { createInspector } from "../../src/shell/profiling/node.js";
+import type { StackNode } from "../../src/shell/profiling/stacks.js";
 import {
   CLOCK_DERIVED,
   type DriveOutcome,
@@ -769,4 +771,67 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
     },
     120_000,
   );
+});
+
+/**
+ * The fold, against a real `node:inspector` (C28 I62, I34; §9b S19).
+ *
+ * **The one place the fold meets V8 rather than a literal.** Every tier-1 row
+ * over it feeds a hand-built `.cpuprofile`, which is right — those rows are
+ * about what the fold does with a shape — and leaves the shape itself an
+ * assumption. This is the row that asks whether V8 emits what the fold reads.
+ */
+describe("C28 §3c — the sampled stacks, against the real inspector", () => {
+  it("T1.127 (C28 I34, C28 I62; §9b's trace): the fold is measured and durationMs is stamped before it", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "calcium-cap-"));
+    // **A counting clock, so the stamp's position is exact rather than noisy.**
+    // `elapsed` advances one per read, so `durationMs` is the number of reads
+    // between the capture's start and its stamp. Moving the stamp past the fold
+    // adds the fold's two reads to it — a mutation this row can see and a wall
+    // clock cannot.
+    let t = 0;
+    const elapsed = (): number => (t += 1);
+    // **A synchronous sink, and the reason is the teardown rather than the
+    // claim.** `createWriteStream` opens lazily, so removing the directory
+    // after `close()` races an open that has not happened and surfaces as an
+    // unhandled ENOENT beside a green row — a passing test with an error in the
+    // run, which is the worst of both. The row asserts the stamp, the fold and
+    // the tree and nothing about the write, so the sink is the simplest thing
+    // that cannot outlive the test.
+    const insp = createInspector(elapsed, {
+      open: (path: string) => {
+        let buf = "";
+        return {
+          write: (c: string) => { buf += c; },
+          close: () => { writeFileSync(path, buf); },
+        };
+      },
+    });
+    // Real work under the sampler, or the window is all `(idle)` and the fold
+    // correctly returns null — which would make every assertion below vacuous.
+    const spin = setInterval(() => {
+      let x = 0;
+      for (let i = 0; i < 2e6; i += 1) x += Math.sqrt(i);
+      return x;
+    }, 5);
+    const r = await insp.capture("cpu", join(dir, "t127.cpuprofile"), 1 << 24, 300);
+    clearInterval(spin);
+    insp.dispose();
+
+    expect(r.stacks, "the window held real work, so there is a tree").not.toBeNull();
+    expect(r.durationMs, "one read between the start and the stamp").toBe(1);
+    expect(r.stacks?.foldMs, "and the fold is measured on its own pair of reads").toBe(1);
+
+    // **V8 emits what the fold reads**, which is the half a literal cannot say:
+    // a real profile, a real tree, and the synthetic frames named as this file
+    // names them.
+    const all = (n: StackNode): readonly StackNode[] => [n, ...n.children.flatMap(all)];
+    const nodes = all(r.stacks!.root);
+    expect(nodes.length, "more than the root alone").toBeGreaterThan(1);
+    expect(nodes.some((n) => n.at !== null), "V8 gave at least one frame a location").toBe(true);
+    expect(nodes.map((n) => n.name), "and no synthetic frame survived the fold")
+      .not.toContain("(idle)");
+
+    rmSync(dir, { recursive: true, force: true });
+  }, 30_000);
 });

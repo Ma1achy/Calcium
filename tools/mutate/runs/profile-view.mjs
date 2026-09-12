@@ -248,7 +248,7 @@ const results = runPass({
       // C23 I27, the other half — the row without its handler.
       name: "shippedHandlers drops the profile handler",
       file: HANDLERS,
-      from: "    profile: profileHandler(deps.profileView, deps.profileReport),\n",
+      from: "    profile: profileHandler(deps.profileView, deps.profileReport, deps.profileCapture),\n",
       to: "",
       expect: "T4.66",
     },
@@ -258,8 +258,8 @@ const results = runPass({
       // nothing else in the tree compares the two lists.
       name: "the manifest's section values lose a member",
       file: FRAMEWORK,
-      from: '        values: Object.freeze(["verdict", "app", "framework", "snapshot", "live"]),',
-      to: '        values: Object.freeze(["verdict", "app", "snapshot", "live"]),',
+      from: '        values: Object.freeze(["verdict", "app", "framework", "snapshot", "live", "capture"]),',
+      to: '        values: Object.freeze(["verdict", "app", "snapshot", "live", "capture"]),',
       expect: "T1.67",
     },
   ],

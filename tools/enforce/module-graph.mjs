@@ -1627,6 +1627,23 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
+  // --- C28's fold over a shape it does not own -------------------------------
+  //
+  // The same argument `CellLike` carries below, on a smaller type: `CpuProfile`
+  // is not an interface this tree implements, it is the shape `Profiler.stop`
+  // hands back — V8's field names, written down so the fold can be driven by a
+  // literal in a tier-1 row rather than by a real capture. Every member is read
+  // by `foldCpuProfile` in the same file; MG24 asks whether a name appears
+  // *elsewhere in `src/`*, and for a wire format the answer is structurally no.
+  // `nodes` and `samples` pass only because other owners share those names,
+  // which is the rule's own stated limit rather than a difference in kind.
+  "CpuProfile.timeDeltas":
+    "C28 I62 — V8's own field name on the `.cpuprofile` shape, read by `foldCpuProfile` in "
+    + "`stacks.ts` and by nothing else because nothing else may parse a profile: the fold "
+    + "happens where `Profiler.stop` returns and a card is a pure function of a report. Its "
+    + "siblings `nodes` and `samples` are exempt by coincidence — other owners have members "
+    + "of those names — so this entry is the whole type's exemption wearing one member's name",
+
   // --- C28's card register ---------------------------------------------------
   "CardSpec.also":
     "C28 §3c — the member exists so the **form register** can count a form a card "

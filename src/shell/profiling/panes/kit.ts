@@ -29,6 +29,7 @@ import { fillHeight, plotHeight } from "../../../presentation/plot/index.js";
 import type { PlotGeometry } from "../../../presentation/plot/index.js";
 import type { Block, HierarchyNode, QuartileSummary } from "../../../data/viewmodel/index.js";
 import { SPAN_SITE, TIER_RANK } from "../types.js";
+import type { StackNode } from "../stacks.js";
 import type {
   FrameRecord, Histogram, ProfileReport, SpanName, TreeNode,
 } from "../types.js";
@@ -280,6 +281,34 @@ export const hierarchyOf = (n: TreeNode): HierarchyNode => ({
   label: n.name,
   value: n.self,
   ...(n.children.length > 0 ? { children: n.children.map(hierarchyOf) } : {}),
+});
+
+/**
+ * The capture the sampled card draws — the last `cpu` one that **completed**
+ * (C28 I64, §9b S17, S18).
+ *
+ * **Completed, not newest.** A capture in flight is an entry with no tree, so a
+ * card taking `captures.at(-1)` blanks for the length of the window and comes
+ * back — which reads as the card failing rather than as a capture running.
+ * An abandoned one has no tree either, and it is kept in view here: *abandoned*
+ * and *none taken* are two different sentences and the card draws them as two.
+ */
+export const lastSampled = (r: ProfileReport): ProfileReport["captures"][number] | undefined => {
+  const cpu = r.captures.filter((c) => c.kind === "cpu");
+  return [...cpu].reverse().find((c) => c.stacks !== null) ?? cpu[cpu.length - 1];
+};
+
+/**
+ * A sampled stack as a `HierarchyNode` — `self`, for `hierarchyOf`'s reason.
+ *
+ * Its own function rather than a widened `hierarchyOf`: the two trees carry
+ * different things and a shared structural parameter would make it easy to hand
+ * a `TreeNode` to the sampled card and get a figure back (C28 I62).
+ */
+export const stackHierarchy = (n: StackNode): HierarchyNode => ({
+  label: n.name,
+  value: n.self,
+  ...(n.children.length > 0 ? { children: n.children.map(stackHierarchy) } : {}),
 });
 
 /**
