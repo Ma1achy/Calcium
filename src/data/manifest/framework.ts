@@ -133,7 +133,12 @@ export const FRAMEWORK_TOOLS: readonly ToolDef[] = Object.freeze([
   Object.freeze({
     name: "profile",
     local: true,
-    summary: "open the profiler's view; `/profile framework` opens a section, `/profile snapshot [card]` appends one",
+    // **Within the family's width, and the golden frame is what says so.** The
+    // other six summaries run 15 to 57 characters; a 102-character one was
+    // truncated with an ellipsis in `/help`'s column, losing the half that
+    // named the two document verbs. The detail lives on the argument's own
+    // summary, which `/help` renders on its own line.
+    summary: "open the profiler's deck; `snapshot` and `live` append a card",
     args: [
       Object.freeze({
         name: "section",

@@ -18,6 +18,8 @@ import { block } from "../../data/viewmodel/index.js";
 import type { Block, LocalDocument } from "../../data/viewmodel/index.js";
 import type { TranscriptStore } from "../../viewport/transcript/index.js";
 import type { HistoryEntry } from "../../interaction/history/types.js";
+import { glyphs } from "../../presentation/blocks/index.js";
+import type { GlyphCaps } from "../../presentation/blocks/index.js";
 import type { ThemeStore } from "../../presentation/theme/index.js";
 import { b } from "../builders/index.js";
 import { blockId, compose, warnNotice } from "../documents.js";
@@ -114,14 +116,26 @@ const isSection = (x: unknown): x is ProfileSection =>
  * A stamp claims the opposite of current on its own face, forever, which is the
  * property I69's first form tried to get by forbidding the document.
  */
-const stampOf = (r: ProfileReport, card: string): string => {
+const sepOf = (caps: GlyphCaps): string => ` ${glyphs(caps).separator} `;
+
+const stampOf = (r: ProfileReport, card: string, caps: GlyphCaps): string => {
   const frames = `${String(r.frames)} frames`;
   const dropped = r.dropped.frames > 0 ? `, ${String(r.dropped.frames)} past the ring` : "";
   const elapsed = `${(r.regime.durationMs / 1000).toFixed(1)} s`;
   const reset = r.regime.ringReset > 0
     ? `ring reset ${(r.regime.ringReset / 1000).toFixed(1)} s in`
     : "ring never reset";
-  return `${card} · ${frames}${dropped} · captured ${elapsed} · tier ${r.regime.tier} · ${reset}`;
+  // **The separator is resolved, never written** (C09 I49, F828). A title is a
+  // head measured in cells, and `·` is ambiguous-width — T2.116 caught the
+  // literal here, which is the rule doing exactly what it is for.
+  const sep = sepOf(caps);
+  return [
+    card,
+    `${frames}${dropped}`,
+    `captured ${elapsed}`,
+    `tier ${r.regime.tier}`,
+    reset,
+  ].join(sep);
 };
 
 /** How often a live card refetches — the view's cadence, for the view's reasons. */
@@ -175,7 +189,7 @@ const profileHandler =
       // **One-shot and stamped**, which is the pair: the document is a reading
       // taken at a moment and it says which moment on its own title.
       return doc("/profile snapshot", [
-        b.panel(stampOf(r, card), [...profileCard(r, card, { w: ctx.width, rows: SNAPSHOT_ROWS })], {
+        b.panel(stampOf(r, card, ctx.capabilities), [...profileCard(r, card, { w: ctx.width, rows: SNAPSHOT_ROWS }, ctx.capabilities)], {
           id: blockId("profile-snapshot"),
         }),
       ]);
@@ -191,7 +205,9 @@ const profileHandler =
     return doc("/profile live", [
       b.live({
         id: blockId("profile-live"),
-        title: `${card} · live`,
+        // The same resolved separator as the stamp's (C09 I49) — a title is a
+        // head, whichever verb composed it.
+        title: `${card}${sepOf(ctx.capabilities)}live`,
         every: LIVE_EVERY_MS,
         fetch: () => Promise.resolve(report()),
         render: (data, pctx) => {
@@ -207,7 +223,7 @@ const profileHandler =
             );
           }
           const rows = pctx.height ?? 24;
-          const only = profileCard(now, card, { w: pctx.width, rows })[0];
+          const only = profileCard(now, card, { w: pctx.width, rows }, pctx.capabilities)[0];
           return only ?? b.notice("warn", `no card \`${card}\``, undefined, { id: `${blockId("profile-live")}-gone` });
         },
       }),
