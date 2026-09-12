@@ -49668,3 +49668,30 @@ and not the family's.
 `expect(() => b.plot({...})).not.toThrow()` over the four forms, and **all four accept
 `quartiles: []` and a summary whose `q1` is above its `q3`** — so *it did not throw*
 was an assertion over an empty population, A03 §2's vacuity class with a picture on it.
+
+## F1142 — I41's own defect, reintroduced deliberately, failed nothing ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/profiling/panes/kit.ts`'s `frameSamples` · C28 I41, I57 |
+| **Reached for** | P9's named control — *frame-site and session-site spans merged* — run on landing |
+| **Verdict** | **closed** — T1.120 is the row; it fails the mutation and its precondition is asserted |
+
+`frameSamples` filters on `SPAN_SITE` because a session-site name appearing in a
+`FrameRecord.spans` is **the window it closed in**, not a per-frame measurement — the
+thing F888 measured at a −460.5 ms residue. Removing the filter, so every name yields
+a per-frame series, was run against `profile-deck`, `profile-register`, `profiler` and
+the contract suite: **26 tests, all green**.
+
+**The deck's population rows are all about the register and the footers.** T1.109b asks
+every card to *declare* its population, T1.116 asks the footers to *say* different
+things, T1.109 asks the two *counts* to differ. Not one of them reads a card's series
+and asks which population the numbers came from — so the declaration, the sentence and
+the count are all correct on a deck drawing the wrong figure.
+
+**A footer is a claim about a figure and no row joined them.** That is the shape: three
+instruments pointed at the label and none at the thing labelled.
+
+The row that closes it asserts the extractor directly and asserts its precondition
+first — the fixture must contain a session-site name inside `timeline[].spans`, or the
+emptiness it checks is emptiness for the wrong reason.
