@@ -49215,3 +49215,84 @@ form needs, the kit compares it to the region before building, and a card that c
 be drawn draws a notice saying which. The `try` is the second line of defence and not
 the first — a caught throw one second later is still a pane that cannot draw itself,
 and the notice is the honest version of that.
+
+---
+
+## F1131 — two cards named a question whose data has no time axis, and the deck read as complete ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | C28 §3c's `far side` and `cache over time` cards · `ProfileReport.spans` · `FrameRecord` |
+| **Reached for** | the report-coverage register (C28 I61), written before the cards |
+| **Verdict** | **closed** — both recut onto a carrier that has the axis |
+
+Two rows of the deck named a form, a question and a source, and read as finished:
+
+- **`far side` — `gantt`, `offsets` per start.** Session-site spans publish a `Histogram`
+  each. A histogram has a count, a sum and seven order statistics, and **no start**, so
+  there is nothing to offset by. A `gantt` without `offsets` is a bar chart, which the
+  row itself says.
+- **`cache over time` — `step`, are misses accumulating.** `misses` is a
+  `Record<string, Record<MissReason, number>>` taken at the instant `report()` is
+  called, and `FrameRecord` carries `seq`, `reason`, `work`, `wait`, `spans`, `tree?`,
+  `outcome`, `selfInflicted` and `at` — **no counters**. A card is a pure function of one
+  report, so it cannot difference two of them, and the only accumulation it could draw
+  is the one it was handed.
+
+**Neither row is wrong about anything it states.** The form is right for the question,
+the question is worth asking, and the source named does hold the quantity — it holds it
+*without the axis the form plots it against*. That is why a reader checking the deck one
+row at a time agrees: the failure is between the form's second axis and the source's
+shape, and no row of the table carries both.
+
+**What found it was the coverage register asking a different question.** Working out
+which `ProfileReport` key each card reads is how the absence surfaced — `far side` could
+not be given a key that carried starts, and `cache over time` could not be given one that
+carried time. The register is about keys; the cards fell out of it.
+
+**Both recut onto the carrier that does have the axis, and both are better cards:**
+
+- The `gantt` becomes **one retained frame's span tree on the frame's own clock**.
+  `TreeNode.startedAt` exists and its comment says why it is carried rather than derived:
+  a parent's children do not tile it, the gaps between them are the parent's own self
+  time, and a consumer laying them end to end produces a timeline that is well-formed,
+  plausible and not what happened. The deck now has the consumer that comment was
+  written for.
+- The `step` becomes **the cumulative counters in the resource ring** — GC counts, major
+  page faults, involuntary context switches over the 64 samples. Those are monotone
+  counters on a wall clock, which is precisely the datum a step function is for and a
+  line lies about.
+
+**The far side keeps `far side cost`**, the `dotplot` of p50 against p95, which is the
+summary honestly drawn and was always the row that did not overreach.
+
+---
+
+## F1132 — a form named in a card's note is not a form dispositioned ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | C28 §3c's form register · `PlotForm` |
+| **Reached for** | the form register (C28 I59), compared to the union by equality |
+| **Verdict** | **closed** — `bubble` refused, with the reason the card already carried |
+
+`PlotForm` has forty-eight members. The deck's cards and the refusal table accounted for
+forty-seven, and the missing one was **`bubble`** — which appears in §3c, in the
+`cost per unit` card's own note: *`sizes` carries total cost, because `bubble` takes
+exactly one series.*
+
+**The sentence is true, it is the right reason, and it is in the wrong table.** A reader
+scanning §3c for `bubble` finds it, reads a correct account of why the card does not use
+it, and concludes the form was considered — which it was. What was missing is the row
+that makes the consideration **countable**, and I59's whole argument is that a deck
+reaching for thirty forms and leaving eighteen unmentioned is indistinguishable from one
+that considered eighteen and rejected them.
+
+This is the citation-reads-as-coverage shape pointed at a register rather than a
+roadmap: the test is never *does this mention the form*, it is *would a gate see it*.
+Nothing but the equality comparison would have asked, because the form is genuinely
+discussed — in prose, one table away from the list that is compared.
+
+Filed at three stars rather than four: the outcome was a row, not a picture. The reason
+it is filed at all is that the same shape at the other register cost a card (F1131), and
+a register whose gaps are only ever found by the register is a register worth having.
