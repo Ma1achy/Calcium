@@ -49811,3 +49811,46 @@ change with `formatReadout`, the annotation formatter and `xFormat` behind it.
 over these cards passes — they build, refuse below their floors, declare their
 populations and state their exclusions — and `yFormat` is a member whose value is
 asserted as *declared*, never as *rendered*.
+
+## F1146 — a second capture rejects, and the report keeps no record that it was taken ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/profiling/recorder.ts`'s `capture` · `src/shell/profiling/node.ts`'s `createInspector` · C28 I17 |
+| **Reached for** | Walking the sampled-stack card's sequence trace — S15 asked what two presses of a capture verb do, and the ruling deferred to a guard that turned out not to exist |
+| **Verdict** | **open** — measured; the guard is the recorder's, and the verb that makes it reachable is not written yet |
+
+`createInspector` holds **one** `node:inspector` session, and `Profiler.start` on it
+is a single recording. `capture()` guards the tier, the disposal and the missing
+inspector, and guards nothing about a capture already running.
+
+Measured, two concurrent `cpu` captures through the real inspector:
+
+```
+0 fulfilled 2963 bytes
+1 rejected  Error [ERR_INSPECTOR_COMMAND]: Inspector error -32000: No recording profiles found
+```
+
+The first capture's `Profiler.stop` ends the only recording, so the second's `stop`
+has nothing to take.
+
+**The rejection is not the finding — where it lands is.** `capture()` reaches
+`inspector.capture` inside a `try`/`finally` whose `finally` only clears `inFlight`,
+so the throw propagates and **`self.addCapture(result)` is never reached**. The
+report therefore holds no entry at all for the second capture: not `abandoned`, not
+`truncated`, not zero bytes — absent. C28 I17 was written for exactly this shape at
+shutdown and says a capture still running is *recorded, not dropped silently*, with
+`abandoned` there because *a zero would read as nothing was lost*. The same argument
+holds one rung out and the code does not make it: an embedder that fires two captures
+sees one file on disk, one entry in the report, and nothing anywhere saying a second
+was asked for.
+
+**Reachable today only from an embedder**, which is why it has not been seen: nothing
+in the shell calls `capture()`. It becomes a double keypress the moment a capture verb
+exists, which is what the walk was asking about.
+
+The repair is the recorder's and has two halves — refuse a concurrent capture with the
+kind and the path of the one already running, and record the refusal as a
+`CaptureResult` so the report can say a capture was asked for and not taken. Neither
+belongs in the caller: a verb that serialised on its own would leave the same hole for
+the next caller.
