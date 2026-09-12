@@ -66,6 +66,19 @@ export type CardSpec = Readonly<{
   floor: number;
   /** One card per retained worst frame, addressed by `seq` and never by position (I58). */
   perFrame?: true;
+  /**
+   * The card draws a loop-delay figure, so its footer carries the resolution
+   * (C28 I13).
+   *
+   * **Declared rather than derived, because `draws` is keyed by report key and
+   * the resolution qualifies three fields of one.** Every card here draws
+   * `samples`; two of the four draw a delay, and a footer that quoted the
+   * resolution on all four would put a loop figure's caveat under a heap chart.
+   * The suspended-sample clause beside it *is* derived, and the difference is
+   * real: a suspended sample breaks every series taken over the ring, and a
+   * resolution bounds only the delay.
+   */
+  loopDelay?: true;
 }>;
 
 const card = (spec: CardSpec): CardSpec => Object.freeze(spec);
@@ -101,6 +114,7 @@ const APP: readonly CardSpec[] = Object.freeze([
     // Four stacked horizons, each a band row and the legend row the form spends
     // whatever `legend` says.
     floor: 8,
+    loopDelay: true,
   }),
   card({
     id: "frame-cost",
@@ -340,6 +354,7 @@ const FRAMEWORK: readonly CardSpec[] = Object.freeze([
     draws: ["samples"],
     site: "none",
     floor: 5,
+    loopDelay: true,
   }),
   card({
     id: "the-loop-utilisation",
@@ -349,6 +364,7 @@ const FRAMEWORK: readonly CardSpec[] = Object.freeze([
     draws: ["samples"],
     site: "none",
     floor: 3,
+    loopDelay: true,
   }),
   card({
     id: "memory",
@@ -386,6 +402,7 @@ const FRAMEWORK: readonly CardSpec[] = Object.freeze([
     draws: ["samples"],
     site: "none",
     floor: 5,
+    loopDelay: true,
   }),
   card({
     id: "the-pairs",
@@ -395,6 +412,7 @@ const FRAMEWORK: readonly CardSpec[] = Object.freeze([
     draws: ["samples"],
     site: "none",
     floor: 6,
+    loopDelay: true,
   }),
   card({
     id: "marks",

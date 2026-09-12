@@ -510,13 +510,19 @@ export { planColumns } from "./presentation/table/index.js";
  * draw it. An entry point shipping behaviour the runtime surface cannot reach
  * would be a second way in.
  *
- * `profilePane` is a pure function from a report to blocks, which is why it is
- * safe to publish: it composes the same builders an application already has.
- * The framework's own view (`/profile`, C28 §3c) draws with these three through
- * the same exports and nothing that opens it is published (C24 I33) —
- * `paneTitle` had no consumer anywhere until that view (F945).
+ * `profileCard` and `profileDeck` are pure functions from a report and a region
+ * to blocks, which is why they are safe to publish: they compose the same
+ * builders an application already has. The framework's own view (`/profile`,
+ * C28 §3c) draws with exactly these exports and nothing that opens it is
+ * published (C24 I33) — `paneTitle`, the surface these replace, had no consumer
+ * anywhere until that view (F945).
+ *
+ * **`CARDS` is published with them because a card's id is its address.** A
+ * consumer drawing its own deck needs the questions and the groups to build a
+ * menu from, and a hard-coded list of ids in an application is the register
+ * written a second time by someone who cannot see it change.
  */
-export { profilePane, paneTitle, PANES } from "./shell/profiling/panes.js";
+export { CARDS, SECTIONS, profileCard, profileDeck } from "./shell/profiling/panes/index.js";
 
 /**
  * **The exporters, and they run — which is not a contradiction of C24 I31.**
@@ -531,7 +537,7 @@ export { profilePane, paneTitle, PANES } from "./shell/profiling/panes.js";
  * appended to and read back with `jq`.
  */
 export { toNdjson, toTraceEvents } from "./shell/profiling/export.js";
-export type { PaneName } from "./shell/profiling/panes.js";
+export type { CardGroup, CardSpec, ProfileSection, Region as CardRegion } from "./shell/profiling/panes/index.js";
 export type {
   FrameRecord,
   Histogram as ProfileHistogram,

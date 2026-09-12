@@ -23,7 +23,7 @@ import { APP_CARDS } from "./app.js";
 import { FRAMEWORK_CARDS } from "./framework.js";
 import { VERDICT_CARDS } from "./verdict.js";
 import type { CardDraw, CardContext, Region } from "./kit.js";
-import { ASCII_CAPS, card, contextFor, ms, populationFooter, resolveFrame } from "./kit.js";
+import { ASCII_CAPS, card, contextFor, ms, populationFooter, resolveFrame, spanning } from "./kit.js";
 
 /** Every card's drawing, by id — the three group modules unioned. */
 const DRAW: Readonly<Record<string, CardDraw>> = Object.freeze({
@@ -80,6 +80,18 @@ const titleOf = (spec: CardSpec, ctx: CardContext): string => {
 const footerOf = (spec: CardSpec, ctx: CardContext): string => {
   const r = ctx.report;
   const parts: string[] = [];
+  // **The tier, and what to do about it, on every card rather than on the two
+  // that happened to reach for a duration** (C28 I11, I23). Two of thirty-seven
+  // drawings carried the sentence, because a card that has no durations usually
+  // has no data either and says *that* instead — so a reader at `counters` was
+  // told the ring was empty and never told why, which is the one thing they can
+  // act on. Generated, for the reason the population clause is: a card that has
+  // to remember will forget.
+  if (!spanning(r)) {
+    parts.push(
+      `tier \`${r.regime.tier}\`${ctx.sep}raise the tier to \`spans\` to record durations`,
+    );
+  }
   if (spec.site === "frame") parts.push(`frame-site spans${ctx.sep}${populationFooter(r, "ring")}`);
   else if (spec.site === "session") parts.push(`session-site spans${ctx.sep}${populationFooter(r, "session")}`);
   // **A card over no span still has a population, and it is a different one.**
@@ -92,7 +104,58 @@ const footerOf = (spec: CardSpec, ctx: CardContext): string => {
       `${String(r.samples.length)} resource samples` +
         (r.dropped.samples > 0 ? `, ${String(r.dropped.samples)} dropped past the ring` : ""),
     );
+    // **A suspended sample breaks the series and the picture cannot say so**
+    // (C28 I27). An idle machine and a paused one draw the same flat run, and
+    // one of them is a reading — `suspended` was on `ResourceSample` from the
+    // start with no consumer reading it (F900), and the four cards over the ring
+    // would have lost it again when the panes became a deck.
+    const asleep = r.samples.filter((x) => x.suspended).length;
+    if (asleep > 0) {
+      parts.push(
+        `${String(asleep)} of ${String(r.samples.length)} suspended${ctx.sep}the series is not continuous`,
+      );
+    }
   } else parts.push(`the session so far${ctx.sep}${ms(r.regime.durationMs)} ms`);
+  // **The resolution travels beside the figure** (C28 I13). A p50 of 0.00 ms at
+  // a 10 ms resolution is a floor and not a reading, and the two are compared
+  // across runs by a reader who has no way to know they cannot be. The newest
+  // sample's, because the probe's resolution is a property of the run rather
+  // than of a sample, and a report with none has no delay figure to qualify.
+  // **The count is drawn and what it cannot say is drawn with it** (C28 I25).
+  // `timingEntries` is how many `PerformanceEntry` objects exist in the process;
+  // the profiler raises none of them and knows whose none of them are. Forty-two
+  // entries with no attribution is a canary, and forty-two rendered as though
+  // the profiler knew whose they were is a claim it cannot make.
+  if (spec.draws.includes("marks")) {
+    const entries = r.samples.at(-1)?.timingEntries;
+    if (entries !== undefined) {
+      parts.push(
+        `${String(entries)} timing entries in the process${ctx.sep}` +
+          `unattributed — the profiler raises no marks of its own`,
+      );
+    }
+  }
+  if (spec.loopDelay === true) {
+    const newest = r.samples.at(-1);
+    // **A count, not a value, separates a floor from an absence** (F1005). Zero
+    // windows and a genuine sub-floor reading are the same three numbers, and
+    // the sentence written for the second was printed over the first until
+    // `loopDelaySamples` existed to tell them apart. A resolution qualifies a
+    // figure that was measured and fell under the floor; it cannot qualify one
+    // that was never measured.
+    const windows = r.samples.reduce((n, x) => n + x.loopDelaySamples, 0);
+    if (newest !== undefined) {
+      parts.push(
+        windows === 0
+          ? `loop delay${ctx.sep}no window sampled yet`
+          // **The resolution is a knob and not a measurement**, so it is printed
+          // as it is set: `ms()` renders the 10 the probe is configured with as
+          // `10.0`, which reads as a reading of something.
+          : `loop delay at resolution ${String(newest.loopDelayResolutionMs)} ms${ctx.sep}` +
+            `a figure under it is a floor, not a reading`,
+      );
+    }
+  }
   if (spec.draws.includes("spans") || spec.draws.includes("worst")) parts.push("self time, not total");
   if (r.excluded.selfInflicted > 0) parts.push(`${String(r.excluded.selfInflicted)} self-inflicted frames excluded`);
   if (r.excluded.fallback > 0) parts.push(`${String(r.excluded.fallback)} fallback frames excluded`);
@@ -127,6 +190,54 @@ export function profileCard(
     return [b.notice("warn", `no drawing is registered for the card \`${spec.id}\``, undefined, { id: `${spec.id}-missing` })];
   }
   return [card(`card-${spec.id}`, titleOf(spec, ctx), draw(ctx, spec), footerOf(spec, ctx))];
+}
+
+
+/**
+ * One addressable entry of a section — a card, and the frame it is showing.
+ *
+ * **The deck's length is a function of the report** (C28 I58, §9b B18). The
+ * per-frame cards hold one entry per retained frame, `worst` is recomputed on
+ * every `report()`, and the view refreshes every second — so a *global* ordinal
+ * changes under a reader who has pressed nothing. The address is therefore
+ * `(section, index-within-section)` and the entry carries the `seq` it resolved
+ * to, never the position it came from.
+ *
+ * A per-frame card over an empty `worst` is **one entry and not none**: a
+ * section that silently loses three cards on an empty ring is a deck whose
+ * length disagrees with its own contents table, and the card itself already
+ * draws the *no retained frame* notice (I23).
+ */
+export type DeckEntry = Readonly<{ spec: CardSpec; seq?: number }>;
+
+export const deckOf = (report: ProfileReport, section: ProfileSection): readonly DeckEntry[] =>
+  cardsOf(section).flatMap((spec): readonly DeckEntry[] => {
+    if (spec.perFrame !== true) return [{ spec }];
+    const worst = report.worst;
+    if (worst.length === 0) return [{ spec }];
+    return worst.map((f) => ({ spec, seq: f.seq }));
+  });
+
+/**
+ * The view's seam — an address in, one card's blocks out.
+ *
+ * The index is **clamped rather than refused**: the deck shortens when a frame
+ * leaves `worst`, and a reader sitting on the last per-frame card of a section
+ * would otherwise be shown nothing between one tick and the next keypress. A
+ * clamp moves them one card and says which frame it is; an empty answer is
+ * indistinguishable from a timer that has stopped (F1130's reading).
+ */
+export function profileDeck(
+  report: ProfileReport,
+  section: ProfileSection,
+  index: number,
+  region: Region,
+  caps: GlyphCaps = ASCII_CAPS,
+): readonly Block[] {
+  const deck = deckOf(report, section);
+  const entry = deck[Math.max(0, Math.min(index, deck.length - 1))];
+  if (entry === undefined) return [];
+  return profileCard(report, entry.spec.id, region, caps, entry.seq);
 }
 
 export { CARDS, CARD_GROUPS } from "./register.js";

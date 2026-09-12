@@ -85,6 +85,18 @@ export const contextFor = (
   ...(seq === undefined ? {} : { seq }),
 });
 
+/**
+ * What a card says instead of a duration below `spans` (C28 I11, I23).
+ *
+ * **One copy, in the kit, because the two it replaces had already drifted**:
+ * `app.ts`'s ended *which is the one reading a profiler must not produce* and
+ * `framework.ts`'s did not, and neither reader could see the other. A sentence
+ * written twice is a sentence that will be corrected once.
+ */
+export const NO_DURATIONS =
+  "the tier is below `spans`, so the report omits durations rather than reporting zeroes — " +
+  "a zeroed figure reads as measured-and-fast, which is the one reading a profiler must not produce";
+
 /** Is the tier high enough to have durations at all (C28 I11)? */
 export const spanning = (r: ProfileReport): boolean =>
   TIER_RANK[r.regime.tier] >= TIER_RANK.spans;

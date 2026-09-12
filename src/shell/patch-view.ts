@@ -58,6 +58,22 @@ export interface PatchView {
   /** Every motion the keymap binds, by name (C16 §6). */
   move(motion: PatchViewMotion): boolean;
   /**
+   * `tab`/`⇧tab` — the section gesture, which for a patch is a **file** (C16 I33).
+   *
+   * **This view holds one file and therefore has one section**, so both answer
+   * `false` always. Required rather than optional, and answered here rather
+   * than left off: I33's failure mode is a silence, and an owner that simply
+   * lacked the member would make the key do nothing at this target with nothing
+   * saying why. A view with one section and a view at its last section return
+   * the same `false`; what separates them is the header, which names the file.
+   *
+   * It becomes a real motion the day a patch view opens over a multi-file diff
+   * — `open` takes one `patch` block and `Patch.path` is a single path, so the
+   * blocker is C04's shape and not this file's.
+   */
+  sectionNext(): boolean;
+  sectionPrev(): boolean;
+  /**
    * `Esc` — the view's own dismissal, not §5's cancellation rung.
    *
    * **There is deliberately no `isOpen`.** One was written and MG24 fired on
@@ -247,6 +263,13 @@ export function createPatchView(deps: PatchViewDeps): PatchView {
       state = { ...at, offset };
       render(state, patch);
       return true;
+    },
+
+    sectionNext() {
+      return false;
+    },
+    sectionPrev() {
+      return false;
     },
 
     pop() {

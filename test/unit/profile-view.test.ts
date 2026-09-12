@@ -18,10 +18,10 @@
 import { describe, expect, it } from "vitest";
 
 import * as api from "../../src/index.js";
-import type { Block, KeyValue, Notice, Table } from "../../src/data/viewmodel/index.js";
+import type { Block, Notice } from "../../src/data/viewmodel/index.js";
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
-import { PANES, paneTitle, profilePane } from "../../src/shell/profiling/panes.js";
-import type { PaneName } from "../../src/shell/profiling/panes.js";
+import { CARDS, SECTIONS, cardsOf, deckOf, profileDeck } from "../../src/shell/profiling/panes/index.js";
+import type { ProfileSection } from "../../src/shell/profiling/panes/index.js";
 import type { CommitReason, ProfileReport, Profiler, Tier } from "../../src/shell/profiling/types.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
@@ -43,7 +43,7 @@ import { ASCII_CAPS, FULL_CAPS, measurable } from "../support/render.js";
  *
  * `test/support/overlay.ts`'s `registry` had neither when this was written, and
  * through it a plot or a table fell to `raw` and measured as the wrapped lines
- * of its own JSON — the overview read 26 rows at twelve frames there and was
+ * of its own JSON — the overview it replaced read 26 rows at twelve frames there and was
  * 40 through this one, so every window the rows here asserted was a window on
  * the JSON. That fixture carries the three definitions now (F959); a row about
  * what fits has to measure what is drawn, and T1.100 builds a bare registry of
@@ -100,7 +100,7 @@ const readerFrame = (p: Profiler): void => {
 /**
  * Every commit reason, from the type rather than a list with a birthday: a
  * member added to `CommitReason` fails the `satisfies` here instead of leaving
- * T1.100 measuring a smaller overview than the pane can be.
+ * T1.100 measuring a smaller verdict than the card can be.
  */
 const ALL_REASONS = Object.keys({
   input: true, completion: true, resize: true, stream: true, spinner: true,
@@ -234,13 +234,41 @@ const rig = (
   };
 };
 
+/**
+ * The verdict card's measured height, header included, at 80 columns, per
+ * fixture — §3c's table. A figure asserted only as a bound says the budget held
+ * and never that a card grew four rows inside it.
+ */
+const VERDICT_ROWS: Readonly<Record<string, number>> = {
+  empty: 11, twelve: 15, full: 16, reasons: 16,
+};
+
 const measure = (blocks: readonly Block[], width = 80): number =>
   registry.measureSequence(blocks, width);
 
-const kvValue = (blocks: readonly Block[], id: string, label: string): string | undefined =>
-  (blocks.find((x): x is KeyValue => x.kind === "keyValue" && x.id === id))?.rows.find(
-    (r) => r.label === label,
-  )?.value;
+/**
+ * The card the view would draw at an address, for a row comparing the layer
+ * against the deck directly.
+ *
+ * **The region is the view's minus the header's row**, which is the arithmetic
+ * the view itself does: a card solves for the height whose `plotHeight` fits,
+ * and a comparison that handed it the whole region would be comparing two
+ * different cards and calling the difference a defect (F1133).
+ */
+const deckAt = (
+  r: Rig,
+  section: ProfileSection,
+  index: number,
+  caps: GlyphCaps = FULL_CAPS,
+): readonly Block[] =>
+  profileDeck(lastReport(r), section, index, { w: r.region.width, rows: r.region.height - 1 }, caps);
+
+/** The layer's header rule — a throw when the first block is not one. */
+const header = (r: Rig): { label: string; meta: string | undefined } => {
+  const first = r.content()[0];
+  if (first?.kind !== "rule") throw new Error("the first block is the header rule");
+  return { label: first.label, meta: first.meta };
+};
 
 const lastReport = (r: Rig): ProfileReport => {
   const last = r.reports.at(-1);
@@ -324,7 +352,7 @@ describe("C28 §3c — the profiler's view", () => {
     const popped = r.overlays.pop();
     expect(popped?.id).toBe(PROFILE_VIEW_ID);
     expect(r.overlays.stack, "the stack is empty").toEqual([]);
-    expect(r.view.pane, "the owner knows").toBeNull();
+    expect(r.view.section, "the owner knows").toBeNull();
     expect(r.profiler.tier, "the tier is restored").toBe("counters");
     expect(r.armed(), "and a later tick fires nothing — the timer is gone").toBe(false);
     expect(() => r.tick()).toThrow("no tick is armed");
@@ -337,7 +365,7 @@ describe("C28 §3c — the profiler's view", () => {
     const menu = r.overlays.pop();
     expect(menu?.id).toBe("menu");
     expect(r.changes.at(-1)).toEqual({ kind: "pop", id: "menu", layerKind: "overlay" });
-    expect(r.view.pane, "the view is untouched").toBe("overview");
+    expect(r.view.section, "the view is untouched").toBe("verdict");
     expect(r.profiler.tier, "the tier stays raised").toBe("spans");
     expect(r.overlays.stack.map((l) => l.id)).toEqual([PROFILE_VIEW_ID]);
     expect(r.armed()).toBe(true);
@@ -380,32 +408,37 @@ describe("C28 §3c — the profiler's view", () => {
     expect(r.redraws.length, "and raises no commit").toBe(quiet.redraws);
   });
 
-  it("T1.96 (C28 I51, C09 I49): the pane is drawn with the terminal's capabilities, never `profilePane`'s ASCII default", () => {
-    const under = (caps: GlyphCaps): { sep: string; excluded: string | undefined; matches: boolean; header: string } => {
-      const r = rig({ caps });
+  it("T1.96 (C28 I51, C09 I49): the card is drawn with the terminal's capabilities, never the deck's ASCII default", () => {
+    const under = (caps: GlyphCaps): { text: string; matches: boolean; header: string } => {
+      const r = rig({ caps, seed: seeds.full });
       r.view.open();
       const content = r.content();
       const header = content[0];
       if (header?.kind !== "rule") throw new Error("the first block is the header rule");
       const body = content.slice(1);
       return {
-        sep: caps.unicode === "ascii" ? ":" : "·",
-        excluded: kvValue(body, "ov-regime", "excluded"),
-        matches: JSON.stringify(body) === JSON.stringify(profilePane(lastReport(r), "overview", caps)),
+        text: JSON.stringify(body),
+        matches: JSON.stringify(body) === JSON.stringify(deckAt(r, "verdict", 0, caps)),
         header: header.label,
       };
     };
 
+    // **The separator, in the card's own generated furniture.** The footer is
+    // where the deck states a population and an exclusion (C28 I57), and it is
+    // joined with the separator the capabilities resolve to — so a card that
+    // took the ASCII default would read `frame-site spans : …` on a unicode
+    // terminal with nothing else on screen different.
     const ascii = under(ASCII_CAPS);
-    expect(ascii.excluded, "the ASCII arm's separator").toBe("0 self-inflicted : 0 fallback");
-    expect(ascii.header).toBe(`profiler : ${paneTitle("overview")}`);
-    expect(ascii.matches, "equals profilePane for the caps handed in").toBe(true);
+    expect(ascii.text, "the ASCII arm's separator").toContain("frame-site spans : ");
+    expect(ascii.text, "and not the ambiguous-width one").not.toContain("·");
+    expect(ascii.header).toBe("profiler : verdict");
+    expect(ascii.matches, "equals the deck for the caps handed in").toBe(true);
 
     const unicode = under(FULL_CAPS);
-    expect(unicode.excluded, "the unicode arm's separator — the one the default would never draw").toBe(
-      "0 self-inflicted · 0 fallback",
+    expect(unicode.text, "the unicode arm's — the one the default would never draw").toContain(
+      "frame-site spans · ",
     );
-    expect(unicode.header).toBe(`profiler · ${paneTitle("overview")}`);
+    expect(unicode.header).toBe("profiler · verdict");
     expect(unicode.matches).toBe(true);
   });
 
@@ -415,159 +448,166 @@ describe("C28 §3c — the profiler's view", () => {
     expect(refused).toMatch(/TuiConfig\.profile/u);
     expect(r.overlays.stack, "nothing pushed").toEqual([]);
     expect(r.changes, "no change emitted").toEqual([]);
-    expect(r.view.pane).toBeNull();
+    expect(r.view.section).toBeNull();
     expect(r.armed(), "no timer armed").toBe(false);
   });
 
-  it("T1.98 (C28 I51, C15 I8): a pane taller than the region is windowed at block boundaries, and a block taller than the region is shown under a notice", () => {
-    // A region of eight over the overview: the header and the pane together
-    // do not fit even on an empty ring — nine rows in four blocks through the
-    // registry that draws them — so the layer holds the blocks that do and no
-    // more.
-    const r = rig({ region: { width: 80, height: 8 } });
+  it("T1.98 (C28 I51, C15 I8): a card taller than the region is shown under a notice, and the header is never what the window drops", () => {
+    // **A card is one block, so the window has one block to window** — which is
+    // what one figure per card costs and what it buys. The four motions exist
+    // for the card the region cannot hold: a `tree` whose leaf count is its
+    // height, a `bullet` whose categories are, a `lollipop` at twenty rows. Where
+    // the card fits they answer `false`, which is the same `false` a document at
+    // its only page gives.
+    const r = rig({ region: { width: 80, height: 24 }, seed: seeds.full });
     r.view.open();
-    const first = r.content();
-    const full: readonly Block[] = [first[0] as Block, ...profilePane(lastReport(r), "overview", FULL_CAPS)];
-    expect(measure(full), "the fixture responds: the whole pane is taller than the region").toBeGreaterThan(8);
-    expect(measure(first), "what is shown fits").toBeLessThanOrEqual(8);
-    expect(first.length, "and is a prefix of the pane").toBeLessThan(full.length);
-    expect(first, "block boundaries, from the top").toEqual(full.slice(0, first.length));
-    expect(measure([...first, full[first.length] as Block]), "one more block would not fit").toBeGreaterThan(8);
+    const whole = r.content();
+    expect(whole.map((x) => x.kind), "the header and the card").toEqual(["rule", "panel"]);
+    expect(measure(whole), "which fit the region they were built for").toBeLessThanOrEqual(24);
+    expect(r.view.move("pageDown"), "and there is nothing to page").toBe(false);
+    expect(r.view.move("bottom"), "nor to reach").toBe(false);
 
-    // On the empty ring the tail from the second block fits a page, so
-    // `pageDown` clamps to the last offset that still fills the region — the
-    // document view's clamp — rather than turning a page. Asserted, because a
-    // motion that overshot into a short last page would pass the arm below.
-    expect(r.view.move("pageDown")).toBe(true);
-    expect(r.content()[0]?.id, "clamped to the last offset whose tail fills the region").toBe(full[1]?.id);
-    expect(measure(r.content())).toBeLessThanOrEqual(8);
-    expect(r.view.move("pageDown"), "and no further").toBe(false);
-
-    // `pageDown` moves the window by the blocks that were showing; `top`
-    // returns. Over the largest report the type allows (T1.100's), whose tail
-    // is more than a page at eight rows.
-    const paged = rig({ region: { width: 80, height: 8 }, seed: seeds.reasons });
-    paged.view.open();
-    const firstPage = paged.content();
-    const whole: readonly Block[] = [firstPage[0] as Block, ...profilePane(lastReport(paged), "overview", FULL_CAPS)];
-    expect(measure(whole), "the fixture responds: three pages at eight rows").toBeGreaterThan(16);
-    const page = firstPage.length;
-    expect(paged.view.move("pageDown")).toBe(true);
-    expect(paged.content()[0]?.id, "the window starts where the last one ended").toBe(whole[page]?.id);
-    expect(measure(paged.content())).toBeLessThanOrEqual(8);
-    expect(paged.view.move("top")).toBe(true);
-    expect(paged.content()).toEqual(firstPage);
-
-    // `n` switches pane and resets the offset to 0 — the view's own unit.
-    paged.view.move("pageDown");
-    expect(paged.view.switchPane(1)).toBe(true);
-    expect(paged.view.pane).toBe("frame");
-    const head = paged.content()[0];
-    expect(head?.kind).toBe("rule");
-    expect(head?.kind === "rule" ? head.label : "").toContain(paneTitle("frame"));
-    expect(head?.kind === "rule" ? head.meta : "").toBe("2/4");
-
-    // A region of one row: the header is one row and fits alone, with no
-    // notice — the gap C28 I52 took off it was a blank first row on every page.
-    // Then `pageDown` to the four-row regime block: that block alone, under a
-    // notice that counts the hidden rows and does **not** say *n/p move by
-    // block*, because here they do not (§9b B5).
-    const tiny = rig({ region: { width: 80, height: 1 } });
-    tiny.view.open();
-    const alone = tiny.content();
-    expect(alone.map((x) => x.kind), "the one-row header fits a one-row region by itself").toEqual(["rule"]);
-    expect(measure(alone)).toBe(1);
-    expect(tiny.view.move("pageDown")).toBe(true);
-    const shown = tiny.content();
-    expect(shown.map((x) => x.kind)).toEqual(["notice", "keyValue"]);
-    const notice = shown[0] as Notice;
-    const tall = shown[1] as Block;
-    expect(tall.id).toBe("ov-regime");
-    expect(measure([tall]), "the fixture responds: the regime block alone is taller than the region").toBeGreaterThan(1);
-    const hidden = measure([tall]) - Math.max(0, 1 - measure([notice]));
+    // **The region shrinks under it and the card does not.** `at.blocks` is the
+    // card built at the old region, so this is exactly the state a resize leaves
+    // before the next tick (T3.14) — and the one the notice exists for.
+    r.region.height = 8;
+    r.view.move("top");
+    r.tick();
+    const cramped = r.content();
+    expect(cramped.map((x) => x.kind), "the header, the notice, and the card under it").toEqual([
+      "rule", "notice", "panel",
+    ]);
+    const card = cramped[2] as Block;
+    const notice = cramped[1] as Notice;
+    expect(measure([card]), "the fixture responds: the card alone is taller than the region").toBeGreaterThan(7);
+    // **The header is drawn whatever the window does** (§3c). It names the
+    // section and the position, which is what a reader looking at a card that
+    // does not fit needs most, and the projection that treated it as the
+    // window's first block showed it *instead of* the figure.
+    expect(cramped[0]?.id, "the header survives").toBe("profile-view-header");
+    const hidden = measure([card]) - Math.max(0, 7 - measure([notice]));
     expect(notice.text).toBe(`${String(hidden)} more rows — this block is taller than the screen`);
+    // Without the document view's *n/p move by block* clause: here `n`/`p`
+    // switch cards and the sentence would be false (§9b B5).
     expect(notice.text).not.toMatch(/n\/p/u);
   });
 
-  it("T1.100 (C28 I52): the overview measures at most 23 rows at 80 columns for every report, met by moving and not by dropping, and the four walked figures hold", () => {
-    // **The fixture that bounds the claim is the type's, not a convenient one.**
-    // The coalescing table has one row per `CommitReason`, so the largest
-    // overview the type allows records every reason — `seeds.reasons`, over
-    // `ALL_REASONS`, which the type checks.
-    const shapes = seeds;
-    // §3c's table, header included, at 80 columns — asserted so the table
-    // cannot outlive its measurement (F935). The bound is the rule; this is
-    // the record beside it, and it is what sees a block grow by two rows
-    // inside the slack the bound leaves.
-    const walked: Readonly<Record<string, number>> = { empty: 9, twelve: 17, full: 18, reasons: 22 };
+  it("T1.115b (C28 §3c, C28 I58): `n` walks the deck across the group boundaries, `tab` walks the groups, and both reset the offset", () => {
+    const r = rig({ region: { width: 80, height: 24 }, seed: seeds.full });
+    r.view.open();
+    expect(r.view.section, "opens on the verdict").toBe("verdict");
 
+    // **The verdict holds one card, so `n` leaves the section** — which is the
+    // cell worth driving: a `nextCard` that clamped inside its section would be
+    // correct at every other address and would strand the reader on card one.
+    expect(cardsOf("verdict"), "the fixture responds: one card in the first group").toHaveLength(1);
+    expect(r.view.nextCard(1)).toBe(true);
+    expect(r.view.section).toBe("app");
+    expect(header(r).meta, "on that group's first card").toMatch(/^1\//u);
+
+    // And back, to the **last** card of the previous section, so the two keys
+    // are inverses across a boundary rather than only within one.
+    expect(r.view.nextCard(-1)).toBe(true);
+    expect(r.view.section).toBe("verdict");
+    expect(header(r).meta).toBe("1/1");
+    expect(r.view.nextCard(-1), "and clamps at the deck's start").toBe(false);
+
+    // `tab` — one group, and back to its first card.
+    expect(r.view.sectionNext()).toBe(true);
+    expect(r.view.section).toBe("app");
+    expect(r.view.sectionNext()).toBe(true);
+    expect(r.view.section).toBe("framework");
+    expect(r.view.sectionNext(), "clamped at the last, never wrapped").toBe(false);
+    expect(r.view.sectionPrev()).toBe(true);
+    expect(r.view.section).toBe("app");
+
+    // **The per-frame cards are one entry per retained frame** (C28 I58), so the
+    // section's length is a function of the report and the header counts what
+    // the reader can actually reach.
+    const report = lastReport(r);
+    const deck = deckOf(report, "app");
+    expect(report.worst.length, "the fixture responds: frames are retained").toBeGreaterThan(1);
+    expect(deck.length, "so the section is longer than its card count").toBeGreaterThan(
+      cardsOf("app").length,
+    );
+    expect(header(r).meta).toBe(`1/${String(deck.length)}`);
+
+    // **The offset resets on a card change** — the window belongs to the card and
+    // not to the view (§9b S9). Driven at a region the card overflows, because
+    // that is the only state in which the offset is ever non-zero: a card is
+    // built against the region it is drawn at and normally fits it.
+    // **And the window has nothing to move, which this row records rather than
+    // asserts away** (F1138). A card is one `panel`, so the windowed sequence is
+    // one block and every offset clamps to zero: `g`, `G` and the four page keys
+    // answer `false` at every card and at every region, including the region a
+    // card overflows. The notice says how many rows are hidden (C15 I8) and
+    // there is no gesture that reaches them. The remedy is a row-window through
+    // the registry or a refusal above the form (C28 I60), and both are larger than
+    // this round; the entry names them.
+    //
+    // **This row watches the remedy and not the condition**, which is the known
+    // weakness of a disagreement row (F855): it goes red the day the window can
+    // move, and says nothing while the card grows.
+    r.view.sectionPrev();
+    r.view.sectionPrev();
+    expect(r.view.section, "back on the verdict").toBe("verdict");
+    r.region.height = 8;
+    r.tick();
+    const cramped = r.content();
+    expect(cramped.map((x) => x.kind), "the fixture responds: this card overflows the region").toEqual([
+      "rule", "notice", "panel",
+    ]);
+    for (const motion of ["pageDown", "bottom", "pageUp", "top"] as const) {
+      expect(r.view.move(motion), `${motion} has nothing to move — F1138`).toBe(false);
+    }
+  });
+
+  it("T1.100 (C28 I52): the verdict card fits a 24-row terminal for every report, measured through the registry that draws it", () => {
+    // **The fixture that bounds the claim is the type's, not a convenient one.**
+    // The verdict reads `checkBudget`'s rows, and the coalescing figures behind
+    // them have one entry per `CommitReason` — so the largest verdict the type
+    // allows records every reason (`seeds.reasons`, over `ALL_REASONS`, which
+    // the type checks).
     const measured: Record<string, number> = {};
-    for (const [name, seed] of Object.entries(shapes)) {
+    for (const [name, seed] of Object.entries(seeds)) {
       const r = rig({ region: { width: 80, height: 24 }, seed });
       expect(r.view.open(), `${name}: opened`).toBeNull();
       const content = r.content();
-      const pane = profilePane(lastReport(r), "overview", FULL_CAPS);
-      // Through the view at the region the harness has: every block of the
-      // pane is on the layer and none is windowed off.
-      expect(content.slice(1), `${name}: the whole pane is on the layer`).toEqual(pane);
+      const card = deckAt(r, "verdict", 0);
+      // Through the view at the region the harness has: the card is on the
+      // layer whole and nothing is windowed off.
+      expect(content.slice(1), `${name}: the whole card is on the layer`).toEqual(card);
       for (const width of [80, 120]) {
-        expect(measure(pane, width), `${name} at ${String(width)}: the pane within the budget`).toBeLessThanOrEqual(23);
+        expect(measure(card, width), `${name} at ${String(width)}: the card within the budget`).toBeLessThanOrEqual(23);
         expect(measure(content, width), `${name} at ${String(width)}: with the header, within the region`).toBeLessThanOrEqual(24);
       }
       measured[name] = measure(content, 80);
     }
-    expect(measured, "the four walked figures, header included, at 80").toEqual(walked);
+    // §3c's table, header included, at 80 — asserted so the table cannot outlive
+    // its measurement (F935). The bound is the rule; this is the record beside
+    // it, and it is what sees a card grow inside the slack the bound leaves.
+    expect(measured, "the four walked figures, header included, at 80").toEqual(VERDICT_ROWS);
 
-    // **The fixture responds, and the ceiling is met by moving, not dropping.**
-    // The largest report's overview holds a coalescing row per reason and the
-    // latency plot; the two tables no type bounds are on `frame`, whole, and
-    // the overview says so with the counts.
-    const r = rig({ seed: shapes.reasons });
+    // **The harness's registry has no `plot`** (F959). Through it a card holding
+    // a figure measures as the wrapped JSON of that figure rather than as the
+    // figure — the instrument F947's number came from.
+    const r = rig({ seed: seeds.full });
     r.view.open();
-    const report = lastReport(r);
-    const ov = profilePane(report, "overview", FULL_CAPS);
-    const coalesce = ov.find((x): x is Table => x.kind === "table" && x.id === "ov-coalesce");
-    expect(coalesce?.rows.map((row) => row.id), "one coalescing row per reason").toEqual(ALL_REASONS);
-    const stream = coalesce?.rows.find((row) => row.id === "stream")?.cells;
+    const withPlot = deckAt(r, "app", 0);
+    expect(JSON.stringify(withPlot), "the fixture responds: this card holds a plot").toContain('"kind":"plot"');
     expect(
-      [stream?.commits?.text, stream?.frames?.text, stream?.saved?.text],
-      "the difference the caption used to ask for is a column",
-    ).toEqual(["8", "4", "4"]);
-    expect(ov.some((x) => x.kind === "plot" && x.id === "ov-latency"), "and the latency plot").toBe(true);
-    expect(ov.filter((x) => x.kind === "table").map((x) => x.id), "no table the type does not bound").toEqual(["ov-coalesce"]);
-    const pointer = ov.find((x): x is Notice => x.kind === "notice" && x.id === "ov-elsewhere");
-    expect(pointer?.text).toBe("1 counter and 2 caches are on the frame pane — press n");
-
-    const fr = profilePane(report, "frame", FULL_CAPS);
-    const counters = fr.find((x): x is Table => x.kind === "table" && x.id === "fr-counters");
-    const cache = fr.find((x): x is Table => x.kind === "table" && x.id === "fr-cache");
-    const recorded = Object.keys(report.counters).filter((k) => !k.startsWith("commit.") && !k.startsWith("frame."));
-    expect(recorded, "the fixture responds: a counter was recorded").toEqual(["bytes.written"]);
-    expect(counters?.rows.map((row) => row.id), "every counter, on frame").toEqual(recorded);
-    expect(cache?.rows.map((row) => row.id), "every cache, on frame").toEqual(["height", "layout"]);
-    // And on the empty ring there is nothing to point at, so no pointer.
-    expect(profilePane(createProfiler({ tier: "spans" }, { elapsed: counterClock() }).report(), "overview", FULL_CAPS).some((x) => x.id === "ov-elsewhere"), "no pointer at an empty table").toBe(false);
-
-    // **The harness's registry has no `plot`** (F959). Through it the
-    // twelve-frame pane measures as the wrapped JSON of its plot and reads as
-    // shorter than it draws — the instrument F947's figure came from. The
-    // empty ring holds no plot and the two agree there, which is the control
-    // on the control.
-    const twelve = createProfiler({ tier: "spans" }, { elapsed: counterClock() });
-    shapes.twelve?.(twelve);
-    const drawn = profilePane(twelve.report(), "overview", FULL_CAPS);
-    expect(bareRegistry.measureSequence(drawn, 80), "a plot measured as its JSON is shorter than the plot").toBeLessThan(measure(drawn, 80));
-    const none = profilePane(createProfiler({ tier: "spans" }, { elapsed: counterClock() }).report(), "overview", FULL_CAPS);
-    expect(bareRegistry.measureSequence(none, 80), "and agrees where there is no plot to measure").toBe(measure(none, 80));
+      bareRegistry.measureSequence(withPlot, 80),
+      "a plot measured as its JSON is not the plot's height",
+    ).not.toBe(measure(withPlot, 80));
   });
 
   it("T1.99 (C28 I50, C15 I1): `open` while open is refused, pushes nothing, and does not overwrite the remembered tier", () => {
     const r = rig({ tier: "counters" });
     expect(r.view.open()).toBeNull();
-    const again = r.view.open("frame");
+    const again = r.view.open("app");
     expect(again).toMatch(/profiler view/u);
     expect(r.changes.filter((c) => c.kind === "push"), "one push in the log").toHaveLength(1);
-    expect(r.view.pane, "and the pane did not change").toBe("overview");
+    expect(r.view.section, "and the section did not change").toBe("verdict");
 
     // **The second clause is the row** (§9b S7): a second raise would remember
     // `spans` and the close would restore to `spans`.
@@ -603,7 +643,7 @@ describe("C28 §3c — the profiler's view", () => {
     expect(r.profiler.tier, "the tier is left where it was — raised, not restored").toBe("spans");
     expect(r.setTierCalls, "one call, up; none down").toEqual(["spans"]);
     expect(r.profiler.report().timeline, "and the ring is untouched").toEqual(before);
-    expect(r.view.pane, "the owner holds nothing").toBeNull();
+    expect(r.view.section, "the owner holds nothing").toBeNull();
 
     expect(r.view.pop(), "pop afterwards is false").toBe(false);
     expect(r.changes.length, "and emits nothing").toBe(changesBefore);
@@ -623,8 +663,19 @@ describe("C28 §3c — the profiler's view", () => {
 
     r.tick();
     const narrow = r.content();
-    expect(measure(narrow), "the tick re-windows to the new region").toBeLessThanOrEqual(8);
-    expect(narrow.length).toBeLessThan(wide.length);
+    // **Re-windowed, and what that means for a one-block card**: the card is
+    // rebuilt against the new region, and where its form's floor is taller than
+    // the region it is shown under the hidden-rows notice rather than cut in
+    // silence (C15 I8). The row asserts the notice rather than a height, because
+    // a card that *could* be made to fit and a card that cannot are both correct
+    // outcomes here and only one of them has a number.
+    expect(narrow.map((x) => x.kind), "the header, the notice and the card").toEqual([
+      "rule", "notice", "panel",
+    ]);
+    expect(JSON.stringify(narrow), "and it says how many rows are hidden").toContain(
+      "more rows — this block is taller than the screen",
+    );
+    expect(narrow).not.toEqual(wide);
     expect(r.redraws.slice(redraws), "one bracketed stream commit, for the tick").toEqual(["stream"]);
   });
 
@@ -638,14 +689,14 @@ describe("C28 §3c — the profiler's view", () => {
     const popped = r.overlays.pop();
     expect(popped?.id).toBe(PROFILE_VIEW_ID);
     expect(r.changes.slice(n)).toEqual([{ kind: "pop", id: PROFILE_VIEW_ID, layerKind: "view" }]);
-    expect(r.view.pane).toBeNull();
+    expect(r.view.section).toBeNull();
 
     // `dismiss(id)` on the same view: one `dismiss`, with its reason.
     r.view.open();
     const m = r.changes.length;
     r.overlays.dismiss(PROFILE_VIEW_ID);
     expect(r.changes.slice(m)).toEqual([{ kind: "dismiss", id: PROFILE_VIEW_ID, reason: "explicit" }]);
-    expect(r.view.pane).toBeNull();
+    expect(r.view.section).toBeNull();
 
     // An id not on the stack: nothing at all.
     const k = r.changes.length;
@@ -653,25 +704,32 @@ describe("C28 §3c — the profiler's view", () => {
     expect(r.changes.slice(k)).toEqual([]);
   });
 
-  it("T1.11 (C24 I33): nothing that opens the view is published, and the view draws with the pane exports that are", () => {
+  it("T1.11 (C24 I33): nothing that opens the view is published, and the view draws with the deck exports that are", () => {
     const published = Object.keys(api);
     expect(published, "no constructor").not.toContain("createProfileView");
     expect(published, "no layer id").not.toContain("PROFILE_VIEW_ID");
     expect(published, "no refresh cadence").not.toContain("VIEW_REFRESH_MS");
     expect(published.filter((k) => /profile.?view/iu.test(k)), "nothing named for the view").toEqual([]);
 
-    // What was published to draw a pane is what the framework's own view draws
-    // with — `paneTitle`'s first consumer (F945), through the same export.
-    const r = rig();
+    // What was published to draw a card is what the framework's own view draws
+    // with, through the same export — the rule `paneTitle` failed for the whole
+    // of its life before the view existed (F945).
+    const r = rig({ seed: seeds.full });
     r.view.open();
     const content = r.content();
-    const header = content[0];
-    expect(header?.kind).toBe("rule");
-    expect(header?.kind === "rule" ? header.label : "").toContain(api.paneTitle("overview"));
-    expect(content.slice(1)).toEqual(api.profilePane(lastReport(r), "overview", FULL_CAPS));
-    expect(api.PANES).toEqual(PANES);
-    for (const pane of api.PANES as readonly PaneName[]) {
-      expect(typeof api.paneTitle(pane)).toBe("string");
+    const head = content[0];
+    expect(head?.kind).toBe("rule");
+    expect(head?.kind === "rule" ? head.label : "").toContain("verdict");
+    expect(content.slice(1), "the layer is the published deck's own answer").toEqual(
+      api.profileDeck(lastReport(r), "verdict", 0, { w: 80, rows: 23 }, FULL_CAPS),
+    );
+    expect(api.SECTIONS).toEqual(SECTIONS);
+    // **`CARDS` is published because a card's id is its address**, so a consumer
+    // drawing its own deck needs it; and every id it names has to be drawable
+    // through the published function, or the register is a menu of dead ends.
+    expect(api.CARDS.map((c) => c.id)).toEqual(CARDS.map((c) => c.id));
+    for (const card of api.CARDS) {
+      expect(api.profileCard(lastReport(r), card.id, { w: 80, rows: 23 }).length, card.id).toBeGreaterThan(0);
     }
   });
 

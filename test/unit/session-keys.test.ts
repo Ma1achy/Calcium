@@ -281,6 +281,11 @@ describe("C22 §3 step 11 — the effect table", () => {
       patchView: {
         open: () => null,
         move: () => false,
+        // The section gesture (C16 I33). `false` is the patch view's real
+        // answer — one file, one section — so the double is not weaker than its
+        // subject here.
+        sectionNext: () => false,
+        sectionPrev: () => false,
         pop: () => false,
       },
       // The same stand-in reason, and `openFor: null` is load-bearing rather
@@ -296,6 +301,8 @@ describe("C22 §3 step 11 — the effect table", () => {
         patch: () => ({ ok: false, reason: "closed" }) as const,
         blockAt: () => null,
         move: () => false,
+        sectionNext: () => false,
+        sectionPrev: () => false,
         pop: () => false,
         openFor: null,
       },
@@ -714,6 +721,8 @@ describe("C22 §3 step 12 — the read loop", () => {
         putBlock: () => false,
         blockAt: () => null,
         move: () => false,
+        sectionNext: () => false,
+        sectionPrev: () => false,
         pop: () => {
           order.push("dismiss");
           return true;
@@ -841,6 +850,8 @@ describe("C26 §8b.6/§8b.7 — focus is an address, through the key effects", (
         putBlock: () => false,
         blockAt: () => null,
         move: () => false,
+        sectionNext: () => false,
+        sectionPrev: () => false,
         pop: () => false,
         openFor: null,
       },
@@ -998,6 +1009,8 @@ describe("C26 §5c — the transcript's selection and semantic copy", () => {
         putBlock: () => false,
         blockAt: () => null,
         move: () => false,
+        sectionNext: () => false,
+        sectionPrev: () => false,
         pop: () => false,
         openFor: null,
       },

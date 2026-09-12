@@ -436,6 +436,12 @@ describe("§6 — the default table (C17 I12)", () => {
       "pushedView pagedown": ["\u001b[6~"],
       "pushedView up": ["\u001b[A", "\u001bOA"],
       "pushedView down": ["\u001b[B", "\u001bOB"],
+      // The section gesture (C16 I33). The same two wire forms `liveBlock`
+      // already proves — `CSI Z` for the shifted arm, which the decoder answers
+      // with `{name: "tab", shift: true}` — at a third target, resolved by the
+      // ladder rather than by a second table.
+      "pushedView tab": ["\t"],
+      "pushedView s+tab": ["\u001b[Z"],
       "pushedView escape": ["\u001b"],
       // Copy mode's own dismissal (C16 §5c): the same lone byte, resolved when
       // `activeTarget` answers `copyMode`.

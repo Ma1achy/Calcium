@@ -14,15 +14,11 @@ import type { FrameRecord, ProfileReport, SpanName, TreeNode } from "../types.js
 import type { CardDraw, CardContext } from "./kit.js";
 import {
   cannotDraw, figureRows, frameSamples, hierarchyOf, mib, ms, namesAt,
-  nothingYet, quartilesOf, resolveFrame, room, sessionSummary, spanning,
+  NO_DURATIONS, nothingYet, quartilesOf, resolveFrame, room, sessionSummary, spanning,
 } from "./kit.js";
 
 /** The notice every card draws below `spans`, rather than a zero (C28 I11). */
 const belowSpans = (ctx: CardContext): boolean => !spanning(ctx.report);
-
-const NO_DURATIONS =
-  "the tier is below `spans`, so the report omits durations rather than reporting zeroes — " +
-  "a zeroed figure reads as measured-and-fast, which is the one reading a profiler must not produce";
 
 // --- vitals -----------------------------------------------------------------
 

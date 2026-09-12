@@ -17,7 +17,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
-import { PANES, profilePane } from "../../src/shell/profiling/panes.js";
+import { CARDS, profileCard } from "../../src/shell/profiling/panes/index.js";
 import { createProfileView } from "../../src/shell/profile-view.js";
 import { createOverlayManager } from "../../src/viewport/overlay/index.js";
 import type { Block, Notice } from "../../src/data/viewmodel/index.js";
@@ -31,14 +31,53 @@ const counterClock = (): (() => number) => {
   return () => (t += 1);
 };
 
+/**
+ * Every block of a card, flattened.
+ *
+ * **A card is a `panel` and its figure is a child of it**, so a filter over the
+ * top level sees one block of kind `panel` and no plot at all — which is the
+ * same empty answer a card that drew nothing gives. The rows below assert on
+ * absences, and an absence assertion over a corpus the reader never descended
+ * into is the strongest green for the worst defect.
+ */
+const flat = (blocks: readonly Block[]): readonly Block[] =>
+  blocks.flatMap((blk) => [
+    blk,
+    ...("children" in blk && Array.isArray(blk.children) ? flat(blk.children as Block[]) : []),
+  ]);
+
 const noticesIn = (blocks: readonly Block[]): readonly Notice[] =>
-  blocks.filter((x): x is Notice => x.kind === "notice");
+  flat(blocks).filter((x): x is Notice => x.kind === "notice");
 
 const plotIds = (blocks: readonly Block[]): readonly string[] =>
-  blocks.filter((x) => x.kind === "plot").map((x) => x.id ?? "?");
+  flat(blocks).filter((x) => x.kind === "plot").map((x) => x.id ?? "?");
+
+/**
+ * The cards a report with frames and spans — and nothing else — can draw.
+ *
+ * **Measured, then read.** Every card not here is absent for a reason the
+ * fixture states: it has no resource sample (the vitals, the loop, memory, the
+ * heap spaces, the system counters), no retained tree (the flame, the icicle,
+ * the named tree, the clock), no cache, no gauge, no leak, no mark and no
+ * far-side span. The list is the reading rather than a snapshot: a card
+ * appearing here is a card drawing a figure over data the fixture does not hold,
+ * and one leaving is a card that has stopped answering.
+ */
+const DRAWS_ON_SPANS: readonly string[] = [
+  "verdict", "vitals", "frame-cost", "where-the-frame-went", "the-flow",
+  "element-tree", "flame", "named-tree", "frame-on-a-clock", "phases",
+  "composition", "span-shapes", "spans-compared", "against-the-budget",
+  "work-against-wait", "by-reason", "co-variance", "the-pairs",
+];
+
+/** The region every row here draws at — a 24-row terminal at 80 columns. */
+const REGION = { w: 80, rows: 24 } as const;
+
+const cardsOfReport = (report: Parameters<typeof profileCard>[0]): readonly (readonly [string, readonly Block[]])[] =>
+  CARDS.map((c) => [c.id, profileCard(report, c.id, REGION)] as const);
 
 describe("C28 — profiler, tier 1 spec-first rows", () => {
-  it("T1.16 (C28 I23): an empty ring at `spans` draws a notice in every pane and no plot at all", () => {
+  it("T1.16 (C28 I23): an empty ring at `spans` draws a notice in every card and no plot at all", () => {
     // **T1.16.** C28 I23's second clause is *a pane with no data draws a notice
     // and never an empty plot, because an empty plot reads as* measured, and
     // zero. `overview` and `distribution` implemented it against the **tier**,
@@ -47,11 +86,12 @@ describe("C28 — profiler, tier 1 spec-first rows", () => {
     // or above, so an empty ring makes it present at `count: 0` with every
     // percentile 0, and the panes drew four and five zero bars (F895).
     //
-    // **Over the whole of `PANES`, not the pane that broke.** The two that were
+    // **Over the whole deck, not the card that broke.** The two panes that were
     // right were right by accident of what they had to hand — `frame` and
-    // `memory` have no tier-shaped field to reach for — so a row naming
-    // `overview` would have been satisfied by the accident and blind to the
-    // next pane written from the same template.
+    // `memory` had no tier-shaped field to reach for — so a row naming
+    // `overview` would have been satisfied by the accident and blind to the next
+    // one written from the same template. The deck is thirty-seven cards from
+    // five templates, so the argument is stronger here than it was there.
     const p = createProfiler({ tier: "spans" }, { elapsed: counterClock() });
     const report = p.report();
 
@@ -60,10 +100,22 @@ describe("C28 — profiler, tier 1 spec-first rows", () => {
     expect(report.timeline, "nothing was recorded").toHaveLength(0);
     expect(report.latency?.work.count, "and `latency` is present anyway — the defect's premise").toBe(0);
 
-    for (const pane of PANES) {
-      const blocks = profilePane(report, pane);
-      expect(plotIds(blocks), `${pane} draws no plot over an empty ring`).toEqual([]);
-      expect(noticesIn(blocks).length, `${pane} says so`).toBeGreaterThan(0);
+    for (const [id, blocks] of cardsOfReport(report)) {
+      expect(plotIds(blocks), `${id} draws no plot over an empty ring`).toEqual([]);
+    }
+
+    // **A card with a figure says why there is none; a card with no figure is
+    // counted rather than excluded.** `the-instrument` is a `kv` of the
+    // profiler's own cost — spans measured, frames dropped, the tier, the node
+    // version — every one of which is a count that exists at `off`, so a notice
+    // there would be a card refusing to draw numbers it holds. One of
+    // thirty-seven, named here so the exemption is a row and not a filter that
+    // quietly widens (the *count an exemption* rule).
+    const textCards = CARDS.filter((c) => c.form === null).map((c) => c.id);
+    expect(textCards, "the cards that draw no figure at any tier").toEqual(["the-instrument"]);
+    for (const [id, blocks] of cardsOfReport(report)) {
+      if (textCards.includes(id)) continue;
+      expect(noticesIn(blocks).length, `${id} says so`).toBeGreaterThan(0);
     }
   });
 
@@ -74,10 +126,16 @@ describe("C28 — profiler, tier 1 spec-first rows", () => {
     // green under any row that asserts a notice exists. So the assertion is the
     // text: at a spanning tier no notice may instruct a raise, and below one
     // every notice that mentions the tier must still do so.
+    // **The card's whole text, not its notices.** The tier and its remedy are in
+    // the panel's generated footer — one place for every card, rather than the
+    // two drawings of thirty-seven that happened to reach for a duration — and a
+    // corpus of `notice` blocks cannot see a panel's footer. An assertion that
+    // reads a narrower corpus than the reader's eye is how a sentence goes
+    // missing from thirty-five cards with a row still green (F1137).
     const at = (tier: Tier): readonly string[] => {
       const p = createProfiler({ tier }, { elapsed: counterClock() });
       const report = p.report();
-      return PANES.flatMap((pane) => noticesIn(profilePane(report, pane)).map((n) => n.text));
+      return cardsOfReport(report).map(([, blocks]) => JSON.stringify(blocks));
     };
 
     for (const text of at("spans")) {
@@ -110,13 +168,16 @@ describe("C28 — profiler, tier 1 spec-first rows", () => {
     const report = p.report();
     expect(report.latency?.work.count, "six frames are in the ring").toBe(6);
 
-    // One plot on the overview since C28 I52: the coalescing block is a table,
-    // asserted as one so a plot coming back — and its two rows per reason
-    // under a height of one per reason (F960) — is seen here.
-    expect(plotIds(profilePane(report, "overview"))).toEqual(["ov-latency"]);
-    expect(profilePane(report, "overview").find((x) => x.id === "ov-coalesce")?.kind, "the coalescing block is drawn, as a table").toBe("table");
-    expect(plotIds(profilePane(report, "frame"))).toEqual(["fr-spans"]);
-    expect(plotIds(profilePane(report, "distribution"))).toEqual(["di-quantiles", "di-spans", "di-worst"]);
+    // **The set of cards that draw, named rather than counted.** A deck that
+    // drew one figure where it owes seven satisfies a count and is missing the
+    // answer; and the set is the reading — every card absent from it is absent
+    // for a stated reason, which is what a report holding frames and spans but
+    // no resource sample, no retained tree, no cache and no gauge *should*
+    // produce. The list moving is a finding either way round.
+    const drew = cardsOfReport(report)
+      .filter(([, blocks]) => plotIds(blocks).length > 0)
+      .map(([id]) => id);
+    expect(drew, "the cards a frames-and-spans report can draw").toEqual(DRAWS_ON_SPANS);
   });
 
   it("T1.88 (C28 I12): a commit inside `own` is the profiler's, and a mixed frame is not", () => {

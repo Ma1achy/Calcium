@@ -3359,15 +3359,15 @@ export function checkExportedArguments(files, readFile = (f) => readFileSync(f, 
 
 /** Functions whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_FUNCTIONS = Object.freeze({
-  // --- C28's deck, ahead of the view that walks it -------------------------
-  "profileCard":
-    "C28 §3c — the deck's entry point, landing one commit before `profile-view.ts` "
-    + "is rewired onto it. The cards were built and read first on purpose: reading "
-    + "thirty-seven frames is what found a form fed instants where it draws intervals "
-    + "(F1135), a treemap root with no value behind a green gate (F1134) and every "
-    + "`axes: true` card three rows past its region (F1133), and none of those is "
-    + "reachable through a view. **Watched rather than deferred**: MG25's equality arm "
-    + "fails the day `profile-view.ts` names it, so the entry cannot outlive its reason",
+  // **`profileCard` was here and is gone.** It was exempted for one commit —
+  // the deck landing ahead of the view that walks it, because reading
+  // thirty-seven frames is what found a form fed instants where it draws
+  // intervals (F1135), a treemap root with no value behind a green gate (F1134)
+  // and every `axes: true` card three rows past its region (F1133), none of them
+  // reachable through a view. Its reason said *MG25's equality arm fails the day
+  // `profile-view.ts` names it*, and on the commit that rewired the view it did,
+  // in the same run. A watched entry rather than a deferred one, and the
+  // difference is that nobody had to remember.
 
   // **`createSourceErrorSink` was here and is gone** — wired by `construct.ts`
   // on 2026-09-03 (C19 T3.6's *logged once* given a place to log to, drained by

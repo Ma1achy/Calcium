@@ -525,18 +525,34 @@ describe("C09 §4 — the call grammar's glyph rows", () => {
     // `src/shell/` never writes ` · ` into a head again. Comments stripped
     // first — the prose about the separator is exactly where the bytes appear.
     const offenders: string[] = [];
+    // **Named, with why, rather than by narrowing the walk** (the allow-list
+    // rule). `checks.ts` writes **Markdown** — `make profile`'s report, read in a
+    // pager and committed to a file — and not a block head: nothing it produces
+    // reaches C09's composer or is measured in cells, so the slot has no
+    // capability to resolve against there. It came into this rule's scope by
+    // moving from `src/testing/` into the shell under F1136, which is the rule
+    // working: the walk covers the directory and the exception is a row.
+    const WRITES_MARKDOWN = ["src/shell/profiling/checks.ts"];
     const walk = (dir: string): void => {
       for (const entry of readdirSync(dir)) {
         const file = `${dir}/${entry}`;
         if (statSync(file).isDirectory()) walk(file);
         else if (file.endsWith(".ts") && !file.endsWith(".d.ts")) {
           const code = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//gu, "").replace(/\/\/.*$/gmu, "");
+          if (WRITES_MARKDOWN.includes(file)) continue;
           if (/["'`][^"'`\n]*\s\u00b7\s[^"'`\n]*["'`]/u.test(code)) offenders.push(file);
         }
       }
     };
     walk("src/shell");
     expect(offenders, "a head joined with a literal `·` (F828)").toEqual([]);
+    // **The exception is asserted to still be one**: a file named here that has
+    // stopped writing the literal is an entry outliving its subject, and an
+    // exemption list nobody drives is how a dead entry keeps its place.
+    for (const file of WRITES_MARKDOWN) {
+      const code = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//gu, "").replace(/\/\/.*$/gmu, "");
+      expect(/["'`][^"'`\n]*\s\u00b7\s[^"'`\n]*["'`]/u.test(code), `${file} still writes it`).toBe(true);
+    }
   });
 });
 

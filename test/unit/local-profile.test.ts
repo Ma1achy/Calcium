@@ -1,4 +1,4 @@
-// C23 — `/profile [pane]`, the seventh shipped local verb
+// C23 — `/profile [section]`, the seventh shipped local verb
 // (docs/components/C23_execution_pipeline.md §2, §10), tier 1.
 //
 // **Driven through `shippedHandlers` with a view handed in, and through a real
@@ -16,8 +16,8 @@ import { shippedHandlers } from "../../src/shell/local/handlers.js";
 import type { HandlerDeps } from "../../src/shell/local/handlers.js";
 import type { LocalContext } from "../../src/shell/local/registry.js";
 import type { ProfileView } from "../../src/shell/profile-view.js";
-import { PANES } from "../../src/shell/profiling/panes.js";
-import type { PaneName } from "../../src/shell/profiling/panes.js";
+import { SECTIONS } from "../../src/shell/profiling/panes/index.js";
+import type { ProfileSection } from "../../src/shell/profiling/panes/index.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { pipelineHarness, settled } from "../support/execution.js";
 import { producerContext } from "../support/producer-context.js";
@@ -25,21 +25,23 @@ import { producerContext } from "../support/producer-context.js";
 /** A view that records what it was asked to open, and answers as told. */
 const fakeView = (
   refuse: string | null = null,
-): { view: ProfileView; opened: (PaneName | undefined)[] } => {
-  const opened: (PaneName | undefined)[] = [];
+): { view: ProfileView; opened: (ProfileSection | undefined)[] } => {
+  const opened: (ProfileSection | undefined)[] = [];
   const view: ProfileView = {
-    open: (pane) => {
-      opened.push(pane);
+    open: (section) => {
+      opened.push(section);
       return refuse;
     },
-    switchPane: () => false,
+    nextCard: () => false,
+    sectionNext: () => false,
+    sectionPrev: () => false,
     move: () => false,
     pop: () => false,
     dispose: () => undefined,
-    // Open on the last pane asked for, unless every open was refused — the
+    // Open on the last section asked for, unless every open was refused — the
     // shape the real view has, reduced to what these rows read.
-    get pane(): PaneName | null {
-      return refuse === null ? ((opened.at(-1) ?? null) as PaneName | null) : null;
+    get section(): ProfileSection | null {
+      return refuse === null ? ((opened.at(-1) ?? null) as ProfileSection | null) : null;
     },
   };
   return { view, opened };
@@ -116,7 +118,7 @@ describe("C23 — /profile, the local route", () => {
     expect(found).toHaveLength(1);
     expect(found[0]?.tone).toBe("warn");
     expect(found[0]?.text).toMatch(/TuiConfig\.profile/u);
-    expect(opened, "the view was asked once, for the default pane").toEqual(["overview"]);
+    expect(opened, "the view was asked once, for the default section").toEqual(["verdict"]);
 
     // **Arm 2: the handler does not depend on the view's answer.** A view that
     // accepts yields the same seven keys — the row is in `FRAMEWORK_TOOLS`, so a
@@ -128,42 +130,46 @@ describe("C23 — /profile, the local route", () => {
     expect(accepting).toHaveProperty("profile");
   });
 
-  it("T1.65 (C23 I68, C22 I66): the pane comes from `args`, and a token that is not a pane gets a usage notice", async () => {
+  it("T1.65 (C23 I68, C22 I66): the section comes from `args`, and a token that is not a section gets a usage notice", async () => {
     const { view, opened } = fakeView();
     const handlers = shippedHandlers(deps(view));
 
-    // `/profile frame`, as C05 hands it over: parsed into `args`.
-    const ok = await run(handlers, ["frame"], { pane: "frame" });
-    expect(opened).toEqual(["frame"]);
-    expect(notices(ok.blocks).map((n) => n.text)).toEqual(["profiler: frame"]);
+    // `/profile app`, as C05 hands it over: parsed into `args`.
+    const ok = await run(handlers, ["app"], { section: "app" });
+    expect(opened).toEqual(["app"]);
+    expect(notices(ok.blocks).map((n) => n.text)).toEqual(["profiler: app"]);
 
     // `/profile foo`: validation failed, so `args` is empty and `argv` carries
-    // the token. Usage names all four panes and quotes what was typed.
+    // the token. Usage names all three sections and quotes what was typed.
     const bad = await run(handlers, ["foo"]);
-    expect(opened, "the view was not asked").toEqual(["frame"]);
+    expect(opened, "the view was not asked").toEqual(["app"]);
     const usage = notices(bad.blocks);
     expect(usage).toHaveLength(1);
     expect(usage[0]?.tone).toBe("warn");
-    for (const pane of PANES) expect(usage[0]?.text).toContain(pane);
+    for (const section of SECTIONS) expect(usage[0]?.text).toContain(section);
     expect(usage[0]?.text).toContain("`foo`");
 
-    // **The pane is asserted to come from `args`**: `argv[0]` says one thing
-    // and `args.pane` another, and a handler reading `argv` would open the
-    // wrong pane while passing both arms above.
-    await run(handlers, ["memory"], { pane: "frame" });
-    expect(opened.at(-1)).toBe("frame");
+    // **The section is asserted to come from `args`**: `argv[0]` says one thing
+    // and `args.section` another, and a handler reading `argv` would open the
+    // wrong section while passing both arms above.
+    await run(handlers, ["framework"], { section: "app" });
+    expect(opened.at(-1)).toBe("app");
   });
 
-  it("T1.66 (C23 I69): the document names the pane and carries none of it", async () => {
+  it("T1.66 (C23 I69): the document names the section and carries none of it", async () => {
     const { view } = fakeView();
-    const doc = await run(shippedHandlers(deps(view)), ["distribution"], { pane: "distribution" });
+    const doc = await run(shippedHandlers(deps(view)), ["framework"], { section: "framework" });
 
     const tree = walk(doc.blocks);
     expect(tree.filter((n) => n.kind === "notice"), "one notice").toHaveLength(1);
     expect(tree.filter((n) => n.kind === "plot"), "no plot anywhere in the tree").toEqual([]);
-    const paneIds = tree.filter((n) => n.id !== undefined && /^(ov|fr|di|me)-/u.test(n.id));
-    expect(paneIds, "no block of any pane's").toEqual([]);
-    expect(notices(doc.blocks)[0]?.text).toBe("profiler: distribution");
+    // **Every card's own id**, from the register rather than a prefix an id
+    // convention happens to share: `card-<id>` is what the deck frames with, and
+    // a regex over four two-letter prefixes was a guess that outlived the panes
+    // it was written for.
+    const cardIds = tree.filter((n) => n.id !== undefined && n.id.startsWith("card-"));
+    expect(cardIds, "no block of any card's").toEqual([]);
+    expect(notices(doc.blocks)[0]?.text).toBe("profiler: framework");
   });
 
   // **Spec-first, so the rows are here and unbuilt.** C23 I69's amendment admits two
@@ -172,35 +178,38 @@ describe("C23 — /profile, the local route", () => {
   it.todo("T1.66b (C23 I69): `/profile snapshot` appends a panel whose title carries the frame range, the elapsed time, the tier and the ring's reset point, and holds no live part; `/profile live` appends a live part with a cadence and no stamp — read as fields, so a reworded stamp fails only when one goes missing — not deferred on a component; the two verbs land with this round's cards");
   it.todo("T1.66c (C23 I69): `/profile live` calls setTier zero times at every tier, and at `off` its first render is C28's raise-the-tier notice rather than a figure — the second half being what makes the first testable, since a verb that raises nothing and draws nothing satisfies the count and answers nobody — not deferred on a component; it lands with this round's cards");
 
-  it("T1.67 (C23 I68, C05 §3): the manifest's `pane` values are C28's `PANES`, written down at L0 and held equal here", () => {
-    // L0 may not import L4, so `framework.ts` carries the four names as
-    // literals; this is the row that fails the day either list moves.
+  it("T1.67 (C23 I68, C05 §3): the manifest's `section` values are C28's `SECTIONS`, written down at L0 and held equal here", () => {
+    // L0 may not import L4, so `framework.ts` carries the three names as
+    // literals; this is the row that fails the day either list moves. **It has
+    // now fired once in anger**: the panes became a deck and the enum was four
+    // pane names, so the rename travelled through this row rather than through
+    // a reader noticing.
     const row = FRAMEWORK_TOOLS.find((t) => t.name === "profile");
     expect(row?.local).toBe(true);
-    expect(row?.args.map((a) => [a.name, a.type, a.required])).toEqual([["pane", "enum", false]]);
-    expect([...(row?.args[0]?.values ?? [])]).toEqual([...PANES]);
+    expect(row?.args.map((a) => [a.name, a.type, a.required])).toEqual([["section", "enum", false]]);
+    expect([...(row?.args[0]?.values ?? [])]).toEqual([...SECTIONS]);
     expect(FRAMEWORK_TOOLS.map((t) => t.name).sort()).toEqual(SEVEN);
   });
 
-  it("T4.66 (C23 I68, C23 I27): a real pipeline over the framework's rows — `/profile frame` opens the view on `frame`, appends one notice and nothing of the panes, and `seal()` accepted the seven", async () => {
+  it("T4.66 (C23 I68, C23 I27): a real pipeline over the framework's rows — `/profile app` opens the view on `app`, appends one notice and nothing of the deck, and `seal()` accepted the seven", async () => {
     const { view, opened } = fakeView();
     // Constructing the harness is the I27 assertion: `seal()` runs inside it
     // and refuses a row without a handler or a handler without a row.
     const h = pipelineHarness({ profileView: view });
-    h.pipeline.submit("/profile frame");
+    h.pipeline.submit("/profile app");
     await settled(h.pipeline);
 
-    expect(opened, "the pane C05 parsed, not `argv[0]` re-read").toEqual(["frame"]);
-    expect(view.pane).toBe("frame");
+    expect(opened, "the section C05 parsed, not `argv[0]` re-read").toEqual(["app"]);
+    expect(view.section).toBe("app");
     expect(h.transcript.entries).toHaveLength(1);
     const blocks = h.transcript.entries[0]?.doc.blocks ?? [];
     // The route's own `step-2` echo of the verb sits above the handler's
     // document (C23 §4), so the handler's notice is the one carrying its id.
     const own = notices(blocks).filter((n) => n.id?.startsWith("profile") === true);
     expect(own, "one notice of the handler's").toHaveLength(1);
-    expect(own[0]?.text).toBe("profiler: frame");
+    expect(own[0]?.text).toBe("profiler: app");
     const tree = walk(blocks);
-    expect(tree.filter((n) => n.id !== undefined && /^(ov|fr|di|me)-/u.test(n.id)), "none of the panes").toEqual([]);
+    expect(tree.filter((n) => n.id !== undefined && n.id.startsWith("card-")), "none of the deck").toEqual([]);
     expect(tree.filter((n) => n.kind === "plot"), "no plot anywhere in the entry").toEqual([]);
   });
 
@@ -210,8 +219,8 @@ describe("C23 — /profile, the local route", () => {
     h.pipeline.submit("/profile");
     await settled(h.pipeline);
 
-    expect(opened, "asked, for the default pane, and refused").toEqual(["overview"]);
-    expect(view.pane).toBeNull();
+    expect(opened, "asked, for the default section, and refused").toEqual(["verdict"]);
+    expect(view.section).toBeNull();
     expect(h.transcript.entries).toHaveLength(1);
     const found = notices(h.transcript.entries[0]?.doc.blocks ?? []).filter(
       (n) => n.id?.startsWith("profile") === true,

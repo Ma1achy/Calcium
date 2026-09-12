@@ -273,6 +273,14 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   { target: "pushedView", key: { name: "pagedown" }, action: "viewPageDown" },
   { target: "pushedView", key: { name: "up" }, action: "viewPageUp" },
   { target: "pushedView", key: { name: "down" }, action: "viewPageDown" },
+  // **`tab` at a third target** (I33). The prompt's `tab` is `complete` and
+  // `liveBlock`'s is `entryNext`; the three never meet, because the ladder
+  // resolves one target per event and the prompt takes no keys while a view is
+  // top. `⇧tab`'s wire form is `CSI Z`, which the decoder already answers with
+  // `{name: "tab", shift: true}` — proven at `liveBlock` before this row was
+  // written, rather than assumed from the modifier convention.
+  { target: "pushedView", key: { name: "tab" }, action: "viewNextSection" },
+  { target: "pushedView", key: { name: "tab", shift: true }, action: "viewPrevSection" },
   { target: "pushedView", key: { name: "escape" }, action: "viewPop" },
 
   // --- selection (C17 §5b, entry 15 step 2) --------------------------------
@@ -542,6 +550,8 @@ const BUILTIN_ACTIONS: ReadonlySet<string> = new Set(
     viewBottom: true,
     viewPageUp: true,
     viewPageDown: true,
+    viewNextSection: true,
+    viewPrevSection: true,
     viewPop: true,
     enterCopyMode: true,
     exitCopyMode: true,

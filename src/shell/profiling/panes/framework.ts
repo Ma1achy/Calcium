@@ -14,12 +14,8 @@ import type { CommitReason, MissReason, SpanName } from "../types.js";
 import type { CardDraw, CardContext } from "./kit.js";
 import {
   cacheNames, cannotDraw, figureRows, frameSamples, lastRunning, mib, ms,
-  namesAt, nothingYet, plainCounters, quartilesOf, room, spanning,
+  namesAt, nothingYet, NO_DURATIONS, plainCounters, quartilesOf, room, spanning,
 } from "./kit.js";
-
-const NO_DURATIONS =
-  "the tier is below `spans`, so the report omits durations rather than reporting zeroes — " +
-  "a zeroed figure reads as measured-and-fast";
 
 /** The frame-site names with enough per-frame samples to have a shape. */
 const shaped = (ctx: CardContext, least = 5): readonly SpanName[] =>
@@ -385,6 +381,15 @@ const loopUtilisation: CardDraw = (ctx, spec) => {
 const memory: CardDraw = (ctx, spec) => {
   const s = ctx.report.samples;
   if (s.length < 2) return nothingYet(spec, "no resource sample yet — the sampler runs on the injected timer at tier `spans` and above");
+  // **A suspended sample is a stopped clock and not a reading** (C28 I27, F900).
+  // Drawn as the present state, an idle machine and a paused one produce the
+  // same picture, and the one field that separates them was on the sample all
+  // along. With nothing running there is no composition to draw at all — the
+  // series is refused rather than filled from the sample that happens to be
+  // newest, and the footer says how many were suspended when some were.
+  if (lastRunning(ctx.report) === undefined) {
+    return nothingYet(spec, "no sample of a running process — every one was taken while the session was suspended, and a suspended sample's figures are a stopped clock");
+  }
   const G = { form: "stackedarea" as const, axes: true };
   if (!room(ctx, spec, G)) return cannotDraw(ctx, spec);
   return [
@@ -405,6 +410,13 @@ const heapSpaces: CardDraw = (ctx, spec) => {
   const spaces = [...ctx.report.heapSpaces].filter((x) => x.used > 0).sort((x, y) => y.used - x.used);
   if (spaces.length === 0) return nothingYet(spec, "no heap-space reading — the resource probe runs at tier `spans` and above");
   const total = spaces.reduce((n, x) => n + x.used, 0);
+  // **`physical` beside `used`, because the gap between them is the reading the
+  // mosaic cannot draw.** The waffle is a proportion of what is *used*, and a
+  // process holding 40 MiB of committed pages to store 12 MiB of objects is
+  // fragmented rather than large — two different remedies, and one figure alone
+  // names neither. It was the one member of `HeapSpace` no consumer read once
+  // the panes became a deck, which MG24 said on the commit that dropped it.
+  const committed = spaces.reduce((n, x) => n + x.physical, 0);
   return [
     b.plot({
       id: "spaces-waffle", form: "waffle", height: 10,
@@ -413,7 +425,8 @@ const heapSpaces: CardDraw = (ctx, spec) => {
     }),
     b.notice(
       "info",
-      `${mib(total).toFixed(1)} MiB used across ${String(spaces.length)} spaces — old space rising with new space flat is retention; the reverse is churn and no leak`,
+      `${mib(total).toFixed(1)} MiB used of ${mib(committed).toFixed(1)} MiB committed across ${String(spaces.length)} spaces` +
+        ` — old space rising with new space flat is retention, the reverse is churn and no leak, and committed far above used is fragmentation rather than size`,
       undefined, { id: "spaces-note" },
     ),
   ];

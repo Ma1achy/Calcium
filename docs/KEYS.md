@@ -52,8 +52,8 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `ms+right` |  |  |  |  | extendWordRight |  |  |
 | `right` † |  |  |  |  | acceptGhostOrForward | cursorRight |  |
 | `s+right` |  |  |  |  | extendCharRight |  |  |
-| `s+tab` |  |  |  |  |  | entryPrev |  |
-| `tab` † | menuNext |  |  |  | complete | entryNext |  |
+| `s+tab` † |  |  | viewPrevSection |  |  | entryPrev |  |
+| `tab` † | menuNext |  | viewNextSection |  | complete | entryNext |  |
 | `c+u` |  |  |  |  | killToStart |  |  |
 | `s+up` |  |  |  |  |  | extendRowUp |  |
 | `up` † | menuPrev |  | viewPageUp |  | historyPrev | rowUp |  |
@@ -67,4 +67,4 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `{` |  |  |  |  |  | tiltDown |  |
 | `}` |  |  |  |  |  | tiltUp |  |
 
-83 bindings · 60 keys · 14 resolved by the ladder (†).
+85 bindings · 60 keys · 15 resolved by the ladder (†).

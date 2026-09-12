@@ -16,7 +16,7 @@ import { describe, expect, it } from "vitest";
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
 import { toNdjson } from "../../src/shell/profiling/export.js";
 import { createResourceProbe } from "../../src/shell/profiling/node.js";
-import { profilePane } from "../../src/shell/profiling/panes.js";
+import { deckText } from "../support/profile.js";
 import { compareFrames, parseRecording } from "../../src/shell/profiling/replay.js";
 import type { ProfileReport, ResourceSample } from "../../src/shell/profiling/types.js";
 
@@ -335,14 +335,14 @@ describe("C28 — profiler, tier 6 spec-first rows", () => {
     try {
       const running = probe.sample(false, 0);
       const paused = probe.sample(true, 0);
-      const drawn = JSON.stringify(profilePane(reportWith([running, paused]), "memory"));
-      expect(drawn, "the series is declared discontinuous").toContain("1 of them suspended");
+      const drawn = deckText(reportWith([running, paused]));
+      expect(drawn, "the series is declared discontinuous").toContain("1 of 2 suspended");
       expect(drawn, "and the reader is told why that matters").toContain("not continuous");
       // A gap, not a zero: with every sample suspended there is no running
-      // reading to headline and the pane refuses rather than drawing one.
-      const none = JSON.stringify(profilePane(reportWith([paused]), "memory"));
-      expect(none, "it says so").toContain("no reading of a running process");
-      expect(none, "and draws no series at all").not.toContain("me-heap");
+      // reading to headline and the card refuses rather than drawing one.
+      const none = deckText(reportWith([paused]));
+      expect(none, "it says so").toContain("no sample of a running process");
+      expect(none, "and draws no series at all").not.toContain("mem-area");
     } finally {
       probe.dispose();
     }

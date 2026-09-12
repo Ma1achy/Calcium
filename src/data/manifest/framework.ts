@@ -123,22 +123,24 @@ export const FRAMEWORK_TOOLS: readonly ToolDef[] = Object.freeze([
     flags: [],
   }),
   // **The seventh, and the one whose handler needs the root** (C23 §2, C23 I68).
-  // `/profile` opens C28's view; the pane is an `enum` so C05 parses and checks
-  // it before the handler sees it, and `/profile foo` reaches the handler with
-  // `args` empty and answers a usage notice (C22 I66's reason: one reader of
-  // one fact). The four values are C28's `PANES` written down at L0, because
-  // this file may not import L4 — C23 T1.67 holds the two lists equal.
+  // `/profile` opens C28's view; the section is an `enum` so C05 parses and
+  // checks it before the handler sees it, and `/profile foo` reaches the handler
+  // with `args` empty and answers a usage notice (C22 I66's reason: one reader
+  // of one fact). The three values are C28's `SECTIONS` written down at L0,
+  // because this file may not import L4 — C23 T1.67 holds the two lists equal.
+  // They were the four pane names until the deck replaced the panes, and the
+  // rename travelled through T1.67 rather than through a reader noticing.
   Object.freeze({
     name: "profile",
     local: true,
-    summary: "open the profiler's view; `/profile frame` opens it on that pane",
+    summary: "open the profiler's view; `/profile framework` opens it on that section",
     args: [
       Object.freeze({
-        name: "pane",
+        name: "section",
         type: "enum" as const,
         required: false,
-        values: Object.freeze(["overview", "frame", "distribution", "memory"]),
-        summary: "`overview`, `frame`, `distribution` or `memory`; default `overview`",
+        values: Object.freeze(["verdict", "app", "framework"]),
+        summary: "`verdict`, `app` or `framework`; default `verdict`",
       }),
     ],
     flags: [],
