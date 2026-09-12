@@ -157,7 +157,7 @@ This is also what distinguishes `/debug` from `{ } json`, which several surfaces
 ```
 
 **Opening appends a notice and never the live panes** (I68, I69). The cards are C28's
-(`profilePane`, C28 §3c), drawn in a `kind: "view"` layer the view refreshes on a timer, and the
+(`profileDeck`, C28 §3c), drawn in a `kind: "view"` layer the view refreshes on a timer, and the
 entry `/profile` appends says which section opened and nothing more — the entry sits under the
 view anyway, read after `Esc`.
 
@@ -189,13 +189,14 @@ two can be compared and one can go in a bug report.
 configured — a session built without `TuiConfig.profile`, which is every session that did not ask
 (C28 T4.1) — the handler answers a `warn` notice naming `TuiConfig.profile` and opens nothing; there
 is no recorder whose tier could be raised, and C28 §3's *a tier is raised by `/profile`* was a
-sentence with no mechanism behind it (F946). With a pane that is not one of C28's `PANES`,
-validation fails, the handler runs with `args` empty (a local verb is not gated on validation), and
-it answers a usage notice naming the four and the token typed — `/theme`'s arm, one verb over. With
+sentence with no mechanism behind it (F946). With a token that is neither one of C28's `SECTIONS`
+nor one of the two document verbs, validation fails, the handler runs with `args` empty (a local
+verb is not gated on validation), and it answers a usage notice naming the five and the token typed
+— `/theme`'s arm, one verb over. With
 another layer up, it answers the view's own refusal string, *close what is open*, as `document-view`
 does (C15 I1's refusal is a throw, and a handler is nowhere to report one).
 
-**The pane comes from `ctx.args`, never from `argv[0]`** (C22 I66), for `/theme`'s reason: C05
+**The section comes from `ctx.args`, never from `argv[0]`** (C22 I66), for `/theme`'s reason: C05
 parsed and enum-checked it, and a second reader of one fact drifts from the first. `argv[0]` is read
 on the failure arm alone, to quote the token.
 
@@ -207,8 +208,12 @@ function, because a consumer's own handler reading it is the case that seam was 
 context.
 
 **The seventh row, and the reconciliation that holds it.** `/profile` is a framework verb: its row is
-in `FRAMEWORK_TOOLS` (C05 §3) with `pane` as an optional `enum` whose four values are C28's `PANES`
-written at L0 — the manifest may not import the shell, so T1.67 holds the two lists equal — and
+in `FRAMEWORK_TOOLS` (C05 §3) with `section` as an optional `enum` and `card` as an optional string.
+The enum's values are C28's three `SECTIONS` **and the two document verbs** — `snapshot` and `live`
+(I69, amended) — written at L0, because the manifest may not import the shell; T1.67 holds the list
+equal to `SECTIONS` plus those two rather than to `SECTIONS` alone, since an equality against the
+sections would go green the day a verb was dropped from the enum and left the completion menu short
+of it. And
 `execution.ts` hands the root's view to `shippedHandlers`. I27 refuses a handler with no row and a row
 with no handler, in either order, so `HandlerDeps.profileView` is required and the view arrives
 whether or not a recorder does; with none it refuses through the route (T4.67). The handler was
@@ -216,8 +221,11 @@ included only when a view was handed in for the one round in which the row and t
 outside the files being edited, so that a tree with neither was exactly the six; T4.66 and T4.67 went
 live when the row landed and that conditional went with it.
 
-Inside the view, `n`/`p` switch panes, `g`/`G` and the page keys move the window, `Esc` closes and
-the ⌃c ladder pops it — C16's `pushedView` bindings, none new (C28 §3c).
+Inside the view, `n`/`p` walk the deck a card at a time and cross the group boundaries, `Tab`/`⇧Tab`
+move a whole group, `g`/`G` and the page keys move the window, `Esc` closes and the ⌃c ladder pops it
+— C16's `pushedView` bindings, **one gesture added** and added at the target rather than for the
+profiler: `Tab` means *the next section* to all three owners, a file to the patch view and a heading
+to the document view (C16 I33, C28 §3c).
 
 ---
 
@@ -2147,12 +2155,12 @@ Fake transport, fake stores.
 - **T1.61** (C23 I24): no `raw` block with empty or newline-only text is composed in `execution.ts` or `refresh.ts`, with a control showing the pattern fires on one. **The rule has teeth in one direction only** — C23 may not *add* rhythm — so the positive half is asserted too: `gapBefore` is set where documents are composed, in the local handlers, and nowhere in the routing, which is the division the invariant describes.
 - **T1.62** (C23 I23): `/debug`'s body reaches no transport — asserted on a **reach** (`deps.transport`, `.invoke(`, `.stream(`, `.submit(`) rather than on the noun, because the handler reads `entry.doc.meta` and prints `transport` as a row label, which is the one thing I23 says it *should* do. A `/debug` that re-invoked would produce a document agreeing with itself and disagreeing with the entry it claims to describe, and every assertion about its contents would pass.
 - **T1.63** (C23 I13): MG23 is run over the real `src/shell` tree and reports nothing. Its fabricated violation is asserted in `enforce-rules.test.ts`; what is owed here is that the rule is **live on the tree**, because a rule that fires on a fabrication and is scoped to nothing reports zero for both reasons.
-- **T1.64** (I68): `shippedHandlers` with a view handed in whose `open` refuses naming `TuiConfig.profile` → `/profile` answers a `warn` notice carrying that name, and the view's `open` was called once with `overview`; `shippedHandlers` with **no** view handed in → the map holds the six and no `profile` key, so a tree without the manifest row registers nothing I27 would refuse. **Both arms**, because the transitional conditional is a birthday clause and this is the row that watches it.
-- **T1.65** (I68, C22 I66): `/profile frame` with `args: { pane: "frame" }` → the view opened on `frame` and the notice names it; `/profile foo` with `args` empty and `argv: ["foo"]` → a usage notice naming all four of C28's `PANES` and the token `foo`, and the view's `open` was not called. **The pane is asserted to come from `args`**: a handler reading `argv[0]` passes the first arm and is caught by the second only because the usage text quotes the token — so the row also feeds `argv: ["memory"]` with `args: { pane: "frame" }` and expects `frame`.
+- **T1.64** (I68, I27): `shippedHandlers` with a view handed in whose `open` refuses naming `TuiConfig.profile` → `/profile` answers a `warn` notice carrying that name, and the view's `open` was called once with `verdict`, the deck's first section. **And the map holds seven whatever the view answers**: the row is in `FRAMEWORK_TOOLS` and I27 refuses a row with no handler at every startup, so `HandlerDeps.profileView` is required and a map that dropped `profile` on any condition is unconstructible. The second arm watched the transitional conditional that preceded that — a birthday clause, now gone with it.
+- **T1.65** (I68, C22 I66): `/profile framework` with `args: { section: "framework" }` → the view opened on `framework` and the notice names it; `/profile foo` with `args` empty and `argv: ["foo"]` → a usage notice naming C28's three `SECTIONS`, the two document verbs and the token `foo`, and the view's `open` was not called. **The section is asserted to come from `args`**: a handler reading `argv[0]` passes the first arm and is caught by the second only because the usage text quotes the token — so the row also feeds `argv: ["framework"]` with `args: { section: "app" }` and expects `app`.
 - **T1.66** (I69): the document bare `/profile` appends holds one `notice` and no card — no block whose id carries a card's prefix and no `plot` — asserted over the document's block tree rather than its length, because a notice wrapping a panel of plots is one block too.
 - **T1.66b** (I69): `/profile snapshot` appends a document whose panel title carries all four stamp fields — the frame range, the elapsed time, the tier and the ring's reset point — and which holds no live part; `/profile live` appends one that is a live part with a cadence and **no** stamp. Asserted by reading the title's fields rather than by matching the rendered string, so a reworded stamp fails only when a field goes missing.
 - **T1.66c** (I69): `/profile live` at every tier calls `setTier` zero times, and at `off` the appended part's first render is C28's *raise the tier* notice rather than a figure. The second half is what makes the first testable — a verb that raises nothing and also draws nothing would satisfy the count and answer nobody.
-- **T1.67** (I68, C05 §3): `FRAMEWORK_TOOLS`' `profile` row is `local`, takes one optional `enum` argument named `pane`, and its `values` equal C28's `PANES` member for member; and the seven names are the six and `profile`. The L0 copy of an L4 list, held equal by the only file that may import both.
+- **T1.67** (I68, C05 §3): `FRAMEWORK_TOOLS`' `profile` row is `local` and takes two optional arguments — `section`, an `enum`, and `card`, a string — and the enum's `values` equal C28's `SECTIONS` followed by `snapshot` and `live`, member for member; and the seven names are the six and `profile`. The L0 copy of an L4 list, held equal by the only file that may import both. **The two verbs are in the equality and not excused from it**: the enum holds two kinds of value, and a row asserting the sections alone passes on a menu that has lost a verb.
 ### Tier 2 — contract / interface
 
 - **T2.1** (I2): a fault injected at each of the eight stages in §5 → a document is appended and the session survives, eight times.

@@ -1457,7 +1457,7 @@ export async function constructGraph(
    * bracket. Nothing about the seam changed for this — which was the point of
    * writing it that way.
    *
-   * `detection.capabilities` whole (C09 I49, F828): `profilePane`'s ASCII
+   * `detection.capabilities` whole (C09 I49, F828): `profileCard`'s ASCII
    * default is for a caller with no terminal, and this one has the resolved
    * record — after C22 I49's overrides, as every other consumer here takes it.
    */

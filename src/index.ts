@@ -393,7 +393,7 @@ export type { TerminalCapabilities } from "./terminal/capabilities.js";
 /**
  * The two capability fields a glyph resolution reads (C24 I29, MG29).
  *
- * Published because `profilePane` takes one, and a consumer with no name for a
+ * Published because `profileCard` takes one, and a consumer with no name for a
  * parameter's type cannot supply it. A whole `TerminalCapabilities` satisfies
  * it, which is what the one caller inside the framework — C28 §3c's view, which
  * hands over `detection.capabilities` whole — does.

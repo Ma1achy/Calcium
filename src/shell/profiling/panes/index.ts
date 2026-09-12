@@ -168,8 +168,8 @@ const footerOf = (spec: CardSpec, ctx: CardContext): string => {
 /**
  * One card, drawn.
  *
- * Unknown ids fall to the verdict rather than to nothing — the same rule
- * `profilePane` has always had, for the same reason: a view that renders empty
+ * Unknown ids fall to the verdict rather than to nothing — the rule the panes
+ * this replaces had, for the same reason: a view that renders empty
  * on a typo is indistinguishable from one whose timer has stopped.
  */
 export function profileCard(

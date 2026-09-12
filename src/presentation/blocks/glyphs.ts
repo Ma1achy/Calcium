@@ -304,7 +304,7 @@ export const SUBSTITUTIONS: readonly (readonly [string, string])[] = Object.free
  * What resolving a glyph actually needs — two fields of `TerminalCapabilities`.
  *
  * **Named rather than written inline**, because `glyphs` is not the only caller
- * any more: `profilePane` takes one and is exported, and MG29 is right that a
+ * any more: `profileCard` takes one and is exported, and MG29 is right that a
  * consumer with no name for a parameter's type cannot supply it. Every existing
  * caller hands over a whole capability record, which this still accepts — the
  * in-tree caller is `shell/profile-view.ts`, handing `detection.capabilities`

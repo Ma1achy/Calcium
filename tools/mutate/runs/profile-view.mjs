@@ -215,7 +215,7 @@ const results = runPass({
       expect: "T1.98",
     },
     {
-      // C28 I51, C09 I49, F828 — `profilePane`'s ASCII default on a terminal that
+      // C28 I51, C09 I49, F828 — `profileCard`'s ASCII default on a terminal that
       // has capabilities of its own. Three rows on the hand pass, T4.9 through
       // the graph's resolved record.
       name: "the card takes the deck's default caps",
