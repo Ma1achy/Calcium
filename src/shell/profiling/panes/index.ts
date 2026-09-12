@@ -99,7 +99,14 @@ const footerOf = (spec: CardSpec, ctx: CardContext): string => {
   // and loop cards cover the last minute or so and not the session — a bound
   // as easy to read past as the frame ring's, and with nothing else on the card
   // to state it.
-  else if (spec.draws.includes("samples")) {
+  //
+  // **And it is its own `if`, not the chain's `else`** (F1143). `vitals` draws
+  // the frame ring *and* the resource ring — four horizons sharing an x axis —
+  // and declares both; behind an `else if` on the span site, its resource bound
+  // was stated nowhere, and on a report with no sampler it drew one curve of
+  // four with nothing saying the other three had no data. A card can have two
+  // populations, and a chain that names one is a chain that hides the other.
+  if (spec.draws.includes("samples")) {
     parts.push(
       `${String(r.samples.length)} resource samples` +
         (r.dropped.samples > 0 ? `, ${String(r.dropped.samples)} dropped past the ring` : ""),
@@ -115,7 +122,12 @@ const footerOf = (spec: CardSpec, ctx: CardContext): string => {
         `${String(asleep)} of ${String(r.samples.length)} suspended${ctx.sep}the series is not continuous`,
       );
     }
-  } else parts.push(`the session so far${ctx.sep}${ms(r.regime.durationMs)} ms`);
+  }
+  // The fallback is *no population named at all*, which is now a question about
+  // both clauses rather than the tail of one chain.
+  if (spec.site === "none" && !spec.draws.includes("samples")) {
+    parts.push(`the session so far${ctx.sep}${ms(r.regime.durationMs)} ms`);
+  }
   // **The resolution travels beside the figure** (C28 I13). A p50 of 0.00 ms at
   // a 10 ms resolution is a floor and not a reading, and the two are compared
   // across runs by a reader who has no way to know they cannot be. The newest

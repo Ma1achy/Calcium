@@ -324,6 +324,39 @@ describe("C28 §3c — the deck, every card", () => {
     expect(after.worst[2]?.seq, "the naive address moved frame").not.toBe(third?.seq);
   });
 
+  it("T1.121 (C28 I57, F1142, F1143): a card declaring two populations states both, and one declaring one states one", () => {
+    const report = reportOf("full");
+    const footerOf = (id: string): string => {
+      const panel = profileCard(report, id, REGIONS[1], ASCII_CAPS)[0];
+      const f = (panel as { footer?: string }).footer;
+      if (f === undefined) throw new Error(`no footer on ${id}`);
+      return f;
+    };
+
+    // **Over the register, not over `vitals` by name.** One card draws two
+    // rings today; the day a second does is the day a row naming this one stops
+    // covering the claim.
+    const both = CARDS.filter((c) => c.site !== "none" && c.draws.includes("samples"));
+    expect(both.length, "the deck has a card with two populations").toBeGreaterThan(0);
+    for (const spec of both) {
+      const footer = footerOf(spec.id);
+      expect(footer, `${spec.id} states its span population`).toContain(`${spec.site}-site spans`);
+      expect(footer, `${spec.id} states its resource population too`).toContain("resource samples");
+    }
+
+    // **The control**: a card declaring one of them carries that clause and not
+    // the other. A footer printing every clause unconditionally satisfies the
+    // first half and tells a reader of `where-the-frame-went` how many resource
+    // samples there are, which is a number about a ring it never touches.
+    const spansOnly = CARDS.filter((c) => c.site !== "none" && !c.draws.includes("samples"));
+    expect(spansOnly.length, "and cards with one").toBeGreaterThan(0);
+    for (const spec of spansOnly) {
+      expect(footerOf(spec.id), `${spec.id} says nothing of a ring it does not read`).not.toContain(
+        "resource samples",
+      );
+    }
+  });
+
   it("T1.120 (C28 I41, C28 I57, F1142): a session-site name yields no per-frame series, on a report that has one in its frames", () => {
     // **A session-site span closed inside a frame**, which is the state the
     // filter exists for: `frameSpans` accumulates whatever closed since the
