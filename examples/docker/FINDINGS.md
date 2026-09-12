@@ -49733,3 +49733,35 @@ the generator then made *one* population per card structurally unstateable.
 **What made it findable was reading the frame**, not the numbers: every row over this
 card passes, because every row asks whether the footer contains the clause the card is
 *declared* to have.
+
+## F1144 — the scatter has no per-point x, so `cost-per-unit` answers a one-dimensional question ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/data/viewmodel/types.ts`'s series contract · `src/shell/profiling/panes/app.ts`'s `costPerUnit` · C12 |
+| **Reached for** | Reading the rendered deck at 140 columns — the x axis read `0 … 19` |
+| **Verdict** | **open** — the card is honest about what it draws and the question it was designed for is not expressible |
+
+The card's question is two-dimensional by design: **expensive per unit** against **how
+many units**, so that the defect sits up and to the left and a big block sits bottom
+right and is nobody's bug. A table sorted by either buries the other, which is the
+whole argument for a scatter here.
+
+**A `Series` is `values: readonly (number | null)[]` and nothing else.** The abscissa
+is `xMin … xMax` spread **evenly by index** when declared, and the sample index
+otherwise — measured across the type: no form in the library takes a per-point `x`.
+So `costPerUnit` plots `self / calls` against the element's **ordinal position in the
+array**, with `calls` reaching the figure only as the `sizes` channel's area.
+
+Read on the frame: twenty elements, an x axis reading `0` to `19`. Every point is
+correctly placed and the axis is a list index wearing a log scale.
+
+**The card is not wrong about what it draws** — its footer and its question are what
+disagree, and the question is the one the plan wrote it for. The two honest options
+are a `sizes`-only reading (rename the question to what a one-dimensional scatter can
+say) or a per-point x on `Series`, which is a C12 change with every form's layout
+behind it.
+
+**What made it findable was reading the axis rather than the ink.** Every row over
+this card passes: it builds, it draws, it names itself, it refuses below its floor,
+and the register's `draws` list is correct. Nothing asserts what the abscissa *means*.

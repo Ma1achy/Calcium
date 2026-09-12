@@ -301,6 +301,16 @@ const elementsRanked: CardDraw = (ctx, spec) => {
  * `sizes` rather than a second series, because `bubble` takes exactly one — so
  * the third channel is the size and the form stays `scatter`.
  */
+/**
+ * **The abscissa is the element's ordinal, not its call count** (F1144).
+ *
+ * The question this card was designed for is two-dimensional — cost per unit
+ * against how many units — and a `Series` is `values` and nothing else: the x
+ * domain is `xMin … xMax` spread evenly by index. `calls` therefore reaches the
+ * figure through `sizes` alone, as area, and the reading *up and to the left* is
+ * not available. Left as it stands with the finding filed rather than worked
+ * around; the remedy is a per-point x on `Series`, which is C12's to make.
+ */
 const costPerUnit: CardDraw = (ctx, spec) => {
   const nodes = ctx.report.nodes.filter((n) => n.calls > 0 && n.self > 0);
   if (nodes.length < 2) return nothingYet(spec, "fewer than two measured elements — a scatter of one point is a number");
