@@ -20,6 +20,7 @@ import type { CommitReason, ProfileReport, Profiler, Tier } from "../../src/shel
 import {
   CARDS, DRAWN_CARD_IDS, REGISTERED_CARD_IDS, SECTIONS, cardsOf, profileCard,
 } from "../../src/shell/profiling/panes/index.js";
+import { frameSamples } from "../../src/shell/profiling/panes/kit.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { ASCII_CAPS, FULL_CAPS, measurable } from "../support/render.js";
@@ -115,6 +116,17 @@ const reportOf = (name: keyof typeof FIXTURES): ProfileReport => {
   f.seed(p);
   return p.report();
 };
+
+/**
+ * Every block in a card's tree — **a card is a `panel`**, so its figure is a
+ * child and a filter over the top level is an absence assertion over a corpus
+ * the reader never descended into.
+ */
+const flat = (blocks: readonly Block[]): readonly Block[] =>
+  blocks.flatMap((blk) => [
+    blk,
+    ...("children" in blk && Array.isArray(blk.children) ? flat(blk.children as Block[]) : []),
+  ]);
 
 /** Every block of a card, flattened — a panel's children are not a string. */
 const linesOf = (blocks: readonly Block[], width: number): readonly string[] => {
@@ -235,6 +247,150 @@ describe("C28 §3c — the deck, every card", () => {
     for (const name of Object.keys(FIXTURES)) {
       const lines = linesOf(profileCard(reportOf(name), "verdict", REGIONS[0], ASCII_CAPS), 80);
       expect(lines.length, `the verdict on the ${name} report`).toBeLessThanOrEqual(23);
+    }
+  });
+
+  it("T1.109 (C28 I57): past the ring, one span's two populations differ in size and say so on two cards", () => {
+    // **A session longer than the ring**, which is the only state in which the
+    // two extractors can be shown to be two: below 512 frames the histogram's
+    // count and the sample series' length agree, and a deck that read one
+    // population for both would pass every assertion.
+    const p = createProfiler({ tier: "spans" }, { elapsed: counterClock() });
+    for (let i = 0; i < 600; i += 1) frameOf(p, "input", true, i);
+    const report = p.report();
+
+    expect(report.dropped.frames, "the ring overflowed").toBeGreaterThan(0);
+    expect(report.timeline.length, "and holds its cap").toBe(512);
+
+    const hist = report.spans?.["compose"];
+    expect(hist, "the histogram is unbounded since the tier was set").not.toBeUndefined();
+    const samples = frameSamples(report, "compose");
+    expect(hist?.count, "the histogram counted every close").toBe(600);
+    expect(samples.length, "the ring kept the last 512").toBe(512);
+    // **The difference is the assertion.** Two figures of the same name over
+    // populations of different sizes, from one report — C28 I57's whole claim, and
+    // the thing a card silently picking either would hide.
+    expect(hist?.count).not.toBe(samples.length);
+
+    // And the two cards say which they drew, in words that differ.
+    const ring = linesOf(profileCard(report, "span-shapes", REGIONS[1], ASCII_CAPS), 120).join("\n");
+    const session = linesOf(profileCard(report, "far-side-cost", REGIONS[1], ASCII_CAPS), 120).join("\n");
+    expect(ring, "the ring card names the ring and its overflow").toContain("frames in the ring");
+    expect(ring).toContain("dropped past it");
+    expect(session, "the session card names every close").toContain("every close since the tier was set");
+    expect(ring, "and the two are not the same sentence").not.toBe(session);
+  });
+
+  it("T1.110 (C28 I58): a recomputed `worst` moves the position and not the card, and the naive address is the control", () => {
+    // **One report pair**, which is what makes the control readable: the same
+    // two reports drive both the address the deck uses and the address it
+    // refuses to use, so the difference is the addressing and nothing else.
+    const p = createProfiler({ tier: "spans" }, { elapsed: counterClock() });
+    for (let i = 0; i < 20; i += 1) frameOf(p, "input", true, i);
+    const before = p.report();
+    const third = before.worst[2];
+    expect(third, "three frames retained").not.toBeUndefined();
+
+    // **A slower frame arrives, and it has to be genuinely slower**: the clock
+    // is a counter, so a frame's cost is the number of reads inside it — a
+    // second batch of the same shape is the same cost, and `worst` would not
+    // move. Sixteen extra spans is what makes these the worst frames rather
+    // than merely the latest, and the row's first assertion is what caught the
+    // version that did not.
+    for (let i = 0; i < 6; i += 1) {
+      p.commit("stream", false);
+      p.beginFrame("stream");
+      for (let k = 0; k < 16; k += 1) {
+        using _slow = p.span("compose");
+      }
+      p.endFrame("frame");
+    }
+    const after = p.report();
+    expect(after.worst.map((f) => f.seq), "the set moved").not.toEqual(before.worst.map((f) => f.seq));
+
+    // **The card holds a `seq`**, so it draws the frame it named or says it is
+    // gone. Either answer is honest; silently drawing a neighbour is not.
+    const held = String(third?.seq ?? -1);
+    const drawn = linesOf(profileCard(after, "element-tree", REGIONS[1], ASCII_CAPS, third?.seq), 120).join("\n");
+    if (after.worst.some((f) => f.seq === third?.seq)) {
+      expect(drawn, "still the frame it named").toContain(`seq ${held}`);
+    } else {
+      expect(drawn, "or named as gone, never replaced").toContain("has left the retained set");
+    }
+
+    // **The control, on the same pair**: position 2 of the recomputed set is a
+    // different frame, and a card addressed that way would have changed what it
+    // shows with nothing on screen saying so.
+    expect(after.worst[2]?.seq, "the naive address moved frame").not.toBe(third?.seq);
+  });
+
+  it("T1.120 (C28 I41, C28 I57, F1142): a session-site name yields no per-frame series, on a report that has one in its frames", () => {
+    // **A session-site span closed inside a frame**, which is the state the
+    // filter exists for: `frameSpans` accumulates whatever closed since the
+    // last reset, so `route` lands in the `FrameRecord` of the window it
+    // happened to close in — the window, not a measurement of it (F888's
+    // −460.5 ms residue).
+    const p = createProfiler({ tier: "spans" }, { elapsed: counterClock() });
+    for (let i = 0; i < 4; i += 1) {
+      p.commit("input", false);
+      p.beginFrame("input");
+      {
+        using _c = p.span("compose");
+      }
+      {
+        // Opened and closed inside the frame, and still a session-site name.
+        using _r = p.span("route");
+      }
+      p.endFrame("frame");
+    }
+    const report = p.report();
+
+    // **The precondition, asserted before the absence.** An empty answer from a
+    // report that never held the name is the same green for the opposite
+    // reason, and that is the version of this row that would have passed with
+    // the filter deleted.
+    const inFrames = report.timeline.filter((f) => (f.spans["route"] ?? 0) > 0);
+    expect(inFrames.length, "the fixture put a session-site span in the frames").toBeGreaterThan(0);
+    expect(frameSamples(report, "compose").length, "and the frame-site name is there to be read").toBe(4);
+
+    // The claim.
+    expect(frameSamples(report, "route"), "a session-site name has no per-frame series").toEqual([]);
+  });
+
+  it("T1.112 (C28 I60): every card with a floor names it below one, and none of them does above", () => {
+    // T3.22 asserts the population moves — more than ten refuse when cramped,
+    // none when roomy. **This is the per-card form of the same claim**, and the
+    // stronger half: the exception is what a count cannot see, and a card that
+    // drew a zero instead of a refusal is exactly the card a reader would act
+    // on.
+    const report = reportOf("full");
+    const withFloor = CARDS.filter((c) => c.floor > 1);
+    expect(withFloor.length, "most of the deck declares a floor").toBeGreaterThan(20);
+
+    const cramped = { w: 80, rows: 3 } as const;
+    for (const spec of withFloor) {
+      const blocks = profileCard(report, spec.id, cramped, ASCII_CAPS);
+      // **No figure, in either honest form.** A card refuses for the floor —
+      // *has 3 rows and has* — or for the datum, when there is nothing to draw
+      // before the room question arises; `counters-over-time` is the second on
+      // this fixture, and a row demanding the floor sentence from every card
+      // would be asserting that the deck checks room before data.
+      expect(
+        flat(blocks).filter((blk) => blk.kind === "plot"),
+        `${spec.id} draws no figure at 3 rows, whichever refusal it has`,
+      ).toEqual([]);
+      const text = linesOf(blocks, 80).join("\n");
+      expect(text, `${spec.id} names itself while refusing`).toContain(spec.id);
+      expect(text.trim(), `${spec.id} says something rather than drawing nothing`).not.toBe("");
+    }
+
+    // The control, per card rather than as a count: the same deck where every
+    // floor is met refuses nothing, so a kit that refused everything fails here
+    // rather than passing twice.
+    const roomy = { w: 120, rows: 44 } as const;
+    for (const spec of CARDS) {
+      const text = linesOf(profileCard(report, spec.id, roomy, ASCII_CAPS), 120).join("\n");
+      expect(text, `${spec.id} builds where its floor is met`).not.toContain("rows and has");
     }
   });
 
