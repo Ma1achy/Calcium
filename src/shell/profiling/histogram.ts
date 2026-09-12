@@ -69,12 +69,30 @@ export class Hist {
       });
     }
     const keys = [...this.#counts.keys()].sort((a, b) => a - b);
+    /**
+     * **The bucket's midpoint, not its lower edge** (C28 I10, F1140).
+     *
+     * `error` is published as *half a sub-bucket at the widest*, and an edge
+     * makes that claim false in one direction: the observation is somewhere in
+     * `[edge, edge + width)`, so an estimate at the edge is up to a **full**
+     * bucket low and never high. Measured on 1–100 ms, one observation each:
+     * `q1` read 24.576 against a true 25, which is 1.70% — outside the
+     * published 1.5625% and outside it downward every time.
+     *
+     * The midpoint makes the published bound exact rather than optimistic:
+     * within an octave the buckets are evenly spaced, so half a width is half a
+     * sub-bucket, which is what `HISTOGRAM_ERROR` says. Clamped into
+     * `[min, max]` because those two are the true observed values (above) and a
+     * top bucket's midpoint can sit past the largest thing ever measured.
+     */
+    const mid = (k: number): number =>
+      Math.min(this.#max, Math.max(this.#min, (valueOf(k) + valueOf(k + 1)) / 2));
     const at = (q: number): number => {
       const target = Math.max(1, Math.ceil(q * this.#n));
       let seen = 0;
       for (const k of keys) {
         seen += this.#counts.get(k) ?? 0;
-        if (seen >= target) return valueOf(k);
+        if (seen >= target) return mid(k);
       }
       return this.#max;
     };

@@ -16,9 +16,15 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { BUDGET, REPEATED_ABOVE, checkBudget, checkElementCost, checkEntryCost, checkLeaks, checkPhases, formatBudget, formatElementCost, formatEntryCost, formatLeaks } from "../../src/testing/index.js";
+import { plotDefinition } from "../../src/presentation/plot/index.js";
+import { b } from "../../src/shell/builders/index.js";
+import { Hist } from "../../src/shell/profiling/histogram.js";
+import { summaryOf } from "../../src/shell/profiling/panes/kit.js";
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
 import { SPAN_SITE } from "../../src/shell/profiling/types.js";
 import type { Histogram, ProfileReport, SpanName, TreeNode } from "../../src/shell/profiling/types.js";
+import type { QuartileSummary } from "../../src/data/viewmodel/index.js";
+import { measurable } from "../support/render.js";
 import { buildSession } from "../support/session.js";
 import { fakeStdin } from "../support/fake-terminal.js";
 
@@ -856,8 +862,113 @@ describe("C28 I55 — every computed section of the report comes from a check/fo
     expect(at(2).threshold, "published on what the check returns").toBe(REPEATED_ABOVE);
   });
 
-  // **Spec-first, so the row is here and unbuilt** (SP9). `q1`/`q3` land with the
-  // front end that needs them; the row exists now because an invariant with no
-  // row is the signature A03 §2 is written about.
-  it.todo("T1.108 (C28 I56): a Hist answers q1 and q3 at the population's quartiles, and the summary built from a snapshot is accepted by b.plot on boxplot, violin, forest and bullet — not deferred on a component; the pair is exercised by this round's own cards and lands with them");
+  it("T1.108 (C28 I56): a `Hist` answers `q1` and `q3` at the population's quartiles, and `summaryOf` is accepted by `b.plot` on all four quartile forms", () => {
+    // **A population whose quartiles are known by construction.** 1 to 100 ms,
+    // one observation each, so q1 is 25, the median 50 and q3 75 — and the
+    // reading is checked against **the histogram's own declared error** rather
+    // than exactly: the buckets are logarithmic and `at` returns a bucket's
+    // lower edge, so an exact assertion would be about the bucket layout and
+    // not about the quantile.
+    const h = new Hist();
+    for (let ms = 1; ms <= 100; ms += 1) h.add(ms);
+    const snap = h.snapshot();
+
+    const near = (got: number, want: number, what: string): void => {
+      expect(
+        Math.abs(got - want) / want,
+        `${what}: ${String(got)} against ${String(want)}, within the declared ${String(snap.error)}`,
+      ).toBeLessThanOrEqual(snap.error);
+    };
+    near(snap.q1, 25, "q1");
+    near(snap.p50, 50, "the median");
+    near(snap.q3, 75, "q3");
+
+    // **The ordering, which the three readings above cannot fail together.** A
+    // pair computed at the wrong quantiles — `at(0.75)` in both slots, say —
+    // satisfies neither bound above, but a pair swapped satisfies both bounds
+    // read as a set. Monotonicity is what says they are in their own places.
+    expect(
+      [snap.min, snap.q1, snap.p50, snap.q3, snap.p95, snap.p99, snap.max],
+      "the seven order statistics are ordered",
+    ).toEqual([...[snap.min, snap.q1, snap.p50, snap.q3, snap.p95, snap.p99, snap.max]].sort((a, b) => a - b));
+
+    // **`q3` is not `p95`**, which is the substitution C28 I56 exists to remove:
+    // a summary taking `p95` for `q3` passes every bound-free assertion about
+    // a five-number summary and draws a box half again too tall.
+    expect(snap.q3, "and the pair is not the percentiles wearing another name").not.toBe(snap.p95);
+
+    // --- the second half: the four forms accept it ---------------------------
+    //
+    // **Through `b.plot` and not through the type**, because the contract is
+    // refuse-never-ignore (C04): a summary the builder rejects is a throw here,
+    // and `q1`/`q3` existing on the type says nothing about that.
+    const q = summaryOf(snap);
+    expect([q.min, q.q1, q.median, q.q3, q.max], "the five, in order").toEqual(
+      [q.min, q.q1, q.median, q.q3, q.max].slice().sort((a, b) => a - b),
+    );
+
+    // **A real series, built from the same snapshot** — `violin` estimates its
+    // density from samples and `bullet` draws an actual against the bands.
+    const series = [{ label: "now", values: [snap.p50] }];
+    const { renderToLines } = measurable({ definitions: [plotDefinition] as never[] });
+    /**
+     * **Two categories, one of them fixed**, and the reference is what makes
+     * the reading possible: with one category every one of these forms
+     * normalises the axis to its own summary, so a figure drawn from a summary
+     * a quarter as wide is identical pixel for pixel and *responds to the
+     * summary* is unaskable. The second category pins the domain.
+     */
+    const REFERENCE: QuartileSummary = { min: 0, q1: 10, median: 20, q3: 30, max: 40, mean: 20 };
+    const figure = (form: string, summary: QuartileSummary): string =>
+      renderToLines(
+        b.plot({
+          form,
+          height: 8,
+          categories: ["compose", "reference"],
+          quartiles: [summary, REFERENCE],
+          // `violin` estimates its density from samples and `bullet` draws an
+          // actual against the bands; the other two read the summary alone.
+          series: form === "violin" || form === "bullet" ? series : [],
+        } as never),
+        40,
+      ).join("\n");
+
+    // **Rendered, not merely constructed** — and this arm was `not.toThrow()`
+    // first, which is the vacuity class with a picture on it. Measured: all four
+    // forms accept `quartiles: []`, and all four accept a summary whose `q1` is
+    // above its `q3`. `b.plot` refuses nothing here, so *it did not throw* is an
+    // assertion about the population being empty.
+    //
+    // What is real is that the figure **responds** to the five numbers: drawn
+    // against a summary a quarter as wide, every one of the four changes.
+    // **All five numbers, not `q1`/`q3` alone.** A `forest` draws its interval
+    // from `min`/`max` and its point from the median, so a summary differing
+    // only in its quartiles is the same figure — a fact about the form rather
+    // than a defect, and a row varying the pair alone reads it as one.
+    const narrow: QuartileSummary = {
+      min: q.median * 0.9, q1: q.median * 0.97, median: q.median,
+      q3: q.median * 1.03, max: q.median * 1.1, mean: q.median,
+    };
+    for (const form of ["boxplot", "forest", "bullet"] as const) {
+      const wide = figure(form, q);
+      expect(wide.trim(), `${form} drew something`).not.toBe("");
+      expect(figure(form, narrow), `${form} reads the summary rather than ignoring it`).not.toBe(
+        wide,
+      );
+    }
+
+    // **`violin` is the fourth form and it is asserted differently, because it
+    // does not read the summary here** — F1141, filed rather than worked
+    // around. Its rung ladder falls to the box exactly when there are too few
+    // samples to estimate a density, and then scales that box to the *samples'*
+    // extent; at one sample that extent is a point, so the box collapses and
+    // the five numbers it was handed are invisible. With sixty samples it
+    // responds. So what this row asserts of `violin` is what is true: it draws,
+    // and the figure is not the summary's.
+    expect(figure("violin", q).trim(), "violin draws").not.toBe("");
+    expect(
+      figure("violin", narrow),
+      "and at one sample it draws the samples, not the summary — F1141",
+    ).toBe(figure("violin", q));
+  });
 });
