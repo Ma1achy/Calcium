@@ -1181,3 +1181,9 @@ describe("plot — the surface carrier", () => {
     expect(byVertex, "and a vertex normal answers differently").not.toEqual(set("smooth"));
   });
 });
+
+describe("C12 I126 — one view-space transform per vertex per render (F1152)", () => {
+  it.todo("PM1 (C12 I126): viewOf(basis).at(p) is keyed on identity and equals project/dot/viewDir — not deferred on a component: lands with F2's code in the next commit");
+  it.todo("PM2 (C12 I126): drawTri with a shared View writes the same depth and samples as with none, across WF8's near-plane fixture — not deferred on a component: lands with F2's code in the next commit");
+});
+
