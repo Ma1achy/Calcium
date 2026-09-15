@@ -28,6 +28,7 @@ import { clampSpans, paint, rows, tone } from "./paint.js";
 import { truncate } from "../text.js";
 import { statusDefinition, statusRowsFor } from "./kinds/status.js";
 import type {
+  MeasureMemo,
   AnyBlockDefinition,
   BlockDefinition,
   BlockFault,
@@ -205,17 +206,24 @@ class Registry implements BlockRegistry {
    * carries the fitted request (I34) and a memoised fault would leave every
    * report at `rows: 0`.
    */
-  #memo: Map<Block, Readonly<{ width: number; rows: number }>> | null = null;
+  #memo: MeasureMemo | null = null;
 
   /**
    * Run `work` inside the current call's memo, opening one if this is the
    * outermost public member and closing it on the way out — **on the throw path
    * too**, or a loud sink's throw would leave the map open for the next call to
    * read from (T3.80).
+   *
+   * **The caller's memo, when it hands one, is the call's** (I70). It is read
+   * and written exactly as a fresh one would be and the field is cleared on
+   * the way out the same way, so nothing here outlives the call; what outlives
+   * it is the caller's object, which the caller owns (C22 I100). A memo handed
+   * to a member entered from inside another member is ignored — the outer
+   * call's memo is already open and the answers have to agree with it.
    */
-  #scoped<T>(work: () => T): T {
+  #scoped<T>(work: () => T, memo?: MeasureMemo): T {
     if (this.#memo !== null) return work();
-    this.#memo = new Map();
+    this.#memo = memo ?? new Map();
     try {
       return work();
     } finally {
@@ -541,8 +549,8 @@ class Registry implements BlockRegistry {
   // **Every public member opens the call's memo** (I61) — this one included,
   // because a `group` measured from L4 asks its children through the seam and
   // the seam reads the memo this call opened.
-  measure = (block: Block, width: number): number =>
-    this.#scoped(() => this.#measured(block, normaliseWidth(width)).rows);
+  measure = (block: Block, width: number, memo?: MeasureMemo): number =>
+    this.#scoped(() => this.#measured(block, normaliseWidth(width)).rows, memo);
 
   /**
    * A block's content width at `width` (§2c, I42) — the definition's answer,
@@ -579,8 +587,8 @@ class Registry implements BlockRegistry {
    * this rather than adding spacing of its own (C23 §2). A composer that
    * inserted a row would make a document's height unknowable from the document.
    */
-  measureSequence = (blocks: readonly Block[], width: number): number =>
-    this.#scoped(() => sequenceHeight(blocks, normaliseWidth(width), this.#measureChild));
+  measureSequence = (blocks: readonly Block[], width: number, memo?: MeasureMemo): number =>
+    this.#scoped(() => sequenceHeight(blocks, normaliseWidth(width), this.#measureChild), memo);
 
   /**
    * What one block offers to keyboard and pointer, `measureChild` supplied
@@ -768,6 +776,7 @@ class Registry implements BlockRegistry {
     width: number,
     from: number,
     to: number,
+    memo?: MeasureMemo,
   ): Readonly<{ blocks: readonly Block[]; skipRows: number }> => this.#scoped(() => {
     const w = normaliseWidth(width);
     const lo = Math.max(0, Math.trunc(from));
@@ -853,7 +862,7 @@ class Registry implements BlockRegistry {
     }
 
     return Object.freeze({ blocks: Object.freeze(kept), skipRows: Math.max(0, skipRows) });
-  });
+  }, memo);
 
   renderSequence = (blocks: readonly Block[], ctx: RenderContext): ReactElement => this.#scoped(() => {
     const width = normaliseWidth(ctx.width);

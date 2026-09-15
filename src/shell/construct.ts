@@ -27,7 +27,7 @@
 import { createAdapterRegistry } from "../data/adapters/index.js";
 import { blankRowsAbove, commandRows } from "./paint.js";
 import { noticeDoc } from "./documents.js";
-import type { NavElement } from "../presentation/blocks/index.js";
+import type { MeasureMemo, NavElement } from "../presentation/blocks/index.js";
 import { initialRegionHeight } from "./frame.js";
 import { elementsOfEntry, measureEntry } from "./entry-layout.js";
 import { createManifestStore, parseManifest, withThemeNames } from "../data/manifest/index.js";
@@ -483,6 +483,14 @@ export type Graph = Readonly<{
    * caller's own arrays, so nothing evicts it and nothing subscribes.
    */
   scratch: RenderScratchStore;
+  /**
+   * The session's measure memo (C22 I100, C09 I70). One `WeakMap` keyed by the
+   * block for the session's life, handed to C14's measurer and to the window,
+   * so the two agree by construction and a still document is measured once.
+   * A rebuilt block is a new key and a settled entry's blocks are collected
+   * with it; nothing evicts and nothing subscribes — `scratch`'s arrangement.
+   */
+  measures: MeasureMemo;
   overlays: ReturnType<typeof createOverlayManager>;
   /**
    * C28 §3c's view, on the graph so a row can open it without a verb.
@@ -812,6 +820,8 @@ export async function constructGraph(
     commandRows(entry.doc.command, width, detection.capabilities).length;
 
   const stores = await (async () => {
+    // Before the viewport, whose measurer reads it (C22 I100).
+    const measures: MeasureMemo = new WeakMap<Block, Readonly<{ width: number; rows: number }>>();
     const transcript = createTranscriptStore(
       config.retainPayloads > 0 ? { retainPayloads: config.retainPayloads } : {},
     );
@@ -856,7 +866,10 @@ export async function constructGraph(
       measureSequence: (blocks, width, entryId) => {
         using _entry =
           entryId === undefined ? NO_SPAN : (deps.profiler?.entry(entryId) ?? NO_SPAN);
-        return measureEntry(built.blocks.measureSequence, blocks, width);
+        // **Through the session's memo** (C22 I100, C09 I70) — the same one
+        // `visibleRows`' window reads, so a height C14 counted is a height the
+        // window never re-measures.
+        return measureEntry((run, w) => built.blocks.measureSequence(run, w, measures), blocks, width);
       },
       // C14 I20 / C22 I33 — the command line is chrome the composer draws, so
       // it is part of the height the index virtualises against. **The same
@@ -1160,6 +1173,7 @@ export async function constructGraph(
       seriesVisibility,
       frames,
       scratch,
+      measures,
       overlays,
       history,
       editor,

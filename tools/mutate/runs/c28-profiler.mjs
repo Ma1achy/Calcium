@@ -180,8 +180,8 @@ const results = runPass({
       // consulted by the row that says it is empty.
       name: "OFF-RECORDS: the disabled path takes the recording arm",
       file: SEAM,
-      from: "  registry.measure = (block, width) => (prof.on ? measured(block, width) : measure(block, width));",
-      to: "  registry.measure = (block, width) => measured(block, width);",
+      from: "  registry.measure = (block, width, memo) =>\n    prof.on ? measured(block, width, memo) : measure(block, width, memo);",
+      to: "  registry.measure = (block, width, memo) => measured(block, width, memo);",
       expect: "T1.44",
     },
     {
@@ -191,15 +191,15 @@ const results = runPass({
       // `spans` report, which is the only report anyone reads.
       name: "COUNTERS-DEAD: the sequence counters are gated on spanning",
       file: SEAM,
-      from: '    prof.count("measure.sequences");\n    prof.gauge("measure.sequence.blocks", blocks.length);\n    return prof.on ? sequenced(blocks, width) : measureSequence(blocks, width);',
-      to: "    return prof.on ? sequenced(blocks, width) : measureSequence(blocks, width);",
+      from: '    prof.count("measure.sequences");\n    prof.gauge("measure.sequence.blocks", blocks.length);\n    return prof.on ? sequenced(blocks, width, memo) : measureSequence(blocks, width, memo);',
+      to: "    return prof.on ? sequenced(blocks, width, memo) : measureSequence(blocks, width, memo);",
       expect: "T1.44",
       also: [
         {
           file: SEAM,
-          from: "  const sequenced = (blocks: readonly Block[], width: number): number => {",
+          from: "  const sequenced = (blocks: readonly Block[], width: number, memo?: Memo): number => {",
           to:
-            "  const sequenced = (blocks: readonly Block[], width: number): number => {\n"
+            "  const sequenced = (blocks: readonly Block[], width: number, memo?: Memo): number => {\n"
             + '    prof.count("measure.sequences");\n'
             + '    prof.gauge("measure.sequence.blocks", blocks.length);',
         },

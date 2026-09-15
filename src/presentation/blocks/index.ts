@@ -44,6 +44,7 @@ export type {
   BlockDefinition,
   BlockFault,
   BlockRegistry,
+  MeasureMemo,
   FocusState,
   NavElement,
   RenderContext,

@@ -97,8 +97,8 @@ const MUTATIONS = [
     // rows C14 measured at `width − 2` are not the rows drawn.
     name: "visibleRows bypasses entryLayout",
     file: SESSION,
-    from: "    const pieces = windowEntry(entryLayout(entry.doc.blocks, width), from, to, graph.blocks);",
-    to: "    const pieces = windowEntry([{ blocks: entry.doc.blocks, width, indent: 0 }], from, to, graph.blocks);",
+    from: "    const pieces = windowEntry(entryLayout(entry.doc.blocks, width), from, to, memoised);",
+    to: "    const pieces = windowEntry([{ blocks: entry.doc.blocks, width, indent: 0 }], from, to, memoised);",
     expect: "T4.28",
   },
   {
@@ -111,8 +111,8 @@ const MUTATIONS = [
     // block now, so the mutable line is the return rather than the arrow. The
     // mutation is unchanged — bypass `measureEntry` and measure the document
     // flush while the renderer indents it.
-    from: "        return measureEntry(built.blocks.measureSequence, blocks, width);",
-    to: "        return built.blocks.measureSequence(blocks, width);",
+    from: "        return measureEntry((run, w) => built.blocks.measureSequence(run, w, measures), blocks, width);",
+    to: "        return built.blocks.measureSequence(blocks, width, measures);",
     expect: "T4.62",
   },
   {

@@ -11,10 +11,27 @@
 // holds.
 import { describe, expect, it } from "vitest";
 
-import { buildSession } from "../support/session.js";
+import { buildGraph, buildSession } from "../support/session.js";
+import { createProfiler } from "../../src/shell/profiling/recorder.js";
 import { fakeStdin } from "../support/fake-terminal.js";
 import { rows as inkRows } from "../../src/presentation/blocks/paint.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
+
+/** A `count` whose `measure` is counted too (C22 I100): what reaches the definition, never what a memo answered. */
+function measuring(): { definition: BlockDefinition; measured: () => number } {
+  let m = 0;
+  return {
+    measured: () => m,
+    definition: {
+      kind: "count",
+      measure: () => {
+        m += 1;
+        return 1;
+      },
+      render: () => inkRows(["counted"]),
+    },
+  };
+}
 
 /** How many times the transcript's entry has been rendered. */
 function counting(): { definition: BlockDefinition; count: () => number } {
@@ -271,9 +288,74 @@ describe("C22 §6c — the render cache", () => {
     await type("x");
     expect(count(), "and the second rendered none of it").toBe(first);
   });
-  it.todo(
-    "T4.88 (C22 I100): forty measured children drawn twice report every measure miss on the first frame and none on the second, a patched child alone misses again, and the C14 height and the window agree — not deferred on a component: the code commit replaces this row",
-  );
+  it("T4.88 (C22 I100, C09 I70): forty measured children drawn twice measure on the first frame and not on the second, and a patched child alone misses again", async () => {
+    // **Two seams, two harnesses.** The frame half runs on a painting session,
+    // because the window is `visibleRows`' and a harness that stubs `render`
+    // never takes one (a test that calls the mechanism misses the wiring). The
+    // patch half runs on a graph with a profiler, because a patch is not
+    // reachable from a local handler (T4.17's note) and the reading is the
+    // registry's own hit and miss counts.
+    const { definition, measured } = measuring();
+    const children = Array.from({ length: 40 }, (_, i) => ({ kind: "count", id: `c-${String(i)}` }));
+    const { screen, type } = await session(definition, [
+      { kind: "group", id: "g", direction: "column", children },
+    ]);
+    expect(screen().rows.join("\n"), "the entry is on screen").toContain("counted");
+    const after = measured();
+    expect(after, "the first frame measured the children").toBeGreaterThanOrEqual(40);
+
+    // Two further frames on a still document: the window reads every height
+    // back through the session's memo and nothing reaches the definition.
+    // Without the memo each frame measured every child again — ~850 measure
+    // misses per frame on `/all` (F1160).
+    await type("x");
+    await type("y");
+    expect(measured(), "two further frames, no further measure").toBe(after);
+
+    // The patch half.
+    // `spans`, so the registry's instrumented arms are the ones on the path:
+    // a wrapper that dropped the memo (registry-probe.ts) would leave the
+    // session's memo unread on exactly the profiled runs.
+    const profiler = createProfiler({ tier: "spans" }, { elapsed: () => performance.now() });
+    const { graph } = await buildGraph({ blocks: [definition] } as never, undefined, profiler);
+    graph.lifecycle.acquire();
+    const meta = {
+      verb: "rows",
+      adapter: "passthrough",
+      exitCode: 0,
+      durationMs: 0,
+      truncated: false,
+      argv: [] as string[],
+      stderr: "",
+      transport: "local",
+      origin: "user",
+    };
+    const doc = (blocks: readonly unknown[]) => ({ schema: "tui.view/1", command: "/rows", status: "ok", blocks, meta });
+    const id = graph.transcript.append(doc([{ kind: "group", id: "g", direction: "column", children }]) as never, {
+      streaming: true,
+    });
+    const counts = (): Readonly<{ hits: number; absent: number }> => {
+      const r = profiler.report();
+      return { hits: r.hits["measure"] ?? 0, absent: r.misses["measure"]?.absent ?? 0 };
+    };
+    const before = counts();
+    expect(before.absent, "C14 measured the forty children through the memo, each absent").toBeGreaterThanOrEqual(40);
+
+    // One child rebuilt: C14 re-measures the entry on the new `rev`, and only
+    // the new object is a question.
+    const rebuilt = { kind: "group", id: "g", direction: "column", children: children.map((c, i) => (i === 7 ? { ...c } : c)) };
+    expect(graph.transcript.patch(id, { op: "replace", blockId: "g", block: rebuilt } as never).ok).toBe(true);
+    const delta = { hits: counts().hits - before.hits, absent: counts().absent - before.absent };
+    // Two new objects: the replaced group, which the sequence asks first, and
+    // the child rebuilt inside it. Thirty-nine children are the same objects.
+    expect(delta.absent, "the rebuilt group and the rebuilt child missed, nothing else").toBe(2);
+    // A column group asks each child twice in one measure (C09 T1.44's
+    // baseline): the first pass reads thirty-nine back and misses the rebuilt
+    // one, and the second pass reads all forty — the miss was written.
+    expect(delta.hits, "thirty-nine and then forty read back").toBe(79);
+    profiler.dispose();
+    graph.lifecycle.release();
+  });
   it.todo(
     "T4.89a (C22 I101): a column group of six counting children windowed to three then scrolled one row renders the entering child alone, the miss is range, the rows are the fresh render's — not deferred on a component: the code commit replaces this row",
   );

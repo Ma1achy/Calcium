@@ -560,16 +560,34 @@ export interface BlockDefinition<B extends Block = Block> {
   keymap?: (block: B) => readonly BlockKeyBinding[];
 }
 
+/**
+ * A measure memo a caller owns and the registry reads and writes as its own
+ * (I70).
+ *
+ * The shape of the registry's per-call memo — `get` and `set` by block
+ * identity, the width in the value — and nothing more, so a `Map` and a
+ * `WeakMap` both satisfy it. Sound on identity alone: a block is frozen (C04
+ * I1) and replaced on any change (C23 I34), an answer is held for one width and
+ * any other misses through, and geometry moves with neither theme nor
+ * capabilities nor tick. The registry keeps no reference past the call; the
+ * owner is L4, for the life of the session (C22 I100).
+ */
+export interface MeasureMemo {
+  get(block: Block): Readonly<{ width: number; rows: number }> | undefined;
+  set(block: Block, held: Readonly<{ width: number; rows: number }>): unknown;
+}
+
 export interface BlockRegistry {
   register(definition: AnyBlockDefinition): void;
   get(kind: string): BlockDefinition | undefined;
   seal(): void;
-  measure(block: Block, width: number): number;
+  /** `memo` — a caller-owned memo that is this call's, read and written as the registry's own (I70). */
+  measure(block: Block, width: number, memo?: MeasureMemo): number;
   /** §2c — a block's content width at `width`, clamped to `[1, width]`; the width itself for a kind declaring none (I42). */
   width(block: Block, width: number): number;
   render(block: Block, ctx: RenderContextInput): ReactElement;
   /** A run of blocks laid out down the screen, `gapBefore` included (C04 §3a). */
-  measureSequence(blocks: readonly Block[], width: number): number;
+  measureSequence(blocks: readonly Block[], width: number, memo?: MeasureMemo): number;
   /**
    * What one block offers to keyboard and pointer; `[]` for an atomic kind
    * (C26 §5). `measureChild` is supplied here, never by the caller.
@@ -600,6 +618,7 @@ export interface BlockRegistry {
     width: number,
     from: number,
     to: number,
+    memo?: MeasureMemo,
   ): Readonly<{ blocks: readonly Block[]; skipRows: number }>;
   /**
    * One block's slice, for a container that bounds its own rows (I58, §6b).

@@ -1532,7 +1532,17 @@ function visibleRows(
     // `entryLayout` the measurer wrapper in `construct.ts` calls, so the rows C14
     // counted are the rows drawn here. A document that is not a card is one run
     // at `width` and the blank.
-    const pieces = windowEntry(entryLayout(entry.doc.blocks, width), from, to, graph.blocks);
+    // **Through the session's memo** (C22 I100, C09 I70): the layout's runs
+    // were measured by C14 through the same `WeakMap` when it chose the range,
+    // so on a still document the window here reads every height back and
+    // measures nothing. Two closures per frame, against the ~850 measures per
+    // frame they replace on `/all` (F1160).
+    const memoised = {
+      measureSequence: (run: readonly Block[], w: number) => graph.blocks.measureSequence(run, w, graph.measures),
+      windowSequence: (run: readonly Block[], w: number, lo: number, hi: number) =>
+        graph.blocks.windowSequence(run, w, lo, hi, graph.measures),
+    };
+    const pieces = windowEntry(entryLayout(entry.doc.blocks, width), from, to, memoised);
     const windowed = { blocks: pieces.flatMap((piece) => piece.windowed.blocks) };
 
     // The key carries the range, because the cached lines are now the *window's*

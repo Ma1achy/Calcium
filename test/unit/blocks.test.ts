@@ -2,8 +2,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { displayCells } from "../../src/presentation/text.js";
-import { block, validateBlock } from "../../src/data/viewmodel/index.js";
-import type { Group, MeasureFn } from "../../src/data/viewmodel/index.js";
+import { NO_PROBE, block, validateBlock } from "../../src/data/viewmodel/index.js";
+import type { Block, Group, MeasureFn, Probe } from "../../src/data/viewmodel/index.js";
 import { groupDefinition } from "../../src/presentation/blocks/kinds/containers.js";
 import {
   createBlockRegistry,
@@ -634,9 +634,82 @@ describe("C09 §6 — kinds", () => {
     expect(calls, "an empty container measures no children").toEqual([]);
   });
 
-  it.todo(
-    "T1.44 (C09 I70): a column group measured twice through one caller-owned memo measures each child once across both calls, the answers equal the memo-less answers, another width and a rebuilt child miss through — not deferred on a component: the code commit replaces this row",
-  );
+  it("T1.44 (I70): a column group measured twice through one caller-owned memo measures each child once across both calls, the answers equal the memo-less answers, and another width and a rebuilt child miss through", () => {
+    const kit = measurable();
+    // **The registry's own probe, so the row reads hits and misses where the
+    // profiler does** (C28 I31) — a count taken from a wrapper round `measure`
+    // would miss the hit path by construction, because a hit never reaches it.
+    const events: string[] = [];
+    const probe: Probe = {
+      ...NO_PROBE,
+      hit: (cache) => void events.push(`hit:${cache}`),
+      miss: (cache, reason) => void events.push(`miss:${cache}:${reason}`),
+      on: true,
+    };
+    (kit.registry as unknown as { probe: Probe }).probe = probe;
+    const measures = (): readonly string[] => events.filter((e) => e.includes(":measure"));
+
+    const kids = Array.from({ length: 12 }, (_, i) => ({
+      kind: "raw",
+      id: `m-${String(i)}`,
+      text: `line ${String(i)}\nand another`,
+    }));
+    const column = block({ kind: "group", id: "g-memo", direction: "column", children: [...kids] });
+
+    // The memo-less answers first: the claim is equality with them — the rows,
+    // and the pattern of asks. A column group asks each child twice in one call
+    // and the per-call memo answers the second ask, so a fresh call reads as
+    // twelve misses then twelve hits; that pattern is the baseline, not a
+    // number this row invents.
+    const plain80 = kit.registry.measure(column, 80);
+    const fresh = measures();
+    expect(fresh.slice(0, kids.length), "a fresh call: every child absent first").toEqual(
+      kids.map(() => "miss:measure:absent"),
+    );
+    expect(fresh.filter((e) => e.startsWith("miss")), "and absent once each").toHaveLength(kids.length);
+    const plain40 = kit.registry.measure(column, 40);
+
+    const memo = new WeakMap<Block, Readonly<{ width: number; rows: number }>>();
+    events.length = 0;
+    expect(kit.registry.measure(column, 80, memo), "the first call answers as without a memo").toBe(plain80);
+    expect(measures(), "and asks exactly as a fresh call does").toEqual(fresh);
+
+    events.length = 0;
+    expect(kit.registry.measure(column, 80, memo), "the second call answers the same").toBe(plain80);
+    expect(measures(), "and asked nothing: the group itself is held, so no child is reached").toEqual([]);
+
+    // **Across members** (I70): `measureSequence` through the same memo reads
+    // the answers `measure` wrote, which is what lets C14's measurer and the
+    // session's window share one (C22 I100).
+    events.length = 0;
+    expect(kit.registry.measureSequence(kids as never, 80, memo)).toBe(plain80);
+    expect(measures(), "the sequence read every child back: every ask a hit, no miss").toEqual(
+      kids.map(() => "hit:measure"),
+    );
+    const asWidth = fresh.map((e) => e.replace("absent", "width"));
+
+    // A rebuilt child — the same content as a new object — is a new question.
+    const rebuilt = block({
+      kind: "group",
+      id: "g-memo",
+      direction: "column",
+      children: kids.map((k) => ({ ...k })),
+    });
+    events.length = 0;
+    expect(kit.registry.measure(rebuilt, 80, memo)).toBe(plain80);
+    expect(measures(), "identity, never content").toEqual(fresh);
+
+    // Another width misses through with the width's reason, and answers right.
+    events.length = 0;
+    expect(kit.registry.measure(column, 40, memo)).toBe(plain40);
+    expect(measures(), "held for one width").toEqual(asWidth);
+
+    // **The registry holds no reference**: a call without the memo is a call
+    // with a fresh one, whatever the caller's still holds.
+    events.length = 0;
+    expect(kit.registry.measure(column, 40)).toBe(plain40);
+    expect(measures(), "afresh").toEqual(fresh);
+  });
 
   it("T1.10 (I10): an unknown kind renders through raw and never throws", () => {
     const kit = measurable();
