@@ -50028,7 +50028,7 @@ was always under the 145 renders and only now visible.
 |---|---|
 | **Surface** | `src/presentation/plot/scatter3.ts`'s `colourOf`/fill loop · `src/presentation/theme/colormap.ts`'s `sample`/`shadeColour`/`overChannels` |
 | **Reached for** | `tools/bench/plots.mjs orbit`, the 3-D bench F507 said did not exist, three meshes measured |
-| **Verdict** | **open** — the remedy is F1 of the pass: `sampleRgb`/`shadeRgb`, the numeric form of `sample`/`shadeColour`, bit-identical over every (map, t, k) |
+| **Verdict** | **closed** — F1 landed (C10 I40, `0a8a7f54`): the fill holds eight-bit ints between sample and shade, one hex built at the end. Suzanne 9.1→3.5 ms a render, bunny 55.8→47.6; 0 of 2 130 goldens moved. See the close below |
 
 **Measured, `orbit` at 80×24, `o` for two seconds of the framework's own tick,
 medians of 40 reps (F936: shares, not absolutes).**
@@ -50071,3 +50071,73 @@ one projection per vertex into a struct-of-arrays (bunny's other half),
 allocation-free `fill`/`shade`, typed sample buffers, the `nearestOf` mask, and
 extent/ticks in scratch. Each is byte-identical and its own cut; this entry is
 F1's.
+
+**Closed — F1, the same bench three runs a side after `0a8a7f54`.** `sampleRgb`
+and `shadeRgb` in `colormap.ts` (C10 I40), the surface fill in `scatter3.ts`
+hoisting `colormapFor` and `colourBy` and holding the channels as ints — one hex
+per painted sample, nothing parsed back, three of six `Math.pow` read from the
+table. `make golden` moved 0 of 2 130 frames.
+
+```
+mesh      plot3d self / render          frame p50
+          before     after   ratio    before   after
+suzanne    9.1 ms    3.5 ms   2.6×    22.3 ms  12.9 ms
+teapot     8.6 ms    7.2 ms   1.2×    18.7 ms  16.6 ms
+bunny     55.8 ms   47.6 ms   1.17×   63.0 ms  56.8 ms
+```
+
+**The floor moved and the projection did not, which is what the entry
+predicted.** Suzanne — 968 faces, all grid — takes the whole 2.6×; bunny — 69 451
+vertices projected twice a frame — takes 15%, and its remainder is F2's subject
+(one projection per vertex into a struct-of-arrays). The host was loaded by other
+sessions' containers during every reading (load 20, `dtui-load` back up), so
+the absolutes carry that; the ratios held across three runs.
+
+**Two things the cut taught about its own tests.** T1.42's first draft swept
+1 024 t × 64 k over every map — ten million calls of the slow reference,
+re-testing `sampleRgb` against `sample` (which delegates to it) and timing out
+under load at 23 s against a 30 s ceiling: a control written as a magnitude. The
+domain the LUT claims is the 256 channels, and that is what the row sweeps now.
+And `shadeColour` was first routed through `shadeRgb`, which made T1.42 compare
+the table to itself — every mutation survived until `shadeColour` was put back on
+`overChannels`' direct arithmetic as an independent implementation.
+
+**And one thing it taught about the register.** I40's insertion dropped C10's
+`## 8. Commitments` heading, every anchor matched, `make enforce` stayed green
+three times, and SP13's own fabrication test was the only thing that saw it
+(F1151).
+
+## F1151 — a spec can lose a section heading and `make enforce` stays green ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `tools/enforce/commitments.mjs`'s `commitmentsOf` · every rule that reads a spec by section · C10 §8 |
+| **Reached for** | SP13's own fabrication test (`enforce-commitments.test.ts`), which fabricates a descent on C10 and found nothing to descend |
+| **Verdict** | **open** — the remedy is a rule that every spec carries its canonical section headings, or that no spec's commitment count is zero while its invariant count is not; recorded with the discriminator |
+
+**What happened.** The edit adding C10 I40 anchored on the paragraph before
+`## 8. Commitments` for uniqueness and re-emitted the paragraph without the
+heading. The script asserted the anchor matched and printed `ok`. `make enforce`
+ran green three times with the heading gone — at the spec commit, at the code
+commit's pre-commit hook, and by hand. `commitmentsOf(C10)` returned **0** for a
+file holding 34 numbered commitments, and every rule downstream of it — SP13's
+order check, SP11's descent list — was satisfied by the empty answer exactly as
+by a correct one. A03 §2's vacuity class, arriving in a section boundary.
+
+**What caught it, and why only that.** SP13's fabrication test swaps commitments
+33 and 34 in a scratch copy of C10 and expects one descent. With no heading the
+parser saw no commitments, the swap moved nothing it could see, and the row
+reported *expected 1, got 0*. It is the only instrument in the tree that asks a
+spec section whether it is still there, and it asks C10 by accident of which
+file F1066 happened in.
+
+**The discriminator, so it can be run rather than read**: for every spec,
+`commitmentsOf(f).length === 0 && invariantsOf(f).length > 0` is the shape;
+today it is false everywhere and was true on C10 for three commits.
+
+**The edit-script half is the sibling of the rule this repository already
+carries.** *An edit script asserts every replacement matched* was written for
+anchors that do not fire; this is an anchor that fires and a replacement that
+drops what the anchor carried for context. The assert that reaches it is on the
+*artefact* after the write — the heading count, the section count — and not on
+the anchor before it (→ CLAUDE.md, F1150).
