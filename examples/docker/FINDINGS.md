@@ -50141,3 +50141,39 @@ anchors that do not fire; this is an anchor that fires and a replacement that
 drops what the anchor carried for context. The assert that reaches it is on the
 *artefact* after the write — the heading count, the section count — and not on
 the anchor before it (→ CLAUDE.md, F1150).
+
+## F1152 — a 3-D vertex is projected once per corner per pass, six times a frame ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/scatter3.ts`'s span pass · `src/presentation/plot/surface3.ts`'s `drawTri`, `clipNear`, `toScreen` |
+| **Reached for** | `tools/bench/plots.mjs orbit bunny`, after F1 — 47.6 ms a render, 75% of the frame, and the floor already cut |
+| **Verdict** | **open** — the remedy is F2 of the pass: one view-space transform per distinct vertex per render, held in a render-local memo the span pass and `drawTri` both read |
+
+**Measured after F1 (F1150's close): bunny 47.6 ms a render at 69 451 faces,
+teapot 7.2 ms, suzanne 3.5 ms.** F1 moved suzanne 2.6× and bunny 15%, which is
+the entry's own prediction: a large mesh's cost is in its vertices, not the grid.
+
+**The path, confirmed at HEAD.** `trianglesOf` builds a `Vert` per *corner*
+(`at(k)` allocates one each call) but its `p` and `n` are the mesh's own shared
+`Vec3` references. Per frame, for every triangle: the span pass calls `project`
+on all three corners (`scatter3.ts` *And the surfaces*); `drawTri` computes
+`zOf` — `dot(sub(p, eye), forward)`, which is `project`'s own `z` — for the
+behind test, `clipNear` computes it again for all three, and `toScreen` calls
+`project` a fourth time plus two `viewDir`s. Six view-space transforms per
+corner, three corners a face, and a bunny vertex sits on ~6 faces: **~36
+transforms per vertex per frame** where one would do, with an allocation for
+each `Projected`, each `vs` array, each `behind` filter, each `Screen`.
+
+**The remedy is F2.** A `View` per render — a memo keyed on the identity of the
+position and normal `Vec3`s, computed on first sight by the same `project`,
+`viewDir` and `dot` expressions — read by the span pass, by `drawTri`'s behind
+test and clip, and by `toScreen`. Same functions, same inputs, once: byte-
+identical by construction, the `plot-meshes` golden its gate. A vertex the clip
+cuts is new and computed on miss. The memo is a local of the render, dropped
+with it (C12 I11), and `drawTri` given none builds its own so every existing
+caller is unchanged. **What it does not reach**: `backfaceCulled`'s centroid, one
+per face and not per corner; and the Map lookup itself, ~200 k a frame on the
+bunny, cheaper than the projection it replaces and the figure F3's typed
+buffers would take next.
+
