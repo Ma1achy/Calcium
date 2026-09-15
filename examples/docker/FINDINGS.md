@@ -51083,3 +51083,44 @@ milliseconds is under the 32 ms the keystrokes now take by six; a sample is
 the same run was a typing race under a load average of 18 and passed on the
 rerun at 3.
 
+## F1166 — the raster projects a vertex once per face that references it, and allocates the screen record each time ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/surface3.ts`'s `toScreen`, `drawTri` and `geometryOf`'s `at`; `src/presentation/plot/scatter3.ts`'s triangle loop |
+| **Reached for** | the `orbit` bench at 80×24 on the F17 build under production React: bunny work p50 37.4 ms, `plot.form.plot3d` 72% of it at 33.3 ms a frame; suzanne 34.3 and 26.4. Self time over 14 renders: `drawTri` 90–104 ms, `toScreen` 70–88, `plot3dArea` 46–80, `thinEdge` 37–50, `project` 11–21. The bunny is 35947 vertices and 69451 faces; `geometryOf`'s `at` builds one `Vert` per face corner, so the smooth mesh holds 208,353 vertex objects for 35947 vertices and the raster calls `toScreen` — `project`, three dots for the position and three for the normal, one object — up to three times per drawn face, about six times per vertex on a closed mesh |
+| **Verdict** | **open** — measured, the remedy named |
+
+**The path, at HEAD.** `drawTri` takes the direct path (I128) and projects
+`tri.a`, `tri.b`, `tri.c` through `toScreen`, which returns a fresh `Screen`
+each call; the geometry cache (I107) holds the triangles across frames but
+nothing about the frame's projection, which is right — the camera moves —
+and nothing shares a projection between the faces that meet at a vertex
+inside one frame either. On a smooth mesh the vertex's position and its
+normal are the same for every face that references it, so five of the six
+projections are the first one repeated.
+
+**Remedy.** `geometryOf` builds one vertex object per mesh vertex when the
+shading is smooth (flat shading keeps one per face corner, since the normal
+is the face's), and the raster holds each vertex's screen record on the
+geometry's own scratch under a per-frame stamp: the first face to reach a
+vertex projects it, the rest read it back. `toScreen` is pure in (vertex,
+basis, grid), so the frame is byte-identical by construction; `plot3d.project`
+counts the projections, which is the observable a row reads.
+
+## F1167 — the bench profiled React's development build, and the frame it reported carried React's own instrumentation ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `tools/bench/plots.mjs`; every figure F12–F17 took from it |
+| **Reached for** | `createElement cjs/react.development.js` in the `all` profile's top twenty, 39 ms self; the bench set no `NODE_ENV`, while both launchers set `production` before their import (F853). Same build, `all` at 80×24: work sum 924 ms under development, 800 and 742 under production; `react` span 456 → 346 ms; work p50 2.3 → 2.3 and 1.6 |
+| **Verdict** | **closed — built and measured.** `tools/bench/env.mjs`, the bench's first import, sets `NODE_ENV ??= "production"` before `dist/` evaluates |
+
+**The shape.** An instrument that measures a configuration nothing ships:
+the launchers pick React's production build, the bench did not, and every
+paired A/B in this pass compared two development builds. The pairs stay
+valid — both sides carried the same overhead — and the absolute figures
+were high by the development build's share, which is the `react` span's
+110 ms of 924 here. From this entry on the bench's numbers are the shipped
+configuration's.
+

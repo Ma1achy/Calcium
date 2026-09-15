@@ -37,6 +37,7 @@
 //
 //     PROFILE_JSON=path   writes the whole ProfileReport
 //
+import "./env.mjs";
 import { writeFileSync } from "node:fs";
 
 import { createTui, defaultTheme } from "../../dist/index.js";
