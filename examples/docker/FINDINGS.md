@@ -50021,3 +50021,53 @@ what one visible figure costs, not how many render: `react` (Ink) still holds
 (per-figure render cost), and `measure absent 74 694` over the run is Phase B's
 (per-rev derived layout). Neither is a regression A introduced; both are what
 was always under the 145 renders and only now visible.
+
+## F1150 — the 3-D per-sample colour round-trips through a hex string, six `Math.pow` a sample ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/scatter3.ts`'s `colourOf`/fill loop · `src/presentation/theme/colormap.ts`'s `sample`/`shadeColour`/`overChannels` |
+| **Reached for** | `tools/bench/plots.mjs orbit`, the 3-D bench F507 said did not exist, three meshes measured |
+| **Verdict** | **open** — the remedy is F1 of the pass: `sampleRgb`/`shadeRgb`, the numeric form of `sample`/`shadeColour`, bit-identical over every (map, t, k) |
+
+**Measured, `orbit` at 80×24, `o` for two seconds of the framework's own tick,
+medians of 40 reps (F936: shares, not absolutes).**
+
+```
+mesh      faces     frame p50   plot3d self / render   plot3d share of work
+bunny    69 451       63.0 ms          55.8 ms                78.9 %
+teapot    6 320       18.7 ms           8.6 ms                45.8 %
+suzanne     968       22.3 ms           9.1 ms                30.1 %
+```
+
+**Suzanne at 968 faces costs nearly what teapot at 6 320 does per render** — the
+grid floor, not the triangle count, is what a small mesh pays. The grid is
+`w·2 × rows·8` = 30 720 samples at 80×24 (C12 I84), and every painted sample runs
+the colour path once. Bunny's 55.8 ms is that floor plus 69 451 vertices
+projected twice a frame (F2's subject); the floor itself is F1's.
+
+**The path, confirmed at HEAD.** `colourOf` (`scatter3.ts:402`) calls
+`colormapFor(block)` **per sample** — a map lookup and a `by` branch that are
+constant across the whole plot. Then, on the 24-bit arm, `continuousColour →
+sample` (`colormap.ts:38`) builds a `#rrggbb` string, and `shadeColour →
+overChannels` (`colormap.ts:119`) **parses it back** — `parseInt` three times —
+scales each channel through `toLinear` and `toSrgb` (**six `Math.pow` a sample**,
+`colormap.ts:136`), reformats to hex. F511 named this the string half of the
+frame that the GPU could not have taken anyway: it is CPU work, and it is
+arithmetic, so it can be made numeric.
+
+**The remedy is F1** (Phase F). `sampleRgb(map, t)` returns the 8-bit ints
+`sample` hexes, and `sample` becomes `rgbHex(sampleRgb(...))` so the two cannot
+drift; `shadeRgb(r, g, b, k)` runs `overChannels`' sequence on ints, with
+`toLinear` over a 256-entry LUT — a pure function of an 8-bit input, so
+bit-identical by construction. The fill loop hoists `colormapFor` and `by` out,
+and one `{kind: "rgb", hex}` is built per painted sample from the ints, with no
+parse-back. Verified against the current arithmetic over all 256 × 1 001
+(channel, k) pairs: **0 mismatches**. The golden tier's `plot-meshes` frames are
+the integration gate, byte for byte.
+
+**F2–F6 are the rest of Phase F** and are measured against the post-F1 profile:
+one projection per vertex into a struct-of-arrays (bunny's other half),
+allocation-free `fill`/`shade`, typed sample buffers, the `nearestOf` mask, and
+extent/ticks in scratch. Each is byte-identical and its own cut; this entry is
+F1's.
