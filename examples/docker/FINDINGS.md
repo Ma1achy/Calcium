@@ -50314,7 +50314,7 @@ large cloud ever measures.
 |---|---|
 | **Surface** | `src/presentation/plot/scatter3.ts`'s `plot3dArea`, the span pass over `scene.tris` |
 | **Reached for** | F1153's profiles: `plot3dArea` self 796–976 ms over sixty bunny renders, `project` 210–447 ms, the largest remaining item outside the raster |
-| **Verdict** | **open** — measured, the remedy named |
+| **Verdict** | **closed — built and measured.** C12 I127; the bunny frame 12–29 ms lighter in every paired run, a thousand-face mesh unmoved. See the close below |
 
 **The path, at HEAD.** Before the raster, `plot3dArea` takes the depth and
 value extrema the ramps are keyed to — every drawn point, both ends of every
@@ -50335,3 +50335,28 @@ minimum over a multiset is the minimum over its support, a vertex no face
 references is excluded now and excluded then, and the cull is the same
 `project` returning `null`. The fabricated violation is the other set — every
 vertex, referenced or not — which a stray vertex distinguishes on the frame.
+
+**Closed — built and measured** (C12 I127, §6o row 15). `geometryOf` builds
+the triangles and the distinct referenced vertices in one pass; the surface's
+slot holds both under one key, written once (PR12b asserts the write count is
+unmoved); the span pass projects each corner once. The paired interleaved
+probe F1153 settled on, F6's build as the A side and this as the B:
+
+```
+bunny, 40 rounds, four runs     B faster in 28 / 34 / 31 / 31 of 40
+                                paired B−A median  −12.1 / −29.2 / −26.5 / −16.3 ms
+                                on A p50s of 90.5 / 138.9 / 106.0 / 88.6 ms under load
+suzanne, 60 rounds, two runs    21 and 38 of 60, paired median +2.2 and −1.5 ms
+teapot, 40 rounds, two runs     17 and 19 of 40, within +2.2 ms
+```
+
+Fourteen to twenty-seven percent of the loaded bunny frame, which is the
+208 353 projections and 69 451 array literals the pass no longer makes; a mesh
+with a thousand faces had a few hundred to save and shows nothing. **The
+gates**: goldens 458 of 458 with no mover; c12-span-corners three caught and
+the control — the span skipping the surfaces — seen by the mesh goldens;
+c12-extent-scratch re-run after the slot's record changed shape, five caught;
+the suite 6215 green in full this time. **What it leaves**: the raster itself —
+`drawTri`, `strokeThin`, `clipNear`, `shade`, `fill` and the per-sample
+callback, about a third of process time on the bunny in F1153's profiles — is
+F3's, and it is next.
