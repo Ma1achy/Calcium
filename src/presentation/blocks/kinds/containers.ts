@@ -30,7 +30,7 @@ import type { NavElement } from "../types.js";
 import { cells, stripControl, truncate } from "../../text.js";
 import { glyphCells, glyphFor, glyphs } from "../glyphs.js";
 import { clampSpans, paint, tone } from "../paint.js";
-import type { BlockDefinition, RenderContext } from "../types.js";
+import type { BlockDefinition, RenderContext, Windowed } from "../types.js";
 
 /** A container's own height, over children measured at the width it gives them. */
 function childHeights(
@@ -629,44 +629,35 @@ export const mosaicDefinition: BlockDefinition<Mosaic> = {
   },
 };
 
+/**
+ * A group's own measured height (C04 I102) — **the one computation, so
+ * `measure` and `window`'s decline branch cannot drift** (C09 I69). A column is
+ * a sequence and takes `sequenceHeight`; a row takes its tallest placed child;
+ * both floor at `minRows`.
+ */
+function groupHeight(block: Group, width: number, measureChild: MeasureFn): number {
+  const widths = childWidths(block, width);
+  const placed = block.children.slice(0, placeable(block, width));
+  if (placed.length === 0) return 0; // cells-ok
+  if (block.direction === "column") {
+    return atLeastOne(groupRows(block, sequenceHeight(block.children, widths[0] ?? width, measureChild)));
+  }
+  let tallest = 0;
+  for (const height of childHeights(placed, widths, measureChild)) tallest = Math.max(tallest, height);
+  return atLeastOne(groupRows(block, tallest));
+}
+
 export const groupDefinition: BlockDefinition<Group> = {
   kind: "group",
 
   measure(block: Group, width: number, measureChild: MeasureFn): number {
-    const widths = childWidths(block, width);
-    // A child that cannot be placed is measured by neither half (C04 §3).
-    const placed = block.children.slice(0, placeable(block, width));
-
-    // An empty container measures 0, and is the one legitimate zero: it is the
-    // absence of content rather than empty content (C04 I17, T3.5).
-    //
-    // **Asked of `placed` and not of the measured heights.** `childHeights` is
-    // a `.map`, so its length is `placed.length` and nothing else — and asking
-    // it that way measured every child, threw the answers away in the column
-    // branch, and measured them all again in `sequenceHeight`. Twice per
-    // `measure`, for a `.length`. `measure` is pure (C09 I2), so both readings
-    // agree and no assertion about a height could tell them apart; the profiler's
-    // calls-per-frame column is what separates them (C28 I31).
-    if (placed.length === 0) return 0; // cells-ok
-
-    if (block.direction === "column") {
-      // A column group is a sequence; a row group is not (C04 §3a). Children
-      // side by side have no "before" to put a gap in, so the field is ignored
-      // there rather than being an error — which is why the two branches do not
-      // share this line.
-      return atLeastOne(groupRows(block, sequenceHeight(block.children, widths[0] ?? width, measureChild)));
-    }
-
-    // Measured here, where the heights are read. A row group is the only branch
-    // that wants them.
-    let tallest = 0;
-    for (const height of childHeights(placed, widths, measureChild)) {
-      tallest = Math.max(tallest, height);
-    }
-    // The author's floor (C04 I102): the row is its tallest child, or `minRows`
-    // if that is taller — and the cells are that tall, which is what lets a
-    // single child sit in a corner.
-    return atLeastOne(groupRows(block, tallest));
+    // **`groupHeight`, the one computation** (C09 I69): a column is a sequence
+    // and a row is its tallest child, both floored at `minRows`, and `window`'s
+    // decline branch reads the same function so the two cannot drift. An empty
+    // container measures 0 — the one legitimate zero, absence of content rather
+    // than empty content (C04 I17, T3.5). Asked of the placed children and their
+    // heights read once (C28 I31, F940).
+    return groupHeight(block, width, measureChild);
   },
 
   /**
@@ -692,6 +683,110 @@ export const groupDefinition: BlockDefinition<Group> = {
     let total = 0;
     for (let i = 0; i < placed; i += 1) total += (widths[i] ?? 1) + (i > 0 ? ROW_GUTTER : 0);
     return Math.max(1, Math.min(w, total));
+  },
+
+  /**
+   * **A `column` group divides; a `row` group and a `column` with `minRows` do
+   * not** (C09 I69). A column's rows are its children's, laid end to end with a
+   * `gapBefore` row before any child that declares one — exactly what
+   * `sequenceHeight` counts and `render` draws — so a window `[from, to)` is the
+   * contiguous run of children whose rows meet it, **each kept whole**. The
+   * partial first and last child are returned entire; their off-window rows are
+   * the residual, so I26 holds without a second height codepath.
+   *
+   * **The gap rule is `windowSequence`'s** (C14 I25), one level up: the gap row
+   * is kept by keeping the child's own `gapBefore` when the window opens on or
+   * above it, and dropped by rewriting the flag off when the window opens below
+   * it. `skipRows` steps over the first kept child's rows above `from`, that gap
+   * row included when it is kept.
+   *
+   * **`row` and `minRows` decline.** A row's children are side by side, so no
+   * contiguous run of them is a row range; and `minRows` pads the group past its
+   * children's rows (C04 I102), pad rows that belong to no child — a window over
+   * them would break I26 from outside any child. Both return the whole block with
+   * the range as residual, the shape `windowSequence` already pays for a kind
+   * that declares nothing (registry.ts).
+   *
+   * **Children are not windowed recursively.** The seam takes `measureChild` and
+   * no `windowChild`, so a child taller than the window is kept whole and charged
+   * to the residual — the slack a non-dividing kind already costs, bounded
+   * because the case that wants this is a long list of short children (F1149).
+   */
+  window(block: Group, width: number, from: number, to: number, measureChild: MeasureFn): Windowed {
+    const w = normaliseWidth(width);
+
+    // **Decline, from inside the one member** (I69). The whole block, with the
+    // range as the residual — `windowSequence`'s answer for a kind declaring
+    // nothing, so the two paths agree.
+    if (block.direction === "row" || block.minRows !== undefined) {
+      const height = groupHeight(block, w, measureChild);
+      return Object.freeze({
+        block,
+        skipRows: Math.max(0, Math.trunc(from)),
+        dropRows: Math.max(0, height - Math.max(0, Math.trunc(to))),
+      });
+    }
+
+    const height = sequenceHeight(block.children, w, measureChild);
+    const lo = Math.max(0, Math.min(Math.trunc(from), height));
+    const hi = Math.max(lo, Math.min(Math.trunc(to), height));
+
+    const kept: Block[] = [];
+    const keptIdx: number[] = [];
+    let skip = -1;
+    let lastBottom = 0;
+    let row = 0; // cells-ok — a row cursor, not a width
+
+    for (const [i, child] of block.children.entries()) {
+      const gap = child.gapBefore === true ? 1 : 0;
+      const h = measureChild(child, w);
+      const top = row + gap;
+      const bottom = top + h;
+      row = bottom;
+
+      // Entirely above or entirely below the window, the gap row included.
+      if (bottom <= lo || top - gap >= hi) continue;
+
+      // The gap row is kept exactly when the window opens on or above it.
+      const gapKept = gap === 1 && top - gap >= lo;
+      const piece =
+        gapKept === (gap === 1)
+          ? child
+          : gapKept
+            ? ({ ...child, gapBefore: true } as Block)
+            : ({ ...child, gapBefore: false } as Block);
+
+      // **`skipRows` is set once, on the first kept child** — the rows of it that
+      // precede `from`, its kept gap row counted (`top - 1` is the gap row).
+      if (skip < 0) skip = lo - (gapKept ? top - 1 : top);
+
+      kept.push(piece);
+      keptIdx.push(i);
+      lastBottom = bottom;
+    }
+
+    // A degenerate range keeps nothing; decline rather than return an empty
+    // group, whose `measure` is 0 and would break I26.
+    if (kept.length === 0 || skip < 0) { // cells-ok — a count of kept children
+      return Object.freeze({ block, skipRows: lo, dropRows: Math.max(0, height - hi) });
+    }
+
+    const dropRows = Math.max(0, lastBottom - hi);
+    // **`align` and `flex` re-indexed to the kept subset** — a right-aligned
+    // child keeps its column, and the arrays stay parallel to `children`.
+    const align = block.align === undefined ? undefined : keptIdx.map((i) => block.align?.[i] ?? "left");
+    const flex = block.flex === undefined ? undefined : keptIdx.map((i) => block.flex?.[i] ?? 1);
+
+    return Object.freeze({
+      block: Object.freeze({
+        ...block,
+        children: Object.freeze(kept),
+        ...(align === undefined ? {} : { align: Object.freeze(align) }),
+        ...(flex === undefined ? {} : { flex: Object.freeze(flex) }),
+      }),
+      skipRows: skip,
+      dropRows,
+    });
   },
 
   render(block: Group, ctx: RenderContext): ReactElement {

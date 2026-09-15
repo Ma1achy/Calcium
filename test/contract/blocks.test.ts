@@ -341,7 +341,6 @@ describe("C09 contract — measurement", () => {
     expect(atomic).toEqual([
       "comparison",
       "events",
-      "group",
       "image",
       "mosaic",
       "notice",

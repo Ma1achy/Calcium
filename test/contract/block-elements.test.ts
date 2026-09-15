@@ -399,8 +399,16 @@ describe("C26 §5 — the lifted list, in both axes (C09 §2)", () => {
   });
 
   it("T2.30 (C26 I4, I5, I6): containment, disjointness and stability hold of the lifted list across blocks; order within each — and a fabricated old walk fails disjointness", () => {
-    const a = tableOf(2, "a");
-    const b = tableOf(2, "b");
+    // **The group window made this a document, not a bag of blocks.** `tableOf`
+    // numbers every table `r1..rn`, so two of them share row ids — harmless to
+    // the per-block checks, which key on `blockId`, but the `window` × `elements`
+    // agreement keys on element id alone (a document's ids are unique, C04 I14),
+    // and a column group now declares a window. So the corpus's tables carry
+    // block-qualified row ids, which is what a real document holds.
+    const uniqueRows = (t: ReturnType<typeof tableOf>): Block =>
+      block({ ...t, rows: t.rows.map((row) => ({ ...row, id: `${t.id}:${row.id}` })) });
+    const a = uniqueRows(tableOf(2, "a"));
+    const b = uniqueRows(tableOf(2, "b"));
     const corpus: readonly Block[] = [
       rowGroup(a, b),
       columnGroup(a, b),
@@ -408,7 +416,7 @@ describe("C26 §5 — the lifted list, in both axes (C09 §2)", () => {
       // Nested: a panel inside a row, so both origins compose.
       rowGroup(a, panel([b])),
       // Three children, so `placeable` drops one at the sweep's narrowest width.
-      rowGroup(a, b, [tableOf(1, "c")]),
+      rowGroup(a, b, [uniqueRows(tableOf(1, "c"))]),
     ];
     const report = checkElements(lifted(), corpus);
     // **Reading order is a per-block predicate.** Across blocks the lifted list

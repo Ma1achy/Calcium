@@ -901,8 +901,8 @@ describe("C04 §7 — the update model and the view state, checked rather than c
     const windowed = ALL_KINDS.filter(
       (k) => typeof (reg.get(k) as { window?: unknown } | undefined)?.window === "function",
     );
-    expect([...windowed].sort(), "seven kinds window, and `raw` is one of them").toEqual([
-      "code", "keyValue", "logs", "patch", "raw", "table", "terminal",
+    expect([...windowed].sort(), "eight kinds window — `group`'s column arm joined them (C09 I69)").toEqual([
+      "code", "group", "keyValue", "logs", "patch", "raw", "table", "terminal",
     ]);
 
     // **What is left of the residue, and it is C04's.** No `ViewPatch` arm
