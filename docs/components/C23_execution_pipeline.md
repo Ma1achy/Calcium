@@ -1272,7 +1272,7 @@ emulator in arrival order. C21 I3 is not weakened — the handle's streams are s
 merging is this route's choice about one block, because a terminal has one stream by nature.
 
 **The emulator is fetched when the route runs** (I71). `createEmulator` arrives through a dynamic
-import awaited at the top of the route, after the arm is chosen and before anything is spawned, so
+import awaited at the top of the route, before the arm is chosen and before anything is spawned, so
 the headless terminal's 35 ms are paid by the first shell command of a session rather than by every
 session's import — a first frame never draws a terminal (F1164). The route is already `async`;
 nothing about the block changes, and the startup graph is what T5.22 reads.
