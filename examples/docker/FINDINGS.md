@@ -50224,7 +50224,7 @@ reading of the machine that day (F936).
 |---|---|
 | **Surface** | `src/presentation/plot/scatter3.ts`'s `drawnOf` · `src/presentation/plot/project3.ts`'s `extentOf` |
 | **Reached for** | F1152's close: the HEAD profile of `tools/bench/plots.mjs orbit bunny` puts `drawnOf` + `extentOf` at **14.3%** of `plot/` self time |
-| **Verdict** | **open** — measured, the remedy named: the same ruling as I107, one carrier further up |
+| **Verdict** | **closed — built and measured.** C12 I126; the work is gone from the profile and the bunny frame is 3–20 ms lighter in every paired run; a thousand-face mesh is unmoved, as expected. See the close below |
 
 **The path, at HEAD.** `drawnOf` builds `all: Vec3[]` by pushing every point of
 every cloud, every path and every surface — `surfacePoints` hands back the
@@ -50248,3 +50248,62 @@ checked inside the value, and the slot written once per build, carrying both.
 Byte-identical by construction: `Math.min` over a union of per-carrier minima
 is the minimum over the points, and the mesh goldens are the gate. Measured on
 landing in a same-minute A/B, three runs a side, and recorded here.
+
+**Closed — built and measured** (C12 I126, §6o rows 10–14). Three instruments,
+because the machine's load average sat at 16 throughout with another session's
+load generator up, and the first two could not see the change.
+
+**The pieces at rest, before**, on the bunny in isolation (`out/probe-f6.mjs`,
+200 reps after warm-up, two runs):
+
+```
+all.push over 35 947 vertices          0.8 – 1.5 ms
+extentOf over the built array          0.8 – 1.2 ms
+the two together                       5.0 – 5.2 ms     GC — the array and 71 894 objects in one young generation
+tris copied into Scene.tris (69 451)   1.4 – 2.1 ms
+a six-scalar walk, the replacement     0.3 – 0.5 ms
+```
+
+So the §6o residue's *0.6 ms* was true of the walk and false of the frame: the
+build and the copy it sat between are 6–7 ms of a 47 ms bunny frame at rest.
+
+**The session bench could not see it.** `tools/bench/plots.mjs orbit` at
+80×24, three runs a side alternating builds: `plot.form.plot3d` p50 read
+137 / 122 / 95 ms on HEAD and 112 / 154 / 85 ms with F6 — nine to twelve
+renders a run at that load, and a 4× spread within a side.
+
+**Two profiles, separate processes, sixty renders each** (`--cpu-prof` on a
+renderer-level probe): `drawnOf` 249 ms self and 3.4% of process time on HEAD,
+**absent from the top twelve with F6** (under 0.7%); `extentOf` likewise;
+garbage collection 14.1% → 13.9%. The untouched raster chain read heavier in
+the F6 profile — `project` 210 → 447 ms, `zOf` appearing at 292 — which was
+either load drift between the two processes or a regression, and a share
+comparison cannot say which.
+
+**The paired probe said which.** Both builds imported into one process, a
+render of each per round with the leading side alternating, the difference
+taken per round so drift cancels (`out/probe-f6-pair.mjs`):
+
+```
+bunny, 40 rounds, four runs     B faster in 24 / 27 / 28 / 23 of 40
+                                paired B−A median  −3.4 / −9.3 / −20.0 / −6.7 ms
+                                on p50s of 93–186 ms under load
+suzanne, 60 rounds, six runs    25–34 of 60, paired median within ±2.3 ms either way
+teapot, 40 rounds, two runs     18 and 21 of 40, within ±1.3 ms
+```
+
+A thousand-face mesh has 500 vertices to walk and nothing to save; the bunny
+has 36k, and every paired run put it lighter. The raster chain's heavier
+reading was drift. **Only the paired, interleaved form was a comparison at
+this load** — F1152's *same-minute* rule turns out to need *same process,
+alternating* once the load is high enough, and that is the instrument to reach
+for first next time rather than third.
+
+**Gates.** Goldens 458 of 458 with no mover. c12-extent-scratch: five caught
+and the control — a cloud's extent recomputed every frame, correct and slower
+— seen only by PR11's write count. c12-lines3d and c12-surface3d re-anchored,
+every mutation caught. `make test` red on 24 files at that load, all 24 green
+serially. **What F6 does not reach**: a multi-surface block still copies its
+triangles per frame (§6o row 14, none in the catalogue), and a cloud's
+normalised points are still `unitOf`'d per frame — a slot's worth if a
+large cloud ever measures.
