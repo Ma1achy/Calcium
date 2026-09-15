@@ -104,4 +104,8 @@ describe("F56: the bin is a claim about an executable", () => {
     expect(stdout).toContain("docker-tui");
     expect(stdout).toContain("needs a terminal");
   }, 40_000);
+
+  it.todo(
+    "R4.6: spawned with a fresh TMPDIR and no NODE_COMPILE_CACHE, the launcher leaves compile-cache files under it — not deferred on a component: the code commit replaces this row",
+  );
 });

@@ -40,6 +40,9 @@ type LiveSpec = Readonly<{
 }>;
 
 describe("the plot demo", () => {
+  it.todo(
+    "R01 R4.6, by the same rule: spawned with a fresh TMPDIR and no NODE_COMPILE_CACHE, plots-tui leaves compile-cache files under it — not deferred on a component: the code commit replaces this row",
+  );
   it("the far side emits the five datasets", async () => {
     // A fixture must be shown to respond before it is asserted against.
     const { stdout } = await run(here("../bin/plots"), ["sample", "--json"]);

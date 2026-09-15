@@ -289,6 +289,7 @@ Each row is a claim the framework makes and this app tests.
   publication, and no instrument in this repository can stand in for it — every other gate here
   checks an artefact, and this one checks a reader.
 - **R4.5**: bump Calcium to a new minor → builds with no app changes. **Requiring changes means the bump was not minor.**
+- **R4.6**: the launcher enables Node's on-disk compile cache before it imports the app, where `NODE_ENV` already goes and for the same reason — a static import hoists past it. Measured on a container-local copy, five interleaved pairs: a session's start 1 045 → 694, 883 → 560, 667 → 650, 676 → 592, 572 → 522 ms, five of five, paired median −84 ms of about 600 (F1164). `module.enableCompileCache()` with no argument, so a consumer who sets `NODE_COMPILE_CACHE` keeps their directory and one who sets nothing gets the platform's temporary directory; a cache that cannot be written is a status the launcher ignores, because a start that fails on a cache is worse than a slow one. `plots-tui` carries the same line by the same rule.
 
 ### Fail-on-revert
 
@@ -299,6 +300,7 @@ Each row is a claim the framework makes and this app tests.
 - **R5.5** (C2): adding a mutating verb → R2.5 fails.
 - **R5.6** (C11): a deep import → R2.3 fails, and the public surface stops being the surface.
 - **R5.7** (C7): a shared failure path across `b.live` parts → R3.8 fails, and the isolation claim is unproven.
+- **R5.8** (R4.6): removing the launcher's `enableCompileCache` call → R4.6's row fails, because the row spawns the launcher with a fresh temporary directory and no `NODE_COMPILE_CACHE` and reads the cache's files back from it; a source assertion would pass on a call moved below the import, where it enables nothing.
 
 ---
 

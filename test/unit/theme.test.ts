@@ -741,3 +741,9 @@ describe("C10 §4j — separation under dichromacy", () => {
       .toEqual(["tritan orange/reddishPurple"]);
   });
 });
+
+describe("C10 I41 — the shipped quantisations", () => {
+  it.todo(
+    "T3.73 (I41): every entry of the shipped table equals quantiseSet computed fresh over its own set, every shipped theme's surfaces and palettes have an entry, and a set the table does not hold computes the same answer — not deferred on a component: the code commit replaces this row",
+  );
+});
