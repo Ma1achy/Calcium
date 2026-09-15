@@ -41,8 +41,8 @@ const results = runPass({
   run,
   control: {
     file: SF,
-    from: "  if (za > NEAR && zb > NEAR && zc > NEAR) {\n    const sa = toScreen(tri.a, basis, grid);",
-    to: "  if (za > NEAR && zb > NEAR && zc > NEAR && false) {\n    const sa = toScreen(tri.a, basis, grid);",
+    from: "  if (za > NEAR && zb > NEAR && zc > NEAR) {\n    const sa = screenOf(tri.a, basis, grid, frame);",
+    to: "  if (za > NEAR && zb > NEAR && zc > NEAR && false) {\n    const sa = screenOf(tri.a, basis, grid, frame);",
     why: "every triangle takes the clip — the same three vertices back, byte-identical and slower; only PR13's count of the front cameras sees it",
   },
   mutations: [
@@ -52,8 +52,8 @@ const results = runPass({
       // clip would have drawn its front part up to the cut. WF8 draws that cut.
       name: "NEVER-CLIP: a straddling triangle takes the direct path",
       file: SF,
-      from: "  if (za > NEAR && zb > NEAR && zc > NEAR) {\n    const sa = toScreen(tri.a, basis, grid);",
-      to: "  if (za > NEAR || zb > NEAR || zc > NEAR) {\n    const sa = toScreen(tri.a, basis, grid);",
+      from: "  if (za > NEAR && zb > NEAR && zc > NEAR) {\n    const sa = screenOf(tri.a, basis, grid, frame);",
+      to: "  if (za > NEAR || zb > NEAR || zc > NEAR) {\n    const sa = screenOf(tri.a, basis, grid, frame);",
       expect: "WF8",
     },
     {

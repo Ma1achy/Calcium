@@ -15,6 +15,7 @@ import type { RenderScratch } from "../../src/presentation/blocks/types.js";
 import { DARK_THEME, FULL_CAPS, measurable, registry } from "../support/render.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
 import { NEAR } from "../../src/presentation/plot/project3.js";
+import { loadMesh } from "../support/obj.js";
 import {
   basisOf,
   boundsOf,
@@ -843,8 +844,79 @@ describe("C12 I126 — the extent scratch", () => {
 });
 
 describe("C12 I130 — a vertex is projected once per frame", () => {
-  it.todo(
-    "T1.142 (I130): a closed cube rendered smooth reports plot3d.project as the distinct vertices among its drawn faces and flat as three per drawn face; a second camera projects in full and equals a fresh render; the bunny's smooth count is at most its vertex count — not deferred on a component: the code commit replaces this row",
-  );
+  const counting = (): Probe & { counts: Map<string, number> } => {
+    const counts = new Map<string, number>();
+    return { ...NO_PROBE, count: (name: string, by = 1): void => { counts.set(name, (counts.get(name) ?? 0) + by); }, counts };
+  };
+  /** The smallest scratch that holds: one slot per owner, as the store keeps it. */
+  const scratchOf = (): RenderScratch => {
+    const slots = new Map<object, { key: string; value: unknown }>();
+    return {
+      get: (owner, key) => { const s = slots.get(owner); return s !== undefined && s.key === key ? s.value : undefined; },
+      set: (owner, key, value) => { slots.set(owner, { key, value }); },
+    };
+  };
+  // **A closed cube with every face wound the same way** (C12 I130) — inward
+  // here, which the renderer reads from the signed volume and never from the caller (C12 I95).
+  const CUBE_V = [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]]
+    .map(([x, y, z]) => ({ x: x as number, y: y as number, z: z as number }));
+  const CUBE_F: [number, number, number][] = [
+    [0, 1, 2], [0, 2, 3], [4, 6, 5], [4, 7, 6], [0, 5, 1], [0, 4, 5], [3, 2, 6], [3, 6, 7], [0, 3, 7], [0, 7, 4], [1, 5, 6], [1, 6, 2],
+  ];
+  const cube = (shading: "smooth" | "flat", camera: { azimuth: number; elevation: number; distance: number }): Plot =>
+    block({
+      kind: "plot", id: "i130", form: "plot3d", height: 12, series: [], axes3: false, box3: "none",
+      colormap: "viridis", camera, surfaces3: [{ vertices: CUBE_V, faces: CUBE_F, closed: true, shading }],
+    } as unknown as Plot);
+  const r = registry([plotDefinition]);
+  const render = (p: Plot, extra: Record<string, unknown> = {}): readonly string[] =>
+    renderToLines(r, p, 60, { theme: DARK_THEME, capabilities: FULL_CAPS, tick: 0, ...extra } as never);
+  const GENERIC = { azimuth: 0.7, elevation: 0.4, distance: 6 };
+
+  it("T1.142 (C12 I130): a closed cube rendered smooth reports plot3d.project as the distinct vertices among its drawn faces and flat as three per drawn face; a second camera projects in full and equals a fresh render; the bunny's smooth count is at most its vertex count", () => {
+    // **Flat first, because it fixes the drawn-face count the smooth figure is
+    // read against**: three projections per drawn face, and a generic camera
+    // sees three sides of a cube — six faces, eighteen.
+    const flat = counting();
+    render(cube("flat", GENERIC), { probe: flat });
+    expect(flat.counts.get("plot3d.project"), "flat: three per drawn face, six faces").toBe(18);
+    // Smooth: the same six faces reach seven distinct vertices — every corner
+    // but the one the three hidden sides meet at.
+    const smooth = counting();
+    const bare = render(cube("smooth", GENERIC), { probe: smooth });
+    expect(smooth.counts.get("plot3d.project"), "smooth: the distinct vertices among the drawn faces").toBe(7);
+    expect(bare.some((line) => line.trim().length > 0), "the cube paints").toBe(true); // cells-ok — a blank test
+
+    // **Two cameras over one scratch.** The geometry is held across the two
+    // renders (C12 I107), so the vertex objects carry the first camera's records
+    // into the second; the stamp is what keeps them from being read. The
+    // second count is taken in full, and the frame is a fresh render's.
+    const scratch = scratchOf();
+    const p = cube("smooth", GENERIC);
+    const first = counting();
+    const one = render(p, { probe: first, scratch });
+    expect(one, "the scratch changes no byte").toEqual(bare);
+    const moved = { azimuth: 1.9, elevation: -0.3, distance: 6 };
+    const second = counting();
+    const two = render(p, { probe: second, scratch, cameras: { i130: moved } });
+    expect(second.counts.get("plot3d.project"), "the second camera projects its drawn vertices in full").toBe(7);
+    expect(two, "and equals a render with no record to read").toEqual(render(cube("smooth", moved)));
+    expect(two, "which is a different frame from the first camera's").not.toEqual(one);
+
+    // **The bunny**: a smooth closed mesh shares each vertex across about six
+    // faces, so the count is bounded by the vertex count and sits well under
+    // three per face — the figure F1166 was opened on.
+    const bunny = loadMesh("stanford-bunny");
+    const probe = counting();
+    render(block({
+      kind: "plot", id: "i130", form: "plot3d", height: 22, series: [], axes3: false, box3: "none", colormap: "coolwarm", colourBy: "depth",
+      camera: { azimuth: 2.2, elevation: 0.25, distance: 5 },
+      surfaces3: [{ label: "bunny", vertices: bunny.vertices, faces: bunny.faces, closed: true, shading: "smooth" }],
+    } as unknown as Plot), { probe });
+    const projected = probe.counts.get("plot3d.project") ?? 0;
+    expect(projected, "at most the vertex count").toBeLessThanOrEqual(bunny.vertices.length); // cells-ok — a vertex count
+    expect(projected, "and under a fifth of three per face").toBeLessThan((3 * bunny.faces.length) / 5); // cells-ok — a face count
+    expect(projected, "and not nothing").toBeGreaterThan(1000);
+  });
 });
 

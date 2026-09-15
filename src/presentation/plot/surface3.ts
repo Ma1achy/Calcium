@@ -38,8 +38,34 @@ import {
   type Vec3,
 } from "./project3.js";
 
-/** A vertex with everything a sample interpolated from it needs. */
-type Vert = Readonly<{ p: Vec3; n: Vec3; v: number | undefined }>;
+/**
+ * A vertex as the raster reads it. `p`, `n` and `v` are the geometry's and
+ * never move; `rec`, `s` and `stamp` are the raster's own record on it (C12
+ * I130) — the screen projection taken under a frame stamp, read back only
+ * under that same stamp, so a projection from the last camera is never
+ * reused. The object lives in the caller's scratch (I107) and nowhere else.
+ *
+ * **`rec` is allocated once and written in place.** A held vertex is
+ * old-generation, and a fresh record stored on it every frame is a write
+ * barrier and a promotion per projection — F1152's class, measured again on
+ * F1166's first cut: `toScreen` self time rose while its call count fell.
+ * `s` is this frame's answer: `rec` when the vertex projects, `null` when it
+ * is behind the eye.
+ */
+type Vert = {
+  readonly p: Vec3;
+  readonly n: Vec3;
+  readonly v: number | undefined;
+  rec?: MutableScreen;
+  s?: Screen | null;
+  stamp?: number;
+};
+
+/**
+ * One render's stamp and its projection count (C12 I130). The caller advances
+ * the stamp once per render and reads `projected` back for `plot3d.project`.
+ */
+export type RasterFrame = { readonly stamp: number; projected: number };
 
 /**
  * One referenced vertex, for the ramp span (C12 I127): its unit-space position
@@ -54,7 +80,14 @@ export type Corner = Readonly<{ p: Vec3; v: number | undefined }>;
  * however many faces share them. Both are functions of the surface, the
  * block's extent and the series index, and neither is the camera.
  */
-export type Geometry3 = Readonly<{ tris: readonly Tri3[]; corners: readonly Corner[] }>;
+/**
+ * A surface's triangles and referenced vertices, and the raster's frame counter
+ * on the record itself (C12 I130). `frame` is the last stamp this geometry was
+ * drawn under; the render advances it once, so a held geometry's vertex records
+ * from the last camera are never read, and the stamp takes no scratch slot and
+ * no write of its own (I126's counts hold).
+ */
+export type Geometry3 = Readonly<{ tris: readonly Tri3[]; corners: readonly Corner[] }> & { frame: number };
 
 /**
  * What a whole surface decides, held once and shared by reference across its
@@ -303,14 +336,23 @@ export function geometryOf(s: Surface3, extent: Extent3, series: number): Geomet
     }
   }
   const out: Tri3[] = [];
+  const shared: (Vert | undefined)[] = new Array(pts.length); // cells-ok — a vertex count
   for (let f = 0; f < idx.length; f += 1) { // cells-ok — a face index
     const [ia, ib, ic] = idx[f] as readonly [number, number, number];
     const fn = unit(faceN[f] as Vec3);
-    const at = (k: number): Vert => ({
-      p: pts[k] as Vec3,
-      n: flat ? fn : (vertN[k] as Vec3),
-      v: values[k],
-    });
+    // **One vertex object per mesh vertex under smooth shading** (C12 I130):
+    // its position, its vertex normal and its value are the same for every
+    // face that references it, so the faces share the object and the raster
+    // projects it once a frame. Flat shading keeps one per face corner — the
+    // normal is the face's — which is the same count as before.
+    const at = (k: number): Vert => {
+      if (flat) return { p: pts[k] as Vec3, n: fn, v: values[k] };
+      const held = shared[k];
+      if (held !== undefined) return held;
+      const made: Vert = { p: pts[k] as Vec3, n: vertN[k] as Vec3, v: values[k] };
+      shared[k] = made;
+      return made;
+    };
     out.push({
       a: at(ia),
       b: at(ib),
@@ -321,7 +363,7 @@ export function geometryOf(s: Surface3, extent: Extent3, series: number): Geomet
       skin,
     });
   }
-  return { tris: out, corners };
+  return { tris: out, corners, frame: 0 };
 }
 
 /**
@@ -434,6 +476,9 @@ type Screen = Readonly<{
   v: number | undefined;
 }>;
 
+/** `Screen` as the vertex's held record, written in place each frame (C12 I130). */
+type MutableScreen = { -readonly [K in keyof Screen]: Screen[K] };
+
 const lerpV = (a: Vec3, b: Vec3, t: number): Vec3 => ({
   x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t,
 });
@@ -461,6 +506,7 @@ export function drawTri(
   light: Vec3,
   span: Readonly<{ nearD: number; farD: number }>,
   paint: Painter,
+  frame?: RasterFrame,
 ): boolean {
   if (backfaceCulled(tri, basis)) return false;
   // **The three view depths once, as scalars** (C12 I128) — `zOf`'s expression,
@@ -475,9 +521,9 @@ export function drawTri(
   // vertices and these edges untouched** (I128). `project`'s own cull is this
   // same test on this same expression, so none of the three is `null`.
   if (za > NEAR && zb > NEAR && zc > NEAR) {
-    const sa = toScreen(tri.a, basis, grid);
-    const sb = toScreen(tri.b, basis, grid);
-    const sc = toScreen(tri.c, basis, grid);
+    const sa = screenOf(tri.a, basis, grid, frame);
+    const sb = screenOf(tri.b, basis, grid, frame);
+    const sc = screenOf(tri.c, basis, grid, frame);
     if (sa === null || sb === null || sc === null) return false;
     fill(sa, sb, sc, tri, tri.edges, grid, depth, light, span, paint);
     return false;
@@ -487,9 +533,9 @@ export function drawTri(
   const zOf = (p: Vec3): number => dot(sub(p, basis.eye), basis.forward);
   const vs: readonly [Vert, Vert, Vert] = [tri.a, tri.b, tri.c];
   for (const t of clipNear(vs, tri.edges, zOf)) {
-    const sp = toScreen(t.v[0], basis, grid);
-    const sq = toScreen(t.v[1], basis, grid);
-    const sr = toScreen(t.v[2], basis, grid);
+    const sp = screenOf(t.v[0], basis, grid, frame);
+    const sq = screenOf(t.v[1], basis, grid, frame);
+    const sr = screenOf(t.v[2], basis, grid, frame);
     if (sp === null || sq === null || sr === null) continue;
     fill(sp, sq, sr, tri, t.e, grid, depth, light, span, paint);
   }
@@ -607,11 +653,33 @@ function clipNear(
  * it commutes with the interpolation below, so a smooth normal may be rotated
  * per vertex rather than per sample.
  */
+/**
+ * The vertex's projection for this frame, taken once (C12 I130). Under a
+ * frame the record on the vertex is read back when its stamp is the frame's;
+ * without one — the tests' direct calls — every corner projects, as before.
+ */
+function screenOf(
+  w: Vert,
+  basis: Basis,
+  grid: Readonly<{ width: number; height: number }>,
+  frame: RasterFrame | undefined,
+): Screen | null {
+  if (frame === undefined) return toScreen(w, basis, grid);
+  if (w.stamp === frame.stamp && w.s !== undefined) return w.s;
+  const s = toScreen(w, basis, grid, w.rec);
+  if (s !== null) w.rec = s;
+  w.s = s;
+  w.stamp = frame.stamp;
+  frame.projected += 1;
+  return s;
+}
+
 function toScreen(
   w: Vert,
   basis: Basis,
   grid: Readonly<{ width: number; height: number }>,
-): Screen | null {
+  into?: MutableScreen,
+): MutableScreen | null {
   const pr = project(basis, w.p);
   if (pr === null) return null;
   // **One record, nine numbers** (C12 I128): `viewDir(basis, sub(w.p, eye))` and
@@ -624,17 +692,31 @@ function toScreen(
   const r = basis.right;
   const u = basis.up;
   const f = basis.forward;
-  return {
-    x: pr.x * grid.width,
-    y: pr.y * grid.height,
-    vx: dx * r.x + dy * r.y + dz * r.z,
-    vy: dx * u.x + dy * u.y + dz * u.z,
-    vz: dx * f.x + dy * f.y + dz * f.z,
-    nx: n.x * r.x + n.y * r.y + n.z * r.z,
-    ny: n.x * u.x + n.y * u.y + n.z * u.z,
-    nz: n.x * f.x + n.y * f.y + n.z * f.z,
-    v: w.v,
-  };
+  if (into === undefined) {
+    return {
+      x: pr.x * grid.width,
+      y: pr.y * grid.height,
+      vx: dx * r.x + dy * r.y + dz * r.z,
+      vy: dx * u.x + dy * u.y + dz * u.z,
+      vz: dx * f.x + dy * f.y + dz * f.z,
+      nx: n.x * r.x + n.y * r.y + n.z * r.z,
+      ny: n.x * u.x + n.y * u.y + n.z * u.z,
+      nz: n.x * f.x + n.y * f.y + n.z * f.z,
+      v: w.v,
+    };
+  }
+  // **The same nine expressions into the vertex's own record** (C12 I130):
+  // the values are the ones above to the bit, and the object is the one the
+  // vertex already holds.
+  into.x = pr.x * grid.width;
+  into.y = pr.y * grid.height;
+  into.vx = dx * r.x + dy * r.y + dz * r.z;
+  into.vy = dx * u.x + dy * u.y + dz * u.z;
+  into.vz = dx * f.x + dy * f.y + dz * f.z;
+  into.nx = n.x * r.x + n.y * r.y + n.z * r.z;
+  into.ny = n.x * u.x + n.y * u.y + n.z * u.z;
+  into.nz = n.x * f.x + n.y * f.y + n.z * f.z;
+  return into;
 }
 
 /**

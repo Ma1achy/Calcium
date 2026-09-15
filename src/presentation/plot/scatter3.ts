@@ -52,6 +52,7 @@ import {
   type Geometry3,
   type Skin,
   type Tri3,
+  type RasterFrame,
 } from "./surface3.js";
 import { plotAreaRows } from "./height.js";
 import { seriesRefOf } from "./marks.js";
@@ -204,6 +205,8 @@ type Scene = Readonly<{
   tris: readonly Tri3[];
   /** Every surface's referenced vertices, once each, for the ramp span (C12 I127). */
   corners: readonly Corner[];
+  /** This render's frame stamp over the surfaces' geometries (C12 I130). */
+  stamp: number;
   identities: readonly Identity[];
   basis: Basis;
   lo: Vec3;
@@ -252,6 +255,20 @@ type HeldSurface = Readonly<{
 /** A cloud's or a path's slot: its own extent, owned by its `points` (C12 I126). */
 type HeldPoints = Readonly<{ own: Extent3 | undefined }>;
 const POINTS_KEY = "extent";
+/**
+ * The render's frame stamp (C12 I130): one above every geometry's last, written
+ * back to each, so two surfaces in one block share one frame and a held
+ * geometry's records from the last camera are unreadable. A fresh geometry is
+ * at zero and any stamp above it is new to every vertex. No scratch write —
+ * the counter sits on the record the scratch already holds (§6o row 16).
+ */
+function advanceFrame(built: readonly Geometry3[]): number {
+  let stamp = 0;
+  for (const b of built) if (b.frame > stamp) stamp = b.frame;
+  stamp += 1;
+  for (const b of built) b.frame = stamp;
+  return stamp;
+}
 
 /** Every object `geometryOf` reads, in a fixed order, for the identity check. */
 const carriersOf = (sf: Surface3): readonly unknown[] =>
@@ -479,6 +496,7 @@ function drawnOf(block: Plot, ctx: RenderContext, aspect: number): Scene {
     built.push(geometryFor(skins[k] as Surface3, extent, si, ctx, helds[k], owns[k]));
     si += 1; // cells-ok — a surface index
   }
+  const stamp = advanceFrame(built);
   let tris: readonly Tri3[];
   let corners: readonly Corner[];
   if (built.length === 1) { // cells-ok — a surface count
@@ -502,6 +520,7 @@ function drawnOf(block: Plot, ctx: RenderContext, aspect: number): Scene {
   return {
     drawn: out,
     strokes,
+    stamp,
     tris,
     corners,
     identities: [...clouds, ...paths, ...skins],
@@ -1306,12 +1325,19 @@ export function plot3dArea(
     mark[i] = sub ? undefined : densityGlyph(k, ctx.capabilities);
     glyph[i] = -1;
   };
+  // **One stamp per render, from the geometries' own counters** (C12 I130):
+  // the raster reads a vertex's projection back only under this stamp, so the
+  // last camera's records are unreadable.
+  const raster: RasterFrame = { stamp: scene.stamp, projected: 0 };
   for (const t of scene.tris) {
     wire = t.skin.wire;
-    const clipped = drawTri(t, scene.basis, grid, depth, lit, span, painter);
+    const clipped = drawTri(t, scene.basis, grid, depth, lit, span, painter, raster);
     // **The clip path counted** (C12 I128): zero for a mesh in front of the camera.
     if (clipped) ctx.probe?.count("plot3d.clip");
   }
+  // **The projections counted** (C12 I130): the distinct vertices among the
+  // drawn faces on a smooth mesh, three per drawn face on a flat one.
+  if (raster.projected > 0) ctx.probe?.count("plot3d.project", raster.projected);
 
   // **The frame goes in last, and it is a rule about ties rather than a reading
   // convenience** (C12 I90, F452). It used to draw first under a comment saying

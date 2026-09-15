@@ -63,8 +63,15 @@ const results = await runPass({
       // it draws is a Gaussian with its peak at ambient and its rim lit.
       name: "the normal is dotted with the light in world space",
       file: F,
-      from: "    nx: n.x * r.x + n.y * r.y + n.z * r.z,\n    ny: n.x * u.x + n.y * u.y + n.z * u.z,\n    nz: n.x * f.x + n.y * f.y + n.z * f.z,",
-      to: "    nx: n.x,\n    ny: n.y,\n    nz: n.z,",
+      // **Both arms of `toScreen`** (C12 I130): the fresh record the tests'
+      // direct calls take and the held record the raster writes in place.
+      from: "      nx: n.x * r.x + n.y * r.y + n.z * r.z,\n      ny: n.x * u.x + n.y * u.y + n.z * u.z,\n      nz: n.x * f.x + n.y * f.y + n.z * f.z,",
+      to: "      nx: n.x,\n      ny: n.y,\n      nz: n.z,",
+      also: [{
+        file: F,
+        from: "  into.nx = n.x * r.x + n.y * r.y + n.z * r.z;\n  into.ny = n.x * u.x + n.y * u.y + n.z * u.z;\n  into.nz = n.x * f.x + n.y * f.y + n.z * f.z;",
+        to: "  into.nx = n.x;\n  into.ny = n.y;\n  into.nz = n.z;",
+      }],
       // **SF3a and not SF3.** SF3 asserts smooth carries more shades than flat,
       // which is true under this defect — it survived that row, and the row it
       // needed is the one about the light's *direction* (F459).
