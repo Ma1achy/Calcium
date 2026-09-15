@@ -50367,7 +50367,7 @@ F3's, and it is next.
 |---|---|
 | **Surface** | `src/presentation/plot/surface3.ts`'s `drawTri`, `clipNear`, `toScreen`, `fill`, `strokeThin` |
 | **Reached for** | F1153's profiles: `drawTri` 1 007 ms self, `strokeThin` 470, `clipNear` 265, `zOf` 292, the garbage collector 14% — about a third of process time on the bunny over sixty renders |
-| **Verdict** | **open** — measured, the remedy named |
+| **Verdict** | **closed — built and measured.** C12 I128; the bunny 10–18 ms lighter on a 52–67 ms frame in every paired run, the teapot 2 ms on 16–20. See the close below |
 
 **The path, at HEAD, per triangle and before any sample is painted.** `drawTri`
 builds `vs`, filters it into `behind` with a closure, and calls `clipNear` on
@@ -50393,3 +50393,39 @@ screen record a vertex — position, view direction and normal as nine numbers,
 lengths, bounds and weights in the fill; explicit edges in the thin stroke.
 `shade` stays as it is, the object form and the reference the goldens hold.
 Measured on landing with the paired probe, F7's build the A side.
+
+**Closed — built and measured** (C12 I128). The paired interleaved probe,
+F7's build the A side, on a machine that had quietened to a 52 ms bunny frame:
+
+```
+bunny, 40 rounds, four runs     B faster in 36 / 38 / 39 / 36 of 40
+                                paired B−A median  −9.8 / −12.6 / −17.7 / −9.8 ms
+                                on A p50s of 52.1 / 52.7 / 66.6 / 53.0 ms
+teapot, 40 rounds, two runs     30 and 32 of 40, −2.1 and −1.9 ms on 15.8 and 19.5
+suzanne, 60 rounds, two runs    39 and 37 of 60, −0.8 and −0.3 ms on 12.1 and 12.4
+```
+
+Nineteen to twenty-seven percent of the bunny frame and about twelve of the
+teapot's, which is the twenty allocations a triangle the direct path no longer
+makes; suzanne has a thousand faces and the same share of nothing much.
+
+**What the first mutation pass found.** `EDGE-LENGTH-CROSSED` — the second
+edge's band measured by the first edge's length — survived WF5 and the mesh
+goldens, because a grid cell's legs are equal and the meshes' faces near
+enough to it that no sample moved. A rewrite that pairs a length with the
+wrong edge was invisible to every row in the tree. PR13b now draws a 1 : 4
+scalene wireframe triangle under all three cyclic vertex orders and asserts
+the edge samples are one set — the band is the geometry's, and under the
+mutation which edge gets the wrong length changes with the order. Four caught
+on the second pass; the control, every triangle clipped, is byte-identical
+and seen only by PR13's count.
+
+**Gates.** Goldens 458 of 458 with no mover, three times over the rewrite.
+c12-surface3d re-anchored on the new `toScreen` components and the new
+`strokeThin` call, every mutation caught; c12-geometry's stale anchor was
+found by `make test`'s inventory rows rather than by the anchors sweep I ran
+by hand, which reported *1 problems* once and I read past it — the rows are
+the gate. **What it leaves**: `shade`'s five allocations a painted sample and
+the `Shaded` record itself, the compose arms over the sample grid, and the
+per-sample `{ kind, hex }` in the fill callback — the per-sample half, next
+if it measures.
