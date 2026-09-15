@@ -50891,7 +50891,7 @@ and the frames equal a fresh render at every window position.
 |---|---|
 | **Surface** | `src/shell/paint.ts`'s `region`; `src/shell/frame.ts`'s `chromeOf` and the footer's `measureSequence`; `src/shell/composite.ts`'s `layerRows`; `src/shell/chrome.ts`'s `clusters` |
 | **Reached for** | the `all` bench at 80×24 on the F14 build, quiet: 88 frames, work p50 6–8 ms; `region` 306 ms inclusive under `paint` — 3.5 ms a frame; 176 of the 234 `react` spans are the header and the footer, at a p50 of 1.3 ms each; `group#chrome.footer` and `group#chrome.header` rendered 88 times each, `pills#chrome.footer.left` measured 2.03 times a frame; `measure absent` 2 885 over the run, of which the chrome's own blocks — rebuilt by `clusters` every frame, so a new identity to the session's memo — are about nine a frame |
-| **Verdict** | **open** — measured, the remedy named |
+| **Verdict** | **closed — built and measured.** C22 I102: the chrome cache holds the header's and the footer's lines and the footer's height per content, width and theme, and a layer's lines per content. The `all` bench at 80×24, three pairs interleaved against the F14 build: work p50 5.7 / 6.5 / 6.6 → 5.2 / 4.3 / 4.2 ms, `react` spans 234 → 145 a run, the header rendered 88 → 3 times; at 130×42, 4.5 → 2.8. See the close below |
 
 **The path, at HEAD.** `compose` calls the app's `header` and `footer`
 functions every frame with a context carrying `now`, and the default chrome
@@ -50913,6 +50913,41 @@ layer's lines keyed by its content's identity in a `WeakMap`. A frame whose
 chrome came back equal paints the held lines and measures nothing; the
 clock's tick is a `rev` miss once a second. Misses reported as `chrome` with
 the axis, so the deck can see it.
+
+**Closed — built and measured** (C22 I102). `ChromeCache`, owned by the
+graph: the header's and the footer's lines keyed by the blocks' serialised
+structure, the width and the theme's name, the footer's measured height in
+the same slot, a pushed layer's lines by its content's identity. `paint`'s
+`region` and `composite`'s `layerRows` ask it before rendering; a frame
+whose chrome came back equal paints the held lines and measures nothing.
+Misses reported as `chrome` on `absent|rev|width|theme`. T4.90a–c are the
+rows; the mutation run caught 7 of 7 with the control killed; the goldens
+458 with no mover.
+
+```
+all 80×24, 88 frames, interleaved, load average 2–4
+
+          work p50            work sum             react spans   header renders
+F14        5.7   6.5   6.6    1 414  1 320  1 382    234           88
+F15        5.2   4.3   4.2    1 265  1 319  1 248    145           3
+
+all 130×42, one pair:  4.5 → 2.8 ms p50, work sum 1 598 → 1 407
+```
+
+**The footer still renders on 83–86 of 88 frames, and that is the
+instrument, not the subject.** Its `chrome` misses are all `rev`: the
+default footer carries C24 I32's `last N.Nms` cell while a profiler is
+attached, and the bench always attaches one, so the footer's content
+moves on every frame whose cost differs from the last. A session that is
+not profiling has no such cell and its footer hits along with the header.
+Reading that figure as a defect in the cache would be a reading about the
+process taken for one about its subject; the header's 3 renders — the
+clock's second changing — are the cache's own figure.
+
+**What remains**: `measure absent` 2 680 a run, about 30 a frame, from
+scopes the memo does not reach; the first-frame cost of `/all` itself —
+145 figures through Ink once — which is Phase H's question and now the
+whole of what a reader waits for.
 
 ## F1163 — the theme store validates the painted floors at load, and it costs a cold session about sixty milliseconds ★★☆☆☆
 
