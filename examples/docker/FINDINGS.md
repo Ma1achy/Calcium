@@ -50218,3 +50218,33 @@ other containers moved that much. **Only a same-minute A/B is a comparison**;
 the numbers above are pairs, and every earlier absolute in this ledger is a
 reading of the machine that day (F936).
 
+## F1153 — the 3-D extent is re-derived from every point every frame, and none of them moves ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/scatter3.ts`'s `drawnOf` · `src/presentation/plot/project3.ts`'s `extentOf` |
+| **Reached for** | F1152's close: the HEAD profile of `tools/bench/plots.mjs orbit bunny` puts `drawnOf` + `extentOf` at **14.3%** of `plot/` self time |
+| **Verdict** | **open** — measured, the remedy named: the same ruling as I107, one carrier further up |
+
+**The path, at HEAD.** `drawnOf` builds `all: Vec3[]` by pushing every point of
+every cloud, every path and every surface — `surfacePoints` hands back the
+mesh's own `vertices` for a mesh and *allocates the whole grid* for a height
+field — and then `extentOf(all)` walks it allocating **two objects per point**
+(`lo` and `hi` rebuilt on every step). On the bunny that is 35 947 pushes and
+71 894 allocations a frame for an answer the camera cannot move: the extent is
+a function of the carriers and nothing else, which is exactly the argument I107
+made for the triangles, and the triangles cannot even be looked up until the
+extent is known — it is in their key.
+
+**The remedy.** Each carrier's own extent held in the caller's scratch, owned by
+the carrier's array, and the block's extent the union of them — the unit cube
+when no carrier has a point, as `extentOf([])` answers today. **The one
+interaction that shapes it**: the scratch holds one slot per owner, and a
+height-field surface's only carrier *is* the triangle slot's owner, so a second
+slot would thrash the first on every frame with no counter reporting it. So a
+surface's slot holds its extent *and* its geometry under one key — the carriers
+and the ranges — with the geometry's own validity (the block extent, the series)
+checked inside the value, and the slot written once per build, carrying both.
+Byte-identical by construction: `Math.min` over a union of per-carrier minima
+is the minimum over the points, and the mesh goldens are the gate. Measured on
+landing in a same-minute A/B, three runs a side, and recorded here.
