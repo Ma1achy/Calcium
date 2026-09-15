@@ -50969,3 +50969,61 @@ say most of it is work the first call does and the later ones do not.
 module load, and the quantisation of a theme's surfaces memoised by the
 surfaces' values — the same answer, once. Measured against the six-call
 series above; no spec change, C10's own contrast rows are the gate.
+
+**Re-measured before building, and the remedy above is wrong in both halves.**
+`buildCube` has held each entry's Lab beside its hex since it was written, and
+every comparison reads it; nothing recomputes it. And the six-call decay is
+not repeated work being skipped: `quantisedHex(light, "bg")` alone, eight
+calls in one process, reads 34.3, 34.9, 17.6, 21.9, 4.2, 1.1, 1.3, 1.1 ms —
+the interpreter running the DP's half-million inner steps until the
+optimiser takes it, then a millisecond a call. Memoising by value would save
+nothing on a cold session, whose two calls are on two different themes.
+
+What the cold cost is: two DP runs at load, one for each shipped theme that
+paints (`light`, `high-contrast`), 65–78 ms of a 600 ms native startup
+(F1164's figures, `/tmp` inside the container; the bind mount makes every
+number here seven times larger and is not the product's). A profile of one
+cold load attributes 44.5 ms self to `quantiseSet` and 32.2 to `quantisedHex`,
+the second being the first inlined.
+
+**Corrected remedy.** The answer for a shipped theme is a constant: the same
+set of hexes gives the same picks on every machine. So the quantisations of
+the shipped sets — three themes' surfaces and their palettes — are computed
+once by a generator and shipped as a table keyed by the set's own values;
+`quantiseSet` reads the table before it computes, and a set the table does
+not hold (an app's own theme, a patched one) computes as today. A test row
+sweeps every table entry against the computation and every shipped set
+against the table, so a theme edit without a regeneration is a red row and
+not a stale constant. Exact by construction — the table *is* the
+computation's output — and the DP never runs for a shipped theme.
+
+## F1164 — the built package's import is the startup, and the theme, the highlighter's every grammar and a headless terminal are all in it ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `dist/index.js`'s module graph — 381 files under `dist/` and the dependencies they pull in; `src/presentation/blocks/kinds/code.ts`'s `createLowlight` at module scope; `src/data/emulator/emulator.ts`'s `@xterm/headless`; the examples' launchers `bin/docker-tui.js` and `bin/plots-tui.js` |
+| **Reached for** | a probe importing `dist/index.js`, constructing a session over fakes and waiting for the first frame, on a container-local copy so the bind mount is out of the figure: import 471–847 ms, first frame 100–197 ms after it, total 572–1 045 ms over five runs at load average 1–2; on the bind mount the import alone is 4 400–5 000 ms. A profile of the import: 353 ms self in Node's ESM loader (resolve, stat, read, compile, link), `ink`'s own graph 205–250 ms of it, `lowlight` 37–73 (its barrel imports every grammar highlight.js ships, ~190, where the code block registers sixteen), `@xterm/headless` 35, `yoga-layout` 39, `elkjs` 4; `dist:presentation` 76 ms self, of which the theme's two cold quantisations are 65–78 (F1163). With Node 22's on-disk compile cache (`NODE_COMPILE_CACHE`), five interleaved pairs: total 1 045 → 694, 883 → 560, 667 → 650, 676 → 592, 572 → 522 ms — five of five, paired median −84 ms |
+| **Verdict** | **open** — measured, four remedies named and ranked |
+
+**The path, at HEAD.** An app's launcher sets `NODE_ENV` and dynamically
+imports its `main.ts`, which statically imports `@fmx/calcium`; the barrel
+statically imports every component, so every module Calcium can ever need is
+resolved, read, compiled and linked before `createTui` is called. That is the
+design — a block kind is a module and the registry is built from them — and
+it puts three things on the startup path that no first frame uses: the
+highlighter and all of highlight.js's grammars (the code block's module
+builds its `lowlight` at module scope, and `lowlight`'s only export is a
+barrel that imports `all` and `common`), the headless terminal emulator (used
+by the shell route, on an `async` path), and two cold runs of the theme's
+quantisation DP (F1163). The rest is the loader's own cost over 381 small
+files and `ink`'s graph, which is Node's per-module floor and not Calcium's
+code.
+
+**Remedies, ranked by measured share.**
+
+1. **The compile cache, in the launchers** (R01 R4.5): `module.enableCompileCache()` before the dynamic import, where `NODE_ENV` already goes and for the same reason — a static import hoists past it. Five of five pairs, −84 ms median on a 600 ms start. A consumer's own launcher does the same; it is a recipe, not a Calcium seam.
+2. **The theme's quantisations as a shipped table** (F1163's corrected remedy, C10 I41): −65 ms cold.
+3. **The emulator behind a dynamic import on the shell route** (C23): −35 ms, and the route is already `async`. A startup-graph row asserts the barrel never loads it.
+4. **The highlighter's grammars off the barrel's path**: −37 ms. `lowlight` exports one entry and it imports every grammar; the honest forms are a vendored `createLowlight` over `highlight.js/lib/core` (150 lines, MIT, a `DEPENDENCIES.md` row) or a deferred engine the pipeline warms before committing a document that needs it. Not chosen yet; measured after 1–3 land.
+
+**What is not on the list**: bundling `dist/` into one file per entry would take the loader's 350 ms down with it, and it changes the published shape every deep import in `test/` and the examples rely on — recorded as the architecture-level lever, with the number, for the day the rest is spent.
