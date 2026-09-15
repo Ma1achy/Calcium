@@ -50613,7 +50613,7 @@ every one caught.
 |---|---|
 | **Surface** | `src/presentation/plot/scatter3.ts`'s `plot3dArea`, the callback handed to `drawTri` |
 | **Reached for** | F1157's close, the residue rows: `plot3dArea` 8.9 MB a render on the bunny and the paint callback 2.7 MB; then two experiments on copies of the F10 build under `out/`, each measured by the allocation bench and the paired interleaved probe against F10 |
-| **Verdict** | **open** — measured, the remedy named |
+| **Verdict** | **closed — built and measured.** C12 I128 amended; the bunny 2–4 ms lighter on 37–46 ms in five paired runs (28–35 of 40), 74 to 70 MB a render; teapot and suzanne level. See the close below |
 
 **The path, at HEAD.** `for (const t of scene.tris)` reads `t.skin.wire` into
 a local and hands `drawTri` an arrow function that closes over it — so the
@@ -50650,3 +50650,24 @@ triangle loop, reading the current triangle's `wire` through a `let` the
 loop assigns; nothing else it closes over changes per triangle. Byte-
 identical by construction — the same function body, the same reads — and
 the goldens are the gate; the allocation bench is the observable.
+
+**Closed — built and measured** (C12 I128). In the tree, the paired
+interleaved probe against F10 and the allocation bench:
+
+```
+bunny, 40 rounds, five runs    B faster in 35 / 28 / 30 / 30 / 29 of 40 (the last under SWAP=1)
+                               paired B−A median  −3.9 / −1.9 / −3.1 / −3.5 / −2.4 ms
+                               on A p50s of 39.3 / 38.8 / 38.6 / 46.0 / 37.1 ms
+teapot, two runs               19 and 20 of 40, +0.4 and 0.0 — level
+suzanne, two runs              18 and 22 of 40, +0.3 and −0.1 — level
+allocation a render, bunny     74 → 70 MB; plot3dArea 8.9 → 6.6, the painter 2.7 → 2.7
+```
+
+Weaker than the copy measured (28–35 wins against 31–33, −1.9 to −3.9
+against −2.8 to −3.0), the same sign in every run, and the same bytes.
+Six to nine percent of the bunny frame for a `let` and a moved brace; the
+teapot's six thousand faces are too few for it to show. The bunny now
+renders in **about 35 ms at rest** against F6's 60-plus, and the
+remaining allocation table is `toScreen` 20 MB, the thin stroke's
+callback closures 17 MB, `drawTri` 9 MB, `plot3dArea` 7 MB, the colour
+objects 3 MB.
