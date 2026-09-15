@@ -51024,7 +51024,7 @@ highlighter's grammars are still open there.
 |---|---|
 | **Surface** | `dist/index.js`'s module graph — 381 files under `dist/` and the dependencies they pull in; `src/presentation/blocks/kinds/code.ts`'s `createLowlight` at module scope; `src/data/emulator/emulator.ts`'s `@xterm/headless`; the examples' launchers `bin/docker-tui.js` and `bin/plots-tui.js` |
 | **Reached for** | a probe importing `dist/index.js`, constructing a session over fakes and waiting for the first frame, on a container-local copy so the bind mount is out of the figure: import 471–847 ms, first frame 100–197 ms after it, total 572–1 045 ms over five runs at load average 1–2; on the bind mount the import alone is 4 400–5 000 ms. A profile of the import: 353 ms self in Node's ESM loader (resolve, stat, read, compile, link), `ink`'s own graph 205–250 ms of it, `lowlight` 37–73 (its barrel imports every grammar highlight.js ships, ~190, where the code block registers sixteen), `@xterm/headless` 35, `yoga-layout` 39, `elkjs` 4; `dist:presentation` 76 ms self, of which the theme's two cold quantisations are 65–78 (F1163). With Node 22's on-disk compile cache (`NODE_COMPILE_CACHE`), five interleaved pairs: total 1 045 → 694, 883 → 560, 667 → 650, 676 → 592, 572 → 522 ms — five of five, paired median −84 ms |
-| **Verdict** | **open** — measured, four remedies ranked; 1 (R01 R4.6) and 2 (C10 I41, F1163) built, 3 and 4 owed |
+| **Verdict** | **open** — measured, four remedies ranked; 1 (R01 R4.6), 2 (C10 I41, F1163) and 3 (C23 I71) built, 4 owed |
 
 **The path, at HEAD.** An app's launcher sets `NODE_ENV` and dynamically
 imports its `main.ts`, which statically imports `@fmx/calcium`; the barrel
@@ -51047,4 +51047,39 @@ code.
 3. **The emulator behind a dynamic import on the shell route** (C23): −35 ms, and the route is already `async`. A startup-graph row asserts the barrel never loads it.
 4. **The highlighter's grammars off the barrel's path**: −37 ms. `lowlight` exports one entry and it imports every grammar; the honest forms are a vendored `createLowlight` over `highlight.js/lib/core` (150 lines, MIT, a `DEPENDENCIES.md` row) or a deferred engine the pipeline warms before committing a document that needs it. Not chosen yet; measured after 1–3 land.
 
+**Remedy 3, built** (C23 I71). `createEmulator` through a dynamic import at
+the top of `runShell`; T5.22 reads the startup graph through
+`test/support/import-trace.mjs` — nothing from `@xterm/headless` after the
+import, the emulator after one shell command through the route. Paired
+against the F15 build on the native copy, five of five: 528 → 475, 350 →
+346, 351 → 344, 367 → 333, 351 → 336 ms, median −15. The direct figure is
+the package's own cold import, 34.5 ms; the pairs sit under it because the
+loader's cost over 380 files is the noise floor here.
+
+**Remedy 4, owed and sized**: `lowlight`'s wrapper is 482 lines over
+highlight.js's underscored emitter API, so vendoring it is a supply-chain
+decision with its own rows (`DEPENDENCIES.md`, SS31), not a cut; the
+deferred-engine form needs an async warm on C23's commit path. Ranked
+after the next profile.
+
 **What is not on the list**: bundling `dist/` into one file per entry would take the loader's 350 ms down with it, and it changes the published shape every deep import in `test/` and the examples rely on — recorded as the architecture-level lever, with the number, for the day the rest is spent.
+
+## F1165 — the profile tool's sampler was outrun by the session it samples, and the appendix row refused for a second sample ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `tools/profile.mjs`'s `sampleMs`; C28 T5.3 |
+| **Reached for** | `node tools/profile.mjs 300 6` after F14–F17: `Streaming CPU — unanswerable: a rate needs two samples in the window and there is 1; the session ran 150 ms`. Timers logged with a `--import` hook: the sampler's first tick scheduled at 768 ms, fired at 918 (the first yield after the recorder exists — the greeting's build and first mount are synchronous), the six keystrokes over in 32 ms, the session over at 950. The same run read four samples over 235 ms when T5.3 was written |
+| **Verdict** | **closed — built and measured.** `sampleMs` 25 → 5 in the tool; three runs read two refusals, T5.3 green |
+
+**The shape.** A harness parameter chosen against the subject's speed on
+the day it was written, with no row that watches the margin: the
+optimisations of this pass took the row's own fixture under one sampling
+interval, and the refusal read as a defect in the profiler. It is the
+process's reading and not the subject's — the CPU row is a rate over
+samples, and a session faster than the interval has no rate to report. Five
+milliseconds is under the 32 ms the keystrokes now take by six; a sample is
+`process.cpuUsage` and `memoryUsage`, tens of microseconds. T5.4's red in
+the same run was a typing race under a load average of 18 and passed on the
+rerun at 3.
+
