@@ -564,10 +564,16 @@ type Group = Readonly<{
   inherited *placement is untouched* from it. The seam-with-two-readers is the same defect
   `entry-layout.ts` closed for the card body: two functions each right about the arithmetic and
   free to disagree.
-- **R6 — `measure` is still a function of `(block, width)`.** `align` never changes a height (I45,
-  T3.23 stands); `minRows` does, and it is a field of the block (I18), so C14's cache key covers
-  both. A group has no `window`, so it is atomic under `windowSequence` and a child's content width
-  is always computed over a whole block — a right-aligned `raw` cannot drift as the reader scrolls.
+- **R6 — `measure` is still a function of `(block, width)`, and that is what lets the `column` arm
+  divide.** `align` never changes a height (I45, T3.23 stands); `minRows` does, and it is a field of
+  the block (I18), so C14's cache key covers both. **A `column` group's child is measured over a
+  whole block at the full width `w`** — a window keeps each child entire (C09 I69), so a
+  right-aligned `raw` inside a windowed column is measured and drawn exactly as it is in the whole
+  group, and cannot drift as the reader scrolls. The `row` arm keeps this literally by declining the
+  window, and a `column` carrying `minRows` declines because the pad rows belong to no child; the
+  drift argument that once read as *a group has no window* is in fact the argument *for* the column
+  window, because the invariant it protects — content width over a whole block — is what dividing by
+  whole children preserves.
 
 **The classification table — structural, because the kind has structure and no state.** Every row
 is a cell where two rules could both claim it; a row governed by one rule is a restatement.

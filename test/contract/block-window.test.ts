@@ -531,6 +531,24 @@ describe("C09 §2a — a block reduced to a valid smaller block", () => {
       expect(reason.length, `${kind} carries a reason`).toBeGreaterThan(20); // graphemes-ok
     }
   });
+
+  // **Phase A — the column group's window** (C09 I69). Filed as deferrals with
+  // the spec so SP9 holds at the spec-alone commit; the code commit fills them.
+  it.todo(
+    "T2.138 (C09 I69, I26): the checkMeasurement sweep over column groups with gaps, align and nested rows balances I26 and renders exact rows; kindsCovered contains group — not deferred on a component: lands with Phase A's window on the column group in the next commit",
+  );
+  it.todo(
+    "T2.139 (C09 I69): a window opening inside the first child and ending inside the last keeps both whole, with non-zero skipRows and dropRows equal to the overhang — not deferred on a component: lands with Phase A's window on the column group in the next commit",
+  );
+  it.todo(
+    "T2.140 (C09 I69, I26): a row group and a column carrying minRows decline, and I26 still balances — not deferred on a component: lands with Phase A's window on the column group in the next commit",
+  );
+  it.todo(
+    "T2.141 (C09 I69): a right-aligned third child windowed to its own rows renders byte-identical to those rows of the whole group — the align re-index — not deferred on a component: lands with Phase A's window on the column group in the next commit",
+  );
+  it.todo(
+    "T2.142 (C09 I69, C14 I25): the gap boundary — on the gap row keeps it, one row below drops it and rewrites the flag off, and I26 balances on both — not deferred on a component: lands with Phase A's window on the column group in the next commit",
+  );
 });
 
 describe("C09 §2c width — the registry's answer (I42, I44)", () => {
