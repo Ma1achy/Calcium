@@ -50678,7 +50678,7 @@ objects 3 MB.
 |---|---|
 | **Surface** | `src/presentation/plot/surface3.ts`'s `thinEdge`; `project3.ts`'s `strokeSeg` and `strokeSegAt` |
 | **Reached for** | F1158's close: `thinEdge` 17 MB a render on the bunny, F1157's E2 having shown the bytes are the closures and not boxing; then an experiment on a copy of the F11 build, the segment loop restated inside `thinEdge` with no callback, measured by the allocation bench and the paired probe against F11 |
-| **Verdict** | **open** — measured, the remedy named |
+| **Verdict** | **closed — built and measured.** C12 I129 amended; the bunny 70 to 55 MB a render with `thinEdge` gone from the table, and 2–3.5 ms lighter on 31–35 ms in four quiet paired runs of 60 (39–53 wins), after five runs under a load average of 7 had split. See the close below |
 
 **The path, at HEAD.** A thin triangle strokes three edges, and each edge
 hands `strokeSegAt` an arrow function closing over the two corners, the
@@ -50709,3 +50709,35 @@ export nothing consumes is MG25's.
 expressions in the same order as `strokeSeg`; no callback, no `Projected`,
 no scalar core. C12 I129's sentence about the segment core is rewritten to
 say this and why.
+
+**Closed — built and measured** (C12 I129). The allocation bench first,
+which does not care about the load:
+
+```
+bunny    70 → 55 MB a render    thinEdge 17.4 → 0.8, nothing else moved
+teapot   18 → 16 MB a render
+```
+
+Then the paired probe against F11, **and the first five runs are the
+number that undercuts the ordering**, so they are here:
+
+```
+load average 7, 40 rounds      −6.8 / −0.3 / −5.3 / +2.1 / +1.6 ms on 54–58 ms    26 / 22 / 24 / 16 / 19 of 40
+load average 5, 60 rounds      −1.3 / −9.6 / −0.1 / −3.8 ms on 33–62 ms           33 / 41 / 32 / 51 of 60
+load average 4, 60 rounds      −3.0 / −1.8 / −2.7 / −3.5 ms on 31–35 ms           53 / 39 / 46 / 52 of 60
+```
+
+The quiet rows agree with E3 (−2.4 to −2.9 on 29, 34–35 of 40) and the
+loaded rows agree with nothing, including each other — a baseline that
+doubled between one run and the next is the machine, and the paired
+form cancels drift within a round, not a load that changes the
+optimiser's decisions between rounds. The bunny at rest is now **about
+29 ms**, against 60-odd when this pass began at F6.
+
+**What remains, from the bench**: `toScreen` 20 MB a render, the `Screen`
+record per drawn corner; `drawTri` 10 MB, which the sampler attributes
+there because `fill` is inlined into it and is still worth a read;
+`plot3dArea` 8 MB, the six boxed sample arrays and the rows; the colour
+objects 1.5 MB. And on the other side of the ask, the `all` bench at
+80×24 reads 33 ms p50 a frame with React at 44% of the work, which is
+Phase H's gate firing.
