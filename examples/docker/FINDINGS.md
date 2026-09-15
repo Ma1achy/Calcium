@@ -50429,3 +50429,34 @@ the gate. **What it leaves**: `shade`'s five allocations a painted sample and
 the `Shaded` record itself, the compose arms over the sample grid, and the
 per-sample `{ kind, hex }` in the fill callback — the per-sample half, next
 if it measures.
+
+## F1156 — a mesh vertex is projected to the screen once per face it sits on, six times a frame ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/surface3.ts`'s `drawTri` and `toScreen`; `geometryOf`'s `Vert` |
+| **Reached for** | the F1155 close's profile: `toScreen` 357 ms self, 8.6% of process time, on a 40 ms bunny frame — 208 353 calls a frame for 35 947 vertices |
+| **Verdict** | **open** — measured, the remedy named |
+
+**The path, at HEAD.** `geometryOf` builds a `Vert` per face corner — `at(k)`
+is a fresh record each call — so a bunny vertex on six faces is six `Vert`s
+holding the same `p`, `n` and `v`, and `drawTri` calls `toScreen` on each: six
+`project`s and six nine-number records a frame for one screen position. F1152
+tried a `Map` keyed on the `Vec3`s and measured slower, because a hash lookup
+and three escaping objects a vertex cost more than the projections they saved
+(F1152's close). **What was wrong was the key, not the idea**: a vertex has an
+index, and an array indexed by it is a load, not a hash.
+
+**The remedy.** A `Vert` carries an `id` — under smooth shading the vertex's
+index and one shared record per vertex; under flat shading a fresh id per
+corner, because the corner's normal is the face's and two faces' corners at one
+vertex are different records. `Geometry3` reports how many ids it issued. The
+raster takes a per-render slot array per surface and `drawTri` reads the
+screen record through it, computing `toScreen` on the first face and reading
+it on the other five; a vertex the near-plane clip cuts is fresh, carries no
+id, and is computed as before. **Byte-identical by construction**: `toScreen`
+is a function of the `Vert`, the basis and the grid, and the record read on
+the sixth face is the record the first computed. The observable is the slot
+count filled per render, which is the referenced vertex count under smooth
+and three times the face count under flat; a raster that ignores the slots
+fills none.
