@@ -50748,7 +50748,36 @@ Phase H's gate firing.
 |---|---|
 | **Surface** | `src/presentation/blocks/registry.ts`'s `#scoped` memo; `src/shell/entry-layout.ts`'s `windowEntry` and `measureEntry`; the session's `visibleRows` |
 | **Reached for** | the `all` bench at 80×24 on the F12 build: 88 frames, `visibleRows` 3 492 ms inclusive, of which `windowEntry` 975 ms — `windowSequence` 484, `measureSequence` 490 — and the profiler's `measure absent 74 694`, about 850 a frame; `wrapCellsParts` and `placeableClusters` 7.6% of process self time under `wrapRuns` |
-| **Verdict** | **open** — measured, the remedy named |
+| **Verdict** | **closed — built and measured.** C09 I70 and C22 I100: one `WeakMap` for the session, read by C14's measurer and by the window. The `all` bench at 80×24, three pairs interleaved against the pre-cut build: work p50 35.3 / 38.4 / 35.3 → 25.3 / 30.5 / 23.3 ms, `measure absent` 74 694 → 3 809 over 88 frames. See the close below |
+
+**Closed — built and measured** (C09 I70, C22 I100). The registry's
+`measure`, `measureSequence` and `windowSequence` take a caller-owned memo
+and use it as the call's; the graph holds one `WeakMap` keyed by the block,
+and both seams — the measurer wrapper C14 receives and `visibleRows`'
+window — read through it. The profiler's wrapper forwards it, and T4.88
+runs at `spans` so a wrapper that dropped it is a red row and not a quiet
+regression on exactly the profiled runs.
+
+```
+all 80×24, 88 frames, interleaved A/B, load average 2–4
+
+          work p50            measure absent
+A (F12)   35.3  38.4  35.3    74 694   about 850 a frame
+B (F13)   25.3  30.5  23.3     3 809   about 43 a frame
+```
+
+Three pairs, the new build ahead in each by 5–12 ms on 35–38. The
+mutation run caught six of six, one of them the wrapper: dropping the
+memo from C14's measurer alone leaves the frame count green — the
+window's first frame writes the memo and the second reads it — and is
+seen only by the patch half, where the re-measure on a new `rev` misses
+the group and all forty children instead of the two objects that changed.
+
+**What remains**: 3 809 `measure` misses over the run, about 43 a frame,
+from scopes the memo is not handed — `renderSequence`'s own on a render
+miss, `elementsIn`, `width` — not attributed further here. And the
+render slot still keys on the window range, so a row of scroll re-renders
+every kept tile: that is F1161, next.
 
 **The path, at HEAD.** `windowEntry` asks the registry for each run's rows
 and then for the window, and the registry answers through `#measureChild`,
