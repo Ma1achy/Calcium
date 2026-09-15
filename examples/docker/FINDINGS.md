@@ -49949,3 +49949,51 @@ remains the safe direction; what this finding adds is that the window makes the
 rule's verdict a function of how much code sits between two unrelated
 declarations. A repair wants a real member scan bounded by the declaration's own
 braces, which is a parser rather than a regex.
+
+
+## F1149 — the column group declines the window seam, so `/all` renders every figure every frame ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/blocks/kinds/containers.ts`'s `groupDefinition` · `registry.windowSequence` · `examples/plots`'s `/all` |
+| **Reached for** | `tools/bench/plots.mjs`, written for this pass — the `/all` scroll frame, measured three runs a side |
+| **Verdict** | **open** — the remedy is a `window` on the column group, Phase A of the pass; F424's own class, the candidate that list already named |
+
+**Measured, `/all` at 80×24, one PageUp/PageDown per keystroke, medians of three
+runs (F936: shares, not absolutes).**
+
+```
+frame work        p50   479 ms   p95   680 ms   max  1020 ms
+react (Ink)             60.3 %   of work
+plot.form.plot3d        23.0 %   of work
+plot renders / frame    ~145             — the whole document, on every keystroke
+```
+
+At 130×42 the median falls to ~20 ms only because more of the document is on
+screen at once and fewer keystrokes cross a figure boundary; the p95 is still
+**926 ms**, and it is the same mechanism.
+
+**The mechanism is the one F424 measured and this list already named.** `/all` is
+one transcript entry: a root `group("column")` of ~73 `group("row")` pairs, each
+holding two `group("column", [caption, plot])` tiles — ~145 plots. `groupDefinition`
+declares no `window` (`containers.ts:632`), and `registry.windowSequence`
+(`registry.ts:761`) keeps a kind that declares none **whole**, paying its
+off-screen rows out of `skipRows` and letting `entry-layout.ts:379` slice ~30
+rows out of the full rendering. So every figure's `render` runs every frame and
+Ink mounts and tears down a tree of ~450 blocks per keystroke — `react` at 60%.
+
+**Silent by design, which is why it is group 8.** Declining a window produces no
+error, no fault, no warning — only a slower frame (C09 T2.136's kept-whole half,
+which names `group` as *a container… bounded by the registry's row cap rather
+than by a window*). F424 measured the same decline on `code` at **913.79 ms**
+against `logs`' **0.65 ms**, a factor of 1 400. `/all` is that defect on a
+container: the cap bounds a single tall child, but a column of 145 short
+children is 145 renders under the cap, and nothing bounds the count.
+
+**The remedy is a `window` on the column arm** (Phase A). A column group's rows
+are its children's, laid end to end with `gapBefore`, so a window is a
+contiguous subsequence kept whole with the partial first and last child's rows
+charged to `skipRows`/`dropRows` — I26's identity, `logs`' shape one level up.
+The row arm declines (its children are side by side, not a sequence), as does a
+column carrying `minRows` (its height is declared). Recursion into a windowed
+child is deferred: a `/all` tile is ≤ 10 rows, so the slack is ≤ two tiles.
