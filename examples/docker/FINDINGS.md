@@ -50955,7 +50955,7 @@ whole of what a reader waits for.
 |---|---|
 | **Surface** | `src/presentation/theme/store.ts`'s `loadTheme`; `src/presentation/theme/resolve.ts`'s `validatePaintedFloors`, `quantisedHex`, `quantiseSet` |
 | **Reached for** | `loadTheme(defaultTheme)` in `dist/`, six calls in one process: 56.8, 29.5, 25.6, 10.6, 3.2, 4.9 ms; the `all` bench's profile attributes 87.8 ms inclusive to `validatePaintedFloors` from the store's constructor, of which `quantisedHex` 51 ms self and `quantiseSet` 35 ms self — for the two themes of three that paint a surface (`light`, `high-contrast`) |
-| **Verdict** | **open** — measured, the remedy named |
+| **Verdict** | **closed — built and measured.** C10 I41: the shipped sets' quantisations generated into a table `quantiseSet` reads before the DP; cold `loadTheme` on a native filesystem 65–78 → 1.4 ms. See the close below |
 
 **The path, at HEAD.** `loadTheme` runs both validators over every theme in
 the set (C10 I26, I27). `validatePaintedFloors` is a no-op for a theme that
@@ -50997,13 +50997,34 @@ against the table, so a theme edit without a regeneration is a red row and
 not a stale constant. Exact by construction — the table *is* the
 computation's output — and the DP never runs for a shipped theme.
 
+**Closed — built and measured** (C10 I41). `quantise.ts` holds the cube,
+the distance and the DP; `quantiseSet` reads `quantised.generated.ts` — 14
+sets over the three themes, each theme's surfaces and each of its
+palettes, written by `tools/theme/quantised.mjs` from `dist/` under
+`make quantised` — and computes only for a set the table does not hold.
+T3.73 sweeps every entry against `computeQuantisation` and every shipped
+set against the table, and reads identity to see the DP did not run; the
+mutation run caught 5 of 5 with the control killed; the goldens 458 with
+no mover.
+
+```
+cold loadTheme(defaultTheme), container-local copy, three processes
+
+before   77.8   76.7   65.2 ms
+after     1.5    1.4    1.4 ms
+```
+
+**What remains of F1164's list after this**: the launchers' compile cache
+landed beside it (R01 R4.6); the emulator's dynamic import and the
+highlighter's grammars are still open there.
+
 ## F1164 — the built package's import is the startup, and the theme, the highlighter's every grammar and a headless terminal are all in it ★★★★☆
 
 | | |
 |---|---|
 | **Surface** | `dist/index.js`'s module graph — 381 files under `dist/` and the dependencies they pull in; `src/presentation/blocks/kinds/code.ts`'s `createLowlight` at module scope; `src/data/emulator/emulator.ts`'s `@xterm/headless`; the examples' launchers `bin/docker-tui.js` and `bin/plots-tui.js` |
 | **Reached for** | a probe importing `dist/index.js`, constructing a session over fakes and waiting for the first frame, on a container-local copy so the bind mount is out of the figure: import 471–847 ms, first frame 100–197 ms after it, total 572–1 045 ms over five runs at load average 1–2; on the bind mount the import alone is 4 400–5 000 ms. A profile of the import: 353 ms self in Node's ESM loader (resolve, stat, read, compile, link), `ink`'s own graph 205–250 ms of it, `lowlight` 37–73 (its barrel imports every grammar highlight.js ships, ~190, where the code block registers sixteen), `@xterm/headless` 35, `yoga-layout` 39, `elkjs` 4; `dist:presentation` 76 ms self, of which the theme's two cold quantisations are 65–78 (F1163). With Node 22's on-disk compile cache (`NODE_COMPILE_CACHE`), five interleaved pairs: total 1 045 → 694, 883 → 560, 667 → 650, 676 → 592, 572 → 522 ms — five of five, paired median −84 ms |
-| **Verdict** | **open** — measured, four remedies named and ranked |
+| **Verdict** | **open** — measured, four remedies ranked; 1 (R01 R4.6) and 2 (C10 I41, F1163) built, 3 and 4 owed |
 
 **The path, at HEAD.** An app's launcher sets `NODE_ENV` and dynamically
 imports its `main.ts`, which statically imports `@fmx/calcium`; the barrel
