@@ -841,3 +841,10 @@ describe("C12 I126 — the extent scratch", () => {
     }
   });
 });
+
+describe("C12 I130 — a vertex is projected once per frame", () => {
+  it.todo(
+    "T1.142 (I130): a closed cube rendered smooth reports plot3d.project as the distinct vertices among its drawn faces and flat as three per drawn face; a second camera projects in full and equals a fresh render; the bunny's smooth count is at most its vertex count — not deferred on a component: the code commit replaces this row",
+  );
+});
+
