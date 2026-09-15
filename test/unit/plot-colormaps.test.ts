@@ -128,3 +128,10 @@ describe("CM13: qualitative palette at 1-bit renders without error", () => {
     }
   });
 });
+
+describe("T1.42 (C10 I40, F1150) — the numeric colour path is the hex path, bit-for-bit", () => {
+  // Not deferred on a component: the it.todo lands with F1's code — `sampleRgb`,
+  // `shadeRgb` and the `toLinear` LUT — in the next commit, which turns this into
+  // a running sweep over every map × 1 024 t × 64 k.
+  it.todo("shadeColour(continuousColour(map,t)).hex === rgbHex(shadeRgb(...sampleRgb(map,t), k)) — not deferred on a component: lands with F1's code in the next commit");
+});
