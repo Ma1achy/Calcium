@@ -50148,7 +50148,7 @@ the anchor before it (→ CLAUDE.md, F1150).
 |---|---|
 | **Surface** | `src/presentation/plot/scatter3.ts`'s span pass · `src/presentation/plot/surface3.ts`'s `drawTri`, `clipNear`, `toScreen` |
 | **Reached for** | `tools/bench/plots.mjs orbit bunny`, after F1 — 47.6 ms a render, 75% of the frame, and the floor already cut |
-| **Verdict** | **open** — the remedy is F2 of the pass: one view-space transform per distinct vertex per render, held in a render-local memo the span pass and `drawTri` both read |
+| **Verdict** | **closed — measured and not built.** The identity-keyed memo was built, gated, and measured **2× slower** on the bunny in a same-minute A/B; the HEAD profile puts projection at ~12% of plot time, so no memo can pay for what it costs. C12 I126 retracted. See the close below |
 
 **Measured after F1 (F1150's close): bunny 47.6 ms a render at 69 451 faces,
 teapot 7.2 ms, suzanne 3.5 ms.** F1 moved suzanne 2.6× and bunny 15%, which is
@@ -50176,4 +50176,45 @@ caller is unchanged. **What it does not reach**: `backfaceCulled`'s centroid, on
 per face and not per corner; and the Map lookup itself, ~200 k a frame on the
 bunny, cheaper than the projection it replaces and the figure F3's typed
 buffers would take next.
+
+**Closed — built, measured, reverted.** The memo landed as specified (C12 I126,
+`viewOf(basis)`, a `Map` keyed on the position and normal `Vec3`s, read by the
+span pass, `drawTri`, `clipNear` and `toScreen`), was byte-identical — 458 of 458
+goldens, PM1/PM2 green — and was **slower**:
+
+```
+                            HEAD           with the memo
+plot-meshes golden, bunny   0.68 s          1.80 s           2.6×
+orbit bunny, same minute    240 ms/render   381–647 ms       ~2×
+```
+
+**The profile says why, and it is not the hash.** A microbench of 250 k `Map`
+lookups over 35 k frozen keys runs in 12 ms, so the frozen-document hypothesis
+was wrong. `--cpu-prof` on the memo build put `at` at **560 ms self** and the
+garbage collector at 712 ms: three heap objects per vertex that escape into a
+`Map` cost more than the six inline projections they replaced, which V8 was
+scalar-replacing. **And the HEAD profile says the ceiling was never there** —
+over 1 876 ms of `plot/` self time on the bunny orbit:
+
+```
+plot3dArea (sample loops)                    26.7 %
+drawTri + strokeThin + fill + shade          ~24 %
+drawnOf + extentOf                           14.3 %   every point pushed and the extent re-derived, per frame
+trianglesOf                                   6.4 %   the cold build, once
+project + clipNear + zOf + toScreen + dot    ~12 %
+```
+
+Projection is twelve percent. F2 as planned — a struct-of-arrays refactor of
+`Tri3` — would buy at most that, for a change to a type six callers hold. Not
+built; F916's class. **The two findings that replace it**: `drawnOf` rebuilds
+`all` from every carrier and re-derives the extent every frame, camera-
+independent work keyed exactly like I107's geometry — that is F6, and it is
+next; and the sample loops in `plot3dArea` and the raster are the halves worth
+the typed-buffer work (F3/F4).
+
+**And a reading about the instrument.** HEAD measured 47.6 ms a render at F1's
+close and 240 ms two hours later on the same code and container — the host's
+other containers moved that much. **Only a same-minute A/B is a comparison**;
+the numbers above are pairs, and every earlier absolute in this ledger is a
+reading of the machine that day (F936).
 
