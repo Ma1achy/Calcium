@@ -465,6 +465,12 @@ describe("C12 I107 — the geometry scratch", () => {
   });
 });
 
+describe("C12 I128 — the direct path, owed at the spec commit", () => {
+  it.todo(
+    "PR13 (C12 I128): plot3d.clip is zero for a mesh wholly in front across three cameras and equals the straddling face count at a camera behind the near plane, the frames unchanged — not deferred on a component: the code commit replaces this row",
+  );
+});
+
 describe("C12 I127 — the span over referenced vertices", () => {
   const counting = (): RenderScratch & { writes: () => number } => {
     const held = new WeakMap<object, { key: string; value: unknown }>();
