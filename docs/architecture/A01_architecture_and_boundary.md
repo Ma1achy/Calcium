@@ -256,7 +256,7 @@ Ratios are `bg / bgElev`. Floors are 4.5 : 1, except `dim` at 3 : 1 and `muted` 
 
 `muted` carries the thinnest margin in the table — 2.61 and 2.62 against a floor of 2.5 — and both variants moved to get there. The dark token was `#5a5a5a`, which measured 2.52 against `bg` and **2.31 against `bgElev`**: not "de-emphasised" but struggling, and struggling on the surface every panel and overlay paints. The figure is recorded rather than only the pass, because a nudge of a few points would break the check and nothing else would say so.
 
-**`syntax`** — nine slots, `lowlight`'s classes mapped in C09 §4a. Same lineage as the tones, so the two read as one design rather than two:
+**`syntax`** — nine slots, highlight.js's classes mapped in C09 §4a. Same lineage as the tones, so the two read as one design rather than two:
 
 | Slot | Dark | | Light | |
 |---|---|---|---|---|
@@ -272,7 +272,7 @@ Ratios are `bg / bgElev`. Floors are 4.5 : 1, except `dim` at 3 : 1 and `muted` 
 
 `comment` takes the 3 : 1 floor rather than 4.5. Recessive is the requirement, not a compromise on it — a comment that met 4.5 would not be a comment.
 
-Two collisions had to be broken, and C10 I17 is what found them. `lowlight` emits `hljs-attr` and `hljs-literal` in one colour, so **`key` and `number` were identical**; the ninth slot exists precisely because YAML keys had nowhere to go, and a `key` that renders as `number` buys nothing. It takes the attribute red in both variants.
+Two collisions had to be broken, and C10 I17 is what found them. highlight.js emits `hljs-attr` and `hljs-literal` in one colour, so **`key` and `number` were identical**; the ninth slot exists precisely because YAML keys had nowhere to go, and a `key` that renders as `number` buys nothing. It takes the attribute red in both variants.
 
 **Light `number` and `type` are the second, and it is the less obvious one.** They were the same hue at different lightness, and correcting both to the floor collapsed them onto one value — the correction *created* the collision, so only recomputation could have found it. `type` moves to a darker gold. That looks arbitrary read cold, and it is not.
 

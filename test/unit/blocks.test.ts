@@ -988,3 +988,9 @@ describe("C09 I28 — a progress bar clamps its fill and never its number", () =
     expect(drawn).not.toContain("Infinity");
   });
 });
+
+describe("C09 I71 — the tokeniser's run is emitted straight from the emitter seam", () => {
+  it.todo(
+    "T1.45 (C09 I71): over every default grammar's sample, a markdown document with a fenced block, an xml document with style and script bodies and a javascript template literal, tokenise's run equals lowlight's tree flattened by §4a's rule token for token, and a grammar registered after the first call tokenises on the next — not deferred on a component: the code commit replaces this row",
+  );
+});

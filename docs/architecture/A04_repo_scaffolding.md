@@ -53,11 +53,11 @@ Separate rather than a monorepo because R01 §8's argument generalises: **a work
 
 ## 2. Dependency posture
 
-**Calcium has six runtime dependencies: `react`, `ink`, `lowlight`, `highlight.js`, `beautiful-mermaid` and `@xterm/headless`.**
+**Calcium has five runtime dependencies: `react`, `ink`, `highlight.js`, `beautiful-mermaid` and `@xterm/headless`.** It had six: `lowlight` wrapped highlight.js's emitter seam in a hast tree and its package entry loaded every grammar highlight.js ships, so the wrapper went internal — sixty lines — and `lowlight` stayed as the devDependency C09 I71's reference row is checked against.
 
 It had two for most of the specification, and that was worth saying because **two was a property that fell out of the specs rather than a target we were defending.** Every other candidate had an internal alternative the specs made better: `Intl.Segmenter` over a grapheme splitter, C10's own arithmetic over a colour library, an injected `() => number` over a date library.
 
-`lowlight` is the first capability that genuinely cannot be internal, which is the bar DEPENDENCIES.md sets rather than a number. C10 defines a `syntax` palette and nothing produced the token spans it colours; a hand-written tokeniser for YAML would be wrong about anchors, multi-line scalars and flow mappings, and wrong quietly. The count moved because a spec needed something real, not because the discipline slipped — and the discipline is the justification, never the integer.
+`highlight.js`'s grammars are the first capability that genuinely cannot be internal, which is the bar DEPENDENCIES.md sets rather than a number. C10 defines a `syntax` palette and nothing produced the token spans it colours; a hand-written tokeniser for YAML would be wrong about anchors, multi-line scalars and flow mappings, and wrong quietly. The count moved because a spec needed something real, not because the discipline slipped — and the discipline is the justification, never the integer.
 
 Everything else is already in Node or is arithmetic the specs define, and that is what keeps the list this short:
 
