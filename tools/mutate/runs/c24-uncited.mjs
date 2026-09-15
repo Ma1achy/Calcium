@@ -117,7 +117,7 @@ const results = runPass({
       // and the one an export-list assertion cannot see.
       name: "registerGrammar discards its argument",
       file: CODE,
-      from: "  lowlight.register(language, grammar);\n  memo.clear();",
+      from: "  high.registerLanguage(language, grammar);\n  memo.clear();",
       to: "  void language;\n  void grammar;\n  memo.clear();",
       expect: "T2.15",
     },

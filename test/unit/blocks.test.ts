@@ -1,6 +1,27 @@
 // C09 tier 1 — the registry's state machine, and each kind's documented height.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { createLowlight } from "lowlight";
+import type { LanguageFn } from "highlight.js";
+import bash from "highlight.js/lib/languages/bash";
+import css from "highlight.js/lib/languages/css";
+import diff from "highlight.js/lib/languages/diff";
+import dockerfile from "highlight.js/lib/languages/dockerfile";
+import go from "highlight.js/lib/languages/go";
+import ini from "highlight.js/lib/languages/ini";
+import java from "highlight.js/lib/languages/java";
+import javascript from "highlight.js/lib/languages/javascript";
+import json from "highlight.js/lib/languages/json";
+import markdown from "highlight.js/lib/languages/markdown";
+import python from "highlight.js/lib/languages/python";
+import rust from "highlight.js/lib/languages/rust";
+import sql from "highlight.js/lib/languages/sql";
+import typescript from "highlight.js/lib/languages/typescript";
+import xml from "highlight.js/lib/languages/xml";
+import yaml from "highlight.js/lib/languages/yaml";
+
+/** The default set again, for the reference tokeniser (T1.45). */
+const GRAMMARS = { bash, css, diff, dockerfile, go, ini, java, javascript, json, markdown, python, rust, sql, typescript, xml, yaml };
 import { displayCells } from "../../src/presentation/text.js";
 import { NO_PROBE, block, validateBlock } from "../../src/data/viewmodel/index.js";
 import type { Block, Group, MeasureFn, Probe } from "../../src/data/viewmodel/index.js";
@@ -13,11 +34,32 @@ import {
   tokenise,
   UNSLOTTED,
 } from "../../src/presentation/blocks/index.js";
+import { SLOTS, type Token } from "../../src/presentation/blocks/kinds/code.js";
 import type { RenderContextInput } from "../../src/presentation/blocks/index.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
 import { ONE_PER_KIND } from "../support/blocks.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, MONO_CAPS, measurable, visible } from "../support/render.js";
 import { cells } from "../../src/presentation/text.js";
+
+/** One sample per default grammar, ASCII throughout (T3.32, T1.45). */
+const SAMPLES: Readonly<Record<string, string>> = {
+  bash: 'for f in *.ts; do echo "$f"; done # c',
+  css: ".a { color: #fff; } /* c */",
+  diff: "--- a\n+++ b\n@@ -1 +1 @@\n-old\n+new\n",
+  dockerfile: "FROM node:22\nRUN npm ci\n",
+  go: 'func main() { fmt.Println("hi") } // c',
+  ini: "[s]\nk = v ; c\n",
+  java: "public class A { public static void main(String[] a) {} }",
+  javascript: "async function f(a) { return await g(a); } // c",
+  json: '{"a": 1, "b": [true, null]}',
+  markdown: "# h\n\n`code` and text\n",
+  python: "def f(x):\n    return [i for i in range(x)]  # c",
+  rust: "fn main() { let v: Vec<u8> = vec![1]; } // c",
+  sql: "SELECT id FROM t WHERE x > 1; -- c",
+  typescript: "export const f = (x: number): string => `n`; // c",
+  xml: '<a href="x">t</a><!-- c -->',
+  yaml: "a: 1\nb:\n  - x\n",
+};
 
 describe("C09 §6 — the registry's transition table", () => {
 
@@ -63,24 +105,6 @@ describe("C09 §6 — the registry's transition table", () => {
     // grammar row can only be written for the ones already known. `markdown`
     // is the row that failed before `SLOTS` was extended: four runs, none
     // slotted, which is indistinguishable from not shipping it (F123).
-    const SAMPLES: Readonly<Record<string, string>> = {
-      bash: 'for f in *.ts; do echo "$f"; done # c',
-      css: ".a { color: #fff; } /* c */",
-      diff: "--- a\n+++ b\n@@ -1 +1 @@\n-old\n+new\n",
-      dockerfile: "FROM node:22\nRUN npm ci\n",
-      go: 'func main() { fmt.Println("hi") } // c',
-      ini: "[s]\nk = v ; c\n",
-      java: "public class A { public static void main(String[] a) {} }",
-      javascript: "async function f(a) { return await g(a); } // c",
-      json: '{"a": 1, "b": [true, null]}',
-      markdown: "# h\n\n`code` and text\n",
-      python: "def f(x):\n    return [i for i in range(x)]  # c",
-      rust: "fn main() { let v: Vec<u8> = vec![1]; } // c",
-      sql: "SELECT id FROM t WHERE x > 1; -- c",
-      typescript: "export const f = (x: number): string => `n`; // c",
-      xml: '<a href="x">t</a><!-- c -->',
-      yaml: "a: 1\nb:\n  - x\n",
-    };
 
     // The set drives the samples, not the other way round: a grammar added with
     // no sample fails here rather than being silently uncovered.
@@ -990,7 +1014,67 @@ describe("C09 I28 — a progress bar clamps its fill and never its number", () =
 });
 
 describe("C09 I71 — the tokeniser's run is emitted straight from the emitter seam", () => {
-  it.todo(
-    "T1.45 (C09 I71): over every default grammar's sample, a markdown document with a fenced block, an xml document with style and script bodies and a javascript template literal, tokenise's run equals lowlight's tree flattened by §4a's rule token for token, and a grammar registered after the first call tokenises on the next — not deferred on a component: the code commit replaces this row",
-  );
+  // **The reference is the tree**: `lowlight`'s hast over the same grammars,
+  // flattened by §4a's rule as `code.ts` had it — a text node's slot is the
+  // innermost mapped class on its path, an unmapped class never dropped.
+  type Hast = Readonly<{ type: string; value?: string; properties?: Readonly<{ className?: readonly string[] | string }>; children?: readonly Hast[] }>;
+  const flatten = (node: Hast, inherited: string | null): Token[] => {
+    if (node.type === "text") return node.value === undefined || node.value === "" ? [] : [{ text: node.value, slot: inherited }];
+    const classes = node.properties?.className;
+    const list = typeof classes === "string" ? [classes] : (classes ?? []);
+    let here = inherited;
+    for (const name of list) { const mapped = SLOTS[name]; if (mapped !== undefined) here = mapped; }
+    const out: Token[] = [];
+    for (const child of node.children ?? []) out.push(...flatten(child, here));
+    return out;
+  };
+  // **A grammar with a sublanguage under a scoped mode**, because none of the
+  // sixteen has one (their `subLanguage` modes carry no scope) and the clause
+  // about a sublanguage's unslotted tokens taking the enclosing slot is
+  // unobservable without it: the JSON between `<<` and `>>` sits in a
+  // `string` scope, and its whitespace and colons — `null` in JSON's own run —
+  // read as `string` here.
+  const holding: LanguageFn = () => ({ contains: [{ scope: "string", begin: "<<", end: ">>", subLanguage: "json" }] });
+  const DOCUMENTS: Readonly<Record<string, readonly string[]>> = {
+    markdown: ["# h\n\n```js\nconst a = 1;\n```\n\ntext <b>bold</b> and `code`\n"],
+    xml: ['<html><style>.a { color: red; }</style><script>let x = 1; // c</script><p class="q">t</p></html>'],
+    javascript: ["const s = `a ${f(1)} b`; const h = html`<b>${x}</b>`; function g() {} // c"],
+    holding: ["k <<{\"a\": [1, true]}>> v", "<<>> <<1>>"],
+  };
+
+  it("T1.45 (C09 I71): over every default grammar's sample, a markdown document with a fenced block, an xml document with style and script bodies and a javascript template literal, tokenise's run equals lowlight's tree flattened by §4a's rule token for token, and a grammar registered after the first call tokenises on the next", () => {
+    // Every key of the table carries the prefix, which is what licenses looking
+    // up the first segment alone (I71).
+    expect(Object.keys(SLOTS).every((k) => k.startsWith("hljs-"))).toBe(true);
+    // ASCII throughout, so I64's cluster pass is the identity and the run is
+    // the emitter's own.
+    const corpus = [...Object.entries(SAMPLES).map(([l, s]) => [l, s] as const), ...Object.entries(DOCUMENTS).flatMap(([l, ds]) => ds.map((d) => [l, d] as const))];
+    for (const [, text] of corpus) expect(/^[\x00-\x7f]*$/u.test(text), "ASCII").toBe(true);
+
+    // The grammar arriving after the first call: `tokenise` has run for the
+    // default set (T3.32 above, and the first arm here), and `holding` is
+    // registered now, on both sides.
+    registerGrammar("holding", holding);
+    const reference = createLowlight({ ...GRAMMARS, holding });
+
+    let compared = 0;
+    for (const [language, text] of corpus) {
+      const ours = tokenise(text, language);
+      const theirs = flatten(reference.highlight(language, text) as Hast, null);
+      expect(ours, `${language}: ${JSON.stringify(text)}`).toEqual(theirs);
+      expect(ours.map((t) => t.text).join(""), "the run is the text").toBe(text);
+      compared += 1;
+    }
+    expect(compared).toBe(corpus.length);
+    // The clause the hand grammar exists for: an unslotted JSON token under the
+    // `string` scope reads as `string`, and the sublanguage's own slots hold.
+    const held = tokenise(DOCUMENTS["holding"]?.[0] ?? "", "holding");
+    // The delimiters, and JSON's two spaces — after the colon and the comma —
+    // which JSON's own run leaves unslotted; the colon itself is JSON's
+    // punctuation and keeps that.
+    expect(held.filter((t) => t.slot === "string").map((t) => t.text).join("")).toBe("<<  >>");
+    expect(held.some((t) => t.slot === "number"), "JSON's own number slot survives").toBe(true);
+    // A sample with two adjacent scopes, the boundary the merge mutation moves.
+    expect(tokenise("a: 1", "yaml").length).toBeGreaterThan(2); // cells-ok — a token count
+  });
 });

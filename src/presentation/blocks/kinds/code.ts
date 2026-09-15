@@ -16,8 +16,8 @@
  */
 import { NO_SPAN } from "../../../data/viewmodel/index.js";
 import type { ReactElement } from "react";
-import { createLowlight } from "lowlight";
-import type { LanguageFn } from "highlight.js";
+import HighlightJs from "highlight.js/lib/core";
+import type { Emitter, HLJSOptions, LanguageFn } from "highlight.js";
 import bash from "highlight.js/lib/languages/bash";
 import css from "highlight.js/lib/languages/css";
 import diff from "highlight.js/lib/languages/diff";
@@ -67,7 +67,6 @@ export const DEFAULT_LANGUAGES: readonly string[] = Object.freeze(
   Object.keys(DEFAULT_GRAMMARS).sort(),
 );
 
-const lowlight = createLowlight(DEFAULT_GRAMMARS);
 
 /**
  * `hljs` class → palette slot, explicit rather than derived (§4a).
@@ -75,7 +74,7 @@ const lowlight = createLowlight(DEFAULT_GRAMMARS);
  * A derived mapping changes silently when the upstream grammar does. This one
  * changes when someone edits it.
  */
-const SLOTS: Readonly<Record<string, string>> = Object.freeze({
+export const SLOTS: Readonly<Record<string, string>> = Object.freeze({
   "hljs-keyword": "keyword",
   "hljs-string": "string",
   "hljs-comment": "comment",
@@ -171,9 +170,7 @@ export function tokenise(text: string, language: string, probe?: Probe): readonl
   // disagree on, and that is a property of the key rather than an omission.
   probe?.miss("tokens", "absent");
 
-  const parsed = lowlight.registered(language)
-    ? flatten(lowlight.highlight(language, text) as HastNode, null)
-    : [{ text, slot: null }];
+  const parsed = high.getLanguage(language) !== undefined ? emitted(language, text) : [{ text, slot: null }];
   const tokens = wholeClusters(parsed, text);
 
   if (memo.size >= MEMO_CAP) {
@@ -253,7 +250,7 @@ function wholeClusters(tokens: readonly Token[], text: string): readonly Token[]
  * token changes appearance and never line count (I8), so nothing reflows.
  */
 export function registerGrammar(language: string, grammar: LanguageFn): void {
-  lowlight.register(language, grammar);
+  high.registerLanguage(language, grammar);
   memo.clear();
 }
 
@@ -263,43 +260,114 @@ export function tokenisationCount(): number {
 }
 
 /**
- * What this file needs from a hast tree, and nothing more.
- *
- * Structural rather than imported from `@types/hast`: the shape is three fields
- * deep, the types package is a transitive dependency of `lowlight` rather than
- * one this repo declares, and DEPENDENCIES.md's bar for declaring one is not
- * met by a node shape that fits in six lines.
+ * A scope as the emitter holds it: its slot, and whether the last thing
+ * emitted under it was text (C09 I71).
  */
-type HastNode = Readonly<{
-  type: string;
-  value?: string | undefined;
-  properties?: Readonly<{ className?: readonly string[] | string | undefined }> | undefined;
-  children?: readonly HastNode[] | undefined;
-}>;
+type Frame = { slot: string | null; tailIsText: boolean };
 
 /**
- * A hast tree to a flat run of tokens.
+ * highlight.js's emitter seam, producing the token run directly (C09 I71).
  *
- * An unmapped class renders its text in the default tone and is **never
- * dropped** (§4a). The fallback is a fallback, not a filter: dropping is the
- * failure mode where a grammar update makes half a file invisible.
+ * **The shape is the tree's, without the tree.** The reference — `lowlight`'s
+ * hast, flattened by §4a's rule — gives a text node a slot from the innermost
+ * mapped class on its path and merges adjacent text nodes under one element.
+ * Here a frame per open scope holds that slot, and `tailIsText` is whether the
+ * last child under it was text, which is exactly when the tree would have
+ * merged. A scope's class is `hljs-` on the first segment of its name; the
+ * later segments of a dotted name carry no prefix, every key of `SLOTS` does,
+ * and so they can map nothing — which is why only the first is looked up.
+ *
+ * **An unmapped class is never dropped** (§4a): it leaves the slot as the
+ * enclosing scope's, and the text is emitted under that.
  */
-function flatten(node: HastNode, inherited: string | null): readonly Token[] {
-  if (node.type === "text") {
-    return node.value === undefined || node.value === "" ? [] : [{ text: node.value, slot: inherited }];
+class TokenEmitter implements Emitter {
+  readonly tokens: Token[] = [];
+  readonly frames: Frame[] = [{ slot: null, tailIsText: false }];
+  private readonly prefix: string;
+
+  constructor(options: HLJSOptions) {
+    this.prefix = options.classPrefix;
   }
 
-  const classes = node.properties?.className;
-  const list = typeof classes === "string" ? [classes] : (classes ?? []);
-  let here = inherited;
-  for (const name of list) {
-    const mapped = SLOTS[name];
-    if (mapped !== undefined) here = mapped;
+  addText(text: string): void {
+    if (text === "") return;
+    const frame = this.frames[this.frames.length - 1] as Frame; // cells-ok — a scope depth
+    if (frame.tailIsText) {
+      const last = this.tokens.length - 1; // cells-ok — a token index
+      const held = this.tokens[last] as Token;
+      this.tokens[last] = { text: held.text + text, slot: held.slot };
+    } else {
+      this.tokens.push({ text, slot: frame.slot });
+    }
+    frame.tailIsText = true;
   }
 
-  const out: Token[] = [];
-  for (const child of node.children ?? []) out.push(...flatten(child, here));
-  return out;
+  /**
+   * highlight.js 11 calls `openNode`/`closeNode` when a mode begins and ends
+   * and `startScope`/`endScope` for a match's own scope; the types name the
+   * second pair, `lowlight` implements both, and the seam is the same either
+   * way.
+   */
+  openNode(name: string): void {
+    this.startScope(name);
+  }
+
+  closeNode(): void {
+    this.endScope();
+  }
+
+  startScope(name: string): void {
+    const outer = this.frames[this.frames.length - 1] as Frame; // cells-ok — a scope depth
+    outer.tailIsText = false;
+    const head = String(name).split(".")[0] as string;
+    const mapped = SLOTS[this.prefix + head];
+    this.frames.push({ slot: mapped ?? outer.slot, tailIsText: false });
+  }
+
+  endScope(): void {
+    this.frames.pop();
+  }
+
+  /**
+   * A sublanguage's run, already emitted by its own emitter: a token keeps its
+   * slot where a scope of its own mapped and takes this scope's where none did
+   * — the innermost mapped class on the whole path, as the tree's flatten had
+   * it. A named sublanguage was wrapped in the tree, so the tail is the wrapper;
+   * an unnamed one was spread, and its last text run stays open to merge.
+   */
+  __addSublanguage(other: Emitter, name: string): void {
+    const sub = other as TokenEmitter;
+    const frame = this.frames[this.frames.length - 1] as Frame; // cells-ok — a scope depth
+    for (const t of sub.tokens) this.tokens.push(t.slot === null ? { text: t.text, slot: frame.slot } : t);
+    if (name) frame.tailIsText = false;
+    else if (sub.tokens.length > 0) frame.tailIsText = (sub.frames[0] as Frame).tailIsText; // cells-ok — a token count
+  }
+
+  finalize(): void {}
+
+  toHTML(): string {
+    return "";
+  }
+}
+
+/**
+ * The tokeniser: a `highlight.js/lib/core` instance of this module's own,
+ * emitting through `TokenEmitter` below (C09 I71). **Not `lowlight`**: its
+ * package entry re-exports every grammar highlight.js ships, 22–30 ms of a
+ * 260 ms cold import container-local and 73–89 ms on the bind mount (F1164),
+ * for a wrapper whose whole service here is the sixty lines that follow.
+ */
+const high = HighlightJs.newInstance();
+high.configure({ __emitter: TokenEmitter, classPrefix: "hljs-" });
+for (const [name, grammar] of Object.entries(DEFAULT_GRAMMARS)) high.registerLanguage(name, grammar);
+
+/** The run for a registered language (C09 I71); a grammar that throws is a defect, not a fallback. */
+function emitted(language: string, text: string): readonly Token[] {
+  const result = high.highlight(text, { language, ignoreIllegals: true });
+  if (result.errorRaised !== undefined) {
+    throw new Error(`could not highlight ${language}`, { cause: result.errorRaised });
+  }
+  return (result._emitter as TokenEmitter).tokens;
 }
 
 /**

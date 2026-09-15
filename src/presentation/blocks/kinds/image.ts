@@ -31,7 +31,7 @@ import type { BlockDefinition, RenderContext } from "../types.js";
  *
  * **On the digest and never on the data**, which is what §3g.2's identity is for:
  * `measure` and `render` both need the dimensions, and a decode per call would
- * do the expensive half twice per frame. `lowlight`'s memoisation on
+ * do the expensive half twice per frame. The tokeniser's memoisation on
  * `(text, language)` is the precedent.
  */
 const DECODED = new Map<string, Decoded>();
