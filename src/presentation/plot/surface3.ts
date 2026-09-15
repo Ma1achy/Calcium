@@ -565,12 +565,15 @@ export function drawTri(
  */
 export function backfaceCulled(tri: Tri3, basis: Basis): boolean {
   if (tri.skin.cull === 0) return false;
-  const c = {
-    x: (tri.a.p.x + tri.b.p.x + tri.c.p.x) / 3,
-    y: (tri.a.p.y + tri.b.p.y + tri.c.p.y) / 3,
-    z: (tri.a.p.z + tri.b.p.z + tri.c.p.z) / 3,
-  };
-  return dot(tri.fn, sub(c, basis.eye)) * tri.skin.cull > 0;
+  // **Scalars, in the order the `Vec3` forms had them** (C12 I131, F1169):
+  // the centroid's components, its difference from the eye, `dot`'s sum —
+  // and nothing allocated, 69,451 times a bunny frame.
+  const cx = (tri.a.p.x + tri.b.p.x + tri.c.p.x) / 3;
+  const cy = (tri.a.p.y + tri.b.p.y + tri.c.p.y) / 3;
+  const cz = (tri.a.p.z + tri.b.p.z + tri.c.p.z) / 3;
+  const e = basis.eye;
+  const n = tri.fn;
+  return (n.x * (cx - e.x) + n.y * (cy - e.y) + n.z * (cz - e.z)) * tri.skin.cull > 0;
 }
 
 /**

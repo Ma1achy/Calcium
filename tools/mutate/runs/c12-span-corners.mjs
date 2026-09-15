@@ -46,8 +46,8 @@ const results = runPass({
   run,
   control: {
     file: S3,
-    from: "  for (const c of scene.corners) {\n    const pr = project(scene.basis, c.p);",
-    to: "  for (const c of [] as typeof scene.corners) {\n    const pr = project(scene.basis, c.p);",
+    from: "  for (const c of scene.corners) {\n    const z = viewDepth(scene.basis, c.p);",
+    to: "  for (const c of [] as typeof scene.corners) {\n    const z = viewDepth(scene.basis, c.p);",
     why: "the ramps keyed to the clouds and paths alone — C04 I79's defect at the read; the mesh goldens must move or they cannot see the ramp",
   },
   mutations: [

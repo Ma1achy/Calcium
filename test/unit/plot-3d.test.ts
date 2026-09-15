@@ -14,7 +14,7 @@ import { backfaceCulled, drawTri, geometryOf, lightDirOf, surfacePoints, type Tr
 import type { RenderScratch } from "../../src/presentation/blocks/types.js";
 import { DARK_THEME, FULL_CAPS, measurable, registry } from "../support/render.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
-import { NEAR } from "../../src/presentation/plot/project3.js";
+import { NEAR, dot, sub, viewDepth } from "../../src/presentation/plot/project3.js";
 import { loadMesh } from "../support/obj.js";
 import {
   basisOf,
@@ -922,7 +922,45 @@ describe("C12 I130 — a vertex is projected once per frame", () => {
 
 
 describe("C12 I131 — the span's depth is project's first dot, and the cull allocates nothing", () => {
-  it.todo(
-    "T1.143 (C12 I131): over a seeded corpus viewDepth equals project's depth bit for bit and is null exactly where project is, and backfaceCulled equals the allocating form on every seeded triangle under both cull signs — not deferred on a component: the code commit replaces this row",
-  );
+  // A seeded generator, so the corpus is the same on every run and a last-bit
+  // difference is reproducible rather than a flake.
+  const lcg = (seed: number): (() => number) => {
+    let x = seed >>> 0;
+    return () => { x = (Math.imul(x, 1664525) + 1013904223) >>> 0; return x / 4294967296; };
+  };
+  it("T1.143 (C12 I131): over a seeded corpus viewDepth equals project's depth bit for bit and is null exactly where project is, and backfaceCulled equals the allocating form on every seeded triangle under both cull signs", () => {
+    const basis = basisOf({ azimuth: 0.7, elevation: 0.4, distance: 3 }, ASPECT(80, 24));
+    const r = lcg(1131);
+    // **Points around and behind the camera**: a cube of side 8 about the
+    // origin at distance 3 puts a share of them at or behind the near plane.
+    let nulls = 0; let depths = 0;
+    for (let i = 0; i < 10_000; i += 1) { // cells-ok — a corpus index
+      const p = { x: r() * 8 - 4, y: r() * 8 - 4, z: r() * 8 - 4 };
+      const full = project(basis, p);
+      const z = viewDepth(basis, p);
+      if (full === null) { expect(z, "null where project is").toBeNull(); nulls += 1; }
+      else { expect(z, "the depth, bit for bit").toBe(full.depth); depths += 1; }
+    }
+    expect(nulls, "the corpus holds points project refuses").toBeGreaterThan(100);
+    expect(depths, "and points it projects").toBeGreaterThan(1000);
+
+    // **The cull against its allocating form**, both signs, on triangles whose
+    // normals are their own — so the sign test reads both answers.
+    const reference = (t: Tri3): boolean => {
+      if (t.skin.cull === 0) return false;
+      const c = { x: (t.a.p.x + t.b.p.x + t.c.p.x) / 3, y: (t.a.p.y + t.b.p.y + t.c.p.y) / 3, z: (t.a.p.z + t.b.p.z + t.c.p.z) / 3 };
+      return dot(t.fn, sub(c, basis.eye)) * t.skin.cull > 0;
+    };
+    const vert = () => ({ p: { x: r() * 4 - 2, y: r() * 4 - 2, z: r() * 4 - 2 }, n: { x: 0, y: 0, z: 1 }, v: undefined });
+    const seen = { culled: 0, kept: 0 };
+    for (let i = 0; i < 10_000; i += 1) { // cells-ok — a corpus index
+      const cull = r() < 0.5 ? 1 : -1;
+      const tri = { a: vert(), b: vert(), c: vert(), fn: { x: r() * 2 - 1, y: r() * 2 - 1, z: r() * 2 - 1 }, edges: [true, true, true], series: 0, skin: { cull, wire: false } } as unknown as Tri3;
+      const ours = backfaceCulled(tri, basis);
+      expect(ours, `triangle ${i}`).toBe(reference(tri));
+      if (ours) seen.culled += 1; else seen.kept += 1;
+    }
+    expect(seen.culled, "the corpus holds culled faces").toBeGreaterThan(1000);
+    expect(seen.kept, "and kept ones").toBeGreaterThan(1000);
+  });
 });

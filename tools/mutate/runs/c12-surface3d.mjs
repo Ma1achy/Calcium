@@ -194,8 +194,8 @@ const results = await runPass({
       // cannot read the eye's position.
       name: "the cull tests a view-space constant rather than the face's own direction",
       file: F,
-      from: "  return dot(tri.fn, sub(c, basis.eye)) * tri.skin.cull > 0;",
-      to: "  return dot(tri.fn, basis.forward) * tri.skin.cull > 0;",
+      from: "  return (n.x * (cx - e.x) + n.y * (cy - e.y) + n.z * (cz - e.z)) * tri.skin.cull > 0;",
+      to: "  return (n.x * basis.forward.x + n.y * basis.forward.y + n.z * basis.forward.z) * tri.skin.cull > 0;",
       expect: "WF1",
     },
     {
@@ -285,8 +285,8 @@ const results = await runPass({
       // satisfied and the set is wrong at the silhouette.
       name: "the cull reads a shading normal rather than the face's",
       file: F,
-      from: "  return dot(tri.fn, sub(c, basis.eye)) * tri.skin.cull > 0;",
-      to: "  return dot(tri.a.n, sub(c, basis.eye)) * tri.skin.cull > 0;",
+      from: "  const n = tri.fn;\n  return (n.x * (cx - e.x)",
+      to: "  const n = tri.a.n;\n  return (n.x * (cx - e.x)",
       expect: "WF9",
     },
   ],

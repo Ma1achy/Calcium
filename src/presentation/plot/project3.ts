@@ -295,6 +295,20 @@ export function project(basis: Basis, p: Vec3): Projected | null {
   return { x: sx * 0.5 + 0.5, y: 0.5 - sy * 0.5, depth: z };
 }
 
+/**
+ * A point's view depth as `project` computes it and nothing more (C12 I131):
+ * the first of its three dots — `(p − eye) · forward`, the same three
+ * subtractions and products in the same order — and `null` at or behind
+ * `NEAR` exactly where `project` answers `null`. The ramp span reads depths
+ * for every referenced vertex a frame (I127) and needs none of the rest.
+ */
+export function viewDepth(basis: Basis, p: Vec3): number | null {
+  const e = basis.eye;
+  const f = basis.forward;
+  const z = (p.x - e.x) * f.x + (p.y - e.y) * f.y + (p.z - e.z) * f.z;
+  return z <= NEAR ? null : z;
+}
+
 /** The depth buffer: one `Float32Array`, cleared to `+Infinity`. */
 export type Depth = Readonly<{ width: number; height: number; z: Float32Array }>;
 

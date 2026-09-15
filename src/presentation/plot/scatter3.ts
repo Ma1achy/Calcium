@@ -68,6 +68,7 @@ import {
   unionOf,
   unitOf,
   UNIT_EXTENT,
+  viewDepth,
   writeDepth,
   type Basis,
   type Depth,
@@ -964,9 +965,11 @@ export function plot3dArea(
   // **Once per referenced vertex and never per corner** (F1154): a bunny vertex
   // sits on six faces, and a minimum over a multiset is the minimum over its
   // support.
+  // **The depth alone** (C12 I131, F1169): `project`'s first dot, not its
+  // record — 35,947 of them a bunny frame.
   for (const c of scene.corners) {
-    const pr = project(scene.basis, c.p);
-    if (pr !== null) reading(pr.depth, c.v);
+    const z = viewDepth(scene.basis, c.p);
+    if (z !== null) reading(z, c.v);
   }
   const span = { nearD, farD, loV, hiV };
 
