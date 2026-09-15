@@ -49957,7 +49957,7 @@ braces, which is a parser rather than a regex.
 |---|---|
 | **Surface** | `src/presentation/blocks/kinds/containers.ts`'s `groupDefinition` · `registry.windowSequence` · `examples/plots`'s `/all` |
 | **Reached for** | `tools/bench/plots.mjs`, written for this pass — the `/all` scroll frame, measured three runs a side |
-| **Verdict** | **open** — the remedy is a `window` on the column group, Phase A of the pass; F424's own class, the candidate that list already named |
+| **Verdict** | **closed** — Phase A landed a `window` on the column arm (C09 I69); the `/all` scroll frame fell from 479 ms to 27 ms at p50, and react from ~145 renders a frame to ~3. See the close below |
 
 **Measured, `/all` at 80×24, one PageUp/PageDown per keystroke, medians of three
 runs (F936: shares, not absolutes).**
@@ -49997,3 +49997,27 @@ charged to `skipRows`/`dropRows` — I26's identity, `logs`' shape one level up.
 The row arm declines (its children are side by side, not a sequence), as does a
 column carrying `minRows` (its height is declared). Recursion into a windowed
 child is deferred: a `/all` tile is ≤ 10 rows, so the slack is ≤ two tiles.
+
+**Closed — Phase A, the same bench three runs a side after the window landed
+(`git 539acac9`).** `groupDefinition.window` divides a column by whole children;
+the row arm and a `minRows` column decline. Byte-identical: `make golden` moved
+0 of 2 130 frames.
+
+```
+                        before (open)      after (Phase A)
+frame work  p50           479 ms             27 ms      17.7× 
+frame work  p95           680 ms             85 ms       8.0× 
+frame work  max         1 020 ms            272 ms       3.8× 
+react renders / frame       ~145             ~3         a subsequence, kept whole
+```
+
+At 130×42 the p95 was the honest figure — the median hid the cost because more
+of the document was on screen — and it fell from **926 ms to 91 ms**, the same
+mechanism from the other size.
+
+**What A left for the phases after it.** With the count bounded, the residue is
+what one visible figure costs, not how many render: `react` (Ink) still holds
+~40 % of the frame and `notice` captions 20 %, which is Phase H's subject
+(per-figure render cost), and `measure absent 74 694` over the run is Phase B's
+(per-rev derived layout). Neither is a regression A introduced; both are what
+was always under the 145 renders and only now visible.
