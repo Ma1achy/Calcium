@@ -258,3 +258,10 @@ describe("C23 — the shell route as a live screen, spec-first rows", () => {
     expect(kept, "and the last one before the press").toContain("tick 2");
   }, 30_000);
 });
+
+describe("C23 I71 — the emulator is loaded by the route, not by the import", () => {
+  it.todo(
+    "T5.22 (I71): a child importing dist/index.js under the import trace loads nothing from @xterm/headless, and the same child after a shell command through the route lists the emulator — not deferred on a component: the code commit replaces this row",
+  );
+});
+

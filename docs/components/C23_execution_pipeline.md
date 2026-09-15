@@ -1183,6 +1183,7 @@ Per submission.
 - **I68** — **`/profile [pane]` opens C28's view through the local route, and every refusal is a document on that route rather than a throw**: a `warn` notice naming `TuiConfig.profile` when no profiler exists, a usage notice naming C28's four panes and the token typed when the pane is not one of them, and the view's own *close what is open* when another layer is up. The pane is read from `ctx.args` and never from `argv[0]`, except to quote the token on the failure arm (C22 I66). The view is reached through `HandlerDeps`, as `/exit` reaches `stop`, and `LocalContext.profile` stays the report and only the report.
 - **I69** — **A profile document is stamped or live; it is never a reading presented as current, and a live one never raises the tier.** `/profile` itself appends a notice naming the section and never the live panes — those are drawn in the view and refreshed there. The rule read *never the panes* until the amendment, and the sentence behind it was true about the only document it considered: an unstamped, never-refreshed copy of a report reads as current on every later frame, which is I18's stale-data shape with the framework's own figures inside it. **What it forbade was the capability rather than the defect**, and the framework already answers the defect twice — a `b.live` part is current because it is refreshed, and a stamp naming the frame range, the elapsed time, the tier and the ring's reset point claims the opposite of current on its face. So `/profile snapshot` and `/profile live` are admitted and the constraint moves to where the real hazard is: **a transcript part has no close**, so a live card that raised the tier would pin it for the session and reset the ring doing it (C28 I50, C28 I18). A live card calls no `setTier` — it draws what is already being recorded, and draws the *raise the tier* notice where that is nothing.
 - **I70** — **A refused patch stops the part and never the host, and a refusal the host still holds the block for is recorded as a fault.** `PatchOutcome`'s arms answer two different questions — *is the host gone* and *was the patch refused* — and a driver reading `outcome.ok` answers only the first, so the shell building a patch C04 cannot take took the same silent teardown as an evicted entry: every sibling part on that host and the entry's elapsed readout (I53) stopped with it, and the exact diagnosis was discarded at the one place that could report it (§8h, F1002). A refused part is given the dead source I43 already defines, so it stops **without a second teardown path** (I32) and the host is released by the sweep once nothing on it still polls. **The report is a fault and not the part's own panel**, which is §5a's first sentence one component along — the reporting path is the path that failed, and I43's refusal can draw in the panel only because it is refused *before* a patch is needed.
+- **I71** — **The emulator is loaded by the shell route, on demand, and never by the package's import.** `@xterm/headless` is 35 ms of a cold start on a native filesystem and no first frame draws a terminal (F1164); the route is `async` before it spawns, so the module arrives through a dynamic import awaited where `createEmulator` was called, and a session that never runs a shell command never loads it. **Behaviour is unchanged by construction**: the block, its snapshots, its resize and its disposal are the same code reached one microtask later on the first shell command of a session, and T5.21 is the row that shows the terminal still streams. The observable is the module graph, not a timing: a child process that imports `dist/index.js` and lists what it loaded holds nothing from the emulator's package, and a test that read a duration instead would pass on a fast machine with the import back on the barrel.
 
 
 ## 8. Commitments
@@ -1248,6 +1249,7 @@ Per submission.
 58. **`/profile` opens the profiler's view, and refuses in a document** (I68). No profiler, an unknown pane and an occupied stack each answer through the route the verb came in on.
 59. **A figure reaching the transcript says when it was taken or keeps itself current, and never raises the tier to do either** (I69). `/profile` still records that the view opened and nothing more; `snapshot` stamps and `live` refreshes.
 60. **A refused patch stops the part, not the host, and says what was refused** (I70). Three arms, two questions: the host is released when C13 has dropped the entry, and the part alone when the document refuses what the shell built — with `applyPatch`'s message on §5a's two channels.
+61. **The shell route imports the emulator when it runs, not when the package loads** (I71). `test/support/import-trace.mjs` is the instrument: a `--import` hook that lists every module a child resolved, so T5.22 reads the startup graph as a corpus rather than timing it.
 
 ---
 
@@ -1268,6 +1270,12 @@ With a `PtyFactory` injected the route calls
 and its progress bar. With none it calls `spawnShell` and writes **both** streams into the same
 emulator in arrival order. C21 I3 is not weakened — the handle's streams are still separate, and
 merging is this route's choice about one block, because a terminal has one stream by nature.
+
+**The emulator is fetched when the route runs** (I71). `createEmulator` arrives through a dynamic
+import awaited at the top of the route, after the arm is chosen and before anything is spawned, so
+the headless terminal's 35 ms are paid by the first shell command of a session rather than by every
+session's import — a first frame never draws a terminal (F1164). The route is already `async`;
+nothing about the block changes, and the startup graph is what T5.22 reads.
 
 **The child's environment names our emulator, not the outer terminal**: `TERM=xterm-256color` and
 `COLORTERM=truecolor`, set over the injected environment (C21 I14). C27 interprets 24-bit SGR, and
@@ -2271,6 +2279,7 @@ Fake transport, fake stores.
 - **T5.6**: `cd` into a directory, run a verb, `cd -`, run it again → each lands in the right place.
 - **T5.20**: a real session with a live part whose source fails and recovers → the placeholder, the data, the error with a visible countdown, and the data again, with the rest of the screen unmoved throughout.
 - **T5.21** (I64, I66): a real `sh -c 'for i in $(seq 1 200); do echo $i; sleep 0.01; done'` under the devcontainer → frames arrive while it runs, the frame count is far below 200, and `⌃c` at the halfway point settles the card `cancelled` with the lines so far.
+- **T5.22** (I71): a child process importing `dist/index.js` under `test/support/import-trace.mjs` lists every module it loaded, and none is under `@xterm/headless`; the same child after a shell command through the route lists the emulator — so the row sees both that the import left it out and that the route brings it in, and T5.21 shows the terminal it brings in still streams.
 
 ### Tier 6 — fail-on-revert
 
@@ -2369,6 +2378,7 @@ Fake transport, fake stores.
 - **T6.96** (I67): keeping the cursor on settle → T2.47 fails and a settled block draws a cursor nobody is writing at.
 - **T6.99** (I53, I54): the card's `startedAt` and its settlement's `cardOver` on `deps.clock()` → T4.68 fails on the settled figure — and C28 T5.1d survives it, measured, because a positional channel reproduces whatever is computed from it (F975); the readout's `startedAt` and `since` on `deps.clock()` → T3.64 fails on the figure after the skew.
 - **T6.100** (I70): reading `outcome.ok` as the whole answer — the shipped behaviour — → **T3.65** fails. Eleven mutations in `tools/mutate/runs/c23-patch-refusal.mjs`, ten caught by name and one recorded as an expected survivor: replacing the `hostGone` release with a part-level stop, which §8h H2 says is unobservable and which the pass confirms.
+- **T6.101** (I71): a static import of `createEmulator` back at the top of `execution.ts` → T5.22's first half fails, the package's import 35 ms heavier on every session with every other row green.
 - **T6.97** (I63): falling back to the pipe arm when `spawnPty` throws → T3.63 fails and a configuration error becomes a child that quietly lost its colours.
 
 ---
