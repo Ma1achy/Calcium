@@ -467,15 +467,6 @@ describe("C12 I107 — the geometry scratch", () => {
   });
 });
 
-describe("C12 I129 — the screen slots, owed at the spec commit", () => {
-  it.todo(
-    "PR14 (C12 I129): plot3d.projected equals the referenced vertex count for a smooth mesh at two cameras and three times the face count under flat, the frames unchanged — not deferred on a component: the code commit replaces this row",
-  );
-  it.todo(
-    "PR14b (C12 I129): drawTri through a slot array paints the same samples, intensities and edges as without one, flat and smooth, and a straddling triangle too — not deferred on a component: the code commit replaces this row",
-  );
-});
-
 describe("C12 I128 — the direct path", () => {
   /** A probe that counts and does nothing else, on `NO_PROBE`'s shape. */
   const counting = (): Probe & { counts: Map<string, number> } => {
