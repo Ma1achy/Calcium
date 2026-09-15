@@ -454,3 +454,18 @@ describe("C12 I107 — the geometry scratch", () => {
     expect(s.writes(), "one slot each").toBe(2);
   });
 });
+
+describe("C12 I126 — the extent scratch, owed at the spec commit", () => {
+  it.todo(
+    "PR11 (C12 I126): the extent scratch changes no byte over a cloud, a path, a mesh and an empty cloud at two cameras, and each carrier is written once — not deferred on a component: the code commit replaces this row",
+  );
+  it.todo(
+    "PR11b (C12 I126, §6o row 12): an empty carrier contributes nothing — a surface beside an empty cloud renders as the surface alone, and the unit cube fabricated into the slot moves the frame — not deferred on a component: the code commit replaces this row",
+  );
+  it.todo(
+    "PR11c (C12 I126, §6o rows 10, 11, 13): a height field has one slot and one write per build; a cloud gaining a point rebuilds the geometry inside the held slot and the frame equals the bare frame — not deferred on a component: the code commit replaces this row",
+  );
+  it.todo(
+    "PR11d (C12 I126): xRange moved on a height field misses and matches the bare frame; a new Surface3 around the same heights and ranges hits — not deferred on a component: the code commit replaces this row",
+  );
+});
