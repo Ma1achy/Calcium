@@ -50360,3 +50360,36 @@ the suite 6215 green in full this time. **What it leaves**: the raster itself �
 `drawTri`, `strokeThin`, `clipNear`, `shade`, `fill` and the per-sample
 callback, about a third of process time on the bunny in F1153's profiles — is
 F3's, and it is next.
+
+## F1155 — the raster allocates about twenty objects per triangle before it paints a sample ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/surface3.ts`'s `drawTri`, `clipNear`, `toScreen`, `fill`, `strokeThin` |
+| **Reached for** | F1153's profiles: `drawTri` 1 007 ms self, `strokeThin` 470, `clipNear` 265, `zOf` 292, the garbage collector 14% — about a third of process time on the bunny over sixty renders |
+| **Verdict** | **open** — measured, the remedy named |
+
+**The path, at HEAD, per triangle and before any sample is painted.** `drawTri`
+builds `vs`, filters it into `behind` with a closure, and calls `clipNear` on
+every triangle — which maps a `z` array, filters `kept`, and returns a fresh
+`[{ v, e }]` even when nothing is clipped, which on a mesh in front of the
+camera is every triangle. `t.v.map(toScreen)` is another array and three
+`Screen`s, each carrying a `Projected`, a `sub` and two `viewDir` results —
+five objects a vertex. `fill` then allocates `len`, four closures for the
+bounds and a `[ua, ub, uc]` tuple per sample; `strokeThin`, which most bunny
+triangles take because they are smaller than a sample, allocates a `pairs`
+array of three tuples, a closure and two `asProjected` objects per edge, and
+per sample two `lerpV` results and a spread. Twenty allocations a triangle
+before the first sample, 69 451 triangles a frame, and the collector's 14% is
+where they go.
+
+**The remedy.** A direct path for the common case: the three view depths as
+scalars, and a triangle wholly in front of the near plane handed to the fill
+without `clipNear` — the same three screen vertices the clip would have
+returned untouched, so byte-identical by construction; `plot3d.clip` counts
+the triangles that take the other path, which is the observable. One flat
+screen record a vertex — position, view direction and normal as nine numbers,
+`project` for the position and `dot`'s order for each component. Scalar edge
+lengths, bounds and weights in the fill; explicit edges in the thin stroke.
+`shade` stays as it is, the object form and the reference the goldens hold.
+Measured on landing with the paired probe, F7's build the A side.
