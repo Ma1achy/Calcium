@@ -51203,3 +51203,54 @@ were high by the development build's share, which is the `react` span's
 110 ms of 924 here. From this entry on the bench's numbers are the shipped
 configuration's.
 
+## F1168 — every rendered row goes through Ink to be measured again, and on a 3-D orbit that is half the frame ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/blocks/paint.ts`'s `Text` per row; `src/presentation/render-lines.ts`'s `react` span around `renderToString`; Ink's `Output`, `@alcalzone/ansi-tokenize`, `string-width` |
+| **Reached for** | the `orbit` bench at 80×24 on the F19 build, suzanne: work p50 11.6 ms, the `react` span 48.5% at 190 ms over 46 renders (p50 1.1, p95 11.1) against `plot.form.plot3d` 34.5% at 135 over 16 — 7.3 ms of Ink a frame against 6.8 of raster. The bunny: `react` 21% at 166 ms over 42 renders beside a 31 ms raster. By package over the bunny run, `@alcalzone/ansi-tokenize` 57 ms, `ink` 27, `string-width` 19; by function, `tokenize` 37 ms, `stringWidth` 13, `tokenizeAnsi` 10. The `all` scroll: `react` 46.7% of 800 ms of work, though at 1.6–2.3 ms a frame after F1149 it is not the complaint there |
+| **Verdict** | **open** — measured, the remedy sized and gated on a spec |
+
+**The path, at HEAD.** A block's renderer produces its rows as strings — each
+row already `exact()` at the width, each cell's colour already an SGR run
+from C10 — and `paint.ts` wraps every row in an Ink `Text`. `renderToString`
+then mounts a React tree, lays it out through Yoga (which measures each
+row by stripping and counting its ANSI through `string-width`), walks the
+tree writing each row into Ink's `Output` (which tokenises the ANSI again
+to slice and place it), reads the screen back as one string, and unmounts.
+For a row of plain text that is cheap; for a 3-D raster row, where nearly
+every cell changes colour, the row is a few hundred SGR bytes and the two
+tokenisations dominate — which is why the share rises with the figure's
+colour density and not its size, and why the `all` scroll, mostly axes and
+plain series, pays a tenth of it.
+
+**Remedy, sized.** A block whose renderer returns exact rows needs no
+layout: the registry has measured it (C09 I1) and the rows are the frame's.
+The seam is a second render arm on the kind definition — rows rather than
+an element — with the registry composing rows itself for a sequence of
+such kinds and falling back to Ink for a sequence holding any other. The
+containers (`group`, `panel`, `scroll`) place children by rows already
+(`group.place`), so the fallback is the rarer case. This is C09's render
+signature and C22's frame path, a spec across two components before a
+line lands, and the gate is the figure above: **half the orbit frame**.
+Not built on suspicion; built on this entry.
+
+## F1169 — the ramp span projects every referenced vertex in full to read its depth, and the cull allocates a centroid and a difference per triangle ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/scatter3.ts`'s corners loop before `drawTri`; `src/presentation/plot/surface3.ts`'s `backfaceCulled` |
+| **Reached for** | line ticks in the F19 bunny profile: `plot3dArea`'s self time (107 ms over 14 renders) has 30% on the two lines of the corners loop — `project(scene.basis, c.p)` for 35,947 vertices a frame, of which the span reads `depth` alone — and `drawTri`'s (105 ms) has 26% on `backfaceCulled`'s centroid literal, two objects per triangle per frame, 69,451 triangles |
+| **Verdict** | **open** — measured, the remedy named |
+
+**The path, at HEAD.** `project` computes `sub(p, eye)`, three dots, the
+divide and the two screen coordinates, and returns a record; the span loop
+reads `depth`, which is the first of the three dots. `backfaceCulled` builds
+the centroid as a `Vec3`, subtracts the eye into another, and dots — the
+same arithmetic as the direct path's scalar view depths (I128), allocated.
+
+**Remedy.** A `viewDepth(basis, p)` that is `project`'s first dot as scalars
+— the same `(p − eye) · forward` in the same order, `null` under the same
+`NEAR` — for the span; the cull's centroid and difference as scalars in the
+same order. Byte-identical by construction, which the goldens and a row
+against the allocating forms hold.
