@@ -51089,9 +51089,9 @@ rerun at 3.
 |---|---|
 | **Surface** | `src/presentation/plot/surface3.ts`'s `toScreen`, `drawTri` and `geometryOf`'s `at`; `src/presentation/plot/scatter3.ts`'s triangle loop |
 | **Reached for** | the `orbit` bench at 80×24 on the F17 build under production React: bunny work p50 37.4 ms, `plot.form.plot3d` 72% of it at 33.3 ms a frame; suzanne 34.3 and 26.4. Self time over 14 renders: `drawTri` 90–104 ms, `toScreen` 70–88, `plot3dArea` 46–80, `thinEdge` 37–50, `project` 11–21. The bunny is 35947 vertices and 69451 faces; `geometryOf`'s `at` builds one `Vert` per face corner, so the smooth mesh holds 208,353 vertex objects for 35947 vertices and the raster calls `toScreen` — `project`, three dots for the position and three for the normal, one object — up to three times per drawn face, about six times per vertex on a closed mesh |
-| **Verdict** | **open** — measured, the remedy named |
+| **Verdict** | **closed — built and measured.** One vertex object per mesh vertex under smooth shading, the projection held on it in a record written in place under the geometry record's frame stamp; the bunny 2.1 ms lighter a frame, paired |
 
-**The path, at HEAD.** `drawTri` takes the direct path (I128) and projects
+**The path, before.** `drawTri` takes the direct path (I128) and projects
 `tri.a`, `tri.b`, `tri.c` through `toScreen`, which returns a fresh `Screen`
 each call; the geometry cache (I107) holds the triangles across frames but
 nothing about the frame's projection, which is right — the camera moves —
@@ -51107,6 +51107,51 @@ geometry's own scratch under a per-frame stamp: the first face to reach a
 vertex projects it, the rest read it back. `toScreen` is pure in (vertex,
 basis, grid), so the frame is byte-identical by construction; `plot3d.project`
 counts the projections, which is the observable a row reads.
+
+**Closed — built and measured** (C12 I130). `geometryOf` shares one `Vert`
+per mesh vertex under smooth shading and builds one per corner under flat;
+`screenOf` reads the record back under the frame's stamp and otherwise
+projects into the record the vertex already holds. The stamp is a counter on
+the held geometry record — the spec's first wording put it on the block's
+scratch, which is a slot and a write per render and exactly what PR10, PR11
+and PR12b count under I126; the spec was corrected alone before the code.
+T1.142 reads 18 flat and 7 smooth on a closed cube at a generic camera, the
+second camera counted in full and byte-equal to a fresh render, and the
+bunny at most its vertex count: measured, 17,125 projections a frame against
+three per drawn face. Mutation: `c12-vertex-once` 3 of 3 with the control
+killed, `c12-direct-path` 4 of 4, `c12-surface3d` 21 of 21 after its
+world-space-normal mutation was re-anchored over both arms of `toScreen`.
+Goldens 458 with no mover; 6231 tests.
+
+**The first cut measured nothing, and the profile said why.** With a fresh
+`Screen` stored on the held vertex each frame the paired probe read B−A
++1.5 and −0.1 ms, B faster in 11 and 21 of 40 rounds, and `toScreen`'s self
+time over 30 bunny frames was 74–148 ms against A's 59–61 — more time in a
+third of the calls. A held vertex is old-generation, so each store is a write
+barrier and a promotion, 17k a frame: F1152's class, the cache of a record
+that was being scalar-replaced. With the record allocated once and written
+in place, `toScreen` self is 41–54 ms and the probe reads:
+
+```
+paired A/B in one process, 40 rounds, bunny and suzanne, both orders
+
+bunny    A p50 27.2  B p50 25.5  B−A median −2.1 ms  B faster in 34/40
+bunny    A p50 27.5  B p50 25.3  B−A median −2.1 ms  B faster in 37/40   (swapped)
+suzanne  A p50 8.7   B p50 8.9   B−A median −0.0 ms  B faster in 21/40
+suzanne  A p50 8.9   B p50 8.8   B−A median −0.2 ms  B faster in 22/40   (swapped)
+```
+
+Suzanne's 7.8k faces are a small share of its frame and it does not move.
+The `orbit` bench at load 5–7 reads the bunny at work p50 33.3–37.4 ms over
+three runs against 34–37 before, which is the bench not resolving a 2 ms cut
+rather than the cut not landing; the paired probe is the instrument (F1153).
+
+**A correction to this entry's own figures.** The "suzanne 34.3 and 26.4"
+in *Reached for* was the bunny: the bench takes the rung as its fifth
+argument, and `orbit suzanne 80x24` fails its size check while `orbit 80x24
+40` with no rung defaults to the bunny — the frames-and-renders shape of
+that run, 25 and 14, is the bunny's. Suzanne under the bench today is work
+p50 9.9–14.7 ms with `plot3d` at 2.8–7.4 ms a render.
 
 ## F1167 — the bench profiled React's development build, and the frame it reported carried React's own instrumentation ★★☆☆☆
 
