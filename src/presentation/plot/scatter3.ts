@@ -13,7 +13,7 @@
  * tiers, and an absolute bucket gives the second one tier and no depth at all.
  */
 import type { AxisSpec3, Plot, Point3, Surface3, Tone } from "../../data/viewmodel/index.js";
-import type { RenderContext } from "../blocks/types.js";
+import type { RenderContext, RenderScratch } from "../blocks/types.js";
 import type { ColourValue, Style } from "../theme/types.js";
 import { assertPictureGlyph } from "../theme/picture.js";
 // **`HALF_BLOCK` is gone from this file and that is the finding, not the
@@ -55,13 +55,15 @@ import { seriesRefOf } from "./marks.js";
 import {
   AREA_ROWS,
   basisOf,
+  boundsOf,
   createDepth,
   equalDepth,
-  extentOf,
   project,
   sampleGrid,
   strokeSeg,
+  unionOf,
   unitOf,
+  UNIT_EXTENT,
   writeDepth,
   type Basis,
   type Depth,
@@ -220,11 +222,50 @@ type Scene = Readonly<{
  * their *values* go in the key and two structurally equal fresh arrays hit
  * rather than missing.
  */
-type HeldGeometry = Readonly<{ from: readonly unknown[]; tris: readonly Tri3[] }>;
+type HeldGeometry = Readonly<{ key: string; tris: readonly Tri3[] }>;
+
+/**
+ * A surface's one slot: its carriers, its own extent, and its geometry under the
+ * geometry's own key (C12 I126, §6o rows 10, 11, 13).
+ *
+ * **Two validity predicates in one slot, because a height field has one
+ * carrier.** The slot's key is the ranges and its `from` is the carriers — what
+ * the surface's own extent depends on. The geometry depends on the block's
+ * extent and the series as well, and the block's extent cannot be known until
+ * every carrier's own has answered, so the geometry's key is checked *inside*
+ * the value rather than at the store. A second slot for the extent would have
+ * to be owned by the same array `trianglesFor` owns, and two writers on one
+ * slot with different keys thrash each other every frame with the store
+ * reporting a `rev` miss it cannot tell from a moved camera.
+ */
+type HeldSurface = Readonly<{
+  from: readonly unknown[];
+  own: Extent3 | undefined;
+  geometry: HeldGeometry | undefined;
+}>;
+
+/** A cloud's or a path's slot: its own extent, owned by its `points` (C12 I126). */
+type HeldPoints = Readonly<{ own: Extent3 | undefined }>;
+const POINTS_KEY = "extent";
 
 /** Every object `trianglesOf` reads, in a fixed order, for the identity check. */
 const carriersOf = (sf: Surface3): readonly unknown[] =>
   [sf.vertices, sf.faces, sf.heights, sf.field];
+
+/** The slot's owner: a carrier and never the `Surface3` (C12 §6o row 2). */
+const ownerOf = (sf: Surface3): object => (sf.faces ?? sf.heights ?? sf.vertices ?? sf) as object;
+
+/**
+ * The slot's key: what a surface's *own* extent depends on besides its carriers
+ * (C12 I126, §6o row 10). A grid's points are laid across `xRange` and `yRange`,
+ * so a range moved is a different extent over the same `heights`; a mesh reads
+ * neither and the key is the same empty pair.
+ */
+function surfaceKey(sf: Surface3): string {
+  const r = (v: readonly [number, number] | undefined): string =>
+    v === undefined ? "" : `${String(v[0])},${String(v[1])}`;
+  return `${r(sf.xRange)}\u0000${r(sf.yRange)}`;
+}
 
 /**
  * Everything else it reads: the scalars, the ranges' values, the extent and the
@@ -284,40 +325,96 @@ function trianglesFor(
   extent: Extent3,
   series: number,
   ctx: RenderContext,
+  held: HeldSurface | undefined,
+  own: Extent3 | undefined,
 ): readonly Tri3[] {
   const scratch = ctx.scratch;
-  if (scratch === undefined) return trianglesOf(sf, extent, series);
-  const owner = (sf.faces ?? sf.heights ?? sf.vertices ?? sf) as object;
-  const key = geometryKey(sf, extent, series);
-  const from = carriersOf(sf);
-  const held = scratch.get(owner, key) as HeldGeometry | undefined;
-  if (held !== undefined && held.from.length === from.length // cells-ok — a carrier count
-    && held.from.every((v, i) => v === from[i])) {
-    return held.tris;
+  if (scratch === undefined) {
+    ctx.probe?.count("plot3d.triangulate");
+    return trianglesOf(sf, extent, series);
   }
+  const key = geometryKey(sf, extent, series);
+  // **The geometry's own validity, checked inside a valid slot** (C12 I126,
+  // §6o row 10). `held` is undefined or its carriers matched; the block extent
+  // and the series are the rest of what the triangles depend on.
+  if (held?.geometry !== undefined && held.geometry.key === key) return held.geometry.tris;
+  // **A rebuild inside a held slot is a hit at the store**, which counts slots;
+  // this is the count that sees it (C28 I30).
+  ctx.probe?.count("plot3d.triangulate");
   const tris = trianglesOf(sf, extent, series);
-  scratch.set(owner, key, { from, tris } satisfies HeldGeometry);
+  // **One write per build, carrying the extent and the geometry together, after
+  // the build** (§6o rows 8, 13).
+  scratch.set(ownerOf(sf), surfaceKey(sf), { from: carriersOf(sf), own, geometry: { key, tris } } satisfies HeldSurface);
   return tris;
+}
+
+/**
+ * A surface's slot if it holds this surface's carriers, else `undefined`
+ * (C12 I126). The owner and the key are the surface's own; `from` is the
+ * identity check, as I107 has it.
+ */
+function heldOf(sf: Surface3, scratch: RenderScratch): HeldSurface | undefined {
+  const held = scratch.get(ownerOf(sf), surfaceKey(sf)) as HeldSurface | undefined;
+  if (held === undefined) return undefined;
+  const from = carriersOf(sf);
+  return held.from.length === from.length && held.from.every((v, i) => v === from[i]) // cells-ok — a carrier count
+    ? held
+    : undefined;
+}
+
+/**
+ * A cloud's or a path's own extent, through the scratch when there is one
+ * (C12 I126, §6o row 12).
+ *
+ * **An empty carrier takes no slot.** Its answer is `undefined` — nothing to
+ * hold, and the union's identity — so the store is not consulted for it and
+ * PR11's *each carrier written once* counts the carriers that have a point.
+ */
+function pointsExtent(points: readonly Point3[], scratch: RenderScratch | undefined): Extent3 | undefined {
+  if (points.length === 0) return undefined; // cells-ok — a point count
+  if (scratch === undefined) return boundsOf(points);
+  const held = scratch.get(points, POINTS_KEY) as HeldPoints | undefined;
+  if (held !== undefined) return held.own;
+  const own = boundsOf(points);
+  scratch.set(points, POINTS_KEY, { own } satisfies HeldPoints);
+  return own;
 }
 
 function drawnOf(block: Plot, ctx: RenderContext, aspect: number): Scene {
   const clouds = block.points3 ?? [];
   const paths = block.lines3 ?? [];
   const skins = block.surfaces3 ?? [];
-  const all: Vec3[] = [];
-  for (const c of clouds) for (const p of c.points) all.push(p);
+  // **The extent is the union of every carrier's own, each held in the
+  // caller's scratch** (C12 I126, §6o rows 10–13). None of it is the camera,
+  // and building `all` from every point and walking it allocated two objects
+  // a point, every frame (F1153).
+  const scratch = ctx.scratch;
+  let acc: Extent3 | undefined;
+  for (const c of clouds) acc = unionOf(acc, pointsExtent(c.points, scratch));
   // **Both carriers, or the frame describes a different document** (C04 I78,
   // C12 §6g row 1). Taking the extent from the clouds alone leaves a
   // lines-only block normalising against `extentOf([])`'s unit cube: on
   // screen, inside the box, and drawn to the wrong scale — which no bounds
   // assertion and no ink comparison can see. That is T6.77.
-  for (const l of paths) for (const p of l.points) all.push(p);
+  for (const l of paths) acc = unionOf(acc, pointsExtent(l.points, scratch));
   // **And the fourth**, on the same rule (C04 I79, C12 §6h row 10). A surface
   // normalised against a cloud somewhere else has its relief flattened, and
   // that is the truth — the drawn geometry *is* the normalised one — but a
   // surface left out of the extent entirely draws against the unit cube.
-  for (const sf of skins) for (const p of surfacePoints(sf)) all.push(p);
-  const extent = extentOf(all);
+  //
+  // **A surface's own extent comes out of its slot when the slot holds its
+  // carriers, and is computed and kept in a local otherwise** — the write
+  // waits for the geometry (§6o row 13).
+  const helds: (HeldSurface | undefined)[] = [];
+  const owns: (Extent3 | undefined)[] = [];
+  for (const sf of skins) {
+    const held = scratch === undefined ? undefined : heldOf(sf, scratch);
+    const own = held !== undefined ? held.own : boundsOf(surfacePoints(sf));
+    helds.push(held);
+    owns.push(own);
+    acc = unionOf(acc, own);
+  }
+  const extent = acc ?? UNIT_EXTENT;
   // **The live camera wins and the block's is the fallback** (C04 I75, C12 I83).
   // `RenderContext` carries the one an orbit moves; the member says where the
   // view starts.
@@ -367,8 +464,20 @@ function drawnOf(block: Plot, ctx: RenderContext, aspect: number): Scene {
   // **Normals come from the normalised geometry** (C12 I94, §6h row 1), which is
   // why the triangles are built here with the extent in hand rather than by the
   // renderer with the surface alone.
-  const tris: Tri3[] = [];
-  for (const sf of skins) {
+  // **One surface's held array is the scene's; two concatenate** (C12 I126,
+  // §6o row 14). The copy is 69,451 pushes a bunny frame and there is no owner
+  // for a block-level slot that outlives the tick, so a multi-surface block pays
+  // it and the catalogue has none.
+  const built: (readonly Tri3[])[] = [];
+  for (let k = 0; k < skins.length; k += 1) { // cells-ok — a surface index
+    built.push(trianglesFor(skins[k] as Surface3, extent, si, ctx, helds[k], owns[k]));
+    si += 1; // cells-ok — a surface index
+  }
+  let tris: readonly Tri3[];
+  if (built.length === 1) { // cells-ok — a surface count
+    tris = built[0] as readonly Tri3[];
+  } else {
+    const out: Tri3[] = [];
     // **A loop and never `push(...built)`** (F508). A spread is an argument
     // list: 100,000 elements is fine and 125,000 throws `RangeError: Maximum
     // call stack size exceeded`, from an expression that reads as a
@@ -376,8 +485,8 @@ function drawnOf(block: Plot, ctx: RenderContext, aspect: number): Scene {
     // refuses, and the largest mesh in the tree is 69,451 faces — under half
     // the ceiling, which is why it never fired. `parseObj` fans quads, so a
     // 63k-quad model is over it.
-    for (const t of trianglesFor(sf, extent, si, ctx)) tris.push(t);
-    si += 1; // cells-ok — a surface index
+    for (const b of built) for (const t of b) out.push(t);
+    tris = out;
   }
   return {
     drawn: out,

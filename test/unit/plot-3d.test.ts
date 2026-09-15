@@ -14,9 +14,11 @@ import type { RenderScratch } from "../../src/presentation/blocks/types.js";
 import { measurable } from "../support/render.js";
 import {
   basisOf,
+  boundsOf,
   createDepth,
   extentOf,
   project,
+  unionOf,
   AREA_ROWS,
   sampleGrid,
   unitOf,
@@ -336,8 +338,9 @@ describe("C12 I107 — the geometry scratch", () => {
    * cheapest thing that can be wrong in the right direction: a store keeping
    * every key would pass every row here and leak.
    */
-  const counting = (): RenderScratch & { writes: () => number; reads: () => number } => {
+  const counting = (): RenderScratch & { writes: () => number; reads: () => number; writesTo: (owner: object) => number } => {
     const held = new WeakMap<object, { key: string; value: unknown }>();
+    const perOwner = new WeakMap<object, number>();
     let writes = 0;
     let reads = 0;
     return {
@@ -348,10 +351,14 @@ describe("C12 I107 — the geometry scratch", () => {
       },
       set: (owner, key, value) => {
         writes += 1;
+        perOwner.set(owner, (perOwner.get(owner) ?? 0) + 1);
         held.set(owner, { key, value });
       },
       writes: () => writes,
       reads: () => reads,
+      // **Per owner, because I126 gives a cloud its own slot** — a total counts
+      // the cloud's write beside the surface's, and the row is about the surface.
+      writesTo: (owner) => perOwner.get(owner) ?? 0,
     };
   };
 
@@ -431,7 +438,9 @@ describe("C12 I107 — the geometry scratch", () => {
     // triangles. Keyed on the surface alone this hits and draws the figure at
     // the wrong scale, inside the box, with every arithmetic assertion passing.
     warm.renderToLines(plot({ points3: [{ points: [{ x: 9, y: 9, z: 9 }] }] }), 60);
-    expect(s.writes(), "a cloud gaining a point moves the extent, so it misses").toBe(2);
+    expect(s.writesTo(MESH.faces), "a cloud gaining a point moves the extent, so the surface misses").toBe(2);
+    // The third write is the cloud's own slot (C12 I126), not a second miss.
+    expect(s.writes(), "the surface twice and the cloud once").toBe(3);
   });
 
   it("PR10c (C12 I107): two surfaces in one block do not share a slot", () => {
@@ -455,17 +464,186 @@ describe("C12 I107 — the geometry scratch", () => {
   });
 });
 
-describe("C12 I126 — the extent scratch, owed at the spec commit", () => {
-  it.todo(
-    "PR11 (C12 I126): the extent scratch changes no byte over a cloud, a path, a mesh and an empty cloud at two cameras, and each carrier is written once — not deferred on a component: the code commit replaces this row",
+describe("C12 I126 — the extent scratch", () => {
+  const counting = (): RenderScratch & { writes: () => number; writesTo: (owner: object) => number } => {
+    const held = new WeakMap<object, { key: string; value: unknown }>();
+    const perOwner = new WeakMap<object, number>();
+    let writes = 0;
+    return {
+      get: (owner, key) => {
+        const slot = held.get(owner);
+        return slot !== undefined && slot.key === key ? slot.value : undefined;
+      },
+      set: (owner, key, value) => {
+        writes += 1;
+        perOwner.set(owner, (perOwner.get(owner) ?? 0) + 1);
+        held.set(owner, { key, value });
+      },
+      writes: () => writes,
+      writesTo: (owner) => perOwner.get(owner) ?? 0,
+    };
+  };
+
+  /** A 9×9 mesh, the same shape PR10 uses; the rows count writes, not milliseconds. */
+  const MESH = Object.freeze({
+    vertices: Array.from({ length: 81 }, (_v, i) => ({ // cells-ok — a vertex count
+      x: ((i % 9) / 4) - 1, // cells-ok — a vertex index
+      y: (Math.floor(i / 9) / 4) - 1, // cells-ok — a vertex index
+      z: Math.sin((i % 9) / 2) * Math.cos(Math.floor(i / 9) / 2), // cells-ok — a vertex index
+    })),
+    faces: Array.from({ length: 64 }, (_v, k) => { // cells-ok — a cell count
+      const r = Math.floor(k / 8); // cells-ok — a cell index
+      const c = k % 8; // cells-ok — a cell index
+      const a = r * 9 + c; // cells-ok — a vertex offset
+      return [a, a + 1, a + 9] as [number, number, number];
+    }),
+  });
+  /** A 5×5 height field — one carrier, which is the row 11 shape. */
+  const HEIGHTS: readonly (readonly number[])[] = Object.freeze(
+    Array.from({ length: 5 }, (_r, j) => Object.freeze(Array.from({ length: 5 }, (_c, i) => Math.sin(i) * Math.cos(j)))), // cells-ok — a grid
   );
-  it.todo(
-    "PR11b (C12 I126, §6o row 12): an empty carrier contributes nothing — a surface beside an empty cloud renders as the surface alone, and the unit cube fabricated into the slot moves the frame — not deferred on a component: the code commit replaces this row",
-  );
-  it.todo(
-    "PR11c (C12 I126, §6o rows 10, 11, 13): a height field has one slot and one write per build; a cloud gaining a point rebuilds the geometry inside the held slot and the frame equals the bare frame — not deferred on a component: the code commit replaces this row",
-  );
-  it.todo(
-    "PR11d (C12 I126): xRange moved on a height field misses and matches the bare frame; a new Surface3 around the same heights and ranges hits — not deferred on a component: the code commit replaces this row",
-  );
+  const CLOUD = Object.freeze([{ x: 0.2, y: -0.4, z: 0.6 }, { x: -0.7, y: 0.1, z: -0.3 }, { x: 0.5, y: 0.5, z: 0.5 }]);
+  const PATH = Object.freeze([{ x: -0.9, y: -0.9, z: 0 }, { x: 0, y: 0.3, z: 0.4 }, { x: 0.8, y: -0.2, z: -0.6 }]);
+  const EMPTY: readonly { x: number; y: number; z: number }[] = Object.freeze([]);
+  const FAR = { azimuth: Math.PI / 4 + 0.4, elevation: 0.3, distance: 6 };
+
+  const plot = (over: Record<string, unknown> = {}): Plot =>
+    block({
+      kind: "plot",
+      id: "pr11",
+      form: "plot3d",
+      height: 12,
+      series: [],
+      axes3: false,
+      box3: "none",
+      colormap: "viridis",
+      camera: { azimuth: Math.PI / 4, elevation: 0.3, distance: 6 },
+      ...over,
+    } as unknown as Plot);
+
+  const kit = (scratch?: RenderScratch) =>
+    measurable({
+      definitions: [plotDefinition],
+      ...(scratch === undefined ? {} : { scratch }),
+    });
+
+  it("PR11 (C12 I126): the extent scratch changes no byte over a cloud, a path, a mesh and an empty cloud at two cameras, and each carrier is written once", () => {
+    const carriers = {
+      points3: [{ points: CLOUD }, { points: EMPTY }],
+      lines3: [{ points: PATH }],
+      surfaces3: [{ vertices: MESH.vertices, faces: MESH.faces, closed: true }],
+    };
+    const here = plot(carriers);
+    const there = plot({ ...carriers, camera: FAR });
+    const bare = kit();
+    const coldHere = bare.renderToLines(here, 60);
+    const coldThere = bare.renderToLines(there, 60);
+    expect(coldHere, "the two cameras draw different pictures").not.toEqual(coldThere);
+
+    // **The control first**: a cache whose absence changes a picture is not a cache.
+    const s = counting();
+    const warm = kit(s);
+    expect(warm.renderToLines(here, 60), "the scratch changes no byte").toEqual(coldHere);
+    expect(warm.renderToLines(there, 60), "at either camera").toEqual(coldThere);
+
+    // **Each carrier once, and the empty cloud takes no slot** (§6o row 12).
+    expect(s.writesTo(CLOUD), "the cloud's points").toBe(1);
+    expect(s.writesTo(PATH), "the path's points").toBe(1);
+    expect(s.writesTo(MESH.faces), "the surface's triangle owner").toBe(1);
+    expect(s.writesTo(EMPTY), "an empty carrier holds nothing").toBe(0);
+    expect(s.writes(), "three writes, no fourth").toBe(3);
+  });
+
+  it("PR11b (C12 I126, §6o row 12): an empty carrier contributes nothing — a surface beside an empty cloud renders as the surface alone, and the unit cube's corners as points move the frame", () => {
+    // A mesh inside [−1, 1] already spans the cube; scale it into [0, 0.5] so a
+    // unit-cube contribution would be visible as a smaller figure inside the box.
+    const small = Object.freeze({
+      vertices: MESH.vertices.map((v) => ({ x: v.x / 4 + 0.25, y: v.y / 4 + 0.25, z: v.z / 4 + 0.25 })),
+      faces: MESH.faces.map((f) => [...f] as [number, number, number]),
+    });
+    const alone = plot({ surfaces3: [{ vertices: small.vertices, faces: small.faces, closed: true }] });
+    const beside = plot({
+      surfaces3: [{ vertices: small.vertices, faces: small.faces, closed: true }],
+      points3: [{ points: EMPTY }],
+    });
+    const bare = kit();
+    const reference = bare.renderToLines(alone, 60);
+    expect(bare.renderToLines(beside, 60), "an empty cloud is invisible, without the scratch").toEqual(reference);
+    expect(kit(counting()).renderToLines(beside, 60), "and with it").toEqual(reference);
+
+    // **The fabricated violation, at the union**: what the frame would be if an
+    // empty carrier contributed the unit cube.
+    const cube = plot({
+      surfaces3: [{ vertices: small.vertices, faces: small.faces, closed: true }],
+      points3: [{ points: [{ x: -1, y: -1, z: -1 }, { x: 1, y: 1, z: 1 }], marker: "none" }],
+    });
+    expect(bare.renderToLines(cube, 60), "the unit cube in the extent shrinks the figure").not.toEqual(reference);
+  });
+
+  it("PR11c (C12 I126, §6o rows 10, 11, 13): a height field has one slot and one write per build; a cloud gaining a point rebuilds the geometry inside the held slot and the frame equals the bare frame", () => {
+    const field = (over: Record<string, unknown> = {}): Plot =>
+      plot({ surfaces3: [{ heights: HEIGHTS, xRange: [0, 1], yRange: [0, 1] }], ...over });
+    const s = counting();
+    const warm = kit(s);
+    const bare = kit();
+
+    expect(warm.renderToLines(field(), 60), "cold, byte-identical").toEqual(bare.renderToLines(field(), 60));
+    expect(s.writesTo(HEIGHTS), "one carrier, one slot, one write").toBe(1);
+    expect(s.writes(), "and nothing else written").toBe(1);
+
+    expect(warm.renderToLines(field({ camera: FAR }), 60), "a second camera, byte-identical")
+      .toEqual(bare.renderToLines(field({ camera: FAR }), 60));
+    expect(s.writes(), "the camera writes nothing").toBe(1);
+
+    // **The block extent moves under a cloud** — the slot is still valid (its
+    // carriers and ranges did not move), the geometry inside it is not.
+    const cloud = [{ x: 3, y: 3, z: 3 }];
+    const moved = field({ points3: [{ points: cloud }] });
+    expect(warm.renderToLines(moved, 60), "rebuilt inside the held slot — asserted on the frame")
+      .toEqual(bare.renderToLines(moved, 60));
+    expect(s.writesTo(HEIGHTS), "one more write, carrying the new geometry").toBe(2);
+    expect(s.writesTo(cloud), "and the cloud's own").toBe(1);
+  });
+
+  it("PR11d (C12 I126): xRange moved on a height field misses and matches the bare frame; a new Surface3 around the same heights and ranges hits", () => {
+    const field = (xRange: readonly [number, number]): Plot =>
+      plot({ surfaces3: [{ heights: HEIGHTS, xRange, yRange: [0, 1] }] });
+    const s = counting();
+    const warm = kit(s);
+    const bare = kit();
+    warm.renderToLines(field([0, 1]), 60);
+    expect(s.writesTo(HEIGHTS), "cold").toBe(1);
+
+    const wide = field([0, 2]);
+    expect(warm.renderToLines(wide, 60), "the range is in the key, and the frame is the bare one")
+      .toEqual(bare.renderToLines(wide, 60));
+    expect(s.writesTo(HEIGHTS), "a moved range misses").toBe(2);
+
+    // **The live path** (§6o row 2): a fresh wrapper, the same carrier and ranges.
+    warm.renderToLines(field([0, 2]), 60);
+    expect(s.writesTo(HEIGHTS), "a new Surface3 around the same heights hits").toBe(2);
+  });
+
+  it("PR11e (C12 I126, §6o row 12): the union over per-carrier bounds equals extentOf over the concatenation to the bit, and boundsOf([]) is undefined", () => {
+    expect(boundsOf([]), "never the unit cube").toBeUndefined();
+    expect(unionOf(undefined, undefined), "the union of nothing").toBeUndefined();
+
+    const sets: (readonly { x: number; y: number; z: number }[])[] = [
+      [],
+      [{ x: -0, y: 0, z: 1 }],
+      [{ x: 0, y: -0, z: -1 }, { x: 0, y: -0, z: -1 }],
+      [{ x: 2.5, y: -3.25, z: 0.125 }, { x: -2.5, y: 3.25, z: -0.125 }, { x: 1e-9, y: 1e9, z: -1e-9 }],
+      [{ x: Number.NaN, y: 4, z: 4 }],
+      [],
+      [{ x: 7, y: -7, z: 0.3 }],
+    ];
+    // Every prefix, and every pair — the fold's order is the thing under test.
+    for (let n = 0; n <= sets.length; n += 1) { // cells-ok — a set count
+      const chosen = sets.slice(0, n);
+      const folded = chosen.reduce<ReturnType<typeof boundsOf>>((acc, set) => unionOf(acc, boundsOf(set)), undefined);
+      const together = extentOf(chosen.flat());
+      expect(folded ?? extentOf([]), `over the first ${String(n)} sets`).toStrictEqual(together);
+      // `toStrictEqual` treats −0 and 0 as different, which is what "to the bit" means here.
+    }
+  });
 });

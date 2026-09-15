@@ -77,17 +77,56 @@ export function sampleGrid(width: number, height: number): Readonly<{ width: num
 /** A point set's per-axis bounds. */
 export type Extent3 = Readonly<{ min: Vec3; max: Vec3 }>;
 
+/** What an empty set's bounds are, so nothing divides by nothing (C12 I86) — and the union's answer when no carrier has a point (C12 I126, §6o row 12). */
+export const UNIT_EXTENT: Extent3 = Object.freeze({
+  min: Object.freeze({ x: -1, y: -1, z: -1 }),
+  max: Object.freeze({ x: 1, y: 1, z: 1 }),
+});
+
+/**
+ * The bounds of a set with at least one point, or `undefined` for none.
+ *
+ * **`undefined` and not the unit cube**, because this is what a carrier holds in
+ * the caller's scratch and what `unionOf` folds (C12 I126, §6o row 12): an
+ * empty cloud beside a surface contributes nothing, where the unit cube would
+ * widen the surface's extent to ±1 and draw it at the wrong scale inside the box.
+ * `extentOf` is this with the unit cube for the empty answer.
+ *
+ * **Six scalars and no allocation per point.** The previous form rebuilt `lo`
+ * and `hi` as objects on every step — two allocations a point, 71,894 a bunny
+ * frame (F1153). `Math.min` from `Infinity` is the same minimum as from the
+ * first point, to the bit: `-0` and `NaN` behave identically on both paths.
+ */
+export function boundsOf(points: readonly Vec3[]): Extent3 | undefined {
+  if (points.length === 0) return undefined; // cells-ok — a point count, not a width
+  let x0 = Infinity; let y0 = Infinity; let z0 = Infinity;
+  let x1 = -Infinity; let y1 = -Infinity; let z1 = -Infinity;
+  for (const p of points) {
+    x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); z0 = Math.min(z0, p.z);
+    x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); z1 = Math.max(z1, p.z);
+  }
+  return { min: { x: x0, y: y0, z: z0 }, max: { x: x1, y: y1, z: z1 } };
+}
+
 /** The bounds of a set. An empty set is the unit cube, so nothing divides by nothing. */
 export function extentOf(points: readonly Vec3[]): Extent3 {
-  // cells-ok — a point count, not a width
-  if (points.length === 0) return { min: { x: -1, y: -1, z: -1 }, max: { x: 1, y: 1, z: 1 } }; // cells-ok — a point count
-  let lo = points[0] as Vec3;
-  let hi = lo;
-  for (const p of points) {
-    lo = { x: Math.min(lo.x, p.x), y: Math.min(lo.y, p.y), z: Math.min(lo.z, p.z) };
-    hi = { x: Math.max(hi.x, p.x), y: Math.max(hi.y, p.y), z: Math.max(hi.z, p.z) };
-  }
-  return { min: lo, max: hi };
+  return boundsOf(points) ?? UNIT_EXTENT;
+}
+
+/**
+ * The bounds of two sets together, with `undefined` as the identity (C12 I126).
+ *
+ * Bit-exact against `extentOf` over the concatenation: a minimum over per-set
+ * minima is the minimum over the points, in any order, and `Math.min` carries
+ * `NaN` and `-0` the same way through either fold.
+ */
+export function unionOf(a: Extent3 | undefined, b: Extent3 | undefined): Extent3 | undefined {
+  if (a === undefined) return b;
+  if (b === undefined) return a;
+  return {
+    min: { x: Math.min(a.min.x, b.min.x), y: Math.min(a.min.y, b.min.y), z: Math.min(a.min.z, b.min.z) },
+    max: { x: Math.max(a.max.x, b.max.x), y: Math.max(a.max.y, b.max.y), z: Math.max(a.max.z, b.max.z) },
+  };
 }
 
 /**

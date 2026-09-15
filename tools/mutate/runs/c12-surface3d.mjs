@@ -143,8 +143,8 @@ const results = await runPass({
       // `extentOf([])`'s unit cube — on screen, in bounds, wrong scale.
       name: "the extent is taken without the surfaces",
       file: S,
-      from: "  for (const sf of skins) for (const p of surfacePoints(sf)) all.push(p);",
-      to: "  for (const sf of [] as typeof skins) for (const p of surfacePoints(sf)) all.push(p);",
+      from: "    acc = unionOf(acc, own);\n  }\n  const extent = acc ?? UNIT_EXTENT;",
+      to: "    acc = unionOf(acc, undefined);\n  }\n  const extent = acc ?? UNIT_EXTENT;",
       expect: "SF6",
     },
     {
