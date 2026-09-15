@@ -21,7 +21,7 @@
 // and c12-plot3d's to mutate, not this run's. The single-surface pass-through
 // (`built[0]` handed through rather than copied) is byte-identical either way
 // and no row can see it — it is the bench's reading (F1153). The write landing
-// before the build (§6o row 8) needs a throwing `trianglesOf`, and the only
+// before the build (§6o row 8) needs a throwing `geometryOf`, and the only
 // throw there is F508's spread ceiling at 125k faces.
 import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
@@ -85,8 +85,8 @@ const results = runPass({
       // moved. PR11c renders the moved block against the bare arm.
       name: "GEOMETRY-KEY-IGNORED: a held slot's triangles are served whatever the block extent",
       file: S3,
-      from: "  if (held?.geometry !== undefined && held.geometry.key === key) return held.geometry.tris;",
-      to: "  if (held?.geometry !== undefined) return held.geometry.tris;",
+      from: "  if (held?.geometry !== undefined && held.geometry.key === key) return held.geometry.built;",
+      to: "  if (held?.geometry !== undefined) return held.geometry.built;",
       expect: "PR11c",
     },
     {

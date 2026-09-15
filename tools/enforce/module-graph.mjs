@@ -1808,7 +1808,7 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
 
   // **`Skin` is `Basis`'s shape one carrier along**, and the same reading
   // applies: a record whose fields exist for one function, exported because
-  // `trianglesOf` returns it on every `Tri3`. `skin.wire` *is* read outside —
+  // `geometryOf` returns it on every `Tri3`. `skin.wire` *is* read outside —
   // `scatter3.ts` owns the paint policy, because it owns `ink`, `mark` and
   // `glyph` — and `skin.cull` is not, because the only question it answers is
   // asked inside `drawTri`.

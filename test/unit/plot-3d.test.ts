@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import { block, CAMERA_DEFAULT, type Plot } from "../../src/data/viewmodel/index.js";
 import { plotDefinition } from "../../src/presentation/plot/definition.js";
+import { geometryOf, surfacePoints } from "../../src/presentation/plot/surface3.js";
 import type { RenderScratch } from "../../src/presentation/blocks/types.js";
 import { measurable } from "../support/render.js";
 import {
@@ -332,7 +333,7 @@ describe("C12 I107 — the geometry scratch", () => {
    * A `RenderScratch` that counts, because **the build count is what the row is
    * about and elapsed time is not** — a timing assertion is what F507 is about.
    * `set` is called exactly once per build, so `writes` *is* the number of times
-   * `trianglesOf` ran.
+   * `geometryOf` ran.
    *
    * One slot per owner, which is the implementation the invariant names and the
    * cheapest thing that can be wrong in the right direction: a store keeping
@@ -417,7 +418,7 @@ describe("C12 I107 — the geometry scratch", () => {
 
     // **The assertion the whole entry exists for** (§6o row 5). Two cameras,
     // one build — the carriers did not move and the camera is not one of
-    // `trianglesOf`'s arguments.
+    // `geometryOf`'s arguments.
     expect(s.writes(), "two cameras, one build").toBe(1);
   });
 
@@ -464,13 +465,89 @@ describe("C12 I107 — the geometry scratch", () => {
   });
 });
 
-describe("C12 I127 — the span over referenced vertices, owed at the spec commit", () => {
-  it.todo(
-    "PR12 (C12 I127): a stray vertex no face references is in the extent and not in the span — the frame equals the mesh without it beside a one-point lines3 at its position — not deferred on a component: the code commit replaces this row",
-  );
-  it.todo(
-    "PR12b (C12 I127, §6o row 15): geometryOf holds one corner per distinct referenced vertex, the triangles' own p objects, the stray absent, and the orbit's write count unchanged — not deferred on a component: the code commit replaces this row",
-  );
+describe("C12 I127 — the span over referenced vertices", () => {
+  const counting = (): RenderScratch & { writes: () => number } => {
+    const held = new WeakMap<object, { key: string; value: unknown }>();
+    let writes = 0;
+    return {
+      get: (owner, key) => {
+        const slot = held.get(owner);
+        return slot !== undefined && slot.key === key ? slot.value : undefined;
+      },
+      set: (owner, key, value) => { writes += 1; held.set(owner, { key, value }); },
+      writes: () => writes,
+    };
+  };
+  /** The 9×9 grid PR10 uses; its faces reference 80 of the 81 vertices, so a stray already exists (index 80) and a second is added on purpose. */
+  const VERTICES = Array.from({ length: 81 }, (_v, i) => ({ // cells-ok — a vertex count
+    x: ((i % 9) / 4) - 1, // cells-ok — a vertex index
+    y: (Math.floor(i / 9) / 4) - 1, // cells-ok — a vertex index
+    z: Math.sin((i % 9) / 2) * Math.cos(Math.floor(i / 9) / 2), // cells-ok — a vertex index
+  }));
+  const FACES = Array.from({ length: 64 }, (_v, k) => { // cells-ok — a cell count
+    const r = Math.floor(k / 8); // cells-ok — a cell index
+    const c = k % 8; // cells-ok — a cell index
+    const a = r * 9 + c; // cells-ok — a vertex offset
+    return [a, a + 1, a + 9] as [number, number, number];
+  });
+  const CAMERA = { azimuth: Math.PI / 4, elevation: 0.3, distance: 6 };
+  const referenced = new Set(FACES.flat());
+  const zs = VERTICES.map((v) => v.z);
+  const zLo = Math.min(...zs);
+  const zHi = Math.max(...zs);
+  /**
+   * The stray: inside the mesh's own extent so the extent is unchanged with or
+   * without it, and **nearer the eye than every referenced vertex** so a span
+   * that read every vertex would move the depth ramp. Chosen among the cube's
+   * near corners by measuring, and the precondition is asserted, because a row
+   * whose fabricated violation could not have moved the frame proves nothing.
+   */
+  const extent = extentOf(VERTICES);
+  const basis = basisOf(CAMERA, 1);
+  const depthOf = (p: { x: number; y: number; z: number }): number => project(basis, unitOf(p, extent))?.depth ?? Infinity;
+  const candidates = [-0.999, 0.999].flatMap((x) => [-0.999, 0.999].flatMap((y) => [zLo + 1e-6, zHi - 1e-6].map((z) => ({ x, y, z }))));
+  const STRAY = candidates.reduce((best, c) => (depthOf(c) < depthOf(best) ? c : best));
+  const nearestReferenced = Math.min(...[...referenced].map((k) => depthOf(VERTICES[k] as { x: number; y: number; z: number })));
+
+  const plot = (surface: Record<string, unknown>, over: Record<string, unknown> = {}): Plot =>
+    block({
+      kind: "plot", id: "pr12", form: "plot3d", height: 12, series: [], axes3: false, box3: "none",
+      colormap: "viridis", colourBy: "depth", camera: CAMERA,
+      surfaces3: [{ faces: FACES, closed: true, ...surface }],
+      ...over,
+    } as unknown as Plot);
+  const kit = (scratch?: RenderScratch) =>
+    measurable({ definitions: [plotDefinition], ...(scratch === undefined ? {} : { scratch }) });
+
+  it("PR12 (C12 I127): a stray vertex no face references is in the extent and not in the span — the frame equals the mesh without it", () => {
+    expect(depthOf(STRAY), "the stray is nearer than every referenced vertex").toBeLessThan(nearestReferenced);
+    const withStray = [...VERTICES, STRAY];
+    expect(extentOf(withStray), "and inside the extent, so the extent is unchanged").toStrictEqual(extent);
+    const bare = kit();
+    const alone = bare.renderToLines(plot({ vertices: VERTICES }), 60);
+    expect(bare.renderToLines(plot({ vertices: withStray }), 60), "a span over every vertex would move the depth ramp; this one does not").toEqual(alone);
+    // The same through the scratch, which holds the referenced set beside the triangles.
+    expect(kit(counting()).renderToLines(plot({ vertices: withStray }), 60)).toEqual(alone);
+  });
+
+  it("PR12b (C12 I127, §6o row 15): geometryOf holds one corner per distinct referenced vertex, the triangles' own p objects, the stray absent, and the orbit's write count unchanged", () => {
+    const surface = { vertices: [...VERTICES, STRAY], faces: FACES, closed: true } as const;
+    const g = geometryOf(surface as never, extentOf(surfacePoints(surface as never)), 0);
+    expect(g.corners.length, "one per distinct referenced vertex").toBe(referenced.size); // cells-ok — a vertex count
+    const held = new Set<object>();
+    for (const t of g.tris) { held.add(t.a.p); held.add(t.b.p); held.add(t.c.p); }
+    expect(held.size, "the triangles hold exactly that many distinct positions").toBe(referenced.size); // cells-ok — a vertex count
+    for (const c of g.corners) expect(held.has(c.p), "a corner's p is the very object a triangle holds").toBe(true);
+    const strayUnit = unitOf(STRAY, extentOf(surfacePoints(surface as never)));
+    expect(g.corners.some((c) => c.p.x === strayUnit.x && c.p.y === strayUnit.y && c.p.z === strayUnit.z), "the stray is not a corner").toBe(false);
+    expect(g.corners.some((c) => c.v !== undefined), "a mesh without values carries none").toBe(false);
+
+    const s = counting();
+    const warm = kit(s);
+    warm.renderToLines(plot({ vertices: VERTICES }), 60);
+    warm.renderToLines(plot({ vertices: VERTICES }, { camera: { ...CAMERA, azimuth: CAMERA.azimuth + 0.4 } }), 60);
+    expect(s.writes(), "two cameras, one build — the second resident costs no write").toBe(1);
+  });
 });
 
 describe("C12 I126 — the extent scratch", () => {

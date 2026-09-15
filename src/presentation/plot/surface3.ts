@@ -43,6 +43,21 @@ import {
 type Vert = Readonly<{ p: Vec3; n: Vec3; v: number | undefined }>;
 
 /**
+ * One referenced vertex, for the ramp span (C12 I127): its unit-space position
+ * — the very object the triangles hold — and its value. No normal, because the
+ * span reads depth and value and nothing else.
+ */
+export type Corner = Readonly<{ p: Vec3; v: number | undefined }>;
+
+/**
+ * What one call builds and the caller's scratch holds (C12 §6o row 15): the
+ * triangles, and the distinct vertices some face references — once each,
+ * however many faces share them. Both are functions of the surface, the
+ * block's extent and the series index, and neither is the camera.
+ */
+export type Geometry3 = Readonly<{ tris: readonly Tri3[]; corners: readonly Corner[] }>;
+
+/**
  * What a whole surface decides, held once and shared by reference across its
  * triangles (C12 I95).
  *
@@ -240,7 +255,18 @@ function gridPoints(s: Surface3): readonly Vec3[] {
  * nothing — where averaging *unit* normals by count would let it pull its
  * neighbours toward an answer it does not have.
  */
-export function trianglesOf(s: Surface3, extent: Extent3, series: number): readonly Tri3[] {
+/**
+ * The triangles and the referenced vertices together (C12 I127, §6o row 15).
+ *
+ * **One corner per distinct referenced vertex and never one per face corner.**
+ * The ramp span takes a minimum and a maximum over the set, and a minimum over
+ * a multiset is the minimum over its support — so a bunny vertex on six faces
+ * is projected once toward the same answer (F1154). **A vertex no face
+ * references is not here**, as it was not in the corner walk this replaces: it
+ * is in the extent, because `surfacePoints` returns it, and in nothing that is
+ * drawn.
+ */
+export function geometryOf(s: Surface3, extent: Extent3, series: number): Geometry3 {
   const pts = surfacePoints(s).map((p) => unitOf(p, extent));
   const idx = facesOf(s);
   const mask = edgeMask(s, idx.length); // cells-ok — a face count
@@ -262,6 +288,15 @@ export function trianglesOf(s: Surface3, extent: Extent3, series: number): reado
     for (let k = 0; k < vertN.length; k += 1) vertN[k] = unit(vertN[k] as Vec3); // cells-ok — a vertex index
   }
   const values = valuesOf(s, pts.length); // cells-ok — a vertex count
+  const seen = new Uint8Array(pts.length); // cells-ok — a vertex count
+  const corners: Corner[] = [];
+  for (const face of idx) {
+    for (const k of face) {
+      if (seen[k] === 1) continue;
+      seen[k] = 1;
+      corners.push({ p: pts[k] as Vec3, v: values[k] });
+    }
+  }
   const out: Tri3[] = [];
   for (let f = 0; f < idx.length; f += 1) { // cells-ok — a face index
     const [ia, ib, ic] = idx[f] as readonly [number, number, number];
@@ -281,7 +316,7 @@ export function trianglesOf(s: Surface3, extent: Extent3, series: number): reado
       skin,
     });
   }
-  return out;
+  return { tris: out, corners };
 }
 
 /**

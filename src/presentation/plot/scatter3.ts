@@ -46,8 +46,10 @@ import {
   drawTri,
   edgeIntensity,
   lightDirOf,
+  geometryOf,
   surfacePoints,
-  trianglesOf,
+  type Corner,
+  type Geometry3,
   type Tri3,
 } from "./surface3.js";
 import { plotAreaRows } from "./height.js";
@@ -199,6 +201,8 @@ type Scene = Readonly<{
   drawn: readonly Drawn[];
   strokes: readonly Stroke[];
   tris: readonly Tri3[];
+  /** Every surface's referenced vertices, once each, for the ramp span (C12 I127). */
+  corners: readonly Corner[];
   identities: readonly Identity[];
   basis: Basis;
   lo: Vec3;
@@ -222,7 +226,7 @@ type Scene = Readonly<{
  * their *values* go in the key and two structurally equal fresh arrays hit
  * rather than missing.
  */
-type HeldGeometry = Readonly<{ key: string; tris: readonly Tri3[] }>;
+type HeldGeometry = Readonly<{ key: string; built: Geometry3 }>;
 
 /**
  * A surface's one slot: its carriers, its own extent, and its geometry under the
@@ -234,7 +238,7 @@ type HeldGeometry = Readonly<{ key: string; tris: readonly Tri3[] }>;
  * extent and the series as well, and the block's extent cannot be known until
  * every carrier's own has answered, so the geometry's key is checked *inside*
  * the value rather than at the store. A second slot for the extent would have
- * to be owned by the same array `trianglesFor` owns, and two writers on one
+ * to be owned by the same array `geometryFor` owns, and two writers on one
  * slot with different keys thrash each other every frame with the store
  * reporting a `rev` miss it cannot tell from a moved camera.
  */
@@ -248,7 +252,7 @@ type HeldSurface = Readonly<{
 type HeldPoints = Readonly<{ own: Extent3 | undefined }>;
 const POINTS_KEY = "extent";
 
-/** Every object `trianglesOf` reads, in a fixed order, for the identity check. */
+/** Every object `geometryOf` reads, in a fixed order, for the identity check. */
 const carriersOf = (sf: Surface3): readonly unknown[] =>
   [sf.vertices, sf.faces, sf.heights, sf.field];
 
@@ -298,9 +302,9 @@ function geometryKey(sf: Surface3, e: Extent3, series: number): string {
 }
 
 /**
- * `trianglesOf` through the caller's scratch (C12 I107, §6o, FINDINGS F469).
+ * `geometryOf` through the caller's scratch (C12 I107, §6o, FINDINGS F469).
  *
- * **None of `trianglesOf`'s three arguments is the camera**, so an orbit rebuilds
+ * **None of `geometryOf`'s three arguments is the camera**, so an orbit rebuilds
  * an identical answer every frame: measured at 69,451 faces, **194 ms of a
  * 319 ms frame**. F469 named this remedy — caller-owned scratch on
  * `RenderContext` — and recorded it rather than taking it, because C12 I11 makes
@@ -320,32 +324,33 @@ function geometryKey(sf: Surface3, e: Extent3, series: number): string {
  * cost is what it was; a cache whose absence changes a picture is not a cache,
  * and PR10's control asserts exactly that before it asserts anything else.
  */
-function trianglesFor(
+function geometryFor(
   sf: Surface3,
   extent: Extent3,
   series: number,
   ctx: RenderContext,
   held: HeldSurface | undefined,
   own: Extent3 | undefined,
-): readonly Tri3[] {
+): Geometry3 {
   const scratch = ctx.scratch;
   if (scratch === undefined) {
     ctx.probe?.count("plot3d.triangulate");
-    return trianglesOf(sf, extent, series);
+    return geometryOf(sf, extent, series);
   }
   const key = geometryKey(sf, extent, series);
   // **The geometry's own validity, checked inside a valid slot** (C12 I126,
   // §6o row 10). `held` is undefined or its carriers matched; the block extent
   // and the series are the rest of what the triangles depend on.
-  if (held?.geometry !== undefined && held.geometry.key === key) return held.geometry.tris;
+  if (held?.geometry !== undefined && held.geometry.key === key) return held.geometry.built;
   // **A rebuild inside a held slot is a hit at the store**, which counts slots;
   // this is the count that sees it (C28 I30).
   ctx.probe?.count("plot3d.triangulate");
-  const tris = trianglesOf(sf, extent, series);
+  const built = geometryOf(sf, extent, series);
   // **One write per build, carrying the extent and the geometry together, after
-  // the build** (§6o rows 8, 13).
-  scratch.set(ownerOf(sf), surfaceKey(sf), { from: carriersOf(sf), own, geometry: { key, tris } } satisfies HeldSurface);
-  return tris;
+  // the build** (§6o rows 8, 13). The referenced vertices ride in the same
+  // record under the same key (row 15).
+  scratch.set(ownerOf(sf), surfaceKey(sf), { from: carriersOf(sf), own, geometry: { key, built } } satisfies HeldSurface);
+  return built;
 }
 
 /**
@@ -468,16 +473,21 @@ function drawnOf(block: Plot, ctx: RenderContext, aspect: number): Scene {
   // §6o row 14). The copy is 69,451 pushes a bunny frame and there is no owner
   // for a block-level slot that outlives the tick, so a multi-surface block pays
   // it and the catalogue has none.
-  const built: (readonly Tri3[])[] = [];
+  const built: Geometry3[] = [];
   for (let k = 0; k < skins.length; k += 1) { // cells-ok — a surface index
-    built.push(trianglesFor(skins[k] as Surface3, extent, si, ctx, helds[k], owns[k]));
+    built.push(geometryFor(skins[k] as Surface3, extent, si, ctx, helds[k], owns[k]));
     si += 1; // cells-ok — a surface index
   }
   let tris: readonly Tri3[];
+  let corners: readonly Corner[];
   if (built.length === 1) { // cells-ok — a surface count
-    tris = built[0] as readonly Tri3[];
+    tris = (built[0] as Geometry3).tris;
+    corners = (built[0] as Geometry3).corners;
   } else {
     const out: Tri3[] = [];
+    const cs: Corner[] = [];
+    for (const b of built) for (const c of b.corners) cs.push(c);
+    corners = cs;
     // **A loop and never `push(...built)`** (F508). A spread is an argument
     // list: 100,000 elements is fine and 125,000 throws `RangeError: Maximum
     // call stack size exceeded`, from an expression that reads as a
@@ -485,13 +495,14 @@ function drawnOf(block: Plot, ctx: RenderContext, aspect: number): Scene {
     // refuses, and the largest mesh in the tree is 69,451 faces — under half
     // the ceiling, which is why it never fired. `parseObj` fans quads, so a
     // 63k-quad model is over it.
-    for (const b of built) for (const t of b) out.push(t);
+    for (const b of built) for (const t of b.tris) out.push(t);
     tris = out;
   }
   return {
     drawn: out,
     strokes,
     tris,
+    corners,
     identities: [...clouds, ...paths, ...skins],
     basis,
     lo: extent.min,
@@ -927,14 +938,15 @@ export function plot3dArea(
     reading(st.b.depth, st.vb);
   }
   // **And the surfaces**, or a landscape under a cloud saturates one end of the
-  // map and the depth cue keys to a set the picture does not hold (C04 I79).
-  // Projected here rather than threaded back from `drawTri`, because a culled
-  // vertex has no depth and the span must not be told otherwise.
-  for (const t of scene.tris) {
-    for (const w of [t.a, t.b, t.c]) {
-      const pr = project(scene.basis, w.p);
-      if (pr !== null) reading(pr.depth, w.v);
-    }
+  // map and the depth cue keys to a set the picture does not hold (C04 I79,
+  // C12 I127). Projected here rather than threaded back from `drawTri`, because
+  // a culled vertex has no depth and the span must not be told otherwise.
+  // **Once per referenced vertex and never per corner** (F1154): a bunny vertex
+  // sits on six faces, and a minimum over a multiset is the minimum over its
+  // support.
+  for (const c of scene.corners) {
+    const pr = project(scene.basis, c.p);
+    if (pr !== null) reading(pr.depth, c.v);
   }
   const span = { nearD, farD, loV, hiV };
 

@@ -20,8 +20,8 @@ import { describe, expect, it } from "vitest";
 import { basisOf, extentOf, project } from "../../src/presentation/plot/project3.js";
 import {
   backfaceCulled,
+  geometryOf,
   surfacePoints,
-  trianglesOf,
   type Tri3,
 } from "../../src/presentation/plot/surface3.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -223,8 +223,8 @@ const REF = { azimuth: 0.5, elevation: Math.PI / 6, distance: 6 } as const;
 const SYM = { azimuth: Math.PI / 4, elevation: Math.PI / 6, distance: 6 } as const;
 
 const tris = (s: Record<string, unknown>): readonly Tri3[] => {
-  const surf = s as unknown as Parameters<typeof trianglesOf>[0];
-  return trianglesOf(surf, extentOf(surfacePoints(surf)), 0);
+  const surf = s as unknown as Parameters<typeof geometryOf>[0];
+  return geometryOf(surf, extentOf(surfacePoints(surf)), 0).tris;
 };
 const zeroNormal = (t: Tri3): boolean => Math.hypot(t.fn.x, t.fn.y, t.fn.z) < 1e-12;
 const kept = (s: Record<string, unknown>, camera: Record<string, number>): number => {

@@ -20,8 +20,8 @@ import {
   backfaceCulled,
   drawTri,
   lightDirOf,
+  geometryOf,
   surfacePoints,
-  trianglesOf,
   type Tri3,
 } from "../../src/presentation/plot/surface3.js";
 import { loadMesh, MESHES, parseObj, type MeshName } from "../support/obj.js";
@@ -86,8 +86,8 @@ const shot = (
 ): readonly string[] => frame(bare({ surfaces3: [s], camera, height }), capsFor("24bit"), width, "rm");
 
 const trisOf = (s: Record<string, unknown>): readonly Tri3[] => {
-  const surf = s as unknown as Parameters<typeof trianglesOf>[0];
-  return trianglesOf(surf, extentOf(surfacePoints(surf)), 0);
+  const surf = s as unknown as Parameters<typeof geometryOf>[0];
+  return geometryOf(surf, extentOf(surfacePoints(surf)), 0).tris;
 };
 
 /** Edges of a triangle soup, counted by how many faces use them and which way. */

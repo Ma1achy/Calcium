@@ -4,7 +4,7 @@
  *
  * **This exists so that C12 can hold nothing.** I11 forbids state that survives
  * a render and permits a local; the distinction it draws is **ownership**, not
- * lifetime. `trianglesOf` is a pure function of a surface's carriers, the
+ * lifetime. `geometryOf` is a pure function of a surface's carriers, the
  * block's extent and the series index — none of which is the camera — so an
  * orbit rebuilds an identical answer thirty times a second, measured at
  * **194 ms of a 319 ms frame** on a 69,451-face mesh. F469 named exactly this

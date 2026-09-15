@@ -18,7 +18,7 @@ import {
 } from "../../src/presentation/plot/project3.js";
 import {
   backfaceCulled, densityGlyph, drawTri, edgeIntensity, lightDirOf, shade,
-  surfacePoints, trianglesOf, type Tri3,
+  geometryOf, surfacePoints, type Tri3,
 } from "../../src/presentation/plot/surface3.js";
 import { ladderFor } from "../../src/presentation/plot/ramp.js";
 import { COLORMAPS, continuousColour, shadeColour } from "../../src/presentation/theme/colormap.js";
@@ -28,6 +28,9 @@ import { slot } from "../../src/presentation/blocks/paint.js";
 // @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
 import { CAPS, frameFor, groundRgb, stripSgr } from "../../tools/plot-catalogue.mjs";
 import { parseLine } from "../../tools/catalogue-png.mjs";
+
+/** The triangles alone — `geometryOf` also returns the referenced vertices (C12 I127), which these rows do not read. */
+const trianglesOf = (...args: Parameters<typeof geometryOf>): readonly Tri3[] => geometryOf(...args).tris;
 
 const CAP = CAPS as readonly { name: string; caps: Record<string, unknown> }[];
 const capsFor = (name: string): Record<string, unknown> =>
