@@ -920,3 +920,9 @@ describe("C12 I130 — a vertex is projected once per frame", () => {
   });
 });
 
+
+describe("C12 I131 — the span's depth is project's first dot, and the cull allocates nothing", () => {
+  it.todo(
+    "T1.143 (C12 I131): over a seeded corpus viewDepth equals project's depth bit for bit and is null exactly where project is, and backfaceCulled equals the allocating form on every seeded triangle under both cull signs — not deferred on a component: the code commit replaces this row",
+  );
+});
