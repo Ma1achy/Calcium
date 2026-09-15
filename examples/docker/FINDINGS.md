@@ -50505,3 +50505,61 @@ gated on a profile that no longer names it. The per-sample half — `shade`'s
 allocations, the `Shaded` record, the fill callback's `{ kind, hex }` — and
 `strokeSeg` are what the F8 profile ranks, and they are next. The spec
 reversal is the commit after this one; nothing of I129 ships.
+
+## F1157 — the raster allocates about a hundred megabytes a bunny frame, and a third of it is the fill's per-sample records ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/surface3.ts`'s `fill`, `strokeThin` and `shade`; `project3.ts`'s `strokeSeg`; the paint callback in `scatter3.ts`'s `plot3dArea` |
+| **Reached for** | a sampling heap profile that **includes collected objects** — `HeapProfiler.startSampling` at a 2 048-byte interval with both `includeObjectsCollectedBy…GC` flags, sixty bunny renders on F8's build — because `--heap-prof` reports what is retained and showed the cached geometry, not the garbage; the CPU profile's collector at 10.1% |
+| **Verdict** | **open** — measured, the remedy named |
+
+**The measurement, by allocation site, sixty renders.** The instrument is
+new to this pass and is committed with the remedy as `tools/bench/alloc3d.mjs`;
+the figures below were taken by hand with the same calls.
+
+```
+bunny, 5 829 MB sampled over 60 renders — about 97 MB a render
+  fill                       1 979 MB   33.9 %      33 MB a render
+  toScreen                   1 201 MB   20.6 %      the Screen record a drawn corner
+  plot3dArea                   712 MB   12.2 %      the six boxed sample arrays and the rows
+  drawTri                      586 MB   10.0 %      strokeThin inlined: its closures and Projected pairs
+  strokeThin's callback        337 MB    5.8 %      per stroked sample
+  project (span pass)          180 MB    3.1 %
+  the paint callback           173 MB    3.0 %      { kind, hex } and the hex per painted sample
+teapot, 1 236 MB over 60 — about 21 MB a render
+  toScreen 13.4 %  fill 9.6 %  plot3dArea 8.6 %  strokeThin 8.0 %  the paint callback 6.7 %
+```
+
+**What a painted sample allocates, read against the sites.** `fill` builds a
+normal and a view position as `Vec3`s and a `Shaded` record, and `shade` —
+untouched by I128 as the object-form reference — builds four more: `unit`'s
+result, the flipped normal, `toEye` and the reflection. Seven records a
+sample, and the thin stroke's callback the same seven, plus per thin triangle
+an `edge` closure, three segment callbacks and six `Projected`s for
+`strokeSeg`'s signature. **F1156 said the optimiser scalar-replaces these,
+and the sampler says it does not**: 33 MB a render at `fill`'s line is about
+eighty thousand painted samples at some four hundred bytes each. The claim
+was true of a record consumed inline by its own function and false of one
+handed across a call the optimiser did not inline, and the measurement was
+the only way to tell which — which is why the row above names the instrument.
+
+**The remedy.** The lighting takes scalars: `shade`'s arithmetic moves to a
+scalar core in the same operation order — `Math.hypot`, the divide, the
+flip on the sign of the view-space `z`, the two dots, the power — and `shade`
+becomes the object-form wrapper over it, so the reference and the path are
+one function and cannot drift. `fill` and the thin stroke interpolate the
+normal and view position as six scalars and hand the painter **scalars** —
+`(i, depth, value, series, intensity, edge)` — so no `Shaded` exists; the
+thin stroke's edges go through a scalar segment core that `strokeSeg` wraps,
+taking the normalised coordinates it multiplied before, with no `Projected`
+pair and no `edge` closure; the eight-bit colour arm, the only reader of a
+reading record, builds it on that arm alone. Byte-identical by construction
+and the 458 goldens the gate. **What it leaves, with the count**: three
+segment callbacks per thin triangle; the colour objects per painted sample —
+the tuple from `sampleRgb`, the tuple from `shadeRgb`, the hex and the
+`{ kind, hex }` — which are the compose arms' contract and the next entry;
+`toScreen`'s record per drawn corner, which `fill` reads by field and only
+Phase F2's SoA form removes. The observable is the sampled bytes a render at
+the fill and stroke sites, taken by the committed bench, and the paired
+interleaved probe for the time.
