@@ -51,6 +51,7 @@ import { createTranscriptStore } from "../viewport/transcript/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
 import { createViewport } from "../viewport/viewport/index.js";
 import { RenderCache } from "./render-cache.js";
+import { ChromeCache } from "./chrome-cache.js";
 import { Cameras } from "./cameras.js";
 import { Frames } from "./frames.js";
 import { CursorPositions } from "./cursor-positions.js";
@@ -470,6 +471,8 @@ export type Graph = Readonly<{
    * asked for again.
    */
   rendered: RenderCache;
+  /** C22 I102 — header, footer and layer lines held per content, one session's worth. */
+  chrome: ChromeCache;
   scrollOffsets: ScrollOffsets;
   cameras: Cameras;
   /** C22 I77 — the frame each animated image is on, keyed like the two above and dropped with them. */
@@ -885,6 +888,9 @@ export async function constructGraph(
     // hold a rendered document nothing can reach, for the life of the session.
     // C14's `HeightCache` takes the same two changes for the same reason.
     const rendered = new RenderCache(deps.profiler?.asProbe());
+    // **Beside it, the chrome's** (C22 I102): three slots by role and the live
+    // layers, nothing to evict and nothing to subscribe.
+    const chrome = new ChromeCache(deps.profiler?.asProbe());
     // **One subscription for both** (C04 I48). The rendered rows and the offset
     // that chose them are the same fact about the same entry, and two callbacks
     // would be two places for a future eviction path to reach one and miss the
@@ -1167,6 +1173,7 @@ export async function constructGraph(
       transcript,
       viewport,
       rendered,
+      chrome,
       scrollOffsets,
       cameras,
       cursorPositions,

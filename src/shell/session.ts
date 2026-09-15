@@ -1204,6 +1204,7 @@ class Session implements TuiInstance {
       capabilities: graph.capabilities,
       ...(graph.probe === undefined ? {} : { probe: graph.probe }),
       // **The layer host, and it is the one `/live` draws into** (C12 I107).
+      chrome: graph.chrome,
       scratch: graph.scratch,
       // C14 selected these at this width; the paint pads them and never
       // re-measures (C09 I1 — one implementation, or the two answers drift).
@@ -1415,7 +1416,11 @@ class Session implements TuiInstance {
       // **The footer's height, from the same measurer C14 uses** (C22 I82).
       // Before the graph exists nothing has a footer to measure; one row is the
       // guess `initialRegionHeight` makes and the first frame corrects it.
-      measureSequence: (blocks, width) => graph?.blocks.measureSequence(blocks, width) ?? 1,
+      // **And once per content** (C22 I102): the footer's blocks are rebuilt
+      // every frame, so the session's memo misses them by identity; the chrome
+      // cache keys on their structure and answers the height with the lines.
+      measureSequence: (blocks, width) =>
+        graph?.chrome.measure("footer", blocks, width, (b, w) => graph.blocks.measureSequence(b, w, graph.measures)) ?? 1,
     });
   }
 }

@@ -36,6 +36,8 @@
  */
 
 import { renderSequenceToLines } from "../presentation/render-lines.js";
+import type { ChromeCache } from "./chrome-cache.js";
+import type { Block } from "../data/viewmodel/index.js";
 import type { RenderScratch } from "../presentation/blocks/types.js";
 import { sliceCells } from "../presentation/text.js";
 import { SGR_RESET } from "../terminal/escapes.js";
@@ -50,6 +52,8 @@ export type CompositeDeps = Readonly<{
   registry: BlockRegistry;
   theme: ResolvedTheme;
   capabilities: TerminalCapabilities;
+  /** C22 I102 — a layer's lines held by its content's identity. */
+  chrome?: ChromeCache;
   /**
    * C28's seam (I30). Absent is not recording, and that is the usual case.
    */
@@ -132,15 +136,21 @@ export function composite(
  * whole (I29).
  */
 function layerRows(p: Placed, deps: CompositeDeps): readonly string[] {
+  const render = (blocks: readonly Block[], width: number): readonly string[] =>
+    renderSequenceToLines(deps.registry, blocks, width, {
+      theme: deps.theme,
+      capabilities: deps.capabilities,
+      ...(deps.scratch === undefined ? {} : { scratch: deps.scratch }),
+      ...(deps.probe === undefined ? {} : { probe: deps.probe }),
+    });
+  // **Once per content** (C22 I102): a layer's owner replaces the array when
+  // the content changes, and that identity is the key.
   const lines =
     p.layer.content.length === 0
       ? []
-      : renderSequenceToLines(deps.registry, p.layer.content, p.width, {
-          theme: deps.theme,
-          capabilities: deps.capabilities,
-          ...(deps.scratch === undefined ? {} : { scratch: deps.scratch }),
-          ...(deps.probe === undefined ? {} : { probe: deps.probe }),
-        });
+      : deps.chrome === undefined
+        ? render(p.layer.content, p.width)
+        : deps.chrome.layer(p.layer.content, p.width, deps.theme.name, render);
 
   const out: string[] = [];
   for (let i = 0; i < p.height; i += 1) out.push(exact(lines[i] ?? "", p.width));
