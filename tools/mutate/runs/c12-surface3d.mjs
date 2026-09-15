@@ -50,8 +50,8 @@ const results = await runPass({
     // cannot observe a kill.
     // Anchored on the fast-path hoist that now precedes the loop (C10 I40), because
     // `for (const t of scene.tris)` appears twice — the span pass and the fill.
-    from: "    colourBy !== \"series\" && ctx.capabilities.colourDepth >= 24 ? colormapFor(block) : undefined;\n  for (const t of scene.tris) {",
-    to: "    colourBy !== \"series\" && ctx.capabilities.colourDepth >= 24 ? colormapFor(block) : undefined;\n  for (const t of [] as typeof scene.tris) {",
+    from: "  for (const t of scene.tris) {\n    wire = t.skin.wire;",
+    to: "  for (const t of [] as typeof scene.tris) {\n    wire = t.skin.wire;",
     why: "every row reads a drawn surface or a refusal about one; a pass where no face draws sees nothing",
   },
   mutations: [
@@ -248,8 +248,8 @@ const results = await runPass({
       // and every assertion about the wireframe itself still passes.
       name: "`wireframe: true` does not clear the samples it claims",
       file: S,
-      from: "      if (wire === true && !edge) {",
-      to: "      if (wire === \"over\" && !edge) {",
+      from: "    if (wire === true && !edge) {",
+      to: "    if (wire === \"over\" && !edge) {",
       expect: "WF6",
     },
     {

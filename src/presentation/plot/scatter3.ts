@@ -50,6 +50,7 @@ import {
   surfacePoints,
   type Corner,
   type Geometry3,
+  type Skin,
   type Tri3,
 } from "./surface3.js";
 import { plotAreaRows } from "./height.js";
@@ -1242,67 +1243,72 @@ export function plot3dArea(
   const colourBy = block.colourBy ?? "depth";
   const fastMap =
     colourBy !== "series" && ctx.capabilities.colourDepth >= 24 ? colormapFor(block) : undefined;
-  for (const t of scene.tris) {
-    const wire = t.skin.wire;
-    const clipped = drawTri(t, scene.basis, grid, depth, lit, span, (i, z, v, si, intensity, edge) => {
-      // **`wireframe: true` writes depth and paints nothing but the edges**
-      // (C12 I95, §6i row 11). The depth write already happened — `drawTri`
-      // calls it before this — so the face occludes what is behind it and the
-      // surface is a solid whose interior is not painted rather than a
-      // transparent cage. **The ink has to be cleared with it**, or a nearer
-      // carrier's colour survives at a sample it has just lost, which is I90's
-      // rule about the frame's write one carrier along. Hidden-line rather than
-      // see-through, because a committed frame cannot be orbited.
-      if (wire === true && !edge) {
-        ink[i] = undefined;
-        mark[i] = undefined;
-        glyph[i] = -1;
-        return;
-      }
-      // **An edge under `"over"` is its own face at half the intensity**
-      // (§6i row 13): the only rule that cannot collapse into a fill whose own
-      // range is `0.1332 … 0.7871`, and it keeps the shading and the depth
-      // attenuation on the edge rather than pinning it to a constant.
-      const k = edge ? edgeIntensity(intensity, wire) : intensity;
-      // **The shading scales the colour in linear light** (C12 I94, F455), and
-      // the intensity arrives already clamped, because the ratio that makes the
-      // field recoverable from hue holds over `[0, 1]` and nowhere else.
-      if (fastMap !== undefined) {
-        // **The numeric path** (C10 I40): the same ramp `colourOf` takes, the
-        // channels held as ints, one hex built at the end. Bit-identical to
-        // `shadeColour(continuousColour(map, t))` because `sample` is
-        // `rgbHex(sampleRgb(...))` and a hex round-trip of eight-bit ints is
-        // lossless; `k === 1` is `shadeColour`'s own unchanged-colour arm.
-        const tt =
-          colourBy === "value"
-            ? ramped(v ?? span.loV, span.loV, span.hiV)
-            : 1 - ramped(z, span.nearD, span.farD);
-        const [r, g, b] = sampleRgb(fastMap, tt);
-        ink[i] = { kind: "rgb", hex: rgbHex(k >= 1 ? [r, g, b] : shadeRgb(r, g, b, k)) };
-      } else {
-        // **The reading record is built on this arm alone** (C12 I129).
-        const base = colourOf(block, ctx, { depth: z, value: v, series: si }, scene.identities, span);
-        ink[i] = base === undefined ? undefined : shadeColour(base, k);
-      }
-      // **A wireframe edge is an outline and a fill is an area**, on the same
-      // surface and often in the same cell (C12 I103). `edge` is the fill's
-      // own sample rather than a second stroke (I95), so the distinction costs
-      // nothing here and is what lets a cage draw in dots over a shaded face.
-      kind[i] = edge ? OUTLINE : AREA;
-      // **The glyph arm's second channel** (§6h row 12): the colour carries the
-      // field and the mark carries the shading, which is F436's retracted claim
-      // holding on the arm that kept two carriers.
-      //
-      // **`sub` and not `!half`, and reading the frame is what said so** (C12
-      // I100, F489). This was `half ? undefined : …`, correct while *not half*
-      // meant *the glyph arm*. On the braille rung it wrote a density glyph at
-      // every surface sample, which `brailleRows` then read as a frame mark and
-      // withheld from the dot grid — measured, the bottom dot row of a shaded
-      // surface's cells was set **3 times against 76** for the rows above it,
-      // and the picture was a plausible stipple rather than an obvious fault.
-      mark[i] = sub ? undefined : densityGlyph(k, ctx.capabilities);
+  // **One painter per render, not per triangle** (C12 I128, F1158): the only
+  // per-triangle input is `wire`, read through a binding the loop assigns;
+  // a closure per triangle was 69 451 allocations a bunny frame for one body.
+  let wire: Skin["wire"] = false;
+  const painter = (i: number, z: number, v: number | undefined, si: number, intensity: number, edge: boolean): void => {
+    // **`wireframe: true` writes depth and paints nothing but the edges**
+    // (C12 I95, §6i row 11). The depth write already happened — `drawTri`
+    // calls it before this — so the face occludes what is behind it and the
+    // surface is a solid whose interior is not painted rather than a
+    // transparent cage. **The ink has to be cleared with it**, or a nearer
+    // carrier's colour survives at a sample it has just lost, which is I90's
+    // rule about the frame's write one carrier along. Hidden-line rather than
+    // see-through, because a committed frame cannot be orbited.
+    if (wire === true && !edge) {
+      ink[i] = undefined;
+      mark[i] = undefined;
       glyph[i] = -1;
-    });
+      return;
+    }
+    // **An edge under `"over"` is its own face at half the intensity**
+    // (§6i row 13): the only rule that cannot collapse into a fill whose own
+    // range is `0.1332 … 0.7871`, and it keeps the shading and the depth
+    // attenuation on the edge rather than pinning it to a constant.
+    const k = edge ? edgeIntensity(intensity, wire) : intensity;
+    // **The shading scales the colour in linear light** (C12 I94, F455), and
+    // the intensity arrives already clamped, because the ratio that makes the
+    // field recoverable from hue holds over `[0, 1]` and nowhere else.
+    if (fastMap !== undefined) {
+      // **The numeric path** (C10 I40): the same ramp `colourOf` takes, the
+      // channels held as ints, one hex built at the end. Bit-identical to
+      // `shadeColour(continuousColour(map, t))` because `sample` is
+      // `rgbHex(sampleRgb(...))` and a hex round-trip of eight-bit ints is
+      // lossless; `k === 1` is `shadeColour`'s own unchanged-colour arm.
+      const tt =
+        colourBy === "value"
+          ? ramped(v ?? span.loV, span.loV, span.hiV)
+          : 1 - ramped(z, span.nearD, span.farD);
+      const [r, g, b] = sampleRgb(fastMap, tt);
+      ink[i] = { kind: "rgb", hex: rgbHex(k >= 1 ? [r, g, b] : shadeRgb(r, g, b, k)) };
+    } else {
+      // **The reading record is built on this arm alone** (C12 I129).
+      const base = colourOf(block, ctx, { depth: z, value: v, series: si }, scene.identities, span);
+      ink[i] = base === undefined ? undefined : shadeColour(base, k);
+    }
+    // **A wireframe edge is an outline and a fill is an area**, on the same
+    // surface and often in the same cell (C12 I103). `edge` is the fill's
+    // own sample rather than a second stroke (I95), so the distinction costs
+    // nothing here and is what lets a cage draw in dots over a shaded face.
+    kind[i] = edge ? OUTLINE : AREA;
+    // **The glyph arm's second channel** (§6h row 12): the colour carries the
+    // field and the mark carries the shading, which is F436's retracted claim
+    // holding on the arm that kept two carriers.
+    //
+    // **`sub` and not `!half`, and reading the frame is what said so** (C12
+    // I100, F489). This was `half ? undefined : …`, correct while *not half*
+    // meant *the glyph arm*. On the braille rung it wrote a density glyph at
+    // every surface sample, which `brailleRows` then read as a frame mark and
+    // withheld from the dot grid — measured, the bottom dot row of a shaded
+    // surface's cells was set **3 times against 76** for the rows above it,
+    // and the picture was a plausible stipple rather than an obvious fault.
+    mark[i] = sub ? undefined : densityGlyph(k, ctx.capabilities);
+    glyph[i] = -1;
+  };
+  for (const t of scene.tris) {
+    wire = t.skin.wire;
+    const clipped = drawTri(t, scene.basis, grid, depth, lit, span, painter);
     // **The clip path counted** (C12 I128): zero for a mesh in front of the camera.
     if (clipped) ctx.probe?.count("plot3d.clip");
   }

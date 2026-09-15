@@ -91,8 +91,8 @@ const results = runPass({
       // reads `reading.depth`.
       name: "FASTPATH-RAMP-NOT-INVERTED: depth colours run far-to-near",
       file: S3,
-      from: "            : 1 - ramped(z, span.nearD, span.farD);",
-      to: "            : ramped(z, span.nearD, span.farD);",
+      from: "          : 1 - ramped(z, span.nearD, span.farD);",
+      to: "          : ramped(z, span.nearD, span.farD);",
       expect: "24bit",
     },
   ],
