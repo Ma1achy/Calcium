@@ -51024,7 +51024,7 @@ highlighter's grammars are still open there.
 |---|---|
 | **Surface** | `dist/index.js`'s module graph — 381 files under `dist/` and the dependencies they pull in; `src/presentation/blocks/kinds/code.ts`'s `createLowlight` at module scope; `src/data/emulator/emulator.ts`'s `@xterm/headless`; the examples' launchers `bin/docker-tui.js` and `bin/plots-tui.js` |
 | **Reached for** | a probe importing `dist/index.js`, constructing a session over fakes and waiting for the first frame, on a container-local copy so the bind mount is out of the figure: import 471–847 ms, first frame 100–197 ms after it, total 572–1 045 ms over five runs at load average 1–2; on the bind mount the import alone is 4 400–5 000 ms. A profile of the import: 353 ms self in Node's ESM loader (resolve, stat, read, compile, link), `ink`'s own graph 205–250 ms of it, `lowlight` 37–73 (its barrel imports every grammar highlight.js ships, ~190, where the code block registers sixteen), `@xterm/headless` 35, `yoga-layout` 39, `elkjs` 4; `dist:presentation` 76 ms self, of which the theme's two cold quantisations are 65–78 (F1163). With Node 22's on-disk compile cache (`NODE_COMPILE_CACHE`), five interleaved pairs: total 1 045 → 694, 883 → 560, 667 → 650, 676 → 592, 572 → 522 ms — five of five, paired median −84 ms |
-| **Verdict** | **open** — measured, four remedies ranked; 1 (R01 R4.6), 2 (C10 I41, F1163) and 3 (C23 I71) built, 4 owed |
+| **Verdict** | **closed — built and measured.** All four remedies built: the compile cache (R01 R4.6), the quantisation table (C10 I41), the emulator off the graph (C23 I71) and the highlighter's grammars off it (C09 I71) — the last −36 ms container-local and −120 ms on the bind mount, paired |
 
 **The path, at HEAD.** An app's launcher sets `NODE_ENV` and dynamically
 imports its `main.ts`, which statically imports `@fmx/calcium`; the barrel
@@ -51056,11 +51056,45 @@ against the F15 build on the native copy, five of five: 528 → 475, 350 →
 the package's own cold import, 34.5 ms; the pairs sit under it because the
 loader's cost over 380 files is the noise floor here.
 
-**Remedy 4, owed and sized**: `lowlight`'s wrapper is 482 lines over
-highlight.js's underscored emitter API, so vendoring it is a supply-chain
-decision with its own rows (`DEPENDENCIES.md`, SS31), not a cut; the
-deferred-engine form needs an async warm on C23's commit path. Ranked
-after the next profile.
+**Remedy 4, built** (C09 I71). Neither of the two forms sized above: the
+wrapper's 482 lines are mostly its hast tree and the `common`/`all`
+tables, and what the code block takes from it is the emitter seam —
+`startScope`/`endScope`, `addText`, `__addSublanguage` — which is sixty
+lines when it emits the token run directly instead of a tree to flatten.
+So `code.ts` runs a `highlight.js/lib/core` instance of its own through
+that emitter, and `lowlight` moves to the development table as the
+reference T1.45 checks the run against, token for token, over every
+default grammar's sample and four documents with sublanguages. T5.6 reads
+the code block's graph in a real child: the core, the sixteen grammar
+files, nothing from `lowlight`.
+
+**The premise was re-measured before it was built, and nearly overturned
+by reading the wrong file.** `lowlight/lib/index.js` imports only
+`highlight.js/lib/core` and `devlop`, and a correction to this entry was one
+commit away; the package's `exports` is its root `index.js`, which
+re-exports `all` and `common` — 156 grammar imports — beside
+`createLowlight`, and admits no deeper path. Timed as a marginal import in
+one process, `highlight.js/lib/core` then `lowlight`: 22–30 ms
+container-local, 73–89 ms on the bind mount. The startup profile under the
+launchers' configuration (production React, the compile cache) is 256–266
+ms container-local, the CommonJS lexer its largest item at 60 ms — the
+reconciler's development and production builds are both lexed for named
+exports, 733 and 398 KB, and `elkjs`'s 1.5 MB bundle — and the ESM compile
+33 ms; the highlighter's own self time was 2–5 ms, which is where a
+profile by package hides a cost the loader carries.
+
+```
+cold import of dist/index.js, one process per reading, interleaved pairs,
+NODE_ENV=production, NODE_COMPILE_CACHE warm — A the F18 build, B this one
+
+container-local   A 257 273 352 247 245 224   B 221 268 199 210 206 220   B lighter 6/6, median −36 ms
+bind mount        A 803 693 567 547           B 661 570 488 429           B lighter 4/4, median −120 ms
+```
+
+**What is left of the startup is the loader**: about 250 ms container-local
+of which the CommonJS lexer is 60, the ESM compile 33 and format detection
+and package-scope reads most of the rest — the shape only bundling changes,
+recorded below with its number.
 
 **What is not on the list**: bundling `dist/` into one file per entry would take the loader's 350 ms down with it, and it changes the published shape every deep import in `test/` and the examples rely on — recorded as the architecture-level lever, with the number, for the day the rest is spent.
 
