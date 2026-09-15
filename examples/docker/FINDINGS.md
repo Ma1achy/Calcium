@@ -51241,9 +51241,9 @@ Not built on suspicion; built on this entry.
 |---|---|
 | **Surface** | `src/presentation/plot/scatter3.ts`'s corners loop before `drawTri`; `src/presentation/plot/surface3.ts`'s `backfaceCulled` |
 | **Reached for** | line ticks in the F19 bunny profile: `plot3dArea`'s self time (107 ms over 14 renders) has 30% on the two lines of the corners loop — `project(scene.basis, c.p)` for 35,947 vertices a frame, of which the span reads `depth` alone — and `drawTri`'s (105 ms) has 26% on `backfaceCulled`'s centroid literal, two objects per triangle per frame, 69,451 triangles |
-| **Verdict** | **open** — measured, the remedy named |
+| **Verdict** | **closed — built and measured.** `viewDepth` for the span and a scalar cull (C12 I131); the bunny 1.6–2.3 ms lighter a frame, paired |
 
-**The path, at HEAD.** `project` computes `sub(p, eye)`, three dots, the
+**The path, before.** `project` computes `sub(p, eye)`, three dots, the
 divide and the two screen coordinates, and returns a record; the span loop
 reads `depth`, which is the first of the three dots. `backfaceCulled` builds
 the centroid as a `Vec3`, subtracts the eye into another, and dots — the
@@ -51254,3 +51254,27 @@ same arithmetic as the direct path's scalar view depths (I128), allocated.
 `NEAR` — for the span; the cull's centroid and difference as scalars in the
 same order. Byte-identical by construction, which the goldens and a row
 against the allocating forms hold.
+
+**Closed — built and measured** (C12 I131). T1.143 reads `viewDepth`
+against `project`'s depth bit for bit over ten thousand seeded points, a
+share of them behind the camera, and the scalar cull against the `Vec3`
+form over ten thousand seeded triangles under both signs. Mutation:
+`c12-span-depth` 2 of 2 with the control killed; the three runs anchored on
+the old lines re-anchored, 31 of 31. Goldens 458 with no mover. **One
+mutation survived and was written into T6.107 rather than the test
+rewritten**: the centroid divided once after the dot is the same figure in
+exact arithmetic, and the cull is a sign — a last-bit change moves no
+verdict on any corpus a row can hold, so the operation order is held by the
+goldens and by nothing sharper.
+
+```
+paired A/B in one process, 40 rounds, both orders — A the F19 build
+
+bunny    A p50 23.8  B p50 22.5  B−A median −1.6 ms  B faster in 29/40
+bunny    A p50 27.4  B p50 25.3  B−A median −2.3 ms  B faster in 35/40   (swapped)
+suzanne  A p50 10.1  B p50 10.3  B−A median +0.8 ms  B faster in 15/40
+suzanne  A p50 8.7   B p50 8.7   B−A median +0.2 ms  B faster in 15/40   (swapped)
+```
+
+Suzanne's 7.8k faces and 4k vertices are under the probe's noise; the cut
+is proportional to the mesh, which is what F1169's line ticks said.
