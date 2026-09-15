@@ -215,20 +215,20 @@ describe("C12 tier 4 — a growing series", () => {
     // bumps one entry's `rev`, and every sibling is a hit.
     const cache = new RenderCache();
     const lines = (n: number): readonly string[] => [`row ${String(n)}`];
-    for (const id of ["a", "b", "c"]) cache.set(id, 1, 80, "", "dark", lines(1));
+    for (const id of ["a", "b", "c"]) cache.set(id, 1, 80, "", "dark", "", lines(1));
 
     // One entry patched: its own slot misses and the other two hit.
-    cache.set("b", 2, 80, "", "dark", lines(2));
-    expect(cache.get("b", 1, 80, "", "dark"), "the patched entry's old rev is gone").toBeUndefined();
+    cache.set("b", 2, 80, "", "dark", "", lines(2));
+    expect(cache.get("b", 1, 80, "", "dark", ""), "the patched entry's old rev is gone").toBeUndefined();
     for (const id of ["a", "c"]) {
-      expect(cache.get(id, 1, 80, "", "dark"), `${id} is untouched`).toEqual(["row 1"]);
+      expect(cache.get(id, 1, 80, "", "dark", ""), `${id} is untouched`).toEqual(["row 1"]);
     }
     // And the patched entry's *new* rev is what it was given.
-    expect(cache.get("b", 2, 80, "", "dark")).toEqual(["row 2"]);
+    expect(cache.get("b", 2, 80, "", "dark", "")).toEqual(["row 2"]);
     // A width change misses everywhere, which is the other axis of the key: a
     // resize is not a patch, and nothing is reusable across it.
     for (const id of ["a", "b", "c"]) {
-      expect(cache.get(id, id === "b" ? 2 : 1, 81, "", "dark"), `${id} at a new width`).toBeUndefined();
+      expect(cache.get(id, id === "b" ? 2 : 1, 81, "", "dark", ""), `${id} at a new width`).toBeUndefined();
     }
     expect(cache.size, "and no slot is added by a patch").toBe(3); // cells-ok — a slot count
   });

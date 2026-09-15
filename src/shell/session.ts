@@ -1647,8 +1647,11 @@ function visibleRows(
     const cadence = animationIntervalOf(windowed.blocks);
     if (cadence !== null && (fastest === null || cadence < fastest)) fastest = cadence;
     const animated = cadence === null ? "" : `\u0000${String(tick)}`;
-    const slot = `${key}\u0000${range}\u0000${offsets}\u0000${orbitKey}\u0000${cursorKey}\u0000${framesKey}\u0000${seriesKey}${animated}`;
-    const held = graph.rendered.get(entry.id, entry.rev, width, slot, theme);
+    // **The range is its own axis, beside the stable key** (C22 I101): a miss
+    // on it alone keeps the parts, and the render below assembles from them.
+    const slot = `${key}\u0000${offsets}\u0000${orbitKey}\u0000${cursorKey}\u0000${framesKey}\u0000${seriesKey}${animated}`;
+    const held = graph.rendered.get(entry.id, entry.rev, width, slot, theme, range);
+    const parts = held === undefined ? graph.rendered.parts(entry.id) : undefined;
     // **Faults from here are this entry's** (I69). A `BlockFault` names a block
     // and ids are unique within a document and not across entries (C04 I14), so
     // neither half addresses anything on its own. A scope rather than a field,
@@ -1706,7 +1709,7 @@ function visibleRows(
           // the very same frame. The two caches disagree by construction and
           // both are right — the picture moved and the geometry did not.
           scratch: graph.scratch,
-        }),
+        }, parts),
           )
         : null;
     const lines = held ?? fresh?.rows ?? [];
@@ -1718,7 +1721,7 @@ function visibleRows(
             `and anything below the overflow in this entry is dropped`,
         );
       }
-      graph.rendered.set(entry.id, entry.rev, width, slot, theme, lines);
+      graph.rendered.set(entry.id, entry.rev, width, slot, theme, range, lines);
     }
 
     // The pieces are already the window's rows (`windowEntry` took `[from, to)`),

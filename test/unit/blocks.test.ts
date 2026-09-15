@@ -650,7 +650,7 @@ describe("C09 §6 — kinds", () => {
     const measures = (): readonly string[] => events.filter((e) => e.includes(":measure"));
 
     const kids = Array.from({ length: 12 }, (_, i) => ({
-      kind: "raw",
+      kind: "raw" as const,
       id: `m-${String(i)}`,
       text: `line ${String(i)}\nand another`,
     }));

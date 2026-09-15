@@ -444,32 +444,33 @@ describe("C22 — the root's injection, refusal and capture path", () => {
     // the two labels leaves every total identical and a single assertion at the
     // end agrees with the swap. Reading the specific key after the specific
     // lookup is what distinguishes them.
-    cache.get("e1", 1, 80, "f", "t");
+    cache.get("e1", 1, 80, "f", "t", "");
     expect(cache.misses.absent).toBe(1);
 
-    cache.set("e1", 1, 80, "f", "t", lines);
-    cache.get("e1", 1, 80, "f", "t");
+    cache.set("e1", 1, 80, "f", "t", "", lines);
+    cache.get("e1", 1, 80, "f", "t", "");
     expect(cache.hits).toBe(1);
 
-    cache.get("e1", 1, 80, "f", "other");
+    cache.get("e1", 1, 80, "f", "other", "");
     expect(cache.misses.theme, "the theme moved and nothing else did").toBe(1);
     expect(cache.misses.focus).toBe(0);
 
-    cache.get("e1", 1, 80, "other", "t");
+    cache.get("e1", 1, 80, "other", "t", "");
     expect(cache.misses.focus, "the focus moved and nothing else did").toBe(1);
     expect(cache.misses.theme).toBe(1);
 
-    cache.get("e1", 1, 99, "f", "t");
+    cache.get("e1", 1, 99, "f", "t", "");
     expect(cache.misses.width).toBe(1);
 
     // Every axis at once: the order decides, and `rev` is first.
-    cache.get("e1", 2, 99, "other", "other");
+    cache.get("e1", 2, 99, "other", "other", "");
     expect(cache.misses).toEqual({
       absent: 1,
       rev: 1,
       width: 1,
       theme: 1,
       focus: 1,
+      range: 0,
       "nothing-changed": 0,
     });
   });
@@ -479,15 +480,15 @@ describe("C22 — the root's injection, refusal and capture path", () => {
     // comparison is on the strings rather than on anything normalised: two rows
     // that look identical and differ in an SGR reset are two different writes.
     const cache = new RenderCache();
-    cache.set("e1", 1, 80, "f", "t", ["\u001b[31mx\u001b[39m"]);
-    cache.get("e1", 2, 80, "f", "t");
-    cache.set("e1", 2, 80, "f", "t", ["\u001b[31mx\u001b[39m"]);
+    cache.set("e1", 1, 80, "f", "t", "", ["\u001b[31mx\u001b[39m"]);
+    cache.get("e1", 2, 80, "f", "t", "");
+    cache.set("e1", 2, 80, "f", "t", "", ["\u001b[31mx\u001b[39m"]);
     expect(cache.misses["nothing-changed"]).toBe(1);
 
     const differing = new RenderCache();
-    differing.set("e1", 1, 80, "f", "t", ["\u001b[31mx\u001b[39m"]);
-    differing.get("e1", 2, 80, "f", "t");
-    differing.set("e1", 2, 80, "f", "t", ["x"]);
+    differing.set("e1", 1, 80, "f", "t", "", ["\u001b[31mx\u001b[39m"]);
+    differing.get("e1", 2, 80, "f", "t", "");
+    differing.set("e1", 2, 80, "f", "t", "", ["x"]);
     expect(
       differing.misses["nothing-changed"],
       "same glyphs, different bytes — a different write",
@@ -1324,7 +1325,7 @@ describe("C28 I43 — the leak counters' call sites", () => {
     const render = recording();
     const cache = new RenderCache(render.probe);
     const lines = ["a", "b"];
-    cache.set("e1", 1, 80, "f", "t", lines);
+    cache.set("e1", 1, 80, "f", "t", "", lines);
 
     expect(render.tracked.map((t) => t.name)).toStrictEqual(["render-cache.lines"]);
     expect(render.tracked[0]?.held, "the array, which is the allocation").toBe(lines);
@@ -1334,14 +1335,14 @@ describe("C28 I43 — the leak counters' call sites", () => {
 describe("C28 I8 — a miss says which axis, and whether it bought anything", () => {
   it("T1.8 (C28 I8): a key differing only in theme reports `theme`, and an identical one that missed reports `nothing-changed`", () => {
     const cache = new RenderCache();
-    cache.set("e1", 1, 80, "f", "dark", ["x"]);
+    cache.set("e1", 1, 80, "f", "dark", "", ["x"]);
 
     // **One axis moved, and it is not the first one checked.** A cache that
     // reported `rev` for every miss satisfies a hit-rate assertion exactly and
     // says the opposite thing about whether the cache is working: `rev` is a
     // content change and the re-render was owed, while `theme` on a screen
     // where nothing moved is a key churning for nothing.
-    cache.get("e1", 1, 80, "f", "light");
+    cache.get("e1", 1, 80, "f", "light", "");
     expect(cache.misses.theme, "the axis that actually disagreed").toBe(1);
     expect(cache.misses.rev, "and not the one checked before it").toBe(0);
     expect(cache.misses["nothing-changed"], "no re-render has been offered back yet").toBe(0);
@@ -1350,16 +1351,16 @@ describe("C28 I8 — a miss says which axis, and whether it bought anything", ()
     // axis says what invalidated the slot; this says whether invalidating it
     // bought anything. A theme switch that produces byte-identical lines is a
     // full re-render for nothing, and only the two counts together show it.
-    cache.set("e1", 1, 80, "f", "light", ["x"]);
+    cache.set("e1", 1, 80, "f", "light", "", ["x"]);
     expect(cache.misses["nothing-changed"], "the recomputed value equalled the discarded one").toBe(1);
     expect(cache.misses.theme, "and the axis count did not move again").toBe(1);
 
     // The reverse, which is what makes the first mean anything: a miss whose
     // re-render really did produce something different.
     const moved = new RenderCache();
-    moved.set("e2", 1, 80, "f", "dark", ["x"]);
-    moved.get("e2", 1, 80, "f", "light");
-    moved.set("e2", 1, 80, "f", "light", ["y"]);
+    moved.set("e2", 1, 80, "f", "dark", "", ["x"]);
+    moved.get("e2", 1, 80, "f", "light", "");
+    moved.set("e2", 1, 80, "f", "light", "", ["y"]);
     expect(moved.misses.theme).toBe(1);
     expect(moved.misses["nothing-changed"], "the work was owed").toBe(0);
   });

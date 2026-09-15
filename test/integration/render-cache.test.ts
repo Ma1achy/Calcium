@@ -16,6 +16,134 @@ import { createProfiler } from "../../src/shell/profiling/recorder.js";
 import { fakeStdin } from "../support/fake-terminal.js";
 import { rows as inkRows } from "../../src/presentation/blocks/paint.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
+import type { Block } from "../../src/data/viewmodel/index.js";
+import { block } from "../../src/data/viewmodel/index.js";
+import type { ProfileReport } from "../../src/index.js";
+import { RenderCache } from "../../src/shell/render-cache.js";
+import type { EntryParts } from "../../src/shell/render-cache.js";
+import { entryLayout, measureEntry, renderEntryPieces, windowEntry } from "../../src/shell/entry-layout.js";
+import { DARK_THEME, FULL_CAPS, measurable, visible } from "../support/render.js";
+
+/**
+ * A kind whose renders are counted **per block id** (C22 I101): the claim is
+ * *which* children rendered on a scroll, and one total cannot say.
+ */
+function countingById(rows: number): { definition: BlockDefinition; rendersOf: () => ReadonlyMap<string, number> } {
+  const n = new Map<string, number>();
+  return {
+    rendersOf: () => new Map(n),
+    definition: {
+      kind: "count",
+      measure: () => rows,
+      render: (b) => {
+        n.set(b.id, (n.get(b.id) ?? 0) + 1);
+        return inkRows(Array.from({ length: rows }, (_, i) => `counted ${b.id} r${String(i)}`));
+      },
+    },
+  };
+}
+
+/**
+ * A kind that **divides** — declares a `window`, as `logs` does — with its
+ * renders counted (C22 I101, T4.89d). Its own kind rather than `logs` because
+ * the reading is a render count per frame, and `logs` has no counter a row
+ * can read without the profiler's per-node tables; what T4.89d is about is
+ * the class the window slices, and this is the shipped mechanism (C09 I25)
+ * with a counter on it.
+ */
+function tallDividing(): { definition: BlockDefinition; renders: () => number } {
+  let n = 0;
+  const linesOf = (b: Block): readonly string[] => (b as unknown as { lines: readonly string[] }).lines;
+  return {
+    renders: () => n,
+    definition: {
+      kind: "tall",
+      measure: (b) => linesOf(b).length,
+      render: (b) => {
+        n += 1;
+        return inkRows(linesOf(b));
+      },
+      window: (b, _w, from, to) => ({
+        block: { ...(b as object), lines: linesOf(b).slice(from, to) } as unknown as Block,
+        skipRows: 0,
+        dropRows: 0,
+      }),
+    },
+  };
+}
+
+const PAGE_UP = "\u001b[5~";
+const DOWN = "\u001b[B";
+
+/**
+ * A painting session over several kinds, with the profiler's counters on and
+ * the report read at stop (C28 I8): the `range` miss is the profiler's word.
+ */
+async function sessionOver(
+  definitions: readonly BlockDefinition[],
+  blocks: readonly unknown[],
+  size: Readonly<{ columns: number; rows: number }>,
+) {
+  const stdin = fakeStdin();
+  let seen: ProfileReport | null = null;
+  const built = await buildSession(
+    {
+      stdin: stdin as never,
+      blocks: definitions,
+      manifest: {
+        schema: "tui.manifest/1",
+        binary: "prism",
+        version: "1.0.0",
+        tools: [{ name: "rows", local: true, summary: "rows", args: [], flags: [] }],
+      },
+      localHandlers: {
+        rows: () => ({ schema: "tui.view/1", status: "ok", blocks }),
+      },
+      profile: { tier: "counters", onReport: (r: ProfileReport) => void (seen = r) },
+    } as never,
+    size,
+  );
+  const type = async (bytes: string): Promise<void> => {
+    stdin.emit(bytes);
+    await Promise.resolve();
+    await Promise.resolve();
+  };
+  await type("/rows\r");
+  await Promise.resolve();
+  await Promise.resolve();
+  const report = async (): Promise<ProfileReport> => {
+    await built.tui.stop("exit");
+    if (seen === null) throw new Error("no report arrived");
+    return seen;
+  };
+  return { ...built, type, report };
+}
+
+/** The ids whose text is on screen. */
+function shown(ids: readonly string[], rows: readonly string[]): ReadonlySet<string> {
+  return new Set(ids.filter((id) => rows.some((r) => r.includes(`counted ${id} `))));
+}
+
+/** The ids rendered since `before`. */
+function renderedSince(before: ReadonlyMap<string, number>, now: ReadonlyMap<string, number>): readonly string[] {
+  return [...now.keys()].filter((id) => (now.get(id) ?? 0) > (before.get(id) ?? 0)).sort();
+}
+
+/** A `Map`-backed parts store, the shape the render cache hands out (C22 I101). */
+function partsStore(): EntryParts & { readonly reads: () => number; readonly size: () => number } {
+  const m = new Map<string, readonly string[]>();
+  let reads = 0;
+  return {
+    part: (key) => {
+      const held = m.get(key);
+      if (held !== undefined) reads += 1;
+      return held;
+    },
+    hold: (key, lines) => void m.set(key, lines),
+    reads: () => reads,
+    size: () => m.size,
+  };
+}
 
 /** A `count` whose `measure` is counted too (C22 I100): what reaches the definition, never what a memo answered. */
 function measuring(): { definition: BlockDefinition; measured: () => number } {
@@ -356,16 +484,242 @@ describe("C22 §6c — the render cache", () => {
     profiler.dispose();
     graph.lifecycle.release();
   });
-  it.todo(
-    "T4.89a (C22 I101): a column group of six counting children windowed to three then scrolled one row renders the entering child alone, the miss is range, the rows are the fresh render's — not deferred on a component: the code commit replaces this row",
-  );
-  it.todo(
-    "T4.89b (C22 I101, C09 I69, C14 I25): every window position over gaps, a right-aligned child and a sequence of whole blocks equals a fresh full render byte for byte — not deferred on a component: the code commit replaces this row",
-  );
-  it.todo(
-    "T4.89c (C22 I101): a rev, focus or theme change drops the held parts and a range change after them holds again — not deferred on a component: the code commit replaces this row",
-  );
-  it.todo(
-    "T4.89d (C22 I101): a logs block taller than the window is rendered at every range and never held, a whole block beside it is held — not deferred on a component: the code commit replaces this row",
-  );
+  it("T4.89a (C22 I101): a column group of twelve counting children scrolled twice — the first scroll holds what it kept, the second renders the entering children alone, the miss is range, and the rows are the fresh render's", async () => {
+    const { definition, rendersOf } = countingById(4);
+    const ids = Array.from({ length: 12 }, (_, i) => `c-${String(i)}`);
+    const group = { kind: "group", id: "g", direction: "column", children: ids.map((id) => ({ kind: "count", id })) };
+    const s = await sessionOver([definition], [group], { columns: 80, rows: 18 });
+
+    // The fixture responds: the entry is taller than the region, so some of the
+    // twelve are on screen and some are not, and the first frame drew what shows.
+    const first = shown(ids, s.screen().text);
+    expect(first.size, "some on screen").toBeGreaterThan(0);
+    expect(first.size, "and not all").toBeLessThan(12);
+    for (const id of first) expect(rendersOf().get(id), `${id} rendered on the first frame`).toBe(1);
+
+    // **The first scroll is a range miss with nothing held**: the first frame
+    // rendered the sequence, so every child this window keeps is rendered
+    // alone now, and held.
+    let drawn = rendersOf();
+    await s.type(PAGE_UP);
+    const before = shown(ids, s.screen().text);
+    expect(before, "the window moved").not.toEqual(first);
+    expect(renderedSince(drawn, rendersOf()), "every kept child rendered, and held").toEqual([...before].sort());
+
+    // **The second scroll renders the entering children alone.** Before I101
+    // every kept tile rendered on every row of scroll, which is the count this
+    // row would report as the whole of `after`.
+    drawn = rendersOf();
+    await s.type(PAGE_UP);
+    const after = shown(ids, s.screen().text);
+    expect(after, "the window moved again").not.toEqual(before);
+    const kept = [...after].filter((id) => before.has(id));
+    expect(kept.length, "the windows overlap by a child").toBeGreaterThan(0);
+    const entering = [...after].filter((id) => !before.has(id)).sort();
+    expect(entering.length, "something entered").toBeGreaterThan(0);
+    expect(renderedSince(drawn, rendersOf()), "the entering children alone").toEqual(entering);
+
+    // **The rows are the fresh render's**: what is on screen is a contiguous
+    // slice of the whole group rendered fresh, by visible text.
+    const kit = measurable({ definitions: [definition as never] });
+    const fresh = kit.renderToLines(block(group as never), 80).map((l) => visible(l).trimEnd());
+    // The entry is a card (C22 I83), so each row carries the gutter in front
+    // of the block's own cells; the comparison is over the cells the block drew.
+    const onScreen = s.screen().text.filter((r) => r.includes("counted ")).map((r) => r.slice(r.indexOf("counted ")).trimEnd());
+    expect(onScreen.length, "rows on screen").toBeGreaterThan(0);
+    expect(fresh.join("\n"), "a slice of the fresh render, in order").toContain(onScreen.join("\n"));
+
+    // And the profiler's word for it.
+    const report = await s.report();
+    expect(report.misses["render"]?.range ?? 0, "the scroll missed on `range`").toBeGreaterThanOrEqual(1);
+  });
+
+  it("T4.89b (C22 I101, C09 I69, C14 I25): every window position over gaps, a right-aligned child, a nested row and a sequence of whole blocks assembles the fresh full render byte for byte", () => {
+    const kit = measurable();
+    const registry = kit.registry;
+    const options = { theme: DARK_THEME, capabilities: FULL_CAPS, tick: 0 };
+    const raw = (id: string, text: string, gap = false): Block =>
+      block({ kind: "raw", id, text, ...(gap ? { gapBefore: true } : {}) } as never);
+    const corpus: Readonly<Record<string, readonly Block[]>> = {
+      "a column group": [
+        block({
+          kind: "group",
+          id: "col",
+          direction: "column",
+          align: ["left", "right", "left", "right", "left"],
+          children: [
+            raw("a", "alpha\nsecond line of alpha"),
+            raw("b", "bravo", true),
+            block({ kind: "group", id: "row", direction: "row", children: [raw("d", "delta\ndelta 2"), raw("e", "echo")] } as never),
+            raw("c", "charlie is right-aligned", false),
+            raw("f", "foxtrot\nfoxtrot 2\nfoxtrot 3", true),
+          ],
+        } as never),
+      ],
+      "a sequence of whole blocks": [
+        raw("x", "x-ray\nx-ray 2"),
+        block({ kind: "notice", id: "n", tone: "info", text: "a notice that wraps at forty cells, surely, given this length", gapBefore: true } as never),
+        raw("z", "zulu", true),
+        block({ kind: "group", id: "g2", direction: "column", align: ["right"], children: [raw("w", "whiskey")] } as never),
+      ],
+    };
+    const WIDTH = 40;
+    const WINDOW = 3;
+    for (const [name, blocks] of Object.entries(corpus)) {
+      const layout = entryLayout(blocks, WIDTH);
+      const height = measureEntry((b, w) => registry.measureSequence(b, w), blocks, WIDTH);
+      const full = renderEntryPieces(registry, windowEntry(layout, 0, height, registry), options).rows;
+      expect(full.length, `${name}: the fixture is taller than the window`).toBeGreaterThan(WINDOW + 2);
+      // **One store across the sweep**, as the session holds one: what a
+      // position held, the next reads.
+      const held = partsStore();
+      for (let from = 0; from < height; from += 1) {
+        const to = Math.min(height, from + WINDOW);
+        const pieces = windowEntry(layout, from, to, registry);
+        const fresh = renderEntryPieces(registry, pieces, options).rows;
+        const assembled = renderEntryPieces(registry, pieces, options, held).rows;
+        expect(assembled, `${name}: assembled [${String(from)}, ${String(to)}) is the fresh render`).toEqual(fresh);
+        expect(assembled, `${name}: and the full render's slice`).toEqual(full.slice(from, to));
+      }
+      expect(held.size(), `${name}: parts were held`).toBeGreaterThan(0);
+      expect(held.reads(), `${name}: and read back`).toBeGreaterThan(0);
+    }
+  });
+
+  it("T4.89c (C22 I101): a rev, focus or theme change drops the held parts, and a range change after them holds again", async () => {
+    // **The rev arm at the cache**, where it is drivable (T4.17's note): the
+    // parts a range miss opens are gone after a rev miss, and open again after
+    // the next range miss.
+    const cache = new RenderCache();
+    cache.set("e", 1, 80, "f", "t", "0", ["a"]);
+    expect(cache.get("e", 1, 80, "f", "t", "1"), "a range miss").toBeUndefined();
+    expect(cache.misses.range).toBe(1);
+    const open = cache.parts("e");
+    if (open === undefined) throw new Error("no parts after a range miss");
+    open.hold("k", ["held"]);
+    cache.set("e", 1, 80, "f", "t", "1", ["b"]);
+    expect(cache.get("e", 1, 80, "f", "t", "2"), "another range miss").toBeUndefined();
+    expect(cache.parts("e")?.part("k"), "the part survived the range").toEqual(["held"]);
+    cache.set("e", 1, 80, "f", "t", "2", ["c"]);
+    expect(cache.get("e", 2, 80, "f", "t", "2"), "a rev miss").toBeUndefined();
+    expect(cache.parts("e"), "no parts after it").toBeUndefined();
+    cache.set("e", 2, 80, "f", "t", "2", ["d"]);
+    expect(cache.get("e", 2, 80, "f", "t", "3")).toBeUndefined();
+    expect(cache.parts("e")?.part("k"), "dropped with the rev, not carried").toBeUndefined();
+    // Focus and theme, the same way.
+    cache.set("e", 2, 80, "f", "t", "3", ["e"]);
+    expect(cache.get("e", 2, 80, "other", "t", "3")).toBeUndefined();
+    expect(cache.parts("e"), "focus drops them").toBeUndefined();
+    cache.set("e", 2, 80, "other", "t", "3", ["e"]);
+    expect(cache.get("e", 2, 80, "other", "light", "3")).toBeUndefined();
+    expect(cache.parts("e"), "theme drops them").toBeUndefined();
+    // And another entry's range miss opens nothing for this one.
+    cache.set("e", 2, 80, "other", "light", "3", ["e"]);
+    cache.set("e2", 1, 80, "", "light", "0", ["z"]);
+    cache.get("e2", 1, 80, "", "light", "1");
+    expect(cache.parts("e"), "another entry's miss is not this one's").toBeUndefined();
+
+    // **Focus and theme end to end**, on a session: after a scroll the parts
+    // hold; a theme switch renders every kept child again; a scroll after it
+    // renders only what enters; focus entering the table does the same.
+    const { definition, rendersOf } = countingById(4);
+    const ids = Array.from({ length: 12 }, (_, i) => `c-${String(i)}`);
+    const group = { kind: "group", id: "g", direction: "column", children: ids.map((id) => ({ kind: "count", id })) };
+    const s = await sessionOver([definition], [group, ...TWO_ROWS], { columns: 80, rows: 18 });
+    await s.type(PAGE_UP);
+    const atFirst = shown(ids, s.screen().text);
+    expect(atFirst.size, "children on screen after the scroll").toBeGreaterThan(0);
+
+    let drawn = rendersOf();
+    await s.type("/theme light\r");
+    const afterTheme = shown(ids, s.screen().text);
+    expect(afterTheme.size, "children still on screen").toBeGreaterThan(0);
+    for (const id of afterTheme) {
+      expect((rendersOf().get(id) ?? 0) > (drawn.get(id) ?? 0), `${id} rendered again after the theme switch`).toBe(true);
+    }
+
+    // The parts went with the theme: the next range miss holds what it keeps,
+    // and the one after it renders the entering children alone.
+    drawn = rendersOf();
+    await s.type(PAGE_UP);
+    const held = shown(ids, s.screen().text);
+    expect(renderedSince(drawn, rendersOf()), "after the theme switch the first scroll renders every kept child").toEqual([...held].sort());
+    drawn = rendersOf();
+    await s.type("\u001b[6~");
+    const afterScroll = shown(ids, s.screen().text);
+    expect(afterScroll, "the window moved").not.toEqual(held);
+    const entering = [...afterScroll].filter((id) => !held.has(id)).sort();
+    expect(entering.length, "something entered").toBeGreaterThan(0);
+    expect(renderedSince(drawn, rendersOf()), "and the second renders the entering children alone").toEqual(entering);
+
+    const report = await s.report();
+    expect(report.misses["render"]?.range ?? 0).toBeGreaterThanOrEqual(2);
+    expect(report.misses["render"]?.theme ?? 0).toBeGreaterThanOrEqual(1);
+
+    // **Focus, on its own session**: `↓` walks from history into the live
+    // block (C16 I22), which has to be this entry — after `/theme` the live
+    // entry is the notice, and the arrow never reaches the table. The focus
+    // axis moved, so every child on screen renders again; a scroll after it
+    // holds, and the next renders the entering children alone.
+    const f = await sessionOver([definition], [group, ...TWO_ROWS], { columns: 80, rows: 18 });
+    await f.type(PAGE_UP);
+    drawn = rendersOf();
+    await f.type(DOWN);
+    const afterFocus = shown(ids, f.screen().text);
+    expect(afterFocus.size, "children on screen with focus in the entry").toBeGreaterThan(0);
+    for (const id of afterFocus) {
+      expect((rendersOf().get(id) ?? 0) > (drawn.get(id) ?? 0), `${id} rendered again after focus moved`).toBe(true);
+    }
+    // Out of the block again (a second focus miss), because with focus in it
+    // `PgUp` pages the block rather than the transcript. A bare escape needs
+    // the router's window to close, and the clock is the harness's.
+    await f.type("\u001b");
+    f.clock.advance(100);
+    await f.type("");
+    drawn = rendersOf();
+    await f.type(PAGE_UP);
+    const heldF = shown(ids, f.screen().text);
+    expect(heldF, "the transcript scrolled").not.toEqual(afterFocus);
+    expect(renderedSince(drawn, rendersOf()), "the first scroll after focus renders every kept child").toEqual([...heldF].sort());
+    drawn = rendersOf();
+    await f.type(PAGE_UP);
+    const afterF = shown(ids, f.screen().text);
+    expect(afterF, "the window moved").not.toEqual(heldF);
+    const enteringF = [...afterF].filter((id) => !heldF.has(id)).sort();
+    expect(enteringF.length, "something entered").toBeGreaterThan(0);
+    expect(renderedSince(drawn, rendersOf()), "and the second renders the entering children alone").toEqual(enteringF);
+    const reportF = await f.report();
+    expect(reportF.misses["render"]?.focus ?? 0).toBeGreaterThanOrEqual(1);
+  });
+
+  it("T4.89d (C22 I101): a top-level block that divides — taller than the window — is rendered at every range and never held, and a whole block beside it is held", async () => {
+    const tall = tallDividing();
+    const { definition: count, rendersOf } = countingById(1);
+    const lines = Array.from({ length: 40 }, (_, i) => `tall line ${String(i)}`);
+    // The whole block last, so the tail window shows it beside the tall one.
+    const s = await sessionOver([tall.definition, count], [{ kind: "tall", id: "big", lines }, { kind: "count", id: "whole" }], {
+      columns: 80,
+      rows: 18,
+    });
+    const text = s.screen().text;
+    expect(text.some((r) => r.includes("tall line 39")), "the tall block's tail is on screen").toBe(true);
+    expect(text.some((r) => r.includes("counted whole")), "and the whole block beside it").toBe(true);
+    expect(tall.renders(), "the first frame rendered the tall block").toBe(1);
+    expect(rendersOf().get("whole"), "and the whole one").toBe(1);
+
+    // **A one-row scroll, twice**: the prompt wraps at 80 cells, the region
+    // loses a row, and the tail window moves one row — the range and nothing
+    // else. The first is a range miss with no parts to read; the second reads
+    // the whole block back and renders the sliced one again.
+    await s.type("x".repeat(80));
+    expect(s.screen().text.some((r) => r.includes("counted whole")), "still beside it after one row").toBe(true);
+    expect(tall.renders(), "rendered at the new range").toBe(2);
+    expect(rendersOf().get("whole"), "rendered alone and held on the first range miss").toBe(2);
+    await s.type("y".repeat(80));
+    expect(s.screen().text.some((r) => r.includes("counted whole")), "still beside it after two rows").toBe(true);
+    expect(tall.renders(), "rendered again: a sliced block is never held").toBe(3);
+    expect(rendersOf().get("whole"), "read back: the whole block was held").toBe(2);
+    const report = await s.report();
+    expect(report.misses["render"]?.range ?? 0).toBeGreaterThanOrEqual(2);
+  });
 });

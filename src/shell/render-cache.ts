@@ -74,7 +74,27 @@ type Slot = Readonly<{
   width: number;
   focus: string;
   theme: string;
+  /** The window range the rows are of — the one axis the parts do not carry (I101). */
+  range: string;
   lines: readonly string[];
+  /**
+   * The lines of every block rendered whole under this slot's stable key, by
+   * the block's id and its `align` (I101). Bounded by the entry's own blocks
+   * and dropped with the slot on a miss on any axis but the range.
+   */
+  parts: Map<string, readonly string[]>;
+}>;
+
+/**
+ * The parts of one entry, open to the render that follows a **range** miss
+ * (I101): `part` reads a block rendered whole under the same stable key, and
+ * `hold` keeps one rendered now for the next range. Handed out by `parts()`
+ * only after a range miss, so a miss on any other axis assembles nothing
+ * from before it.
+ */
+export type EntryParts = Readonly<{
+  part(key: string): readonly string[] | undefined;
+  hold(key: string, lines: readonly string[]): void;
 }>;
 
 /**
@@ -112,7 +132,7 @@ export function focusKey(
 
 /** `HeightCache`'s two axes and the three this one adds (C28 I8, C14 I27). */
 export type RenderMisses = Readonly<
-  Record<"absent" | "rev" | "width" | "theme" | "focus" | "nothing-changed", number>
+  Record<"absent" | "rev" | "width" | "theme" | "focus" | "range" | "nothing-changed", number>
 >;
 
 /**
@@ -134,10 +154,17 @@ export class RenderCache {
   readonly #slots = new Map<EntryId, Slot>();
   readonly #probe: Probe;
   #hits = 0;
-  readonly #misses = { absent: 0, rev: 0, width: 0, theme: 0, focus: 0, "nothing-changed": 0 };
+  readonly #misses = { absent: 0, rev: 0, width: 0, theme: 0, focus: 0, range: 0, "nothing-changed": 0 };
 
   /** The slot `get` most recently rejected, and its lines — see `set` (C14 I28). */
   #discarded: Readonly<{ id: EntryId; lines: readonly string[] }> | null = null;
+
+  /**
+   * The parts a **range** miss left open for the render that follows it (I101),
+   * or `null` after any other miss — the render after a `rev` miss holds
+   * whatever it renders whole into a fresh map, and reads nothing from before.
+   */
+  #open: Readonly<{ id: EntryId; parts: Map<string, readonly string[]> }> | null = null;
 
   /**
    * C28's seam, or none (C28 I30).
@@ -178,18 +205,23 @@ export class RenderCache {
     width: number,
     focus: string,
     theme: string,
+    range: string,
   ): readonly string[] | undefined {
     const slot = this.#slots.get(id);
-    if (slot === undefined) return this.#miss(id, "absent", undefined);
+    if (slot === undefined) return this.#miss(id, "absent", undefined, null);
     // **The order is the invariant** (C28 I8). A slot can disagree on several
     // axes at once and the reason reported is the first checked, so this
     // sequence is what a count means. Coarsest first: `rev` moves on any content
     // change at all, so an entry that changed reports `rev` even if the width
     // moved too — right, because the re-render was owed either way.
-    if (slot.rev !== rev) return this.#miss(id, "rev", slot.lines);
-    if (slot.width !== width) return this.#miss(id, "width", slot.lines);
-    if (slot.theme !== theme) return this.#miss(id, "theme", slot.lines);
-    if (slot.focus !== focus) return this.#miss(id, "focus", slot.lines);
+    if (slot.rev !== rev) return this.#miss(id, "rev", slot.lines, null);
+    if (slot.width !== width) return this.#miss(id, "width", slot.lines, null);
+    if (slot.theme !== theme) return this.#miss(id, "theme", slot.lines, null);
+    if (slot.focus !== focus) return this.#miss(id, "focus", slot.lines, null);
+    // **The range last, and it is the one miss that keeps the parts** (I101):
+    // every axis above agreed, so what the slot rendered whole is what this
+    // window would render whole, and only the rows are of the wrong range.
+    if (slot.range !== range) return this.#miss(id, "range", slot.lines, slot.parts);
     this.#hits += 1;
     this.#probe.hit("render");
     return slot.lines;
@@ -197,13 +229,28 @@ export class RenderCache {
 
   #miss(
     id: EntryId,
-    reason: "absent" | "rev" | "width" | "theme" | "focus",
+    reason: "absent" | "rev" | "width" | "theme" | "focus" | "range",
     discarded: readonly string[] | undefined,
+    parts: Map<string, readonly string[]> | null,
   ): undefined {
     this.#misses[reason] += 1;
     this.#probe.miss("render", reason);
     this.#discarded = discarded === undefined ? null : { id, lines: discarded };
+    this.#open = parts === null ? null : { id, parts };
     return undefined;
+  }
+
+  /**
+   * The parts left open for `id` by a range miss (I101), or `undefined` when
+   * the last miss for it was on any other axis — or was another entry's.
+   */
+  parts(id: EntryId): EntryParts | undefined {
+    const open = this.#open;
+    if (open === null || open.id !== id) return undefined;
+    return {
+      part: (key) => open.parts.get(key),
+      hold: (key, lines) => void open.parts.set(key, lines),
+    };
   }
 
   set(
@@ -212,6 +259,7 @@ export class RenderCache {
     width: number,
     focus: string,
     theme: string,
+    range: string,
     lines: readonly string[],
   ): void {
     // **C14 I28's comparison, on lines rather than a height.** `slot` above is
@@ -230,7 +278,13 @@ export class RenderCache {
     // say so: occupancy counts slots, and a slot that was overwritten leaves no
     // trace in it at all.
     this.#probe.track("render-cache.lines", lines);
-    this.#slots.set(id, Object.freeze({ rev, width, focus, theme, lines }));
+    // **The parts survive a range miss and nothing else** (I101): the map the
+    // miss left open is the one stored back, grown by what this render held;
+    // after any other miss it is a fresh one.
+    const open = this.#open;
+    const parts = open !== null && open.id === id ? open.parts : new Map<string, readonly string[]>();
+    this.#open = null;
+    this.#slots.set(id, Object.freeze({ rev, width, focus, theme, range, lines, parts }));
   }
 
   /** `evict` deletes by id — no key enumeration, because there is one slot. */

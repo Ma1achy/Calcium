@@ -17,13 +17,14 @@
  * (§6l.2 row 13), and a `step` header with no body hangs no hook (row 14).
  */
 
-import type { Block } from "../data/viewmodel/index.js";
+import type { Block, Group } from "../data/viewmodel/index.js";
 import { block as rebuild } from "../data/viewmodel/index.js";
 import { glyphFor } from "../presentation/blocks/index.js";
 import type { BlockRegistry, NavElement } from "../presentation/blocks/index.js";
 import { paint as paintSpans, tone } from "../presentation/blocks/paint.js";
 import { glyphForMask, LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP } from "../presentation/plot/linedraw.js";
 import { renderSequenceToLines } from "../presentation/render-lines.js";
+import type { EntryParts } from "./render-cache.js";
 
 /**
  * The hook's column: the header's text column (C22 I84, §6l.6 row 16).
@@ -319,6 +320,71 @@ export function windowEntry(
 
 type RenderOptions = Parameters<typeof renderSequenceToLines>[3];
 
+/** A gap row is an empty row — what the sequence and the group both draw for `gapBefore` (C22 I101). */
+const GAP_ROW = "";
+
+/** The lines less the gap row the sequence form draws above a `gapBefore` block. */
+function ownRows(block: Block, lines: readonly string[]): readonly string[] {
+  return block.gapBefore === true ? lines.slice(1) : lines;
+}
+
+/**
+ * The window's rows from the parts a range miss kept, rendering only what
+ * enters (C22 I101).
+ *
+ * **The identity this rests on is C09's, read from the other side**: a column
+ * group's rows are its children's laid end to end (C09 I69) and a sequence's
+ * are its blocks' (C14 I25), so a child rendered alone in a single-child group
+ * carrying its own `align`, and a top-level block rendered as a one-block
+ * sequence, lay the rows the full render would. A column group's children are
+ * taken from the parts or rendered alone and held; a top-level block the
+ * window kept whole — the same object as the run's — likewise; a block the
+ * window sliced is rendered as before and held by nobody, because its rows
+ * are the range's. `gapBefore` is a row here as it is there. T4.89b sweeps
+ * every position against the full render, byte for byte.
+ */
+function assemble(
+  registry: BlockRegistry,
+  piece: EntryPiece,
+  options: RenderOptions,
+  held: EntryParts,
+): readonly string[] {
+  const rows: string[] = [];
+  const width = piece.run.width;
+  const whole = new Set<Block>(piece.run.blocks);
+  const render = (blocks: readonly Block[]): readonly string[] =>
+    renderSequenceToLines(registry, blocks, width, options);
+  for (const block of piece.windowed.blocks) {
+    if (block.gapBefore === true) rows.push(GAP_ROW);
+    if (block.kind === "group" && (block as Group).direction === "column" && (block as Group).minRows === undefined) {
+      const group = block as Group;
+      group.children.forEach((child, i) => {
+        if (child.gapBefore === true) rows.push(GAP_ROW);
+        const align = group.align?.[i] ?? "left";
+        // The separator keeps a child's key apart from a top-level block's, which is its id alone.
+        const key = `${child.id}\u0000${align}`;
+        let lines = held.part(key);
+        if (lines === undefined) {
+          const alone: Group = { ...group, gapBefore: false, children: [child], align: [align] };
+          lines = ownRows(child, render([alone]));
+          held.hold(key, lines);
+        }
+        rows.push(...lines);
+      });
+    } else if (whole.has(block)) {
+      let lines = held.part(block.id);
+      if (lines === undefined) {
+        lines = ownRows(block, render([block]));
+        held.hold(block.id, lines);
+      }
+      rows.push(...lines);
+    } else {
+      rows.push(...ownRows(block, render([block])));
+    }
+  }
+  return rows;
+}
+
 /**
  * One gutter cell's text, `GUTTER_UNIT` cells wide (I88, I89): `HOOK_INDENT`
  * blanks, then the glyph or glyphs, muted, padded to the unit. Every glyph is
@@ -363,6 +429,7 @@ export function renderEntryPieces(
   registry: BlockRegistry,
   pieces: readonly EntryPiece[],
   options: RenderOptions,
+  held?: EntryParts,
 ): Readonly<{ rows: readonly string[]; faults: readonly Readonly<{ drawn: number; expected: number }>[] }> {
   const rows: string[] = [];
   const faults: Readonly<{ drawn: number; expected: number }>[] = [];
@@ -373,7 +440,12 @@ export function renderEntryPieces(
       for (let i = 0; i < piece.take; i += 1) rows.push("");
       continue;
     }
-    const rendered = renderSequenceToLines(registry, piece.windowed.blocks, piece.run.width, options);
+    // **On a range miss, from the parts** (C22 I101); otherwise the sequence
+    // render, as every first frame is.
+    const rendered =
+      held === undefined
+        ? renderSequenceToLines(registry, piece.windowed.blocks, piece.run.width, options)
+        : assemble(registry, piece, options, held);
     const expected = registry.measureSequence(piece.windowed.blocks, piece.run.width);
     if (rendered.length !== expected) faults.push(Object.freeze({ drawn: rendered.length, expected }));
     const slice = rendered.slice(piece.windowed.skipRows, piece.windowed.skipRows + piece.take);

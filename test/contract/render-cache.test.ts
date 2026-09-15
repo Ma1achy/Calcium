@@ -172,15 +172,15 @@ describe("C22 §6c — the cache's C13 arms", () => {
     const { graph } = await buildGraph();
     const a = graph.transcript.append(doc("one"));
     const b = graph.transcript.append(doc("two"));
-    graph.rendered.set(a, 0, 80, "", "t", ["a"]);
-    graph.rendered.set(b, 0, 80, "", "t", ["b"]);
+    graph.rendered.set(a, 0, 80, "", "t", "", ["a"]);
+    graph.rendered.set(b, 0, 80, "", "t", "", ["b"]);
     expect(graph.rendered.size, "two slots held").toBe(2);
 
     graph.rendered.delete(a);
 
     expect(graph.rendered.size, "one gone").toBe(1);
-    expect(graph.rendered.get(a, 0, 80, "", "t"), "the deleted one").toBeUndefined();
-    expect(graph.rendered.get(b, 0, 80, "", "t"), "and its neighbour stayed").toEqual(["b"]);
+    expect(graph.rendered.get(a, 0, 80, "", "t", ""), "the deleted one").toBeUndefined();
+    expect(graph.rendered.get(b, 0, 80, "", "t", ""), "and its neighbour stayed").toEqual(["b"]);
   });
 
   // **The fourth axis, and the audit that found it.** *A cache key is wrong
@@ -313,7 +313,7 @@ describe("C22 §6c — the cache's C13 arms", () => {
     // can reach (T4.18a's note explains why `evict` is not drivable here).
     const { graph } = await buildGraph();
     const id = graph.transcript.append(doc("one"));
-    graph.rendered.set(id, 0, 80, "", "t", ["row"]);
+    graph.rendered.set(id, 0, 80, "", "t", "", ["row"]);
     graph.scrollOffsets.nudge(id, "box", 3);
     expect(graph.scrollOffsets.size, "one entry holding an offset").toBe(1);
 
@@ -326,7 +326,7 @@ describe("C22 §6c — the cache's C13 arms", () => {
   it("T4.18b (I58): clear drops every slot", async () => {
     const { graph } = await buildGraph();
     const id = graph.transcript.append(doc("one"));
-    graph.rendered.set(id, 0, 80, "", "t", ["row"]);
+    graph.rendered.set(id, 0, 80, "", "t", "", ["row"]);
     expect(graph.rendered.size, "one slot held").toBe(1);
 
     graph.transcript.clear();

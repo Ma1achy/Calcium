@@ -223,8 +223,8 @@ const results = runPass({
       // separates them.
       name: "LABEL-SWAP: theme and focus report each other's reason",
       file: RCACHE,
-      from: '    if (slot.theme !== theme) return this.#miss(id, "theme", slot.lines);\n    if (slot.focus !== focus) return this.#miss(id, "focus", slot.lines);',
-      to: '    if (slot.theme !== theme) return this.#miss(id, "focus", slot.lines);\n    if (slot.focus !== focus) return this.#miss(id, "theme", slot.lines);',
+      from: '    if (slot.theme !== theme) return this.#miss(id, "theme", slot.lines, null);\n    if (slot.focus !== focus) return this.#miss(id, "focus", slot.lines, null);',
+      to: '    if (slot.theme !== theme) return this.#miss(id, "focus", slot.lines, null);\n    if (slot.focus !== focus) return this.#miss(id, "theme", slot.lines, null);',
       expect: "T1.55",
     },
     {
