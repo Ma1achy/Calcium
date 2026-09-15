@@ -271,4 +271,19 @@ describe("C22 §6c — the render cache", () => {
     await type("x");
     expect(count(), "and the second rendered none of it").toBe(first);
   });
+  it.todo(
+    "T4.88 (C22 I100): forty measured children drawn twice report every measure miss on the first frame and none on the second, a patched child alone misses again, and the C14 height and the window agree — not deferred on a component: the code commit replaces this row",
+  );
+  it.todo(
+    "T4.89a (C22 I101): a column group of six counting children windowed to three then scrolled one row renders the entering child alone, the miss is range, the rows are the fresh render's — not deferred on a component: the code commit replaces this row",
+  );
+  it.todo(
+    "T4.89b (C22 I101, C09 I69, C14 I25): every window position over gaps, a right-aligned child and a sequence of whole blocks equals a fresh full render byte for byte — not deferred on a component: the code commit replaces this row",
+  );
+  it.todo(
+    "T4.89c (C22 I101): a rev, focus or theme change drops the held parts and a range change after them holds again — not deferred on a component: the code commit replaces this row",
+  );
+  it.todo(
+    "T4.89d (C22 I101): a logs block taller than the window is rendered at every range and never held, a whole block beside it is held — not deferred on a component: the code commit replaces this row",
+  );
 });

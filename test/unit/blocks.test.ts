@@ -634,6 +634,10 @@ describe("C09 §6 — kinds", () => {
     expect(calls, "an empty container measures no children").toEqual([]);
   });
 
+  it.todo(
+    "T1.44 (C09 I70): a column group measured twice through one caller-owned memo measures each child once across both calls, the answers equal the memo-less answers, another width and a rebuilt child miss through — not deferred on a component: the code commit replaces this row",
+  );
+
   it("T1.10 (I10): an unknown kind renders through raw and never throws", () => {
     const kit = measurable();
     const foreign = { kind: "sparkline-3000", id: "x-1", values: [1, 2, 3] } as unknown as never;
