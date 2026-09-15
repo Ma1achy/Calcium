@@ -50606,3 +50606,47 @@ that sees it, and the run says so now.
 missing after c10-colormap, c12-direct-path and c12-surface3d were
 re-anchored on the scalar callback and `thinEdge`; four mutation runs
 every one caught.
+
+## F1158 — the painter is built once per triangle, and it is the same closure every time ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/scatter3.ts`'s `plot3dArea`, the callback handed to `drawTri` |
+| **Reached for** | F1157's close, the residue rows: `plot3dArea` 8.9 MB a render on the bunny and the paint callback 2.7 MB; then two experiments on copies of the F10 build under `out/`, each measured by the allocation bench and the paired interleaved probe against F10 |
+| **Verdict** | **open** — measured, the remedy named |
+
+**The path, at HEAD.** `for (const t of scene.tris)` reads `t.skin.wire` into
+a local and hands `drawTri` an arrow function that closes over it — so the
+function literal is one, and the closure is new per triangle: 69 451
+closures a bunny frame, each with its context, for a painter whose only
+per-triangle input is `wire`. That is I128's class one function out: an
+allocation per triangle the sample loop does not need.
+
+**Two experiments, on copies, before anything was written into the tree.**
+
+```
+E1  the painter hoisted above the loop, `wire` a `let` it reads
+      allocation a render        74 → 69 MB   (plot3dArea 8.9 → 6.6, the painter 2.7 → 1.5)
+      paired B−A, three runs     −2.8 / −2.8 / −3.0 ms on 36–40 ms   31 / 32 / 33 of 40
+E2  E1 plus the sample handed through one shared Float64Array, the painter (i, series, edge)
+      allocation a render        73 MB — fill back in the table at 18 MB, thinEdge unchanged at 17
+      paired B−A, three runs     −0.9 / −1.1 / −2.0 ms                 25 / 26 / 30 of 40
+```
+
+E1 is the remedy: seven to eight percent of the frame for a `let` and a
+moved brace. **E2 is a hypothesis falsified and worth the line**: F1157's
+close guessed the thin stroke's 17 MB was doubles boxed on the way into a
+painter the optimiser did not inline. A typed scratch that boxes nothing
+measured *slower* than E1 alone and moved `thinEdge`'s bytes not at all —
+so those bytes are the segment callback closure and its context per edge,
+three a thin triangle, about 190 bytes each over ninety thousand edges,
+and a scratch record for the doubles is not a remedy for anything. What
+would remove them is a stroke core that steps without a callback, which
+duplicates `strokeSeg`'s stepping rule (F453's floor) or restructures it;
+recorded here, not built on suspicion.
+
+**The remedy.** The painter is one closure per render, declared above the
+triangle loop, reading the current triangle's `wire` through a `let` the
+loop assigns; nothing else it closes over changes per triangle. Byte-
+identical by construction — the same function body, the same reads — and
+the goldens are the gate; the allocation bench is the observable.
