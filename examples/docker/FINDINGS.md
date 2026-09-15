@@ -50814,7 +50814,46 @@ none after the first frame.
 |---|---|
 | **Surface** | `src/shell/render-cache.ts`; `src/shell/session.ts`'s `visibleRows`; `src/shell/entry-layout.ts`'s `renderEntryPieces` |
 | **Reached for** | the same bench: `renderEntryPieces` 2 491 ms inclusive of `visibleRows`' 3 492, `react` 43.5% of frame work; `render` misses `focus 80` over 88 frames, which is the slot's string moving with the window; then a probe over `/all`'s root at width 80, 64 children and 773 rows |
-| **Verdict** | **open** — measured, the remedy named |
+| **Verdict** | **closed — built and measured.** C22 I101: the slot splits on the range and holds the parts; a range miss renders what enters. The `all` bench at 80×24, three pairs interleaved against the F13 build: work p50 24.8 / 23.3 / 23.8 → 6.2 / 7.4 / 8.1 ms; at 130×42, 16.6 → 4.8. See the close below |
+
+**Closed — built and measured** (C22 I101). The slot's key lost the range
+and gained it back as its own axis, checked last; a miss there keeps the
+map of parts — a column group's children by id and `align`, a top-level
+block the window kept whole by id — and the render after it assembles
+the window from them, rendering the entering blocks alone in a
+single-child group and holding them. A sliced block is rendered and held
+by nobody. Any other miss drops the parts with the rows, so nothing was
+added to the invalidation story. T4.89b is the referee: every window
+position over gaps, a right-aligned child, a nested row and a sequence of
+whole blocks, byte for byte against the fresh render; the goldens 458
+with no mover.
+
+```
+all 80×24, 88 frames, interleaved, load average 2–4
+
+          work p50            work sum           render misses
+F13       24.8  23.3  23.8    2 799  2 694  2 878    focus 80
+F14        6.2   7.4   8.1    1 336  1 455  1 621    range 80
+
+all 130×42, one pair:  16.6 → 4.8 ms p50
+```
+
+The eighty scroll frames that read `focus` before read `range` now, which
+is the same frames with the axis named: the range had been living inside
+the focus string. Against the F12 build this pass started from, the
+`/all` scroll frame is 33–38 → 6–8 ms p50 — F1160 and F1161 together.
+
+**What the first range miss costs**: the first frame after `/all` renders
+the sequence as before and holds nothing, so the first row of scroll
+renders every kept tile alone and holds it; the second scroll is the
+cheap one. T4.89a's row text was corrected to say so. Holding on the
+first frame would spend one Ink render per tile where the sequence
+render spends one, and was not measured worth it.
+
+**What remains**: `measure absent` 2 885 over the run (about 33 a frame)
+from scopes the memo does not reach; the first-frame cost of `/all`
+itself, which is 145 figures through Ink once — Phase H's question, now
+the whole of what a reader waits for.
 
 **The path, at HEAD.** The render slot's key is nine axes joined, and the
 window range is one of them. A scroll of one row moves the range, the slot
