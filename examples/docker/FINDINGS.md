@@ -50884,3 +50884,53 @@ what invalidated the rows invalidates the parts. The lines held are
 bounded by the entry's own rows and dropped with the slot. The observable
 is the kind renders on a one-row scroll — the entering child's alone —
 and the frames equal a fresh render at every window position.
+
+## F1162 — the header and the footer go through Ink on every frame, and the footer is measured again each time ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/paint.ts`'s `region`; `src/shell/frame.ts`'s `chromeOf` and the footer's `measureSequence`; `src/shell/composite.ts`'s `layerRows`; `src/shell/chrome.ts`'s `clusters` |
+| **Reached for** | the `all` bench at 80×24 on the F14 build, quiet: 88 frames, work p50 6–8 ms; `region` 306 ms inclusive under `paint` — 3.5 ms a frame; 176 of the 234 `react` spans are the header and the footer, at a p50 of 1.3 ms each; `group#chrome.footer` and `group#chrome.header` rendered 88 times each, `pills#chrome.footer.left` measured 2.03 times a frame; `measure absent` 2 885 over the run, of which the chrome's own blocks — rebuilt by `clusters` every frame, so a new identity to the session's memo — are about nine a frame |
+| **Verdict** | **open** — measured, the remedy named |
+
+**The path, at HEAD.** `compose` calls the app's `header` and `footer`
+functions every frame with a context carrying `now`, and the default chrome
+builds two `group` blocks of two `pills` each through `block()` — fresh
+objects, structurally identical to the last frame's except when the clock's
+second changes. `frame.ts` measures the footer through C14's measurer, whose
+memo is keyed by identity, so the fresh blocks miss and are measured again;
+`paint` then renders header and footer through `renderSequenceToLines`, which
+is a React mount and teardown each, before the transcript's rows — which
+F1160 and F1161 just made nearly free — are spliced between them. On a
+scroll frame the chrome is now over half the work. Overlay layers take the
+same path in `composite.ts`: a layer's content is set once per change and
+rendered once per frame.
+
+**Remedy.** A session-owned chrome cache (C22 I102): the header's and the
+footer's lines and the footer's measured height keyed by the blocks'
+serialised structure, the width and the theme's name — three slots — and a
+layer's lines keyed by its content's identity in a `WeakMap`. A frame whose
+chrome came back equal paints the held lines and measures nothing; the
+clock's tick is a `rev` miss once a second. Misses reported as `chrome` with
+the axis, so the deck can see it.
+
+## F1163 — the theme store validates the painted floors at load, and it costs a cold session about sixty milliseconds ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/theme/store.ts`'s `loadTheme`; `src/presentation/theme/resolve.ts`'s `validatePaintedFloors`, `quantisedHex`, `quantiseSet` |
+| **Reached for** | `loadTheme(defaultTheme)` in `dist/`, six calls in one process: 56.8, 29.5, 25.6, 10.6, 3.2, 4.9 ms; the `all` bench's profile attributes 87.8 ms inclusive to `validatePaintedFloors` from the store's constructor, of which `quantisedHex` 51 ms self and `quantiseSet` 35 ms self — for the two themes of three that paint a surface (`light`, `high-contrast`) |
+| **Verdict** | **open** — measured, the remedy named |
+
+**The path, at HEAD.** `loadTheme` runs both validators over every theme in
+the set (C10 I26, I27). `validatePaintedFloors` is a no-op for a theme that
+inherits the terminal's background and, for one that paints, quantises the
+surface set to find what an 8-bit terminal would paint for `bg` — and that
+walk recomputes each cube entry's Lab on every comparison rather than once.
+It is paid once per session, before the first frame, and the warm figures
+say most of it is work the first call does and the later ones do not.
+
+**Remedy.** The cube's Lab beside its hex in `buildCube`, computed once at
+module load, and the quantisation of a theme's surfaces memoised by the
+surfaces' values — the same answer, once. Measured against the six-call
+series above; no spec change, C10's own contrast rows are the gate.
