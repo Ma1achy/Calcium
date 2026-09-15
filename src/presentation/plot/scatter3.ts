@@ -1244,7 +1244,7 @@ export function plot3dArea(
     colourBy !== "series" && ctx.capabilities.colourDepth >= 24 ? colormapFor(block) : undefined;
   for (const t of scene.tris) {
     const wire = t.skin.wire;
-    drawTri(t, scene.basis, grid, depth, lit, span, (i, sm) => {
+    const clipped = drawTri(t, scene.basis, grid, depth, lit, span, (i, sm) => {
       // **`wireframe: true` writes depth and paints nothing but the edges**
       // (C12 I95, §6i row 11). The depth write already happened — `drawTri`
       // calls it before this — so the face occludes what is behind it and the
@@ -1302,6 +1302,8 @@ export function plot3dArea(
       mark[i] = sub ? undefined : densityGlyph(k, ctx.capabilities);
       glyph[i] = -1;
     });
+    // **The clip path counted** (C12 I128): zero for a mesh in front of the camera.
+    if (clipped) ctx.probe?.count("plot3d.clip");
   }
 
   // **The frame goes in last, and it is a rule about ties rather than a reading

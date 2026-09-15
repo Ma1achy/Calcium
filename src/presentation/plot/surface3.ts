@@ -419,7 +419,15 @@ function valuesOf(s: Surface3, count: number): readonly (number | undefined)[] {
 }
 
 /** A vertex projected into sample coordinates, carrying its view position. */
-type Screen = Readonly<{ x: number; y: number; vp: Vec3; n: Vec3; v: number | undefined }>;
+type Screen = Readonly<{
+  x: number;
+  y: number;
+  /** The view-space position, as components — `viewDir(basis, sub(p, eye))` in `dot`'s order (C12 I128). */
+  vx: number; vy: number; vz: number;
+  /** The view-space normal, likewise `viewDir(basis, n)`. */
+  nx: number; ny: number; nz: number;
+  v: number | undefined;
+}>;
 
 const lerpV = (a: Vec3, b: Vec3, t: number): Vec3 => ({
   x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t,
@@ -448,17 +456,39 @@ export function drawTri(
   light: Vec3,
   span: Readonly<{ nearD: number; farD: number }>,
   paint: (i: number, sample: Shaded) => void,
-): void {
-  if (backfaceCulled(tri, basis)) return;
-  const zOf = (p: Vec3): number => dot(sub(p, basis.eye), basis.forward);
-  const vs = [tri.a, tri.b, tri.c];
-  const behind = vs.filter((w) => zOf(w.p) <= NEAR);
-  if (behind.length === 3) return; // cells-ok — a vertex count
-  for (const t of clipNear(vs as [Vert, Vert, Vert], tri.edges, zOf)) {
-    const s = t.v.map((w) => toScreen(w, basis, grid));
-    if (s.some((q) => q === null)) continue;
-    fill(s as [Screen, Screen, Screen], tri, t.e, grid, depth, light, span, paint);
+): boolean {
+  if (backfaceCulled(tri, basis)) return false;
+  // **The three view depths once, as scalars** (C12 I128) — `zOf`'s expression,
+  // `dot(sub(p, eye), forward)`, term by term in its order.
+  const e = basis.eye;
+  const f = basis.forward;
+  const za = (tri.a.p.x - e.x) * f.x + (tri.a.p.y - e.y) * f.y + (tri.a.p.z - e.z) * f.z;
+  const zb = (tri.b.p.x - e.x) * f.x + (tri.b.p.y - e.y) * f.y + (tri.b.p.z - e.z) * f.z;
+  const zc = (tri.c.p.x - e.x) * f.x + (tri.c.p.y - e.y) * f.y + (tri.c.p.z - e.z) * f.z;
+  if (za <= NEAR && zb <= NEAR && zc <= NEAR) return false;
+  // **The direct path: wholly in front, so the clip would hand back these three
+  // vertices and these edges untouched** (I128). `project`'s own cull is this
+  // same test on this same expression, so none of the three is `null`.
+  if (za > NEAR && zb > NEAR && zc > NEAR) {
+    const sa = toScreen(tri.a, basis, grid);
+    const sb = toScreen(tri.b, basis, grid);
+    const sc = toScreen(tri.c, basis, grid);
+    if (sa === null || sb === null || sc === null) return false;
+    fill(sa, sb, sc, tri, tri.edges, grid, depth, light, span, paint);
+    return false;
   }
+  // **The clip path**, taken only when a corner is at or behind the plane; the
+  // return value is what lets the caller count it.
+  const zOf = (p: Vec3): number => dot(sub(p, basis.eye), basis.forward);
+  const vs: readonly [Vert, Vert, Vert] = [tri.a, tri.b, tri.c];
+  for (const t of clipNear(vs, tri.edges, zOf)) {
+    const sp = toScreen(t.v[0], basis, grid);
+    const sq = toScreen(t.v[1], basis, grid);
+    const sr = toScreen(t.v[2], basis, grid);
+    if (sp === null || sq === null || sr === null) continue;
+    fill(sp, sq, sr, tri, t.e, grid, depth, light, span, paint);
+  }
+  return true;
 }
 
 /**
@@ -579,11 +609,25 @@ function toScreen(
 ): Screen | null {
   const pr = project(basis, w.p);
   if (pr === null) return null;
+  // **One record, nine numbers** (C12 I128): `viewDir(basis, sub(w.p, eye))` and
+  // `viewDir(basis, w.n)` component by component, each `dot` in its own order,
+  // where this was a `Projected`, a `sub` and two `Vec3`s a vertex.
+  const dx = w.p.x - basis.eye.x;
+  const dy = w.p.y - basis.eye.y;
+  const dz = w.p.z - basis.eye.z;
+  const n = w.n;
+  const r = basis.right;
+  const u = basis.up;
+  const f = basis.forward;
   return {
     x: pr.x * grid.width,
     y: pr.y * grid.height,
-    vp: viewDir(basis, sub(w.p, basis.eye)),
-    n: viewDir(basis, w.n),
+    vx: dx * r.x + dy * r.y + dz * r.z,
+    vy: dx * u.x + dy * u.y + dz * u.z,
+    vz: dx * f.x + dy * f.y + dz * f.z,
+    nx: n.x * r.x + n.y * r.y + n.z * r.z,
+    ny: n.x * u.x + n.y * u.y + n.z * u.z,
+    nz: n.x * f.x + n.y * f.y + n.z * f.z,
     v: w.v,
   };
 }
@@ -606,7 +650,9 @@ function toScreen(
  * the frame is unbounded work for no ink.
  */
 function fill(
-  s: readonly [Screen, Screen, Screen],
+  a: Screen,
+  b: Screen,
+  c: Screen,
   tri: Tri3,
   e: readonly [boolean, boolean, boolean],
   grid: Readonly<{ width: number; height: number }>,
@@ -615,80 +661,46 @@ function fill(
   span: Readonly<{ nearD: number; farD: number }>,
   paint: (i: number, sample: Shaded) => void,
 ): void {
-  const [a, b, c] = s;
   const series = tri.series;
   const area = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
   if (!(Math.abs(area) >= 1)) {
-    strokeThin(s, tri, e, grid, depth, light, span, paint);
+    strokeThin(a, b, c, tri, e, grid, depth, light, span, paint);
     return;
   }
-  // **The edge lengths, folded once** (C12 I95, §6i row 8). `w0` is twice the
-  // sub-triangle's area, so `w0 / |ab|` is the perpendicular distance to `ab`
-  // in samples — and the whole test is skipped when no edge of this triangle
-  // is the caller's, which is every triangle of a surface with no wireframe.
   const wire = tri.skin.wire !== false && (e[0] || e[1] || e[2]);
-  const len: readonly [number, number, number] = [
-    Math.hypot(b.x - a.x, b.y - a.y),
-    Math.hypot(c.x - b.x, c.y - b.y),
-    Math.hypot(a.x - c.x, a.y - c.y),
-  ];
-  const lo = (f: (q: Screen) => number): number =>
-    Math.max(0, Math.floor(Math.min(f(a), f(b), f(c)))); // cells-ok — a sample coordinate
-  const hi = (f: (q: Screen) => number, n: number): number =>
-    Math.min(n - 1, Math.floor(Math.max(f(a), f(b), f(c)))); // cells-ok — a sample coordinate
-  const x0 = lo((q) => q.x);
-  const x1 = hi((q) => q.x, grid.width);
-  const y0 = lo((q) => q.y);
-  const y1 = hi((q) => q.y, grid.height);
+  // **Scalars, not a `len` tuple and four closures** (C12 I128) — the same
+  // `Math.hypot`, `Math.min` and `Math.max` calls with the same arguments.
+  const len0 = Math.hypot(b.x - a.x, b.y - a.y);
+  const len1 = Math.hypot(c.x - b.x, c.y - b.y);
+  const len2 = Math.hypot(a.x - c.x, a.y - c.y);
+  const x0 = Math.max(0, Math.floor(Math.min(a.x, b.x, c.x))); // cells-ok — a sample coordinate
+  const x1 = Math.min(grid.width - 1, Math.floor(Math.max(a.x, b.x, c.x))); // cells-ok — a sample coordinate
+  const y0 = Math.max(0, Math.floor(Math.min(a.y, b.y, c.y))); // cells-ok — a sample coordinate
+  const y1 = Math.min(grid.height - 1, Math.floor(Math.max(a.y, b.y, c.y))); // cells-ok — a sample coordinate
   const sign = area > 0 ? 1 : -1;
+  const m = Math.abs(area);
+  const eps = m * 1e-6;
   for (let py = y0; py <= y1; py += 1) { // cells-ok — a sample coordinate
     for (let px = x0; px <= x1; px += 1) { // cells-ok — a sample coordinate
-      // **The sample's centre, which is `+0.5` because every writer here floors**
-      // (F453): sample `i` covers `[i, i + 1)`, so its centre is `i + 0.5`.
       const cx = px + 0.5;
       const cy = py + 0.5;
       const w0 = ((b.x - a.x) * (cy - a.y) - (cx - a.x) * (b.y - a.y)) * sign;
       const w1 = ((c.x - b.x) * (cy - b.y) - (cx - b.x) * (c.y - b.y)) * sign;
       const w2 = ((a.x - c.x) * (cy - c.y) - (cx - c.x) * (a.y - c.y)) * sign;
-      // **A shared edge is claimed by both triangles or by neither, and
-      // floating point decides which** (C12 I104, F493).
-      //
-      // The test was `w < 0`, which accepts a sample exactly *on* an edge — so
-      // two triangles sharing one both take it, and the depth test settles it.
-      // That is right in exact arithmetic. In floating point the two compute the
-      // same edge from **different operands**, so a sample on it can evaluate to
-      // `-1e-13` for both and be dropped by both: a **crack**, one sample wide,
-      // along every shared edge in the mesh.
-      //
-      // **It was invisible until the grid doubled.** At `width × 1` the cracks
-      // fell between samples; at `width × 2` there are four times as many
-      // chances to land on one, and they surfaced as half-cell holes punched
-      // into a solid surface — which reads as a rendering fault and is a
-      // sampling one. Found by looking at a magnified frame, not by any
-      // assertion about coverage.
-      //
-      // The epsilon is relative to the triangle's own area so it scales with the
-      // mesh, and it errs toward double coverage, which `writeDepth` already
-      // resolves.
-      const eps = Math.abs(area) * 1e-6;
       if (w0 < -eps || w1 < -eps || w2 < -eps) continue;
-      const m = Math.abs(area);
-      const [ua, ub, uc] = [w1 / m, w2 / m, w0 / m];
-      // **Depth interpolates linearly across the screen triangle**, which is not
-      // perspective-correct and is deliberate: `strokeSeg` interpolates its `z`
-      // the same way, and a wireframe edge z-fighting its own face *because the
-      // two primitives interpolate differently* is a defect no assertion about
-      // either one alone would find.
-      const z = a.vp.z * ua + b.vp.z * ub + c.vp.z * uc;
+      const ua = w1 / m;
+      const ub = w2 / m;
+      const uc = w0 / m;
+      const z = a.vz * ua + b.vz * ub + c.vz * uc;
       if (!writeDepth(depth, px, py, z)) continue; // cells-ok — a sample coordinate
       const n = {
-        x: a.n.x * ua + b.n.x * ub + c.n.x * uc,
-        y: a.n.y * ua + b.n.y * ub + c.n.y * uc,
-        z: a.n.z * ua + b.n.z * ub + c.n.z * uc,
+        x: a.nx * ua + b.nx * ub + c.nx * uc,
+        y: a.ny * ua + b.ny * ub + c.ny * uc,
+        z: a.nz * ua + b.nz * ub + c.nz * uc,
       };
       const vp = {
-        x: a.vp.x * ua + b.vp.x * ub + c.vp.x * uc,
-        y: a.vp.y * ua + b.vp.y * ub + c.vp.y * uc,
+        x: a.vx * ua + b.vx * ub + c.vx * uc,
+        y: a.vy * ua + b.vy * ub + c.vy * uc,
         z,
       };
       paint(py * grid.width + px, { // cells-ok — a sample offset
@@ -697,9 +709,9 @@ function fill(
         series,
         intensity: shade(n, vp, light, z, span),
         edge: wire
-          && ((e[0] && w0 / (len[0] as number) < EDGE_HALF)
-            || (e[1] && w1 / (len[1] as number) < EDGE_HALF)
-            || (e[2] && w2 / (len[2] as number) < EDGE_HALF)),
+          && ((e[0] && w0 / len0 < EDGE_HALF)
+            || (e[1] && w1 / len1 < EDGE_HALF)
+            || (e[2] && w2 / len2 < EDGE_HALF)),
       });
     }
   }
@@ -713,7 +725,9 @@ function fill(
  * computing.
  */
 function strokeThin(
-  s: readonly [Screen, Screen, Screen],
+  a: Screen,
+  b: Screen,
+  c: Screen,
   tri: Tri3,
   e: readonly [boolean, boolean, boolean],
   grid: Readonly<{ width: number; height: number }>,
@@ -723,30 +737,32 @@ function strokeThin(
   paint: (i: number, sample: Shaded) => void,
 ): void {
   const series = tri.series;
-  const pairs: readonly (readonly [Screen, Screen, boolean])[] = [
-    [s[0], s[1], e[0]], [s[1], s[2], e[1]], [s[2], s[0], e[2]],
-  ];
-  // **All three still stroke, and only the caller's carry `edge`.** A degenerate
-  // triangle is a line whichever member is set, so the arm that keeps it does
-  // not change; what changes is which of its three strokes a wireframe paints.
-  for (const [p, q, own] of pairs) {
-    const asProjected = (w: Screen): { x: number; y: number; depth: number } => ({
-      x: w.x / grid.width, y: w.y / grid.height, depth: w.vp.z,
-    });
-    // **Strictly nearer**: this arm writes a colour, and a colour has one
-    // question — a tie belongs to whoever drew first (C12 I101, F452).
-    strokeSeg(asProjected(p), asProjected(q), grid, depth, (i, t, z) => {
-      const n = lerpV(p.n, q.n, t);
-      const vp = { ...lerpV(p.vp, q.vp, t), z };
-      paint(i, {
-        depth: z,
-        value: p.v === undefined || q.v === undefined ? p.v ?? q.v : p.v + (q.v - p.v) * t,
-        series,
-        intensity: shade(n, vp, light, z, span),
-        edge: own && tri.skin.wire !== false,
-      });
-    }, false);;
-  }
+  const wire = tri.skin.wire !== false;
+  // **Three explicit edges, not a `pairs` array of tuples** (C12 I128); the
+  // per-sample lerps are `lerpV`'s expression, `a + (b − a) · t`, on components.
+  const edge = (p: Screen, q: Screen, own: boolean): void => {
+    strokeSeg(
+      { x: p.x / grid.width, y: p.y / grid.height, depth: p.vz },
+      { x: q.x / grid.width, y: q.y / grid.height, depth: q.vz },
+      grid,
+      depth,
+      (i, t, z) => {
+        const n = { x: p.nx + (q.nx - p.nx) * t, y: p.ny + (q.ny - p.ny) * t, z: p.nz + (q.nz - p.nz) * t };
+        const vp = { x: p.vx + (q.vx - p.vx) * t, y: p.vy + (q.vy - p.vy) * t, z };
+        paint(i, {
+          depth: z,
+          value: p.v === undefined || q.v === undefined ? p.v ?? q.v : p.v + (q.v - p.v) * t,
+          series,
+          intensity: shade(n, vp, light, z, span),
+          edge: own && wire,
+        });
+      },
+      false,
+    );
+  };
+  edge(a, b, e[0]);
+  edge(b, c, e[1]);
+  edge(c, a, e[2]);
 }
 
 /** Three readings under barycentric weights, `undefined` surviving as `undefined`. */

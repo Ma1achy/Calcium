@@ -121,7 +121,7 @@ const results = await runPass({
       // draw nothing, and GM2 is the row that holds it.
       name: "a triangle under a sample of projected area draws nothing",
       file: SURFACE,
-      from: "  if (!(Math.abs(area) >= 1)) {\n    strokeThin(s, tri, e, grid, depth, light, span, paint);",
+      from: "  if (!(Math.abs(area) >= 1)) {\n    strokeThin(a, b, c, tri, e, grid, depth, light, span, paint);",
       to: "  if (!(Math.abs(area) >= 1)) {",
       expect: "GM2",
     },

@@ -63,8 +63,8 @@ const results = await runPass({
       // it draws is a Gaussian with its peak at ambient and its rim lit.
       name: "the normal is dotted with the light in world space",
       file: F,
-      from: "    n: viewDir(basis, w.n),",
-      to: "    n: w.n,",
+      from: "    nx: n.x * r.x + n.y * r.y + n.z * r.z,\n    ny: n.x * u.x + n.y * u.y + n.z * u.z,\n    nz: n.x * f.x + n.y * f.y + n.z * f.z,",
+      to: "    nx: n.x,\n    ny: n.y,\n    nz: n.z,",
       // **SF3a and not SF3.** SF3 asserts smooth carries more shades than flat,
       // which is true under this defect — it survived that row, and the row it
       // needed is the one about the light's *direction* (F459).
@@ -77,7 +77,7 @@ const results = await runPass({
       // keeping its line.
       name: "a degenerate triangle is filled rather than stroked",
       file: F,
-      from: "  if (!(Math.abs(area) >= 1)) {\n    strokeThin(s, tri, e, grid, depth, light, span, paint);\n    return;\n  }",
+      from: "  if (!(Math.abs(area) >= 1)) {\n    strokeThin(a, b, c, tri, e, grid, depth, light, span, paint);\n    return;\n  }",
       to: "  if (!(Math.abs(area) >= 1)) {\n    return;\n  }",
       expect: "SF1",
     },

@@ -8,11 +8,13 @@
 // implementation written test-last would ship.
 import { describe, expect, it } from "vitest";
 
-import { block, CAMERA_DEFAULT, type Plot } from "../../src/data/viewmodel/index.js";
+import { block, CAMERA_DEFAULT, NO_PROBE, type Plot, type Probe } from "../../src/data/viewmodel/index.js";
 import { plotDefinition } from "../../src/presentation/plot/definition.js";
-import { geometryOf, surfacePoints } from "../../src/presentation/plot/surface3.js";
+import { backfaceCulled, drawTri, geometryOf, lightDirOf, surfacePoints, type Tri3 } from "../../src/presentation/plot/surface3.js";
 import type { RenderScratch } from "../../src/presentation/blocks/types.js";
-import { measurable } from "../support/render.js";
+import { DARK_THEME, FULL_CAPS, measurable, registry } from "../support/render.js";
+import { renderToLines } from "../../src/presentation/render-lines.js";
+import { NEAR } from "../../src/presentation/plot/project3.js";
 import {
   basisOf,
   boundsOf,
@@ -465,10 +467,110 @@ describe("C12 I107 — the geometry scratch", () => {
   });
 });
 
-describe("C12 I128 — the direct path, owed at the spec commit", () => {
-  it.todo(
-    "PR13 (C12 I128): plot3d.clip is zero for a mesh wholly in front across three cameras and equals the straddling face count at a camera behind the near plane, the frames unchanged — not deferred on a component: the code commit replaces this row",
-  );
+describe("C12 I128 — the direct path", () => {
+  /** A probe that counts and does nothing else, on `NO_PROBE`'s shape. */
+  const counting = (): Probe & { counts: Map<string, number> } => {
+    const counts = new Map<string, number>();
+    return {
+      ...NO_PROBE,
+      count: (name: string, by = 1): void => { counts.set(name, (counts.get(name) ?? 0) + by); },
+      counts,
+    };
+  };
+  const VERTICES = Array.from({ length: 81 }, (_v, i) => ({ // cells-ok — a vertex count
+    x: ((i % 9) / 4) - 1, // cells-ok — a vertex index
+    y: (Math.floor(i / 9) / 4) - 1, // cells-ok — a vertex index
+    z: Math.sin((i % 9) / 2) * Math.cos(Math.floor(i / 9) / 2), // cells-ok — a vertex index
+  }));
+  const FACES = Array.from({ length: 64 }, (_v, k) => { // cells-ok — a cell count
+    const r = Math.floor(k / 8); // cells-ok — a cell index
+    const c = k % 8; // cells-ok — a cell index
+    const a = r * 9 + c; // cells-ok — a vertex offset
+    return [a, a + 1, a + 9] as [number, number, number];
+  });
+  const plot = (camera: { azimuth: number; elevation: number; distance: number }): Plot =>
+    block({
+      kind: "plot", id: "pr13", form: "plot3d", height: 12, series: [], axes3: false, box3: "none",
+      colormap: "viridis", camera,
+      surfaces3: [{ vertices: VERTICES, faces: FACES, closed: true }],
+    } as unknown as Plot);
+  const r = registry([plotDefinition]);
+  const render = (p: Plot, probe?: Probe): readonly string[] =>
+    renderToLines(r, p, 60, { theme: DARK_THEME, capabilities: FULL_CAPS, tick: 0, ...(probe === undefined ? {} : { probe }) });
+  /**
+   * How many faces the clip path takes, from the geometry the renderer builds:
+   * not culled as a back face, a corner at or behind the near plane, and a
+   * corner in front of it — a face wholly behind is dropped before the clip.
+   */
+  const straddling = (camera: { azimuth: number; elevation: number; distance: number }): number => {
+    const surface = { vertices: VERTICES, faces: FACES, closed: true };
+    const g = geometryOf(surface as never, extentOf(surfacePoints(surface as never)), 0);
+    // The renderer's basis takes the grid's aspect; the view depth and the cull do not read it.
+    const b = basisOf(camera, 1);
+    const zOf = (p: { x: number; y: number; z: number }): number =>
+      (p.x - b.eye.x) * b.forward.x + (p.y - b.eye.y) * b.forward.y + (p.z - b.eye.z) * b.forward.z;
+    return g.tris.filter((t) => {
+      if (backfaceCulled(t, b)) return false;
+      const zs = [t.a, t.b, t.c].map((w) => zOf(w.p));
+      return zs.some((z) => z <= NEAR) && zs.some((z) => z > NEAR);
+    }).length; // cells-ok — a face count
+  };
+
+  it("PR13 (C12 I128): plot3d.clip is zero for a mesh wholly in front across three cameras and equals the straddling face count at a camera behind the near plane, the frames unchanged", () => {
+    const front = [0.3, 1.1, 2.4].map((azimuth) => ({ azimuth, elevation: 0.3, distance: 6 }));
+    for (const camera of front) {
+      expect(straddling(camera), "a precondition: nothing straddles at distance 6").toBe(0);
+      const probe = counting();
+      const bare = render(plot(camera));
+      expect(render(plot(camera), probe), "the probe changes no byte").toEqual(bare);
+      expect(probe.counts.get("plot3d.clip") ?? 0, `no clip at azimuth ${String(camera.azimuth)}`).toBe(0);
+    }
+    // **The camera inside the figure.** At distance 0.2 the eye sits among the
+    // vertices and the near plane cuts faces; the count is the faces it cuts.
+    const inside = { azimuth: 0.7, elevation: 0.2, distance: 0.2 };
+    const expected = straddling(inside);
+    expect(expected, "a precondition: the near plane cuts something").toBeGreaterThan(0);
+    // A face wholly behind the plane is culled before the clip and is not counted.
+    const probe = counting();
+    const bare = render(plot(inside));
+    expect(render(plot(inside), probe), "byte-identical through the clip path too").toEqual(bare);
+    expect(probe.counts.get("plot3d.clip") ?? 0, "every face with a corner at or behind the plane, a corner in front, and not culled").toBe(expected);
+    // The frame is not blank: the clip path drew something.
+    expect(bare.some((line) => line.trim().length > 0), "the clip path paints").toBe(true); // cells-ok — a blank test
+  });
+
+  it("PR13b (C12 I128, I95): the edge band is the geometry's and not the vertex order's — a 1 : 4 scalene wireframe triangle marks the same edge samples under every cyclic order", () => {
+    // Legs of 1.6 and 0.4 in unit space, facing the eye; a grid cell's legs are
+    // equal, which is why no grid row could see an edge measured by its
+    // neighbour's length.
+    const P = { a: { x: -0.8, y: -0.2, z: 0 }, b: { x: 0.8, y: -0.2, z: 0 }, c: { x: -0.8, y: 0.2, z: 0 } };
+    const n = { x: 0, y: 0, z: 1 };
+    const vert = (p: { x: number; y: number; z: number }) => ({ p, n, v: undefined });
+    const tri = (a: keyof typeof P, b: keyof typeof P, c: keyof typeof P): Tri3 => ({
+      a: vert(P[a]), b: vert(P[b]), c: vert(P[c]),
+      fn: n, edges: [true, true, true], series: 0, skin: { cull: 0, wire: "over" },
+    });
+    const grid = sampleGrid(60, 12);
+    const basis = basisOf({ azimuth: 0.4, elevation: 0.5, distance: 5 }, grid.width / (grid.height * 0.5));
+    const light = lightDirOf(undefined, basis);
+    const shot = (t: Tri3): { painted: string; edges: string } => {
+      const painted: number[] = [];
+      const edges: number[] = [];
+      drawTri(t, basis, grid, createDepth(grid.width, grid.height), light, { nearD: 4, farD: 6 }, (i, sm) => {
+        painted.push(i);
+        if (sm.edge) edges.push(i);
+      });
+      return { painted: painted.sort((x, y) => x - y).join(","), edges: edges.sort((x, y) => x - y).join(",") };
+    };
+    const first = shot(tri("a", "b", "c"));
+    expect(first.edges.length, "a precondition: the band marks samples").toBeGreaterThan(0); // cells-ok — a string length
+    expect(first.painted.length, "and the fill paints more than the band").toBeGreaterThan(first.edges.length); // cells-ok — a string length
+    for (const order of [["b", "c", "a"], ["c", "a", "b"]] as const) {
+      const other = shot(tri(order[0], order[1], order[2]));
+      expect(other.painted, `the fill under ${order.join("")}`).toBe(first.painted);
+      expect(other.edges, `the band under ${order.join("")}`).toBe(first.edges);
+    }
+  });
 });
 
 describe("C12 I127 — the span over referenced vertices", () => {
