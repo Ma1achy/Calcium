@@ -50307,3 +50307,31 @@ serially. **What F6 does not reach**: a multi-surface block still copies its
 triangles per frame (§6o row 14, none in the catalogue), and a cloud's
 normalised points are still `unitOf`'d per frame — a slot's worth if a
 large cloud ever measures.
+
+## F1154 — the ramp span projects every corner of every face, six times a vertex, for a minimum and a maximum ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/scatter3.ts`'s `plot3dArea`, the span pass over `scene.tris` |
+| **Reached for** | F1153's profiles: `plot3dArea` self 796–976 ms over sixty bunny renders, `project` 210–447 ms, the largest remaining item outside the raster |
+| **Verdict** | **open** — measured, the remedy named |
+
+**The path, at HEAD.** Before the raster, `plot3dArea` takes the depth and
+value extrema the ramps are keyed to — every drawn point, both ends of every
+stroke, **and every corner of every triangle**: `for (const t of scene.tris)
+for (const w of [t.a, t.b, t.c]) project(scene.basis, w.p)`. On the bunny that
+is 69 451 array literals and 208 353 projections a frame for 35 947 distinct
+vertices — a mesh vertex sits on about six faces, so each is projected six
+times toward a `Math.min` and a `Math.max` that cannot tell. The rule itself
+is right (C04 I78, I79: a landscape under a cloud must not saturate one end of
+the map) and lives only in a code comment.
+
+**The remedy.** The distinct referenced vertices are a function of the faces
+and the normalised points — exactly the triangles' inputs, none of them the
+camera — so they are built by the same call that builds the triangles and held
+beside them in the surface's slot (C12 I126 row 13: one write, carrying both).
+The span pass projects each once. **Byte-identical by construction**: a
+minimum over a multiset is the minimum over its support, a vertex no face
+references is excluded now and excluded then, and the cull is the same
+`project` returning `null`. The fabricated violation is the other set — every
+vertex, referenced or not — which a stray vertex distinguishes on the frame.
