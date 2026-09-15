@@ -50436,7 +50436,7 @@ if it measures.
 |---|---|
 | **Surface** | `src/presentation/plot/surface3.ts`'s `drawTri` and `toScreen`; `geometryOf`'s `Vert` |
 | **Reached for** | the F1155 close's profile: `toScreen` 357 ms self, 8.6% of process time, on a 40 ms bunny frame — 208 353 calls a frame for 35 947 vertices |
-| **Verdict** | **open** — measured, the remedy named |
+| **Verdict** | **closed — built, measured, reverted.** The slots landed as specified, cut the calls about five-fold, and the paired interleaved probe saw nothing: nine bunny runs between −0.6 and +2.9 ms on a 31–46 ms frame, the teapot and suzanne level. The count the entry reached for was F1154's span-pass figure, never `toScreen`'s; and F1152's close had already said why a record that escapes costs what six inline projections do not. See the close below |
 
 **The path, at HEAD.** `geometryOf` builds a `Vert` per face corner — `at(k)`
 is a fresh record each call — so a bunny vertex on six faces is six `Vert`s
@@ -50460,3 +50460,48 @@ the sixth face is the record the first computed. The observable is the slot
 count filled per render, which is the referenced vertex count under smooth
 and three times the face count under flat; a raster that ignores the slots
 fills none.
+
+**Closed — built, measured, reverted** (C12 I129 written and reversed). The
+remedy landed exactly as the entry names it — `id` on the `Vert`, one shared
+record per vertex under smooth, a per-render slot array per surface,
+`plot3d.projected` counting the slots filled — and held every gate: 334 unit
+files, goldens 458 of 458 with no mover, four mutations caught with the
+never-cache control seen only by PR14's count. The paired interleaved probe,
+F8's build the A side, then measured nothing:
+
+```
+bunny, 40 rounds, nine runs    B faster in 27 / 31 / 13 / 22 / 4 / 10 / 23 / 18 / 17 of 40
+                               paired B−A median  −0.3 / −0.6 / +1.3 / −0.6 / +2.9 / +2.9 / −0.6 / +1.5 / +0.6 ms
+                               on A p50s of 31–46 ms; the +2.9s under SWAP=1 and after
+                               hoisting the slot lookup out of drawTri's closure
+teapot, 40 rounds, two runs    21 and 19 of 40, 0.0 ms on 12.4 and 10.4
+suzanne, 40 rounds, two runs   18 and 18 of 40, +0.1 ms on 9.3 and 10.0
+--max-semi-space-size=64       12 and 19 of 40, +1.9 and +0.1 — the nursery is not it
+garbage collector, --cpu-prof  10.1 % on A, 10.0 % on B — nor the collector
+```
+
+**Two claims were carried and neither was measured, and the record held both
+answers.** The *208 353 calls a frame* in the *Reached for* row is F1154's
+count of the span pass, which F7 had already reduced to one read per
+referenced vertex; `toScreen` never ran on a culled face, and the slots the
+render fills — `plot3d.projected` on the probe's bunny camera — are **16 539**,
+against some ninety thousand corner reads on the faces the cull keeps. A
+five-fold cut, and still a cut in the wrong currency. The second claim is the
+one F1152's close had already written down: *three heap objects per vertex
+that escape into a `Map` cost more than the six inline projections they
+replaced, which V8 was scalar-replacing.* A `Screen` consumed inline by
+`fill` is never allocated; a `Screen` written to a slot array is a real
+record, a write barrier and a holey-array load on every later read, and the
+arithmetic it saves is smaller than that. The key was not the whole of what
+was wrong with F1152, and this entry read only the half it wanted. The
+instrument that reaches this is *ask where a settled claim is written down*,
+run on the entry's own *Reached for* row before the spec commit; the profile
+share it cited was a separate-process figure for a function the optimiser
+inlines, which is a reading about the optimiser (F1153's close).
+
+**What it leaves.** The projection is not where the bunny's time is, in any
+form this tree can express without the SoA rewrite of Phase F2, and F2 is
+gated on a profile that no longer names it. The per-sample half — `shade`'s
+allocations, the `Shaded` record, the fill callback's `{ kind, hex }` — and
+`strokeSeg` are what the F8 profile ranks, and they are next. The spec
+reversal is the commit after this one; nothing of I129 ships.
