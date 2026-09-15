@@ -1184,3 +1184,9 @@ describe("plot — the surface carrier", () => {
     expect(byVertex, "and a vertex normal answers differently").not.toEqual(set("smooth"));
   });
 });
+
+describe("C12 I129 — the per-sample path, owed at the spec commit", () => {
+  it.todo(
+    "PR15 (C12 I129, I94): every painted sample's intensity through drawTri equals shade over the test's own barycentric interpolation of the corners, and the value the same weights over the corners' values — not deferred on a component: the code commit replaces this row",
+  );
+});
