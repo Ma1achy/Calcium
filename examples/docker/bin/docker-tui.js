@@ -45,4 +45,13 @@
  * deliberately keeps it.
  */
 process.env.NODE_ENV ??= "production";
+/**
+ * **The compile cache, before the import, for the same reason** (R01 R4.6).
+ * Node 22 can hold every module's compiled form on disk and skip the compile
+ * on the next start; measured five of five interleaved pairs, −84 ms of about
+ * 600 (F1164). No argument, so a consumer who set `NODE_COMPILE_CACHE` keeps
+ * their directory; the result is ignored, because a start that fails on a
+ * cache is worse than a slow one.
+ */
+(await import("node:module")).enableCompileCache();
 await import("../src/main.ts");

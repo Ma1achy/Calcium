@@ -25,7 +25,9 @@
  */
 
 import { execFile } from "node:child_process";
-import { readFileSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
@@ -105,7 +107,24 @@ describe("F56: the bin is a claim about an executable", () => {
     expect(stdout).toContain("needs a terminal");
   }, 40_000);
 
-  it.todo(
-    "R4.6: spawned with a fresh TMPDIR and no NODE_COMPILE_CACHE, the launcher leaves compile-cache files under it — not deferred on a component: the code commit replaces this row",
-  );
+  it("R4.6: spawned with a fresh TMPDIR and no NODE_COMPILE_CACHE, the launcher leaves compile-cache files under it", async () => {
+    // **The artefact, not the source.** `enableCompileCache()` with no argument
+    // writes under the platform's temporary directory, which `TMPDIR` names on
+    // POSIX; a fresh one starts empty, and the variable that would enable the
+    // cache from outside is removed so the files can only be the launcher's.
+    // A source assertion would pass on a call moved below the import (R5.8).
+    const tmp = mkdtempSync(join(tmpdir(), "docker-tui-cc-"));
+    try {
+      const env: Record<string, string> = { ...(process.env as Record<string, string>), TMPDIR: tmp };
+      delete env["NODE_COMPILE_CACHE"];
+      const { stdout } = await run(binPath, [], { env, timeout: 30_000 });
+      expect(stdout, "the launcher ran to the no-TTY branch").toContain("needs a terminal");
+      const cache = join(tmp, "node-compile-cache");
+      expect(existsSync(cache), "the cache directory appeared under the fresh TMPDIR").toBe(true);
+      const files = readdirSync(cache, { recursive: true }).filter((f) => statSync(join(cache, String(f))).isFile());
+      expect(files.length, "and it holds compiled modules").toBeGreaterThan(50);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  }, 40_000);
 });

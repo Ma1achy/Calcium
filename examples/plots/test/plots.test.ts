@@ -16,7 +16,9 @@
  */
 
 import { execFile } from "node:child_process";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { b, completeLocal } from "@fmx/calcium";
@@ -40,9 +42,24 @@ type LiveSpec = Readonly<{
 }>;
 
 describe("the plot demo", () => {
-  it.todo(
-    "R01 R4.6, by the same rule: spawned with a fresh TMPDIR and no NODE_COMPILE_CACHE, plots-tui leaves compile-cache files under it — not deferred on a component: the code commit replaces this row",
-  );
+  it("R01 R4.6, by the same rule: spawned with a fresh TMPDIR and no NODE_COMPILE_CACHE, plots-tui leaves compile-cache files under it", async () => {
+    // The artefact rather than the source, as `docker-tui`'s row reads it:
+    // a fresh TMPDIR starts empty and the outside variable is removed, so the
+    // files can only be the launcher's own call.
+    const tmp = mkdtempSync(join(tmpdir(), "plots-tui-cc-"));
+    try {
+      const env: Record<string, string> = { ...(process.env as Record<string, string>), TMPDIR: tmp };
+      delete env["NODE_COMPILE_CACHE"];
+      const { stdout } = await run(here("../bin/plots-tui.js"), [], { env, timeout: 30_000 });
+      expect(stdout, "the launcher ran to the no-TTY branch").toContain("plots-tui");
+      const cache = join(tmp, "node-compile-cache");
+      expect(existsSync(cache), "the cache directory appeared under the fresh TMPDIR").toBe(true);
+      const files = readdirSync(cache, { recursive: true }).filter((f) => statSync(join(cache, String(f))).isFile());
+      expect(files.length, "and it holds compiled modules").toBeGreaterThan(50);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  }, 40_000);
   it("the far side emits the five datasets", async () => {
     // A fixture must be shown to respond before it is asserted against.
     const { stdout } = await run(here("../bin/plots"), ["sample", "--json"]);

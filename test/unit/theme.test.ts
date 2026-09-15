@@ -24,6 +24,8 @@ import {
 } from "../../src/presentation/theme/index.js";
 import { floorFor } from "../../src/presentation/theme/index.js";
 import { REQUIRED_SLOTS } from "../../src/presentation/theme/contrast.js";
+import { computeQuantisation, cubeHexOf, quantisationKey, quantiseSet } from "../../src/presentation/theme/quantise.js";
+import { QUANTISED } from "../../src/presentation/theme/quantised.generated.js";
 import { caps, DEPTHS, store, SURFACES, TONES, withTone } from "../support/theme.js";
 
 /**
@@ -743,7 +745,44 @@ describe("C10 §4j — separation under dichromacy", () => {
 });
 
 describe("C10 I41 — the shipped quantisations", () => {
-  it.todo(
-    "T3.73 (I41): every entry of the shipped table equals quantiseSet computed fresh over its own set, every shipped theme's surfaces and palettes have an entry, and a set the table does not hold computes the same answer — not deferred on a component: the code commit replaces this row",
-  );
+  it("T3.73 (I41): every entry of the shipped table equals quantiseSet computed fresh over its own set, every shipped theme's surfaces and palettes have an entry, and a set the table does not hold computes the same answer", () => {
+    // **The table against the computation, entry by entry.** The key is the
+    // set itself, so each entry carries its own input; the DP run over it
+    // must give the picks the table holds. A theme edited without `make
+    // quantised` fails here on the coverage half below, not silently.
+    const keys = Object.keys(QUANTISED);
+    expect(keys.length, "the table holds the shipped sets").toBeGreaterThanOrEqual(14);
+    for (const key of keys) {
+      const slots = Object.fromEntries(JSON.parse(key) as [string, string][]);
+      expect(computeQuantisation(slots), `the entry for ${key.slice(0, 40)}… equals the computation`).toEqual(QUANTISED[key]);
+    }
+
+    // **Every shipped set has an entry, and the resolver's call reads it.**
+    // `quantiseSet` hands back the table's own frozen object when it holds the
+    // set — the DP builds a new one — so identity is how this row sees that the
+    // DP did not run (T6.100).
+    for (const [name, tokens] of Object.entries(defaultTheme)) {
+      const sets: [string, Readonly<Record<string, string>>][] = [
+        [`${name}.surfaces`, tokens.surfaces as Readonly<Record<string, string>>],
+        ...Object.entries(tokens.palettes).map(([p, spec]): [string, Readonly<Record<string, string>>] => [`${name}.palettes.${p}`, spec.slots]),
+      ];
+      for (const [from, slots] of sets) {
+        const key = quantisationKey(slots);
+        expect(QUANTISED[key], `${from} has an entry`).toBeDefined();
+        expect(quantiseSet(slots), `${from} is served from the table, not recomputed`).toBe(QUANTISED[key]);
+      }
+    }
+
+    // **The negative: a set the table does not hold computes, and computes
+    // what the table would have.** `light`'s surfaces with `bg` one step
+    // lighter is not shipped; its answer is the DP's, reached through the
+    // resolver's own entry, and `quantisedHex` reads it the same way.
+    const light = defaultTheme["light"]!;
+    const perturbed = { ...light.surfaces, bg: "#fafafb" } as Readonly<Record<string, string>>;
+    expect(QUANTISED[quantisationKey(perturbed)], "the perturbed set is not in the table").toBeUndefined();
+    const fresh = computeQuantisation(perturbed);
+    expect(quantiseSet(perturbed), "and it computes").toEqual(fresh);
+    expect(quantiseSet(perturbed), "a new object each time — the DP ran").not.toBe(quantiseSet(perturbed));
+    expect(quantisedHex({ ...light, surfaces: perturbed } as never, "bg"), "read through quantisedHex").toBe(cubeHexOf(fresh["bg"]!));
+  });
 });
