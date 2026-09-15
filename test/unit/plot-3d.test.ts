@@ -464,6 +464,15 @@ describe("C12 I107 — the geometry scratch", () => {
   });
 });
 
+describe("C12 I127 — the span over referenced vertices, owed at the spec commit", () => {
+  it.todo(
+    "PR12 (C12 I127): a stray vertex no face references is in the extent and not in the span — the frame equals the mesh without it beside a one-point lines3 at its position — not deferred on a component: the code commit replaces this row",
+  );
+  it.todo(
+    "PR12b (C12 I127, §6o row 15): geometryOf holds one corner per distinct referenced vertex, the triangles' own p objects, the stray absent, and the orbit's write count unchanged — not deferred on a component: the code commit replaces this row",
+  );
+});
+
 describe("C12 I126 — the extent scratch", () => {
   const counting = (): RenderScratch & { writes: () => number; writesTo: (owner: object) => number } => {
     const held = new WeakMap<object, { key: string; value: unknown }>();
