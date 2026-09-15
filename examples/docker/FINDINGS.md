@@ -50741,3 +50741,78 @@ there because `fill` is inlined into it and is still worth a read;
 objects 1.5 MB. And on the other side of the ask, the `all` bench at
 80×24 reads 33 ms p50 a frame with React at 44% of the work, which is
 Phase H's gate firing.
+
+## F1160 — a frame measures every block of the entry to find the window, and the registry's memo does not outlive the call ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/blocks/registry.ts`'s `#scoped` memo; `src/shell/entry-layout.ts`'s `windowEntry` and `measureEntry`; the session's `visibleRows` |
+| **Reached for** | the `all` bench at 80×24 on the F12 build: 88 frames, `visibleRows` 3 492 ms inclusive, of which `windowEntry` 975 ms — `windowSequence` 484, `measureSequence` 490 — and the profiler's `measure absent 74 694`, about 850 a frame; `wrapCellsParts` and `placeableClusters` 7.6% of process self time under `wrapRuns` |
+| **Verdict** | **open** — measured, the remedy named |
+
+**The path, at HEAD.** `windowEntry` asks the registry for each run's rows
+and then for the window, and the registry answers through `#measureChild`,
+which reads a memo `#scoped` creates at the top of the call and drops at
+its end. So the memo never sees a second frame: `/all`'s column of 64 row
+groups is walked every frame — 145 tiles, each a caption and a figure —
+and a caption's measure wraps its text, which is where the two text
+functions at the top of the profile come from. Eleven milliseconds of a
+forty-millisecond frame, measuring a document that has not changed.
+
+**Why the memo may outlive the call.** The registry's memo is identity-
+keyed on the block with the width in the value, and a block is frozen
+(C04 I1) and replaced on any change (C23 I34), so an entry that is the
+same object measures the same at the same width on every frame; C14's
+`HeightCache` rests on the same premise one level up, and its header says
+why theme and capabilities are not in the key — C09 §4's substitutions
+are 1:1 by cell count and C10 T4.1 holds geometry equal across themes.
+Nothing measure sees animates, by the rule in `CLAUDE.md`.
+
+**The remedy.** The registry's `measure`, `measureSequence` and
+`windowSequence` accept a caller-owned memo — the memo's own shape, keyed
+by the block, `get` and `set` — and read and write it as they read and
+write their own; without one, the per-call memo as before. The session
+owns one `WeakMap` for the life of the session and hands it to `windowEntry`
+and to the C14 measurer through the closures they already take, so the
+two seams agree by construction; a rebuilt block is a new key and a
+settled entry's blocks are collected with it. The observable is the
+profiler's `measure` misses on a still document: about 850 a frame today,
+none after the first frame.
+
+## F1161 — the window range is in the render slot, so a row of scroll re-renders every tile it keeps ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `src/shell/render-cache.ts`; `src/shell/session.ts`'s `visibleRows`; `src/shell/entry-layout.ts`'s `renderEntryPieces` |
+| **Reached for** | the same bench: `renderEntryPieces` 2 491 ms inclusive of `visibleRows`' 3 492, `react` 43.5% of frame work; `render` misses `focus 80` over 88 frames, which is the slot's string moving with the window; then a probe over `/all`'s root at width 80, 64 children and 773 rows |
+| **Verdict** | **open** — measured, the remedy named |
+
+**The path, at HEAD.** The render slot's key is nine axes joined, and the
+window range is one of them. A scroll of one row moves the range, the slot
+misses, and `renderEntryPieces` hands the windowed group — the same four
+to six tiles, one of them new — to Ink again. Phase A (C09 I69) made the
+window a subsequence of children; it did not make the kept children's
+rows reusable, so `/all` renders its visible figures once per keystroke
+and the profile is 44% React.
+
+**The identity the remedy rests on, measured before it was written.** Over
+the whole `/all` root, byte for byte: a column group's render equals its
+children rendered alone, in order, with an empty row for each `gapBefore`;
+a sequence's render equals its blocks rendered alone the same way; and a
+right-aligned child rendered alone in a single-child group with its own
+`align` equals its rows in the full group. That is C09 I25 and I69 read
+from the other side, and it held on 773 rows with no exception.
+
+**The remedy.** The slot holds, beside the window's rows, the lines of each
+block it has rendered whole under the same stable key — every axis but the
+range — keyed by the block's id and its `align`. A miss on the range alone
+is a **range** miss: the pieces are rebuilt, and for each kept block a
+column group's children are taken from the held lines or rendered alone in
+a single-child group and held; a top-level block the sequence kept whole
+— the same object as the run's — likewise; a sliced block is rendered as
+before and not held. A gap is an empty row. A miss on any other axis drops
+the held lines with the rows, so no new invalidation reasoning exists:
+what invalidated the rows invalidates the parts. The lines held are
+bounded by the entry's own rows and dropped with the slot. The observable
+is the kind renders on a one-row scroll — the entering child's alone —
+and the frames equal a fresh render at every window position.
