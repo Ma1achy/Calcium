@@ -38,7 +38,7 @@ import {
   type Axis3,
   type Seg3,
 } from "./axes3.js";
-import { continuousColour, shadeColour } from "../theme/colormap.js";
+import { continuousColour, rgbHex, sampleRgb, shadeColour, shadeRgb } from "../theme/colormap.js";
 import { colormapFor } from "./heatmap.js";
 import { CELL_ASPECT } from "./aspect.js";
 import {
@@ -1110,6 +1110,17 @@ export function plot3dArea(
   // coincident edges. That is F452's ruling arriving where the coincidence is
   // structural rather than incidental.
   const lit = lightDirOf(block.light3, scene.basis);
+  // **The colour map and its axis resolved once per render, not per sample**
+  // (C10 I40, F1150). `colourOf` looks the map up and branches on `colourBy`
+  // for every painted sample of a 30 720-sample grid, and on the 24-bit
+  // continuous arm it then builds a hex that `shadeColour` parses straight
+  // back. Both are constant across the plot, so they are read here and the
+  // fill holds the eight-bit channels between sample and shade. `fastMap` is
+  // `undefined` for a series colour, an eight-bit terminal or a plot with no
+  // map, and the fill falls back to `colourOf` + `shadeColour` unchanged.
+  const colourBy = block.colourBy ?? "depth";
+  const fastMap =
+    colourBy !== "series" && ctx.capabilities.colourDepth >= 24 ? colormapFor(block) : undefined;
   for (const t of scene.tris) {
     const wire = t.skin.wire;
     drawTri(t, scene.basis, grid, depth, lit, span, (i, sm) => {
@@ -1127,7 +1138,6 @@ export function plot3dArea(
         glyph[i] = -1;
         return;
       }
-      const base = colourOf(block, ctx, sm, scene.identities, span);
       // **An edge under `"over"` is its own face at half the intensity**
       // (§6i row 13): the only rule that cannot collapse into a fill whose own
       // range is `0.1332 … 0.7871`, and it keeps the shading and the depth
@@ -1136,7 +1146,22 @@ export function plot3dArea(
       // **The shading scales the colour in linear light** (C12 I94, F455), and
       // the intensity arrives already clamped, because the ratio that makes the
       // field recoverable from hue holds over `[0, 1]` and nowhere else.
-      ink[i] = base === undefined ? undefined : shadeColour(base, k);
+      if (fastMap !== undefined) {
+        // **The numeric path** (C10 I40): the same ramp `colourOf` takes, the
+        // channels held as ints, one hex built at the end. Bit-identical to
+        // `shadeColour(continuousColour(map, t))` because `sample` is
+        // `rgbHex(sampleRgb(...))` and a hex round-trip of eight-bit ints is
+        // lossless; `k === 1` is `shadeColour`'s own unchanged-colour arm.
+        const tt =
+          colourBy === "value"
+            ? ramped(sm.value ?? span.loV, span.loV, span.hiV)
+            : 1 - ramped(sm.depth, span.nearD, span.farD);
+        const [r, g, b] = sampleRgb(fastMap, tt);
+        ink[i] = { kind: "rgb", hex: rgbHex(k >= 1 ? [r, g, b] : shadeRgb(r, g, b, k)) };
+      } else {
+        const base = colourOf(block, ctx, sm, scene.identities, span);
+        ink[i] = base === undefined ? undefined : shadeColour(base, k);
+      }
       // **A wireframe edge is an outline and a fill is an area**, on the same
       // surface and often in the same cell (C12 I103). `sm.edge` is the fill's
       // own sample rather than a second stroke (I95), so the distinction costs

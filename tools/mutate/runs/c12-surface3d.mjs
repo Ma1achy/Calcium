@@ -48,8 +48,10 @@ const results = await runPass({
     // Every triangle dropped. Ten of the eleven rows below read a rendered
     // surface or a refusal about one, so a pass in which no face can be drawn
     // cannot observe a kill.
-    from: "  const lit = lightDirOf(block.light3, scene.basis);\n  for (const t of scene.tris) {",
-    to: "  const lit = lightDirOf(block.light3, scene.basis);\n  for (const t of [] as typeof scene.tris) {",
+    // Anchored on the fast-path hoist that now precedes the loop (C10 I40), because
+    // `for (const t of scene.tris)` appears twice — the span pass and the fill.
+    from: "    colourBy !== \"series\" && ctx.capabilities.colourDepth >= 24 ? colormapFor(block) : undefined;\n  for (const t of scene.tris) {",
+    to: "    colourBy !== \"series\" && ctx.capabilities.colourDepth >= 24 ? colormapFor(block) : undefined;\n  for (const t of [] as typeof scene.tris) {",
     why: "every row reads a drawn surface or a refusal about one; a pass where no face draws sees nothing",
   },
   mutations: [
