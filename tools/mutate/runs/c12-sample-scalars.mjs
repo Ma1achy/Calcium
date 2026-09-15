@@ -14,8 +14,8 @@
 //
 // **Left out, with its reason.** The wrapper `shade` reordered to call
 // `shadeAt` with `viewPos` before `normal` is a type error, not a mutation;
-// `strokeSeg` bypassing `strokeSegAt` with its old body is byte-identical and
-// a duplication, not a defect a row could name.
+// `strokeSeg`'s own floor is c12-lines3d's to mutate, and the thin stroke's
+// copy is mutated here.
 import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
@@ -23,7 +23,6 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CMD = "npx vitest run test/unit/plot-3d.test.ts test/unit/plot-surface3d.test.ts test/golden/plot-meshes.test.ts";
 const SF = "src/presentation/plot/surface3.ts";
-const PJ = "src/presentation/plot/project3.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -85,18 +84,29 @@ const results = runPass({
       // the stroked samples take the far corner's shade.
       name: "THIN-VP-FROM-Q: the stroke's view position is q's",
       file: SF,
-      from: "          p.vx + (q.vx - p.vx) * t,\n          p.vy + (q.vy - p.vy) * t,",
-      to: "          q.vx,\n          q.vy,",
+      from: "        p.vx + (q.vx - p.vx) * t,\n        p.vy + (q.vy - p.vy) * t,",
+      to: "        q.vx,\n        q.vy,",
       expect: "PR15 thin",
     },
     {
-      // **The segment core rounds where the record form floored.** F453's
-      // defect again, one function along: sample `i` over `[i − 0.5, i + 0.5)`
-      // offsets every stroked line from its own vertices by up to a sample.
-      name: "SEG-ROUNDED: the scalar segment core rounds its coordinates",
-      file: PJ,
-      from: "    const px = Math.floor(x0 + (x1 - x0) * t); // cells-ok — a sample coordinate\n    const py = Math.floor(y0 + (y1 - y0) * t); // cells-ok — a sample coordinate\n    const z = az + (bz - az) * t;",
-      to: "    const px = Math.round(x0 + (x1 - x0) * t); // cells-ok — a sample coordinate\n    const py = Math.round(y0 + (y1 - y0) * t); // cells-ok — a sample coordinate\n    const z = az + (bz - az) * t;",
+      // **The thin stroke's copy rounds where `strokeSeg` floors.** F453's
+      // defect again, in the second copy of the rule (F1159): sample `i` over
+      // `[i − 0.5, i + 0.5)` offsets every stroked edge by up to a sample, and
+      // PR15 thin — the referee — sees it.
+      name: "SEG-ROUNDED: the thin stroke's copy of the stepping rounds its coordinates",
+      file: SF,
+      from: "    const px = Math.floor(x0 + (x1 - x0) * t); // cells-ok — a sample coordinate\n    const py = Math.floor(y0 + (y1 - y0) * t); // cells-ok — a sample coordinate\n    const z = p.vz + (q.vz - p.vz) * t;",
+      to: "    const px = Math.round(x0 + (x1 - x0) * t); // cells-ok — a sample coordinate\n    const py = Math.round(y0 + (y1 - y0) * t); // cells-ok — a sample coordinate\n    const z = p.vz + (q.vz - p.vz) * t;",
+      expect: "PR15 thin",
+    },
+    {
+      // **The step count from the minor axis.** `strokeSeg` steps on the
+      // dominant screen axis so no slope leaves gaps; the other axis leaves a
+      // shallow edge dotted, which the referee and the meshes' goldens see.
+      name: "STEPS-MINOR-AXIS: the thin stroke steps on the shorter axis",
+      file: SF,
+      from: "  const steps = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)))); // cells-ok — a sample count\n  for (let s = 0; s <= steps; s += 1) { // cells-ok — a sample index",
+      to: "  const steps = Math.max(1, Math.ceil(Math.min(Math.abs(x1 - x0), Math.abs(y1 - y0)))); // cells-ok — a sample count\n  for (let s = 0; s <= steps; s += 1) { // cells-ok — a sample index",
       expect: "PR15 thin",
     },
     {

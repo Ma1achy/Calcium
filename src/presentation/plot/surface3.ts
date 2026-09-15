@@ -27,7 +27,6 @@ import {
   dot,
   NEAR,
   project,
-  strokeSegAt,
   sub,
   unit,
   unitOf,
@@ -755,11 +754,13 @@ function strokeThin(
 }
 
 /**
- * One edge of a thin triangle, stroked (C12 I129). **The scalar segment core
- * takes the normalised coordinates `strokeSeg` multiplied before**, so no
- * `Projected` pair is built; the per-sample lerps are `lerpV`'s expression,
- * `a + (b − a) · t`, on components, and `shadeAt` is `shade`'s arithmetic.
- * The one closure left per edge is the segment's own callback.
+ * One edge of a thin triangle, stroked (C12 I129). **`strokeSeg`'s stepping,
+ * restated in its own loop** — the dominant-axis count, F453's floor, the
+ * depth lerped by `t`, `writeDepth` strictly nearer — because a callback is a
+ * closure and a context per edge (F1159). The two copies are held to one
+ * rule by PR15's thin half, which restates it a third time as the referee.
+ * The per-sample lerps are `lerpV`'s expression, `a + (b − a) · t`, on
+ * components, and `shadeAt` is `shade`'s arithmetic; nothing is allocated.
  */
 function thinEdge(
   p: Screen,
@@ -772,37 +773,37 @@ function thinEdge(
   span: Readonly<{ nearD: number; farD: number }>,
   paint: Painter,
 ): void {
-  strokeSegAt(
-    p.x / grid.width,
-    p.y / grid.height,
-    p.vz,
-    q.x / grid.width,
-    q.y / grid.height,
-    q.vz,
-    grid,
-    depth,
-    (i, t, z) => {
-      paint(
-        i,
+  // The normalised coordinates `strokeSeg` took, multiplied back as it did.
+  const x0 = (p.x / grid.width) * grid.width;
+  const y0 = (p.y / grid.height) * grid.height;
+  const x1 = (q.x / grid.width) * grid.width;
+  const y1 = (q.y / grid.height) * grid.height;
+  const steps = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)))); // cells-ok — a sample count
+  for (let s = 0; s <= steps; s += 1) { // cells-ok — a sample index
+    const t = s / steps; // cells-ok — a sample index
+    const px = Math.floor(x0 + (x1 - x0) * t); // cells-ok — a sample coordinate
+    const py = Math.floor(y0 + (y1 - y0) * t); // cells-ok — a sample coordinate
+    const z = p.vz + (q.vz - p.vz) * t;
+    if (!writeDepth(depth, px, py, z)) continue;
+    paint(
+      py * grid.width + px, // cells-ok — a sample offset
+      z,
+      p.v === undefined || q.v === undefined ? p.v ?? q.v : p.v + (q.v - p.v) * t,
+      series,
+      shadeAt(
+        p.nx + (q.nx - p.nx) * t,
+        p.ny + (q.ny - p.ny) * t,
+        p.nz + (q.nz - p.nz) * t,
+        p.vx + (q.vx - p.vx) * t,
+        p.vy + (q.vy - p.vy) * t,
         z,
-        p.v === undefined || q.v === undefined ? p.v ?? q.v : p.v + (q.v - p.v) * t,
-        series,
-        shadeAt(
-          p.nx + (q.nx - p.nx) * t,
-          p.ny + (q.ny - p.ny) * t,
-          p.nz + (q.nz - p.nz) * t,
-          p.vx + (q.vx - p.vx) * t,
-          p.vy + (q.vy - p.vy) * t,
-          z,
-          light,
-          z,
-          span,
-        ),
-        own,
-      );
-    },
-    false,
-  );
+        light,
+        z,
+        span,
+      ),
+      own,
+    );
+  }
 }
 
 /** Three readings under barycentric weights, `undefined` surviving as `undefined`. */
