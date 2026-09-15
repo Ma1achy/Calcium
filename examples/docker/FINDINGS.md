@@ -50671,3 +50671,41 @@ renders in **about 35 ms at rest** against F6's 60-plus, and the
 remaining allocation table is `toScreen` 20 MB, the thin stroke's
 callback closures 17 MB, `drawTri` 9 MB, `plot3dArea` 7 MB, the colour
 objects 3 MB.
+
+## F1159 — the thin stroke builds a closure per edge for a stepping rule of four lines ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/surface3.ts`'s `thinEdge`; `project3.ts`'s `strokeSeg` and `strokeSegAt` |
+| **Reached for** | F1158's close: `thinEdge` 17 MB a render on the bunny, F1157's E2 having shown the bytes are the closures and not boxing; then an experiment on a copy of the F11 build, the segment loop restated inside `thinEdge` with no callback, measured by the allocation bench and the paired probe against F11 |
+| **Verdict** | **open** — measured, the remedy named |
+
+**The path, at HEAD.** A thin triangle strokes three edges, and each edge
+hands `strokeSegAt` an arrow function closing over the two corners, the
+series, the light, the span and the painter — a closure and a context per
+edge, three per triangle, some ninety thousand a bunny frame at about 190
+bytes each. The callback exists so that one function owns the stepping
+rule — F453's floor, the dominant-axis step count — and every stroke in
+the renderer takes it from `strokeSeg`.
+
+**The experiment.** `thinEdge` with the four-line rule restated in its
+own loop, calling `writeDepth` and then the painter directly:
+
+```
+E3   allocation a render      70 → 56 MB   (thinEdge absent from the table)
+     paired B−A, three runs   −2.4 / −2.7 / −2.9 ms on 29.0–29.3 ms     35 / 34 / 34 of 40
+```
+
+Eight to ten percent of the frame. **The cost is a second copy of the
+stepping rule**, and the discipline says what pays for it: PR15's thin
+half already restates the rule in the test as the referee, so the two
+copies in the tree are held equal by a third that is not in the tree; a
+mutation that rounds either copy is caught by that row or by the polyline
+rows (F453). And `strokeSegAt`, F1157's scalar core, loses its only
+consumer and comes out — `strokeSeg` takes its own loop back — because an
+export nothing consumes is MG25's.
+
+**The remedy.** `thinEdge` steps its three edges in its own loop, the same
+expressions in the same order as `strokeSeg`; no callback, no `Projected`,
+no scalar core. C12 I129's sentence about the segment core is rewritten to
+say this and why.
