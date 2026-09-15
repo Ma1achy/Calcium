@@ -87,12 +87,12 @@ const results = runPass({
       // **The ramp not inverted on the fast path.** `colourOf` puts near at the
       // top of the ramp (`1 − ramped(depth)`); a fast path that forgot the `1 −`
       // colours the surface the other way while every count agrees. The anchor
-      // is unique to the fast path — `sm.depth`, where `colourOf` reads
-      // `reading.depth`.
+      // is unique to the fast path — the scalar `z` (C12 I129), where `colourOf`
+      // reads `reading.depth`.
       name: "FASTPATH-RAMP-NOT-INVERTED: depth colours run far-to-near",
       file: S3,
-      from: "            : 1 - ramped(sm.depth, span.nearD, span.farD);",
-      to: "            : ramped(sm.depth, span.nearD, span.farD);",
+      from: "            : 1 - ramped(z, span.nearD, span.farD);",
+      to: "            : ramped(z, span.nearD, span.farD);",
       expect: "24bit",
     },
   ],

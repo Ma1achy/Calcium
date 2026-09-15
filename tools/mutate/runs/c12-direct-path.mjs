@@ -87,8 +87,8 @@ const results = runPass({
       // sides, which the meshes' goldens see because most bunny faces are thin.
       name: "THIN-EDGE-DROPPED: the closing edge of a thin triangle is not stroked",
       file: SF,
-      from: "  edge(b, c, e[1]);\n  edge(c, a, e[2]);",
-      to: "  edge(b, c, e[1]);",
+      from: "  thinEdge(b, c, e[1] && wire, series, grid, depth, light, span, paint);\n  thinEdge(c, a, e[2] && wire, series, grid, depth, light, span, paint);",
+      to: "  thinEdge(b, c, e[1] && wire, series, grid, depth, light, span, paint);",
       expect: "24bit",
     },
   ],

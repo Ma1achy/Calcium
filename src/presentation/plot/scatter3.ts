@@ -1244,7 +1244,7 @@ export function plot3dArea(
     colourBy !== "series" && ctx.capabilities.colourDepth >= 24 ? colormapFor(block) : undefined;
   for (const t of scene.tris) {
     const wire = t.skin.wire;
-    const clipped = drawTri(t, scene.basis, grid, depth, lit, span, (i, sm) => {
+    const clipped = drawTri(t, scene.basis, grid, depth, lit, span, (i, z, v, si, intensity, edge) => {
       // **`wireframe: true` writes depth and paints nothing but the edges**
       // (C12 I95, §6i row 11). The depth write already happened — `drawTri`
       // calls it before this — so the face occludes what is behind it and the
@@ -1253,7 +1253,7 @@ export function plot3dArea(
       // carrier's colour survives at a sample it has just lost, which is I90's
       // rule about the frame's write one carrier along. Hidden-line rather than
       // see-through, because a committed frame cannot be orbited.
-      if (wire === true && !sm.edge) {
+      if (wire === true && !edge) {
         ink[i] = undefined;
         mark[i] = undefined;
         glyph[i] = -1;
@@ -1263,7 +1263,7 @@ export function plot3dArea(
       // (§6i row 13): the only rule that cannot collapse into a fill whose own
       // range is `0.1332 … 0.7871`, and it keeps the shading and the depth
       // attenuation on the edge rather than pinning it to a constant.
-      const k = sm.edge ? edgeIntensity(sm.intensity, wire) : sm.intensity;
+      const k = edge ? edgeIntensity(intensity, wire) : intensity;
       // **The shading scales the colour in linear light** (C12 I94, F455), and
       // the intensity arrives already clamped, because the ratio that makes the
       // field recoverable from hue holds over `[0, 1]` and nowhere else.
@@ -1275,19 +1275,20 @@ export function plot3dArea(
         // lossless; `k === 1` is `shadeColour`'s own unchanged-colour arm.
         const tt =
           colourBy === "value"
-            ? ramped(sm.value ?? span.loV, span.loV, span.hiV)
-            : 1 - ramped(sm.depth, span.nearD, span.farD);
+            ? ramped(v ?? span.loV, span.loV, span.hiV)
+            : 1 - ramped(z, span.nearD, span.farD);
         const [r, g, b] = sampleRgb(fastMap, tt);
         ink[i] = { kind: "rgb", hex: rgbHex(k >= 1 ? [r, g, b] : shadeRgb(r, g, b, k)) };
       } else {
-        const base = colourOf(block, ctx, sm, scene.identities, span);
+        // **The reading record is built on this arm alone** (C12 I129).
+        const base = colourOf(block, ctx, { depth: z, value: v, series: si }, scene.identities, span);
         ink[i] = base === undefined ? undefined : shadeColour(base, k);
       }
       // **A wireframe edge is an outline and a fill is an area**, on the same
-      // surface and often in the same cell (C12 I103). `sm.edge` is the fill's
+      // surface and often in the same cell (C12 I103). `edge` is the fill's
       // own sample rather than a second stroke (I95), so the distinction costs
       // nothing here and is what lets a cage draw in dots over a shaded face.
-      kind[i] = sm.edge ? OUTLINE : AREA;
+      kind[i] = edge ? OUTLINE : AREA;
       // **The glyph arm's second channel** (§6h row 12): the colour carries the
       // field and the mark carries the shading, which is F436's retracted claim
       // holding on the arm that kept two carriers.

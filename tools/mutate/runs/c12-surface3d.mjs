@@ -248,8 +248,8 @@ const results = await runPass({
       // and every assertion about the wireframe itself still passes.
       name: "`wireframe: true` does not clear the samples it claims",
       file: S,
-      from: "      if (wire === true && !sm.edge) {",
-      to: "      if (wire === \"over\" && !sm.edge) {",
+      from: "      if (wire === true && !edge) {",
+      to: "      if (wire === \"over\" && !edge) {",
       expect: "WF6",
     },
     {

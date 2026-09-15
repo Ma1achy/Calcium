@@ -406,16 +406,37 @@ export function strokeSeg(
    */
   onEqual: boolean,
 ): void {
-  const x0 = pa.x * grid.width;
-  const y0 = pa.y * grid.height;
-  const x1 = pb.x * grid.width;
-  const y1 = pb.y * grid.height;
+  strokeSegAt(pa.x, pa.y, pa.depth, pb.x, pb.y, pb.depth, grid, depth, paint, onEqual);
+}
+
+/**
+ * `strokeSeg` on scalars — **the same stepping, taking the normalised
+ * coordinates the record form multiplied** (C12 I129), so a caller that has
+ * the numbers builds no `Projected` pair. `strokeSeg` is the wrapper and the
+ * two cannot drift.
+ */
+export function strokeSegAt(
+  ax: number,
+  ay: number,
+  az: number,
+  bx: number,
+  by: number,
+  bz: number,
+  grid: Readonly<{ width: number; height: number }>,
+  depth: Depth,
+  paint: (i: number, t: number, z: number, nearer: boolean, px: number, py: number) => void,
+  onEqual: boolean,
+): void {
+  const x0 = ax * grid.width;
+  const y0 = ay * grid.height;
+  const x1 = bx * grid.width;
+  const y1 = by * grid.height;
   const steps = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)))); // cells-ok — a sample count
   for (let i = 0; i <= steps; i += 1) { // cells-ok — a sample index
     const t = i / steps; // cells-ok — a sample index
     const px = Math.floor(x0 + (x1 - x0) * t); // cells-ok — a sample coordinate
     const py = Math.floor(y0 + (y1 - y0) * t); // cells-ok — a sample coordinate
-    const z = pa.depth + (pb.depth - pa.depth) * t;
+    const z = az + (bz - az) * t;
     const at = py * grid.width + px; // cells-ok — a sample offset
     if (writeDepth(depth, px, py, z)) paint(at, t, z, true, px, py);
     else if (onEqual && equalDepth(depth, px, py, z)) paint(at, t, z, false, px, py);

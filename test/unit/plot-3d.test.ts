@@ -556,9 +556,9 @@ describe("C12 I128 — the direct path", () => {
     const shot = (t: Tri3): { painted: string; edges: string } => {
       const painted: number[] = [];
       const edges: number[] = [];
-      drawTri(t, basis, grid, createDepth(grid.width, grid.height), light, { nearD: 4, farD: 6 }, (i, sm) => {
+      drawTri(t, basis, grid, createDepth(grid.width, grid.height), light, { nearD: 4, farD: 6 }, (i, _z, _v, _s, _k, edge) => {
         painted.push(i);
-        if (sm.edge) edges.push(i);
+        if (edge) edges.push(i);
       });
       return { painted: painted.sort((x, y) => x - y).join(","), edges: edges.sort((x, y) => x - y).join(",") };
     };

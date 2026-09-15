@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 import { validateBlock } from "../../src/data/viewmodel/index.js";
 import { b } from "../../src/shell/builders/index.js";
 import {
-  basisOf, createDepth, extentOf, project, viewDir, type Vec3,
+  basisOf, createDepth, extentOf, project, viewDir, writeDepth, type Vec3,
 } from "../../src/presentation/plot/project3.js";
 import {
   backfaceCulled, densityGlyph, drawTri, edgeIntensity, lightDirOf, shade,
@@ -238,8 +238,8 @@ const maskOf = (s: unknown): { edge: number; fill: number } => {
   const depth = createDepth(grid.width, grid.height);
   const kind = new Int8Array(grid.width * grid.height).fill(-1); // cells-ok — a sample count
   for (const t of tris) {
-    drawTri(t, basis, grid, depth, lightDirOf(undefined, basis), { nearD: 4, farD: 8 }, (i, sm) => {
-      kind[i] = sm.edge ? 1 : 0;
+    drawTri(t, basis, grid, depth, lightDirOf(undefined, basis), { nearD: 4, farD: 8 }, (i, _z, _v, _s, _k, edge) => {
+      kind[i] = edge ? 1 : 0;
     });
   }
   let edge = 0;
@@ -347,6 +347,26 @@ describe("plot — the surface carrier", () => {
     const nearly = shot({ azimuth: Math.PI / 2 - 0.004, elevation: 0.002, distance: 6 });
     expect(nearly, "a plane a hair off edge-on still draws").toBeGreaterThan(0);
     expect(nearly, "and it is still a line rather than a fill").toBeLessThan(oblique / 2);
+  });
+
+  it("SF2b (C12 I94, I129, F456): a zero-length normal shades finite — no diffuse, and the reflection of nothing is the negated light, so the specular term is the light's own alignment with the eye", () => {
+    // `unit` hands the zero vector back and the scalar core keeps that rule, so
+    // `n · l` is 0 and the reflection `2 (n · l) n − l` is `−l`. With the light
+    // along the view axis and the eye straight ahead, `−l · toEye` is 1, the
+    // specular term is `SPECULAR · 1^16 = 0.2`, and the sample reads
+    // `AMBIENT + SPECULAR = 0.4` at the near plane. **A core that divided the
+    // zero normal by its length would give `NaN`**, which every comparison
+    // swallows into `0.2` — finite, at ambient, and wrong by the whole
+    // highlight; a finiteness assertion passes either way, and this is the
+    // value that does not.
+    const zero = { x: 0, y: 0, z: 0 };
+    const ahead = { x: 0, y: 0, z: 5 };
+    const towardEye = { x: 0, y: 0, z: 1 };
+    const span = { nearD: 0, farD: 1 };
+    expect(shade(zero, ahead, towardEye, 0, span), "ambient plus the reflection of nothing").toBe(0.4);
+    // And with the light away from the eye the reflection points away too:
+    // ambient alone, which is the floor the invariant names.
+    expect(shade(zero, ahead, { x: 0, y: 0, z: -1 }, 0, span), "ambient alone").toBe(0.2);
   });
 
   it("SF2 (C12 I94, F456): a zero-width range shades at ambient, and the degenerate is the projector's", () => {
@@ -1061,7 +1081,7 @@ describe("plot — the surface carrier", () => {
     const bs = basisOf({ azimuth: 0, elevation: 0, distance: 6 }, 1);
     let band = 0; // cells-ok — a sample count
     drawTri(big, bs, box, createDepth(box.width, box.height), lightDirOf(undefined, bs),
-      { nearD: 5, farD: 7 }, (_i, sm) => { if (sm.edge) band += 1; }); // cells-ok — a sample count
+      { nearD: 5, farD: 7 }, (_i, _z, _v, _s, _k, edge) => { if (edge) band += 1; }); // cells-ok — a sample count
     const corners = [big.a, big.b, big.c].map((w) => {
       const pr = project(bs, w.p) as { x: number; y: number };
       return { x: pr.x * box.width, y: pr.y * box.height }; // cells-ok — a sample coordinate
@@ -1138,8 +1158,8 @@ describe("plot — the surface carrier", () => {
     const edgesOf = (tri: Tri3): number => {
       const d = createDepth(grid.width, grid.height);
       let n = 0; // cells-ok — a sample count
-      drawTri(tri, basis, grid, d, lightDirOf(undefined, basis), { nearD: 0, farD: 2 }, (_i, sm) => {
-        if (sm.edge) n += 1; // cells-ok — a sample count
+      drawTri(tri, basis, grid, d, lightDirOf(undefined, basis), { nearD: 0, farD: 2 }, (_i, _z, _v, _s, _k, edge) => {
+        if (edge) n += 1; // cells-ok — a sample count
       });
       return n;
     };
@@ -1185,8 +1205,102 @@ describe("plot — the surface carrier", () => {
   });
 });
 
-describe("C12 I129 — the per-sample path, owed at the spec commit", () => {
-  it.todo(
-    "PR15 (C12 I129, I94): every painted sample's intensity through drawTri equals shade over the test's own barycentric interpolation of the corners, and the value the same weights over the corners' values — not deferred on a component: the code commit replaces this row",
-  );
+describe("C12 I129 — the per-sample path", () => {
+  const grid = { width: 240, height: 96 };
+  const basis = basisOf({ azimuth: 0.6, elevation: 0.35, distance: 3.5 }, grid.width / (grid.height * 0.5));
+  const light = lightDirOf(undefined, basis);
+  const span = { nearD: 3, farD: 7 };
+  type Corner = { p: Vec3; n: Vec3; v: number | undefined };
+  /** The test's own screen record: `project` for the position, `viewDir` for the rest. */
+  const screenOf = (w: Corner) => {
+    const pr = project(basis, w.p);
+    if (pr === null) throw new Error("a corner behind the eye");
+    const vp = viewDir(basis, { x: w.p.x - basis.eye.x, y: w.p.y - basis.eye.y, z: w.p.z - basis.eye.z });
+    const vn = viewDir(basis, w.n);
+    return { x: pr.x * grid.width, y: pr.y * grid.height, vp, vn, v: w.v }; // cells-ok — a sample coordinate
+  };
+  type Sample = { z: number; v: number | undefined; k: number; edge: boolean };
+  const tri = (a: Corner, b: Corner, c: Corner, edges: readonly [boolean, boolean, boolean]): Tri3 =>
+    ({ a, b, c, fn: { x: 0, y: 0, z: 1 }, edges, series: 0, skin: { cull: 0, wire: "over" } });
+  const painted = (t: Tri3): Map<number, Sample> => {
+    const got = new Map<number, Sample>();
+    drawTri(t, basis, grid, createDepth(grid.width, grid.height), light, span, (i, z, v, _s, k, edge) => {
+      got.set(i, { z, v, k, edge });
+    });
+    return got;
+  };
+
+  it("PR15 (C12 I129, I94): every painted sample's intensity through drawTri equals shade over the test's own barycentric interpolation of the corners, and the value the same weights over the corners' values", () => {
+    // Three corners, three normals, three values — so a crossed component or a
+    // crossed weight moves something at almost every sample.
+    const A: Corner = { p: { x: -0.8, y: -0.6, z: 0.1 }, n: { x: 0.2, y: 0.1, z: 0.97 }, v: 1 };
+    const B: Corner = { p: { x: 0.9, y: -0.4, z: -0.2 }, n: { x: -0.3, y: 0.4, z: 0.86 }, v: 2 };
+    const C: Corner = { p: { x: 0.1, y: 0.8, z: 0.3 }, n: { x: 0.1, y: -0.5, z: 0.86 }, v: 3 };
+    const [a, b, c] = [screenOf(A), screenOf(B), screenOf(C)];
+    const got = painted(tri(A, B, C, [true, true, true]));
+    expect(got.size, "a precondition: the fill paints").toBeGreaterThan(100); // cells-ok — a sample count
+    // **`fill`'s weights, restated**: the sample centre against each edge, the
+    // signed area as the divisor.
+    const area = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
+    expect(Math.abs(area), "a precondition: the fill path, not the stroke").toBeGreaterThanOrEqual(1);
+    const sign = area > 0 ? 1 : -1;
+    const m = Math.abs(area);
+    const ks = new Set<number>();
+    for (const [i, s] of got) {
+      const cx = (i % grid.width) + 0.5; // cells-ok — a sample coordinate
+      const cy = Math.floor(i / grid.width) + 0.5; // cells-ok — a sample coordinate
+      const w0 = ((b.x - a.x) * (cy - a.y) - (cx - a.x) * (b.y - a.y)) * sign;
+      const w1 = ((c.x - b.x) * (cy - b.y) - (cx - b.x) * (c.y - b.y)) * sign;
+      const w2 = ((a.x - c.x) * (cy - c.y) - (cx - c.x) * (a.y - c.y)) * sign;
+      const ua = w1 / m;
+      const ub = w2 / m;
+      const uc = w0 / m;
+      const z = a.vp.z * ua + b.vp.z * ub + c.vp.z * uc;
+      const n = { x: a.vn.x * ua + b.vn.x * ub + c.vn.x * uc, y: a.vn.y * ua + b.vn.y * ub + c.vn.y * uc, z: a.vn.z * ua + b.vn.z * ub + c.vn.z * uc };
+      const vp = { x: a.vp.x * ua + b.vp.x * ub + c.vp.x * uc, y: a.vp.y * ua + b.vp.y * ub + c.vp.y * uc, z };
+      expect(s.z, `the depth at ${String(i)}`).toBe(z);
+      expect(s.v, `the value at ${String(i)}`).toBe(1 * ua + 2 * ub + 3 * uc);
+      expect(s.k, `the intensity at ${String(i)}`).toBe(shade(n, vp, light, z, span));
+      ks.add(s.k);
+    }
+    expect(ks.size, "and the intensity varies across the face").toBeGreaterThan(10); // cells-ok — a distinct count
+  });
+
+  it("PR15 thin (C12 I129, I94): a stroked triangle's samples equal shade over the edge's own t, in strokeSeg's steps and its first-writer order", () => {
+    // Two corners and a third on the second: the screen area is zero, so the
+    // three edges are stroked — a→b, b→c of no length, and c→a back again.
+    const A: Corner = { p: { x: -0.95, y: -0.8, z: 0 }, n: { x: 0.3, y: 0.2, z: 0.93 }, v: 1 };
+    const B: Corner = { p: { x: 0.95, y: 0.8, z: 0.1 }, n: { x: -0.4, y: 0.1, z: 0.91 }, v: 4 };
+    const [a, b] = [screenOf(A), screenOf(B)];
+    const got = painted(tri(A, B, B, [true, false, true]));
+    expect(got.size, "a precondition: the stroke paints").toBeGreaterThan(20); // cells-ok — a sample count
+    // **`strokeSeg`'s stepping, restated**, with the tree's own `writeDepth` so
+    // the first writer wins as it does in the stroke.
+    const want = new Map<number, Sample>();
+    const d = createDepth(grid.width, grid.height);
+    const edge = (p: typeof a, q: typeof a, own: boolean): void => {
+      const x0 = (p.x / grid.width) * grid.width;
+      const y0 = (p.y / grid.height) * grid.height;
+      const x1 = (q.x / grid.width) * grid.width;
+      const y1 = (q.y / grid.height) * grid.height;
+      const steps = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)))); // cells-ok — a sample count
+      for (let s = 0; s <= steps; s += 1) { // cells-ok — a sample index
+        const t = s / steps; // cells-ok — a sample index
+        const px = Math.floor(x0 + (x1 - x0) * t); // cells-ok — a sample coordinate
+        const py = Math.floor(y0 + (y1 - y0) * t); // cells-ok — a sample coordinate
+        const z = p.vp.z + (q.vp.z - p.vp.z) * t;
+        if (!writeDepth(d, px, py, z)) continue;
+        const n = { x: p.vn.x + (q.vn.x - p.vn.x) * t, y: p.vn.y + (q.vn.y - p.vn.y) * t, z: p.vn.z + (q.vn.z - p.vn.z) * t };
+        const vp = { x: p.vp.x + (q.vp.x - p.vp.x) * t, y: p.vp.y + (q.vp.y - p.vp.y) * t, z };
+        const v = p.v === undefined || q.v === undefined ? p.v ?? q.v : p.v + (q.v - p.v) * t;
+        want.set(py * grid.width + px, { z, v, k: shade(n, vp, light, z, span), edge: own }); // cells-ok — a sample offset
+      }
+    };
+    edge(a, b, true);
+    edge(b, b, false);
+    edge(b, a, true);
+    expect([...got.keys()].sort((x, y) => x - y), "the same samples").toEqual([...want.keys()].sort((x, y) => x - y));
+    for (const [i, s] of got) expect(s, `the sample at ${String(i)}`).toEqual(want.get(i));
+    expect(new Set([...got.values()].map((s) => s.k)).size, "and the intensity varies along the edge").toBeGreaterThan(5); // cells-ok — a distinct count
+  });
 });

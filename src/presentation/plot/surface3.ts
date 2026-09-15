@@ -27,7 +27,7 @@ import {
   dot,
   NEAR,
   project,
-  strokeSeg,
+  strokeSegAt,
   sub,
   unit,
   unitOf,
@@ -90,15 +90,21 @@ export type Tri3 = Readonly<{
 }>;
 
 /** What a shaded sample hands back to whoever is composing the raster. */
-export type Shaded = Readonly<{
-  depth: number;
-  value: number | undefined;
-  series: number;
-  /** The clamped lighting, `[0, 1]`. Ambient is its floor and it is never zero. */
-  intensity: number;
-  /** On one of the caller's own edges, within `EDGE_HALF` of a sample (C12 I95). */
-  edge: boolean;
-}>;
+/**
+ * The painter, **called with the sample as scalars** (C12 I129): the sample's
+ * offset, its view-space depth, its interpolated value, the series, the
+ * clamped lighting `[0, 1]` — ambient is its floor and it is never zero —
+ * and whether it lies on one of the caller's own edges within `EDGE_HALF` of
+ * a sample (I95). No record is built per sample, which is the invariant.
+ */
+type Painter = (
+  i: number,
+  depth: number,
+  value: number | undefined,
+  series: number,
+  intensity: number,
+  edge: boolean,
+) => void;
 
 /**
  * The shading terms, and **they sum to 1 by construction** (C12 I94, F457).
@@ -455,7 +461,7 @@ export function drawTri(
   depth: Depth,
   light: Vec3,
   span: Readonly<{ nearD: number; farD: number }>,
-  paint: (i: number, sample: Shaded) => void,
+  paint: Painter,
 ): boolean {
   if (backfaceCulled(tri, basis)) return false;
   // **The three view depths once, as scalars** (C12 I128) — `zOf`'s expression,
@@ -659,7 +665,7 @@ function fill(
   depth: Depth,
   light: Vec3,
   span: Readonly<{ nearD: number; farD: number }>,
-  paint: (i: number, sample: Shaded) => void,
+  paint: Painter,
 ): void {
   const series = tri.series;
   const area = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
@@ -693,26 +699,29 @@ function fill(
       const uc = w0 / m;
       const z = a.vz * ua + b.vz * ub + c.vz * uc;
       if (!writeDepth(depth, px, py, z)) continue; // cells-ok — a sample coordinate
-      const n = {
-        x: a.nx * ua + b.nx * ub + c.nx * uc,
-        y: a.ny * ua + b.ny * ub + c.ny * uc,
-        z: a.nz * ua + b.nz * ub + c.nz * uc,
-      };
-      const vp = {
-        x: a.vx * ua + b.vx * ub + c.vx * uc,
-        y: a.vy * ua + b.vy * ub + c.vy * uc,
+      // **Six scalars and no record** (C12 I129): the same lerps, then
+      // `shadeAt`, which is `shade`'s arithmetic on the components.
+      paint(
+        py * grid.width + px, // cells-ok — a sample offset
         z,
-      };
-      paint(py * grid.width + px, { // cells-ok — a sample offset
-        depth: z,
-        value: blend(a.v, b.v, c.v, ua, ub, uc),
+        blend(a.v, b.v, c.v, ua, ub, uc),
         series,
-        intensity: shade(n, vp, light, z, span),
-        edge: wire
+        shadeAt(
+          a.nx * ua + b.nx * ub + c.nx * uc,
+          a.ny * ua + b.ny * ub + c.ny * uc,
+          a.nz * ua + b.nz * ub + c.nz * uc,
+          a.vx * ua + b.vx * ub + c.vx * uc,
+          a.vy * ua + b.vy * ub + c.vy * uc,
+          z,
+          light,
+          z,
+          span,
+        ),
+        wire
           && ((e[0] && w0 / len0 < EDGE_HALF)
             || (e[1] && w1 / len1 < EDGE_HALF)
             || (e[2] && w2 / len2 < EDGE_HALF)),
-      });
+      );
     }
   }
 }
@@ -734,35 +743,66 @@ function strokeThin(
   depth: Depth,
   light: Vec3,
   span: Readonly<{ nearD: number; farD: number }>,
-  paint: (i: number, sample: Shaded) => void,
+  paint: Painter,
 ): void {
   const series = tri.series;
   const wire = tri.skin.wire !== false;
-  // **Three explicit edges, not a `pairs` array of tuples** (C12 I128); the
-  // per-sample lerps are `lerpV`'s expression, `a + (b − a) · t`, on components.
-  const edge = (p: Screen, q: Screen, own: boolean): void => {
-    strokeSeg(
-      { x: p.x / grid.width, y: p.y / grid.height, depth: p.vz },
-      { x: q.x / grid.width, y: q.y / grid.height, depth: q.vz },
-      grid,
-      depth,
-      (i, t, z) => {
-        const n = { x: p.nx + (q.nx - p.nx) * t, y: p.ny + (q.ny - p.ny) * t, z: p.nz + (q.nz - p.nz) * t };
-        const vp = { x: p.vx + (q.vx - p.vx) * t, y: p.vy + (q.vy - p.vy) * t, z };
-        paint(i, {
-          depth: z,
-          value: p.v === undefined || q.v === undefined ? p.v ?? q.v : p.v + (q.v - p.v) * t,
-          series,
-          intensity: shade(n, vp, light, z, span),
-          edge: own && wire,
-        });
-      },
-      false,
-    );
-  };
-  edge(a, b, e[0]);
-  edge(b, c, e[1]);
-  edge(c, a, e[2]);
+  // **Three explicit edges, not a `pairs` array of tuples** (C12 I128), through
+  // a module function rather than a closure of this call (I129).
+  thinEdge(a, b, e[0] && wire, series, grid, depth, light, span, paint);
+  thinEdge(b, c, e[1] && wire, series, grid, depth, light, span, paint);
+  thinEdge(c, a, e[2] && wire, series, grid, depth, light, span, paint);
+}
+
+/**
+ * One edge of a thin triangle, stroked (C12 I129). **The scalar segment core
+ * takes the normalised coordinates `strokeSeg` multiplied before**, so no
+ * `Projected` pair is built; the per-sample lerps are `lerpV`'s expression,
+ * `a + (b − a) · t`, on components, and `shadeAt` is `shade`'s arithmetic.
+ * The one closure left per edge is the segment's own callback.
+ */
+function thinEdge(
+  p: Screen,
+  q: Screen,
+  own: boolean,
+  series: number,
+  grid: Readonly<{ width: number; height: number }>,
+  depth: Depth,
+  light: Vec3,
+  span: Readonly<{ nearD: number; farD: number }>,
+  paint: Painter,
+): void {
+  strokeSegAt(
+    p.x / grid.width,
+    p.y / grid.height,
+    p.vz,
+    q.x / grid.width,
+    q.y / grid.height,
+    q.vz,
+    grid,
+    depth,
+    (i, t, z) => {
+      paint(
+        i,
+        z,
+        p.v === undefined || q.v === undefined ? p.v ?? q.v : p.v + (q.v - p.v) * t,
+        series,
+        shadeAt(
+          p.nx + (q.nx - p.nx) * t,
+          p.ny + (q.ny - p.ny) * t,
+          p.nz + (q.nz - p.nz) * t,
+          p.vx + (q.vx - p.vx) * t,
+          p.vy + (q.vy - p.vy) * t,
+          z,
+          light,
+          z,
+          span,
+        ),
+        own,
+      );
+    },
+    false,
+  );
 }
 
 /** Three readings under barycentric weights, `undefined` surviving as `undefined`. */
@@ -804,9 +844,36 @@ export function shade(
   depth: number,
   span: Readonly<{ nearD: number; farD: number }>,
 ): number {
-  // **A zero-length normal survives as itself** (F456). `dot` is then `0`, so
-  // the face takes ambient and nothing divides by anything.
-  const raw = unit(normal);
+  // **The object form is the wrapper** (C12 I129): the arithmetic lives in
+  // `shadeAt` on the components, so the reference and the per-sample path are
+  // one function.
+  return shadeAt(normal.x, normal.y, normal.z, viewPos.x, viewPos.y, viewPos.z, light, depth, span);
+}
+
+/**
+ * `shade` on scalars (C12 I129) — `unit`, the flip, `dot`, `unit` again and
+ * the reflection, each on components in the same operation order, with no
+ * record built. The comments on the arithmetic are `shade`'s and are kept
+ * with it.
+ */
+function shadeAt(
+  nx0: number,
+  ny0: number,
+  nz0: number,
+  vx: number,
+  vy: number,
+  vz: number,
+  light: Vec3,
+  depth: number,
+  span: Readonly<{ nearD: number; farD: number }>,
+): number {
+  // **A zero-length normal survives as itself** (F456): `unit`'s rule — the
+  // hypot, and the divide only when it is not zero — so `dot` is then `0`, the
+  // face takes ambient and nothing divides by anything.
+  const len = Math.hypot(nx0, ny0, nz0);
+  const rx = len === 0 ? nx0 : nx0 / len;
+  const ry = len === 0 ? ny0 : ny0 / len;
+  const rz = len === 0 ? nz0 : nz0 / len;
   // **The flip's tie at `raw.z === 0` is not reachable and there is no
   // tie-break here** (F464). It looks like it needs one: reversing a mesh's
   // winding negates every normal **exactly** — measured, 1728 of 1728 vertex
@@ -817,12 +884,20 @@ export function shade(
   // view-space `z` of `6.123e-17` rather than `0`, which is `Math.cos(π/2)`.
   // The two windings' residue is the **rasteriser's** shared-edge tie instead,
   // and it is recorded on I95 rather than repaired here.
-  const n = raw.z > 0 ? { x: -raw.x, y: -raw.y, z: -raw.z } : raw;
-  const nl = dot(n, light);
+  const flip = rz > 0;
+  const nx = flip ? -rx : rx;
+  const ny = flip ? -ry : ry;
+  const nz = flip ? -rz : rz;
+  const nl = nx * light.x + ny * light.y + nz * light.z;
   const lit = nl > 0 ? nl : 0;
-  const toEye = unit({ x: -viewPos.x, y: -viewPos.y, z: -viewPos.z });
-  const r = { x: 2 * nl * n.x - light.x, y: 2 * nl * n.y - light.y, z: 2 * nl * n.z - light.z };
-  const rv = dot(r, toEye);
+  const ex = -vx;
+  const ey = -vy;
+  const ez = -vz;
+  const elen = Math.hypot(ex, ey, ez);
+  const tx = elen === 0 ? ex : ex / elen;
+  const ty = elen === 0 ? ey : ey / elen;
+  const tz = elen === 0 ? ez : ez / elen;
+  const rv = (2 * nl * nx - light.x) * tx + (2 * nl * ny - light.y) * ty + (2 * nl * nz - light.z) * tz;
   const spec = rv > 0 ? SPECULAR * Math.pow(rv, SHINE) : 0;
   const far = span.farD > span.nearD ? (depth - span.nearD) / (span.farD - span.nearD) : 0;
   const i = (AMBIENT + DIFFUSE * lit + spec) * (1 - FALLOFF * far);
