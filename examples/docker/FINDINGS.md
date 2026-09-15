@@ -50512,7 +50512,7 @@ reversal is the commit after this one; nothing of I129 ships.
 |---|---|
 | **Surface** | `src/presentation/plot/surface3.ts`'s `fill`, `strokeThin` and `shade`; `project3.ts`'s `strokeSeg`; the paint callback in `scatter3.ts`'s `plot3dArea` |
 | **Reached for** | a sampling heap profile that **includes collected objects** — `HeapProfiler.startSampling` at a 2 048-byte interval with both `includeObjectsCollectedBy…GC` flags, sixty bunny renders on F8's build — because `--heap-prof` reports what is retained and showed the cached geometry, not the garbage; the CPU profile's collector at 10.1% |
-| **Verdict** | **open** — measured, the remedy named |
+| **Verdict** | **closed — built and measured.** C12 I129; the bunny 5–8 ms lighter on a 38–42 ms frame in every paired run (35–39 of 40), 97 to 74 MB a render with `fill` gone from the table; the teapot half a millisecond. See the close below |
 
 **The measurement, by allocation site, sixty renders.** The instrument is
 new to this pass and is committed with the remedy as `tools/bench/alloc3d.mjs`;
@@ -50563,3 +50563,46 @@ the tuple from `sampleRgb`, the tuple from `shadeRgb`, the hex and the
 Phase F2's SoA form removes. The observable is the sampled bytes a render at
 the fill and stroke sites, taken by the committed bench, and the paired
 interleaved probe for the time.
+
+**Closed — built and measured** (C12 I129). The paired interleaved probe,
+F8's build the A side, and the committed allocation bench on both:
+
+```
+bunny, 40 rounds, five runs    B faster in 39 / 37 / 35 / 36 / 35 of 40 (the last under SWAP=1)
+                               paired B−A median  −5.7 / −6.2 / −7.9 / −7.9 / −5.3 ms
+                               on A p50s of 39.4 / 41.8 / 40.6 / 38.0 / 39.0 ms
+teapot, 40 rounds, two runs    28 and 25 of 40, −0.5 and −0.3 ms on 12.6 and 12.1
+suzanne, 40 rounds, two runs   24 and 25 of 40, −0.4 and −0.6 ms on 14.4 and 10.5
+
+allocation a render            before        after
+  bunny                        97 MB         74 MB     fill 33 MB → absent; the thin stroke's callback 5.6 → 0
+  teapot                       21 MB         18 MB     fill 2.0 → 1.3, the stroke's callback 0.8 → 0
+```
+
+Fourteen to nineteen percent of the bunny frame. What remains on the
+bunny, from the bench: `toScreen` 20 MB a render — the `Screen` record a
+drawn corner, which `fill` reads by field and Phase F2's SoA form is the
+only thing that removes; `thinEdge` 17 MB — the segment callback closure
+per edge and, the sampler's line suggests, the doubles boxed on the way
+into a painter the optimiser did not inline; `drawTri` 10 MB and
+`plot3dArea` 9 MB, neither yet read against its lines; the paint callback's
+colour objects 2.7 MB, F11's subject.
+
+**What the first mutation pass found.** `ZERO-NORMAL-DIVIDES` survived:
+`shade`'s guard for the zero-length normal — F456's rule, *nothing divides
+by anything* — was asserted by no row. SF2 asserts the geometry's normals
+and c12-surface3d's mutation of `unit` is caught there, so the shading
+half of the rule had been a comment for as long as it existed. A `NaN`
+from the divide is swallowed by every comparison into ambient, which is
+finite and at the floor, so a finiteness row would have passed the
+mutation too; SF2b asserts the value — ambient plus the specular of the
+reflection of nothing, `0.4` with the light along the eye — which the
+divide turns into `0.2`. And `TO-EYE-UNNORMALISED` was caught elsewhere
+than PR15: PR15's reference is `shade`, which is the core under test, so a
+mutation inside the core moves both sides equally; the goldens are the row
+that sees it, and the run says so now.
+
+**Gates.** 334 unit files, goldens 458 of 458 with no mover, anchors 0
+missing after c10-colormap, c12-direct-path and c12-surface3d were
+re-anchored on the scalar callback and `thinEdge`; four mutation runs
+every one caught.
