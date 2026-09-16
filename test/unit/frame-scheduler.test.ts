@@ -103,6 +103,9 @@ describe("C03 commit classification", () => {
     expect(render).toHaveBeenCalledTimes(1);
   });
 
+  it.todo("T1.26 (I17): frames sixteen apart under a continuous source — not deferred on a component: the code commit replaces this row");
+  it.todo("T1.27 (I17): an unused slot lapses without a write — not deferred on a component: the code commit replaces this row");
+
   it("T1.7: commit(spinner) schedules at 80 ms — the braille set's interval — not at the 16 ms stream window", () => {
     const { scheduler, clock } = build();
 

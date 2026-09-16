@@ -113,6 +113,8 @@ What makes this cheap is that there is no frame content. Re-arming at 16 ms does
 
 A ceiling is also the only form of this rule C03 can implement. A deadline is *now + window*, and C03 has no clock — A03 SS1 forbids one in `src/`, and the injected timer reports that it fired, never how long it has been running. Comparing windows needs neither.
 
+**The write opens the next window, so the ceiling is a rate and not a latency** (I17, F1200). Dated from the commit alone, the window and the frame lie end to end: a continuous source's next commit lands the moment the write returns — its timers cannot fire inside a synchronous write — and arms a fresh window, so the period is window + frame + slop and a 16 ms window drew 54 frames a second over a 1 ms frame. So every write arms one timer for the shortest coalesced window as it begins and leaves it standing: the machine is `paced`. A coalesced commit that lands while the slot stands is served when it closes and arms nothing — the slot is already the shortest window, so the strictly-shorter rule never re-arms; an immediate commit cancels it and writes now; a slot nobody commits into fires once and lapses to `idle` without writing. A lone commit's latency is unchanged, a commit inside a slot is served sooner than its own window, and a continuous source draws at the window's rate whatever the frame costs. This is the clock-free form: the timer is the only thing in C03 that knows sixteen milliseconds have passed, so the timer is armed when the sixteen begin.
+
 **An immediate commit cancels any pending one and renders now.** Nothing is lost — the pending frame and the immediate frame would draw the same current state, so the earlier schedule is redundant rather than skipped.
 
 **A pending frame is always flushed before a transition the user is waiting on** (A01 §render discipline). In practice this falls out of the rule above: the completion commit is immediate, so the pending stream frame is superseded rather than dropped. Final content is never lost.
@@ -196,15 +198,18 @@ Neither happens, because **there is no queue to bound**. `commit` already collap
 
 ## 5. State machine
 
-Three states plus an orthogonal `contaminated` flag. `writing` is transient but observable from inside the render callback, which is what makes re-entrancy well-defined.
+Four states plus an orthogonal `contaminated` flag. `writing` is transient but observable from inside the render callback, which is what makes re-entrancy well-defined; `paced` is the slot a write leaves standing (I17), with nothing pending in it.
 
 | From ↓ / call → | `commit(input\|completion)` | `commit(resize)` | `commit(stream\|spinner)` | `flush()` | `invalidate()` |
 |---|---|---|---|---|---|
-| **idle** | → writing → idle (T1.1) | set flag, → pending, timer set at 16 ms (T1.10, T1.21) | → pending, timer set (T1.3) | no-op (T3.1) | flag set, idle (T1.8) |
-| **pending** | cancel timer, → writing → idle (T1.5) | set flag; timer re-armed only if 16 ms is strictly shorter than the one standing — which it is against `spinner` and is not against `stream`, whose window it equals (T3.16, T1.22) | → pending; timer unchanged unless the arriving window is strictly shorter, in which case it is re-armed (T1.4, T3.12) | cancel timer, → writing → idle (T1.6) | flag set, pending (T3.6) |
+| **idle** | → writing → paced (T1.1) | set flag, → pending, timer set at 16 ms (T1.10, T1.21) | → pending, timer set (T1.3) | no-op (T3.1) | flag set, idle (T1.8) |
+| **paced** | cancel the slot, → writing → paced (T1.26) | set flag, → pending; the slot stands, since 16 is not strictly shorter than 16 (T3.25) | → pending; the slot stands and nothing is armed (T1.26, T3.25) | no-op — nothing is pending (T1.27) | flag set, paced |
+| **pending** | cancel timer, → writing → paced (T1.5) | set flag; timer re-armed only if 16 ms is strictly shorter than the one standing — which it is against `spinner` and is not against `stream`, whose window it equals (T3.16, T1.22) | → pending; timer unchanged unless the arriving window is strictly shorter, in which case it is re-armed (T1.4, T3.12) | cancel timer, → writing → paced (T1.6) | flag set, pending (T3.6) |
 | **writing** | defer (T3.7) | defer, flag set (T3.17) | defer (T3.18) | no-op (T3.8) | flag set (T3.19) |
 
 Orthogonal: a write while `contaminated` calls `repaint()` rather than `render()` and clears the flag once that repaint returns (T1.9, T3.5). `resize` sets that flag as part of the commit (I7).
+
+The timer firing: from `pending` → writing → paced; from `paced` → idle, and nothing is written — the slot lapsed (T1.27). A write that is refused — unacquired (I1) or suspended (I13) — or that throws (I9) cancels the slot it opened and lands in `idle`.
 
 ---
 
@@ -213,12 +218,12 @@ Orthogonal: a write while `contaminated` calls `repaint()` rather than `render()
 - **I1** — C03 never writes while `lifecycle.acquired` is false. A commit in that state is dropped silently.
 - **I2** — `input` and `completion` commits are never delayed by any amount, and their windows are not configurable.
 - **I3** — At most one timer is outstanding. A coalesced commit within an open window never extends, slides or duplicates it. It re-arms the timer only when its own window is strictly shorter than the pending one; equal windows never re-arm, which is what makes T1.4 and T6.2's sliding-window revert bite.
-- **I4** — An immediate commit cancels a pending timer. A timer never fires after the frame it would have produced has already been drawn.
+- **I4** — An immediate commit cancels a pending timer. A timer never writes a frame after the frame it would have produced has already been drawn; the slot a write leaves standing (I17) fires and writes nothing.
 - **I5** — A write while `contaminated` is a full repaint, and clears the flag once the repaint returns. A repaint that throws leaves the flag set, so the next write retries it (T3.5).
 - **I6** — Synchronised-update markers are emitted iff the capability is present, and are always balanced — every `2026 h` has a matching `2026 l`, including when the render callback throws.
 - **I7** — `resize` implies `invalidate()`. There is no path where dimensions change and a diff is attempted.
 - **I8** — C03 holds no frame content. It calls `render()` or `repaint()`; what is drawn is current state.
-- **I9** — A throwing `render()` does not leave a pending timer, an unbalanced marker, or a stuck `contaminated` flag.
+- **I9** — A throwing `render()` does not leave a timer standing — the slot the write opened is cancelled — an unbalanced marker, or a stuck `contaminated` flag.
 - **I10** — A commit during a write is deferred with the strictest reason seen and acted on once the write returns: inline **once**, then by timer. A commit arising from that second write escalates to the timer rather than writing inline again.
 
   Inline-once bounds the chain at two writes; escalation means nothing is dropped. A render callback that commits on every render is pathological but legal, and without the escalation it drains forever — a livelock, not a recursion, which is why the depth argument in §3 does not catch it.
@@ -229,6 +234,7 @@ Orthogonal: a write while `contaminated` calls `repaint()` rather than `render()
 
 - **I15** — **`resize` is coalesced on a fixed 16 ms window, and the window is not configurable.** It is not immediate and it is not tunable, and those are two rulings with two reasons. *Not immediate*, because the cost of a resize is not the frame: the width is what invalidates every cached height (C14 I8), so a drag of thirty `SIGWINCH`es was thirty re-measures of the whole transcript — **544 ms at a thousand entries, of which the index rebuild everyone named was 0.07%** (F423). *Not tunable*, because `stream` and `spinner` windows make a frame **stale** where this one makes it **wrong**, and I2's reasoning — a config may not introduce lag — reaches the second case for a different reason than the first. **Contamination is set eagerly at commit and never at flush** (I7, §5), which is what lets an `input` commit arriving inside the window write a correct frame rather than a diff against dimensions that no longer exist.
 - **I16** — **`render` and `repaint` are called with the `CommitReason` that drove the frame**, chosen by strictness among the coalesced reasons at flush — the shorter window, and at an equal window `resize`, because the frame it drives is a repaint (I7) and the reason handed down should say so; since F1199 `stream` and `resize` share 16 ms, so the tie is reachable and not a rounding case. It is the one thing about a frame that only C03 knows: a caller wrapping `commit` sees every reason committed and a caller wrapping `render` sees every frame, and neither can recover which reason a coalesced frame was drawn for. C03 keeps no count of its own coalescing — commits and frames are counted at the seams above, and *coalesced* is their difference (→ C28 I8).
+- **I17** — **A write opens the next window, and a continuous source draws at the window's rate.** Every write arms one timer for the shortest coalesced window as it begins and leaves the machine `paced` with that slot standing. A coalesced commit inside the slot moves the machine to `pending` and arms nothing; an immediate commit cancels the slot and writes; a slot nobody commits into fires once and lapses to `idle` without writing. A write that is refused or throws cancels the slot. The period under a continuous source is therefore the window, not the window plus the frame (F1200, → I3, I4).
 
 ---
 
@@ -251,6 +257,7 @@ Orthogonal: a write while `contaminated` calls `repaint()` rather than `render()
 15. Suspension is bounded state, not a buffer: `flush()` forces nothing while suspended and `resume()` writes an ordinary diffed frame, not a repaint (I14). **`suspend()` and `resume()` are new members on a published L0 interface and are freeze-relevant.**
 16. **A resize is coalesced on a fixed, non-configurable 16 ms window, and the frame is where the viewport learns its size** (I15). L4 composes from `lifecycle.size()` read fresh and resizes the viewport from the composed frame before any row is read, so a commit of any reason arriving inside the window writes a frame at the *current* width — the wrong-frame hazard is closed by that ordering rather than by immediacy. C22 I34 owns that ordering and §8a A2 is the row that checked it.
 17. **The frame's reason travels with it, and nothing else about coalescing does** (I16, → C28 I8). C03 chooses the winning reason and is the only component that can, so it passes it; it keeps no count, because commits and frames are counted at the seams above and *coalesced* is their difference. F395's row named the reason, not a count — the scheduler holds one `deferred` reason and no total, so a total added here would be a second place the arithmetic lives.
+18. **The write opens the next window** (I17). One timer for the shortest coalesced window is armed as every write begins and left standing; a coalesced commit inside it is served when it closes, an immediate one cancels it, and an unused one lapses without writing. The frame rate under a continuous source is the window's, not the window plus the frame (F1200).
 
 ---
 
@@ -262,6 +269,8 @@ Six tiers. Every cell of the §5 transition table is covered; fake clock through
 
 - **T1.24** (I16): five commits of different reasons coalesced into one frame → `render` is called once, with the **strictest** reason and not the first or the last — `resize` over a `stream` at the same window, by the tie rule. The three are distinguishable only when the arrival order and the strictness order disagree, so the row constructs that state rather than the convenient one.
 - **T1.25** (I16): a contaminated frame → `repaint` receives the reason too, and it is the same one `render` would have had.
+- **T1.26** (I17): a `stream` commit, the frame at 16, a second commit one millisecond after the frame, a third one millisecond after the second frame → frames at 16, 32 and 48 — sixteen apart, with the second and third commits arming nothing. Against the tree before I17 the frames were at 16, 33 and 50, and every live case sat at window + frame + slop (F1200).
+- **T1.27** (I17): a frame with no commit after it → one timer stands, `pending` is false, and when it fires nothing is written and no timer remains; a commit after that arms a fresh 16 ms window as from idle.
 
 Fake `schedule`, spy `render`/`repaint`, fabricated capabilities.
 
@@ -293,7 +302,7 @@ Fake `schedule`, spy `render`/`repaint`, fabricated capabilities.
 - **T2.1**: the returned object satisfies every member of `FrameScheduler`; `pending` and `contaminated` are getters.
 - **T2.2** (I8): C03 exposes no method accepting or returning frame content — asserted on the interface shape.
 - **T2.3** (I12): the injected `lifecycle` view has only `acquired`; passing a full lifecycle does not let C03 reach `acquire` or `release` (type-level, asserted by a compile test).
-- **T2.4** (I3): `pending` is true only while a timer is outstanding, for every reason in the enum.
+- **T2.4** (I3, I17): `pending` is true exactly while a commit awaits a timer, for every reason in the enum — false before, true after a coalesced commit and false after an immediate one, false once the window has passed. The slot every write leaves standing is a timer with nothing pending in it, and it has lapsed by the time the window has passed.
 - **T2.5**: every `CommitReason` in the union has a window entry — asserted exhaustively over the type, so adding a reason without a window fails the build.
 - **T2.6** (A02 §1): the module graph contains no import from `data/`.
 - **T2.7** (C13): across the whole tier-1 and tier-3 corpus, every string passed to `write` is the synchronised-update open or close marker. Nothing else, ever — a third string means frame content has moved into C03.
@@ -303,7 +312,7 @@ Fake `schedule`, spy `render`/`repaint`, fabricated capabilities.
 
 - **T3.1**: `flush()` from idle → no-op, no callback, no throw.
 - **T3.2**: `invalidate()` called twice before a write → one `repaint()`, not two.
-- **T3.3** (I9): `render()` throws → the error propagates, `pending` is false, no timer remains, and a subsequent commit still works.
+- **T3.3** (I9, I17): `render()` throws → the error propagates, `pending` is false, no timer remains — the slot the write opened is cancelled — and a subsequent commit still works.
 - **T3.4** (I6, I9): `render()` throws with synchronised update on → the closing `2026 l` is still emitted. An unbalanced marker leaves the terminal in synchronised mode and frozen.
 - **T3.5** (I9): `repaint()` throws while contaminated → the flag stays set, so the next write retries the repaint rather than diffing against an unknown screen.
 - **T3.6**: `invalidate()` while pending → stays pending; the pending timer's write is a repaint.
@@ -315,7 +324,7 @@ Fake `schedule`, spy `render`/`repaint`, fabricated capabilities.
 - **T3.12** (I3): alternating `stream` and `spinner` commits → the shortest ceiling governs, in both orderings. Stream-then-spinner leaves the 16 ms timer alone — 80 is not shorter. Spinner-then-stream re-arms the 80 ms timer at 16 ms. A longer window never pushes the frame out.
 - **T3.13** (I2, I15): `windows: { input: 50 }` at construction → **throws**. Same for `completion` — those two by I2 — and for `resize`, **by I15 and for a different reason**, which is why the row names both. A single citation here read as one rule covering three reasons and I2 covers two (F423). **The two messages are asserted separately in T2.5**, which is where the partition lives: a shared message would restate the conflation this replaces, and a reader told *never delayed* about a reason that is delayed by 16 ms has a sentence they cannot check against the behaviour.
 - **T3.14** (I1): `flush()` from pending while `acquired` is false → the timer is cancelled, nothing is written, `pending` is false. The one path where an explicit flush discards a frame silently.
-- **T3.15** (I3, I10): a coalesced commit deferred during a write schedules a **fresh** window measured from the end of the write, not from the original commit. No timer is outstanding at that moment, so I3 holds.
+- **T3.15** (I3, I10, I17): a coalesced commit deferred during a write is served at the close of the slot that write opened — a window measured from the start of the write, not from the original commit and not from the write's end — and arms nothing, so I3 holds: the slot is the one timer.
 - **T3.16** (I15): `commit("resize")` while a `stream` is pending → the standing timer is left alone, because 16 against 16 is not strictly shorter (I3), and the one frame it fires is the repaint the resize contaminated; the stream's own frame never happens separately. The row's bound is that the resize is drawn within 16 ms, and it holds whether the standing window is equal or longer.
 - **T3.17** (I10): `commit("resize")` during a write → deferred, contamination flag set, and the deferred write is a repaint.
 - **T3.18** (I10): `commit("stream")` during a write → deferred and scheduled, not written immediately.
@@ -325,6 +334,7 @@ Fake `schedule`, spy `render`/`repaint`, fabricated capabilities.
 - **T3.22** (I12): `acquired` flips true after construction → the next commit writes. A snapshotted view would never write at all.
 - **T3.23** (§1): the starvation property, directly. With `windows: { stream: 16 }`, a long interleaving of `stream` commits at 16 ms and `input` commits at irregular offsets → every input frame is rendered at the tick its commit arrived, none is delayed behind a pending stream frame, and stream frames remain capped at one per window. This is what T4.6 and T5.2 assert against real components and real timers; here it is deterministic.
 - **T3.24** (I12): a scheduler constructed with an object literal capturing `acquired` — the mistake §2 warns L4 against — drops every frame after the first state change, silently: no throw, no output, no timer left behind. T3.22 proves the live view works; this proves the dead one fails, and fails in exactly the way described.
+- **T3.25** (I17, I3): a `spinner` commit inside the slot → served when the slot closes, 16 ms after the frame and not 80 after the commit, and the arm list gains nothing — the slot is already the shortest window, so strictly-shorter never re-arms. The same for `resize`: the flag is set and the slot stands.
 
 ### Tier 4 — integration
 
@@ -352,6 +362,7 @@ PTY harness, real timers, real terminal.
 ### Tier 6 — fail-on-revert
 
 - **T6.18** (I16): flattening the tie — strictness the window alone, with `resize` and `stream` at 16 → **T1.24** reads `stream`, the last reason committed, for a frame that is a repaint. Anchor in `tools/mutate/runs/c03-resize-window.mjs`.
+- **T6.19** (I17): cancelling the slot when the write found nothing deferred — the tree before F1200 — → **T1.26** fails, the second frame at 33 rather than 32; letting a lapsing slot write → **T1.27** fails with a render nobody committed. Anchor in `tools/mutate/runs/c03-resize-window.mjs`.
 - **T6.17** (I16): calling `render()` with no argument → T1.24 and T1.25 fail, and the profiler's frames-by-reason collapses to one bucket. **The structural half is named**: nothing prevents a caller ignoring the argument, and what would catch that is the L4 counter disagreeing with itself rather than a row here.
 
 - **T6.1** (I2): giving `input` a non-zero window → T1.1 and T3.13 fail.
@@ -395,7 +406,9 @@ of every entry, and the walk's job was to find where it can be made to happen on
 | A5 | resize pending | the terminal is released | C01 I12b · I1 | The timer fires and the write is dropped silently by I1. **No cancel**, because adding one is a second expression of an invariant that already holds — the reimplemented-rule shape |
 | A6 | startup deferred on a failed size gate | `SIGWINCH` | C22 I8 | **No effect.** That continuation is a second `onResize` subscriber (`session.ts:323`), not a commit, so C03's window is not in its path. Checked rather than assumed, because a 16 ms delay to a deferral that once *deferred for ever* is the kind of thing that reads as harmless |
 | A7 | resize pending | `flush()` | §5 | Cancel timer, write now. Existing rule |
-| A8 | `writing` | `SIGWINCH` | I10 · §5's eager contamination | **The walk said *unchanged* and the implementation disproved it.** The flag is still set at commit time, which is the half that was right. But `runWrite` gives a deferred *coalesced* reason a fresh window from the end of the write (T3.15), and `resize` is one now — so it no longer writes inline, it waits 16 ms like a stream. Safe for the same reason as A2: the flag is already set, so whenever the write lands it is a repaint at whatever width the terminal then has. **Recorded rather than smoothed over: this is the row the code got to disprove, and a walk that is never disproved is one nobody checked** |
+| A8 | `writing` | `SIGWINCH` | I10 · §5's eager contamination | **The walk said *unchanged* and the implementation disproved it.** The flag is still set at commit time, which is the half that was right. But `runWrite` serves a deferred *coalesced* reason at the close of the slot the write opened (T3.15; a fresh window from the write's end before F1200), and `resize` is one now — so it no longer writes inline, it waits for the slot like a stream. Safe for the same reason as A2: the flag is already set, so whenever the write lands it is a repaint at whatever width the terminal then has. **Recorded rather than smoothed over: this is the row the code got to disprove, and a walk that is never disproved is one nobody checked** |
+| A9 | `paced` | `commit("stream")` a half-millisecond after the frame | I17 · §5 strictness | Served at the slot's close — 16 ms after the frame began, not 16 after this commit. The period under a stream is the window (T1.26). Before F1200 this row read *→ pending, timer set*, and the timer it set is the frame's cost the rate was paying (F1200) |
+| A10 | `paced` | `commit("input")` | I17 · I4 | The slot is cancelled and the frame written now, which opens a new slot. Same as `pending` × immediate, which is the point: a slot is a pending window with nothing in it (T1.26) |
 
 ### The classification table — who owns the width, at rest
 
