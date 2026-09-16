@@ -42,8 +42,8 @@ const results = runPass({
   run,
   control: {
     file: SF,
-    from: "          a.ny * ua + b.ny * ub + c.ny * uc,\n          a.nz * ua + b.nz * ub + c.nz * uc,",
-    to: "          a.nx * ua + b.nx * ub + c.nx * uc,\n          a.nz * ua + b.nz * ub + c.nz * uc,",
+    from: "      lane[LANE_NY] = a.ny * ua + b.ny * ub + c.ny * uc;",
+    to: "      lane[LANE_NY] = a.nx * ua + b.nx * ub + c.nx * uc;",
     why: "the fill's normal takes its x for its y — the lighting moves on every face, which PR15 and the mesh goldens both see",
   },
   mutations: [
@@ -84,8 +84,8 @@ const results = runPass({
       // the stroked samples take the far corner's shade.
       name: "THIN-VP-FROM-Q: the stroke's view position is q's",
       file: SF,
-      from: "        p.vx + (q.vx - p.vx) * t,\n        p.vy + (q.vy - p.vy) * t,",
-      to: "        q.vx,\n        q.vy,",
+      from: "    lane[LANE_VX] = p.vx + (q.vx - p.vx) * t;\n    lane[LANE_VY] = p.vy + (q.vy - p.vy) * t;",
+      to: "    lane[LANE_VX] = q.vx;\n    lane[LANE_VY] = q.vy;",
       expect: "PR15 thin",
     },
     {

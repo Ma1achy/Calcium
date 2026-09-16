@@ -837,6 +837,7 @@ function fill(
   // **Scalars, not a `len` tuple and four closures** (C12 I128) — the same
   // `hypot2`, `Math.min` and `Math.max` calls with the same arguments — the
   // length is `Math.hypot`'s to the bit, without the builtin's array (C12 I133).
+  const lane = depth.lane;
   const len0 = hypot2(b.x - a.x, b.y - a.y);
   const len1 = hypot2(c.x - b.x, c.y - b.y);
   const len2 = hypot2(a.x - c.x, a.y - c.y);
@@ -861,23 +862,23 @@ function fill(
       const z = a.vz * ua + b.vz * ub + c.vz * uc;
       if (!writeDepth(depth, px, py, z)) continue; // cells-ok — a sample coordinate
       // **Six scalars and no record** (C12 I129): the same lerps, then
-      // `shadeAt`, which is `shade`'s arithmetic on the components.
+      // `shadeAt`, which is `shade`'s arithmetic on the components — **through
+      // the lane** (I136), because the shade is a real call and a double
+      // crossing one is a heap number.
+      lane[LANE_NX] = a.nx * ua + b.nx * ub + c.nx * uc;
+      lane[LANE_NY] = a.ny * ua + b.ny * ub + c.ny * uc;
+      lane[LANE_NZ] = a.nz * ua + b.nz * ub + c.nz * uc;
+      lane[LANE_VX] = a.vx * ua + b.vx * ub + c.vx * uc;
+      lane[LANE_VY] = a.vy * ua + b.vy * ub + c.vy * uc;
+      lane[LANE_VZ] = z;
+      lane[LANE_DEPTH] = z;
+      shadeAt(lane, light, span);
       paint(
         py * grid.width + px, // cells-ok — a sample offset
         z,
         blend(a.v, b.v, c.v, ua, ub, uc),
         series,
-        shadeAt(
-          a.nx * ua + b.nx * ub + c.nx * uc,
-          a.ny * ua + b.ny * ub + c.ny * uc,
-          a.nz * ua + b.nz * ub + c.nz * uc,
-          a.vx * ua + b.vx * ub + c.vx * uc,
-          a.vy * ua + b.vy * ub + c.vy * uc,
-          z,
-          light,
-          z,
-          span,
-        ),
+        lane[LANE_INTENSITY] as number,
         wire
           && ((e[0] && w0 / len0 < EDGE_HALF)
             || (e[1] && w1 / len1 < EDGE_HALF)
@@ -936,6 +937,7 @@ function thinEdge(
   paint: Painter,
 ): void {
   // The normalised coordinates `strokeSeg` took, multiplied back as it did.
+  const lane = depth.lane;
   const x0 = (p.x / grid.width) * grid.width;
   const y0 = (p.y / grid.height) * grid.height;
   const x1 = (q.x / grid.width) * grid.width;
@@ -947,22 +949,20 @@ function thinEdge(
     const py = Math.floor(y0 + (y1 - y0) * t); // cells-ok — a sample coordinate
     const z = p.vz + (q.vz - p.vz) * t;
     if (!writeDepth(depth, px, py, z)) continue;
+    lane[LANE_NX] = p.nx + (q.nx - p.nx) * t;
+    lane[LANE_NY] = p.ny + (q.ny - p.ny) * t;
+    lane[LANE_NZ] = p.nz + (q.nz - p.nz) * t;
+    lane[LANE_VX] = p.vx + (q.vx - p.vx) * t;
+    lane[LANE_VY] = p.vy + (q.vy - p.vy) * t;
+    lane[LANE_VZ] = z;
+    lane[LANE_DEPTH] = z;
+    shadeAt(lane, light, span);
     paint(
       py * grid.width + px, // cells-ok — a sample offset
       z,
       p.v === undefined || q.v === undefined ? p.v ?? q.v : p.v + (q.v - p.v) * t,
       series,
-      shadeAt(
-        p.nx + (q.nx - p.nx) * t,
-        p.ny + (q.ny - p.ny) * t,
-        p.nz + (q.nz - p.nz) * t,
-        p.vx + (q.vx - p.vx) * t,
-        p.vy + (q.vy - p.vy) * t,
-        z,
-        light,
-        z,
-        span,
-      ),
+      lane[LANE_INTENSITY] as number,
       own,
     );
   }
@@ -1009,27 +1009,57 @@ export function shade(
 ): number {
   // **The object form is the wrapper** (C12 I129): the arithmetic lives in
   // `shadeAt` on the components, so the reference and the per-sample path are
-  // one function.
-  return shadeAt(normal.x, normal.y, normal.z, viewPos.x, viewPos.y, viewPos.z, light, depth, span);
+  // one function — **over a lane per call** (I136): the reference is per
+  // figure and per test row, and the raster's lane is on its depth record.
+  const lane = new Float64Array(8); // cells-ok — the lane's slots
+  lane[LANE_NX] = normal.x;
+  lane[LANE_NY] = normal.y;
+  lane[LANE_NZ] = normal.z;
+  lane[LANE_VX] = viewPos.x;
+  lane[LANE_VY] = viewPos.y;
+  lane[LANE_VZ] = viewPos.z;
+  lane[LANE_DEPTH] = depth;
+  shadeAt(lane, light, span);
+  return lane[LANE_INTENSITY] as number;
 }
+
+/**
+ * The lane's layout (C12 I136): the normal, the view position, the depth in,
+ * the intensity out. Slot numbers rather than a record, because the record is
+ * the allocation this exists to remove.
+ */
+const LANE_NX = 0;
+const LANE_NY = 1;
+const LANE_NZ = 2;
+const LANE_VX = 3;
+const LANE_VY = 4;
+const LANE_VZ = 5;
+const LANE_DEPTH = 6;
+const LANE_INTENSITY = 7;
 
 /**
  * `shade` on scalars (C12 I129) — `unit`, the flip, `dot`, `unit` again and
  * the reflection, each on components in the same operation order, with no
  * record built. The comments on the arithmetic are `shade`'s and are kept
- * with it.
+ * with it. **Every input is read from the lane and the answer is written to
+ * it** (I136), never passed or returned:
+ * this function's bytecode is past V8's inlining size, so it is a real call
+ * from `fill` and `thinEdge`, and each double argument to a real call is a
+ * heap number — seven in and one out per painted sample, 33.6 MB of a
+ * twenty-frame bunny heap before the lane (F1176).
  */
 function shadeAt(
-  nx0: number,
-  ny0: number,
-  nz0: number,
-  vx: number,
-  vy: number,
-  vz: number,
+  lane: Float64Array,
   light: Vec3,
-  depth: number,
   span: Readonly<{ nearD: number; farD: number }>,
-): number {
+): void {
+  const nx0 = lane[LANE_NX] as number;
+  const ny0 = lane[LANE_NY] as number;
+  const nz0 = lane[LANE_NZ] as number;
+  const vx = lane[LANE_VX] as number;
+  const vy = lane[LANE_VY] as number;
+  const vz = lane[LANE_VZ] as number;
+  const depth = lane[LANE_DEPTH] as number;
   // **A zero-length normal survives as itself** (F456): `unit`'s rule — the
   // hypot, and the divide only when it is not zero — so `dot` is then `0`, the
   // face takes ambient and nothing divides by anything.
@@ -1064,7 +1094,7 @@ function shadeAt(
   const spec = rv > 0 ? SPECULAR * Math.pow(rv, SHINE) : 0;
   const far = span.farD > span.nearD ? (depth - span.nearD) / (span.farD - span.nearD) : 0;
   const i = (AMBIENT + DIFFUSE * lit + spec) * (1 - FALLOFF * far);
-  return i < 0 ? 0 : i > 1 ? 1 : i;
+  lane[LANE_INTENSITY] = i < 0 ? 0 : i > 1 ? 1 : i;
 }
 
 /**

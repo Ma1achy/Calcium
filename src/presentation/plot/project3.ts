@@ -364,8 +364,14 @@ export function project(basis: Basis, p: Vec3): Projected | null {
   return { x: sx * 0.5 + 0.5, y: 0.5 - sy * 0.5, depth: z };
 }
 
-/** The depth buffer: one `Float32Array`, cleared to `+Infinity`. */
-export type Depth = Readonly<{ width: number; height: number; z: Float32Array }>;
+/**
+ * The depth buffer: one `Float32Array`, cleared to `+Infinity` — and beside it
+ * **the shade's lane** (C12 I136), eight doubles the raster writes a sample's
+ * normal, view position and depth into and reads the intensity back from, so
+ * no double crosses the shade's call boundary as a heap number. Per render
+ * with the buffer, which is I11's requirement and what keeps it off the module.
+ */
+export type Depth = Readonly<{ width: number; height: number; z: Float32Array; lane: Float64Array }>;
 
 /**
  * A buffer for one render, sized from the sample grid (C12 I84, C12 I11).
@@ -380,7 +386,7 @@ export function createDepth(width: number, height: number): Depth {
   const h = Math.max(1, Math.floor(height)); // cells-ok — a sample count
   const z = new Float32Array(w * h);
   z.fill(Infinity);
-  return { width: w, height: h, z };
+  return { width: w, height: h, z, lane: new Float64Array(8) }; // cells-ok — the lane's slots (C12 I136)
 }
 
 /**

@@ -1231,7 +1231,7 @@ describe("C12 I129 — the per-sample path", () => {
     return got;
   };
 
-  it("PR15 (C12 I129, I94): every painted sample's intensity through drawTri equals shade over the test's own barycentric interpolation of the corners, and the value the same weights over the corners' values", () => {
+  it("PR15 (C12 I129, I94, I136): every painted sample's intensity through drawTri equals shade over the test's own barycentric interpolation of the corners, and the value the same weights over the corners' values", () => {
     // Three corners, three normals, three values — so a crossed component or a
     // crossed weight moves something at almost every sample.
     const A: Corner = { p: { x: -0.8, y: -0.6, z: 0.1 }, n: { x: 0.2, y: 0.1, z: 0.97 }, v: 1 };
@@ -1267,7 +1267,7 @@ describe("C12 I129 — the per-sample path", () => {
     expect(ks.size, "and the intensity varies across the face").toBeGreaterThan(10); // cells-ok — a distinct count
   });
 
-  it("PR15 thin (C12 I129, I94): a stroked triangle's samples equal shade over the edge's own t, in strokeSeg's steps and its first-writer order", () => {
+  it("PR15 thin (C12 I129, I94, I136): a stroked triangle's samples equal shade over the edge's own t, in strokeSeg's steps and its first-writer order", () => {
     // Two corners and a third on the second: the screen area is zero, so the
     // three edges are stroked — a→b, b→c of no length, and c→a back again.
     const A: Corner = { p: { x: -0.95, y: -0.8, z: 0 }, n: { x: 0.3, y: 0.2, z: 0.93 }, v: 1 };
@@ -1303,5 +1303,59 @@ describe("C12 I129 — the per-sample path", () => {
     expect([...got.keys()].sort((x, y) => x - y), "the same samples").toEqual([...want.keys()].sort((x, y) => x - y));
     for (const [i, s] of got) expect(s, `the sample at ${String(i)}`).toEqual(want.get(i));
     expect(new Set([...got.values()].map((s) => s.k)).size, "and the intensity varies along the edge").toBeGreaterThan(5); // cells-ok — a distinct count
+  });
+
+  it("T1.148 (C12 I136, F1176): createDepth's record carries an eight-slot Float64Array lane, and after drawTri its slots hold the last painted sample's normal, view position, depth and intensity by the documented layout, with shade over slots 0–6 answering slot 7 to the bit", () => {
+    const fresh = createDepth(grid.width, grid.height);
+    expect(fresh.lane).toBeInstanceOf(Float64Array);
+    expect([...fresh.lane], "eight zeros beside the buffer").toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
+    // PR15's triangle: three normals, three values, so the slots read a sample
+    // no other sample shares.
+    const A: Corner = { p: { x: -0.8, y: -0.6, z: 0.1 }, n: { x: 0.2, y: 0.1, z: 0.97 }, v: 1 };
+    const B: Corner = { p: { x: 0.9, y: -0.4, z: -0.2 }, n: { x: -0.3, y: 0.4, z: 0.86 }, v: 2 };
+    const C: Corner = { p: { x: 0.1, y: 0.8, z: 0.3 }, n: { x: 0.1, y: -0.5, z: 0.86 }, v: 3 };
+    const [a, b, c] = [screenOf(A), screenOf(B), screenOf(C)];
+    const held = createDepth(grid.width, grid.height);
+    let count = 0;
+    let last: { i: number; z: number; k: number } | undefined;
+    drawTri(tri(A, B, C, [true, true, true]), basis, grid, held, light, span, (i, z, _v, _s, k, _edge) => {
+      count += 1;
+      last = { i, z, k };
+    });
+    expect(count, "more than one sample, so the last is a claim").toBeGreaterThan(100); // cells-ok — a sample count
+    if (last === undefined) throw new Error("nothing painted");
+    // **The row's own interpolation at the last sample's centre** — PR15's weights.
+    const area = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
+    const sign = area > 0 ? 1 : -1;
+    const m = Math.abs(area);
+    const cx = (last.i % grid.width) + 0.5; // cells-ok — a sample coordinate
+    const cy = Math.floor(last.i / grid.width) + 0.5; // cells-ok — a sample coordinate
+    const w0 = ((b.x - a.x) * (cy - a.y) - (cx - a.x) * (b.y - a.y)) * sign;
+    const w1 = ((c.x - b.x) * (cy - b.y) - (cx - b.x) * (c.y - b.y)) * sign;
+    const w2 = ((a.x - c.x) * (cy - c.y) - (cx - c.x) * (a.y - c.y)) * sign;
+    const ua = w1 / m;
+    const ub = w2 / m;
+    const uc = w0 / m;
+    const lane = held.lane;
+    const want = [
+      a.vn.x * ua + b.vn.x * ub + c.vn.x * uc,
+      a.vn.y * ua + b.vn.y * ub + c.vn.y * uc,
+      a.vn.z * ua + b.vn.z * ub + c.vn.z * uc,
+      a.vp.x * ua + b.vp.x * ub + c.vp.x * uc,
+      a.vp.y * ua + b.vp.y * ub + c.vp.y * uc,
+      last.z,
+      last.z,
+      last.k,
+    ];
+    for (let slot = 0; slot < 8; slot += 1) { // cells-ok — a slot index
+      expect(Object.is(lane[slot], want[slot]), `slot ${String(slot)}: ${String(lane[slot])} vs ${String(want[slot])}`).toBe(true);
+    }
+    // **`shade` over the first seven slots answers the eighth**: the reference
+    // and the raster's answer are one function over one lane layout.
+    const n = { x: lane[0] as number, y: lane[1] as number, z: lane[2] as number };
+    const vp = { x: lane[3] as number, y: lane[4] as number, z: lane[5] as number };
+    expect(Object.is(shade(n, vp, light, lane[6] as number, span), lane[7]), "shade over slots 0–6 answers slot 7").toBe(true);
+    // The fixture responds: a slot moved changes the answer.
+    expect(Object.is(shade({ ...n, x: n.x + 0.25 }, vp, light, lane[6] as number, span), lane[7])).toBe(false);
   });
 });
