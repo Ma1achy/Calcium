@@ -1429,7 +1429,7 @@ this arm is owed there and the degraded picture is what it should show.
 
 **The wake is the orbit's** (C22 I77). One timer path, one stamp, and each animation reads its own
 elapsed time from it — the frame store walks whole delays and keeps the remainder, so a GIF beside a
-33 ms orbit shows each frame for its own delay and a spinner beside a GIF does not move it. The
+16 ms orbit shows each frame for its own delay and a spinner beside a GIF does not move it. The
 timer is armed for the earliest frame change on screen, floored at the `stream` rate, so a 500 ms
 GIF costs two wakes a second and not thirty; a still — PNG or one-frame GIF — arms **nothing**.
 Frame 0 after a loop keys as untouched, on `ScrollOffsets`' zero rule, because it draws what frame

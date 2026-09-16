@@ -364,7 +364,7 @@ Plus `blocks` for extra block types (F1) and `transport` for per-verb overrides 
 | Keystroke → frame | < 16 ms p95 | **T5.2**, through a PTY |
 | Command commit → frame | < 33 ms p95, excluding subprocess time | **nowhere** — no assertion exists |
 | Page Down through 10,000 blocks | < 50 ms | **nowhere** — `test/e2e/viewport.test.ts:12` asserts the rows match at every screenful and reads no clock |
-| Streaming at 1,000 lines/s | ≤ 30 frames/s, < 25% of one core | **T5.1**, both halves |
+| Streaming at 1,000 lines/s | ≤ 60 frames/s, < 25% of one core | **T5.1**, both halves |
 | Resize → correct frame | < 33 ms, zero corruption | **T5.4, the corruption half only** — one width per frame, the right height, not empty, not the fallback; never timed |
 | Idle CPU | ~0% — no polling render loop | **T5.6** |
 
