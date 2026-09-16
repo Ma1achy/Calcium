@@ -51517,7 +51517,7 @@ the doubles boxed at `shadeAt`'s boundary, `mixedRows` 10, the rows arm's
 |---|---|
 | **Surface** | `src/presentation/plot/scatter3.ts`'s `plot3dArea`: `let nearD … hiV` captured by the `reading` closure, called for every drawn point, stroke end and mesh corner; `project3.ts`'s `viewDepth`, whose `number \| null` return crosses the call boundary |
 | **Reached for** | the sampled heap after F1174: `plot3dArea` 54.9 MB of 150.6 over twenty bunny frames — the largest frame left, under a name that reads as the buffers. Sized before it was believed: the colour records are 2,921 a frame with 2,514 distinct, so interning them saves a seventh of a small number; the corners loop as an index loop moved the figure by nothing, because the corners array is not frozen and `for…of` has its fast path. With inlining off the figure resolves into its callees: **`reading` 22.3 MB, `viewDepth` 11.3, the three boxed sample arrays 13.5**. V8 holds a `let` any closure captures in a context object, and a context slot holds a tagged value — so `nearD = Math.min(nearD, depth)` allocates a fresh heap number on every write, four writes a corner over 35,947 corners, whether or not the bound moved; and `viewDepth`'s return is a heap number whenever the call is not inlined. On a scratch build: the four bounds as scalars no closure captures, `viewDepth` still called, **54.9 → 32.8**; the dot written in place as well, **54.9 → 21.4**, the twenty-frame total **150.6 → 116.9 MB**; the bunny paired **−3.1 ms** (18.7 → 15.6 p50), B faster in 36 of 40 |
-| **Verdict** | **open** — measured, the remedy sized on a scratch build |
+| **Verdict** | **closed** — built and measured: I135, T1.147, `c12-span-depth` |
 
 **Remedy, sized.** The corner pass is one function, `spanOverCorners(basis,
 corners, nearD, farD, loV, hiV)` beside `geometryOf`, holding its bounds in
@@ -51531,3 +51531,33 @@ no closure captures. Byte-identical by construction: the same operations in
 the same order, `Math.min` kept for its `NaN` and signed-zero arms. What it
 does not reach: the three boxed sample arrays (13.5 MB), `thinEdge` and
 `shadeAt`'s boxing at the call boundary (31), `mixedRows` (10).
+
+**Closed — built and measured.** C12 I135; `reading` gone from `plot3dArea`,
+the drawn and stroke readings as statements, the corners through
+`spanOverCorners` beside `geometryOf`; `viewDepth` gone with its one consumer.
+**The landed function allocated where the scratch loop had not** — 22.5 MB
+under its own name — and the cause was not the closure: `Math.min` over a
+bound that arrives as a parameter keeps the loop-carried value tagged and
+boxes it per iteration. Comparisons carrying `Math.min`'s `NaN` and
+signed-zero answers took it to nothing, and so did `Math.min` over the
+parameters coerced by `- 0` at entry, which is what names the representation
+rather than the arithmetic; the comparisons landed because they say what they
+do. T1.147 holds the span to `project`'s depths and the corners' values over
+ten thousand seeded corners, with enclosing and partial incoming bounds and
+the `NaN` and `±0` cases by `Object.is`; T1.143 keeps the cull.
+`c12-span-depth` re-anchored onto the pass, control seen, six caught (the near
+cull, the dot along `up`, the incoming bounds, the value swap, the `NaN` arm,
+the signed-zero arm), none survived; `c12-span-corners` control re-anchored,
+three caught. Gates green, goldens 458 with no mover.
+
+| | before | after |
+|---|---|---|
+| twenty-frame bunny heap | 150.6 MB | 119.8 MB |
+| `plot3dArea` | 54.9 MB | 21.2 MB |
+| bunny paired, A→B / swapped | — | −3.6 ms (37/40) / −1.6 ms (31/40) |
+| suzanne paired, four readings | — | 0.0, +0.4, −0.0, 0.0 ms; self-pair −0.0 |
+
+What remains, by allocation: `plot3dArea` 21.2 — the three boxed sample
+arrays 13.5 and the colour records 8; `thinEdge` 18.8 and `shadeAt` 14.8,
+the doubles boxed at `shadeAt`'s nine-argument boundary; `mixedRows` 10.1; the
+rows arm's `between`, its `Set`s and `normaliseRow` about 22.
