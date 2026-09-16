@@ -19,6 +19,10 @@ const mk = (height: number, cap?: number) => {
 };
 
 describe("C14 unit — visibility", () => {
+  it.todo(
+    "T1.23 (I30, F1198): visible() returns the same frozen range until the viewport moves, and a fresh one after a scroll, an append or a resize — not deferred on a component: the code commit replaces this row",
+  );
+
   it("T1.1 (I10): takeRows sum to viewportHeight exactly", () => {
     const { store, viewport } = mk(6);
     store.append(rowsDoc(4, "a"));

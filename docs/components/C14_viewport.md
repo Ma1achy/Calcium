@@ -51,6 +51,8 @@ type VisibleRange = Readonly<{
 
 `skipRows` lets an entry be partially visible at either edge — a 500-row log block scrolled halfway is one entry with `skipRows: 250`.
 
+**`visible()` is answered from a memo between movements** (I30). The range is a pure function of the entries, the top row, the region's height and the live entry, and each of those moves only through a path this component owns — a scroll, a content change, a resize, a clear — every one of which ends in `#setTop`, I2's clamp. So the clamp is where the memo is dropped, and a caller asking twice with nothing moved is handed the same frozen object. **Why** (F1198): C23's refresh driver asks *is this host on screen* once per live part per sweep, and L4 answers it from this range; at two hundred parts ticking every 16 ms that was twelve thousand range computations a second and a tenth of a core, for a yes-or-no that changes only when the viewport does. `stats` reports the memo's hits and misses beside the height cache's (I27's rule).
+
 ### Movement
 
 | Input | Effect |
@@ -440,6 +442,7 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 - **I27** — **`stats` reports the cache's hits and its misses by reason, and the reason is the axis the comparison rejected first.** `HeightCache.get`'s three-way test already distinguishes `absent`, `rev` and `width`; publishing which one rejected costs nothing and turns a size into a hit rate. The shape joins the three members `stats` already has: `hits: number` and `misses: Readonly<Record<"absent" | "rev" | "width" | "nothing-changed", number>>`. A size says how much is held; only a hit rate says whether holding it was worth anything (F863).
 - **I28** — **`nothing-changed` is a value comparison, never an axis.** A miss where no axis moved cannot occur — a slot agreeing on `rev` and `width` **is** a hit — so the counter is *the recomputed height equalled the height the miss discarded*, which is wasted work reporting itself. Counting it as a fourth axis would be a member that can never be non-zero (→ C28 I8).
 - **I29** — **The measure seam is told *whose* blocks these are.** `measureSequence` takes the entry's id beside the blocks and the width, as `chromeRows` already takes the entry itself — C14 reads neither and passes both, so this adds nothing C14 can be wrong about. What it buys is at the other end: block ids are unique within a document (C04 I14) and a transcript holds many, so a measurer handed only `(blocks, width)` cannot tell one entry's `table#t1` from another's. Measured — with the height cache warm the shell attributes every element from its own render loop and this path opens nothing; on a miss it opens the whole entry, and three unattributed calls in three frames on a four-entry fixture become every entry on a resize, which is the axis this component exists to make cheap (C28 I42, F892). **Optional, and the default is the shipped behaviour**: a caller that omits it measures exactly as before, so this is not a second way to measure.
+- **I30** — **`visible()` returns the same frozen range until the viewport moves, and every movement drops it at the clamp.** The memo is invalidated in `#setTop` and nowhere else, because every path that changes what is visible — a scroll, `#afterContent` after any content change, `resize` on either arm, `clear` — ends there (I2). A second call with nothing moved is the first call's object by identity; a call after a scroll, an append or a resize is a fresh one. `stats.visibleMemo` counts the hits and the misses. **Why** (F1198): the range was recomputed per question — a `locate`, a walk, an object per entry — and C23 asks the question per live part per sweep; 200 parts at 16 ms were twelve thousand computations a second, 585 ms of a six-second profile, for an answer that moves only with the viewport (→ I2, I9, I27, C23 I46).
 
 ---
 
@@ -472,6 +475,7 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 25. The cap applies to exactly the kinds that declare `window`; atomic kinds are outside it by the same absence, and a container's children are capped through the child seam (I26, §4b).
 25a. **A seam carries the identity of the thing it is asked about** (I29). `chromeRows` takes the entry and `measureSequence` takes its id; C14 reads neither, and a measurer that wants to attribute what it measured cannot recover the identity from the blocks.
 26. **A cache that publishes its size publishes its hit rate and its miss reasons** (I27, I28). The comparisons already happen; which one rejected is free, and the value comparison that says a miss was pointless costs one more. A size cannot say whether the cache is working.
+27. **A pure function of the component's own state is answered once per state** (I30, F1198). `visible()` is memoised at the one point every movement passes through, so a caller asking it per part per sweep pays the walk once per movement; the memo publishes its rate beside the height cache's.
 
 ---
 
@@ -483,6 +487,7 @@ Six tiers. Every cell of the §7 transition table is covered.
 
 - **T1.21** (I27): one `get` on an empty cache, one after a `set`, one after the `rev` moved and one after the width did → `hits` is 1 and `misses` is `{absent: 1, rev: 1, width: 1, "nothing-changed": 0}`. Each reason is asserted by name, not by a total, because a total is satisfied by redistribution.
 - **T1.22** (I28): a `rev` bump that recomputes the **same** height → `misses.rev` is 1 **and** `misses["nothing-changed"]` is 1; the same bump recomputing a different height leaves the second at 0. The two counters are not exclusive: the axis says what invalidated, the value comparison says whether it needed to.
+- **T1.23** (I30): two `visible()` calls with nothing moved → the same object by identity and `stats.visibleMemo` reads one miss, one hit; after `scrollBy(-1)`, after an `append` while following the tail, and after `resize` to a shorter region → a fresh object each time whose `topRow` and entries are the moved state's, and the miss count is four.
 
 Fake heights, no rendering.
 
@@ -590,6 +595,7 @@ Fake heights, no rendering.
 
 - **T2.15** (I29): a viewport whose injected `measureSequence` records its third argument → every call names the entry whose blocks it was given, and a run with two entries records two distinct ids. **Asserted on the ids and not on the arity**, because a parameter declared and never passed satisfies the type and is what a later reader deletes.
 - **T6.25** (I29): dropping the entry id from the `measureSequence` call → T2.15 fails, and C28's `byEntry` under-reports every entry by whatever the height cache missed — an undercount with no signal, which is worse than the absence it looks like.
+- **T6.26** (I30): moving the invalidation from `#setTop` into the scroll methods → **T1.23** fails at the append step — the range served after the append is the one before it, with the new entry absent and the old `topRow` — because a content change reaches the clamp through `#afterContent` and never through a scroll method. Dropping the memo write → T1.23 fails on identity at the second call. Anchor in `tools/mutate/runs/c14-visible-memo.mjs`.
 - **T6.24** (I28): counting `nothing-changed` as a fourth axis — a miss where none of the three moved — → T1.22 fails, and **the counter becomes one that can never be non-zero**, because a slot agreeing on `rev` and `width` is a hit. The revert to guard against is not a wrong number but a vacuous one, which reads as a healthy zero for ever.
 
 - **T6.1** (I4): recomputing `topRow` from an index rather than the anchor → T1.10 and T5.3 fail; the view jumps whenever a stream above it grows.
