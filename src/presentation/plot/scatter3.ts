@@ -1353,7 +1353,12 @@ export function plot3dArea(
   // the raster reads a vertex's projection back only under this stamp, so the
   // last camera's records are unreadable.
   const raster: RasterFrame = { stamp: scene.stamp, projected: 0 };
-  for (const t of scene.tris) {
+  // **An index loop, not `for…of`** (C12 I133): the triangles are frozen (I107)
+  // and V8's unallocating iteration holds for a plain packed array, not a frozen
+  // one — the statement built a result object per triangle.
+  const tris = scene.tris;
+  for (let ti = 0; ti < tris.length; ti += 1) { // cells-ok — a triangle index
+    const t = tris[ti] as Tri3;
     wire = t.skin.wire;
     const clipped = drawTri(t, scene.basis, grid, depth, lit, span, painter, raster);
     // **The clip path counted** (C12 I128): zero for a mesh in front of the camera.

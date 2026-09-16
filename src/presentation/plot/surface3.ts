@@ -27,6 +27,8 @@ import {
   dot,
   NEAR,
   project,
+  hypot2,
+  hypot3,
   sub,
   unit,
   unitOf,
@@ -759,10 +761,11 @@ function fill(
   }
   const wire = tri.skin.wire !== false && (e[0] || e[1] || e[2]);
   // **Scalars, not a `len` tuple and four closures** (C12 I128) — the same
-  // `Math.hypot`, `Math.min` and `Math.max` calls with the same arguments.
-  const len0 = Math.hypot(b.x - a.x, b.y - a.y);
-  const len1 = Math.hypot(c.x - b.x, c.y - b.y);
-  const len2 = Math.hypot(a.x - c.x, a.y - c.y);
+  // `hypot2`, `Math.min` and `Math.max` calls with the same arguments — the
+  // length is `Math.hypot`'s to the bit, without the builtin's array (C12 I133).
+  const len0 = hypot2(b.x - a.x, b.y - a.y);
+  const len1 = hypot2(c.x - b.x, c.y - b.y);
+  const len2 = hypot2(a.x - c.x, a.y - c.y);
   const x0 = Math.max(0, Math.floor(Math.min(a.x, b.x, c.x))); // cells-ok — a sample coordinate
   const x1 = Math.min(grid.width - 1, Math.floor(Math.max(a.x, b.x, c.x))); // cells-ok — a sample coordinate
   const y0 = Math.max(0, Math.floor(Math.min(a.y, b.y, c.y))); // cells-ok — a sample coordinate
@@ -956,7 +959,7 @@ function shadeAt(
   // **A zero-length normal survives as itself** (F456): `unit`'s rule — the
   // hypot, and the divide only when it is not zero — so `dot` is then `0`, the
   // face takes ambient and nothing divides by anything.
-  const len = Math.hypot(nx0, ny0, nz0);
+  const len = hypot3(nx0, ny0, nz0);
   const rx = len === 0 ? nx0 : nx0 / len;
   const ry = len === 0 ? ny0 : ny0 / len;
   const rz = len === 0 ? nz0 : nz0 / len;
@@ -979,7 +982,7 @@ function shadeAt(
   const ex = -vx;
   const ey = -vy;
   const ez = -vz;
-  const elen = Math.hypot(ex, ey, ez);
+  const elen = hypot3(ex, ey, ez);
   const tx = elen === 0 ? ex : ex / elen;
   const ty = elen === 0 ? ey : ey / elen;
   const tz = elen === 0 ? ez : ez / elen;

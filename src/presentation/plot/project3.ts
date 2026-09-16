@@ -175,6 +175,75 @@ export const cross = (a: Vec3, b: Vec3): Vec3 => ({
   z: a.x * b.y - a.y * b.x,
 });
 /**
+ * `Math.hypot`, without the builtin (C12 I133).
+ *
+ * V8's `MathHypot` is variadic and copies its arguments into a fresh double
+ * array on every call, and the raster called it twice per shaded sample and
+ * three times per face (F1172). These are the builtin's algorithm statement
+ * for statement — the largest magnitude found first over the absolute values,
+ * `Infinity` answered before `NaN` and `NaN` before the zero case, the squares
+ * of the values normalised by the largest Kahan-summed in argument order, the
+ * root scaled back — so the result is `Math.hypot`'s bit for bit, which T1.145
+ * holds over the extremes the early returns exist for. Unrolled rather than
+ * looped, because a loop over an arguments array is the allocation.
+ */
+export function hypot3(a: number, b: number, c: number): number {
+  const aa = Math.abs(a);
+  const ab = Math.abs(b);
+  const ac = Math.abs(c);
+  let max = 0;
+  if (aa > max) max = aa;
+  if (ab > max) max = ab;
+  if (ac > max) max = ac;
+  if (max === Infinity) return Infinity;
+  if (aa !== aa || ab !== ab || ac !== ac) return NaN;
+  if (max === 0) return 0;
+  let sum = 0;
+  let compensation = 0;
+  let n = aa / max;
+  let summand = n * n - compensation;
+  let preliminary = sum + summand;
+  compensation = preliminary - sum - summand;
+  sum = preliminary;
+  n = ab / max;
+  summand = n * n - compensation;
+  preliminary = sum + summand;
+  compensation = preliminary - sum - summand;
+  sum = preliminary;
+  n = ac / max;
+  summand = n * n - compensation;
+  preliminary = sum + summand;
+  compensation = preliminary - sum - summand;
+  sum = preliminary;
+  return Math.sqrt(sum) * max;
+}
+
+/** The two-argument form of `hypot3`, for the screen-space edge lengths (C12 I133). */
+export function hypot2(a: number, b: number): number {
+  const aa = Math.abs(a);
+  const ab = Math.abs(b);
+  let max = 0;
+  if (aa > max) max = aa;
+  if (ab > max) max = ab;
+  if (max === Infinity) return Infinity;
+  if (aa !== aa || ab !== ab) return NaN;
+  if (max === 0) return 0;
+  let sum = 0;
+  let compensation = 0;
+  let n = aa / max;
+  let summand = n * n - compensation;
+  let preliminary = sum + summand;
+  compensation = preliminary - sum - summand;
+  sum = preliminary;
+  n = ab / max;
+  summand = n * n - compensation;
+  preliminary = sum + summand;
+  compensation = preliminary - sum - summand;
+  sum = preliminary;
+  return Math.sqrt(sum) * max;
+}
+
+/**
  * A vector normalised, **and a zero-length one comes back unchanged rather than
  * as `NaN`** — which is `axis`'s rule one dimension up: the caller that produced
  * it is degenerate and the picture it draws is empty, not corrupt.
@@ -187,7 +256,7 @@ export const cross = (a: Vec3, b: Vec3): Vec3 => ({
  * already draws a collapsed set rather than dropping it.
  */
 export const unit = (a: Vec3): Vec3 => {
-  const n = Math.hypot(a.x, a.y, a.z);
+  const n = hypot3(a.x, a.y, a.z);
   return n === 0 ? a : { x: a.x / n, y: a.y / n, z: a.z / n };
 };
 

@@ -48,10 +48,9 @@ const results = await runPass({
     // Every triangle dropped. Ten of the eleven rows below read a rendered
     // surface or a refusal about one, so a pass in which no face can be drawn
     // cannot observe a kill.
-    // Anchored on the fast-path hoist that now precedes the loop (C10 I40), because
-    // `for (const t of scene.tris)` appears twice — the span pass and the fill.
-    from: "  for (const t of scene.tris) {\n    wire = t.skin.wire;",
-    to: "  for (const t of [] as typeof scene.tris) {\n    wire = t.skin.wire;",
+    // Anchored on the fill's index loop (C12 I133); the span pass has its own loop.
+    from: "  for (let ti = 0; ti < tris.length; ti += 1) { // cells-ok — a triangle index\n    const t = tris[ti] as Tri3;",
+    to: "  for (let ti = 0; ti < 0; ti += 1) { // cells-ok — a triangle index\n    const t = tris[ti] as Tri3;",
     why: "every row reads a drawn surface or a refusal about one; a pass where no face draws sees nothing",
   },
   mutations: [

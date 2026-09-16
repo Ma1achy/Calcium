@@ -14,7 +14,7 @@ import { backfaceCulled, drawTri, geometryOf, lightDirOf, surfacePoints, type Tr
 import type { RenderScratch } from "../../src/presentation/blocks/types.js";
 import { DARK_THEME, FULL_CAPS, measurable, registry } from "../support/render.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
-import { NEAR, dot, sub, viewDepth } from "../../src/presentation/plot/project3.js";
+import { NEAR, dot, hypot2, hypot3, sub, viewDepth } from "../../src/presentation/plot/project3.js";
 import { loadMesh } from "../support/obj.js";
 import {
   basisOf,
@@ -1031,7 +1031,76 @@ describe("C12 I132 — the painter writes an integer and the records are built o
     expect(eight.counts.get("plot3d.ink") ?? 0, "no packed records on the eight-bit arm").toBe(0);
     expect(eight.counts.get("plot3d.paint") ?? 0, "the writes are still counted").toBeGreaterThan(0);
   });
-  it.todo(
-    "T1.145 (C12 I133, F1172): hypot3 and hypot2 equal Math.hypot bit for bit over a seeded corpus with the extremes, the pure-extreme tuples enumerated — not deferred on a component: the code commit replaces this row",
-  );
+  it("T1.145 (C12 I133, F1172): hypot3 and hypot2 equal Math.hypot bit for bit over a seeded corpus of a million tuples in each arity drawn from a pool with the extremes, and over every pure-extreme tuple enumerated", () => {
+    // **The builtin is the reference and Object.is is the comparison**: `-0`
+    // and `NaN` are answers the early returns exist for, and `toBe` on
+    // numbers is `Object.is` — so a `0` for a `-0`, or a `NaN` for an
+    // `Infinity`, is a mismatch and not an agreement.
+    const EXTREMES = [0, -0, Number.MIN_VALUE, -Number.MIN_VALUE, 1e-308, -1e-308, 1e308, -1e308, Infinity, -Infinity, NaN];
+    // A magnitude anywhere in the exponent range, either sign — the corpus
+    // where Kahan's compensation and the normalisation by the largest are
+    // both load-bearing.
+    let seed = 0x5eed_c12_1;
+    const rand = (): number => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed / 0x100000000;
+    };
+    const draw = (): number => {
+      const r = rand();
+      if (r < 0.08) return EXTREMES[Math.floor(rand() * EXTREMES.length)] as number;
+      const mantissa = rand() * 2 - 1;
+      const exponent = Math.floor(rand() * 600) - 300;
+      return mantissa * 10 ** exponent;
+    };
+    // A plain loop that counts, and one assertion naming the first mismatch —
+    // a million `expect` calls is the harness's cost, not the row's.
+    let differ3 = 0; // tuples where the naive sum of squares is not the builtin — the fixture responding
+    let wrong3 = 0;
+    let first3 = "";
+    for (let i = 0; i < 1_000_000; i += 1) {
+      const a = draw();
+      const b = draw();
+      const c = draw();
+      const want = Math.hypot(a, b, c);
+      if (!Object.is(hypot3(a, b, c), want)) {
+        wrong3 += 1;
+        if (first3 === "") first3 = `hypot3(${String(a)}, ${String(b)}, ${String(c)}) = ${String(hypot3(a, b, c))}, builtin ${String(want)}`;
+      }
+      if (!Object.is(Math.sqrt(a * a + b * b + c * c), want)) differ3 += 1;
+    }
+    expect(wrong3, first3).toBe(0);
+    let differ2 = 0;
+    let wrong2 = 0;
+    let first2 = "";
+    for (let i = 0; i < 1_000_000; i += 1) {
+      const a = draw();
+      const b = draw();
+      const want = Math.hypot(a, b);
+      if (!Object.is(hypot2(a, b), want)) {
+        wrong2 += 1;
+        if (first2 === "") first2 = `hypot2(${String(a)}, ${String(b)}) = ${String(hypot2(a, b))}, builtin ${String(want)}`;
+      }
+      if (!Object.is(Math.sqrt(a * a + b * b), want)) differ2 += 1;
+    }
+    expect(wrong2, first2).toBe(0);
+    // The corpus is one the naive form gets wrong — otherwise the row would
+    // pass for any square root of a sum.
+    expect(differ3).toBeGreaterThan(100_000);
+    expect(differ2).toBeGreaterThan(100_000);
+    // **Every pure-extreme tuple**, so the order of the early returns is
+    // tested at each cell of the table and not where the sample happened to land.
+    for (const a of EXTREMES) {
+      for (const b of EXTREMES) {
+        expect(hypot2(a, b), `hypot2(${String(a)}, ${String(b)})`).toBe(Math.hypot(a, b));
+        for (const c of EXTREMES) {
+          expect(hypot3(a, b, c), `hypot3(${String(a)}, ${String(b)}, ${String(c)})`).toBe(Math.hypot(a, b, c));
+        }
+      }
+    }
+    // The named cells of T6.109: the builtin answers Infinity over NaN, and a
+    // finite answer at the top of the range where the naive sum overflows.
+    expect(hypot2(Infinity, NaN)).toBe(Infinity);
+    expect(hypot3(NaN, Infinity, 1)).toBe(Infinity);
+    expect(Number.isFinite(hypot3(1e308, 1e308, 1e308))).toBe(true);
+  });
 });
