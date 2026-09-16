@@ -1697,3 +1697,7 @@ describe("C12 I139 — the geometry is lanes", () => {
     expect(Array.from(built.lanes.stamps)).toEqual([0, 0, 0, 0]);
   });
 });
+
+describe("C12 I140 — the projection reads its lanes", () => {
+  it.todo("T1.152 (C12 I140, F1185): every lane holds three spare slots, a straddling triangle's two cuts land in them by the clip's own interpolation with their screen slots equal to project, and a triangle with no cut leaves them — not deferred on a component: the code commit replaces this row");
+});
