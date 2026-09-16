@@ -94,8 +94,8 @@ const results = await runPass({
       // declines — and GM4 is the row that says the blind spot is real.
       name: "the cull drops a face whose normal is exactly zero",
       file: SURFACE,
-      from: "  return (n.x * (cx - e.x) + n.y * (cy - e.y) + n.z * (cz - e.z)) * tri.skin.cull > 0;",
-      to: "  return (n.x * (cx - e.x) + n.y * (cy - e.y) + n.z * (cz - e.z)) * tri.skin.cull >= 0;",
+      from: "  return (nx * (cx - e.x) + ny * (cy - e.y) + nz * (cz - e.z)) * tri.skin.cull > 0;",
+      to: "  return (nx * (cx - e.x) + ny * (cy - e.y) + nz * (cz - e.z)) * tri.skin.cull >= 0;",
       expect: "GM4",
     },
     {
@@ -104,8 +104,8 @@ const results = await runPass({
       // camera, so GM3's 2 / 4 / 6 collapses.
       name: "the cull tests the view direction rather than the eye",
       file: SURFACE,
-      from: "  return (n.x * (cx - e.x) + n.y * (cy - e.y) + n.z * (cz - e.z)) * tri.skin.cull > 0;",
-      to: "  return (n.x * basis.forward.x + n.y * basis.forward.y + n.z * basis.forward.z) * tri.skin.cull > 0;",
+      from: "  return (nx * (cx - e.x) + ny * (cy - e.y) + nz * (cz - e.z)) * tri.skin.cull > 0;",
+      to: "  return (nx * basis.forward.x + ny * basis.forward.y + nz * basis.forward.z) * tri.skin.cull > 0;",
       expect: "GM3",
     },
     {
@@ -141,7 +141,7 @@ const results = await runPass({
       from: "export function backfaceCulled(tri: Tri3, basis: Basis): boolean {\n  if (tri.skin.cull === 0) return false;",
       to:
         "export function backfaceCulled(tri: Tri3, basis: Basis): boolean {\n" +
-        "  if (Math.hypot(tri.fn.x, tri.fn.y, tri.fn.z) < 1e-12) return true;\n" +
+        "  if (Math.hypot(faceNormalOf(tri).x, faceNormalOf(tri).y, faceNormalOf(tri).z) < 1e-12) return true;\n" +
         "  if (tri.skin.cull === 0) return false;",
       expect: "GM4",
     },

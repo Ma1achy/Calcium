@@ -20,7 +20,7 @@ import {
   basisOf, createDepth, cross, dot, extentOf, NEAR, project, sub, unit, unitOf, viewDir, writeDepth, type Vec3,
 } from "../../src/presentation/plot/project3.js";
 import {
-  backfaceCulled, cornerAt, cornersOf, densityGlyphOf, densitySteps, drawTri, edgeIntensity, geometryFrom, hiddenThin, lightDirOf,
+  backfaceCulled, cornerAt, cornersOf, densityGlyphOf, densitySteps, drawTri, edgeIntensity, faceNormalOf, geometryFrom, hiddenThin, lightDirOf,
   placeScreen, screenAt, shade, geometryOf, surfacePoints, type Lanes, type Tri3,
 } from "../../src/presentation/plot/surface3.js";
 import { ladderFor } from "../../src/presentation/plot/ramp.js";
@@ -868,7 +868,7 @@ describe("plot — the surface carrier", () => {
     // 3's ruling instead of row 1's and reports 92.7% at every distance. This
     // row is about the *direction* alone, so the sign is held fixed.
     const byConstant = (t: Tri3, basis: ReturnType<typeof basisOf>): boolean =>
-      viewDir(basis, t.fn).z * t.skin.cull > 0;
+      viewDir(basis, faceNormalOf(t)).z * t.skin.cull > 0;
     const at = (distance: number): { dis: number; kept: number; keptConst: number } => {
       const basis = basisOf({ distance }, 2);
       let dis = 0;
@@ -926,8 +926,9 @@ describe("plot — the surface carrier", () => {
         y: (a.p.y + b.p.y + c3.p.y) / 3,
         z: (a.p.z + b.p.z + c3.p.z) / 3,
       };
-      return !(t.fn.x * (c.x - basis.eye.x) + t.fn.y * (c.y - basis.eye.y)
-        + t.fn.z * (c.z - basis.eye.z) > 0);
+      const fn = faceNormalOf(t);
+      return !(fn.x * (c.x - basis.eye.x) + fn.y * (c.y - basis.eye.y)
+        + fn.z * (c.z - basis.eye.z) > 0);
     });
     const agree = naive.filter((v, i) => v === ka[i]).length; // cells-ok — a face count
     expect(agree / ka.length, "trusting the winding draws the other hemisphere").toBeLessThan(0.15);
@@ -1398,7 +1399,7 @@ describe("C12 I137 — the builder's normals live in two lanes", () => {
     return { tris, corners };
   };
   /** A lane triangle in the reference's shape — its three corners read back through `cornersOf` (C12 I139). */
-  const objectForm = (t: Tri3): RefTri => { const [a, b, c] = cornersOf(t); return { a, b, c, fn: t.fn, edges: t.edges, series: t.series, skin: t.skin }; };
+  const objectForm = (t: Tri3): RefTri => { const [a, b, c] = cornersOf(t); return { a, b, c, fn: faceNormalOf(t), edges: t.edges, series: t.series, skin: t.skin }; };
   const cornersForm = (L: Lanes): { p: Vec3; v: number | undefined }[] => Array.from({ length: L.count }, (_v, k) => { const c = cornerAt(L, k); return { p: c.p, v: c.v }; }); // cells-ok — a vertex count
   /** The first path where the two differ — `Object.is` on every number — or null; one assertion per surface, not one per number. */
   const firstDifference = (x: unknown, y: unknown, path: string): string | null => {
@@ -1460,7 +1461,7 @@ describe("C12 I137 — the builder's normals live in two lanes", () => {
       expect(sharingDiffers, `${name}: sharing`).toBeNull();
       if (sf.shading === "flat") expect(shared, `${name}: flat shares nothing`).toBe(0);
       else sharedSmooth += shared;
-      for (const t of got.tris) if (t.fn.x === 0 && t.fn.y === 0 && t.fn.z === 0) zeroNormals += 1;
+      for (const t of got.tris) { const fn = faceNormalOf(t); if (fn.x === 0 && fn.y === 0 && fn.z === 0) zeroNormals += 1; }
     }
     expect(sharedSmooth, "smooth meshes share records").toBeGreaterThan(100000);
     expect(zeroNormals, "the degenerate faces have the zero normal, kept").toBe(2);
@@ -1803,5 +1804,84 @@ describe("C12 I140 — the projection reads its lanes", () => {
 });
 
 describe("C12 I141 — the cull reads two face lanes", () => {
-  it.todo("T1.153 (C12 I141, F1186): every face's centroid and unit-normal lanes equal the cull's expression and the reference over the position and sum lanes, faceNormalOf reads the lane, and backfaceCulled equals the allocating form — not deferred on a component: the code commit replaces this row");
+  type Sf = Parameters<typeof geometryOf>[0];
+  const lcg = (seed: number): (() => number) => { let x = seed >>> 0; return () => { x = (Math.imul(x, 1664525) + 1013904223) >>> 0; return x / 4294967296; }; };
+  it("T1.153 (C12 I141, F1186): over the three meshes and seeded grids under both shadings every face's centroid lane is (P[a] + P[b] + P[c]) / 3 over the position lane and its normal lane is unit over cross(b − a, c − a) by Object.is, faceNormalOf reads that lane, a flat raster vertex's normal is its face's entry; backfaceCulled equals the allocating form on ten thousand seeded triangles under both signs, and the bunny keeps 30,747 faces under the profile camera", () => {
+    const rand = lcg(0x5eed_c12_141);
+    const surfaces: [string, Sf][] = [];
+    for (const name of ["suzanne", "teapot", "stanford-bunny"] as const) {
+      const m = loadMesh(name);
+      for (const shading of ["smooth", "flat"] as const) surfaces.push([`${name} ${shading}`, { vertices: m.vertices, faces: m.faces, closed: true, shading } as Sf]);
+    }
+    for (let g = 0; g < 4; g += 1) {
+      const rows = 2 + Math.floor(rand() * 7); const cols = 2 + Math.floor(rand() * 9);
+      const heights = Array.from({ length: rows }, () => Array.from({ length: cols }, () => (rand() - 0.5) * 4));
+      surfaces.push([`grid ${g} smooth`, { heights, shading: "smooth" } as Sf], [`grid ${g} flat`, { heights, shading: "flat" } as Sf]);
+    }
+    let faces = 0;
+    for (const [name, sf] of surfaces) {
+      const G = geometryOf(sf, extentOf(surfacePoints(sf)), 1);
+      const L = G.lanes;
+      const P = L.pos;
+      expect(L.cen.length, `${name}: three doubles a face`).toBe(G.tris.length * 3); // cells-ok — a lane length
+      expect(L.fnrm.length, `${name}: three doubles a face`).toBe(G.tris.length * 3); // cells-ok — a lane length
+      let wrong: string | null = null;
+      for (const t of G.tris) {
+        const o = t.f * 3;
+        const a = (L.idx[o] as number) * 3; const b = (L.idx[o + 1] as number) * 3; const c = (L.idx[o + 2] as number) * 3;
+        // **The centroid lane is the cull's expression over the position lane.**
+        const want = [
+          ((P[a] as number) + (P[b] as number) + (P[c] as number)) / 3,
+          ((P[a + 1] as number) + (P[b + 1] as number) + (P[c + 1] as number)) / 3,
+          ((P[a + 2] as number) + (P[b + 2] as number) + (P[c + 2] as number)) / 3,
+        ];
+        for (let m = 0; m < 3; m += 1) if (!Object.is(L.cen[o + m], want[m])) { wrong = `${name} face ${String(t.f)}: centroid[${String(m)}] ${String(L.cen[o + m])} vs ${String(want[m])}`; break; } // cells-ok — a component index
+        if (wrong !== null) break;
+        // **The normal lane is `unit` over the face's cross product**, as T1.149's reference has it.
+        const [ca, cb, cc] = cornersOf(t);
+        const n = unit(cross(sub(cb.p, ca.p), sub(cc.p, ca.p)));
+        const got = faceNormalOf(t);
+        if (!Object.is(got.x, n.x) || !Object.is(got.y, n.y) || !Object.is(got.z, n.z)) { wrong = `${name} face ${String(t.f)}: normal ${JSON.stringify(got)} vs ${JSON.stringify(n)}`; break; }
+        if (!Object.is(L.fnrm[o], got.x) || !Object.is(L.fnrm[o + 1], got.y) || !Object.is(L.fnrm[o + 2], got.z)) { wrong = `${name} face ${String(t.f)}: faceNormalOf is not the lane`; break; }
+        // **A flat raster vertex's normal is its face's entry.**
+        if (sf.shading === "flat") {
+          for (const w of [ca, cb, cc]) if (!Object.is(w.n.x, got.x) || !Object.is(w.n.y, got.y) || !Object.is(w.n.z, got.z)) { wrong = `${name} face ${String(t.f)}: a flat vertex normal is not the face's`; break; }
+          if (wrong !== null) break;
+        }
+        faces += 1;
+      }
+      expect(wrong, `${name}`).toBeNull();
+    }
+    expect(faces, "a corpus, not a sample").toBeGreaterThan(150_000); // cells-ok — a face count
+    // **The cull against its allocating form**, both signs, normals of their own.
+    const basis = basisOf({ azimuth: 0.7, elevation: 0.4, distance: 3 }, 160 / 88);
+    const r = lcg(1141);
+    const reference = (t: Tri3): boolean => {
+      if (t.skin.cull === 0) return false;
+      const [a, b, c3] = cornersOf(t);
+      const c = { x: (a.p.x + b.p.x + c3.p.x) / 3, y: (a.p.y + b.p.y + c3.p.y) / 3, z: (a.p.z + b.p.z + c3.p.z) / 3 };
+      return dot(faceNormalOf(t), sub(c, basis.eye)) * t.skin.cull > 0;
+    };
+    const vert = () => ({ p: { x: r() * 4 - 2, y: r() * 4 - 2, z: r() * 4 - 2 }, n: { x: 0, y: 0, z: 1 }, v: undefined });
+    const seen = { culled: 0, kept: 0 };
+    for (let i = 0; i < 10_000; i += 1) { // cells-ok — a corpus index
+      const cull = r() < 0.5 ? 1 : -1;
+      const fn = { x: r() * 2 - 1, y: r() * 2 - 1, z: r() * 2 - 1 };
+      const tri = geometryFrom([vert(), vert(), vert()], [[0, 1, 2]], { fn: [fn], skin: { cull, wire: false } }).tris[0] as Tri3;
+      expect(faceNormalOf(tri), `triangle ${String(i)}: the given normal is the lane's`).toEqual(fn);
+      const ours = backfaceCulled(tri, basis);
+      if (ours !== reference(tri)) throw new Error(`triangle ${String(i)}: cull ${String(ours)} vs reference ${String(!ours)}`);
+      if (ours) seen.culled += 1; else seen.kept += 1;
+    }
+    expect(seen.culled, "the corpus holds culled faces").toBeGreaterThan(1000);
+    expect(seen.kept, "and kept ones").toBeGreaterThan(1000);
+    // **The bunny under the profile camera keeps what the object form kept** (F1186's probe).
+    const bunny = loadMesh("stanford-bunny");
+    const sf = { vertices: bunny.vertices, faces: bunny.faces, closed: true, shading: "smooth" } as Sf;
+    const G = geometryOf(sf, extentOf(surfacePoints(sf)), 0);
+    const profile = basisOf({ azimuth: 2.2, elevation: 0.25, distance: 5 }, 160 / 88);
+    let kept = 0;
+    for (const t of G.tris) if (!backfaceCulled(t, profile)) kept += 1;
+    expect(kept, "kept faces").toBe(30_747); // cells-ok — a face count
+  });
 });

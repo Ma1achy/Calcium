@@ -21,6 +21,7 @@ import { basisOf, extentOf, project } from "../../src/presentation/plot/project3
 import {
   backfaceCulled,
   cornersOf,
+  faceNormalOf,
   geometryOf,
   surfacePoints,
   type Tri3,
@@ -227,7 +228,7 @@ const tris = (s: Record<string, unknown>): readonly Tri3[] => {
   const surf = s as unknown as Parameters<typeof geometryOf>[0];
   return geometryOf(surf, extentOf(surfacePoints(surf)), 0).tris;
 };
-const zeroNormal = (t: Tri3): boolean => Math.hypot(t.fn.x, t.fn.y, t.fn.z) < 1e-12;
+const zeroNormal = (t: Tri3): boolean => { const n = faceNormalOf(t); return Math.hypot(n.x, n.y, n.z) < 1e-12; };
 const kept = (s: Record<string, unknown>, camera: Record<string, number>): number => {
   const basis = basisOf(camera as never, WIDTH / 28);
   let n = 0; // cells-ok — a face count
@@ -250,7 +251,7 @@ describe("plot — the geometry suite", () => {
       expect(ts.length, `${axis}=0 face count`).toBe(72);
       expect(ts.filter(zeroNormal).length, `${axis}=0 has no zero normal`).toBe(0);
       const [ex, ey, ez] = expected[axis] as readonly [number, number, number];
-      const n = ts[0]?.fn as { x: number; y: number; z: number };
+      const n = faceNormalOf(ts[0] as Tri3);
       const len = Math.hypot(n.x, n.y, n.z);
       expect(n.x / len, `${axis}=0 normal x`).toBeCloseTo(ex, 6);
       expect(n.y / len, `${axis}=0 normal y`).toBeCloseTo(ey, 6);

@@ -1,4 +1,4 @@
-// C12 I139 and I140 — the geometry is lanes: position, normal and value lanes per
+// C12 I139, I140 and I141 — the geometry is lanes: position, normal and value lanes per
 // raster vertex, an index lane per face, an eight-double screen slot under a
 // stamp lane with the negation marking a refused vertex and three spare slots
 // for the clip path's cuts. Mutated (T6.115, F1184).
@@ -87,8 +87,8 @@ const results = runPass({
       // sum of unit normals and the allocating form disagrees.
       name: "CULL-FROM-NORMALS: the centroid is read from the normal lane",
       file: SF,
-      from: "  const L = tri.lanes;\n  const P = L.pos;\n  const o = tri.f * 3;",
-      to: "  const L = tri.lanes;\n  const P = L.nrm;\n  const o = tri.f * 3;",
+      from: "  const L = tri.lanes;\n  const C = L.cen;\n  const N = L.fnrm;",
+      to: "  const L = tri.lanes;\n  const C = L.nrm;\n  const N = L.fnrm;",
       expect: "T1.143",
     },
     // --- C12 I140, the projection reads its lanes (T6.116, F1185) ---------
@@ -118,6 +118,35 @@ const results = runPass({
       from: "    pos: new Float64Array((count + SPARE) * 3), // cells-ok — a vertex count",
       to: "    pos: new Float64Array(count * 3), // cells-ok — a vertex count",
       expect: "T1.152",
+    },
+    // --- C12 I141, the cull reads two face lanes (T6.117, F1186) ----------
+    {
+      name: "CENTROID-UNDIVIDED: the centroid lane holds the sum",
+      file: SF,
+      from: "  lanes.cen[o] = ((P[a] as number) + (P[b] as number) + (P[c] as number)) / 3;",
+      to: "  lanes.cen[o] = ((P[a] as number) + (P[b] as number) + (P[c] as number));",
+      expect: "T1.153",
+    },
+    {
+      name: "NORMAL-UNNORMALISED: the normal lane holds the sum lane",
+      file: SF,
+      from: "    fnrm[o] = fn.x;\n    fnrm[o + 1] = fn.y;\n    fnrm[o + 2] = fn.z;",
+      to: "    fnrm[o] = faceN[o] as number;\n    fnrm[o + 1] = faceN[o + 1] as number;\n    fnrm[o + 2] = faceN[o + 2] as number;",
+      expect: "T1.153",
+    },
+    {
+      name: "CULL-CENTROID-FROM-NORMALS: the cull reads the normal lane for the centroid",
+      file: SF,
+      from: "  const cx = C[o] as number;\n  const cy = C[o + 1] as number;\n  const cz = C[o + 2] as number;",
+      to: "  const cx = N[o] as number;\n  const cy = N[o + 1] as number;\n  const cz = N[o + 2] as number;",
+      expect: "T1.153",
+    },
+    {
+      name: "FLAT-FROM-SUM: a flat vertex normal is the unnormalised face sum",
+      file: SF,
+      from: "        nrm[q] = fnrm[o] as number;\n        nrm[q + 1] = fnrm[o + 1] as number;\n        nrm[q + 2] = fnrm[o + 2] as number;",
+      to: "        nrm[q] = faceN[o] as number;\n        nrm[q + 1] = faceN[o + 1] as number;\n        nrm[q + 2] = faceN[o + 2] as number;",
+      expect: "T1.149",
     },
   ],
 });

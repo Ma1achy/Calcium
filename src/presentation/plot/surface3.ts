@@ -65,7 +65,9 @@ export type Corner = Readonly<{ p: Vec3; n: Vec3; v: number | undefined }>;
  * `stamps` (C12 I130). Every lane but `idx` and `stamps` carries `SPARE`
  * slots past the last vertex for the clip path's cut vertices (C12 I140): a
  * cut is written into them and projected as a vertex is, so no double crosses
- * the projection's call (F1185).
+ * the projection's call (F1185). `cen` and `fnrm` are the face lanes (C12
+ * I141): a face's centroid by the cull's own expression and its unit normal,
+ * three doubles a face, read by the cull in face order (F1186).
  */
 export type Lanes = Readonly<{
   count: number;
@@ -75,6 +77,8 @@ export type Lanes = Readonly<{
   idx: Uint32Array;
   screen: Float64Array;
   stamps: Int32Array;
+  cen: Float64Array;
+  fnrm: Float64Array;
 }>;
 
 export type RasterFrame = { readonly stamp: number; projected: number };
@@ -87,7 +91,6 @@ export type Skin = Readonly<{ cull: 0 | 1 | -1; wire: boolean | "over" }>;
 export type Tri3 = Readonly<{
   f: number;
   lanes: Lanes;
-  fn: Vec3;
   edges: readonly [boolean, boolean, boolean];
   series: number;
   skin: Skin;
@@ -116,12 +119,21 @@ function makeLanes(count: number, faces: number): Lanes {
     idx: new Uint32Array(faces * 3), // cells-ok — a face count
     screen: new Float64Array((count + SPARE) * S_STRIDE), // cells-ok — a vertex count
     stamps: new Int32Array(count), // cells-ok — a vertex count
+    cen: new Float64Array(faces * 3), // cells-ok — a face count
+    fnrm: new Float64Array(faces * 3), // cells-ok — a face count
   };
 }
 
 /** A raster vertex's value — a cut's sits in the lane's spare slots (C12 I139, I140). */
 function valueAt(L: Lanes, k: number): number | undefined {
   return L.value[k];
+}
+
+/** A face's unit normal read back from its lane — for rows, not the raster (C12 I141). */
+export function faceNormalOf(tri: Tri3): Vec3 {
+  const N = tri.lanes.fnrm;
+  const o = tri.f * 3;
+  return { x: N[o] as number, y: N[o + 1] as number, z: N[o + 2] as number };
 }
 
 /** A raster vertex read back as a record — for rows and the clip path, not the raster (C12 I139). */
@@ -181,6 +193,22 @@ export function placeScreen(
 }
 
 /**
+ * A face's centroid into its lane, by the cull's own expression over the
+ * position lane (C12 I141): the same three sums and divisions the cull made
+ * per frame, made once.
+ */
+function writeCentroid(lanes: Lanes, f: number): void {
+  const P = lanes.pos;
+  const o = f * 3;
+  const a = (lanes.idx[o] as number) * 3;
+  const b = (lanes.idx[o + 1] as number) * 3;
+  const c = (lanes.idx[o + 2] as number) * 3;
+  lanes.cen[o] = ((P[a] as number) + (P[b] as number) + (P[c] as number)) / 3;
+  lanes.cen[o + 1] = ((P[a + 1] as number) + (P[b + 1] as number) + (P[c + 1] as number)) / 3;
+  lanes.cen[o + 2] = ((P[a + 2] as number) + (P[b + 2] as number) + (P[c + 2] as number)) / 3;
+}
+
+/**
  * A geometry from explicit corners and faces — the shape a row builds a
  * triangle in, with the normals it chooses (C12 I139). Every corner is a raster
  * vertex in order; a face normal not given is `unit(cross(b − a, c − a))`.
@@ -221,7 +249,11 @@ export function geometryFrom(
     const b = (corners[face[1]] as Corner).p;
     const c = (corners[face[2]] as Corner).p;
     const fn = shape.fn?.[f] ?? unit(cross(sub(b, a), sub(c, a)));
-    tris[f] = { f, lanes, fn, edges: shape.edges?.[f] ?? [true, true, true], series, skin };
+    lanes.fnrm[o] = fn.x;
+    lanes.fnrm[o + 1] = fn.y;
+    lanes.fnrm[o + 2] = fn.z;
+    writeCentroid(lanes, f);
+    tris[f] = { f, lanes, edges: shape.edges?.[f] ?? [true, true, true], series, skin };
   }
   return { tris, lanes, frame: 0 };
 }
@@ -506,14 +538,18 @@ export function geometryOf(s: Surface3, extent: Extent3, series: number): Geomet
   lanes.idx.set(idxLane);
   const pos = lanes.pos;
   const nrm = lanes.nrm;
+  const fnrm = lanes.fnrm;
   const value = lanes.value as (number | undefined)[];
   const written = new Uint8Array(n); // cells-ok — a vertex count
   const out: Tri3[] = new Array<Tri3>(faces);
   for (let f = 0; f < faces; f += 1) { // cells-ok — a face index
     const face = idx[f] as readonly [number, number, number];
     const o = f * 3;
-    // **The face normal, `unit` over the lane's three** (I137).
+    // **The face normal, `unit` over the lane's three, into the normal lane** (I137, I141).
     const fn = unit3(faceN[o] as number, faceN[o + 1] as number, faceN[o + 2] as number);
+    fnrm[o] = fn.x;
+    fnrm[o + 1] = fn.y;
+    fnrm[o + 2] = fn.z;
     for (let m = 0; m < 3; m += 1) { // cells-ok — a corner index
       const k = face[m] as number;
       const j = idxLane[o + m] as number;
@@ -525,9 +561,10 @@ export function geometryOf(s: Surface3, extent: Extent3, series: number): Geomet
       pos[q + 1] = p.y;
       pos[q + 2] = p.z;
       if (flat) {
-        nrm[q] = fn.x;
-        nrm[q + 1] = fn.y;
-        nrm[q + 2] = fn.z;
+        // **A flat raster vertex's normal is its face's lane entry** (I141).
+        nrm[q] = fnrm[o] as number;
+        nrm[q + 1] = fnrm[o + 1] as number;
+        nrm[q + 2] = fnrm[o + 2] as number;
       } else {
         // **The vertex normal, once per raster vertex**: `unit` over the sum lane (I137).
         const vq = k * 3;
@@ -538,7 +575,9 @@ export function geometryOf(s: Surface3, extent: Extent3, series: number): Geomet
       }
       value[j] = values[k];
     }
-    out[f] = { f, lanes, fn, edges: mask[f] as readonly [boolean, boolean, boolean], series, skin };
+    // **The centroid, once the face's corners are in the lane** (I141).
+    writeCentroid(lanes, f);
+    out[f] = { f, lanes, edges: mask[f] as readonly [boolean, boolean, boolean], series, skin };
   }
   return { tris: out, lanes, frame: 0 };
 }
@@ -833,22 +872,23 @@ function clipPath(
  */
 export function backfaceCulled(tri: Tri3, basis: Basis): boolean {
   if (tri.skin.cull === 0) return false;
-  // **Scalars, in the order the `Vec3` forms had them** (C12 I131, F1169), read
-  // from the position lane by the face's indices (I139): the centroid's
-  // components, its difference from the eye, `dot`'s sum — and nothing
-  // allocated, 69,451 times a bunny frame.
+  // **Six doubles in face order** (C12 I141, F1186): the centroid lane holds
+  // `(P[a] + P[b] + P[c]) / 3` per component as this function computed it
+  // 69,451 times a bunny frame through the index lane, and the normal lane
+  // holds `unit` over the face's sum — 0.9 → 0.3 ms a frame measured, the
+  // same doubles read from a lane the face owns.
   const L = tri.lanes;
-  const P = L.pos;
+  const C = L.cen;
+  const N = L.fnrm;
   const o = tri.f * 3;
-  const a = (L.idx[o] as number) * 3;
-  const b = (L.idx[o + 1] as number) * 3;
-  const c = (L.idx[o + 2] as number) * 3;
-  const cx = ((P[a] as number) + (P[b] as number) + (P[c] as number)) / 3;
-  const cy = ((P[a + 1] as number) + (P[b + 1] as number) + (P[c + 1] as number)) / 3;
-  const cz = ((P[a + 2] as number) + (P[b + 2] as number) + (P[c + 2] as number)) / 3;
+  const cx = C[o] as number;
+  const cy = C[o + 1] as number;
+  const cz = C[o + 2] as number;
   const e = basis.eye;
-  const n = tri.fn;
-  return (n.x * (cx - e.x) + n.y * (cy - e.y) + n.z * (cz - e.z)) * tri.skin.cull > 0;
+  const nx = N[o] as number;
+  const ny = N[o + 1] as number;
+  const nz = N[o + 2] as number;
+  return (nx * (cx - e.x) + ny * (cy - e.y) + nz * (cz - e.z)) * tri.skin.cull > 0;
 }
 
 /**

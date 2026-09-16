@@ -1859,6 +1859,13 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "Lanes.nrm":
     "C12 I139 — the unit-normal lane: read by the projection into the screen slot, and by " +
     "T1.149 through cornerAt. The shade reads the slot, never the lane",
+  "Lanes.cen":
+    "C12 I141 — the face-centroid lane, the cull's own expression made once; read by " +
+    "backfaceCulled alone and by T1.153 against that expression. A second reader would be " +
+    "a second cull (Skin.cull's argument)",
+  "Lanes.fnrm":
+    "C12 I141 — the unit face-normal lane: read by the cull, by the builder's flat arm, and " +
+    "by the rows through faceNormalOf",
 
   // --- published ahead of the value that makes it readable ------------------
   //
@@ -3525,6 +3532,9 @@ export const UNCONSUMED_FUNCTIONS = Object.freeze({
   geometryFrom:
     "C12 I139 — given corners laid out as lanes, one triangle without a mesh, for the rows " +
     "that used to write a Tri3 literal; geometryOf is the builder every renderer takes",
+  faceNormalOf:
+    "C12 I141 — a face's unit normal read back from its lane for the rows that hold the cull " +
+    "and the builder against a reference; the cull reads the lane by offset",
 
   // --- a refusal that runs at test time by design --------------------------
   hasEmojiForm:

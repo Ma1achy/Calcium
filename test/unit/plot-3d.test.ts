@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import { block, CAMERA_DEFAULT, NO_PROBE, type Plot, type Probe } from "../../src/data/viewmodel/index.js";
 import { plotDefinition } from "../../src/presentation/plot/definition.js";
-import { backfaceCulled, cornerAt, cornersOf, drawTri, geometryFrom, geometryOf, lightDirOf, screenAt, spanOverCorners, surfacePoints, type Lanes, type Tri3 } from "../../src/presentation/plot/surface3.js";
+import { backfaceCulled, cornerAt, cornersOf, drawTri, faceNormalOf, geometryFrom, geometryOf, lightDirOf, screenAt, spanOverCorners, surfacePoints, type Lanes, type Tri3 } from "../../src/presentation/plot/surface3.js";
 import type { RenderScratch } from "../../src/presentation/blocks/types.js";
 import { DARK_THEME, FULL_CAPS, measurable, registry } from "../support/render.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
@@ -935,7 +935,7 @@ describe("C12 I131 — the span's depth is project's first dot, and the cull all
       if (t.skin.cull === 0) return false;
       const [a, b, c3] = cornersOf(t);
       const c = { x: (a.p.x + b.p.x + c3.p.x) / 3, y: (a.p.y + b.p.y + c3.p.y) / 3, z: (a.p.z + b.p.z + c3.p.z) / 3 };
-      return dot(t.fn, sub(c, basis.eye)) * t.skin.cull > 0;
+      return dot(faceNormalOf(t), sub(c, basis.eye)) * t.skin.cull > 0;
     };
     const vert = () => ({ p: { x: r() * 4 - 2, y: r() * 4 - 2, z: r() * 4 - 2 }, n: { x: 0, y: 0, z: 1 }, v: undefined });
     const seen = { culled: 0, kept: 0 };

@@ -18,6 +18,7 @@ import { describe, expect, it } from "vitest";
 import { basisOf, createDepth, extentOf } from "../../src/presentation/plot/project3.js";
 import {
   backfaceCulled,
+  faceNormalOf,
   drawTri,
   lightDirOf,
   geometryOf,
@@ -190,7 +191,7 @@ describe("plot — the real meshes", () => {
       expect(e.boundary, `${name} is open`).toBe(boundary[name]);
 
       const ts = trisOf(surfaceOf(name, { closed: true }));
-      expect(ts.filter((t) => Math.hypot(t.fn.x, t.fn.y, t.fn.z) < 1e-12).length, `${name} degenerate`).toBe(0);
+      expect(ts.filter((t) => { const n = faceNormalOf(t); return Math.hypot(n.x, n.y, n.z) < 1e-12; }).length, `${name} degenerate`).toBe(0);
       // And the orientation the volume gives, which is what `closed` reads.
       expect(ts[0]?.skin.cull, `${name} is oriented outward`).toBe(1);
     }
