@@ -30,6 +30,10 @@
     "./mermaid": {
       "types": "./dist/mermaid.d.ts",
       "default": "./dist/mermaid.js"
+    },
+    "./launch": {
+      "types": "./dist/launch.d.ts",
+      "default": "./dist/launch.js"
     }
   },
   "repository": {

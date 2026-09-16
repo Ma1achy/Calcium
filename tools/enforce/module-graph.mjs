@@ -3451,6 +3451,19 @@ export function checkExportedArguments(files, readFile = (f) => readFileSync(f, 
 
 /** Functions whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_FUNCTIONS = Object.freeze({
+  // **`prepareLaunch` cannot have a caller in `src/`, by construction** (C24
+  // I37). It installs loader hooks that must be in place before the loader
+  // reads Ink's import line, and a static import of the runtime barrel hoists
+  // past anything in the same module — so the call lives in a launcher, before
+  // its dynamic import of the app (R01 R4.7), which is outside this graph. Its
+  // consumers are `examples/docker/bin/docker-tui.js` and
+  // `examples/plots/bin/plots-tui.js`; T5.7 and both R4.7 rows are what
+  // exercise it. The day a caller inside `src/` appears, that caller is wrong
+  // for the same reason this entry exists.
+  prepareLaunch:
+    "C24 I37 · R01 R4.7 — the launch entry's one export, called by a launcher before it "
+    + "imports the app because a static import hoists past a hook installed beside it; "
+    + "no caller in src/ can be early enough (F1192)",
   // **`shadeRgb` is the reference the packed form is held against** (C10 I42).
   // The painter took `shadePacked` (C12 I132) and `shadeColour` deliberately
   // stays on `overChannels`, so the tuple form has no caller in `src/` — and

@@ -33,6 +33,11 @@ import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 
 const run = promisify(execFile);
+const COUNTING_HOOK = "data:text/javascript," + encodeURIComponent(
+  'import { registerHooks } from "node:module"; import { writeFileSync } from "node:fs";' +
+  'let n = 0; registerHooks({ resolve(s, c, next) { const r = next(s, c); if (r.url.includes("/es-toolkit/")) n += 1; return r; } });' +
+  'process.on("exit", () => writeFileSync(process.env.LAUNCH_COUNT_OUT, String(n)));',
+);
 
 const root = new URL("../", import.meta.url);
 const pkg = JSON.parse(readFileSync(new URL("package.json", root), "utf8")) as {
@@ -107,6 +112,24 @@ describe("F56: the bin is a claim about an executable", () => {
     expect(stdout).toContain("needs a terminal");
   }, 40_000);
 
+  it("R01 R4.7 (C24 I37, F1192): spawned under a counting resolve hook, the launcher resolves fewer than ten es-toolkit modules — the barrel Ink imports one name from is over a thousand", async () => {
+    // **The count, not the source** (R5.9). The hook registers first, so it
+    // is innermost and sees every resolution the launcher's own hook lets
+    // through: three or so as shipped, and the whole barrel with the call
+    // removed or moved below the app import.
+    const tmp = mkdtempSync(join(tmpdir(), "docker-tui-launch-"));
+    try {
+      const out = join(tmp, "count.txt");
+      const env: Record<string, string> = { ...(process.env as Record<string, string>), LAUNCH_COUNT_OUT: out };
+      const { stdout } = await run(process.execPath, ["--import", COUNTING_HOOK, binPath], { env, timeout: 30_000 });
+      expect(stdout, "the launcher ran to the no-TTY branch").toContain("needs a terminal");
+      const count = Number(readFileSync(out, "utf8"));
+      expect(count, "es-toolkit resolutions in the launcher's process").toBeGreaterThan(0);
+      expect(count).toBeLessThan(10);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  }, 40_000);
   it("R4.6: spawned with a fresh TMPDIR and no NODE_COMPILE_CACHE, the launcher leaves compile-cache files under it", async () => {
     // **The artefact, not the source.** `enableCompileCache()` with no argument
     // writes under the platform's temporary directory, which `TMPDIR` names on

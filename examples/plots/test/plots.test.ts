@@ -33,6 +33,11 @@ import { manifest } from "../src/manifest.ts";
 
 const run = promisify(execFile);
 const here = (p: string): string => new URL(p, import.meta.url).pathname;
+const COUNTING_HOOK = "data:text/javascript," + encodeURIComponent(
+  'import { registerHooks } from "node:module"; import { writeFileSync } from "node:fs";' +
+  'let n = 0; registerHooks({ resolve(s, c, next) { const r = next(s, c); if (r.url.includes("/es-toolkit/")) n += 1; return r; } });' +
+  'process.on("exit", () => writeFileSync(process.env.LAUNCH_COUNT_OUT, String(n)));',
+);
 
 /** What `T-doc8` reads off a live part — `LivePart.spec`'s three relevant members. */
 type LiveSpec = Readonly<{
@@ -42,6 +47,24 @@ type LiveSpec = Readonly<{
 }>;
 
 describe("the plot demo", () => {
+  it("R01 R4.7 (C24 I37, F1192): spawned under a counting resolve hook, the launcher resolves fewer than ten es-toolkit modules — the barrel Ink imports one name from is over a thousand", async () => {
+    // **The count, not the source** (R5.9). The hook registers first, so it
+    // is innermost and sees every resolution the launcher's own hook lets
+    // through: three or so as shipped, and the whole barrel with the call
+    // removed or moved below the app import.
+    const tmp = mkdtempSync(join(tmpdir(), "plots-tui-launch-"));
+    try {
+      const out = join(tmp, "count.txt");
+      const env: Record<string, string> = { ...(process.env as Record<string, string>), LAUNCH_COUNT_OUT: out };
+      const { stdout } = await run(process.execPath, ["--import", COUNTING_HOOK, here("../bin/plots-tui.js")], { env, timeout: 30_000 });
+      expect(stdout, "the launcher ran to the no-TTY branch").toContain("plots-tui");
+      const count = Number(readFileSync(out, "utf8"));
+      expect(count, "es-toolkit resolutions in the launcher's process").toBeGreaterThan(0);
+      expect(count).toBeLessThan(10);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  }, 40_000);
   it("R01 R4.6, by the same rule: spawned with a fresh TMPDIR and no NODE_COMPILE_CACHE, plots-tui leaves compile-cache files under it", async () => {
     // The artefact rather than the source, as `docker-tui`'s row reads it:
     // a fresh TMPDIR starts empty and the outside variable is removed, so the

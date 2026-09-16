@@ -18,7 +18,42 @@ import { FULL_CAPS } from "../support/render.js";
 const execFileP = promisify(execFile);
 
 describe("C24 I37 — prepareLaunch narrows Ink's es-toolkit import to one module", () => {
-  it.todo("T5.7 (C24 I37, F1192): a child under the import trace calling prepareLaunch() then importing dist/index.js lists under ten es-toolkit modules and none of the barrel's re-exports, the same child without the call over a thousand, and the armed child renders a block through the registry; exports[\"./launch\"] resolves to ./dist/launch.js — not deferred on a component: the code commit replaces this row");
+  it("T5.7 (C24 I37, F1192): a child under the import trace calling prepareLaunch() then importing dist/index.js lists under ten es-toolkit modules and none of the barrel's re-exports, the same child without the call over a thousand, and the armed child renders a block through Ink; exports[\"./launch\"] resolves to ./dist/launch.js", async () => {
+    // **Both arms in one row.** The plain child is the fabricated violation
+    // — a consumer who never called it — and it is what shows the trace sees
+    // the barrel at all; a small armed count with no large plain count would
+    // be an instrument that lists nothing.
+    const here = new URL("../support/", import.meta.url);
+    const dir = mkdtempSync(join(tmpdir(), "launch-graph-"));
+    const child = async (mode: "armed" | "plain"): Promise<string[]> => {
+      const out = join(dir, `${mode}.jsonl`);
+      await execFileP(process.execPath, [
+        "--import", fileURLToPath(new URL("import-trace.mjs", here)),
+        fileURLToPath(new URL("launch-graph-child.mjs", here)),
+        out, mode,
+      ], { timeout: 60_000 });
+      return readFileSync(out, "utf8").split("\n").filter((l) => l.startsWith("{"));
+    };
+    try {
+      const [armed, plain] = await Promise.all([child("armed"), child("plain")]);
+      const armedGraph = JSON.parse(armed[0] ?? "{}") as { status?: string; esToolkit?: string[] };
+      const plainGraph = JSON.parse(plain[0] ?? "{}") as { status?: string; esToolkit?: string[] };
+      const rendered = JSON.parse(armed[1] ?? "{}") as { rendered?: string };
+      expect(armedGraph.status, "the hooks were installed on this Node").toBe("hooked");
+      expect(plainGraph.status).toBe("not called");
+      const plainCount = (plainGraph.esToolkit ?? []).length; // cells-ok
+      const armedCount = (armedGraph.esToolkit ?? []).length; // cells-ok
+      expect(plainCount, "the barrel, unnarrowed, is over a thousand modules").toBeGreaterThan(1000);
+      expect(armedCount, `armed: ${(armedGraph.esToolkit ?? []).join(", ")}`).toBeLessThan(10);
+      expect(armedGraph.esToolkit ?? [], "none of the barrel's re-exports").not.toContainEqual(expect.stringContaining("/compat/array/chunk.mjs"));
+      expect(plainGraph.esToolkit ?? [], "the plain child does list them").toContainEqual(expect.stringContaining("/compat/array/chunk.mjs"));
+      expect(rendered.rendered, "Ink ran with the redirected throttle").toContain("armed");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    const pkg = JSON.parse(readFileSync(fileURLToPath(new URL("../../package.json", import.meta.url)), "utf8")) as { exports: Record<string, { types: string; default: string }> };
+    expect(pkg.exports["./launch"]).toEqual({ types: "./dist/launch.d.ts", default: "./dist/launch.js" });
+  }, 120_000);
 });
 
 describe("C24 I36 — the Mermaid renderer is off the runtime barrel's graph", () => {

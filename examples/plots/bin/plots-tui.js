@@ -46,4 +46,13 @@ process.env.NODE_ENV ??= "production";
  * cache is worse than a slow one.
  */
 (await import("node:module")).enableCompileCache();
+/**
+ * **The renderer's graph, narrowed before the app imports it** (R01 R4.7, C24
+ * I37, F1192). Ink imports one name from a barrel of thirteen hundred modules;
+ * `prepareLaunch()` hands it the one file instead, exactly or not at all. Here
+ * and not in the app for the compile cache's reason: a static import hoists
+ * past anything in the same module, so the hook must be installed by the
+ * launcher, before the dynamic import below.
+ */
+(await import("@fmx/calcium/launch")).prepareLaunch();
 await import("../main.ts");
