@@ -53588,6 +53588,17 @@ seconds, against a figure that read 10.8, 10.7 and 10.8 on three prior runs. 458
 no movers; `c09-rows-arm` catches 14 with none surviving, three of its anchors re-pointed at
 the sites that still carry their rules.
 
+**The cut is not a regression, and the scatter that prompted the doubt is the host.** Six clean
+runs after it read `stream` 42.65–58.28 and `live:line` 47.96–56.43 where the same commands had
+read 58–60 earlier, which is the shape of a change that traded rate for allocation. Checked
+paired against a tree built without the cut and differing in nothing else, five rounds of twenty
+seconds a side: `stream` **59.1 → 59.8**, `live:line` **59.4 → 59.4**, work p50 1.10 → 1.07 and
+2.21 → 2.14. **The baseline scatters the same way** — single runs of 50.7 and 51.1 on the side
+without the cut — so the spread is contention on both arms rather than anything the normaliser
+did. The first attempt at this check measured nothing: its baseline runner carried a second
+unrewritten relative import and every baseline row came back empty, which reads identically to a
+run that produced no frames.
+
 **And the ceiling is arithmetic, which is why this is a campaign and not a cut.** A pause
 longer than one frame costs frames that cannot be repaid: repaying them means drawing above
 sixty, which A02 §7 forbids. One 57 ms collection in a 25-second window caps the run at
