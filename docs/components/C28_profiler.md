@@ -117,7 +117,7 @@ export type Histogram = Readonly<{
 }>;
 
 export type MissReason =
-  | "absent" | "rev" | "width" | "theme" | "focus" | "range" | "evicted" | "nothing-changed";
+  | "absent" | "rev" | "width" | "theme" | "focus" | "tick" | "range" | "evicted" | "nothing-changed";
 
 export type GcKind = "minor" | "major" | "incremental" | "weakcb";
 
@@ -453,7 +453,7 @@ recomputes nothing.
 | `a periodic stall` | is something beating against the frame window | `autocorrelation` | a 100 ms timer against a 33 ms window is a peak at lag 3, and nothing else in C12 finds it |
 | `coalescing` | C03's value proposition | `funnel` | commits → coalesced → frames |
 | `by reason` | p50 and p95 per `CommitReason` | `dotplot` | |
-| `caches` | six caches against eight axes | `heatmap` | the eye finds the hot cell; a not-measured cell is drawn as such and the legend says so |
+| `caches` | six caches against nine axes | `heatmap` | the eye finds the hot cell; a not-measured cell is drawn as such and the legend says so |
 | `counters over time` | what has accumulated, and when it jumped | `step` | GC counts, major faults and involuntary switches over the resource ring. A cumulative counter is a step function and a line interpolates it into a lie. **Not the cache misses**: the report is a snapshot and `FrameRecord` carries no counters, so *are misses accumulating* has no carrier (F1131) |
 | `the loop` | a stall is a band, not a percentile | `spectrogram`, `utilisation` | two cards; the p50 is not a reading (I13) |
 | `memory` | composition, and the floor under the sawtooth | `stackedarea` | |
@@ -766,6 +766,7 @@ expensive failure available to this design.
 | a container's cost | self time. `measureChild` recurses, so an inclusive figure counts every child twice (I7) |
 | the loop-delay p50 | **not a reading.** Its floor is the sampler's own resolution — idle reads 2.00 ms at `resolution: 1`, 13.00 at `10`, 21.00 at `20` (design M17). The `max` and the high percentiles are real, and the resolution travels with them (I13) |
 | `nothing-changed` | **not "no axis moved"** — that cannot happen: both caches return a hit when every axis matches, so the naive reading is a counter that can never fire. It is the recomputed value comparing equal to the discarded one, which costs one comparison on a miss and is the only form of the question the caches can answer (I8) |
+| `tick` | the spinner counter moved and nothing else did (C22 I103): the render cache keeps its parts and the frame re-renders the blocks that animate. Until F1189 a tick was reported as `focus` — the compound key's name — which is the misreading the pair above warns of: `focus` misses on a screen where focus never moved |
 | the user-timing count | sampled at most once per sampler interval. Reading it costs 3 µs at 0 entries and **449 µs at 10 000** (design M19), so the canary gets more expensive exactly as its subject gets worse (I19) |
 | spans, below tier `spans` | **absent from the report, not zeroed** (I11). A zeroed histogram reads as measured-and-fast |
 

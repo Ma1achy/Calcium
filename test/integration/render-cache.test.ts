@@ -723,3 +723,7 @@ describe("C22 §6c — the render cache", () => {
     expect(report.misses["render"]?.range ?? 0).toBeGreaterThanOrEqual(2);
   });
 });
+
+describe("C22 I103 — a tick miss keeps the parts", () => {
+  it.todo("T4.89e (C22 I103, F1189): a spinner tick beside a kept-whole block renders the status alone, the report reads tick: 1 and focus: 0, and at the cache a tick-only miss keeps the parts — not deferred on a component: the code commit replaces this row");
+});
