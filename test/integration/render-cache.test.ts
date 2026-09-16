@@ -939,5 +939,37 @@ describe("C22 I103 — a tick miss keeps the parts", () => {
 });
 
 describe("C22 I108 — the paced schedule, wired (F1207)", () => {
-  it.todo("T4.92 (C22 I108): the slot C03 opens inside a firing is dated from that slot's deadline — not deferred on a component: the code commit replaces this row");
+  it("T4.92 (C22 I108, F1207): the window C03 opens inside a firing is dated from that slot's deadline, through the composed schedule", async () => {
+    // **The wiring, not the arithmetic.** T1.63 holds the wrapper; this row
+    // holds that construct step 8 hands C03 the wrapped schedule and not the
+    // ambient one, which is the only thing a mutation of the wiring can move.
+    // The ambient schedule reaches `setTimeout` at call time, so a spy on the
+    // global reads every window C03 asks for; `elapsed` is the session's
+    // injected clock, which is the untapped one when nothing records.
+    const spy = vi.spyOn(globalThis, "setTimeout");
+    let now = 0;
+    try {
+      const { tui, resize } = await buildSession({ elapsed: () => now });
+      const windows = (from = 0): number[] =>
+        spy.mock.calls.slice(from).map((c) => Number(c[1])).filter((ms) => ms > 0 && ms < 79);
+      expect(windows().length, "the start-up write armed a paced slot").toBeGreaterThan(0);
+      expect(windows()[0], "the slot is the floored window").toBeCloseTo(1000 / 60, 9);
+      // A resize inside the slot is pending in it. The slot fires two
+      // milliseconds late; C03 writes and opens the next window inside the
+      // firing, and the composed schedule dates it from the deadline.
+      const call = spy.mock.calls.find((c) => Number(c[1]) > 0 && Number(c[1]) < 79);
+      if (call === undefined) throw new Error("no paced slot");
+      now = 5;
+      resize({ columns: 90, rows: 30 });
+      const before = spy.mock.calls.length;
+      now = 1000 / 60 + 2;
+      (call[0] as () => void)();
+      const next = windows(before);
+      expect(next.length, "the write inside the firing armed the next slot").toBeGreaterThan(0);
+      expect(next[0], "dated from the last deadline, two milliseconds late").toBeCloseTo(1000 / 60 - 2, 9);
+      await tui.stop("exit");
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });

@@ -137,9 +137,17 @@ const wake = async (
   // the slot C03 I17 leaves standing: a miss every third frame that no real
   // clock produces, because a real wake armed after a paint is due strictly
   // inside the slot (F1200).
-  await vi.advanceTimersByTimeAsync(1);
-  built.clock.advance(ms);
-  await vi.advanceTimersByTimeAsync(ms - 1);
+  // **Lockstep, a millisecond at a time.** Advancing the injected clock by the
+  // whole span and the timers by the rest leaves the two up to `ms - 1` apart
+  // for the length of the drain, so anything reading the injected clock while
+  // a timer callback runs dates its arithmetic from a different present than
+  // the timer it arms on. Stepping both keeps the one-millisecond lead F1200
+  // needs and bounds the skew at that millisecond instead of at the span.
+  for (let i = 0; i < ms; i += 1) {
+    await vi.advanceTimersByTimeAsync(1);
+    built.clock.advance(1);
+  }
+  await vi.advanceTimersByTimeAsync(0);
 };
 
 /**

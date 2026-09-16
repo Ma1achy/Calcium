@@ -57,6 +57,7 @@ import { Frames } from "./frames.js";
 import { CursorPositions } from "./cursor-positions.js";
 import { SeriesVisibility } from "./series-visibility.js";
 import { VisibleIds } from "./visible-ids.js";
+import { pacedSchedule } from "./paced-schedule.js";
 import { RenderScratchStore } from "./render-scratch.js";
 import { ScrollOffsets } from "./scroll-offsets.js";
 import { createOverlayManager, takesInput } from "../viewport/overlay/index.js";
@@ -1247,6 +1248,20 @@ export async function constructGraph(
       capabilities: detection.capabilities,
       lifecycle,
       write: (s) => void lifecycle.writer.write(s),
+      // C22 I108 — a window dated from the firing it belongs to, on the clock
+      // C03 has not. **The untapped clock** (C28 I53): a read per arm on the
+      // recording's positional channel lands where no replay reaches, and the
+      // dating enters no frame.
+      // **Live only** (C28 I14). A paced window is dated from a clock reading,
+      // and a replay serves a recorded sequence of them positionally — so the
+      // number of arms, and with it the cadence, is the one thing a replay
+      // cannot reproduce. C28 I53 already takes the sampler off that channel
+      // for the same reason; this takes the scheduler off it, and a replay
+      // gets the ambient schedule its recording was driven by.
+      schedule:
+        config.profile?.replay === undefined
+          ? pacedSchedule(config.sampleClock, config.schedule)
+          : config.schedule,
     });
     const prof = deps.profiler;
     if (prof === undefined) return inner;

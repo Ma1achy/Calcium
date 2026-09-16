@@ -61,8 +61,12 @@ describe("C09 §5 — a shimmer through the session", () => {
       expect(screen().text.join("\n")).toContain("PLAIN-LINE-BELOW");
 
       const step = async (ms: number): Promise<void> => {
-        clock.advance(ms);
-        await vi.advanceTimersByTimeAsync(ms);
+        // Lockstep: a whole-span jump on one clock and a drain on the other
+        // leaves a reader of the injected clock a span ahead of the timers.
+        for (let i = 0; i < ms; i += 1) {
+          clock.advance(1);
+          await vi.advanceTimersByTimeAsync(1);
+        }
         await settle();
       };
       // Four steps, the first discarded: 150 ms lands inside the first window and
