@@ -51561,3 +51561,24 @@ What remains, by allocation: `plot3dArea` 21.2 — the three boxed sample
 arrays 13.5 and the colour records 8; `thinEdge` 18.8 and `shadeAt` 14.8,
 the doubles boxed at `shadeAt`'s nine-argument boundary; `mixedRows` 10.1; the
 rows arm's `between`, its `Set`s and `normaliseRow` about 22.
+
+## F1176 — every double the raster hands the shade, and the one it gets back, is boxed at the call boundary, because `shadeAt` is too large for V8 to inline ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/surface3.ts`'s `shadeAt`, nine parameters, seven of them doubles, called per painted sample from `fill` and `thinEdge`; its double return |
+| **Reached for** | the sampled heap after F1175: `thinEdge` 18.8 MB and `shadeAt` 14.8 of 119.8 over twenty bunny frames — 130 and 92 bytes a painted sample, about eight and six heap numbers. `--trace-turbo-inlining` shows `hypot3` inlined into `shadeAt` and `writeDepth`, the painter, `ramped`, `shadePacked`, `toSrgb` inlined into `thinEdge`, and **`shadeAt` inlined into nothing**: its bytecode is 511 bytes against V8's `max-inlined-bytecode-size` of 460, so every call is a real call, and a double crossing a real call is a heap number in each direction. Sized before it was believed: a lane through the arguments alone, the wrapper calling `shadeAt` as before, moved nothing (119.7) — that moved the boundary rather than removing it; the shade call removed outright took both names off the list (94.6); the six inputs and the depth written into a `Float64Array` lane and the answer read back from it, **119.8 → 96.3**, both names gone; the answer returned as a double instead, 101.9, the return's 5.6 MB. Bunny paired **−1.9 ms** (30/40) and **−2.2 swapped** (36/40), against a bunny self-pair reading −0.6 ms in B's slot (24/40) — so the swapped figure is the one measured against the bias |
+| **Verdict** | **open** — measured, the remedy sized on a scratch build |
+
+**Remedy, sized.** The lane is a per-render `Float64Array` of eight on the
+depth-buffer record `createDepth` builds — the one record every raster
+function already holds, allocated per render as C12 I11 requires and never
+module state. `fill` and `thinEdge` write the interpolated normal, the view
+position and the depth into it and call `shadeAt(lane, light, span)`, which
+reads them and writes the intensity to the last slot; the painter takes it
+from there. `shade`, the reference, allocates a lane per call, which is per
+figure and per test row and not per sample. Byte-identical by construction
+— the same expressions in the same order, one store and one load apart — and
+PR15 holds the painter's intensity to `shade` at every painted sample already,
+through the raster end to end. What it does not reach: `plot3dArea`'s three
+boxed sample arrays and colour records (21), `mixedRows` (10), the rows arm.
