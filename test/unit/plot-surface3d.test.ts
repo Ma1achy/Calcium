@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 import { validateBlock } from "../../src/data/viewmodel/index.js";
 import { b } from "../../src/shell/builders/index.js";
 import {
-  basisOf, createDepth, extentOf, project, viewDir, writeDepth, type Vec3,
+  basisOf, createDepth, cross, dot, extentOf, project, sub, unit, unitOf, viewDir, writeDepth, type Vec3,
 } from "../../src/presentation/plot/project3.js";
 import {
   backfaceCulled, densityGlyphOf, densitySteps, drawTri, edgeIntensity, lightDirOf, shade,
@@ -28,6 +28,7 @@ import { slot } from "../../src/presentation/blocks/paint.js";
 // @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
 import { CAPS, frameFor, groundRgb, stripSgr } from "../../tools/plot-catalogue.mjs";
 import { parseLine } from "../../tools/catalogue-png.mjs";
+import { loadMesh } from "../support/obj.js";
 
 /** The triangles alone — `geometryOf` also returns the referenced vertices (C12 I127), which these rows do not read. */
 const trianglesOf = (...args: Parameters<typeof geometryOf>): readonly Tri3[] => geometryOf(...args).tris;
@@ -1360,4 +1361,97 @@ describe("C12 I129 — the per-sample path", () => {
   });
 });
 
-it.todo("T1.149 (C12 I137, F1181): geometryOf equals a reference over the Vec3 helpers by Object.is on every number and shares vertex records as it does — not deferred on a component: the code commit replaces this row");
+describe("C12 I137 — the builder's normals live in two lanes", () => {
+  type Sf = Parameters<typeof geometryOf>[0];
+  /** `geometryOf` as it was written over the `Vec3` helpers — the reference the lanes must equal to the bit. */
+  const referenceOf = (s: Sf, extent: ReturnType<typeof extentOf>, series: number): ReturnType<typeof geometryOf> => {
+    const pts = surfacePoints(s).map((p) => unitOf(p, extent));
+    const idx: readonly (readonly [number, number, number])[] = s.faces ?? (() => {
+      const h = s.heights as readonly (readonly number[])[]; const rows = h.length; const cols = h[0]!.length;
+      const out: [number, number, number][] = [];
+      const at = (i: number, j: number): number => j * cols + i;
+      for (let j = 0; j + 1 < rows; j += 1) for (let i = 0; i + 1 < cols; i += 1) { out.push([at(i, j), at(i + 1, j), at(i + 1, j + 1)]); out.push([at(i, j), at(i + 1, j + 1), at(i, j + 1)]); }
+      return out;
+    })();
+    const flat = s.shading === "flat";
+    const faceN = idx.map(([a, b, c]) => cross(sub(pts[b]!, pts[a]!), sub(pts[c]!, pts[a]!)));
+    let vertN: Vec3[] = pts.map(() => ({ x: 0, y: 0, z: 0 }));
+    if (!flat) {
+      for (let f = 0; f < idx.length; f += 1) { const n = faceN[f]!; for (const k of idx[f]!) { const acc = vertN[k]!; vertN[k] = { x: acc.x + n.x, y: acc.y + n.y, z: acc.z + n.z }; } }
+      vertN = vertN.map((v) => unit(v));
+    }
+    const values: (number | undefined)[] = s.vertices !== undefined ? s.vertices.map((p) => p.value) : (s.field ?? s.heights)!.flatMap((row) => [...row]);
+    const seen = new Uint8Array(pts.length);
+    const corners: { p: Vec3; v: number | undefined }[] = [];
+    for (const face of idx) for (const k of face) { if (seen[k] === 1) continue; seen[k] = 1; corners.push({ p: pts[k]!, v: values[k] }); }
+    let cull = 0; for (const [a, b, c] of idx) cull += dot(pts[a]!, cross(pts[b]!, pts[c]!)); cull /= 6;
+    const skin = { cull: s.closed !== true ? 0 : Math.abs(cull) < 1e-12 ? 0 : cull < 0 ? -1 : 1, wire: s.wireframe ?? false } as Tri3["skin"];
+    const mask = s.vertices !== undefined ? idx.map(() => [true, true, true] as const) : idx.map((_, f) => (f % 2 === 0 ? [true, true, false] : [false, true, true]) as readonly [boolean, boolean, boolean]);
+    const shared: (Tri3["a"] | undefined)[] = new Array(pts.length);
+    const tris = idx.map(([ia, ib, ic], f) => {
+      const fn = unit(faceN[f]!);
+      const at = (k: number): Tri3["a"] => { if (flat) return { p: pts[k]!, n: fn, v: values[k] }; const held = shared[k]; if (held !== undefined) return held; const made = { p: pts[k]!, n: vertN[k]!, v: values[k] }; shared[k] = made; return made; };
+      return { a: at(ia), b: at(ib), c: at(ic), fn, edges: mask[f]!, series, skin };
+    });
+    return { tris, corners, frame: 0 };
+  };
+  /** The first path where the two differ — `Object.is` on every number — or null; one assertion per surface, not one per number. */
+  const firstDifference = (x: unknown, y: unknown, path: string): string | null => {
+    if (typeof x === "number" || typeof y === "number") return Object.is(x, y) ? null : `${path}: ${String(x)} vs ${String(y)}`;
+    if (typeof x !== "object" || x === null || typeof y !== "object" || y === null) return x === y ? null : `${path}: ${String(x)} vs ${String(y)}`;
+    const kx = Object.keys(x as object); const ky = Object.keys(y as object);
+    if (kx.length !== ky.length) return `${path}: ${String(kx.length)} keys vs ${String(ky.length)}`;
+    for (const k of kx) { const d = firstDifference((x as Record<string, unknown>)[k], (y as Record<string, unknown>)[k], `${path}.${k}`); if (d !== null) return d; }
+    return null;
+  };
+  const lcg = (seed: number): (() => number) => { let x = seed >>> 0; return () => { x = (Math.imul(x, 1664525) + 1013904223) >>> 0; return x / 4294967296; }; };
+  it("T1.149 (C12 I137, F1181): over the three meshes and seeded grids under both shadings, geometryOf equals the reference over the Vec3 helpers by Object.is on every number and shares vertex records as it does; a degenerate face keeps the zero normal", () => {
+    const rand = lcg(0x5eed_c12_137);
+    const surfaces: [string, Sf][] = [];
+    for (const name of ["suzanne", "teapot", "stanford-bunny"] as const) {
+      const m = loadMesh(name);
+      for (const shading of ["smooth", "flat"] as const) surfaces.push([`${name} ${shading}`, { vertices: m.vertices, faces: m.faces, closed: true, shading } as Sf]);
+    }
+    for (let g = 0; g < 6; g += 1) {
+      const rows = 2 + Math.floor(rand() * 7); const cols = 2 + Math.floor(rand() * 9);
+      const heights = Array.from({ length: rows }, () => Array.from({ length: cols }, () => (rand() - 0.5) * 4));
+      // one level grid: every face normal is along z and every vertex sum is a plain multiple
+      if (g === 0) for (const row of heights) row.fill(1);
+      surfaces.push([`grid ${g} smooth`, { heights, xRange: [-1, 2], yRange: [0, 3], shading: "smooth", wireframe: g % 2 === 0 } as Sf]);
+      surfaces.push([`grid ${g} flat`, { heights, shading: "flat" } as Sf]);
+    }
+    // **A degenerate face**: one that names a vertex twice has the zero normal, which `unit` keeps.
+    const quad = { vertices: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0.5 }, { x: 1, y: 1, z: 0 }, { x: 0, y: 1, z: 1 }], faces: [[0, 1, 2], [0, 1, 1], [2, 3, 0]] as [number, number, number][] };
+    surfaces.push(["degenerate smooth", { ...quad, shading: "smooth" } as Sf], ["degenerate flat", { ...quad, shading: "flat" } as Sf]);
+    let zeroNormals = 0; let sharedSmooth = 0;
+    for (const [name, sf] of surfaces) {
+      const extent = extentOf(surfacePoints(sf));
+      const got = geometryOf(sf, extent, 2);
+      const ref = referenceOf(sf, extent, 2);
+      expect(got.tris.length, `${name}: triangles`).toBe(ref.tris.length);
+      expect(got.corners.length, `${name}: corners`).toBe(ref.corners.length);
+      expect(firstDifference(got, ref, name), `${name}: every number by Object.is`).toBeNull();
+      // **Sharing as the reference shares**: two corners hold one record in
+      // the build exactly where they hold one in the reference — a mesh may
+      // carry two vertices at one position, so identity is the test, not
+      // the coordinates. Under flat shading neither shares anything.
+      const fwd = new Map<Tri3["a"], Tri3["a"]>(); const back = new Map<Tri3["a"], Tri3["a"]>();
+      let shared = 0; let sharingDiffers: string | null = null;
+      for (let f = 0; f < got.tris.length && sharingDiffers === null; f += 1) {
+        for (const c of ["a", "b", "c"] as const) {
+          const r = ref.tris[f]![c]; const g = got.tris[f]![c];
+          const seen = fwd.get(r);
+          if (seen === undefined) { if (back.has(g)) sharingDiffers = `face ${String(f)} ${c} shares a record the reference does not`; fwd.set(r, g); back.set(g, r); }
+          else if (seen !== g) sharingDiffers = `face ${String(f)} ${c} does not share the record the reference shares`;
+          else shared += 1;
+        }
+      }
+      expect(sharingDiffers, `${name}: sharing`).toBeNull();
+      if (sf.shading === "flat") expect(shared, `${name}: flat shares nothing`).toBe(0);
+      else sharedSmooth += shared;
+      for (const t of got.tris) if (t.fn.x === 0 && t.fn.y === 0 && t.fn.z === 0) zeroNormals += 1;
+    }
+    expect(sharedSmooth, "smooth meshes share records").toBeGreaterThan(100000);
+    expect(zeroNormals, "the degenerate faces have the zero normal, kept").toBe(2);
+  });
+});

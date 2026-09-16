@@ -26,7 +26,7 @@ import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const CMD = "npx vitest run test/unit/plot-geometry.test.ts";
+const CMD = "npx vitest run test/unit/plot-geometry.test.ts test/unit/plot-surface3d.test.ts";
 const SURFACE = "src/presentation/plot/surface3.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
@@ -49,14 +49,45 @@ const results = await runPass({
     // control has to be a thing the suite asserts rather than merely a change
     // to the subject.
     from:
-      "  const faceN = idx.map(([a, b, c]) =>\n" +
-      "    cross(sub(pts[b] as Vec3, pts[a] as Vec3), sub(pts[c] as Vec3, pts[a] as Vec3)));",
+      "    const nx = uy * vz - uz * vy;\n" +
+      "    const ny = uz * vx - ux * vz;\n" +
+      "    const nz = ux * vy - uy * vx;",
     to:
-      "  const faceN = idx.map(([a, b, c]) =>\n" +
-      "    cross(sub(pts[c] as Vec3, pts[a] as Vec3), sub(pts[b] as Vec3, pts[a] as Vec3)));",
+      "    const nx = vy * uz - vz * uy;\n" +
+      "    const ny = vz * ux - vx * uz;\n" +
+      "    const nz = vx * uy - vy * ux;",
     why: "GM1 asserts each coordinate plane's own normal to six places; a run where reversing the cross product survives cannot see a kill",
   },
   mutations: [
+    {
+      // **A corner's sum skipped** (I137): the third corner of every face
+      // no longer accumulates, and the smooth normals part from the reference
+      // on every mesh.
+      name: "LANE-CORNER-SKIPPED: the third corner does not accumulate its face normal",
+      file: SURFACE,
+      from: "      q = ic * 3;\n      vertN[q] = (vertN[q] as number) + ax;\n      vertN[q + 1] = (vertN[q + 1] as number) + ay;\n      vertN[q + 2] = (vertN[q + 2] as number) + az;",
+      to: "      q = ic * 3;",
+      expect: "T1.149",
+    },
+    {
+      // **The vertex record made per corner** (I137, I130): smooth shading
+      // shares nothing, and the raster would project a vertex per face.
+      name: "RECORD-UNSHARED: a smooth vertex record is made for every corner",
+      file: SURFACE,
+      from: "    const held = shared[k];\n    if (held !== undefined) return held;\n    const q = k * 3;",
+      to: "    const q = k * 3;",
+      expect: "T1.149",
+    },
+    {
+      // **The zero normal normalised** (I137): `unit` answers the values
+      // unchanged at zero length; dividing gives `NaN`, and the flat grid's
+      // degenerate faces carry it.
+      name: "ZERO-DIVIDED: unit3 divides at zero length",
+      file: SURFACE,
+      from: "  return n === 0 ? { x, y, z } : { x: x / n, y: y / n, z: z / n };",
+      to: "  return { x: x / n, y: y / n, z: z / n };",
+      expect: "T1.149",
+    },
     {
       // **The cull's sign test loses its blind spot** (C12 I96, F473). `>= 0` culls
       // the zero-normal faces along with the back ones — the repair §6j

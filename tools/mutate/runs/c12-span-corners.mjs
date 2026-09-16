@@ -57,8 +57,8 @@ const results = runPass({
       // places one nearest the eye and compares the frame with the mesh alone.
       name: "SPAN-EVERY-VERTEX: the referenced set is every vertex",
       file: SF,
-      from: "  for (const face of idx) {\n    for (const k of face) {\n      if (seen[k] === 1) continue;",
-      to: "  for (const face of [pts.map((_p, k) => k)]) {\n    for (const k of face) {\n      if (seen[k] === 1) continue;",
+      from: "    for (let m = 0; m < 3; m += 1) { // cells-ok — a corner index\n      const k = face[m] as number;\n      if (seen[k] === 1) continue;",
+      to: "    for (let m = 0; m < (f === 0 ? count : 3); m += 1) { // cells-ok — a corner index\n      const k = f === 0 ? m : face[m] as number;\n      if (seen[k] === 1) continue;",
       expect: "PR12",
     },
     {

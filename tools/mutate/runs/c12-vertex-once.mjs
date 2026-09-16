@@ -68,8 +68,8 @@ const results = runPass({
       // flat count.
       name: "CORNER-PER-FACE: smooth shading builds a vertex object per corner",
       file: SF,
-      from: "      const held = shared[k];\n      if (held !== undefined) return held;",
-      to: "      const held = shared[k];\n      if (held !== undefined && flat) return held;",
+      from: "    const held = shared[k];\n    if (held !== undefined) return held;",
+      to: "    const held = shared[k];\n    if (held !== undefined && flat) return held;",
       expect: "T1.142",
     },
   ],

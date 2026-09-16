@@ -23,7 +23,6 @@ import type { Light3, Point3, Surface3 } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { ladderFor } from "./ramp.js";
 import {
-  cross,
   dot,
   NEAR,
   hypot2,
@@ -305,64 +304,111 @@ function gridPoints(s: Surface3): readonly Vec3[] {
  * is in the extent, because `surfacePoints` returns it, and in nothing that is
  * drawn.
  */
+/** `unit` over three scalars (C12 I137): `hypot3` and three divisions, or the values unchanged at zero length, as `unit` answers. */
+function unit3(x: number, y: number, z: number): Vec3 {
+  const n = hypot3(x, y, z);
+  return n === 0 ? { x, y, z } : { x: x / n, y: y / n, z: z / n };
+}
+
 export function geometryOf(s: Surface3, extent: Extent3, series: number): Geometry3 {
-  const pts = surfacePoints(s).map((p) => unitOf(p, extent));
+  const src = surfacePoints(s);
+  const count = src.length; // cells-ok — a vertex count
+  const pts: Vec3[] = new Array<Vec3>(count);
+  for (let k = 0; k < count; k += 1) pts[k] = unitOf(src[k] as Vec3, extent); // cells-ok — a vertex index
   const idx = facesOf(s);
-  const mask = edgeMask(s, idx.length); // cells-ok — a face count
+  const faces = idx.length; // cells-ok — a face count
+  const mask = edgeMask(s, faces);
   const skin: Skin = { cull: cullSign(s, pts, idx), wire: s.wireframe ?? false };
   const flat = s.shading === "flat";
-  // The face normals, unnormalised — their length is twice the area, which is
-  // what makes the accumulation below area-weighted without a second term.
-  const faceN = idx.map(([a, b, c]) =>
-    cross(sub(pts[b] as Vec3, pts[a] as Vec3), sub(pts[c] as Vec3, pts[a] as Vec3)));
-  const vertN: Vec3[] = pts.map(() => ({ x: 0, y: 0, z: 0 }));
-  if (!flat) {
-    for (let f = 0; f < idx.length; f += 1) { // cells-ok — a face index
-      const n = faceN[f] as Vec3;
-      for (const k of idx[f] as readonly [number, number, number]) {
-        const acc = vertN[k] as Vec3;
-        vertN[k] = { x: acc.x + n.x, y: acc.y + n.y, z: acc.z + n.z };
-      }
+  // **The normals in two lanes** (C12 I137, F1181). The face normal is
+  // `cross(sub(b, a), sub(c, a))` written out — the same six differences and
+  // six products in the same order — unnormalised, so its length is twice the
+  // area and the accumulation below is area-weighted without a second term.
+  // The vertex sum adds the lane's three per corner in face order, exactly as
+  // the object form summed, so every double is the same double; what was
+  // three objects a face and three more a face corner is two typed lanes.
+  const faceN = new Float64Array(faces * 3); // cells-ok — a face count
+  const vertN = new Float64Array(count * 3); // cells-ok — a vertex count
+  for (let f = 0; f < faces; f += 1) { // cells-ok — a face index
+    const face = idx[f] as readonly [number, number, number];
+    const ia = face[0];
+    const ib = face[1];
+    const ic = face[2];
+    const a = pts[ia] as Vec3;
+    const b = pts[ib] as Vec3;
+    const c = pts[ic] as Vec3;
+    const ux = b.x - a.x;
+    const uy = b.y - a.y;
+    const uz = b.z - a.z;
+    const vx = c.x - a.x;
+    const vy = c.y - a.y;
+    const vz = c.z - a.z;
+    const nx = uy * vz - uz * vy;
+    const ny = uz * vx - ux * vz;
+    const nz = ux * vy - uy * vx;
+    const o = f * 3;
+    faceN[o] = nx;
+    faceN[o + 1] = ny;
+    faceN[o + 2] = nz;
+    if (!flat) {
+      // Accumulated unnormalised (§6j row 7): a large face moves a shared
+      // vertex's normal more than a sliver does.
+      const ax = nx;
+      const ay = ny;
+      const az = nz;
+      let q = ia * 3;
+      vertN[q] = (vertN[q] as number) + ax;
+      vertN[q + 1] = (vertN[q + 1] as number) + ay;
+      vertN[q + 2] = (vertN[q + 2] as number) + az;
+      q = ib * 3;
+      vertN[q] = (vertN[q] as number) + ax;
+      vertN[q + 1] = (vertN[q + 1] as number) + ay;
+      vertN[q + 2] = (vertN[q + 2] as number) + az;
+      q = ic * 3;
+      vertN[q] = (vertN[q] as number) + ax;
+      vertN[q + 1] = (vertN[q + 1] as number) + ay;
+      vertN[q + 2] = (vertN[q + 2] as number) + az;
     }
-    for (let k = 0; k < vertN.length; k += 1) vertN[k] = unit(vertN[k] as Vec3); // cells-ok — a vertex index
   }
-  const values = valuesOf(s, pts.length); // cells-ok — a vertex count
-  const seen = new Uint8Array(pts.length); // cells-ok — a vertex count
+  const values = valuesOf(s, count);
+  const seen = new Uint8Array(count);
   const corners: Corner[] = [];
-  for (const face of idx) {
-    for (const k of face) {
+  for (let f = 0; f < faces; f += 1) { // cells-ok — a face index
+    const face = idx[f] as readonly [number, number, number];
+    for (let m = 0; m < 3; m += 1) { // cells-ok — a corner index
+      const k = face[m] as number;
       if (seen[k] === 1) continue;
       seen[k] = 1;
       corners.push({ p: pts[k] as Vec3, v: values[k] });
     }
   }
-  const out: Tri3[] = [];
-  const shared: (Vert | undefined)[] = new Array(pts.length); // cells-ok — a vertex count
-  for (let f = 0; f < idx.length; f += 1) { // cells-ok — a face index
-    const [ia, ib, ic] = idx[f] as readonly [number, number, number];
-    const fn = unit(faceN[f] as Vec3);
-    // **One vertex object per mesh vertex under smooth shading** (C12 I130):
-    // its position, its vertex normal and its value are the same for every
-    // face that references it, so the faces share the object and the raster
-    // projects it once a frame. Flat shading keeps one per face corner — the
-    // normal is the face's — which is the same count as before.
-    const at = (k: number): Vert => {
-      if (flat) return { p: pts[k] as Vec3, n: fn, v: values[k] };
-      const held = shared[k];
-      if (held !== undefined) return held;
-      const made: Vert = { p: pts[k] as Vec3, n: vertN[k] as Vec3, v: values[k] };
-      shared[k] = made;
-      return made;
-    };
-    out.push({
-      a: at(ia),
-      b: at(ib),
-      c: at(ic),
-      fn,
-      edges: mask[f] as readonly [boolean, boolean, boolean],
-      series,
-      skin,
-    });
+  const out: Tri3[] = new Array<Tri3>(faces);
+  // **One vertex object per mesh vertex under smooth shading** (C12 I130):
+  // its position, its vertex normal and its value are the same for every
+  // face that references it, so the faces share the object and the raster
+  // projects it once a frame — and the normal is made once, with the record,
+  // so an unreferenced vertex costs nothing (I137). Flat shading keeps one per
+  // face corner — the normal is the face's — which is the same count as before.
+  const shared: (Vert | undefined)[] = new Array(count); // cells-ok — a vertex count
+  const vertAt = (k: number): Vert => {
+    const held = shared[k];
+    if (held !== undefined) return held;
+    const q = k * 3;
+    const made: Vert = { p: pts[k] as Vec3, n: unit3(vertN[q] as number, vertN[q + 1] as number, vertN[q + 2] as number), v: values[k] };
+    shared[k] = made;
+    return made;
+  };
+  for (let f = 0; f < faces; f += 1) { // cells-ok — a face index
+    const face = idx[f] as readonly [number, number, number];
+    const ia = face[0];
+    const ib = face[1];
+    const ic = face[2];
+    const o = f * 3;
+    const fn = unit3(faceN[o] as number, faceN[o + 1] as number, faceN[o + 2] as number);
+    const a = flat ? { p: pts[ia] as Vec3, n: fn, v: values[ia] } : vertAt(ia);
+    const b = flat ? { p: pts[ib] as Vec3, n: fn, v: values[ib] } : vertAt(ib);
+    const c = flat ? { p: pts[ic] as Vec3, n: fn, v: values[ic] } : vertAt(ic);
+    out[f] = { a, b, c, fn, edges: mask[f] as readonly [boolean, boolean, boolean], series, skin };
   }
   return { tris: out, corners, frame: 0 };
 }
@@ -470,8 +516,13 @@ function cullSign(
 ): 0 | 1 | -1 {
   if (s.closed !== true) return 0;
   let v = 0;
-  for (const [a, b, c] of idx) {
-    v += dot(pts[a] as Vec3, cross(pts[b] as Vec3, pts[c] as Vec3));
+  // `dot(a, cross(b, c))` written out, term by term in its order (C12 I137).
+  for (let f = 0; f < idx.length; f += 1) { // cells-ok — a face index
+    const face = idx[f] as readonly [number, number, number];
+    const a = pts[face[0]] as Vec3;
+    const b = pts[face[1]] as Vec3;
+    const c = pts[face[2]] as Vec3;
+    v += a.x * (b.y * c.z - b.z * c.y) + a.y * (b.z * c.x - b.x * c.z) + a.z * (b.x * c.y - b.y * c.x);
   }
   v /= 6;
   return Math.abs(v) < VOLUME_EPS ? 0 : v < 0 ? -1 : 1;

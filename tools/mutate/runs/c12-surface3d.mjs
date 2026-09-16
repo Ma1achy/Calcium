@@ -130,8 +130,8 @@ const results = await runPass({
       // scheme: the reason named the one input on which the two options agree.
       name: "smooth normals are unit-averaged rather than accumulated",
       file: F,
-      from: "      const n = faceN[f] as Vec3;\n      for (const k of idx[f] as readonly [number, number, number]) {",
-      to: "      const n = unit(faceN[f] as Vec3);\n      for (const k of idx[f] as readonly [number, number, number]) {",
+      from: "      const ax = nx;\n      const ay = ny;\n      const az = nz;",
+      to: "      const l = hypot3(nx, ny, nz) || 1;\n      const ax = nx / l;\n      const ay = ny / l;\n      const az = nz / l;",
       expect: "SF3",
     },
     {
