@@ -53169,3 +53169,20 @@ twelve meshes, 4.8 for forty line plots. That is where the next findings go —
 the L4 visibility wrapper still at the top of the stream profile, the per-form
 render, the raster. `stream` at 55 rather than 58 is two hundred timers at 16 ms
 landing late together; not the scheduler's.
+
+## F1201 — the visibility gate's L4 half walks the visible range once per part per sweep: at two hundred live parts it is the largest single line of the stream profile after F1198 took the C14 half ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | The `visible` dependency C22 hands C23's refresh driver (`src/shell/construct.ts`, the execution pipeline's deps): `host.kind === "view" || stores.viewport.visible().entries.some((e) => e.id === host.id)`. The driver asks it for every part on every sweep — `anyoneLooking`, the stale pass, `armParts`'s gates, the readouts (C23 I46). |
+| **Reached for** | `--cpu-prof` over `stress stream` (200 live parts at 16 ms, 6 s, after F1199): `visible shell/construct.js:1272` **324 ms** self time, the largest single entry after idle and the garbage collector — 4.4% of the process and about 14% of the non-idle time — with `armParts` 81, `currentPanel` 35 and `sweepParts` 26 behind it. F1198 memoised C14's range and left this half as *the cheap one*: a `.some` over a screenful. At two hundred parts a sweep it is two hundred walks of the same frozen array, twelve thousand a second. |
+| **Verdict** | **open.** C14 I30 now returns the same object until the viewport moves, so the range's identity is a key: build the set of visible ids once per range object and answer membership from it. One slot, not a cache — the previous range is unreachable the moment the viewport moves, and a `WeakMap` would be a second copy of C14's own invalidation. The blind spot is stated up front: the wiring has no observable but cost, so the bench is what verifies it and the mutation run says so. |
+
+**Remedy, sized.** `VisibleIds` in `shell/visible-ids.ts` — `of(range)` returns
+the same `ReadonlySet` while the range object is the same and rebuilds it when it
+is not — owned by the composition root beside the other stores, and the wrapper
+answers `visibleIds.of(stores.viewport.visible()).has(host.id)`. One C22
+invariant, one unit row on identity and freshness, one fail-on-revert row, a
+mutation run with the control on the set's contents. Expected: the `visible`
+line gone from the top of the stream profile and its share moved to the sweep's
+own bookkeeping; no frame moves.
