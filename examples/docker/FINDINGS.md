@@ -51813,3 +51813,21 @@ What remains: the bunny's kept geometry is 28 MB of records — a position, a
 record, a normal and a corner per vertex, a normal and a triangle per face —
 and the cold call's 39 ms is now mostly building them; `plot3dArea`'s boxed
 sample arrays; `normaliseRow`'s byte scan.
+
+## F1182 — `plot3dArea`'s boxed sample arrays and per-sample colour records, measured and left ★☆☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/scatter3.ts` `plot3dArea`: `ink`, `glyph` and `mark` as boxed arrays of `width × height` samples, `bits`, `frameBits` and `frameInkAt` over the cells, `inkRgb` beside them; the pass that builds a `{ kind: "rgb", hex }` record per pending sample (I132) |
+| **Reached for** | the inspector's allocation sampler over twenty bunny frames on the F1181 build: `plot3dArea` **21.2 MB of 66.5** sampled, 1.06 MB a frame; `plot3d.paint` / `plot3d.ink` per frame — suzanne 3,001 / 2,509, teapot 3,962 / 2,995, bunny 8,392 / 3,048 — against 1,760 cells at 80 × 22. So the records are 1.7× the cells and about 170 KB a frame; the three boxed arrays at eight bytes a slot are 740 KB, `inkRgb` 123 KB, the rest small. On the CPU profile `plot3dArea` is 63 ms self over forty frames, 1.6 ms a frame of 14.5, and the collector 2.3 ms a frame |
+| **Verdict** | **checked, not built** (2026-09-16) — the remedy's ceiling is under the bar |
+
+**Sized and declined.** Records built where a cell reads one rather than
+per painted sample would save at most 1,300 records a frame — 70 KB — and
+would move I132's count, which `plot3d.ink` reports and its row pins.
+`glyph` as an `Int16Array` and `mark` as indices into a per-render string
+table would save about 430 KB of the 3.3 MB a bunny frame allocates, some
+thirteen per cent of the allocation and, at the collector's 2.3 ms a frame,
+about 0.3 ms — two per cent of the frame, under F916's five. Recorded so the
+next reader of the heap sample does not size it again; the figure to beat is
+the frame's 14.5 ms, of which `drawTri` and `thinEdge` hold 6.4.
