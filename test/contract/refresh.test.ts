@@ -1119,6 +1119,7 @@ describe("C23 §3d — a source does not poll while nothing is looking", () => {
     await h.tick(0);
     expect(shown(h, id, "a"), "the declaration survived the pause").toBe("1");
   });
+  it.todo("T2.48 (C23 I72): a poll's next deadline is one interval after the last — not deferred on a component: the code commit replaces this row");
 
   it("T3.32 (I45, §8c C2): a resolution with no referrers is dropped, not a failure", async () => {
     // Nothing failed, so nothing backs off. Backing off here would make a source
