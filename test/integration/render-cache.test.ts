@@ -9,12 +9,13 @@
 // path rather than from a spy wrapped round it. `renderSequenceToLines` renders
 // a whole sequence, so one call is one increment however many blocks an entry
 // holds.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { buildGraph, buildSession } from "../support/session.js";
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
 import { fakeStdin } from "../support/fake-terminal.js";
 import { rows as inkRows } from "../../src/presentation/blocks/paint.js";
+import { spinnerIntervalMs } from "../../src/presentation/blocks/index.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import { block } from "../../src/data/viewmodel/index.js";
@@ -725,5 +726,76 @@ describe("C22 §6c — the render cache", () => {
 });
 
 describe("C22 I103 — a tick miss keeps the parts", () => {
-  it.todo("T4.89e (C22 I103, F1189): a spinner tick beside a kept-whole block renders the status alone, the report reads tick: 1 and focus: 0, and at the cache a tick-only miss keeps the parts — not deferred on a component: the code commit replaces this row");
+  it("T4.89e (C22 I103, F1189): a spinner tick beside a kept-whole block moves the frame, renders the kept block no further time, reports tick: 1 and focus: 0, and at the cache a tick-only miss keeps the parts", async () => {
+    // **At the cache first**, where the axis and its order are drivable: a
+    // slot differing on the tick alone misses `tick` with the parts open, and
+    // one differing on the tick and the range misses `tick` — the tick is
+    // compared before the range (C28 I8).
+    const cache = new RenderCache();
+    cache.set("e", 1, 80, "f", "t", "0", ["a"], "1");
+    expect(cache.get("e", 1, 80, "f", "t", "0", "1"), "a hit at the same tick").toEqual(["a"]);
+    expect(cache.get("e", 1, 80, "f", "t", "0", "2"), "a tick miss").toBeUndefined();
+    expect(cache.misses.tick).toBe(1);
+    expect(cache.misses.focus, "and it is not a focus miss").toBe(0);
+    const open = cache.parts("e");
+    if (open === undefined) throw new Error("no parts after a tick miss");
+    open.hold("k", ["held"]);
+    cache.set("e", 1, 80, "f", "t", "0", ["b"], "2");
+    expect(cache.get("e", 1, 80, "f", "t", "1", "3"), "tick and range both moved").toBeUndefined();
+    expect(cache.misses.tick, "reported as the tick, which is compared first").toBe(2);
+    expect(cache.misses.range).toBe(0);
+    expect(cache.parts("e")?.part("k"), "the part survived the tick").toEqual(["held"]);
+
+    // **End to end, under fake timers** (T4.35's reason): the claim is that the
+    // chain is wired, not that a machine keeps 80 ms. Thirty counted rows kept
+    // whole beside a status spinner; the clock moves with the timers (I74), so
+    // one step is one interval of elapsed time and the counter advances once.
+    vi.useFakeTimers();
+    try {
+      const { definition, rendersOf } = countingById(30);
+      const status = { kind: "status", id: "sp", state: "loading", message: "working", height: 1 };
+      const s = await sessionOver([definition], [{ kind: "count", id: "whole" }, status], { columns: 80, rows: 40 });
+      await vi.advanceTimersByTimeAsync(0);
+      for (let i = 0; i < 4; i += 1) await Promise.resolve();
+      const before = rendersOf().get("whole") ?? 0;
+      expect(before, "the kept block rendered").toBeGreaterThan(0);
+      const glyph = (): string => {
+        const row = s.screen().text.find((r) => r.includes("loading"));
+        if (row === undefined) return "<absent>";
+        return /[\u2800-\u28ff]/u.exec(row)?.[0] ?? "<none>";
+      };
+      const frameBefore = s.screen().text.join("\n");
+      expect(frameBefore, "the counted rows are on screen").toContain("counted whole r29");
+      const glyphBefore = glyph();
+      expect(glyphBefore, "the spinner is on screen").toMatch(/[\u2800-\u28ff]/u);
+
+      // One interval, then C03's window: the ticker fires, `commit("spinner")`
+      // reaches the scheduler, the frame follows within its coalescing window.
+      const step = async (ms: number): Promise<void> => {
+        s.clock.advance(ms);
+        await vi.advanceTimersByTimeAsync(ms);
+      };
+      await step(spinnerIntervalMs());
+      for (let i = 0; i < 6 && glyph() === glyphBefore; i += 1) await step(25);
+      const glyphFirst = glyph();
+      expect(glyphFirst, "the frame moved — the glyph turned").not.toBe(glyphBefore);
+      // **The first tick may render the kept block once**: a whole render holds
+      // no parts, and the assembly is what fills them (I101). What the axis buys
+      // shows from the second tick on.
+      const afterFirst = rendersOf().get("whole") ?? 0;
+      expect(afterFirst, "at most one render, to fill the parts").toBeLessThanOrEqual(before + 1);
+
+      await step(spinnerIntervalMs());
+      for (let i = 0; i < 6 && glyph() === glyphFirst; i += 1) await step(25);
+      const frameAfter = s.screen().text.join("\n");
+      expect(glyph(), "the glyph turned again").not.toBe(glyphFirst);
+      expect(frameAfter, "and the counted rows are still there").toContain("counted whole r29");
+      expect(rendersOf().get("whole"), "the kept block rendered no further time").toBe(afterFirst);
+      const report = await s.report();
+      expect(report.misses["render"]?.tick ?? 0, "the ticks reported as ticks").toBeGreaterThanOrEqual(2);
+      expect(report.misses["render"]?.focus ?? 0, "and not as focus").toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 20_000);
 });

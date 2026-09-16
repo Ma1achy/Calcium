@@ -42,7 +42,7 @@
  * from the axes it compares.
  */
 export type MissReason =
-  | "absent" | "rev" | "width" | "theme" | "focus" | "range" | "evicted" | "nothing-changed";
+  | "absent" | "rev" | "width" | "theme" | "focus" | "tick" | "range" | "evicted" | "nothing-changed";
 
 /**
  * What a component reports about itself.

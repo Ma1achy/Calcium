@@ -41,6 +41,9 @@ import { descendants } from "../data/viewmodel/index.js";
 import type { Block, Image, Plot } from "../data/viewmodel/index.js";
 import { entryLayout, renderEntryPieces, windowEntry } from "./entry-layout.js";
 import { animationIntervalOf } from "../presentation/blocks/index.js";
+import type { EntryParts } from "./render-cache.js";
+import type { EntryPiece } from "./entry-layout.js";
+import type { Group } from "../data/viewmodel/index.js";
 import { framesOf, placesAtProtocol } from "../presentation/blocks/kinds/image.js";
 import type { FocusState } from "../presentation/blocks/index.js";
 import { contextAt } from "../interaction/completion/index.js";
@@ -1651,12 +1654,18 @@ function visibleRows(
 
     const cadence = animationIntervalOf(windowed.blocks);
     if (cadence !== null && (fastest === null || cadence < fastest)) fastest = cadence;
-    const animated = cadence === null ? "" : `\u0000${String(tick)}`;
+    // **The tick is its own axis, not a suffix of the slot** (C22 I103, F1189).
+    // Folded into the slot every spinner tick was a `focus` miss, which drops
+    // the parts, and the entry rendered whole every 80 ms for one glyph.
+    const tickKey = cadence === null ? "" : String(tick);
     // **The range is its own axis, beside the stable key** (C22 I101): a miss
     // on it alone keeps the parts, and the render below assembles from them.
-    const slot = `${key}\u0000${offsets}\u0000${orbitKey}\u0000${cursorKey}\u0000${framesKey}\u0000${seriesKey}${animated}`;
-    const held = graph.rendered.get(entry.id, entry.rev, width, slot, theme, range);
-    const parts = held === undefined ? graph.rendered.parts(entry.id) : undefined;
+    const slot = `${key}\u0000${offsets}\u0000${orbitKey}\u0000${cursorKey}\u0000${framesKey}\u0000${seriesKey}`;
+    const held = graph.rendered.get(entry.id, entry.rev, width, slot, theme, range, tickKey);
+    // **An animating block is never taken from the parts** (C22 I103): on a
+    // tick miss its held rows are the last tick's, and on a range miss the
+    // one small render it costs is the price of not asking which miss this was.
+    const parts = held === undefined ? withoutAnimating(graph.rendered.parts(entry.id), pieces) : undefined;
     // **Faults from here are this entry's** (I69). A `BlockFault` names a block
     // and ids are unique within a document and not across entries (C04 I14), so
     // neither half addresses anything on its own. A scope rather than a field,
@@ -1726,7 +1735,7 @@ function visibleRows(
             `and anything below the overflow in this entry is dropped`,
         );
       }
-      graph.rendered.set(entry.id, entry.rev, width, slot, theme, range, lines);
+      graph.rendered.set(entry.id, entry.rev, width, slot, theme, range, lines, tickKey);
     }
 
     // The pieces are already the window's rows (`windowEntry` took `[from, to)`),
@@ -1740,6 +1749,41 @@ function visibleRows(
       : { spinnerMs: fastest, orbits, frames },
   );
   return out;
+}
+
+/**
+ * The parts with every animating block withheld (C22 I103).
+ *
+ * The keys are `assemble`'s (C22 I101): a top-level block's id, or a column
+ * group's child's id and its `align` behind a NUL — so the block half is what
+ * is matched. `animationIntervalOf` over one block is I73's walk, containers
+ * included, which is what makes a `steps` inside a `panel` a block this
+ * withholds rather than one it serves stale.
+ */
+function withoutAnimating(parts: EntryParts | undefined, pieces: readonly EntryPiece[]): EntryParts | undefined {
+  if (parts === undefined) return undefined;
+  const animating = new Set<string>();
+  for (const piece of pieces) {
+    for (const block of piece.windowed.blocks) {
+      if (animationIntervalOf([block]) !== null) animating.add(block.id);
+      if (block.kind === "group" && (block as Group).direction === "column") {
+        for (const child of (block as Group).children) {
+          if (animationIntervalOf([child]) !== null) animating.add(child.id);
+        }
+      }
+    }
+  }
+  if (animating.size === 0) return parts;  // cells-ok — a block count, not a width
+  const blockOf = (key: string): string => {
+    const nul = key.indexOf("\u0000");
+    return nul < 0 ? key : key.slice(0, nul);
+  };
+  return Object.freeze({
+    part: (key) => (animating.has(blockOf(key)) ? undefined : parts.part(key)),
+    hold: (key, lines) => {
+      if (!animating.has(blockOf(key))) parts.hold(key, lines);
+    },
+  });
 }
 
 /**

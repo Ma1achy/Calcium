@@ -342,7 +342,7 @@ const FRAMEWORK: readonly CardSpec[] = Object.freeze([
   card({
     id: "caches",
     group: "framework",
-    question: "six caches against eight axes",
+    question: "six caches against nine axes",
     form: "heatmap",
     draws: ["misses", "hits"],
     site: "none",

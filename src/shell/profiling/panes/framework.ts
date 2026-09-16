@@ -327,11 +327,11 @@ const byReason: CardDraw = (ctx, spec) => {
 // --- caches -----------------------------------------------------------------
 
 const MISS_AXES: readonly MissReason[] = Object.freeze([
-  "absent", "rev", "width", "theme", "focus", "range", "evicted", "nothing-changed",
+  "absent", "rev", "width", "theme", "focus", "tick", "range", "evicted", "nothing-changed",
 ]);
 
 /**
- * Six caches against eight miss axes — the eye finds the hot cell.
+ * Six caches against nine miss axes — the eye finds the hot cell.
  *
  * **A miss carries exactly one reason** (C28 I8) — the first axis that rejected
  * it — so a row sums to that cache's miss count and never to more. `height` is

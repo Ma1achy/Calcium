@@ -136,8 +136,9 @@ const results = runPass({
       name: "the frame key is not in the render slot",
       file: SESSION,
       // Re-anchored 2026-09-05: the ninth axis (`seriesKey`, C22 I78) follows `framesKey`.
-      from: "\\u0000${cursorKey}\\u0000${framesKey}\\u0000${seriesKey}${animated}`;",
-      to: "\\u0000${cursorKey}\\u0000${seriesKey}${animated}`;",
+      // Re-anchored 2026-09-16: the tick left the slot for its own axis (C22 I103).
+      from: "\\u0000${cursorKey}\\u0000${framesKey}\\u0000${seriesKey}`;",
+      to: "\\u0000${cursorKey}\\u0000${seriesKey}`;",
       expect: "T4.17o",
     },
     {

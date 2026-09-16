@@ -110,7 +110,8 @@ const results = runPass({
       // assembly reached.
       name: "PARTS-NOT-PASSED: the session renders the sequence on a range miss",
       file: SESSION,
-      from: "    const parts = held === undefined ? graph.rendered.parts(entry.id) : undefined;",
+      // Re-anchored 2026-09-16: the parts pass through `withoutAnimating` (C22 I103).
+      from: "    const parts = held === undefined ? withoutAnimating(graph.rendered.parts(entry.id), pieces) : undefined;",
       to: "    const parts = undefined as ReturnType<typeof graph.rendered.parts>;",
       expect: "T4.89a",
     },

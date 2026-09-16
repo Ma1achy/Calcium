@@ -470,6 +470,7 @@ describe("C22 — the root's injection, refusal and capture path", () => {
       width: 1,
       theme: 1,
       focus: 1,
+      tick: 0,
       range: 0,
       "nothing-changed": 0,
     });

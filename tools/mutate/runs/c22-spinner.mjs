@@ -96,8 +96,8 @@ const results = runPass({
       // an animating entry is served its first frame on every hit.
       name: "the line cache has no tick axis",
       file: SESSION,
-      from: 'const animated = cadence === null ? "" : `\\u0000${String(tick)}`;',
-      to: 'const animated = "";',
+      from: 'const tickKey = cadence === null ? "" : String(tick);',
+      to: 'const tickKey = "";',
       expect: "T4.36",
     },
     {
