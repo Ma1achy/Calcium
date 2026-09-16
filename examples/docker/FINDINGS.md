@@ -51374,7 +51374,7 @@ bisect named, unmoved and now the whole of what the raster allocates. Goldens
 |---|---|
 | **Surface** | `src/presentation/plot/surface3.ts`'s `shadeAt` (two `Math.hypot` per sample) and `fill` (three per face); `src/presentation/plot/scatter3.ts`'s `for (const t of scene.tris)` |
 | **Reached for** | the sampled heap over twenty bunny frames on the F1171 build: `plot3dArea` 110 MB of 325, `hypot` 17.9 as its own frame, with the painter's allocation gone. Bisected on the F1168 build: with no triangle drawn `plot3dArea` samples 47.8 MB, with the painter a no-op it samples 104 — so the loop statement itself allocates about 2.8 MB a frame. V8's `Math.hypot` is a variadic builtin (`MathHypot` in `math.tq`) that allocates a `FixedDoubleArray` for its arguments on every call; `for…of` over a frozen array does not take the unallocating fast path, and the triangle array is `deepFreeze`d geometry. A register for the doubles crossing into the painter — the diagnosis the F1171 bisect suggested — was tried first on a scratch build and moved nothing: `drawTri` 55.6, `plot3dArea` 110.6, the total 325 → 318; a fix that changes nothing indicts the diagnosis. Sized on a scratch build with an index loop and a JS replica of V8's algorithm: `plot3dArea` 110 → 54.7 MB, `hypot` gone, the total 325 → 241; paired both orders the bunny 21.3 → 16.8 and 19.4 → 16.9 ms, **B−A median −3.8 and −2.6 ms**, B faster in 39 and 36 of 40; suzanne −0.3 and −0.1. The replica against `Math.hypot` over four million calls with a pool of extremes — `±0`, denormals, `1e308`, `±Infinity`, `NaN`: **0 mismatches** |
-| **Verdict** | **open** — measured, the remedy sized on a scratch build |
+| **Verdict** | **closed** — built and measured: I133, `hypot3`/`hypot2` and the index loop, T1.145, `c12-hypot` |
 
 **The path, at HEAD.** `shadeAt` normalises the interpolated normal and the
 view vector with `Math.hypot`, per sample, as I129 says it does; `fill` takes
@@ -51396,3 +51396,18 @@ goldens hold every mesh frame and T1.145 holds the replica. **What it does
 not reach**: `drawTri` 55.9, `toScreen` 33.1, `thinEdge` 18.6 and `shadeAt`
 15.2 MB of the 241 that remain, which the register experiment says are not
 boxed call arguments and which nothing has yet named.
+
+**Closed — built and measured.** C12 I133; `hypot3` and `hypot2` in
+`project3.ts`, called by `unit`, `shadeAt` and `fill`; the fill loop indexes
+`scene.tris`. T1.145 holds the replica to the builtin over a million tuples per
+arity and the enumerated extreme table; `c12-hypot` control seen and four
+caught (the compensation dropped, the normalisation dropped, the early returns
+swapped in each arity); `c12-surface3d`'s control re-anchored on the index
+loop. Gates green, goldens 458 with no mover. Paired against the F1171 build,
+both orders, forty rounds: **bunny 16.4 → 14.4 and 21.3 → 17.6 ms, B−A median
+−2.0 and −3.9 ms, B faster in 33 and 38 of 40**; suzanne 0.0 and −0.1, as the
+scratch build said. The sampled heap over twenty bunny frames **325 → 241 MB**;
+`hypot` no longer appears as a frame. What remains, by allocation: `drawTri`
+55.6, `plot3dArea` 54.8, `toScreen` 33.4, `thinEdge` 19.0, `shadeAt` 15.0,
+`mixedRows` 10.2, and the rows arm's `between` with its `Set`s about 14.5 —
+the next things to name.
