@@ -52801,3 +52801,26 @@ and does not move once the chunks are dropped; the heap's floor is the mesh
 (the parsed OBJ, the frozen geometry object graph, the typed geometry — about
 20 MB for 69k faces) and the loader's retained source text, which is Node's.
 No remedy is owed here; the number is the record for the next reading.
+
+## F1195 — three surfaces the pass had not measured — an image under kitty, a table of thousands of rows, a transcript of hundreds of entries — read beside a spinner, and none owes a remedy ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | The tick frame beside three block shapes F1189–F1191 did not measure: `image` under `imageProtocol: "kitty"` (`TERM=xterm-kitty`), `table` at 2,000 and 20,000 rows, and a transcript of 300 one-block entries — each with a `status` spinner, through a session over fakes on the F1193 build (`out/probe-surfaces.mjs`, `make load-down`). |
+| **Reached for** | **Image**: the kitty APC carries the picture once — 18,158 bytes before the window, **0 during** four seconds of ticks; 48–63 writes of about 0.1 KB each; tick work p50 1.5–3.8 ms against 2.9 for the spinner alone, 3–5% of a core. **Table**: a spinner below 2,000 rows is off screen and the session correctly draws no tick at all — 0 writes, 1% of a core — so the only figure is the document's first frame: **40 ms at 2,000 rows, 265 ms at 20,000**; the profile is the wrap of every cell (`wrapCellsParts` 65 ms, `clusterCells` 53, `placeableClusters` 42, `placeable` 24, `wrapRuns` 17, `breakPoint` 15 over 80,000 cells) plus construction (`deepFreeze` 24, `validate.table` 17, `rebuild` 12). **Entries**: 300 submissions then a spinner — tick work **p50 0.31 ms**, p95 0.66, 3.0% of a core, 21 writes in four seconds; the render cache misses `range` 293 and `absent` 302 during the building and `tick` 21 after. |
+| **Verdict** | **checked — clear.** No per-frame cost on any of the three; the table's figure is a one-off proportional to the document, and it is the contract's. |
+
+**Why the table's first frame is what it is.** A row's height is its wrapped
+cells, and the table's height is the sum of its rows, so C09's measure has to
+wrap every row once before the viewport can place the block — O(rows) on the
+first frame and memoised after (C22 I100). Nothing in the profile is repeated
+or misplaced: it is 80,000 cells at about three microseconds each. A `ps`
+of two thousand containers pays 40 ms once; a table of twenty thousand rows is
+not a shape any example produces, and the row here is the number for the day
+one does.
+
+**What the image reading settles.** F1164's list had "images unmeasured", and
+the fear was a picture re-encoded or re-sent on every frame under a graphics
+protocol. It is not: `transmitFrame` sends a placement once and releases it
+when the frame no longer places it (C09 I66), and the per-tick cost beside a
+spinner is the placeholder rows.
