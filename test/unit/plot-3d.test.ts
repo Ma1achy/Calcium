@@ -1103,4 +1103,7 @@ describe("C12 I132 — the painter writes an integer and the records are built o
     expect(hypot3(NaN, Infinity, 1)).toBe(Infinity);
     expect(Number.isFinite(hypot3(1e308, 1e308, 1e308))).toBe(true);
   });
+  it.todo(
+    "T1.146 (C12 I134, F1174): after drawTri under a frame each stamped vertex's record equals project to the bit over the cube, suzanne and the bunny under perspective and orthographic cameras — not deferred on a component: the code commit replaces this row",
+  );
 });
