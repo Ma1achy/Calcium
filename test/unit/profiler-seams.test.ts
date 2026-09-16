@@ -1043,7 +1043,7 @@ describe("C24 — the public surface", () => {
     };
     const sub = pkg.exports["./profiling"];
     expect(sub?.default, "@fmx/calcium/profiling resolves to the barrel").toBe(
-      "./dist/shell/profiling/index.js",
+      "./dist/bundle/shell/profiling/index.js",
     );
 
     // **A fresh execution, so "constructs nothing" is measured rather than
