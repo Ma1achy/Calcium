@@ -51320,3 +51320,32 @@ second cut with its own measurement — what a `/all` scroll frame pays
 after I72 — and its own row on the agreement, not a line in the first.
 `table` and `image` emit one `Text` per row already and are the cheap
 half: `rows()` in place of the elements.
+
+## F1171 — the surface painter allocates two tuples, a hex string and a colour record per write, and a sample is written many times before the nearest wins ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/scatter3.ts`'s `painter` fast arm — `sampleRgb`, `shadeRgb`, `rgbHex`, the `{ kind: "rgb", hex }` record — and `densityGlyph`'s `[...steps]` copy per call on the glyph arm |
+| **Reached for** | the inspector's sampling heap profiler over twenty bunny orbit frames on the F1168 build, both collected flags on: **379 MB sampled, 19 MB a frame** — `plot3dArea` 103 MB, `drawTri` 55.8, `painter` 55.0, `toScreen` 33.7, `shadeAt` 18.8, `hypot` 17.6, `thinEdge` 16.1, `toString` 11.8 (that is `hex2`), `mixedRows` 10.5, `toSrgb` 8.2; the CPU profile over thirty frames puts the garbage collector at 131 ms of 1 839, 7.1%, **4.4 ms a frame**. Sized on a scratch copy of the build with the colour held as one packed integer per sample and the records built once after the surfaces: `painter` gone from the table, `toString` 11.8 → 4.4, the total 379 → 318 MB; paired in one process both orders, the bunny 20.8 → 19.0 and 21.0 → 18.9 ms, **B−A median −1.5 and −2.1 ms**, B faster in 29 and 37 of 40; suzanne 0.0 both orders. Bisected: with no triangle drawn `plot3dArea` samples 47.8 MB (the per-frame buffers); with the painter a no-op it still samples 104 and `drawTri` 55 — so what those two allocate is boxed doubles crossing the painter call, not anything the painter builds |
+| **Verdict** | **open** — measured, the remedy sized on a scratch build |
+
+**The path, at HEAD.** The fast arm (C10 I40) already holds the channels as
+ints between sample and shade — but `sampleRgb` returns them in a fresh tuple,
+`shadeRgb` returns another and creates its `ch` closure on the way, `rgbHex`
+builds a string through three `toString(16)` calls, and the record is a fresh
+object, all per **write**. A sample is written every time a nearer carrier
+reaches it — three thin edges of every sub-sample bunny triangle, then the
+faces — so the frame builds a colour for every write and keeps one per sample.
+`densityGlyph` copies the ladder's steps into a new array per call on the
+glyph arm; the braille and half-block arms do not reach it.
+
+**Remedy, sized.** The painter writes one packed integer — `r·2¹⁶ + g·2⁸ + b`
+— into an `Int32Array` beside `ink` and a shared pending mark into `ink`; after
+the last surface has drawn and before the frame does, one pass builds the
+record for every sample still pending, so the frame holds one record per
+painted sample however many writes it took. `samplePacked`, `shadePacked` and
+`packedHex` are I40's forms on one integer, equal bit for bit by the same
+sweep that holds I40, so the bytes do not move. The ladder's steps are read
+once per render. **What it does not reach**: the boxed doubles the bisect
+named — `z` and the intensity crossing into the painter, `shadeAt`'s return,
+`Math.hypot`'s — which are a call-boundary cost and a different cut.
