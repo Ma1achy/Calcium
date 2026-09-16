@@ -339,6 +339,10 @@ describe("C22 §6i — the ticker is the second writer", () => {
     }
   });
 
+  it.todo(
+    "T4.17u (C22 I105, F1197): a spinner alone renders at least 9 times and an orbit alone at least 27 over thirty 33 ms wakes — not deferred on a component: the code commit replaces this row",
+  );
+
   it("T4.17k (C22 I73, AN5): without synchronised update the rate is capped, and with it it is not", async () => {
     vi.useFakeTimers();
     try {
