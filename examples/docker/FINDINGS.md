@@ -53356,7 +53356,7 @@ line even when the profile clears it.
 |---|---|
 | **Surface** | `truncateParts` and `truncate` (`src/presentation/text.ts`). Each measures the line, and a line over the width then has every grapheme cluster of the *whole* line built — `[...GRAPHEMES.segment(whole)].map((s) => s.segment)`, a record and a string per cluster — before a walk from the front spends the budget and stops. The clusters past the cut are built and dropped, so the cost is the line's and not the width's. `raw`'s render asks it for every line it draws (`kinds/simple.ts`), `code`'s for every row over the width, and the reverse arm (`from: "start"`) is the one caller that needs the whole line. |
 | **Reached for** | `--cpu-prof` over `stress text` at 120×40 — 200 markdown responses of eight paragraphs, forty PageUps: `truncateParts` self **134–153 ms** of a 697-frame run, all of it under `raw`'s render on the miss path; the profiler's `byKind.raw` 5,120 renders summing 191 ms, 37 µs each against a p50 of 10. The measurement that explains it: a markdown paragraph is one `raw` line — C04's markdown makes a paragraph a `raw` block, and `raw` never wraps — of 300 to 600 cells, and `truncateParts` on a 329-cell bench paragraph at width 118 costs **94 µs**, against 1.9 at a width that keeps it whole: 329 segment records for a 117-cell answer. About 0.4 ms of each of the 441 miss frames, and the same per over-width row in `code`. |
-| **Verdict** | **Open.** |
+| **Verdict** | **Closed — built and measured.** The head arm walks with the measurer's cursor and stops at the cut; the tail arm reads the whole line's boundaries from the same cursor. Byte-identical because the cursor's clusters are the segmenter's on every input (C09 I63, I74), which T1.53 holds against the iterator walk it replaces; the goldens are the gate that says so over every frame. |
 
 **Remedy, sized.** Walk the clusters in place with the measurer's cursor — `plainRun`,
 `soloAt`, `clusterAt`, the boundary every path of `cells` and `fitStyled` already reads
@@ -53366,3 +53366,28 @@ and the two arms cannot round differently at a CJK or ZWJ edge. Byte-identical b
 the cursor's clusters are the segmenter's on every input T1.40 and T1.51 sweep. One C09
 invariant, a unit corpus over both arms at widths over and under the line, a cost row, a
 fail-on-revert row, a mutation run whose control segments the whole line.
+
+**Closed — built and measured.** `keptWithin` in `text.ts` (C09 I79, commitment 68,
+T1.53, T3.90, T6.125; `c09-cut-walk` 3/3 with its control, `quadratic-cursor` and
+`c09-fit-pad` green). Gates: enforce, 6,616 unit-to-e2e, 458 goldens with no mover, 137
+e2e. **The baseline was rebuilt from the commit, not taken from a copy**: the copy on
+hand was checked against the I78 return and lacked it, so the F1204 close commit was
+built in a worktree into its own `dist/` and the bench pointed at that. Three paired
+rounds at 120×40, medians of work per run, before → after, with the Ink measurement
+agent's builds and profiles sharing the container through the first round:
+
+| case | work sum (ms) | note |
+|---|---|---|
+| text | 612 → 590 · rounds 907/563/612 → 485/590/674 | bimodal on both sides, as F1204 recorded; the spread is the process's |
+| code | 651 → 598 | `code`'s over-width rows take the same cut |
+| mixed | 524 → 424 | |
+| patch | 637 → 466 | |
+| session | 367 → 310 | |
+| logs | 227 → 226 | no line over the width; flat as expected |
+
+The profile is the reading the bench cannot give on text: over a 6 s run,
+`truncateParts` **134 → 24 ms** inclusive (131 → 18 under `raw`'s render, 3 → 6 under
+`code`'s), `keptWithin` 5 ms of the 24, and `renderSequenceToLines` 305 → 227 ms.
+Per paragraph the micro-bench's 94 µs is now the cursor's few. T1.53's corpus found
+one edge the spec row had over-stated: at the sweep's top width the answer is the
+line itself, not `width` cells, and the row was amended before the code landed.
