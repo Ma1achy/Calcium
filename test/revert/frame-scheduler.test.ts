@@ -17,7 +17,8 @@ describe("C03 fail-on-revert", () => {
     const { scheduler, render, clock } = harness();
     scheduler.commit("input");
     expect(render).toHaveBeenCalledTimes(1);
-    expect(clock.outstanding).toBe(0);
+    expect(clock.outstanding, "the slot, not a window for the input (I17)").toBe(1);
+    expect(scheduler.pending).toBe(false);
 
     // T3.13's property: the window cannot be supplied in the first place.
     expect(() => harness({ windows: { input: 1 } })).toThrow(RangeError);

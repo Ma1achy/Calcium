@@ -129,8 +129,17 @@ const wake = async (
   built: { clock: { advance: (ms: number) => void } },
   ms: number,
 ): Promise<void> => {
+  // **Two clocks, kept in step.** A zero-delay timer armed at the end of one
+  // drain is fired by the fake in the next, and a zero-length advance does not
+  // flush it — so the first millisecond drains before the injected clock
+  // moves. Advancing the clock first made the ticker read such a wake as
+  // sixteen milliseconds late, arm the next for a full window, and tie with
+  // the slot C03 I17 leaves standing: a miss every third frame that no real
+  // clock produces, because a real wake armed after a paint is due strictly
+  // inside the slot (F1200).
+  await vi.advanceTimersByTimeAsync(1);
   built.clock.advance(ms);
-  await vi.advanceTimersByTimeAsync(ms);
+  await vi.advanceTimersByTimeAsync(ms - 1);
 };
 
 /**

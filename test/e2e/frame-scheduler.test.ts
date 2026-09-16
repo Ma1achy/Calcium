@@ -35,9 +35,9 @@ describe("C03 e2e", () => {
       expect(r["commits"]).toBeGreaterThan(9_000);
 
       // A ceiling approached from below, not a band around a cadence. The
-      // window is armed after the previous frame completes, so the real gap is
-      // window + frame cost + timer slop — about 39 ms measured against the
-      // 33 ms window it shipped with, and the same shape against 16 (F1199).
+      // window opens as each write begins (C03 I17, F1200), so the real gap is
+      // window + timer slop; before that it was window + frame cost + slop —
+      // about 39 ms measured against the 33 ms window it shipped with.
       // Exceeding the ceiling would mean the window is not being honoured;
       // collapsing below 40/s would mean it is being honoured badly.
       expect(r["framesPerSecond"], "the 16 ms ceiling must hold").toBeLessThanOrEqual(62.5);

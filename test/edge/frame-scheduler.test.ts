@@ -283,7 +283,7 @@ describe("C03 re-entrancy", () => {
     // One deferred write, immediate — not two, and not deferred to 16 ms.
     expect(h.render).toHaveBeenCalledTimes(2);
     expect(h.scheduler.pending).toBe(false);
-    expect(h.clock.outstanding).toBe(0);
+    expect(h.clock.outstanding, "the second write's slot (I17)").toBe(1);
   });
 });
 
@@ -340,6 +340,33 @@ describe("C03 acquisition moving underneath a timer", () => {
 
     // A snapshotted view would never write at all — see T3.24.
     expect(h.render).toHaveBeenCalledTimes(1);
+  });
+
+  it("T3.25 (I17, I3): a spinner commit inside the slot is served at its close and arms nothing", () => {
+    const h = build();
+
+    h.scheduler.commit("input");
+    expect(h.render).toHaveBeenCalledTimes(1);
+    expect(h.clock.armed, "the slot").toEqual([16]);
+
+    h.clock.advance(5);
+    h.scheduler.commit("spinner");
+    // 80 is not strictly shorter than the 16 standing, so nothing is armed
+    // (I3); the spinner is drawn when the slot closes, 16 after the frame and
+    // not 80 after its commit.
+    expect(h.clock.arms).toEqual([16]);
+    expect(h.scheduler.pending).toBe(true);
+
+    h.clock.advance(11);
+    expect(h.render).toHaveBeenCalledTimes(2);
+
+    // The same for resize: the flag is set and the slot stands.
+    h.clock.advance(5);
+    h.scheduler.commit("resize");
+    expect(h.scheduler.contaminated).toBe(true);
+    expect(h.clock.arms).toEqual([16, 16]);
+    h.clock.advance(11);
+    expect(h.repaint).toHaveBeenCalledTimes(1);
   });
 
   it("T3.24 (I12): a snapshotted lifecycle view drops every frame, in silence", () => {
@@ -421,7 +448,7 @@ describe("C03 coalescing under load", () => {
 
     expect(h.repaint, "and it repaints, because the resize contaminated").toHaveBeenCalledTimes(1);
     expect(h.render, "the stream's own frame never happens separately").not.toHaveBeenCalled();
-    expect(h.clock.outstanding).toBe(0);
+    expect(h.clock.outstanding, "the slot (I17)").toBe(1);
     expect(h.scheduler.pending).toBe(false);
   });
 
