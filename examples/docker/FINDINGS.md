@@ -52877,3 +52877,34 @@ mixed              60      366   0.0         -      1582       0.6   4.3   26   
 **The bunny stays where it is.** `livemesh:bunny` draws 17.5 fps at 53% of a core and 30 ms a frame; twelve bunnies at 120×40 keep two or three on screen, and the raster is the frame. F1155–F1188 took the allocation out of it; what is left is the arithmetic, and culling would move goldens. The goal's own concession covers it.
 
 **Two readings of the instrument itself.** A count argument passed as the empty string was read as `Number("") = 0` entries and the first profile measured a transcript of nothing (fixed: empty means the default). And the `ms/frame` column at the low frame rates is inflated by the profiler's own 25 ms sampler — the spinner case's 4.2 ms is mostly sampler — which is why the bench now samples at 250 ms and the first re-take is the honest column.
+
+## F1197 — the ticker's period is its interval plus C03's window, so a spinner draws at 5 fps where the spec states 10 and an orbit at 7 where it states 30 — and the spec's own row measured the half and kept it ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `#armSpinner` in `src/shell/session.ts`, which arms the next wake **out of `#render`** — after the paint — for the full interval (`ms` = the fastest of the spinner set's 80 ms, `ORBIT_MS` 33, the image frames' due). `#animate` then commits `spinner` or `stream`, and C03 holds the frame for its window (100 or 33 ms) before the paint that re-arms. The two waits are serial. |
+| **Reached for** | `tools/bench/stress.mjs spinners` and `steps` (F1196): **5.2 fps** drawn over four seconds, 300 entries. `tools/bench/plots.mjs orbit suzanne` under `ORBIT_MS=2000` and `6000`: 28 and 56 frames — **7 fps** over the difference, against a 4 ms frame (work p50 3.8). C22 I60a: *the braille default declares 80 ms and is observed at 100*; I73: *`commit("spinner")` draws at 10fps however fast the timer fires* and *a full-frame rewrite at 10fps instead of 30*. `test/integration/orbit-wiring.test.ts` T4.17j's comment: *Measured over 990 ms of the clock: 5 for the spinner alone, 15 with the orbit live* — the defect's own figures, kept as the ratio the row bounds. |
+| **Verdict** | **open.** The period is `interval + window` where I60a's *floor* needs `max(interval, window)`: 80 + 100 = 180 ms is 5.5 fps; 33 + 33 = 66 ms is 15 fps under fake timers and 7 measured, the paint's own cost and the settle adding to the chain. Every animated surface — spinner, steps, orbit, animated image — runs at roughly half its designed rate, and the goal names 60. |
+
+**Why the spec read as satisfied.** I60a says the window is a floor *under* the
+ticker, which is true of one wake: a tick at 80 ms is drawn no sooner than 100.
+It says nothing about where the *next* wake is armed from, and `#render` arms it
+from the paint — so the floor is laid end to end with the interval instead of
+beneath it. T4.17j measured 5 and 15, wrote both numbers into its comment, and
+asserted only that the second exceeds twice the first, which the defect
+satisfies exactly as the fix does. This is *ask where a settled claim is written
+down* with the record present and wrong: the sentence *observed at 100* was a
+derivation from C03's table, never a measurement, and the row beside it held the
+measurement that contradicted it.
+
+**Remedy, sized.** Arm the wake for the *stamp's* next due time rather than for
+the interval after the paint: `delay = max(0, min(tickAt + spinnerMs, motionAt +
+orbitMs, now + framesMs) − now)`, the stamps being the ones I74 already advances
+by whole intervals. A paint that lands at the end of the window then re-arms a
+wake that is already due, and the next frame follows one window later — the
+period becomes `max(interval, window)`: 100 ms for the braille spinner, 33 for
+the orbit, and the tick arithmetic (whole steps, remainder kept) is unchanged. A
+new invariant on C22 stating the period; T4.17j's comment corrected and a rate
+row added that fails on the shipped code; the fail-on-revert row is the shipped
+arming. One file in `src/`, no spec change outside C22, byte-identical frames —
+only their timing moves.
