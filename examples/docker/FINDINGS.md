@@ -53461,7 +53461,63 @@ own entry rather than folded into this one.
 |---|---|
 | **Surface** | `armTimer`/`writeFrame` (`src/terminal/frame-scheduler.ts`): every write opens the next window as it begins (C03 I17) and the window is armed from that moment, so Node's timer granularity — a median of 0.80 to 1.16 ms measured on the slot itself — joins every period and is never recovered. C03 cannot correct it: it has no clock (C03 I11, A03 SS1) and the injected timer reports that it fired, never how long it had been running. The correction belongs in the composition root, where the clock is injected. |
 | **Reached for** | With F1206's poll chained, the live cases read `stream` 59.5–61.3, `live:line` 58.0–60.5, `everylive` 58.0–60.0 over five runs each at 120×40 — a second under A02 §7's sixty and, on `stream`, occasionally a second over it. The slot's own instrument (`out/log-pace4.mjs`) says the slot is now what closes the frame often enough to matter: **fired 237 of 1,222 arms in `stream`, 235 of 520 in `live:line`, 175 of 488 in `everylive`**, at a median lateness of 0.80, 0.93 and 1.16 ms. |
-| **Verdict** | **Open.** |
+| **Verdict** | **Closed** — C22 I108 amended and landed (`5fe8aa0e`, `490e22c9`). |
+
+**Closed.** The mechanism is the one withdrawn under F1206 and it needed two amendments,
+both forced by a red gate rather than by a second opinion.
+
+**Only a window of the same length chains.** A session runs several cadences at once —
+C03's 16 ms stream window, its 80 ms spinner window, the ticker's own interval — and an
+arm of one length dated from the deadline of another places a frame on a cadence it does
+not belong to. It reads as a halved rate, not as a phase error, which is why T4.35 and
+T4.8 named a spinner and not a chain.
+
+**A replay is not paced at all.** Taking the pacer's clock reads off the recording's
+positional channel (C28 I53) is not enough: how many times the schedule arms is itself a
+function of when timers fired, so a paced replay composes a different number of frames
+than the recording it is checked against and exhausts the recorded clock. T5.1, T5.1c and
+T5.1d all said so. A session built with `profile.replay` gets the ambient schedule its
+recording was driven by.
+
+**Three harness defects stood between the mechanism and its effect, and each read as the
+mechanism being wrong.** This is the same lesson as F1206's wrong seam, arriving from the
+instrument's side rather than the subject's.
+
+- `test/support/session.ts` injected `elapsed: () => 0` at both fixture sites — honest
+  about profiling being off, and it stills every consumer that dates an interval from that
+  clock. The pacer computed each delay against a present of zero while its deadline walked
+  forward, reaching 200 ms of `due` at time zero; an orbit drew ten frames a second where
+  fifty-nine were asserted. A fixture's honest default made four rows read as a broken
+  subject.
+- `wake` in `orbit-wiring.test.ts` advanced the injected clock by a whole span and the
+  timers by the rest; `ramps.test.ts` did the reverse. Either way the two sat up to a span
+  apart for the length of the drain, against that helper's own docstring saying they move
+  at the same speed. Both now step a millisecond at a time.
+- The floor was the suspect throughout and was innocent. With chaining disabled the whole
+  tier is green at any floor and the mechanism is worthless; with the floor removed the
+  live cases run at 62.5 fps, past A02 §7's ceiling. The chain carries both the value and
+  the failure.
+
+**Measured, and the loaded reading is the weaker one.** The five-run reading above —
+60.0 on all three live cases to a tenth — was taken on a quiet host. Re-taken tonight over
+**seven paired rounds at 120×40 with the host at load 9.66** (the VM, the window server
+and three desktop applications), the medians are `stream` 57.2 → 58.0, `live:line`
+56.2 → 59.7, `everylive` 55.7 → 59.5. Head beats base on every case's median and `work`
+p50 improves on all four cases including `mixed` (0.856 → 0.728 ms), but the per-round
+spread exceeds the difference on every case individually — base `stream` ranges 39.9 to
+61.0 — so **this run does not on its own demonstrate the budget**, and the 60.0 figure
+belongs to the quiet host. A sign test over seven paired rounds cannot reject zero at
+4/7, 4/7 and 5/7 wins.
+
+**Gates.** enforce, 6,283 tests, 458 goldens with no movers, tier 5, and both mutation
+runs green with their controls — five caught on the schedule, three on the poll. Tier 5's
+`T5.6` (sixty idle seconds under a 0.5% CPU bound) went red at 0.76% during the chain with
+the host at load 10.06 and green at load 2.77 when re-run alone; both loads are recorded
+here rather than the row being called noise, because its margin is about two.
+
+**The replay gate is not mutated.** Its fail-on-revert is `T5.1`, which tier 5 runs against
+`dist/` — a build the mutation harness does not do, so a mutation there would run against
+stale bytes and read as survived. T6.123 names the row.
 
 **This is F1206's withdrawn remedy, and the reason it now stands is the measurement and
 not a second opinion.** C22 I108 was specified, built, covered 4/4 with a control and
