@@ -51776,7 +51776,7 @@ mesh on a `/all` scroll, a 137 ms frame.
 |---|---|
 | **Surface** | `src/presentation/plot/surface3.ts` `geometryOf`: `faceN` as `idx.map` of `cross(sub, sub)` — three objects a face; `vertN` re-made per face-vertex — `vertN[k] = { x: acc.x + n.x, … }`, three objects a face; a `for … of` over each face's index triple, twice; `unit(faceN[f])` a fourth object a face; an `at` closure a face; `cullSign`'s `dot(cross(…))` an object a face. The kept geometry — a position, a normal and a vertex record per referenced vertex, a corner, a face normal and a triangle per face — is what the raster reads and stays |
 | **Reached for** | `probe-cold.mjs` on the F1180 build under `make load-down`: the bunny's first frame **67–104 ms** against a warm one at **13.5–14.5**, and `geometryOf` alone **37–53 ms and 42 MB** a triangulation over 69,451 faces; the teapot **8.6 ms and 16 MB**, suzanne **2.3 ms and 4 MB**. On the `/all` scroll the first render of each mesh figure triangulates it, `geometryOf` is 46.7 ms self and the largest frame is **137 ms**, against a p95 of 4.5 (F507's cold figure, re-taken). Sized on a dist copy with the face normals and the vertex sums in two `Float64Array` lanes, the scalar arithmetic in `cross`'s and `sub`'s order, the index triple read by position, the vertex normal made once when its record is, and `cullSign` in scalars: bit-identical geometry over the three meshes and a grid under both shadings, the bunny **37 → 15 ms warm, 51 → 33 cold, 42 → 27 MB**, the teapot **8.6 → 1.3 ms, 16 → 2.7 MB**, suzanne **2.3 → 1.1 ms**, the bunny's first frame **67 → 55 ms** |
-| **Verdict** | **open** — measured, the remedy sized |
+| **Verdict** | **closed** — built and measured: C12 I137, T1.149, `c12-geometry` |
 
 **Remedy, sized.** C12 I137: the builder accumulates in scalars and two
 lanes and allocates only what the geometry keeps. The face normal is
@@ -51788,3 +51788,28 @@ the three divisions, answering the values unchanged when the length is
 zero; the corners and the triangles read each face's triple by position. A
 row builds the same meshes and grids through a reference written over the
 `Vec3` helpers and asks for bit equality and the same vertex sharing.
+
+**Closed — built and measured.** C12 I137 as sized, with the vertex normal
+made once when its record is, so an unreferenced vertex costs nothing.
+T1.149 holds every number by `Object.is` to the reference and the sharing of
+records by identity over the three meshes, six seeded grids and a face that
+names a vertex twice, in under a second; SF3's unit-averaging mutation,
+PR12's every-vertex set and T1.142's corner-per-face were re-anchored on the
+lanes and caught. `c12-geometry` gained three: a corner's sum skipped, the
+record made per corner, the zero length divided — ten caught, none survived;
+`c12-surface3d` twenty-one, `c12-span-corners` and `c12-vertex-once` three
+each. Gates green, goldens 458 with no mover, e2e green.
+
+| `probe-cold.mjs`, `make load-down` | before | after |
+|---|---|---|
+| bunny `geometryOf`, cold / warm | 48.3 / 32.5–37.5 ms | 38.9 / 14.6–15.2 ms |
+| bunny `geometryOf` heap | 42.0–42.7 MB | 28.4–30.5 MB |
+| bunny first frame / second / third | 110.7 / 19.0 / 15.4 ms | 89.4 / 22.0 / 14.5 ms |
+| teapot `geometryOf` | 3.0–10.6 ms, 13–16 MB | 1.2–1.5 ms, 2.7 MB |
+| suzanne `geometryOf` | 1.4–2.2 ms, 2.7–4.1 MB | 1.0–1.2 ms, 1.7–1.9 MB |
+| paired warm bunny, `probe-f6-pair` n=40 | A p50 17.7 ms | B p50 14.6, B−A median −2.6 ms, B faster in 37 of 40 |
+
+What remains: the bunny's kept geometry is 28 MB of records — a position, a
+record, a normal and a corner per vertex, a normal and a triangle per face —
+and the cold call's 39 ms is now mostly building them; `plot3dArea`'s boxed
+sample arrays; `normaliseRow`'s byte scan.
