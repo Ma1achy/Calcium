@@ -52726,3 +52726,52 @@ compiled form, and a minified stack is a card nobody can read. Bundling
 `node_modules/ink/build/ink.js`. Replacing `dist/`'s file tree — every tier-5
 child, probe and tool reads it by path, and it is what the bundle is built
 from.
+
+**Closed — built and measured.** A04 §5, C24 I38 and C28 I65 as sized:
+`tools/bundle.mjs` after `tsc` (six entries, `splitting`, `packages:
+"external"`, linked maps without sources, into `dist/bundle/`), the six
+`default` targets moved there with every `types` on the tree, `esbuild` 0.28.2
+in `DEPENDENCIES.md`'s Development table pinned to the copy `tsx` brings;
+`src/shell/profiling/locate.ts` and a locator parameter on `foldCpuProfile`,
+created once per inspector. T5.8 runs the bundled entries under the import
+trace — the count, the six parity lists, `b.live` through the runtime read by
+`liveParts` through `testing`, the emulator chunk after a shell command and
+not before, and the export map beside files that exist; T1.129 holds the
+locator over a synthetic map and T5.5 over the built chunk, naming
+`registry.ts` and the declaration's line. Mutation runs: `c24-bundle` control
+caught, four of four (the runtime pointed back at the tree, packages bundled
+in — R4.7's count reads zero es-toolkit resolutions — no maps, an entry
+dropped); `c28-locate` control caught, five of five. Gates: enforce green,
+6,264 root rows and every example suite, 458 goldens with no mover, 137 e2e.
+
+**Three rows encoded the old shape and none of them named it.** The seal's
+`packageRoot()`, the minimal example's README row and two C24 contract rows
+each derived a path from the runtime's resolved URL by one `../` or from the
+`default` target by a regex — correct for as long as the entry was
+`dist/index.js`, and wrong by one directory the moment it was not. Each now
+derives from what actually names the thing: the root is whatever sits above
+`dist/`, and an entry's source is beside its `types` target.
+
+| reading, F1192 build A (the tree) against this build B (the bundle), both armed by `prepareLaunch()`, `make load-down`, load average 3–5 as the suite drained | A | B |
+|---|---|---|
+| modules on a cold import under the trace | 1,133 | **302** |
+| cold import, container-local, no compile cache, eight interleaved pairs | 278 / 183 / 202 / 169 / 206 / 267 / 249 / 199 ms | 182 / 128 / 137 / 136 / 187 / 178 / 172 / 149 — **B lighter 8 of 8, paired median −60 ms of about 210** |
+| cold import, container-local, compile cache warm, eight pairs | 183 / 176 / 216 / 216 / 237 / 148 / 140 / 161 | 130 / 186 / 133 / 129 / 150 / 96 / 106 / 105 — **7 of 8, paired median −54 ms of about 180** |
+| heap used after the import · RSS | 30–31 MB · 113–125 | **21–23 MB · 101–111**, every pair |
+| `plots-tui` end to end to its no-TTY exit, on the bind mount, the shipped launcher against the same launcher with every `dist/bundle/` resolution redirected to the tree, six pairs | 618 / 537 / 603 / 548 / 557 / 526 | 385 / 418 / 393 / 362 / 364 / 387 — **6 of 6, paired median −183 ms of about 550, a third** |
+| the bundle's build | — | 347 ms after `tsc`; nine files, 2.1 MB against the tree's 12 |
+
+**What the end-to-end figure says.** The launcher's start on the filesystem
+this repository develops on is where the loader's per-file cost is largest,
+and it is where the bundle takes the most: a third of the whole start, against
+a quarter of a quiet container-local import. The frame is untouched — same
+code, same order, the golden tier at 458 — and the profiler's card names
+`src/presentation/blocks/registry.ts:1074` from a chunk frame, which is the
+name it showed before there was a chunk.
+
+**What remains.** Ink's hundred modules, React's forty and Yoga's
+instantiation are the renderer's floor; the compile cache (R4.6) and the
+narrowed barrel (C24 I37) are what the launchers do about them. The `minimal`
+example's launcher still carries neither R4.6 nor R4.7 by R4.4's rule. The
+next figure on a cold start is Node itself — about 40 ms before the first
+line of the launcher runs — and it is not Calcium's.
