@@ -37,8 +37,8 @@ const results = runPass({
   run,
   control: {
     file: SF,
-    from: "  w.stamp = frame.stamp;\n  frame.projected += 1;",
-    to: "  w.stamp = frame.stamp;\n  frame.projected += 2;",
+    from: "  L.stamps[k] = shown ? frame.stamp : -frame.stamp;\n  frame.projected += 1;",
+    to: "  L.stamps[k] = shown ? frame.stamp : -frame.stamp;\n  frame.projected += 2;",
     why: "the count doubles and no byte of any frame moves; only T1.142's hand-counted cube sees it",
   },
   mutations: [
@@ -48,8 +48,8 @@ const results = runPass({
       // face, which is the flat figure.
       name: "ALWAYS-PROJECT: the record on the vertex is never read back",
       file: SF,
-      from: "  if (w.stamp === frame.stamp && w.s !== undefined) return w.s;",
-      to: "  if (w.stamp === frame.stamp && w.s !== undefined && frame.stamp < 0) return w.s;",
+      from: "  if (held === frame.stamp) return true;",
+      to: "  if (held === frame.stamp && frame.stamp < 0) return true;",
       expect: "T1.142",
     },
     {
@@ -68,8 +68,8 @@ const results = runPass({
       // flat count.
       name: "CORNER-PER-FACE: smooth shading builds a vertex object per corner",
       file: SF,
-      from: "    const held = shared[k];\n    if (held !== undefined) return held;",
-      to: "    const held = shared[k];\n    if (held !== undefined && flat) return held;",
+      from: "        let j = slotOf[k] as number;\n        if (j < 0) {",
+      to: "        let j = slotOf[k] as number;\n        if (j < 0 || !flat) {",
       expect: "T1.142",
     },
   ],

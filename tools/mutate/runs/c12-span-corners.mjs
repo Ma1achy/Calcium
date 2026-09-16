@@ -46,8 +46,8 @@ const results = runPass({
   run,
   control: {
     file: S3,
-    from: "  const span = spanOverCorners(scene.basis, scene.corners, nearD, farD, loV, hiV);",
-    to: "  const span = spanOverCorners(scene.basis, [], nearD, farD, loV, hiV);",
+    from: "  for (let k = 0; k < scene.lanes.length; k += 1) { // cells-ok — a surface index",
+    to: "  for (let k = 0; k < 0; k += 1) { // cells-ok — a surface index",
     why: "the ramps keyed to the clouds and paths alone — C04 I79's defect at the read; the mesh goldens must move or they cannot see the ramp",
   },
   mutations: [
@@ -57,8 +57,8 @@ const results = runPass({
       // places one nearest the eye and compares the frame with the mesh alone.
       name: "SPAN-EVERY-VERTEX: the referenced set is every vertex",
       file: SF,
-      from: "    for (let m = 0; m < 3; m += 1) { // cells-ok — a corner index\n      const k = face[m] as number;\n      if (seen[k] === 1) continue;",
-      to: "    for (let m = 0; m < (f === 0 ? count : 3); m += 1) { // cells-ok — a corner index\n      const k = f === 0 ? m : face[m] as number;\n      if (seen[k] === 1) continue;",
+      from: "  const lanes = makeLanes(n, faces);",
+      to: "  const lanes = makeLanes(flat ? n : count, faces);",
       expect: "PR12",
     },
     {
@@ -67,8 +67,8 @@ const results = runPass({
       // move too.
       name: "CORNERS-EMPTY: the referenced set is never filled",
       file: SF,
-      from: "      corners.push({ p: pts[k] as Vec3, v: values[k] });",
-      to: "      seen[k] = 1;",
+      from: "      pos[q] = p.x;\n      pos[q + 1] = p.y;\n      pos[q + 2] = p.z;",
+      to: "      pos[q] = 0;\n      pos[q + 1] = 0;\n      pos[q + 2] = 0;",
       expect: "PR12b",
     },
     {
@@ -77,8 +77,8 @@ const results = runPass({
       // by value and reads the colours off the frame.
       name: "CORNER-VALUE-DROPPED: a corner carries no value",
       file: SF,
-      from: "      corners.push({ p: pts[k] as Vec3, v: values[k] });",
-      to: "      corners.push({ p: pts[k] as Vec3, v: undefined });",
+      from: "      value[j] = values[k];",
+      to: "      value[j] = undefined;",
       expect: "SF5",
     },
   ],

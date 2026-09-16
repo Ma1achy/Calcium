@@ -36,8 +36,8 @@ const results = runPass({
   run,
   control: {
     file: SF,
-    from: "  if (hiddenThin(a, b, c, grid, depth)) {",
-    to: "  if (false && hiddenThin(a, b, c, grid, depth)) {",
+    from: "  if (hiddenThin(L, ia, ib, ic, grid, depth)) {",
+    to: "  if (false && hiddenThin(L, ia, ib, ic, grid, depth)) {",
     why: "the check removed: no byte of any frame moves and the count is zero; T1.150's count arm alone sees it",
   },
   mutations: [
@@ -46,8 +46,8 @@ const results = runPass({
       // `0`, the cell holds `fround(1e-20)`, and the check marks the triangle.
       name: "Z-MARGIN-DROPPED: the floor is the nearest corner exactly",
       file: SF,
-      from: "  const zlo = Math.fround(Math.min(a.vz, b.vz, c.vz) - zspan * MARGIN);",
-      to: "  const zlo = Math.fround(Math.min(a.vz, b.vz, c.vz) - zspan * 0);",
+      from: "  const zlo = Math.fround(Math.min(avz, bvz, cvz) - zspan * MARGIN);",
+      to: "  const zlo = Math.fround(Math.min(avz, bvz, cvz) - zspan * 0);",
       expect: "T1.150",
     },
     {

@@ -61,8 +61,8 @@ const results = runPass({
       // the depth, and the first projected point is off in more than a bit.
       name: "DEPTH-ALONG-UP: the corner pass dots with the basis's up vector",
       file: P,
-      from: "  const f = basis.forward;\n  for (let i = 0; i < corners.length; i += 1) {",
-      to: "  const f = basis.up;\n  for (let i = 0; i < corners.length; i += 1) {",
+      from: "  const f = basis.forward;\n  const P = lanes.pos;",
+      to: "  const f = basis.up;\n  const P = lanes.pos;",
       expect: "T1.147",
     },
     {
@@ -71,8 +71,8 @@ const results = runPass({
       // the corpus where it expected the hand-in.
       name: "INCOMING-DROPPED: the pass starts from open bounds whatever it is handed",
       file: P,
-      from: "  const e = basis.eye;\n  const f = basis.forward;\n  for (let i = 0; i < corners.length; i += 1) {",
-      to: "  nearD = Infinity; farD = -Infinity; loV = Infinity; hiV = -Infinity;\n  const e = basis.eye;\n  const f = basis.forward;\n  for (let i = 0; i < corners.length; i += 1) {",
+      from: "  const e = basis.eye;\n  const f = basis.forward;\n  const P = lanes.pos;",
+      to: "  nearD = Infinity; farD = -Infinity; loV = Infinity; hiV = -Infinity;\n  const e = basis.eye;\n  const f = basis.forward;\n  const P = lanes.pos;",
       expect: "T1.147",
     },
     {

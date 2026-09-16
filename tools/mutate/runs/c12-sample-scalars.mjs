@@ -42,8 +42,8 @@ const results = runPass({
   run,
   control: {
     file: SF,
-    from: "      lane[LANE_NY] = a.ny * ua + b.ny * ub + c.ny * uc;",
-    to: "      lane[LANE_NY] = a.nx * ua + b.nx * ub + c.nx * uc;",
+    from: "      lane[LANE_NY] = any * ua + bny * ub + cny * uc;",
+    to: "      lane[LANE_NY] = anx * ua + bnx * ub + cnx * uc;",
     why: "the fill's normal takes its x for its y — the lighting moves on every face, which PR15 and the mesh goldens both see",
   },
   mutations: [
@@ -84,8 +84,8 @@ const results = runPass({
       // the stroked samples take the far corner's shade.
       name: "THIN-VP-FROM-Q: the stroke's view position is q's",
       file: SF,
-      from: "    lane[LANE_VX] = p.vx + (q.vx - p.vx) * t;\n    lane[LANE_VY] = p.vy + (q.vy - p.vy) * t;",
-      to: "    lane[LANE_VX] = q.vx;\n    lane[LANE_VY] = q.vy;",
+      from: "    lane[LANE_VX] = pvx + (qvx - pvx) * t;\n    lane[LANE_VY] = pvy + (qvy - pvy) * t;",
+      to: "    lane[LANE_VX] = qvx;\n    lane[LANE_VY] = qvy;",
       expect: "PR15 thin",
     },
     {
@@ -95,8 +95,8 @@ const results = runPass({
       // PR15 thin — the referee — sees it.
       name: "SEG-ROUNDED: the thin stroke's copy of the stepping rounds its coordinates",
       file: SF,
-      from: "    const px = Math.floor(x0 + (x1 - x0) * t); // cells-ok — a sample coordinate\n    const py = Math.floor(y0 + (y1 - y0) * t); // cells-ok — a sample coordinate\n    const z = p.vz + (q.vz - p.vz) * t;",
-      to: "    const px = Math.round(x0 + (x1 - x0) * t); // cells-ok — a sample coordinate\n    const py = Math.round(y0 + (y1 - y0) * t); // cells-ok — a sample coordinate\n    const z = p.vz + (q.vz - p.vz) * t;",
+      from: "    const px = Math.floor(x0 + (x1 - x0) * t); // cells-ok — a sample coordinate\n    const py = Math.floor(y0 + (y1 - y0) * t); // cells-ok — a sample coordinate\n    const z = pvz + (qvz - pvz) * t;",
+      to: "    const px = Math.round(x0 + (x1 - x0) * t); // cells-ok — a sample coordinate\n    const py = Math.round(y0 + (y1 - y0) * t); // cells-ok — a sample coordinate\n    const z = pvz + (qvz - pvz) * t;",
       expect: "PR15 thin",
     },
     {
@@ -115,8 +115,8 @@ const results = runPass({
       // asked for none.
       name: "THIN-EDGE-IGNORES-WIRE: a stroked edge is own regardless of wire",
       file: SF,
-      from: "  thinEdge(a, b, e[0] && wire, series, grid, depth, light, span, paint);",
-      to: "  thinEdge(a, b, e[0], series, grid, depth, light, span, paint);",
+      from: "  thinEdge(L, ia, ib, e[0] && wire, series, grid, depth, light, span, paint);",
+      to: "  thinEdge(L, ia, ib, e[0], series, grid, depth, light, span, paint);",
       expect: "WF",
     },
   ],

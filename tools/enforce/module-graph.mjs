@@ -1843,6 +1843,28 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "composition layer reads `skin.wire` because it owns the paint policy, and " +
     "has no use for this: the cull moves neither the extent nor the depth span.",
 
+  // **`Lanes` is the geometry's storage, and three of its lanes have one
+  // reader by design** (C12 I139, F1184). The record is exported because
+  // `geometryOf` returns it and `scatter3.ts` holds it across frames (I107) and
+  // hands it to the span (`count`, `value`) and the raster (`idx`, `screen`,
+  // `stamps` — read where `drawTri` is called with a frame). The position and
+  // normal lanes are read by the cull, the projection and the fill, all in
+  // `surface3.ts`; the spare-value list is written and read by the clip path
+  // alone. A second reader of a position lane outside the raster would be a
+  // second projection, which I134 made single; a second reader of the spare
+  // values would be a second clip path. The tests read them through `cornerAt`
+  // and `screenAt`, which are the readers the layout is held against.
+  "Lanes.pos":
+    "C12 I139 — the position lane: read by the cull, the projection and the span inside " +
+    "surface3.ts, and by T1.149 and T1.151 through cornerAt. A reader outside the raster " +
+    "would be a second projection (I134)",
+  "Lanes.nrm":
+    "C12 I139 — the unit-normal lane: read by the projection into the screen slot, and by " +
+    "T1.149 through cornerAt. The shade reads the slot, never the lane",
+  "Lanes.spareValue":
+    "C12 I139 — the clip path's three cut values, written and read by clipPath and the fill " +
+    "in one function. A second reader would be a second clip path",
+
   // --- published ahead of the value that makes it readable ------------------
   //
   // **`Plot.graphLayout` was here and its exemption was simply wrong** (F1027).
@@ -3481,6 +3503,33 @@ export const UNCONSUMED_FUNCTIONS = Object.freeze({
     "C12 — `definition.ts` computes `areaWidth` inline across a three-rung ladder with " +
     "`MIN_AREA`, and this helper states the simple case. Two expressions of one width, " +
     "and the helper is the one no renderer calls. C12's to reconcile",
+
+  // --- the lanes' readers, exported as the reference the layout is held against --
+  //
+  // **The lanes are numbers at an address, and the rows need a reader** (C12
+  // I139, F1184). `cornerAt`/`cornersOf` read a raster vertex back as the
+  // `{p, n, v}` record the object form held; `screenAt` reads a slot back as
+  // the eight-field record; `placeScreen` writes one so T1.150 can hand
+  // `hiddenThin` the records it computed by hand; `geometryFrom` lays given
+  // corners out as lanes so a row can build one triangle without a mesh. No
+  // renderer calls any of them — the raster reads the lanes by offset, which
+  // is the point of the change — and a reader that lived only in the tests
+  // would be a second statement of the layout rather than the first (the
+  // shadeRgb argument above). They go the day the lanes go.
+  // (`cornerAt` itself is not listed: the gate counts it consumed.)
+  cornersOf:
+    "C12 I139 — a triangle's three corners read back as {p, n, v} records through cornerAt; " +
+    "consumed by T1.149, T1.151 and the mesh rows, by no renderer: the raster reads the lanes " +
+    "by offset",
+  screenAt:
+    "C12 I139 — a screen slot read back as the eight-field record T1.146 and T1.151 hold to " +
+    "project; the fill reads the slot by offset",
+  placeScreen:
+    "C12 I139 — a screen slot written from a hand-computed record so T1.150 can ask " +
+    "hiddenThin about corners no camera produced; toScreenAt is the only writer in src/",
+  geometryFrom:
+    "C12 I139 — given corners laid out as lanes, one triangle without a mesh, for the rows " +
+    "that used to write a Tri3 literal; geometryOf is the builder every renderer takes",
 
   // --- a refusal that runs at test time by design --------------------------
   hasEmojiForm:

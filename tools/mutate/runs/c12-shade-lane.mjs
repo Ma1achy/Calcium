@@ -36,8 +36,8 @@ const results = runPass({
   run,
   control: {
     file: SF,
-    from: "        blend(a.v, b.v, c.v, ua, ub, uc),\n        series,\n        lane[LANE_INTENSITY] as number,",
-    to: "        blend(a.v, b.v, c.v, ua, ub, uc),\n        series,\n        lane[LANE_DEPTH] as number,",
+    from: "        blend(va, vb, vc, ua, ub, uc),\n        series,\n        lane[LANE_INTENSITY] as number,",
+    to: "        blend(va, vb, vc, ua, ub, uc),\n        series,\n        lane[LANE_DEPTH] as number,",
     why: "the fill hands the painter the depth as the intensity; PR15 and T1.148 read the intensity, and the goldens move",
   },
   mutations: [
@@ -46,8 +46,8 @@ const results = runPass({
       // crossed component PR15 was written for, one store along.
       name: "FILL-SLOT-CROSSED: the fill writes the normal's x into the view position's x slot",
       file: SF,
-      from: "      lane[LANE_VX] = a.vx * ua + b.vx * ub + c.vx * uc;",
-      to: "      lane[LANE_VX] = a.nx * ua + b.nx * ub + c.nx * uc;",
+      from: "      lane[LANE_VX] = avx * ua + bvx * ub + cvx * uc;",
+      to: "      lane[LANE_VX] = anx * ua + bnx * ub + cnx * uc;",
       expect: "PR15",
     },
     {
@@ -56,8 +56,8 @@ const results = runPass({
       // every sample against its own t.
       name: "THIN-DEPTH-UNWRITTEN: the thin stroke leaves the depth slot to the previous sample",
       file: SF,
-      from: "    lane[LANE_VZ] = z;\n    lane[LANE_DEPTH] = z;\n    shadeAt(lane, light, span);\n    paint(\n      py * grid.width + px, // cells-ok — a sample offset\n      z,\n      p.v === undefined",
-      to: "    lane[LANE_VZ] = z;\n    shadeAt(lane, light, span);\n    paint(\n      py * grid.width + px, // cells-ok — a sample offset\n      z,\n      p.v === undefined",
+      from: "    lane[LANE_VZ] = z;\n    lane[LANE_DEPTH] = z;\n    shadeAt(lane, light, span);\n    paint(\n      py * grid.width + px, // cells-ok — a sample offset\n      z,\n      pv === undefined",
+      to: "    lane[LANE_VZ] = z;\n    shadeAt(lane, light, span);\n    paint(\n      py * grid.width + px, // cells-ok — a sample offset\n      z,\n      pv === undefined",
       expect: "PR15 thin",
     },
     {

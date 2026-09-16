@@ -59,8 +59,8 @@ import {
   geometryOf,
   spanOverCorners,
   surfacePoints,
-  type Corner,
   type Geometry3,
+  type Lanes,
   type Skin,
   type Tri3,
   type RasterFrame,
@@ -215,7 +215,7 @@ type Scene = Readonly<{
   strokes: readonly Stroke[];
   tris: readonly Tri3[];
   /** Every surface's referenced vertices, once each, for the ramp span (C12 I127). */
-  corners: readonly Corner[];
+  lanes: readonly Lanes[];
   /** This render's frame stamp over the surfaces' geometries (C12 I130). */
   stamp: number;
   identities: readonly Identity[];
@@ -509,15 +509,10 @@ function drawnOf(block: Plot, ctx: RenderContext, aspect: number): Scene {
   }
   const stamp = advanceFrame(built);
   let tris: readonly Tri3[];
-  let corners: readonly Corner[];
   if (built.length === 1) { // cells-ok — a surface count
     tris = (built[0] as Geometry3).tris;
-    corners = (built[0] as Geometry3).corners;
   } else {
     const out: Tri3[] = [];
-    const cs: Corner[] = [];
-    for (const b of built) for (const c of b.corners) cs.push(c);
-    corners = cs;
     // **A loop and never `push(...built)`** (F508). A spread is an argument
     // list: 100,000 elements is fine and 125,000 throws `RangeError: Maximum
     // call stack size exceeded`, from an expression that reads as a
@@ -528,12 +523,15 @@ function drawnOf(block: Plot, ctx: RenderContext, aspect: number): Scene {
     for (const b of built) for (const t of b.tris) out.push(t);
     tris = out;
   }
+  // **Each geometry's lanes, for the span** (C12 I127, I139).
+  const lanes: Lanes[] = [];
+  for (const b of built) lanes.push(b.lanes);
   return {
     drawn: out,
     strokes,
     stamp,
     tris,
-    corners,
+    lanes,
     identities: [...clouds, ...paths, ...skins],
     basis,
     lo: extent.min,
@@ -992,7 +990,10 @@ export function plot3dArea(
   // **The depth alone** (C12 I131, F1169): `project`'s first dot, not its
   // record — 35,947 of them a bunny frame — **in one function returning the
   // span once** (I135), so the bounds stay in registers over the pass.
-  const span = spanOverCorners(scene.basis, scene.corners, nearD, farD, loV, hiV);
+  let span = { nearD, farD, loV, hiV };
+  for (let k = 0; k < scene.lanes.length; k += 1) { // cells-ok — a surface index
+    span = spanOverCorners(scene.basis, scene.lanes[k] as Lanes, span.nearD, span.farD, span.loV, span.hiV);
+  }
 
   const depth = createDepth(grid.width, grid.height);
   // **One colour per sample, and `null` is *not drawn*.** A sparse raster has

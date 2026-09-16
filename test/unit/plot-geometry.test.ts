@@ -20,6 +20,7 @@ import { describe, expect, it } from "vitest";
 import { basisOf, extentOf, project } from "../../src/presentation/plot/project3.js";
 import {
   backfaceCulled,
+  cornersOf,
   geometryOf,
   surfacePoints,
   type Tri3,
@@ -272,7 +273,7 @@ describe("plot — the geometry suite", () => {
       const basis = basisOf(cams[axis] as never, WIDTH / 28);
       let flat = 0; // cells-ok — a face count
       for (const t of tris(m as unknown as Record<string, unknown>)) {
-        const p = [t.a.p, t.b.p, t.c.p].map((v) => project(basis, v));
+        const p = cornersOf(t).map((w) => project(basis, w.p));
         if (!p.every((q) => q !== null)) continue;
         const [A, B, C] = p as unknown as readonly [
           { x: number; y: number },

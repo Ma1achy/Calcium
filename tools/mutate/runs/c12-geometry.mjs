@@ -70,12 +70,12 @@ const results = await runPass({
       expect: "T1.149",
     },
     {
-      // **The vertex record made per corner** (I137, I130): smooth shading
+      // **The lane index made per corner** (I139, I130): smooth shading
       // shares nothing, and the raster would project a vertex per face.
-      name: "RECORD-UNSHARED: a smooth vertex record is made for every corner",
+      name: "RECORD-UNSHARED: a smooth vertex takes a lane index for every corner",
       file: SURFACE,
-      from: "    const held = shared[k];\n    if (held !== undefined) return held;\n    const q = k * 3;",
-      to: "    const q = k * 3;",
+      from: "        let j = slotOf[k] as number;\n        if (j < 0) {",
+      to: "        let j = slotOf[k] as number;\n        if (j < 0 || !flat) {",
       expect: "T1.149",
     },
     {
@@ -152,7 +152,7 @@ const results = await runPass({
       // draw nothing, and GM2 is the row that holds it.
       name: "a triangle under a sample of projected area draws nothing",
       file: SURFACE,
-      from: "  if (!(Math.abs(area) >= 1)) {\n    strokeThin(a, b, c, tri, e, grid, depth, light, span, paint);",
+      from: "  if (!(Math.abs(area) >= 1)) {\n    strokeThin(L, ia, ib, ic, tri, e, grid, depth, light, span, paint);",
       to: "  if (!(Math.abs(area) >= 1)) {",
       expect: "GM2",
     },

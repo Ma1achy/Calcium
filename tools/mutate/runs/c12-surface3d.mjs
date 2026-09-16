@@ -62,15 +62,10 @@ const results = await runPass({
       // it draws is a Gaussian with its peak at ambient and its rim lit.
       name: "the normal is dotted with the light in world space",
       file: F,
-      // **Both arms of `toScreen`** (C12 I130): the fresh record the tests'
-      // direct calls take and the held record the raster writes in place.
-      from: "      nx: n.x * r.x + n.y * r.y + n.z * r.z,\n      ny: n.x * u.x + n.y * u.y + n.z * u.z,\n      nz: n.x * f.x + n.y * f.y + n.z * f.z,",
-      to: "      nx: n.x,\n      ny: n.y,\n      nz: n.z,",
-      also: [{
-        file: F,
-        from: "  into.nx = n.x * r.x + n.y * r.y + n.z * r.z;\n  into.ny = n.x * u.x + n.y * u.y + n.z * u.z;\n  into.nz = n.x * f.x + n.y * f.y + n.z * f.z;",
-        to: "  into.nx = n.x;\n  into.ny = n.y;\n  into.nz = n.z;",
-      }],
+      // **The one arm of `toScreenAt`** (C12 I139): every record — a vertex's
+      // or a cut's — is written into its slot by this projection.
+      from: "  S[o + S_NX] = nx0 * r.x + ny0 * r.y + nz0 * r.z;\n  S[o + S_NY] = nx0 * u.x + ny0 * u.y + nz0 * u.z;\n  S[o + S_NZ] = nx0 * f.x + ny0 * f.y + nz0 * f.z;",
+      to: "  S[o + S_NX] = nx0;\n  S[o + S_NY] = ny0;\n  S[o + S_NZ] = nz0;",
       // **SF3a and not SF3.** SF3 asserts smooth carries more shades than flat,
       // which is true under this defect — it survived that row, and the row it
       // needed is the one about the light's *direction* (F459).
@@ -83,7 +78,7 @@ const results = await runPass({
       // keeping its line.
       name: "a degenerate triangle is filled rather than stroked",
       file: F,
-      from: "  if (!(Math.abs(area) >= 1)) {\n    strokeThin(a, b, c, tri, e, grid, depth, light, span, paint);\n    return;\n  }",
+      from: "  if (!(Math.abs(area) >= 1)) {\n    strokeThin(L, ia, ib, ic, tri, e, grid, depth, light, span, paint);\n    return;\n  }",
       to: "  if (!(Math.abs(area) >= 1)) {\n    return;\n  }",
       expect: "SF1",
     },
@@ -285,7 +280,7 @@ const results = await runPass({
       name: "the cull reads a shading normal rather than the face's",
       file: F,
       from: "  const n = tri.fn;\n  return (n.x * (cx - e.x)",
-      to: "  const n = tri.a.n;\n  return (n.x * (cx - e.x)",
+      to: "  const n = cornerAt(L, L.idx[o] as number).n;\n  return (n.x * (cx - e.x)",
       expect: "WF9",
     },
   ],

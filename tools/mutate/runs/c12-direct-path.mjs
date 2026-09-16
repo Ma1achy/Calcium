@@ -41,8 +41,8 @@ const results = runPass({
   run,
   control: {
     file: SF,
-    from: "  if (za > NEAR && zb > NEAR && zc > NEAR) {\n    const sa = screenOf(tri.a, basis, grid, frame);",
-    to: "  if (za > NEAR && zb > NEAR && zc > NEAR && false) {\n    const sa = screenOf(tri.a, basis, grid, frame);",
+    from: "  if (pa && pb && pc) {\n    fill(L, ia, ib, ic, tri, tri.edges, grid, depth, light, span, paint);",
+    to: "  if (pa && pb && pc && false) {\n    fill(L, ia, ib, ic, tri, tri.edges, grid, depth, light, span, paint);",
     why: "every triangle takes the clip — the same three vertices back, byte-identical and slower; only PR13's count of the front cameras sees it",
   },
   mutations: [
@@ -52,8 +52,8 @@ const results = runPass({
       // clip would have drawn its front part up to the cut. WF8 draws that cut.
       name: "NEVER-CLIP: a straddling triangle takes the direct path",
       file: SF,
-      from: "  if (za > NEAR && zb > NEAR && zc > NEAR) {\n    const sa = screenOf(tri.a, basis, grid, frame);",
-      to: "  if (za > NEAR || zb > NEAR || zc > NEAR) {\n    const sa = screenOf(tri.a, basis, grid, frame);",
+      from: "  if (pa && pb && pc) {\n    fill(L, ia, ib, ic, tri, tri.edges, grid, depth, light, span, paint);",
+      to: "  if (pa || pb || pc) {\n    fill(L, ia, ib, ic, tri, tri.edges, grid, depth, light, span, paint);",
       expect: "WF8",
     },
     {
@@ -88,8 +88,8 @@ const results = runPass({
       // sides, which the meshes' goldens see because most bunny faces are thin.
       name: "THIN-EDGE-DROPPED: the closing edge of a thin triangle is not stroked",
       file: SF,
-      from: "  thinEdge(b, c, e[1] && wire, series, grid, depth, light, span, paint);\n  thinEdge(c, a, e[2] && wire, series, grid, depth, light, span, paint);",
-      to: "  thinEdge(b, c, e[1] && wire, series, grid, depth, light, span, paint);",
+      from: "  thinEdge(L, ib, ic, e[1] && wire, series, grid, depth, light, span, paint);\n  thinEdge(L, ic, ia, e[2] && wire, series, grid, depth, light, span, paint);",
+      to: "  thinEdge(L, ib, ic, e[1] && wire, series, grid, depth, light, span, paint);",
       expect: "24bit",
     },
   ],

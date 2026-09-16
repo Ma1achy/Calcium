@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import { block, CAMERA_DEFAULT, NO_PROBE, type Plot, type Probe } from "../../src/data/viewmodel/index.js";
 import { plotDefinition } from "../../src/presentation/plot/definition.js";
-import { backfaceCulled, drawTri, geometryOf, lightDirOf, spanOverCorners, surfacePoints, type Corner, type Tri3 } from "../../src/presentation/plot/surface3.js";
+import { backfaceCulled, cornerAt, cornersOf, drawTri, geometryFrom, geometryOf, lightDirOf, screenAt, spanOverCorners, surfacePoints, type Lanes, type Tri3 } from "../../src/presentation/plot/surface3.js";
 import type { RenderScratch } from "../../src/presentation/blocks/types.js";
 import { DARK_THEME, FULL_CAPS, measurable, registry } from "../support/render.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
@@ -512,7 +512,7 @@ describe("C12 I128 — the direct path", () => {
       (p.x - b.eye.x) * b.forward.x + (p.y - b.eye.y) * b.forward.y + (p.z - b.eye.z) * b.forward.z;
     return g.tris.filter((t) => {
       if (backfaceCulled(t, b)) return false;
-      const zs = [t.a, t.b, t.c].map((w) => zOf(w.p));
+      const zs = cornersOf(t).map((w) => zOf(w.p));
       return zs.some((z) => z <= NEAR) && zs.some((z) => z > NEAR);
     }).length; // cells-ok — a face count
   };
@@ -547,10 +547,8 @@ describe("C12 I128 — the direct path", () => {
     const P = { a: { x: -0.8, y: -0.2, z: 0 }, b: { x: 0.8, y: -0.2, z: 0 }, c: { x: -0.8, y: 0.2, z: 0 } };
     const n = { x: 0, y: 0, z: 1 };
     const vert = (p: { x: number; y: number; z: number }) => ({ p, n, v: undefined });
-    const tri = (a: keyof typeof P, b: keyof typeof P, c: keyof typeof P): Tri3 => ({
-      a: vert(P[a]), b: vert(P[b]), c: vert(P[c]),
-      fn: n, edges: [true, true, true], series: 0, skin: { cull: 0, wire: "over" },
-    });
+    const tri = (a: keyof typeof P, b: keyof typeof P, c: keyof typeof P): Tri3 =>
+      geometryFrom([vert(P[a]), vert(P[b]), vert(P[c])], [[0, 1, 2]], { fn: [n], edges: [[true, true, true]], series: 0, skin: { cull: 0, wire: "over" } }).tris[0] as Tri3;
     const grid = sampleGrid(60, 12);
     const basis = basisOf({ azimuth: 0.4, elevation: 0.5, distance: 5 }, grid.width / (grid.height * 0.5));
     const light = lightDirOf(undefined, basis);
@@ -642,14 +640,14 @@ describe("C12 I127 — the span over referenced vertices", () => {
   it("PR12b (C12 I127, §6o row 15): geometryOf holds one corner per distinct referenced vertex, the triangles' own p objects, the stray absent, and the orbit's write count unchanged", () => {
     const surface = { vertices: [...VERTICES, STRAY], faces: FACES, closed: true } as const;
     const g = geometryOf(surface as never, extentOf(surfacePoints(surface as never)), 0);
-    expect(g.corners.length, "one per distinct referenced vertex").toBe(referenced.size); // cells-ok — a vertex count
-    const held = new Set<object>();
-    for (const t of g.tris) { held.add(t.a.p); held.add(t.b.p); held.add(t.c.p); }
-    expect(held.size, "the triangles hold exactly that many distinct positions").toBe(referenced.size); // cells-ok — a vertex count
-    for (const c of g.corners) expect(held.has(c.p), "a corner's p is the very object a triangle holds").toBe(true);
+    expect(g.lanes.count, "one raster vertex per distinct referenced vertex").toBe(referenced.size); // cells-ok — a vertex count
+    const held = new Set<number>(g.lanes.idx);
+    expect(held.size, "the triangles name exactly that many distinct lane indices").toBe(referenced.size); // cells-ok — a vertex count
+    for (const k of held) expect(k, "a triangle's index is within the lanes").toBeLessThan(g.lanes.count);
     const strayUnit = unitOf(STRAY, extentOf(surfacePoints(surface as never)));
-    expect(g.corners.some((c) => c.p.x === strayUnit.x && c.p.y === strayUnit.y && c.p.z === strayUnit.z), "the stray is not a corner").toBe(false);
-    expect(g.corners.some((c) => c.v !== undefined), "a mesh without values carries none").toBe(false);
+    const positions = Array.from({ length: g.lanes.count }, (_v, k) => cornerAt(g.lanes, k)); // cells-ok — a vertex count
+    expect(positions.some((c) => c.p.x === strayUnit.x && c.p.y === strayUnit.y && c.p.z === strayUnit.z), "the stray is not a raster vertex").toBe(false);
+    expect(positions.some((c) => c.v !== undefined), "a mesh without values carries none").toBe(false);
 
     const s = counting();
     const warm = kit(s);
@@ -935,14 +933,15 @@ describe("C12 I131 — the span's depth is project's first dot, and the cull all
     // normals are their own — so the sign test reads both answers.
     const reference = (t: Tri3): boolean => {
       if (t.skin.cull === 0) return false;
-      const c = { x: (t.a.p.x + t.b.p.x + t.c.p.x) / 3, y: (t.a.p.y + t.b.p.y + t.c.p.y) / 3, z: (t.a.p.z + t.b.p.z + t.c.p.z) / 3 };
+      const [a, b, c3] = cornersOf(t);
+      const c = { x: (a.p.x + b.p.x + c3.p.x) / 3, y: (a.p.y + b.p.y + c3.p.y) / 3, z: (a.p.z + b.p.z + c3.p.z) / 3 };
       return dot(t.fn, sub(c, basis.eye)) * t.skin.cull > 0;
     };
     const vert = () => ({ p: { x: r() * 4 - 2, y: r() * 4 - 2, z: r() * 4 - 2 }, n: { x: 0, y: 0, z: 1 }, v: undefined });
     const seen = { culled: 0, kept: 0 };
     for (let i = 0; i < 10_000; i += 1) { // cells-ok — a corpus index
       const cull = r() < 0.5 ? 1 : -1;
-      const tri = { a: vert(), b: vert(), c: vert(), fn: { x: r() * 2 - 1, y: r() * 2 - 1, z: r() * 2 - 1 }, edges: [true, true, true], series: 0, skin: { cull, wire: false } } as unknown as Tri3;
+      const tri = geometryFrom([vert(), vert(), vert()], [[0, 1, 2]], { fn: [{ x: r() * 2 - 1, y: r() * 2 - 1, z: r() * 2 - 1 }], skin: { cull, wire: false } }).tris[0] as Tri3;
       const ours = backfaceCulled(tri, basis);
       expect(ours, `triangle ${i}`).toBe(reference(tri));
       if (ours) seen.culled += 1; else seen.kept += 1;
@@ -956,10 +955,15 @@ describe("C12 I131 — the span's depth is project's first dot, and the cull all
     // **Corners around and behind the camera**: a cube of side 8 about the
     // origin at distance 3 puts a share of them at or behind the near plane;
     // half carry a value, so the value bounds read a subset of the depth's.
+    type Corner = { p: { x: number; y: number; z: number }; v: number | undefined };
     const corners: Corner[] = [];
     for (let i = 0; i < 10_000; i += 1) { // cells-ok — a corpus index
       corners.push({ p: { x: r() * 8 - 4, y: r() * 8 - 4, z: r() * 8 - 4 }, v: r() < 0.5 ? r() * 20 - 10 : undefined });
     }
+    // **The corners as lanes** (C12 I139): every corner a raster vertex in order, no faces.
+    const N = { x: 0, y: 0, z: 1 };
+    const lanesOf = (cs: readonly Corner[]): Lanes => geometryFrom(cs.map((c) => ({ p: c.p, n: N, v: c.v })), []).lanes;
+    const lanes = lanesOf(corners);
     // **The reference is `project` itself**, over the corners it accepts.
     let nearD = Infinity; let farD = -Infinity; let loV = Infinity; let hiV = -Infinity;
     let refused = 0; let accepted = 0; let valueless = 0;
@@ -977,30 +981,30 @@ describe("C12 I131 — the span's depth is project's first dot, and the cull all
     expect(valueless, "and accepted corners without a value").toBeGreaterThan(100);
     // **A refused corner moves neither pair**: the reference above skipped it,
     // and a refused corner nearer than every accepted one would show in `nearD`.
-    const open = spanOverCorners(basis, corners, Infinity, -Infinity, Infinity, -Infinity);
+    const open = spanOverCorners(basis, lanes, Infinity, -Infinity, Infinity, -Infinity);
     expect(Object.is(open.nearD, nearD), `nearD ${String(open.nearD)} vs ${String(nearD)}`).toBe(true);
     expect(Object.is(open.farD, farD), `farD ${String(open.farD)} vs ${String(farD)}`).toBe(true);
     expect(Object.is(open.loV, loV), `loV ${String(open.loV)} vs ${String(loV)}`).toBe(true);
     expect(Object.is(open.hiV, hiV), `hiV ${String(open.hiV)} vs ${String(hiV)}`).toBe(true);
     // **The incoming bounds honoured** when they enclose the corpus — the
     // clouds and paths read before the surfaces (C04 I78, I79).
-    const enclosing = spanOverCorners(basis, corners, nearD - 1, farD + 1, loV - 1, hiV + 1);
+    const enclosing = spanOverCorners(basis, lanes, nearD - 1, farD + 1, loV - 1, hiV + 1);
     expect(enclosing).toEqual({ nearD: nearD - 1, farD: farD + 1, loV: loV - 1, hiV: hiV + 1 });
     // And partial bounds tighten only where the corpus reaches past them.
-    const partial = spanOverCorners(basis, corners, nearD + 0.5, farD - 0.5, Infinity, -Infinity);
+    const partial = spanOverCorners(basis, lanes, nearD + 0.5, farD - 0.5, Infinity, -Infinity);
     expect(partial).toEqual({ nearD, farD, loV, hiV });
     // **The fixture responds**: an empty corpus answers the bounds it was handed.
-    expect(spanOverCorners(basis, [], 1, 2, 3, 4)).toEqual({ nearD: 1, farD: 2, loV: 3, hiV: 4 });
+    expect(spanOverCorners(basis, lanesOf([]), 1, 2, 3, 4)).toEqual({ nearD: 1, farD: 2, loV: 3, hiV: 4 });
     // **The arms `Math.min` has and a comparison lacks, by name** (C12 I135).
     const front = corners.find((c) => project(basis, c.p) !== null) as Corner;
     const nanCorner: Corner = { p: { x: NaN, y: 0, z: 0 }, v: undefined };
     expect(project(basis, nanCorner.p), "project accepts a NaN coordinate").not.toBeNull();
-    const nanDepth = spanOverCorners(basis, [front, nanCorner, front], Infinity, -Infinity, Infinity, -Infinity);
+    const nanDepth = spanOverCorners(basis, lanesOf([front, nanCorner, front]), Infinity, -Infinity, Infinity, -Infinity);
     expect(Number.isNaN(nanDepth.nearD) && Number.isNaN(nanDepth.farD), "NaN propagates as Math.min's does").toBe(true);
-    const nanValue = spanOverCorners(basis, [{ p: front.p, v: 1 }, { p: front.p, v: NaN }, { p: front.p, v: 2 }], Infinity, -Infinity, Infinity, -Infinity);
+    const nanValue = spanOverCorners(basis, lanesOf([{ p: front.p, v: 1 }, { p: front.p, v: NaN }, { p: front.p, v: 2 }]), Infinity, -Infinity, Infinity, -Infinity);
     expect(Number.isNaN(nanValue.loV) && Number.isNaN(nanValue.hiV), "a NaN value").toBe(true);
     for (const order of [[0, -0], [-0, 0]] as const) {
-      const zeros = spanOverCorners(basis, order.map((v) => ({ p: front.p, v })), Infinity, -Infinity, Infinity, -Infinity);
+      const zeros = spanOverCorners(basis, lanesOf(order.map((v) => ({ p: front.p, v }))), Infinity, -Infinity, Infinity, -Infinity);
       expect(Object.is(zeros.loV, -0), `loV is −0 after ${order.map((v) => (Object.is(v, -0) ? "−0" : "+0")).join(", ")}`).toBe(true);
       expect(Object.is(zeros.hiV, 0), "hiV is +0").toBe(true);
     }
@@ -1183,17 +1187,15 @@ describe("C12 I132 — the painter writes an integer and the records are built o
         const frame = { stamp, projected: 0 };
         const depth = createDepth(grid.width, grid.height);
         for (const t of g.tris) drawTri(t, basis, grid, depth, light, { nearD: 1, farD: 20 }, () => {}, frame);
-        const seen = new Set<object>();
-        for (const t of g.tris) {
-          for (const w of [t.a, t.b, t.c]) {
-            if (w.stamp !== frame.stamp || w.s === undefined || w.s === null || seen.has(w)) continue;
-            seen.add(w);
-            const want = project(basis, w.p);
-            compared += 1;
-            if (want === null || !Object.is(w.s.x, want.x * grid.width) || !Object.is(w.s.y, want.y * grid.height) || !Object.is(w.s.vz, want.depth)) {
-              wrong += 1;
-              if (first === "") first = `${mesh.name} under ${JSON.stringify(camera)}: held (${String(w.s.x)}, ${String(w.s.y)}, ${String(w.s.vz)}), project ${JSON.stringify(want)}`;
-            }
+        // **Each stamped slot against `project`** (C12 I139): the record is the slot's.
+        for (let k = 0; k < g.lanes.count; k += 1) { // cells-ok — a vertex index
+          if (g.lanes.stamps[k] !== frame.stamp) continue;
+          const held = screenAt(g.lanes, k);
+          const want = project(basis, cornerAt(g.lanes, k).p);
+          compared += 1;
+          if (want === null || !Object.is(held.x, want.x * grid.width) || !Object.is(held.y, want.y * grid.height) || !Object.is(held.vz, want.depth)) {
+            wrong += 1;
+            if (first === "") first = `${mesh.name} under ${JSON.stringify(camera)}: held (${String(held.x)}, ${String(held.y)}, ${String(held.vz)}), project ${JSON.stringify(want)}`;
           }
         }
         // The fixture responds: the frame stamped its drawn vertices.
