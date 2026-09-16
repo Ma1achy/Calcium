@@ -184,4 +184,44 @@ describe("C09 I72 — normaliseRow", () => {
   });
 });
 
-it.todo("T1.50 (C09 I75, F1180): a plot-shaped row normalises with no Set constructed and split never called — not deferred on a component: the code commit replaces this row");
+describe("C09 I75 — the rows arm reads parameters in place and reuses its state lists", () => {
+  /** `Set` constructions and `split` calls during `fn`, counted through the globals and restored whatever happens. */
+  const counted = (fn: () => void): { sets: number; splits: number } => {
+    const RealSet = globalThis.Set;
+    const realSplit = String.prototype.split;
+    let sets = 0; let splits = 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).Set = function CountingSet(this: unknown, ...args: unknown[]) { sets += 1; return new (RealSet as any)(...args); } as any;
+    (globalThis as any).Set.prototype = RealSet.prototype;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (String.prototype as any).split = function (this: string, ...args: unknown[]) { splits += 1; return (realSplit as any).apply(this, args); };
+    try { fn(); } finally { globalThis.Set = RealSet; String.prototype.split = realSplit; }
+    return { sets, splits };
+  };
+  const tc = (i: number): string => `${ESC}[38;2;${String(i % 256)};${String((i * 7) % 256)};${String((i * 13) % 256)}m`;
+  const c256 = (i: number): string => `${ESC}[48;5;${String(i % 256)}m`;
+  it("T1.50 (C09 I75, F1180): a plot-shaped row of eighty truecolour cells, and its 256-colour, compound and empty-parameter kin, normalise to the tokeniser's serialiser with no Set constructed and split never called", () => {
+    const rows: string[] = [];
+    let plot = ""; for (let i = 0; i < 80; i += 1) plot += `${tc(i)}⠿`; rows.push(`${plot}${ESC}[0m`);
+    let bg = ""; for (let i = 0; i < 80; i += 1) bg += `${c256(i)} `; rows.push(`${bg}${ESC}[49m`);
+    let compound = ""; for (let i = 0; i < 40; i += 1) compound += `${ESC}[1;38;2;${String(i)};0;${String(255 - i)};4m▄${ESC}[22;24m`; rows.push(compound);
+    rows.push(`${ESC}[1;m x ${ESC}[;31mred${ESC}[38;5;m?${ESC}[38;2;1;2m?${ESC}[m`);
+    rows.push(`${ESC}]8;;https://example.test/a\x07link${ESC}]8;;\x07 ${ESC}[31m${ESC}[32mgreen${ESC}[0m   `);
+    for (const row of rows) {
+      let got = "";
+      const n = counted(() => { got = normaliseRow(row); });
+      expect(got, JSON.stringify(row).slice(0, 80)).toBe(reference(row));
+      expect(n.sets, `no Set constructed for ${JSON.stringify(row).slice(0, 40)}`).toBe(0);
+      expect(n.splits, `split never called for ${JSON.stringify(row).slice(0, 40)}`).toBe(0);
+    }
+    // **The counter responds to its subject**: the reference's own path splits and builds sets.
+    const control = counted(() => { reference(rows[0] as string); });
+    expect(control.sets + control.splits, "the tokeniser's path is seen by the counters").toBeGreaterThan(0);
+    // Reported, not gated: the seeded corpus, where a mark after a sequence still segments.
+    const rand = lcg(0x5eed_c09_75);
+    let sets = 0; let splits = 0;
+    for (let i = 0; i < 2000; i += 1) { const r = seededRow(rand); const c = counted(() => { normaliseRow(r); }); sets += c.sets; splits += c.splits; }
+    expect(sets).toBe(0);
+    expect(splits).toBe(0);
+  });
+});

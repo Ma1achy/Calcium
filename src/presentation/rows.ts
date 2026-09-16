@@ -79,9 +79,16 @@ const END_OF_START: ReadonlyMap<string, string> = new Map(
 const END_CODES: ReadonlySet<string> = new Set([...CLOSE_OF.values()].map((end) => `${CSI}${end}m`));
 
 const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+const EMPTY_STATE: readonly Code[] = [];
 
 /** The tokeniser's `getEndCode`, rule for rule. */
 function endOf(code: string): string {
+  // `38;…` and `48;…` first, from the bytes: the codes a plot row carries a cell (I75).
+  if (code.charCodeAt(3) === CC_8 && code.charCodeAt(1) === CC_BRACKET) {
+    const c2 = code.charCodeAt(2);
+    if (c2 === CC_3) return FG_CLOSE;
+    if (c2 === CC_4) return BG_CLOSE;
+  }
   if (END_CODES.has(code)) return code;
   const mapped = END_OF_START.get(code);
   if (mapped !== undefined) return mapped;
@@ -99,44 +106,95 @@ function endOf(code: string): string {
 
 const isIntensity = (c: Code): boolean => c.code === BOLD || c.code === DIM;
 
-/** The tokeniser's `reduceAnsiCodesIncremental`, one code at a time, into a fresh list. */
-function applied(state: readonly Code[], c: Code): Code[] {
-  if (c.code === SGR_RESET) return [];
-  if (END_CODES.has(c.code)) return state.filter((held) => held.end !== c.code);
-  if (isIntensity(c)) {
-    return state.some((held) => held.code === c.code) ? state.slice() : [...state, c];
+const hasCode = (state: readonly Code[], code: string): boolean => {
+  for (let k = 0; k < state.length; k += 1) if ((state[k] as Code).code === code) return true; // cells-ok — a code count
+  return false;
+};
+const hasEnd = (state: readonly Code[], end: string): boolean => {
+  for (let k = 0; k < state.length; k += 1) if ((state[k] as Code).end === end) return true; // cells-ok — a code count
+  return false;
+};
+
+/** Every code ending in `end` removed, the order of the rest kept — `filter` in place. */
+function dropEnd(state: Code[], end: string): void {
+  let kept = 0;
+  for (let k = 0; k < state.length; k += 1) { // cells-ok — a code count
+    const held = state[k] as Code;
+    if (held.end !== end) {
+      state[kept] = held;
+      kept += 1;
+    }
   }
-  const kept = state.filter((held) => held.end !== c.end);
-  kept.push(c);
-  return kept;
+  state.length = kept; // cells-ok — a code count
 }
 
-/** `undoAnsiCodes`: the state reduced, reversed, each code replaced by its end. */
-function undone(codes: readonly Code[]): readonly string[] {
-  let state: Code[] = [];
-  for (const c of codes) state = applied(state, c);
-  return state.reverse().map((c) => c.end);
+/**
+ * The tokeniser's `reduceAnsiCodesIncremental`, one code at a time, **into the
+ * list it is given** (C09 I75): the reset empties it, an end code removes
+ * every code it ends, the two intensity codes accumulate, and every other code
+ * replaces the one of its kind. The list is the arm's own and is reused across
+ * a row; a fresh list per code was an allocation per sequence (F1180).
+ */
+function apply(state: Code[], c: Code): void {
+  if (c.code === SGR_RESET) {
+    state.length = 0; // cells-ok — a code count
+    return;
+  }
+  if (END_CODES.has(c.code)) {
+    dropEnd(state, c.code);
+    return;
+  }
+  if (isIntensity(c)) {
+    if (!hasCode(state, c.code)) state.push(c);
+    return;
+  }
+  dropEnd(state, c.end);
+  state.push(c);
+}
+
+/** `to` copied over `from` in place — the shown state takes the live one without a new list. */
+function copyState(into: Code[], from: readonly Code[]): void {
+  into.length = from.length; // cells-ok — a code count
+  for (let k = 0; k < from.length; k += 1) into[k] = from[k] as Code; // cells-ok — a code count
 }
 
 /**
  * The sequences Ink writes between a character styled `from` and one styled
  * `to` — `diffAnsiCodes`, serialised by `ansiCodesToString`, which joins the
- * distinct codes in first-occurrence order.
+ * distinct codes in first-occurrence order. **Linear scans over two short
+ * lists and no `Set`** (C09 I75): the codes not carried into `to` are reduced
+ * as `apply` reduces them — into a list made only when there is one — then
+ * undone in reverse, each end written once; the codes `to` adds are written
+ * in its order. The transition a plot row makes at every cell, one colour
+ * replacing another, writes the new code and allocates nothing but the string.
  */
 function between(from: readonly Code[], to: readonly Code[]): string {
-  const endsInTo = new Set(to.map((c) => c.end));
-  const startsInTo = new Set(to.map((c) => c.code));
-  const startsInFrom = new Set(from.map((c) => c.code));
-  const closing = undone(
-    from.filter((c) => (isIntensity(c) ? !startsInTo.has(c.code) : !endsInTo.has(c.end))),
-  );
-  const opening = to.filter((c) => !startsInFrom.has(c.code)).map((c) => c.code);
   let out = "";
-  const written = new Set<string>();
-  for (const code of [...closing, ...opening]) {
-    if (written.has(code)) continue;
-    written.add(code);
-    out += code;
+  let closing: Code[] | null = null;
+  for (let k = 0; k < from.length; k += 1) { // cells-ok — a code count
+    const c = from[k] as Code;
+    if (isIntensity(c) ? hasCode(to, c.code) : hasEnd(to, c.end)) continue;
+    closing ??= [];
+    apply(closing, c);
+  }
+  if (closing !== null) {
+    for (let k = closing.length - 1; k >= 0; k -= 1) { // cells-ok — a code count
+      const end = (closing[k] as Code).end;
+      let written = false;
+      for (let m = k + 1; m < closing.length; m += 1) { // cells-ok — a code count
+        if ((closing[m] as Code).end === end) {
+          written = true;
+          break;
+        }
+      }
+      if (!written) out += end;
+    }
+  }
+  for (let k = 0; k < to.length; k += 1) { // cells-ok — a code count
+    const c = to[k] as Code;
+    if (hasCode(from, c.code)) continue;
+    if (closing !== null && hasEnd(closing, c.code)) continue;
+    out += c.code;
   }
   return out;
 }
@@ -179,24 +237,63 @@ function osc(row: string, at: number): Readonly<{ end: number; link: boolean }> 
   return end === -1 ? null : { end, link: false };
 }
 
-/** `splitCompoundSGRSequences`: the parts, `38;5;n`/`48;2;r;g;b` kept whole, each under `ESC [`. */
-function partsOf(sequence: string): readonly string[] {
-  if (!sequence.includes(";")) return [sequence];
-  const params = sequence.slice(2, -1).split(";");
-  const out: string[] = [];
-  for (let i = 0; i < params.length; i += 1) { // cells-ok — code units in a byte scan, not a width
-    const p = params[i] as string;
-    if ((p === "38" || p === "48") && i + 2 < params.length && params[i + 1] === "5") { // cells-ok — code units in a byte scan, not a width
-      out.push(params.slice(i, i + 3).join(";"));
-      i += 2;
-    } else if ((p === "38" || p === "48") && i + 4 < params.length && params[i + 1] === "2") { // cells-ok — code units in a byte scan, not a width
-      out.push(params.slice(i, i + 5).join(";"));
-      i += 4;
-    } else {
-      out.push(p);
-    }
+/** The index of the `;` ending the parameter that starts at `from`, or `last` — the `m` — when it is the final one. */
+function paramEnd(row: string, from: number, last: number): number {
+  for (let k = from; k < last; k += 1) if (row.charCodeAt(k) === CC_SEMI) return k; // cells-ok — code units in a byte scan, not a width
+  return last;
+}
+
+/** Whether the parameter `[from, to)` is exactly the digits `a` and, when given, `b`. */
+function paramIs(row: string, from: number, to: number, a: number, b: number): boolean {
+  return b === -1
+    ? to - from === 1 && row.charCodeAt(from) === a // cells-ok — code units in a byte scan, not a width
+    : to - from === 2 && row.charCodeAt(from) === a && row.charCodeAt(from + 1) === b; // cells-ok — code units in a byte scan, not a width
+}
+
+const CC_2 = 0x32;
+const CC_3 = 0x33;
+const CC_4 = 0x34;
+const CC_5 = 0x35;
+const CC_8 = 0x38;
+
+/**
+ * `splitCompoundSGRSequences`, read in place (C09 I75): the SGR from `at` to
+ * `last` applied to `live` one part at a time, `38;5;n` and `48;2;r;g;b` kept
+ * whole under `ESC [`, a sequence with one parameter applied as the bytes it
+ * is. The parts were an array of strings from a `split`, each `slice`d and
+ * `join`ed and `map`ped under the prefix — five arrays a sequence, and a plot
+ * row carries a truecolour sequence a cell (F1180).
+ */
+function applySequence(row: string, at: number, last: number, live: Code[]): void {
+  const first = at + 2;
+  let end = paramEnd(row, first, last);
+  if (end === last) {
+    const code = row.slice(at, last + 1);
+    apply(live, { code, end: endOf(code) });
+    return;
   }
-  return out.map((p) => `${CSI}${p}m`);
+  let from = first;
+  for (;;) {
+    let to = end;
+    // `38`/`48` then `5` then one more: three parts; then `2` then four more: five.
+    if (end < last && paramIs(row, from, end, CC_3, CC_8) || end < last && paramIs(row, from, end, CC_4, CC_8)) {
+      const next = paramEnd(row, end + 1, last);
+      if (paramIs(row, end + 1, next, CC_5, -1) && next < last) {
+        to = paramEnd(row, next + 1, last);
+      } else if (paramIs(row, end + 1, next, CC_2, -1) && next < last) {
+        const e2 = paramEnd(row, next + 1, last);
+        if (e2 < last) {
+          const e3 = paramEnd(row, e2 + 1, last);
+          if (e3 < last) to = paramEnd(row, e3 + 1, last);
+        }
+      }
+    }
+    const code = `${CSI}${row.slice(from, to)}m`;
+    apply(live, { code, end: endOf(code) });
+    if (to >= last) return;
+    from = to + 1;
+    end = paramEnd(row, from, last);
+  }
 }
 
 /**
@@ -227,8 +324,8 @@ function swallowed(row: string, last: number): number {
  */
 export function normaliseRow(row: string): string {
   let out = "";
-  let live: Code[] = []; // the state after every sequence read so far
-  let shown: readonly Code[] = []; // the state written at the last visible character
+  const live: Code[] = []; // the state after every sequence read so far — one list, reduced in place (I75)
+  const shown: Code[] = []; // the state written at the last visible character — copied from `live` at each transition
   let changed = false; // a sequence was read since the last visible character
   let seen = false; // a visible character has been written
   let runStart = 0; // where the pending verbatim run begins
@@ -240,20 +337,21 @@ export function normaliseRow(row: string): string {
     if (c === CC_ESC || c === CC_CSI_8BIT) {
       const next = row.charCodeAt(i + 1);
       let last = -1;
-      let codes: readonly string[] | null = null;
       if (next === CC_CLOSE_BRACKET) {
         const found = osc(row, i);
         if (found !== null) {
           last = found.end;
-          codes = found.link ? [row.slice(i, last + 1)] : [];
+          if (found.link) {
+            const code = row.slice(i, last + 1);
+            apply(live, { code, end: endOf(code) });
+          }
         }
       } else if (next === CC_BRACKET) {
         last = sgrEnd(row, i);
-        if (last !== -1) codes = partsOf(row.slice(i, last + 1));
+        if (last !== -1) applySequence(row, i, last, live);
       }
-      if (codes !== null) {
+      if (last !== -1) {
         out += row.slice(runStart, i);
-        for (const code of codes) live = applied(live, { code, end: endOf(code) });
         changed = true;
         i = last + 1 + swallowed(row, last);
         runStart = i;
@@ -265,7 +363,7 @@ export function normaliseRow(row: string): string {
     // character that shows it, and the run of characters after it is copied.
     if (changed) {
       out += between(shown, live);
-      shown = live;
+      copyState(shown, live);
       changed = false;
     }
     seen = true;
@@ -273,7 +371,7 @@ export function normaliseRow(row: string): string {
   }
 
   out += row.slice(runStart);
-  if (seen) out += between(shown, []);
+  if (seen) out += between(shown, EMPTY_STATE);
   return out.trimEnd();
 }
 

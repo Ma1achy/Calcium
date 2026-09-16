@@ -50,7 +50,7 @@ const results = runPass({
       // changes: a two-character styled run carries its codes twice.
       name: "STATE-EVERY-CHAR: the open codes are written before every visible character",
       file: ROWS,
-      from: "    if (changed) {\n      out += between(shown, live);\n      shown = live;\n      changed = false;\n    }",
+      from: "    if (changed) {\n      out += between(shown, live);\n      copyState(shown, live);\n      changed = false;\n    }",
       to: "    out += live.map((c) => c.code).join(\"\");\n    shown = live;\n    changed = false;",
       expect: "T1.46",
     },
@@ -59,7 +59,7 @@ const results = runPass({
       // stay open past the row's end, which Ink never writes.
       name: "FINAL-UNDO-DROPPED: the state open at the last character is not undone",
       file: ROWS,
-      from: "  if (seen) out += between(shown, []);\n  return out.trimEnd();",
+      from: "  if (seen) out += between(shown, EMPTY_STATE);\n  return out.trimEnd();",
       to: "  return out.trimEnd();",
       expect: "T1.46",
     },
@@ -67,8 +67,8 @@ const results = runPass({
       // **Trailing blanks kept**: a row padded to its width keeps the pad.
       name: "TRIM-DROPPED: trailing blanks are not trimmed",
       file: ROWS,
-      from: "  if (seen) out += between(shown, []);\n  return out.trimEnd();",
-      to: "  if (seen) out += between(shown, []);\n  return out;",
+      from: "  if (seen) out += between(shown, EMPTY_STATE);\n  return out.trimEnd();",
+      to: "  if (seen) out += between(shown, EMPTY_STATE);\n  return out;",
       expect: "T1.46",
     },
     {
@@ -76,7 +76,7 @@ const results = runPass({
       // treating them as one kind drops the first when the second arrives.
       name: "INTENSITY-REPLACING: bold and dim replace each other instead of accumulating",
       file: ROWS,
-      from: "  if (isIntensity(c)) {\n    return state.some((held) => held.code === c.code) ? state.slice() : [...state, c];\n  }\n",
+      from: "  if (isIntensity(c)) {\n    if (!hasCode(state, c.code)) state.push(c);\n    return;\n  }\n",
       to: "",
       expect: "T1.46",
     },
@@ -84,7 +84,7 @@ const results = runPass({
       // **The reset as a style**: `0` no longer clears the state, it joins it.
       name: "RESET-AS-STYLE: the reset does not clear the state",
       file: ROWS,
-      from: "  if (c.code === SGR_RESET) return [];\n",
+      from: "  if (c.code === SGR_RESET) {\n    state.length = 0; // cells-ok — a code count\n    return;\n  }\n",
       to: "",
       expect: "T1.46",
     },
@@ -105,6 +105,34 @@ const results = runPass({
       // step (C09 I73) and the normaliser is the one T1.46 reads.
       from: "        changed = true;\n        i = last + 1 + swallowed(row, last);",
       to: "        changed = true;\n        i = last + 1;",
+      expect: "T1.46",
+    },
+    {
+      // **A truecolour sequence not taken whole** (I75): `38;2;r;g;b` applied
+      // as five codes, and the diff writes them apart where the tokeniser
+      // writes one.
+      name: "GROUP-DROPPED: 38;2;r;g;b is five parts",
+      file: ROWS,
+      from: "      } else if (paramIs(row, end + 1, next, CC_2, -1) && next < last) {",
+      to: "      } else if (false) {",
+      expect: "T1.46",
+    },
+    {
+      // **A closing end written twice** (I75): bold and dim share `22`, and
+      // the reference writes it once.
+      name: "CLOSE-DUPLICATED: a shared end is written for each code",
+      file: ROWS,
+      from: "      if (!written) out += end;",
+      to: "      out += end;",
+      expect: "T1.46",
+    },
+    {
+      // **The byte-decided end wrong** (I75): a foreground colour closed as a
+      // background one.
+      name: "ENDOF-SWAPPED: 38 closes with 49",
+      file: ROWS,
+      from: "    if (c2 === CC_3) return FG_CLOSE;",
+      to: "    if (c2 === CC_3) return BG_CLOSE;",
       expect: "T1.46",
     },
     {
