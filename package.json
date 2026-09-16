@@ -26,6 +26,10 @@
     "./profiling": {
       "types": "./dist/shell/profiling/index.d.ts",
       "default": "./dist/shell/profiling/index.js"
+    },
+    "./mermaid": {
+      "types": "./dist/mermaid.d.ts",
+      "default": "./dist/mermaid.js"
     }
   },
   "repository": {

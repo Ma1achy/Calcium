@@ -366,11 +366,13 @@ export type { LanguageFn } from "highlight.js";
  * from there, which is how a plot becomes an image inside a transcript.
  */
 export { plotToSvg, svgLayout, SVG_FONT_SIZE, type SvgLayout } from "./presentation/plot/svg.js";
-export { mermaidCode } from "./presentation/mermaid.js";
+// `mermaidCode` is `@fmx/calcium/mermaid` and not here (C24 I36): its renderer
+// is a quarter of a cold import, and no line of this barrel may load it (F1188).
 /**
  * A banner, from a sparse set of variants (roadmap 22).
  *
- * **Published for the same reason and by the same argument as `mermaidCode`.**
+ * **Published for the same reason and by the same argument as `mermaidCode`**
+ * (which sits on `@fmx/calcium/mermaid`, C24 I36).
  * Art is pre-composed text: nothing about it needs a renderer, so it is a
  * transform in front rather than a seventeenth kind in the vocabulary — which
  * is what keeps the freeze from having to carry it.
