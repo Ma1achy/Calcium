@@ -51327,7 +51327,7 @@ half: `rows()` in place of the elements.
 |---|---|
 | **Surface** | `src/presentation/plot/scatter3.ts`'s `painter` fast arm — `sampleRgb`, `shadeRgb`, `rgbHex`, the `{ kind: "rgb", hex }` record — and `densityGlyph`'s `[...steps]` copy per call on the glyph arm |
 | **Reached for** | the inspector's sampling heap profiler over twenty bunny orbit frames on the F1168 build, both collected flags on: **379 MB sampled, 19 MB a frame** — `plot3dArea` 103 MB, `drawTri` 55.8, `painter` 55.0, `toScreen` 33.7, `shadeAt` 18.8, `hypot` 17.6, `thinEdge` 16.1, `toString` 11.8 (that is `hex2`), `mixedRows` 10.5, `toSrgb` 8.2; the CPU profile over thirty frames puts the garbage collector at 131 ms of 1 839, 7.1%, **4.4 ms a frame**. Sized on a scratch copy of the build with the colour held as one packed integer per sample and the records built once after the surfaces: `painter` gone from the table, `toString` 11.8 → 4.4, the total 379 → 318 MB; paired in one process both orders, the bunny 20.8 → 19.0 and 21.0 → 18.9 ms, **B−A median −1.5 and −2.1 ms**, B faster in 29 and 37 of 40; suzanne 0.0 both orders. Bisected: with no triangle drawn `plot3dArea` samples 47.8 MB (the per-frame buffers); with the painter a no-op it still samples 104 and `drawTri` 55 — so what those two allocate is boxed doubles crossing the painter call, not anything the painter builds |
-| **Verdict** | **open** — measured, the remedy sized on a scratch build |
+| **Verdict** | **closed — built and measured.** One packed integer per sample, the records built once (C10 I42, C12 I132): the bunny −3.7 and −2.8 ms a frame paired, B faster in 36 and 38 of 40; the painter gone from the allocation table, 379 → 325 MB over twenty frames |
 
 **The path, at HEAD.** The fast arm (C10 I40) already holds the channels as
 ints between sample and shade — but `sampleRgb` returns them in a fresh tuple,
@@ -51349,3 +51349,50 @@ sweep that holds I40, so the bytes do not move. The ladder's steps are read
 once per render. **What it does not reach**: the boxed doubles the bisect
 named — `z` and the intensity crossing into the painter, `shadeAt`'s return,
 `Math.hypot`'s — which are a call-boundary cost and a different cut.
+
+**Closed — built and measured** (C10 I42, C12 I132). `samplePacked`,
+`shadePacked` and `packedHex` through one shared channel function; the painter
+writes `inkRgb[i]` and a pending mark, one pass after the surfaces loop and
+before the frame builds the records, and `plot3d.paint` / `plot3d.ink` count
+the writes and the records. The density ladder's steps are read once per
+render. **Paired, one process, both orders** (40 rounds, frames asserted
+identical): the bunny A p50 23.3 → B 18.4 ms and 17.2 → 15.0, paired B−A
+median **−3.7 and −2.8 ms**, B faster in 36/40 and 38/40 — more than the
+scratch build's −1.5/−2.1, the ladder read once and the shade's closure gone
+being the difference; suzanne −0.0 and −0.1, 21/40 and 25/40, its frame too
+short to hold much of this. The sampled heap over twenty bunny frames 379 →
+325 MB: `painter` and `toString` gone from the table, `plot3dArea` 103 → 110,
+`drawTri` 55.8 → 56.2, `toScreen` 33.7 → 33.5, `thinEdge` 16.1 → 21.7,
+`shadeAt` 18.8 → 19.1, `hypot` 17.6 → 17.9 — the boxed-double residue the
+bisect named, unmoved and now the whole of what the raster allocates. Goldens
+458 frames, 0 movers; tier 5 133 green; `c12-packed-ink` four caught,
+`c10-colormap` seven, none survived. 2026-09-16.
+
+## F1172 — the builtin `Math.hypot` allocates an array per call and is called twice per shaded sample, and `for…of` over the frozen triangle array allocates an iterator result per triangle ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/surface3.ts`'s `shadeAt` (two `Math.hypot` per sample) and `fill` (three per face); `src/presentation/plot/scatter3.ts`'s `for (const t of scene.tris)` |
+| **Reached for** | the sampled heap over twenty bunny frames on the F1171 build: `plot3dArea` 110 MB of 325, `hypot` 17.9 as its own frame, with the painter's allocation gone. Bisected on the F1168 build: with no triangle drawn `plot3dArea` samples 47.8 MB, with the painter a no-op it samples 104 — so the loop statement itself allocates about 2.8 MB a frame. V8's `Math.hypot` is a variadic builtin (`MathHypot` in `math.tq`) that allocates a `FixedDoubleArray` for its arguments on every call; `for…of` over a frozen array does not take the unallocating fast path, and the triangle array is `deepFreeze`d geometry. A register for the doubles crossing into the painter — the diagnosis the F1171 bisect suggested — was tried first on a scratch build and moved nothing: `drawTri` 55.6, `plot3dArea` 110.6, the total 325 → 318; a fix that changes nothing indicts the diagnosis. Sized on a scratch build with an index loop and a JS replica of V8's algorithm: `plot3dArea` 110 → 54.7 MB, `hypot` gone, the total 325 → 241; paired both orders the bunny 21.3 → 16.8 and 19.4 → 16.9 ms, **B−A median −3.8 and −2.6 ms**, B faster in 39 and 36 of 40; suzanne −0.3 and −0.1. The replica against `Math.hypot` over four million calls with a pool of extremes — `±0`, denormals, `1e308`, `±Infinity`, `NaN`: **0 mismatches** |
+| **Verdict** | **open** — measured, the remedy sized on a scratch build |
+
+**The path, at HEAD.** `shadeAt` normalises the interpolated normal and the
+view vector with `Math.hypot`, per sample, as I129 says it does; `fill` takes
+three edge lengths with it per face. The builtin is exact and it allocates —
+`MathHypot` copies its arguments into a fresh double array before it scans
+for the largest magnitude — so a shaded sample costs two arrays and a face
+three, under a name that reads as arithmetic. The triangle loop is `for…of`
+over `scene.tris`, which `geometryOf` returns frozen (I107); V8 takes its
+fast path for a plain packed array and not for a frozen one, so every step
+builds a `{ value, done }`.
+
+**Remedy, sized.** `hypot3` and `hypot2` in `project3.ts`, V8's algorithm
+statement for statement — the largest magnitude found first, `Infinity` and
+`NaN` answered before the sum, the squares of the values normalised by the
+largest Kahan-summed in argument order, the root scaled back — so the result
+is `Math.hypot`'s to the bit, held by a seeded corpus with the extremes; and
+an index loop over the triangles. Byte-identical by construction: the
+goldens hold every mesh frame and T1.145 holds the replica. **What it does
+not reach**: `drawTri` 55.9, `toScreen` 33.1, `thinEdge` 18.6 and `shadeAt`
+15.2 MB of the 241 that remain, which the register experiment says are not
+boxed call arguments and which nothing has yet named.
