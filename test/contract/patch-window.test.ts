@@ -608,3 +608,8 @@ describe("C25 I22 — a window is built over a plan", () => {
     expect(() => windowRows(a, SPLIT, 0, 5, planA)).toThrow(/I22/u);
   });
 });
+
+describe("C25 I22 — the plan travels through the seam, and a planned window costs the window", () => {
+  it.todo("T1.25 (C25 I22, F1191): a planned windowRows reads no row outside the window and bodyStarts equal a full scan's — not deferred on a component: the code commit replaces this row");
+  it.todo("T1.26 (C25 I22, F1191): the definition's window holds one plan per patch and width in the caller's scratch and refuses another block's — not deferred on a component: the code commit replaces this row");
+});

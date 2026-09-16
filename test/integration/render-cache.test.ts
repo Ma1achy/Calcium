@@ -889,4 +889,5 @@ describe("C22 I103 — a tick miss keeps the parts", () => {
       vi.useRealTimers();
     }
   }, 20_000);
+  it.todo("T4.89g (C22 I100, F1191): every frame after the first over a windowed patch reads the scratch with a hit — not deferred on a component: the code commit replaces this row");
 });

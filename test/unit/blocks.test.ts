@@ -1078,3 +1078,7 @@ describe("C09 I71 — the tokeniser's run is emitted straight from the emitter s
     expect(tokenise("a: 1", "yaml").length).toBeGreaterThan(2); // cells-ok — a token count
   });
 });
+
+describe("C09 I76 — the window seam takes the caller's scratch, and the cap form is held in it", () => {
+  it.todo("T2.145 (C09 I76, F1191): an over-cap block resolves once per width through one scratch, the seam hands `window` the same object, and a block within the cap holds nothing — not deferred on a component: the code commit replaces this row");
+});
