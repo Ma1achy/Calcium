@@ -208,3 +208,9 @@ describe("T1.42 (C10 I40, F1150) — the numeric colour path is the hex path, bi
     expect(wrong(128, 0.5), "an off-by-one table answers differently").not.toBe(r);
   });
 });
+
+describe("C10 I42 — the packed forms", () => {
+  it.todo(
+    "T1.43 (C10 I42): packedHex(shadePacked(samplePacked(map, t), k)) equals rgbHex(shadeRgb(...sampleRgb(map, t), k)) over I40's sweep, k >= 1 included, and samplePacked on a non-finite t and an empty map equals sampleRgb packed — not deferred on a component: the code commit replaces this row",
+  );
+});

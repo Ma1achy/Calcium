@@ -964,3 +964,9 @@ describe("C12 I131 — the span's depth is project's first dot, and the cull all
     expect(seen.kept, "and kept ones").toBeGreaterThan(1000);
   });
 });
+
+describe("C12 I132 — the painter writes an integer and the records are built once", () => {
+  it.todo(
+    "T1.144 (C12 I132): two surfaces at 24-bit with the farther drawn first count more plot3d.paint than plot3d.ink, plot3d.ink is at most the grid and equals the surface-owned samples, no empty hex in the frame, and colourDepth 8 counts no plot3d.ink — not deferred on a component: the code commit replaces this row",
+  );
+});
