@@ -42,8 +42,8 @@ const results = runPass({
   run,
   control: {
     file: P,
-    from: "    if (z <= NEAR) continue;\n    nearD = Math.min(nearD, z);",
-    to: "    if (z <= NEAR) continue;\n    nearD = Math.min(nearD, z + 1);",
+    from: "    if (z <= NEAR) continue;\n    if (z < nearD || z !== z) nearD = z;",
+    to: "    if (z <= NEAR) continue;\n    if (z < nearD || z !== z) nearD = z + 1;",
     why: "the near bound is one too far; T1.147's nearD is off by one against project",
   },
   mutations: [
@@ -52,8 +52,8 @@ const results = runPass({
       // ramp a depth `project` would have refused, and the span keys to it.
       name: "NEAR-DROPPED: the corner pass reads a corner project refuses",
       file: P,
-      from: "    if (z <= NEAR) continue;\n    nearD = Math.min(nearD, z);",
-      to: "    nearD = Math.min(nearD, z);",
+      from: "    if (z <= NEAR) continue;\n    if (z < nearD || z !== z) nearD = z;",
+      to: "    if (z < nearD || z !== z) nearD = z;",
       expect: "T1.147",
     },
     {
@@ -80,8 +80,26 @@ const results = runPass({
       // arm reads the greatest value where the least was.
       name: "VALUE-SWAPPED: loV takes the maximum",
       file: P,
-      from: "      loV = Math.min(loV, v);\n      hiV = Math.max(hiV, v);",
-      to: "      loV = Math.max(loV, v);\n      hiV = Math.max(hiV, v);",
+      from: "      if (v < loV || v !== v || (v === 0 && loV === 0 && 1 / v < 0)) loV = v;",
+      to: "      if (v > loV || v !== v || (v === 0 && loV === 0 && 1 / v < 0)) loV = v;",
+      expect: "T1.147",
+    },
+    {
+      // **The `NaN` arm dropped from the depth fold**: a comparison alone
+      // skips a `NaN` depth where `Math.min` would take it (I135).
+      name: "NAN-ARM-DROPPED: the depth fold is a bare comparison",
+      file: P,
+      from: "    if (z < nearD || z !== z) nearD = z;\n    if (z > farD || z !== z) farD = z;",
+      to: "    if (z < nearD) nearD = z;\n    if (z > farD) farD = z;",
+      expect: "T1.147",
+    },
+    {
+      // **The signed-zero arm dropped from the value fold**: `+0` then `−0`
+      // keeps `+0` for the least where `Math.min` answers `−0` (I135).
+      name: "ZERO-ARM-DROPPED: the value fold ignores the sign of zero",
+      file: P,
+      from: "      if (v < loV || v !== v || (v === 0 && loV === 0 && 1 / v < 0)) loV = v;\n      if (v > hiV || v !== v || (v === 0 && hiV === 0 && 1 / v > 0)) hiV = v;",
+      to: "      if (v < loV || v !== v) loV = v;\n      if (v > hiV || v !== v) hiV = v;",
       expect: "T1.147",
     },
   ],

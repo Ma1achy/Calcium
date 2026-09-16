@@ -378,9 +378,14 @@ export function geometryOf(s: Surface3, extent: Extent3, series: number): Geomet
  * closure captures them** (I135): V8 keeps a captured variable in a context
  * object, whose slots hold tagged values, so a double assigned to one is a heap
  * number allocated on every assignment — four a corner over 35,947 corners a
- * bunny frame when the span was a closure (F1175). `Math.min` and `Math.max`
- * are kept rather than written as comparisons: they propagate `NaN` and order
- * the signed zeros, and a comparison does neither.
+ * bunny frame when the span was a closure (F1175). **The folds are comparisons
+ * carrying `Math.min`'s and `Math.max`'s answers exactly** — the `NaN` arm on
+ * both bounds, the signed-zero arm on the values — because `Math.min` over a
+ * bound that arrives as a parameter keeps the loop-carried value tagged and
+ * boxes it on every iteration: 22.5 MB a twenty-frame heap with `Math.min`,
+ * nothing with these, nothing with `Math.min` over `nearD - 0` either, which
+ * names the representation and not the arithmetic (I135). The depth has no
+ * zero arm because a depth past `NEAR` is positive.
  */
 export function spanOverCorners(
   basis: Basis,
@@ -397,12 +402,12 @@ export function spanOverCorners(
     const p = c.p;
     const z = (p.x - e.x) * f.x + (p.y - e.y) * f.y + (p.z - e.z) * f.z;
     if (z <= NEAR) continue;
-    nearD = Math.min(nearD, z);
-    farD = Math.max(farD, z);
+    if (z < nearD || z !== z) nearD = z;
+    if (z > farD || z !== z) farD = z;
     const v = c.v;
     if (v !== undefined) {
-      loV = Math.min(loV, v);
-      hiV = Math.max(hiV, v);
+      if (v < loV || v !== v || (v === 0 && loV === 0 && 1 / v < 0)) loV = v;
+      if (v > hiV || v !== v || (v === 0 && hiV === 0 && 1 / v > 0)) hiV = v;
     }
   }
   return { nearD, farD, loV, hiV };

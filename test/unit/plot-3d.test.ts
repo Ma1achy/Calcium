@@ -991,6 +991,19 @@ describe("C12 I131 — the span's depth is project's first dot, and the cull all
     expect(partial).toEqual({ nearD, farD, loV, hiV });
     // **The fixture responds**: an empty corpus answers the bounds it was handed.
     expect(spanOverCorners(basis, [], 1, 2, 3, 4)).toEqual({ nearD: 1, farD: 2, loV: 3, hiV: 4 });
+    // **The arms `Math.min` has and a comparison lacks, by name** (C12 I135).
+    const front = corners.find((c) => project(basis, c.p) !== null) as Corner;
+    const nanCorner: Corner = { p: { x: NaN, y: 0, z: 0 }, v: undefined };
+    expect(project(basis, nanCorner.p), "project accepts a NaN coordinate").not.toBeNull();
+    const nanDepth = spanOverCorners(basis, [front, nanCorner, front], Infinity, -Infinity, Infinity, -Infinity);
+    expect(Number.isNaN(nanDepth.nearD) && Number.isNaN(nanDepth.farD), "NaN propagates as Math.min's does").toBe(true);
+    const nanValue = spanOverCorners(basis, [{ p: front.p, v: 1 }, { p: front.p, v: NaN }, { p: front.p, v: 2 }], Infinity, -Infinity, Infinity, -Infinity);
+    expect(Number.isNaN(nanValue.loV) && Number.isNaN(nanValue.hiV), "a NaN value").toBe(true);
+    for (const order of [[0, -0], [-0, 0]] as const) {
+      const zeros = spanOverCorners(basis, order.map((v) => ({ p: front.p, v })), Infinity, -Infinity, Infinity, -Infinity);
+      expect(Object.is(zeros.loV, -0), `loV is −0 after ${order.map((v) => (Object.is(v, -0) ? "−0" : "+0")).join(", ")}`).toBe(true);
+      expect(Object.is(zeros.hiV, 0), "hiV is +0").toBe(true);
+    }
   });
 });
 
