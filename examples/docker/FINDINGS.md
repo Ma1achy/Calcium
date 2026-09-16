@@ -52049,7 +52049,7 @@ and it retires `fn` and `edges` as objects); the thin path's 3.7 ms;
 |---|---|
 | **Surface** | `src/presentation/plot/surface3.ts` `backfaceCulled`: per face, three index-lane reads, nine position-lane reads at those indices — three dependent loads a corner into a 3.3 MB lane, in face order but not vertex order — and the face normal from `tri.fn`, a `Vec3` object a face; `geometryOf` builds that object from a face-normal sum lane it already holds |
 | **Reached for** | the line ticks of forty bunny frames on the F1184 build (`out/prof-bunny7`, `make load-down`): `drawTri` is the largest self time in the raster at 117.8 ms, and its ticks sit on the cull's centroid lines (662–670 in the build, 30 of 75 ticks in the function) and the first `screenOf`. A micro-benchmark over the bunny's real lanes (`out/probe-cull.mjs`, three runs, 60 timed rounds each): the cull as the tree has it **0.88–0.92 ms a frame**, the same arithmetic inlined over the index lane 0.78–0.81, and over a per-face centroid lane and a per-face normal lane, read in face order, **0.29–0.31 ms** — 30,747 kept faces on every arm. Teapot 0.06 → 0.02 |
-| **Verdict** | **open** — measured, the remedy sized |
+| **Verdict** | **closed** — built and measured: C12 I141, T1.153, `c12-lanes` |
 
 **A claim in F1184 corrected first.** F1184's remedy and its close say
 `edges` is *an array of three booleans a face, 2.8 MB on the bunny*, and
@@ -52074,3 +52074,43 @@ the same three sums as one computed at cull time. Sized: 0.6 ms of the
 bunny's warm frame, about 6%; the heap trades 69,451 `Vec3` objects (about
 2.8 MB) for two lanes of 1.67 MB each, so about half a megabyte heavier and
 2.6 MB less garbage on a build. The paired probe is the check.
+
+**Closed — built and measured.** C12 I141 as sized. `Lanes` carries `cen`
+and `fnrm`, three doubles a face; `writeCentroid` fills the centroid by the
+cull's own expression once the face's corners are in the position lane;
+`geometryOf` writes `unit3` over the sum lane into `fnrm` and the flat arm
+reads it; `backfaceCulled` reads six doubles in face order; `Tri3.fn` is
+gone and `faceNormalOf` serves the rows. T1.153 holds both lanes to their
+expressions over 150,000 faces under both shadings, the flat vertex normal
+to its face's entry, the cull to the allocating form on ten thousand seeded
+triangles, and the bunny's 30,747 kept faces. `c12-lanes` extended by four,
+twelve of twelve caught; c12-geometry and c12-surface3d re-anchored, green.
+Gates green, goldens 458 with no mover, e2e green; 432 frames byte-identical
+against the F1185 build; counts unchanged.
+
+| `make load-down` | before (F1185 build) | after |
+|---|---|---|
+| paired warm bunny, `probe-f6-pair` n=60, both orders | A p50 10.7 · 10.4 ms | B p50 9.9 · 9.9; B−A median **−0.8 and −0.6 ms; B faster in 53 and 50 of 60** |
+| paired warm teapot · suzanne | 3.3 · 2.7 ms | 3.3 · 2.6; −0.1 and −0.1 ms; 39–46 of 60 |
+| `probe-cold.mjs` bunny `geometryOf` warm heap | 22.7 MB | **9.8 MB** |
+| `probe-cold.mjs` bunny `geometryOf` warm time | 14.7–16.0 ms | 16.5–17.7 ms |
+| `probe-cold.mjs` bunny second / third frame | 10.9 / 10.8 ms | 10.5 / 10.1 ms |
+| allocation sample, 30 bunny renders | 97.0 MB | 100.5 MB — the same sites, within the sampler's spread |
+
+Two figures against the sizing. The frame gained 0.6–0.8 ms where 0.6 was
+sized — the cull's whole measured saving, so the lane reads cost nothing the
+micro-benchmark did not see. The heap went the other way from the sizing and
+by far more: the sizing said *half a megabyte heavier*, trading 2.8 MB of
+`Vec3` objects for two 1.67 MB lanes; the warm build measures **22.7 → 9.8
+MB**. A `Vec3` a face was not 40 bytes — each of its three doubles is a heap
+number when the object is built from typed-array reads, so the record was
+nearer a hundred bytes and the 69,451 of them nearer 7 MB, and the `Tri3`
+records lost a field and a hidden-class transition with them. The count of
+objects was right and the size of one was a guess. The builder's warm time
+rose about 1.5 ms for the two extra lanes' writes, which the cold first frame
+pays once.
+
+What remains: the thin path's 3.7 ms (`thinEdge` and `hiddenThin`);
+`plot3dArea`'s boxed sample arrays (F1182, 31.6 MB of the sample);
+`shadeAt`'s 6.5 MB at `hypot3` and `Math.pow`; `normaliseRow`'s byte scan;
+the builder's 17 ms warm on the bunny.
