@@ -53576,6 +53576,26 @@ the span records, the `run += cell` string building and the per-layer cell array
 which escape analysis can reach. See the sibling reading in F1152 and F1156 — a cache of a
 scalar-replaced record is an allocation, and the inverse holds too.
 
+**First cut landed: the normaliser confirms the row against itself** (commit below). The
+normal form of a row a renderer already wrote in diff form *is* that row, and on `live:line`
+that is **59,494 of 82,913 calls** — each building a second copy of a string it was going to
+return unchanged. `normaliseRow` now carries `op`, the count of code units the output has
+been confirmed to equal, and materialises `out` only when a piece arrives that the row does
+not carry at that position; every span it appends is a slice of the row itself, so *the
+positions agreeing* is the whole comparison, and only `between`'s built sequence needs its
+bytes checked. Measured: **10.8% to 9.5% of all allocation, 259 MB to 233 MB** over twenty
+seconds, against a figure that read 10.8, 10.7 and 10.8 on three prior runs. 458 goldens with
+no movers; `c09-rows-arm` catches 14 with none surviving, three of its anchors re-pointed at
+the sites that still carry their rules.
+
+**And the ceiling is arithmetic, which is why this is a campaign and not a cut.** A pause
+longer than one frame costs frames that cannot be repaid: repaying them means drawing above
+sixty, which A02 §7 forbids. One 57 ms collection in a 25-second window caps the run at
+**59.86** before anything else goes wrong. Halving allocation halves how often a collection
+happens and does not shorten the tail that costs the frames, so **a literal sustained 60.0
+needs every pause gone rather than fewer of them**. The profile is flat — the largest site is
+16% and nothing else is above 10% — so no single cut reaches it.
+
 **Sized.** The instrument exists (`out/alloc.mjs`, a preload starting
 `HeapProfiler.startSampling` with `includeObjectsCollectedByMajorGC` and
 `...MinorGC`, walking the tree by self size) and so does the period reader

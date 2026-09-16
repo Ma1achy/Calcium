@@ -50,8 +50,8 @@ const results = runPass({
       // changes: a two-character styled run carries its codes twice.
       name: "STATE-EVERY-CHAR: the open codes are written before every visible character",
       file: ROWS,
-      from: "    if (changed) {\n      out += between(shown, live);\n      copyState(shown, live);\n      changed = false;\n    }",
-      to: "    out += live.map((c) => c.code).join(\"\");\n    shown = live;\n    changed = false;",
+      from: "    if (changed) {\n      const diff = between(shown, live);\n      if (diverged) out += diff;\n      else if (row.startsWith(diff, op)) op += diff.length; // cells-ok — code units\n      else {\n        diverged = true;\n        out = row.slice(0, op) + diff;\n      }\n      copyState(shown, live);\n      changed = false;\n    }",
+      to: "    {\n      if (!diverged) {\n        diverged = true;\n        out = row.slice(0, op);\n      }\n      out += live.map((c) => c.code).join(\"\");\n      copyState(shown, live);\n      changed = false;\n    }",
       expect: "T1.46",
     },
     {
@@ -59,16 +59,16 @@ const results = runPass({
       // stay open past the row's end, which Ink never writes.
       name: "FINAL-UNDO-DROPPED: the state open at the last character is not undone",
       file: ROWS,
-      from: "  if (seen) out += between(shown, EMPTY_STATE);\n  return out.trimEnd();",
-      to: "  return out.trimEnd();",
+      from: "  if (seen) {\n    const tail = between(shown, EMPTY_STATE);\n    if (diverged) out += tail;\n    else if (row.startsWith(tail, op)) op += tail.length; // cells-ok — code units\n    else {\n      diverged = true;\n      out = row.slice(0, op) + tail;\n    }\n  }",
+      to: "  if (seen) { /* the state open at the last character is left open */ }",
       expect: "T1.46",
     },
     {
       // **Trailing blanks kept**: a row padded to its width keeps the pad.
       name: "TRIM-DROPPED: trailing blanks are not trimmed",
       file: ROWS,
-      from: "  if (seen) out += between(shown, EMPTY_STATE);\n  return out.trimEnd();",
-      to: "  if (seen) out += between(shown, EMPTY_STATE);\n  return out;",
+      from: "  if (diverged) return out.trimEnd();\n  // `out` was never built, and what it would hold is `row`'s first `op` units —\n  // `n` of them in every path that reaches here, so the slice is the row.\n  return (op === n ? row : row.slice(0, op)).trimEnd();",
+      to: "  if (diverged) return out;\n  return op === n ? row : row.slice(0, op);",
       expect: "T1.46",
     },
     {

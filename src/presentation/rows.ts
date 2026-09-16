@@ -323,7 +323,18 @@ function swallowed(row: string, last: number): number {
  * yields for a `Text` holding it, byte for byte, which T1.46 and T2.143 hold.
  */
 export function normaliseRow(row: string): string {
+  // **Confirmed against the row, materialised only on divergence** (F1208).
+  // The normal form of a row a renderer already wrote in diff form *is* that
+  // row, and on `live:line` that is 59,494 of 82,913 calls — each of which
+  // built a second copy of a row it was going to return unchanged. So `op` is
+  // how many code units of `row` the output has been confirmed to equal, and
+  // `out` stays empty until a piece arrives that `row` does not carry at `op`.
+  // Every span appended is a slice of `row` itself, so *the positions agreeing*
+  // is the whole comparison for those — only `between`'s built sequence needs
+  // its bytes checked.
   let out = "";
+  let op = 0; // cells-ok — code units confirmed, not a width
+  let diverged = false;
   const live: Code[] = []; // the state after every sequence read so far — one list, reduced in place (I75)
   const shown: Code[] = []; // the state written at the last visible character — copied from `live` at each transition
   let changed = false; // a sequence was read since the last visible character
@@ -351,7 +362,12 @@ export function normaliseRow(row: string): string {
         if (last !== -1) applySequence(row, i, last, live);
       }
       if (last !== -1) {
-        out += row.slice(runStart, i);
+        if (diverged) out += row.slice(runStart, i);
+        else if (op === runStart) op = i;
+        else {
+          diverged = true;
+          out = row.slice(0, op) + row.slice(runStart, i);
+        }
         changed = true;
         i = last + 1 + swallowed(row, last);
         runStart = i;
@@ -362,7 +378,13 @@ export function normaliseRow(row: string): string {
     // treats it. The state's difference is written once, before the first
     // character that shows it, and the run of characters after it is copied.
     if (changed) {
-      out += between(shown, live);
+      const diff = between(shown, live);
+      if (diverged) out += diff;
+      else if (row.startsWith(diff, op)) op += diff.length; // cells-ok — code units
+      else {
+        diverged = true;
+        out = row.slice(0, op) + diff;
+      }
       copyState(shown, live);
       changed = false;
     }
@@ -370,9 +392,27 @@ export function normaliseRow(row: string): string {
     i += 1;
   }
 
-  out += row.slice(runStart);
-  if (seen) out += between(shown, EMPTY_STATE);
-  return out.trimEnd();
+  if (diverged) out += row.slice(runStart);
+  else if (op === runStart) op = n;
+  else {
+    diverged = true;
+    out = row.slice(0, op) + row.slice(runStart);
+  }
+  if (seen) {
+    const tail = between(shown, EMPTY_STATE);
+    if (diverged) out += tail;
+    else if (row.startsWith(tail, op)) op += tail.length; // cells-ok — code units
+    else {
+      diverged = true;
+      out = row.slice(0, op) + tail;
+    }
+  }
+  // Nothing diverged and every code unit is accounted for, so the normal form
+  // is the row: `trimEnd` is the only thing left that can change it.
+  if (diverged) return out.trimEnd();
+  // `out` was never built, and what it would hold is `row`'s first `op` units —
+  // `n` of them in every path that reaches here, so the slice is the row.
+  return (op === n ? row : row.slice(0, op)).trimEnd();
 }
 
 /**
