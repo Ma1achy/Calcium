@@ -52279,3 +52279,40 @@ async form, `import("@fmx/calcium/mermaid")` inside the adapter that needs
 it, is the consumer's to choose and costs nothing here. The examples call
 no `mermaidCode`; the docker example's notes describe the transform and
 name no import line.
+
+## F1189 — a spinner tick re-renders every block in its entry: 8.6 ms a tick beside a 2,000-line patch against 2.3 alone, 12% of a core idle, and the deck calls the miss `focus` ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/session.ts:1654`: `animated` — the spinner counter, present when anything in the entry animates — is folded into the slot string the render cache compares as its `focus` axis, so every tick is a miss on that axis, and `RenderCache.get` drops the parts on a `focus` miss (I101 keeps them for `range` alone). `renderEntryPieces` then renders the whole entry through the sequence render: the 2,000-line patch beside the `status` block, every 80 ms, for a glyph |
+| **Reached for** | `out/probe-anim.mjs` on the F1188 build over the bench's fakes, 120×40, three seconds of real time, `make load-down`: a `status` spinner alone — 21 frames, work p50 **2.34 ms**, 4.5% of a core; the same spinner beside a 2,000-line `patch` — 20 frames, work p50 **8.58 ms**, sum 205 ms, **11.9% of a core**; beside a 2,000-line `logs` — p50 3.94, p95 **34.3 ms**, 13.4% of a core; the patch alone — no frame after the greeting, 2.9% (the residue of start-up). The report's misses for the spinning runs: `render: {absent: 1, focus: 15}` — fifteen spinner ticks reported as **focus** misses on a screen where focus never moved |
+| **Verdict** | **open** — measured, the remedy sized |
+
+**Why it is the whole entry.** The slot key is right: a frame at another tick
+*is* a different frame, and I60 put the counter in the key so a spinner does
+not freeze on a cache hit (F227). What the key cannot say is *which block*
+the tick moves, and the cache's answer to any miss but the range is to drop
+everything it held and render the entry whole. I101 already built the other
+half — the parts, a per-block store the range miss assembles from, keyed on
+everything but the range — and the tick is exactly a range-shaped miss: the
+rows are the wrong rows for one block and the right rows for every other.
+And the deck's word for it is `focus`, because the compound slot string is
+what the cache compares under that name; C28 §3's own warning — *a cache at
+40% is healthy if the misses are `absent` on a scrolling transcript and
+broken if they are `focus` on a screen where nothing moved* — is met here by
+a reading that is wrong in the way it warns against.
+
+**Remedy, sized.** C22 I103: the tick is the slot's own axis, `tick`,
+compared after `focus` and before `range`, and a miss on it **keeps the
+parts** as a range miss does; the assembly takes every block from the parts
+except one whose subtree animates (`animationIntervalOf`, C22 I73's walk),
+which is rendered alone and never held — so a tick renders the `status` and
+assembles the patch's rows from what the last frame held, byte-identical by
+I101's identity (C09 I69, C14 I25; T4.89b's sweep). C28's `MissReason` gains
+`tick`, and the deck's six-by-eight heatmap is six-by-nine. The orbit, the
+cursor, the image frame and the series toggle stay in the compound slot —
+each names the block it moves and could take the same treatment, and each
+is recorded as what remains rather than cut here. Sized from the probe: a
+tick beside a 2,000-line patch from about 8.6 ms to about the spinner
+alone's 2.3, and the idle core share from 12% toward 5%; the `logs` case's
+34 ms p95 is the window's measure and is the same cut's to reduce.
