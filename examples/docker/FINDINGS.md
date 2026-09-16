@@ -51209,7 +51209,7 @@ configuration's.
 |---|---|
 | **Surface** | `src/presentation/blocks/paint.ts`'s `Text` per row; `src/presentation/render-lines.ts`'s `react` span around `renderToString`; Ink's `Output`, `@alcalzone/ansi-tokenize`, `string-width` |
 | **Reached for** | the `orbit` bench at 80×24 on the F19 build, suzanne: work p50 11.6 ms, the `react` span 48.5% at 190 ms over 46 renders (p50 1.1, p95 11.1) against `plot.form.plot3d` 34.5% at 135 over 16 — 7.3 ms of Ink a frame against 6.8 of raster. The bunny: `react` 21% at 166 ms over 42 renders beside a 31 ms raster. By package over the bunny run, `@alcalzone/ansi-tokenize` 57 ms, `ink` 27, `string-width` 19; by function, `tokenize` 37 ms, `stringWidth` 13, `tokenizeAnsi` 10. The `all` scroll: `react` 46.7% of 800 ms of work, though at 1.6–2.3 ms a frame after F1149 it is not the complaint there |
-| **Verdict** | **open** — measured, the remedy sized and gated on a spec |
+| **Verdict** | **closed — built and measured.** The rows arm (C09 I72): the bunny −7.3 and −8.0 ms a frame paired, suzanne −7.1 and −6.7 on an 11.6 ms frame, B faster in 159 of 160 rounds |
 
 **The path, at HEAD.** A block's renderer produces its rows as strings — each
 row already `exact()` at the width, each cell's colour already an SGR run
@@ -51234,6 +51234,29 @@ containers (`group`, `panel`, `scroll`) place children by rows already
 signature and C22's frame path, a spec across two components before a
 line lands, and the gate is the figure above: **half the orbit frame**.
 Not built on suspicion; built on this entry.
+
+**Closed — built and measured** (C09 I72). `render` answers `Rendered` — rows,
+or an element — and every kind that ended in `rows()` answers rows; the
+registry composes the gap, the floor and the cap's marker as rows, and
+`renderSequenceToLines` composes a document block by block, normalising each
+rows block through `normaliseRow` (a sixty-line reimplementation of Ink's
+output form, held against `@alcalzone/ansi-tokenize`'s own serialiser over the
+corpus and ten thousand seeded rows, T1.46) and sending only element blocks
+through Ink (T2.143 holds the two arms equal over the corpus and a mixed
+sequence). **Paired, one process, both orders** (`out/probe-f6-pair.mjs`, 40
+rounds, frames asserted identical before timing): the bunny A p50 25.4 → B
+17.7 ms and 27.3 → 18.7, paired B−A median **−7.3 and −8.0 ms**, B faster in
+40/40 and 39/40; suzanne 11.6 → 4.3 and 11.3 → 4.7, **−7.1 and −6.7 ms**,
+40/40 both orders. The `orbit` bench's shares: suzanne's `react` 48.5% → 22.2%
+of work (56 ms over 31 renders at 1.2 ms p50 — the chrome and prompt, not
+the plot), with `rows` at 10.6% (27 ms over 17 at 1.3 ms p50) where the
+raster's rows are normalised; the bunny's `react` 21% → 5.9%, `rows` 3.4%.
+Goldens 458 frames, 0 movers; tier 5 133 green; the mutation run eleven
+caught, none survived, with two mutations recorded in C09 T6.119 as ones the
+row cannot see and why. **What remains is F1170**: the `all` scroll's root is
+a `group`, an element, so its `react` is 64.2% of that bench's work at 1.3 ms
+p50 and 22.8 p95 a frame — the containers, `table` and `image` are the
+residue, and the cost is now theirs alone. 2026-09-16.
 
 ## F1169 — the ramp span projects every referenced vertex in full to read its depth, and the cull allocates a centroid and a difference per triangle ★★★☆☆
 
@@ -51285,7 +51308,7 @@ is proportional to the mesh, which is what F1169's line ticks said.
 |---|---|
 | **Surface** | `src/presentation/blocks/kinds/containers.ts` (`group`, `panel`, `scroll`), `src/presentation/table/definition.ts`, `src/presentation/blocks/kinds/image.ts` — the five kinds that build their own Ink elements rather than ending in `rows()` |
 | **Reached for** | F1168's design: a rows arm on `render` (C09 I72) takes every kind that ends in `rows()` off Ink, per block, and leaves a block that composes an element on the Ink path unchanged. These five compose elements — a `group` places children by `renderChild`, a `panel` draws its border around them in a `row` box, `scroll` pads, `table` and `image` emit a `Text` per row — so a document built of them keeps paying Ink. The `all` scroll is the measured case: its root is a `column` group of `row` groups of `column` tiles, `react` 46.7% of 800 ms of work on the F17 build, though at 1.6–2.3 ms a frame after F1149 |
-| **Verdict** | **open** — the residue of I72's first cut, named so the arm's scope is a decision and not an omission |
+| **Verdict** | **open** — the residue of I72's first cut, named so the arm's scope is a decision and not an omission | · measured after F1168 closed: the `all` bench's `react` 64.2% of work, 1.3 ms p50 and 22.8 p95 a frame, `rows` 0.3% — the root `group` keeps the whole document on the element arm
 
 **Why they are left.** A `column` composition is concatenation and takes
 the arm for free; a `row` composition and a border need each child's rows
