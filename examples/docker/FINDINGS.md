@@ -53311,10 +53311,41 @@ new block by design.
 |---|---|
 | **Surface** | `fitStyled` (`src/presentation/text.ts`), behind `exact` in `src/shell/frame-error.ts`. Its first line measures the row; a row at the width returns; every other row takes the walk — escape by escape, run by run, cluster by cluster, each piece appended to a fresh string — and a row *under* the width comes out of that walk as itself, byte for byte, with the shortfall in blanks. The walk cannot change a short row: nothing is cut, nothing dropped, every piece copied whole. |
 | **Reached for** | `--cpu-prof` over `stress session` and `stress mixed` (the coding-session and round-robin cases), the tree under `writeFrame`: `exact → fitStyled` **56 ms of a 386 ms write** in session and **69 of 494** in mixed, `fitStyled` self 26 and 21 with `displayCells` 25 and 46 beneath it. About 88 frames of 40 rows in session — some 3,500 rows — is **16 µs a row**, against about one for the measure that precedes it (F1202); a transcript of prose, code and patch rows is short rows almost entirely, so the walk runs on nearly every row of every frame to produce the string it was handed. |
-| **Verdict** | **open.** The pad is the measure's: a row measuring under the width is returned as itself with `width − cells` blanks, and only a row over the width walks. Byte-identical because the walk's `used` is `displayCells`'s count — I63's claim, held by T1.39 and T3.78 — and the walk's output on the non-cut path is its input, so the two paths cannot differ; the goldens are the gate that says so over every frame. Arithmetic: about 0.5 ms of a 4.4 ms session frame and 0.6 of a mixed one. |
+| **Verdict** | **Closed — built and measured.** The pad is the measure's: a row measuring under the width is returned as itself with `width − cells` blanks, and only a row over the width walks. Byte-identical because the walk's `used` is `displayCells`'s count — I63's claim, held by T1.39 and T3.78 — and the walk's output on the non-cut path is its input, so the two paths cannot differ; the goldens are the gate that says so over every frame. Arithmetic: about 0.5 ms of a 4.4 ms session frame and 0.6 of a mixed one. |
 
 **Remedy, sized.** One early return in `fitStyled`, one C09 invariant, a unit row
 asserting the padded answer's shape from outside — exactly `width` cells, the row
 as its prefix, the blanks as its suffix, no reset — over styled, plain, family,
 mark and control rows, and that the cut path is untouched; a fail-on-revert row;
 a mutation run whose control pads one short.
+
+**Closed — built and measured.** One early return in `fitStyled` (C09 I78, commitment
+67, T1.52, T6.124; `c09-fit-pad` 2/2 with the goldens in the loop; `quadratic-cursor`
+and `c09-solo-cluster` green). **The mutation pass found the rows before the code
+did**: FIT-REMAINDER — the cluster arm made quadratic — survived, because T3.77 and
+T3.84 fitted rows one cell *under* the width and under I78 that path times no walk
+at all; both rows moved to one cell over the width, and T3.85's segmenter count
+halved to what the measure alone asks. Gates: enforce, 6274 unit-to-integration,
+458 goldens with no mover, 137 e2e. Three paired rounds at 120×40, medians of work
+per run, before → after:
+
+| case | work sum (ms) | note |
+|---|---|---|
+| session | 412 → 332 | the coding-session case |
+| mixed | 499 → 461 | |
+| patch | 660 → 599 | |
+| code | 694 → 632 | |
+| logs | 329 → 288 | |
+| text | 655 → 897 · re-taken ×7: 578–674 → 573–805 | bimodal on both sides with the load phase; see below |
+| live:line | 823 → 880 | plot rows are at the width and take neither path |
+| spinners | 575 → 541 | |
+
+The session write tree, one profile a side: `exact → fitStyled` **58 → 22 ms** over 6 s.
+**The text case is flat, and its spread is the process's.** Its first three rounds
+read 655 → 897; re-taken seven more pairs, the after build sat at 554–590 in four
+and 805–897 in three, and every slow run was slow in its load phase too — 1,075 ms
+against 715–835 — with `work p50` rising in step: a whole-process slowdown on the
+host, not a frame that grew. Under `--cpu-prof` the after build is lighter on text
+as on every other case, 673 against 695, the guard's line 85 → 51. Recorded rather
+than averaged away, because a reading that only one side shows deserves its own
+line even when the profile clears it.
