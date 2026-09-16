@@ -51308,7 +51308,7 @@ is proportional to the mesh, which is what F1169's line ticks said.
 |---|---|
 | **Surface** | `src/presentation/blocks/kinds/containers.ts` (`group`, `panel`, `scroll`), `src/presentation/table/definition.ts`, `src/presentation/blocks/kinds/image.ts` — the five kinds that build their own Ink elements rather than ending in `rows()` |
 | **Reached for** | F1168's design: a rows arm on `render` (C09 I72) takes every kind that ends in `rows()` off Ink, per block, and leaves a block that composes an element on the Ink path unchanged. These five compose elements — a `group` places children by `renderChild`, a `panel` draws its border around them in a `row` box, `scroll` pads, `table` and `image` emit a `Text` per row — so a document built of them keeps paying Ink. The `all` scroll is the measured case: its root is a `column` group of `row` groups of `column` tiles, `react` 46.7% of 800 ms of work on the F17 build, though at 1.6–2.3 ms a frame after F1149 |
-| **Verdict** | **open** — the residue of I72's first cut, named so the arm's scope is a decision and not an omission | · measured after F1168 closed: the `all` bench's `react` 64.2% of work, 1.3 ms p50 and 22.8 p95 a frame, `rows` 0.3% — the root `group` keeps the whole document on the element arm
+| **Verdict** | **closed** — built and measured: C09 I73, `composeRow`/`placeRows`, T1.47, T2.144, T3.89, `c09-rows-containers` | · measured after F1168 closed: the `all` bench's `react` 64.2% of work, 1.3 ms p50 and 22.8 p95 a frame, `rows` 0.3% — the root `group` kept the whole document on the element arm; re-measured on the F1174 build before the cut: `react` 61.2% and 67.7% of work at 80×24 and 130×42, 1.3 and 3.0 ms p50, 10.6 and 24.3 p95, the frame's work 125 and 253 ms over fourteen frames
 
 **Why they are left.** A `column` composition is concatenation and takes
 the arm for free; a `row` composition and a border need each child's rows
@@ -51320,6 +51320,36 @@ second cut with its own measurement — what a `/all` scroll frame pays
 after I72 — and its own row on the agreement, not a line in the first.
 `table` and `image` emit one `Text` per row already and are the cheap
 half: `rows()` in place of the elements.
+
+**Closed — built and measured.** C09 I73. The composition is Ink's output
+grid restated in `rows.ts`: `composeRow` places each child's normalised row
+after a pad from where the previous row ended, measured as Ink measures it,
+and normalises the line again; `placeRows` does it for a grid of placed
+blocks and declines where the grid would overwrite or clip. `group`, `panel`,
+`scroll`, `table` and `image` answer rows when every child does and fall back
+to their unchanged element path otherwise; every child is rendered once where
+it was rendered twice. **The reference is the element path itself**, reached
+in T2.144 by a test-only kind that lifts each leaf into an element, over
+eighteen containers at eight widths under three capability sets and the
+placement arm; the goldens hold every frame, 458 with no mover. The mutation
+pass caught nine and found two statements over-determined — the empty panel's
+body row is drawn three ways at once — which T6.120 records. Measured, three
+runs a side on the same fourteen scroll frames:
+
+| | before | after |
+|---|---|---|
+| 80×24 work, sum | 125 ms | 53–60 ms |
+| 80×24 work p50 / p95 | 2.2 / 33.8 ms | 1.1–1.6 / 12.8–14.2 ms |
+| 130×42 work, sum | 253 ms | 109–116 ms |
+| 130×42 work p50 / p95 | 2.9 / 76.8 ms | 2.1–2.3 / 35–38 ms |
+| `react` share | 61.2% · 67.7% | not in the table; `rows` 3–4% |
+
+The mesh pair, whose document sits in a container: **bunny 17.8 → 15.6 and
+15.2 → 13.2 ms, B−A median −2.3 and −1.8, B faster in 35 and 33 of 40**;
+suzanne 0.0 over a hundred rounds. **What it does not reach**: `mosaic`,
+which places children absolutely and clips each and stays on the element
+arm; and the miss frame itself, 13–14 ms at 80 columns, which is now the
+figures' own rendering rather than Ink's.
 
 ## F1171 — the surface painter allocates two tuples, a hex string and a colour record per write, and a sample is written many times before the nearest wins ★★★☆☆
 
