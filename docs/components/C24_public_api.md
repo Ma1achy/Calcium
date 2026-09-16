@@ -29,14 +29,17 @@ The test it serves: Phase 1 is done when someone who is not its author builds a 
 
 ## 2. Entry points
 
-Four, split by what ships to production.
+Five, split by what ships to production — and one by what a consumer pays to import.
 
 ```
 @fmx/calcium            runtime — createTui, builders, types, defaultTheme
 @fmx/calcium/profiling  the report types and Tier; C28 (I31)
+@fmx/calcium/mermaid    the Mermaid transform, and the renderer it loads (I36)
 @fmx/calcium/testing    adapter harness, document assertions, fakes
 @fmx/calcium/fixtures   recording tooling and the Fixture model
 ```
+
+**`mermaid` is production, and it is separate for a cost rather than an audience.** `mermaidCode` is a synchronous builder over `beautiful-mermaid`, an ESM-only package that brings a layout engine with it; on the runtime barrel it was about a quarter of a cold import — 80–156 ms of 400–480 on a native filesystem, six interleaved pairs — for a builder no example calls (F1188). A synchronous function cannot load an ESM module on demand, so the two shapes that took the emulator (C23 I71) and the grammars (C09 I71) off the graph do not reach it; an entry of its own does, and it is the shape this section already has. A consumer that draws diagrams imports the subpath and pays what it paid before, when it chooses; every other consumer's first frame is that much closer to its import.
 
 `testing` and `fixtures` are dev-only. One entry with everything would drag a golden-frame differ into every production install for nothing.
 
@@ -1195,6 +1198,7 @@ one more line on §3's list.
 32. **The profiler's view is a verb's, not a consumer's** (I33). Nothing that opens it is published; what was published to draw a pane is what the framework draws its own with.
 33. **A type `src/` names is nameable from the surface, and the consumers are what say which ones** (I34, §8e). Checked over the index expressions an app wrote rather than over the members a type declares, because the gap is invisible from inside a package whose every caller imports the declaration directly — and because the member list would answer *fifty*, where the consumers answer *two*.
 34. **The assertion helper measures what the app registered** (I35, F405). Not an exported registry — the definitions, which the consumer already holds because `TuiConfig.blocks` takes them. The measured failure is the one that makes this a defect rather than an omission: an unregistered kind does not throw, it renders as one row and every assertion below it passes.
+35. **The runtime barrel imports nothing from the Mermaid renderer; the transform is its own entry** (I36, F1188).
 
 ---
 
@@ -1203,6 +1207,7 @@ one more line on §3's list.
 ### Tier 1 — unit
 
 - **I35** (F405, C04 I119) — **`expectDocument` renders with the definitions the caller registered.** `fullRegistry()` held `table`, `plot` and `patch` and offered no way to add a fourth, so a consumer who registers a kind could not test it with the published assertion helper: every height of their block rendered as **one row**, because the registry fell back to `raw`. The frame was correct and the instrument could not see it — a reader that guesses is measuring the guess. The parameter is `readonly AnyBlockDefinition[]`, which is exactly what `TuiConfig.blocks` takes — a definition of some **one** kind, and `readonly BlockDefinition[]` (the first draft's spelling) asks each element to handle *any* block, which is the contravariance C04 I119 records, so the surface asks for nothing a consumer cannot already construct (I19's rule, and the reason this is a parameter rather than an exported `BlockRegistry`: the registry is one of the eleven §3 keeps unreachable).
+- **I36** (F1188) — **The runtime barrel imports nothing from the Mermaid renderer.** `@fmx/calcium` re-exports no `mermaidCode` and a process that imports `dist/index.js` under the import trace loads no module from `beautiful-mermaid` or `elkjs`; the transform is `@fmx/calcium/mermaid`, a one-line barrel over `presentation/mermaid.ts`, and the function behind it is the same function — the contract rows hold unchanged, because what moved is an import line and not a byte of output. **The observable is the graph and never a duration** (C23 I71's argument): a timing row is green on a fast machine with the renderer still on the graph, and red on a slow one with it gone.
 
 - **T1.9** (I31): every runtime value exported from `@fmx/calcium/profiling` → two frozen lookup tables and nothing callable; importing the module constructs no recorder, registers no timer and touches no process figure. Asserted on the module's own exports rather than on a written list, because a list is satisfied by the list. **The two tables are the operations a report's reader has that a type cannot give them**: `TIER_RANK` compares two tiers, and `PHASE_GROUP` groups a span into `compute` / `draw` / `output` / `input` / `far side` — which is the *is it computing or drawing* question, unanswerable from `spans` alone because a `Record<SpanName, Histogram>` carries no grouping. A frozen table starts nothing, which is the whole of why either is here.
 - **T1.10** (I32): at the recorder — `undefined` before any frame; the first frame's `work` after one; the **first** frame's figure after the second, so a member filled with the frame in flight reads a number that frame cannot have; the last completed frame's whatever its `outcome`, because a projection over drawn frames would hold a stale figure through a run of fallbacks; and `undefined` again after a tier change, which clears it with the ring. **The four clauses are four states and only one is reachable from a session** — a driven session has composed several frames before anything can read a footer, so *the first frame's is undefined* cannot be constructed there.
@@ -1283,12 +1288,14 @@ one more line on §3's list.
 - **T5.3**: an adapter with a deliberate bug → contained, fallback rendering, session survives (A02 §7 from the consumer's side).
 - **T5.4**: a `b.live` panel whose fetch fails → error rendered in place, backoff visible, siblings unaffected, recovery on success.
 - **T5.5**: `degradesTo1Bit` run over every document the reference app produces → passes.
+- **T5.6** (I36, F1188): a child importing `dist/index.js` under `test/support/import-trace.mjs` loads more than a hundred modules, the barrel among them, and none whose URL is under `beautiful-mermaid/` or `elkjs/`; the same child then imports `dist/mermaid.js`, after which the renderer's bundle is in the list and `mermaidCode` on a two-node flowchart under full capabilities equals the contract corpus's rendering byte for byte — the second import is what makes the first an assertion rather than an absence. `package.json`'s `exports["./mermaid"]` resolves to `./dist/mermaid.js` with its types beside it, and `dist/index.js` names no `mermaidCode`. Not deferred on a component: the code commit replaces this row.
 
 ### Tier 6 — fail-on-revert
 
 - **T6.16** (I32): renaming `lastFrame` to `frame`, or filling it with the frame being composed → T1.10 fails on the second frame, and every consumer drawing it reports a number taken before the work it names. **The state that distinguishes the two is a pair of frames with different costs**; two frames of equal cost agree under both readings, which is the convenient fixture and the one that finds nothing. The reverted figure is a real duration of a real frame, one frame early — which is why no arithmetic check reaches it.
 
 - **T6.18** (I35, F405): `expectDocument` ignoring its second argument → **T2.22** fails on the registered arm alone, and the unregistered arm stays green — which is why both arms are one row.
+- **T6.19** (I36, F1188): restoring `export { mermaidCode }` to `src/index.ts` → **T5.6** fails on the graph — the renderer's bundle is in the import's list — while every contract row on `mermaidCode` stays green, which is why the row is a graph row and not a contract one.
 - **T6.17** (I34): dropping `Camera` or `PlotForm` from the runtime entry → T2.21's **resolution** arm fails, and the consumer's spelling of a *view* becomes a property of a plot again. **Which arm fails is the part worth writing down, because it was measured and it is not the obvious one.** The residue arm — *no app indexes for a name `src/` declares* — stays **green** under that revert: closing the finding deleted the index expressions, so its population no longer holds them and cannot hold them again until an app re-indexes. A residue watches the consumers; the surface is watched by resolving `Plot.form` and `Plot.camera` against the published set by name. **The revert that reads as tidiness**: nothing else breaks, and the only other evidence is an alias reappearing in an app file under a framework name.
 
 - **T6.1** (I2): exporting one of the eleven absent components → T2.1 fails, and the layering starts leaking.
