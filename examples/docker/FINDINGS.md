@@ -53304,3 +53304,17 @@ head — do not move, which is the shape the finding predicted. What remains in 
 big-patch frame is the window's own work and the render of the rows on screen; the
 `measure absent` residue in `stream` is the ticking notice replaced every 16 ms, a
 new block by design.
+
+## F1204 — the exact-width guard walks a short row cluster by cluster to copy it through unchanged, after it has already measured it ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `fitStyled` (`src/presentation/text.ts`), behind `exact` in `src/shell/frame-error.ts`. Its first line measures the row; a row at the width returns; every other row takes the walk — escape by escape, run by run, cluster by cluster, each piece appended to a fresh string — and a row *under* the width comes out of that walk as itself, byte for byte, with the shortfall in blanks. The walk cannot change a short row: nothing is cut, nothing dropped, every piece copied whole. |
+| **Reached for** | `--cpu-prof` over `stress session` and `stress mixed` (the coding-session and round-robin cases), the tree under `writeFrame`: `exact → fitStyled` **56 ms of a 386 ms write** in session and **69 of 494** in mixed, `fitStyled` self 26 and 21 with `displayCells` 25 and 46 beneath it. About 88 frames of 40 rows in session — some 3,500 rows — is **16 µs a row**, against about one for the measure that precedes it (F1202); a transcript of prose, code and patch rows is short rows almost entirely, so the walk runs on nearly every row of every frame to produce the string it was handed. |
+| **Verdict** | **open.** The pad is the measure's: a row measuring under the width is returned as itself with `width − cells` blanks, and only a row over the width walks. Byte-identical because the walk's `used` is `displayCells`'s count — I63's claim, held by T1.39 and T3.78 — and the walk's output on the non-cut path is its input, so the two paths cannot differ; the goldens are the gate that says so over every frame. Arithmetic: about 0.5 ms of a 4.4 ms session frame and 0.6 of a mixed one. |
+
+**Remedy, sized.** One early return in `fitStyled`, one C09 invariant, a unit row
+asserting the padded answer's shape from outside — exactly `width` cells, the row
+as its prefix, the blanks as its suffix, no reset — over styled, plain, family,
+mark and control rows, and that the cut path is untouched; a fail-on-revert row;
+a mutation run whose control pads one short.
