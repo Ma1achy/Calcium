@@ -1031,4 +1031,7 @@ describe("C12 I132 — the painter writes an integer and the records are built o
     expect(eight.counts.get("plot3d.ink") ?? 0, "no packed records on the eight-bit arm").toBe(0);
     expect(eight.counts.get("plot3d.paint") ?? 0, "the writes are still counted").toBeGreaterThan(0);
   });
+  it.todo(
+    "T1.145 (C12 I133, F1172): hypot3 and hypot2 equal Math.hypot bit for bit over a seeded corpus with the extremes, the pure-extreme tuples enumerated — not deferred on a component: the code commit replaces this row",
+  );
 });
