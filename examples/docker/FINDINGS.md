@@ -51606,3 +51606,24 @@ What remains, by allocation: `plot3dArea` 21.3 — the three boxed sample
 arrays 13.5 and the colour records 8; the rows arm's `between`, its `Set`s
 and `normaliseRow` about 22 together; `mixedRows` 10.2; `thinEdge` and
 `shadeAt` 9.7 between them still, a residue the lane did not name.
+
+## F1177 — the measurer asks the segmenter for every isolated glyph, and a plot row is nothing but isolated glyphs ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/text.ts`'s three cluster walks — `cells`, `fitStyled`, `sliceCells` — at the arm past `plainRun`: `clusterAt(segments, i)`, a `containing` call and a segment record per glyph; `src/presentation/rows.ts`'s `swallowed`, which slices the row's tail and segments it after every SGR whose next unit is at or above U+0300 |
+| **Reached for** | the `/all` profile at 408 frames and the forms bench at ten repetitions, both on the F1176 build: `clusterAt` 83 ms of 1,870 (4.5 %, the largest frame-path function), `cells` 34, `swallowed` 20, `wrapCellsParts` 18, `normaliseRow` 15, `placeableClusters` 14, `partsOf` 13; on the forms bench `clusterAt` 786 ms, `cells` 418, `swallowed` 281, `placeableClusters` 253, `partsOf` 243, `between` 195, `normaliseRow` 183. I63's fast path counts a run of printable ASCII by its length and hands the segmenter what follows one — the shape F955 found, a gutter glyph among ASCII. A plot row inverts it: eighty braille or box-drawing units and no ASCII at all, so every unit is handed to `containing`, which builds a segment record, and `swallowed` after each SGR sees a next unit at U+2800 and segments the rest of the row. **A boundary after such a glyph is decidable from the next unit**: by UAX #29, a character that is not Hangul, Prepend, a regional indicator or a joiner is followed by a boundary unless the next unit is Extend, ZWJ or SpacingMark — and no unit below U+0300 other than the joiner is any of those, nor is any unit of the box-drawing, block, geometric, braille, arrow, Latin-1 or punctuation ranges. Sized on the built tree, three runs a side under `make load-down`: forms sum **287 / 485 / 302 → 250 / 233 / 364 ms**, the `rows` span **374 / 446 / 351 → 293 / 299 / 300**, `/all` work over 408 frames **671 / 616 / 717 → 583 / 591 / 557 ms** |
+| **Verdict** | **open** — measured, the remedy sized on a scratch build |
+
+**Remedy, sized.** A unit in one of those ranges whose next unit cannot
+extend it is its own cluster, measured by `clusterCells` as the segmenter's
+one-unit cluster would be — the same function on the same string — so the
+three walks take the unit without asking, and `swallowed` answers zero when
+the unit after the `m` is in a range that cannot extend it. The segmenter
+still decides everything else: a mark, a selector, a joiner, an enclosing
+keycap, a spacing mark, an emoji, a flag, Hangul, CJK, and every unit outside
+the ranges. Byte-identical by construction, and the row that holds it pairs
+every range with every extender kind and asks the walks to keep the cluster
+whole. What it does not reach: `placeableClusters` and `wrapCellsParts`,
+which iterate the segmenter over whole text rather than asking `containing`;
+`partsOf` and `between` in the rows arm.
