@@ -53215,3 +53215,18 @@ costs to be called at all. **The code stays** — it is smaller than what it rep
 tested, and the profile now reads truer — and the register carries the null result
 so nobody opens this line a third time. What remains is the frame's own cost per
 part, which is where the next cuts were already pointed.
+
+## F1202 — the exact-width guard's measurer leaves its one-pass scan at the first braille unit, and every plot row of every frame pays a strip and a second walk ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `displayCells` (`src/presentation/text.ts`), the measurer behind `fitStyled`, behind `exact` in `src/shell/frame-error.ts` — the guard that pads or truncates every transcript row to the frame's width before it is written. Its one-pass scan takes printable ASCII and SGR; anything else returns `cells(text.replace(sgrPattern(), ""))` — a stripped copy allocated and a second walk that asks `soloAt` of every unit. |
+| **Reached for** | `--cpu-prof` over `stress live:line` (40 line plots at 16 ms, 6 s), the tree under `writeFrame` rather than the self-time column, and the arithmetic first: `exact → fitStyled → displayCells` is **181 ms** of the write's 1037 ms over about 340 frames at 40 rows — some 13,600 rows, **13 µs a row**. A single scan of 120 code units with a four-pair binary search per unit is one to two microseconds, so the fall-through is ten microseconds a row and about **0.45 ms of a 3 ms write** in every case that draws braille or box rows: every live plot, every mesh, the orbit. The plot render itself is 202 ms of the same tree, so the guard's re-measure costs almost as much as drawing. |
+| **Verdict** | **open.** `rowCells` in the same file already admits `CELL_PER_UNIT_RANGES` at `narrow` as one cell per unit — the fast set is a checked claim, T1.40 holds it against `cells` — and I74 rules a table unit is a cluster of its own unless an extender follows. The one-pass scan takes the same set at `narrow`. No next-unit test is needed there, and one would be a sentence that cannot be violated: any unit outside the scan's three kinds returns the whole stripped measure, so a unit followed by a mark or a selector is answered by `cells` exactly as before. Byte-identical by construction — a measure, not a render. |
+
+**Remedy, sized.** One arm in `displayCells`, one C09 invariant, one unit row
+asserting the scan equals the stripped measure over a corpus that reaches every
+arm — styled braille and box rows, a table unit before a selector, a mark and a
+joiner, a sextant pair, CJK, and every row at `wide` — a fail-on-revert row, and a
+mutation run whose control counts a table unit as two. Expected: the guard's line
+gone from the write's tree and the frame about 0.4 ms lighter on every plot case.
