@@ -1442,6 +1442,8 @@ export async function constructGraph(
     transcript: stores.transcript,
     region: deps.frame.overlayRegion,
     redraw: () => void scheduler.commit("input"),
+    // C22 I41 — the plan's misses reach the deck (C28 I30).
+    ...(deps.profiler === undefined ? {} : { probe: deps.profiler.asProbe() }),
   });
 
   /**

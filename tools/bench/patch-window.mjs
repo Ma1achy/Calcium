@@ -18,7 +18,7 @@
 //
 //     node tools/bench/patch-window.mjs [lines] [reps]
 //
-import { windowPatch, totalRows, clampOffset } from "../../dist/presentation/patch/window.js";
+import { windowPatch, totalRows, clampOffset, windowPlan } from "../../dist/presentation/patch/window.js";
 import { numberWidth } from "../../dist/presentation/patch/layout.js";
 import { gutter } from "./liveness.mjs";
 
@@ -90,4 +90,29 @@ for (let r = 0; r < REPS; r += 1) {
 console.log(
   `window build  ${median(times).toFixed(3)} ms median   ` +
     `${Math.min(...times).toFixed(3)} min   ${Math.max(...times).toFixed(3)} max`,
+);
+
+// **The planned path — the view's** (C25 I22, C22 I41, F1187). The plan is
+// derived once, as the view derives it once per block and width, and every
+// window reads it; the unplanned figure above is what a caller with no plan
+// pays, which is the view before F1187.
+const tp0 = process.hrtime.bigint();
+const plan = windowPlan(patch, WIDTH);
+const planMs = ms(tp0, process.hrtime.bigint());
+const planned = [];
+for (let r = 0; r < REPS; r += 1) {
+  const offset = clampOffset(patch, WIDTH, HEIGHT, Math.floor((total * r) / REPS), plan);
+  const t0 = process.hrtime.bigint();
+  const w = windowPatch(patch, WIDTH, offset, HEIGHT, plan);
+  const t1 = process.hrtime.bigint();
+  planned.push(ms(t0, t1));
+  if (r === 0 && w.hunks.length === 0) {
+    console.error("PLANNED WINDOW EMPTY: nothing below would mean anything.");
+    process.exit(1);
+  }
+}
+console.log(
+  `planned window  ${median(planned).toFixed(3)} ms median   ` +
+    `${Math.min(...planned).toFixed(3)} min   ${Math.max(...planned).toFixed(3)} max   ` +
+    `(plan derived once: ${planMs.toFixed(3)} ms)`,
 );

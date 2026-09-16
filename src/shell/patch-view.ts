@@ -21,12 +21,14 @@
  * the condition — it subscribes to nothing and holds no entry ids (C15 I10) — so
  * the watching is here.
  */
-import { descendants } from "../data/viewmodel/index.js";
-import type { Block, Patch } from "../data/viewmodel/index.js";
+import { NO_PROBE, descendants } from "../data/viewmodel/index.js";
+import type { Block, Patch, Probe } from "../data/viewmodel/index.js";
 import {
   clampOffset,
   hunkHeaderRows,
   windowPatch,
+  windowPlan,
+  type WindowPlan,
 } from "../presentation/patch/window.js";
 import type { EntryId, TranscriptView } from "../viewport/transcript/index.js";
 import type { Layer, OverlayManager } from "../viewport/overlay/index.js";
@@ -41,6 +43,12 @@ export type PatchViewDeps = Readonly<{
   region: () => Readonly<{ width: number; height: number }>;
   /** A frame, because a motion changes what is on screen and nothing else will. */
   redraw: () => void;
+  /**
+   * The profiler's narrowing view, for the plan's misses (C28 I30). An
+   * instrument and not a data seam — the view reads nothing from it, which is
+   * why C25 T2.10 lists it beside the four and still holds.
+   */
+  probe?: Probe;
 }>;
 
 export interface PatchView {
@@ -92,10 +100,37 @@ export type PatchViewMotion =
   | "pageUp"
   | "pageDown";
 
-type State = Readonly<{ entry: EntryId; blockId: string; offset: number }>;
+/**
+ * The offset, and beside it the plan — **a cache and not a cursor** (C22 I41,
+ * C25 I22). The plan is a property of the block and the width alone, so it is
+ * keyed on both and re-derived when either moves; a motion over an unchanged
+ * block at an unchanged width walks no line of the patch.
+ */
+type State = Readonly<{ entry: EntryId; blockId: string; offset: number; plan: WindowPlan }>;
+
+/** The store's name in the profiler's miss table. */
+const PLAN_CACHE = "patch-view-plan";
 
 export function createPatchView(deps: PatchViewDeps): PatchView {
   let state: State | null = null;
+  const probe = deps.probe ?? NO_PROBE;
+
+  /**
+   * The held plan when it is for this block at this width, else a fresh one —
+   * and which axis rejected the held one, because a plan missing on `rev` under
+   * a steady diff and one missing on `width` under a steady region are
+   * different findings with the same ratio (C28 §3).
+   */
+  function planFor(held: WindowPlan | null, patch: Patch, width: number): WindowPlan {
+    if (held === null) probe.miss(PLAN_CACHE, "absent");
+    else if (held.patch !== patch) probe.miss(PLAN_CACHE, "rev");
+    else if (held.width !== width) probe.miss(PLAN_CACHE, "width");
+    else {
+      probe.hit(PLAN_CACHE);
+      return held;
+    }
+    return windowPlan(patch, width);
+  }
 
   /**
    * A block by id **within one entry, at any depth** (C23 I31, F471).
@@ -128,13 +163,13 @@ export function createPatchView(deps: PatchViewDeps): PatchView {
     return found;
   }
 
-  function layerFor(patch: Patch, offset: number): Layer {
+  function layerFor(at: State): Layer {
     const region = deps.region();
     return {
       id: PATCH_VIEW_ID,
       kind: "view",
       placement: { kind: "fill" },
-      content: [windowPatch(patch, region.width, offset, region.height)],
+      content: [windowPatch(at.plan.patch, region.width, at.offset, region.height, at.plan)],
       // `Esc` pops it, which is what makes the coverage clause in C16 §4
       // necessary: a dismissable layer takes the permissive branch, and this one
       // covers the region.
@@ -142,8 +177,8 @@ export function createPatchView(deps: PatchViewDeps): PatchView {
     };
   }
 
-  function render(at: State, patch: Patch): void {
-    deps.overlays.update(PATCH_VIEW_ID, { content: layerFor(patch, at.offset).content });
+  function render(at: State): void {
+    deps.overlays.update(PATCH_VIEW_ID, { content: layerFor(at).content });
     deps.redraw();
   }
 
@@ -185,10 +220,12 @@ export function createPatchView(deps: PatchViewDeps): PatchView {
       return;
     }
     // The offset is re-clamped against the new document: a patch that shortened
-    // the diff can leave the offset past its end.
+    // the diff can leave the offset past its end. The plan misses on `rev` here
+    // by construction — the block is a new object.
     const region = deps.region();
-    state = { ...at, offset: clampOffset(patch, region.width, region.height, at.offset) };
-    render(state, patch);
+    const plan = planFor(at.plan, patch, region.width);
+    state = { ...at, plan, offset: clampOffset(patch, region.width, region.height, at.offset, plan) };
+    render(state);
   });
 
   // **Torn down by whichever caller removed the layer** (C15 I25, F944, §8a A7).
@@ -224,8 +261,8 @@ export function createPatchView(deps: PatchViewDeps): PatchView {
         return `close what is open before opening \`${found.path}\``;
       }
 
-      state = { entry: from, blockId, offset: 0 };
-      deps.overlays.push(layerFor(found, 0));
+      state = { entry: from, blockId, offset: 0, plan: planFor(null, found, deps.region().width) };
+      deps.overlays.push(layerFor(state));
       deps.redraw();
       return null;
     },
@@ -238,7 +275,8 @@ export function createPatchView(deps: PatchViewDeps): PatchView {
 
       const region = deps.region();
       const page = Math.max(1, region.height - 1);
-      const headers = hunkHeaderRows(patch, region.width);
+      const plan = planFor(at.plan, patch, region.width);
+      const headers = hunkHeaderRows(patch, region.width, plan);
 
       const wanted = ((): number => {
         switch (motion) {
@@ -259,9 +297,9 @@ export function createPatchView(deps: PatchViewDeps): PatchView {
         }
       })();
 
-      const offset = clampOffset(patch, region.width, region.height, wanted);
-      state = { ...at, offset };
-      render(state, patch);
+      const offset = clampOffset(patch, region.width, region.height, wanted, plan);
+      state = { ...at, plan, offset };
+      render(state);
       return true;
     },
 

@@ -1852,6 +1852,23 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   // `surface3.ts`. A second reader of a position lane outside the raster would
   // be a second projection, which I134 made single. The tests read them through
   // `cornerAt` and `screenAt`, which are the readers the layout is held against.
+  // --- C25's window plan ------------------------------------------------------
+  //
+  // The plan is a value the view holds and the window functions read (C25 I22,
+  // C22 I41). Its row model — `Row` and `Unit` — is exported only because a
+  // published type cannot name a private one; the view reads `patch`, `width`
+  // and `headers`, and the start rows and unit bounds are read inside window.ts
+  // by the bottom search and the builder. A reader of them outside window.ts
+  // would be a second row arithmetic, which C25 I1 forbids. T1.24 reads them.
+  "WindowPlan.starts":
+    "C25 I22 — the rows a window may begin at, read by the bottom search inside window.ts " +
+    "and held to clampOffset by T1.24; a second reader would be a second row arithmetic (C25 I1)",
+  "Unit.lineFrom":
+    "C25 I19 — a unit's first line, read by the builder and windowRows inside window.ts; the " +
+    "type is published only because WindowPlan.rows names it (C25 I22)",
+  "Unit.lineTo":
+    "C25 I19 — a unit's end line, read by the builder and windowRows inside window.ts; the " +
+    "type is published only because WindowPlan.rows names it (C25 I22)",
   "Lanes.pos":
     "C12 I139 — the position lane: read by the cull, the projection and the span inside " +
     "surface3.ts, and by T1.149 and T1.151 through cornerAt. A reader outside the raster " +
