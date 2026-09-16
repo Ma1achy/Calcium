@@ -308,6 +308,10 @@ ViewDocument ─► TranscriptStore ─► Viewport ─► BlockRegistry ─► 
                                 (selects visible)   (render)              (layout)
 ```
 
+The React → Ink → Yoga leg is the element arm. A kind that answers rows (C09 I72) — every
+non-container kind — hands them to the frame directly, normalised into the form Ink's output
+layer would have written, and the leg is taken only by a block that composes an Ink tree.
+
 
 ```mermaid
 flowchart TD

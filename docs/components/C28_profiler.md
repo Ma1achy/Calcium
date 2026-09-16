@@ -89,7 +89,7 @@ export type Tier = "off" | "counters" | "spans" | "alloc" | "deep";
  * changes is that its self time is now the remainder rather than the whole.
  */
 export type SpanName =
-  | "frame" | "compose" | "measure" | "elements" | "paint" | "react" | "assemble" | "write"
+  | "frame" | "compose" | "measure" | "elements" | "paint" | "react" | "rows" | "assemble" | "write"
   | "body" | "prompt" | "composite" | "based" | "transcript" | "visible"
   | "decode" | "route" | "handler" | "local" | "transport" | "adapt" | "stream" | "livefetch"
   | "completion" | "overlays" | "chrome";
@@ -104,6 +104,8 @@ export type SpanName =
  * bytes, and `far side` to nothing this framework can change.
  */
 export type PhaseGroup = "compute" | "draw" | "output" | "input" | "far side" | "total";
+// `rows` is the rows arm's normalisation (C09 I72), a `draw` span beside `react`, which
+// is now the element arm alone; one block opens one of the two and never both.
 export const PHASE_GROUP: Readonly<Record<SpanName, PhaseGroup>>;
 
 /** Log-linear buckets. `error` is the relative bound, stated because a percentile

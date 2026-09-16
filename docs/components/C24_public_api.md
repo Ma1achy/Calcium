@@ -87,7 +87,7 @@ export type { CompletionSource, CompletionContext, Candidate, Slot };
 export type { LiveSpec, ViewRefresh };
 export type { Identity };
 export type { CommandPolicy, Classification, ParseResult };
-export type { BlockDefinition, Measure, MeasureFn, RenderContext, BlockKeymap };
+export type { BlockDefinition, Measure, MeasureFn, RenderContext, BlockKeymap, Rendered };   // `Rendered` widens `render`'s answer to rows (C09 I72); an element-returning kind is unchanged
 export type { TerminalCapabilities };   // what `TuiConfig.capabilities` overrides — C22 I49
 export type { TransportRouter, VerbTransport, Invocation };
 export type { TransportDeps, Fixture, FixtureHandler };   // what the constructors below take — MG29 named all three

@@ -39,8 +39,15 @@ type RenderContext = Readonly<{
   focus:        FocusState | null;    // C11 / C15 use it; most kinds ignore it
   tick:         number;               // monotonic animation counter — see below
   measureChild: MeasureFn;            // Seam 1, on the render side — see below
-  renderChild:  (block: Block, width: number) => ReactElement;
+  renderChild:  (block: Block, width: number) => Rendered;  // rows or an element — I72
 }>;
+
+// What a renderer answers (I72): the rows of the block at the width, each already
+// exact and carrying its SGR, or an Ink element for a kind that composes one.
+type Rendered = ReactElement | readonly string[];
+function rows(lines: readonly string[]): readonly string[];   // the rows arm — one empty row for none (I14)
+function elementOf(rendered: Rendered): ReactElement;          // rows wrapped for an Ink tree; an element as it is
+function normaliseRow(line: string): string;                   // the row as Ink's output layer would write it (I72)
 
 function cells(text: string): number;          // grapheme-aware display width
 function graphemes(text: string): readonly string[];   // the cluster stream, for C17
@@ -60,7 +67,7 @@ function sliceCells(text: string, from: number, to: number): string;
 interface BlockDefinition<B extends Block = Block> {
   kind:    string;
   measure: Measure<B>;                // contract from C04; receives measureChild
-  render:  (block: B, ctx: RenderContext) => ReactElement;
+  render:  (block: B, ctx: RenderContext) => Rendered;   // rows, or an element — I72
   // §2a — a valid smaller block covering rows [from, to). Optional: a kind that
   // does not divide omits it and is atomic by having no member.
   window?: (block: B, width: number, from: number, to: number) => Windowed<B>;
@@ -86,13 +93,13 @@ interface BlockRegistry {
   get(kind: string): BlockDefinition | undefined;
   seal(): void;
   measure(block: Block, width: number): number;
-  render(block: Block, ctx: RenderContext): ReactElement;
+  render(block: Block, ctx: RenderContext): Rendered;    // rows when the kind answered rows — I72
   measureSequence(blocks: readonly Block[], width: number): number;
   // C14 §4b — the slice of a sequence that fills rows [from, to), on block boundaries
   // where a kind declares no `window`; the rows skipped before the first kept block.
   windowSequence(blocks: readonly Block[], width: number, from: number, to: number):
     Readonly<{ blocks: readonly Block[]; skipRows: number }>;
-  renderSequence(blocks: readonly Block[], ctx: RenderContext): ReactElement;
+  renderSequence(blocks: readonly Block[], ctx: RenderContext): ReactElement;   // the element arm of a sequence; render-lines composes rows block by block (I72)
   // C26 §5 — one block's elements, block-local; and a sequence's, lifted in BOTH axes.
   elementsOf(block: Block, width: number): readonly NavElement[];
   elementsIn(blocks: readonly Block[], width: number):
@@ -783,6 +790,22 @@ wrapping and truncation are not usable here: its truncation marker is `…`
 unconditionally, which is not the 1:1 ASCII substitution §4 requires, and a
 renderer that let Ink decide where a line breaks would be measuring one layout
 and rendering another.
+
+**Ink is the element arm, not the path** (I72). Every non-container kind ends in
+`rows(lines)`, and those rows are already the frame's: exact at the width, their
+SGR written by C10. Ink's contribution to such a block was to mount a React
+tree, measure every row again through Yoga and a second width implementation,
+tokenise every row's SGR into per-character styles, write them into a grid and
+re-serialise the grid — and on a 3-D orbit that was half the frame (F1168). So
+`render` answers `Rendered`: rows, which `render-lines` normalises and hands on,
+or an element, which takes Ink as before. **The bytes do not move**: Ink's output
+layer writes a row in a normal form — each SGR read into a style state and
+re-emitted only where the state changes, the open state undone after the last
+visible character, trailing blanks trimmed — and `normaliseRow` is that form,
+checked against the tokeniser's own serialiser (T1.46) and against Ink on the
+corpus (T2.143). The containers, `table` and `image` compose Ink trees and stay
+on the element arm; a sequence is composed block by block, so a rows block
+beside an element block pays nothing for its neighbour.
 
 **C09 relies on Ink's layout width agreeing with `cells()`, and the agreement is
 asserted rather than assumed.** Ink still computes width for box sizing and
@@ -2297,6 +2320,7 @@ the same overrun in smaller form.
 - **I69** — **A `column` group divides; a `row` group and a `column` carrying `minRows` do not.** A column group's rows are its children's, laid end to end with a `gapBefore` row before any child that declares one (C04 §3a), so a window `[from, to)` is the contiguous run of children whose rows meet it, **each kept whole** — the partial first and last child are returned entire and their off-window rows are the residual. `skipRows` is the rows of the first kept child that precede `from` (its `gapBefore` row included when the window opens on or above it), `dropRows` the rows of the last kept child that follow `to`, and `align` is re-indexed to the kept subset so a right-aligned child keeps its column. The gap row is kept by keeping the child's own `gapBefore` when the window opens on or above it and dropped by rewriting the flag off when the window opens below it — `windowSequence`'s own rule (C14 I25), one level up. **A `row` group declines**: its children are side by side, not a sequence, so no contiguous run of them is a row range — it returns itself with `skipRows = from` and `dropRows = height − to`, the shape `windowSequence` already pays for a kind that declares nothing. **A `column` carrying `minRows` declines too**: `minRows` pads the group past its children's own rows (C04 I102, groupRows), and those pad rows belong to no child, so a window over them would break I26 from outside any child. **Children are not windowed recursively**: the seam takes `measureChild` and no `windowChild`, so a child taller than the window is kept whole and charged to the residual — the same slack a non-dividing kind costs, and bounded because the reason to divide a `group` is a long *list* of short children, which `/all` is (F1149). Enforced generically by I26; the partition moves `group` into T2.136's divisible list.
 - **I70** — **A caller may hand the registry a measure memo that outlives the call, and the registry reads and writes it exactly as its own.** `measure`, `measureSequence` and `windowSequence` take an optional memo of the per-call memo's shape — `get` and `set` by block identity, the width in the value — and for that call it *is* the memo; without one, a fresh one per call as before. Sound because the memo's premise is identity and nothing else: a block is frozen (C04 I1) and replaced on any change (C23 I34), so the same object measures the same; an answer is held for one width and any other width misses through; and geometry moves with neither theme nor capabilities nor tick — C14's `HeightCache` header, §4's 1:1 substitutions, C10 T4.1 — so an answer read back is the answer `measure` would give. The registry keeps no reference past the call; the owner is the caller, which is L4 (C22 I100), and the observable is the profiler's `measure` hit on a second call through the same memo where the first missed (F1160) (→ I2, I26a, C28 I31, C22 I100).
 - **I71** — **The tokeniser's run is emitted straight from highlight.js core's emitter seam, and no grammar outside the registered set is on the import graph.** `tokenise` runs a `highlight.js/lib/core` instance of its own, `ignoreIllegals` set, with an emitter that builds the token run directly — no tree between the grammar and the run. The emitter keeps one slot per open scope: a scope's class is `hljs-` on the first segment of its name (highlight.js's own class shape, the one §4a's table reads; the later segments of a dotted name carry no prefix and every key of the table does, so they can map nothing), and the slot of an open scope is that class's mapping where the table has one and the enclosing scope's where it does not — an unmapped class is never dropped (§4a). A text run under a scope is one token, merged with the run before it only when nothing but text has been emitted under that scope since — the shape adjacent text nodes had in the tree. A sublanguage's tokens arrive with their own slots where a scope of theirs mapped and take the enclosing scope's where none did, and a sublanguage handed over with no name leaves its last text run open to merge, as the spread of its children did. **The reference is the tree**: `lowlight`'s hast, flattened by the rule above, is what the run equals token for token, and `lowlight` is a devDependency for that row alone — a consumer's install does not carry it, and `src/` does not import it (SS38). What the graph loads for the code block is `highlight.js/lib/core` and the sixteen grammar files §4a names, and a `registerGrammar` call adds its own file and nothing else (F1164) (→ I23, I24, C24 I22, C23 I71).
+- **I72** — **A renderer may answer rows, and a row it answers is a row of the frame — byte for byte the row Ink would have written.** `render` returns `Rendered`: rows, or an element. `rows(lines)` answers rows and every kind that ended in it does now; a kind that composes an Ink tree returns an element and takes the Ink path, and a sequence is composed block by block, so a rows block beside an element block pays nothing for its neighbour. The registry composes rows as Ink composed elements: a `gapBefore` is one empty row, the floor pads with empty rows (I33), the cap's marker is a row after the block's (C14 I24), and an error block is its status rows. `normaliseRow` puts a row into the form Ink's output layer writes: each SGR sequence, compound ones split, is read into a style state — a code carries the code that ends it; `0` clears the state; an end code removes every code it ends; the two intensity codes accumulate and every other code replaces the one of its kind — the sequences are re-emitted only where that state differs between one visible character and the next, the open state is undone after the last, and trailing blanks are trimmed; an OSC control sequence is dropped and a hyperlink is a style. So `normaliseRow(row)` equals the row Ink writes for a `Text` holding it: over the tokeniser's own serialiser on a fuzzed corpus (T1.46) and over the block corpus rendered both ways (T2.143), with the goldens holding every frame. What the arm skips is the mount, Yoga's measure of every row through a second width implementation and two tokenisations of every row's SGR (F1168); what it keeps is the bytes. **The element arm is unchanged and is the fallback**: `group`, `panel`, `scroll`, `table` and `image` compose elements and take it, which is the residue F1170 names (→ I1, I14, I33, C14 I24, C28 I39, C10 I24).
 
 ## 8. Commitments
 
@@ -2528,6 +2552,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.43** (I68): `fit` returns exactly `width` cells **at the convention it was given**, over a table crossing Ambiguous and non-Ambiguous text at both conventions and at five widths — and the table is shown to respond first: `µ` (U+00B5) is 1 cell at both, so a fixture built on it cannot move, while `°`, `Δ` and `±` are 1 and 2. The **control** is the same call at `narrow`, which was always right and must stay right. In `test/contract/blocks.test.ts`.
 - **T1.44** (I70): a column group measured twice through one caller-owned memo measures each child once across both calls — the second call is every `measure` hit and no miss — and the answers equal the memo-less answers; at another width every child misses through (`width`); a rebuilt child, the same content as a new object, misses (`absent`); and the registry holds no reference — a memo dropped by the caller leaves the next call measuring afresh. In `test/unit/blocks.test.ts`.
 - **T1.45** (I71): over every default grammar's sample and a `markdown` document holding a fenced block, an `xml` document holding a `<style>` and a `<script>` body, and a `javascript` template literal, `tokenise`'s run equals `lowlight`'s tree flattened by §4a's rule token for token — text, slot and boundaries — and a grammar registered through `registerGrammar` after the first call tokenises on the next.
+- **T1.46** (I72): `normaliseRow` equals `@alcalzone/ansi-tokenize`'s `styledCharsToString(styledCharsFromTokens(tokenize(row))).trimEnd()` byte for byte over every row of the block corpus at four widths under the three capability sets, and over ten thousand seeded rows of random text — ASCII, wide, combining, a hyperlink — carrying random SGR among `0`, `1`, `2`, `3`, `4`, `7`, `9`, `22`–`24`, `27`, `29`, `30`–`37`, `39`, `40`–`47`, `49`, `90`–`97`, `100`–`107`, `38;5;n`, `48;5;n`, `38;2;r;g;b`, `48;2;r;g;b`, compound sequences, an empty `\x1b[m`, an unknown `5`, and trailing blanks styled and plain.
 
 ### Tier 2 — contract / interface
 
@@ -2589,6 +2614,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.140** (I69, I26): a `row` group and a `column` carrying `minRows` decline — the window is the whole block with `skipRows = from`, `dropRows = height − to`, and I26 still balances. In `test/contract/block-window.test.ts`.
 - **T2.141** (I69): a `column` of three children with the third `right`-aligned, windowed to the third child's own rows, renders byte-identical to those rows of the whole group — the `align` re-index is what keeps the column, and dropping it moves the child. In `test/contract/block-window.test.ts`.
 - **T2.142** (I69, C14 I25): the gap boundary — a window opening on a child's `gapBefore` row keeps the gap and the child, one row below drops the gap with the child above and rewrites the kept child's flag off, and I26 balances on both. In `test/contract/block-window.test.ts`.
+- **T2.143** (I72): over the block corpus × seven widths × the three capability sets, `renderToLines` — the rows arm — equals the same block rendered through Ink, its rows wrapped back into an element with `elementOf`, byte for byte; and a sequence of rows-answering and element-answering blocks with gaps, a floored block and a capped one equals the sequence rendered whole through Ink; and the probe reads `rows` for the rows arm and `react` for the element arm, never both for one block.
 
 ### Tier 3 — edge cases
 
@@ -2673,6 +2699,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T3.84** (I60, I63): T3.77's ratio on the arm T3.77 cannot reach — a row of CJK, where every cluster reaches the segmenter — for `fitStyled`'s pad path and `sliceCells`'s tail window: under 24× from 50 to 400 cells, each operand a batch of at least 20 ms. `containing` answers for one cluster from one position; a reader that segmented the remainder of the row to reach it would be F937's quadratic by the mechanism SS60 cannot see, and this is the row that sees it (7.2× and 6.6× measured on the fix).
 - **T3.85** (I63, F955, F1084): a 200-cell row holding one `│` among ASCII — the patch gutter's shape — asks the segmenter for **2** clusters where a 200-cell CJK row asks for **200**, counted through `Intl.Segmenter`'s `Segments.prototype.containing` and not timed. That count *is* what I63 says, where a duration is a proxy for it: one cluster against a hundred, each found once and measured once. The timing is kept and reported — the CJK row costs more, which is the control — but it does not gate. **It gated as a ratio and the ratio is fragile in one direction**: measured at 200 cells the gutter row costs 0.0065 ms of which most is a fixed floor, sixteen times the cells costing 3.2× the time while the CJK row is linear, so any additive noise compresses a quotient whose denominator is that floor. It fell to 5.7 against a bound of 6 inside a full `make all`, with the fix it exists to protect fully in place, and the pre-fix figure is 2.8×.
 - **T3.87** (I68): the two frames, read rather than totalled — a bordered `status` in a 40-cell block at `ambiguousWidth: "wide"` has **every** row at 40 cells measured at that convention, the message row included; and a `comparison` at 44 keeps its last column's text whole, which is the arm no row total can see because `clampSpans` above it made the total right while the content was cut. In `test/edge/status.test.ts`.
+- **T3.88** (I72): a row that is only SGR normalises to `""`; a row holding an OSC control sequence loses it, as Ink drops it; a row ending in styled blanks keeps them and their closing codes; a row ending in plain blanks loses them; a wide character keeps its cells and its styles; `rows([])` answers one empty row (I14) and the frame has it.
 - **T3.86** (I66): the cache — a block whose digest changes at a stable placement is re-transmitted at the same id and the map still holds one entry; an unchanged block on a redraw sends nothing; an overlay change alone re-transmits; a block removed from the document releases its placement on the next frame, and re-added it transmits again; a hundred frames of one block leave one entry where the picture identity leaves a hundred; and two groups holding one block id are two entries. In `test/edge/image-placement.test.ts`.
 
 ### Tier 4 — integration
@@ -2765,6 +2792,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.116** (I67): mutated by hand on landing, four mutations and a control, and the table is the run's rather than a prediction. `placesAtProtocol` gating on `imageProtocol` alone — the shape the shell had — → **T1.42, T2.137 and C22's T4.17t**; the `rows` clause dropped from `placementFits`, which is the axis F624's defence never covered → **the same three**; `visibleRows` gathering by `imageProtocol` again → **T4.17t alone**; the seam's skip removed so a refused placement transmits again → **T4.17t alone**. The control is a no-edit run, which fails nothing. **The last two are held by one row each and the row is a session-level one**, which is stated rather than left to be discovered: a seam-level row calling the predicate would pass on the day nothing called it, and the two mutations that reach only T4.17t are exactly the wiring.
 - **T6.117** (I68): mutated by hand on landing, and the third row is the one that came back differently from its prediction. `fit` dropping the convention on its `pad` again — the shipped shape — → **T1.43 and T3.87**; `comparison`'s three columns dropping it → **T3.87 alone**, which is what separates the two members of the class; every Ambiguous character in T1.43's own table swapped for `µ` **with the defect restored** → **T1.43 still fails**, because `truncate` inserts `…` and U+2026 is itself Ambiguous, so a fixture with no Ambiguous input still has one in its *output* the moment the text is cut. The prediction was *nothing fails*, and the run is what corrected it. Every mutation restored by `cp` and compared by `md5`.
 - **T6.118** (I71): the emitter merging text runs across scopes → T1.45's boundaries differ on the first sample with two adjacent scopes; a sublanguage's unslotted tokens keeping `null` instead of the enclosing scope's slot → T1.45's `xml` document; the prefix dropped from the class → T1.45 reads every keyword as `null`; the scope's whole dotted name prefixed rather than its first segment → T1.45 on a scope named `title.function`, which then maps nothing where the reference maps `function`; `createLowlight` imported again → T5.6 lists the grammars. `tools/mutate/runs/c09-token-emitter.mjs`, whose control returns the reference's run with every slot cleared.
+- **T6.119** (I72): the diff emitted at every visible character rather than where the state changes → T1.46 on any row with a two-character styled run; the final undo dropped → T1.46 on any styled row; trailing blanks kept → T1.46 on a row ending in spaces; the intensity codes replacing rather than accumulating → T1.46 on `1` then `2`; the gap row emitted as `" "` rather than `""` → T2.143's sequence arm; the floor's pad rows likewise → T2.143's floored block. `tools/mutate/runs/c09-rows-arm.mjs`, whose control returns every row unnormalised.
 
 ---
 
