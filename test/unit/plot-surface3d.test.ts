@@ -1591,3 +1591,7 @@ describe("C12 I138 — a hidden thin triangle is not walked", () => {
     }
   });
 });
+
+describe("C12 I139 — the geometry is lanes", () => {
+  it.todo("T1.151 (C12 I139, F1184): the lanes hold the reference's distinct records in first-reference order, every stamped slot equals project, a straddling cube counts its front corners, and a lane-built triangle draws what the object form drew — not deferred on a component: the code commit replaces this row");
+});
