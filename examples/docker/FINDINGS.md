@@ -51418,7 +51418,7 @@ the next things to name.
 |---|---|
 | **Surface** | `src/presentation/plot/surface3.ts`'s `drawTri`: `const zOf = (p) => dot(sub(p, basis.eye), basis.forward)` on the clip path, capturing the `basis` parameter |
 | **Reached for** | the sampled heap after F1172: `drawTri` 55.6 MB of 241 over twenty bunny frames, about 40 bytes for each of the 69,451 triangles, constant per frame over sixty (so not warm-up), with no deoptimisation of the raster in a `--trace-deopt` run. Nothing in the direct path builds an object. Four hypotheses tried on a scratch build and each moved `drawTri` by nothing: `shadeAt`'s nine doubles through a typed lane (that took `shadeAt` and half of `thinEdge` off the list — 18 MB — but not this), the depth write's double through the lane, the painter's two doubles through the lane, the three edge lengths computed inline. The fifth held: **the clip path moved into its own function, `drawTri` 55.9 → 0**. V8 allocates a function's context in its prologue when any of its variables is captured by an inner closure, and `basis` is a parameter captured by `zOf` — so every call pays for the closure the clip path would have built, before `backfaceCulled` runs, whether or not the path is taken. Paired with F1174 on one scratch build: bunny −2.4 and −3.1 ms, B faster in 35 and 39 of 40; suzanne −0.2 and 0.0 over a hundred rounds each way, a self-pair in the swapped position reading +0.1 |
-| **Verdict** | **open** — measured, the remedy sized on a scratch build |
+| **Verdict** | **closed** — built and measured: I134, `clipPath`, T6.110's recorded survivor |
 
 **The path, at HEAD.** I128 put the direct path first — three view depths as
 scalars, an early return for a triangle wholly in front — so that the clip
@@ -51436,13 +51436,24 @@ nothing. Byte-identical by construction: the same statements, one call
 boundary further in. **What it does not reach**: the closure itself, built
 once per straddling face, which is the clip path's cost and stays.
 
+**Closed — built and measured.** C12 I134; `clipPath` with `basis` as its
+own parameter, `drawTri` declaring no closure. No row can see a context per
+entry, and T6.110 records the survivor. Gates green, goldens 458 with no
+mover. With F1174 in one commit, paired against the F1172 build both orders:
+**bunny 15.9 → 13.7 and 19.4 → 16.5 ms, B−A median −1.8 and −3.0 ms, B faster
+in 33 and 39 of 40**; suzanne 0.0 and −0.1 over a hundred rounds each way,
+against a self-pair of identical builds reading +0.2 in the same slot — the
+instrument's bias at that scale, and the figure a suzanne reading has to
+clear. The sampled heap over twenty bunny frames **241 → 151 MB**; `drawTri`
+gone from the list.
+
 ## F1174 — `toScreen` builds a difference vector and a projection record per vertex per frame, through `project`, for three numbers it then copies ★★☆☆☆
 
 | | |
 |---|---|
 | **Surface** | `src/presentation/plot/surface3.ts`'s `toScreen`, calling `project(basis, w.p)`; `project3.ts`'s `project`, whose `sub` allocates a `Vec3` and whose return is a fresh record |
 | **Reached for** | the sampled heap after F1172: `toScreen` 33.4 MB of 241 over twenty bunny frames. I130 projects each vertex once per frame into a record the vertex holds, so the remaining allocation is inside the projection itself: `sub` builds the eye-relative vector as an object, and `project` returns `{ x, y, depth }` — two objects per vertex per frame, read for three numbers and dropped. `toScreen` already computes the three view-space components `vx`, `vy`, `vz` from the same differences in `dot`'s order — and `vz` **is** `project`'s `z`, `vx` its `x`, `vy` its `y` — so the projection is four more scalar statements on values the function already holds. On a scratch build, the projection in scalars: **`toScreen` 34.0 → 0** |
-| **Verdict** | **open** — measured, the remedy sized on a scratch build |
+| **Verdict** | **closed** — built and measured: I134, T1.146, `c12-scalar-project` |
 
 **Remedy, sized.** `toScreen` projects in scalars: the near test on `vz`, the
 divisor by the orthographic flag, `f`, the aspect and the half-and-shift in
@@ -51452,3 +51463,20 @@ by a row comparing the record the vertex holds after a `drawTri` against
 its other four callers, which are per figure and not per vertex. Sized with
 F1173 on one scratch build, see there; the heap over twenty bunny frames
 **241 → 155 MB** for the two together.
+
+**Closed — built and measured.** C12 I134; `toScreen`'s position from the
+`vx`, `vy`, `vz` it holds in `project`'s expression order; `project` no longer
+imported by `surface3.ts`. T1.146 compares the record every stamped vertex
+holds against `project` over the cube, suzanne and the bunny under two
+perspective and two orthographic cameras, by `Object.is`. `c12-scalar-project`
+control seen and three caught (the orthographic divisor, the aspect fold, the
+`y` flip); the near return loosened survived on the first run because
+`clipNear` cuts above the plane and the direct path requires every corner
+beyond it, so the arm is unreachable from the raster — kept, and recorded in
+T6.110. `Basis.orthographic` left MG24's exemption list with its reason met on
+its own terms: a second reader of the arm, held to the first by T1.146. Gates
+green, goldens 458 with no mover; `toScreen` gone from the heap list; the
+paired figures are F1173's. What remains, by allocation: `plot3dArea` 54.7 MB
+of 151 — the per-frame sample buffers — `thinEdge` and `shadeAt` 31 together,
+the doubles boxed at `shadeAt`'s boundary, `mixedRows` 10, the rows arm's
+`between` and its `Set`s about 15.
