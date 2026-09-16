@@ -56,6 +56,7 @@ import { PerformanceObserver, monitorEventLoopDelay, performance } from "node:pe
 import { Session as InspectorSession } from "node:inspector";
 import { getHeapSnapshot, getHeapSpaceStatistics, getHeapStatistics } from "node:v8";
 
+import { createSourceLocator } from "./locate.js";
 import { foldCpuProfile } from "./stacks.js";
 import type { CpuProfile, SampledStacks } from "./stacks.js";
 import type { CaptureKind, CaptureResult, GcKind, ResourceProbe, ResourceSample } from "./types.js";
@@ -311,6 +312,9 @@ function capped(sink: CaptureSink, capBytes: number): CaptureSink & {
  * live sessions posting to the same domain is a shape with no defined answer.
  */
 export function createInspector(elapsed: () => number, io: CaptureIo): Inspector {
+  // **One locator per inspector** (C28 I65): the maps beside the bundle's
+  // chunks are read on the first fold that asks and held for the rest.
+  const locate = createSourceLocator();
   const session = new InspectorSession();
   let connected = false;
   let disposed = false;
@@ -415,7 +419,7 @@ export function createInspector(elapsed: () => number, io: CaptureIo): Inspector
       let stacks: SampledStacks | null = null;
       if (cpuProfile !== undefined) {
         const foldAt = elapsed();
-        const folded = foldCpuProfile(cpuProfile);
+        const folded = foldCpuProfile(cpuProfile, locate);
         if (folded !== null) stacks = Object.freeze({ ...folded, foldMs: elapsed() - foldAt });
       }
 

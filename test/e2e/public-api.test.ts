@@ -7,7 +7,7 @@
 // is the same on both.
 import { describe, expect, it } from "vitest";
 import { execFile } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -52,12 +52,76 @@ describe("C24 I37 — prepareLaunch narrows Ink's es-toolkit import to one modul
       rmSync(dir, { recursive: true, force: true });
     }
     const pkg = JSON.parse(readFileSync(fileURLToPath(new URL("../../package.json", import.meta.url)), "utf8")) as { exports: Record<string, { types: string; default: string }> };
-    expect(pkg.exports["./launch"]).toEqual({ types: "./dist/launch.d.ts", default: "./dist/launch.js" });
+    expect(pkg.exports["./launch"]).toEqual({ types: "./dist/launch.d.ts", default: "./dist/bundle/launch.js" });
   }, 120_000);
 });
 
 describe("C24 I38 — every entry resolves into one bundled graph", () => {
-  it.todo("T5.8 (C24 I38, F1193): the armed bundled runtime under the import trace is under four hundred modules with nothing from the emulator or the renderer, the six entries' export keys equal the tsc files', SurfaceError is one object across the runtime and testing entries, and the emulator chunk appears only after a shell command; exports resolve into dist/bundle — not deferred on a component: the code commit replaces this row");
+  it("T5.8 (C24 I38, F1193): the armed bundled runtime under the import trace is under four hundred modules with nothing from the emulator or the renderer, the six entries' export keys equal the tsc files', a b.live declaration made through the runtime is read by the testing entry's liveParts, the emulator chunk appears only after a shell command, and exports resolve into dist/bundle beside files that exist", async () => {
+    const here = new URL("../support/", import.meta.url);
+    const dir = mkdtempSync(join(tmpdir(), "bundle-graph-"));
+    const out = join(dir, "trace.jsonl");
+    try {
+      await execFileP(process.execPath, [
+        "--import", fileURLToPath(new URL("import-trace.mjs", here)),
+        fileURLToPath(new URL("bundle-graph-child.mjs", here)),
+        out,
+      ], { timeout: 90_000 });
+    } catch (e) {
+      rmSync(dir, { recursive: true, force: true });
+      throw e;
+    }
+    const lines = readFileSync(out, "utf8").split("\n").filter((l) => l.startsWith("{"));
+    rmSync(dir, { recursive: true, force: true });
+    const graph = JSON.parse(lines[0] ?? "{}") as { status?: string; afterImport?: string[] };
+    const names = (JSON.parse(lines[1] ?? "{}") as { names?: Record<string, { bundled: string[]; tree: string[] }> }).names ?? {};
+    const live = (JSON.parse(lines[2] ?? "{}") as { live?: unknown }).live;
+    const before = (JSON.parse(lines[3] ?? "{}") as { beforeShell?: string[] }).beforeShell ?? [];
+    const after = JSON.parse(lines[4] ?? "{}") as { afterShell?: string[]; seen?: boolean };
+
+    // **The graph.** Armed, bundled: a few hundred where the tree was 1,130.
+    expect(graph.status).toBe("hooked");
+    const imported = graph.afterImport ?? [];
+    const count = imported.length; // cells-ok
+    expect(count, "modules on the bundled runtime's import").toBeGreaterThan(50);
+    expect(count).toBeLessThan(400);
+    const forbidden = (urls: readonly string[]): string[] => urls.filter((u) => u.includes("/@xterm/headless/") || u.includes("/beautiful-mermaid/") || u.includes("/elkjs/") || /\/emulator-[^/]*\.js$/.test(u));
+    expect(forbidden(imported), "nothing from the emulator or the renderer").toEqual([]);
+    expect(imported.some((u) => u.includes("/dist/bundle/index.js")), "the bundled runtime is what loaded").toBe(true);
+
+    // **The same names, six times.**
+    const entries = ["index.js", "launch.js", "mermaid.js", "testing/index.js", "fixtures/index.js", "shell/profiling/index.js"];
+    expect(Object.keys(names).sort()).toEqual([...entries].sort());
+    for (const e of entries) expect(names[e]?.bundled, `${e}: the bundled entry's names are the tree's`).toEqual(names[e]?.tree);
+    expect(names["index.js"]?.bundled ?? [], "and the runtime has its names").toContain("createTui");
+
+    // **One instance.** The runtime's b.live is read by testing's liveParts.
+    expect(live, "liveParts sees the declaration b.live made").toEqual(["one"]);
+
+    // **The emulator, after and not before.**
+    // The renderer is on this list legitimately — the parity arm imported the
+    // mermaid entry — so before the command only the emulator is forbidden.
+    const emulatorIn = (urls: readonly string[]): string[] => urls.filter((u) => u.includes("/@xterm/headless/") || /\/emulator-[^/]*\.js$/.test(u));
+    expect(emulatorIn(before), "before the shell command").toEqual([]);
+    expect(after.seen, "the shell command's output reached the screen").toBe(true);
+    const emulator = after.afterShell ?? [];
+    expect(emulator.some((u) => /\/emulator-[^/]*\.js$/.test(u)), "the emulator chunk is loaded by the command").toBe(true);
+    expect(emulator.some((u) => u.includes("/@xterm/headless/")), "and the emulator's package with it").toBe(true);
+
+    // **The map.** Six defaults under dist/bundle, six types under dist, every one a file.
+    const root = new URL("../../", import.meta.url);
+    const pkg = JSON.parse(readFileSync(new URL("package.json", root), "utf8")) as { exports: Record<string, { types: string; default: string }> };
+    const subpaths = Object.keys(pkg.exports);
+    expect(subpaths).toHaveLength(6);
+    for (const sub of subpaths) {
+      const target = pkg.exports[sub];
+      if (target === undefined) throw new Error(sub);
+      expect(target.default.startsWith("./dist/bundle/"), `${sub} default → ${target.default}`).toBe(true);
+      expect(target.types.startsWith("./dist/") && !target.types.startsWith("./dist/bundle/"), `${sub} types → ${target.types}`).toBe(true);
+      expect(existsSync(new URL(target.default, root)), `${target.default} exists`).toBe(true);
+      expect(existsSync(new URL(target.types, root)), `${target.types} exists`).toBe(true);
+    }
+  }, 150_000);
 });
 
 describe("C24 I36 — the Mermaid renderer is off the runtime barrel's graph", () => {
@@ -100,7 +164,7 @@ describe("C24 I36 — the Mermaid renderer is off the runtime barrel's graph", (
     };
     expect(pkg.exports["./mermaid"], "@fmx/calcium/mermaid resolves to the entry barrel").toEqual({
       types: "./dist/mermaid.d.ts",
-      default: "./dist/mermaid.js",
+      default: "./dist/bundle/mermaid.js",
     });
   }, 90_000);
 });

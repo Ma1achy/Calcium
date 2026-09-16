@@ -14,10 +14,12 @@
  * object; this reads it there.
  */
 
+import type { FrameLocator } from "./locate.js";
+
 /** A node of V8's `.cpuprofile`, as the protocol emits it. */
 type ProfileNode = Readonly<{
   id: number;
-  callFrame: Readonly<{ functionName?: string; url?: string; lineNumber?: number }>;
+  callFrame: Readonly<{ functionName?: string; url?: string; lineNumber?: number; columnNumber?: number }>;
   children?: readonly number[];
 }>;
 
@@ -66,11 +68,17 @@ const frameName = (n: ProfileNode): string => {
   return fn === undefined || fn === "" ? "(anonymous)" : fn;
 };
 
-const frameAt = (n: ProfileNode): string | null => {
+/**
+ * `url:line`, located through the chunk's source map where a locator is given
+ * and answers (I65) — and exactly what V8 said where it is not or does not.
+ */
+const frameAt = (n: ProfileNode, locate: FrameLocator | undefined): string | null => {
   const url = n.callFrame.url;
   if (url === undefined || url === "") return null;
   const line = n.callFrame.lineNumber;
-  return line === undefined || line < 0 ? url : `${url}:${String(line + 1)}`;
+  if (line === undefined || line < 0) return url;
+  const found = locate?.(url, line, n.callFrame.columnNumber ?? 0) ?? null;
+  return found === null ? `${url}:${String(line + 1)}` : `${found.url}:${String(found.line + 1)}`;
 };
 
 /**
@@ -86,7 +94,7 @@ const frameAt = (n: ProfileNode): string | null => {
  *     describes less than it claims;
  *   - **no nodes at all**.
  */
-export function foldCpuProfile(profile: CpuProfile): Omit<SampledStacks, "foldMs"> | null {
+export function foldCpuProfile(profile: CpuProfile, locate?: FrameLocator): Omit<SampledStacks, "foldMs"> | null {
   const nodes = profile.nodes ?? [];
   const samples = profile.samples ?? [];
   const deltas = profile.timeDeltas ?? [];
@@ -146,7 +154,7 @@ export function foldCpuProfile(profile: CpuProfile): Omit<SampledStacks, "foldMs
     const self = selfUs.get(id) ?? 0;
     return [Object.freeze({
       name,
-      at: frameAt(n),
+      at: frameAt(n, locate),
       self,
       total: self + kids.reduce((sum, k) => sum + k.total, 0),
       children: Object.freeze(kids),
@@ -164,7 +172,7 @@ export function foldCpuProfile(profile: CpuProfile): Omit<SampledStacks, "foldMs
   const rootSelf = SYNTHETIC.includes(rootName) ? 0 : selfUs.get(rootNode.id) ?? 0;
   const root: StackNode = Object.freeze({
     name: rootName,
-    at: frameAt(rootNode),
+    at: frameAt(rootNode, locate),
     self: rootSelf,
     total: rootSelf + children.reduce((sum, k) => sum + k.total, 0),
     children: Object.freeze(children),

@@ -13,27 +13,27 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "default": "./dist/bundle/index.js"
     },
     "./testing": {
       "types": "./dist/testing/index.d.ts",
-      "default": "./dist/testing/index.js"
+      "default": "./dist/bundle/testing/index.js"
     },
     "./fixtures": {
       "types": "./dist/fixtures/index.d.ts",
-      "default": "./dist/fixtures/index.js"
+      "default": "./dist/bundle/fixtures/index.js"
     },
     "./profiling": {
       "types": "./dist/shell/profiling/index.d.ts",
-      "default": "./dist/shell/profiling/index.js"
+      "default": "./dist/bundle/shell/profiling/index.js"
     },
     "./mermaid": {
       "types": "./dist/mermaid.d.ts",
-      "default": "./dist/mermaid.js"
+      "default": "./dist/bundle/mermaid.js"
     },
     "./launch": {
       "types": "./dist/launch.d.ts",
-      "default": "./dist/launch.js"
+      "default": "./dist/bundle/launch.js"
     }
   },
   "repository": {
@@ -49,7 +49,7 @@
     "registry": "https://npm.pkg.github.com/"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node tools/bundle.mjs",
     "check": "tsc --noEmit && eslint .",
     "enforce": "node tools/enforce/index.mjs",
     "test": "vitest run --dir test --exclude '{e2e,golden}/**'",
@@ -66,10 +66,11 @@
   },
   "devDependencies": {
     "@alcalzone/ansi-tokenize": "0.3.0",
-    "lowlight": "3.3.0",
     "@types/node": "26.1.2",
     "@types/react": "19.2.17",
+    "esbuild": "0.28.2",
     "eslint": "10.8.0",
+    "lowlight": "3.3.0",
     "node-pty": "1.1.0",
     "sharp": "0.35.4",
     "tsx": "4.23.13",
