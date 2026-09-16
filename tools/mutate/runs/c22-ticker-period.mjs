@@ -83,6 +83,25 @@ const results = runPass({
       to: "  spinner: 100,\n});",
       expect: "T4.35",
     },
+    {
+      // **The window back at 33** (F1199). The orbit commits `stream` and its
+      // period is the longer of 16 and the window, so sixty 16 ms wakes draw
+      // thirty frames and T4.17u's orbit bound reads half.
+      name: "STREAM-33: C03's stream window at the 30 fps it shipped with",
+      file: SCHEDULER,
+      from: "  stream: 16,\n",
+      to: "  stream: 33,\n",
+      expect: "T4.17u",
+    },
+    {
+      // **The orbit's own cadence back at 33** with the window at 16: the
+      // interval is the longer of the two and the orbit draws at 30 again.
+      name: "ORBIT-33: ORBIT_MS at the cadence the stream window used to set",
+      file: SESSION,
+      from: "const ORBIT_MS = 16;",
+      to: "const ORBIT_MS = 33;",
+      expect: "T4.17u",
+    },
   ],
 });
 

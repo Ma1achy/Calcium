@@ -15,6 +15,7 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const SUITE = [
   "test/unit/frame-scheduler.test.ts",
+  "test/unit/profiler-seams.test.ts",
   "test/contract/frame-scheduler.test.ts",
   "test/edge/frame-scheduler.test.ts",
   "test/revert/frame-scheduler.test.ts",
@@ -98,6 +99,16 @@ const results = runPass({
         "height: stores.viewport.scroll.viewportHeight });\n" +
         "      pipeline.resized();\n      scheduler.commit(\"resize\");",
       expect: "T4.7",
+    },
+    {
+      // **The tie flattened** (C03 T6.18, F1199). `stream` and `resize` share
+      // 16 ms, so strictness by window alone hands a repaint the last reason
+      // committed, and T1.24 reads `stream`.
+      name: "TIE-FLAT: strictness is the window alone, and resize ties with stream",
+      file: SCHED,
+      from: '    return -windows[reason] + (reason === "resize" ? 0.5 : 0);',
+      to: "    return -windows[reason];",
+      expect: "T1.24",
     },
   ],
 });

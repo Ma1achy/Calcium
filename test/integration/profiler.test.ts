@@ -276,14 +276,14 @@ describe("C28 — profiler, tier 4 spec-first rows", () => {
     let t = 0;
     const p = createProfiler({ tier: "spans" }, { elapsed: () => t });
 
-    // Ten commits inside one 33 ms window, then the frame that serves them.
+    // Five commits inside one 16 ms window, then the frame that serves them.
     for (let i = 0; i < 5; i += 1) {
       t = i * 3;
       p.commit("stream", false);
     }
-    t = 33;
+    t = 16;
     p.beginFrame("stream");
-    t = 35;
+    t = 18;
     p.endFrame("frame");
 
     const report = p.report();
@@ -292,8 +292,8 @@ describe("C28 — profiler, tier 4 spec-first rows", () => {
     expect(report.frames, "five commits, one frame").toBe(1);
 
     // `wait` is dated from the **earliest unserved commit** (C28 I5), so it is
-    // the window and not the gap since the last one: 33 − 0, not 33 − 12.
-    expect(frame?.wait, "wait is the window, from the earliest unserved commit").toBe(33);
+    // the window and not the gap since the last one: 16 − 0, not 16 − 12.
+    expect(frame?.wait, "wait is the window, from the earliest unserved commit").toBe(16);
     expect(frame?.work, "and work is the composition alone").toBe(2);
     expect(frame?.work, "the two are not the same number").not.toBe(frame?.wait);
 

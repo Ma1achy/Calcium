@@ -84,7 +84,12 @@ const WINDOWS: Readonly<Record<CommitReason, number>> = Object.freeze({
   // (F423). One frame instead of thirty, and the final size is the only one
   // anyone sees.
   resize: 16,
-  stream: 33,
+  // **16 ms, the A02 §7 budget at 60 frames/s** (F1199). The 33 it shipped with
+  // was argued from *fewer, larger writes*; DECSET 2026 makes a frame one
+  // write however often it comes, and C22 I73 caps the one surface that
+  // rewrites the whole screen where the capability is absent. The ceiling is
+  // the display's (§3).
+  stream: 16,
   // **80 ms, the fastest shipped glyph interval, and not longer** (F1197). A
   // window longer than the interval it floors skips glyphs in a fixed pattern:
   // at 100 over C09's 80 ms braille set the frames landed on ticks 1, 2, 3, 5
@@ -142,13 +147,17 @@ export function createFrameScheduler(opts: FrameSchedulerOptions): FrameSchedule
 
   /**
    * Higher is stricter. Immediate outranks every coalesced reason; among
-   * coalesced, the shorter window. Order *among* the immediate reasons is
-   * deliberately flat: `resize` sets contamination eagerly at commit time, so
-   * the only thing that could distinguish the three has already taken effect by
-   * the time a deferred reason is chosen (§3).
+   * coalesced, the shorter window, and at an equal window `resize` — the frame
+   * it drives is a repaint (I7) and the reason handed down says so (I16). The
+   * tie is reachable: `stream` and `resize` are both 16 ms since F1199. Order
+   * *among* the immediate reasons is deliberately flat: `resize` sets
+   * contamination eagerly at commit time, so the only thing that could
+   * distinguish the three has already taken effect by the time a deferred
+   * reason is chosen (§3).
    */
   function strictness(reason: CommitReason): number {
-    return IMMEDIATE.has(reason) ? Number.MAX_SAFE_INTEGER : -windows[reason];
+    if (IMMEDIATE.has(reason)) return Number.MAX_SAFE_INTEGER;
+    return -windows[reason] + (reason === "resize" ? 0.5 : 0);
   }
 
   function cancelTimer(): void {

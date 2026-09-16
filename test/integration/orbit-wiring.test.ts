@@ -340,14 +340,17 @@ describe("C22 §6i — the ticker is the second writer", () => {
     }
   });
 
-  it("T4.17u (C22 I105, F1197): a spinner alone renders at least 9 times and an orbit alone at least 27 over thirty 33 ms wakes", async () => {
+  it("T4.17u (C22 I105, F1197): a spinner alone renders at least 11 times and an orbit alone at least 55 over sixty-two 16 ms wakes", async () => {
     vi.useFakeTimers();
     try {
       // **The rates, not their ratio.** T4.17j bounds the orbit at twice the
       // spinner, and 5 against 15 satisfied it exactly as 10 against 30 does —
       // the shipped arming halved both and the ratio could not see it. The
       // bounds here are the invariant's rates less one frame for the window's
-      // phase: 100 ms and 33 ms periods over 990 ms of the clock.
+      // phase: 80 ms and 16 ms periods over 992 ms of the clock (F1199 moved
+      // the orbit's from 33; sixty-two wakes and not sixty because the
+      // spinner's eleventh frame lands on 960 exactly, which a span of 960
+      // excludes).
       // **Frames are writes outside the synchronised-update brackets**, not
       // renders of the `count` kind: I103 keeps a block that does not animate
       // out of a tick's render, so a render count on it reads one for the
@@ -360,18 +363,18 @@ describe("C22 §6i — the ticker is the second writer", () => {
       const s = watching();
       const bs = await session(s.definition, [{ kind: "count", id: "c" }, SPINNER, plot()], SYNC);
       const spinnerBefore = bs.stdout.chunks.length;
-      for (let i = 0; i < 30; i += 1) await wake(bs, 33);
+      for (let i = 0; i < 62; i += 1) await wake(bs, 16);
       const spinnerFrames = framesSince(bs.stdout.chunks, spinnerBefore);
 
       const o = watching();
       const bo = await session(o.definition, [{ kind: "count", id: "c" }, SPINNER, plot()], SYNC);
       await bo.type("o");
       const orbitBefore = bo.stdout.chunks.length;
-      for (let i = 0; i < 30; i += 1) await wake(bo, 33);
+      for (let i = 0; i < 62; i += 1) await wake(bo, 16);
       const orbitFrames = framesSince(bo.stdout.chunks, orbitBefore);
 
       expect(spinnerFrames, "the spinner draws at its 80 ms window, not at interval plus window").toBeGreaterThanOrEqual(11);
-      expect(orbitFrames, "the orbit draws at the stream window's 30fps, not at 15").toBeGreaterThanOrEqual(27);
+      expect(orbitFrames, "the orbit draws at the stream window's 60fps, not at 30").toBeGreaterThanOrEqual(55);
     } finally {
       vi.useRealTimers();
     }

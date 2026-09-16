@@ -26,16 +26,16 @@ describe("C03 fail-on-revert", () => {
   it("T6.2 (I3): restarting the timer on each coalesced commit → T1.4 fails", () => {
     const { scheduler, render, clock } = harness();
 
-    // Five commits inside one window: one arm, and the frame lands 33 ms after
+    // Five commits inside one window: one arm, and the frame lands 16 ms after
     // the *first* of them.
     for (let i = 0; i < 5; i += 1) {
       scheduler.commit("stream");
-      clock.advance(5);
+      clock.advance(3);
     }
-    expect(clock.arms, "one arm, not five").toEqual([33]);
+    expect(clock.arms, "one arm, not five").toEqual([16]);
     expect(render).not.toHaveBeenCalled();
 
-    clock.advance(8); // t = 33
+    clock.advance(1); // t = 16
     expect(render).toHaveBeenCalledTimes(1);
 
     // And the shape of the bug itself: under a sliding window a stream that
@@ -192,19 +192,19 @@ describe("C03 fail-on-revert", () => {
   });
 
   it("T6.13 (I3): re-arming on a window that is merely not longer → T1.4; never → T3.12", () => {
-    // Not-longer rather than strictly-shorter: 33 against 33 re-arms, and the
+    // Not-longer rather than strictly-shorter: 16 against 16 re-arms, and the
     // window slides on every commit.
     const same = harness();
     same.scheduler.commit("stream");
     same.clock.advance(10);
     same.scheduler.commit("stream");
-    expect(same.clock.arms, "equal windows never re-arm").toEqual([33]);
+    expect(same.clock.arms, "equal windows never re-arm").toEqual([16]);
 
     // Never re-arming: an 80 ms spinner holds a stream frame past its budget.
     const shorter = harness();
     shorter.scheduler.commit("spinner");
     shorter.scheduler.commit("stream");
-    expect(shorter.clock.arms, "a strictly shorter ceiling governs").toEqual([80, 33]);
+    expect(shorter.clock.arms, "a strictly shorter ceiling governs").toEqual([80, 16]);
     expect(shorter.clock.outstanding, "and there is still only one timer").toBe(1);
   });
 

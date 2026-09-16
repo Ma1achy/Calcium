@@ -52,7 +52,7 @@ describe("C03 no-ops and idempotence", () => {
     expect(scheduler.pending).toBe(true);
     expect(clock.outstanding).toBe(1);
 
-    clock.advance(33);
+    clock.advance(16);
 
     expect(repaint).toHaveBeenCalledTimes(1);
     expect(render).not.toHaveBeenCalled();
@@ -148,7 +148,7 @@ describe("C03 re-entrancy", () => {
     });
 
     h.scheduler.commit("stream");
-    h.clock.advance(33);
+    h.clock.advance(16);
 
     expect(h.render).toHaveBeenCalledTimes(1);
   });
@@ -169,9 +169,9 @@ describe("C03 re-entrancy", () => {
     expect(h.scheduler.pending).toBe(true);
     // Measured from the end of the write, and one timer only.
     expect(h.clock.outstanding).toBe(1);
-    expect(h.clock.armed).toEqual([33]);
+    expect(h.clock.armed).toEqual([16]);
 
-    h.clock.advance(33);
+    h.clock.advance(16);
     expect(h.render).toHaveBeenCalledTimes(2);
   });
 
@@ -280,7 +280,7 @@ describe("C03 re-entrancy", () => {
 
     h.scheduler.commit("input");
 
-    // One deferred write, immediate — not two, and not deferred to 33 ms.
+    // One deferred write, immediate — not two, and not deferred to 16 ms.
     expect(h.render).toHaveBeenCalledTimes(2);
     expect(h.scheduler.pending).toBe(false);
     expect(h.clock.outstanding).toBe(0);
@@ -294,7 +294,7 @@ describe("C03 acquisition moving underneath a timer", () => {
     h.scheduler.commit("stream");
     h.setAcquired(false);
 
-    expect(() => h.clock.advance(33)).not.toThrow();
+    expect(() => h.clock.advance(16)).not.toThrow();
 
     expect(h.render).not.toHaveBeenCalled();
     expect(h.written).toEqual([]);
@@ -307,7 +307,7 @@ describe("C03 acquisition moving underneath a timer", () => {
     h.scheduler.commit("stream");
     h.setAcquired(false);
     h.setAcquired(true);
-    h.clock.advance(33);
+    h.clock.advance(16);
 
     expect(h.render).toHaveBeenCalledTimes(1);
   });
@@ -376,9 +376,9 @@ describe("C03 coalescing under load", () => {
     for (let i = 0; i < 100; i += 1) h.scheduler.commit("stream");
 
     expect(h.clock.outstanding).toBe(1);
-    expect(h.clock.arms).toEqual([33]);
+    expect(h.clock.arms).toEqual([16]);
 
-    h.clock.advance(33);
+    h.clock.advance(16);
     expect(h.render).toHaveBeenCalledTimes(1);
   });
 
@@ -386,33 +386,34 @@ describe("C03 coalescing under load", () => {
     const first = build();
     first.scheduler.commit("stream");
     first.scheduler.commit("spinner");
-    // 80 is not shorter than 33 — the longer window never pushes a frame out.
-    expect(first.clock.arms).toEqual([33]);
+    // 80 is not shorter than 16 — the longer window never pushes a frame out.
+    expect(first.clock.arms).toEqual([16]);
 
     const second = build();
     second.scheduler.commit("spinner");
     second.scheduler.commit("stream");
-    // 33 is strictly shorter, so the ceiling drops. There is no frame content,
+    // 16 is strictly shorter, so the ceiling drops. There is no frame content,
     // so this draws the spinner earlier rather than later (§3).
-    expect(second.clock.arms).toEqual([80, 33]);
+    expect(second.clock.arms).toEqual([80, 16]);
     expect(second.clock.outstanding).toBe(1);
 
-    second.clock.advance(33);
+    second.clock.advance(16);
     expect(second.render).toHaveBeenCalledTimes(1);
   });
 
-  it("T3.16 (I15): a resize while a stream is pending shortens the window rather than cancelling it", () => {
-    // **The row's subject survives the change and its mechanism does not.** It
-    // asserted that a resize pre-empts a pending stream, which it still does —
-    // but by being *strictly shorter* (16 ms against 33) rather than by being
-    // immediate. §3's strictly-shorter rule was already what ordered coalesced
-    // reasons; `resize` simply joined them, and this row is where that shows.
+  it("T3.16 (I15): a resize while a stream is pending is drawn within 16 ms, on the timer already standing", () => {
+    // **The row's subject has survived two changes of mechanism.** It first
+    // asserted that a resize pre-empts a pending stream immediately; then that
+    // it does so by being *strictly shorter* (16 ms against 33); since F1199
+    // `stream` is 16 as well, 16 against 16 is not shorter (I3), and the timer
+    // that stands is the one that fires. What the row owns is the bound — a
+    // resize is on screen within its own window — and it holds either way.
     const h = build();
 
     h.scheduler.commit("stream");
     h.scheduler.commit("resize");
 
-    expect(h.scheduler.pending, "still pending, on the shorter window").toBe(true);
+    expect(h.scheduler.pending, "still pending, on the standing window").toBe(true);
     expect(h.clock.outstanding).toBe(1);
     expect(h.repaint, "nothing written yet").not.toHaveBeenCalled();
 

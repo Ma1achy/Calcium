@@ -39,16 +39,16 @@ describe("C03 commit classification", () => {
     expect(clock.outstanding).toBe(0);
   });
 
-  it("T1.3: commit(stream) schedules at 33 ms and renders only when it arrives", () => {
+  it("T1.3: commit(stream) schedules at 16 ms and renders only when it arrives", () => {
     const { scheduler, render, clock } = build();
 
     scheduler.commit("stream");
 
     expect(render).not.toHaveBeenCalled();
     expect(scheduler.pending).toBe(true);
-    expect(clock.armed).toEqual([33]);
+    expect(clock.armed).toEqual([16]);
 
-    clock.advance(32);
+    clock.advance(15);
     expect(render).not.toHaveBeenCalled();
 
     clock.advance(1);
@@ -60,17 +60,17 @@ describe("C03 commit classification", () => {
     const { scheduler, render, clock } = build();
 
     scheduler.commit("stream");
-    clock.advance(10);
+    clock.advance(5);
     scheduler.commit("stream");
-    clock.advance(10);
+    clock.advance(5);
     scheduler.commit("stream");
 
     expect(clock.outstanding).toBe(1);
-    // One arm, not three: 33 is not strictly shorter than 33, so the window
+    // One arm, not three: 16 is not strictly shorter than 16, so the window
     // cannot slide (I3, T6.2).
-    expect(clock.arms).toEqual([33]);
+    expect(clock.arms).toEqual([16]);
 
-    clock.advance(13); // 33 ms from the *first* commit.
+    clock.advance(6); // 16 ms from the *first* commit.
     expect(render).toHaveBeenCalledTimes(1);
   });
 
@@ -103,7 +103,7 @@ describe("C03 commit classification", () => {
     expect(render).toHaveBeenCalledTimes(1);
   });
 
-  it("T1.7: commit(spinner) schedules at 80 ms — the braille set's interval — not at the 33 ms stream window", () => {
+  it("T1.7: commit(spinner) schedules at 80 ms — the braille set's interval — not at the 16 ms stream window", () => {
     const { scheduler, clock } = build();
 
     scheduler.commit("spinner");

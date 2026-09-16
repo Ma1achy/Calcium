@@ -225,7 +225,7 @@ describe("C03 §2 — time enters through one seam", () => {
       const h = harness();
       h.scheduler.commit("stream");
       h.scheduler.commit("stream");
-      h.clock.advance(33);
+      h.clock.advance(16);
       h.scheduler.commit("input");
       h.scheduler.flush();
 

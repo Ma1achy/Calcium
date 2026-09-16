@@ -32,8 +32,8 @@
 //
 // **Frame rate has two readings and both are printed.** `fps` is what the
 // framework drew per second under its own cadence — C03's `stream` window is
-// 33 ms and the spinner's cadence 100 ms, so a spinner at 10 fps is the design
-// and not a shortfall. `headroom` is `1000 / work p50`: the rate the frame's
+// 16 ms (F1199) and the spinner's cadence its 80 ms glyph interval (F1197), so
+// a spinner at 12.5 fps is the design and not a shortfall. `headroom` is `1000 / work p50`: the rate the frame's
 // cost alone would allow. The second is the optimisation target; the first
 // moves only when a cadence constant does.
 //
@@ -239,8 +239,8 @@ const CASES = {
   image: { n: 60, env: "kitty", says: "a PNG per entry under kitty", entries: (n) => range(n, (i) => PNG === null ? [b.notice("warn", "out/probe.png is missing", undefined, { id: `img${String(i)}` })] : [b.image({ id: `img${String(i)}`, data: PNG, height: 12, alt: `picture ${String(i)}` })]) },
   // plots
   everyplot: { n: 1, says: "every 2-D form once, still", entries: () => FORMS.filter((f) => f !== "plot3d").map((f, i) => [caption(`c${String(i)}`, `${f} · ${CATALOGUE[f].says}`), staticForm(f, 0)]) },
-  everylive: { n: 1, animated: true, says: "every 2-D form once, live at 33 ms", entries: () => FORMS.filter((f) => f !== "plot3d").map((f, i) => [caption(`c${String(i)}`, f), liveForm(f, i, 33)]) },
-  everymesh: { n: 1, animated: true, says: "every plot3d rung once, live at 33 ms", entries: () => Object.keys(variantsOf("plot3d")).map((rung, i) => [caption(`c${String(i)}`, `plot3d/${rung}`), liveMesh(rung, i, 33)]) },
+  everylive: { n: 1, animated: true, says: "every 2-D form once, live at 16 ms", entries: () => FORMS.filter((f) => f !== "plot3d").map((f, i) => [caption(`c${String(i)}`, f), liveForm(f, i, 16)]) },
+  everymesh: { n: 1, animated: true, says: "every plot3d rung once, live at 16 ms", entries: () => Object.keys(variantsOf("plot3d")).map((rung, i) => [caption(`c${String(i)}`, `plot3d/${rung}`), liveMesh(rung, i, 16)]) },
   // mixed
   session: { n: 30, animated: true, says: "a coding session — response text, code, a patch, a table, logs, steps — with a spinner and a live plot at the tail", entries: (n, r) => [
     ...range(n, (i) => {
@@ -258,7 +258,7 @@ const CASES = {
   mixed: { n: 60, animated: true, says: "round-robin: spinner, live line plot, mesh, text, patch, table — everything at once", entries: (n, r) => range(n, (i) => {
     const k = i % 6;
     if (k === 0) return [status(`s${String(i)}`, `working on ${String(i)}`)];
-    if (k === 1) return [liveForm(["line", "bar", "heatmap", "scatter", "stackedarea"][Math.floor(i / 6) % 5], i, 33)];
+    if (k === 1) return [liveForm(["line", "bar", "heatmap", "scatter", "stackedarea"][Math.floor(i / 6) % 5], i, 16)];
     if (k === 2) return [liveMesh(["suzanne", "teapot"][Math.floor(i / 6) % 2], i, 100)];
     if (k === 3) return b.markdown(markdownSource(r, 6), { idPrefix: `md${String(i)}-` });
     if (k === 4) return [patchBlock(r, `p${String(i)}`, 2, 80)];
@@ -276,9 +276,9 @@ function parametric(name) {
     process.exit(2);
   }
   if (kind === "plot") return { n: 40, says: `${arg}, still, ${String(40)} times`, entries: (n) => range(n, (i) => [caption(`c${String(i)}`, `${arg} #${String(i)}`), staticForm(arg, i)]) };
-  if (kind === "live") return { n: 40, animated: true, says: `${arg}, live at 33 ms`, entries: (n) => range(n, (i) => [caption(`c${String(i)}`, `${arg} #${String(i)}`), liveForm(arg, i, 33)]) };
+  if (kind === "live") return { n: 40, animated: true, says: `${arg}, live at 16 ms`, entries: (n) => range(n, (i) => [caption(`c${String(i)}`, `${arg} #${String(i)}`), liveForm(arg, i, 16)]) };
   if (kind === "mesh") return { n: 12, says: `plot3d/${arg}, still`, entries: (n) => range(n, (i) => [caption(`c${String(i)}`, `plot3d/${arg} #${String(i)}`), staticMesh(arg, i)]) };
-  return { n: 12, animated: true, says: `plot3d/${arg}, live at 33 ms`, entries: (n) => range(n, (i) => [caption(`c${String(i)}`, `plot3d/${arg} #${String(i)}`), liveMesh(arg, i, 33)]) };
+  return { n: 12, animated: true, says: `plot3d/${arg}, live at 16 ms`, entries: (n) => range(n, (i) => [caption(`c${String(i)}`, `plot3d/${arg} #${String(i)}`), liveMesh(arg, i, 16)]) };
 }
 
 function range(n, f) {
@@ -297,8 +297,8 @@ const STANDARD = [
 
 if (CASE === "list") {
   for (const [name, c] of Object.entries(CASES)) console.log(`${name.padEnd(12)} n ${String(c.n).padStart(4)}  ${c.says}`);
-  console.log(`${"plot:<form>".padEnd(12)} n   40  one 2-D form, still · live:<form> the same live at 33 ms`);
-  console.log(`${"mesh:<rung>".padEnd(12)} n   12  one plot3d rung, still · livemesh:<rung> the same live at 33 ms`);
+  console.log(`${"plot:<form>".padEnd(12)} n   40  one 2-D form, still · live:<form> the same live at 16 ms`);
+  console.log(`${"mesh:<rung>".padEnd(12)} n   12  one plot3d rung, still · livemesh:<rung> the same live at 16 ms`);
   console.log(`forms: ${FORMS.join(" ")}`);
   console.log(`rungs: ${Object.keys(variantsOf("plot3d")).join(" ")}`);
   process.exit(0);

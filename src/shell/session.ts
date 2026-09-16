@@ -249,14 +249,14 @@ const NOTHING_ANIMATES: Animated = Object.freeze({
  * The orbit's cadence, and it is C03's two windows rather than two new numbers
  * (C22 I73).
  *
- * 33 ms is `stream`'s window — *~30 frames/s, matching the A02 §7 budget* — and
- * 100 ms is the cap the rotation falls back to where `synchronisedUpdate` is
+ * 16 ms is `stream`'s window — *~60 frames/s, matching the A02 §7 budget*
+ * (F1199) — and 100 ms is the cap the rotation falls back to where `synchronisedUpdate` is
  * absent and a full-frame rewrite would tear (it was `spinner`'s window until
  * F1197 set that at the glyph interval; the tearing cap keeps its own number). Naming
  * them here rather than importing C03's table keeps L4 out of a constant L0
  * tunes at construction; the *reason* is what binds them, and that is asserted.
  */
-const ORBIT_MS = 33;
+const ORBIT_MS = 16;
 
 /**
  * The span a `null` profiler yields — one frozen object, so the `using` form
@@ -277,11 +277,12 @@ const ORBIT_MS_TORN = 100;
 /**
  * One revolution in twelve seconds, in radians per millisecond (C22 I74).
  *
- * **The number comes from the measurement rather than from taste.** At 30fps it
- * is one degree a frame, between the `pi/256` and `pi/64` steps measured at 22%
- * and 30% of a frame's cells changing; at the capped 10fps it is three degrees,
- * just past `pi/64`. Both read as motion rather than as a jump, which is the
- * property the figure has to have (F468).
+ * **The number comes from the measurement rather than from taste.** At 60fps it
+ * is half a degree a frame and at 30fps one, at and between the `pi/256` and
+ * `pi/64` steps measured at 22% and 30% of a frame's cells changing; at the
+ * capped 10fps it is three degrees, just past `pi/64`. Every rate reads as
+ * motion rather than as a jump, which is the property the figure has to have
+ * (F468).
  */
 const ORBIT_RATE = (2 * Math.PI) / 12_000;
 
@@ -1106,7 +1107,7 @@ class Session implements TuiInstance {
     //
     // C03's window, so a reserve coalesces with whatever else moved the
     // document. `stream` rather than `input`: this is content changing, not a
-    // key, and 33 ms is one frame at a rate a reader cannot see.
+    // key, and 16 ms is one frame at a rate a reader cannot see.
     if (raised) graph.scheduler.commit("stream");
   }
 
@@ -1168,7 +1169,7 @@ class Session implements TuiInstance {
    * a floor under the ticker (I60a, I105) — so a live orbit commits `stream`, whose
    * rationale in C03 §3 is a rate ceiling and says nothing about the source.
    * Everything else keeps `spinner`, and C03 §3's asymmetry is exactly this
-   * case: a stream commit under a pending spinner draws within its own 33 ms.
+   * case: a stream commit under a pending spinner draws within its own 16 ms.
    */
   #animate(): void {
     const graph = this.#graph;
@@ -1184,7 +1185,7 @@ class Session implements TuiInstance {
     //
     // **The frame index is the same arithmetic one store along** (I77): the
     // elapsed time goes into `Frames.advance`, which walks whole delays and
-    // keeps the remainder, so a GIF beside a 33 ms orbit shows each frame for
+    // keeps the remainder, so a GIF beside a 16 ms orbit shows each frame for
     // its own delay and not for one wake. One stamp serves both, read once.
     if (orbits.length > 0 || frames.length > 0) {
       const since = now - (this.#motionAt ?? now);

@@ -503,8 +503,10 @@ describe("C03 — the reason the frame was drawn for", () => {
     // *last* are three different answers only when arrival order and strictness
     // order disagree; a sequence that arrives in strictness order is satisfied
     // by all three readings and finds nothing. Among coalesced reasons
-    // strictness is the shorter window — `resize` 16, `stream` 33,
-    // `spinner` 100 — so the sequence below puts the strictest third of five.
+    // strictness is the shorter window — `resize` 16, `stream` 16, `spinner`
+    // 80 — and at the tie `resize`, whose frame is a repaint (C03 I7, I16); so
+    // the sequence below puts the strictest third of five and the reason that
+    // ties with it last, where a flattened tie would read it.
     const { scheduler, render, repaint, clock } = harness();
 
     scheduler.commit("spinner"); // first — the weakest
