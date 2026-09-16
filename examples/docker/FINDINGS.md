@@ -52608,3 +52608,44 @@ lines. Ink importing `es-toolkit/compat/function/throttle` itself would make
 the hook a no-op, and that is a one-line change upstream — recorded here, not
 sent from here. Yoga's WebAssembly instantiation (22–38 ms) and React's 7–16
 are the renderer's floor and stay.
+
+**Closed — built and measured.** C24 I37, R01 R4.7 as sized: `src/launch.ts`
+(a `load` hook arming on Ink's exact import line, a `resolve` hook rewriting
+the resolved barrel URL to `compat/function/throttle.mjs` when the file is on
+disk), `exports["./launch"]`, one line in each of the docker and plots
+launchers, and `prepareLaunch` excused from MG25 with the reason no caller in
+`src/` can be early enough. T1.12 holds the predicate and the rewrite with
+its fallback arm; T5.7 runs the armed and the plain child under the import
+trace in one row and renders through Ink afterwards; both R4.7 rows count
+es-toolkit resolutions in the launcher's own process. Mutation run
+`c24-launch`: control caught, five of five caught — the loose predicate, the
+any-index rewrite, the check dropped, the check made on the wrong file, the
+redirect that resolves and never answers. Gates: enforce green, 6,263 tests,
+458 goldens with no mover, 135 e2e.
+
+| reading, F1191 build A against this build B, `make load-down`, load average 1.1–2.1 | A | B |
+|---|---|---|
+| modules on a cold import of `dist/index.js` (`import-trace.mjs`) · of them es-toolkit's | 2,442 · 1,319 | 1,130 · 3 |
+| cold import, container-local, no compile cache, eight interleaved pairs | 407 / 273 / 245 / 294 / 367 / 250 / 221 / 226 ms | 257 / 214 / 218 / 256 / 255 / 172 / 187 / 207 — **B lighter 8 of 8, paired median −43 ms of about 260** |
+| cold import, container-local, compile cache warm, eight pairs | 172 / 208 / 177 / 194 / 199 / 206 / 209 / 206 | 159 / 171 / 154 / 173 / 162 / 163 / 180 / 161 — **8 of 8, paired median −33 ms of about 200, 16%** |
+| `plots-tui` end to end to its no-TTY exit, on the bind mount, the shipped launcher against a copy with the call deleted, six pairs | 937 / 612 / 521 / 723 / 656 / 628 | 629 / 485 / 478 / 580 / 564 / 532 — **6 of 6, paired median −86 ms of about 640** |
+| es-toolkit resolutions in the launcher's process (R4.7's count) | 1,319 | 3 |
+
+**What the launcher figure says that the import figure cannot.** The
+end-to-end pair is the consumer's start — the compile cache on, the app's own
+modules and the far side's manifest included, on the filesystem this
+repository actually develops on — and the saving there is twice the quiet
+import's, because the barrel's thirteen hundred files are thirteen hundred
+stats and reads the mount multiplies (F1164's own finding about the loader).
+The frame is untouched: the module Ink receives is the object the barrel
+re-exported, and the golden tier says so at 458.
+
+**What remains.** Ink's own hundred modules, React's forty and Yoga's
+instantiation are the renderer's floor. Calcium's eight hundred files are the
+loader's per-module cost F1164 recorded, and bundling `dist/` stays the
+architecture-level lever it was, with its number. The `minimal` example's
+launcher carries neither this nor the compile cache and stays two lines by
+R4.4. A one-line change upstream — Ink importing the narrow path itself —
+would make the hook a no-op, and the hook is built to notice: the line would
+no longer match, and the barrel it fell back to would be the one Ink no
+longer imports.
