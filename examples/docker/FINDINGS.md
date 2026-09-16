@@ -51983,7 +51983,7 @@ the builder's 15 ms warm on the bunny, now the largest cold cost of a mesh.
 |---|---|
 | **Surface** | `src/presentation/plot/surface3.ts` `toScreen(L, k, basis, grid)`: reads the vertex's three position and three normal doubles from the lanes and passes them to `toScreenAt(L, slot, px0, py0, pz0, nx0, ny0, nz0, basis, grid)`, which the clip path also calls with a cut vertex's components; `clipPath` keeps the cut's value in a `spareValue` list beside the lanes because the position and normal lanes have no spare slots |
 | **Reached for** | the inspector's allocation sampler with collected objects included (`out/probe-f9-heap.mjs`, 30 bunny renders under a moving camera, `make load-down`), on the F1184 build and on the F1183 build rebuilt from `cb082243` in a worktree. F1184: **`toScreen` 49.1 MB of 149.4 sampled — 32.9%, 1.6 MB a frame, the largest site**, ahead of `plot3dArea`'s 31.9 (F1182) and `mixedRows`' 15.2. F1183: `toScreen` **1.5 MB of 110.1** — the clip path's fresh records, and nothing per vertex. Arithmetic: 17,171 projections a frame (`plot3d.project`) × six doubles × 16 bytes = 1.65 MB — the sample to the decimal. The CPU profile of forty frames (`out/prof-bunny7`) has the garbage collector at 58.5 ms self, 1.5 ms a frame of a 10 ms frame, and 5 MB a frame of sampled allocation, so the projection's share is about a third of the collector |
-| **Verdict** | **open** — measured, the remedy sized |
+| **Verdict** | **closed** — built and measured: C12 I140, T1.152, `c12-lanes` |
 
 **What happened.** F1184 moved the vertex off an object and into lanes, and
 the projection with it: where `toScreen(w, …)` read `w.p.x` inside the
@@ -52013,3 +52013,32 @@ the paired probe the check. Not in this cut: `thinEdge`'s 7.7 MB and
 `shadeAt`'s 6.6 over the same thirty frames — `writeDepth` and the painter
 take a depth and an intensity as doubles, `hypot3` takes three, at sites
 partly inlined — and `plot3dArea`'s 31.9 (F1182), each its own measurement.
+
+**Closed — built and measured.** C12 I140 as sized. Every lane carries the
+three spare slots; `toScreenAt(L, slot, basis, grid)` reads the six doubles
+at the slot itself; the clip path writes a cut's position, normal and value
+into the spare slots and projects the slot; `spareValue` is gone. T1.152
+holds the lane lengths, the two-kept and one-kept cuts by the clip's own
+interpolation, both value arms, each cut's screen slot to `project`, and
+sentinels surviving a frame with no cut. `c12-lanes` extended by three,
+eight of eight caught; the six-doubles mutation is the sampler's to see, as
+T6.116 records. Gates green, goldens 458 with no mover, e2e green; 432
+frames byte-identical against the F1184 build; paint, hidden and project
+counts unchanged.
+
+| `make load-down` | before (F1184 build) | after |
+|---|---|---|
+| allocation sample, 30 bunny renders | 149.4 MB · `toScreen` 49.1 MB, 32.9% | **97.0 MB · `toScreen` absent from the top twenty** |
+| `thinEdge` in the same sample | 7.7 MB | 4.0 MB — the cut records it held are gone too |
+| paired warm bunny, `probe-f6-pair` n=60, both orders | A p50 9.8 · 11.5 ms | B p50 9.5 · 11.4; B−A median −0.4 and −0.3 ms; B faster in 45 and 36 of 60 |
+| paired warm teapot · suzanne | 3.8 · 2.8 ms | 3.7 · 2.7; 0.0 and −0.0 ms |
+| `probe-cold.mjs` bunny first / second / third frame | 61.1 / 11.5 / 12.1 ms | 57.9 / 11.0 / 10.8 ms |
+
+As sized: a third of a millisecond to half, and a heap sample a third
+lighter. The largest site is now `plot3dArea`'s 32 MB (F1182's boxed
+sample arrays, measured and left at 0.3 ms) and `mixedRows`' 15 MB of row
+strings; `shadeAt`'s 6.6 MB is `hypot3` and `Math.pow` at a real call.
+
+What remains: the cull over face lanes (0.9 → 0.3 ms measured, `out/probe-cull.mjs`,
+and it retires `fn` and `edges` as objects); the thin path's 3.7 ms;
+`plot3dArea`'s arrays; `normaliseRow`'s byte scan.
