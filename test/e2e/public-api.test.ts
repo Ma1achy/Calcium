@@ -56,6 +56,10 @@ describe("C24 I37 — prepareLaunch narrows Ink's es-toolkit import to one modul
   }, 120_000);
 });
 
+describe("C24 I38 — every entry resolves into one bundled graph", () => {
+  it.todo("T5.8 (C24 I38, F1193): the armed bundled runtime under the import trace is under four hundred modules with nothing from the emulator or the renderer, the six entries' export keys equal the tsc files', SurfaceError is one object across the runtime and testing entries, and the emulator chunk appears only after a shell command; exports resolve into dist/bundle — not deferred on a component: the code commit replaces this row");
+});
+
 describe("C24 I36 — the Mermaid renderer is off the runtime barrel's graph", () => {
   it("T5.6 (C24 I36, F1188): a child importing dist/index.js under the import trace loads nothing from beautiful-mermaid or elkjs and exports no mermaidCode; after importing dist/mermaid.js the renderer is in the list and the rendering equals the contract corpus's; the exports map names the entry", async () => {
     const here = new URL("../support/", import.meta.url);
