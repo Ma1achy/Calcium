@@ -1119,7 +1119,75 @@ describe("C23 §3d — a source does not poll while nothing is looking", () => {
     await h.tick(0);
     expect(shown(h, id, "a"), "the declaration survived the pause").toBe("1");
   });
-  it.todo("T2.48 (C23 I72): a poll's next deadline is one interval after the last — not deferred on a component: the code commit replaces this row");
+  it("T2.48 (I72, F1206): the next deadline is one interval after the last, and one after the settle only when the far side is slower than its cadence", async () => {
+    // **The deadline sequence, read from the timer the driver arms.** The
+    // cadence cannot be read from a frame — C03 coalesces `stream` either way —
+    // and a duration would measure the machine, so the assertion is on
+    // `nextTimer`, which is `min(dueAt)` and the thing I72 is about.
+    //
+    // A wake fires late by the timer's granularity and the fetch takes what it
+    // takes. Dated from the settle, both join the period and neither is ever
+    // recovered: `every: 16` polled every 18 and a screen of parts drew 55
+    // frames a second (F1206).
+
+    // --- a fast source, woken late ten times over ---------------------------
+    const fast = harness();
+    const fid = fast.transcript.append(docWith([panel("a", "a", raw("a-c", "…"))]));
+    fast.driver.declare({ kind: "entry", id: fid }, [
+      part({ id: "a", intervalMs: 16, fetch: () => Promise.resolve("ok") }),
+    ]);
+    // The first poll is due the moment it is declared, which the chain leaves
+    // alone: the deadline it starts from is the declaration's own.
+    expect(fast.nextTimer(), "the first poll is due at once").toBe(fast.at());
+
+    const deadlines: number[] = [];
+    // Each round wakes 1 to 3 ms after the deadline, as a real timer does.
+    for (let k = 0; k < 11; k += 1) {
+      const due = fast.nextTimer();
+      if (due === null) throw new Error("nothing armed");
+      await fast.tick(due - fast.at() + 1 + (k % 3));
+      const next = fast.nextTimer();
+      if (next === null) throw new Error("nothing re-armed");
+      deadlines.push(next);
+    }
+    const first = deadlines[0] ?? 0;
+    for (let k = 1; k < deadlines.length; k += 1) {
+      expect(deadlines[k], `deadline ${String(k)} is one interval after ${String(k - 1)}`).toBe((deadlines[k - 1] ?? 0) + 16);
+    }
+    expect((deadlines[10] ?? 0) - first, "ten intervals, and none of the lateness").toBe(160);
+
+    // --- a far side slower than its own cadence -----------------------------
+    // **The clamp, and what it is for**: a 40 ms fetch on a 16 ms interval is
+    // three deadlines behind the moment it lands. Chained, it would fire three
+    // overdue sweeps at once; clamped, it restarts from where it finished.
+    const slow = harness();
+    const sid = slow.transcript.append(docWith([panel("b", "b", raw("b-c", "…"))]));
+    slow.driver.declare({ kind: "entry", id: sid }, [
+      part({
+        id: "b",
+        intervalMs: 16,
+        fetch: () => {
+          slow.skew(40);
+          return Promise.resolve("ok");
+        },
+      }),
+    ]);
+    await slow.tick(0);
+    const after = slow.nextTimer();
+    expect(after, "something is armed").not.toBeNull();
+    expect((after ?? 0) > slow.at(), "the next poll is in the future, not three overdue").toBe(true);
+    expect((after ?? 0) - slow.at(), "a fresh interval from where the fetch finished").toBe(16);
+
+    // --- a failure lengthens the gap from the deadline it had ---------------
+    const bad = harness();
+    const bid = bad.transcript.append(docWith([panel("c", "c", raw("c-c", "…"))]));
+    bad.driver.declare({ kind: "entry", id: bid }, [
+      part({ id: "c", intervalMs: 16, fetch: () => Promise.reject(new Error("no")) }),
+    ]);
+    const hadDue = bad.nextTimer() ?? 0;
+    await bad.tick(2);
+    expect(bad.nextTimer(), "backoffOf after the deadline it had, not after the rejection").toBe(hadDue + 32);
+  });
 
   it("T3.32 (I45, §8c C2): a resolution with no referrers is dropped, not a failure", async () => {
     // Nothing failed, so nothing backs off. Backing off here would make a source
