@@ -53398,7 +53398,7 @@ line itself, not `width` cells, and the row was amended before the code landed.
 |---|---|
 | **Surface** | `settleSource` (`src/shell/refresh.ts`): `src.dueAt = at + interval`, where `at` is the moment the fetch settled. The timer that woke the poll fired late by Node's granularity, the fetch took what it took, and the next deadline is set from the far end of both — so a part declared `every: 16` is polled every `16 + fetch + slop`, and the shortfall compounds rather than being recovered. C22 I105 already solved this shape for the spinner (*whole intervals from the stamp, never the interval counted from the paint*) and the poll was written the other way. |
 | **Reached for** | The goal names sixty frames a second and no live case reads it. `stress` at 120×40: `stream` **55.5** fps, `live:line` **55.3**, `everylive` **54.7** — each a 16 ms part with a 3.6 to 6.7 ms frame, so the cost of the frame is not what caps them. A preload logging every `setTimeout` window and its lateness (`out/log-pace.mjs`): the 16 ms window is armed **1,111 times in a `stream` run with a median lateness of 1.66 ms and a 90th of 4.95**, and it is `armParts` in the refresh driver — 16 + 1.66 + the promise hop is 18 ms, which is 55 fps to the frame. |
-| **Verdict** | **Open.** |
+| **Verdict** | **Closed — built and measured.** The deadline chains from the deadline the poll was woken for, and from the settle only when the settle is more than one declared interval past it. Three live cases up three to four frames a second, no case down, and the spinner exactly on its 12.50 design. |
 
 **The first remedy was built, measured and withdrawn, and the measurement is the finding.**
 The entry opened on C03's paced slot: the scheduler arms the next window when the last
@@ -53422,3 +53422,35 @@ interval` — and from the settle only when the settle is more than an interval 
 which is the far side being slower than its own cadence and must not build a backlog.
 One C23 invariant, a contract row over a fast source, a slow one and a backoff, a
 fail-on-revert row, a mutation run whose control dates every poll from the settle.
+
+**Closed — built and measured.** `settleSource` (C23 I72, commitment 62, T2.48, T6.102;
+`c23-poll-deadline` 3/3 with its control). Gates: enforce, 6,277 unit-to-integration,
+458 goldens with no mover, 137 e2e — **and the e2e is the one that separates this remedy
+from the withdrawn one**: pacing C03's slot read the recording's tapped clock once per
+arm and broke replay parity (C28 T5.1c, T5.1d), where the poll's chain reads no clock of
+its own and the replay is untouched. Six paired rounds at 120×40 over two runs, medians
+of frames drawn per second, before → after:
+
+| case | fps | note |
+|---|---|---|
+| stream | 56.0 → 59.0 · and 55.0 → 58.9 in the first run | 200 live parts at `every: 16` |
+| live:line | 54.2 → 58.5 · 58.0 → 57.7 | the plot's rows are the frame's cost here, not the cadence |
+| everylive | 55.5 → 58.5 · 54.7 → 58.2 | every 2-D form once, live at 16 ms |
+| spinners | 12.49 → 12.50 | the 80 ms glyph cadence, exactly as designed |
+| session | 14.49 → 14.99 | no regression where the withdrawn remedy cost 2 fps |
+| mixed | flat | no live part, nothing to move |
+
+**The budget is met at the seam and not yet on the screen.** A02 §7 asks for sixty and
+the live cases now sit at 58 to 59, touching 60 in the best runs. What is left is C03's
+own slot — the window is armed when the last timer fires, so the frame's period is
+16 ms plus that timer's lateness — and the withdrawn C22 I108 says that is worth about
+nothing while 695 of every 706 slots are cancelled by an immediate commit first. The
+next frame a second has to come from the frame's cost, not from another timer.
+
+**Two rows stopped constraining their subject and this run found it.** `c22-ticker-period`
+came back 4 caught, **2 survived** — `WINDOW-100` (C03's spinner window at 100 ms against
+the 80 ms glyph interval, expecting T4.35) and `STREAM-33` (C03's stream window back at
+the 30 fps it shipped with, expecting T4.17u). Neither row's file declares a live source
+at all, so `settleSource` never runs in either and this change cannot have caused them:
+the run has rotted and the two bounds have gone slack. Recorded here and opened as its
+own entry rather than folded into this one.
