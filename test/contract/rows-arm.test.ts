@@ -104,4 +104,7 @@ describe("C09 I72 — the two arms agree", () => {
       }
     }
   });
+  it.todo(
+    "T2.144 (C09 I73, F1170): over a corpus of containers at seven widths under three capability sets the rows arm equals the container rendered through Ink byte for byte and the probe reads rows — not deferred on a component: the code commit replaces this row",
+  );
 });

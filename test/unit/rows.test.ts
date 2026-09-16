@@ -139,4 +139,7 @@ describe("C09 I72 — normaliseRow", () => {
     }
     expect(fuzzMoved).toBeGreaterThan(5000);
   });
+  it.todo(
+    "T1.47 (C09 I73): rowCells equals cells of the row with its sequences removed over the corpus rows and the seeded rows, and counts wide as two, combining as none, SGR-only as zero — not deferred on a component: the code commit replaces this row",
+  );
 });

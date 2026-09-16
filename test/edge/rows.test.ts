@@ -63,4 +63,7 @@ describe("C09 I72 — rows at the edges", () => {
     expect(renderToLines(r, { kind: "empty-rows", id: "e" } as unknown as Block, 20, options)).toEqual([""]);
     expect(renderToLines(r, { kind: "one-text", id: "t" } as unknown as Block, 20, options)).toEqual([""]);
   });
+  it.todo(
+    "T3.89 (C09 I73): an element child, an over-wide row placement, a short child in a row group and an over-tall panel body — not deferred on a component: the code commit replaces this row",
+  );
 });
