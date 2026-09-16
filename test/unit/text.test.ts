@@ -17,6 +17,7 @@ import {
   hardWrapCells,
   placeableClusters,
   rowCells,
+  soloUnit,
   sliceCells,
   stripControl,
   truncate,
@@ -1273,5 +1274,45 @@ describe("rowCells — a row as cells, and the fast set is a checked claim (C09 
 });
 
 describe("displayCells — the one pass takes the rasterised alphabets (C09 §5, I77, F1202)", () => {
-  it.todo("T1.51 (I77): displayCells equals cells of the stripped text over every arm, at narrow and at wide — not deferred on a component: the code commit replaces this row");
+  const ESC = "\u001b";
+  const SGR = /\u001b\[[0-9;]*m/g;
+  const dim = `${ESC}[2m`;
+  const colour = (n: number): string => `${ESC}[38;5;${String(n)}m`;
+  const FAMILY = "\u{1F468}\u200d\u{1F469}\u200d\u{1F467}";
+  const KEYCAP = "1\ufe0f\u20e3";
+  /** A plot-shaped row: eighty braille units under a colour change every twenty. */
+  const braille = Array.from({ length: 4 }, (_, k) => `${colour(20 + k)}${"\u2801\u2802\u2800\u28ff\u2847".repeat(4)}`).join("") + SGR_RESET;
+  /** A panel row: a dim rail, box drawing, a dim rail. */
+  const panel = `${dim}\u2502${SGR_RESET}${"\u2500\u256d\u2570\u2534".repeat(20)}${dim}\u2502${SGR_RESET}`;
+
+  it("T1.51 (I77): displayCells equals cells of the stripped text over every arm, at narrow and at wide", () => {
+    const corpus = [
+      braille, panel, "\u2581\u2584\u2588\u2192\u2197", `${colour(3)}\u2500\ufe0f${SGR_RESET}`, "\u2500\u0301x", "\u2500\u200d\u2500",
+      "\u{1FB00}\u{1FB3B}", `${colour(9)}図表${SGR_RESET}`, FAMILY, KEYCAP, "plain ascii row", "", `${dim}x${SGR_RESET}\u2500図`,
+    ];
+    for (const ambiguous of ["narrow", "wide"] as const) {
+      for (const row of corpus) {
+        expect(displayCells(row, ambiguous), `${JSON.stringify(row)} at ${ambiguous}`).toBe(cells(row.replace(SGR, ""), ambiguous));
+      }
+    }
+    // **The arm that is the finding**: every visible unit of the braille row is
+    // a table unit, so the scan's answer is that count — a sweep of `soloUnit`
+    // over the stripped row, which the cluster walk would also give, asserted
+    // so a unit counted as two or none here fails before a frame does.
+    const stripped = braille.replace(SGR, "");
+    let units = 0; // cells-ok — a unit count that is the width by I77
+    for (let i = 0; i < stripped.length; i += 1) { // cells-ok — a code-unit cursor
+      expect(soloUnit(stripped.charCodeAt(i)), `unit ${String(i)} is of the table`).toBe(true);
+      units += 1;
+    }
+    expect(displayCells(braille, "narrow")).toBe(units);
+    expect(displayCells(braille, "narrow")).toBe(80);
+    // **At `wide` the set is not admitted**: box drawing is Ambiguous and
+    // measures two there (I65), braille is Neutral and stays one.
+    expect(displayCells(panel, "wide")).toBe(2 * 82);
+    expect(displayCells(braille, "wide")).toBe(80);
+    // **A table unit before a selector leaves the scan**, and the cluster walk
+    // answers two — the arm a next-unit test would have duplicated.
+    expect(displayCells(`${colour(3)}\u2500\ufe0f${SGR_RESET}`, "narrow")).toBe(2);
+  });
 });

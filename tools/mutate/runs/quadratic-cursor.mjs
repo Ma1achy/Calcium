@@ -260,7 +260,7 @@ const results = runPass({
         "        continue;\n" +
         "      }\n" +
         "    }\n" +
-        "    return cells(text.replace(sgrPattern(), \"\"), ambiguous);",
+        "    // **A unit of the rasterised alphabets, at `narrow`** (I77, F1202). The set",
       to:
         "      const m = sgr.exec(text);\n" +
         "      if (m !== null && m.index === i) {\n" +
@@ -269,7 +269,7 @@ const results = runPass({
         "        continue;\n" +
         "      }\n" +
         "    }\n" +
-        "    return cells(text.replace(sgrPattern(), \"\"), ambiguous);",
+        "    // **A unit of the rasterised alphabets, at `narrow`** (I77, F1202). The set",
       expect: "T1.30",
     },
     {

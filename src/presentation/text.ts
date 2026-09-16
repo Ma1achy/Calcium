@@ -315,6 +315,20 @@ export function displayCells(text: string, ambiguous: AmbiguousWidth = "narrow")
         continue;
       }
     }
+    // **A unit of the rasterised alphabets, at `narrow`** (I77, F1202). The set
+    // `rowCells` admits as a checked claim — one cell per unit, T1.40 — taken
+    // in the same pass, so a plot row measures without the stripped copy and
+    // the second walk it paid for at the first braille unit: 13 µs a row
+    // against one or two, on every row of every frame the guard re-measures.
+    // No next-unit test here, and one could not be violated: an extender is
+    // itself a unit of no kind the scan takes, and the line below answers the
+    // whole row through the cluster walk — a unit before a selector is two
+    // cells there, as it always was.
+    if (ambiguous === "narrow" && soloUnit(c)) {
+      total += 1;
+      i += 1;
+      continue;
+    }
     return cells(text.replace(sgrPattern(), ""), ambiguous);
   }
   return total;
