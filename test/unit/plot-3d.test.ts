@@ -1005,6 +1005,7 @@ describe("C12 I131 — the span's depth is project's first dot, and the cull all
       expect(Object.is(zeros.hiV, 0), "hiV is +0").toBe(true);
     }
   });
+  it.todo("T1.148 (C12 I136, F1176): createDepth's record carries an eight-slot Float64Array lane, and after drawTri its slots hold the last painted sample's normal, view position, depth and intensity by the documented layout, with shade over slots 0–6 answering slot 7 to the bit — not deferred on a component: the code commit replaces this row");
 });
 
 describe("C12 I132 — the painter writes an integer and the records are built once", () => {
