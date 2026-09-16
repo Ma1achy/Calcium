@@ -588,6 +588,7 @@ describe("C09 I74 — a unit of the rasterised alphabets is its own cluster unle
     expect(slow, "and table units the segmenter must still decide").toBeGreaterThan(300);
     expect(escaped, "and escapes placed between clusters").toBeGreaterThan(1000);
   });
+  it.todo("T1.49 (C09 I74, F1178): the five whole-text walks answer the segmenter's own clusters over a seeded corpus holding a carriage return before a line feed — not deferred on a component: the code commit replaces this row");
 });
 
 describe("C09 §5 — the printable-ASCII path", () => {
