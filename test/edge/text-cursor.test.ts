@@ -69,14 +69,18 @@ function perCall(fn: () => unknown, floorMs = 20): number {
 const LINEAR_AT_8X_WITH_MARGIN = 24;
 
 describe("C09 §5a — the walk is linear in the row (C09 I60)", () => {
-  it("T3.77 (C09 I60): fitStyled's cost from 50 to 400 cells is nearer 8× than 64×", () => {
-    // The pad path — a row one cell short of `width` — because F937 measured it
-    // as the ordinary case: rows arrive from Ink short of the terminal width, so
-    // a row that needs nothing but spaces pays the whole walk to discover it.
+  it("T3.77 (C09 I60, I78): fitStyled's cost from 50 to 400 cells is nearer 8× than 64×", () => {
+    // **The cut path — a row one cell over `width`** (C09 I78, F1204). This
+    // measured the pad path, which F937 named as the ordinary case, until a
+    // short row stopped walking: a row under the width now costs its measure
+    // and nothing else (T1.51), and a row fitted one cell short would time no
+    // walk at all — the mutation pass showed it, a quadratic cluster arm
+    // surviving a row that never reached it. One cell over, the walk runs to
+    // the cut and its cost is what this row is about.
     const small = styledRow(50);
     const large = styledRow(400);
-    const smallMs = perCall(() => fitStyled(small, 51, SGR_RESET));
-    const largeMs = perCall(() => fitStyled(large, 401, SGR_RESET));
+    const smallMs = perCall(() => fitStyled(small, 49, SGR_RESET));
+    const largeMs = perCall(() => fitStyled(large, 399, SGR_RESET));
     const ratio = largeMs / smallMs;
 
     // The control that says the operands measured something: a longer row costs
@@ -214,17 +218,18 @@ describe("C09 §5a — the cluster step is linear, and one glyph does not segmen
   /** The gutter row with a precomposed `é` — a unit below U+0300, solo since F1178. */
   const latinRow = (n: number): string => `${SGR}é${SGR_RESET} ${"x".repeat(n - 2)}`;
 
-  it("T3.84 (C09 I60, I63): the cluster walk's cost from 50 to 400 cells is nearer 8× than 64×, on a row where every cluster reaches the segmenter", () => {
+  it("T3.84 (C09 I60, I63, I78): the cluster walk's cost from 50 to 400 cells is nearer 8× than 64×, on a row where every cluster reaches the segmenter", () => {
     // T3.77's form over the arm T3.77 cannot reach: its styled rows are ASCII
     // and never ask the segmenter. `containing` answers for one cluster from
     // one position; a reader that segmented the remainder of the row to reach
     // it would be F937's quadratic by another mechanism, and this is the row
     // that would see it. Measured on the fix: 7.2× for the pad path and 6.6×
-    // for the tail window.
+    // for the tail window. **On the cut path since I78** (F1204): a short row
+    // no longer walks, so the row fits one cell over the width.
     const small = cjkRow(50);
     const large = cjkRow(400);
-    const smallMs = perCall(() => fitStyled(small, 51, SGR_RESET));
-    const largeMs = perCall(() => fitStyled(large, 401, SGR_RESET));
+    const smallMs = perCall(() => fitStyled(small, 49, SGR_RESET));
+    const largeMs = perCall(() => fitStyled(large, 399, SGR_RESET));
     const ratio = largeMs / smallMs;
     expect(largeMs, `400 cells took ${largeMs.toFixed(4)} ms against ${smallMs.toFixed(4)} at 50`).toBeGreaterThan(smallMs);
     expect(
@@ -242,7 +247,7 @@ describe("C09 §5a — the cluster step is linear, and one glyph does not segmen
     ).toBeLessThan(LINEAR_AT_8X_WITH_MARGIN);
   });
 
-  it("T3.85 (C09 I63, I74, F955, F1084): a 200-cell row holding one mark on its base asks the segmenter for one cluster, one holding a precomposed é or the gutter's │ asks for none, a CJK row for a hundred", () => {
+  it("T3.85 (C09 I63, I74, I78, F955, F1084, F1204): a 200-cell row holding one mark on its base asks the segmenter for one cluster, one holding a precomposed é or the gutter's │ asks for none, a CJK row for a hundred", () => {
     // **The transcript's 60 µs a row, counted rather than timed.** Every patch
     // row carries one `│` in its gutter, and that one glyph sent the whole row
     // through the segmenter — a segment object per ASCII character, forty of
@@ -262,9 +267,10 @@ describe("C09 §5a — the cluster step is linear, and one glyph does not segmen
     // full `make all` with the fix fully in place, the pre-fix figure being 2.8.
     //
     // `clusterAt` is the only caller of `Segments.prototype.containing`, so
-    // patching that prototype counts exactly what I63 is about. **Two per
-    // cluster and not one**, kept rather than divided away: `fitStyled` asks
-    // once to find the cluster and `pieceCells` asks again to measure it.
+    // patching that prototype counts exactly what I63 is about. **One per
+    // cluster, the measure's** (C09 I78, F1204): it was two — the measure's ask
+    // and the walk's — until a row under the width stopped walking, and the
+    // count halved the day it did, which is the count saying what I78 says.
     const proto = Object.getPrototypeOf(new Intl.Segmenter().segment("")) as {
       containing: (i: number) => unknown;
     };
@@ -299,8 +305,8 @@ describe("C09 §5a — the cluster step is linear, and one glyph does not segmen
     // glyph outside the table is the row I63's count is about.
     expect(gutterAsks, "the gutter glyph is a unit of the table — never asked (I74)").toBe(0);
     expect(latinAsks, "a precomposed é is a unit below U+0300 — never asked since F1178 (I74)").toBe(0);
-    expect(accentAsks, "one mark on its base, found once and measured once").toBe(2);
-    expect(cjkAsks, "a hundred clusters, each found once and measured once").toBe(200);
+    expect(accentAsks, "one mark on its base, found once by the measure and never by a walk (I78)").toBe(1);
+    expect(cjkAsks, "a hundred clusters, each found once by the measure").toBe(100);
 
     // **The timing is kept as evidence and no longer as the gate.** The control
     // it always had still holds — a row that must segment every cluster costs

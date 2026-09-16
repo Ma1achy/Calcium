@@ -384,7 +384,16 @@ export function fitStyled(
   reset: string,
   ambiguous: AmbiguousWidth = "narrow",
 ): string {
-  if (displayCells(text, ambiguous) === width) return text;
+  const measured = displayCells(text, ambiguous);
+  if (measured === width) return text;
+  // **A short row is padded, not walked** (I78, F1204). The walk below cannot
+  // change a row it does not cut — every escape, run and cluster is copied
+  // through whole — and its `used` is the measurer's count (I63, T1.39), so
+  // its answer on a short row is the row and the shortfall in blanks. It
+  // walked every such row anyway, 16 µs against one, on nearly every row of
+  // every frame of prose, code and patch. The pad is the measure's; the walk
+  // is the cut path's alone.
+  if (measured < width) return text + " ".repeat(width - measured);
 
   const sgr = sgrAt();
   let segments: Segments | null = null;

@@ -1318,5 +1318,37 @@ describe("displayCells — the one pass takes the rasterised alphabets (C09 §5,
 });
 
 describe("fitStyled — a short row is padded, not walked (C09 §5a, I78, F1204)", () => {
-  it.todo("T1.52 (I78): a row under the width comes back as the row, the shortfall in blanks, and nothing else — not deferred on a component: the code commit replaces this row");
+  const ESC = "\u001b";
+  const SGR = /\u001b\[[0-9;]*m/g;
+  const RED = `${ESC}[31m`;
+  const FAMILY = "\u{1F468}\u200d\u{1F469}\u200d\u{1F467}";
+  const KEYCAP = "1\ufe0f\u20e3";
+  const LINK = `${ESC}]8;;https://example.test${ESC}\\`;
+
+  it("T1.52 (I78): a row under the width comes back as the row, the shortfall in blanks, and nothing else", () => {
+    // **Held from outside** — the answer's width, prefix and suffix, not its
+    // construction — so a pad that disagreed with the measure, or a walk that
+    // dropped or closed something on a row it did not cut, fails here rather
+    // than in a frame.
+    const corpus = [
+      `${RED}styled ascii${SGR_RESET}`, "plain ascii", `a ${FAMILY} b ${KEYCAP}`, "e\u0301x", `tab\there`, `${LINK}link${ESC}]8;;${ESC}\\ after`,
+      `${RED}\u2801\u2802\u28ff${ESC}[32m\u2847\u2800${SGR_RESET}`, "",
+    ];
+    for (const row of corpus) {
+      const w = displayCells(row);
+      expect(fitStyled(row, w, SGR_RESET), `${JSON.stringify(row)} at its own width: itself`).toBe(row);
+      for (const extra of [1, 20]) {
+        const width = w + extra;
+        const out = fitStyled(row, width, SGR_RESET);
+        expect(displayCells(out), `${JSON.stringify(row)} + ${String(extra)}: exactly the width`).toBe(width);
+        expect(out.startsWith(row), "the row, byte for byte, first").toBe(true);
+        expect(out.slice(row.length), "then the shortfall in blanks").toBe(" ".repeat(extra));
+        expect((out.match(SGR) ?? []).length, "and no reset the row did not carry").toBe((row.match(SGR) ?? []).length);
+      }
+    }
+    // **The cut path is the walk's still** (I9, T1.30): over the width, cut and
+    // closed; a straddling glyph dropped and blanked.
+    expect(fitStyled(`${RED}abcdef${SGR_RESET}`, 3, SGR_RESET)).toBe(`${RED}abc${SGR_RESET}`);
+    expect(fitStyled("a日b", 2, SGR_RESET)).toBe("a ");
+  });
 });
