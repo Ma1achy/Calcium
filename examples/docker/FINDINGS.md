@@ -52475,3 +52475,72 @@ slice's render plus a scratch read — under 1.5 ms, and under 0.2 with F1190
 — and a one-row scroll at that size from about 10 ms to about 1; at 2,000
 lines about 0.4 ms a frame. The measure memo (C22 I100) is the precedent
 for who owns the store, and SS24 is why it is not in `patch/` (I22, F1187).
+
+**A correction to the figures above, before the close.** The two
+`registry.windowSequence([patch, status])` and `measureSequence` readings in
+the table — 1.45–1.69 and 15.6–16.5 ms — were not the patch's. The probe's
+registry was `createBlockRegistry({ defaults: true })`, which does not
+register the `patch` kind (block-cap's kit registers it by hand), so the
+registry resolved the block to a `raw` fallback and the sequence figures
+were the fallback's; the direct `window.js` figures beside them were right,
+which is what made the column look corroborated. It surfaced when a later
+reading came back at 0.001 ms and a debug call showed an empty window.
+Re-taken with the kind registered, both builds: `windowSequence` with no
+memo **0.31–0.40 ms** at 2,000 lines and **6.4–6.8 ms** at 20,000 — the
+latter the cap form's whole-block measure and window, the finding's claim
+as stated; `measureSequence` 0.03–0.05 and 4.9–6.9 ms. The 20,000-line
+"memo + scratch" cell is a window past the capped block and says nothing.
+The in-session figures (`out/probe-anim.mjs`) never went through that
+registry and stand.
+
+**Closed — built and measured.** C09 I76, C25 I22 and C22 I100 as sized,
+with one ruling on the way: `render` holds no form, because the block it is
+handed on the transcript path is the frame's own slice — a new object every
+frame — and a slot held by it would be an absent miss a frame and a hit
+never (C09 I76 amended alone). The registry's call scope carries the scratch
+beside the memo; `#form` reads and holds a windowable block's `Form` with
+the block as owner and the width as key, and hands each kind's `window` the
+form's own bare block with the scratch as its sixth argument. C25's `window`
+holds its plan there — owner the hunks, refused for another block or width —
+and `windowRows` walks the window's rows only, the hunks' first body rows
+from the plan's `bodyStarts`. The session hands `graph.scratch` to
+`windowEntry`. T2.145 counts the definition's own calls and the identity of
+the block the seam hands over; T1.25 records every row index a planned
+window reads through a proxy and finds none outside it; T1.26 holds one plan
+per patch and width and refuses a twin sharing the hunks array; T4.89g reads
+the `scratch` hits on every frame after the first. Mutations:
+`c09-form-scratch` three of three after its sticky-scratch mutation was cut
+to both guards (the reset in `finally` and the assignment at the call's
+start each clear it alone — F1189's shape again); `c25-window-plan` nine of
+nine; `c22-measure-memo` seven of seven with the scratch-not-handed
+mutation added; `c14-cap`, `c22-footer-budget`, `p11-residue` re-anchored
+and green. Gates: enforce, 6,262 tests, 458 goldens with no mover, 134 e2e.
+
+| `out/probe-anim.mjs`, 120×40, 4 s, spans on, `make load-down`, host load 1.5–2.5, three interleaved pairs | before (F1190 build) | after |
+|---|---|---|
+| 20,000 lines, `patch` + `status` — `visible` p50 | 10.62 · 8.32 · 14.21 ms | **0.65 · 0.63 · 1.94 ms** |
+| — work p50 | 13.44 · 9.60 · 20.22 ms | **2.00 · 2.08 · 6.08 ms** |
+| — CPU over 4 s | 627 · 648 · 765 ms (16–19% of a core) | **250 · 169 · 325 ms (4–8%)** |
+| 2,000 lines — `visible` p50 | 1.26 · 2.27 · 2.34 ms | **0.68 · 0.40 · 1.30 ms** — B lower in 3 of 3 |
+| — work p50 | 2.40 · 4.29 · 4.54 | 2.59 · 1.39 · 5.18 |
+| `status` alone — work p50 | 1.17 | 2.66 (the control; the run-to-run noise) |
+| `out/probe-slice.mjs` — planned `windowRows`, 37 rows, 20,000 lines | 1.72–2.52 ms | **0.56–0.94 ms** |
+| — at 2,000 lines | 0.128 | **0.053** |
+| — `windowSequence` second call through memo and scratch, 2,000 lines | 0.356 ms | **0.060 ms** |
+
+**Against the sizing.** The sizing said a tick or a hit frame beside a
+20,000-line patch would fall from about 10 ms of `visible` to under 1.5, and
+it fell to 0.6–1.9; the core share from 15% toward a few per cent, and it
+fell from 16–19 to 4–8. The 2,000-line frame fell by about half in `visible`,
+as the plan's 0.25 ms and the form's measure predicted. What the planned
+window still costs at 20,000 lines — 0.56–0.94 ms for 37 rows — is
+`linesForRows` and the frozen block it builds, not a walk of the patch, and
+it is the scroll frame's to pay.
+
+**What remains.** The scroll frame at any size is now the slice's render
+(0.8–1.4 ms for 37 lines, C25's intra-line span work) plus the window; the
+tick frame beside a patch is the spinner's. The orbit, the crosshair, the
+image frame and the series toggle stay in the compound focus slot (F1189).
+The registry's `#measured` still measures a form again to commit its height
+(F942's second half), memoised across frames by C22 I100 and paid once per
+block within a call.
