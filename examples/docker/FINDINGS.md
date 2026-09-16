@@ -52824,3 +52824,56 @@ the fear was a picture re-encoded or re-sent on every frame under a graphics
 protocol. It is not: `transmitFrame` sends a placement once and releases it
 when the frame no longer places it (C09 I66), and the per-tick cost beside a
 spinner is the placeholder rows.
+
+## F1196 — the stress bench: a transcript full of one thing, and transcripts full of many — twenty-seven cases read as frame rate, frame cost, input latency and live heap, and the baseline names five defects ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `tools/bench/stress.mjs`, against `dist/` through the public surface over `tools/bench/fakes.mjs`, on the F1195 build (`514fa151`, node 22.23.2, `make load-down`, 120×40). Pure cases — a transcript holding nothing but one kind: `spinners`, `steps`, `stream` (200 live parts at 16 ms), `text`, `code`, `logs`, `table`, `bigtable` (5 × 5,000 rows), `kv`, `patch`, `bigpatch` (5 × 4,000 lines), `notice`, `tip`, `pills`, `panel`, `progress`, `image` under kitty, `everyplot`, `everylive` (46 forms at 33 ms), `everymesh` (every `plot3d` rung at 33 ms), `plot:<form>`, `live:<form>`, `mesh:<rung>`, `livemesh:<rung>` — and mixed: `session` (a coding session of responses, code, patches, tables, logs, a spinner and a live plot at the tail) and `mixed` (round-robin of all six). Each loads `n` entries through the shell's own submit path, runs the animation for four seconds, then measures forty PageUp/PageDown keystrokes and twenty-six typed characters from the byte in to the first byte out, and reads the heap after a forced GC with the fake's record emptied (F1194). |
+| **Reached for** | The matrix, one process per case (`matrix`). **fps** is frames drawn per second under the framework's own cadence; **ms/frame** is the window's CPU per frame drawn; **headroom** is `1000 / ms/frame`; **work** is the profiler's per-frame work over every frame; **key** and **type** are keystroke latencies. |
+| **Verdict** | **Closed — built and measured.** The bench is the instrument; the baseline below is the record the findings that follow are cut against. |
+
+```
+case                n  load ms   fps  ms/frame  headroom  work p50   p95  max  key p50   p95  type p50  cpu %  heap MB  frames
+spinners          300      616   5.2       4.2       240       0.3   0.7    6      0.5   1.4       0.2      2     58.4    1018
+steps             300      623   5.2       7.0       142       0.3   0.8    5      0.8   1.8       0.4      4     58.5    1018
+stream            200      846  25.0      15.1        66       0.6   2.0    5      0.7   1.6       0.4     38     61.9     797
+text              200     1037   0.0         -      2174       0.5   3.0   20      1.6   3.1       0.3      2     64.6     697
+code              200      863   0.0         -      2577       0.4   2.6   15      1.1   6.1       0.3      3     81.7     697
+logs              200      450   0.0         -      3425       0.3   0.8    5      0.6   2.3       0.2      2     66.1     697
+table             100      173   0.0         -      3731       0.3   0.4    9      0.3   1.2       0.3      2     64.6     397
+bigtable            5      148   0.0         -      2632       0.4  19.7   76     19.0  21.0       0.3      2     65.7     112
+kv                300      632   0.0         -      3521       0.3   0.6    6      0.5   1.0       0.3      2     59.4     997
+patch             100      669   0.0         -      1316       0.8   4.0   19      3.3   5.8       0.7      2     74.1     397
+bigpatch            5      163   0.0         -       214       4.7   9.6   32      7.4  11.1       4.0      2     62.6     112
+notice            500      998   0.0         -      3731       0.3   0.5    5      0.5   2.0       0.3      2     59.9    1597
+tip               300      788   0.0         -      2525       0.4   0.8    6      0.9   2.6       0.4      2     60.0     997
+pills             300      650   0.0         -      3333       0.3   0.7    5      0.8   3.5       0.4      3     59.3     997
+panel             150      568   0.0         -      2525       0.4   1.6    5      0.5   0.9       0.3      2     60.6     547
+progress          300      752   0.0         -      2874       0.3   0.6    5      0.5   1.6       0.3      2     59.2     997
+image              60      451   0.0         -       906       1.1   3.0    7      0.0   0.4       0.0      2     55.8     277
+everyplot          47      237   0.0         -      2632       0.4   3.8   14      0.6   8.0       0.3      2     57.8     238
+everylive          47      309  25.0       8.3       120       1.2   8.1   18      1.2   6.8       0.4     21     60.4     338
+everymesh          16      345  24.2      10.3        98       4.5   9.9   59      2.4  12.3       0.3     25     71.9     242
+live:line          40      214  23.5      11.1        90       1.3   8.3   10      1.4   3.1       0.4     26     58.2     311
+live:heatmap       40      231  24.5       8.2       122       1.5   8.3   10      1.4   8.7       0.3     20     58.2     315
+live:bar           40      189  26.7       4.9       203       1.2   2.6    7      1.2   3.2       0.4     13     58.1     324
+livemesh:suzanne   12      177  24.0      10.3        97       4.7  11.4   30      0.4   8.3       0.3     25     57.2     229
+livemesh:bunny     12      642  17.5      30.2        33      11.4  23.8   84      0.5  22.6       0.3     53     65.0     203
+session            32      197   5.0       7.6       132       0.6   3.8   16      1.3   5.6       0.4      4     58.3     213
+mixed              60      366   0.0         -      1582       0.6   4.3   26      3.2   5.2       0.5      2     59.4     277
+```
+
+(`ms/frame` in this first matrix includes the profiler's 25 ms sampler; the bench now samples at 250 ms, and the first re-take is the next finding's.)
+
+**What the baseline says, in the order it will be cut.**
+
+1. **The ticker draws at half the rate the spec states, and the spec's own row recorded the half.** `spinners`, `steps` and `session` draw at **5.2 fps** where C22 I60a says the braille set's 80 ms *is observed at 100*; a suzanne orbit through `plots.mjs` draws **7 fps** ((56 − 28) frames over four seconds) where I73 says 30, against a 4 ms frame. T4.17j's comment measured *5 for the spinner alone, 15 with the orbit live* over 990 ms of fake clock and kept the ratio. The mechanism is in `#armSpinner`: the wake is armed from `#render` at the full interval **after** the paint, and the paint sits at the end of C03's window, so the period is *interval + window* — 80 + 100 and 33 + 33 — where the invariant's *floor* wording needs `max`. → opened next, as its own finding.
+2. **A refresh source's visibility gate rebuilds the visible range for every part on every sweep.** `stream` at 200 parts is 38% of a core with a 0.6 ms frame; the CPU profile puts `viewport.visible` at 335 ms of 6 s and its L4 wrapper (`stores.viewport.visible().entries.some(...)`, `construct.ts:1587`) at 250 more, with `sweepParts`, `armParts` and `currentPanel` behind them — twelve thousand full range computations a second for a yes/no answer that changes only when the viewport does. → opened as its own finding.
+3. **The ceiling is 30 fps by two constants, and the goal names 60.** Every live case sits at 24–27 fps: C03's `stream` window is 33 ms and `ORBIT_MS` names the same number. The frame costs 1–5 ms, so the headroom is there; the constants are the spec's and move only with it. → opened after 1 and 2, so the doubled frame rate is paid at the reduced cost.
+4. **A keystroke beside a big table or a big patch costs what the block costs, not what the key costs.** `bigtable` PageUp **19 ms** p50; `bigpatch` **7.4 ms** a page and **4.0 ms per typed character** — the prompt changes and the 4,000-line patch pays again. Candidates from the survey: the table sorts its whole row set on every `window` call, and the patch's `rowsOf` builds a `Row` per line per call for four callers. → to open on their own profiles.
+5. **A live plot's tick costs four to eight times its frame.** `live:line` is 11 ms of CPU a frame against 1.3 ms of frame work; the rest is the app's render, the patch's walks (`countId`, `rewrite`, `countBlocks`, `deepFreeze` — three to four full document walks per patch) and the viewport re-measuring the whole entry at patch rate rather than frame rate. → to open after the visibility gate's re-take separates the sweep from the patch.
+
+**The bunny stays where it is.** `livemesh:bunny` draws 17.5 fps at 53% of a core and 30 ms a frame; twelve bunnies at 120×40 keep two or three on screen, and the raster is the frame. F1155–F1188 took the allocation out of it; what is left is the arithmetic, and culling would move goldens. The goal's own concession covers it.
+
+**Two readings of the instrument itself.** A count argument passed as the empty string was read as `Number("") = 0` entries and the first profile measured a transcript of nothing (fixed: empty means the default). And the `ms/frame` column at the low frame rates is inflated by the profiler's own 25 ms sampler — the spinner case's 4.2 ms is mostly sampler — which is why the bench now samples at 250 ms and the first re-take is the honest column.
