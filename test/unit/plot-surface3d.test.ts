@@ -1801,3 +1801,7 @@ describe("C12 I140 — the projection reads its lanes", () => {
     expect(Array.from(L5.screen.slice(3 * 8)).every((v) => v === -1), "the spare screen slots as they were").toBe(true);
   });
 });
+
+describe("C12 I141 — the cull reads two face lanes", () => {
+  it.todo("T1.153 (C12 I141, F1186): every face's centroid and unit-normal lanes equal the cull's expression and the reference over the position and sum lanes, faceNormalOf reads the lane, and backfaceCulled equals the allocating form — not deferred on a component: the code commit replaces this row");
+});
