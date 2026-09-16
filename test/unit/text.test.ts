@@ -1316,3 +1316,7 @@ describe("displayCells — the one pass takes the rasterised alphabets (C09 §5,
     expect(displayCells(`${colour(3)}\u2500\ufe0f${SGR_RESET}`, "narrow")).toBe(2);
   });
 });
+
+describe("fitStyled — a short row is padded, not walked (C09 §5a, I78, F1204)", () => {
+  it.todo("T1.52 (I78): a row under the width comes back as the row, the shortfall in blanks, and nothing else — not deferred on a component: the code commit replaces this row");
+});
