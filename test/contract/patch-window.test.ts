@@ -537,3 +537,7 @@ describe("C25 §7 — the invariants that had no row", () => {
     }
   });
 });
+
+describe("C25 I22 — a window is built over a plan", () => {
+  it.todo("T1.24 (C25 I22, F1187): the plan's rows, header rows, start rows and gutter width equal the patch-taking functions over the corpus at both widths, and the planned window deep-equals windowPatch at every valid offset — not deferred on a component: the code commit replaces this row");
+});

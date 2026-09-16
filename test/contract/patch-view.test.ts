@@ -427,3 +427,7 @@ describe("C25 §3b — what the view may read, and where its motions land", () =
     expect(h.overlays.stack.map((l) => l.id)).toEqual([PATCH_VIEW_ID]);
   });
 });
+
+describe("C22 I41 — the view holds the window plan beside its offset", () => {
+  it.todo("T3.41 (C22 I41, C25 I22, F1187): one plan miss on open and none over four motions, a rev miss when the entry is patched, a width miss on resize, and the frames equal a view with no cache — not deferred on a component: the code commit replaces this row");
+});
