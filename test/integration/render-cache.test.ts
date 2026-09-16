@@ -798,4 +798,5 @@ describe("C22 I103 — a tick miss keeps the parts", () => {
       vi.useRealTimers();
     }
   }, 20_000);
+  it.todo("T4.89f (C22 I104, F1190): a sliced block beside a spinner renders no further time across a tick, once across a one-row scroll, and the parts hold one slice per sliced block — not deferred on a component: the code commit replaces this row");
 });
