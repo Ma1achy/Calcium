@@ -63,7 +63,44 @@ describe("§9c — the header, the body, and the row the body already has", () =
     expect(cardBody([plain, second])[0], "no gap: the same object").toBe(plain);
   });
 
-  it.todo("C22 T1.62 (C22 I107, F1203): entryLayout over one card array hands out the same body objects every call, and a fresh array a fresh body — not deferred on a component: the code commit replaces this row");
+  it("C22 T1.62 (C22 I107, F1203): entryLayout over one card array hands out the same body objects every call, and a fresh array a fresh body", () => {
+    const step = block({ kind: "notice", id: "h", tone: "info", glyph: "step", text: "ps · ok" });
+    const first = block({ kind: "notice", id: "a", tone: "muted", text: "first", gapBefore: true });
+    const second = block({ kind: "notice", id: "b", tone: "muted", text: "second", gapBefore: true });
+    const card = Object.freeze([step, first, second]);
+    const bodyOf = (runs: ReturnType<typeof entryLayout>) => runs.find((r) => r.indent > 0)?.blocks;
+
+    // **Held**: the same array twice is the same body — the cleared copy by
+    // identity — which is what the memo (C22 I100) and the form hold (C09 I76)
+    // key on; a copy made per call was a new key per frame (F1203).
+    const one = bodyOf(entryLayout(card, 40));
+    const two = bodyOf(entryLayout(card, 40));
+    expect(one?.[0], "the cleared first block, by identity across calls").toBe(two?.[0]);
+    expect(one?.[0]?.gapBefore, "cleared").toBeUndefined();
+    expect(one?.[0]).not.toBe(first);
+    expect(card[1], "the document's own block untouched (C23 I57)").toBe(first);
+    expect(first.gapBefore).toBe(true);
+    expect(one?.[1], "later blocks are the document's own").toBe(second);
+
+    // **Per array, not per content**: an equal card in a fresh array is a fresh
+    // body, derived from that array's own first block.
+    const again = block({ kind: "notice", id: "a", tone: "muted", text: "first", gapBefore: true });
+    const fresh = bodyOf(entryLayout(Object.freeze([step, again, second]), 40));
+    expect(fresh?.[0], "a different array: a different body").not.toBe(one?.[0]);
+    expect(fresh?.[0]?.id).toBe("a");
+    expect(fresh?.[0]?.gapBefore).toBeUndefined();
+
+    // **A nested card the same, keyed on its children.** The parent's body is
+    // a plain notice and the nested card; the nested body run is the one at
+    // the deeper indent.
+    const nested = block({ kind: "group", id: "n", direction: "column", children: [step, first, second] });
+    const parent = Object.freeze([step, block({ kind: "notice", id: "p", tone: "muted", text: "plain" }), nested]);
+    const deepest = (runs: ReturnType<typeof entryLayout>) => runs.reduce((a, r) => (r.indent > a.indent ? r : a));
+    const n1 = deepest(entryLayout(parent, 60)).blocks;
+    const n2 = deepest(entryLayout(parent, 60)).blocks;
+    expect(n1[0]?.gapBefore, "the nested body's first gap is cleared").toBeUndefined();
+    expect(n1[0], "and held across calls").toBe(n2[0]);
+  });
 
   it("T2.46 (C23 I58): the header is `name(args) · duration · outcome`; running, the spinner owns the duration slot, alone below one second", () => {
     const spin = spinnerFrames(FULL_CAPS);

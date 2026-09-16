@@ -426,7 +426,26 @@ describe("C22 §6c — the render cache", () => {
     await type("x");
     expect(count(), "and the second rendered none of it").toBe(first);
   });
-  it.todo("T4.91 (C22 I107, I100, F1203): a card whose body opens with a gapped block measures on the first frame and not on the two after — not deferred on a component: the code commit replaces this row");
+  it("T4.91 (C22 I107, I100, F1203): a card whose body opens with a gapped block measures on the first frame and not on the two after", async () => {
+    // **T4.88's shape over a card.** The head is a `step` notice, so the
+    // layout hands the measurer a body run — and the body's first block
+    // declares `gapBefore`, so that run's first block is `cardBody`'s cleared
+    // copy. Before I107 the copy was made on every call, twice a frame, and
+    // the memo keyed on it missed once a frame for as long as the card stood.
+    const { definition, measured } = measuring();
+    const children = Array.from({ length: 40 }, (_, i) => ({ kind: "count", id: `c-${String(i)}`, ...(i === 0 ? { gapBefore: true } : {}) }));
+    const { screen, type } = await session(definition, [
+      { kind: "notice", id: "h", tone: "info", glyph: "step", text: "rows · ok" },
+      ...children,
+    ]);
+    expect(screen().rows.join("\n"), "the card is on screen").toContain("counted");
+    const after = measured();
+    expect(after, "the first frame measured the children").toBeGreaterThanOrEqual(40);
+
+    await type("x");
+    await type("y");
+    expect(measured(), "two further frames on a still card, no further measure — the cleared copy is held").toBe(after);
+  });
 
   it("T4.88 (C22 I100, C09 I70): forty measured children drawn twice measure on the first frame and not on the second, and a patched child alone misses again", async () => {
     // **Two seams, two harnesses.** The frame half runs on a painting session,

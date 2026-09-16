@@ -126,9 +126,35 @@ export function entryLayout(blocks: readonly Block[], width: number): readonly E
   }
   return [
     Object.freeze({ blocks: blocks.slice(0, 1), width, indent: 0, blank: false, gutter: NO_GUTTER }),
-    ...bodyRuns(cardBody(blocks.slice(1)), width, NO_GUTTER, 1),
+    ...bodyRuns(heldBody(blocks), width, NO_GUTTER, 1),
     gap,
   ];
+}
+
+/**
+ * The body derived from each blocks array, held for as long as the array is
+ * (I107, F1203).
+ *
+ * **A copy that lives one frame is a new key every frame.** `cardBody` clears
+ * the first block's gap by rebuilding it, and the layout is asked twice a frame
+ * — by C14's measurer and by the frame. Every store downstream keyed on block
+ * identity — the measure memo (I100), the cap-form hold (C09 I76), the patch's
+ * plan (C25 I22) — missed on every frame for every card opening with a gapped
+ * block: 4.1 ms of a 6.4 ms big-patch frame re-deriving a form that had not
+ * changed. Keyed on the array the body comes from — the document's `blocks`,
+ * a nested card's `children` — which is deep-frozen (C04 I1) and replaced with
+ * its document (C23 I34), so the same array is the same body. F821's
+ * constraint stands: the document's own objects are never copied over.
+ */
+const CARD_BODIES = new WeakMap<readonly Block[], readonly Block[]>();
+
+function heldBody(blocks: readonly Block[]): readonly Block[] {
+  let body = CARD_BODIES.get(blocks);
+  if (body === undefined) {
+    body = cardBody(blocks.slice(1));
+    CARD_BODIES.set(blocks, body);
+  }
+  return body;
 }
 
 /** A run under `gutter` columns, at the width those columns leave. */
@@ -190,13 +216,13 @@ function bodyRuns(
     // siblings, `├─` for every child but the last and `└─` for the last.
     const closes = b === last && b === tail;
     const cell: GutterCell = cards.length === 1 && runs.length === 0 ? "hook" : closes ? "elbow" : "branch"; // cells-ok — a card count
-    const [head, ...rest] = card.children;
+    const head = card.children[0];
     if (head !== undefined) runs.push(bodyRun([head], width, [...outer, { first: cell, rest: cell }]));
-    if (rest.length > 0) { // cells-ok — a block count
+    if (card.children.length > 1) { // cells-ok — a block count
       // The parent's line continues past a child's body and stops under the
       // last child (row 25): nothing below it to connect to.
       const through: GutterColumn = closes ? { first: "blank", rest: "blank" } : { first: "bar", rest: "bar" };
-      runs.push(...bodyRuns(cardBody(rest), width, [...outer, through], depth + 1));
+      runs.push(...bodyRuns(heldBody(card.children), width, [...outer, through], depth + 1));
     }
   }
   flush();
@@ -213,10 +239,12 @@ function bodyRuns(
  * part is declared by *object identity* (`builders/live.ts`'s `declarations`
  * keyed by the block), so clearing the gap by copying the block on the stored
  * document drops its declaration and it never ticks (F821). `entryLayout` is
- * rebuilt from the current `doc.blocks` on every frame and is read by the
- * measurer and the renderer but never by the identity-keyed driver, so the copy
- * lives one frame and the declaration on the original survives. Measure and
- * render agree because both reach the body through this one function (I83).
+ * read by the measurer and the renderer but never by the identity-keyed driver,
+ * so the copy is the layout's and the declaration on the original survives.
+ * **The copy is held per blocks array** (`heldBody`, I107, F1203): it lived one
+ * frame once, and a copy that lives one frame is a new key every frame to every
+ * identity-keyed store below. Measure and render agree because both reach the
+ * body through this one function (I83).
  */
 export function cardBody(blocks: readonly Block[]): readonly Block[] {
   const [first, ...rest] = blocks;
