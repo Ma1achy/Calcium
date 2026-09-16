@@ -53454,3 +53454,33 @@ the 30 fps it shipped with, expecting T4.17u). Neither row's file declares a liv
 at all, so `settleSource` never runs in either and this change cannot have caused them:
 the run has rotted and the two bounds have gone slack. Recorded here and opened as its
 own entry rather than folded into this one.
+
+## F1207 — C03's window is dated from the timer that fired, so the frame rate sits a second under its budget and the fix only works once the poll is chained ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `armTimer`/`writeFrame` (`src/terminal/frame-scheduler.ts`): every write opens the next window as it begins (C03 I17) and the window is armed from that moment, so Node's timer granularity — a median of 0.80 to 1.16 ms measured on the slot itself — joins every period and is never recovered. C03 cannot correct it: it has no clock (C03 I11, A03 SS1) and the injected timer reports that it fired, never how long it had been running. The correction belongs in the composition root, where the clock is injected. |
+| **Reached for** | With F1206's poll chained, the live cases read `stream` 59.5–61.3, `live:line` 58.0–60.5, `everylive` 58.0–60.0 over five runs each at 120×40 — a second under A02 §7's sixty and, on `stream`, occasionally a second over it. The slot's own instrument (`out/log-pace4.mjs`) says the slot is now what closes the frame often enough to matter: **fired 237 of 1,222 arms in `stream`, 235 of 520 in `live:line`, 175 of 488 in `everylive`**, at a median lateness of 0.80, 0.93 and 1.16 ms. |
+| **Verdict** | **Open.** |
+
+**This is F1206's withdrawn remedy, and the reason it now stands is the measurement and
+not a second opinion.** C22 I108 was specified, built, covered 4/4 with a control and
+green through every gate, then measured flat with `session` down 14.7 to 12.7 fps, and
+withdrawn (commit `747af079`). What was wrong was not the mechanism but the tree it was
+measured in: with the poll dating itself from each fetch, **695 of 706 slots were
+cancelled by an immediate commit before they closed**, so pacing them moved nothing while
+the 16.67 ms floor still widened every coalescing window. F1206 chained the poll, the
+slot began closing a fifth to a half of all frames, and the same code measures
+**60.0 fps on all three live cases, to a tenth, five runs each** — `stream` 60.0 60.0
+60.0 60.2 60.0, `live:line` 60.0 five times, `everylive` 60.0 four times and one 57.7 —
+with `session` 14.7 to 15.7 and the spinner on its 12.5 design. **Two defects that read
+as one**: either alone measures as noise, and only the pair removed shows the budget.
+
+**Remedy, sized.** C22 I108 as written and withdrawn: `pacedSchedule(sampleClock,
+schedule)` wrapping the ambient timer, chaining an arm made inside the last slot's own
+firing from that slot's deadline and dating every other arm from now, floored at
+`1000 / 60` so a 16 ms window does not draw 62.5. The clock is the untapped `sampleClock`
+(C28 I53), which is what keeps the replay positional — the first attempt read the tapped
+`elapsed` and broke C28 T5.1c and T5.1d. One C22 invariant, a unit row over the chain, a
+wiring row through the composed session, a fail-on-revert row, a mutation run whose
+control floors at twenty.
