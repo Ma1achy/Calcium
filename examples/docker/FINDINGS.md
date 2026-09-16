@@ -51906,7 +51906,7 @@ nearest corner and their samples — which no whole-triangle bound reaches;
 |---|---|
 | **Surface** | `src/presentation/plot/surface3.ts`: `Tri3` holds three `Vert` objects, each holding a `Vec3` position, a `Vec3` normal, a value and — since I130 — its screen record, a `MutableScreen` of nine doubles, under a frame stamp; `geometryOf` builds them all; `backfaceCulled`, `drawTri`, `screenOf`, `fill`, `strokeThin`, `hiddenThin` and `thinEdge` read them; `spanOverCorners` reads a `Corner` object per referenced vertex |
 | **Reached for** | the line ticks of forty bunny frames on the F1183 build (`out/prof-bunny6`, `make load-down`): of `drawTri`'s 75 self ticks, 23 sit on the third view-depth line — the first read of a corner's position object — and 30 on `screenOf`'s two record lines, `return w.s` and `w.rec = s`; the cull's centroid line holds 6 more. A micro-benchmark over the bunny's real geometry (`out/probe-soa.mjs`), the same arithmetic over the tree's objects and over packed `Float64Array`s, interleaved sixty rounds: the cull loop over 69,451 faces **0.93 → 0.55 ms**, the three-record touch a triangle over the 30,909 drawn **0.75 → 0.36 ms**. `probe-cold.mjs`: the bunny's first frame **53 ms**, of which `geometryOf` is **33 ms and 28.8 MB** building a `Vert` and two `Vec3` per vertex, a record per projected vertex, a `Corner` per referenced vertex, a normal and a triangle per face — some 260,000 objects for a mesh whose numbers fit in 6 MB of lanes; the `/all` bench's worst frame is that first render at **144 ms** |
-| **Verdict** | **open** — measured, the remedy sized |
+| **Verdict** | **closed** — built and measured: C12 I139, T1.151, `c12-lanes` |
 
 **Remedy, sized.** C12 I139: the geometry is lanes. `geometryOf` fills a
 position lane and a unit-normal lane of three doubles per raster vertex — the
@@ -51927,3 +51927,52 @@ building, which is most of `geometryOf`'s 33 ms. Not in this cut: `edges`
 stays an array of three booleans a face (2.8 MB on the bunny), `fn` a
 `Vec3` a face — both read by rows and runs by name, and each its own change.
 
+**Closed — built and measured.** C12 I139 as sized, with one correction
+made in the spec before the code: the slot is eight doubles, not nine — the
+value lives in the value list, not in the per-frame record. `Lanes` holds
+`pos`, `nrm`, `value`, `idx`, `screen`, `stamps` and three spare values; a
+`Tri3` is its face index, its lanes, its face normal, its edges, its series
+and its skin. `screenOf` reads a slot under the frame's stamp, treats the
+negation as a refusal and projects otherwise; the three booleans decide the
+direct path, so the separate view-depth block is gone; the clip path cuts
+into the spare slots through the same `toScreenAt` and the same `fill`;
+`backfaceCulled`, `spanOverCorners`, `hiddenThin` and the thin stroke read by
+index. T1.151 replaces its deferred row and holds the layout, every stamp
+against `project` after straddling frames over the cube, suzanne and the
+bunny, and `plot3d.project` to a count built from `backfaceCulled` and
+`project` over the same lanes — the distinct vertices of the non-culled faces
+plus two cuts a straddling face. T1.149 compares the lanes with the object
+reference under both shadings; the five rows that read vertex objects read
+the lanes through four exported readers, exempted with their reasons.
+`c12-lanes`: five caught, none survived; nine runs re-anchored on the lane
+reads, 67 caught. Gates green, goldens 458 with no mover, e2e green; 432
+frames byte-identical against the F1183 build; paint 8,163, hidden 13,521,
+project 16,539 on the bunny, unchanged.
+
+| `make load-down` | before (F1183 build) | after |
+|---|---|---|
+| paired warm bunny, `probe-f6-pair` n=60, both orders | A p50 13.6 · 17.6 ms | B p50 9.6 · 11.1; B−A median **−4.2 and −6.4 ms; B faster in 60 and 60 of 60** |
+| paired warm teapot | 3.5 · 3.5 ms | 3.3 · 3.4; −0.1 and −0.0 ms; 42 and 37 of 60 |
+| paired warm suzanne | 2.8 · 3.2 ms | 2.8 · 3.3; 0.0 and 0.0 ms; 30 and 28 of 60 |
+| `probe-cold.mjs` bunny first / second / third frame | 62.5 / 16.4 / 13.7 ms | 59.1 / 11.1 / 10.4 ms |
+| `probe-cold.mjs` bunny `geometryOf` cold / warm | 37.2 ms, 28.7 MB / 16.4 ms, 30.5 MB | 33.4 ms, 24.5 MB / 15.0 ms, 22.7 MB |
+| `probe-cold.mjs` teapot · suzanne third frame | 6.2 · 6.3 ms | 6.0 · 6.0 ms |
+
+Two numbers undercut the sizing and one exceeds it. The sizing said a
+millisecond of the bunny's warm frame, about 8%; the paired probes say four
+to six, about a third — more than the two loops measured account for, and
+the likely reason is that the vertex objects' hidden classes had gone
+polymorphic (`rec`, `s` and `stamp` were added to a `Vert` after
+construction, by I130), so every read the raster made on them was a
+megamorphic load and not the object read the micro-benchmark modelled. The
+sizing also said the cold first frame would lose most of `geometryOf`'s 33
+ms, since that was object building; it lost four, and the warm build one and
+a half. The builder's time is not the objects — it is the two normal lanes
+and the index compaction, which the lanes keep — and the heap it saves is 8
+MB on the warm build, not the 23 the count of objects suggested, because the
+`edges` arrays and the `fn` records were never in the count.
+
+What remains: `edges` as an array of three booleans a face and `fn` as a
+`Vec3` a face — 2.8 MB and about 3 MB on the bunny, each its own change;
+`plot3dArea`'s boxed sample arrays (F1182); `normaliseRow`'s byte scan;
+the builder's 15 ms warm on the bunny, now the largest cold cost of a mesh.
