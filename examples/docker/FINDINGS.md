@@ -51708,7 +51708,7 @@ transition; `plot3dArea`'s boxed sample arrays; F1179's cut.
 |---|---|
 | **Surface** | `src/presentation/text.ts` `breakPoint`: `line.lastIndexOf(" ")` and the cut at `at + 1`; `wrapCellsParts`'s own break-at-the-overflowing-space arm, which tests `segment === " "` and so is not the one that cuts |
 | **Reached for** | T1.49's corpus, written for F1178 to hold that every wrapped row begins on a segmenter boundary of its paragraph. The row `é‍👨 ‍👨́` at width 4 — a joiner after the space — wraps to `é‍👨` and `‍👨́` at start 5, on the F1177 build and the F1178 one alike: the segmenter's clusters are `é‍`, `👨`, ` ‍`, `👨́`, and the second row begins inside the third with a bare joiner. `breakPoint` finds the space by code unit and cuts after it, so any extender on a space — a joiner, a combining mark, a variation selector — begins the next row alone, which C04 I84 says a renderer never paints. The input is degenerate and the corpus reaches it in seeded rows; nothing in the block corpus does |
-| **Verdict** | **open** — recorded from T1.49, which names the exception where it sees it and counts it; not built |
+| **Verdict** | **closed** — built: C09 §5, T3.10e, T1.49 without its exception, `c09-solo-cluster` |
 
 **Remedy, sized.** `breakPoint` cuts at the cluster boundary after the
 space — the end of the cluster the space begins — which the walk already
@@ -51716,3 +51716,14 @@ knows, since it steps by cluster: a space followed by an extender is not a
 break point, or is one whose cut lands after the extender. Either keeps every
 row on a boundary; the second keeps the break. A row over the corpus with the
 exception removed, and the goldens, which hold no such input.
+
+**Closed — built.** The first: `breakPoint` asks `soloAt` of the space it
+found, so a space the next unit can extend is not a break point and the
+search continues towards the row's start — the overflow arm already asked
+the same, its test being that the cluster *is* the space. T3.10e names the
+joiner, a combining mark and the selector on both shapes, the later space
+breaking and the lone joined space cutting the token on a boundary; T1.49
+holds every row start on a segmenter boundary with no exception now.
+`c09-solo-cluster`: seven caught, none survived. Gates green, goldens 458
+with no mover, e2e green. Not timed: one predicate per break point found,
+and a break point is found once per full row.
