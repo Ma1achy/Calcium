@@ -23,6 +23,7 @@ import {
   truncate,
   wrapCells,
   wrapCellsParts,
+  truncateParts,
 } from "../../src/presentation/text.js";
 import { SGR_RESET } from "../../src/terminal/escapes.js";
 
@@ -1351,5 +1352,90 @@ describe("fitStyled — a short row is padded, not walked (C09 §5a, I78, F1204)
     expect(fitStyled(`${RED}abcdef${SGR_RESET}`, 3, SGR_RESET)).toBe(`${RED}abc${SGR_RESET}`);
     expect(fitStyled("a日b", 2, SGR_RESET)).toBe("a ");
   });
-  it.todo("T1.53 (C09 I79): truncate and truncateParts from both ends equal a reference cut over the corpus — not deferred on a component: the code commit replaces this row");
+  it("T1.53 (I9, I79, F1205): truncate and truncateParts from both ends equal a reference cut made with the segmenter's iterator, over a corpus at every width", () => {
+    // **The walk this replaces, re-stated rather than imported.** Before I79
+    // both arms built every cluster of the whole line through the iterator and
+    // walked from the front until the budget was spent; the cursor walk must
+    // give the same bytes at every width, which only the old walk can say.
+    const SEG = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+    type Caps = Readonly<{ unicode: "full" | "bmp" | "ascii"; ambiguousWidth?: "narrow" | "wide" }>;
+    const reference = (text: string, width: number, caps: Caps, from: "start" | "end"): string => {
+      const amb = caps.ambiguousWidth ?? "narrow";
+      const limit = Math.max(0, Math.floor(width));
+      if (limit === 0) return "";
+      const clean = stripControl(text);
+      if (cells(clean, amb) <= limit) return clean;
+      const marker = caps.unicode === "ascii" ? "~" : "\u2026";
+      const markerCells = cells(marker, amb);
+      if (markerCells > limit) return " ".repeat(limit);
+      const budget = limit - markerCells;
+      if (budget <= 0) return marker;
+      const clusters = [...SEG.segment(clean)].map((c) => c.segment);
+      const order = from === "start" ? [...clusters].reverse() : clusters;
+      let kept = "";
+      let used = 0;
+      for (const segment of order) {
+        const w = cells(segment, amb);
+        if (used + w > budget) break;
+        kept = from === "start" ? segment + kept : kept + segment;
+        used += w;
+      }
+      const pad = " ".repeat(budget - used);
+      return from === "start" ? marker + pad + kept : kept + pad + marker;
+    };
+
+    const ZWJ = "\u200d";
+    const FAMILY = `\u{1F468}${ZWJ}\u{1F469}${ZWJ}\u{1F467}${ZWJ}\u{1F466}`;
+    const KEYCAP = "1\ufe0f\u20e3";
+    const corpus: readonly string[] = [
+      "the frame holds under load and the joint carries weight",
+      "図表図表図表図表図表図表",
+      "ab図cd図ef",
+      `a${FAMILY}b${KEYCAP}c`,
+      "cafe\u0301 au lait, abe\u0301",
+      "ab\u0007cd\u001befg\u009fh",
+      "⠁⠃⠉⠙⠑⠋⠛⠓",
+      `x図${FAMILY}e\u0301⠁\u0007${KEYCAP}yz`,
+    ];
+    const capsList: readonly Caps[] = [
+      { unicode: "full", ambiguousWidth: "narrow" },
+      { unicode: "full", ambiguousWidth: "wide" },
+      { unicode: "ascii", ambiguousWidth: "narrow" },
+    ];
+    let checked = 0;
+    for (const text of corpus) {
+      for (const caps of capsList) {
+        const amb = caps.ambiguousWidth ?? "narrow";
+        const clean = stripControl(text);
+        const lineCells = cells(clean, amb);
+        for (let width = 1; width <= lineCells + 1; width += 1) {
+          for (const from of ["end", "start"] as const) {
+            const label = `${JSON.stringify(text)} at ${String(width)} from ${from} (${caps.unicode}/${amb})`;
+            const expected = reference(text, width, caps, from);
+            const whole = truncate(text, width, caps, from);
+            expect(whole, `truncate ${label}`).toBe(expected);
+            expect(cells(whole, amb), `width of ${label}`).toBe(Math.min(width, lineCells));
+            const parts = truncateParts(text, width, caps, from);
+            expect(parts.prefix + parts.kept + parts.suffix, `truncateParts ${label}`).toBe(expected);
+            if (from === "end") {
+              expect(clean.startsWith(parts.kept), `kept is a prefix ${label}`).toBe(true);
+              expect(parts.start, `start ${label}`).toBe(0);
+            } else {
+              expect(clean.endsWith(parts.kept), `kept is a suffix ${label}`).toBe(true);
+              // An empty `kept` — the marker refused or the budget spent on it
+              // — has no offset to report, and the edge answers 0 on both arms.
+              if (parts.kept !== "") expect(parts.start, `start is the suffix's offset ${label}`).toBe(clean.length - parts.kept.length);
+            }
+            checked += 1;
+          }
+        }
+      }
+    }
+    // **The fixture responds**: the corpus reaches a cut inside a wide glyph,
+    // a refused family and a control stripped before the cut, and the sweep
+    // is not a handful of widths.
+    expect(checked).toBeGreaterThan(800);
+    expect(truncate("ab図cd", 4, { unicode: "full" })).toBe("ab …");
+    expect(truncate("ab図cd", 4, { unicode: "full" }, "start")).toBe("… cd");
+  });
 });

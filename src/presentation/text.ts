@@ -759,17 +759,7 @@ export function truncate(
   // than two implementations: a second pass over the same grapheme stream would
   // round differently at the boundary in exactly the CJK and ZWJ cases this
   // module exists for (C09 I9).
-  const clusters = [...GRAPHEMES.segment(clean)].map((s) => s.segment);
-  const order = from === "start" ? [...clusters].reverse() : clusters;
-
-  let kept = "";
-  let used = 0;
-  for (const segment of order) {
-    const w = clusterCells(segment, caps.ambiguousWidth);
-    if (used + w > budget) break;
-    kept = from === "start" ? segment + kept : kept + segment;
-    used += w;
-  }
+  const { kept, used } = keptWithin(clean, budget, caps.ambiguousWidth, from);
 
   // A double-width glyph refused at the boundary leaves a cell to fill, so the
   // result is exactly `limit` cells rather than `limit - 1`. The padding sits
@@ -777,6 +767,94 @@ export function truncate(
   // flush against the end it was kept from.
   const pad = " ".repeat(budget - used);
   return from === "start" ? marker + pad + kept : kept + pad + marker;
+}
+
+/**
+ * The clusters of `text` that fit within `budget` cells — from its head, or
+ * from its tail when `from` is `"start"` — as the kept string and the cells it
+ * uses. `text` is already stripped of controls.
+ *
+ * **Walked with the measurer's cursor, to the cut and no further** (I79,
+ * F1205). Both arms used to build every cluster of the whole line through the
+ * segmenter's iterator — a record and a string per cluster — and then walk from
+ * the front until the budget was spent, so a 329-cell paragraph kept to 117
+ * cost 94 µs and the clusters past the cut were built to be dropped. The head
+ * arm now steps as `cells` steps (I63, I74): a run of printable ASCII by its
+ * length, cut inside the run where the budget ends; a unit of the table on its
+ * own; otherwise one cluster from `containing`, kept whole or refused whole
+ * (I9) — and stops at the first cluster that would overrun. The tail arm needs
+ * the whole line's boundaries and takes them from the same cursor, so the two
+ * arms read one boundary source, which is I9's reason for one implementation.
+ *
+ * Byte-identical to the iterator walk: the cursor's clusters are the
+ * segmenter's on every input (I63, T1.40, T1.51), a run's units are clusters
+ * of one cell each (§5), and the old walk kept nothing past its first refusal
+ * either. A zero-cell cluster after a run that spends the budget exactly is
+ * still kept, as it was — the run does not end the walk, only an overrun does.
+ */
+function keptWithin(
+  text: string,
+  budget: number,
+  ambiguous: AmbiguousWidth | undefined,
+  from: "start" | "end",
+): Readonly<{ kept: string; used: number }> {
+  let segments: Segments | null = null;
+  if (from === "end") {
+    let used = 0;
+    let i = 0;
+    while (i < text.length) {   // cells-ok: a cursor, not a width
+      const run = plainRun(text, i);
+      if (run > i) {
+        const room = budget - used;
+        if (run - i > room) {   // cells-ok — one cell per unit inside a run (§5)
+          used = budget;
+          i += room;   // cells-ok: the cursor moves by the cells the run has room for, one per unit
+          break;
+        }
+        used += run - i;   // cells-ok — one cell per unit
+        i = run;
+        continue;
+      }
+      const cluster = soloAt(text, i) ? text.charAt(i) : clusterAt((segments ??= GRAPHEMES.segment(text)), i); // C09 I74
+      if (cluster === "") break;
+      const w = clusterCells(cluster, ambiguous);
+      if (used + w > budget) break;
+      used += w;
+      i += cluster.length;   // cells-ok: advancing the cursor past what was consumed
+    }
+    return { kept: text.slice(0, i), used };
+  }
+
+  // The tail is kept, so every boundary is needed before the first is chosen:
+  // one pass of the cursor records where each cluster starts and what it
+  // measures, and the reverse walk reads them back.
+  const starts: number[] = [];
+  const widths: number[] = [];
+  let i = 0;
+  while (i < text.length) {   // cells-ok: a cursor, not a width
+    const run = plainRun(text, i);
+    if (run > i) {
+      for (; i < run; i += 1) {   // cells-ok: a code-unit cursor over a run of one-cell units
+        starts.push(i);
+        widths.push(1);
+      }
+      continue;
+    }
+    const cluster = soloAt(text, i) ? text.charAt(i) : clusterAt((segments ??= GRAPHEMES.segment(text)), i); // C09 I74
+    if (cluster === "") break;
+    starts.push(i);
+    widths.push(clusterCells(cluster, ambiguous));
+    i += cluster.length;   // cells-ok: advancing the cursor past what was consumed
+  }
+  let used = 0;
+  let at = text.length;   // cells-ok — a code-unit offset
+  for (let k = starts.length - 1; k >= 0; k -= 1) {   // cells-ok — a count of clusters, walked from the last
+    const w = widths[k] ?? 0;
+    if (used + w > budget) break;
+    used += w;
+    at = starts[k] ?? at;
+  }
+  return { kept: text.slice(at), used };
 }
 
 /**
@@ -819,17 +897,7 @@ export function truncateParts(
   // the clusters in reverse and keeps the tail, so `kept` is an exact suffix
   // and `start` is its code-unit offset — a caller slicing spans against it
   // adds `start` rather than assuming zero.
-  const clusters = [...GRAPHEMES.segment(whole)].map((s) => s.segment);
-  const order = from === "start" ? [...clusters].reverse() : clusters;
-
-  let kept = "";
-  let used = 0;
-  for (const segment of order) {
-    const w = clusterCells(segment, caps.ambiguousWidth);
-    if (used + w > budget) break;
-    kept = from === "start" ? segment + kept : kept + segment;
-    used += w;
-  }
+  const { kept, used } = keptWithin(whole, budget, caps.ambiguousWidth, from); // C09 I79
 
   const pad = " ".repeat(budget - used);
   return from === "start"

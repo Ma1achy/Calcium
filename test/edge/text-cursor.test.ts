@@ -15,7 +15,7 @@
 // the cluster step is linear too, and a row holding one glyph is not
 // segmented whole for it.
 import { describe, expect, it } from "vitest";
-import { cells, displayCells, fitStyled, sliceCells } from "../../src/presentation/text.js";
+import { cells, displayCells, fitStyled, sliceCells, truncateParts } from "../../src/presentation/text.js";
 import { SGR_RESET } from "../../src/terminal/escapes.js";
 
 /** Built rather than written, as T1.14 builds its ESC: a literal here is a byte no reader sees. */
@@ -320,5 +320,54 @@ describe("C09 §5a — the cluster step is linear, and one glyph does not segmen
         `(${(cjkMs / gutterMs).toFixed(1)}×, reported not gated — F1084)`,
     ).toBeGreaterThan(gutterMs);
   });
-  it.todo("T3.90 (C09 I63, I79): a 400-cell CJK line cut to 100 asks containing for 250 clusters and iterates no Segments — not deferred on a component: the code commit replaces this row");
+  it("T3.90 (C09 I63, I79, F1205): a 400-cell CJK line cut to 100 asks the segmenter for 250 clusters and iterates no Segments; kept from the tail it asks for the whole line's 400; an ASCII line asks for none", () => {
+    // **The cut path, counted rather than timed** (C09 I79). Before I79 both
+    // arms iterated the whole line's `Segments` once — 200 records for a
+    // 99-cell answer — after the measure had already asked `containing` for
+    // every cluster. The head arm now stops at the cut: 200 asks for the
+    // measure, 49 clusters kept and the fiftieth refused at the boundary, and
+    // no iteration; the tail arm needs every boundary and reads them through
+    // the same cursor, so its count is the line's and its iterations are none.
+    const proto = Object.getPrototypeOf(new Intl.Segmenter().segment("")) as {
+      containing: (i: number) => unknown;
+      [Symbol.iterator]: () => Iterator<unknown>;
+    };
+    const realContaining = proto.containing;
+    const realIterator = proto[Symbol.iterator];
+    const counted = (fn: () => unknown): Readonly<{ asks: number; iterations: number }> => {
+      let asks = 0;
+      let iterations = 0;
+      proto.containing = function (this: unknown, i: number): unknown {
+        asks += 1;
+        return realContaining.call(this, i);
+      };
+      proto[Symbol.iterator] = function (this: unknown): Iterator<unknown> {
+        iterations += 1;
+        return realIterator.call(this);
+      };
+      try {
+        fn();
+      } finally {
+        proto.containing = realContaining;
+        proto[Symbol.iterator] = realIterator;
+      }
+      return { asks, iterations };
+    };
+    const caps = { unicode: "full" as const, ambiguousWidth: "narrow" as const };
+    const cjk = cjkRow(400);
+    const ascii = "a".repeat(400);
+    const head = counted(() => truncateParts(cjk, 100, caps));
+    const tail = counted(() => truncateParts(cjk, 100, caps, "start"));
+    const asciiHead = counted(() => truncateParts(ascii, 100, caps));
+    const asciiTail = counted(() => truncateParts(ascii, 100, caps, "start"));
+    expect(proto.containing, "the patch is restored").toBe(realContaining);
+    expect(proto[Symbol.iterator], "the iterator is restored").toBe(realIterator);
+    expect(head, "200 for the measure, 49 kept, one refused — and no iteration").toEqual({ asks: 250, iterations: 0 });
+    expect(tail, "the whole line's boundaries through the cursor, no iteration").toEqual({ asks: 400, iterations: 0 });
+    expect(asciiHead, "a run is cut by its length and asks nothing").toEqual({ asks: 0, iterations: 0 });
+    expect(asciiTail, "a run's boundaries are its units and ask nothing").toEqual({ asks: 0, iterations: 0 });
+    // The fixture responds: the answers are the cut the count is about.
+    expect(cells(truncateParts(cjk, 100, caps).kept)).toBe(98);
+    expect(truncateParts(cjk, 100, caps, "start").start).toBe(400 / 2 - 49);
+  });
 });
