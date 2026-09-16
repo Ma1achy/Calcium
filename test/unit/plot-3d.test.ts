@@ -10,11 +10,11 @@ import { describe, expect, it } from "vitest";
 
 import { block, CAMERA_DEFAULT, NO_PROBE, type Plot, type Probe } from "../../src/data/viewmodel/index.js";
 import { plotDefinition } from "../../src/presentation/plot/definition.js";
-import { backfaceCulled, drawTri, geometryOf, lightDirOf, surfacePoints, type Tri3 } from "../../src/presentation/plot/surface3.js";
+import { backfaceCulled, drawTri, geometryOf, lightDirOf, spanOverCorners, surfacePoints, type Corner, type Tri3 } from "../../src/presentation/plot/surface3.js";
 import type { RenderScratch } from "../../src/presentation/blocks/types.js";
 import { DARK_THEME, FULL_CAPS, measurable, registry } from "../support/render.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
-import { NEAR, dot, hypot2, hypot3, sub, viewDepth } from "../../src/presentation/plot/project3.js";
+import { NEAR, dot, hypot2, hypot3, sub } from "../../src/presentation/plot/project3.js";
 import { loadMesh } from "../support/obj.js";
 import {
   basisOf,
@@ -928,22 +928,9 @@ describe("C12 I131 — the span's depth is project's first dot, and the cull all
     let x = seed >>> 0;
     return () => { x = (Math.imul(x, 1664525) + 1013904223) >>> 0; return x / 4294967296; };
   };
-  it("T1.143 (C12 I131): over a seeded corpus viewDepth equals project's depth bit for bit and is null exactly where project is, and backfaceCulled equals the allocating form on every seeded triangle under both cull signs", () => {
+  it("T1.143 (C12 I131): backfaceCulled equals the allocating form on every seeded triangle under both cull signs", () => {
     const basis = basisOf({ azimuth: 0.7, elevation: 0.4, distance: 3 }, ASPECT(80, 24));
     const r = lcg(1131);
-    // **Points around and behind the camera**: a cube of side 8 about the
-    // origin at distance 3 puts a share of them at or behind the near plane.
-    let nulls = 0; let depths = 0;
-    for (let i = 0; i < 10_000; i += 1) { // cells-ok — a corpus index
-      const p = { x: r() * 8 - 4, y: r() * 8 - 4, z: r() * 8 - 4 };
-      const full = project(basis, p);
-      const z = viewDepth(basis, p);
-      if (full === null) { expect(z, "null where project is").toBeNull(); nulls += 1; }
-      else { expect(z, "the depth, bit for bit").toBe(full.depth); depths += 1; }
-    }
-    expect(nulls, "the corpus holds points project refuses").toBeGreaterThan(100);
-    expect(depths, "and points it projects").toBeGreaterThan(1000);
-
     // **The cull against its allocating form**, both signs, on triangles whose
     // normals are their own — so the sign test reads both answers.
     const reference = (t: Tri3): boolean => {
@@ -963,7 +950,48 @@ describe("C12 I131 — the span's depth is project's first dot, and the cull all
     expect(seen.culled, "the corpus holds culled faces").toBeGreaterThan(1000);
     expect(seen.kept, "and kept ones").toBeGreaterThan(1000);
   });
-  it.todo("T1.147 (C12 I131, I135, F1175): spanOverCorners from open bounds answers project's least and greatest depth over the accepted corners and the least and greatest value among them, a refused corner moves neither, and tighter incoming bounds come back unchanged — not deferred on a component: the code commit replaces this row");
+  it("T1.147 (C12 I131, I135, F1175): spanOverCorners from open bounds answers project's least and greatest depth over the accepted corners and the least and greatest value among them, a refused corner moves neither, and enclosing incoming bounds come back unchanged", () => {
+    const basis = basisOf({ azimuth: 0.7, elevation: 0.4, distance: 3 }, ASPECT(80, 24));
+    const r = lcg(1135);
+    // **Corners around and behind the camera**: a cube of side 8 about the
+    // origin at distance 3 puts a share of them at or behind the near plane;
+    // half carry a value, so the value bounds read a subset of the depth's.
+    const corners: Corner[] = [];
+    for (let i = 0; i < 10_000; i += 1) { // cells-ok — a corpus index
+      corners.push({ p: { x: r() * 8 - 4, y: r() * 8 - 4, z: r() * 8 - 4 }, v: r() < 0.5 ? r() * 20 - 10 : undefined });
+    }
+    // **The reference is `project` itself**, over the corners it accepts.
+    let nearD = Infinity; let farD = -Infinity; let loV = Infinity; let hiV = -Infinity;
+    let refused = 0; let accepted = 0; let valueless = 0;
+    for (const c of corners) {
+      const full = project(basis, c.p);
+      if (full === null) { refused += 1; continue; }
+      accepted += 1;
+      nearD = Math.min(nearD, full.depth);
+      farD = Math.max(farD, full.depth);
+      if (c.v === undefined) valueless += 1;
+      else { loV = Math.min(loV, c.v); hiV = Math.max(hiV, c.v); }
+    }
+    expect(refused, "the corpus holds corners project refuses").toBeGreaterThan(100);
+    expect(accepted, "and corners it accepts").toBeGreaterThan(1000);
+    expect(valueless, "and accepted corners without a value").toBeGreaterThan(100);
+    // **A refused corner moves neither pair**: the reference above skipped it,
+    // and a refused corner nearer than every accepted one would show in `nearD`.
+    const open = spanOverCorners(basis, corners, Infinity, -Infinity, Infinity, -Infinity);
+    expect(Object.is(open.nearD, nearD), `nearD ${String(open.nearD)} vs ${String(nearD)}`).toBe(true);
+    expect(Object.is(open.farD, farD), `farD ${String(open.farD)} vs ${String(farD)}`).toBe(true);
+    expect(Object.is(open.loV, loV), `loV ${String(open.loV)} vs ${String(loV)}`).toBe(true);
+    expect(Object.is(open.hiV, hiV), `hiV ${String(open.hiV)} vs ${String(hiV)}`).toBe(true);
+    // **The incoming bounds honoured** when they enclose the corpus — the
+    // clouds and paths read before the surfaces (C04 I78, I79).
+    const enclosing = spanOverCorners(basis, corners, nearD - 1, farD + 1, loV - 1, hiV + 1);
+    expect(enclosing).toEqual({ nearD: nearD - 1, farD: farD + 1, loV: loV - 1, hiV: hiV + 1 });
+    // And partial bounds tighten only where the corpus reaches past them.
+    const partial = spanOverCorners(basis, corners, nearD + 0.5, farD - 0.5, Infinity, -Infinity);
+    expect(partial).toEqual({ nearD, farD, loV, hiV });
+    // **The fixture responds**: an empty corpus answers the bounds it was handed.
+    expect(spanOverCorners(basis, [], 1, 2, 3, 4)).toEqual({ nearD: 1, farD: 2, loV: 3, hiV: 4 });
+  });
 });
 
 describe("C12 I132 — the painter writes an integer and the records are built once", () => {

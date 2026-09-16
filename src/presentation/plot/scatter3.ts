@@ -57,6 +57,7 @@ import {
   edgeIntensity,
   lightDirOf,
   geometryOf,
+  spanOverCorners,
   surfacePoints,
   type Corner,
   type Geometry3,
@@ -78,7 +79,6 @@ import {
   unionOf,
   unitOf,
   UNIT_EXTENT,
-  viewDepth,
   writeDepth,
   type Basis,
   type Depth,
@@ -947,26 +947,40 @@ export function plot3dArea(
   const scene = drawnOf(block, ctx, aspect);
   const drawn = scene.drawn;
 
+  // **Four bounds no closure captures** (C12 I135, F1175): these were written
+  // through a `reading` closure, and a double assigned to a captured variable
+  // is a heap number allocated per assignment — 22 MB of a twenty-frame bunny
+  // heap for the corners alone. The readings are the same `Math.min` and
+  // `Math.max` statements, written where the closure was called.
   let nearD = Infinity;
   let farD = -Infinity;
   let loV = Infinity;
   let hiV = -Infinity;
-  const reading = (depth: number, value: number | undefined): void => {
-    nearD = Math.min(nearD, depth);
-    farD = Math.max(farD, depth);
-    if (value !== undefined) {
-      loV = Math.min(loV, value);
-      hiV = Math.max(hiV, value);
+  for (const d of drawn) {
+    nearD = Math.min(nearD, d.depth);
+    farD = Math.max(farD, d.depth);
+    if (d.value !== undefined) {
+      loV = Math.min(loV, d.value);
+      hiV = Math.max(hiV, d.value);
     }
-  };
-  for (const d of drawn) reading(d.depth, d.value);
+  }
   // **The ramps span both carriers** (C04 I78). A path outside the cloud's
   // depth range would otherwise saturate at one end of the map, and the tier
   // and the ramp would be keyed to different sets — two answers to *how far is
   // far* in one figure.
   for (const st of scene.strokes) {
-    reading(st.a.depth, st.va);
-    reading(st.b.depth, st.vb);
+    nearD = Math.min(nearD, st.a.depth);
+    farD = Math.max(farD, st.a.depth);
+    nearD = Math.min(nearD, st.b.depth);
+    farD = Math.max(farD, st.b.depth);
+    if (st.va !== undefined) {
+      loV = Math.min(loV, st.va);
+      hiV = Math.max(hiV, st.va);
+    }
+    if (st.vb !== undefined) {
+      loV = Math.min(loV, st.vb);
+      hiV = Math.max(hiV, st.vb);
+    }
   }
   // **And the surfaces**, or a landscape under a cloud saturates one end of the
   // map and the depth cue keys to a set the picture does not hold (C04 I79,
@@ -976,12 +990,9 @@ export function plot3dArea(
   // sits on six faces, and a minimum over a multiset is the minimum over its
   // support.
   // **The depth alone** (C12 I131, F1169): `project`'s first dot, not its
-  // record — 35,947 of them a bunny frame.
-  for (const c of scene.corners) {
-    const z = viewDepth(scene.basis, c.p);
-    if (z !== null) reading(z, c.v);
-  }
-  const span = { nearD, farD, loV, hiV };
+  // record — 35,947 of them a bunny frame — **in one function returning the
+  // span once** (I135), so the bounds stay in registers over the pass.
+  const span = spanOverCorners(scene.basis, scene.corners, nearD, farD, loV, hiV);
 
   const depth = createDepth(grid.width, grid.height);
   // **One colour per sample, and `null` is *not drawn*.** A sparse raster has

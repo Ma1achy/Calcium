@@ -368,6 +368,47 @@ export function geometryOf(s: Surface3, extent: Extent3, series: number): Geomet
 }
 
 /**
+ * The ramp span over a surface's referenced vertices, from the bounds the
+ * clouds and paths set — **one function, scalars, one record** (C12 I131, I135).
+ *
+ * **The depth is `project`'s first dot in place** (I131): the same three
+ * subtractions and three products in the same order, and a corner at or behind
+ * `NEAR` is skipped exactly where `project` refuses it — `<=`, so the frozen
+ * `NaN` arm is `project`'s too. **The bounds are parameters and locals, and no
+ * closure captures them** (I135): V8 keeps a captured variable in a context
+ * object, whose slots hold tagged values, so a double assigned to one is a heap
+ * number allocated on every assignment — four a corner over 35,947 corners a
+ * bunny frame when the span was a closure (F1175). `Math.min` and `Math.max`
+ * are kept rather than written as comparisons: they propagate `NaN` and order
+ * the signed zeros, and a comparison does neither.
+ */
+export function spanOverCorners(
+  basis: Basis,
+  corners: readonly Corner[],
+  nearD: number,
+  farD: number,
+  loV: number,
+  hiV: number,
+): Readonly<{ nearD: number; farD: number; loV: number; hiV: number }> {
+  const e = basis.eye;
+  const f = basis.forward;
+  for (let i = 0; i < corners.length; i += 1) { // cells-ok — a corner index
+    const c = corners[i] as Corner;
+    const p = c.p;
+    const z = (p.x - e.x) * f.x + (p.y - e.y) * f.y + (p.z - e.z) * f.z;
+    if (z <= NEAR) continue;
+    nearD = Math.min(nearD, z);
+    farD = Math.max(farD, z);
+    const v = c.v;
+    if (v !== undefined) {
+      loV = Math.min(loV, v);
+      hiV = Math.max(hiV, v);
+    }
+  }
+  return { nearD, farD, loV, hiV };
+}
+
+/**
  * Which of each triangle's three edges the **caller** drew (C12 I95, §6i row 9).
  *
  * **A height field is triangulated before it is drawn, and the diagonal is not
