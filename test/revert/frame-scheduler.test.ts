@@ -200,11 +200,11 @@ describe("C03 fail-on-revert", () => {
     same.scheduler.commit("stream");
     expect(same.clock.arms, "equal windows never re-arm").toEqual([33]);
 
-    // Never re-arming: a 100 ms spinner holds a stream frame past its budget.
+    // Never re-arming: an 80 ms spinner holds a stream frame past its budget.
     const shorter = harness();
     shorter.scheduler.commit("spinner");
     shorter.scheduler.commit("stream");
-    expect(shorter.clock.arms, "a strictly shorter ceiling governs").toEqual([100, 33]);
+    expect(shorter.clock.arms, "a strictly shorter ceiling governs").toEqual([80, 33]);
     expect(shorter.clock.outstanding, "and there is still only one timer").toBe(1);
   });
 

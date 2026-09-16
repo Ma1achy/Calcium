@@ -28,6 +28,7 @@
 //     SPANS=1                the in-frame spans and kinds tables
 //     SCREEN=1               the final screen, for a reader checking what drew
 //     PROFILE_JSON=path      the whole ProfileReport
+//     SYNC=0                 no synchronised update: the orbit's 100 ms tearing fallback
 //
 // **Frame rate has two readings and both are printed.** `fps` is what the
 // framework drew per second under its own cadence — C03's `stream` window is
@@ -395,6 +396,9 @@ const tui = createTui({
   },
   theme: defaultTheme,
   env,
+  // Synchronised update pinned on, as `plots.mjs` does: an un-pinned fake
+  // measures the orbit's 100 ms tearing fallback (C22 I73). `SYNC=0` for that arm.
+  ...(process.env.SYNC === "0" ? {} : { capabilities: { synchronisedUpdate: true } }),
   stdout,
   stdin,
   greeting: () => doc("/greeting", [caption("g", `stress — ${CASE}: ${spec.says}`)]),

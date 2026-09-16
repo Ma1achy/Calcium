@@ -250,8 +250,9 @@ const NOTHING_ANIMATES: Animated = Object.freeze({
  * (C22 I73).
  *
  * 33 ms is `stream`'s window — *~30 frames/s, matching the A02 §7 budget* — and
- * 100 ms is `spinner`'s, which is what the rotation falls back to where
- * `synchronisedUpdate` is absent and a full-frame rewrite would tear. Naming
+ * 100 ms is the cap the rotation falls back to where `synchronisedUpdate` is
+ * absent and a full-frame rewrite would tear (it was `spinner`'s window until
+ * F1197 set that at the glyph interval; the tearing cap keeps its own number). Naming
  * them here rather than importing C03's table keeps L4 out of a constant L0
  * tunes at construction; the *reason* is what binds them, and that is asserted.
  */
@@ -1059,7 +1060,7 @@ class Session implements TuiInstance {
   /**
    * The third link, and the one recorded nowhere (F227).
    *
-   * C03 declares a `spinner` commit reason, tunes its 100 ms window and
+   * C03 declares a `spinner` commit reason, tunes its window (80 ms, F1197) and
    * specifies how it coalesces against `stream` — and nothing in the product
    * ever supplied one. **A missing producer makes every consumer downstream of
    * it look like a decision deferred rather than a chain broken**, which is why
@@ -1136,9 +1137,7 @@ class Session implements TuiInstance {
       }
       framesMs = Math.max(floor, Number.isFinite(due) ? due : floor);
     }
-    const candidates = [spinnerMs, orbitMs, framesMs].filter((m): m is number => m !== null);
-    const ms = candidates.length === 0 ? null : Math.min(...candidates);
-    if (ms === null) {
+    if (spinnerMs === null && orbitMs === null && framesMs === null) {
       this.#tickAt = null;
       this.#motionAt = null;
       return;
@@ -1146,15 +1145,27 @@ class Session implements TuiInstance {
     const now = this.config.clock();
     this.#tickAt ??= now;
     this.#motionAt ??= now;
-    this.#spinner = this.config.schedule(() => void this.#animate(), ms);
+    // **Armed for when it is due, not for how long it waits** (I105, F1197).
+    // This runs out of `#render`, which sits at the end of C03's window, so a
+    // delay of the full interval from here laid the window and the interval
+    // end to end: 80 + 100 ms for the braille spinner, 33 + 33 for the orbit,
+    // every animation at half the rate I60a and I73 state. The stamps below are
+    // the ones `#animate` advances, so a wake already due fires at once and the
+    // next frame follows one window later — the period is the longer of the
+    // two, which is what *floor* meant.
+    let due = Number.POSITIVE_INFINITY;
+    if (spinnerMs !== null) due = Math.min(due, this.#tickAt + spinnerMs);
+    if (orbitMs !== null) due = Math.min(due, this.#motionAt + orbitMs);
+    if (framesMs !== null) due = Math.min(due, now + framesMs);
+    this.#spinner = this.config.schedule(() => void this.#animate(), Math.max(0, due - now));
   }
 
   /**
    * One wake: advance whatever is moving, then ask for a frame (I73, I74).
    *
    * **The reason is the frame rate and the interval is not.** `commit("spinner")`
-   * draws at 10fps however fast this fires, because C03's 100 ms window is a
-   * floor under the ticker (I60a) — so a live orbit commits `stream`, whose
+   * draws at its window's rate however fast this fires, because C03's window is
+   * a floor under the ticker (I60a, I105) — so a live orbit commits `stream`, whose
    * rationale in C03 §3 is a rate ceiling and says nothing about the source.
    * Everything else keeps `spinner`, and C03 §3's asymmetry is exactly this
    * case: a stream commit under a pending spinner draws within its own 33 ms.

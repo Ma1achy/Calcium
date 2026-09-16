@@ -326,8 +326,9 @@ describe("C22 §6i — the ticker is the second writer", () => {
       // capability it had just pinned. The watcher's push is one per render of
       // the entry, and an animating entry misses the cache on every frame.
       //
-      // Measured over 990 ms of the clock: 5 for the spinner alone, 15 with the
-      // orbit live. The bound is a third of that ratio — wide enough to survive
+      // Measured over 990 ms of the clock: 10 for the spinner alone, 30 with the
+      // orbit live (5 and 15 before F1197, which T4.17u is the row for — this
+      // ratio held under the defect). The bound is a third of that ratio — wide enough to survive
       // a scheduler tweak, narrow enough to fail the mutation that commits
       // `spinner`.
       expect(spinnerFrames, "the spinner drew at all").toBeGreaterThan(0);
@@ -339,9 +340,42 @@ describe("C22 §6i — the ticker is the second writer", () => {
     }
   });
 
-  it.todo(
-    "T4.17u (C22 I105, F1197): a spinner alone renders at least 9 times and an orbit alone at least 27 over thirty 33 ms wakes — not deferred on a component: the code commit replaces this row",
-  );
+  it("T4.17u (C22 I105, F1197): a spinner alone renders at least 9 times and an orbit alone at least 27 over thirty 33 ms wakes", async () => {
+    vi.useFakeTimers();
+    try {
+      // **The rates, not their ratio.** T4.17j bounds the orbit at twice the
+      // spinner, and 5 against 15 satisfied it exactly as 10 against 30 does —
+      // the shipped arming halved both and the ratio could not see it. The
+      // bounds here are the invariant's rates less one frame for the window's
+      // phase: 100 ms and 33 ms periods over 990 ms of the clock.
+      // **Frames are writes outside the synchronised-update brackets**, not
+      // renders of the `count` kind: I103 keeps a block that does not animate
+      // out of a tick's render, so a render count on it reads one for the
+      // spinner arm however fast the ticker runs.
+      const SYNC = { capabilities: { synchronisedUpdate: true } };
+      const BRACKETS = new Set(["\u001b[?2026h", "\u001b[?2026l"]);
+      const framesSince = (chunks: readonly string[], from: number): number =>
+        chunks.slice(from).filter((c) => !BRACKETS.has(c)).length;
+
+      const s = watching();
+      const bs = await session(s.definition, [{ kind: "count", id: "c" }, SPINNER, plot()], SYNC);
+      const spinnerBefore = bs.stdout.chunks.length;
+      for (let i = 0; i < 30; i += 1) await wake(bs, 33);
+      const spinnerFrames = framesSince(bs.stdout.chunks, spinnerBefore);
+
+      const o = watching();
+      const bo = await session(o.definition, [{ kind: "count", id: "c" }, SPINNER, plot()], SYNC);
+      await bo.type("o");
+      const orbitBefore = bo.stdout.chunks.length;
+      for (let i = 0; i < 30; i += 1) await wake(bo, 33);
+      const orbitFrames = framesSince(bo.stdout.chunks, orbitBefore);
+
+      expect(spinnerFrames, "the spinner draws at its 80 ms window, not at interval plus window").toBeGreaterThanOrEqual(11);
+      expect(orbitFrames, "the orbit draws at the stream window's 30fps, not at 15").toBeGreaterThanOrEqual(27);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
   it("T4.17k (C22 I73, AN5): without synchronised update the rate is capped, and with it it is not", async () => {
     vi.useFakeTimers();

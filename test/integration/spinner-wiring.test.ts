@@ -123,9 +123,11 @@ describe("C22 §6c — the counter advances in a real session", () => {
 
       const seen = [cell()];
       // **Thirty samples for a ten-frame set, and the surplus is deliberate.**
-      // The ticker arms at the set's 80 ms and C03 coalesces at 100 ms, so a
-      // fixed sampling interval aliases against the two and a ten-sample run
-      // sees eight. Sampling past the set rather than tuning the interval keeps
+      // The ticker arms at the set's 80 ms and C03's window is the same 80, so
+      // a fixed sampling interval aliases against the cadence and a ten-sample
+      // run sees eight. **And every glyph is the assertion** — with the window
+      // at 100 the frames fell on ticks 1, 2, 3, 5 of every five and two glyphs
+      // were never drawn (F1197). Sampling past the set rather than tuning the interval keeps
       // the row about the chain being wired rather than about the arithmetic of
       // two cadences.
       for (let i = 0; i < 29; i += 1) {

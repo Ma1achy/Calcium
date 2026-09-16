@@ -157,6 +157,11 @@ const tui = createTui({
   localHandlers,
   theme: defaultTheme,
   env: { TERM: "xterm-256color", COLORTERM: "truecolor", LANG: "en_GB.UTF-8" },
+  // **Synchronised update pinned on** (C22 I73): without it the orbit takes the
+  // 100 ms tearing cap and commits `spinner`, and `TERM` alone identifies no
+  // terminal to C02 — so an un-pinned bench measures the fallback (F1197 read
+  // 10 fps and thought it was the ticker). `SYNC=0` measures the torn arm.
+  ...(process.env.SYNC === "0" ? {} : { capabilities: { synchronisedUpdate: true } }),
   stdout,
   stdin,
   greeting: () => doc("/greeting", [caption("plots bench — the example's own documents, measured")]),

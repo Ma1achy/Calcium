@@ -386,7 +386,7 @@ describe("C03 coalescing under load", () => {
     const first = build();
     first.scheduler.commit("stream");
     first.scheduler.commit("spinner");
-    // 100 is not shorter than 33 — the longer window never pushes a frame out.
+    // 80 is not shorter than 33 — the longer window never pushes a frame out.
     expect(first.clock.arms).toEqual([33]);
 
     const second = build();
@@ -394,7 +394,7 @@ describe("C03 coalescing under load", () => {
     second.scheduler.commit("stream");
     // 33 is strictly shorter, so the ceiling drops. There is no frame content,
     // so this draws the spinner earlier rather than later (§3).
-    expect(second.clock.arms).toEqual([100, 33]);
+    expect(second.clock.arms).toEqual([80, 33]);
     expect(second.clock.outstanding).toBe(1);
 
     second.clock.advance(33);

@@ -85,7 +85,12 @@ const WINDOWS: Readonly<Record<CommitReason, number>> = Object.freeze({
   // anyone sees.
   resize: 16,
   stream: 33,
-  spinner: 100,
+  // **80 ms, the fastest shipped glyph interval, and not longer** (F1197). A
+  // window longer than the interval it floors skips glyphs in a fixed pattern:
+  // at 100 over C09's 80 ms braille set the frames landed on ticks 1, 2, 3, 5
+  // of every five and two glyphs of ten were never drawn. The window is the
+  // cadence's floor, not a second cadence (§3).
+  spinner: 80,
 });
 
 /**

@@ -103,12 +103,14 @@ describe("C03 commit classification", () => {
     expect(render).toHaveBeenCalledTimes(1);
   });
 
-  it("T1.7: commit(spinner) schedules at 100 ms, not at the 33 ms stream window", () => {
+  it("T1.7: commit(spinner) schedules at 80 ms — the braille set's interval — not at the 33 ms stream window", () => {
     const { scheduler, clock } = build();
 
     scheduler.commit("spinner");
 
-    expect(clock.armed).toEqual([100]);
+    // **80 and not 100** (F1197): a window longer than the glyph interval it
+    // floors skipped two glyphs of ten in a fixed pattern.
+    expect(clock.armed).toEqual([80]);
   });
 
   it("T1.14: a custom stream window is the one that is armed", () => {
