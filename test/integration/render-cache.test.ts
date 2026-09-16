@@ -937,3 +937,7 @@ describe("C22 I103 — a tick miss keeps the parts", () => {
     expect(report.misses["scratch"]?.absent ?? 0, "absent once per held owner — the form and the plan — not per frame").toBeLessThanOrEqual(2);
   });
 });
+
+describe("C22 I108 — the paced schedule, wired (F1206)", () => {
+  it.todo("T4.92 (C22 I108): after a stream write the next slot is dated from the last deadline — not deferred on a component: the code commit replaces this row");
+});

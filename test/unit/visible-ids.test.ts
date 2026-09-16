@@ -40,3 +40,7 @@ describe("C22 visible ids (F1201)", () => {
     expect(visible({ kind: "transcript", id: "d" }, second)).toBe(true);
   });
 });
+
+describe("C22 I108 — the paced schedule (F1206)", () => {
+  it.todo("T1.63 (C22 I108): pacedSchedule dates consecutive windows end to end — not deferred on a component: the code commit replaces this row");
+});
