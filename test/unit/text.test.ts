@@ -1271,3 +1271,7 @@ describe("rowCells — a row as cells, and the fast set is a checked claim (C09 
     expect(cells("\u0301", "narrow")).toBe(0);
   });
 });
+
+describe("displayCells — the one pass takes the rasterised alphabets (C09 §5, I77, F1202)", () => {
+  it.todo("T1.51 (I77): displayCells equals cells of the stripped text over every arm, at narrow and at wide — not deferred on a component: the code commit replaces this row");
+});
