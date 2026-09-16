@@ -52208,3 +52208,38 @@ carry the gutter out of the rows and take a quarter off `open`. The inline
 `windowRows` route derives a plan per call and has no holder — a frame's
 window is one walk, which the render cache keeps to a miss. None of the
 three is a keystroke.
+
+## F1188 — the runtime barrel imports the Mermaid renderer for every consumer: about a quarter of a cold import, for a builder no example calls ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/index.ts:369` re-exports `mermaidCode` from `src/presentation/mermaid.ts`, which statically imports `renderMermaidASCII` from `beautiful-mermaid` — an ESM-only package whose bundle pulls `elkjs`, 8.1 MB installed. So `import "@fmx/calcium"` resolves, reads and compiles the layout engine before `createTui` is called, for every consumer, whether or not a diagram is ever drawn. No example in the tree calls `mermaidCode`; its consumers are `test/contract/mermaid.test.ts` and, by the module-graph rule's own note, an app out of tree |
+| **Reached for** | the F1187 build copied to `/tmp/calc/dist-cur` so the bind mount is out of the figure (F1164's protocol), `make load-down`, six interleaved pairs: a plain import of `dist/index.js` **398–483 ms**, the same import with `beautiful-mermaid` already loaded **278–334 ms**, the paired difference **80–156 ms, median about 110**; `import("beautiful-mermaid")` alone 95–114 ms. Under the import trace the barrel loads 2,458 modules, two of them the renderer's and `elkjs`'s bundles. Per dependency, cold and alone: `ink` 262, `beautiful-mermaid` 127, `@xterm/headless` 38 (off the graph since C23 I71), `react` 7 |
+| **Verdict** | **open** — measured, the remedy sized |
+
+**Why it is on the graph.** `mermaidCode` is a synchronous builder — an app
+calls it inside an adapter and gets a `code` block — and a synchronous
+function cannot load an ESM-only module on demand: there is no CommonJS
+build to `require`, and a dynamic import is a promise. C23 I71 took the
+emulator off the graph because its route was already `async`; C09 I71 took
+the grammars off because highlight.js core has a registration seam. Neither
+shape is available here. What the tree does have is the entry-point form:
+`@fmx/calcium/testing`, `/fixtures` and `/profiling` exist so that a
+consumer pays for what it imports (C24 §2), and a diagram renderer that
+most sessions never reach is the same argument.
+
+**Remedy, sized.** C24 I36: a fifth entry, `@fmx/calcium/mermaid`, whose
+target is a one-line barrel over `presentation/mermaid.ts`; the runtime
+barrel exports `mermaidCode` no longer and imports nothing from
+`beautiful-mermaid` or `elkjs`. `mermaidCode` itself is untouched — the same
+function, the same bytes, on a different import line — so the contract rows
+hold as they are; the observable is the module graph under the import trace,
+T5.22's instrument (C23 I71), and not a duration. A consumer that draws
+diagrams imports the subpath and pays what it paid before, at the moment of
+its own choosing; a consumer that does not is about 110 ms faster to its
+first frame on a native filesystem and more on a bind mount, where F1164
+measured the loader's I/O multiplied ten times. The alternative — an
+`async mermaidCode` on the barrel behind a dynamic import — removes the same
+cost from the graph but changes the function's shape for a loading reason,
+and is recorded here rather than built. Sized: **−80 to −156 ms of a
+400–480 ms cold import**, the second-largest piece after `ink`'s own graph.
