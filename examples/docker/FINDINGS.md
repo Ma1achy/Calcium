@@ -52950,3 +52950,23 @@ armed after the paint and the paint is 4 ms; the goal names 60, and both
 constants (`stream` 33, `ORBIT_MS` 33) are C03's and C22's to move. The
 un-pinned arm stays capped at 100 ms by I73's tearing argument, which the
 goal's own concession on terminals without DECSET 2026 covers.
+
+## F1198 — a refresh source's visibility gate rebuilds the whole visible range for every part on every sweep: 200 live parts at 16 ms spend a tenth of a core answering yes or no ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | C23's refresh driver (`src/shell/refresh.ts`) asks `deps.visible(part.host)` per part per sweep — in `anyoneLooking`, the stale pass, `armParts`'s three gates and the readouts — and L4 answers it as `stores.viewport.visible().entries.some((e) => e.id === host.id)` (`src/shell/construct.ts:1587`). C14's `visible()` computes the range afresh on every call: a `locate` on the index, a walk over the on-screen entries, a frozen object per entry and one for the range. |
+| **Reached for** | `tools/bench/stress.mjs stream` (F1196): 200 live parts at 16 ms, 27 fps drawn at **41% of a core** with a 0.6 ms frame — 14.9 ms of CPU per frame drawn. `--cpu-prof` over the run: `visible` in `viewport.js` **335 ms** of 6,003 and its L4 wrapper **250 ms** more, with `sweepParts` 82, `currentPanel` 37 and `armParts` 35 behind them; `(garbage collector)` 179. Twelve thousand full range computations a second for an answer that changes only when the viewport does. |
+| **Verdict** | **open.** The range is a pure function of the viewport's state — the store's entries, the top row, the height, the live entry — and that state moves only through paths C14 already owns. Recomputing it per question is the cost; the question rate is the app's and will only rise at 60 fps. |
+
+**Remedy, sized.** `visible()` keeps the last range it answered and returns it
+until the viewport moves. Every movement — a scroll, a content change through
+`#afterContent`, a resize, a clear — ends in `#setTop`, I2's clamp, so the clamp
+is the memo's one invalidation point and no path can move the viewport past it.
+`stats` gains the memo's hits and misses beside the height cache's (C14 I27's
+rule: a cache that publishes its size publishes its rate). One invariant on
+C14, one unit row that reads the same reference back across two calls and a
+fresh one across each of the three axes, one fail-on-revert row for the
+invalidation moved off the clamp, and a mutation run. L4's wrapper is left as
+it is: `.some` over at most a screenful of entries is the cheap half. Frames
+are untouched; only the sweep's cost moves.
