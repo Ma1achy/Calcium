@@ -203,6 +203,7 @@ describe("wrapCells (§3)", () => {
     expect(early).toEqual([]);
   });
 
+  it.todo("T3.10e (C09 I74, C04 I84, F1179): a space carrying an extender is not a break point — not deferred on a component: the code commit replaces this row");
   it("T3.10c: an unbroken token breaks mid-word rather than overflowing", () => {
     const rows = wrapCells("x".repeat(25), 10);
 

@@ -1747,7 +1747,14 @@ is a break inside the atom wearing a break space's clothes (F642). The general p
 findings instance is that **no row could have taken the first word of the next row**, and it is
 swept over a corpus at every width from 1 to 40 rather than pinned at the two strings that found
 it (T3.10b2): a row breaking early is invisible to a per-row width assertion, because a short row
-fits.
+fits. **And a break space is a cluster of its own**: `breakPoint` found the last space by code unit
+and cut after it, so a space the next unit extends — a joiner, a mark, a selector — was cut inside
+its cluster and the extender began the next row alone, which C04 I84 says no renderer paints
+(F1179). A space whose next unit can extend it is not a break point, decided as I74 decides a
+cluster — from the next unit, never from the segmenter — and the search continues towards the
+row's start; the overflow arm already asked the same, since its test is that the cluster *is* the
+space. Every row `wrapCellsParts` returns begins on a cluster boundary of its paragraph (T1.49,
+T3.10e).
 
 **A valued run is a wrap unit, and the wrapper learns one property rather than gaining a sibling**
 (C04 I90). `wrapCellsParts(text, width, ambiguous, atoms)` takes an optional list of `[from, to)`
@@ -2651,6 +2658,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T3.8**: width 1 → every kind returns ≥1 and renders something.
 - **T3.9**: width 0 → treated as 1; no division by zero, no infinite loop.
 - **T3.10**: text exactly `w`, `w-1`, `w+1` cells → 1, 1, 2 rows for wrapped kinds.
+- **T3.10e** (I74, C04 I84, F1179): a space carrying a joiner, a combining mark or the emoji-presentation selector is not a break point — `"ab \u200Dcd ef"` at 5 breaks at the later space and the row holding the joined space keeps it whole; with no other space the token is cut at a cluster boundary and no row begins with the extender; and T1.49's sweep holds every row start on a segmenter boundary with no exception. Not deferred on a component: the code commit replaces this row.
 - **T3.10b2** (C04 I86, §5): the sweep — over fourteen strings at every width from 1 to 40, **no row could have taken the first word of the next row**, counted only where the join is legitimate (the rows are separated by exactly one source space, the next opens on content rather than whitespace, and its first word is whole rather than the head of a cut token). This is the property F590 and F591 are each one instance of, and it is a sweep rather than two pinned strings because **a row that breaks early is invisible to T3.10b**: a short row fits. Measured before the arm: 161 violating joins over 102 of the 560 pairs; after, 0. The same sweep carries the two properties the arm must not move — **no row overflows** (T3.10b over 560 pairs rather than 4) and **every row is an exact slice from its `start`** (C04 I86, on the ASCII members, since a substituted cluster is deliberately not a slice).
 - **T3.11**: `panel` at width 2 → children measured at 0, clamped to 1; no negative width reaches a child.
 - **T3.12**: `group` nested five deep → correct total, no stack overflow.
