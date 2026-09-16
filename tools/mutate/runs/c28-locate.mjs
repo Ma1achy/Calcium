@@ -69,11 +69,12 @@ const results = runPass({
     },
     {
       // **An empty entry read as a hit.** A position before the first mapping
-      // answers `{}`, and a URL built from `undefined` throws out of the fold.
-      name: "EMPTY-IS-HIT: the empty-entry guard is dropped",
+      // answers `{}`, and the locator hands back the chunk's own position as if
+      // the map had named it — T1.129's before-first-mapping arm reads a hit.
+      name: "EMPTY-IS-HIT: an empty entry answers the chunk's own position",
       file: L,
-      from: '    if (typeof entry.originalSource !== "string" || entry.originalSource === "") return null;\n',
-      to: "",
+      from: '    if (typeof entry.originalSource !== "string" || entry.originalSource === "") return null;',
+      to: '    if (typeof entry.originalSource !== "string" || entry.originalSource === "") return Object.freeze({ url, line });',
       expect: "T1.129",
     },
     {
