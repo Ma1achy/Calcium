@@ -51976,3 +51976,40 @@ What remains: `edges` as an array of three booleans a face and `fn` as a
 `Vec3` a face — 2.8 MB and about 3 MB on the bunny, each its own change;
 `plot3dArea`'s boxed sample arrays (F1182); `normaliseRow`'s byte scan;
 the builder's 15 ms warm on the bunny, now the largest cold cost of a mesh.
+
+## F1185 — the lane projection hands six doubles across a call and boxes every one: 1.6 MB of heap numbers a bunny frame, where the object form allocated none ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/surface3.ts` `toScreen(L, k, basis, grid)`: reads the vertex's three position and three normal doubles from the lanes and passes them to `toScreenAt(L, slot, px0, py0, pz0, nx0, ny0, nz0, basis, grid)`, which the clip path also calls with a cut vertex's components; `clipPath` keeps the cut's value in a `spareValue` list beside the lanes because the position and normal lanes have no spare slots |
+| **Reached for** | the inspector's allocation sampler with collected objects included (`out/probe-f9-heap.mjs`, 30 bunny renders under a moving camera, `make load-down`), on the F1184 build and on the F1183 build rebuilt from `cb082243` in a worktree. F1184: **`toScreen` 49.1 MB of 149.4 sampled — 32.9%, 1.6 MB a frame, the largest site**, ahead of `plot3dArea`'s 31.9 (F1182) and `mixedRows`' 15.2. F1183: `toScreen` **1.5 MB of 110.1** — the clip path's fresh records, and nothing per vertex. Arithmetic: 17,171 projections a frame (`plot3d.project`) × six doubles × 16 bytes = 1.65 MB — the sample to the decimal. The CPU profile of forty frames (`out/prof-bunny7`) has the garbage collector at 58.5 ms self, 1.5 ms a frame of a 10 ms frame, and 5 MB a frame of sampled allocation, so the projection's share is about a third of the collector |
+| **Verdict** | **open** — measured, the remedy sized |
+
+**What happened.** F1184 moved the vertex off an object and into lanes, and
+the projection with it: where `toScreen(w, …)` read `w.p.x` inside the
+function that used it, `toScreen(L, k, …)` reads `L.pos[q]` and hands the
+six doubles to `toScreenAt` so the clip path can project a cut vertex that
+has no lane slot through the same arithmetic. `toScreenAt` is a real call —
+the record write is eight typed-array stores after the projection, and V8
+does not inline it into the small `toScreen` — and a double crossing a real
+call is a heap number (I136, F1176: the shade's seven-in-one-out, 33.6 MB of
+a twenty-frame heap). The bytes did not move and the paired frame got 4–6 ms
+faster, so nothing watched the heap; the sampler with collected objects is
+the only instrument that sees garbage rather than survivors, and it was not
+run on the landing.
+
+**Remedy, sized.** C12 I140, an amendment to I139: every lane carries the
+three spare slots, not only the screen lane — position, normal and value
+sized `count + 3` — and `toScreenAt(L, slot, basis, grid)` reads the
+position and normal from the lanes at the slot, taking two integers and two
+records across the call and no double. The clip path writes a cut's
+position, normal and value into the spare slots and projects the slot as a
+vertex is projected; `spareValue` goes, and `valueAt` is the value lane.
+Every expression keeps its order — the same `dx = px − eye.x` on the same
+doubles read one frame later — so the goldens hold. Sized: the 1.6 MB a
+frame goes to zero, a third of the collector's 1.5 ms, about half a
+millisecond of the bunny's warm frame; the heap reading is the acceptance,
+the paired probe the check. Not in this cut: `thinEdge`'s 7.7 MB and
+`shadeAt`'s 6.6 over the same thirty frames — `writeDepth` and the painter
+take a depth and an intensity as doubles, `hypot3` takes three, at sites
+partly inlined — and `plot3dArea`'s 31.9 (F1182), each its own measurement.
