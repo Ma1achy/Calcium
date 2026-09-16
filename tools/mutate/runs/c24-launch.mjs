@@ -94,5 +94,6 @@ const results = runPass({
   ],
 });
 
+console.log(report(results));
 execSync("npm run build >/dev/null 2>&1", { cwd: ROOT });
-report(results);
+process.exit(results.some((r) => !r.killed) ? 1 : 0);
