@@ -97,8 +97,9 @@ const MUTATIONS = [
     // rows C14 measured at `width − 2` are not the rows drawn.
     name: "visibleRows bypasses entryLayout",
     file: SESSION,
-    from: "    const pieces = windowEntry(entryLayout(entry.doc.blocks, width), from, to, memoised);",
-    to: "    const pieces = windowEntry([{ blocks: entry.doc.blocks, width, indent: 0 }], from, to, memoised);",
+    // Re-anchored 2026-09-16 (C22 I100, F1191): the scratch travels beside the memo.
+    from: "    const pieces = windowEntry(entryLayout(entry.doc.blocks, width), from, to, memoised, graph.scratch);",
+    to: "    const pieces = windowEntry([{ blocks: entry.doc.blocks, width, indent: 0 }], from, to, memoised, graph.scratch);",
     expect: "T4.28",
   },
   {

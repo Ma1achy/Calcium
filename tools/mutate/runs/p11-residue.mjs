@@ -74,8 +74,9 @@ const results = runPass({
       // C09 I61 — the memo outlives the call, which is the cache F914 refused.
       name: "memo outlives the call",
       file: REGISTRY,
-      from: "    } finally {\n      this.#memo = null;\n    }",
-      to: "    } finally {\n      // kept\n    }",
+      // Re-anchored 2026-09-16 (C09 I76, F1191): the call's scratch is reset beside the memo.
+      from: "    } finally {\n      this.#memo = null;\n      this.#scratch = undefined;\n    }",
+      to: "    } finally {\n      this.#scratch = undefined; // the memo kept\n    }",
       expect: "T1.35",
     },
     {

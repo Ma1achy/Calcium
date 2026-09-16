@@ -22,7 +22,10 @@ import {
   windowPatch,
   windowPlan,
   windowRows,
+  type WindowPlan,
 } from "../../src/presentation/patch/window.js";
+import { patchDefinition } from "../../src/presentation/patch/definition.js";
+import type { RenderScratch } from "../../src/presentation/blocks/types.js";
 import { numberWidth } from "../../src/presentation/patch/layout.js";
 import { hunkRows, isCollapsed, layoutFor, pairedRows } from "../../src/presentation/patch/height.js";
 import { globSync, readFileSync } from "node:fs";
@@ -610,6 +613,93 @@ describe("C25 I22 — a window is built over a plan", () => {
 });
 
 describe("C25 I22 — the plan travels through the seam, and a planned window costs the window", () => {
-  it.todo("T1.25 (C25 I22, F1191): a planned windowRows reads no row outside the window and bodyStarts equal a full scan's — not deferred on a component: the code commit replaces this row");
-  it.todo("T1.26 (C25 I22, F1191): the definition's window holds one plan per patch and width in the caller's scratch and refuses another block's — not deferred on a component: the code commit replaces this row");
+  it("T1.25 (C25 I22, F1191): over the corpus at both layouts and every start row, a planned windowRows reads no row index outside [from, to) and equals the unplanned window byte for byte; bodyStarts equal each hunk's first body row by a full scan, -1 for none", () => {
+    let windows = 0;
+    for (const candidate of PATCH_CORPUS) {
+      if (candidate.kind !== "patch") throw new Error("the corpus is patches");
+      const patch: Patch = candidate;
+      for (const width of [UNIFIED, SPLIT]) {
+        const plan = windowPlan(patch, width);
+        // **The full scan the plan replaces**, as the row's reference.
+        const scanned = patch.hunks.map(() => -1);
+        plan.rows.forEach((row, i) => {
+          if (row.kind === "body" && scanned[row.hunk] === -1) scanned[row.hunk] = i;
+        });
+        expect([...plan.bodyStarts], "bodyStarts are the first body rows").toEqual(scanned);
+        expect(Object.isFrozen(plan.bodyStarts)).toBe(true);
+
+        // **A recording proxy over the rows**: every numeric index read is noted.
+        const seen = new Set<number>();
+        const recording = new Proxy(plan.rows, {
+          get(target, key, receiver) {
+            if (typeof key === "string" && /^\d+$/u.test(key)) seen.add(Number(key));
+            return Reflect.get(target, key, receiver);
+          },
+        });
+        const recorded: WindowPlan = { ...plan, rows: recording };
+        for (const from of plan.starts) {
+          const to = from + 10;
+          seen.clear();
+          const planned = windowRows(patch, width, from, to, recorded);
+          expect(planned, `the planned window at ${String(from)}`).toEqual(windowRows(patch, width, from, to));
+          const outside = [...seen].filter((i) => i < from || i >= to);
+          expect(outside, `rows read outside [${String(from)}, ${String(to)})`).toEqual([]);
+          windows += 1;
+        }
+      }
+    }
+    expect(windows, "the sweep ran").toBeGreaterThan(50);
+  });
+
+  it("T1.26 (C25 I22, F1191): the definition's window through a caller's scratch derives one plan per patch and width — set once, read back after, the block equal to a scratch-less call — and rebuilds for another width or another patch sharing the hunks array; with no scratch, as before", () => {
+    // A stand-in with the seam's shape (C12 I107): one slot per owner.
+    const slots = new Map<object, { key: string; value: unknown }>();
+    let sets = 0;
+    let gets = 0;
+    const scratch: RenderScratch = {
+      get: (owner, key) => {
+        gets += 1;
+        const slot = slots.get(owner);
+        return slot !== undefined && slot.key === key ? slot.value : undefined;
+      },
+      set: (owner, key, value) => {
+        sets += 1;
+        slots.set(owner, { key, value });
+      },
+    };
+    const window = patchDefinition.window;
+    if (window === undefined) throw new Error("patch declares a window");
+    const measure = (): number => 0;
+    const candidate = PATCH_CORPUS.find((b) => b.kind === "patch" && (b as Patch).hunks.length >= 2);
+    if (candidate === undefined || candidate.kind !== "patch") throw new Error("a two-hunk patch in the corpus");
+    const patch: Patch = candidate;
+
+    const plain = window(patch, SPLIT, 2, 8, measure);
+    const a = window(patch, SPLIT, 2, 8, measure, scratch);
+    expect(a, "the first call equals a call with no scratch").toEqual(plain);
+    expect(sets, "one plan set").toBe(1);
+    const b = window(patch, SPLIT, 3, 9, measure, scratch);
+    expect(b).toEqual(window(patch, SPLIT, 3, 9, measure));
+    expect(sets, "read back, not rebuilt").toBe(1);
+    expect(gets).toBe(2);
+    expect(slots.has(patch.hunks), "keyed on the hunks array").toBe(true);
+
+    // **Another width rebuilds** — the key.
+    window(patch, UNIFIED, 2, 8, measure, scratch);
+    expect(sets, "a new width is a new plan").toBe(2);
+
+    // **Another patch sharing the hunks array is refused, not read**: the held
+    // plan's `patch` is not this block, so it is rebuilt and overwrites.
+    const twin: Patch = block({ ...patch, id: `${patch.id}-twin`, path: `${patch.path}.twin` } as Patch) as Patch;
+    expect(twin.hunks, "the twin shares the array").toBe(patch.hunks);
+    const fromTwin = window(twin, UNIFIED, 2, 8, measure, scratch);
+    expect(sets, "rebuilt for the twin").toBe(3);
+    expect(fromTwin).toEqual(window(twin, UNIFIED, 2, 8, measure));
+    expect((fromTwin.block as Patch).path, "the twin's own path, not the held plan's").toBe(twin.path);
+
+    // **No scratch**: nothing is read or written and the bytes are the same.
+    const before = sets + gets;
+    expect(window(patch, SPLIT, 2, 8, measure)).toEqual(plain);
+    expect(sets + gets).toBe(before);
+  });
 });

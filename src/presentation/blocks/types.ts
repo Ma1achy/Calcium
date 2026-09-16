@@ -524,6 +524,14 @@ export interface BlockDefinition<B extends Block = Block> {
     from: number,
     to: number,
     measureChild: MeasureFn,
+    /**
+     * The caller's scratch, through the seam (I76, F1191). A kind whose window
+     * derives something from the block and the width alone — C25's plan — may
+     * hold it here, keyed on the block's own payload, and read it back on the
+     * next window over the same object; the registry hands the same store
+     * `RenderContext.scratch` carries. Absent when the caller holds nothing.
+     */
+    scratch?: RenderScratch,
   ) => Windowed;
   /**
    * What this block offers to keyboard and pointer (C26 §5, I3).
@@ -630,6 +638,8 @@ export interface BlockRegistry {
     from: number,
     to: number,
     memo?: MeasureMemo,
+    /** The caller's scratch, handed to each kind's `window` and holding each form (I76). */
+    scratch?: RenderScratch,
   ): Readonly<{ blocks: readonly Block[]; skipRows: number }>;
   /**
    * One block's slice, for a container that bounds its own rows (I58, §6b).

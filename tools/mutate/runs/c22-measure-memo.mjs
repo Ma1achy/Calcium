@@ -65,8 +65,9 @@ const results = runPass({
       // does not; T1.44's last clause measures afresh and finds hits.
       name: "MEMO-KEPT: the caller's memo stays open for the next call",
       file: REG,
-      from: "    } finally {\n      this.#memo = null;\n    }",
-      to: "    } finally {\n      if (memo === undefined) this.#memo = null;\n    }",
+      // Re-anchored 2026-09-16 (C09 I76, F1191): the call's scratch is reset beside the memo.
+      from: "    } finally {\n      this.#memo = null;\n      this.#scratch = undefined;\n    }",
+      to: "    } finally {\n      if (memo === undefined) this.#memo = null;\n      this.#scratch = undefined;\n    }",
       expect: "T1.44",
     },
     {
@@ -83,9 +84,20 @@ const results = runPass({
       // **The window itself unmemoised.** The same seam one member over.
       name: "WINDOW-UNMEMOISED: the session's window slices each run afresh",
       file: SESSION,
-      from: "        graph.blocks.windowSequence(run, w, lo, hi, graph.measures),",
-      to: "        graph.blocks.windowSequence(run, w, lo, hi),",
+      // Re-anchored 2026-09-16 (C22 I100, F1191): the scratch travels beside the memo.
+      from: "        graph.blocks.windowSequence(run, w, lo, hi, graph.measures, scratch),",
+      to: "        graph.blocks.windowSequence(run, w, lo, hi, undefined, scratch),",
       expect: "T4.88",
+    },
+    {
+      // **The scratch not handed to the window** (C22 I100, F1191). Every frame
+      // resolves the form and derives the plan afresh; T4.89g's scratch hits
+      // read none.
+      name: "SCRATCH-NOT-HANDED: the session windows the entry with no scratch",
+      file: SESSION,
+      from: "    const pieces = windowEntry(entryLayout(entry.doc.blocks, width), from, to, memoised, graph.scratch);",
+      to: "    const pieces = windowEntry(entryLayout(entry.doc.blocks, width), from, to, memoised);",
+      expect: "T4.89g",
     },
     {
       // **C14's measurer unmemoised.** The frame half still passes — the

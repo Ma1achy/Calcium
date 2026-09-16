@@ -21,7 +21,7 @@ import { cells } from "../text.js";
 import { atLeastOne, changedRuns, normaliseWidth, type ChangedRun } from "../../data/viewmodel/index.js";
 import { collapseText } from "./collapse.js";
 import { hunkRows, isCollapsed, layoutFor, patchHeight, type Layout } from "./height.js";
-import { windowRows } from "./window.js";
+import { planFrom, windowRows } from "./window.js";
 import { blankSide, dress, gutterSpans, line, textSpans } from "./lines.js";
 import { patchLayout, type PatchLayout } from "./layout.js";
 import type { Hunk, Patch } from "../../data/viewmodel/index.js";
@@ -190,8 +190,11 @@ export const patchDefinition: BlockDefinition<Patch> = {
    * than a budget the caller never asked to spend. The gutter travels pinned
    * (C25 I21a), which is what stops the window narrowing it from its own slice.
    */
-  window: (block: Patch, width: number, from: number, to: number) =>
-    windowRows(block, normaliseWidth(width), from, to),
+  window: (block: Patch, width: number, from: number, to: number, _measure, scratch) =>
+    // **The plan from the caller's scratch** (I22, C09 I76): derived once per
+    // block and width and read back at every window after — F1191 measured
+    // the derivation at 2.2 ms a frame beside a 20,000-line patch.
+    windowRows(block, normaliseWidth(width), from, to, planFrom(scratch, block, normaliseWidth(width))),
 
   render(block: Patch, ctx: RenderContext): Rendered {
     const width = normaliseWidth(ctx.width);

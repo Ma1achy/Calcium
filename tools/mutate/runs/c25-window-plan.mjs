@@ -107,6 +107,35 @@ const results = runPass({
       to: "    numberWidth: numberWidth({ ...patch, hunks, numberWidth: undefined } as unknown as Patch),\n  } as Patch);\n\n  return { patch: windowed",
       expect: "T3.20",
     },
+    {
+      // **Every row walked again** (I22, F1191). The bytes are the same and
+      // the cost is the patch's; T1.25's recording proxy sees the indices
+      // outside the window.
+      name: "WALK-EVERY-ROW: windowRows walks the plan's rows from the first to the last",
+      file: W,
+      from: "  for (let i = lo; i < hi; i += 1) {\n    const row = rows[i];\n    if (row === undefined) break;",
+      to: "  for (let i = 0; i < rows.length; i += 1) {\n    const row = rows[i];\n    if (row === undefined || i < lo || i >= hi) continue;",
+      expect: "T1.25",
+    },
+    {
+      // **The last body row taken for the first.** A window inside a hunk
+      // slices the wrong lines; T1.25's byte equality and its scan both see it.
+      name: "BODYSTART-LAST: bodyStarts hold each hunk's last body row",
+      file: W,
+      from: "    if (row.kind === \"body\" && bodyStarts[row.hunk] === -1) bodyStarts[row.hunk] = i;",
+      to: "    if (row.kind === \"body\") bodyStarts[row.hunk] = i;",
+      expect: "T1.25",
+    },
+    {
+      // **The held plan read without the block check** (I22). A twin sharing
+      // the hunks array is windowed by the other patch's plan — the path and
+      // the header rows are the wrong block's. T1.26's shared-array arm.
+      name: "PLAN-UNCHECKED: a held plan is read for any block sharing the hunks array",
+      file: W,
+      from: "  return p.patch === patch && p.width === width && Array.isArray(p.rows);",
+      to: "  return p.width === width && Array.isArray(p.rows);",
+      expect: "T1.26",
+    },
   ],
 });
 

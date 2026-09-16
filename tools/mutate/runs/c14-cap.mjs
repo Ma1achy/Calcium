@@ -60,8 +60,9 @@ const results = runPass({
       // fails, and the panel row fails on the child.
       name: "CAP-INERT: the capped form is never produced",
       file: REGISTRY,
-      from: "    if (!(total > this.#cap)) return { ...resolved, capped: null };",
-      to: "    if (!(total > this.#cap) || total > 0) return { ...resolved, capped: null };",
+      // Re-anchored 2026-09-16 (C09 I76, F1191): the form carries `bare` and is frozen.
+      from: "    if (!(total > this.#cap)) return Object.freeze({ ...resolved, bare: resolved.block, capped: null });",
+      to: "    if (!(total > this.#cap) || total > 0) return Object.freeze({ ...resolved, bare: resolved.block, capped: null });",
       expect: "T1.19", // and T1.20, T2.13, T3.20–T3.23, T4.11, T6.22, T6.23
     },
     {
@@ -112,8 +113,9 @@ const results = runPass({
       // app's kind that declares `window` does not.
       name: "LIST-OF-KINDS: the cap consults kind names instead of `definition.window`",
       file: REGISTRY,
-      from: "    if (windowable === undefined) return { ...resolved, capped: null };",
-      to: '    if (windowable === undefined || !["logs", "raw", "code", "keyValue", "table", "patch"].includes(resolved.definition.kind)) return { ...resolved, capped: null };',
+      // Re-anchored 2026-09-16 (C09 I76, F1191): the form carries `bare`.
+      from: "    if (windowable === undefined) return { ...resolved, bare: resolved.block, capped: null };",
+      to: '    if (windowable === undefined || !["logs", "raw", "code", "keyValue", "table", "patch"].includes(resolved.definition.kind)) return { ...resolved, bare: resolved.block, capped: null };',
       expect: "T6.23", // and T1.19's `lanek` row
     },
     {
@@ -123,8 +125,9 @@ const results = runPass({
       // would window it to one row and attach a second marker.
       name: "RECAP: a piece carrying `capped` is measured for the cap again",
       file: REGISTRY,
-      from: "    if (held !== null) return { ...resolved, capped: held };",
-      to: "    if (held !== null && false) return { ...resolved, capped: held };",
+      // Re-anchored 2026-09-16 (C09 I76, F1191): the form carries `bare`.
+      from: "    if (held !== null) return { ...resolved, bare: stripCapped(resolved.block), capped: held };",
+      to: "    if (held !== null && false) return { ...resolved, bare: stripCapped(resolved.block), capped: held };",
       expect: "T6.22", // and T1.20
     },
     {

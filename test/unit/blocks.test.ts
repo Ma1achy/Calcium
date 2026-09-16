@@ -38,7 +38,10 @@ import { SLOTS, type Token } from "../../src/presentation/blocks/kinds/code.js";
 import type { RenderContextInput } from "../../src/presentation/blocks/index.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
 import { ONE_PER_KIND } from "../support/blocks.js";
-import { ASCII_CAPS, DARK_THEME, FULL_CAPS, MONO_CAPS, measurable, visible } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LOUD, MONO_CAPS, measurable, visible } from "../support/render.js";
+import { RenderScratchStore } from "../../src/shell/render-scratch.js";
+import { rows as inkRows } from "../../src/presentation/blocks/paint.js";
+import type { BlockDefinition } from "../../src/presentation/blocks/types.js";
 import { cells } from "../../src/presentation/text.js";
 
 /** One sample per default grammar, ASCII throughout (T3.32, T1.45). */
@@ -1079,6 +1082,96 @@ describe("C09 I71 — the tokeniser's run is emitted straight from the emitter s
   });
 });
 
-describe("C09 I76 — the window seam takes the caller's scratch, and the cap form is held in it", () => {
-  it.todo("T2.145 (C09 I76, F1191): an over-cap block resolves once per width through one scratch, the seam hands `window` the same object, and a block within the cap holds nothing — not deferred on a component: the code commit replaces this row");
+describe("C09 I76 — the window seam takes the caller's scratch, and the form is held in it", () => {
+  it("T2.145 (C09 I76, F1191): a windowable block resolves once per width through one scratch — over the cap and within it — the seam hands `window` the same bare block both times, `render` touches the store not at all, another width resolves again, and a kind with no `window` leaves the store untouched", () => {
+    const measured: Block[] = [];
+    const windowed: Block[] = [];
+    const linesOf = (b: Block): readonly string[] => (b as unknown as { lines: readonly string[] }).lines;
+    const tall: BlockDefinition = {
+      kind: "tall",
+      measure: (b) => {
+        measured.push(b);
+        return linesOf(b).length; // cells-ok — a row count
+      },
+      render: (b) => inkRows(linesOf(b)),
+      window: (b, _w, from, to) => {
+        windowed.push(b);
+        return { block: { ...(b as object), lines: linesOf(b).slice(from, to) } as unknown as Block, skipRows: 0, dropRows: 0 };
+      },
+    };
+    const r = createBlockRegistry({ maxBlockRows: 10, onError: LOUD });
+    r.register(tall);
+    const events: string[] = [];
+    const probe: Probe = {
+      ...NO_PROBE,
+      hit: (cache) => void events.push(`hit:${cache}`),
+      miss: (cache, reason) => void events.push(`miss:${cache}:${reason}`),
+      on: true,
+    };
+    const scratch = new RenderScratchStore(probe);
+    const scratchEvents = (): readonly string[] => events.filter((e) => e.includes(":scratch"));
+
+    // **Over the cap.** Forty lines against a cap of ten: the form is the
+    // kind's own window to [0, cap) with the marker attached (§2b).
+    const big = { kind: "tall", id: "big", lines: Array.from({ length: 40 }, (_, i) => `l${String(i)}`) } as unknown as Block;
+    const on = (b: Block, list: readonly Block[]): number => list.filter((x) => x === b).length; // cells-ok — a call count
+    const first = r.windowSequence([big], 80, 0, 5, undefined, scratch);
+    expect(on(big, measured), "the whole block measured once to decide the cap").toBe(1);
+    expect(on(big, windowed), "and windowed once to the cap").toBe(1);
+    const handed = windowed.filter((b) => b !== big);
+    expect(handed, "the sequence windowed the form's bare block").toHaveLength(1);
+    expect(scratchEvents().some((e) => e.startsWith("miss:scratch")), "the first call missed the store").toBe(true);
+
+    const second = r.windowSequence([big], 80, 0, 5, undefined, scratch);
+    expect(second, "the same window").toEqual(first);
+    expect(on(big, measured), "the whole block measured no further time").toBe(1);
+    expect(on(big, windowed), "nor windowed to the cap again").toBe(1);
+    const handedAgain = windowed.filter((b) => b !== big);
+    expect(handedAgain, "the sequence windowed the bare block again").toHaveLength(2);
+    expect(handedAgain[1], "and it is the same object (I76)").toBe(handed[0]);
+    expect(scratchEvents().filter((e) => e === "hit:scratch").length, "a scratch hit on the second call").toBeGreaterThanOrEqual(1); // cells-ok — a count
+
+    // **`render` touches the store not at all** (I76): the block it is handed
+    // on the transcript path is the frame's slice, a new object every frame.
+    const scratchBefore = scratchEvents().length;
+    renderToLines(r, big, 80, { theme: DARK_THEME, capabilities: FULL_CAPS, tick: 0, scratch });
+    expect(scratchEvents().length, "render neither read nor wrote the store").toBe(scratchBefore);
+
+    // **Another width resolves again** — the width is the key. Relative to
+    // the count after the render, which measures as it always did (F942).
+    const beforeWidth = on(big, measured);
+    r.windowSequence([big], 40, 0, 5, undefined, scratch);
+    expect(on(big, measured), "a new width is a new form").toBe(beforeWidth + 1);
+    r.windowSequence([big], 40, 0, 5, undefined, scratch);
+    expect(on(big, measured), "and is held at that width").toBe(beforeWidth + 1);
+
+    // **Within the cap**, the form is the block itself and is held likewise:
+    // the whole-block measure that decided the cap is the cost either way.
+    // Through the session's memo too (I70), because `#measured` commits the
+    // height with a measure of its own (F942's second half) and that one is
+    // the memo's to answer — so the reading is *no further measure on the
+    // second call*, not a count of one.
+    const small = { kind: "tall", id: "small", lines: ["a", "b", "c", "d", "e"] } as unknown as Block;
+    const memo = new WeakMap<Block, Readonly<{ width: number; rows: number }>>();
+    r.windowSequence([small], 80, 0, 3, memo, scratch);
+    const afterFirstSmall = on(small, measured);
+    expect(afterFirstSmall, "the first call measured the block").toBeGreaterThanOrEqual(1);
+    r.windowSequence([small], 80, 0, 3, memo, scratch);
+    expect(on(small, measured), "a block within the cap resolved no further time").toBe(afterFirstSmall);
+
+    // **A kind with no `window`** has no form to hold and touches the store
+    // not at all. Its own kind, because `raw` divides (block-cap's `raw(n)`).
+    r.register({ kind: "atom", measure: () => 1, render: () => inkRows(["atom"]) });
+    const before = scratchEvents().length;
+    r.windowSequence([{ kind: "atom", id: "a" } as unknown as Block], 80, 0, 1, undefined, scratch);
+    expect(scratchEvents().length, "no scratch read or write for a kind with no window").toBe(before);
+
+    // **Without a scratch**, as before: every call resolves the form twice —
+    // once for the height (`#measureChild`), once for the window — which is
+    // the cost F1191 measured and the scratch removes.
+    const beforePlain = on(big, measured);
+    r.windowSequence([big], 80, 0, 5);
+    r.windowSequence([big], 80, 0, 5);
+    expect(on(big, measured), "two calls with no scratch, two whole-block measures each").toBe(beforePlain + 4);
+  });
 });

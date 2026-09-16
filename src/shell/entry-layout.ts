@@ -21,6 +21,7 @@ import type { Block, Group } from "../data/viewmodel/index.js";
 import { block as rebuild } from "../data/viewmodel/index.js";
 import { glyphFor } from "../presentation/blocks/index.js";
 import type { BlockRegistry, NavElement } from "../presentation/blocks/index.js";
+import type { RenderScratch } from "../presentation/blocks/types.js";
 import { paint as paintSpans, tone } from "../presentation/blocks/paint.js";
 import { glyphForMask, LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP } from "../presentation/plot/linedraw.js";
 import { renderSequenceToLines } from "../presentation/render-lines.js";
@@ -294,6 +295,8 @@ export function windowEntry(
   from: number,
   to: number,
   registry: Pick<BlockRegistry, "windowSequence" | "measureSequence">,
+  /** The session's render scratch (C22 I100, F1191), through the window seam (C09 I76). */
+  scratch?: RenderScratch,
 ): readonly EntryPiece[] {
   const pieces: EntryPiece[] = [];
   let offset = 0;
@@ -307,7 +310,7 @@ export function windowEntry(
           run,
           windowed: run.blank
             ? { blocks: [], skipRows: 0 }
-            : registry.windowSequence(run.blocks, run.width, lo - offset, hi - offset),
+            : registry.windowSequence(run.blocks, run.width, lo - offset, hi - offset, undefined, scratch),
           localFrom: lo - offset,
           take: hi - lo,
         }),

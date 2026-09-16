@@ -889,5 +889,30 @@ describe("C22 I103 — a tick miss keeps the parts", () => {
       vi.useRealTimers();
     }
   }, 20_000);
-  it.todo("T4.89g (C22 I100, F1191): every frame after the first over a windowed patch reads the scratch with a hit — not deferred on a component: the code commit replaces this row");
+  it("T4.89g (C22 I100, F1191): a session over a patch taller than the region reads the scratch with a hit on every frame after the first, adds no absent miss for it, and lays the same rows a scroll would have laid before the hold", async () => {
+    const lines = Array.from({ length: 200 }, (_, i) => ({
+      kind: i % 7 === 0 ? "add" : i % 11 === 0 ? "remove" : "context",
+      text: `const value${String(i)} = compute(${String(i)});`,
+      oldNo: i + 1,
+      newNo: i + 1,
+    }));
+    const patch = { kind: "patch", id: "p", path: "src/deep/module.ts", language: "typescript", hunks: [{ header: "@@ -1,200 +1,200 @@", lines }] };
+    const s = await sessionOver([], [patch], { columns: 80, rows: 18 });
+    const tailOf = (): readonly string[] => s.screen().text.filter((r) => r.includes("compute("));
+    expect(tailOf().length, "the patch's tail is on screen").toBeGreaterThan(5); // cells-ok — a row count
+    expect(tailOf().some((r) => r.includes("value199")), "the last line is on screen").toBe(true);
+    // **A one-row scroll, twice**: the prompt wraps, the region loses a row,
+    // the window moves; each frame is a window over the same block at the same
+    // width and reads the plan and the form back.
+    await s.type("x".repeat(80));
+    const afterOne = tailOf();
+    expect(afterOne.some((r) => r.includes("value199")), "still the tail").toBe(true);
+    await s.type("y".repeat(80));
+    const afterTwo = tailOf();
+    expect(afterTwo.length, "one row fewer per wrapped prompt row").toBe(afterOne.length - 1);
+    expect(afterTwo, "the rows a fresh window lays: the tail, one shorter").toEqual(afterOne.slice(1));
+    const report = await s.report();
+    expect(report.hits["scratch"] ?? 0, "the window seam read the held form and plan").toBeGreaterThanOrEqual(2);
+    expect(report.misses["scratch"]?.absent ?? 0, "absent once per held owner — the form and the plan — not per frame").toBeLessThanOrEqual(2);
+  });
 });

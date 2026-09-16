@@ -30,6 +30,7 @@ import type { Hunk, Patch } from "../../data/viewmodel/index.js";
 import { block, changedRuns } from "../../data/viewmodel/index.js";
 import { isCollapsed, layoutFor, pairedRows, patchHeight, type Layout } from "./height.js";
 import { numberWidth } from "./layout.js";
+import type { RenderScratch } from "../blocks/types.js";
 
 /**
  * The smallest thing a window may cut at.
@@ -144,6 +145,8 @@ export type WindowPlan = Readonly<{
   starts: readonly number[];
   /** The row each hunk's header occupies. */
   headers: readonly number[];
+  /** Each hunk's first body row, `-1` for a hunk with no body — what `windowRows` found by a second walk (F1191). */
+  bodyStarts: readonly number[];
   /** The pinned gutter width (I21a). */
   numberWidth: number;
 }>;
@@ -153,9 +156,11 @@ export function windowPlan(patch: Patch, width: number): WindowPlan {
   const rows = rowsOf(patch, layout);
   const starts: number[] = [];
   const headers: number[] = [];
+  const bodyStarts: number[] = patch.hunks.map(() => -1);
   rows.forEach((row, i) => {
     if (row.kind === "header") headers.push(i);
     if (row.kind !== "body" || row.first) starts.push(i);
+    if (row.kind === "body" && bodyStarts[row.hunk] === -1) bodyStarts[row.hunk] = i;
   });
   return Object.freeze({
     patch,
@@ -164,8 +169,38 @@ export function windowPlan(patch: Patch, width: number): WindowPlan {
     rows: Object.freeze(rows),
     starts: Object.freeze(starts),
     headers: Object.freeze(headers),
+    bodyStarts: Object.freeze(bodyStarts),
     numberWidth: numberWidth(patch),
   });
+}
+
+/** The scratch key of a plan at `width` (I22): one slot per `hunks`, the width the condition. */
+const planKey = (width: number): string => `plan\u0000${String(width)}`;
+
+/**
+ * The plan for `patch` at `width` from the caller's scratch, or derived and
+ * held there (I22, F1191).
+ *
+ * **Owner the patch's `hunks`** — the payload the rows are derived from, as
+ * C12 keys on a surface's `faces` (C12 I107) — and **read back only for this
+ * very block at this very width**: a plan is refused rather than read for
+ * another block sharing the array or another width, because a stale plan
+ * slices the new lines by the old rows. The store is the caller's, which is
+ * what SS24 asks; with none, one walk as before.
+ */
+export function planFrom(scratch: RenderScratch | undefined, patch: Patch, width: number): WindowPlan {
+  if (scratch === undefined) return windowPlan(patch, width);
+  const held = scratch.get(patch.hunks, planKey(width));
+  if (isPlanFor(held, patch, width)) return held;
+  const plan = windowPlan(patch, width);
+  scratch.set(patch.hunks, planKey(width), plan);
+  return plan;
+}
+
+function isPlanFor(held: unknown, patch: Patch, width: number): held is WindowPlan {
+  if (typeof held !== "object" || held === null) return false;
+  const p = held as Partial<WindowPlan>;
+  return p.patch === patch && p.width === width && Array.isArray(p.rows);
 }
 
 /** The caller's plan when it has one for this block at this width, else one walk. */
@@ -329,8 +364,12 @@ export function windowRows(
   let headerIn = new Set<number>();
   let tail = false;
 
-  rows.forEach((row, i) => {
-    if (i < lo || i >= hi) return;
+  // **The window's rows and no others** (I22, F1191): a planned window at
+  // 20,000 lines was 1.7 ms for two walks of every row; the hunks' first body
+  // rows are the plan's `bodyStarts`, found once when the plan was derived.
+  for (let i = lo; i < hi; i += 1) {
+    const row = rows[i];
+    if (row === undefined) break;
     if (row.kind === "tail") tail = true;
     else if (row.kind === "marker") markerIn.add(row.hunk);
     else if (row.kind === "header") headerIn.add(row.hunk);
@@ -339,7 +378,7 @@ export function windowRows(
       if (cur === undefined) touched.set(row.hunk, { first: i, last: i });
       else cur.last = i;
     }
-  });
+  }
 
   // A hunk whose header is out of range still renders one, because nothing
   // suppresses it (I18) — so it is slack, exactly as the path header is.
@@ -347,11 +386,11 @@ export function windowRows(
   for (const h of hunkIds) if (!headerIn.has(h)) skipRows += 1;
 
   // Where each hunk's body rows begin in `rows`, so a row index becomes a body
-  // offset within the hunk.
-  const bodyStart = new Map<number, number>();
-  rows.forEach((row, i) => {
-    if (row.kind === "body" && !bodyStart.has(row.hunk)) bodyStart.set(row.hunk, i);
-  });
+  // offset within the hunk — the plan's, not a second walk's.
+  const bodyStart = (h: number, first: number): number => {
+    const start = p.bodyStarts[h] ?? -1;
+    return start < 0 ? first : start;
+  };
 
   const hunks: Hunk[] = [];
   for (const h of hunkIds) {
@@ -364,8 +403,8 @@ export function windowRows(
         : linesForRows(
             source,
             layout,
-            range.first - (bodyStart.get(h) ?? range.first),
-            range.last + 1 - (bodyStart.get(h) ?? range.first),
+            range.first - bodyStart(h, range.first),
+            range.last + 1 - bodyStart(h, range.first),
           );
     hunks.push({
       header: source.header,

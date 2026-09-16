@@ -29,6 +29,7 @@ import { truncate } from "../text.js";
 import { statusDefinition, statusRowsFor } from "./kinds/status.js";
 import type {
   MeasureMemo,
+  RenderScratch,
   AnyBlockDefinition,
   BlockDefinition,
   BlockFault,
@@ -95,7 +96,23 @@ type Capped = Readonly<{ shown: number; total: number }>;
  * `window` (C14 I26); `block` is then the **same reference** the caller passed,
  * so nothing downstream can observe the cap on a block it does not touch.
  */
-type Form = Readonly<{ definition: BlockDefinition; block: Block; capped: Capped | null }>;
+/**
+ * A block resolved to what the registry measures, renders and windows (§2b):
+ * `block` carries `capped` when the block is over the cap, and `bare` is the
+ * same block without it — the object a kind's `window` is handed (I76), so a
+ * kind that holds a plan by the block finds it on the next call.
+ */
+type Form = Readonly<{ definition: BlockDefinition; block: Block; bare: Block; capped: Capped | null }>;
+
+/** `held` is a `Form` this registry set in a scratch (I76): its four fields present. */
+function isForm(held: unknown): held is Form {
+  if (typeof held !== "object" || held === null) return false;
+  const f = held as Partial<Form>;
+  return typeof f.definition === "object" && typeof f.block === "object" && typeof f.bare === "object" && "capped" in f;
+}
+
+/** The scratch key of a form at `width` (I76): one slot per block, the width the condition. */
+const formKey = (width: number): string => `form\u0000${String(width)}`;
 
 /**
  * `capped` is view state on `lineRange`'s argument (C04 I82, C09 I25a): written
@@ -208,6 +225,8 @@ class Registry implements BlockRegistry {
    * report at `rows: 0`.
    */
   #memo: MeasureMemo | null = null;
+  /** The call's scratch (I76): the caller's, for the call's duration, as `#memo` is. */
+  #scratch: RenderScratch | undefined = undefined;
 
   /**
    * Run `work` inside the current call's memo, opening one if this is the
@@ -222,13 +241,15 @@ class Registry implements BlockRegistry {
    * to a member entered from inside another member is ignored — the outer
    * call's memo is already open and the answers have to agree with it.
    */
-  #scoped<T>(work: () => T, memo?: MeasureMemo): T {
+  #scoped<T>(work: () => T, memo?: MeasureMemo, scratch?: RenderScratch): T {
     if (this.#memo !== null) return work();
+    this.#scratch = scratch;
     this.#memo = memo ?? new Map();
     try {
       return work();
     } finally {
       this.#memo = null;
+      this.#scratch = undefined;
     }
   }
 
@@ -491,16 +512,35 @@ class Registry implements BlockRegistry {
    * **A block already carrying `capped` is never re-capped.** It is a piece a
    * window produced, and its rows are its definition's plus the marker.
    */
-  #form(block: Block, width: number): Form {
+  #form(block: Block, width: number, scratch: RenderScratch | undefined = this.#scratch): Form {
     const resolved = this.#resolve(block);
     const held = cappedOf(resolved.block);
-    if (held !== null) return { ...resolved, capped: held };
+    if (held !== null) return { ...resolved, bare: stripCapped(resolved.block), capped: held };
     const windowable = resolved.definition.window;
-    if (windowable === undefined) return { ...resolved, capped: null };
+    if (windowable === undefined) return { ...resolved, bare: resolved.block, capped: null };
+    // **A windowable block's form is held in the caller's scratch, once per
+    // width** (I76, F1191). The whole-block measure below decides the cap and
+    // is the cost either way — a 20,000-line patch was measured whole and
+    // windowed to the cap on every frame's `windowSequence`, before the frame's
+    // own window was taken. Owner the block, key the width: `RenderScratchStore`
+    // keeps one slot per owner (C12 I107), so a width change misses through.
+    const kept = scratch?.get(resolved.block, formKey(width));
+    if (isForm(kept)) return kept;
+    const form = this.#resolveForm(resolved, windowable, width, scratch);
+    scratch?.set(resolved.block, formKey(width), form);
+    return form;
+  }
+
+  #resolveForm(
+    resolved: Readonly<{ definition: BlockDefinition; block: Block }>,
+    windowable: NonNullable<BlockDefinition["window"]>,
+    width: number,
+    scratch: RenderScratch | undefined,
+  ): Form {
     const total = resolved.definition.measure(resolved.block, width, this.#measureChild, this.probe);
-    if (!(total > this.#cap)) return { ...resolved, capped: null };
+    if (!(total > this.#cap)) return Object.freeze({ ...resolved, bare: resolved.block, capped: null });
     // `#measureChild` is the child seam (I26a), as `windowSequence` hands it.
-    const out = windowable(resolved.block, width, 0, this.#cap, this.#measureChild);
+    const out = windowable(resolved.block, width, 0, this.#cap, this.#measureChild, scratch);
     // **Two measures, two questions, two blocks** (I62, F942). `total` above is
     // the block's own rows and decided the cap; this is the *window's* rows,
     // and it is what the marker says is on screen. Neither is the other read
@@ -512,7 +552,7 @@ class Registry implements BlockRegistry {
     // measure of a block already bounded at the cap.
     const shown = resolved.definition.measure(out.block, width, this.#measureChild, this.probe);
     const capped: Capped = Object.freeze({ shown, total });
-    return { definition: resolved.definition, block: withCapped(out.block, capped), capped };
+    return Object.freeze({ definition: resolved.definition, block: withCapped(out.block, capped), bare: out.block, capped });
   }
 
   /**
@@ -788,6 +828,7 @@ class Registry implements BlockRegistry {
     from: number,
     to: number,
     memo?: MeasureMemo,
+    scratch?: RenderScratch,
   ): Readonly<{ blocks: readonly Block[]; skipRows: number }> => this.#scoped(() => {
     const w = normaliseWidth(width);
     const lo = Math.max(0, Math.trunc(from));
@@ -818,9 +859,10 @@ class Registry implements BlockRegistry {
       // **The whole piece is the block itself unless it was capped** — the
       // caller's reference, not `#resolve`'s conversion of an unknown kind to
       // `raw`, so a block within the cap is handed back unchanged (C14 I24).
-      // The definition's window is handed the resolved block, as before.
+      // The definition's window is handed the form's own bare block (I76): the
+      // same object across frames, so C25's plan held by it is found.
       const held = form === null || form.capped === null ? block : form.block;
-      const source = form === null ? block : form.block;
+      const source = form === null ? block : form.bare;
       const capped = form === null ? null : form.capped;
       // **A block carrying a floor is kept whole** (C09 I33, C04 I68).
       //
@@ -860,7 +902,7 @@ class Registry implements BlockRegistry {
         // depend on a child's height — a table row's detail — cannot compute
         // them from `(block, width)` alone, and a window that guessed would
         // slice at the wrong row while I26's arithmetic still balanced.
-        const out = windowable(stripCapped(source), w, wFrom, wTo, this.#measureChild);
+        const out = windowable(source, w, wFrom, wTo, this.#measureChild, this.#scratch);
         piece = reachesMarker && capped !== null ? withCapped(out.block, capped) : stripCapped(out.block);
         dropped = out.skipRows + (localFrom - wFrom);
       }
@@ -873,7 +915,7 @@ class Registry implements BlockRegistry {
     }
 
     return Object.freeze({ blocks: Object.freeze(kept), skipRows: Math.max(0, skipRows) });
-  }, memo);
+  }, memo, scratch);
 
   renderSequence = (blocks: readonly Block[], ctx: RenderContext): ReactElement => this.#scoped(() => {
     const width = normaliseWidth(ctx.width);
@@ -991,6 +1033,9 @@ class Registry implements BlockRegistry {
       // **The capped form, and the marker beneath it** (C14 I24). The same
       // form `#measured` counted one row for, drawn from the same fields, so the
       // frame and the height agree by construction rather than by agreement.
+      // **No scratch here** (I76): the block on the transcript path is the
+      // frame's slice, a new object every frame, so a held form would be an
+      // absent miss a frame and a hit never. The window seam holds the form.
       const form = this.#form(block, width);
       const drawn = form.definition.render(form.block, childContext);
       const rendered =

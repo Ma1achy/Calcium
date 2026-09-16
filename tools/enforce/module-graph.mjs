@@ -1863,6 +1863,9 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "WindowPlan.starts":
     "C25 I22 — the rows a window may begin at, read by the bottom search inside window.ts " +
     "and held to clampOffset by T1.24; a second reader would be a second row arithmetic (C25 I1)",
+  "WindowPlan.bodyStarts":
+    "C25 I22 — each hunk's first body row, read by windowRows inside window.ts so a planned window " +
+    "walks the window's rows only (F1191); held to a full scan by T1.25",
   "Unit.lineFrom":
     "C25 I19 — a unit's first line, read by the builder and windowRows inside window.ts; the " +
     "type is published only because WindowPlan.rows names it (C25 I22)",

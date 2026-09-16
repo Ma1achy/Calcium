@@ -46,6 +46,7 @@ import type { EntryPiece } from "./entry-layout.js";
 import type { Group } from "../data/viewmodel/index.js";
 import { framesOf, placesAtProtocol } from "../presentation/blocks/kinds/image.js";
 import type { FocusState } from "../presentation/blocks/index.js";
+import type { RenderScratch } from "../presentation/blocks/types.js";
 import { contextAt } from "../interaction/completion/index.js";
 import { selectionSpans, type CellSpan } from "../interaction/editor/index.js";
 import { extentOf } from "../interaction/router/focus.js";
@@ -1547,10 +1548,12 @@ function visibleRows(
     // frame they replace on `/all` (F1160).
     const memoised = {
       measureSequence: (run: readonly Block[], w: number) => graph.blocks.measureSequence(run, w, graph.measures),
-      windowSequence: (run: readonly Block[], w: number, lo: number, hi: number) =>
-        graph.blocks.windowSequence(run, w, lo, hi, graph.measures),
+      windowSequence: (run: readonly Block[], w: number, lo: number, hi: number, _memo?: unknown, scratch?: RenderScratch) =>
+        graph.blocks.windowSequence(run, w, lo, hi, graph.measures, scratch),
     };
-    const pieces = windowEntry(entryLayout(entry.doc.blocks, width), from, to, memoised);
+    // **The scratch travels with the memo** (I100, F1191): the window seam holds
+    // the cap form (C09 I76) and the patch's plan (C25 I22) across frames.
+    const pieces = windowEntry(entryLayout(entry.doc.blocks, width), from, to, memoised, graph.scratch);
     const windowed = { blocks: pieces.flatMap((piece) => piece.windowed.blocks) };
 
     // The key carries the range, because the cached lines are now the *window's*
