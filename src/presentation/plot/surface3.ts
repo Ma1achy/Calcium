@@ -946,6 +946,66 @@ function fill(
  * because the barycentric weights are exactly what this arm exists to avoid
  * computing.
  */
+/** What `hiddenThin` reads of a screen record: the sample coordinates and the view depth (C12 I138). Not published — a row builds the shape. */
+type ThinCorner = Readonly<{ x: number; y: number; vz: number }>;
+
+/**
+ * Whether a sub-cell triangle can write no sample, so its edges need not be
+ * walked (C12 I138, F1183).
+ *
+ * **The bound is the walk's own arithmetic.** An edge sample's depth is
+ * `p.vz + (q.vz − p.vz) · t` for `t` in `[0, 1]` — at least the smaller
+ * endpoint less the subtraction's rounding, which is under an ulp of the
+ * larger magnitude — so the triangle's floor is its nearest corner less a
+ * relative margin of `1e-9`, through `Math.fround` as `writeDepth` takes the
+ * sample. The walk's coordinate is `(p.x / width) · width`, the corner's to
+ * within an ulp and one cell below it when the corner sits on an integer —
+ * `(1 / 49) · 49` is `0.9999999999999999` — while the interpolation at `t = 1`
+ * lands on or above the far endpoint's floor; so the cells are the corners'
+ * floors widened by the same margin and clamped to the grid, where
+ * `writeDepth` refuses. A cell at or under the floor refuses every sample the
+ * triangle could put in it, the depth test being strict.
+ *
+ * **The nearest corner's own cell first**, because most of the triangles this
+ * does not mark fail there, and the scan is then never entered.
+ */
+export function hiddenThin(
+  a: ThinCorner,
+  b: ThinCorner,
+  c: ThinCorner,
+  grid: Readonly<{ width: number; height: number }>,
+  depth: Depth,
+): boolean {
+  const z = depth.z;
+  const w = grid.width;
+  const h = grid.height;
+  const zspan = Math.max(Math.abs(a.vz), Math.abs(b.vz), Math.abs(c.vz));
+  const zlo = Math.fround(Math.min(a.vz, b.vz, c.vz) - zspan * MARGIN);
+  const fx = Math.floor(a.x); // cells-ok — a sample coordinate
+  const fy = Math.floor(a.y); // cells-ok — a sample coordinate
+  if (fx >= 0 && fy >= 0 && fx < w && fy < h && !((z[fy * w + fx] as number) <= zlo)) return false; // cells-ok — a sample offset
+  const minx = Math.min(a.x, b.x, c.x);
+  const maxx = Math.max(a.x, b.x, c.x);
+  const miny = Math.min(a.y, b.y, c.y);
+  const maxy = Math.max(a.y, b.y, c.y);
+  const dx = Math.max(Math.abs(minx), Math.abs(maxx)) * MARGIN;
+  const dy = Math.max(Math.abs(miny), Math.abs(maxy)) * MARGIN;
+  const x0 = Math.max(0, Math.floor(minx - dx)); // cells-ok — a sample coordinate
+  const x1 = Math.min(w - 1, Math.floor(maxx + dx)); // cells-ok — a sample coordinate
+  const y0 = Math.max(0, Math.floor(miny - dy)); // cells-ok — a sample coordinate
+  const y1 = Math.min(h - 1, Math.floor(maxy + dy)); // cells-ok — a sample coordinate
+  for (let yy = y0; yy <= y1; yy += 1) { // cells-ok — a sample coordinate
+    const row = yy * w; // cells-ok — a sample offset
+    for (let xx = x0; xx <= x1; xx += 1) { // cells-ok — a sample coordinate
+      if (!((z[row + xx] as number) <= zlo)) return false;
+    }
+  }
+  return true;
+}
+
+/** The relative margin `hiddenThin` widens its bounds by — far above an ulp, far below a cell (C12 I138). */
+const MARGIN = 1e-9;
+
 function strokeThin(
   a: Screen,
   b: Screen,
@@ -958,6 +1018,13 @@ function strokeThin(
   span: Readonly<{ nearD: number; farD: number }>,
   paint: Painter,
 ): void {
+  // **Asked before the edges are walked** (C12 I138): a triangle whose every
+  // reachable cell already holds a nearer depth writes nothing, and on the
+  // bunny that is four of five — counted, since the frame cannot show it.
+  if (hiddenThin(a, b, c, grid, depth)) {
+    depth.hidden[0] = (depth.hidden[0] as number) + 1;
+    return;
+  }
   const series = tri.series;
   const wire = tri.skin.wire !== false;
   // **Three explicit edges, not a `pairs` array of tuples** (C12 I128), through

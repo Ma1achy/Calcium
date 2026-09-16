@@ -371,7 +371,14 @@ export function project(basis: Basis, p: Vec3): Projected | null {
  * no double crosses the shade's call boundary as a heap number. Per render
  * with the buffer, which is I11's requirement and what keeps it off the module.
  */
-export type Depth = Readonly<{ width: number; height: number; z: Float32Array; lane: Float64Array }>;
+export type Depth = Readonly<{
+  width: number;
+  height: number;
+  z: Float32Array;
+  lane: Float64Array;
+  /** The sub-cell triangles skipped this render, one slot, reported as `plot3d.hidden` (C12 I138). */
+  hidden: Int32Array;
+}>;
 
 /**
  * A buffer for one render, sized from the sample grid (C12 I84, C12 I11).
@@ -386,7 +393,7 @@ export function createDepth(width: number, height: number): Depth {
   const h = Math.max(1, Math.floor(height)); // cells-ok — a sample count
   const z = new Float32Array(w * h);
   z.fill(Infinity);
-  return { width: w, height: h, z, lane: new Float64Array(8) }; // cells-ok — the lane's slots (C12 I136)
+  return { width: w, height: h, z, lane: new Float64Array(8), hidden: new Int32Array(1) }; // cells-ok — the lane's slots (C12 I136) and one counter (C12 I138)
 }
 
 /**

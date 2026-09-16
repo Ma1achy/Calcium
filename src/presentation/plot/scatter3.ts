@@ -1388,6 +1388,9 @@ export function plot3dArea(
   }
   if (paints > 0) ctx.probe?.count("plot3d.paint", paints);
   if (records > 0) ctx.probe?.count("plot3d.ink", records);
+  // **The sub-cell triangles skipped** (C12 I138): the observable, since a
+  // skipped triangle would have written nothing.
+  if ((depth.hidden[0] as number) > 0) ctx.probe?.count("plot3d.hidden", depth.hidden[0] as number);
   // **The projections counted** (C12 I130): the distinct vertices among the
   // drawn faces on a smooth mesh, three per drawn face on a flat one.
   if (raster.projected > 0) ctx.probe?.count("plot3d.project", raster.projected);

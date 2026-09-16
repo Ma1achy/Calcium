@@ -11,13 +11,16 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { validateBlock } from "../../src/data/viewmodel/index.js";
+import { block, NO_PROBE, validateBlock, type Probe } from "../../src/data/viewmodel/index.js";
+import { plotDefinition } from "../../src/presentation/plot/definition.js";
+import { renderToLines } from "../../src/presentation/render-lines.js";
+import { DARK_THEME, FULL_CAPS, registry } from "../support/render.js";
 import { b } from "../../src/shell/builders/index.js";
 import {
   basisOf, createDepth, cross, dot, extentOf, project, sub, unit, unitOf, viewDir, writeDepth, type Vec3,
 } from "../../src/presentation/plot/project3.js";
 import {
-  backfaceCulled, densityGlyphOf, densitySteps, drawTri, edgeIntensity, lightDirOf, shade,
+  backfaceCulled, densityGlyphOf, densitySteps, drawTri, edgeIntensity, hiddenThin, lightDirOf, shade,
   geometryOf, surfacePoints, type Tri3,
 } from "../../src/presentation/plot/surface3.js";
 import { ladderFor } from "../../src/presentation/plot/ramp.js";
@@ -1457,5 +1460,134 @@ describe("C12 I137 — the builder's normals live in two lanes", () => {
 });
 
 describe("C12 I138 — a hidden thin triangle is not walked", () => {
-  it.todo("T1.150 (C12 I138, F1183): a triangle hiddenThin marks has no edge sample writeDepth would accept, the two rounding cases are not marked, and plot3d.hidden counts the skipped triangles — not deferred on a component: the code commit replaces this row");
+  /** A screen record's three fields the predicate reads. */
+  /** The three fields `hiddenThin` reads: the sample coordinates and the view depth. */
+  type ThinCorner = { x: number; y: number; vz: number };
+  const S = (x: number, y: number, vz: number): ThinCorner => ({ x, y, vz });
+  const lcg = (seed: number): (() => number) => { let x = seed >>> 0; return () => { x = (Math.imul(x, 1664525) + 1013904223) >>> 0; return x / 4294967296; }; };
+
+  it("T1.150 (C12 I138, F1183): a triangle hiddenThin marks writes no sample through drawTri and the depth counts it, the two rounding cases are not marked, and plot3d.hidden counts the skipped triangles of a rendered mesh while plot3d.paint is the count without the check", () => {
+    // **The corpus arm — through the walk itself, not a restatement of it.**
+    // Sub-cell world triangles at seeded places, the buffer around each seeded
+    // near its corners' depths, the predicate asked on the test's own screen
+    // records (PR15's mirror of `project` and `viewDir`), and `drawTri` run.
+    const grid = { width: 160, height: 176 };
+    const basis = basisOf({ azimuth: 0.6, elevation: 0.35, distance: 3.5 }, grid.width / (grid.height * 0.5));
+    const light = lightDirOf(undefined, basis);
+    const span = { nearD: 3, farD: 7 };
+    type Corner = { p: Vec3; n: Vec3; v: number | undefined };
+    const screenOf = (w: Corner): ThinCorner & { vx: number; vy: number; nx: number; ny: number; nz: number; v: number | undefined } => {
+      const pr = project(basis, w.p);
+      if (pr === null) throw new Error("a corner behind the eye");
+      const vp = viewDir(basis, { x: w.p.x - basis.eye.x, y: w.p.y - basis.eye.y, z: w.p.z - basis.eye.z });
+      const vn = viewDir(basis, w.n);
+      return { x: pr.x * grid.width, y: pr.y * grid.height, vx: vp.x, vy: vp.y, vz: vp.z, nx: vn.x, ny: vn.y, nz: vn.z, v: w.v }; // cells-ok — a sample coordinate
+    };
+    const tri = (a: Corner, b: Corner, c: Corner): Tri3 =>
+      ({ a, b, c, fn: { x: 0, y: 0, z: 1 }, edges: [true, true, true], series: 0, skin: { cull: 0, wire: "over" } });
+    const rand = lcg(0x5eed_c12_138);
+    let hidden = 0;
+    let walked = 0;
+    let walkedAndPainted = 0;
+    for (let i = 0; i < 400; i += 1) {
+      const o = { x: (rand() - 0.5) * 1.6, y: (rand() - 0.5) * 1.6, z: (rand() - 0.5) * 1.6 };
+      const corner = (): Corner => ({
+        p: { x: o.x + (rand() - 0.5) * 0.004, y: o.y + (rand() - 0.5) * 0.004, z: o.z + (rand() - 0.5) * 0.004 },
+        n: unit({ x: rand() - 0.5, y: rand() - 0.5, z: rand() - 0.5 }),
+        v: rand(),
+      });
+      const [A, B, C] = [corner(), corner(), corner()];
+      const [sa, sb, sc] = [screenOf(A), screenOf(B), screenOf(C)];
+      const area = (sb.x - sa.x) * (sc.y - sa.y) - (sc.x - sa.x) * (sb.y - sa.y);
+      expect(Math.abs(area), `triangle ${i} is sub-cell, so the thin stroke is the path`).toBeLessThan(1);
+      const depth = createDepth(grid.width, grid.height);
+      const zmin = Math.min(sa.vz, sb.vz, sc.vz);
+      const x0 = Math.floor(Math.min(sa.x, sb.x, sc.x)) - 1; // cells-ok — a sample coordinate
+      const y0 = Math.floor(Math.min(sa.y, sb.y, sc.y)) - 1; // cells-ok — a sample coordinate
+      const shape = i % 5;
+      for (let yy = y0; yy <= y0 + 3; yy += 1) { // cells-ok — a sample coordinate
+        for (let xx = x0; xx <= x0 + 3; xx += 1) { // cells-ok — a sample coordinate
+          if (xx < 0 || yy < 0 || xx >= grid.width || yy >= grid.height) continue;
+          // every cell nearer · the corner's depth exactly · a spread about it · one cell left open · untouched
+          const seeded = shape === 0 ? zmin - 0.01 : shape === 1 ? Math.fround(zmin)
+            : shape === 2 ? zmin + (rand() - 0.5) * 0.002 : shape === 3 && xx === x0 + 1 && yy === y0 + 1 ? Infinity : shape === 3 ? zmin - 0.01 : Infinity;
+          depth.z[yy * grid.width + xx] = seeded; // cells-ok — a sample offset
+        }
+      }
+      const marked = hiddenThin(sa, sb, sc, grid, depth);
+      const before = Float32Array.from(depth.z);
+      let paints = 0;
+      drawTri(tri(A, B, C), basis, grid, depth, light, span, () => { paints += 1; });
+      expect(depth.hidden[0], `triangle ${i}: the depth record counts the skip and nothing else`).toBe(marked ? 1 : 0);
+      if (marked) {
+        hidden += 1;
+        expect(paints, `triangle ${i} was marked hidden and painted`).toBe(0);
+        let moved = -1;
+        for (let k = 0; k < before.length && moved < 0; k += 1) if (before[k] !== depth.z[k]) moved = k; // cells-ok — a sample index
+        expect(moved, `triangle ${i} was marked hidden and wrote the buffer`).toBe(-1);
+      } else {
+        walked += 1;
+        if (paints > 0) walkedAndPainted += 1;
+      }
+    }
+    expect(hidden, "the corpus marks some").toBeGreaterThan(60); // cells-ok — a triangle count
+    expect(walked, "and leaves some").toBeGreaterThan(60); // cells-ok — a triangle count
+    expect(walkedAndPainted, "and some of those it leaves do paint, so the fixture responds").toBeGreaterThan(30); // cells-ok — a triangle count
+
+    // **The depth rounding case.** `1 + (1e-20 − 1) · 1` is `0`, below the
+    // smaller endpoint; a cell holding exactly that endpoint's `fround` would
+    // accept the sample, so the triangle is not hidden — and it is, once the
+    // cell holds a depth under the margin.
+    {
+      const g = { width: 8, height: 1 };
+      const d = createDepth(g.width, g.height);
+      const [a, b, c] = [S(2.3, 0.5, 1), S(2.6, 0.5, 1e-20), S(2.4, 0.6, 1)];
+      const sample = a.vz + (b.vz - a.vz) * 1;
+      expect(sample, "the far sample's depth rounds to zero").toBe(0);
+      d.z[2] = Math.fround(1e-20);
+      expect(Math.fround(sample) < (d.z[2] as number), "and the cell would take it").toBe(true);
+      expect(hiddenThin(a, b, c, g, d), "so the triangle is walked").toBe(false);
+      d.z[2] = Math.fround(-1e-9);
+      expect(hiddenThin(a, b, c, g, d), "a cell under the margin hides it").toBe(true);
+    }
+    // **The coordinate rounding case.** The walk's `(1 / 49) · 49` floors to
+    // cell 0; the corner's own floor is 1. Every cell from 1 up is nearer and
+    // cell 0 is open, so the walk writes there and the triangle is not hidden.
+    {
+      const g = { width: 49, height: 1 };
+      const d = createDepth(g.width, g.height);
+      const [a, b, c] = [S(1, 0.5, 5), S(1.3, 0.5, 5), S(1.2, 0.6, 5)];
+      expect(Math.floor((a.x / g.width) * g.width), "the walked coordinate is one cell below the corner").toBe(0); // cells-ok — a sample coordinate
+      d.z.fill(4, 1);
+      expect(hiddenThin(a, b, c, g, d), "cell 0 is open, so the triangle is walked").toBe(false);
+      d.z[0] = 4;
+      expect(hiddenThin(a, b, c, g, d), "cell 0 nearer too, and it is hidden").toBe(true);
+    }
+
+    // **The count arm.** The three meshes under a probe: `plot3d.hidden` above
+    // zero on each and above ten thousand on the bunny; `plot3d.paint` the
+    // figure the same render gave on the build before the check (dist-A at
+    // 01dc31a6: bunny 8,163, teapot 3,719, suzanne 2,950), which is the count
+    // of the same frame without it; and the probe changes no byte.
+    const r = registry([plotDefinition]);
+    const counting = (): Probe & { counts: Map<string, number> } => {
+      const counts = new Map<string, number>();
+      return { ...NO_PROBE, count: (name: string, by = 1): void => { counts.set(name, (counts.get(name) ?? 0) + by); }, counts };
+    };
+    const paintsBefore = { "stanford-bunny": 8163, teapot: 3719, suzanne: 2950 } as const;
+    for (const name of ["stanford-bunny", "teapot", "suzanne"] as const) {
+      const m = loadMesh(name);
+      const plot = block({
+        kind: "plot", id: "ab", form: "plot3d", height: 22, series: [], points3: [], lines3: [], colourBy: "depth", colormap: "coolwarm",
+        camera: { azimuth: 2.2, elevation: 0.25, distance: 5 },
+        surfaces3: [{ label: name, vertices: m.vertices, faces: m.faces, closed: true, shading: "smooth" }],
+      } as never);
+      const probe = counting();
+      const bare = renderToLines(r, plot, 80, { theme: DARK_THEME, capabilities: FULL_CAPS, tick: 0 });
+      expect(renderToLines(r, plot, 80, { theme: DARK_THEME, capabilities: FULL_CAPS, tick: 0, probe }), `${name}: the probe changes no byte`).toEqual(bare);
+      expect(probe.counts.get("plot3d.hidden") ?? 0, `${name}: some triangles are hidden`).toBeGreaterThan(0);
+      expect(probe.counts.get("plot3d.paint"), `${name}: the paints of the frame without the check`).toBe(paintsBefore[name]);
+      if (name === "stanford-bunny") expect(probe.counts.get("plot3d.hidden") ?? 0, "the bunny hides four of nine").toBeGreaterThan(10000); // cells-ok — a triangle count
+    }
+  });
 });
