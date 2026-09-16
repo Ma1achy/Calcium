@@ -51831,3 +51831,34 @@ thirteen per cent of the allocation and, at the collector's 2.3 ms a frame,
 about 0.3 ms — two per cent of the frame, under F916's five. Recorded so the
 next reader of the heap sample does not size it again; the figure to beat is
 the frame's 14.5 ms, of which `drawTri` and `thinEdge` hold 6.4.
+
+## F1183 — four of five thin-triangle edge samples fail the depth test, and a triangle whose every reachable cell already holds a nearer depth is walked anyway ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/surface3.ts` `strokeThin` and `thinEdge`: a triangle under one cell of projected area (I95, F453) is stroked along its three edges, two to three samples an edge, each sample interpolating the depth, the normal and the view position, then asking `writeDepth`; nothing asks first whether the triangle can write at all |
+| **Reached for** | the CPU profile of forty bunny frames on the F1182 build (`out/prof-bunny5`): `thinEdge` **242 ms self of 1,498 — 16.2%**, the largest self time in the process, `drawTri` 118, `plot3dArea` 102; the frame 15.9 ms p50. A counting copy of `dist/` over forty frames: **30,909 triangles** reach the raster a frame and every one is sub-cell, **196,681 edge samples**, of which **8,128 pass the depth test — 4.1%**; **25,159 triangles — 81%** write nothing. A check over the cells the three edges' samples can reach, each cell asked whether it already holds a depth at or nearer than the triangle's nearest corner, marks **14,367 of them — 46% of the raster's triangles** — and over forty frames not one marked triangle would have written a sample. The teapot: 1,470 thin triangles, 873 writing nothing, 284 marked. On a copy of `dist/` that skips a marked triangle, paired in one process against the HEAD build: bunny **p50 15.6 → 14.3 ms, B−A −0.9 ms a round, faster in 33 of 40**; sixty rounds **−0.7 (40 of 60)** and with the sides swapped **−1.4 (50 of 60)**; the teapot **0.0**; **432 frames over three meshes, two shadings, three wire settings, four sizes and six cameras byte-identical** |
+| **Verdict** | **open** — measured, the remedy sized |
+
+**Remedy, sized.** C12 I138: a sub-cell triangle is not walked when every
+cell its edge samples can reach already holds a depth at or nearer than its
+nearest corner. The samples' depth is `p.vz + (q.vz − p.vz)·t` for `t` in
+`[0, 1]`, which is at least the smaller endpoint less the subtraction's
+rounding — so the bound is the nearest corner less a relative margin of
+`1e-9`, taken through `Math.fround` as `writeDepth` takes the sample; the
+cells are the floor of the corners' coordinates widened by the same relative
+margin, because the interpolated coordinate lies within the endpoints up to
+the same rounding. A cell holding a depth at or under the bound refuses every
+sample the triangle could put in it, `writeDepth`'s test being strict; a
+triangle that writes nothing paints nothing and leaves the buffer as it was,
+so the frame after it is the frame without it. The check reads the nearest
+corner's own cell first, since most of the triangles it does not mark fail
+there. `plot3d.hidden` counts the triangles skipped, which is the observable
+the frame cannot show; a row holds the predicate against a restatement of the
+edge walk over a seeded corpus, and constructs the two rounding cases the
+margins exist for — a depth difference whose subtraction rounds below the
+smaller endpoint, and a coordinate difference whose sum lands one cell below
+the corner — where a check without the margin would skip a triangle that
+writes. The area path is left as it is: its samples' weights carry `fill`'s
+own `−eps` tolerance, its triangles are few, and 91% of its samples pass on
+the teapot.
