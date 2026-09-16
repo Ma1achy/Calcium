@@ -17,7 +17,7 @@ import {
   basisOf, createDepth, extentOf, project, viewDir, writeDepth, type Vec3,
 } from "../../src/presentation/plot/project3.js";
 import {
-  backfaceCulled, densityGlyph, drawTri, edgeIntensity, lightDirOf, shade,
+  backfaceCulled, densityGlyphOf, densitySteps, drawTri, edgeIntensity, lightDirOf, shade,
   geometryOf, surfacePoints, type Tri3,
 } from "../../src/presentation/plot/surface3.js";
 import { ladderFor } from "../../src/presentation/plot/ramp.js";
@@ -646,8 +646,9 @@ describe("plot — the surface carrier", () => {
     }
     // **And never a marker from the tier table** (§6g row 5 one carrier along):
     // `glyph[]` packs `tier × clouds + series`, and a surface is neither.
-    expect(densityGlyph(0.2, caps as never), "ambient is the ladder's second rung").toBe(":");
-    expect(densityGlyph(1, caps as never), "full light is its last").toBe("@");
+    const steps = densitySteps(caps as never);
+    expect(densityGlyphOf(steps, 0.2), "ambient is the ladder's second rung").toBe(":");
+    expect(densityGlyphOf(steps, 1), "full light is its last").toBe("@");
   });
 
   it("SF9 (C12 I94, F455, F480): the field's hue ratio under shading, per colormap", () => {

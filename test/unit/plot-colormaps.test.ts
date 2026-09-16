@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { COLORMAPS_WITH_REVERSED, COLORMAPS, COLORMAPS_256, COLORMAP_NAMES } from "../../src/data/colormaps/index.js";
 import { QUALITATIVE_PALETTES } from "../../src/data/colormaps/qualitative/index.js";
-import { continuousColour, rgbHex, sample, sampleRgb, shadeColour, shadeRgb } from "../../src/presentation/theme/colormap.js";
+import { continuousColour, packedHex, rgbHex, sample, samplePacked, sampleRgb, shadeColour, shadePacked, shadeRgb } from "../../src/presentation/theme/colormap.js";
 
 function luminance(r: number, g: number, b: number): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
@@ -210,7 +210,57 @@ describe("T1.42 (C10 I40, F1150) — the numeric colour path is the hex path, bi
 });
 
 describe("C10 I42 — the packed forms", () => {
-  it.todo(
-    "T1.43 (C10 I42): packedHex(shadePacked(samplePacked(map, t), k)) equals rgbHex(shadeRgb(...sampleRgb(map, t), k)) over I40's sweep, k >= 1 included, and samplePacked on a non-finite t and an empty map equals sampleRgb packed — not deferred on a component: the code commit replaces this row",
-  );
+  // **I40's own sweep, run a second time over the packed forms.** The tuple
+  // path is the reference here because T1.42 has already held it against the
+  // hex path; a packed integer that unpacks to the same hex over the same
+  // domain is the same colour, and the domain is every eight-bit channel.
+  const unpack = (p: number): readonly [number, number, number] => [(p >> 16) & 255, (p >> 8) & 255, p & 255];
+  it("T1.43 (C10 I42): packedHex(shadePacked(samplePacked(map, t), k)) equals rgbHex(shadeRgb(...sampleRgb(map, t), k)) over I40's sweep, k >= 1 included, and samplePacked on a non-finite t and an empty map equals sampleRgb packed", () => {
+    let compared = 0;
+    // Every grey channel × 65 k, straight through shadePacked from a packed grey.
+    for (let c = 0; c <= 255; c += 1) {
+      const packed = (c << 16) | (c << 8) | c;
+      for (let ki = 0; ki <= 64; ki += 1) {
+        const k = ki / 64;
+        const viaTuple = rgbHex(k >= 1 ? [c, c, c] : shadeRgb(c, c, c, k));
+        const viaPacked = packedHex(k >= 1 ? packed : shadePacked(packed, k));
+        if (viaTuple !== viaPacked) throw new Error(`grey ${String(c)} k=${String(k)}: tuple ${viaTuple}, packed ${viaPacked}`);
+        compared += 1;
+      }
+    }
+    // The mixed-channel grid, so a channel shaded into another's place is seen.
+    for (let c = 0; c <= 255; c += 17) {
+      for (let ki = 0; ki <= 64; ki += 8) {
+        const k = ki / 64;
+        const rgb: readonly [number, number, number] = [c, 255 - c, (c * 7) % 256];
+        const packed = (rgb[0] << 16) | (rgb[1] << 8) | rgb[2];
+        expect(packedHex(k >= 1 ? packed : shadePacked(packed, k))).toBe(rgbHex(k >= 1 ? rgb : shadeRgb(rgb[0], rgb[1], rgb[2], k)));
+        compared += 1;
+      }
+    }
+    // Every map × 64 t × 8 k, from the sample onward — the path the painter takes.
+    for (const map of Object.values(COLORMAPS_WITH_REVERSED)) {
+      for (let ti = 0; ti <= 64; ti += 1) {
+        const t = ti / 64;
+        const rgb = sampleRgb(map, t);
+        const packed = samplePacked(map, t);
+        expect(unpack(packed), `${map.name} sample at ${String(t)}`).toEqual(rgb);
+        for (let ki = 0; ki <= 8; ki += 1) {
+          const k = ki / 8;
+          const viaTuple = rgbHex(k >= 1 ? rgb : shadeRgb(rgb[0], rgb[1], rgb[2], k));
+          const viaPacked = packedHex(k >= 1 ? packed : shadePacked(packed, k));
+          if (viaTuple !== viaPacked) throw new Error(`${map.name} t=${String(t)} k=${String(k)}: tuple ${viaTuple}, packed ${viaPacked}`);
+          compared += 1;
+        }
+      }
+    }
+    expect(compared, "pairs compared — the subject, before the claim").toBeGreaterThan(256 * 65 + 16 * 9 + 10_000);
+    // The two arms sampleRgb answers without interpolating.
+    const first = Object.values(COLORMAPS_WITH_REVERSED)[0]!;
+    for (const t of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      expect(unpack(samplePacked(first, t)), `non-finite t ${String(t)}`).toEqual(sampleRgb(first, t));
+    }
+    const empty = { ...first, data: [] as readonly (readonly [number, number, number])[] };
+    expect(unpack(samplePacked(empty as typeof first, 0.5))).toEqual(sampleRgb(empty as typeof first, 0.5));
+  });
 });

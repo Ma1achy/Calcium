@@ -47,7 +47,7 @@ const results = runPass({
   run,
   control: {
     file: MAP,
-    from: "  return [ch(r), ch(g), ch(b)];",
+    from: "  return [shadeChannel(r, kk), shadeChannel(g, kk), shadeChannel(b, kk)];",
     to: "  return [r, g, b];",
     why: "an unshaded shadeRgb differs from overChannels at every k < 1; a run where this survives is comparing the table to itself",
   },
@@ -68,8 +68,8 @@ const results = runPass({
       // every channel above 0 saturates.
       name: "LUT-BYPASSED-WRONG-DOMAIN: shadeRgb reads toLinear(c) instead of the table",
       file: MAP,
-      from: "    const v = toSrgb((LINEAR_LUT[c] ?? toLinear(c / 255)) * kk);",
-      to: "    const v = toSrgb(toLinear(c) * kk);",
+      from: "  const v = toSrgb((LINEAR_LUT[c] ?? toLinear(c / 255)) * kk);",
+      to: "  const v = toSrgb(toLinear(c) * kk);",
       expect: "T1.42",
     },
     {
@@ -82,6 +82,32 @@ const results = runPass({
       from: "  const frac = scaled - low;\n  const lo = data[low]!;\n  const hi = data[high]!;\n  return [",
       to: "  const frac = 0;\n  const lo = data[low]!;\n  const hi = data[high]!;\n  return [",
       expect: "24bit",
+    },
+    {
+      // **The green channel shaded into red's place** (C10 I42): a packed
+      // shade that unpacks the wrong bits agrees on grey and on nothing else.
+      name: "PACKED-CHANNEL-SWAPPED: shadePacked shades the green channel as red",
+      file: MAP,
+      from: "    (shadeChannel((packed >> 16) & 255, kk) << 16)\n    | (shadeChannel((packed >> 8) & 255, kk) << 8)",
+      to: "    (shadeChannel((packed >> 8) & 255, kk) << 16)\n    | (shadeChannel((packed >> 8) & 255, kk) << 8)",
+      expect: "T1.43",
+    },
+    {
+      // **Packed without rounding**: the shifts truncate what `sampleRgb`
+      // rounds, one off on every interpolated channel above `.5`.
+      name: "PACKED-NO-ROUNDING: samplePacked truncates the interpolated channels",
+      file: MAP,
+      from: "    (Math.round(lo[0] + (hi[0] - lo[0]) * frac) << 16)\n    | (Math.round(lo[1] + (hi[1] - lo[1]) * frac) << 8)\n    | Math.round(lo[2] + (hi[2] - lo[2]) * frac)",
+      to: "    ((lo[0] + (hi[0] - lo[0]) * frac) << 16)\n    | ((lo[1] + (hi[1] - lo[1]) * frac) << 8)\n    | (lo[2] + (hi[2] - lo[2]) * frac)",
+      expect: "T1.43",
+    },
+    {
+      // **The hex read back in `b, g, r` order.**
+      name: "PACKED-HEX-REVERSED: packedHex writes the channels blue first",
+      file: MAP,
+      from: "  return `#${hex2((packed >> 16) & 255)}${hex2((packed >> 8) & 255)}${hex2(packed & 255)}`;",
+      to: "  return `#${hex2(packed & 255)}${hex2((packed >> 8) & 255)}${hex2((packed >> 16) & 255)}`;",
+      expect: "T1.43",
     },
     {
       // **The ramp not inverted on the fast path.** `colourOf` puts near at the

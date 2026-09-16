@@ -170,11 +170,59 @@ export function shadeRgb(
   k: number,
 ): readonly [number, number, number] {
   const kk = k < 0 ? 0 : k > 1 ? 1 : k;
-  const ch = (c: number): number => {
-    const v = toSrgb((LINEAR_LUT[c] ?? toLinear(c / 255)) * kk);
-    return Math.max(0, Math.min(255, Math.round(v * 255)));
-  };
-  return [ch(r), ch(g), ch(b)];
+  return [shadeChannel(r, kk), shadeChannel(g, kk), shadeChannel(b, kk)];
+}
+
+/**
+ * One channel under a clamped intensity — `overChannels`' sequence on an
+ * eight-bit input, the table standing in for `toLinear` over its whole domain
+ * (I40). **One function for both forms** (I42): `shadeRgb` and `shadePacked`
+ * call this, so a tuple and a packed integer shade the same way by construction.
+ */
+function shadeChannel(c: number, kk: number): number {
+  const v = toSrgb((LINEAR_LUT[c] ?? toLinear(c / 255)) * kk);
+  return Math.max(0, Math.min(255, Math.round(v * 255)));
+}
+
+/**
+ * `sampleRgb`'s three channels as one integer, `r·2¹⁶ + g·2⁸ + b` (I42) — the
+ * form a per-sample caller holds in a typed array so a write allocates nothing
+ * (C12 I132). The same interpolation, expressed on the same arithmetic.
+ */
+export function samplePacked(map: Colormap, t: number): number {
+  const data = map.data;
+  if (data.length === 0) return 0; // cells-ok — a data length
+  if (!Number.isFinite(t)) {
+    const d = data[0]!;
+    return (d[0] << 16) | (d[1] << 8) | d[2];
+  }
+  const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
+  const scaled = clamped * (data.length - 1); // cells-ok — a data length
+  const low = Math.floor(scaled);
+  const high = Math.min(data.length - 1, low + 1); // cells-ok — a data length
+  const frac = scaled - low;
+  const lo = data[low]!;
+  const hi = data[high]!;
+  return (
+    (Math.round(lo[0] + (hi[0] - lo[0]) * frac) << 16)
+    | (Math.round(lo[1] + (hi[1] - lo[1]) * frac) << 8)
+    | Math.round(lo[2] + (hi[2] - lo[2]) * frac)
+  );
+}
+
+/** `shadeRgb` on a packed integer (I42): each channel unpacked, shaded by the one channel function, packed back. */
+export function shadePacked(packed: number, k: number): number {
+  const kk = k < 0 ? 0 : k > 1 ? 1 : k;
+  return (
+    (shadeChannel((packed >> 16) & 255, kk) << 16)
+    | (shadeChannel((packed >> 8) & 255, kk) << 8)
+    | shadeChannel(packed & 255, kk)
+  );
+}
+
+/** `rgbHex` of a packed integer's channels (I42). */
+export function packedHex(packed: number): string {
+  return `#${hex2((packed >> 16) & 255)}${hex2((packed >> 8) & 255)}${hex2(packed & 255)}`;
 }
 
 /**

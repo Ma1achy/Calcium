@@ -1008,11 +1008,13 @@ function shadeAt(
 export const edgeIntensity = (intensity: number, wire: boolean | "over"): number =>
   wire === "over" ? intensity * EDGE_DIM : intensity;
 
-export function densityGlyph(
-  intensity: number,
-  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
-): string {
-  const steps = [...ladderFor("density", caps).steps];
+/** The density ladder's steps for a capability set, read once per render rather than per write (C12 I132). */
+export function densitySteps(caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">): readonly string[] {
+  return [...ladderFor("density", caps).steps];
+}
+
+/** The step an intensity selects, on steps already read: floor of intensity × steps, clamped to the ladder. */
+export function densityGlyphOf(steps: readonly string[], intensity: number): string {
   const k = Math.min(steps.length - 1, Math.max(0, Math.floor(intensity * steps.length))); // cells-ok — a ladder index
   return steps[k] as string;
 }

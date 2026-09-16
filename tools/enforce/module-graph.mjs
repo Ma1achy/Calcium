@@ -3404,6 +3404,18 @@ export function checkExportedArguments(files, readFile = (f) => readFileSync(f, 
 
 /** Functions whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_FUNCTIONS = Object.freeze({
+  // **`shadeRgb` is the reference the packed form is held against** (C10 I42).
+  // The painter took `shadePacked` (C12 I132) and `shadeColour` deliberately
+  // stays on `overChannels`, so the tuple form has no caller in `src/` — and
+  // C10 T1.42 and T1.43 compare three implementations through it: the hex
+  // path against the tuple, the tuple against the packed integer. Deleting it
+  // would leave the packed form checked against the hex path alone, through
+  // a channel function it shares; wiring it back in is the allocation F1171
+  // measured. It goes the day the tuple form stops being the sweep's middle.
+  shadeRgb:
+    "C10 I40 · C10 I42 — the tuple form of the shade, consumed by T1.42 and T1.43 as the "
+    + "reference between the hex path and the packed integer, and by no caller in src/ since "
+    + "the painter took shadePacked (C12 I132, F1171)",
   // **`profileCard` was here and is gone.** It was exempted for one commit —
   // the deck landing ahead of the view that walks it, because reading
   // thirty-seven frames is what found a form fed instants where it draws

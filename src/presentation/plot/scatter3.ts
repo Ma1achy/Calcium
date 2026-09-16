@@ -38,11 +38,21 @@ import {
   type Axis3,
   type Seg3,
 } from "./axes3.js";
-import { continuousColour, rgbHex, sampleRgb, shadeColour, shadeRgb } from "../theme/colormap.js";
+import { continuousColour, packedHex, samplePacked, shadeColour, shadePacked } from "../theme/colormap.js";
 import { colormapFor } from "./heatmap.js";
 import { CELL_ASPECT } from "./aspect.js";
+
+/**
+ * The mark a surface sample carries between its write and its record (C12
+ * I132): one shared, frozen value, compared by identity, never a colour the
+ * compose could see — the pass that builds the records replaces every one
+ * before the frame draws. An empty hex, so a mark that escaped would be a
+ * visible fault rather than a plausible colour.
+ */
+const PENDING_INK: ColourValue = Object.freeze({ kind: "rgb", hex: "" }) as ColourValue;
 import {
-  densityGlyph,
+  densityGlyphOf,
+  densitySteps,
   drawTri,
   edgeIntensity,
   lightDirOf,
@@ -1269,7 +1279,17 @@ export function plot3dArea(
   // per-triangle input is `wire`, read through a binding the loop assigns;
   // a closure per triangle was 69 451 allocations a bunny frame for one body.
   let wire: Skin["wire"] = false;
+  // **The colour is one packed integer per sample until the last surface has
+  // drawn** (C12 I132, F1171): the painter writes `inkRgb[i]` and leaves
+  // `PENDING_INK` in `ink[i]`; the pass after the surfaces loop builds one
+  // record per sample still pending. A sample written by every thin edge of a
+  // bunny triangle before its face used to build a colour per write.
+  const inkRgb = new Int32Array(grid.width * grid.height); // cells-ok — a sample count
+  let paints = 0;
+  // The ladder's steps once per render (I132) — they were copied per write before.
+  const density = sub ? undefined : densitySteps(ctx.capabilities);
   const painter = (i: number, z: number, v: number | undefined, si: number, intensity: number, edge: boolean): void => {
+    paints += 1;
     // **`wireframe: true` writes depth and paints nothing but the edges**
     // (C12 I95, §6i row 11). The depth write already happened — `drawTri`
     // calls it before this — so the face occludes what is behind it and the
@@ -1302,8 +1322,9 @@ export function plot3dArea(
         colourBy === "value"
           ? ramped(v ?? span.loV, span.loV, span.hiV)
           : 1 - ramped(z, span.nearD, span.farD);
-      const [r, g, b] = sampleRgb(fastMap, tt);
-      ink[i] = { kind: "rgb", hex: rgbHex(k >= 1 ? [r, g, b] : shadeRgb(r, g, b, k)) };
+      const p = samplePacked(fastMap, tt);
+      inkRgb[i] = k >= 1 ? p : shadePacked(p, k);
+      ink[i] = PENDING_INK;
     } else {
       // **The reading record is built on this arm alone** (C12 I129).
       const base = colourOf(block, ctx, { depth: z, value: v, series: si }, scene.identities, span);
@@ -1325,7 +1346,7 @@ export function plot3dArea(
     // withheld from the dot grid — measured, the bottom dot row of a shaded
     // surface's cells was set **3 times against 76** for the rows above it,
     // and the picture was a plausible stipple rather than an obvious fault.
-    mark[i] = sub ? undefined : densityGlyph(k, ctx.capabilities);
+    mark[i] = density === undefined ? undefined : densityGlyphOf(density, k);
     glyph[i] = -1;
   };
   // **One stamp per render, from the geometries' own counters** (C12 I130):
@@ -1338,6 +1359,19 @@ export function plot3dArea(
     // **The clip path counted** (C12 I128): zero for a mesh in front of the camera.
     if (clipped) ctx.probe?.count("plot3d.clip");
   }
+  // **The records, once per painted sample** (C12 I132): every sample the
+  // surfaces own and nothing since overwrote — the wireframe clear and a later
+  // carrier replace the mark as they replaced a record. Before the frame draws,
+  // so the frame's own ink lands over a record as it always did.
+  let records = 0;
+  for (let i = 0; i < ink.length; i += 1) { // cells-ok — a sample index
+    if (ink[i] === PENDING_INK) {
+      ink[i] = { kind: "rgb", hex: packedHex(inkRgb[i] as number) };
+      records += 1;
+    }
+  }
+  if (paints > 0) ctx.probe?.count("plot3d.paint", paints);
+  if (records > 0) ctx.probe?.count("plot3d.ink", records);
   // **The projections counted** (C12 I130): the distinct vertices among the
   // drawn faces on a smooth mesh, three per drawn face on a flat one.
   if (raster.projected > 0) ctx.probe?.count("plot3d.project", raster.projected);

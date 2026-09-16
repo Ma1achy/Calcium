@@ -966,7 +966,69 @@ describe("C12 I131 — the span's depth is project's first dot, and the cull all
 });
 
 describe("C12 I132 — the painter writes an integer and the records are built once", () => {
-  it.todo(
-    "T1.144 (C12 I132): two surfaces at 24-bit with the farther drawn first count more plot3d.paint than plot3d.ink, plot3d.ink is at most the grid and equals the surface-owned samples, no empty hex in the frame, and colourDepth 8 counts no plot3d.ink — not deferred on a component: the code commit replaces this row",
-  );
+  const counting = (): Probe & { counts: Map<string, number> } => {
+    const counts = new Map<string, number>();
+    return {
+      ...NO_PROBE,
+      count: (name: string, by = 1): void => { counts.set(name, (counts.get(name) ?? 0) + by); },
+      counts,
+    };
+  };
+  // Two height fields over the same footprint, the lower one first in the
+  // list: every sample the upper one covers was written by the lower one
+  // before, so writes exceed the records the frame keeps.
+  const sheet = (lift: number): { vertices: { x: number; y: number; z: number }[]; faces: [number, number, number][]; shading: "smooth" } => ({
+    vertices: Array.from({ length: 81 }, (_v, i) => ({ // cells-ok — a vertex count
+      x: ((i % 9) / 4) - 1, // cells-ok — a vertex index
+      y: (Math.floor(i / 9) / 4) - 1, // cells-ok — a vertex index
+      z: lift + 0.15 * Math.sin((i % 9) / 2) * Math.cos(Math.floor(i / 9) / 2), // cells-ok — a vertex index
+    })),
+    faces: Array.from({ length: 64 }, (_v, k) => { // cells-ok — a cell count
+      const r = Math.floor(k / 8); // cells-ok — a cell index
+      const c = k % 8; // cells-ok — a cell index
+      const a = r * 9 + c; // cells-ok — a vertex offset
+      return [a, a + 1, a + 9] as [number, number, number];
+    }),
+    shading: "smooth",
+  });
+  const plot = (surfaces: unknown[]): Plot =>
+    block({
+      kind: "plot", id: "t1144", form: "plot3d", height: 14, series: [], axes3: false, box3: "none",
+      colormap: "viridis", camera: { azimuth: 0.6, elevation: 1.1, distance: 5 },
+      surfaces3: surfaces,
+    } as unknown as Plot);
+  const r = registry([plotDefinition]);
+  const render = (p: Plot, probe: Probe, capabilities = FULL_CAPS): readonly string[] =>
+    renderToLines(r, p, 60, { theme: DARK_THEME, capabilities, tick: 0, probe });
+
+  it("T1.144 (C12 I132, F1171): two surfaces at 24-bit with the farther drawn first count more plot3d.paint than plot3d.ink, plot3d.ink is at most the grid and equals the surface-owned samples, no empty hex in the frame, and colourDepth 8 counts no plot3d.ink", () => {
+    const two = plot([sheet(-0.4), sheet(0.4)]);
+    const probe = counting();
+    const frame = render(two, probe);
+    const paints = probe.counts.get("plot3d.paint") ?? 0;
+    const records = probe.counts.get("plot3d.ink") ?? 0;
+    expect(records, "records were built").toBeGreaterThan(0);
+    expect(paints, "the lower sheet's samples were written again by the upper").toBeGreaterThan(records);
+    // The grid is w·2 × rows·8 (I84) at the plot's area; the records cannot exceed it.
+    expect(records).toBeLessThanOrEqual(60 * 2 * 14 * 8); // cells-ok — a sample bound
+    // No mark escaped into the frame: an escaped PENDING_INK would paint an
+    // empty hex, and `sgr` on an empty hex is not a sequence any row carries.
+    expect(frame.some((line) => line.includes("#")), "no raw hex in the frame").toBe(false);
+    expect(frame.some((line) => /\x1b\[38;2;;/.test(line)), "no empty channel triple").toBe(false);
+    expect(frame.some((line) => line.trim().length > 0), "the surfaces painted").toBe(true); // cells-ok — a blank test
+
+    // **The records equal the surface-owned samples.** One sheet alone writes
+    // each sample once, so its records equal its writes; the count is the
+    // number of samples the surface owns in the composed frame.
+    const one = counting();
+    render(plot([sheet(0)]), one);
+    expect(one.counts.get("plot3d.paint"), "a single sheet writes each sample once").toBe(one.counts.get("plot3d.ink"));
+
+    // **The eight-bit arm is untouched**: it builds its record through colourOf
+    // and shadeColour per write, and counts no records.
+    const eight = counting();
+    render(two, eight, { ...FULL_CAPS, colourDepth: 8 });
+    expect(eight.counts.get("plot3d.ink") ?? 0, "no packed records on the eight-bit arm").toBe(0);
+    expect(eight.counts.get("plot3d.paint") ?? 0, "the writes are still counted").toBeGreaterThan(0);
+  });
 });
