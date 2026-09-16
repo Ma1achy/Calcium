@@ -51654,3 +51654,26 @@ Gates green, goldens 458 with no mover.
 What remains: `placeableClusters` and `wrapCellsParts` iterate the segmenter
 over whole text; `partsOf` and `between` build arrays and `Set`s per style
 transition; `plot3dArea`'s boxed sample arrays.
+
+## F1178 — the wrap and the placeable pass segment every paragraph whole, and I74's answer stops at the three styled walks ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/text.ts`'s five whole-text walks — `wrapCellsParts`, `hardWrapCells`, `placeableClusters`, `clusterEnds`, `graphemes` — each a `for … of GRAPHEMES.segment(text)`, a segment record per cluster; `soloAt`, which decides a unit of the rasterised alphabets alone |
+| **Reached for** | the `/all` profile at 408 frames and the forms bench at ten repetitions on the F1177 build: `wrapCellsParts` 11.2 ms and `placeableClusters` 8.1 of 576 on `/all`, both under `wrapRuns` ← `noticeRows`; on the forms bench `wrapCellsParts` 74.6 ms, `placeableClusters` 68.4, `graphemes` 36.5, `clusterAt` 58.7 of 2,399. `placeableClusters` and `clusterEnds` return early on all-ASCII text and the wrap never does — a notice of ASCII prose is segmented whole, a segment record per character — and a plot row's box and braille units go the same way because the iterator asks the segmenter for every cluster where the styled walks, since I74, ask only where the next unit can extend one. I74 is stated for the table's units, and the ground it stands on is wider: by UAX #29 no unit below U+0300 is Extend, ZWJ, SpacingMark, Hangul, Prepend, a regional indicator or the joiner, so every such unit other than the carriage return — which a line feed joins — is its own cluster whenever the next unit is below U+0300 or in the table. Sized on the built tree with the five walks stepping by `soloAt` and the rule widened, three runs a side under `make load-down`: forms sum **260 / 247 / 289 → 259 / 415 / 224 ms**, the `rows` span **323 / 276 / 310 → 288 / 386 / 305**, `/all` work over 408 frames **600 / 532 / 622 → 510 / 484 / 558 ms**, `/all` p95 **4.9 / 4.3 / 6.1 → 4.4 / 4.1 / 5.1** |
+| **Verdict** | **open** — measured, the remedy sized |
+
+**Remedy, sized.** I74 widened to every unit below U+0300 other than the
+carriage return, and the five whole-text walks stepping by cluster from the
+text's start with the same one-line arm the styled walks take — `soloAt` at
+the cursor, `containing` otherwise — so a paragraph of ASCII, Latin-1 or the
+alphabets never builds a segmenter iterator, and one holding a mark, a
+joiner, Hangul or CJK builds it once and asks it only at those clusters. The
+cursor is always on a boundary because every step is a cluster, so the rule
+is asked only where it holds. Byte-identical by construction; a new row asks
+the five walks for the segmenter's own clusters over a seeded corpus that
+holds a carriage return before a line feed, and T3.85 re-pins the `é` row at
+zero asks with a mark on its base taking its place. What it does not reach:
+`partsOf` and `between` in the rows arm; `plot3dArea`'s boxed sample arrays;
+`truncate`'s two cluster arrays and `compareByGrapheme`, which are not on
+the frame path in either profile.
