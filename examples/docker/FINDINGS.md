@@ -53222,7 +53222,7 @@ part, which is where the next cuts were already pointed.
 |---|---|
 | **Surface** | `displayCells` (`src/presentation/text.ts`), the measurer behind `fitStyled`, behind `exact` in `src/shell/frame-error.ts` — the guard that pads or truncates every transcript row to the frame's width before it is written. Its one-pass scan takes printable ASCII and SGR; anything else returns `cells(text.replace(sgrPattern(), ""))` — a stripped copy allocated and a second walk that asks `soloAt` of every unit. |
 | **Reached for** | `--cpu-prof` over `stress live:line` (40 line plots at 16 ms, 6 s), the tree under `writeFrame` rather than the self-time column, and the arithmetic first: `exact → fitStyled → displayCells` is **181 ms** of the write's 1037 ms over about 340 frames at 40 rows — some 13,600 rows, **13 µs a row**. A single scan of 120 code units with a four-pair binary search per unit is one to two microseconds, so the fall-through is ten microseconds a row and about **0.45 ms of a 3 ms write** in every case that draws braille or box rows: every live plot, every mesh, the orbit. The plot render itself is 202 ms of the same tree, so the guard's re-measure costs almost as much as drawing. |
-| **Verdict** | **open.** `rowCells` in the same file already admits `CELL_PER_UNIT_RANGES` at `narrow` as one cell per unit — the fast set is a checked claim, T1.40 holds it against `cells` — and I74 rules a table unit is a cluster of its own unless an extender follows. The one-pass scan takes the same set at `narrow`. No next-unit test is needed there, and one would be a sentence that cannot be violated: any unit outside the scan's three kinds returns the whole stripped measure, so a unit followed by a mark or a selector is answered by `cells` exactly as before. Byte-identical by construction — a measure, not a render. |
+| **Verdict** | **Closed — built and measured.** `rowCells` in the same file already admits `CELL_PER_UNIT_RANGES` at `narrow` as one cell per unit — the fast set is a checked claim, T1.40 holds it against `cells` — and I74 rules a table unit is a cluster of its own unless an extender follows. The one-pass scan takes the same set at `narrow`. No next-unit test is needed there, and one would be a sentence that cannot be violated: any unit outside the scan's three kinds returns the whole stripped measure, so a unit followed by a mark or a selector is answered by `cells` exactly as before. Byte-identical by construction — a measure, not a render. |
 
 **Remedy, sized.** One arm in `displayCells`, one C09 invariant, one unit row
 asserting the scan equals the stripped measure over a corpus that reaches every
@@ -53230,3 +53230,31 @@ arm — styled braille and box rows, a table unit before a selector, a mark and 
 joiner, a sextant pair, CJK, and every row at `wide` — a fail-on-revert row, and a
 mutation run whose control counts a table unit as two. Expected: the guard's line
 gone from the write's tree and the frame about 0.4 ms lighter on every plot case.
+
+**Closed — built and measured.** One arm in `displayCells` (C09 I77, commitment 66,
+T1.51, T6.123; `c09-styled-fast-set` 2/2 with the control firing; `quadratic-cursor`
+re-anchored past the arm and green). Gates: enforce, 6271 unit-to-integration, 458
+goldens with no mover, 137 e2e. **The measure itself, both builds in one process**,
+20,000 calls a row, medians of five interleaved rounds:
+
+| row | width | before | after |
+|---|---|---|---|
+| braille under a colour change every twenty cells | 120 | 6.34 µs | 0.99 µs |
+| box drawing between two dim rails | 118 | 6.20 µs | 0.78 µs |
+| styled ASCII | 120 | 0.49 µs | 0.49 µs |
+
+Equal widths on every row, and the ASCII path untouched. In the live-line profile
+the guard's line — `exact → fitStyled → displayCells` — fell **125 → 47 ms** over
+7.5 s. At forty rows a frame that is a little over 0.2 ms, about 4% of a 5 ms frame,
+which is under what three paired bench rounds can resolve: live:line's work sum
+987 → 852 ms and everylive's 1090 → 994 read as the cut, live:heatmap's 1000 →
+1071 and session's 360 → 430 read against it, and every one of the four sits
+inside its own side's spread. The entry's estimate of 0.45 ms a frame was twice
+the measured figure — the profile's 181 ms was taken under a heavier run than the
+paired one. **What remains** on this path is volume, not per-row cost: the panel's
+rows arm composes three hundred and sixty rows a frame at 1.4 µs each, and the
+plot renders themselves are 0.6 ms for forty plots. Neither has fat to take (F916),
+and the 2-D render path is recorded as checked and clear at this date. One small
+thing seen and not taken: `displayCells` allocates a sticky `RegExp` per call
+through `sgrAt()`, about 13,000 a second under live plots — below a microsecond
+each and not worth a finding until a profile names it.
