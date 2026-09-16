@@ -51838,7 +51838,7 @@ the frame's 14.5 ms, of which `drawTri` and `thinEdge` hold 6.4.
 |---|---|
 | **Surface** | `src/presentation/plot/surface3.ts` `strokeThin` and `thinEdge`: a triangle under one cell of projected area (I95, F453) is stroked along its three edges, two to three samples an edge, each sample interpolating the depth, the normal and the view position, then asking `writeDepth`; nothing asks first whether the triangle can write at all |
 | **Reached for** | the CPU profile of forty bunny frames on the F1182 build (`out/prof-bunny5`): `thinEdge` **242 ms self of 1,498 — 16.2%**, the largest self time in the process, `drawTri` 118, `plot3dArea` 102; the frame 15.9 ms p50. A counting copy of `dist/` over forty frames: **30,909 triangles** reach the raster a frame and every one is sub-cell, **196,681 edge samples**, of which **8,128 pass the depth test — 4.1%**; **25,159 triangles — 81%** write nothing. A check over the cells the three edges' samples can reach, each cell asked whether it already holds a depth at or nearer than the triangle's nearest corner, marks **14,367 of them — 46% of the raster's triangles** — and over forty frames not one marked triangle would have written a sample. The teapot: 1,470 thin triangles, 873 writing nothing, 284 marked. On a copy of `dist/` that skips a marked triangle, paired in one process against the HEAD build: bunny **p50 15.6 → 14.3 ms, B−A −0.9 ms a round, faster in 33 of 40**; sixty rounds **−0.7 (40 of 60)** and with the sides swapped **−1.4 (50 of 60)**; the teapot **0.0**; **432 frames over three meshes, two shadings, three wire settings, four sizes and six cameras byte-identical** |
-| **Verdict** | **open** — measured, the remedy sized |
+| **Verdict** | **closed** — built and measured: C12 I138, T1.150, `c12-hidden-thin` |
 
 **Remedy, sized.** C12 I138: a sub-cell triangle is not walked when every
 cell its edge samples can reach already holds a depth at or nearer than its
@@ -51862,3 +51862,41 @@ the corner — where a check without the margin would skip a triangle that
 writes. The area path is left as it is: its samples' weights carry `fill`'s
 own `−eps` tolerance, its triangles are few, and 91% of its samples pass on
 the teapot.
+
+**Closed — built and measured.** C12 I138 as sized, with one correction
+made in the spec before the code: the coordinate margin is not for the
+interpolation — at `t = 1` the sum lands on or above the far endpoint's floor,
+by the rounding of a difference against a representable integer — but for
+the walk's normalised-and-back coordinate, `(p.x / width) · width`, which is
+`0.9999999999999999` for a corner at `1` on a 49-wide grid. `hiddenThin`
+reads the nearest corner's own cell first and enters the scan for the rest;
+the count travels as one `Int32Array` slot on the depth-buffer record and is
+reported as `plot3d.hidden`. T1.150 runs four hundred seeded sub-cell
+triangles through `drawTri` itself against buffers seeded near their depths —
+every marked triangle paints nothing and leaves the buffer as it was, the
+record counts it and nothing else, and the corpus marks some, leaves some
+and paints through some of those it leaves — then the two constructed cases,
+and the three meshes under a probe with `plot3d.paint` pinned to the figure
+the build before the check gave. `c12-hidden-thin`: five caught, none
+survived — both margins dropped, the scan ignored, the quick reject
+inverted, the count dropped — with the check removed as the control, which
+only the count arm sees. Gates green, goldens 458 with no mover, e2e green;
+432 frames over three meshes, two shadings, three wire settings, four sizes
+and six cameras byte-identical against the F1182 build.
+
+| `make load-down` | before (F1182 build) | after |
+|---|---|---|
+| bunny raster triangles / edge samples a frame | 30,909 / 196,681 | 17,388 walked / about 108,000 — 13,521 skipped |
+| bunny `plot3d.paint` | 8,163 | 8,163 |
+| paired warm bunny, `probe-f6-pair` n=60 | A p50 17.4 · 14.1 ms | B p50 15.8 · 12.6; B−A median −1.7 and −2.0 ms; B faster in 52 and 53 of 60 |
+| paired warm teapot | 3.9 ms | 3.9; −0.1 and −0.0 ms; 35 and 34 of 60 |
+| paired warm suzanne | 3.0 · 3.2 ms | 3.2 · 3.4; **+0.2 ms, B faster in 12 of 60** — 57 thin triangles a frame, the difference is not the check's; the cold probe below has it the other way |
+| `probe-cold.mjs` bunny first / second / third frame | 71.5 / 20.5 / 15.9 ms | 53.2 / 12.1 / 11.2 ms |
+| `probe-cold.mjs` teapot · suzanne third frame | 6.5 · 6.9 ms | 5.9 · 5.6 ms |
+
+What remains: the 17,388 bunny triangles still walked, of which some 11,600
+write nothing — occluded only cell by cell, or by depths between their
+nearest corner and their samples — which no whole-triangle bound reaches;
+`thinEdge`'s remaining iterations are the arithmetic the walk needs;
+`plot3dArea`'s boxed sample arrays (F1182); `normaliseRow`'s byte scan.
+
