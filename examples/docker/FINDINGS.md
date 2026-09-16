@@ -53123,3 +53123,49 @@ re-read rather than substituted, because half of them were asserting a
 cancellation and the slot is not what they were about. Expected: every live
 case at the source's rate — 58 to 60 where the frame is under 16 ms — and T5.6's
 idle CPU unchanged, since a slot fires once per burst and not per second.
+
+**Closed — built and measured.** C03 I17 as sized: the fourth state, the slot
+armed as the write begins, the lapse, the cancels on a refused or throwing
+write. Thirteen assertions of *no timer after a frame* were re-read one by one:
+eight were asserting a cancellation and now assert the cancelled window is gone
+and the slot stands, five were asserting silence and hold unchanged because a
+refused write opens no slot. **The mutation pass found the harness, not the
+scheduler.** T4.17u's orbit read 41 frames over sixty-two wakes, in a
+`011 011 …` pattern, and a trace of arms and fires against the injected clock
+showed why: `wake` advanced the clock sixteen milliseconds and then drained the
+fake's timers, so a zero-delay wake armed at the end of one drain fired at the
+start of the next with the clock already moved — the ticker read it as sixteen
+late, armed the next wake for a full window, and that wake tied with the slot's
+close, where the fake fires the earlier-armed timer first. A real wake armed
+after a paint is due strictly inside the slot, so no real clock produces the
+tie; the helper now drains the first millisecond before the clock moves and the
+row reads 61. Mutation run `c03-resize-window`: eight of eight, SLOT-CANCELLED
+and LAPSE-WRITES added, WINDOW-SLIDES re-anchored on the widened guard. Gates:
+enforce green, 6,267 root rows, 458 goldens with no mover, 137 e2e — T5.1 and
+T5.6 both green at the first run, the idle row unmoved by a slot that lapses
+once per burst.
+
+| reading, F1199 build B against this build A, both pinned, sources at 16 ms, `make load-down`, 120×40, three paired rounds | B | A | CPU share, B → A |
+|---|---|---|---|
+| `stress live:line` (40), frames drawn per second | 49.0 | **57.5** | 23.2 → 28.3% |
+| `stress everylive` (46 forms) | 46.2 | **55.7** | 29.7 → 32.4% |
+| `stress livemesh:suzanne` (12 meshes) | 41.1 | **55.8** | 39.7 → 55.7% |
+| `plots orbit suzanne`, frames over the 4 s between `ORBIT_MS=2000` and `6000` | 40.0 · 37.5 · 42.0 | **56.3 · 59.5 · 57.0** | work p50 3.5 → 3.3 ms |
+| `stress stream` (200 parts) | 52.2 | **55.0** | 27.2 → 31.8% |
+| `stress spinners` (300) | 11.5 | **12.5** | the glyph interval, reached |
+| `stress session` (mixed) | 12.25 | 14.5 | 5.6 → 8.1% |
+| CPU per frame drawn, every live case | | within ±0.7 ms | the frame's cost did not move |
+| heap after `gc()` | | +0.4 to +0.7 MB on the live cases | more frames in the timeline |
+| every frame | byte-identical | | 458 goldens, 0 movers |
+
+Every live case is now at the source's rate less the fake-timer slop of Node's
+16 ms `setTimeout`, which lands at 17 to 18 — 55 to 58 of the 60 the sources
+ask for. The CPU share rises with the frames drawn and the cost per frame is
+flat, which is the shape the finding predicted.
+
+**What remains.** The rate is the source's, and the frame's cost is now the
+whole of what the CPU share pays for: 5.8 ms for forty-six live forms, 9.8 for
+twelve meshes, 4.8 for forty line plots. That is where the next findings go —
+the L4 visibility wrapper still at the top of the stream profile, the per-form
+render, the raster. `stream` at 55 rather than 58 is two hundred timers at 16 ms
+landing late together; not the scheduler's.
