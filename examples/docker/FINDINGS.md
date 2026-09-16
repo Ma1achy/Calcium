@@ -53007,3 +53007,42 @@ with `.some` over the range's entries; both are now cheap and neither is
 free. The frame rate did not move because the finding was never about the
 frame: 27 of a 30 ceiling in every row, which is the `stream` window's to move and
 the next finding's.
+
+## F1199 — the frame cadence is 30 a second by two constants written for a budget the goal has since doubled: `stream` at 33 ms and `ORBIT_MS` at 33 cap every live surface at 27 while the frame underneath costs 6 ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | C03's `stream` window (`src/terminal/frame-scheduler.ts` `WINDOWS`, 33 ms, *~30 frames/s ceiling, matching the A02 §7 budget*) and C22's `ORBIT_MS` (`src/shell/session.ts`, 33, *`stream`'s window*), which floors the orbit's and a GIF's wake where `synchronisedUpdate` holds. A02 §7's row reads *≤ 30 frames/s* for streaming and T5.1 asserts it from above at 30.4. |
+| **Reached for** | The goal names 60 and the F1196 matrix reads 27 on every live case: `stream` 25.4 and 25.7 fps, `live:line` 24.5, `everylive` 26.0, `livemesh:suzanne` 23.2, the suzanne orbit 26.5. A copy of this build with both constants at 16 (`out/dist-D`, `sed` on the built files, the bench's own refresh sources at 16 as well), two paired rounds each, `make load-down`, 120×40: |
+
+| case, sources at the cadence named | 33 ms window | 16 ms window | CPU share, 33 → 16 |
+|---|---|---|---|
+| `stream` (200 live parts, one-line render) | 25.4 · 25.7 fps | **46.2 · 49.5** | 31.0 → 27.9%, 29.0 → 27.7% |
+| `live:line` (40 live line plots) | 24.5 · 24.4 | **51.0 · 51.0** | 23.5 → 22.3%, 23.5 → 21.9% |
+| `everylive` (46 live 2-D forms) | 26.0 · 25.5 | **44.5 · 45.2** | 17.0 → 36.4%, 18.0 → 32.8% |
+| `livemesh:suzanne` (12 live meshes) | 23.2 · 22.0 | **39.7 · 41.0** | 27.2 → 44.0%, 29.7 → 41.3% |
+| `plots orbit suzanne`, frames over the 4 s between `ORBIT_MS=2000` and `6000` | 22.3 · 25.8 | **39.5 · 42.3** | work p50 4.8 → 3.7 ms |
+| `spinners` (300) | 11.7 · 11.7 | 11.5 · 11.2 | 3.5 → 6.3%, 4.1 → 5.7% |
+| `session` (mixed, a live plot at the tail) | 9.7 · 9.7 | 12.0 · 12.2 | 8.5 → 5.6%, 8.6 → 4.4% |
+
+The tree with its sources moved to 16 ms and the window left at 33 (`out/stress-A16.mjs`) draws 25 to 27 on every case — the source cadence is not the cap, the window is.
+
+| | |
+|---|---|
+| **Verdict** | **open.** Two of the three constants that set the rate are in the wrong place for the goal: C03's `stream` window and C22's `ORBIT_MS` say 30 because A02 §7 said 30 when they were written, and the frame they pace costs 0.5 to 6 ms. The third, `spinner` at 80, is the glyph interval and stays (F1197). Where the frame is cheap — a one-line render, a line plot — the 16 ms window draws twice the frames for the same CPU, because a frame's cost is the same whether it waits 16 or 33 for its turn and the sweep between frames is what the 33 was paying for. Where the frame is not cheap — every 2-D form at once, twelve meshes — the frames double and so does the CPU share, which is the price of drawing them and the next findings' business to lower. 60 is not reached at 16 either: 46 to 51 on the cheap cases, because the window is armed after the paint and the paint sits at the end of it (C22 I105's `#armSpinner`, T5.1's *window + frame cost + timer slop*). |
+
+**Remedy, sized.** C03 §3's `stream` row becomes **16 ms** with its reason
+rewritten — the ceiling is the display's, and *terminals benefit from fewer,
+larger writes* was the argument for 33 and is answered by DECSET 2026 where it
+holds and by I73's 100 ms cap where it does not; A02 §7's streaming budget
+becomes *≤ 60 frames/s*; C22's `ORBIT_MS` follows `stream` as I73 says it does.
+`resize` stays at 16 and is now equal to `stream` rather than shorter, so §8a A3
+and T3.16 restate their mechanism: a resize under a pending stream lands on the
+stream's own timer rather than re-arming it, and its 16 ms bound holds either
+way. Every row that carries the number is re-derived rather than substituted —
+T1.3, T1.4, T3.12, T6.13, C28 T4.3's window, T4.17u's sixty wakes, T4.17q's
+timeline, T5.1's ceiling at 62.5 with its CPU bound kept at a quarter of a core
+and measured before it is trusted. The walk rows in C22 §6i that were written
+against 33 keep their figures with the F1197 form of note. The bench's live
+sources move to 16 so the matrix measures the ceiling and not the source.
+Gates as always; goldens are cadence-blind and should not move.
