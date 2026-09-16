@@ -8,12 +8,14 @@ import { describe, expect, it } from "vitest";
 import {
   CELL_PER_UNIT_RANGES,
   cells,
+  clusterEnds,
   clusterWidth,
   displayCells,
   expandTabs,
   fitStyled,
   graphemes,
   hardWrapCells,
+  placeableClusters,
   rowCells,
   sliceCells,
   stripControl,
@@ -588,7 +590,85 @@ describe("C09 I74 — a unit of the rasterised alphabets is its own cluster unle
     expect(slow, "and table units the segmenter must still decide").toBeGreaterThan(300);
     expect(escaped, "and escapes placed between clusters").toBeGreaterThan(1000);
   });
-  it.todo("T1.49 (C09 I74, F1178): the five whole-text walks answer the segmenter's own clusters over a seeded corpus holding a carriage return before a line feed — not deferred on a component: the code commit replaces this row");
+  it("T1.49 (C09 I74, F1178): graphemes, clusterEnds, placeableClusters, hardWrapCells and wrapCellsParts answer the segmenter's own clusters over a seeded corpus of ASCII, Latin, controls, the table's units, every extender, Hangul, CJK, a Prepend, a flag and a pictograph, at every width", () => {
+    // **The reference is the segmenter itself**, iterated whole as the walks
+    // used to iterate it — not a reconstruction of the rule the walks apply.
+    const PIECES = [
+      "a", "bc", " ", "x y", "é", "ÿ", "ȧ", "˿", "­", "\t", "\r", "\n", "\r\n",
+      "─", "│", "█", "▄", "⠿", "→",
+      "́", "⃣", "ः", "‍\u{1F468}", "️", "\u{1F3FB}", "̀",
+      "한", "日本", "؀", "\u{1F1EC}\u{1F1E7}", "\u{1F44D}", "\u{1F468}",
+    ];
+    const EXT_FIRST = new Set(["́", "⃣", "ः", "‍\u{1F468}", "️", "\u{1F3FB}", "̀"]);
+    const isSolo = (s: string): boolean => s.length === 1 && s !== "\r" && (s.charCodeAt(0) < 0x300 || TABLE_BMP.some(([lo, hi]) => s.charCodeAt(0) >= lo && s.charCodeAt(0) <= hi));
+    const ends = (text: string): readonly number[] => {
+      const out: number[] = []; let at = 0;
+      for (const g of clustersOf(text)) { at += g.length; out.push(at); }
+      return out;
+    };
+    const SUB = placeableClusters("日", 1);
+    expect(SUB, "the substitute is one cell and not the cluster").not.toBe("日");
+    expect(cells(SUB)).toBe(1);
+    const rand = lcg(0x5eed_c09_49);
+    let fast = 0; let slow = 0; let crlf = 0; let wrapped = 0; let spaceCuts = 0;
+    for (let n = 0; n < 2000; n += 1) {
+      const count = 1 + Math.floor(rand() * 8);
+      const pieces: string[] = [];
+      for (let k = 0; k < count; k += 1) pieces.push(PIECES[Math.floor(rand() * PIECES.length)] as string);
+      const text = pieces.join("");
+      for (let k = 0; k + 1 < pieces.length; k += 1) {
+        if (isSolo(pieces[k] as string)) { if (EXT_FIRST.has(pieces[k + 1] as string)) slow += 1; else fast += 1; }
+      }
+      if (text.includes("\r\n")) crlf += 1;
+      const ref = clustersOf(text);
+      const label = `row ${n}: ${JSON.stringify(text)}`;
+      expect(graphemes(text), `${label}: graphemes`).toEqual(ref);
+      expect(clusterEnds(text), `${label}: clusterEnds`).toEqual(text.split("").every((ch) => ch >= " " && ch <= "~") ? [] : ends(text));
+      const total = cells(text);
+      for (let w = 1; w <= total + 1; w += 1) { // cells-ok — a width sweep
+        // `placeable` is private: an unplaceable cluster is one wider than the
+        // width, written as the substitute `SUB` — so the reference is the
+        // segmenter's clusters, each kept or substituted by its own width.
+        // `clusterWidth` is `placeable`'s own measure, where `cells` strips a control.
+        const fits = ref.every((g) => clusterWidth(g) <= w);
+        expect(placeableClusters(text, w), `${label}: placeableClusters at ${w}`).toBe(ref.map((g) => (clusterWidth(g) > w ? SUB : g)).join(""));
+        // **Every wrapped row begins on a boundary of its paragraph**, and is
+        // an exact slice at its `start` — of the paragraph as `wrapRuns` hands
+        // it over, every cluster already placed, since `start` counts the
+        // units the wrap wrote and a substitute is one unit.
+        for (const raw of text.split("\n")) {
+          const paragraph = placeableClusters(raw, w);
+          const bounds = new Set([0, ...ends(paragraph)]);
+          const rows = wrapCellsParts(paragraph, w);
+          let last = -1;
+          for (const row of rows) {
+            // **One cut the walk does not make**: `breakPoint` breaks after a
+            // space by code unit, so a space carrying an extender — a joiner,
+            // a mark — is cut inside its cluster, on this build and the one
+            // before it (F1179). The row names it rather than hiding it.
+            const afterSpace = row.start > 0 && paragraph.charAt(row.start - 1) === " ";
+            expect(bounds.has(row.start) || afterSpace, `${label}: wrap at ${w} starts row ${JSON.stringify(row.text)} at ${row.start}`).toBe(true);
+            if (afterSpace && !bounds.has(row.start)) spaceCuts += 1;
+            expect(row.start, `${label}: wrap at ${w} advances`).toBeGreaterThan(last);
+            last = row.start;
+            expect(paragraph.slice(row.start, row.start + row.text.length), `${label}: wrap at ${w} slices`).toBe(row.text);
+            wrapped += 1;
+          }
+        }
+        if (fits) {
+          const hard = hardWrapCells(text, w);
+          expect(hard.join(""), `${label}: hardWrapCells at ${w} is the text in pieces`).toBe(text);
+          let at = 0; const all = new Set([0, ...ends(text)]);
+          for (const row of hard) { at += row.length; expect(all.has(at), `${label}: hardWrapCells at ${w} cuts on a boundary`).toBe(true); }
+        }
+      }
+    }
+    expect(fast, "rows the fast path answers").toBeGreaterThan(2000);
+    expect(slow, "and units the segmenter must still decide").toBeGreaterThan(500);
+    expect(crlf, "and a carriage return before a line feed").toBeGreaterThan(30);
+    expect(wrapped, "and rows wrapped").toBeGreaterThan(10000);
+    expect(spaceCuts, "and the space cut inside its cluster, seen (F1179)").toBeGreaterThan(0);
+  });
 });
 
 describe("C09 §5 — the printable-ASCII path", () => {

@@ -213,21 +213,28 @@ function plainRun(text: string, i: number): number {
  * by the rows arm's `swallowed` too: after an SGR's `m`, one of these cannot
  * have joined the `m`.
  */
+const CC_CR = 0x0d;
+
 export function soloUnit(c: number): boolean {
   return inRanges(c, CELL_PER_UNIT_RANGES);
 }
 
 /**
  * Whether the unit at `i` is a whole cluster on its own, decided from the next
- * unit and never from the segmenter (C09 I74, F1177). By UAX #29 a character
- * that is not Hangul, a Prepend, a regional indicator or the joiner is followed
- * by a boundary unless the next unit is Extend, ZWJ or SpacingMark — and no
- * unit below U+0300 is any of those (Extend begins at U+0300 and the joiner
- * is U+200D), nor is any unit of the table. A plot row is eighty of these and no ASCII, and every one of them
- * went to `containing` for a segment record before this.
+ * unit and never from the segmenter (C09 I74, F1177, F1178). By UAX #29 a
+ * character that is not Hangul, a Prepend, a regional indicator or the joiner
+ * is followed by a boundary unless the next unit is Extend, ZWJ or SpacingMark
+ * — and no unit below U+0300 is any of those seven (Extend begins at U+0300,
+ * the joiner is U+200D, the first Prepend is U+0600), nor is any unit of the
+ * table. **The one exception below U+0300 is the carriage return**, which a
+ * line feed joins (GB3), so it always goes to the segmenter. A plot row is
+ * eighty table units and no ASCII, and a notice is ASCII prose the wrap
+ * segmented whole: every one of those units went to the segmenter for a
+ * segment record before this.
  */
 function soloAt(text: string, i: number): boolean {
-  if (!soloUnit(text.charCodeAt(i))) return false;
+  const c = text.charCodeAt(i);
+  if (c >= 0x300 ? !soloUnit(c) : c === CC_CR) return false;
   const n = text.charCodeAt(i + 1);
   return Number.isNaN(n) || n < 0x300 || soloUnit(n);
 }
@@ -581,7 +588,13 @@ export function sliceCells(
  */
 export function graphemes(text: string): readonly string[] {
   const out: string[] = [];
-  for (const { segment } of GRAPHEMES.segment(text)) out.push(segment);
+  let segments: Segments | null = null;
+  for (let i = 0; i < text.length; ) { // cells-ok — a code-unit cursor
+    const segment = soloAt(text, i) ? text.charAt(i) : clusterAt((segments ??= GRAPHEMES.segment(text)), i); // C09 I74
+    if (segment === "") break;
+    out.push(segment);
+    i += segment.length; // cells-ok — past the cluster
+  }
   return out;
 }
 
@@ -855,8 +868,12 @@ export function hardWrapCells(
   let line = "";
   let used = 0;
 
-  for (const raw of GRAPHEMES.segment(text)) {
-    const segment = placeable(raw.segment, limit);
+  let segments: Segments | null = null;
+  for (let i = 0; i < text.length; ) { // cells-ok — a code-unit cursor
+    const raw = soloAt(text, i) ? text.charAt(i) : clusterAt((segments ??= GRAPHEMES.segment(text)), i); // C09 I74
+    if (raw === "") break;
+    i += raw.length; // cells-ok — past the cluster
+    const segment = placeable(raw, limit);
     const w = clusterCells(segment, ambiguous);
     if (used + w > limit && line !== "") {
       out.push(line);
@@ -943,8 +960,12 @@ export function wrapCellsParts(
     let line = "";
     let lineStart = base;
     let used = 0;
-    for (const raw of GRAPHEMES.segment(paragraph)) {
-      const segment = placeable(raw.segment, limit);
+    let segments: Segments | null = null;
+    for (let i = 0; i < paragraph.length; ) { // cells-ok — a code-unit cursor
+      const raw = soloAt(paragraph, i) ? paragraph.charAt(i) : clusterAt((segments ??= GRAPHEMES.segment(paragraph)), i); // C09 I74
+      if (raw === "") break;
+      i += raw.length; // cells-ok — past the cluster
+      const segment = placeable(raw, limit);
       const w = clusterCells(segment, ambiguous);
 
       if (used + w > limit && line !== "") {
@@ -1031,7 +1052,13 @@ export function placeableClusters(text: string, width: number): string {
   }
   if (ascii) return text;
   let out = "";
-  for (const { segment } of GRAPHEMES.segment(text)) out += placeable(segment, limit);
+  let segments: Segments | null = null;
+  for (let i = 0; i < text.length; ) { // cells-ok — a code-unit cursor
+    const segment = soloAt(text, i) ? text.charAt(i) : clusterAt((segments ??= GRAPHEMES.segment(text)), i); // C09 I74
+    if (segment === "") break;
+    i += segment.length; // cells-ok — past the cluster
+    out += placeable(segment, limit);
+  }
   return out;
 }
 
@@ -1054,7 +1081,10 @@ export function clusterEnds(text: string): readonly number[] {
   if (ascii) return [];
   const out: number[] = [];
   let at = 0;
-  for (const { segment } of GRAPHEMES.segment(text)) {
+  let segments: Segments | null = null;
+  while (at < text.length) { // cells-ok — a code-unit cursor
+    const segment = soloAt(text, at) ? text.charAt(at) : clusterAt((segments ??= GRAPHEMES.segment(text)), at); // C09 I74
+    if (segment === "") break;
     at += segment.length; // cells-ok — a code-unit cursor
     out.push(at);
   }

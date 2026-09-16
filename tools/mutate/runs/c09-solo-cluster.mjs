@@ -13,6 +13,13 @@
 // whatever follows. T1.48's selector pair measures one cell where two are
 // counted, and the window of one over a marked unit loses the mark.
 //
+// **Since F1178 the rule covers every unit below U+0300 but the carriage
+// return, and the five whole-text walks take it.** The return admitted as
+// solo splits `\r\n`, which T1.49's corpus holds; the rule narrowed back to
+// the table moves no byte and is caught only by T3.85's ask count, which is
+// why that file is in the command; a whole-text walk skipping the segmenter
+// splits a mark from its base where the wrap cuts a row.
+//
 // **Left out, with its reason.** *The joiner admitted as a unit that cannot
 // extend* was written and survived on the first run: U+200D lies above
 // U+0300, so the clause excepting it below U+0300 could never fire and the
@@ -22,7 +29,7 @@ import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const CMD = "npx vitest run test/unit/text.test.ts test/unit/rows.test.ts test/golden/plot-meshes.test.ts";
+const CMD = "npx vitest run test/unit/text.test.ts test/unit/rows.test.ts test/edge/text-cursor.test.ts test/golden/plot-meshes.test.ts";
 const TEXT = "src/presentation/text.ts";
 const ROWS = "src/presentation/rows.ts";
 
@@ -68,6 +75,45 @@ const results = runPass({
       from: "  if (Number.isNaN(next) || next < 0x300 || soloUnit(next)) return 0;",
       to: "  if (Number.isNaN(next) || next < 0x300 || soloUnit(next) || true) return 0;",
       expect: "T1.46",
+    },
+    {
+      // **The carriage return admitted as solo**: `\r\n` is two clusters to
+      // the walks and one to the segmenter, and `graphemes` parts from it.
+      name: "CR-ADMITTED: a carriage return is its own cluster before a line feed",
+      file: TEXT,
+      from: "  if (c >= 0x300 ? !soloUnit(c) : c === CC_CR) return false;",
+      to: "  if (c >= 0x300 ? !soloUnit(c) : false) return false;",
+      expect: "T1.49",
+    },
+    {
+      // **The rule narrowed back to the table**: no byte moves, and the `é`
+      // row asks the segmenter twice where T3.85 pins zero.
+      name: "LATIN-EXCLUDED: only a table unit is solo",
+      file: TEXT,
+      from: "  if (c >= 0x300 ? !soloUnit(c) : c === CC_CR) return false;",
+      to: "  if (!soloUnit(c)) return false;",
+      expect: "T3.85",
+    },
+    {
+      // **The wrap never asks the segmenter**: a mark is its own cluster to
+      // the walk, and a row can begin on it.
+      name: "WRAP-UNSEGMENTED: wrapCellsParts takes every unit as a cluster",
+      file: TEXT,
+      from: "      const raw = soloAt(paragraph, i) ? paragraph.charAt(i) : clusterAt((segments ??= GRAPHEMES.segment(paragraph)), i); // C09 I74",
+      to: "      const raw = paragraph.charAt(i); // C09 I74",
+      expect: "T1.49",
+    },
+    {
+      // **The placeable pass never asks**: a pictograph's two units are two
+      // clusters, each a surrogate half of no width, and at a width of one
+      // the pass keeps both where the segmenter's one cluster is substituted.
+      // **Written first as a function nothing called** and survived as a
+      // no-op on the first run; T6.121 records it.
+      name: "PLACEABLE-UNSEGMENTED: placeableClusters takes every unit as a cluster",
+      file: TEXT,
+      from: "    if (segment === \"\") break;\n    i += segment.length; // cells-ok — past the cluster\n    out += placeable(segment, limit);",
+      to: "    i += 1;\n    out += placeable(text.charAt(i - 1), limit);",
+      expect: "T1.49",
     },
   ],
 });
