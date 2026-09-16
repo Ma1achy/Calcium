@@ -53046,3 +53046,42 @@ and measured before it is trusted. The walk rows in C22 §6i that were written
 against 33 keep their figures with the F1197 form of note. The bench's live
 sources move to 16 so the matrix measures the ceiling and not the source.
 Gates as always; goldens are cadence-blind and should not move.
+
+**Closed — built and measured.** C03 §3 and C22 I73/I105 as sized, plus one
+ruling the sizing did not see: with `stream` and `resize` both at 16 the two
+tie on strictness, and T1.24 read `stream` — the last reason committed — for a
+frame that was a repaint. C03 I16 now breaks an equal window for `resize`,
+because the frame it drives is a repaint (I7) and the reason handed down should
+say so; T6.18 names the flattening and `c03-resize-window` mutates it. Every
+row carrying the number was re-derived rather than substituted; two needed
+more than substitution — T6.2's five commits at 5 ms apart crossed a 16 ms
+window, and T4.17u over sixty 16 ms wakes read ten spinner frames where the
+eleventh landed on 960 exactly, so it runs sixty-two. Mutation runs:
+`c22-ticker-period` six of six with STREAM-33 and ORBIT-33 added, both caught
+by T4.17u's orbit bound; `c03-resize-window` six of six with TIE-FLAT added.
+Gates: enforce green, 6,266 root rows, 458 goldens with no mover, 137 e2e —
+T5.1 held at the 62.5 ceiling and 40/s floor on the first run.
+
+| reading, F1198 build B against this build A, both pinned, sources at 16 ms in both benches, `make load-down`, 120×40, three paired rounds | B | A | CPU share, B → A |
+|---|---|---|---|
+| `stress stream` (200 live parts), frames drawn per second | 26.5 | **51.8** | 24.6 → 24.4% |
+| `stress live:line` (40) | 25.0 | **48.5** | 21.6 → 25.2% |
+| `stress everylive` (46 forms) | 25.0 | **46.2** | 23.0 → 34.5% |
+| `stress livemesh:suzanne` (12 meshes) | 23.7 | **41.2** | 24.8 → 39.9% |
+| `plots orbit suzanne`, frames over the 4 s between `ORBIT_MS=2000` and `6000` | 24.8 · 26.0 · 24.5 | **43.0 · 41.8 · 41.8** | work p50 3.6 → 3.6 ms |
+| `stress session` (mixed) | 9.75 | 12.0 | 7.4 → 5.6% |
+| `stress spinners` (300) | 11.5 | 11.5 | 6.2 → 3.7% |
+| `stress text`, `bigpatch` — key and type latency p50/p95 | 0.04/0.13 · 0.07/0.18 ms | 0.03/0.11 · 0.06/0.19 ms | static, unchanged |
+| heap after `gc()`, the live cases | | **+0.7 to +1.6 MB** | more frames in the profiler's timeline over the same 4 s |
+| every case, frames | byte-identical | | 458 goldens, 0 movers |
+
+**What remains.** Sixty is the ceiling and 46 to 52 is the rate, because the
+window is armed after the paint and the paint sits at the end of it: at a 16 ms
+window a 5 ms frame is a 21 ms period. The path from here to 60 is the frame's
+cost, not the cadence — the per-patch path for live plots, the render of each
+2-D form, the mesh raster — which is where the next findings go. The heavy
+cases pay for their doubled frames in CPU share (every-live 23 → 34%, twelve
+meshes 25 → 40%) and that is the same frame cost seen from the other side. The
+spinner stays at its glyph interval by design (F1197), and the orbit without
+DECSET 2026 at I73's 100 ms cap. The heap rise is the timeline's, not the
+frame's, and reads as such in `misses`.
