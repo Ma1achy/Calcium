@@ -53392,24 +53392,33 @@ Per paragraph the micro-bench's 94 µs is now the cursor's few. T1.53's corpus f
 one edge the spec row had over-stated: at the sweep's top width the answer is the
 line itself, not `width` cells, and the row was amended before the code landed.
 
-## F1206 — the paced slot is dated from the arm, so every timer's lateness is added to the period and a 16 ms window draws 54 to 58 frames a second ★★★★☆
+## F1206 — a live part's next poll is dated from the fetch it just finished, so a 16 ms cadence draws 55 frames a second ★★★★☆
 
 | | |
 |---|---|
-| **Surface** | C03's `paced` machine (C03 I17) arms one timer for the shortest coalesced window as each write begins, through the `schedule` C22 hands it — `setTimeout` at the boundary. Node's timer fires late by its own granularity and the loop's turn — one to three milliseconds — and the next window is armed from the moment it fires, so the lateness is never recovered: the period is *window + slop*, every frame. Nothing in C03 can correct it, because C03 has no clock (C03 I11, A03 SS1) and the timer reports only that it fired. |
-| **Reached for** | The goal names 60 frames a second and no case reads it. `stress` at 120×40 on the F1205 tree: `stream` **58.5** fps, `everylive` **54.7**, `live:line` **54.2** — each under a 16 ms window with a 3.6 to 6.7 ms frame — and `spinners` 12.48 against an 80 ms cadence. A probe of Node's timer alone (`out/probe-pace.mjs`, a 1 ms busy frame): `setTimeout(16)` re-armed on firing paces at **52.9** fps, period 18.9 ms; `setTimeout(15)` 52.4; the same timer armed for *`lastDeadline + 1000/60 − now`* paces at **59.96**, period 16.678 ms; and with a `setImmediate` for a sub-millisecond remainder 59.98. The slop is the timer's and it is recoverable by dating consecutive windows end to end. |
+| **Surface** | `settleSource` (`src/shell/refresh.ts`): `src.dueAt = at + interval`, where `at` is the moment the fetch settled. The timer that woke the poll fired late by Node's granularity, the fetch took what it took, and the next deadline is set from the far end of both — so a part declared `every: 16` is polled every `16 + fetch + slop`, and the shortfall compounds rather than being recovered. C22 I105 already solved this shape for the spinner (*whole intervals from the stamp, never the interval counted from the paint*) and the poll was written the other way. |
+| **Reached for** | The goal names sixty frames a second and no live case reads it. `stress` at 120×40: `stream` **55.5** fps, `live:line` **55.3**, `everylive` **54.7** — each a 16 ms part with a 3.6 to 6.7 ms frame, so the cost of the frame is not what caps them. A preload logging every `setTimeout` window and its lateness (`out/log-pace.mjs`): the 16 ms window is armed **1,111 times in a `stream` run with a median lateness of 1.66 ms and a 90th of 4.95**, and it is `armParts` in the refresh driver — 16 + 1.66 + the promise hop is 18 ms, which is 55 fps to the frame. |
 | **Verdict** | **Open.** |
 
-**Remedy, sized.** A paced `schedule` in C22, where the clock is injected: it remembers
-the deadline of the last slot it armed, and a window armed after that deadline has
-passed and within one window of it is dated from the deadline rather than from now —
-consecutive windows lie end to end, and a late firing shortens the next delay by what it
-was late. A disposed slot seeds nothing; an arm more than a window after the last
-deadline starts from now, so a lone commit's latency is unchanged. The period is held at
-no less than one sixtieth of a second — A02 §7's ceiling as a rate — since a 16 ms
-window dated end to end would draw 62.5. C03 is not changed: its windows remain the
-integer ceilings on each gap, and I17's *period is the window* becomes literally true
-through the composed schedule. One C22 invariant, a unit row over the chain, a wiring
-row through the composed Tui, a fail-on-revert row, a mutation run whose control dates
-every window from now; the acceptance is the three live cases at 59.5 or better and the
-spinner at 12.5.
+**The first remedy was built, measured and withdrawn, and the measurement is the finding.**
+The entry opened on C03's paced slot: the scheduler arms the next window when the last
+timer fires (C03 I17), so the lateness joins the period there too, and a probe of Node's
+timer alone confirmed the arithmetic — `setTimeout(16)` re-armed on firing paces at
+**52.9** fps against **59.96** for the same timer dated from the last deadline. C22 I108
+was specified, built as `pacedSchedule`, covered 4/4 by `c22-paced-schedule` with a
+control, and green through enforce, the suite and the goldens. Then it was measured:
+`stream` 55.5 → 54.7, `live:line` 55.3 → 55.0, `everylive` 54.7 → 57.2 — flat inside
+the spread — while `session` fell **14.7 → 12.7** fps and `spinners` moved off its 12.50
+design to 13.0. A second preload counting slots against cancels says why: of **706 paced
+slots armed in a `stream` run, 10 fired and 695 were cancelled** by an immediate commit
+before they closed. C03's slot is almost never what closes a frame under a live load, so
+pacing it moves nothing and its floor only widens the coalescing window. The invariant
+went back out (commit `747af079`) rather than stand on a measurement it did not have.
+**A correct mechanism at the wrong seam measures as nothing, and only the paired bench
+tells that from a fix** — the mutation pass, the goldens and the gates were all green on it.
+
+**Remedy, sized.** `settleSource` dates the next deadline from the last one — `dueAt +
+interval` — and from the settle only when the settle is more than an interval past it,
+which is the far side being slower than its own cadence and must not build a backlog.
+One C23 invariant, a contract row over a fast source, a slow one and a backoff, a
+fail-on-revert row, a mutation run whose control dates every poll from the settle.
