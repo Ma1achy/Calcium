@@ -56,6 +56,7 @@ import { Cameras } from "./cameras.js";
 import { Frames } from "./frames.js";
 import { CursorPositions } from "./cursor-positions.js";
 import { SeriesVisibility } from "./series-visibility.js";
+import { VisibleIds } from "./visible-ids.js";
 import { RenderScratchStore } from "./render-scratch.js";
 import { ScrollOffsets } from "./scroll-offsets.js";
 import { createOverlayManager, takesInput } from "../viewport/overlay/index.js";
@@ -1510,6 +1511,10 @@ export async function constructGraph(
    */
   let suppressBackground = false;
 
+  // **The visible range's ids as a set** (C22 I106, F1201). Not on the graph
+  // and not on the drop subscription: it holds no entry state, it is keyed on
+  // the range object C14 I30 returns, and its one reader is the gate below.
+  const visibleIds = new VisibleIds();
   const pipeline = at("pipeline", () => {
     const p = config.pipeline({
       // A function, not a snapshot: the store freezes a fresh object per write,
@@ -1586,7 +1591,7 @@ export async function constructGraph(
        */
       visible: (host) =>
         host.kind === "view" ||
-        stores.viewport.visible().entries.some((e) => e.id === host.id),
+        visibleIds.of(stores.viewport.visible()).has(host.id), // C22 I106
       confirm,
       theme: stores.theme,
       // **On the change, not at exit** (I40). Fire-and-forget for the same
