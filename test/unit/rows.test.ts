@@ -183,3 +183,5 @@ describe("C09 I72 — normaliseRow", () => {
     expect(composeRow([{ x: 0, row: "abc" }, { x: 1, row: "|" }])).toBeNull();
   });
 });
+
+it.todo("T1.50 (C09 I75, F1180): a plot-shaped row normalises with no Set constructed and split never called — not deferred on a component: the code commit replaces this row");
