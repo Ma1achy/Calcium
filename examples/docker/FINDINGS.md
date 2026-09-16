@@ -52775,3 +52775,29 @@ narrowed barrel (C24 I37) are what the launchers do about them. The `minimal`
 example's launcher still carries neither R4.6 nor R4.7 by R4.4's rule. The
 next figure on a cold start is Node itself — about 40 ms before the first
 line of the launcher runs — and it is not Calcium's.
+
+## F1194 — a sixty-second orbit grows the live heap by half a megabyte a second, and every byte of it is the bench harness's: the session holds no frame it has painted ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | Session memory under sustained frames — the bunny in orbit through `tools/bench/plots.mjs`'s session over `fakeStdout`/`fakeStdin`, the F1193 build, `make load-down`. |
+| **Reached for** | A copy of the bench with the orbit's duration from the environment and a forced GC every three seconds, `process.memoryUsage()` read after each: **bunny, profiler on, 60 s — live heap 64.7 → 93.0 MB, 0.52 MB/s, 412 frames (about 70 KB a frame)**; profiler off, 45 s — 63.9 → 81.7, 0.46 MB/s; suzanne, 45 s — 55.1 → 69.3, 0.36 MB/s, 333 frames (about 49 KB a frame). Linear in every run, so not the profiler's and not the mesh's size. `--heap-prof` over a 30-second orbit, live at exit: 11.7 MB of strings allocated in `fitStyled` under `exact` under the transcript's paint — one frame's rows per frame, all still reachable — beside the fixed costs (13.0 MB module source text in the loader, 6.6 `parseObj`, 5.4 `geometryOf`, 4.0 the mesh's `deepFreeze`, 3.8 `unitCube`). The holder is `fakeStdout`: `write(chunk)` pushes every chunk onto an array the bench reads screens from, unbounded. **With that array emptied every three seconds, the same 45-second bunny orbit: 62.6 → 62.9 MB, 0.007 MB/s** — fourteen readings within 300 KB of each other. |
+| **Verdict** | **checked — clear.** The session retains nothing per frame; the render cache, the parts and the plan slots are one per entry and replace. The reading that said otherwise was the instrument's. |
+
+**What the instrument does to every other reading.** `fakeStdout.chunks` is
+how the bench reads the screen (`screenRows`), and it is also why every
+`ResourceSample.rss` a bench reports climbs for the length of the run: the
+subject's process is carrying the harness's transcript of itself. A bench
+figure for memory is the last sample minus the first, and here the whole of
+that difference was the harness. The arm that settles it is cheap and is now
+in the soak copy: drop the chunks and read again; a slope that survives is the
+subject's. Recorded rather than fixed in `fakes.mjs` — `screenRows` parses the
+chunk stream from the last full repaint and a cap would need to know where
+that is — so the rule is the reading's: **a memory figure taken over a fake
+that records is the recording's until the recording is emptied.**
+
+**What the fixed set says.** RSS sits at about 220 MB through a bunny orbit
+and does not move once the chunks are dropped; the heap's floor is the mesh
+(the parsed OBJ, the frozen geometry object graph, the typed geometry — about
+20 MB for 69k faces) and the loader's retained source text, which is Node's.
+No remedy is owed here; the number is the record for the next reading.

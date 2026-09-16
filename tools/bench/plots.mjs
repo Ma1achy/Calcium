@@ -56,7 +56,13 @@ if (SIZE_ARG === null) {
 const SIZE = { columns: Number(SIZE_ARG[1]), rows: Number(SIZE_ARG[2]) };
 const REPS = Number(process.argv[4] ?? (SCENARIO === "forms" ? 10 : 40));
 const RUNG = SCENARIO.startsWith("orbit") ? (process.argv[5] ?? "bunny") : null;
-const ORBIT_MS = 2_000;
+// `ORBIT_MS` from the environment for a soak (F1194); `SOAK=1` empties the
+// fake's chunk record every three seconds, forces a GC where `--expose-gc`
+// allows one, and prints the live heap series — the reading F1194 needed and
+// the reason it needed it: `fakeStdout` records every byte written, so a
+// memory figure over it is the recording's until the record is emptied.
+const ORBIT_MS = Number(process.env.ORBIT_MS ?? 2_000);
+const SOAK = process.env.SOAK === "1";
 
 const ESC = String.fromCharCode(27);
 const KEY = {
@@ -220,7 +226,21 @@ if (SCENARIO === "all") {
   // the caption declares none, so the second `↓` lands on the plot (C12 I85).
   await press(KEY.down, 2, 2);
   await press("o", 1, 2); // orbit on; the framework commits `stream` at its own rate
+  const live = [];
+  const soak = SOAK
+    ? setInterval(() => {
+        stdout.chunks.length = 0;
+        globalThis.gc?.();
+        const m = process.memoryUsage();
+        live.push([Math.round(performance.now() - t0), m.heapUsed, m.rss]);
+      }, 3_000)
+    : null;
   await sleep(ORBIT_MS);
+  if (soak !== null) {
+    clearInterval(soak);
+    console.log("\n## live heap after a forced GC, every 3 s (SOAK=1, chunks dropped)");
+    for (const [at, heap, rss] of live) console.log(`${String(Math.round(at / 1000)).padStart(4)} s  heap ${(heap / 1048576).toFixed(1).padStart(6)} MB  rss ${(rss / 1048576).toFixed(0).padStart(4)} MB`);
+  }
   await press("o", 1, 2); // orbit off
   await settle(4);
 } else {
