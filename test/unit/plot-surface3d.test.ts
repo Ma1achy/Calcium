@@ -1455,3 +1455,7 @@ describe("C12 I137 — the builder's normals live in two lanes", () => {
     expect(zeroNormals, "the degenerate faces have the zero normal, kept").toBe(2);
   });
 });
+
+describe("C12 I138 — a hidden thin triangle is not walked", () => {
+  it.todo("T1.150 (C12 I138, F1183): a triangle hiddenThin marks has no edge sample writeDepth would accept, the two rounding cases are not marked, and plot3d.hidden counts the skipped triangles — not deferred on a component: the code commit replaces this row");
+});
