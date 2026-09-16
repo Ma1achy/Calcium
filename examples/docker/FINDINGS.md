@@ -52544,3 +52544,67 @@ image frame and the series toggle stay in the compound focus slot (F1189).
 The registry's `#measured` still measures a form again to commit its height
 (F942's second half), memoised across frames by C22 I100 and paid once per
 block within a call.
+
+## F1192 — Ink's one `throttle` loads es-toolkit's compat barrel: 1,319 of a cold start's 2,442 modules for one function, and a fifth of the import under the compile cache ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | Startup. `node_modules/ink/build/ink.js:3` — `import { throttle } from 'es-toolkit/compat';` — and es-toolkit 1.50's `dist/compat/index.mjs`, a barrel of 295 lines that imports every compat function it re-exports. The barrel's own `throttle` is `./function/throttle.mjs`, which imports `debounce` and nothing else. |
+| **Reached for** | `test/support/import-trace.mjs` over a cold import of `dist/index.js` (F1191 build), container-local copy, `make load-down`, load average 1.1–1.7: **2,442 modules, 1,319 of them under `es-toolkit/`** — more than half the graph, against 369 for `presentation/`, 232 for `data/`, 100 for `ink`, 42 for `react`, 18 for `highlight.js`. The barrel's marginal import, measured first in its own process: 64–91 ms cold, 46–72 ms under the compile cache, three readings each. A resolve hook that hands Ink `compat/function/throttle.mjs` in the barrel's place: **1,130 modules, 3 of them es-toolkit's.** Paired against the plain import, interleaved, six pairs a condition — no compile cache A 274 / 223 / 243 / 232 / 235 / 236 ms, B 246 / 188 / 208 / 189 / 212 / 214, B lighter six of six, paired median **−27 ms**; under the compile cache A 195 / 218 / 214 / 195 / 217 / 197, B 157 / 165 / 165 / 158 / 170 / 162, six of six, paired median **−44 ms of about 205, 21%**. |
+| **Verdict** | **open** — measured, the remedy sized |
+
+**Why it is Calcium's to fix and not the consumer's.** F1164 spent the
+startup list down to "the loader — about 250 ms container-local of which the
+CommonJS lexer is 60, the ESM compile 33 and format detection and package-
+scope reads most of the rest — the shape only bundling changes", and F1188
+left `ink`'s own graph as "the largest piece left of a cold import (262 ms
+alone, cold) and it is the renderer". Both read Ink's graph as Ink's. Counting
+it by package says otherwise: Ink is a hundred modules and the thirteen
+hundred behind it are a barrel loaded for one named import, which the
+`registerHooks` API Node 22.15 shipped (the same one `import-trace.mjs` is
+built on) can redirect before the loader reads a single one of them. A
+consumer cannot do this: C24 is what hides Ink from a consumer, and a launcher
+recipe that names Ink's import line and es-toolkit's file layout would be a
+recipe about two packages the consumer never chose. It goes beside the Mermaid
+entry (C24 I36): a subpath a launcher imports before the app, because a static
+import of the barrel hoists past anything in the same module — R01 R4.6's
+argument for the compile cache, verbatim.
+
+**Why a bare narrow specifier does not work, measured.** es-toolkit's export
+map has `"./compat/*": "./compat/*.mjs"` — package-root-relative, and the
+package ships `compat/*.d.mts` there and no `.mjs`, so
+`es-toolkit/compat/function/throttle` resolves to a file that does not exist
+(`ERR_MODULE_NOT_FOUND`, three of three). The form that holds resolves the
+barrel as Ink asked and rewrites the resolved URL's `compat/index.mjs` to
+`compat/function/throttle.mjs` — inside whichever copy of es-toolkit the
+loader chose — and keeps the barrel when that file is not on disk (measured:
+a wrong name falls back, 2,446 modules, no error).
+
+**What makes it exact rather than hopeful.** A `resolve` hook cannot see which
+names an import binds, so on its own it would link `debounce` against a file
+that exports `throttle` the day Ink imports two names — a `SyntaxError` at
+start for a startup optimisation. So the redirect is *armed* by a `load` hook
+that reads Ink's source as the loader hands it over and matches the import
+line byte for byte; any other text leaves the barrel in place. Both failure
+modes — line changed, file gone — land on today's behaviour.
+
+**Remedy, sized.** `@fmx/calcium/launch` (C24 §2's sixth entry, **C24 I37**),
+one export `prepareLaunch()` that registers the two hooks; the docker and
+plots launchers call it between `enableCompileCache()` and the app import
+(R01 **R4.7**, **R5.9**). T5.7 is the graph row: a child under
+`import-trace.mjs` that calls `prepareLaunch()` and imports `dist/index.js`
+lists under ten es-toolkit modules and none of the barrel's re-exports, while
+the same child without the call lists over a thousand — the fabricated
+violation run in the same row so the instrument is shown to see the barrel;
+and the child renders a block through Ink afterwards, because a redirect that
+links and does not run is the case a graph row cannot see. T1.12 holds the
+arming text against the exact line and against a two-name import. About 60
+lines of `src/launch.ts`, one line in each of two launchers, and a mutation
+run `c24-launch.mjs` whose control is a hook that never arms.
+
+**Not on the list.** The `minimal` example's launcher carries neither the
+compile cache nor this; it is the stranger's example (R4.4) and stays two
+lines. Ink importing `es-toolkit/compat/function/throttle` itself would make
+the hook a no-op, and that is a one-line change upstream — recorded here, not
+sent from here. Yoga's WebAssembly instantiation (22–38 ms) and React's 7–16
+are the renderer's floor and stay.
