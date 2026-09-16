@@ -53540,3 +53540,48 @@ firing from that slot's deadline and dating every other arm from now, floored at
 `elapsed` and broke C28 T5.1c and T5.1d. One C22 invariant, a unit row over the chain, a
 wiring row through the composed session, a fail-on-revert row, a mutation run whose
 control floors at twenty.
+
+## F1208 — the frame cadence is exactly sixty and the rate is not, because ten to thirty frames in fifteen hundred are eaten by garbage collection ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | The render path's allocation rate. Sampled with the inspector's heap profiler over a 20-second `live:line` run, with both collected-by-GC flags set so garbage is counted and not only what survived: **2,400 MB allocated in twenty seconds**, about 120 MB/s or **2 MB per frame**. `--trace-gc` over the same case shows pauses of 57.3, 24.7, 23.6, 12.8, 11.6 and 8.7 ms, and a scavenge clearing about 13 MB every 130 ms. |
+| **Reached for** | With C22 I108 landed (F1207) the cadence is correct and the shortfall is entirely stalls. Over 25 seconds a perfect sixty is 1,500 animation frames. Measured, with every inter-frame gap longer than 20 ms totalled and charged against the budget: `stream` loses **13.8** frames to 16 long gaps against a measured deficit of **14**; `live:line` loses **25.2** to 18 gaps against **30**; `everylive` loses **8.8** to 10 gaps against **10**. The longest gaps are 72.9, 119.9 and 50.8 ms, which is the major-GC pause and host scheduling, not a frame. |
+| **Verdict** | **Open.** |
+
+**This is what is left between 59.4 fps and 60.0, and it is not in the frame path.** F1207
+pinned the window at one sixtieth of a second and the period holds; what the rate loses is
+whole multi-frame pauses, and a pause of 120 ms is seven frames whatever the scheduler does.
+So the remaining work on the frame rate is **allocation**, and it is the same axis the
+standing goal names for memory.
+
+**Where the garbage is**, self-size, as a share of all allocation over the run:
+
+| share | site |
+|---|---|
+| 15.7% | `mergedRow` (`src/presentation/plot/definition.ts`) |
+| 10.8% | `normaliseRow` (`src/presentation/rows.ts`) |
+| 6.9% | `Array.prototype.push` growth |
+| 3.2% | `cells` (`src/presentation/text.ts`) |
+| 3.0% | `stripControl` (`src/data/text.ts`) |
+| 2.5% | `channel` (`src/terminal/escapes.ts`) |
+
+**One remedy was tried and measured as nothing, which is recorded here so it is not tried
+again.** `mergedRow` declares `const peers: { ref, ink }[] = []` **per cell** — about 110
+cells by 30 rows by 60 frames a second — and hoisting it to two parallel arrays reused down
+the row, cleared per cell, left the profile **byte-identical at 15.7% and 394 MB**. V8's
+escape analysis had already removed it: the array never leaves the function. The attribution
+is to the function's own frame and not to that line, so the real cost inside `mergedRow` is
+the span records, the `run += cell` string building and the per-layer cell arrays, none of
+which escape analysis can reach. See the sibling reading in F1152 and F1156 — a cache of a
+scalar-replaced record is an allocation, and the inverse holds too.
+
+**Sized.** The instrument exists (`out/alloc.mjs`, a preload starting
+`HeapProfiler.startSampling` with `includeObjectsCollectedByMajorGC` and
+`...MinorGC`, walking the tree by self size) and so does the period reader
+(`out/period.mjs`, which totals every inter-frame gap over 20 ms and converts the excess to
+frames). **Acceptance is the frame accounting and not the fps figure**: gaps over 20 ms
+should fall, and the deficit from 1,500 should fall with them. The fps median is too noisy
+on a loaded host to be the gate — F1207's close carries that argument and the numbers behind
+it.
+
