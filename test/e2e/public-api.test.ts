@@ -17,6 +17,10 @@ import { FULL_CAPS } from "../support/render.js";
 
 const execFileP = promisify(execFile);
 
+describe("C24 I37 — prepareLaunch narrows Ink's es-toolkit import to one module", () => {
+  it.todo("T5.7 (C24 I37, F1192): a child under the import trace calling prepareLaunch() then importing dist/index.js lists under ten es-toolkit modules and none of the barrel's re-exports, the same child without the call over a thousand, and the armed child renders a block through the registry; exports[\"./launch\"] resolves to ./dist/launch.js — not deferred on a component: the code commit replaces this row");
+});
+
 describe("C24 I36 — the Mermaid renderer is off the runtime barrel's graph", () => {
   it("T5.6 (C24 I36, F1188): a child importing dist/index.js under the import trace loads nothing from beautiful-mermaid or elkjs and exports no mermaidCode; after importing dist/mermaid.js the renderer is in the list and the rendering equals the contract corpus's; the exports map names the entry", async () => {
     const here = new URL("../support/", import.meta.url);
