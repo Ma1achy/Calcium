@@ -52114,3 +52114,37 @@ What remains: the thin path's 3.7 ms (`thinEdge` and `hiddenThin`);
 `plot3dArea`'s boxed sample arrays (F1182, 31.6 MB of the sample);
 `shadeAt`'s 6.5 MB at `hypot3` and `Math.pow`; `normaliseRow`'s byte scan;
 the builder's 17 ms warm on the bunny.
+
+## F1187 — a fullscreen patch scroll step walks every line of the patch about thirty times: 5.3 ms at 5,000 lines, 103 ms at 50,000, and the cost has no bound ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/patch/window.ts` and `src/shell/patch-view.ts`: `rowsOf` builds one `Row` per screen row of the whole patch — `unitsOf` per hunk, `changedRuns` and `pairedRows` over sliced arrays in split layout — and `numberWidth` walks every line; `windowPatch` calls `clampOffset`, which calls `rowsOf` and `bottomOffset`, which calls `rowsOf` and then `build` — itself `rowsOf` and `numberWidth` — once per step of a binary search over every row a window may begin at; then `build` again for the window. `move` in the view calls `hunkHeaderRows` (`rowsOf`), `clampOffset` (the whole of the above) and `windowPatch` (all of it again) |
+| **Reached for** | `tools/bench/patch-window.mjs` on the F1186 build, `make load-down`: one `windowPatch` at 200×50 is **5.3 ms median at 5,000 lines (3,335 rows), 35.7 ms at 20,000, 102.9 ms at 50,000** — linear in the patch, not the window. Its CPU profile: `numberWidth` 24.9%, `unitsOf` 21.0%, the collector 20.7%, `rowsOf`'s row literals 15.1%, `build` 8.1%. By the call graph a `windowPatch` is 3 + ⌈log₂ starts⌉ walks of `rowsOf` — about 15 at 3,335 rows — and a view motion roughly twice that. The framework-wide profile (`out/prof-ev`) has the same four functions at the top of the scripted session's self time — `unitsOf` 35 ms, `numberWidth` 19 ms, `pairedRows` 12 ms over 211 frames of a 2,000-line patch — so the cost is paid in the transcript's inline window too, through `windowRows`, once a frame |
+| **Verdict** | **open** — measured, the remedy sized |
+
+**Why it has no bound.** Every function here is written as a pure function
+of the patch, so each derives the rows from scratch — and the rows are a
+property of the block and the width, not of the offset. A scroll step
+changes the offset alone. The design that made every function independent
+is what makes a keystroke cost the whole document; SS24 forbids module
+state in `patch/`, and correctly, so the derived form has to be handed in
+by a caller that owns it.
+
+**Remedy, sized.** C25 I22: a **window plan** — `windowPlan(patch, width)`
+returns the layout, the rows, the row indices a window may begin at, the
+hunk header rows and the pinned gutter width, derived once — and every
+window function is written over the plan: `build` walks from the offset
+until the budget is spent, so it is O(window); the bottom search is
+O(window · log rows); the clamp is a `snapDown` over the plan's rows. The
+patch-taking signatures stay and compute the plan themselves, byte-identical
+by construction, so a `windowPatch` becomes one walk instead of fifteen. C22
+I41 amended: the pushed view holds the plan beside its offset, keyed on the
+block's identity and the region's width — dropped when the entry is patched
+or the region resizes, reporting `absent`, `rev` and `width` misses through
+the profiler's probe — so a motion over an unchanged block walks nothing.
+Sized from the profile: the one-walk form about 12–15× on the bench; the
+planned view O(window) a keystroke at any size, which is the figure that
+matters — *it cannot be slow*. The inline `windowRows` takes the plan form
+too but no cache: a frame's window is one walk, which the height cache
+already pays for the measure.
