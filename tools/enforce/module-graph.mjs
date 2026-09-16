@@ -1843,17 +1843,15 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "composition layer reads `skin.wire` because it owns the paint policy, and " +
     "has no use for this: the cull moves neither the extent nor the depth span.",
 
-  // **`Lanes` is the geometry's storage, and three of its lanes have one
+  // **`Lanes` is the geometry's storage, and two of its lanes have one
   // reader by design** (C12 I139, F1184). The record is exported because
   // `geometryOf` returns it and `scatter3.ts` holds it across frames (I107) and
   // hands it to the span (`count`, `value`) and the raster (`idx`, `screen`,
   // `stamps` — read where `drawTri` is called with a frame). The position and
   // normal lanes are read by the cull, the projection and the fill, all in
-  // `surface3.ts`; the spare-value list is written and read by the clip path
-  // alone. A second reader of a position lane outside the raster would be a
-  // second projection, which I134 made single; a second reader of the spare
-  // values would be a second clip path. The tests read them through `cornerAt`
-  // and `screenAt`, which are the readers the layout is held against.
+  // `surface3.ts`. A second reader of a position lane outside the raster would
+  // be a second projection, which I134 made single. The tests read them through
+  // `cornerAt` and `screenAt`, which are the readers the layout is held against.
   "Lanes.pos":
     "C12 I139 — the position lane: read by the cull, the projection and the span inside " +
     "surface3.ts, and by T1.149 and T1.151 through cornerAt. A reader outside the raster " +
@@ -1861,9 +1859,6 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "Lanes.nrm":
     "C12 I139 — the unit-normal lane: read by the projection into the screen slot, and by " +
     "T1.149 through cornerAt. The shade reads the slot, never the lane",
-  "Lanes.spareValue":
-    "C12 I139 — the clip path's three cut values, written and read by clipPath and the fill " +
-    "in one function. A second reader would be a second clip path",
 
   // --- published ahead of the value that makes it readable ------------------
   //

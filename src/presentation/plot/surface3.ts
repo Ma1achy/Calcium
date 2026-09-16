@@ -62,8 +62,10 @@ export type Corner = Readonly<{ p: Vec3; n: Vec3; v: number | undefined }>;
  * A raster vertex is a referenced mesh vertex under smooth shading, in
  * first-reference order, and a face corner under flat; `idx` names three per
  * face. `screen` holds the per-frame record — `S_STRIDE` doubles a vertex under
- * `stamps` (C12 I130), with `SPARE` slots past the last vertex for the clip
- * path's cut vertices; `spareValue` carries those slots' values.
+ * `stamps` (C12 I130). Every lane but `idx` and `stamps` carries `SPARE`
+ * slots past the last vertex for the clip path's cut vertices (C12 I140): a
+ * cut is written into them and projected as a vertex is, so no double crosses
+ * the projection's call (F1185).
  */
 export type Lanes = Readonly<{
   count: number;
@@ -73,7 +75,6 @@ export type Lanes = Readonly<{
   idx: Uint32Array;
   screen: Float64Array;
   stamps: Int32Array;
-  spareValue: (number | undefined)[];
 }>;
 
 export type RasterFrame = { readonly stamp: number; projected: number };
@@ -109,19 +110,18 @@ const SPARE = 3;
 function makeLanes(count: number, faces: number): Lanes {
   return {
     count,
-    pos: new Float64Array(count * 3), // cells-ok — a vertex count
-    nrm: new Float64Array(count * 3), // cells-ok — a vertex count
-    value: new Array<number | undefined>(count).fill(undefined), // cells-ok — a vertex count
+    pos: new Float64Array((count + SPARE) * 3), // cells-ok — a vertex count
+    nrm: new Float64Array((count + SPARE) * 3), // cells-ok — a vertex count
+    value: new Array<number | undefined>(count + SPARE).fill(undefined), // cells-ok — a vertex count
     idx: new Uint32Array(faces * 3), // cells-ok — a face count
     screen: new Float64Array((count + SPARE) * S_STRIDE), // cells-ok — a vertex count
     stamps: new Int32Array(count), // cells-ok — a vertex count
-    spareValue: new Array<number | undefined>(SPARE).fill(undefined), // cells-ok — a slot count
   };
 }
 
-/** A raster vertex's value: the value list's, or a spare slot's (C12 I139). */
+/** A raster vertex's value — a cut's sits in the lane's spare slots (C12 I139, I140). */
 function valueAt(L: Lanes, k: number): number | undefined {
-  return k < L.count ? L.value[k] : L.spareValue[k - L.count];
+  return L.value[k];
 }
 
 /** A raster vertex read back as a record — for rows and the clip path, not the raster (C12 I139). */
@@ -776,8 +776,13 @@ function clipPath(
     return { p: c.p, n: c.n, v: c.v, k };
   };
   const vs: readonly [ClipVert, ClipVert, ClipVert] = [clipVert(ia), clipVert(ib), clipVert(ic)];
-  // **A cut vertex takes a spare slot** (C12 I139): projected as a lane vertex
-  // is, counted as one was, and read by the same fill.
+  // **A cut vertex takes a spare slot in every lane** (C12 I139, I140): its
+  // position, normal and value written there, projected as a lane vertex is —
+  // by the slot, no double across the call (F1185) — counted as one was, and
+  // read by the same fill.
+  const P = L.pos;
+  const Nn = L.nrm;
+  const V = L.value as (number | undefined)[];
   let spare = 0;
   for (const t of clipNear(vs, tri.edges, zOf)) {
     let drawn = true;
@@ -786,11 +791,18 @@ function clipPath(
       if (w.k >= 0) continue;
       if (spare >= SPARE) throw new Error("the clip path cut more vertices than it has slots for");
       const slot = L.count + spare;
-      L.spareValue[spare] = w.v;
+      const q = slot * 3;
+      P[q] = w.p.x;
+      P[q + 1] = w.p.y;
+      P[q + 2] = w.p.z;
+      Nn[q] = w.n.x;
+      Nn[q + 1] = w.n.y;
+      Nn[q + 2] = w.n.z;
+      V[slot] = w.v;
       spare += 1;
       w.k = slot;
       if (frame !== undefined) frame.projected += 1;
-      if (!toScreenAt(L, slot, w.p.x, w.p.y, w.p.z, w.n.x, w.n.y, w.n.z, basis, grid)) drawn = false;
+      if (!toScreenAt(L, slot, basis, grid)) drawn = false;
     }
     if (!drawn) continue;
     fill(L, (t.v[0] as ClipVert).k, (t.v[1] as ClipVert).k, (t.v[2] as ClipVert).k, tri, t.e, grid, depth, light, span, paint);
@@ -931,39 +943,29 @@ function screenOf(
   grid: Readonly<{ width: number; height: number }>,
   frame: RasterFrame | undefined,
 ): boolean {
-  if (frame === undefined) return toScreen(L, k, basis, grid);
+  if (frame === undefined) return toScreenAt(L, k, basis, grid);
   const held = L.stamps[k] as number;
   if (held === frame.stamp) return true;
   if (held === -frame.stamp) return false;
-  const shown = toScreen(L, k, basis, grid);
+  const shown = toScreenAt(L, k, basis, grid);
   L.stamps[k] = shown ? frame.stamp : -frame.stamp;
   frame.projected += 1;
   return shown;
 }
 
-/** A lane vertex projected into its own slot (C12 I139). */
-function toScreen(L: Lanes, k: number, basis: Basis, grid: Readonly<{ width: number; height: number }>): boolean {
-  const q = k * 3;
-  return toScreenAt(
-    L, k,
-    L.pos[q] as number, L.pos[q + 1] as number, L.pos[q + 2] as number,
-    L.nrm[q] as number, L.nrm[q + 1] as number, L.nrm[q + 2] as number,
-    basis, grid,
-  );
-}
-
-function toScreenAt(
-  L: Lanes,
-  slot: number,
-  px0: number,
-  py0: number,
-  pz0: number,
-  nx0: number,
-  ny0: number,
-  nz0: number,
-  basis: Basis,
-  grid: Readonly<{ width: number; height: number }>,
-): boolean {
+/**
+ * A lane vertex — or a cut in a spare slot — projected into its own slot
+ * (C12 I139, I140): the position and normal read from the lanes at the slot,
+ * so two records and an integer cross the call and no double (F1185).
+ */
+function toScreenAt(L: Lanes, slot: number, basis: Basis, grid: Readonly<{ width: number; height: number }>): boolean {
+  const q = slot * 3;
+  const px0 = L.pos[q] as number;
+  const py0 = L.pos[q + 1] as number;
+  const pz0 = L.pos[q + 2] as number;
+  const nx0 = L.nrm[q] as number;
+  const ny0 = L.nrm[q + 1] as number;
+  const nz0 = L.nrm[q + 2] as number;
   // **One record, eight numbers in a slot** (C12 I128, I139): `viewDir(basis,
   // sub(p, eye))` and `viewDir(basis, n)` component by component, each `dot`
   // in its own order, where this was a `Projected`, a `sub` and two `Vec3`s a

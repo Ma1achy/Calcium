@@ -17,7 +17,7 @@ import { renderToLines } from "../../src/presentation/render-lines.js";
 import { DARK_THEME, FULL_CAPS, registry } from "../support/render.js";
 import { b } from "../../src/shell/builders/index.js";
 import {
-  basisOf, createDepth, cross, dot, extentOf, project, sub, unit, unitOf, viewDir, writeDepth, type Vec3,
+  basisOf, createDepth, cross, dot, extentOf, NEAR, project, sub, unit, unitOf, viewDir, writeDepth, type Vec3,
 } from "../../src/presentation/plot/project3.js";
 import {
   backfaceCulled, cornerAt, cornersOf, densityGlyphOf, densitySteps, drawTri, edgeIntensity, geometryFrom, hiddenThin, lightDirOf,
@@ -1699,5 +1699,105 @@ describe("C12 I139 — the geometry is lanes", () => {
 });
 
 describe("C12 I140 — the projection reads its lanes", () => {
-  it.todo("T1.152 (C12 I140, F1185): every lane holds three spare slots, a straddling triangle's two cuts land in them by the clip's own interpolation with their screen slots equal to project, and a triangle with no cut leaves them — not deferred on a component: the code commit replaces this row");
+  type Corner = { p: Vec3; n: Vec3; v: number | undefined };
+  const grid = { width: 160, height: 176 };
+  const basis = basisOf({ azimuth: 0.7, elevation: 0.2, distance: 3 }, grid.width / (grid.height * 0.5));
+  const light = lightDirOf(undefined, basis);
+  /** A position `s` along the view, `a` to the right and `b` up from the eye. */
+  const at = (s: number, a: number, b: number): Vec3 => ({
+    x: basis.eye.x + basis.forward.x * s + basis.right.x * a + basis.up.x * b,
+    y: basis.eye.y + basis.forward.y * s + basis.right.y * a + basis.up.y * b,
+    z: basis.eye.z + basis.forward.z * s + basis.right.z * a + basis.up.z * b,
+  });
+  const zOf = (p: Vec3): number => dot(sub(p, basis.eye), basis.forward);
+  const IN = NEAR * (1 + 1e-6);
+  /** The clip's own cut: `kept + (dropped − kept)·t` at `t = (IN − z_kept) / (z_dropped − z_kept)`, component by component. */
+  const lerp = (a: Vec3, b: Vec3, t: number): Vec3 => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t });
+  const cutOf = (kept: Corner, dropped: Corner): Corner => {
+    const t = (IN - zOf(kept.p)) / (zOf(dropped.p) - zOf(kept.p));
+    return {
+      p: lerp(kept.p, dropped.p, t),
+      n: lerp(kept.n, dropped.n, t),
+      v: kept.v === undefined || dropped.v === undefined ? kept.v ?? dropped.v : kept.v + (dropped.v - kept.v) * t,
+    };
+  };
+  const same = (got: Corner, want: Corner, what: string): void => {
+    for (const k of ["x", "y", "z"] as const) {
+      expect(Object.is(got.p[k], want.p[k]), `${what}: p.${k} ${String(got.p[k])} vs ${String(want.p[k])}`).toBe(true);
+      expect(Object.is(got.n[k], want.n[k]), `${what}: n.${k} ${String(got.n[k])} vs ${String(want.n[k])}`).toBe(true);
+    }
+    expect(Object.is(got.v, want.v), `${what}: v ${String(got.v)} vs ${String(want.v)}`).toBe(true);
+  };
+  const N = (x: number, y: number, z: number): Vec3 => unit({ x, y, z });
+  it("T1.152 (C12 I140, F1185): the position, normal and value lanes hold count + 3 entries; after drawTri with a frame over a triangle straddling the near plane its two cuts sit in the spare slots by the clip's own interpolation — kept + (dropped − kept)·t — with values interpolated or the defined corner's, and each cut's screen slot equals project of that position by Object.is; a triangle with no cut leaves the spare slots as they were", () => {
+    // **A is behind the plane, B and C in front**: the quad remainder is two
+    // triangles sharing the cut on C–A, which takes the first spare slot; the
+    // cut on B–A takes the second.
+    const A: Corner = { p: at(-0.4, 0.1, 0.05), n: N(0.2, 0.3, 0.9), v: 1 };
+    const B: Corner = { p: at(2, 0.6, -0.2), n: N(-0.3, 0.1, 0.9), v: 3 };
+    const C: Corner = { p: at(2.5, -0.5, 0.4), n: N(0.1, -0.4, 0.9), v: 5 };
+    expect(zOf(A.p) <= NEAR, "A is behind the plane").toBe(true);
+    expect(zOf(B.p) > NEAR && zOf(C.p) > NEAR, "B and C are in front").toBe(true);
+    const g = geometryFrom([A, B, C], [[0, 1, 2]]);
+    const L = g.lanes;
+    // **Every lane carries the three spare slots** (C12 I140).
+    expect(L.count).toBe(3);
+    expect(L.pos.length, "positions: count + 3 vertices").toBe((3 + 3) * 3); // cells-ok — a lane length
+    expect(L.nrm.length, "normals: count + 3 vertices").toBe((3 + 3) * 3); // cells-ok — a lane length
+    expect(L.value.length, "values: count + 3 entries").toBe(3 + 3); // cells-ok — a lane length
+    expect(L.screen.length, "screen: count + 3 slots").toBe((3 + 3) * 8); // cells-ok — a lane length
+    expect(L.value.slice(3), "the spare values start undefined").toEqual([undefined, undefined, undefined]);
+    const frame = { stamp: 9, projected: 0 };
+    let paints = 0;
+    drawTri(g.tris[0] as Tri3, basis, grid, createDepth(grid.width, grid.height), light, { nearD: NEAR, farD: 5 }, () => { paints += 1; }, frame);
+    expect(paints, "the straddling triangle paints").toBeGreaterThan(0);
+    expect(frame.projected, "three corners and two cuts").toBe(5);
+    expect(L.stamps[0], "A refused").toBe(-9);
+    expect(L.stamps[1], "B accepted").toBe(9);
+    expect(L.stamps[2], "C accepted").toBe(9);
+    // **The cuts, by the clip's own arithmetic**: kept first, dropped second.
+    same(cornerAt(L, 3), cutOf(C, A), "slot 3, the cut on C–A");
+    same(cornerAt(L, 4), cutOf(B, A), "slot 4, the cut on B–A");
+    expect(L.value[5], "the third spare slot untouched").toBeUndefined();
+    // **Each cut's screen slot is `project` of its own position.**
+    for (const slot of [3, 4]) {
+      const want = project(basis, cornerAt(L, slot).p);
+      if (want === null) throw new Error(`slot ${String(slot)}: project refused a cut on the plane`);
+      const rec = screenAt(L, slot);
+      expect(Object.is(rec.x, want.x * grid.width) && Object.is(rec.y, want.y * grid.height) && Object.is(rec.vz, want.depth), `slot ${String(slot)}: the record is project's`).toBe(true);
+    }
+    // **The value arm**: an undefined corner makes the cut the defined one's;
+    // two undefined make it undefined.
+    const B2: Corner = { ...B, v: undefined };
+    const g2 = geometryFrom([A, B2, C], [[0, 1, 2]]);
+    drawTri(g2.tris[0] as Tri3, basis, grid, createDepth(grid.width, grid.height), light, { nearD: NEAR, farD: 5 }, () => {}, { stamp: 10, projected: 0 });
+    same(cornerAt(g2.lanes, 3), cutOf(C, A), "g2 slot 3, both defined");
+    expect(cornerAt(g2.lanes, 4).v, "g2 slot 4: B undefined, so A's value").toBe(1);
+    const g3 = geometryFrom([{ ...A, v: undefined }, B2, C], [[0, 1, 2]]);
+    drawTri(g3.tris[0] as Tri3, basis, grid, createDepth(grid.width, grid.height), light, { nearD: NEAR, farD: 5 }, () => {}, { stamp: 11, projected: 0 });
+    expect(cornerAt(g3.lanes, 4).v, "g3 slot 4: both undefined").toBeUndefined();
+    // **One kept**: B and C behind, A's cuts in the order the clip makes them —
+    // cut(A, B) then cut(A, C).
+    const A4: Corner = { p: at(2, 0.1, 0.05), n: A.n, v: 1 };
+    const B4: Corner = { p: at(-0.5, 0.6, -0.2), n: B.n, v: 3 };
+    const C4: Corner = { p: at(-0.8, -0.5, 0.4), n: C.n, v: 5 };
+    const g4 = geometryFrom([A4, B4, C4], [[0, 1, 2]]);
+    const f4 = { stamp: 12, projected: 0 };
+    drawTri(g4.tris[0] as Tri3, basis, grid, createDepth(grid.width, grid.height), light, { nearD: NEAR, farD: 5 }, () => {}, f4);
+    expect(f4.projected, "three corners and two cuts").toBe(5);
+    same(cornerAt(g4.lanes, 3), cutOf(A4, B4), "g4 slot 3, the cut on A–B");
+    same(cornerAt(g4.lanes, 4), cutOf(A4, C4), "g4 slot 4, the cut on A–C");
+    // **No cut, no write**: sentinels in the spare slots survive a frame.
+    const g5 = geometryFrom([{ ...A, p: at(1, 0.1, 0.05) }, B, C], [[0, 1, 2]]);
+    const L5 = g5.lanes;
+    L5.pos.fill(7, 9); L5.nrm.fill(8, 9);
+    (L5.value as (number | undefined)[])[3] = 42;
+    L5.screen.fill(-1, 3 * 8);
+    const f5 = { stamp: 13, projected: 0 };
+    drawTri(g5.tris[0] as Tri3, basis, grid, createDepth(grid.width, grid.height), light, { nearD: NEAR, farD: 5 }, () => {}, f5);
+    expect(f5.projected, "three corners, no cut").toBe(3);
+    expect(Array.from(L5.pos.slice(9)).every((v) => v === 7) && Array.from(L5.nrm.slice(9)).every((v) => v === 8), "the spare position and normal slots as they were").toBe(true);
+    expect(L5.value[3]).toBe(42);
+    expect(Array.from(L5.screen.slice(3 * 8)).every((v) => v === -1), "the spare screen slots as they were").toBe(true);
+  });
 });

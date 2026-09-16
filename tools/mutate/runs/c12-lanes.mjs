@@ -1,4 +1,4 @@
-// C12 I139 — the geometry is lanes: position, normal and value lanes per
+// C12 I139 and I140 — the geometry is lanes: position, normal and value lanes per
 // raster vertex, an index lane per face, an eight-double screen slot under a
 // stamp lane with the negation marking a refused vertex and three spare slots
 // for the clip path's cuts. Mutated (T6.115, F1184).
@@ -90,6 +90,34 @@ const results = runPass({
       from: "  const L = tri.lanes;\n  const P = L.pos;\n  const o = tri.f * 3;",
       to: "  const L = tri.lanes;\n  const P = L.nrm;\n  const o = tri.f * 3;",
       expect: "T1.143",
+    },
+    // --- C12 I140, the projection reads its lanes (T6.116, F1185) ---------
+    {
+      // **The cut written, the slot before it projected.** The cut's own
+      // screen slot is never written and the fill reads whatever was there.
+      name: "CUT-SLOT-STALE: the clip path projects the slot before the cut's",
+      file: SF,
+      from: "      if (!toScreenAt(L, slot, basis, grid)) drawn = false;",
+      to: "      if (!toScreenAt(L, slot - 1, basis, grid)) drawn = false;",
+      expect: "T1.152",
+    },
+    {
+      // **The cut's value not written.** A valued straddling face blends
+      // whatever the spare slot held.
+      name: "CUT-VALUE-UNWRITTEN: the spare value slot keeps its last value",
+      file: SF,
+      from: "      V[slot] = w.v;\n      spare += 1;",
+      to: "      spare += 1;",
+      expect: "T1.152",
+    },
+    {
+      // **No spare slots in the position lane.** The cut's writes fall off the
+      // end and its projection reads `undefined`.
+      name: "POS-SPARE-DROPPED: the position lane has no spare slots",
+      file: SF,
+      from: "    pos: new Float64Array((count + SPARE) * 3), // cells-ok — a vertex count",
+      to: "    pos: new Float64Array(count * 3), // cells-ok — a vertex count",
+      expect: "T1.152",
     },
   ],
 });
