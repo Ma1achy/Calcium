@@ -51568,7 +51568,7 @@ rows arm's `between`, its `Set`s and `normaliseRow` about 22.
 |---|---|
 | **Surface** | `src/presentation/plot/surface3.ts`'s `shadeAt`, nine parameters, seven of them doubles, called per painted sample from `fill` and `thinEdge`; its double return |
 | **Reached for** | the sampled heap after F1175: `thinEdge` 18.8 MB and `shadeAt` 14.8 of 119.8 over twenty bunny frames — 130 and 92 bytes a painted sample, about eight and six heap numbers. `--trace-turbo-inlining` shows `hypot3` inlined into `shadeAt` and `writeDepth`, the painter, `ramped`, `shadePacked`, `toSrgb` inlined into `thinEdge`, and **`shadeAt` inlined into nothing**: its bytecode is 511 bytes against V8's `max-inlined-bytecode-size` of 460, so every call is a real call, and a double crossing a real call is a heap number in each direction. Sized before it was believed: a lane through the arguments alone, the wrapper calling `shadeAt` as before, moved nothing (119.7) — that moved the boundary rather than removing it; the shade call removed outright took both names off the list (94.6); the six inputs and the depth written into a `Float64Array` lane and the answer read back from it, **119.8 → 96.3**, both names gone; the answer returned as a double instead, 101.9, the return's 5.6 MB. Bunny paired **−1.9 ms** (30/40) and **−2.2 swapped** (36/40), against a bunny self-pair reading −0.6 ms in B's slot (24/40) — so the swapped figure is the one measured against the bias |
-| **Verdict** | **open** — measured, the remedy sized on a scratch build |
+| **Verdict** | **closed** — built and measured: I136, T1.148, `c12-shade-lane` |
 
 **Remedy, sized.** The lane is a per-render `Float64Array` of eight on the
 depth-buffer record `createDepth` builds — the one record every raster
@@ -51582,3 +51582,27 @@ figure and per test row and not per sample. Byte-identical by construction
 PR15 holds the painter's intensity to `shade` at every painted sample already,
 through the raster end to end. What it does not reach: `plot3dArea`'s three
 boxed sample arrays and colour records (21), `mixedRows` (10), the rows arm.
+
+**Closed — built and measured.** C12 I136; the lane on `createDepth`'s
+record, `fill` and `thinEdge` writing six scalars and the depth and reading
+the intensity back, `shadeAt(lane, light, span)` answering in slot 7,
+`shade` over a lane per call. T1.148 holds the layout on the public record
+after a draw — every slot by `Object.is` against the painter's record of the
+last sample and the row's own interpolation, and `shade` over slots 0–6
+against slot 7 — and PR15 cites I136 through the whole path. `c12-shade-lane`:
+control seen, three caught (a normal into a view slot at the fill, the thin
+stroke's depth slot left to the previous sample, the answer written over the
+depth), none survived; `c12-sample-scalars` re-anchored onto the lane
+writes, seven caught. Gates green, goldens 458 with no mover.
+
+| | before | after |
+|---|---|---|
+| twenty-frame bunny heap | 119.8 MB | 96.1 MB |
+| `thinEdge` / `shadeAt` | 18.8 / 14.8 MB | 5.5 / 4.2 MB |
+| bunny paired, A→B / swapped | — | −2.4 ms (35/40) / −2.6 ms (36/40) |
+| suzanne paired, both orders | — | 0.0 / −0.0 ms |
+
+What remains, by allocation: `plot3dArea` 21.3 — the three boxed sample
+arrays 13.5 and the colour records 8; the rows arm's `between`, its `Set`s
+and `normaliseRow` about 22 together; `mixedRows` 10.2; `thinEdge` and
+`shadeAt` 9.7 between them still, a residue the lane did not name.
