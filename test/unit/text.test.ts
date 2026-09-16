@@ -464,6 +464,10 @@ describe("C09 §5a — the three pieces, and where the segmenter is asked (I63)"
   });
 });
 
+describe("C09 I74 — a unit of the rasterised alphabets is its own cluster unless the next unit can extend it", () => {
+  it.todo("T1.48 (C09 I74, F1177): every range of the table paired with every kind of extender keeps the cluster whole through cells, fitStyled and sliceCells, two table units cut between, and a seeded corpus measures the same by both paths — not deferred on a component: the code commit replaces this row");
+});
+
 describe("C09 §5 — the printable-ASCII path", () => {
   // **The path is an equality, so it is tested as one.** A fast path that is
   // *nearly* right is worse than none: it puts the frame one cell into a row
