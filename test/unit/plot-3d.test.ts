@@ -1103,7 +1103,62 @@ describe("C12 I132 — the painter writes an integer and the records are built o
     expect(hypot3(NaN, Infinity, 1)).toBe(Infinity);
     expect(Number.isFinite(hypot3(1e308, 1e308, 1e308))).toBe(true);
   });
-  it.todo(
-    "T1.146 (C12 I134, F1174): after drawTri under a frame each stamped vertex's record equals project to the bit over the cube, suzanne and the bunny under perspective and orthographic cameras — not deferred on a component: the code commit replaces this row",
-  );
+  it("T1.146 (C12 I134, F1174): after drawTri under a frame each stamped vertex's record has x, y and vz equal to project's x·width, y·height and depth by Object.is, over the cube, suzanne and the bunny under two perspective cameras and an orthographic camera at two distances, and more than a thousand vertices are compared", () => {
+    // **`project` is the reference**: the scalar projection in `toScreen` is a
+    // second implementation of it, verified by the first over every vertex the
+    // raster stamps — the record on the vertex is what the fill reads.
+    const cube = {
+      vertices: [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]]
+        .map(([x, y, z]) => ({ x: x as number, y: y as number, z: z as number })),
+      faces: [[0, 1, 2], [0, 2, 3], [4, 6, 5], [4, 7, 6], [0, 5, 1], [0, 4, 5], [3, 2, 6], [3, 6, 7], [0, 3, 7], [0, 7, 4], [1, 5, 6], [1, 6, 2]],
+    };
+    const meshes = [
+      { name: "cube", ...cube },
+      { name: "suzanne", ...loadMesh("suzanne") },
+      { name: "bunny", ...loadMesh("stanford-bunny") },
+    ];
+    const cameras = [
+      CAMERA_DEFAULT,
+      { ...CAMERA_DEFAULT, azimuth: 2.2, elevation: 0.25, distance: 5 },
+      { ...CAMERA_DEFAULT, projection: "orthographic" as const, distance: 6 },
+      { ...CAMERA_DEFAULT, projection: "orthographic" as const, azimuth: 1.1, elevation: -0.3, distance: 2.5 },
+    ];
+    const grid = sampleGrid(80, 22);
+    let compared = 0;
+    let wrong = 0;
+    let first = "";
+    // **The stamp advances per camera** (C12 I130): a record under the last
+    // camera's stamp would be read back as this camera's, and the first draft
+    // of this row did exactly that.
+    let stamp = 0;
+    for (const mesh of meshes) {
+      const surface = { vertices: mesh.vertices, faces: mesh.faces, closed: true, shading: "smooth" };
+      const g = geometryOf(surface as never, extentOf(surfacePoints(surface as never)), 0);
+      for (const camera of cameras) {
+        const basis = basisOf(camera, ASPECT(80, 22));
+        const light = lightDirOf(undefined, basis);
+        stamp += 1;
+        const frame = { stamp, projected: 0 };
+        const depth = createDepth(grid.width, grid.height);
+        for (const t of g.tris) drawTri(t, basis, grid, depth, light, { nearD: 1, farD: 20 }, () => {}, frame);
+        const seen = new Set<object>();
+        for (const t of g.tris) {
+          for (const w of [t.a, t.b, t.c]) {
+            if (w.stamp !== frame.stamp || w.s === undefined || w.s === null || seen.has(w)) continue;
+            seen.add(w);
+            const want = project(basis, w.p);
+            compared += 1;
+            if (want === null || !Object.is(w.s.x, want.x * grid.width) || !Object.is(w.s.y, want.y * grid.height) || !Object.is(w.s.vz, want.depth)) {
+              wrong += 1;
+              if (first === "") first = `${mesh.name} under ${JSON.stringify(camera)}: held (${String(w.s.x)}, ${String(w.s.y)}, ${String(w.s.vz)}), project ${JSON.stringify(want)}`;
+            }
+          }
+        }
+        // The fixture responds: the frame stamped its drawn vertices.
+        expect(frame.projected, `${mesh.name} projected under ${JSON.stringify(camera)}`).toBeGreaterThan(0);
+      }
+    }
+    expect(wrong, first).toBe(0);
+    expect(compared).toBeGreaterThan(1000);
+  });
 });

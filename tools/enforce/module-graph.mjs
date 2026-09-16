@@ -1810,8 +1810,11 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   // derived from — and \`basis.forward\`, to find where a segment crosses the near
   // plane. \`orthographic\` stayed: \`project\` picks the arm and a second reader of
   // that field would be a second place the projection is chosen, which is the
-  // reason the entry was written with rather than a date.
-  "Basis.orthographic": "project() picks the arm, and a second reader of this field would be a second place the projection is chosen",
+  // reason the entry was written with rather than a date. **And that reason
+  // was met on its own terms** (C12 I134, F1174): \`toScreen\` now restates
+  // \`project\`'s projection in scalars per vertex, so it is a second reader of
+  // the arm — held to the first to the bit by C12 T1.146, which is what makes a
+  // second place the projection is chosen tolerable. The entry left with it.
   // The tool-call card's streamed body (`AGENT_TUI_DESIGN.md` §9c). `toolCallDoc` reads
   // it into a follow scroll. **Its producer landed and does not fill it** (C23 I54,
   // 2026-09-05, Lane P): the shell's pending entry is a `toolCallDoc`, and its body is

@@ -26,7 +26,6 @@ import {
   cross,
   dot,
   NEAR,
-  project,
   hypot2,
   hypot3,
   sub,
@@ -531,7 +530,24 @@ export function drawTri(
     return false;
   }
   // **The clip path**, taken only when a corner is at or behind the plane; the
-  // return value is what lets the caller count it.
+  // return value is what lets the caller count it. **In its own function**
+  // (C12 I134, F1173): its closure captured `basis`, and a captured parameter
+  // is a context allocated on every entry to this function — before the cull,
+  // for every triangle — not only on the path that builds the closure.
+  return clipPath(tri, basis, grid, depth, light, span, paint, frame);
+}
+
+/** The clip path of `drawTri`, holding the one closure the raster builds per straddling face (C12 I134). */
+function clipPath(
+  tri: Tri3,
+  basis: Basis,
+  grid: Readonly<{ width: number; height: number }>,
+  depth: Depth,
+  light: Vec3,
+  span: Readonly<{ nearD: number; farD: number }>,
+  paint: Painter,
+  frame: RasterFrame | undefined,
+): boolean {
   const zOf = (p: Vec3): number => dot(sub(p, basis.eye), basis.forward);
   const vs: readonly [Vert, Vert, Vert] = [tri.a, tri.b, tri.c];
   for (const t of clipNear(vs, tri.edges, zOf)) {
@@ -685,8 +701,6 @@ function toScreen(
   grid: Readonly<{ width: number; height: number }>,
   into?: MutableScreen,
 ): MutableScreen | null {
-  const pr = project(basis, w.p);
-  if (pr === null) return null;
   // **One record, nine numbers** (C12 I128): `viewDir(basis, sub(w.p, eye))` and
   // `viewDir(basis, w.n)` component by component, each `dot` in its own order,
   // where this was a `Projected`, a `sub` and two `Vec3`s a vertex.
@@ -697,13 +711,27 @@ function toScreen(
   const r = basis.right;
   const u = basis.up;
   const f = basis.forward;
+  // **The position in scalars** (C12 I134, F1174): `vz` is `project`'s `z`,
+  // `vx` its `x` and `vy` its `y` — the same `sub` and the same three `dot`s —
+  // so the near cull, the divisor, the fold of `f` and the aspect and the
+  // half-and-shift follow in `project`'s expression order, and the record is
+  // `project`'s to the bit (T1.146) without its vector and its return.
+  const vz = dx * f.x + dy * f.y + dz * f.z;
+  if (vz <= NEAR) return null;
+  const vx = dx * r.x + dy * r.y + dz * r.z;
+  const vy = dx * u.x + dy * u.y + dz * u.z;
+  const divisor = basis.orthographic ? basis.distance : vz;
+  const sx = (vx * basis.f) / basis.aspect / divisor;
+  const sy = (vy * basis.f) / divisor;
+  const px = sx * 0.5 + 0.5;
+  const py = 0.5 - sy * 0.5;
   if (into === undefined) {
     return {
-      x: pr.x * grid.width,
-      y: pr.y * grid.height,
-      vx: dx * r.x + dy * r.y + dz * r.z,
-      vy: dx * u.x + dy * u.y + dz * u.z,
-      vz: dx * f.x + dy * f.y + dz * f.z,
+      x: px * grid.width,
+      y: py * grid.height,
+      vx,
+      vy,
+      vz,
       nx: n.x * r.x + n.y * r.y + n.z * r.z,
       ny: n.x * u.x + n.y * u.y + n.z * u.z,
       nz: n.x * f.x + n.y * f.y + n.z * f.z,
@@ -713,11 +741,11 @@ function toScreen(
   // **The same nine expressions into the vertex's own record** (C12 I130):
   // the values are the ones above to the bit, and the object is the one the
   // vertex already holds.
-  into.x = pr.x * grid.width;
-  into.y = pr.y * grid.height;
-  into.vx = dx * r.x + dy * r.y + dz * r.z;
-  into.vy = dx * u.x + dy * u.y + dz * u.z;
-  into.vz = dx * f.x + dy * f.y + dz * f.z;
+  into.x = px * grid.width;
+  into.y = py * grid.height;
+  into.vx = vx;
+  into.vy = vy;
+  into.vz = vz;
   into.nx = n.x * r.x + n.y * r.y + n.z * r.z;
   into.ny = n.x * u.x + n.y * u.y + n.z * u.z;
   into.nz = n.x * f.x + n.y * f.y + n.z * f.z;

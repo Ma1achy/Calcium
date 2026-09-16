@@ -62,8 +62,9 @@ const results = runPass({
       // `toEye`, and the frame moves.
       name: "VIEW-Y-ALONG-RIGHT: the view position's y is its x",
       file: SF,
-      from: "    vy: dx * u.x + dy * u.y + dz * u.z,",
-      to: "    vy: dx * r.x + dy * r.y + dz * r.z,",
+      // Anchored on the scalar the projection and both record arms read (C12 I134).
+      from: "  const vy = dx * u.x + dy * u.y + dz * u.z;",
+      to: "  const vy = dx * r.x + dy * r.y + dz * r.z;",
       expect: "24bit",
     },
     {
