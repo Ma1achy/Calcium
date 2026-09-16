@@ -53176,7 +53176,7 @@ landing late together; not the scheduler's.
 |---|---|
 | **Surface** | The `visible` dependency C22 hands C23's refresh driver (`src/shell/construct.ts`, the execution pipeline's deps): `host.kind === "view" || stores.viewport.visible().entries.some((e) => e.id === host.id)`. The driver asks it for every part on every sweep — `anyoneLooking`, the stale pass, `armParts`'s gates, the readouts (C23 I46). |
 | **Reached for** | `--cpu-prof` over `stress stream` (200 live parts at 16 ms, 6 s, after F1199): `visible shell/construct.js:1272` **324 ms** self time, the largest single entry after idle and the garbage collector — 4.4% of the process and about 14% of the non-idle time — with `armParts` 81, `currentPanel` 35 and `sweepParts` 26 behind it. F1198 memoised C14's range and left this half as *the cheap one*: a `.some` over a screenful. At two hundred parts a sweep it is two hundred walks of the same frozen array, twelve thousand a second. |
-| **Verdict** | **open.** C14 I30 now returns the same object until the viewport moves, so the range's identity is a key: build the set of visible ids once per range object and answer membership from it. One slot, not a cache — the previous range is unreachable the moment the viewport moves, and a `WeakMap` would be a second copy of C14's own invalidation. The blind spot is stated up front: the wiring has no observable but cost, so the bench is what verifies it and the mutation run says so. |
+| **Verdict** | **Closed — built and measured, and the frame did not move.** C14 I30 now returns the same object until the viewport moves, so the range's identity is a key: build the set of visible ids once per range object and answer membership from it. One slot, not a cache — the previous range is unreachable the moment the viewport moves, and a `WeakMap` would be a second copy of C14's own invalidation. The blind spot is stated up front: the wiring has no observable but cost, so the bench is what verifies it and the mutation run says so. |
 
 **Remedy, sized.** `VisibleIds` in `shell/visible-ids.ts` — `of(range)` returns
 the same `ReadonlySet` while the range object is the same and rebuilds it when it
@@ -53186,3 +53186,32 @@ invariant, one unit row on identity and freshness, one fail-on-revert row, a
 mutation run with the control on the set's contents. Expected: the `visible`
 line gone from the top of the stream profile and its share moved to the sweep's
 own bookkeeping; no frame moves.
+
+**Closed — built and measured.** `VisibleIds` landed as a local of the composition
+root (C22 I106, commitment 77, T1.61, T6.121; `c22-visible-ids` 2/2 with the control
+firing), and the gate is a `has`. Gates: enforce green, 6270 unit-to-integration,
+458 goldens with no mover, 137 e2e. The stream profile's line did what the entry said
+— `visible shell/construct.js` **241 → 56 ms** over a 7.5 s profile — and the frame
+did not: three paired rounds at 120×40, medians, before → after —
+
+| case | fps | ms/frame | work sum (ms / 4 s) |
+|---|---|---|---|
+| stream | 56.5 → 56.7 | 5.7 → 5.9 | 787 → 809 |
+| everylive | 57.8 → 57.0 | 6.2 → 6.7 | 1120 → 1297 |
+| live:line | 57.2 → 57.5 | 5.4 → 5.6 | 954 → 1024 |
+| livemesh:suzanne | 56.2 → 57.0 | 10.1 → 9.8 | 1903 → 1744 |
+| session | 14.8 → 14.8 | 3.8 → 6.9 | 458 → 502 |
+
+Every difference sits inside the three-run spread, in both directions. **The
+diagnosis was wrong about what the line measured.** The walk's arithmetic was
+never done before the entry was opened: twelve thousand calls a second over a
+range of thirty entries is under a millisecond a second, two orders below the
+figure quoted. What the 241 ms was is visible in the after-profile — `sweepParts`,
+`armParts` and `currentPanel` gained about 90 ms between them once `visible`
+stopped absorbing it — so most of the line was attribution: V8 inlined the range
+memo and the closure's own entry into the wrapper's frame, and a sampled self-time
+column charged the callee for its callers. The remaining 56 ms is what the gate
+costs to be called at all. **The code stays** — it is smaller than what it replaced,
+tested, and the profile now reads truer — and the register carries the null result
+so nobody opens this line a third time. What remains is the frame's own cost per
+part, which is where the next cuts were already pointed.
