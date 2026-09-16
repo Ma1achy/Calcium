@@ -51661,7 +51661,7 @@ transition; `plot3dArea`'s boxed sample arrays.
 |---|---|
 | **Surface** | `src/presentation/text.ts`'s five whole-text walks — `wrapCellsParts`, `hardWrapCells`, `placeableClusters`, `clusterEnds`, `graphemes` — each a `for … of GRAPHEMES.segment(text)`, a segment record per cluster; `soloAt`, which decides a unit of the rasterised alphabets alone |
 | **Reached for** | the `/all` profile at 408 frames and the forms bench at ten repetitions on the F1177 build: `wrapCellsParts` 11.2 ms and `placeableClusters` 8.1 of 576 on `/all`, both under `wrapRuns` ← `noticeRows`; on the forms bench `wrapCellsParts` 74.6 ms, `placeableClusters` 68.4, `graphemes` 36.5, `clusterAt` 58.7 of 2,399. `placeableClusters` and `clusterEnds` return early on all-ASCII text and the wrap never does — a notice of ASCII prose is segmented whole, a segment record per character — and a plot row's box and braille units go the same way because the iterator asks the segmenter for every cluster where the styled walks, since I74, ask only where the next unit can extend one. I74 is stated for the table's units, and the ground it stands on is wider: by UAX #29 no unit below U+0300 is Extend, ZWJ, SpacingMark, Hangul, Prepend, a regional indicator or the joiner, so every such unit other than the carriage return — which a line feed joins — is its own cluster whenever the next unit is below U+0300 or in the table. Sized on the built tree with the five walks stepping by `soloAt` and the rule widened, three runs a side under `make load-down`: forms sum **260 / 247 / 289 → 259 / 415 / 224 ms**, the `rows` span **323 / 276 / 310 → 288 / 386 / 305**, `/all` work over 408 frames **600 / 532 / 622 → 510 / 484 / 558 ms**, `/all` p95 **4.9 / 4.3 / 6.1 → 4.4 / 4.1 / 5.1** |
-| **Verdict** | **open** — measured, the remedy sized |
+| **Verdict** | **closed** — built and measured: C09 I74, T1.49, T3.85, `c09-solo-cluster` |
 
 **Remedy, sized.** I74 widened to every unit below U+0300 other than the
 carriage return, and the five whole-text walks stepping by cluster from the
@@ -51676,6 +51676,31 @@ holds a carriage return before a line feed, and T3.85 re-pins the `é` row at
 zero asks with a mark on its base taking its place. What it does not reach:
 `partsOf` and `between` in the rows arm; `plot3dArea`'s boxed sample arrays;
 `truncate`'s two cluster arrays and `compareByGrapheme`, which are not on
+the frame path in either profile.
+
+**Closed — built and measured.** C09 I74 widened to every unit below U+0300
+but the carriage return; `soloAt` decides it, and `graphemes`,
+`clusterEnds`, `placeableClusters`, `hardWrapCells` and `wrapCellsParts`
+step by cluster from the text's start with the styled walks' one-line arm.
+T1.49 asks the five for the segmenter's own clusters over two thousand
+seeded rows at every width — and found F1179 on the way, the wrap's cut
+after a space by code unit, which the row names and counts rather than
+hides. T3.85 re-pinned: a mark on its base asks two, the precomposed `é`
+none. `c09-solo-cluster`: control seen, six caught, none survived — the
+placeable mutation was first written as a function nothing called and
+survived as a no-op, recorded in T6.121. Gates green, goldens 458 with no
+mover, e2e green. (F1179's opening commit split this entry's last sentence
+with its heading; mended here.)
+
+| three runs a side, `make load-down` | before | after |
+|---|---|---|
+| forms sum | 260 / 247 / 289 ms | 371 / 205 / 320 ms — inside its spread, no reading |
+| `rows` span, forms | 323 / 276 / 310 ms | 298 / 321 / 266 ms |
+| `/all` work, 408 frames | 600 / 532 / 622 ms | 494 / 514 / 457 ms |
+| `/all` p95 | 4.9 / 4.3 / 6.1 ms | 4.4 / 4.3 / 3.7 ms |
+
+What remains: `partsOf` and `between` build arrays and `Set`s per style
+transition; `plot3dArea`'s boxed sample arrays; F1179's cut.
 
 ## F1179 — the wrap breaks after a space by code unit, and a space that carries an extender is cut inside its cluster ★★☆☆☆
 
@@ -51691,4 +51716,3 @@ knows, since it steps by cluster: a space followed by an extender is not a
 break point, or is one whose cut lands after the extender. Either keeps every
 row on a boundary; the second keeps the break. A row over the corpus with the
 exception removed, and the goldens, which hold no such input.
-the frame path in either profile.
