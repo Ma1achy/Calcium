@@ -52400,6 +52400,42 @@ beside a 2,000-line patch from 1.58 ms toward the 0.22 that is not the render,
 and work p50 from 4.8 toward the spinner alone's 1.5; the scroll frame is
 unchanged, which is the control.
 
+**Closed — built and measured.** C22 I104 as sized. The parts are a `Held` —
+whole lines by key, and one slice per block id with the run-local window it
+was rendered for; `assemble` reads a sliced block at its window and holds
+what it renders, another window replaces the hold, and `withoutAnimating`
+covers the slice as it covers the parts. T4.89f drives it at the cache — a
+slice served at its own window alone, the old window gone after the new one
+is held — and end to end under fake timers: two ticks beside a forty-line
+dividing block render it once, to fill the parts, and no further time; a
+one-row scroll renders it once and lays the contiguous tail one row shorter.
+T4.89d amended from "never held" to "held under its window".
+`c22-slice-hold` three of three, `c22-range-parts` seven of seven after its
+SLICED-HELD mutation was re-anchored onto the window condition at the cache
+(the old one *is* the tree now), `c22-tick-axis` three of three. Gates:
+enforce, 6,258 tests, 458 goldens with no mover, 134 e2e.
+
+| `out/probe-anim.mjs`, 120×40, 2,000 lines, 4 s, spans on, `make load-down`, host load 2–4 | before (F1189 build) | after |
+|---|---|---|
+| `patch.lines` span — frames it ran on, of 25–26 | **21–22** | **2** (the first render and the first tick, which fills the parts) |
+| `patch.lines` span — sum over the run | 40 · 46 · 59 ms | **15 · 17 · 21 ms** |
+| work p50, seven interleaved pairs | 4.93 · 4.42 · 9.34 · 3.30 · 7.49 · 8.83 · 3.36 | 3.81 · 7.10 · 2.40 · 6.46 · 5.57 · 3.36 · 7.36 — B faster in 4 of 7 |
+| CPU over 4 s, median of seven | 287 ms | 326 ms |
+| `status` alone — work p50 | 3.49 | 1.74 (the control; the noise between two runs of one build) |
+
+**What the table says and what it does not.** The count is the finding's
+own observable and it moved exactly as sized: the slice is rendered twice a
+run instead of twenty-two times, and the span's sum fell by about the
+twenty renders it no longer pays. The wall and CPU figures do not resolve a
+1.3 ms effect at a host load of two to four — the same build's `visible`
+p50 read 0.89 ms in one round and 2.98 in another, and the `status`
+control's two readings differ by more than the effect — so they are
+recorded and not read (F936, F1189's rule: the noise is the load, and a
+magnitude at this load measures the machine). The structural half of what
+F1189 left — the re-windowing and the whole-block form, linear in the
+block — is F1191, and its 20,000-line frames are where the wall figure will
+move.
+
 ## F1191 — the window seam derives the patch's plan and the registry's cap form on every frame: a tick beside a 20,000-line patch is 10 ms of `visible`, of which the thirty-seven rendered lines are 0.7 ★★★★☆
 
 | | |
