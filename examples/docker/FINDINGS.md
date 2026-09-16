@@ -52908,3 +52908,45 @@ new invariant on C22 stating the period; T4.17j's comment corrected and a rate
 row added that fails on the shipped code; the fail-on-revert row is the shipped
 arming. One file in `src/`, no spec change outside C22, byte-identical frames —
 only their timing moves.
+
+**Closed — built and measured.** C22 I105 and C03 §3 as sized, and one half
+more than sized: `#armSpinner` arms for the stamps' due time less now, clamped
+at zero; and C03's `spinner` window is **80 ms**, the braille set's interval,
+because the first half alone left the period at exactly the 100 ms window over
+80 ms glyphs and T4.35 read nine glyphs of ten — the frames fell on ticks 1, 2,
+3, 5 of every five and two glyphs were never drawn. T4.17u asserts the rates as
+frames written outside the synchronised-update brackets (I103 keeps a
+bystander kind out of a tick's render, so the count T4.17j reads gives one for
+the spinner arm); T4.17j's comment carries 10 and 30 with the 5 and 15 it used
+to state. Mutation run `c22-ticker-period`: control caught, four of four (the
+arming from the paint, the stamps ignored, the spinner alone from now, the
+window back at 100 — the last through T4.35); `c22-spinner` five of five and
+`c22-camera` fifteen of fifteen unchanged. Gates: enforce green, 6,265 root
+rows, 458 goldens with no mover, 137 e2e.
+
+**The bench was measuring the fallback.** `plots.mjs` read 7 fps on the orbit
+because a fake terminal's `TERM` identifies nothing to C02, `synchronisedUpdate`
+resolves false, and the orbit takes the 100 ms tearing cap and commits `spinner`
+by I73's design. Both benches now pin the capability (`SYNC=0` measures the
+torn arm), and the before-figure below is taken the same way from the F1193
+build kept in `out/dist-B`.
+
+| reading, F1193 build B against this build A, both pinned, `make load-down`, 120×40 | B | A |
+|---|---|---|
+| `stress spinners` (300 entries), frames drawn per second over 4 s | 5.2 | **11.2** |
+| `stress steps` (300) | 5.2 | **11.5** |
+| `stress session` (32, a spinner and a live plot at the tail) | 5.0 | **9.7** |
+| `plots orbit suzanne`, frames over the 4 s between `ORBIT_MS=2000` and `6000` | 13.0 | **26.5** |
+| the same orbit, un-pinned (the 100 ms cap, both builds) | 7 | 10 |
+| CPU per frame drawn, spinners | 6.6 ms | 6.4 ms |
+
+The spinner's ceiling is now its own glyph interval — 12.5 a second, 11.2
+drawn under real timers — and the orbit's is C03's `stream` window plus the
+frame, 26 against a 4 ms frame. Every frame is byte-identical; the goldens say
+so.
+
+**What remains.** The orbit sits at 26 of a 30 ceiling because the window is
+armed after the paint and the paint is 4 ms; the goal names 60, and both
+constants (`stream` 33, `ORBIT_MS` 33) are C03's and C22's to move. The
+un-pinned arm stays capped at 100 ms by I73's tearing argument, which the
+goal's own concession on terminals without DECSET 2026 covers.
