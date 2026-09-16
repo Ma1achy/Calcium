@@ -51900,3 +51900,30 @@ nearest corner and their samples — which no whole-triangle bound reaches;
 `thinEdge`'s remaining iterations are the arithmetic the walk needs;
 `plot3dArea`'s boxed sample arrays (F1182); `normaliseRow`'s byte scan.
 
+## F1184 — the raster reads its vertices through three dependent object loads a corner, and the mesh is held as a quarter of a million objects ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/surface3.ts`: `Tri3` holds three `Vert` objects, each holding a `Vec3` position, a `Vec3` normal, a value and — since I130 — its screen record, a `MutableScreen` of nine doubles, under a frame stamp; `geometryOf` builds them all; `backfaceCulled`, `drawTri`, `screenOf`, `fill`, `strokeThin`, `hiddenThin` and `thinEdge` read them; `spanOverCorners` reads a `Corner` object per referenced vertex |
+| **Reached for** | the line ticks of forty bunny frames on the F1183 build (`out/prof-bunny6`, `make load-down`): of `drawTri`'s 75 self ticks, 23 sit on the third view-depth line — the first read of a corner's position object — and 30 on `screenOf`'s two record lines, `return w.s` and `w.rec = s`; the cull's centroid line holds 6 more. A micro-benchmark over the bunny's real geometry (`out/probe-soa.mjs`), the same arithmetic over the tree's objects and over packed `Float64Array`s, interleaved sixty rounds: the cull loop over 69,451 faces **0.93 → 0.55 ms**, the three-record touch a triangle over the 30,909 drawn **0.75 → 0.36 ms**. `probe-cold.mjs`: the bunny's first frame **53 ms**, of which `geometryOf` is **33 ms and 28.8 MB** building a `Vert` and two `Vec3` per vertex, a record per projected vertex, a `Corner` per referenced vertex, a normal and a triangle per face — some 260,000 objects for a mesh whose numbers fit in 6 MB of lanes; the `/all` bench's worst frame is that first render at **144 ms** |
+| **Verdict** | **open** — measured, the remedy sized |
+
+**Remedy, sized.** C12 I139: the geometry is lanes. `geometryOf` fills a
+position lane and a unit-normal lane of three doubles per raster vertex — the
+mesh's vertices under smooth shading, three per face under flat — a value
+array beside them, and an index lane of three per face; a triangle holds its
+face index and its geometry's lanes and no vertex object. The per-frame
+screen record is nine doubles in a lane slot per vertex under a stamp lane —
+I130's records and stamps, moved off the objects — with three spare slots
+the clip path writes its cut vertices into, so the fill and the thin stroke
+read every corner by index through one lane and the clip path is the same
+fill. The ramp span reads the position and value lanes. Every expression
+keeps its order: the numbers are the same doubles read from a different
+address, and the goldens are the gate. Sized from the two loops measured, a
+millisecond of the bunny's 12.6 warm — about 8% — plus what the fill and the
+stroke gain from contiguous corners; the heap loses the objects and gains
+the lanes, about 9 MB against 6; and the cold first frame loses the object
+building, which is most of `geometryOf`'s 33 ms. Not in this cut: `edges`
+stays an array of three booleans a face (2.8 MB on the bunny), `fn` a
+`Vec3` a face — both read by rows and runs by name, and each its own change.
+
