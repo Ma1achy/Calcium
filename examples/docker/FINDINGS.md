@@ -52316,3 +52316,53 @@ is recorded as what remains rather than cut here. Sized from the probe: a
 tick beside a 2,000-line patch from about 8.6 ms to about the spinner
 alone's 2.3, and the idle core share from 12% toward 5%; the `logs` case's
 34 ms p95 is the window's measure and is the same cut's to reduce.
+
+**Closed — built and measured.** C22 I103 as sized. The tick is the render
+slot's own axis, compared after `focus` and before the range, and its miss
+keeps the parts; `withoutAnimating` in the session withholds from the parts —
+on the read and on the hold — every block whose subtree animates, I73's walk
+per block, so a tick renders the `status` alone and assembles the patch from
+what the last frame held. `MissReason` has `tick`, the deck's caches card is
+six by nine, and the spinner is no longer a `focus` miss. T4.89e drives it at
+the cache and end to end under fake timers: the glyph turns, the kept block
+renders once more on the first tick — a whole render holds no parts and the
+assembly is what fills them — and no further time on the second; `tick` at
+least 2, `focus` 0. `c22-tick-axis` three of three, after its third mutation
+was cut to both halves of the filter: removing the read filter alone survived,
+because the hold filter alone keeps the spinner out of the parts and there is
+nothing stale to read — a mutation of one of two sufficient guards is a
+no-op, not a survivor. `c22-spinner`, `c22-range-parts`,
+`c22-series-visibility` and `c09-gif` re-anchored on the moved slot line and
+green. Gates: build, enforce, goldens 458 with no mover, e2e 134 green; the
+full suite's one red was RS14b's 30-second timeout in a file that took 221 s
+under a host load near three, green alone.
+
+| `out/probe-anim.mjs`, 120×40, 2,000 lines, 3 s, `make load-down` | before (F1188 build) | after |
+|---|---|---|
+| `patch` + `status`, first two rounds — work p50 | 6.98 · 6.46 ms | **3.94 · 3.62 ms** |
+| — core share | 12.2% · 10.0% | **8.0% · 7.1%** |
+| `patch` + `status`, six paired rounds at load 2–3 — work p50 | 6.34 · 3.87 · 9.60 · 9.34 · 8.83 · 9.34 | **3.49 · 7.49 · 5.70 · 4.67 · 5.18 · 5.95; B faster in 5 of 6** |
+| — CPU over 3 s | 349–372 ms (one 198) | **224–298 ms** |
+| `status` alone — work p50 | 1.14 · 1.74 ms | 1.30 · 0.98 ms (unchanged, the control) |
+| `logs` + `status` — work p50 | 3.42 · 1.42 ms | 1.84 · 4.54 ms — the noise exceeds the effect; no reading |
+
+**Against the sizing.** The sizing said a tick would fall to about the
+spinner alone's cost; it fell by about half and stopped near 3.6–5 ms, three
+times the spinner alone. The profile of the new build's run says why: after
+the module loader and the collector, the top Calcium self is `unitsOf` and
+`rowsOf` in `patch/window.js` and the text measure — **the entry is
+re-windowed and re-measured on every frame**, hit or miss, before the render
+cache is asked. `windowEntry` calls the patch's `window`, which derives a
+plan (C25 I22) over every line at every frame, and `renderEntryPieces`
+measures the sequence again for the C09 I1 check. None of that is the
+render's; all of it scales with the entry; and it is the same cost on a
+render-cache **hit**, which is the shape the framework profile's `compute`
+phase showed at 7% of a static frame and this probe shows at half a tick.
+
+**What remains.** The per-frame layout: `entryLayout` and `windowEntry`
+derive the pieces from the block and the width and the range, which are the
+render slot's own axes — a plan held beside the render slot, dropped on
+`rev`/`width`, would make a hit frame and a tick frame touch no line of the
+patch. That is the next finding, and it is the larger half of what this one
+measured. The orbit, the crosshair, the image frame and the series toggle
+stay in the compound slot as recorded above.
