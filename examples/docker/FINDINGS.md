@@ -51727,3 +51727,21 @@ holds every row start on a segmenter boundary with no exception now.
 `c09-solo-cluster`: seven caught, none survived. Gates green, goldens 458
 with no mover, e2e green. Not timed: one predicate per break point found,
 and a break point is found once per full row.
+
+## F1180 — the rows arm builds the tokeniser's shapes to avoid the tokeniser: five arrays a sequence, a list a code, four `Set`s a transition ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/rows.ts`: `partsOf` (`split`, `slice`, `join`, `map`, and the `[sequence]` array), `applied` (a fresh list per code), `between` (three `Set`s, two `filter`s, `undone`'s reduction into fresh lists, a reversal, a spread and a fourth `Set`), `endOf` (two hashes and a `slice` before the `38`/`48` test) |
+| **Reached for** | the forms bench at ten repetitions and the `/all` profile at 408 frames on the F1179 build: `partsOf` 113.9 ms, `normaliseRow` 92.6, `between` 40.3, `endOf` 32.7 of 2,279 — the four largest frame-path functions after `cells`, twelve per cent of the work — and on `/all` `partsOf` 17.2, `normaliseRow` 10.3 of 549. A plot row carries a truecolour sequence a cell, and every one went through `partsOf`'s compound path. Sized with the parameters read in place by their `;` positions, the state reduced into two lists the row reuses, and the transition scanned linearly, three runs a side under `make load-down`: the `rows` span on forms **302 / 268 / 271 → 178 / 190 / 157 ms**, forms sum **327 / 205 / 230 → 231 / 245 / 282**, `/all` work over 408 frames **479 / 597 / 579 → 488 / 568 / 473 ms**, `/all` p95 **4.3 / 4.7 / 4.5 → 3.7 / 4.1 / 3.7**; the arm's self time on the forms profile 222 → 130 ms, of which `normaliseRow` 57 → 59, `partsOf` 81 → 0 with `applySequence`, `paramEnd` and `apply` at 11, 11 and 16, `between` 55 → under 11 |
+| **Verdict** | **open** — measured, the remedy sized |
+
+**Remedy, sized.** C09 I75: the arm reads a sequence's parameters in place —
+`38`/`48` with `5` and one more, or `2` and four more, taken as one part
+exactly where `splitCompoundSGRSequences` does — reduces each code into the
+live list in place, copies the live list over the shown one at a transition,
+and writes the transition from two linear scans, reducing the codes not
+carried over into a list made only when there is one; `endOf` answers the
+colour codes from their bytes. The bytes are I72's and T1.46 holds them
+against the tokeniser's serialiser; a new row counts `Set` constructions and
+`split` calls over a plot-shaped row and finds none.
