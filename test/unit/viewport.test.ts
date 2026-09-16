@@ -19,9 +19,47 @@ const mk = (height: number, cap?: number) => {
 };
 
 describe("C14 unit — visibility", () => {
-  it.todo(
-    "T1.23 (I30, F1198): visible() returns the same frozen range until the viewport moves, and a fresh one after a scroll, an append or a resize — not deferred on a component: the code commit replaces this row",
-  );
+  it("T1.23 (I30, F1198): visible() returns the same frozen range until the viewport moves, and a fresh one after a scroll, an append or a resize", () => {
+    const { store, viewport } = mk(6);
+    store.append(rowsDoc(2, "a"));
+
+    // **Identity, not equality.** An equal object recomputed per call is the
+    // cost F1198 measured; the claim is that nothing was recomputed.
+    const first = viewport.visible();
+    expect(viewport.visible(), "nothing moved: the same object").toBe(first);
+    expect(viewport.stats.visibleMemo).toEqual({ hits: 1, misses: 1 });
+
+    // **On the call and not on a changed row.** Two rows in six: an append
+    // leaves the top row at 0 and changes what the rows hold. A drop keyed on
+    // the row moving serves the range from before the append here — the
+    // mutation that survived the first run of this row.
+    const b = store.append(rowsDoc(2, "b"));
+    const grown = viewport.visible();
+    expect(grown, "content changed under a still top row: a movement").not.toBe(first);
+    expect(grown.topRow).toBe(0);
+    expect(grown.entries.map((e) => e.id), "and the new entry is in the range").toContain(b);
+
+    store.append(rowsDoc(4, "c"));
+    const tail = viewport.visible();
+    viewport.scrollBy(-1);
+    const scrolled = viewport.visible();
+    expect(scrolled, "a scroll is a movement").not.toBe(tail);
+    expect(scrolled.topRow).toBe(tail.topRow - 1);
+
+    viewport.scrollToBottom();
+    const bottom = viewport.visible();
+    const d = store.append(rowsDoc(4, "d"));
+    const appended = viewport.visible();
+    expect(appended, "a content change is a movement").not.toBe(bottom);
+    expect(appended.entries.map((e) => e.id), "and the range is the moved state's, following the tail").toContain(d);
+    expect(appended.entries.reduce((n, e) => n + e.takeRows, 0)).toBe(6);
+
+    viewport.resize({ width: W, height: 4 });
+    const shorter = viewport.visible();
+    expect(shorter, "a resize is a movement").not.toBe(appended);
+    expect(shorter.entries.reduce((n, e) => n + e.takeRows, 0)).toBe(4);
+    expect(viewport.stats.visibleMemo.misses, "one miss per movement, and none between").toBe(7);
+  });
 
   it("T1.1 (I10): takeRows sum to viewportHeight exactly", () => {
     const { store, viewport } = mk(6);

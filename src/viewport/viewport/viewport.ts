@@ -46,6 +46,19 @@ class ViewportImpl implements Viewport {
   #topRow = 0;
   #followTail = true;
   #anchor: Anchor | null = null;
+  /**
+   * The last range `visible()` answered, until the viewport moves (I30).
+   *
+   * **Dropped in `#setTop` and nowhere else**, because every path that changes
+   * what is on screen — a scroll, `#afterContent` after any content change,
+   * `resize` on either arm, `clear` — ends in that clamp (I2). C23's refresh
+   * driver asks *is this host on screen* per live part per sweep and L4 answers
+   * from this range; at two hundred parts every 16 ms that was twelve thousand
+   * walks a second for an answer that moves only with the viewport (F1198).
+   */
+  #visibleMemo: VisibleRange | null = null;
+  #visibleHits = 0;
+  #visibleMisses = 0;
 
   constructor(view: TranscriptView, opts: ViewportOptions) {
     this.#view = view;
@@ -82,6 +95,7 @@ class ViewportImpl implements Viewport {
     entryCount: number;
     hits: number;
     misses: HeightMisses;
+    visibleMemo: Readonly<{ hits: number; misses: number }>;
   }> {
     return Object.freeze({
       cacheSize: this.#cache.size,
@@ -92,10 +106,24 @@ class ViewportImpl implements Viewport {
       // reason says whether a miss was legitimate (F863).
       hits: this.#cache.hits,
       misses: this.#cache.misses,
+      // The range memo's rate, by I27's rule (I30).
+      visibleMemo: Object.freeze({ hits: this.#visibleHits, misses: this.#visibleMisses }),
     });
   }
 
   visible(): VisibleRange {
+    // I30 — the same object until something moves; `#setTop` drops it.
+    if (this.#visibleMemo !== null) {
+      this.#visibleHits += 1;
+      return this.#visibleMemo;
+    }
+    this.#visibleMisses += 1;
+    const range = this.#visibleRange();
+    this.#visibleMemo = range;
+    return range;
+  }
+
+  #visibleRange(): VisibleRange {
     const entries = this.#view.entries;
     const total = this.#index.totalRows;
     const height = Math.max(0, this.#height);
@@ -438,6 +466,10 @@ class ViewportImpl implements Viewport {
   #setTop(row: number): void {
     // I2 — always within [0, max(0, totalRows − viewportHeight)].
     this.#topRow = Math.min(Math.max(0, row), this.#maxTop());
+    // I30 — every movement ends here, so this is where the range memo goes.
+    // On the call and not on a changed row: a content change that leaves the
+    // top row where it was has still changed what the rows hold.
+    this.#visibleMemo = null;
   }
 
   #captureAnchor(): void {
