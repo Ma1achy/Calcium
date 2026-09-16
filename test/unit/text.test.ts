@@ -1351,4 +1351,5 @@ describe("fitStyled — a short row is padded, not walked (C09 §5a, I78, F1204)
     expect(fitStyled(`${RED}abcdef${SGR_RESET}`, 3, SGR_RESET)).toBe(`${RED}abc${SGR_RESET}`);
     expect(fitStyled("a日b", 2, SGR_RESET)).toBe("a ");
   });
+  it.todo("T1.53 (C09 I79): truncate and truncateParts from both ends equal a reference cut over the corpus — not deferred on a component: the code commit replaces this row");
 });

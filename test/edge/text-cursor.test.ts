@@ -320,4 +320,5 @@ describe("C09 §5a — the cluster step is linear, and one glyph does not segmen
         `(${(cjkMs / gutterMs).toFixed(1)}×, reported not gated — F1084)`,
     ).toBeGreaterThan(gutterMs);
   });
+  it.todo("T3.90 (C09 I63, I79): a 400-cell CJK line cut to 100 asks containing for 250 clusters and iterates no Segments — not deferred on a component: the code commit replaces this row");
 });
