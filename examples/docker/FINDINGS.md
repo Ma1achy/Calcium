@@ -53349,3 +53349,20 @@ host, not a frame that grew. Under `--cpu-prof` the after build is lighter on te
 as on every other case, 673 against 695, the guard's line 85 → 51. Recorded rather
 than averaged away, because a reading that only one side shows deserves its own
 line even when the profile clears it.
+
+## F1205 — a truncation builds every cluster of the line to keep its first hundred cells ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `truncateParts` and `truncate` (`src/presentation/text.ts`). Each measures the line, and a line over the width then has every grapheme cluster of the *whole* line built — `[...GRAPHEMES.segment(whole)].map((s) => s.segment)`, a record and a string per cluster — before a walk from the front spends the budget and stops. The clusters past the cut are built and dropped, so the cost is the line's and not the width's. `raw`'s render asks it for every line it draws (`kinds/simple.ts`), `code`'s for every row over the width, and the reverse arm (`from: "start"`) is the one caller that needs the whole line. |
+| **Reached for** | `--cpu-prof` over `stress text` at 120×40 — 200 markdown responses of eight paragraphs, forty PageUps: `truncateParts` self **134–153 ms** of a 697-frame run, all of it under `raw`'s render on the miss path; the profiler's `byKind.raw` 5,120 renders summing 191 ms, 37 µs each against a p50 of 10. The measurement that explains it: a markdown paragraph is one `raw` line — C04's markdown makes a paragraph a `raw` block, and `raw` never wraps — of 300 to 600 cells, and `truncateParts` on a 329-cell bench paragraph at width 118 costs **94 µs**, against 1.9 at a width that keeps it whole: 329 segment records for a 117-cell answer. About 0.4 ms of each of the 441 miss frames, and the same per over-width row in `code`. |
+| **Verdict** | **Open.** |
+
+**Remedy, sized.** Walk the clusters in place with the measurer's cursor — `plainRun`,
+`soloAt`, `clusterAt`, the boundary every path of `cells` and `fitStyled` already reads
+(C09 I63, I74) — and stop at the cut, for `from: "end"`; the `"start"` arm keeps the tail
+and takes the whole line's boundaries from the same cursor, so one boundary source stands
+and the two arms cannot round differently at a CJK or ZWJ edge. Byte-identical because
+the cursor's clusters are the segmenter's on every input T1.40 and T1.51 sweep. One C09
+invariant, a unit corpus over both arms at widths over and under the line, a cost row, a
+fail-on-revert row, a mutation run whose control segments the whole line.
