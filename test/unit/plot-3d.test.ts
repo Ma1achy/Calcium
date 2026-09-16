@@ -963,6 +963,7 @@ describe("C12 I131 — the span's depth is project's first dot, and the cull all
     expect(seen.culled, "the corpus holds culled faces").toBeGreaterThan(1000);
     expect(seen.kept, "and kept ones").toBeGreaterThan(1000);
   });
+  it.todo("T1.147 (C12 I131, I135, F1175): spanOverCorners from open bounds answers project's least and greatest depth over the accepted corners and the least and greatest value among them, a refused corner moves neither, and tighter incoming bounds come back unchanged — not deferred on a component: the code commit replaces this row");
 });
 
 describe("C12 I132 — the painter writes an integer and the records are built once", () => {
