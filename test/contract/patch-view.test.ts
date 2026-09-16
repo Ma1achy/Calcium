@@ -313,7 +313,7 @@ describe("C22 §3 — the fullscreen patch view", () => {
 });
 
 describe("C25 §3b — what the view may read, and where its motions land", () => {
-  it("T2.10 (C25 I17): the view's dependencies are overlays, transcript, region and redraw — no data seam", () => {
+  it("T2.10 (C25 I17): the view's dependencies are overlays, transcript, region, redraw and an instrument-only probe — no data seam", () => {
     /**
      * ***Never needs data the block does not carry* is a claim about the
      * dependency list**, and no assertion about output can see it. A view that
