@@ -51613,7 +51613,7 @@ and `normaliseRow` about 22 together; `mixedRows` 10.2; `thinEdge` and
 |---|---|
 | **Surface** | `src/presentation/text.ts`'s three cluster walks — `cells`, `fitStyled`, `sliceCells` — at the arm past `plainRun`: `clusterAt(segments, i)`, a `containing` call and a segment record per glyph; `src/presentation/rows.ts`'s `swallowed`, which slices the row's tail and segments it after every SGR whose next unit is at or above U+0300 |
 | **Reached for** | the `/all` profile at 408 frames and the forms bench at ten repetitions, both on the F1176 build: `clusterAt` 83 ms of 1,870 (4.5 %, the largest frame-path function), `cells` 34, `swallowed` 20, `wrapCellsParts` 18, `normaliseRow` 15, `placeableClusters` 14, `partsOf` 13; on the forms bench `clusterAt` 786 ms, `cells` 418, `swallowed` 281, `placeableClusters` 253, `partsOf` 243, `between` 195, `normaliseRow` 183. I63's fast path counts a run of printable ASCII by its length and hands the segmenter what follows one — the shape F955 found, a gutter glyph among ASCII. A plot row inverts it: eighty braille or box-drawing units and no ASCII at all, so every unit is handed to `containing`, which builds a segment record, and `swallowed` after each SGR sees a next unit at U+2800 and segments the rest of the row. **A boundary after such a glyph is decidable from the next unit**: by UAX #29, a character that is not Hangul, Prepend, a regional indicator or a joiner is followed by a boundary unless the next unit is Extend, ZWJ or SpacingMark — and no unit below U+0300 other than the joiner is any of those, nor is any unit of the box-drawing, block, geometric, braille, arrow, Latin-1 or punctuation ranges. Sized on the built tree, three runs a side under `make load-down`: forms sum **287 / 485 / 302 → 250 / 233 / 364 ms**, the `rows` span **374 / 446 / 351 → 293 / 299 / 300**, `/all` work over 408 frames **671 / 616 / 717 → 583 / 591 / 557 ms** |
-| **Verdict** | **open** — measured, the remedy sized on a scratch build |
+| **Verdict** | **closed** — built and measured: C09 I74, T1.48, T3.85, `c09-solo-cluster` |
 
 **Remedy, sized.** A unit in one of those ranges whose next unit cannot
 extend it is its own cluster, measured by `clusterCells` as the segmenter's
@@ -51627,3 +51627,30 @@ every range with every extender kind and asks the walks to keep the cluster
 whole. What it does not reach: `placeableClusters` and `wrapCellsParts`,
 which iterate the segmenter over whole text rather than asking `containing`;
 `partsOf` and `between` in the rows arm.
+
+**Closed — built and measured.** C09 I74; `soloUnit` is the table
+`CELL_PER_UNIT_RANGES` already held for `rowCells`, and `soloAt` decides from
+the next unit — the end, a unit below U+0300, or another unit of the table —
+in `cells`, `fitStyled` and `sliceCells`; `swallowed` answers zero after an
+SGR before one. **One correction to the entry above**: it said *no unit below
+U+0300 other than the joiner* can extend, and the joiner is U+200D, above
+U+0300 — the clause excepting it was dead, the mutation admitting it survived
+on the first run as a no-op, and T6.121 records the survivor as the code's.
+T1.48 pairs every BMP range of the table with every extender kind through
+all three walks and sweeps three thousand seeded rows at every width and
+window against references written over the segmenter's own clusters; T3.85
+now counts zero asks for the gutter glyph and two for a glyph outside the
+table; T1.46's corpus carries the alphabets. `c09-solo-cluster`: control seen,
+two caught, none survived; `quadratic-cursor` re-anchored, sixteen caught.
+Gates green, goldens 458 with no mover.
+
+| three runs a side, `make load-down` | before | after |
+|---|---|---|
+| forms sum | 287 / 485 / 302 ms | 267 / 300 / 283 ms |
+| `rows` span, forms | 374 / 446 / 351 ms | 276 / 311 / 307 ms |
+| `/all` work, 408 frames | 671 / 616 / 717 ms | 485 / 712 / 576 ms |
+| `/all` p95 | 5.4 / 4.9 / 5.8 ms | 4.0 / 5.7 / 4.7 ms |
+
+What remains: `placeableClusters` and `wrapCellsParts` iterate the segmenter
+over whole text; `partsOf` and `between` build arrays and `Set`s per style
+transition; `plot3dArea`'s boxed sample arrays.
