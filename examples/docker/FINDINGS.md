@@ -52970,3 +52970,40 @@ fresh one across each of the three axes, one fail-on-revert row for the
 invalidation moved off the clamp, and a mutation run. L4's wrapper is left as
 it is: `.some` over at most a screenful of entries is the cheap half. Frames
 are untouched; only the sweep's cost moves.
+
+**Closed — built and measured.** C14 I30 as sized. The drop is on the call and
+not on a changed row, and that clause earned its place in the mutation pass:
+the first run left *dropped only when the clamp moved the row* alive, because
+every step of T1.23 moved the top row — a scroll, an append while following a
+tail longer than the region, a shorter region. The step that reaches it is an
+append to a transcript that fits: the top row is 0 before and after and the rows
+under it are different, and a memo keyed on the row would serve the range
+without the new entry. T1.23 walks that step now and the spec row says so
+(C14 T1.23, T6.26). Second run of `c14-visible-memo`: control caught, three of
+three (the drop into the scroll methods, the drop on a changed row only, the
+counters swapped); `c14-cap` and `c14-windows` unchanged. Gates: enforce green,
+6,266 root rows, 458 goldens with no mover, e2e green — T5.6's idle-CPU bound
+went red once in the chain at 0.0054 against 0.005 and passed alone.
+
+| reading, F1197 build B against this build A, both pinned, `make load-down`, 120×40, paired rounds | B | A | rounds |
+|---|---|---|---|
+| `stress stream` (200 live parts at 16 ms), CPU per frame drawn | 14.1 ms | **8.0 ms** | 8, every pair lower |
+| the same, CPU share of one core | 36.5% | **21.9%** | 8, every pair lower |
+| the same, key latency p50 | 0.17 ms | **0.09 ms** | 8 |
+| `stress everylive` (47 live forms), CPU per frame | 9.7 ms | **6.4 ms** | 3, two of three lower |
+| `stress live:line` (40), CPU per frame | 9.4 ms | 8.1 ms | 3, within the spread |
+| `stress session` (32), CPU per frame | 7.4 ms | 6.9 ms | 8, paired differences straddling zero |
+| frames drawn per second, every case | unchanged | unchanged | the window sets it, not the sweep |
+| heap after `gc()`, every case | within 0.2 MB | | |
+
+The first three-round table read session at 5.2 → 8.3 ms and that is recorded
+here rather than dropped: five more paired rounds put the differences at +1.5,
+−0.8, +3.8, +0.1 and −3.3 ms on a case that draws forty animated frames in the
+window, which is the spread and not a cost. Stream is the case the finding was
+opened on and it is the one that moves in every pair.
+
+**What remains.** The sweep still asks per part per sweep and L4 still answers
+with `.some` over the range's entries; both are now cheap and neither is
+free. The frame rate did not move because the finding was never about the
+frame: 27 of a 30 ceiling in every row, which is the `stream` window's to move and
+the next finding's.
