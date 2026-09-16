@@ -52243,3 +52243,39 @@ measured the loader's I/O multiplied ten times. The alternative — an
 cost from the graph but changes the function's shape for a loading reason,
 and is recorded here rather than built. Sized: **−80 to −156 ms of a
 400–480 ms cold import**, the second-largest piece after `ink`'s own graph.
+
+**Closed — built and measured.** C24 I36 as sized. `src/mermaid.ts` is a
+one-line barrel over `presentation/mermaid.ts`, `package.json` names
+`./mermaid` beside `./profiling`, and `src/index.ts` re-exports `mermaidCode`
+no longer; the function is untouched and the four contract rows on it pass
+as they were. T5.6 reads the built package's graph under the import trace:
+nothing from `beautiful-mermaid` or `elkjs` after the runtime import, the
+renderer's bundle present after `dist/mermaid.js`'s, the rendering of a
+two-node flowchart equal to the contract corpus's byte for byte, and the
+exports map naming the entry. `c24-mermaid-entry` rebuilds `dist/` at each
+step and at its end and catches the export restored to the barrel, one of
+one. Gates green, goldens 458 with no mover, the full suite 6,256; e2e's one
+red was `T5.8`'s three-second exit bound at 3.4 s during the chain, green
+alone on the idle machine — a timing row, not this cut's.
+
+| `/tmp/calc`, off the bind mount | before (F1187 build) | after |
+|---|---|---|
+| modules loaded by `import "dist/index.js"` under the trace | 2,458 · 2 from the renderer's packages | **2,441 · 0** |
+| cold import, quiet machine, six pairs — the renderer's marginal cost (preloaded − plain) | 80–156 ms of 398–483, median about 110 | — |
+| cold import, paired A/B, `probe-import.mjs`, load average 2.2–2.9, sixteen pairs | A 563–1,372 ms | **B 443–950 ms; B faster in 15 of 16; paired median −220 ms in the second eight** |
+
+The two readings disagree by a factor of two and the difference is the
+load, not the cut: the quiet reading isolates the renderer's own import at
+a quarter of the total, and under a load average near three every import
+stretches with it, the renderer's included. The honest figure is the
+quiet one — about 110 ms of a 400–480 ms cold import — with the loaded
+pairs as the sign and the consistency: fifteen of sixteen.
+
+**What remains.** `ink`'s own graph is the largest piece left of a cold
+import (262 ms alone, cold) and it is the renderer; Node's compile cache
+(R01 R4.6) is what the launchers already do about it. A consumer that does
+draw diagrams now pays the renderer at its own import, statically — the
+async form, `import("@fmx/calcium/mermaid")` inside the adapter that needs
+it, is the consumer's to choose and costs nothing here. The examples call
+no `mermaidCode`; the docker example's notes describe the transform and
+name no import line.
