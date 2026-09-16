@@ -51734,7 +51734,7 @@ and a break point is found once per full row.
 |---|---|
 | **Surface** | `src/presentation/rows.ts`: `partsOf` (`split`, `slice`, `join`, `map`, and the `[sequence]` array), `applied` (a fresh list per code), `between` (three `Set`s, two `filter`s, `undone`'s reduction into fresh lists, a reversal, a spread and a fourth `Set`), `endOf` (two hashes and a `slice` before the `38`/`48` test) |
 | **Reached for** | the forms bench at ten repetitions and the `/all` profile at 408 frames on the F1179 build: `partsOf` 113.9 ms, `normaliseRow` 92.6, `between` 40.3, `endOf` 32.7 of 2,279 — the four largest frame-path functions after `cells`, twelve per cent of the work — and on `/all` `partsOf` 17.2, `normaliseRow` 10.3 of 549. A plot row carries a truecolour sequence a cell, and every one went through `partsOf`'s compound path. Sized with the parameters read in place by their `;` positions, the state reduced into two lists the row reuses, and the transition scanned linearly, three runs a side under `make load-down`: the `rows` span on forms **302 / 268 / 271 → 178 / 190 / 157 ms**, forms sum **327 / 205 / 230 → 231 / 245 / 282**, `/all` work over 408 frames **479 / 597 / 579 → 488 / 568 / 473 ms**, `/all` p95 **4.3 / 4.7 / 4.5 → 3.7 / 4.1 / 3.7**; the arm's self time on the forms profile 222 → 130 ms, of which `normaliseRow` 57 → 59, `partsOf` 81 → 0 with `applySequence`, `paramEnd` and `apply` at 11, 11 and 16, `between` 55 → under 11 |
-| **Verdict** | **open** — measured, the remedy sized |
+| **Verdict** | **closed** — built and measured: C09 I75, T1.50, `c09-rows-arm` |
 
 **Remedy, sized.** C09 I75: the arm reads a sequence's parameters in place —
 `38`/`48` with `5` and one more, or `2` and four more, taken as one part
@@ -51745,3 +51745,27 @@ carried over into a list made only when there is one; `endOf` answers the
 colour codes from their bytes. The bytes are I72's and T1.46 holds them
 against the tokeniser's serialiser; a new row counts `Set` constructions and
 `split` calls over a plot-shaped row and finds none.
+
+**Closed — built and measured.** C09 I75 as sized: `applySequence`, `apply`,
+`copyState`, `between` over two linear scans, `endOf` from the bytes. T1.50
+counts no `Set` and no `split` over eighty truecolour cells, the 256-colour,
+compound and empty-parameter rows, and two thousand seeded rows, with the
+tokeniser's own path as the counters' control; T1.46 and T2.143 hold every
+byte. `c09-rows-arm` re-anchored on the in-place forms and extended by the
+colour group applied as five parts, a shared end written twice and `38`
+closed with `49`: fourteen caught, none survived. SS23 fired on the three
+list truncations and they carry their `cells-ok`. Gates green, goldens 458
+with no mover, e2e green. The bench is the sizing's, taken on the tree's
+build before the marks — comments move no byte of `dist/`.
+
+| three runs a side, `make load-down` | before | after |
+|---|---|---|
+| `rows` span, forms | 302 / 268 / 271 ms | 178 / 190 / 157 ms |
+| forms sum | 327 / 205 / 230 ms | 231 / 245 / 282 ms — inside its spread |
+| `/all` work, 408 frames | 479 / 597 / 579 ms | 488 / 568 / 473 ms |
+| `/all` p95 | 4.3 / 4.7 / 4.5 ms | 3.7 / 4.1 / 3.7 ms |
+| the arm's self time, forms profile | 222 ms | 130 ms |
+
+What remains: `normaliseRow`'s own 58 ms is the byte scan and the string
+building; `plot3dArea`'s boxed sample arrays; the first triangulation of a
+mesh on a `/all` scroll, a 137 ms frame.
