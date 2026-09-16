@@ -53085,3 +53085,41 @@ meshes 25 → 40%) and that is the same frame cost seen from the other side. The
 spinner stays at its glyph interval by design (F1197), and the orbit without
 DECSET 2026 at I73's 100 ms cap. The heap rise is the timeline's, not the
 frame's, and reads as such in `misses`.
+
+## F1200 — the window is laid end to end with the frame: C03 dates the ceiling from the commit that follows a paint, so a continuous source draws at window + frame + slop and 60 is unreachable at any frame cost ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | C03 `commit` (`src/terminal/frame-scheduler.ts`): a coalesced commit from `idle` arms the window; the write consumes the timer; the next commit — which under a continuous source lands the moment the write returns — arms a fresh one. §3 calls the window a *throughput ceiling*, and what the code implements is a ceiling on the gap between a commit and its frame, not on the gap between frames. |
+| **Reached for** | After F1199 every live case sits at 46 to 53 of the 62.5 the 16 ms window allows (`stress stream` 53.7, `live:line` 51.7, `everylive` 47.8, `livemesh:suzanne` 41.5, the suzanne orbit 42). `PROFILE_JSON` over `stress stream`, the `stream` frames of the timeline: |
+
+| stream frames, 217 in the window | p10 | p50 | p90 |
+|---|---|---|---|
+| gap between consecutive frames | 17.39 ms | **18.34** | 19.47 |
+| `wait` — earliest unserved commit → frame start | 15.73 | 16.69 | 17.58 |
+| `work` | | 1.19 | 1.45 |
+| frame end → next earliest commit | 0.43 | 0.47 | 0.56 |
+
+18.34 = 16.69 + 1.19 + 0.47: the window, then the frame, then the half-millisecond until the source's next timer fires, and then the window again. Nothing lands during the write — the sources are timers, and a timer cannot fire inside a synchronous write — so the two waits are serial by construction and the rate is 1000 / (16 + frame + slop), which is 54 at a 1 ms frame and 47 at a 5 ms one. **A first hypothesis was measured and did not hold**: opening the next window at the write's start *for a commit deferred during the write* (T3.15's case) changed nothing — 50.7 against 49.5, 50.0 against 47.5 — because the commit does not arrive during the write; it arrives after.
+
+| | |
+|---|---|
+| **Verdict** | **open.** The ceiling §3 describes is a rate — *at most one frame per window* — and the ceiling the code implements is a latency — *at most one window between a commit and its frame*. They agree for a lone commit and disagree for a stream, where the second is stricter than the first by the frame's cost. The fix is clock-free, which is the constraint §3 names: a write opens the next window as it begins, so a commit that lands after the paint is served when that window closes rather than a full window after its own arrival. Frame latency for a lone commit is unchanged; for a commit inside an open slot it is shorter, never longer. |
+
+**Remedy, sized.** C03 gains a fourth state, `paced`: every write arms one
+timer for the shortest coalesced window (16 ms) as it begins, and leaves it
+standing. A coalesced commit that lands while it stands moves the machine to
+`pending` and arms nothing — the slot is already the shortest window, so I3's
+strictly-shorter rule never re-arms; an immediate commit cancels it and writes,
+as today; a slot nobody commits into fires once and lapses to `idle` without
+writing. I9 and I1 hold by cancelling the slot on a throwing render and on an
+unacquired write. One invariant (I17), a §5 row, two unit rows (frames 16 ms
+apart under a continuous source; an unused slot lapses without a write), one
+edge row (a spinner commit inside the slot is served at its close), T3.15 and
+T2.4 restated, T6.19 for the slot cancelled when nothing was deferred, two
+mutations in `c03-resize-window`. Fourteen assertions that read *no timer after
+a frame* become *one timer, the slot, which lapses and writes nothing* — each
+re-read rather than substituted, because half of them were asserting a
+cancellation and the slot is not what they were about. Expected: every live
+case at the source's rate — 58 to 60 where the frame is under 16 ms — and T5.6's
+idle CPU unchanged, since a slot fires once per burst and not per second.
