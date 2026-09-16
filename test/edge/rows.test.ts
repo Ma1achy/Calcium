@@ -6,14 +6,27 @@
 // the normaliser.
 import { describe, expect, it } from "vitest";
 import { styledCharsFromTokens, styledCharsToString, tokenize } from "@alcalzone/ansi-tokenize";
-import { Text } from "ink";
+import { Box, Text, renderToString } from "ink";
 import { createElement } from "react";
-import type { Block } from "../../src/data/viewmodel/index.js";
-import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
-import { rows } from "../../src/presentation/blocks/paint.js";
+import { NO_PROBE, NO_SPAN } from "../../src/data/viewmodel/index.js";
+import type { Block, Probe } from "../../src/data/viewmodel/index.js";
+import type { BlockDefinition, RenderContextInput } from "../../src/presentation/blocks/index.js";
+import { elementOf, rows } from "../../src/presentation/blocks/paint.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
-import { normaliseRow } from "../../src/presentation/rows.js";
+import { normaliseRow, placeRows } from "../../src/presentation/rows.js";
+import { ONE_PER_KIND } from "../support/blocks.js";
+import { TEST_KINDS, twin } from "../support/lifted.js";
 import { DARK_THEME, FULL_CAPS, registry } from "../support/render.js";
+
+/** The element arm as `render-lines` ran it for every block before C09 I72: a sentinel row below, then split. */
+function throughInk(element: Parameters<typeof renderToString>[0], width: number): readonly string[] {
+  const painted = renderToString(
+    createElement(Box, { flexDirection: "column" }, element, createElement(Text, { key: "sentinel" }, ".")),
+    { columns: width },
+  );
+  const lines = painted.split("\n");
+  return lines.slice(0, Math.max(0, lines.length - 1)); // cells-ok — rows, not columns
+}
 
 const reference = (row: string): string =>
   styledCharsToString(styledCharsFromTokens(tokenize(row))).trimEnd();
@@ -63,7 +76,38 @@ describe("C09 I72 — rows at the edges", () => {
     expect(renderToLines(r, { kind: "empty-rows", id: "e" } as unknown as Block, 20, options)).toEqual([""]);
     expect(renderToLines(r, { kind: "one-text", id: "t" } as unknown as Block, 20, options)).toEqual([""]);
   });
-  it.todo(
-    "T3.89 (C09 I73): an element child, an over-wide row placement, a short child in a row group and an over-tall panel body — not deferred on a component: the code commit replaces this row",
-  );
+  it("T3.89 (C09 I73): a group with a mosaic child composes elements and the probe reads react; placeRows declines a row wider than its cell and composeRow an overlap; a row group with a short child is the tallest child's height with the short cell blank below, and a panel whose body answers more rows than measured extends below the rails — each equal to the element path through Ink", () => {
+    const r = registry(TEST_KINDS);
+    const B = (spec: Record<string, unknown>): Block => spec as unknown as Block;
+    const both = (b: Block, width: number): { got: readonly string[]; expected: readonly string[]; names: string[] } => {
+      const ctx: RenderContextInput = { width, theme: DARK_THEME, capabilities: FULL_CAPS, focus: null, tick: 0 };
+      const expected = throughInk(elementOf(r.render(twin(b), ctx)), width);
+      const names: string[] = [];
+      const probe: Probe = { ...NO_PROBE, on: true, span: (name: string) => { names.push(name); return NO_SPAN; } };
+      const got = renderToLines(r, b, width, { theme: DARK_THEME, capabilities: FULL_CAPS, probe });
+      return { got, expected, names };
+    };
+    // **An element child**: the mosaic is the one kind left on the element arm.
+    const withMosaic = B({ kind: "group", id: "g-mosaic", direction: "column", children: [ONE_PER_KIND.notice, ONE_PER_KIND.mosaic] });
+    const m = both(withMosaic, 60);
+    expect(m.got).toEqual(m.expected);
+    expect(m.names.filter((n) => n === "react")).toHaveLength(1);
+    expect(m.names.filter((n) => n === "rows")).toHaveLength(0);
+    // **The declines**: a row wider than its cell, and two pieces overlapping.
+    expect(placeRows([{ x: 0, top: 0, width: 2, rows: ["abc"] }], 1)).toBeNull();
+    expect(placeRows([{ x: 0, top: 0, width: 3, rows: ["abc"] }, { x: 2, top: 0, width: 3, rows: ["def"] }], 1)).toBeNull();
+    expect(placeRows([{ x: 0, top: 0, width: 3, rows: ["abc"] }, { x: 4, top: 1, width: 3, rows: ["def"] }], 2)).toEqual(["abc", "    def"]);
+    // **A short child**: measured three, answered one.
+    const short = B({ kind: "group", id: "g-short", direction: "row", flex: [1, 1], children: [B({ kind: "short", id: "sh" }), B({ kind: "raw", id: "tall", text: "a\nb\nc" })] });
+    const s = both(short, 40);
+    expect(s.got).toEqual(s.expected);
+    expect(s.got).toHaveLength(3); // cells-ok — rows
+    expect(s.got[1], "the short cell is blank below its row").toMatch(/^\s+b$/u);
+    // **An over-tall body**: measured one, answered three; the rails stop at one.
+    const tall = B({ kind: "panel", id: "p-tall", title: "T", children: [B({ kind: "tall", id: "tl" })] });
+    const p = both(tall, 20);
+    expect(p.got).toEqual(p.expected);
+    expect(p.got).toHaveLength(5); // cells-ok — top, three body rows, bottom
+    expect(p.got[2], "the second body row has no rail").not.toMatch(/[│|]/u);
+  });
 });

@@ -20,7 +20,7 @@ import {
 } from "../../image/index.js";
 import { placementFits, placementIdOf, placementRows } from "../../image/kitty.js";
 import { overlayColour, overlayField } from "../../image/overlay.js";
-import { elementOf, paint, type Span } from "../paint.js";
+import { elementOf, paint, rows as rowsOf, type Span } from "../paint.js";
 import { statusDefinition } from "./status.js";
 import type { Image, MeasureFn, Probe, Status } from "../../../data/viewmodel/index.js";
 import { truncate } from "../../text.js";
@@ -275,11 +275,8 @@ export const imageDefinition: BlockDefinition<Image> = {
       // **The overlay is not here at `kitty` and that is the whole ruling**
       // (C04 §3h.2): the cell's rendering is the terminal's, so it is composited
       // into the pixels by `transmitImage` before the bytes ever leave L4.
-      return createElement(
-        Box,
-        { flexDirection: "column", width: cols },
-        placed.rows.map((line, i) => createElement(Text, { key: String(i) }, line)),
-      );
+      // Rows, not a `Text` per row (C09 I73).
+      return rowsOf(placed.rows);
     }
 
     // **Below here every arm rasterises, so this is where the refusal goes**
@@ -322,6 +319,9 @@ export const imageDefinition: BlockDefinition<Image> = {
       // **Truncated by C09's own function**, not by Ink's `wrap`, which emits
       // `…` at every capability where I22 substitutes `~` under `ascii`.
       const alt = truncate(block.alt, ctx.width, ctx.capabilities);
+      // **The fault box's rows and the alt text dimmed** (C09 I73) — `dim` is
+      // the one attribute Ink's `dimColor` set, so the bytes are the same.
+      if (Array.isArray(box)) return [...(box as readonly string[]), paint([{ text: alt, style: { dim: true } }])];
       return createElement(
         Box,
         { flexDirection: "column", width: ctx.width },
@@ -341,15 +341,9 @@ export const imageDefinition: BlockDefinition<Image> = {
     // are the right size.
     if (halfBlockEligible(ctx.capabilities, block.overlay !== undefined)) {
       const cellRows = halfBlockRows(px, cols, rows, ctx.capabilities.colourDepth);
-      return createElement(
-        Box,
-        { flexDirection: "column", width: cols },
-        cellRows.map((line, i) =>
-          createElement(
-            Text,
-            { key: String(i) },
-            paint(line.map((cell) => ({ text: HALF_BLOCK, style: { colour: cell.top, background: cell.bottom } }))),
-          ),
+      return rowsOf(
+        cellRows.map((line) =>
+          paint(line.map((cell) => ({ text: HALF_BLOCK, style: { colour: cell.top, background: cell.bottom } }))),
         ),
       );
     }
@@ -380,10 +374,6 @@ export const imageDefinition: BlockDefinition<Image> = {
             });
           })();
 
-    return createElement(
-      Box,
-      { flexDirection: "column", width: cols },
-      lines.map((line, i) => createElement(Text, { key: String(i) }, line)),
-    );
+    return rowsOf(lines);
   },
 };

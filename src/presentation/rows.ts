@@ -33,6 +33,7 @@
  * the table of sequences stays where SS14 puts it.
  */
 import { SGR_RESET } from "../terminal/escapes.js";
+import { cells } from "./text.js";
 
 /** A code as the tokeniser holds it: the sequence, and the sequence that ends it. */
 type Code = Readonly<{ code: string; end: string }>;
@@ -271,4 +272,98 @@ export function normaliseRow(row: string): string {
   out += row.slice(runStart);
   if (seen) out += between(shown, []);
   return out.trimEnd();
+}
+
+/**
+ * The row with every sequence `normaliseRow` reads removed — SGR, OSC and
+ * hyperlink, the swallowed mark with them — so what is left is what Ink's
+ * grid holds a cell for (C09 I73).
+ */
+function visibleOf(row: string): string {
+  let out = "";
+  let runStart = 0;
+  const n = row.length; // cells-ok — code units in a byte scan, not a width
+  let i = 0;
+  while (i < n) {
+    const c = row.charCodeAt(i);
+    if (c === CC_ESC || c === CC_CSI_8BIT) {
+      const next = row.charCodeAt(i + 1);
+      let last = -1;
+      if (next === CC_CLOSE_BRACKET) {
+        const found = osc(row, i);
+        if (found !== null) last = found.end;
+      } else if (next === CC_BRACKET) {
+        last = sgrEnd(row, i);
+      }
+      if (last !== -1) {
+        out += row.slice(runStart, i);
+        i = last + 1 + swallowed(row, last);
+        runStart = i;
+        continue;
+      }
+    }
+    i += 1;
+  }
+  return out + row.slice(runStart);
+}
+
+/**
+ * Where a row ends, measured as Ink's grid measures it: one cell per visible
+ * grapheme and two for a wide one, the sequences taking none (C09 I73).
+ * **Narrow for the ambiguous**, because Ink reads the width through
+ * `string-width`, which is narrow — this is the pinned pair T2.16 holds.
+ */
+export function rowCells(row: string): number {
+  return cells(visibleOf(row)); // narrow-ok — Ink reads a row's width through `string-width`, which is narrow for the ambiguous; this is T2.16's pinned pair (C09 I73)
+}
+
+/** A row written at a column of a composed line (C09 I73). */
+export type Piece = Readonly<{ x: number; row: string }>;
+
+/**
+ * One line of Ink's output grid, from the rows written into it (C09 I73):
+ * each piece normalised, placed after a pad of unstyled spaces that runs from
+ * where the previous piece ended to this piece's column, and the line
+ * normalised again so the transitions across pieces are the ones Ink emits
+ * between adjacent characters. Pieces are in column order and do not overlap;
+ * `null` when one would, because the grid overwrites and this does not.
+ */
+export function composeRow(pieces: readonly Piece[]): string | null {
+  let out = "";
+  let cursor = 0;
+  for (const piece of pieces) {
+    const row = normaliseRow(piece.row);
+    if (row === "") continue;
+    if (piece.x < cursor) return null;
+    if (piece.x > cursor) out += " ".repeat(piece.x - cursor);
+    out += row;
+    cursor = piece.x + rowCells(row);
+  }
+  return normaliseRow(out);
+}
+
+/** A block of rows written at a column and a row of the grid (C09 I73). */
+export type Placed = Readonly<{ x: number; top: number; width: number; rows: readonly string[] }>;
+
+/**
+ * The lines of a grid `height` tall holding every placed block (C09 I73) —
+ * `composeRow` per line over the pieces that reach it. `null` when a row is
+ * wider than its block's cell or two blocks would overlap on a line, which is
+ * where Ink's grid overwrites and clips and this arm declines.
+ */
+export function placeRows(placed: readonly Placed[], height: number): readonly string[] | null {
+  const lines: string[] = [];
+  for (let y = 0; y < height; y += 1) { // cells-ok — a row index
+    const pieces: Piece[] = [];
+    for (const p of placed) {
+      const row = p.rows[y - p.top];
+      if (row === undefined || row === "") continue;
+      if (rowCells(row) > p.width) return null;
+      pieces.push({ x: p.x, row });
+    }
+    const line = composeRow(pieces);
+    if (line === null) return null;
+    lines.push(line);
+  }
+  return lines;
 }

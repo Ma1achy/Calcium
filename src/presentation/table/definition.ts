@@ -26,7 +26,7 @@ import { atLeastOne, insetWidth, normaliseWidth, sequenceHeight } from "../../da
 import type { Block, MeasureFn, Table, TableRow } from "../../data/viewmodel/index.js";
 import { cells } from "../text.js";
 import { clampSpans, elementOf, paint, selectionStyle, tone, type Span } from "../blocks/paint.js";
-import type { BlockDefinition, NavElement, RenderContext, Windowed } from "../blocks/types.js";
+import type { BlockDefinition, NavElement, Rendered, RenderContext, Windowed } from "../blocks/types.js";
 import { emptySpans, headerSpans, markedSeriesColumns, rowSpans } from "./cells.js";
 import { detailBlocks, isExpandable } from "./detail.js";
 import { planColumns } from "./plan.js";
@@ -247,7 +247,7 @@ export const tableDefinition: BlockDefinition<Table> = {
     });
   },
 
-  render(block: Table, ctx: RenderContext): ReactElement {
+  render(block: Table, ctx: RenderContext): Rendered {
     const width = normaliseWidth(ctx.width);
     const probe = ctx.probe;
     // **Rows and columns separately, because they are different failures.** A
@@ -279,27 +279,17 @@ export const tableDefinition: BlockDefinition<Table> = {
     const washed = (spans: readonly Span[]): readonly Span[] =>
       spans.map((s) => ({ ...s, style: { ...(s.style ?? {}), ...wash } }));
 
-    const lines: ReactElement[] = [];
+    // **Rows until a detail child answers an element** (C09 I73): every part
+    // is a row, and `finishTable` answers rows when they all are.
+    const parts: Array<string | ReactElement> = [];
 
     if (hasHeader(block)) {
-      lines.push(
-        createElement(
-          Text,
-          { key: "header" },
-          textOf(paint(clampSpans(headerSpans(block, plan, ctx), width, ctx.capabilities))),
-        ),
-      );
+      parts.push(paint(clampSpans(headerSpans(block, plan, ctx), width, ctx.capabilities)));
     }
 
     if (!hasBody(block)) {
-      lines.push(
-        createElement(
-          Text,
-          { key: "empty" },
-          textOf(paint(clampSpans(emptySpans(block, width, ctx), width, ctx.capabilities))),
-        ),
-      );
-      return createElement(Box, { flexDirection: "column", width }, lines);
+      parts.push(paint(clampSpans(emptySpans(block, width, ctx), width, ctx.capabilities)));
+      return finishTable(parts, width);
     }
 
     // Sorting is a permutation, so this changes the order of what follows and
@@ -328,9 +318,7 @@ export const tableDefinition: BlockDefinition<Table> = {
         ctx.capabilities,
       );
 
-      lines.push(
-        createElement(Text, { key: `row-${row.id}` }, textOf(paint(isSelected ? washed(spans) : spans))),
-      );
+      parts.push(paint(isSelected ? washed(spans) : spans));
 
       if (row.expanded !== true) continue;
       // **A count, not a span.** Each detail child goes through `renderChild`,
@@ -343,27 +331,25 @@ export const tableDefinition: BlockDefinition<Table> = {
       // Indented by two cells, and the children are rendered at the width they
       // were *measured* at. `paddingLeft` plus a `width` of the whole leaves a
       // content box of exactly `insetWidth`, so the two halves see one number.
-      lines.push(
-        createElement(
-          Box,
-          {
-            key: `detail-${row.id}`,
-            flexDirection: "column",
-            width,
-            paddingLeft: width - insetWidth(width),
-          },
-          detailBlocks(block, row, plan, ctx.capabilities).flatMap((child, index) => {
-            const drawn = createElement(
+      // **The detail's rows padded left by the inset** (C09 I73), one part per
+      // row; a child that answers an element is its padded box, as before.
+      const inset = width - insetWidth(width);
+      const pad = " ".repeat(inset);
+      detailBlocks(block, row, plan, ctx.capabilities).forEach((child, index) => {
+        if (child.gapBefore === true) parts.push("");
+        const drawn = ctx.renderChild(child, insetWidth(width));
+        if (Array.isArray(drawn)) {
+          for (const line of drawn as readonly string[]) parts.push(line === "" ? "" : pad + line);
+        } else {
+          parts.push(
+            createElement(
               Box,
-              { key: child.id === "" ? String(index) : child.id },
-              elementOf(ctx.renderChild(child, insetWidth(width))),
-            );
-            return child.gapBefore === true
-              ? [createElement(Text, { key: `gap-${index}` }, " "), drawn]
-              : [drawn];
-          }),
-        ),
-      );
+              { key: `detail-${row.id}-${child.id === "" ? String(index) : child.id}`, flexDirection: "column", width, paddingLeft: inset },
+              elementOf(drawn),
+            ),
+          );
+        }
+      });
     }
 
     // **The action bar** (I17, §5). Present because the data says so; empty
@@ -373,25 +359,15 @@ export const tableDefinition: BlockDefinition<Table> = {
     if (hasActionBar(block)) {
       const row = focused === null ? undefined : block.rows.find((r) => r.id === focused);
       const labels = (row?.actions ?? []).map((a) => a.label).join("   ");
-      lines.push(createElement(Text, { key: "actions-gap" }, " "));
-      lines.push(
-        createElement(
-          Text,
-          { key: "actions" },
-          textOf(
-            paint(
-              clampSpans(
-                [{ text: labels, style: tone("meta", ctx.theme, ctx.capabilities) }],
-                width,
-                ctx.capabilities,
-              ),
-            ),
-          ),
+      parts.push("");
+      parts.push(
+        paint(
+          clampSpans([{ text: labels, style: tone("meta", ctx.theme, ctx.capabilities) }], width, ctx.capabilities),
         ),
       );
     }
 
-    return createElement(Box, { flexDirection: "column", width }, lines);
+    return finishTable(parts, width);
   },
 };
 
@@ -405,6 +381,19 @@ export const tableDefinition: BlockDefinition<Table> = {
  */
 function textOf(line: string): string {
   return line === "" ? " " : line;
+}
+
+/**
+ * The table's parts as rows when every part is one, else as the column of
+ * elements the element arm always built — a row lifted to a `Text` (C09 I73).
+ */
+function finishTable(parts: readonly (string | ReactElement)[], width: number): Rendered {
+  if (parts.every((p) => typeof p === "string")) return parts as readonly string[];
+  return createElement(
+    Box,
+    { flexDirection: "column", width },
+    parts.map((p, i) => (typeof p === "string" ? createElement(Text, { key: String(i) }, textOf(p)) : p)),
+  );
 }
 
 /**

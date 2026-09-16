@@ -51,8 +51,23 @@ const MUTATIONS = [
     // T6.88's other half — the floor dropped from the render while the measure keeps it.
     name: "minRows dropped from the render only",
     file: CONTAINERS,
-    from: "        ...(block.minRows === undefined ? {} : { minHeight: block.minRows }),",
-    to: "",
+    // **On both arms** (C09 I73): the rows arm's column floor and row height,
+    // and the element arm's `minHeight` — a floor left on any one of the three
+    // is a floor the frame keeps.
+    from: "        const floor = block.minRows ?? 0;\n",
+    to: "        const floor = 0;\n",
+    also: [
+      {
+        file: CONTAINERS,
+        from: "      const lines = fits ? placeRows(blocks, Math.max(tallest, block.minRows ?? 0)) : null;\n",
+        to: "      const lines = fits ? placeRows(blocks, tallest) : null;\n",
+      },
+      {
+        file: CONTAINERS,
+        from: "        ...(block.minRows === undefined ? {} : { minHeight: block.minRows }),\n",
+        to: "",
+      },
+    ],
     expect: "T3.72",
   },
   {
@@ -83,8 +98,9 @@ const MUTATIONS = [
     // C04 I101 R2 — the child rendered at its cell rather than its content width.
     name: "aligned child rendered at the cell width",
     file: CONTAINERS,
-    from: "            elementOf(ctx.renderChild(child, at.width)),",
-    to: "            elementOf(ctx.renderChild(child, widths[index] ?? 1)),",
+    // Anchored on the one render both arms read (C09 I73).
+    from: "    const rendered = placed.map((child, index) => ctx.renderChild(child, (ats[index] as (typeof ats)[number]).width));",
+    to: "    const rendered = placed.map((child, index) => ctx.renderChild(child, widths[index] ?? 1));",
     expect: "T3.69",
   },
   {

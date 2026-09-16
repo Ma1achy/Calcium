@@ -18,6 +18,7 @@ import { elementOf } from "../../src/presentation/blocks/paint.js";
 import { renderSequenceToLines, renderToLines } from "../../src/presentation/render-lines.js";
 import { CORPUS, ONE_PER_KIND } from "../support/blocks.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, MONO_CAPS, registry } from "../support/render.js";
+import { TEST_KINDS, twin } from "../support/lifted.js";
 
 const CAPS = [FULL_CAPS, ASCII_CAPS, MONO_CAPS] as const;
 
@@ -69,7 +70,11 @@ describe("C09 I72 — the two arms agree", () => {
     // Both arms were exercised — a corpus that took one arm alone would prove
     // nothing about the seam between them.
     expect(rowsArm).toBeGreaterThan(200);
-    expect(elementArm).toBeGreaterThan(20);
+    // **The element arm is `mosaic`'s alone since C09 I73**: every corpus mosaic at
+    // every width under every capability set, and nothing else.
+    const mosaics = blocks.filter((b) => b.kind === "mosaic").length; // cells-ok — a count of blocks
+    expect(mosaics).toBeGreaterThan(0);
+    expect(elementArm).toBe(mosaics * DEFAULT_WIDTHS.length * CAPS.length);
 
     // **The mixed sequence.** Rows blocks and element blocks side by side, a gap
     // before some, a floor taller than the block, and a cap with its marker —
@@ -104,7 +109,76 @@ describe("C09 I72 — the two arms agree", () => {
       }
     }
   });
-  it.todo(
-    "T2.144 (C09 I73, F1170): over a corpus of containers at seven widths under three capability sets the rows arm equals the container rendered through Ink byte for byte and the probe reads rows — not deferred on a component: the code commit replaces this row",
-  );
+  it("T2.144 (C09 I73, F1170): over a corpus of containers — column and row groups with gaps, alignment, flex, minRows and short, open-styled and solid children; panels with a title, a footer, live, empty and narrow; scrolls with a residue, pads and an offset; tables with an expanded detail and an action bar; images in the placement, cell and fault arms; the /all shape — at seven widths under three capability sets, the rows arm equals the container's element path rendered through Ink byte for byte, and the probe reads rows", () => {
+    const r = registry(TEST_KINDS);
+    const B = (spec: Record<string, unknown>): Block => spec as unknown as Block;
+    const raw = (id: string, text: string): Block => B({ kind: "raw", id, text });
+    const notice = (id: string, text: string): Block => B({ kind: "notice", id, tone: "info", text });
+    const rule = (id: string): Block => B({ kind: "rule", id, label: "r" });
+    const tile = (id: string, text: string): Block =>
+      B({ kind: "group", id, direction: "column", children: [notice(`${id}-c`, text), ONE_PER_KIND.plot] });
+    const containers: readonly Block[] = [
+      B({ kind: "group", id: "g-col", direction: "column", align: ["left", "right", "centre"], minRows: 8,
+        children: [notice("g-col-a", "first"), { ...raw("g-col-b", "two lines\nof text"), gapBefore: true }, rule("g-col-c")] }),
+      B({ kind: "group", id: "g-row2", direction: "row", flex: [1, 1], children: [raw("g-row2-a", "left\nside"), notice("g-row2-b", "right")] }),
+      B({ kind: "group", id: "g-row3", direction: "row", flex: [2, 1, 1], align: ["top-left", "middle-right", "bottom-centre"],
+        children: [raw("g-row3-a", "tall\ntall\ntall"), rule("g-row3-b"), notice("g-row3-c", "c")] }),
+      B({ kind: "group", id: "g-short", direction: "row", flex: [1, 1], children: [B({ kind: "short", id: "sh" }), raw("g-short-b", "a\nb\nc")] }),
+      B({ kind: "group", id: "g-dangle", direction: "row", flex: [1, 1], children: [B({ kind: "dangling", id: "dg" }), notice("g-dangle-b", "after")] }),
+      B({ kind: "group", id: "g-solid", direction: "row", flex: [1, 1], children: [B({ kind: "solid", id: "s1" }), B({ kind: "solid", id: "s2" })] }),
+      B({ kind: "panel", id: "p-title", title: "Summary", footer: "3 items", children: [raw("p-title-a", "two lines\nof text"), { ...notice("p-title-b", "n"), gapBefore: true }] }),
+      B({ kind: "panel", id: "p-live", title: "Live", live: true, children: [notice("p-live-a", "beating")] }),
+      B({ kind: "panel", id: "p-empty", title: "", children: [] }),
+      B({ kind: "panel", id: "p-tall", title: "Tall", children: [B({ kind: "tall", id: "tl" })] }),
+      B({ kind: "scroll", id: "sc-residue", height: 2, children: [raw("sc-r-a", "one"), raw("sc-r-b", "two"), raw("sc-r-c", "three")] }),
+      B({ kind: "scroll", id: "sc-pads", height: 6, children: [raw("sc-p-a", "one"), raw("sc-p-b", "two")] }),
+      B({ kind: "scroll", id: "sc-off", height: 2, children: [raw("sc-o-a", "one"), raw("sc-o-b", "two"), raw("sc-o-c", "three"), raw("sc-o-d", "four")] }),
+      B({ ...(ONE_PER_KIND.table as unknown as Record<string, unknown>), id: "t-detail",
+        rows: ((ONE_PER_KIND.table as unknown as { rows: readonly Record<string, unknown>[] }).rows).map((row, i) =>
+          i === 0 ? { ...row, expanded: true, detail: [notice("t-d-a", "detail"), { ...raw("t-d-b", "more"), gapBefore: true }] } : row) }),
+      B({ ...(ONE_PER_KIND.table as unknown as Record<string, unknown>), id: "t-actions", actionBar: true }),
+      { ...(ONE_PER_KIND.image as unknown as Record<string, unknown>), id: "img-fault", data: "not-a-png" } as unknown as Block,
+      ONE_PER_KIND.image,
+      B({ kind: "group", id: "all", direction: "column", children: [
+        notice("all-n", "3 tiles"),
+        B({ kind: "group", id: "all-r1", direction: "row", flex: [1, 1], children: [tile("all-t1", "one"), tile("all-t2", "two")] }),
+        B({ kind: "group", id: "all-r2", direction: "row", flex: [1, 1], children: [tile("all-t3", "three"), tile("all-t4", "four")] }),
+      ] }),
+    ];
+    const KITTY = { ...FULL_CAPS, imageProtocol: "kitty" as const };
+    const capsFor = (b: Block): readonly (typeof FULL_CAPS)[] => (b.id === "img-place" ? [KITTY] : CAPS);
+    const withPlacement = [...containers, { ...(ONE_PER_KIND.image as unknown as Record<string, unknown>), id: "img-place" } as unknown as Block];
+    const widths = [2, ...DEFAULT_WIDTHS];
+    const scrollOffsets = { "sc-off": 1 };
+    let compared = 0;
+    for (const b of withPlacement) {
+      for (const width of widths) {
+        for (const capabilities of capsFor(b)) {
+          const ctx: RenderContextInput = {
+            width, theme: DARK_THEME, capabilities, focus: null, tick: 0, scrollOffsets,
+            ...(b.id === "img-place" ? { placementScope: "e1" } : {}),
+          };
+          const expected = throughInk(elementOf(r.render(twin(b), ctx)), width);
+          const { probe, names } = recording();
+          const got = renderToLines(r, b, width, {
+            theme: DARK_THEME, capabilities, probe, scrollOffsets,
+            ...(b.id === "img-place" ? { placementScope: "e1" } : {}),
+          } as never);
+          expect(got, `${b.id} at ${String(width)}`).toEqual(expected);
+          expect(names.filter((n) => n === "rows"), `${b.id} at ${String(width)} took the rows arm`).toHaveLength(1);
+          expect(names.filter((n) => n === "react"), `${b.id} at ${String(width)} never opened react`).toHaveLength(0);
+          compared += 1;
+        }
+      }
+    }
+    expect(compared).toBeGreaterThan(400);
+    // **The fixtures respond**: the seams the composition exists for are in the frames.
+    const ctx: RenderContextInput = { width: 60, theme: DARK_THEME, capabilities: FULL_CAPS, focus: null, tick: 0 };
+    const rowGroup = r.render(containers[1] as Block, ctx) as readonly string[];
+    expect(rowGroup[0], "both cells on one line, a pad between").toMatch(/left\s+.*right/u);
+    const panel = r.render(containers[6] as Block, ctx) as readonly string[];
+    expect(panel.length, "rails, body and a gap").toBeGreaterThan(5); // cells-ok — rows
+    const short = r.render(containers[3] as Block, ctx) as readonly string[];
+    expect(short.length, "the short child leaves its cell blank below its row").toBe(3); // cells-ok — rows
+  });
 });

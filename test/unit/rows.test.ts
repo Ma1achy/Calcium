@@ -9,7 +9,8 @@
 // combining text, a hyperlink, and trailing blanks styled and plain.
 import { describe, expect, it } from "vitest";
 import { styledCharsFromTokens, styledCharsToString, tokenize } from "@alcalzone/ansi-tokenize";
-import { normaliseRow } from "../../src/presentation/rows.js";
+import { composeRow, normaliseRow } from "../../src/presentation/rows.js";
+import { cells } from "../../src/presentation/text.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import type { RenderContextInput } from "../../src/presentation/blocks/index.js";
 import { CORPUS, ONE_PER_KIND } from "../support/blocks.js";
@@ -139,7 +140,45 @@ describe("C09 I72 — normaliseRow", () => {
     }
     expect(fuzzMoved).toBeGreaterThan(5000);
   });
-  it.todo(
-    "T1.47 (C09 I73): rowCells equals cells of the row with its sequences removed over the corpus rows and the seeded rows, and counts wide as two, combining as none, SGR-only as zero — not deferred on a component: the code commit replaces this row",
-  );
+  it("T1.47 (C09 I73): composeRow pads from where the row ends — cells of the tokeniser's visible characters — over every corpus row and ten thousand seeded rows, and a wide character ends two cells on, a combining mark none, an SGR-only row at zero", () => {
+    // **The width is read through the pad**: a second piece at a known column
+    // makes the pad `x − rowCells(row)` spaces, and `rowCells` is what the
+    // composition rests on. The visible text is the tokeniser's own reading —
+    // its characters joined — measured by `cells`, narrow for the ambiguous as
+    // `string-width` is.
+    const visible = (row: string): string => styledCharsFromTokens(tokenize(row)).map((c) => c.value).join("");
+    const check = (row: string, label: string): void => {
+      const norm = normaliseRow(row);
+      const w = cells(visible(norm));
+      const x = w + 3;
+      const got = composeRow([{ x: 0, row }, { x, row: "|" }]);
+      const expected = norm === "" ? `${" ".repeat(x)}|` : `${norm}   |`;
+      expect(got, `${label}: ${JSON.stringify(row)}`).toBe(normaliseRow(expected));
+    };
+    const registry = createBlockRegistry();
+    const blocks = [...Object.values(ONE_PER_KIND), ...CORPUS];
+    let corpusRows = 0;
+    for (const block of blocks) {
+      for (const width of WIDTHS) {
+        for (const capabilities of CAPS) {
+          const ctx: RenderContextInput = { width, theme: DARK_THEME, capabilities, focus: null, tick: 0 };
+          const rendered = registry.render(block, ctx);
+          if (!Array.isArray(rendered)) continue;
+          for (const row of rendered as readonly string[]) {
+            check(row, `${block.kind} at ${String(width)}`);
+            corpusRows += 1;
+          }
+        }
+      }
+    }
+    expect(corpusRows).toBeGreaterThan(800);
+    const rand = lcg(0x5eed_c09_47);
+    for (let i = 0; i < 10_000; i += 1) check(seededRow(rand), `seeded row ${String(i)}`);
+    // The named widths.
+    expect(composeRow([{ x: 0, row: "日" }, { x: 2, row: "|" }])).toBe("日|");
+    expect(composeRow([{ x: 0, row: "e\u0301" }, { x: 1, row: "|" }])).toBe("e\u0301|");
+    expect(composeRow([{ x: 0, row: `${ESC}[31m${ESC}[39m` }, { x: 0, row: "|" }])).toBe("|");
+    // Overlap declines: the grid overwrites and this does not.
+    expect(composeRow([{ x: 0, row: "abc" }, { x: 1, row: "|" }])).toBeNull();
+  });
 });

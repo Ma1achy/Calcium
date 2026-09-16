@@ -30,7 +30,18 @@ import type { NavElement } from "../types.js";
 import { cells, stripControl, truncate } from "../../text.js";
 import { glyphCells, glyphFor, glyphs } from "../glyphs.js";
 import { clampSpans, elementOf, paint, tone } from "../paint.js";
-import type { BlockDefinition, RenderContext, Windowed } from "../types.js";
+import { composeRow, placeRows, type Placed } from "../../rows.js";
+import type { BlockDefinition, Rendered, RenderContext, Windowed } from "../types.js";
+
+/** Every child's rows, or `null` when one answers an element and the container composes elements (C09 I73). */
+function rowsOfAll(rendered: readonly Rendered[]): readonly (readonly string[])[] | null {
+  const out: (readonly string[])[] = [];
+  for (const r of rendered) {
+    if (!Array.isArray(r)) return null;
+    out.push(r as readonly string[]);
+  }
+  return out;
+}
 
 /** A container's own height, over children measured at the width it gives them. */
 function childHeights(
@@ -79,7 +90,7 @@ export const panelDefinition: BlockDefinition<Panel> = {
     );
   },
 
-  render(block: Panel, ctx: RenderContext): ReactElement {
+  render(block: Panel, ctx: RenderContext): Rendered {
     // The child count, which is what a container's cost is proportional to and
     // what no duration states. Each child is its own node; this is how many.
     ctx.probe?.gauge("panel.children", block.children.length); // cells-ok — a count of items, not a display width
@@ -146,6 +157,48 @@ export const panelDefinition: BlockDefinition<Panel> = {
     // be drawn, or a panel with nothing in it renders shorter than it measures
     // — which is the empty-container case arriving through the one kind that
     // is *not* an empty container.
+    const rendered = block.children.map((child) => ctx.renderChild(child, inner));
+    const total = sequenceHeight(block.children, inner, ctx.measureChild);
+    const side = paint([
+      { text: Array.from({ length: Math.max(1, total) }, () => g.vertical).join("\n"), style: dim },
+    ]);
+
+    // **The rows arm** (C09 I73): the body's rows between the rails, each line
+    // as Ink's grid would hold it — the rail's line at column 0, the body row
+    // at column 1, the other rail at `1 + inner`. The rails are as tall as the
+    // measured body and the body as tall as its rows; whichever is taller
+    // leaves the other's column blank, as the row box does.
+    const childRows = rowsOfAll(rendered);
+    if (childRows !== null) {
+      const body: string[] = [];
+      block.children.forEach((child, index) => {
+        if (child.gapBefore === true) body.push("");
+        for (const row of childRows[index] ?? []) body.push(row);
+      });
+      // An empty body is one blank row, and the rail floor `Math.max(1, total)`
+      // is what draws it: the height below is the rail's, so nothing is pushed
+      // for it here — a push was, and the mutation pass showed it dead.
+      const rail = side.split("\n");
+      const height = Math.max(rail.length, body.length); // cells-ok — a row count
+      const lines: string[] = [top];
+      let composed = true;
+      for (let y = 0; y < height && composed; y += 1) { // cells-ok — a row index
+        const bodyRow = body[y] ?? "";
+        const railRow = rail[y] ?? "";
+        const line = composeRow(
+          width < 3
+            ? [{ x: 0, row: bodyRow }]
+            : [{ x: 0, row: railRow }, { x: 1, row: bodyRow }, { x: 1 + inner, row: railRow }],
+        );
+        if (line === null) composed = false;
+        else lines.push(line);
+      }
+      if (composed) {
+        lines.push(bottom);
+        return lines;
+      }
+    }
+
     const inside =
       block.children.length === 0 // cells-ok
         ? [createElement(Text, { key: "empty" }, " ")]
@@ -153,7 +206,7 @@ export const panelDefinition: BlockDefinition<Panel> = {
             const drawn = createElement(
               Box,
               { key: child.id === "" ? String(index) : child.id },
-              elementOf(ctx.renderChild(child, inner)),
+              elementOf(rendered[index] as Rendered),
             );
             return child.gapBefore === true
               ? [createElement(Text, { key: `gap-${index}` }, " "), drawn]
@@ -169,11 +222,7 @@ export const panelDefinition: BlockDefinition<Panel> = {
     // The border column is as tall as the children *measure*. If a child's two
     // halves disagree, the frame draws a border that does not close — which is
     // the one place an I1 violation is visible in the frame rather than only in
-    // the viewport's drift, six screenfuls later.
-    const total = sequenceHeight(block.children, inner, ctx.measureChild);
-    const side = paint([
-      { text: Array.from({ length: Math.max(1, total) }, () => g.vertical).join("\n"), style: dim },
-    ]);
+    // the viewport's drift, six screenfuls later — `total` and `side` above.
 
     // Below three columns there is no room for two borders and a column of
     // content: `insetWidth` floors the inside at one, so sides plus inside is
@@ -393,7 +442,7 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
    * cell that was said to be empty still is, and this kind is not its inhabitant.
    */
 
-  render(block: Scroll, ctx: RenderContext): ReactElement {
+  render(block: Scroll, ctx: RenderContext): Rendered {
     // The child count, which is what a container's cost is proportional to and
     // what no duration states. Each child is its own node; this is how many.
     ctx.probe?.gauge("scroll.children", block.children.length); // cells-ok — a count of items, not a display width
@@ -414,20 +463,20 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
     // never applied (F855). `windowChild` returns `null` where the slice would
     // cost the container something — an atomic kind, a floor, a cap, a residual
     // — and the child is then kept whole, which is what every child got before.
-    const children: ReactElement[] = shown.map((r) => {
+    const pieces = shown.map((r) => {
       const height = r.to - r.from;
       const from = Math.max(0, offset - r.from); // cells-ok — a row index
       const to = Math.min(height, offset + interior - r.from); // cells-ok — a row index
       const piece =
         from === 0 && to === height ? r.child : (ctx.windowChild(r.child, width, from, to)?.block ?? r.child);
-      return createElement(
-        Box,
-        { key: r.child.id, width, flexDirection: "column" },
-        elementOf(ctx.renderChild(piece, width)),
-      );
+      return { child: r.child, rendered: ctx.renderChild(piece, width) };
     });
+    const children: ReactElement[] = pieces.map((p) =>
+      createElement(Box, { key: p.child.id, width, flexDirection: "column" }, elementOf(p.rendered)),
+    );
 
     const residue: ReactElement[] = [];
+    let residueRow: string | null = null;
     // **The residue, both directions** (C04 I49). A settled container keeps the
     // offset it had, so content is hidden above as well as below — and a
     // bounded region that says neither is the empty-block class (F123).
@@ -457,13 +506,8 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
         interior === 0
           ? `${g.residue} +${String(content)} more`
           : `${g.residue} ${String(above)} above, ${String(below)} below`;
-      residue.push(
-        createElement(
-          Text,
-          { key: "residue" },
-          paint(clampSpans([{ text: truncate(text, width, ctx.capabilities), style: dim }], width, ctx.capabilities)),
-        ),
-      );
+      residueRow = paint(clampSpans([{ text: truncate(text, width, ctx.capabilities), style: dim }], width, ctx.capabilities));
+      residue.push(createElement(Text, { key: "residue" }, residueRow));
     }
 
     // **The box states its height, and the sentence that said otherwise was
@@ -501,8 +545,21 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
     // slices. A ruling naming an operation the layer below lacks — C23 §8a A4's
     // class, and the remedy is a seam rather than a clip.
     const drawn = shown.reduce((n, r) => n + ctx.measureChild(r.child, width), 0);
+    const padCount = Math.max(0, interior - drawn); // cells-ok — a row count, not a width
+
+    // **The rows arm** (C09 I73): the shown pieces' rows, the pads as empty
+    // rows, the residue row — a column, so a concatenation.
+    const pieceRows = rowsOfAll(pieces.map((p) => p.rendered));
+    if (pieceRows !== null) {
+      const lines: string[] = [];
+      for (const rows of pieceRows) for (const row of rows) lines.push(row);
+      for (let i = 0; i < padCount; i += 1) lines.push(""); // cells-ok — a row count
+      if (residueRow !== null) lines.push(residueRow);
+      return lines;
+    }
+
     const pads = Array.from(
-      { length: Math.max(0, interior - drawn) }, // cells-ok — a row count, not a width
+      { length: padCount }, // cells-ok — a row count, not a width
       (_unused, i) => createElement(Text, { key: `pad-${String(i)}` }, " "),
     );
 
@@ -789,7 +846,7 @@ export const groupDefinition: BlockDefinition<Group> = {
     });
   },
 
-  render(block: Group, ctx: RenderContext): ReactElement {
+  render(block: Group, ctx: RenderContext): Rendered {
     const width = normaliseWidth(ctx.width);
     const probe = ctx.probe;
     probe?.gauge("group.children", block.children.length); // cells-ok — a count of items, not a display width
@@ -811,10 +868,49 @@ export const groupDefinition: BlockDefinition<Group> = {
       placements = groupPlacements(block, width, ctx.measureChild, ctx.widthChild);
     }
 
-    const children = block.children
-      .slice(0, placeable(block, width))
+    const placed = block.children.slice(0, placeable(block, width));
+    const ats = placed.map((_child, index) => placements[index] ?? { left: 0, top: 0, width: widths[index] ?? 1 });
+    const rendered = placed.map((child, index) => ctx.renderChild(child, (ats[index] as (typeof ats)[number]).width));
+
+    // **The rows arm** (C09 I73). A column is its children's rows in order, a
+    // gap an empty row, each row padded by the child's alignment offset, and
+    // the floor `minRows` of empty rows; a row lays each child's rows into its
+    // cell — the cells left to right with the gutter (C04 I103) — at the
+    // placement's offset, as tall as the tallest child or `minRows`. Declined
+    // when a child answers an element, or when the cells would exceed the
+    // width, where the row box shrinks and clips and this arm would not.
+    const childRows = rowsOfAll(rendered);
+    if (childRows !== null) {
+      if (block.direction === "column") {
+        const lines: string[] = [];
+        placed.forEach((child, index) => {
+          const at = ats[index] as (typeof ats)[number];
+          if (child.gapBefore === true) lines.push("");
+          const pad = at.left > 0 ? " ".repeat(at.left) : "";
+          for (const row of childRows[index] ?? []) lines.push(row === "" ? "" : pad + row);
+        });
+        const floor = block.minRows ?? 0;
+        while (lines.length < floor) lines.push(""); // cells-ok — a row count
+        return lines;
+      }
+      const blocks: Placed[] = [];
+      let x = 0;
+      let tallest = 0;
+      placed.forEach((_child, index) => {
+        const at = ats[index] as (typeof ats)[number];
+        const rows = childRows[index] ?? [];
+        blocks.push({ x: x + at.left, top: at.top, width: at.width, rows });
+        tallest = Math.max(tallest, at.top + rows.length); // cells-ok — a row count
+        x += (widths[index] ?? 1) + ROW_GUTTER;
+      });
+      const fits = x - ROW_GUTTER <= width;
+      const lines = fits ? placeRows(blocks, Math.max(tallest, block.minRows ?? 0)) : null;
+      if (lines !== null) return lines;
+    }
+
+    const children = placed
       .flatMap((child, index) => {
-        const at = placements[index] ?? { left: 0, top: 0, width: widths[index] ?? 1 };
+        const at = ats[index] as (typeof ats)[number];
         // The cell — the allocation wide, stretched to the row's height by the
         // row's default `alignItems` — and inside it the child at its placement.
         // **No height is stated on the cell, and a dead guard is why that is
@@ -840,7 +936,7 @@ export const groupDefinition: BlockDefinition<Group> = {
               ...(at.left === 0 ? {} : { marginLeft: at.left }),
               ...(at.top === 0 ? {} : { marginTop: at.top }),
             },
-            elementOf(ctx.renderChild(child, at.width)),
+            elementOf(rendered[index] as Rendered),
           ),
         );
         return block.direction === "column" && child.gapBefore === true

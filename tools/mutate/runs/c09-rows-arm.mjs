@@ -101,8 +101,10 @@ const results = runPass({
       // is written where the tokeniser dropped it inside the grapheme.
       name: "SWALLOW-DROPPED: a mark clustering with the sequence's last byte is kept",
       file: ROWS,
-      from: "        i = last + 1 + swallowed(row, last);",
-      to: "        i = last + 1;",
+      // Anchored with the state flag above it, because `visibleOf` repeats the
+      // step (C09 I73) and the normaliser is the one T1.46 reads.
+      from: "        changed = true;\n        i = last + 1 + swallowed(row, last);",
+      to: "        changed = true;\n        i = last + 1;",
       expect: "T1.46",
     },
     {
