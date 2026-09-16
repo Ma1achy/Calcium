@@ -1783,6 +1783,12 @@ function withoutAnimating(parts: EntryParts | undefined, pieces: readonly EntryP
     hold: (key, lines) => {
       if (!animating.has(blockOf(key))) parts.hold(key, lines);
     },
+    // **The slice too** (C22 I104): a sliced block that animates is rendered
+    // at every miss that opens the parts, as a whole one is.
+    slice: (id, window) => (animating.has(id) ? undefined : parts.slice(id, window)),
+    holdSlice: (id, window, lines) => {
+      if (!animating.has(id)) parts.holdSlice(id, window, lines);
+    },
   });
 }
 

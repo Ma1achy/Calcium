@@ -339,9 +339,12 @@ function ownRows(block: Block, lines: readonly string[]): readonly string[] {
  * sequence, lay the rows the full render would. A column group's children are
  * taken from the parts or rendered alone and held; a top-level block the
  * window kept whole — the same object as the run's — likewise; a block the
- * window sliced is rendered as before and held by nobody, because its rows
- * are the range's. `gapBefore` is a row here as it is there. T4.89b sweeps
- * every position against the full render, byte for byte.
+ * window sliced is rendered as before and held **under its window** (C22
+ * I104) — the run-local first row and the rows taken, which the slice is a
+ * function of once the run's blocks and width are fixed — so a tick, whose
+ * range did not move, takes it back, and a scroll renders the new slice once
+ * and replaces it (F1190). `gapBefore` is a row here as it is there. T4.89b
+ * sweeps every position against the full render, byte for byte.
  */
 function assemble(
   registry: BlockRegistry,
@@ -379,7 +382,13 @@ function assemble(
       }
       rows.push(...lines);
     } else {
-      rows.push(...ownRows(block, render([block])));
+      const window = `${String(piece.localFrom)}\u0000${String(piece.take)}`;
+      let lines = held.slice(block.id, window);
+      if (lines === undefined) {
+        lines = ownRows(block, render([block]));
+        held.holdSlice(block.id, window, lines);
+      }
+      rows.push(...lines);
     }
   }
   return rows;

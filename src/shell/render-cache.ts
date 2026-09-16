@@ -81,22 +81,42 @@ type Slot = Readonly<{
   lines: readonly string[];
   /**
    * The lines of every block rendered whole under this slot's stable key, by
-   * the block's id and its `align` (I101). Bounded by the entry's own blocks
-   * and dropped with the slot on a miss on any axis but the range.
+   * the block's id and its `align` (I101), and one slice per block the window
+   * sliced, under its id with the window it is of (I104). Bounded by the
+   * entry's own blocks and dropped with the slot on a miss on any axis but
+   * the range and the tick.
    */
-  parts: Map<string, readonly string[]>;
+  parts: Held;
 }>;
+
+/**
+ * What a slot holds beside its rows (I101, I104): the lines of every block
+ * rendered whole, by key; and for a block the window sliced, one slice —
+ * its rows and the run-local window they are of — by the block's id, replaced
+ * whenever another window renders it. Bounded by the entry's own shape.
+ */
+type Held = Readonly<{
+  whole: Map<string, readonly string[]>;
+  slices: Map<string, Readonly<{ window: string; lines: readonly string[] }>>;
+}>;
+
+const freshHeld = (): Held => ({ whole: new Map(), slices: new Map() });
 
 /**
  * The parts of one entry, open to the render that follows a **range** miss
  * (I101): `part` reads a block rendered whole under the same stable key, and
- * `hold` keeps one rendered now for the next range. Handed out by `parts()`
- * only after a range miss, so a miss on any other axis assembles nothing
- * from before it.
+ * `hold` keeps one rendered now for the next range. `slice` reads the rows of
+ * a block the window sliced, if they were rendered for this very window, and
+ * `holdSlice` keeps them under the block's id for the next miss that reaches
+ * it — replacing whatever window that id held before (I104). Handed out by
+ * `parts()` only after a range or a tick miss, so a miss on any other axis
+ * assembles nothing from before it.
  */
 export type EntryParts = Readonly<{
   part(key: string): readonly string[] | undefined;
   hold(key: string, lines: readonly string[]): void;
+  slice(id: string, window: string): readonly string[] | undefined;
+  holdSlice(id: string, window: string, lines: readonly string[]): void;
 }>;
 
 /**
@@ -166,7 +186,7 @@ export class RenderCache {
    * the render that follows it, or `null` after any other miss — the render after a `rev` miss holds
    * whatever it renders whole into a fresh map, and reads nothing from before.
    */
-  #open: Readonly<{ id: EntryId; parts: Map<string, readonly string[]> }> | null = null;
+  #open: Readonly<{ id: EntryId; parts: Held }> | null = null;
 
   /**
    * C28's seam, or none (C28 I30).
@@ -240,7 +260,7 @@ export class RenderCache {
     id: EntryId,
     reason: "absent" | "rev" | "width" | "theme" | "focus" | "tick" | "range",
     discarded: readonly string[] | undefined,
-    parts: Map<string, readonly string[]> | null,
+    parts: Held | null,
   ): undefined {
     this.#misses[reason] += 1;
     this.#probe.miss("render", reason);
@@ -257,8 +277,15 @@ export class RenderCache {
     const open = this.#open;
     if (open === null || open.id !== id) return undefined;
     return {
-      part: (key) => open.parts.get(key),
-      hold: (key, lines) => void open.parts.set(key, lines),
+      part: (key) => open.parts.whole.get(key),
+      hold: (key, lines) => void open.parts.whole.set(key, lines),
+      // **One slice per id, and the window is the condition** (I104): a slice
+      // held for another window is not these rows, and holding replaces it.
+      slice: (id, window) => {
+        const held = open.parts.slices.get(id);
+        return held !== undefined && held.window === window ? held.lines : undefined;
+      },
+      holdSlice: (id, window, lines) => void open.parts.slices.set(id, { window, lines }),
     };
   }
 
@@ -292,7 +319,7 @@ export class RenderCache {
     // miss left open is the one stored back, grown by what this render held;
     // after any other miss it is a fresh one.
     const open = this.#open;
-    const parts = open !== null && open.id === id ? open.parts : new Map<string, readonly string[]>();
+    const parts = open !== null && open.id === id ? open.parts : freshHeld();
     this.#open = null;
     this.#slots.set(id, Object.freeze({ rev, width, focus, theme, tick, range, lines, parts }));
   }

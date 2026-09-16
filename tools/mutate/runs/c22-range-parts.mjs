@@ -62,8 +62,10 @@ const results = runPass({
       // under a frame from before is read after it.
       name: "PARTS-OUTLIVE-REV: the slot's parts are carried across a miss on another axis",
       file: CACHE,
-      from: "    const parts = open !== null && open.id === id ? open.parts : new Map<string, readonly string[]>();",
-      to: "    const parts = open !== null && open.id === id ? open.parts : (this.#slots.get(id)?.parts ?? new Map<string, readonly string[]>());",
+      // Re-anchored 2026-09-16 (C22 I104, F1190): the parts are a `Held` — whole
+      // lines and slices — and a fresh one comes from `freshHeld()`.
+      from: "    const parts = open !== null && open.id === id ? open.parts : freshHeld();",
+      to: "    const parts = open !== null && open.id === id ? open.parts : (this.#slots.get(id)?.parts ?? freshHeld());",
       expect: "T4.89c",
     },
     {
@@ -87,12 +89,15 @@ const results = runPass({
       expect: "T4.89b",
     },
     {
-      // **A sliced block held.** Its rows are the range's; held under its id and
-      // read back at the next range, the window shows the previous slice.
-      name: "SLICED-HELD: a block the window sliced is held and read back",
-      file: LAYOUT,
-      from: "      rows.push(...ownRows(block, render([block])));\n    }",
-      to: "      const held2 = held.part(block.id) ?? ownRows(block, render([block]));\n      held.hold(block.id, held2);\n      rows.push(...held2);\n    }",
+      // **A sliced block held regardless of its window.** Its rows are the
+      // range's; served at the next range, the window shows the previous
+      // slice. Re-anchored 2026-09-16 (C22 I104, F1190): a slice *is* held now,
+      // under its window — so the mutation is the window condition dropped at
+      // the cache, and T4.89d's second scroll renders no new slice.
+      name: "SLICED-HELD: a slice is read back at any window",
+      file: CACHE,
+      from: "        return held !== undefined && held.window === window ? held.lines : undefined;",
+      to: "        return held !== undefined ? held.lines : undefined;",
       expect: "T4.89d",
     },
     {

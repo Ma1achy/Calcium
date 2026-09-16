@@ -133,6 +133,7 @@ function renderedSince(before: ReadonlyMap<string, number>, now: ReadonlyMap<str
 /** A `Map`-backed parts store, the shape the render cache hands out (C22 I101). */
 function partsStore(): EntryParts & { readonly reads: () => number; readonly size: () => number } {
   const m = new Map<string, readonly string[]>();
+  const slices = new Map<string, Readonly<{ window: string; lines: readonly string[] }>>();
   let reads = 0;
   return {
     part: (key) => {
@@ -141,8 +142,16 @@ function partsStore(): EntryParts & { readonly reads: () => number; readonly siz
       return held;
     },
     hold: (key, lines) => void m.set(key, lines),
+    // The shipped shape (C22 I104): one slice per id, served at its window alone.
+    slice: (id, window) => {
+      const held = slices.get(id);
+      if (held === undefined || held.window !== window) return undefined;
+      reads += 1;
+      return held.lines;
+    },
+    holdSlice: (id, window, lines) => void slices.set(id, { window, lines }),
     reads: () => reads,
-    size: () => m.size,
+    size: () => m.size + slices.size,
   };
 }
 
@@ -693,7 +702,7 @@ describe("C22 §6c — the render cache", () => {
     expect(reportF.misses["render"]?.focus ?? 0).toBeGreaterThanOrEqual(1);
   });
 
-  it("T4.89d (C22 I101): a top-level block that divides — taller than the window — is rendered at every range and never held, and a whole block beside it is held", async () => {
+  it("T4.89d (C22 I101, I104): a top-level block that divides — taller than the window — is rendered at every new range and held under its window, and a whole block beside it is held", async () => {
     const tall = tallDividing();
     const { definition: count, rendersOf } = countingById(1);
     const lines = Array.from({ length: 40 }, (_, i) => `tall line ${String(i)}`);
@@ -718,7 +727,7 @@ describe("C22 §6c — the render cache", () => {
     expect(rendersOf().get("whole"), "rendered alone and held on the first range miss").toBe(2);
     await s.type("y".repeat(80));
     expect(s.screen().text.some((r) => r.includes("counted whole")), "still beside it after two rows").toBe(true);
-    expect(tall.renders(), "rendered again: a sliced block is never held").toBe(3);
+    expect(tall.renders(), "rendered again: the window moved, and a slice is held under its window (C22 I104)").toBe(3);
     expect(rendersOf().get("whole"), "read back: the whole block was held").toBe(2);
     const report = await s.report();
     expect(report.misses["render"]?.range ?? 0).toBeGreaterThanOrEqual(2);
@@ -798,5 +807,86 @@ describe("C22 I103 — a tick miss keeps the parts", () => {
       vi.useRealTimers();
     }
   }, 20_000);
-  it.todo("T4.89f (C22 I104, F1190): a sliced block beside a spinner renders no further time across a tick, once across a one-row scroll, and the parts hold one slice per sliced block — not deferred on a component: the code commit replaces this row");
+  it("T4.89f (C22 I104, F1190): a sliced block beside a spinner renders no further time across a tick, once across a one-row scroll with the rows a fresh render lays, and the parts serve a slice at its own window alone and hold one per id", async () => {
+    // **At the parts first.** A slice held for one window is not served at
+    // another; holding a second window for the same id replaces the first,
+    // which is what bounds the store at one slice per sliced block.
+    const cache = new RenderCache();
+    cache.set("e", 1, 80, "f", "t", "0", ["a"]);
+    expect(cache.get("e", 1, 80, "f", "t", "1"), "a range miss opens the parts").toBeUndefined();
+    const open = cache.parts("e");
+    if (open === undefined) throw new Error("no parts after a range miss");
+    open.holdSlice("big", "0 10", ["r0", "r1"]);
+    expect(open.slice("big", "0 10"), "served at its window").toEqual(["r0", "r1"]);
+    expect(open.slice("big", "1 10"), "not at another").toBeUndefined();
+    expect(open.slice("other", "0 10"), "nor for another id").toBeUndefined();
+    open.holdSlice("big", "1 10", ["r1", "r2"]);
+    expect(open.slice("big", "1 10"), "the new window is served").toEqual(["r1", "r2"]);
+    expect(open.slice("big", "0 10"), "and the old one is gone — replaced, not added").toBeUndefined();
+
+    // **End to end, under fake timers** (T4.89e's reason). A forty-line
+    // dividing block in an eighteen-row terminal beside a status spinner: the
+    // tail window slices it. The first tick fills the parts (a whole render
+    // holds none, I101); the second renders the dividing kind no further time.
+    vi.useFakeTimers();
+    try {
+      const tall = tallDividing();
+      const lines = Array.from({ length: 40 }, (_, i) => `tall line ${String(i)}`);
+      const status = { kind: "status", id: "sp", state: "loading", message: "working", height: 1 };
+      const s = await sessionOver([tall.definition], [{ kind: "tall", id: "big", lines }, status], { columns: 80, rows: 18 });
+      await vi.advanceTimersByTimeAsync(0);
+      for (let i = 0; i < 4; i += 1) await Promise.resolve();
+      const glyph = (): string => {
+        const row = s.screen().text.find((r) => r.includes("loading"));
+        if (row === undefined) return "<absent>";
+        return /[⠀-⣿]/u.exec(row)?.[0] ?? "<none>";
+      };
+      /** The tall rows on screen, as their line numbers, in screen order. */
+      const tallRows = (): readonly number[] =>
+        s.screen().text.flatMap((r) => {
+          const m = /tall line (\d+)/.exec(r);
+          return m === null ? [] : [Number(m[1])];
+        });
+      const contiguousTail = (rows: readonly number[]): boolean =>
+        rows.length > 0 && rows[rows.length - 1] === 39 && rows.every((n, i) => i === 0 || n === (rows[i - 1] as number) + 1);
+      expect(contiguousTail(tallRows()), `the tail window is on screen: ${tallRows().join(",")}`).toBe(true);
+      const glyphBefore = glyph();
+      expect(glyphBefore, "the spinner is on screen").toMatch(/[⠀-⣿]/u);
+      expect(tall.renders(), "the first frame rendered the slice").toBe(1);
+
+      const step = async (ms: number): Promise<void> => {
+        s.clock.advance(ms);
+        await vi.advanceTimersByTimeAsync(ms);
+      };
+      await step(spinnerIntervalMs());
+      for (let i = 0; i < 6 && glyph() === glyphBefore; i += 1) await step(25);
+      const glyphFirst = glyph();
+      expect(glyphFirst, "the frame moved — the glyph turned").not.toBe(glyphBefore);
+      const afterFirst = tall.renders();
+      expect(afterFirst, "at most one render on the first tick, to fill the parts").toBeLessThanOrEqual(2);
+      const rowsAtTick = tallRows();
+
+      await step(spinnerIntervalMs());
+      for (let i = 0; i < 6 && glyph() === glyphFirst; i += 1) await step(25);
+      expect(glyph(), "the glyph turned again").not.toBe(glyphFirst);
+      expect(tall.renders(), "the slice rendered no further time across the tick").toBe(afterFirst);
+      expect(tallRows(), "and the same rows are on screen").toEqual(rowsAtTick);
+
+      // **A one-row scroll**: the prompt wraps at 80 cells, the region loses a
+      // row, the tail window moves one row. The slice is a new window —
+      // rendered once — and the rows are the fresh render's, not the held
+      // window's: still the contiguous tail, one row shorter.
+      await s.type("x".repeat(80));
+      await vi.advanceTimersByTimeAsync(0);
+      for (let i = 0; i < 4; i += 1) await Promise.resolve();
+      const scrolled = tallRows();
+      expect(contiguousTail(scrolled), `the moved window is the fresh render's: ${scrolled.join(",")}`).toBe(true);
+      expect(scrolled.length, "one row shorter").toBe(rowsAtTick.length - 1);
+      expect(tall.renders(), "rendered once for the new window").toBe(afterFirst + 1);
+      const report = await s.report();
+      expect(report.misses["render"]?.tick ?? 0, "the ticks were ticks").toBeGreaterThanOrEqual(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 20_000);
 });
