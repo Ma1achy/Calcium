@@ -52042,3 +52042,35 @@ strings; `shadeAt`'s 6.6 MB is `hypot3` and `Math.pow` at a real call.
 What remains: the cull over face lanes (0.9 → 0.3 ms measured, `out/probe-cull.mjs`,
 and it retires `fn` and `edges` as objects); the thin path's 3.7 ms;
 `plot3dArea`'s arrays; `normaliseRow`'s byte scan.
+
+## F1186 — the cull reads three positions through the index lane and a normal object per face, 69,451 times a bunny frame; the same test over two face lanes runs in a third of the time ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/surface3.ts` `backfaceCulled`: per face, three index-lane reads, nine position-lane reads at those indices — three dependent loads a corner into a 3.3 MB lane, in face order but not vertex order — and the face normal from `tri.fn`, a `Vec3` object a face; `geometryOf` builds that object from a face-normal sum lane it already holds |
+| **Reached for** | the line ticks of forty bunny frames on the F1184 build (`out/prof-bunny7`, `make load-down`): `drawTri` is the largest self time in the raster at 117.8 ms, and its ticks sit on the cull's centroid lines (662–670 in the build, 30 of 75 ticks in the function) and the first `screenOf`. A micro-benchmark over the bunny's real lanes (`out/probe-cull.mjs`, three runs, 60 timed rounds each): the cull as the tree has it **0.88–0.92 ms a frame**, the same arithmetic inlined over the index lane 0.78–0.81, and over a per-face centroid lane and a per-face normal lane, read in face order, **0.29–0.31 ms** — 30,747 kept faces on every arm. Teapot 0.06 → 0.02 |
+| **Verdict** | **open** — measured, the remedy sized |
+
+**A claim in F1184 corrected first.** F1184's remedy and its close say
+`edges` is *an array of three booleans a face, 2.8 MB on the bunny*, and
+list it as a cut to make. It is not: `edgeMask` fills a mesh's mask with one
+shared `[true, true, true]` — `new Array(faces).fill(triple)` is one array
+named 69,451 times — so a mesh's edges cost a pointer a face and nothing to
+retire. Only a height field, whose diagonal is not an edge, gets a fresh
+pair per cell, and no height field in the examples has more than a few
+hundred cells. The figure was carried from the object count without being
+measured; it is struck here rather than left to be built on.
+
+**Remedy, sized.** C12 I141: two face lanes on the geometry — the face
+centroid, three doubles a face computed once by the cull's own expression
+`(P[a] + P[b] + P[c]) / 3` over the position lane, and the unit face normal,
+three doubles a face from the sum lane the builder already has — and
+`backfaceCulled` reads six doubles in face order and the skin's sign.
+`Tri3.fn` goes; the rows that read a face's normal take it through
+`faceNormalOf(tri)`, exported for them as `cornersOf` is. The flat-shading
+arm of the builder reads the normal lane instead of the object. Same
+doubles: a centroid computed at build time is the same three divisions on
+the same three sums as one computed at cull time. Sized: 0.6 ms of the
+bunny's warm frame, about 6%; the heap trades 69,451 `Vec3` objects (about
+2.8 MB) for two lanes of 1.67 MB each, so about half a megabyte heavier and
+2.6 MB less garbage on a build. The paired probe is the check.
