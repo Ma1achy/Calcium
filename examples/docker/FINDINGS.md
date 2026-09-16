@@ -52366,3 +52366,76 @@ render slot's own axes — a plan held beside the render slot, dropped on
 patch. That is the next finding, and it is the larger half of what this one
 measured. The orbit, the crosshair, the image frame and the series toggle
 stay in the compound slot as recorded above.
+
+## F1190 — a block the window slices is rendered again on every tick: 1.36 ms of a 1.58 ms tick frame beside a 2,000-line patch is thirty-seven lines that did not change ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/entry-layout.ts:377` `assemble`: a block the sequence window sliced — the first or last block of a run, cut to the window — is "rendered as before and held by nobody, because its rows are the range's" (I101's wording). True on a range miss, where the slice is new; on a **tick** miss (I103) the range did not move, the slice is the same slice, and it is rendered again for the spinner beside it. `src/presentation/patch/definition.ts:217` is the span that shows it: `patch.lines` runs on 22 of 26 frames of a still screen. |
+| **Reached for** | `out/probe-anim.mjs` on the F1189 build, 120×40, four seconds, `make load-down`, spans on: `patch` + `status` at 2,000 lines — work p50 **4.80 ms**, 9.9% of a core, `visible` p50 **1.584 ms** of which `patch.lines` **1.360 ms** on 22 frames; `status` alone — work p50 1.55, `visible` 0.242. `out/probe-slice.mjs` (this build, width 120, a 37-line slice, medians of forty): rendering the slice alone **0.83–0.84 ms** at 2,000 lines and 0.82–0.93 at 20,000 — the render is the slice's size and not the patch's. The paint row path the last profile also named — `exact` and `based` per row — is `paint` 0.042 ms and `based` 0.005 ms a frame at the span level, and is **checked and clear** on that reading. |
+| **Verdict** | **open** — measured, the remedy sized |
+
+**Why a tick renders it.** I101 held whole blocks and column-group children
+because their rows are the same rows at every range; a sliced block's rows
+are the range's, so holding them under the block's id alone would serve the
+last window's rows at the next. That reasoning is about the *range* miss.
+I103 made the tick a second miss that keeps the parts, and under it the range
+is unchanged — the slice the assembly rebuilds is byte for byte the one the
+last frame rendered, and nothing says so because the parts have no slot a
+slice can be held in. A scroll pays this render rightly; a tick pays it for
+nothing, 37 lines of intra-line span work (`unitsOf`, `sgr`, `fitStyled`,
+`normaliseRow` — the top Calcium self of F1189's residue profile) every 80 ms.
+
+**Remedy, sized.** C22 I104: the parts hold a sliced block's rows **under its
+id with the window they were rendered for** — the run-local `from` and `take`
+the piece carries, which is what the slice is a function of once the run's
+blocks and width are fixed, and those are the slot's own axes. A range or a
+tick miss that reaches the same window takes the held rows; a different
+window renders the slice once and **replaces** the hold, so the store is
+bounded at one slice per sliced block — at most two per run — and grows with
+nothing. The animating filter (`withoutAnimating`, I103) covers the slice
+reads and holds as it covers the parts. Byte-identical by construction: the
+same render at the same inputs. Sized from the probe: `visible` on a tick
+beside a 2,000-line patch from 1.58 ms toward the 0.22 that is not the render,
+and work p50 from 4.8 toward the spinner alone's 1.5; the scroll frame is
+unchanged, which is the control.
+
+## F1191 — the window seam derives the patch's plan and the registry's cap form on every frame: a tick beside a 20,000-line patch is 10 ms of `visible`, of which the thirty-seven rendered lines are 0.7 ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | Three sites, one call. `src/shell/entry-layout.ts:305` `windowEntry` → `registry.windowSequence` per frame, hit or miss. Inside it, `src/presentation/blocks/registry.ts:817` `#formContained` → `#form`, which for a block over the cap (`DEFAULT_MAX_BLOCK_ROWS` 2,000) measures the whole block through the definition — not the memo — and windows it to `[0, cap)` **on every call**, building a fresh capped block each frame; nothing holds a `Form`. Then `registry.ts:860` calls the kind's `window(block, w, from, to, measureChild)` — `src/presentation/patch/definition.ts:194` → `windowRows(block, width, from, to)` **with no plan**, so `windowPlan` (C25 I22) walks every line of the patch again; and `windowRows` itself, `src/presentation/patch/window.ts:329-345`, walks every row of the plan twice — once to collect the touched hunks, once to find each hunk's first body row — even when handed a plan. |
+| **Reached for** | `out/probe-anim.mjs`, F1189 build, 120×40, four seconds, `make load-down`: `patch` + `status` at **20,000** lines — work p50 **12.93 ms**, p95 39.4, **15.1% of a core** for one glyph, `visible` p50 **10.11 ms**, `patch.lines` **0.68 ms**; at 2,000 lines `visible` 1.58 with `patch.lines` 1.36 — so the part that is not the render is 0.22 ms at 2,000 and **9.4 ms at 20,000**, linear in the block and paid on the frame that changed nothing in it. `out/probe-slice.mjs`, width 120, 37-line slice, medians of forty: `windowPlan` 0.30 ms at 2,000 lines, **2.2 ms** at 20,000; `windowRows` with no plan 0.28–0.30 and **4.3–5.4**; with a plan 0.13 and **1.7–1.8** — the planned figure is still linear, which is the two walks; `registry.windowSequence([patch, status])` with no memo 1.45–1.69 and **15.6–16.5 ms**, the cap form's measure and window included. The render of the slice, 0.82–0.93 ms, is the same at both sizes. |
+| **Verdict** | **open** — measured, the remedy sized |
+
+**Why every frame pays it.** F1189 named this as the larger half — "the entry
+is re-windowed and re-measured on every frame, hit or miss, before the render
+cache is asked" — and sizing it splits it three ways. The measure is memoised
+(C22 I100) and is not the cost; the *window* is not, because the plan is a
+value C25 hands to whoever holds a block across many windows (I22's own
+words), and the transcript path never holds one — `window` is a pure seam with
+five arguments and no place to keep anything, so it derives the plan from the
+block each call. Above it, the registry's cap form is the same shape one level
+up: a form is a function of the block and the width, the registry resolves it
+per call, and for a block over the cap the resolution is a whole-block measure
+plus a whole-block window. And below it, `windowRows` was written before the
+plan existed and kept its two full walks when the plan arrived, so a planned
+window at 20,000 lines still costs 1.7 ms for 37 rows.
+
+**Remedy, sized.** Three cuts, one spec each, one seam. **C09**: the window
+seam takes the caller's scratch — `RenderScratch`, C12 I107's owner-keyed
+store, the shape `RenderContext.scratch` already hands renderers — as a sixth
+argument, `windowSequence` takes it beside the memo (I70's pattern), and the
+registry holds the cap form in it: owner the block, key the width; a block
+within the cap is unchanged. **C25**: `window` reads the plan from the scratch
+— owner the patch's `hunks` (the payload the plan is derived from, as C12
+keys on `faces`), key the width — and refuses one whose `patch` is not this
+block rather than read it; `windowRows` touches the window's rows and the
+hunks it reaches and no others, which is I22's own sentence for `build`,
+with the hunk body starts added to the plan. **C22**: the session hands
+`graph.scratch` to `windowEntry`. Sized from the probes: a tick or a hit
+frame beside a 20,000-line patch from about 10 ms of `visible` to about the
+slice's render plus a scratch read — under 1.5 ms, and under 0.2 with F1190
+— and a one-row scroll at that size from about 10 ms to about 1; at 2,000
+lines about 0.4 ms a frame. The measure memo (C22 I100) is the precedent
+for who owns the store, and SS24 is why it is not in `patch/` (I22, F1187).
