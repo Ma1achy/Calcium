@@ -228,7 +228,7 @@ Orthogonal: a write while `contaminated` calls `repaint()` rather than `render()
 - **I14** — **Suspension introduces no queue.** `flush()` while suspended forces nothing beyond what I13 already allows, and `resume()` writes an ordinary frame rather than a repaint: suspension writes nothing, so the terminal still holds the last frame written and the diff's model of it is still true. C03's memory of deferred work stays one `state` and one `deferred` reason under suspension, exactly as without it.
 
 - **I15** — **`resize` is coalesced on a fixed 16 ms window, and the window is not configurable.** It is not immediate and it is not tunable, and those are two rulings with two reasons. *Not immediate*, because the cost of a resize is not the frame: the width is what invalidates every cached height (C14 I8), so a drag of thirty `SIGWINCH`es was thirty re-measures of the whole transcript — **544 ms at a thousand entries, of which the index rebuild everyone named was 0.07%** (F423). *Not tunable*, because `stream` and `spinner` windows make a frame **stale** where this one makes it **wrong**, and I2's reasoning — a config may not introduce lag — reaches the second case for a different reason than the first. **Contamination is set eagerly at commit and never at flush** (I7, §5), which is what lets an `input` commit arriving inside the window write a correct frame rather than a diff against dimensions that no longer exist.
-- **I16** — **`render` and `repaint` are called with the `CommitReason` that drove the frame**, chosen by strictness among the coalesced reasons at flush. It is the one thing about a frame that only C03 knows: a caller wrapping `commit` sees every reason committed and a caller wrapping `render` sees every frame, and neither can recover which reason a coalesced frame was drawn for. C03 keeps no count of its own coalescing — commits and frames are counted at the seams above, and *coalesced* is their difference (→ C28 I8).
+- **I16** — **`render` and `repaint` are called with the `CommitReason` that drove the frame**, chosen by strictness among the coalesced reasons at flush — the shorter window, and at an equal window `resize`, because the frame it drives is a repaint (I7) and the reason handed down should say so; since F1199 `stream` and `resize` share 16 ms, so the tie is reachable and not a rounding case. It is the one thing about a frame that only C03 knows: a caller wrapping `commit` sees every reason committed and a caller wrapping `render` sees every frame, and neither can recover which reason a coalesced frame was drawn for. C03 keeps no count of its own coalescing — commits and frames are counted at the seams above, and *coalesced* is their difference (→ C28 I8).
 
 ---
 
@@ -260,7 +260,7 @@ Six tiers. Every cell of the §5 transition table is covered; fake clock through
 
 ### Tier 1 — unit
 
-- **T1.24** (I16): five commits of different reasons coalesced into one frame → `render` is called once, with the **strictest** reason and not the first or the last. The three are distinguishable only when the arrival order and the strictness order disagree, so the row constructs that state rather than the convenient one.
+- **T1.24** (I16): five commits of different reasons coalesced into one frame → `render` is called once, with the **strictest** reason and not the first or the last — `resize` over a `stream` at the same window, by the tie rule. The three are distinguishable only when the arrival order and the strictness order disagree, so the row constructs that state rather than the convenient one.
 - **T1.25** (I16): a contaminated frame → `repaint` receives the reason too, and it is the same one `render` would have had.
 
 Fake `schedule`, spy `render`/`repaint`, fabricated capabilities.
@@ -351,6 +351,7 @@ PTY harness, real timers, real terminal.
 
 ### Tier 6 — fail-on-revert
 
+- **T6.18** (I16): flattening the tie — strictness the window alone, with `resize` and `stream` at 16 → **T1.24** reads `stream`, the last reason committed, for a frame that is a repaint. Anchor in `tools/mutate/runs/c03-resize-window.mjs`.
 - **T6.17** (I16): calling `render()` with no argument → T1.24 and T1.25 fail, and the profiler's frames-by-reason collapses to one bucket. **The structural half is named**: nothing prevents a caller ignoring the argument, and what would catch that is the L4 counter disagreeing with itself rather than a row here.
 
 - **T6.1** (I2): giving `input` a non-zero window → T1.1 and T3.13 fail.
