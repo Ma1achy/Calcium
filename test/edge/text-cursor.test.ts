@@ -209,6 +209,8 @@ describe("C09 §5a — the cluster step is linear, and one glyph does not segmen
   const cjkRow = (n: number): string => "日".repeat(n / 2);
   /** A row of `n` cells holding one box-drawing glyph among ASCII — the patch gutter's shape (F955). */
   const gutterRow = (n: number): string => `${SGR}│${SGR_RESET} ${"x".repeat(n - 2)}`;
+  /** The gutter row with a glyph outside the rasterised alphabets in the gutter's place — I63's count since I74. */
+  const accentRow = (n: number): string => `${SGR}é${SGR_RESET} ${"x".repeat(n - 2)}`;
 
   it("T3.84 (C09 I60, I63): the cluster walk's cost from 50 to 400 cells is nearer 8× than 64×, on a row where every cluster reaches the segmenter", () => {
     // T3.77's form over the arm T3.77 cannot reach: its styled rows are ASCII
@@ -238,7 +240,7 @@ describe("C09 §5a — the cluster step is linear, and one glyph does not segmen
     ).toBeLessThan(LINEAR_AT_8X_WITH_MARGIN);
   });
 
-  it("T3.85 (C09 I63, F955, F1084): a 200-cell row holding one glyph asks the segmenter for one cluster, a CJK row for a hundred", () => {
+  it("T3.85 (C09 I63, I74, F955, F1084): a 200-cell row holding one glyph outside the rasterised alphabets asks the segmenter for one cluster, one holding the gutter's │ asks for none, a CJK row for a hundred", () => {
     // **The transcript's 60 µs a row, counted rather than timed.** Every patch
     // row carries one `│` in its gutter, and that one glyph sent the whole row
     // through the segmenter — a segment object per ASCII character, forty of
@@ -282,11 +284,17 @@ describe("C09 §5a — the cluster step is linear, and one glyph does not segmen
     };
 
     const gutter = gutterRow(200);
+    const accent = accentRow(200);
     const cjk = cjkRow(200);
     const gutterAsks = asked(() => fitStyled(gutter, 201, SGR_RESET));
+    const accentAsks = asked(() => fitStyled(accent, 201, SGR_RESET));
     const cjkAsks = asked(() => fitStyled(cjk, 201, SGR_RESET));
     expect(proto.containing, "the patch is restored").toBe(real);
-    expect(gutterAsks, "one glyph, found once and measured once").toBe(2);
+    // **A unit of the rasterised alphabets never asks** (C09 I74): the gutter's
+    // `│` is one, so the row that F955 measured now asks for nothing; the
+    // glyph outside the table is the row I63's count is about.
+    expect(gutterAsks, "the gutter glyph is a unit of the table — never asked (I74)").toBe(0);
+    expect(accentAsks, "one glyph outside the table, found once and measured once").toBe(2);
     expect(cjkAsks, "a hundred clusters, each found once and measured once").toBe(200);
 
     // **The timing is kept as evidence and no longer as the gate.** The control

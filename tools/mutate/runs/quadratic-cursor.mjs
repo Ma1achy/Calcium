@@ -81,8 +81,7 @@ const results = runPass({
       name: "FIT-REMAINDER: the fitStyled cluster arm builds every cluster after the cursor",
       file: TEXT,
       from:
-        "    segments ??= GRAPHEMES.segment(text);\n" +
-        "    const cluster = clusterAt(segments, i);\n" +
+        "    const cluster = soloAt(text, i) ? text.charAt(i) : clusterAt((segments ??= GRAPHEMES.segment(text)), i); // C09 I74\n" +
         "    if (cluster === \"\") break;\n" +
         "    const w = pieceCells(cluster, c, ambiguous);\n" +
         "    if (used + w > width) {",
@@ -99,8 +98,7 @@ const results = runPass({
       name: "SLICE-REMAINDER: the sliceCells cluster arm builds every cluster after the cursor",
       file: TEXT,
       from:
-        "    segments ??= GRAPHEMES.segment(text);\n" +
-        "    const cluster = clusterAt(segments, i);\n" +
+        "    const cluster = soloAt(text, i) ? text.charAt(i) : clusterAt((segments ??= GRAPHEMES.segment(text)), i); // C09 I74\n" +
         "    if (cluster === \"\") break;\n" +
         "    const w = pieceCells(cluster, c, ambiguous);\n" +
         "\n" +
@@ -168,7 +166,7 @@ const results = runPass({
       name: "FIT-POINT: the fitStyled cluster arm takes one code point",
       file: TEXT,
       from:
-        "    const cluster = clusterAt(segments, i);\n" +
+        "    const cluster = soloAt(text, i) ? text.charAt(i) : clusterAt((segments ??= GRAPHEMES.segment(text)), i); // C09 I74\n" +
         "    if (cluster === \"\") break;\n" +
         "    const w = pieceCells(cluster, c, ambiguous);\n" +
         "    if (used + w > width) {",
@@ -184,7 +182,7 @@ const results = runPass({
       name: "SLICE-POINT: the sliceCells cluster arm takes one code point",
       file: TEXT,
       from:
-        "    const cluster = clusterAt(segments, i);\n" +
+        "    const cluster = soloAt(text, i) ? text.charAt(i) : clusterAt((segments ??= GRAPHEMES.segment(text)), i); // C09 I74\n" +
         "    if (cluster === \"\") break;\n" +
         "    const w = pieceCells(cluster, c, ambiguous);\n" +
         "\n" +

@@ -33,7 +33,7 @@
  * the table of sequences stays where SS14 puts it.
  */
 import { SGR_RESET } from "../terminal/escapes.js";
-import { cells } from "./text.js";
+import { cells, soloUnit } from "./text.js";
 
 /** A code as the tokeniser holds it: the sequence, and the sequence that ends it. */
 type Code = Readonly<{ code: string; end: string }>;
@@ -210,7 +210,10 @@ function swallowed(row: string, last: number): number {
   const c = row.charCodeAt(last);
   if (c !== CC_M && c !== CC_BACKSLASH) return 0;
   const next = row.charCodeAt(last + 1);
-  if (Number.isNaN(next) || next < 0x300) return 0;
+  // **A unit of the rasterised alphabets cannot have joined the `m`** (C09 I74):
+  // the row's tail was sliced and segmented after every SGR before a braille
+  // or box unit, which is every SGR in a plot row.
+  if (Number.isNaN(next) || next < 0x300 || soloUnit(next)) return 0;
   const cluster = GRAPHEMES.segment(row.slice(last)).containing(0);
   return cluster === undefined ? 0 : cluster.segment.length - 1; // cells-ok — code units in a byte scan, not a width
 }

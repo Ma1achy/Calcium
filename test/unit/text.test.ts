@@ -465,7 +465,129 @@ describe("C09 §5a — the three pieces, and where the segmenter is asked (I63)"
 });
 
 describe("C09 I74 — a unit of the rasterised alphabets is its own cluster unless the next unit can extend it", () => {
-  it.todo("T1.48 (C09 I74, F1177): every range of the table paired with every kind of extender keeps the cluster whole through cells, fitStyled and sliceCells, two table units cut between, and a seeded corpus measures the same by both paths — not deferred on a component: the code commit replaces this row");
+  const RED = "\u001b[31m";
+  const SGR = /\u001b\[[0-9;]*m/g;
+  const SEG = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+  const clustersOf = (row: string): readonly string[] => [...SEG.segment(row)].map((s) => s.segment);
+  /** `fitStyled` over the segmenter's clusters, for a row with no escape — the walk's own conditions. */
+  const fitRef = (row: string, width: number): string => {
+    if (cells(row) === width) return row;
+    let out = ""; let used = 0;
+    for (const g of clustersOf(row)) {
+      const w = cells(g);
+      if (used + w > width) break;
+      out += g; used += w;
+    }
+    return out + " ".repeat(Math.max(0, width - used));
+  };
+  /** `sliceCells` over the segmenter's clusters, for a row with no escape — the walk's own conditions. */
+  const sliceRef = (row: string, from: number, to: number): string => {
+    if (to <= from) return "";
+    let out = ""; let used = 0; let started = false;
+    for (const g of clustersOf(row)) {
+      const w = cells(g);
+      if (used < from && used + w > from) { started = true; out += " ".repeat(used + w - from); used += w; continue; }
+      if (used >= from && !started) started = true;
+      if (used >= to) break;
+      if (used >= from && used + w > to) { out += " ".repeat(to - used); break; }
+      if (started) out += g;
+      used += w;
+    }
+    return out;
+  };
+  const lcg = (seed: number): (() => number) => {
+    let x = seed >>> 0;
+    return () => { x = (Math.imul(x, 1664525) + 1013904223) >>> 0; return x / 4294967296; };
+  };
+  const TABLE_BMP: [number, number][] = [];
+  for (let i = 0; i < CELL_PER_UNIT_RANGES.length; i += 2) { // cells-ok — a pair index
+    const lo = CELL_PER_UNIT_RANGES[i]!; const hi = CELL_PER_UNIT_RANGES[i + 1]!;
+    if (hi <= 0xffff) TABLE_BMP.push([lo, hi]);
+  }
+  const EXTENDERS: readonly [string, string][] = [
+    ["a combining mark", "́"], ["an enclosing mark", "⃣"], ["a spacing mark", "ः"],
+    ["the joiner and a pictograph", "‍\u{1F468}"], ["the emoji-presentation selector", "️"], ["a skin-tone modifier", "\u{1F3FB}"],
+  ];
+
+  it("T1.48 (C09 I74, F1177): every range of the table paired with every kind of extender keeps the cluster whole through cells, fitStyled and sliceCells, two table units cut between, and a seeded corpus measures the same by both paths", () => {
+    expect(TABLE_BMP.length, "the table has BMP ranges").toBeGreaterThanOrEqual(3);
+    let pairs = 0;
+    for (const [lo, hi] of TABLE_BMP) {
+      for (const cp of [lo, (lo + hi) >> 1, hi]) {
+        const u = String.fromCharCode(cp);
+        for (const [kind, ext] of EXTENDERS) {
+          const pair = u + ext;
+          const first = clustersOf(pair)[0] as string;
+          const label = `U+${cp.toString(16)} with ${kind}`;
+          // **The pair measures as the segmenter clusters it**: the first
+          // cluster's width plus the rest's, never the unit plus a stray.
+          expect(cells(pair), label).toBe(clustersOf(pair).reduce((t, g) => t + cells(g), 0));
+          const w = cells(first);
+          // **Kept whole by both walks**, at the cluster's own width and cut at one.
+          expect(sliceCells(`${pair}x`, 0, w), `${label}: sliceCells keeps the cluster`).toBe(sliceRef(`${pair}x`, 0, w));
+          expect(sliceCells(`${pair}x`, 0, 1), `${label}: a window of one`).toBe(sliceRef(`${pair}x`, 0, 1));
+          expect(fitStyled(`${pair}x`, w, SGR_RESET), `${label}: fitStyled keeps the cluster`).toBe(fitRef(`${pair}x`, w));
+          expect(fitStyled(`${pair}x`, 1, SGR_RESET), `${label}: fitStyled at one`).toBe(fitRef(`${pair}x`, 1));
+          pairs += 1;
+        }
+        // **Two units of the table are two clusters**, cut between.
+        expect(fitStyled(`${u}${u}`, 1, SGR_RESET), `two of U+${cp.toString(16)}`).toBe(u);
+        expect(sliceCells(`${u}${u}`, 1, 2), `the second of U+${cp.toString(16)}`).toBe(u);
+        expect(cells(`${u}${u}`)).toBe(2);
+      }
+    }
+    expect(pairs).toBe(TABLE_BMP.length * 3 * EXTENDERS.length);
+
+    // **The seeded corpus**: the table's units among ASCII, escapes, every
+    // extender, Hangul, CJK, a Prepend and a flag — rows the fast path answers
+    // and rows the segmenter must.
+    const PIECES = [
+      "a", "b", " ", "xy", "─", "│", "┌", "█", "▄", "⠿", "⠁", "→", "↔", "▁",
+      "́", "⃣", "ः", "‍\u{1F468}", "️", "\u{1F3FB}",
+      "한", "日", "؀", "\u{1F1EC}\u{1F1E7}", "\u{1F44D}", "é",
+    ];
+    const EXT_FIRST = new Set(["́", "⃣", "ः", "‍\u{1F468}", "️", "\u{1F3FB}"]);
+    const isTableUnit = (s: string): boolean => s.length === 1 && TABLE_BMP.some(([lo, hi]) => s.charCodeAt(0) >= lo && s.charCodeAt(0) <= hi);
+    const rand = lcg(0x5eed_c09_74);
+    let fast = 0; let slow = 0; let escaped = 0;
+    for (let n = 0; n < 3000; n += 1) {
+      const count = 1 + Math.floor(rand() * 8);
+      const pieces: string[] = [];
+      for (let k = 0; k < count; k += 1) pieces.push(PIECES[Math.floor(rand() * PIECES.length)] as string);
+      const plain = pieces.join("");
+      for (let k = 0; k + 1 < pieces.length; k += 1) {
+        if (isTableUnit(pieces[k] as string)) {
+          if (EXT_FIRST.has(pieces[k + 1] as string)) slow += 1; else fast += 1;
+        }
+      }
+      const total = cells(plain);
+      expect(cells(plain), `row ${n}: cells by clusters`).toBe(clustersOf(plain).reduce((t, g) => t + cells(g), 0));
+      for (let w = 0; w <= total + 1; w += 1) { // cells-ok — a width sweep
+        expect(fitStyled(plain, w, SGR_RESET), `row ${n} fit ${w}: ${JSON.stringify(plain)}`).toBe(fitRef(plain, w));
+      }
+      for (let a = 0; a <= total; a += 1) { // cells-ok — a window sweep
+        for (const b of [a + 1, a + 2, total]) {
+          if (b <= a) continue;
+          expect(sliceCells(plain, a, b), `row ${n} slice [${a}, ${b}): ${JSON.stringify(plain)}`).toBe(sliceRef(plain, a, b));
+        }
+      }
+      // **Escapes between clusters only** (I63's clause): before a piece that
+      // is not an extender.
+      let styled = "";
+      for (let k = 0; k < pieces.length; k += 1) {
+        const piece = pieces[k] as string;
+        if (!EXT_FIRST.has(piece) && rand() < 0.4) { styled += rand() < 0.5 ? RED : SGR_RESET; escaped += 1; }
+        styled += piece;
+      }
+      expect(displayCells(styled), `row ${n}: displayCells`).toBe(cells(styled.replace(SGR, "")));
+      for (const w of [0, 1, Math.floor(total / 2), total, total + 3]) {
+        expect(displayCells(fitStyled(styled, w, SGR_RESET)), `row ${n}: fitStyled measures ${w}`).toBe(w);
+      }
+    }
+    expect(fast, "rows the fast path answers").toBeGreaterThan(500);
+    expect(slow, "and table units the segmenter must still decide").toBeGreaterThan(300);
+    expect(escaped, "and escapes placed between clusters").toBeGreaterThan(1000);
+  });
 });
 
 describe("C09 §5 — the printable-ASCII path", () => {

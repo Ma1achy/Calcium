@@ -65,6 +65,7 @@ const sgrOf = (rand: () => number): string => {
 const TEXT = [
   "a", "bc", "def", "ghij", " ", "  ", "x y", "—", "…",
   "日本", "語", "한", "👍", "🇬🇧",
+  "⠿", "│", "▄", "→", // the rasterised alphabets — swallowed answers without the segmenter (C09 I74)
   "é", "äb", "́x", "̈", "‍", "z️",
   "\t", "[", "m", ";", "5", "\x1b", "\x1b[", "\x1b[31", "\x1b]",
 ];

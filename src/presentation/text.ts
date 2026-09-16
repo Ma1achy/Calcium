@@ -158,8 +158,8 @@ export function cells(text: string, ambiguous: AmbiguousWidth = "narrow"): numbe
       i = run;
       continue;
     }
-    segments ??= GRAPHEMES.segment(clean);
-    const cluster = clusterAt(segments, i);
+    // **A unit of the rasterised alphabets is taken without asking** (I74).
+    const cluster = soloAt(clean, i) ? clean.charAt(i) : clusterAt((segments ??= GRAPHEMES.segment(clean)), i);
     if (cluster === "") break;
     total += clusterCells(cluster, ambiguous);
     i += cluster.length;   // cells-ok: advancing the cursor past what was consumed
@@ -207,6 +207,31 @@ function plainRun(text: string, i: number): number {
  * escape inside a cluster in the first place, which makes this a corner and
  * not a path.
  */
+/**
+ * A code unit of the rasterised alphabets — `CELL_PER_UNIT_RANGES` — which is
+ * a cluster of its own unless the unit after it can extend it (C09 I74). Read
+ * by the rows arm's `swallowed` too: after an SGR's `m`, one of these cannot
+ * have joined the `m`.
+ */
+export function soloUnit(c: number): boolean {
+  return inRanges(c, CELL_PER_UNIT_RANGES);
+}
+
+/**
+ * Whether the unit at `i` is a whole cluster on its own, decided from the next
+ * unit and never from the segmenter (C09 I74, F1177). By UAX #29 a character
+ * that is not Hangul, a Prepend, a regional indicator or the joiner is followed
+ * by a boundary unless the next unit is Extend, ZWJ or SpacingMark — and no
+ * unit below U+0300 is any of those (Extend begins at U+0300 and the joiner
+ * is U+200D), nor is any unit of the table. A plot row is eighty of these and no ASCII, and every one of them
+ * went to `containing` for a segment record before this.
+ */
+function soloAt(text: string, i: number): boolean {
+  if (!soloUnit(text.charCodeAt(i))) return false;
+  const n = text.charCodeAt(i + 1);
+  return Number.isNaN(n) || n < 0x300 || soloUnit(n);
+}
+
 function clusterAt(segments: Segments, i: number): string {
   const found = segments.containing(i);
   if (found === undefined) return "";
@@ -382,8 +407,7 @@ export function fitStyled(
     }
 
     // One cluster, whole or not at all (I9, I63).
-    segments ??= GRAPHEMES.segment(text);
-    const cluster = clusterAt(segments, i);
+    const cluster = soloAt(text, i) ? text.charAt(i) : clusterAt((segments ??= GRAPHEMES.segment(text)), i); // C09 I74
     if (cluster === "") break;
     const w = pieceCells(cluster, c, ambiguous);
     if (used + w > width) {
@@ -498,8 +522,7 @@ export function sliceCells(
       continue;
     }
 
-    segments ??= GRAPHEMES.segment(text);
-    const cluster = clusterAt(segments, i);
+    const cluster = soloAt(text, i) ? text.charAt(i) : clusterAt((segments ??= GRAPHEMES.segment(text)), i); // C09 I74
     if (cluster === "") break;
     const w = pieceCells(cluster, c, ambiguous);
 
