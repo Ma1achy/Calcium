@@ -53391,3 +53391,25 @@ The profile is the reading the bench cannot give on text: over a 6 s run,
 Per paragraph the micro-bench's 94 µs is now the cursor's few. T1.53's corpus found
 one edge the spec row had over-stated: at the sweep's top width the answer is the
 line itself, not `width` cells, and the row was amended before the code landed.
+
+## F1206 — the paced slot is dated from the arm, so every timer's lateness is added to the period and a 16 ms window draws 54 to 58 frames a second ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | C03's `paced` machine (C03 I17) arms one timer for the shortest coalesced window as each write begins, through the `schedule` C22 hands it — `setTimeout` at the boundary. Node's timer fires late by its own granularity and the loop's turn — one to three milliseconds — and the next window is armed from the moment it fires, so the lateness is never recovered: the period is *window + slop*, every frame. Nothing in C03 can correct it, because C03 has no clock (C03 I11, A03 SS1) and the timer reports only that it fired. |
+| **Reached for** | The goal names 60 frames a second and no case reads it. `stress` at 120×40 on the F1205 tree: `stream` **58.5** fps, `everylive` **54.7**, `live:line` **54.2** — each under a 16 ms window with a 3.6 to 6.7 ms frame — and `spinners` 12.48 against an 80 ms cadence. A probe of Node's timer alone (`out/probe-pace.mjs`, a 1 ms busy frame): `setTimeout(16)` re-armed on firing paces at **52.9** fps, period 18.9 ms; `setTimeout(15)` 52.4; the same timer armed for *`lastDeadline + 1000/60 − now`* paces at **59.96**, period 16.678 ms; and with a `setImmediate` for a sub-millisecond remainder 59.98. The slop is the timer's and it is recoverable by dating consecutive windows end to end. |
+| **Verdict** | **Open.** |
+
+**Remedy, sized.** A paced `schedule` in C22, where the clock is injected: it remembers
+the deadline of the last slot it armed, and a window armed after that deadline has
+passed and within one window of it is dated from the deadline rather than from now —
+consecutive windows lie end to end, and a late firing shortens the next delay by what it
+was late. A disposed slot seeds nothing; an arm more than a window after the last
+deadline starts from now, so a lone commit's latency is unchanged. The period is held at
+no less than one sixtieth of a second — A02 §7's ceiling as a rate — since a 16 ms
+window dated end to end would draw 62.5. C03 is not changed: its windows remain the
+integer ceilings on each gap, and I17's *period is the window* becomes literally true
+through the composed schedule. One C22 invariant, a unit row over the chain, a wiring
+row through the composed Tui, a fail-on-revert row, a mutation run whose control dates
+every window from now; the acceptance is the three live cases at 59.5 or better and the
+spinner at 12.5.
