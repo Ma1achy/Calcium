@@ -51278,3 +51278,22 @@ suzanne  A p50 8.7   B p50 8.7   B−A median +0.2 ms  B faster in 15/40   (swap
 
 Suzanne's 7.8k faces and 4k vertices are under the probe's noise; the cut
 is proportional to the mesh, which is what F1169's line ticks said.
+
+## F1170 — the containers, the table and the image compose Ink trees, so the rows arm passes them by ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/blocks/kinds/containers.ts` (`group`, `panel`, `scroll`), `src/presentation/table/definition.ts`, `src/presentation/blocks/kinds/image.ts` — the five kinds that build their own Ink elements rather than ending in `rows()` |
+| **Reached for** | F1168's design: a rows arm on `render` (C09 I72) takes every kind that ends in `rows()` off Ink, per block, and leaves a block that composes an element on the Ink path unchanged. These five compose elements — a `group` places children by `renderChild`, a `panel` draws its border around them in a `row` box, `scroll` pads, `table` and `image` emit a `Text` per row — so a document built of them keeps paying Ink. The `all` scroll is the measured case: its root is a `column` group of `row` groups of `column` tiles, `react` 46.7% of 800 ms of work on the F17 build, though at 1.6–2.3 ms a frame after F1149 |
+| **Verdict** | **open** — the residue of I72's first cut, named so the arm's scope is a decision and not an omission |
+
+**Why they are left.** A `column` composition is concatenation and takes
+the arm for free; a `row` composition and a border need each child's rows
+padded to its width, which is a `cells()` measure per row — the width
+Ink computes today through `string-width`, and C09 §*What a renderer
+emits* records that the two implementations are pinned to agree (T2.16)
+rather than known to. Composing rows for a `row` group is therefore a
+second cut with its own measurement — what a `/all` scroll frame pays
+after I72 — and its own row on the agreement, not a line in the first.
+`table` and `image` emit one `Text` per row already and are the cheap
+half: `rows()` in place of the elements.
