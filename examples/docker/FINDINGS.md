@@ -52649,3 +52649,80 @@ R4.4. A one-line change upstream — Ink importing the narrow path itself —
 would make the hook a no-op, and the hook is built to notice: the line would
 no longer match, and the barrel it fell back to would be the one Ink no
 longer imports.
+
+## F1193 — the loader is two thirds of a cold start and the loader's unit is the file: 820 of the 1,130 modules left are Calcium's own, and one chunk per entry is a third of the import and a quarter of the heap ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | The published shape. `tsc -p tsconfig.build.json` emits one file per source module into `dist/`, `exports` points every entry at one of them, and the loader resolves, reads, lexes, compiles and links each of the 820 on a consumer's first import — `presentation/` 369, `data/` 232, `shell/` 120, `interaction/` 65, `viewport/` 20, `terminal/` 15. |
+| **Reached for** | `node --cpu-prof` over the F1192 build's armed import, container-local: **207 of 310 sampled ms in `node:internal`** — the loader — against 8 for `presentation/`'s own evaluation, 4 for the colormaps, 4 for `highlight.js`; module evaluation is not the cost, module count is. esbuild 0.25 (already in the tree under `vite`) over the built `dist/`, six entries, `splitting`, `format: "esm"`, `packages: "external"`: nine files — `index.js` 812 KB, three shared chunks, an `emulator-*.js` chunk the dynamic import keeps separate, and four small entries — 2.1 MB against `dist/`'s 12; **347 ms to build**. Paired against the file tree, both armed by `prepareLaunch()`, interleaved: no compile cache A 225 / 233 / 231 / 184 / 190 / 226 ms, B 171 / 162 / 155 / 133 / 154 / 176 — **B lighter 6 of 6, paired median −56 ms of about 220**; compile cache warm A 176 / 234 / 191 / 181 / 167 / 165, B 110 / 155 / 124 / 120 / 119 / 121 — **6 of 6, paired median −57 ms of about 180, a third**. Heap after import **30 → 22 MB**, RSS 120 → 110, every pair. Modules under the trace, armed: 1,130 → about 295. |
+| **Verdict** | **open** — measured, the remedy sized; the day F1164 named has come |
+
+**Why now and not at F1164.** F1164 recorded bundling as "the architecture-
+level lever, with the number, for the day the rest is spent", and listed what
+it would cost: "it changes the published shape every deep import in `test/`
+and the examples rely on". Half of that premise is checked and false — no
+example deep-imports anything (`exports` has no `./dist/*` pattern, so a
+consumer *cannot*, which is A04 §1's seal), and `test/` imports `src/` or
+`dist/` files by relative path, which a bundle beside them does not move. The
+rest is now spent: the compile cache (R4.6), the quantisation table (C10
+I41), the emulator (C23 I71) and the grammars (C09 I71) off the graph, the
+Mermaid renderer its own entry (C24 I36), es-toolkit's barrel narrowed (C24
+I37). What is left is the per-file floor, and only the file count moves it.
+
+**What the bundle must keep, and how each is checked.**
+
+- *One instance of every module across every entry.* `testing` and `fixtures`
+  share the registry, the theme and the measurer with the runtime; a bundle
+  per entry without splitting would give a consumer's test two registries and
+  an `instanceof` that lies. `splitting: true` gives one chunk graph; a T5 row
+  imports two entries in one child and asserts a shared class is the same
+  object. The file tree in `dist/` is a second instance of everything and is
+  reached only by relative path from inside this repository — no `exports`
+  pattern leads to it — so nothing outside can mix the two.
+- *The same names.* Each bundled entry's `Object.keys` equals its file entry's
+  — the runtime, `testing`, `fixtures`, `profiling`, `mermaid`, `launch` — in
+  one T5 row; C24's surface rows keep running over `src/`.
+- *The emulator and the renderer stay off the runtime's graph.* esbuild keeps
+  a dynamic `import()` as its own chunk, measured above (`emulator-*.js`); the
+  Mermaid entry is a separate entry point and its renderer is `external`, so
+  T5.6 and T5.22's claims hold in bundle form and the row that says so runs
+  the same children through the bundle.
+- *Acyclic already.* MG1 and MG22 hold the graph acyclic across and within
+  layers, which is the property that makes a bundler's single-scope
+  evaluation order the loader's order; nothing in `src/` reads
+  `import.meta`, `__dirname` or `createRequire` (grepped, none).
+- *Frames stay named.* C28's sampled-stack card draws `url:line` from
+  `callFrame`; in a bundle that is `chunk-LBZ3RKGM.js:10038`. Enabling Node's
+  source-map support process-wide costs the start 15–60 ms in five pairs
+  (rejected — it would give back a third of the win to repair a card that is
+  drawn on request). The honest form is lazy: the fold resolves a frame
+  through the chunk's linked map when the card is folded — `node:module`'s
+  `SourceMap` over the sibling `.map`, **36 ms once**, and esbuild composes
+  tsc's maps so the answer is `src/presentation/blocks/registry.ts:1074`, the
+  name the deck already shows under vitest. A frame with no map beside it
+  keeps its URL.
+
+**Remedy, sized.** A04 §5's build is `tsc` then `tools/bundle.mjs` — esbuild,
+six entries from `dist/`, `splitting`, `packages: "external"`, `sourcemap:
+"linked"`, `sourcesContent: false`, into `dist/bundle/`; `exports` targets
+move there and every `types` stays on `dist/*.d.ts`; `esbuild` gains a
+Development row in `DEPENDENCIES.md` (SS31) pinned to the version `tsx`
+already brings. C24 §2 says what an entry resolves to and **I38** holds the
+four properties above; C28 **I65** holds the located frame; C23 I71 and C24
+I36 gain a sentence each that their claims are checked through the bundle
+too. Rows: C24 T5.8 (parity, one instance, module count under the armed
+trace below 400, the emulator chunk absent until a shell command), C28 T1.129
+(the locator over a synthetic chunk and map — resolved, map absent → URL
+kept, map malformed → URL kept) and T4.69 (a fold over the built bundle's
+chunk names `registry.ts`). About 60 lines of `tools/bundle.mjs`, 50 of
+`src/shell/profiling/locate.ts`, a parameter on `foldCpuProfile`, and a
+mutation run each for the bundle rows and the locator.
+
+**Not on the list.** Minification — the compile cache already holds the
+compiled form, and a minified stack is a card nobody can read. Bundling
+`ink` or `react` in — they are the consumer's to deduplicate, and `packages:
+"external"` is what keeps `prepareLaunch()`'s target at
+`node_modules/ink/build/ink.js`. Replacing `dist/`'s file tree — every tier-5
+child, probe and tool reads it by path, and it is what the bundle is built
+from.
