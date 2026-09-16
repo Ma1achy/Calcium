@@ -52148,3 +52148,63 @@ planned view O(window) a keystroke at any size, which is the figure that
 matters — *it cannot be slow*. The inline `windowRows` takes the plan form
 too but no cache: a frame's window is one walk, which the height cache
 already pays for the measure.
+
+**Closed — built and measured.** C25 I22 and C22 I41 as sized.
+`windowPlan(patch, width)` returns the layout, the rows, the start rows, the
+header rows and the pinned gutter, frozen; `build`, the bottom search, the
+clamp, `windowRows` and `hunkHeaderRows` read it, and the patch-taking
+signatures take an optional plan and refuse one for another block or width
+rather than read it. The view holds the plan on its state beside the offset,
+keyed on the block's identity and the region's width, and reports `absent`,
+`rev` and `width` through the profiler's probe as `patch-view-plan`; C25
+T2.10 lists the probe as the view's fifth dependency, an instrument and not
+a seam. T1.24 holds the plan to the patch-taking functions over the corpus
+at both layouts and three heights — plan against no plan at every offset to
+two past the end, `windowRows` likewise, the start rows to the clamp's fixed
+points up to the ceiling, the refusal on both axes. T3.41 reads one `absent`
+on open, none over four motions, one `rev` on a patch, one `width` on a
+resize to the other layout with the window the other layout's, and every
+frame a window of the live block at the live width. `c25-window-plan` six of
+six, `c22-patch-view-plan` four of four. Gates green, goldens 458 with no
+mover, e2e green.
+
+| `make load-down`, 200×50 | before (F1186 build) | after |
+|---|---|---|
+| view motion, `out/probe-f1187-view.mjs`, 200 motions, 3 paired rounds — 5,000 lines | median 33.9 · 33.9 · 33.4 ms | **0.31 · 0.11 · 0.11 ms** (p95 ≤ 0.9) |
+| — 20,000 lines | 200 · 227 · 149 ms | **0.17 · 0.15 · 0.14 ms** (p95 ≤ 1.2) |
+| — 50,000 lines | 562 · 559 · 558 ms | **0.15 · 0.32 · 0.15 ms** (p95 ≤ 1.0) |
+| view `open`, one plan walk — 5,000 · 50,000 lines | 5–13 · 39–46 ms | 6–21 · 44–62 ms |
+| `tools/bench/patch-window.mjs` `windowPatch`, no plan — 5,000 · 20,000 · 50,000 | 5.3 · 35.7 · 102.9 ms | **0.37 · 4.7 · 10.5 ms** (14× · 7.6× · 9.8×) |
+| the same, over a held plan | — | **0.070 · 0.034 · 0.041 ms**; the plan derived once 0.31 · 5.5 · 14.8 ms |
+
+Three figures against the sizing. The keystroke path was worse than the
+finding's headline: the 5.3 ms was one `windowPatch`, and a motion calls
+`hunkHeaderRows`, `clampOffset` and `windowPatch` — about thirty walks, as
+the title said, and **34 ms at 5,000 lines**, not 5.3. The one-walk form
+was sized 12–15× and measures 14× at 5,000 lines and 8–10× above, where the
+plan's own walk — `unitsOf` over sliced arrays and `numberWidth` over every
+line — is the whole cost and the collector's share climbs with it. The view
+is O(window) at every size, as sized: a tenth to a third of a millisecond
+whether the patch is five thousand lines or fifty thousand, which is the
+figure that mattered.
+
+Two survivors on the first mutation run, both about the rows and not the
+code. The start-row arm compared the plan's starts to the clamp's fixed
+points *up to the ceiling*, and at ten and twenty-four rows the ceiling is
+offset 0 for every corpus patch — the arm was comparing one offset, and a
+plan listing every row as a start passed it. Three rows is the height that
+puts the ceiling near the end; the arm now runs at three, ten and
+twenty-four, and a control asserts the sweep saw interior rows at all. The
+gutter-from-the-slice mutation survived because the pin rows (C25 T3.20,
+T3.20b) live in `test/edge/patch.test.ts`, which the run did not execute;
+it does now. Neither indicts the code: both mutations were byte-visible to
+rows the tree already had, run from the wrong height or the wrong file.
+
+**What remains.** `open` and a patch of the entry pay one plan walk — 40–60
+ms at 50,000 lines, once, and the same walk the transcript's height cache
+pays for the block's measure. The plan's own walk is two passes,
+`numberWidth` over every line and `rowsOf` over every unit; one pass would
+carry the gutter out of the rows and take a quarter off `open`. The inline
+`windowRows` route derives a plan per call and has no holder — a frame's
+window is one walk, which the render cache keeps to a miss. None of the
+three is a keystroke.
