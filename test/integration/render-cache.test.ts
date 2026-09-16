@@ -426,6 +426,8 @@ describe("C22 §6c — the render cache", () => {
     await type("x");
     expect(count(), "and the second rendered none of it").toBe(first);
   });
+  it.todo("T4.91 (C22 I107, I100, F1203): a card whose body opens with a gapped block measures on the first frame and not on the two after — not deferred on a component: the code commit replaces this row");
+
   it("T4.88 (C22 I100, C09 I70): forty measured children drawn twice measure on the first frame and not on the second, and a patched child alone misses again", async () => {
     // **Two seams, two harnesses.** The frame half runs on a painting session,
     // because the window is `visibleRows`' and a harness that stubs `render`

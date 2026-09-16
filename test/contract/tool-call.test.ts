@@ -63,6 +63,8 @@ describe("§9c — the header, the body, and the row the body already has", () =
     expect(cardBody([plain, second])[0], "no gap: the same object").toBe(plain);
   });
 
+  it.todo("C22 T1.62 (C22 I107, F1203): entryLayout over one card array hands out the same body objects every call, and a fresh array a fresh body — not deferred on a component: the code commit replaces this row");
+
   it("T2.46 (C23 I58): the header is `name(args) · duration · outcome`; running, the spinner owns the duration slot, alone below one second", () => {
     const spin = spinnerFrames(FULL_CAPS);
     expect(toolCallHeader({ name: "run_command", args: "npm test", elapsedMs: 4_200, outcome: "exit 0" }, FULL_CAPS)).toBe(
