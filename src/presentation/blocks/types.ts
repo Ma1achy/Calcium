@@ -6,6 +6,16 @@
  * renderer (C09 §1).
  */
 import type { ReactElement } from "react";
+
+/**
+ * What a renderer answers (I72): the block's rows at the width, each already
+ * clamped by `paint`, or an Ink element for a kind that composes a tree. Rows
+ * are the frame's rows once `normaliseRow` has put them in the form Ink's
+ * output layer writes; an element takes the Ink path unchanged. Every kind
+ * that ends in `rows()` answers rows, and a sequence is composed block by
+ * block, so a rows block beside an element block pays nothing for its neighbour.
+ */
+export type Rendered = ReactElement | readonly string[];
 import type { Action, Block, BlockKind, Camera, Measure, MeasureFn, Probe, WidthFn } from "../../data/viewmodel/index.js";
 import type { ResolvedTheme } from "../theme/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
@@ -257,7 +267,8 @@ export type RenderContext = Readonly<{
   measureChild: MeasureFn;
   /** The registry's `width` (§2c) — a container asks a child's content width through this and never imports the registry. */
   widthChild: WidthFn;
-  renderChild: (block: Block, width: number) => ReactElement;
+  /** The registry's `render` of a child (I72): rows, or an element — `elementOf` lifts either into a container's tree. */
+  renderChild: (block: Block, width: number) => Rendered;
   /**
    * The registry's slice of a child, or `null` when it cannot take one (I58, §6b).
    *
@@ -488,7 +499,7 @@ export type AnyBlockDefinition = {
 export interface BlockDefinition<B extends Block = Block> {
   kind: string;
   measure: Measure<B>;
-  render: (block: B, ctx: RenderContext) => ReactElement;
+  render: (block: B, ctx: RenderContext) => Rendered;
   /**
    * A valid smaller block covering rows `[from, to)` of this one (I25, I26).
    *
@@ -585,7 +596,7 @@ export interface BlockRegistry {
   measure(block: Block, width: number, memo?: MeasureMemo): number;
   /** §2c — a block's content width at `width`, clamped to `[1, width]`; the width itself for a kind declaring none (I42). */
   width(block: Block, width: number): number;
-  render(block: Block, ctx: RenderContextInput): ReactElement;
+  render(block: Block, ctx: RenderContextInput): Rendered;
   /** A run of blocks laid out down the screen, `gapBefore` included (C04 §3a). */
   measureSequence(blocks: readonly Block[], width: number, memo?: MeasureMemo): number;
   /**

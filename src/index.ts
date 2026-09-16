@@ -322,7 +322,7 @@ export type {
 
 // `AnyBlockDefinition` is what `TuiConfig.blocks` takes — a definition of some
 // **one** kind, which is what an app writes (C04 I119, F405).
-export type { AnyBlockDefinition, BlockDefinition, RenderContext } from "./presentation/blocks/index.js";
+export type { AnyBlockDefinition, BlockDefinition, RenderContext, Rendered } from "./presentation/blocks/index.js";
 /**
  * C24 I22 — a `code` block accepts any language name, and until this existed
  * only two of them meant anything (C09 §4a, F93).

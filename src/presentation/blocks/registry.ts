@@ -24,7 +24,7 @@ import {
 import { NO_PROBE } from "../../data/viewmodel/index.js";
 import type { Block, Probe, Status } from "../../data/viewmodel/index.js";
 import { DEFAULT_DEFINITIONS } from "./defaults.js";
-import { clampSpans, paint, rows, tone } from "./paint.js";
+import { clampSpans, elementOf, paint, rows, tone } from "./paint.js";
 import { truncate } from "../text.js";
 import { statusDefinition, statusRowsFor } from "./kinds/status.js";
 import type {
@@ -37,6 +37,7 @@ import type {
   RenderContext,
   RenderContextInput,
   Windowed,
+  Rendered,
 } from "./types.js";
 
 /**
@@ -379,7 +380,7 @@ class Registry implements BlockRegistry {
    * which cells the figure intended to paint — and the implementation read them
    * as characters. The tag ` ERROR ` keeps its own, because those are real.
    */
-  #errorBlock(text: string, height: number, ctx: RenderContext): ReactElement {
+  #errorBlock(text: string, height: number, ctx: RenderContext): Rendered {
     if (height <= 0) return createElement(Box, { flexDirection: "column" });
     // **Through the `status` definition, not a private figure** (C09 I31). The
     // boundary's box and the box a live part draws while it is retrying are the
@@ -537,13 +538,23 @@ class Registry implements BlockRegistry {
    * literal for the mark scan to excuse. `en-GB` grouping as D40's notice.
    * Clamped to the width so this is one row at every width the measurer counted.
    */
-  #marker(capped: Capped, width: number, ctx: RenderContext): ReactElement {
+  #marker(capped: Capped, width: number, ctx: RenderContext): string {
     const mark = truncate("..", 1, ctx.capabilities);
     const text =
       `${mark} ${capped.shown.toLocaleString("en-GB")} of ` +
       `${capped.total.toLocaleString("en-GB")} rows`;
     const style = tone("muted", ctx.theme, ctx.capabilities);
-    return rows([paint(clampSpans([{ text, style }], width, ctx.capabilities))]);
+    return paint(clampSpans([{ text, style }], width, ctx.capabilities));
+  }
+
+  /**
+   * The capped form and its marker, composed the way the arm demands (I72,
+   * C14 I24): rows get the marker as one more row; an element gets it as a
+   * `Text` beneath, in a column box, which is the same row once Ink has written it.
+   */
+  #capped(drawn: Rendered, marker: string): Rendered {
+    if (Array.isArray(drawn)) return [...(drawn as readonly string[]), marker];
+    return createElement(Box, { flexDirection: "column" }, drawn as ReactElement, elementOf([marker]));
   }
 
   // **Every public member opens the call's memo** (I61) — this one included,
@@ -876,7 +887,7 @@ class Registry implements BlockRegistry {
         createElement(
           Box,
           { key: block.id === "" ? `block-${index}` : block.id, flexDirection: "column" },
-          this.render(block, { ...ctx, width }),
+          elementOf(this.render(block, { ...ctx, width })),
         ),
       );
     });
@@ -899,10 +910,18 @@ class Registry implements BlockRegistry {
    * sides take the same number from the same field, so neither is trusted to
    * agree with the other.
    */
-  #floored(block: Block, element: ReactElement): ReactElement {
+  #floored(block: Block, rendered: Rendered): Rendered {
     const floor = floorOf(block);
-    if (floor === 0) return element;
-    return createElement(Box, { flexDirection: "column", minHeight: floor }, element);
+    if (floor === 0) return rendered;
+    // **Rows are padded with empty rows** (I72): Ink's `minHeight` fills the box
+    // with blank cells and trims them to nothing on the way out, so an empty
+    // row is what the element arm wrote, and a tall block is left as it was.
+    if (Array.isArray(rendered)) {
+      const lines = rendered as readonly string[];
+      if (lines.length >= floor) return lines; // cells-ok — rows, not columns
+      return [...lines, ...Array.from({ length: floor - lines.length }, () => "")]; // cells-ok — rows
+    }
+    return createElement(Box, { flexDirection: "column", minHeight: floor }, rendered as ReactElement);
   }
 
   /**
@@ -934,14 +953,14 @@ class Registry implements BlockRegistry {
     return out;
   });
 
-  render = (block: Block, ctx: RenderContextInput): ReactElement => this.#scoped(() => {
+  render = (block: Block, ctx: RenderContextInput): Rendered => this.#scoped(() => {
     const width = normaliseWidth(ctx.width);
     const childContext: RenderContext = {
       ...ctx,
       width,
       measureChild: this.#measureChild,
       widthChild: this.width,
-      renderChild: (child: Block, childWidth: number): ReactElement =>
+      renderChild: (child: Block, childWidth: number): Rendered =>
         this.render(child, { ...ctx, width: childWidth }),
       windowChild: this.windowChild,
     };
@@ -974,16 +993,9 @@ class Registry implements BlockRegistry {
       // frame and the height agree by construction rather than by agreement.
       const form = this.#form(block, width);
       const drawn = form.definition.render(form.block, childContext);
-      const element =
-        form.capped === null
-          ? drawn
-          : createElement(
-              Box,
-              { flexDirection: "column" },
-              drawn,
-              this.#marker(form.capped, width, childContext),
-            );
-      return this.#floored(block, element);
+      const rendered =
+        form.capped === null ? drawn : this.#capped(drawn, this.#marker(form.capped, width, childContext));
+      return this.#floored(block, rendered);
     } catch (error) {
       // I11 — a throwing renderer is contained to its block, **and the
       // containment includes the row count**. The rest of the frame is

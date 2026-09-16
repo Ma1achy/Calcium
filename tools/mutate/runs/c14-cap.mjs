@@ -51,8 +51,8 @@ const results = runPass({
       // 2 000 as if it had 2 000 rows. The silent-truncation class.
       name: "MARKER-DROPPED: `render` draws the capped form and no marker",
       file: REGISTRY,
-      from: "      const element =\n        form.capped === null\n          ? drawn\n          : createElement(",
-      to: "      const element =\n        form.capped === null || form.capped !== null\n          ? drawn\n          : createElement(",
+      from: "      const rendered =\n        form.capped === null ? drawn : this.#capped(",
+      to: "      const rendered =\n        form.capped === null || form.capped !== null ? drawn : this.#capped(",
       expect: "T6.22", // and T1.19
     },
     {

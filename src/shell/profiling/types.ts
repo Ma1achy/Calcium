@@ -51,7 +51,7 @@ export type SpanName =
   | "frame" | "compose" | "measure" | "elements" | "paint" | "react" | "assemble" | "write"
   | "body" | "prompt" | "composite" | "based" | "transcript" | "visible"
   | "decode" | "route" | "handler" | "local" | "transport" | "adapt" | "stream" | "livefetch"
-  | "completion" | "overlays" | "chrome";
+  | "completion" | "overlays" | "chrome" | "rows";
 
 /**
  * What each phase is doing, in the terms the question gets asked in: *was the
@@ -125,6 +125,7 @@ export const SPAN_SITE: Readonly<Record<SpanName, SpanSite>> = Object.freeze({
   overlays: "frame",
   paint: "frame",
   react: "frame",
+  rows: "frame",
   assemble: "frame",
   // `assemble`'s parts, so necessarily where `assemble` is.
   body: "frame",
@@ -157,6 +158,7 @@ export const PHASE_GROUP: Readonly<Record<SpanName, PhaseGroup>> = Object.freeze
   overlays: "compute",
   paint: "draw",
   react: "draw",
+  rows: "draw",
   assemble: "draw",
   // **`draw`, with `assemble`, and that is the point.** They are its children,
   // so grouping them anywhere else would move cost between phases and make the

@@ -29,7 +29,7 @@ import { BORDER_INSET, axesOf, groupPlacements, groupRows, mosaicRects, parseAre
 import type { NavElement } from "../types.js";
 import { cells, stripControl, truncate } from "../../text.js";
 import { glyphCells, glyphFor, glyphs } from "../glyphs.js";
-import { clampSpans, paint, tone } from "../paint.js";
+import { clampSpans, elementOf, paint, tone } from "../paint.js";
 import type { BlockDefinition, RenderContext, Windowed } from "../types.js";
 
 /** A container's own height, over children measured at the width it gives them. */
@@ -153,7 +153,7 @@ export const panelDefinition: BlockDefinition<Panel> = {
             const drawn = createElement(
               Box,
               { key: child.id === "" ? String(index) : child.id },
-              ctx.renderChild(child, inner),
+              elementOf(ctx.renderChild(child, inner)),
             );
             return child.gapBefore === true
               ? [createElement(Text, { key: `gap-${index}` }, " "), drawn]
@@ -423,7 +423,7 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
       return createElement(
         Box,
         { key: r.child.id, width, flexDirection: "column" },
-        ctx.renderChild(piece, width),
+        elementOf(ctx.renderChild(piece, width)),
       );
     });
 
@@ -615,7 +615,7 @@ export const mosaicDefinition: BlockDefinition<Mosaic> = {
           createElement(
             Box,
             { flexShrink: 0, flexDirection: "column" as const },
-            ctx.renderChild(child, rect.width),
+            elementOf(ctx.renderChild(child, rect.width)),
           ),
         ),
       ];
@@ -840,7 +840,7 @@ export const groupDefinition: BlockDefinition<Group> = {
               ...(at.left === 0 ? {} : { marginLeft: at.left }),
               ...(at.top === 0 ? {} : { marginTop: at.top }),
             },
-            ctx.renderChild(child, at.width),
+            elementOf(ctx.renderChild(child, at.width)),
           ),
         );
         return block.direction === "column" && child.gapBefore === true

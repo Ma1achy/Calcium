@@ -1155,6 +1155,7 @@ export const OWNERS = [
   { path: "src/data/text", spec: "C09" },
   { path: "src/presentation/blocks", spec: "C09" },
   { path: "src/presentation/text", spec: "C09" },
+  { path: "src/presentation/rows", spec: "C09" },
   { path: "src/presentation/theme", spec: "C10" },
   { path: "src/presentation/table", spec: "C11" },
   { path: "src/presentation/plot", spec: "C12" },

@@ -12,6 +12,7 @@
 import type { AmbiguousWidth } from "../text.js";
 import { Box, Text } from "ink";
 import { createElement, type ReactElement } from "react";
+import type { Rendered } from "./types.js";
 import { SGR_RESET, sgr } from "../../terminal/escapes.js";
 import { resolve, resolveBackground, resolveTone, type Style } from "../theme/index.js";
 import type { ColourRef, ColourValue, ResolvedTheme } from "../theme/index.js";
@@ -354,24 +355,36 @@ export function clampSpans(
  * counting the blank and a renderer losing it disagree by one, which is I1
  * violated by the framework rather than by the kind.
  */
-export function rows(lines: readonly string[]): ReactElement {
+export function rows(lines: readonly string[]): readonly string[] {
   // I14's floor, applied where every non-container renderer ends rather than in
   // each of them: a block that is present occupies at least one row, so a
   // `logs` with no lines renders one blank row rather than nothing. The
   // containers do not come through here, which is what keeps the one legitimate
   // zero — an empty `group` — expressible.
-  const floored = lines.length === 0 ? [""] : lines; // cells-ok
+  //
+  // **The rows are the answer** (I72). They used to be wrapped in a `Text` per
+  // row here and unwrapped again by Ink, tokenised twice on the way; now the
+  // registry composes them and `render-lines` normalises each into the form
+  // Ink's output layer wrote. A kind that composes an Ink tree does not come
+  // through here either, and `elementOf` is how it takes a rows-answering child.
+  return lines.length === 0 ? [""] : lines; // cells-ok
+}
 
+/**
+ * A render's answer as an element (I72) — the rows arm lifted onto the Ink
+ * path, for a container that places a child inside its own tree. A `Text` per
+ * row, an empty row a single space so Ink keeps the row; an element is itself.
+ */
+export function elementOf(rendered: Rendered): ReactElement {
+  if (!Array.isArray(rendered)) return rendered as ReactElement;
   return createElement(
     Box,
     { flexDirection: "column" },
-    floored.map((line, index) =>
-      createElement(Text, { key: index }, line === "" ? " " : line),
-    ),
+    rendered.map((line, index) => createElement(Text, { key: index }, line === "" ? " " : line)),
   );
 }
 
 /** One row, as an element. */
-export function row(spans: readonly Span[]): ReactElement {
+export function row(spans: readonly Span[]): readonly string[] {
   return rows([paint(spans)]);
 }

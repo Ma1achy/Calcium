@@ -16,7 +16,6 @@
  * so a row built any other way is both unclamped and ragged.
  */
 import { NO_SPAN } from "../../data/viewmodel/index.js";
-import type { ReactElement } from "react";
 import { rows } from "../blocks/paint.js";
 import { cells } from "../text.js";
 import { atLeastOne, changedRuns, normaliseWidth, type ChangedRun } from "../../data/viewmodel/index.js";
@@ -27,7 +26,7 @@ import { blankSide, dress, gutterSpans, line, textSpans } from "./lines.js";
 import { patchLayout, type PatchLayout } from "./layout.js";
 import type { Hunk, Patch } from "../../data/viewmodel/index.js";
 import type { Span } from "../blocks/paint.js";
-import type { BlockDefinition, RenderContext } from "../blocks/types.js";
+import type { BlockDefinition, RenderContext, Rendered } from "../blocks/types.js";
 
 type Line = Hunk["lines"][number];
 
@@ -194,7 +193,7 @@ export const patchDefinition: BlockDefinition<Patch> = {
   window: (block: Patch, width: number, from: number, to: number) =>
     windowRows(block, normaliseWidth(width), from, to),
 
-  render(block: Patch, ctx: RenderContext): ReactElement {
+  render(block: Patch, ctx: RenderContext): Rendered {
     const width = normaliseWidth(ctx.width);
     const probe = ctx.probe;
     // **F134's kind, and the split that says which half.** A 5,000-line diff

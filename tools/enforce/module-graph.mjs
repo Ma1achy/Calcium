@@ -1627,6 +1627,21 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
+  // --- C09's element arm of a whole sequence ---------------------------------
+  //
+  // `renderSequenceToLines` composed a document through this until C09 I72: one
+  // tree, one `renderToString`. It now composes block by block, so a block
+  // answering rows never meets Ink, and the whole-tree form has no caller in
+  // `src/`. It stays on the interface because it is the reference the block-by-
+  // block composition is held against — C09 T2.143 renders a mixed sequence both
+  // ways and asserts the bytes agree — and a reference that lived only in a test
+  // would be a second implementation of the composition rather than the first.
+  "BlockRegistry.renderSequence":
+    "C09 I72 — the element arm of a whole sequence: the form every frame took before the rows "
+    + "arm, kept as the reference C09 T2.143 holds the block-by-block composition against. "
+    + "Consumed by that row and by nothing in `src/`, which is the point: a document now "
+    + "reaches Ink one element block at a time. Removing it removes the reference; wiring it "
+    + "back in puts every rows block through Ink again",
   // --- C28's fold over a shape it does not own -------------------------------
   //
   // The same argument `CellLike` carries below, on a smaller type: `CpuProfile`

@@ -72,8 +72,9 @@ const results = runPass({
       // element is short, so the entry is short and everything below it moves up.
       name: "the render does not pad to the floor",
       file: REG,
-      from: "    return createElement(Box, { flexDirection: \"column\", minHeight: floor }, element);",
-      to: "    return element;",
+      // Both arms at once (C09 I72): the early return before either pads.
+      from: "    const floor = floorOf(block);\n    if (floor === 0) return rendered;",
+      to: "    const floor = floorOf(block);\n    if (floor >= 0) return rendered;",
       expect: "T3.54",
     },
     {

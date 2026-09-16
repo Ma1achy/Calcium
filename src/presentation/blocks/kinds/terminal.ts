@@ -6,7 +6,6 @@
  * assumed: a `Terminal` whose line text holds a control is refused at
  * construction and at the far side, so what reaches here is safe to write.
  */
-import type { ReactElement } from "react";
 
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Terminal, TerminalLine } from "../../../data/viewmodel/index.js";
@@ -16,7 +15,7 @@ import { NO_STYLE } from "../../theme/index.js";
 import type { Style } from "../../theme/types.js";
 import { glyphs } from "../glyphs.js";
 import { paint, rows, tone, type Span } from "../paint.js";
-import type { BlockDefinition, RenderContext, Windowed } from "../types.js";
+import type { BlockDefinition, RenderContext, Windowed, Rendered } from "../types.js";
 
 /**
  * The marker row a capped screen draws, as its first line (C04 §3i.1).
@@ -182,7 +181,7 @@ export const terminalDefinition: BlockDefinition<Terminal> = {
     return Object.freeze({ block: windowed, skipRows: 0, dropRows: 0 });
   },
 
-  render(block: Terminal, ctx: RenderContext): ReactElement {
+  render(block: Terminal, ctx: RenderContext): Rendered {
     ctx.probe?.gauge("terminal.lines", block.lines.length); // cells-ok — a count of items, not a display width
     const width = normaliseWidth(ctx.width);
     const painted: string[] = [];

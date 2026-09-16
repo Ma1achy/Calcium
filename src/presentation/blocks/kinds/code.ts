@@ -15,7 +15,6 @@
  *     same principle as C07's fallback adapter.
  */
 import { NO_SPAN } from "../../../data/viewmodel/index.js";
-import type { ReactElement } from "react";
 import HighlightJs from "highlight.js/lib/core";
 import type { Emitter, HLJSOptions, LanguageFn } from "highlight.js";
 import bash from "highlight.js/lib/languages/bash";
@@ -39,7 +38,7 @@ import type { Code, Probe } from "../../../data/viewmodel/index.js";
 import { cells, clusterEnds, expandTabs, hardWrapCells, stripControl, truncateParts } from "../../text.js";
 import { sliceRuns } from "../../runs.js";
 import { paint, rows, slot, tone, type Span } from "../paint.js";
-import type { BlockDefinition, RenderContext, Windowed } from "../types.js";
+import type { BlockDefinition, RenderContext, Windowed, Rendered } from "../types.js";
 
 /**
  * The default set (§4a, I23), and the **rule** rather than a list, so the next
@@ -499,7 +498,7 @@ export const codeDefinition: BlockDefinition<Code> = {
     });
   },
 
-  render(block: Code, ctx: RenderContext): ReactElement {
+  render(block: Code, ctx: RenderContext): Rendered {
     const width = normaliseWidth(ctx.width);
     const probe = ctx.probe;
     const source = expandTabs(stripControl(block.text));

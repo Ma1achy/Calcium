@@ -48,5 +48,6 @@ export type {
   FocusState,
   NavElement,
   RenderContext,
+  Rendered,
   RenderContextInput,
 } from "./types.js";

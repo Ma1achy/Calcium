@@ -25,7 +25,7 @@ import { createElement, type ReactElement } from "react";
 import { atLeastOne, insetWidth, normaliseWidth, sequenceHeight } from "../../data/viewmodel/index.js";
 import type { Block, MeasureFn, Table, TableRow } from "../../data/viewmodel/index.js";
 import { cells } from "../text.js";
-import { clampSpans, paint, selectionStyle, tone, type Span } from "../blocks/paint.js";
+import { clampSpans, elementOf, paint, selectionStyle, tone, type Span } from "../blocks/paint.js";
 import type { BlockDefinition, NavElement, RenderContext, Windowed } from "../blocks/types.js";
 import { emptySpans, headerSpans, markedSeriesColumns, rowSpans } from "./cells.js";
 import { detailBlocks, isExpandable } from "./detail.js";
@@ -356,7 +356,7 @@ export const tableDefinition: BlockDefinition<Table> = {
             const drawn = createElement(
               Box,
               { key: child.id === "" ? String(index) : child.id },
-              ctx.renderChild(child, insetWidth(width)),
+              elementOf(ctx.renderChild(child, insetWidth(width))),
             );
             return child.gapBefore === true
               ? [createElement(Text, { key: `gap-${index}` }, " "), drawn]

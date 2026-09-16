@@ -5,7 +5,7 @@
  * first and the one every capability set but `kitty` reaches.
  */
 import { Box, Text } from "ink";
-import { createElement, type ReactElement } from "react";
+import { createElement } from "react";
 import { columnsForAspect } from "../../plot/aspect.js";
 import {
   decodeImage,
@@ -20,11 +20,11 @@ import {
 } from "../../image/index.js";
 import { placementFits, placementIdOf, placementRows } from "../../image/kitty.js";
 import { overlayColour, overlayField } from "../../image/overlay.js";
-import { paint, type Span } from "../paint.js";
+import { elementOf, paint, type Span } from "../paint.js";
 import { statusDefinition } from "./status.js";
 import type { Image, MeasureFn, Probe, Status } from "../../../data/viewmodel/index.js";
 import { truncate } from "../../text.js";
-import type { BlockDefinition, RenderContext } from "../types.js";
+import type { BlockDefinition, RenderContext, Rendered } from "../types.js";
 
 /**
  * Decoded pixels, memoised on the block's digest.
@@ -236,7 +236,7 @@ export const imageDefinition: BlockDefinition<Image> = {
     return imageCells(block, width, probe).rows;
   },
 
-  render(block: Image, ctx: RenderContext): ReactElement {
+  render(block: Image, ctx: RenderContext): Rendered {
     const { cols, rows } = imageCells(block, ctx.width, ctx.probe);
     // C28 I45 — the payload, which the decode and the kitty transmission both
     // walk in full, and which `cols * rows` cannot stand in for: the drawn cell
@@ -325,7 +325,7 @@ export const imageDefinition: BlockDefinition<Image> = {
       return createElement(
         Box,
         { flexDirection: "column", width: ctx.width },
-        createElement(Box, { key: "box" }, box),
+        createElement(Box, { key: "box" }, elementOf(box)),
         createElement(Text, { key: "alt", dimColor: true }, alt),
       );
     }

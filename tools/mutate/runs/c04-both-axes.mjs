@@ -83,8 +83,8 @@ const MUTATIONS = [
     // C04 I101 R2 — the child rendered at its cell rather than its content width.
     name: "aligned child rendered at the cell width",
     file: CONTAINERS,
-    from: "            ctx.renderChild(child, at.width),",
-    to: "            ctx.renderChild(child, widths[index] ?? 1),",
+    from: "            elementOf(ctx.renderChild(child, at.width)),",
+    to: "            elementOf(ctx.renderChild(child, widths[index] ?? 1)),",
     expect: "T3.69",
   },
   {

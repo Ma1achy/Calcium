@@ -10,14 +10,13 @@
  * is what lets a tail scroll smoothly at a thousand lines a second (T5.4).
  */
 import type { AmbiguousWidth } from "../../text.js";
-import type { ReactElement } from "react";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Comparison, Events, Glyph, KeyValue, Logs, Steps, Tone } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate } from "../../text.js";
 import { glyphFor, glyphs, spinnerFrames } from "../glyphs.js";
 import { valueBar } from "../../plot/bar.js";
 import { clampSpans, pad, paint, rows, tone, type Span } from "../paint.js";
-import type { BlockDefinition, RenderContext, Windowed } from "../types.js";
+import type { BlockDefinition, RenderContext, Windowed, Rendered } from "../types.js";
 
 /** §3: the key column is sized to the longest key and capped here. */
 const KEY_COLUMN_CAP = 20;
@@ -146,7 +145,7 @@ export const keyValueDefinition: BlockDefinition<KeyValue> = {
     });
   },
 
-  render(block: KeyValue, ctx: RenderContext): ReactElement {
+  render(block: KeyValue, ctx: RenderContext): Rendered {
     ctx.probe?.gauge("keyValue.rows", block.rows.length); // cells-ok — a count of items, not a display width
     const width = normaliseWidth(ctx.width);
     const keyWidth = block.keyWidth ?? keyColumn(block, width);
@@ -240,7 +239,7 @@ export const logsDefinition: BlockDefinition<Logs> = {
     });
   },
 
-  render(block: Logs, ctx: RenderContext): ReactElement {
+  render(block: Logs, ctx: RenderContext): Rendered {
     ctx.probe?.gauge("logs.lines", block.lines.length); // cells-ok — a count of items, not a display width
     const width = normaliseWidth(ctx.width);
 
@@ -283,7 +282,7 @@ export const eventsDefinition: BlockDefinition<Events> = {
 
   measure: (block: Events): number => atLeastOne(block.events.length), // cells-ok
 
-  render(block: Events, ctx: RenderContext): ReactElement {
+  render(block: Events, ctx: RenderContext): Rendered {
     ctx.probe?.gauge("events.events", block.events.length); // cells-ok — a count of items, not a display width
     const width = normaliseWidth(ctx.width);
     const typeWidth = widest(
@@ -406,7 +405,7 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
   // with no rows is still a header.
   measure: (block: Comparison): number => atLeastOne(block.rows.length + 1), // cells-ok
 
-  render(block: Comparison, ctx: RenderContext): ReactElement {
+  render(block: Comparison, ctx: RenderContext): Rendered {
     ctx.probe?.gauge("comparison.rows", block.rows.length); // cells-ok — a count of items, not a display width
     const width = normaliseWidth(ctx.width);
     // The marker column appears only when a row declares a change, so a block
@@ -529,7 +528,7 @@ export const stepsDefinition: BlockDefinition<Steps> = {
 
   measure: (block: Steps): number => atLeastOne(block.steps.length), // cells-ok
 
-  render(block: Steps, ctx: RenderContext): ReactElement {
+  render(block: Steps, ctx: RenderContext): Rendered {
     ctx.probe?.gauge("steps.steps", block.steps.length); // cells-ok — a count of items, not a display width
     const g = glyphs(ctx.capabilities);
     const frames = spinnerFrames(ctx.capabilities);
