@@ -53258,3 +53258,24 @@ and the 2-D render path is recorded as checked and clear at this date. One small
 thing seen and not taken: `displayCells` allocates a sticky `RegExp` per call
 through `sgrAt()`, about 13,000 a second under live plots — below a microsecond
 each and not worth a finding until a profile names it.
+
+## F1203 — the card body's cleared copy lives one frame, so it is a new key every frame: every card whose body opens with a gapped block re-measures and re-forms on every frame, and the I100 memo and the I76 hold were never reached for it ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/entry-layout.ts` `entryLayout` → `cardBody(blocks.slice(1))` → C04 `rebuild` → `deepFreeze`: a copy of the body's first block without its `gapBefore`, made on every call — and the layout is called twice a frame, by C14's measurer and by `visibleRows`. Downstream, everything keyed on block identity: C22 I100's measure memo, C09 I76's cap-form hold in the scratch, and through it C25 I22's plan. |
+| **Reached for** | `--cpu-prof` over `stress bigpatch` (five four-thousand-line patches, forty scroll keys and fifty-two typed): `windowEntry` **461 ms of a 713 ms write** over 112 frames — `windowSequence → #form → #resolveForm → patch window` 196 and `measureSequence → #measured → #form` 217 — **4.1 ms of a 6.4 ms frame** deriving the form of a block that did not change. The profiler's counters: `measure absent 748`, `scratch absent 215`, on a transcript nothing patched. In isolation the seam holds — a second identical `windowSequence` reads the form and the plan back in 0.15 ms against 9. In the session a preload on the scratch store saw **105 form sets, 105 distinct patch owners, 100 consecutive with the same `hunks` array**; a preload on `Object.freeze` named the caller: `deepFreeze ← rebuild ← block ← cardBody ← entryLayout`, from `measureEntry` under C14's `#sync` and from `visibleRows`. `stress stream` carries the same signature at `measure absent 22,351`. |
+| **Verdict** | **open.** The copy was ruled into the layout by F821 — a live part is declared by object identity, so clearing the gap on the stored document lost the declaration — and C23 I57 wrote down the consequence as a property: *rebuilt from the current `doc.blocks` every frame*. That sentence is the defect. C22 I100's observable — *the first frame's misses and none after* — holds for T4.88's column group, whose body has no gap, and for no card that opens with a `table`, a `patch` or a `code` block under C24 §4's default gap. Two documents said the memo holds and one said the key moves every frame, and nothing read them together. |
+
+**Remedy, sized.** One `WeakMap` in the layout, keyed on the array the body is
+derived from — the document's `blocks` for the top card, the group's `children`
+for a nested one — holding the body `cardBody` derives. Sound for the reason the
+memo is: a blocks array is deep-frozen (C04 I1) and replaced with its document
+(C23 I34), so the same array is the same body, and F821's constraint is kept
+whole — the document's own objects are untouched and the driver never reads the
+layout. C22 I107 states it, C23 I57 loses its per-frame sentence, and the row is
+T4.88's shape over a card whose body opens with a gapped block: misses on the
+first frame and none after — which is the fabricated violation, because today's
+tree misses once a frame. Expected: the big-patch typing frame from about 6.4 ms
+to about 2.5, and every card-shaped case lighter by its first body block's
+measure and form.
