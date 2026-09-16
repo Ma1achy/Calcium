@@ -51510,3 +51510,24 @@ paired figures are F1173's. What remains, by allocation: `plot3dArea` 54.7 MB
 of 151 — the per-frame sample buffers — `thinEdge` and `shadeAt` 31 together,
 the doubles boxed at `shadeAt`'s boundary, `mixedRows` 10, the rows arm's
 `between` and its `Set`s about 15.
+
+## F1175 — the ramp span's four bounds are written into a closure's context per corner, and a double written to a context slot is an allocation ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/scatter3.ts`'s `plot3dArea`: `let nearD … hiV` captured by the `reading` closure, called for every drawn point, stroke end and mesh corner; `project3.ts`'s `viewDepth`, whose `number \| null` return crosses the call boundary |
+| **Reached for** | the sampled heap after F1174: `plot3dArea` 54.9 MB of 150.6 over twenty bunny frames — the largest frame left, under a name that reads as the buffers. Sized before it was believed: the colour records are 2,921 a frame with 2,514 distinct, so interning them saves a seventh of a small number; the corners loop as an index loop moved the figure by nothing, because the corners array is not frozen and `for…of` has its fast path. With inlining off the figure resolves into its callees: **`reading` 22.3 MB, `viewDepth` 11.3, the three boxed sample arrays 13.5**. V8 holds a `let` any closure captures in a context object, and a context slot holds a tagged value — so `nearD = Math.min(nearD, depth)` allocates a fresh heap number on every write, four writes a corner over 35,947 corners, whether or not the bound moved; and `viewDepth`'s return is a heap number whenever the call is not inlined. On a scratch build: the four bounds as scalars no closure captures, `viewDepth` still called, **54.9 → 32.8**; the dot written in place as well, **54.9 → 21.4**, the twenty-frame total **150.6 → 116.9 MB**; the bunny paired **−3.1 ms** (18.7 → 15.6 p50), B faster in 36 of 40 |
+| **Verdict** | **open** — measured, the remedy sized on a scratch build |
+
+**Remedy, sized.** The corner pass is one function, `spanOverCorners(basis,
+corners, nearD, farD, loV, hiV)` beside `geometryOf`, holding its bounds in
+locals and returning the ramp span once a frame; the depth is `project`'s
+first dot in place — `viewDepth`'s three subtractions and three products in
+its order, its `<= NEAR` refusal verbatim — so `viewDepth` loses its one
+consumer and goes, and T1.143's arm re-homes onto the span against
+`project`'s depths over the seeded corpus. The drawn and stroke readings in
+`plot3dArea` become the same `Math.min`/`Math.max` statements over bounds
+no closure captures. Byte-identical by construction: the same operations in
+the same order, `Math.min` kept for its `NaN` and signed-zero arms. What it
+does not reach: the three boxed sample arrays (13.5 MB), `thinEdge` and
+`shadeAt`'s boxing at the call boundary (31), `mixedRows` (10).
