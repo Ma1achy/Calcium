@@ -115,6 +115,15 @@ const results = runPass({
       to: "    i += 1;\n    out += placeable(text.charAt(i - 1), limit);",
       expect: "T1.49",
     },
+    {
+      // **The break point found by code unit again** (F1179): a joined space
+      // is cut inside its cluster and the extender begins the next row.
+      name: "BREAK-BY-UNIT: a space carrying an extender is a break point",
+      file: TEXT,
+      from: "    if (soloAt(line, at) && atomAround(lineStart + at + 1, atoms) === undefined) return at + 1;",
+      to: "    if (atomAround(lineStart + at + 1, atoms) === undefined) return at + 1;",
+      expect: "T3.10e",
+    },
   ],
 });
 

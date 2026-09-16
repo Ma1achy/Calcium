@@ -1214,18 +1214,24 @@ function placeable(segment: string, limit: number): string {
 }
 
 /**
- * Where to break a full line: after the last space, or nowhere.
+ * Where to break a full line: after the last space that is a cluster of its
+ * own, or nowhere.
  *
  * Null when the line holds no space to break at — an unbroken token — in which
  * case the caller breaks at the cluster boundary rather than growing past the
  * width. A line that overflows is a row the terminal adds and nobody counted.
+ * **A space the next unit can extend is not a break point** (C09 §5, F1179):
+ * the search found the space by code unit and cut after it, so a joiner or a
+ * mark on the space began the next row alone. `soloAt` decides it as I74
+ * decides any cluster — from the next unit, never from the segmenter.
  */
 function breakPoint(line: string, lineStart: number, atoms: readonly Atom[]): number | null {
   let at = line.lastIndexOf(" ");
   while (at > 0) {
     // The break lands after the space; a break strictly inside an atom is not
-    // one, and the search continues towards the row's start (C04 I90).
-    if (atomAround(lineStart + at + 1, atoms) === undefined) return at + 1; // cells-ok — a code-unit offset
+    // one, nor is a space carrying an extender, and the search continues
+    // towards the row's start (C04 I90, C09 §5).
+    if (soloAt(line, at) && atomAround(lineStart + at + 1, atoms) === undefined) return at + 1; // cells-ok — a code-unit offset
     at = line.lastIndexOf(" ", at - 1);
   }
   return null;

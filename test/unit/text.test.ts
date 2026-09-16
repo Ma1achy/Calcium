@@ -203,7 +203,39 @@ describe("wrapCells (§3)", () => {
     expect(early).toEqual([]);
   });
 
-  it.todo("T3.10e (C09 I74, C04 I84, F1179): a space carrying an extender is not a break point — not deferred on a component: the code commit replaces this row");
+  it("T3.10e (C09 I74, C04 I84, F1179): a space carrying a joiner, a combining mark or the emoji-presentation selector is not a break point — the later space breaks, the joined space stays whole, and with no other space the token is cut on a cluster boundary with no row beginning on the extender", () => {
+    const SEG = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+    const starts = (text: string): Set<number> => new Set([0, ...[...SEG.segment(text)].map((s) => s.index)]);
+    for (const [kind, ext] of [["the joiner", "\u200D"], ["a combining mark", "\u0301"], ["the emoji-presentation selector", "\uFE0F"]] as const) {
+      // `ab ‍cd ef` at the joined prefix's own width — the selector makes
+      // its space two cells — the last space is plain and breaks; the first
+      // is joined and, narrower, is not a break: the row cuts the token.
+      const joined = `ab ${ext}cd ef`;
+      expect(wrapCellsParts(joined, cells(`ab ${ext}cd`)).map((r) => r.text), `${kind}: the later space breaks`).toEqual([`ab ${ext}cd`, "ef"]);
+      for (const w of [3, 4]) { // cells-ok — a width sweep
+        const rows = wrapCellsParts(joined, w);
+        const bounds = starts(joined);
+        for (const row of rows) {
+          expect(bounds.has(row.start), `${kind} at ${w}: row ${JSON.stringify(row.text)} at ${row.start} begins on a boundary`).toBe(true);
+          expect(row.text.startsWith(ext), `${kind} at ${w}: no row begins with the extender`).toBe(false);
+        }
+        expect(rows.map((r) => r.text).join(" ").replace(/  +/g, " ").trim().length, `${kind} at ${w}: nothing lost`).toBeGreaterThan(0);
+      }
+      // No other space: the token is cut at a cluster boundary, never after
+      // the joined space by code unit.
+      const only = `abcd ${ext}efgh`;
+      for (const w of [2, 3, 4, 5, 6]) { // cells-ok — a width sweep
+        const bounds = starts(only);
+        for (const row of wrapCellsParts(only, w)) {
+          expect(bounds.has(row.start), `${kind}, one space, at ${w}: row ${JSON.stringify(row.text)} at ${row.start}`).toBe(true);
+          expect(row.text.startsWith(ext), `${kind}, one space, at ${w}: no row begins with the extender`).toBe(false);
+        }
+      }
+    }
+    // The F1179 row itself.
+    const rows = wrapCellsParts("é\u200D\u{1F468} \u200D\u{1F468}\u0301", 4);
+    expect(rows.every((r) => starts("é\u200D\u{1F468} \u200D\u{1F468}\u0301").has(r.start)), "F1179's row begins on boundaries").toBe(true);
+  });
   it("T3.10c: an unbroken token breaks mid-word rather than overflowing", () => {
     const rows = wrapCells("x".repeat(25), 10);
 
@@ -611,7 +643,7 @@ describe("C09 I74 — a unit of the rasterised alphabets is its own cluster unle
     expect(SUB, "the substitute is one cell and not the cluster").not.toBe("日");
     expect(cells(SUB)).toBe(1);
     const rand = lcg(0x5eed_c09_49);
-    let fast = 0; let slow = 0; let crlf = 0; let wrapped = 0; let spaceCuts = 0;
+    let fast = 0; let slow = 0; let crlf = 0; let wrapped = 0;
     for (let n = 0; n < 2000; n += 1) {
       const count = 1 + Math.floor(rand() * 8);
       const pieces: string[] = [];
@@ -643,13 +675,9 @@ describe("C09 I74 — a unit of the rasterised alphabets is its own cluster unle
           const rows = wrapCellsParts(paragraph, w);
           let last = -1;
           for (const row of rows) {
-            // **One cut the walk does not make**: `breakPoint` breaks after a
-            // space by code unit, so a space carrying an extender — a joiner,
-            // a mark — is cut inside its cluster, on this build and the one
-            // before it (F1179). The row names it rather than hiding it.
-            const afterSpace = row.start > 0 && paragraph.charAt(row.start - 1) === " ";
-            expect(bounds.has(row.start) || afterSpace, `${label}: wrap at ${w} starts row ${JSON.stringify(row.text)} at ${row.start}`).toBe(true);
-            if (afterSpace && !bounds.has(row.start)) spaceCuts += 1;
+            // **Every row, no exception**: the cut after a space carrying an
+            // extender that this sweep found is F1179, closed by T3.10e.
+            expect(bounds.has(row.start), `${label}: wrap at ${w} starts row ${JSON.stringify(row.text)} at ${row.start}`).toBe(true);
             expect(row.start, `${label}: wrap at ${w} advances`).toBeGreaterThan(last);
             last = row.start;
             expect(paragraph.slice(row.start, row.start + row.text.length), `${label}: wrap at ${w} slices`).toBe(row.text);
@@ -668,7 +696,6 @@ describe("C09 I74 — a unit of the rasterised alphabets is its own cluster unle
     expect(slow, "and units the segmenter must still decide").toBeGreaterThan(500);
     expect(crlf, "and a carriage return before a line feed").toBeGreaterThan(30);
     expect(wrapped, "and rows wrapped").toBeGreaterThan(10000);
-    expect(spaceCuts, "and the space cut inside its cluster, seen (F1179)").toBeGreaterThan(0);
   });
 });
 
