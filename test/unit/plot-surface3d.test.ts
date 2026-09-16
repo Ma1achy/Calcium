@@ -1359,3 +1359,5 @@ describe("C12 I129 — the per-sample path", () => {
     expect(Object.is(shade({ ...n, x: n.x + 0.25 }, vp, light, lane[6] as number, span), lane[7])).toBe(false);
   });
 });
+
+it.todo("T1.149 (C12 I137, F1181): geometryOf equals a reference over the Vec3 helpers by Object.is on every number and shares vertex records as it does — not deferred on a component: the code commit replaces this row");
