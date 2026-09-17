@@ -278,6 +278,92 @@ word the prose left implicit, so no index by rule interaction reaches it. The in
 
 ---
 
+## Artefact C — the narrow mosaic, walked before 1.7
+
+**A third artefact, because 1.7 is the one step whose frames move**, and the ruling it implements —
+*shrink, never drop* — is a sentence about two mechanisms that live in different files. The table
+below indexes the cells where the mosaic's own rules meet the ruling.
+
+The rules in play, at HEAD:
+
+| | rule | where |
+|---|---|---|
+| R1 | every grid line is floored at 1 | `divideShares`, C04 I44 |
+| R2 | a fixed `{cells: n}` share neither shrinks nor absorbs | `divideShares`/`spread`, C04 I44 |
+| R3 | the leftover goes one cell each to the **earliest** non-fixed lines | `spread`, C04 I42 |
+| R4 | a spanning region takes the sum of what it spans | `mosaicRects`, walk M1 |
+| R5 | each region is clamped to `width - left` | `mosaicRects`, **C09 I35 — the rule being replaced** |
+| R6 | a cell never goes below its declared minimum; the container clips | **this pass's ruling** |
+| R7 | a child is measured at `atLeastOne(rect.width)` | `childWidths` |
+| R8 | every region emits an element at its rect | `mosaic.elements` |
+| R9 | a region narrower or shorter than one cell is not drawn | `mosaic.render` |
+
+| # | the cell | today | under R6 | ruled |
+|---|---|---|---|---|
+| C1 | R1 × R5 — three equal columns at width 1 | lines `[1,1,1]`, rects `1,0,0` | lines `[1,1,1]`, rects `1,1,1`, cut at paint | **the frame is the same**; the geometry stops lying |
+| C2 | R7 × R5 — the second child of C1 | measured at 1, over a rect of 0 | measured at 1, over a rect of 1 | the same number, now true rather than floored over a zero |
+| C3 | R8 × R5 — the same child | a **zero-width focusable element** | an element wholly outside the container | **the three answers become one**: it is off the grid, and that is one fact |
+| C4 | R9 × R5 — the same child | not drawn | drawn, then cut to nothing | same frame, one rule fewer |
+| C5 | R2 × R6 — `[{cells:10}, 1]` at width 6 | the fixed column clamped to 6 | the fixed column keeps 10 and the grid clips | **R2 wins**: a cell count that shrinks is a suggestion |
+| C6 | R3 × R6 — shares `[1,2]` at width 4 | `[2,2]` — the leftover to the **earliest** line | `[1,3]` — the leftover to the **largest fractional part** | **the engine's**, per C29 I4 and F1219; `spread` is the approximation and **this frame moves** |
+| C7 | R4 × R6 — a region spanning 2 of 3 columns at width 2 | sum 2, clamped to 2 | sum 2, no clamp needed | unchanged; the span is the sum either way |
+| C8 | R9 × R6 on the **height** axis — three rows in `height: 1` | rows `[1,1,1]`, clamped by `height - top` | rects `1,1,1`, cut vertically | unchanged in the frame; the block's height is declared, so the cut is C09 I1's own bound |
+
+### C9 · the finding — the ruling names an operation this path does not have
+
+**R6 says *the container clips*, and the mosaic's render arm has nothing that clips.** It builds one
+`Placed` per drawable cell and hands them to `placeRows`, which takes the pieces and a **height** and
+no width at all: the only width bound in that path is each piece's own `rect.width`. So removing R5
+from the geometry does not move the cut elsewhere — it removes the cut, and a region reaching past
+the grid writes an over-wide row straight into the frame. That is F1211's class, one container over.
+
+This is C23 §8a A4's shape and CLAUDE.md names it: **a ruling can be correct about the interaction
+and wrong about a mechanism it assumed existed.** C29's `compose` does have the operation — a
+`Window` intersected down the tree (C29 I15) — and the mosaic's render arm is not on `compose`.
+
+**Ruled: R5 moves rather than disappears.** The geometry keeps the floor, so `childWidths`,
+`elements` and `render` finally answer one thing; the cut to `width - left` happens where the rows
+are written, which is the same place `fitRow` already cuts for F1211. The clamp was doing two jobs
+in one expression and only one of them was geometry.
+
+### C10 · what moves — measured, because the first reading of C6 was wrong
+
+**C6's first example was `[1,3]` at width 9, and it does not move.** Both rules answer `[3,6]`
+there. Writing the example down and running it is what said so, which is the walk's own instrument
+turned on the walk: a rule inferred from one case has been tested against none.
+
+Measured over ten share vectors at every width from 1 to 200 — 2,000 cases:
+
+| construction of the engine's demands | disagrees with today |
+|---|---|
+| `base: 0, min: 1` — the floor taken off the budget first | 266 of 2,000, **and it distorts every width**: `[1,3]` at 8 answers `[3,5]` where the declared ratio is `[2,6]` |
+| `base: 0, min: 0`, floored afterwards | 514 of 2,000, and the floor breaks the total — which is the lie `divideShares` already tells and the reason R5 exists |
+| **`base` = the largest-remainder share, `min: 1`** | 513 of 2,000, of which 15 are the clamp firing |
+
+**Ruled: the third.** A mosaic's lines are proportions with a floor, not growers with a minimum —
+`columns: [1, 3]` means a quarter and three quarters, and a reader who declared that and got `3:5`
+would be right to call it wrong. So the share divides the whole budget by largest remainder (C29 I4)
+and `min: 1` bites only where a proportion falls below one cell. The first construction is what
+`GROW` means and it is the wrong verb for this field.
+
+**The expected movers, named before the gate runs.** Only fixtures declaring *unequal weights* can
+move; a mosaic that declares no `columns`/`rows` takes `ones(grid.columns)` and is equal by
+construction, and `[{cells: 6}, 1, 1, 1]` is equal in its weighted half. Three declarations in the
+tree have unequal weights, and at the widths the gates actually run:
+
+| declaration | where | moves at | today → engine |
+|---|---|---|---|
+| `columns: [2, 1]` | `examples/plots`'s `mosaic-pair` | width **80** | `[54, 26]` → `[53, 27]` |
+| `columns: [2, 1]` | the same | width **200** | `[134, 66]` → `[133, 67]` |
+| `rows: [2, 1]` | `navigation-mosaic` | height **8** | `[6, 2]` → `[5, 3]` |
+| `columns: [1, 3]` | `navigation-mosaic` | **none of the seven widths** | `[10,30]`, `[15,45]`, `[20,60]`, `[25,75]`, `[30,90]`, `[40,120]`, `[50,150]` — every one divides |
+
+At width 80 the declared ratio is 2:1 and the exact division is `53.33 : 26.67`. `[54, 26]` is
+2.08:1 and `[53, 27]` is 1.96:1, so the rule that moves the frame is also the one that lands nearer
+the number the author wrote. **Any golden outside this table is a finding, not a regeneration.**
+
+---
+
 ## What the walk did not reach
 
 **Floats (§10) and incremental layout (§13) are not walked here.** Both are event-mediated and both

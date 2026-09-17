@@ -331,6 +331,17 @@ the source's stretch is the mosaic row's. It is the same defect as D1 and no rea
 reaches it — a reader checking I9 against S3 finds them agreeing, since both say pass 4. **Writing
 the pass is what named the axis**, which is the implementation falsifying the walk.
 
+**A third artefact was added before 1.7** — artefact C, the narrow mosaic — because that is the one
+step whose frames move, and *shrink, never drop* is a sentence about two mechanisms in different
+files. Ten cells, two findings. **C9**: the ruling says *the container clips* and the mosaic's render
+arm has nothing that clips — it hands `Placed` pieces to `placeRows`, which takes a height and no
+width, so removing C09 I35's clamp would not move the cut elsewhere, it would remove it. Ruled: the
+clamp moves from the geometry to the paint, so `childWidths`, `elements` and `render` finally give
+one answer instead of three. **C10**: the walk's own first example was wrong and running it is what
+said so, and the measured ruling is that a mosaic's lines are **proportions with a floor**, not
+growers with a minimum — `base` from the largest-remainder share and `min: 1`, where taking the
+floor off the budget first distorts every width.
+
 That is CLAUDE.md's *two artefact shapes catch different interactions* arriving from the side that
 usually goes unexamined: a sizing model reads as a classification problem, so the table is the
 obvious artefact, and the table is the one that found nothing. **The table's blind spot is stated
