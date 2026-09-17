@@ -10,10 +10,36 @@
  */
 import { placeRows, type Placed } from "../rows.js";
 import { sliceCells } from "../text.js";
-import type { SolvedBox } from "./types.js";
+import type { SolvedBox, SolvedFloat } from "./types.js";
 
 /** An absolute rectangle a leaf's rows are cut to (C29 I15). */
-type Window = Readonly<{ x: number; y: number; w: number; h: number }>;
+export type Window = Readonly<{ x: number; y: number; w: number; h: number }>;
+
+/**
+ * Where a box ended up and what it is drawn through — C29 §7f, I22.
+ *
+ * **The composited rect and not the flow rect**, which is the whole of why this
+ * is built here rather than in `solve`: a box on row 9 of a list scrolled to
+ * row 3 is on screen row 6, and `SolvedBox.rect` says 9 either way. A float
+ * attached to it belongs where it is drawn, not where flow put it — and at
+ * `offset 0` the two agree, so a fixture written there tests nothing.
+ */
+export type Sited = Readonly<{ rect: Window; window: Window }>;
+
+/**
+ * The floats a walk found, each beside the site of the box that declared it.
+ *
+ * Document order, because that is the only total order a tree supplies and the
+ * walk is stable (walk C7).
+ */
+export type FoundFloat = Readonly<{ float: SolvedFloat; parent: Sited }>;
+
+/** What one walk of a solved tree produces besides its rows (C29 §7f). */
+export type Sites = Readonly<{
+  /** Every non-float box by id — **first match in document order wins** (walk C5). */
+  byId: ReadonlyMap<string, Sited>;
+  floats: readonly FoundFloat[];
+}>;
 
 const intersect = (a: Window, b: Window): Window => {
   const x = Math.max(a.x, b.x);
@@ -55,10 +81,22 @@ function cut(placed: Placed, window: Window): Placed | undefined {
   };
 }
 
-function collect(node: SolvedBox, ox: number, oy: number, window: Window, out: Placed[]): void {
+type Walk = { readonly byId: Map<string, Sited>; readonly floats: FoundFloat[] };
+
+function collect(node: SolvedBox, ox: number, oy: number, window: Window, out: Placed[], walk: Walk): void {
   const x = ox + node.rect.x;
   const y = oy + node.rect.y;
   const own: Window = { x, y, w: node.rect.width, h: node.rect.height };
+
+  // **Sited where it is drawn, and recorded for every box** (C29 §7f, I22). A
+  // float attaches to a box by id and the id may name a leaf, so this is before
+  // the leaf's return rather than after it — and **first match wins**, because
+  // `Box.id` has no uniqueness rule and a throw would make a float's validity
+  // depend on a box two subtrees away that it does not name (walk C5).
+  if (!walk.byId.has(node.id)) walk.byId.set(node.id, { rect: own, window });
+  for (const float of node.floats ?? []) {
+    walk.floats.push({ float, parent: { rect: own, window } });
+  }
 
   const leaf = node.leaf;
   if (leaf !== undefined) {
@@ -111,17 +149,31 @@ function collect(node: SolvedBox, ox: number, oy: number, window: Window, out: P
     // so a footer declared anywhere lands on the last row.
     const oyOf =
       child.sticky === "bottom" ? y + own.h - child.rect.height - child.rect.y : y; // cells-ok — a row count
-    collect(child, x, oyOf, inner, out);
+    collect(child, x, oyOf, inner, out, walk);
   }
   for (const child of node.children) {
-    if (child.sticky === undefined) collect(child, dx, dy, inner, out);
+    if (child.sticky === undefined) collect(child, dx, dy, inner, out, walk);
   }
 }
 
 /** The rows a solved tree draws — `measure` is their count, by construction (C29 I12). */
 export function compose(solved: SolvedBox): readonly string[] {
+  return composeSited(solved).rows;
+}
+
+/**
+ * The same walk, with what a float needs to be placed — C29 §7f, I22.
+ *
+ * **One walk and two products, never two walks.** The composited rect of every
+ * box is a by-product of drawing it, and a second traversal computing the same
+ * offsets is a second place for `clip.offset` to be applied differently — which
+ * is F1213's shape, where every count agreed while a mosaic was missing two of
+ * five cells.
+ */
+export function composeSited(solved: SolvedBox): { readonly rows: readonly string[]; readonly sites: Sites } {
   const out: Placed[] = [];
   const window: Window = { x: 0, y: 0, w: solved.rect.width, h: solved.rect.height };
-  collect(solved, 0, 0, window, out);
-  return placeRows(out, solved.rect.height);
+  const walk: Walk = { byId: new Map(), floats: [] };
+  collect(solved, 0, 0, window, out, walk);
+  return { rows: placeRows(out, solved.rect.height), sites: { byId: walk.byId, floats: walk.floats } };
 }

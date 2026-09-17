@@ -1628,6 +1628,40 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
+  // --- C29 §7g's frames, groundwork ahead of their first caller -------------
+  //
+  // **The queued consumer is named and the rule's honest form is what allows
+  // this.** `Never add an export nothing consumes` is a feature rule; in a
+  // groundwork pass it is circular, because infrastructure has no consumers by
+  // construction — that is what makes it groundwork. The scoped form is
+  // *nothing consumes it **and** nothing is queued to consume it*, and the
+  // layout-engine plan's phase 4 is the queue: §10's frame ring is `⌃⇥` across
+  // a main session and its subagents, which is C16's to wire and C22's to
+  // compose, and neither can be written while the shape is absent (CLAUDE.md,
+  // F1235).
+  //
+  // **Three members and one reason**, because a ring, a stack and a layer stack
+  // are three types on purpose: collapsing them is the error `INTERACTION.md`
+  // §2 corrected once, where nesting, modality and parallelism wore one ladder.
+  // Exempting them one at a time would let two of the three be quietly merged
+  // with the entry still reading as satisfied.
+  "FrameRing.tabs":
+    "C29 I23 — the ring of tabs, groundwork for the plan's phase 4: `⌃⇥` cycles a main "
+    + "session and its subagents, which C16 wires and C22 composes, and neither can be "
+    + "written while the shape is absent. Named in the plan, which is what `queued to "
+    + "consume` means (F1235)",
+  "FrameRing.at":
+    "C29 I23 — a position in a **cycle** and not a depth, which is the field that keeps a "
+    + "ring from being read as a stack: `esc` must pop a stack and must never leave a ring "
+    + "(F1235)",
+  "FrameStack.frames":
+    "C29 I23 — a view pushed over its base **within one tab**. `INTERACTION.md` §14 rules "
+    + "that there are no pushed views today, and that ruling is about usage rather than "
+    + "about the mechanism: having the shape does not undo it, it means the rule governs "
+    + "what may occupy it. If nothing else ever passes the test, a tab's stack has exactly "
+    + "one member and costs nothing, which §10 pre-authorises as the correct outcome "
+    + "rather than a wasted mechanism (F1235)",
+
   // --- C28's fold over a shape it does not own -------------------------------
   //
   // The same argument `CellLike` carries below, on a smaller type: `CpuProfile`

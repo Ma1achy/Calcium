@@ -14,10 +14,26 @@
  * distributes slack or deficit.*
  */
 export { distribute, type Demand, type Distribution } from "./distribute.js";
-export { compose } from "./compose.js";
+export { compose, composeSited, type FoundFloat, type Sited, type Sites, type Window } from "./compose.js";
+export { placeFloats } from "./floats.js";
+export {
+  compositeOf,
+  currentTab,
+  nextTab,
+  popFrame,
+  previousTab,
+  pushFrame,
+  topFrame,
+  type Frame,
+  type FrameRing,
+  type FrameStack,
+  type Layer,
+  type LayerName,
+} from "./frames.js";
 export { layout, layoutCounted, measure } from "./solve.js";
 export {
   boxesOf,
+  floatsOf,
   isLeaf,
   leafOf,
   type Align,
@@ -26,8 +42,14 @@ export {
   type Overflow,
   type Padding,
   type Rect,
+  type AttachTo,
+  type FloatLayer,
+  type Floating,
+  type PlacedFloat,
+  type Point,
   type Size,
   type SolveCounts,
   type SolvedBox,
+  type SolvedFloat,
   type Spend,
 } from "./types.js";

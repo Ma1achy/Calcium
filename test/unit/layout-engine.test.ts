@@ -11,11 +11,25 @@ import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   compose,
+  composeSited,
+  compositeOf,
+  currentTab,
   distribute,
   layout,
   layoutCounted,
   measure,
+  nextTab,
+  placeFloats,
+  popFrame,
+  previousTab,
+  pushFrame,
+  topFrame,
   type Box,
+  type Floating,
+  type Frame,
+  type FrameRing,
+  type FrameStack,
+  type PlacedFloat,
   type SolvedBox,
 } from "../../src/presentation/layout/index.js";
 import { DEFAULT_WIDTHS } from "../../src/testing/measurement-conformance.js";
@@ -680,6 +694,7 @@ describe("C29 — the sizing core", () => {
         "overflow",
         "padding",
         "representations",
+        "floating",
         "spend",
         "sticky",
         "width",
@@ -901,32 +916,357 @@ describe("C29 — the sizing core", () => {
     expect(framed(scroller(3, "top"))[0], "and holds it whole, not half a body row").toBe("H0");
   });
 
-  // **The spec commit's rows, before the field exists** (SP9). C29 I22: a float
-  // takes no space and is resolved after pass 5, into a product beside the tree.
-  it.todo(
-    "T1.39 (C29 I22, \u00a77f, F1235): a float contributes nothing upward and is sized by its own subtree — every non-float rect is identical with and without the field, and the float's own rect is its FIT rather than the frame's width — not deferred on a component: Box.floating is not built",
-  );
-  it.todo(
-    "T1.40 (C29 I22, \u00a77f, I15, F1235): attachment resolves against the composited rect, so a float on row 9 of a list clipped at an offset of 3 lands on screen row 6 — asserted at more than one offset, because offset zero is where the two rects agree — not deferred on a component: Box.floating is not built",
-  );
-  it.todo(
-    "T1.41 (C29 I22, \u00a77f, F1235): the nudge answers to the clip window and not to the frame — a float near a clipping ancestor's bottom edge is nudged up into the ancestor rather than down into the frame's spare rows — not deferred on a component: Box.floating is not built",
-  );
-  it.todo(
-    "T1.43 (C29 I22, \u00a77f, F1235): the nudge is both axes and ordered, x then y, by the minimum shift — a float overflowing on one axis moves on that axis alone and one overflowing on both lands at the window's origin — not deferred on a component: Box.floating is not built",
-  );
-  it.todo(
-    "T1.44 (C29 I22, \u00a77f, F1235): the three attachTo forms resolve to three different boxes in one tree — parent to the declaring box's container, root to the frame, element to a box in an unrelated subtree — not deferred on a component: Box.floating is not built",
-  );
-  it.todo(
-    "T1.45 (C29 I23, \u00a77g, F1235): a ring and a stack are different types, asserted by their field sets by equality — the ring has next/previous and no push/pop/top, the stack has push/pop and no cycle — not deferred on a component: the frame ring is not built",
-  );
-  it.todo(
-    "T1.46 (C29 I23, \u00a77g, F1235): each frame owns its own layer stack — a layer pushed in one frame is absent from another's, a switch pops and dismisses nothing, and debug is in every frame's composite — not deferred on a component: the frame ring is not built",
-  );
-  it.todo(
-    "T1.42 (C29 I22, \u00a77f, F1235): an unresolvable attachment omits the float and leaves the rest placed — an id in no box, a float naming one not yet placed, and a float naming itself, each beside a float that must survive — not deferred on a component: Box.floating is not built",
-  );
+  // **C29 I22 and I23** (§7f, §7g, F1235). Every float row reads a placement
+  // rather than a rect: a float takes no space, so the solved tree it is
+  // declared in is identical with and without it, and no assertion about that
+  // tree can tell whether the mechanism ran.
+  const tip = (id: string, attach: Floating["attachTo"], anchor: Floating["anchor"], rest: Partial<Floating> = {}): Box => ({
+    id,
+    floating: { attachTo: attach, anchor, layer: "float", ...rest },
+    children: { kind: "rows", rows: [id.toUpperCase()] },
+  });
+
+  const placedIn = (box: Box, width: number): readonly PlacedFloat[] => {
+    const solved = layout(box, width);
+    const { sites } = composeSited(solved);
+    return placeFloats(sites, { x: 0, y: 0, w: solved.rect.width, h: solved.rect.height });
+  };
+
+  it("T1.39 (C29 I22, §7f, F1235): a float contributes nothing upward and is sized by its own subtree", () => {
+    const page = (withFloat: boolean): Box => ({
+      id: "page",
+      direction: "column",
+      children: [
+        { id: "r0", children: { kind: "rows", rows: ["a0"] } },
+        { id: "r1", children: { kind: "rows", rows: ["b0"] } },
+        ...(withFloat ? [tip("wide", { kind: "element", id: "r1" }, { self: "tl", target: "bl" })] : []),
+        { id: "r2", children: { kind: "rows", rows: ["c0"] } },
+      ],
+    });
+
+    // **Nothing upward**: the frame, the measured height and every rect are
+    // identical. A float in the flow would widen the page to its own content
+    // and push `r2` down a row, and both are invisible to a row count alone.
+    expect(compose(layout(page(true), 10)), "the frame is the frame without it").toEqual(
+      compose(layout(page(false), 10)),
+    );
+    expect(measure(page(true), 10), "and so is the measured height").toBe(measure(page(false), 10));
+    // **Every rect of every box in the flow.** `floats` is the one key that
+    // differs, and it differs because the mechanism ran — stripping it is what
+    // makes this an assertion about the flow rather than about the product.
+    const flow = (box: Box): string =>
+      JSON.stringify(layout(box, 10), (key, value: unknown) => (key === "floats" ? undefined : value));
+    expect(flow(page(true)), "and every solved rect in the flow").toBe(flow(page(false)));
+
+    // **And the other half, which the first cannot see.** The natural
+    // implementation reads the flag inside the sizing pass and skips the
+    // float's own subtree too, giving every float a size of zero — which
+    // satisfies every assertion above exactly as well (walk C4). `WIDE` is four
+    // cells and the page is two, so the float's width is its own `FIT` and
+    // never the frame's.
+    const floats = placedIn(page(true), 10);
+    expect(floats.length, "the float is in the product").toBe(1);
+    expect(floats[0]?.rect.width, "sized by its own content, not by the frame").toBe(4);
+    expect(floats[0]?.rect.height, "and it has a height").toBe(1);
+  });
+
+  it("T1.40 (C29 I22, §7f, I15, F1235): attachment resolves against the composited rect", () => {
+    const scrolled = (offset: number): Box => ({
+      id: "page",
+      direction: "column",
+      height: { kind: "fixed", n: 6 },
+      clip: { y: true, offset: { x: 0, y: offset } },
+      children: [
+        ...Array.from({ length: 12 }, (_, i) => ({
+          id: `row${String(i)}`,
+          children: { kind: "rows" as const, rows: [`b${String(i)}`] },
+        })),
+        tip("t", { kind: "element", id: "row9" }, { self: "tl", target: "tl" }),
+      ],
+    });
+
+    // **Row 9 is on screen row 9 − offset**, and the row asserts the whole
+    // relation rather than one instance of it. **Offset zero is where the flow
+    // rect and the composited rect agree**, so a fixture written there tests
+    // nothing and reads as coverage; offsets 4 to 9 are where only the
+    // composited rect can produce the answer, because the nudge is not what is
+    // deciding.
+    for (const offset of [4, 5, 6, 7, 8, 9]) {
+      const floats = placedIn(scrolled(offset), 12);
+      expect(floats[0]?.rect.y, `offset ${String(offset)}: row 9 follows the scroll`).toBe(9 - offset);
+    }
+
+    // At offset 0 row 9 is off the bottom of a six-row frame and the nudge
+    // takes over — kept, because it is the case that makes the six above
+    // meaningful rather than arithmetic that happens to hold.
+    expect(placedIn(scrolled(0), 12)[0]?.rect.y, "and off-screen, the nudge answers").toBe(5);
+  });
+
+  it("T1.41 (C29 I22, §7f, F1235): the nudge answers to the clip window and not to the frame", () => {
+    // A four-row scroll block near the top of a twelve-row frame, with a
+    // two-row card anchored under its last visible row. **The frame has six
+    // spare rows below and the ancestor has none**, so the two windows give
+    // different answers and only one of them is drawable.
+    const box: Box = {
+      id: "frame",
+      direction: "column",
+      height: { kind: "fixed", n: 12 },
+      children: [
+        {
+          id: "scroll",
+          height: { kind: "fixed", n: 4 },
+          clip: { y: true, offset: { x: 0, y: 0 } },
+          children: [
+            ...Array.from({ length: 8 }, (_, i) => ({
+              id: `s${String(i)}`,
+              children: { kind: "rows" as const, rows: [`s${String(i)}`] },
+            })),
+            {
+              id: "card",
+              floating: { attachTo: { kind: "element", id: "s3" }, anchor: { self: "tl", target: "bl" }, layer: "float" },
+              children: { kind: "rows", rows: ["C0", "C1"] },
+            },
+          ],
+        },
+        { id: "rest", children: { kind: "rows", rows: ["r0", "r1", "r2", "r3", "r4", "r5"] } },
+      ],
+    };
+
+    const floats = placedIn(box, 12);
+    expect(floats[0]?.rect.y, "nudged UP into the ancestor, not down into the frame's spare rows").toBe(2);
+    expect(floats[0]?.clip.height, "and the window it is drawn through is the ancestor's").toBe(4);
+
+    // §10 nudges into the frame and *then* clips to the ancestor, which would
+    // leave the card at row 4 — inside the frame, outside the four-row window
+    // it is about to be clipped to, and therefore drawn as nothing. **Moved to
+    // the one place it cannot be drawn**, which is what makes this a row about
+    // an order rather than about a number.
+    expect(floats[0]?.rect.y, "§10's order would say 4").not.toBe(4);
+  });
+
+  it("T1.42 (C29 I22, §7f, F1235): an unresolvable attachment omits the float and leaves the rest placed", () => {
+    const box: Box = {
+      id: "root",
+      direction: "column",
+      children: [
+        { id: "ok", children: { kind: "rows", rows: ["o0"] } },
+        tip("ghost", { kind: "element", id: "nowhere" }, { self: "tl", target: "tl" }),
+        tip("self", { kind: "element", id: "self" }, { self: "tl", target: "tl" }),
+        tip("early", { kind: "element", id: "late" }, { self: "tl", target: "tl" }),
+        tip("late", { kind: "parent" }, { self: "tl", target: "tl" }),
+        tip("survivor", { kind: "parent" }, { self: "tl", target: "br" }),
+      ],
+    };
+
+    // **Three ways to be unresolvable and one rule**: an id in no box, a float
+    // naming itself, and a float naming one placed after it. The third is the
+    // cycle rule and it needs no detection of its own — *not yet placed* is the
+    // same condition as *not there*.
+    const ids = placedIn(box, 12).map((f) => f.id);
+    expect([...ids].sort(), "by equality, because a subset check hides the survivor").toEqual(
+      ["late", "survivor"].sort(),
+    );
+
+    // The row is about what the rejection path leaves behind, which neither
+    // artefact shape indexes: a throw here would abandon `late` and `survivor`,
+    // and both were resolvable.
+    expect(() => placedIn(box, 12), "and nothing throws").not.toThrow();
+
+    // **And the `floating`-beside-`sticky` contradiction does not throw either**
+    // (C29 I16). It is refused at C04's boundary with every other construction
+    // error, because `measure` is pure and total; here the float is placed and
+    // `sticky` has no subject, since it modifies a place in the flow that a
+    // float does not have. **A first draft threw and was wrong twice** — it is
+    // the fault I16 names, and it fired for nothing, because a float never
+    // reaches `build` through its parent.
+    const both: Box = {
+      id: "bad",
+      children: [
+        { id: "host", children: { kind: "rows", rows: ["h"] } },
+        { ...tip("x", { kind: "parent" }, { self: "tl", target: "br" }), sticky: "top" },
+      ],
+    };
+    expect(() => layout(both, 10), "the engine stays total on a contradiction").not.toThrow();
+    expect(placedIn(both, 10).map((f) => f.id), "the float is placed and sticky has no subject").toEqual(["x"]);
+  });
+
+  it("T1.43 (C29 I22, §7f, F1235): the nudge is both axes, ordered, and by the minimum shift", () => {
+    // A 4×2 float anchored past the bottom-right of a 10×6 frame. **The row
+    // asserts the position and not the containment** — *containment is not
+    // correctness*, and inside-the-bounds is satisfied by every wrong answer,
+    // including a clamp to the origin.
+    const at = (self: Parameters<typeof tip>[2]["self"], target: Parameters<typeof tip>[2]["target"], offset?: { x: number; y: number }): PlacedFloat | undefined => {
+      const box: Box = {
+        id: "frame",
+        direction: "column",
+        width: { kind: "fixed", n: 10 },
+        height: { kind: "fixed", n: 6 },
+        children: [
+          { id: "host", children: { kind: "rows", rows: ["h"] } },
+          {
+            id: "card",
+            floating: { attachTo: { kind: "root" }, anchor: { self, target }, layer: "float", ...(offset === undefined ? {} : { offset }) },
+            children: { kind: "rows", rows: ["ABCD", "EFGH"] },
+          },
+        ],
+      };
+      return placedIn(box, 10)[0];
+    };
+
+    // Anchored at the frame's bottom-right corner with its own top-left: wanted
+    // (10, 6), and the minimum shift is to (6, 4). A larger shift — to the
+    // origin, say — is inside the window too.
+    expect({ x: at("tl", "br")?.rect.x, y: at("tl", "br")?.rect.y }, "the minimum shift on both axes").toEqual({
+      x: 6,
+      y: 4,
+    });
+
+    // One axis overflowing moves that axis alone: anchored top-right, wanted
+    // x = 10 and y = 0, so `y` must not move.
+    expect({ x: at("tl", "tr")?.rect.x, y: at("tl", "tr")?.rect.y }, "only the overflowing axis moves").toEqual({
+      x: 6,
+      y: 0,
+    });
+
+    // **`offset` is applied before the nudge**, which is what keeps the result
+    // inside the window: applied after, this would land at x = 106.
+    expect(at("tl", "tl", { x: 100, y: 0 })?.rect.x, "an offset past the edge is nudged back, not obeyed").toBe(6);
+
+    // A float too large for its window lands at the window's origin, so the
+    // answer is deterministic rather than a function of which axis was clamped
+    // last.
+    const huge: Box = {
+      id: "frame",
+      width: { kind: "fixed", n: 2 },
+      height: { kind: "fixed", n: 1 },
+      children: [
+        { id: "host", children: { kind: "rows", rows: ["h"] } },
+        {
+          id: "big",
+          floating: { attachTo: { kind: "root" }, anchor: { self: "tl", target: "br" }, layer: "float" },
+          children: { kind: "rows", rows: ["ABCDEFGH"] },
+        },
+      ],
+    };
+    expect({ x: placedIn(huge, 2)[0]?.rect.x, y: placedIn(huge, 2)[0]?.rect.y }, "too large: the origin").toEqual({
+      x: 0,
+      y: 0,
+    });
+  });
+
+  it("T1.44 (C29 I22, §7f, F1235): the three attachTo forms resolve to three different boxes in one tree", () => {
+    // **One tree, so a form resolving to the same rect as another by accident
+    // is visible.** Three forms agreeing is the failure mode a separate fixture
+    // per form cannot show.
+    const box: Box = {
+      id: "root",
+      direction: "column",
+      children: [
+        {
+          id: "left",
+          direction: "column",
+          children: [
+            { id: "host", children: { kind: "rows", rows: ["h0"] } },
+            // **One cell each**, so what the row reads is the anchor and not a
+            // width: a wider float would be nudged, and a nudged float agrees
+            // with a wrongly anchored one at the window's edge.
+            //
+            // **Declared in the reverse of the order they must come out in**,
+            // which is what gives the sort something to do. Declared in layer
+            // order the sort is unfalsifiable: removing it entirely leaves the
+            // product byte-identical, and the mutation pass is what said so
+            // (F1235) — the same class as a fixture that cannot see the thing
+            // under test.
+            { id: "fe", floating: { attachTo: { kind: "element", id: "far" }, anchor: { self: "tl", target: "tl" }, layer: "debug" }, children: { kind: "rows", rows: ["E"] } },
+            { id: "fr", floating: { attachTo: { kind: "root" }, anchor: { self: "br", target: "br" }, layer: "overlay" }, children: { kind: "rows", rows: ["R"] } },
+            { id: "fp", floating: { attachTo: { kind: "parent" }, anchor: { self: "tl", target: "br" }, layer: "float" }, children: { kind: "rows", rows: ["P"] } },
+          ],
+        },
+        { id: "far", children: { kind: "rows", rows: ["f0", "f1"] } },
+      ],
+    };
+
+    const floats = placedIn(box, 14);
+    const at = new Map(floats.map((f) => [f.id, `${String(f.rect.x)},${String(f.rect.y)}`]));
+    expect(at.get("fp"), "parent → the declaring box's container, bottom-right").toBe("1,1");
+    expect(at.get("fr"), "root → the frame, bottom-right").toBe("1,2");
+    expect(at.get("fe"), "element → a box in an unrelated subtree, top-left").toBe("0,1");
+    expect(new Set(at.values()).size, "three forms, three places").toBe(3);
+
+    // **The named positions order the product and an integer never could**:
+    // `float` before `overlay` before `debug`, and within one the walk's order.
+    expect(floats.map((f) => f.id), "ordered by name and not by declaration").toEqual(["fp", "fr", "fe"]);
+    expect(floats.map((f) => f.layer), "ordered by name, bottom-first").toEqual(["float", "overlay", "debug"]);
+  });
+
+  it("T1.45 (C29 I23, §7g, F1235): a ring and a stack are different types, and a cycle is what separates them", () => {
+    // **The type is the row.** Collapsing a ring and a stack reads as correct at
+    // every call site — both hold a list and both have a current member — and
+    // what it breaks is `esc`, which must pop a stack and must never leave a
+    // ring. `INTERACTION.md` §2 corrected this error once already.
+    const source = readFileSync("src/presentation/layout/frames.ts", "utf8");
+    const ring = /export type FrameRing = Readonly<\{([\s\S]*?)\}>;/u.exec(source);
+    const stack = /export type FrameStack = Readonly<\{([\s\S]*?)\}>;/u.exec(source);
+    expect([...(ring?.[1] ?? "").matchAll(/(\w+)\??:/gu)].map((m) => m[1]).sort(), "the ring's fields, by equality").toEqual(
+      ["at", "tabs"].sort(),
+    );
+    expect([...(stack?.[1] ?? "").matchAll(/(\w+)\??:/gu)].map((m) => m[1]).sort(), "the stack's fields").toEqual([
+      "frames",
+    ]);
+
+    // And the behaviour the types keep apart: **a ring wraps and a stack
+    // floors.** Either alone is satisfied by the other's implementation at
+    // every index but the last.
+    const frame = (id: string): Frame => ({ id, layers: [] });
+    const ringOf: FrameRing = { tabs: [{ frames: [frame("a")] }, { frames: [frame("b")] }], at: 1 };
+    expect(nextTab(ringOf).at, "the ring cycles past its last tab").toBe(0);
+    expect(previousTab({ ...ringOf, at: 0 }).at, "and backwards past its first").toBe(1);
+
+    const stackOf: FrameStack = { frames: [frame("base")] };
+    expect(popFrame(stackOf).frames.length, "the stack floors at its base and does not wrap").toBe(1);
+    expect(popFrame(pushFrame(stackOf, frame("view"))).frames.map((f) => f.id), "push then pop is identity").toEqual([
+      "base",
+    ]);
+  });
+
+  it("T1.46 (C29 I23, §7g, F1235): each frame owns its own layer stack", () => {
+    const float = (id: string): PlacedFloat => ({
+      id,
+      layer: "float",
+      rect: { x: 0, y: 0, width: 1, height: 1 },
+      clip: { x: 0, y: 0, width: 1, height: 1 },
+      solved: layout({ id, children: { kind: "rows", rows: [id] } }, 4),
+    });
+    const debug: PlacedFloat = { ...float("d"), layer: "debug" };
+    const question: PlacedFloat = { ...float("q"), layer: "overlay" };
+
+    const a: Frame = { id: "a", layers: [{ name: "float", floats: [float("a1")] }, { name: "debug", floats: [debug] }] };
+    const b: Frame = {
+      id: "b",
+      layers: [{ name: "overlay", floats: [question] }, { name: "debug", floats: [debug] }],
+    };
+    const ring: FrameRing = { tabs: [{ frames: [a] }, { frames: [b] }], at: 0 };
+
+    // **Read as the composed product rather than as a count**: a stack that is
+    // shared and a stack that is copied agree on every length.
+    expect(compositeOf(a).map((f) => f.id), "tab A composites its own layers").toEqual(["a1", "d"]);
+    expect(compositeOf(b).map((f) => f.id), "and tab B its own — the question is in one frame").toEqual(["q", "d"]);
+
+    // A switch pops and dismisses nothing: the other tab's stack is the stack
+    // it had.
+    const after = nextTab(ring);
+    expect(topFrame(currentTab(after)!)?.id, "the switch moved sideways").toBe("b");
+    expect(compositeOf(topFrame(currentTab(after)!)!).map((f) => f.id), "and B is untouched by A").toEqual(["q", "d"]);
+    expect(compositeOf(topFrame(currentTab(nextTab(after))!)!).map((f) => f.id), "as is A, coming back").toEqual([
+      "a1",
+      "d",
+    ]);
+
+    // **`debug` is global**: present in every frame's composite, and last, so it
+    // is over everything the frame draws.
+    expect(compositeOf(a).at(-1)?.layer, "debug is above every other layer in A").toBe("debug");
+    expect(compositeOf(b).at(-1)?.layer, "and in B").toBe("debug");
+  });
 
   it("T1.34 (C29 I20, \u00a77e, C22 I100, C09 I61): the engine declares no cache, and the memo holds one slot per block", () => {
     // **The engine's own sources, by equality over the directory.** An absence
@@ -934,12 +1274,40 @@ describe("C29 — the sizing core", () => {
     // claim is about the component rather than about `solve.ts`.
     const files = readdirSync("src/presentation/layout").filter((f) => f.endsWith(".ts"));
     expect(files.sort(), "every source the engine has, by equality").toEqual(
-      ["compose.ts", "distribute.ts", "index.ts", "solve.ts", "types.ts"].sort(),
+      ["compose.ts", "distribute.ts", "floats.ts", "frames.ts", "index.ts", "solve.ts", "types.ts"].sort(),
     );
+    // **The claim is about state that survives a call, and the grep was a proxy
+    // for it** (CLAUDE.md: *assert the artefact, not a proxy*). A `Map` built
+    // inside a function and dropped when it returns is an index, not a cache —
+    // `composeSited` builds one per walk so a float can find the box it attaches
+    // to, and `placeFloats` copies it so a float can attach to a float already
+    // placed (I22). Neither outlives the call, neither can answer a second one,
+    // and the row went red on both while the invariant was untouched (F1235).
+    //
+    // So what is asserted is **module scope**: a cache is a binding at the top
+    // of a file, because that is the only place state can be that a later call
+    // can read. Every line of every source, with the ones inside a function body
+    // excluded by indentation — the files are formatted, and a top-level
+    // declaration starts at column zero.
     for (const f of files) {
       const text = sourceOf(`src/presentation/layout/${f}`);
-      expect(/\b(?:new\s+(?:Weak)?Map\b|memo)/u.test(text), `${f} declares no cache`).toBe(false);
+      const moduleScope = text.split("\n").filter((line) => /^(?:const|let|var|export const)\s/u.test(line));
+      expect(
+        moduleScope.filter((line) => /\b(?:new\s+(?:Weak)?Map\b|memo)/iu.test(line)),
+        `${f} declares no cache at module scope`,
+      ).toEqual([]);
     }
+
+    // **And the fabricated violation, because an absence check that cannot fail
+    // is the vacuity class this suite exists to catch.** A module-scope cache in
+    // the engine's own shape is what the loop must reject; the corpus is real
+    // source text, so a filter that matched nothing would pass the loop above
+    // and fail here.
+    const fabricated = ["const memo = new WeakMap();", "export const cache = new Map();"];
+    expect(
+      fabricated.filter((line) => /^(?:const|let|var|export const)\s/u.test(line) && /\b(?:new\s+(?:Weak)?Map\b|memo)/iu.test(line)),
+      "the check fires on a cache it is given",
+    ).toEqual(fabricated);
 
     // **The memo's shape, through a call.** One memo across three asks: 80, 60,
     // 80. A map over widths and a single slot agree on every ask that does not

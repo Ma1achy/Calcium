@@ -26,6 +26,7 @@ import { cells, wrapCells } from "../text.js";
 import { distribute, type Demand } from "./distribute.js";
 import {
   boxesOf,
+  floatsOf,
   isLeaf,
   leafOf,
   type Box,
@@ -33,6 +34,7 @@ import {
   type Size,
   type SolveCounts,
   type SolvedBox,
+  type SolvedFloat,
 } from "./types.js";
 
 const FIT: Size = { kind: "fit" };
@@ -59,6 +61,17 @@ type Node = {
   y: number;
   /** A `rows` leaf's rows at the solved width, when the box wraps (C29 §7). */
   wrapped: readonly string[] | undefined;
+  /**
+   * The floats declared on this box, **unsolved** — C29 §7f, I22.
+   *
+   * They are held rather than built because a float is solved against the
+   * *frame's* width, which `build` does not have: the width arrives at
+   * `solveSize` and a float's own root call needs it. Holding the boxes is also
+   * what keeps them out of every pass by construction.
+   */
+  floatBoxes: readonly Box[];
+  /** The same floats, solved — filled once, after pass 5 (C29 §7f). */
+  floats: SolvedFloat[];
 };
 
 /**
@@ -128,6 +141,22 @@ const fallbackOf = (box: Box): Box => {
 };
 
 const build = (input: Box): Node => {
+  // **`floating` beside `sticky` is refused at construction and not here**
+  // (C29 I16, I22, §7f). The two are opposites — a sticky child occupies flow
+  // space and is excluded from an offset, a float takes no space at all — and
+  // I16 is exact about where a contradiction is caught: *at construction, never
+  // at layout*, because `measure` is pure and total and a throw mid-pass
+  // abandons a half-solved tree.
+  //
+  // **The first draft threw here and was wrong twice.** It is the fault I16
+  // names, and it fired for nothing anyway: a float never reaches `build`
+  // through its parent, because `boxesOf` has already taken it out and
+  // `solveFloat` strips `floating` before solving the subtree. The frame-read
+  // said `NOT REFUSED` where the check read as obviously correct.
+  //
+  // So the engine is total on it, and not by preference: `sticky` modifies a
+  // child's place in **the flow**, and a float has no place in the flow, so on
+  // a float the field has no subject rather than a losing claim.
   const box = normalise(input);
   const declared = box.representations;
   const node: Node = {
@@ -142,6 +171,8 @@ const build = (input: Box): Node => {
     x: 0,
     y: 0,
     wrapped: undefined,
+    floatBoxes: floatsOf(box),
+    floats: [],
   };
   if (declared === undefined || declared.length === 0) return node; // cells-ok — a form count
   // **The fallback is built last and is the box itself.** Preference order is
@@ -525,8 +556,46 @@ const freeze = (node: Node): SolvedBox => ({
             ? { kind: "rows" as const, rows: node.wrapped }
             : node.leaf,
       }),
+  ...(node.floats.length === 0 ? {} : { floats: node.floats }), // cells-ok — a float count
   children: node.children.map(freeze),
 });
+
+/**
+ * A float's own solved subtree — C29 §7f, I22.
+ *
+ * **Solved as its own root, at the frame's width**, which is what makes its
+ * size its own `FIT` rather than the frame's: a box with no declared width fits
+ * its content, and a float that filled the frame would have no anchor worth
+ * resolving (walk A3). The recursion terminates on the tree, because a float's
+ * children are a strictly smaller subtree — and a float declaring floats of its
+ * own is legal, which is why this goes through the same entry point rather than
+ * a special one.
+ *
+ * `floating` is stripped before the call. It belongs to the *relationship*
+ * between the float and what it attaches to, and carrying it inward would make
+ * the float a float of itself.
+ */
+const solveFloat = (box: Box, frameWidth: number, counts: SolveCounts): SolvedFloat => {
+  const { floating, ...rest } = box;
+  const root = solveSize(rest, frameWidth, counts);
+  position(root, counts);
+  return { solved: freeze(root), floating: floating! };
+};
+
+/**
+ * Pass 5b — every float solved, after the tree it attaches to is positioned
+ * (C29 §7f, I22).
+ *
+ * **A separate walk and not a step inside `position`**, because a float's
+ * subtree is solved by the same four passes as a root: running it from inside
+ * pass 5 would put a full solve inside a positioning walk and make the pass
+ * order a thing the reader has to reconstruct.
+ */
+function solveFloats(node: Node, frameWidth: number, counts: SolveCounts): void {
+  for (const box of node.floatBoxes) node.floats.push(solveFloat(box, frameWidth, counts));
+  for (const child of node.children) solveFloats(child, frameWidth, counts);
+  for (const form of node.forms ?? []) solveFloats(form, frameWidth, counts);
+}
 
 /** Passes 1 to 4, which is where `measure` stops (C29 I12). */
 function solveSize(box: Box, width: number, counts: SolveCounts): Node {
@@ -560,6 +629,7 @@ export function layoutCounted(box: Box, width: number): { solved: SolvedBox; cou
   const counts: SolveCounts = { rounds: [], alignNoOp: 0 };
   const root = solveSize(box, width, counts);
   position(root, counts);
+  solveFloats(root, width, counts);
   return { solved: freeze(root), counts };
 }
 

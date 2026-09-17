@@ -39,8 +39,8 @@ const results = runPass({
   run,
   control: {
     file: COMPOSE,
-    from: "    collect(child, x, oyOf, inner, out);",
-    to: "    collect(child, dx, dy, inner, out);",
+    from: "    collect(child, x, oyOf, inner, out, walk);",
+    to: "    collect(child, dx, dy, inner, out, walk);",
     why: "the sticky child takes the container's offset like every other child, so the field is read and changes nothing; T1.37's header scrolls away and the frame equals the one with no field at all",
   },
   mutations: [
@@ -54,7 +54,7 @@ const results = runPass({
     if (child.sticky === undefined) continue;`,
       to: `  for (const child of node.children) {
     if (child.sticky !== undefined) continue;
-    collect(child, dx, dy, inner, out);
+    collect(child, dx, dy, inner, out, walk);
   }
   for (const child of node.children) {
     if (child.sticky === undefined) continue;`,
@@ -98,8 +98,8 @@ const results = runPass({
       // not at all of them.
       name: "a sticky child is also collected with its scrolling siblings",
       file: COMPOSE,
-      from: "    if (child.sticky === undefined) collect(child, dx, dy, inner, out);",
-      to: "    collect(child, dx, dy, inner, out);",
+      from: "    if (child.sticky === undefined) collect(child, dx, dy, inner, out, walk);",
+      to: "    collect(child, dx, dy, inner, out, walk);",
       expect: "T1.37",
     },
   ],
