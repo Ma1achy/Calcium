@@ -53787,8 +53787,34 @@ it was that the shedding ladder was moving the same captures in the same landing
 one moved frame cannot be told apart. I81 is closed, its movers were named and read, so this
 landing's movers have exactly one candidate cause.
 
-**Open** — the header reserves what the body reserves; every `comparison` capture at every width
-where a verdict is declared moves, and the movers are named before the run.
+**5 · The movers, named before the run and read after it.** Predicted: the sixteen snapshot entries
+holding `comparison-1`, the frozen Ink captures for that block at every width not already retired by
+I81, and any baseline frame carrying the header. Measured: **sixteen entries moved, one line each**,
+and diffing the whole snapshot file gives 32 changed lines of which **none** is anything but the
+`field … a … b` header. **Twenty-seven Ink captures retired**, widths 24 to 200 × three capability
+sets.
+
+**And the retirement register gained a reason per group**, because it had carried one string over
+every entry — right while there was one ruling, and a claim about a frame that nothing re-reads as
+soon as there were two: a shared reason would have cited C09 I81 over captures that ruling never
+touched.
+
+**6 · The baselines held, and the reason is two homonyms.** Across 2,440 terminal-baseline frames and
+the SVG set, **zero** contain a `comparison` block. The greps that suggested otherwise were the
+English word — `terminal-baseline.test.ts`'s own prose, *a comparison against a corpus* — and ten
+frames of a `plot3d` fixture named `surface-field`. That is F161's class twice in one prediction, and
+the cheap check is asking the frames rather than the filenames.
+
+**Closed** — landed at `ecb9630a`. The header passes `markFor(undefined, judgedRoom, ctx)` and
+`reserve: judgedRoom`: the same blank the body uses for a row with no verdict, rather than a second
+way to say two spaces. The header moves 56→58, 42→44, 32→34, 24→26 at 80/60/44/32, onto its values,
+and `run 4` is untouched. T3.95 asserts **both** columns over the 4-to-80 sweep, the body's agreement
+with itself, and the count of widths it reached — a filter excluding every width would satisfy every
+assertion above it. Mutation `c09-header` **4 caught / 0 survived**, control `judgedRoom` → 0; the
+first mutation is the shipped defect verbatim and the second is the same misalignment in the other
+direction, which a fix-shaped row would not catch. Gates: enforce at 24,823 references, 343 files /
+6,307 passed / 4 todo, golden 468/468, tier 5 24 files / 136 passed / 3 todo, anchors 0 known stale.
+Commits `3ca5e86c` (open), `701e6fe0` (spec, alone), `ecb9630a` (code).
 
 ---
 
