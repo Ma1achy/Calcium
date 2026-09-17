@@ -53748,6 +53748,61 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1224 — a fail-on-revert row whose defect can no longer be built, found by its own premise going red ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | C14 T6.16 — *summing `measure` instead of calling `measureSequence` → short by one row per gap*. It reverts a defect that phase 2a removed the possibility of. |
+| **Reached for** | It went red on its own fixture line, not on its viewport assertion: `measureSequence(gapped) === sumMeasure(gapped) + 1` is now false, because the two functions are the same fold. |
+| **Verdict** | **The invariants inverted and three rows and a harness comment did not follow.** C09 I17 and C14 I1 rewritten; T6.16, T2.9 and C09 T6.17 re-pointed at the defect the new rule makes possible. |
+
+**`measureSequence` is `Σ measure`, by construction rather than by agreement.** Phase 2a moved a
+block's spacing inside the block (C04 §3a, C09 I80), so `sequenceHeight` became a bare fold —
+`for (const block of blocks) total += measureChild(block, width)` — and there is no longer a
+document for which folding by hand gives a different number. C09 I17 still read *`gapBefore` is
+applied by the sequence, never by the block*, which is now false in both of its clauses, and C14
+I1 still carried *never `Σ measure(b, w)` — the two differ by one row per `gapBefore`*.
+
+**This is A03 §2's vacuity class arriving from the other side, and that is why it was findable.**
+The usual shape is a rule that never could be violated, which passes exactly like a rule that is
+satisfied and which only the mutation pass can interrogate. This is a rule that *was* violable and
+whose subject the change removed. A row like that does not go quietly green: the fixture asserting
+the disagreement is the first thing it runs, so it fails on its premise with nothing wrong in the
+subject. **The premise assertion is what made a silent emptying loud** — T6.16's own comment says
+*the fixture declares a gap so the two disagree*, and the line exists because a row that cannot
+distinguish the two functions is satisfied by either. It outlived its purpose usefully.
+
+**Three records and one of them is prose.** `test/support/viewport.ts`'s header states the same
+claim — *the defect T2.9 and T6.16 guard against is picking `Σ measure`, and a fake that returns a
+made-up number cannot tell the two apart* — and `sumMeasure` is exported for no other consumer.
+That is *ask where a settled claim is written down*, run in the ordinary direction: the claim had
+three homes, all of them true when written, and the change that falsified it touched none of them.
+
+**What survives, and it is the load-bearing half.** I17 is two sentences that read as one rule: *a
+block never counts its own spacing* — gone — and *a composer inserts none of its own*, which is
+what makes a document's height knowable from the document (C23 §2) and is untouched by where the
+spacing lives. The seam keeps its reason for the same kind of reason: `measureSequence` shares the
+memo and the containment (C09 I11, I26a), so a caller folding by hand gets the right number today
+and loses both the moment a kind's `measure` throws. **The claim narrowed rather than died**, and
+a rule rewritten to the half that still holds is stronger than one carrying a false clause that
+nothing can fail.
+
+**Where the defect went.** Spacing applied once, inside the block, makes a *second* application
+possible, and that is what a reader restoring the composer's arithmetic would write — so T6.16
+now reverts to reading `padding` at the sequence as well, which double-counts every padded block.
+T2.9 loses its evidence that the right function was called (the two no longer differ) and gains
+the frame: `measureSequence` against the rendered row count, which no summation satisfies by
+accident. `sumMeasure` stays, its comment corrected — it is no longer the wrong answer, it is the
+same answer, and a row asserting they agree is what keeps the fold honest.
+
+**And the walk did not have the cell** (`C04_PADDING_WALK.md` A9, A9a). Its classification table
+is indexed *where two sizing rules meet at rest*, and every other cell pairs two rules about a
+block; this one pairs a rule about a block with a rule about the container's arithmetic, which
+the index reads as out of scope. The index is right and its subject was drawn one layer too
+narrow — a walk over a property that moves between owners has to include the owner it is leaving.
+
+---
+
 ## F1223 — a group whose children all measure zero measures one row and draws none, in both directions ★★★★☆
 
 | | |
