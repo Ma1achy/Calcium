@@ -17,6 +17,9 @@ import { normaliseRow, placeRows } from "../../src/presentation/rows.js";
 import { ONE_PER_KIND } from "../support/blocks.js";
 import { TEST_KINDS, twin } from "../support/lifted.js";
 import { DARK_THEME, FULL_CAPS, registry } from "../support/render.js";
+import { InkOracle, oracleName } from "../support/ink-oracle.js";
+
+const oracle = new InkOracle("edge-rows");
 
 /** The element arm as `render-lines` ran it for every block before C09 I72: a sentinel row below, then split. */
 function throughInk(element: Parameters<typeof renderToString>[0], width: number): readonly string[] {
@@ -81,7 +84,9 @@ describe("C09 I72 — rows at the edges", () => {
     const B = (spec: Record<string, unknown>): Block => spec as unknown as Block;
     const both = (b: Block, width: number): { got: readonly string[]; expected: readonly string[]; names: string[] } => {
       const ctx: RenderContextInput = { width, theme: DARK_THEME, capabilities: FULL_CAPS, focus: null, tick: 0 };
-      const expected = throughInk(elementOf(r.render(twin(b), ctx)), width);
+      const expected = oracle.rows(oracleName(`${b.kind}-${b.id}`, "full", width), () =>
+        throughInk(elementOf(r.render(twin(b), ctx)), width),
+      );
       const names: string[] = [];
       const probe: Probe = { ...NO_PROBE, on: true, span: (name: string) => { names.push(name); return NO_SPAN; } };
       const got = renderToLines(r, b, width, { theme: DARK_THEME, capabilities: FULL_CAPS, probe });
@@ -109,5 +114,11 @@ describe("C09 I72 — rows at the edges", () => {
     expect(p.got).toEqual(p.expected);
     expect(p.got).toHaveLength(5); // cells-ok — top, three body rows, bottom
     expect(p.got[2], "the second body row has no rail").not.toMatch(/[│|]/u);
+  });
+
+  it("T3.91 (C09 I73, F1209): every capture this row asks for is one the tree holds, and no other", () => {
+    const { asked, committed } = oracle.settle();
+    expect(asked.length, "the row asked for captures").toBeGreaterThan(0);
+    expect(committed, "committed equals asked").toEqual(asked);
   });
 });

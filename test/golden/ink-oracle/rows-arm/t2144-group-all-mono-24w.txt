@@ -1,0 +1,5 @@
+3 tiles
+one         two
+{"kind":"p~ {"kind":"p~
+three       four
+{"kind":"p~ {"kind":"p~

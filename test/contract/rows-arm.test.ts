@@ -19,8 +19,24 @@ import { renderSequenceToLines, renderToLines } from "../../src/presentation/ren
 import { CORPUS, ONE_PER_KIND } from "../support/blocks.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, MONO_CAPS, registry } from "../support/render.js";
 import { TEST_KINDS, twin } from "../support/lifted.js";
+import { InkOracle, oracleName } from "../support/ink-oracle.js";
 
 const CAPS = [FULL_CAPS, ASCII_CAPS, MONO_CAPS] as const;
+/** The same sets, named, because a capture's file name carries the arm it was taken under. */
+const NAMED_CAPS = [["full", FULL_CAPS], ["ascii", ASCII_CAPS], ["mono", MONO_CAPS]] as const;
+/** A block's key in the capture directory — **kind and id**, because ids repeat across the two corpora. */
+const keyOf = (b: Block): string => `${b.kind}-${b.id}`;
+const oracle = new InkOracle("rows-arm");
+/**
+ * **Below `DEFAULT_WIDTHS`' floor of 40**, which is where container
+ * disagreements grow rather than where they are comfortable: a rail pair and a
+ * gap cost the same columns at 12 as at 200, so the fraction of the width the
+ * chrome takes is the axis, and the sweep never looked at the end of it. Held
+ * here rather than added to `DEFAULT_WIDTHS` — that constant is exported and
+ * drives the conformance sweeps, and widening it is a different change.
+ */
+const NARROW_WIDTHS: readonly number[] = [2, 12, 24, 32];
+const WIDTHS: readonly number[] = [...NARROW_WIDTHS, ...DEFAULT_WIDTHS];
 
 /** The element arm, as `render-lines` ran it for every block before C09 I72: a sentinel row below, then split. */
 function throughInk(element: Parameters<typeof renderToString>[0], width: number): readonly string[] {
@@ -49,14 +65,26 @@ function recording(): Readonly<{ probe: Probe; names: string[] }> {
 describe("C09 I72 — the two arms agree", () => {
   it("T2.143 (C09 I72): over the corpus × seven widths × three capability sets the rows arm equals the block rendered through Ink byte for byte, a mixed sequence with gaps, a floor and a cap equals the whole sequence through Ink, and the probe reads rows or react for a block, never both", () => {
     const r = registry();
-    const blocks = [...Object.values(ONE_PER_KIND), ...CORPUS];
+    // **The union by identity, not by concatenation.** Every one of
+    // `ONE_PER_KIND`'s twenty-two entries is the same object as a `CORPUS`
+    // member today, so the plain concatenation rendered twenty-two blocks twice
+    // at every width and arm and took its tallies over the doubled list. A
+    // `Set` keeps the union — a `ONE_PER_KIND` entry the corpus stops holding is
+    // still compared — and gives each block one capture rather than two names
+    // for one.
+    const blocks = [...new Set([...Object.values(ONE_PER_KIND), ...CORPUS])];
     let rowsArm = 0;
     let elementArm = 0;
+    // **Keys must not collide**, or one capture stands for two blocks and the
+    // one it does not match is never compared.
+    expect(new Set(blocks.map(keyOf)).size, "every block has its own key").toBe(blocks.length);
     for (const b of blocks) {
-      for (const width of DEFAULT_WIDTHS) {
-        for (const capabilities of CAPS) {
+      for (const width of WIDTHS) {
+        for (const [capsName, capabilities] of NAMED_CAPS) {
           const ctx: RenderContextInput = { width, theme: DARK_THEME, capabilities, focus: null, tick: 0 };
-          const expected = throughInk(elementOf(r.render(b, ctx)), width);
+          const expected = oracle.rows(oracleName(`t2143-${keyOf(b)}`, capsName, width), () =>
+            throughInk(elementOf(r.render(b, ctx)), width),
+          );
           const { probe, names } = recording();
           const got = renderToLines(r, b, width, { theme: DARK_THEME, capabilities, probe });
           expect(got, `${b.kind} at ${String(width)}`).toEqual(expected);
@@ -74,7 +102,7 @@ describe("C09 I72 — the two arms agree", () => {
     // every width under every capability set, and nothing else.
     const mosaics = blocks.filter((b) => b.kind === "mosaic").length; // cells-ok — a count of blocks
     expect(mosaics).toBeGreaterThan(0);
-    expect(elementArm).toBe(mosaics * DEFAULT_WIDTHS.length * CAPS.length);
+    expect(elementArm).toBe(mosaics * WIDTHS.length * CAPS.length);
 
     // **The mixed sequence.** Rows blocks and element blocks side by side, a gap
     // before some, a floor taller than the block, and a cap with its marker —
@@ -97,9 +125,14 @@ describe("C09 I72 — the two arms agree", () => {
       ONE_PER_KIND.plot,
     ];
     for (const width of [24, 60, 100]) {
-      for (const capabilities of CAPS) {
+      for (const [capsName, capabilities] of NAMED_CAPS) {
         const ctx: RenderContextInput = { width, theme: DARK_THEME, capabilities, focus: null, tick: 0 };
-        const expected = throughInk(capped.renderSequence(sequence, ctx), width);
+        // **Captured before `renderSequence` goes.** It has no caller in `src/`
+        // and the pass deletes it; this row is the only thing that reads it, so
+        // its Ink side has to be on disk before the deletion, not after.
+        const expected = oracle.rows(oracleName("t2143-sequence", capsName, width), () =>
+          throughInk(capped.renderSequence(sequence, ctx), width),
+        );
         const got = renderSequenceToLines(capped, sequence, width, { theme: DARK_THEME, capabilities });
         expect(got, `sequence at ${String(width)}`).toEqual(expected);
         // The fixture responds: the cap's marker is in the frame, and the floor's
@@ -146,19 +179,22 @@ describe("C09 I72 — the two arms agree", () => {
       ] }),
     ];
     const KITTY = { ...FULL_CAPS, imageProtocol: "kitty" as const };
-    const capsFor = (b: Block): readonly (typeof FULL_CAPS)[] => (b.id === "img-place" ? [KITTY] : CAPS);
+    const capsFor = (b: Block): readonly (readonly [string, typeof FULL_CAPS])[] =>
+      b.id === "img-place" ? [["kitty", KITTY]] : NAMED_CAPS;
     const withPlacement = [...containers, { ...(ONE_PER_KIND.image as unknown as Record<string, unknown>), id: "img-place" } as unknown as Block];
-    const widths = [2, ...DEFAULT_WIDTHS];
+    const widths = WIDTHS;
     const scrollOffsets = { "sc-off": 1 };
     let compared = 0;
     for (const b of withPlacement) {
       for (const width of widths) {
-        for (const capabilities of capsFor(b)) {
+        for (const [capsName, capabilities] of capsFor(b)) {
           const ctx: RenderContextInput = {
             width, theme: DARK_THEME, capabilities, focus: null, tick: 0, scrollOffsets,
             ...(b.id === "img-place" ? { placementScope: "e1" } : {}),
           };
-          const expected = throughInk(elementOf(r.render(twin(b), ctx)), width);
+          const expected = oracle.rows(oracleName(`t2144-${keyOf(b)}`, capsName, width), () =>
+            throughInk(elementOf(r.render(twin(b), ctx)), width),
+          );
           const { probe, names } = recording();
           const got = renderToLines(r, b, width, {
             theme: DARK_THEME, capabilities, probe, scrollOffsets,
@@ -180,5 +216,16 @@ describe("C09 I72 — the two arms agree", () => {
     expect(panel.length, "rails, body and a gap").toBeGreaterThan(5); // cells-ok — rows
     const short = r.render(containers[3] as Block, ctx) as readonly string[];
     expect(short.length, "the short child leaves its cell blank below its row").toBe(3); // cells-ok — rows
+  });
+
+  it("T2.146 (C09 I72, I73; F1209): every capture the two rows ask for is a capture the tree holds, and every capture the tree holds is one a row asks for", () => {
+    // **Equality, both ways.** A subset check passes a corpus that shrank — a
+    // block that stopped being rendered would simply stop being compared, and
+    // the run would be quieter rather than red. This is the gate the captured
+    // oracle needs and the live one did not, because a live oracle cannot be
+    // stale: it was computed from the corpus that ran.
+    const { asked, committed } = oracle.settle();
+    expect(asked.length, "the rows asked for captures").toBeGreaterThan(400);
+    expect(committed, "the committed captures are exactly the ones the rows ask for").toEqual(asked);
   });
 });

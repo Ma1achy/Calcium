@@ -1,0 +1,5 @@
+3 tiles
+one                                                         two
+{"kind":"plot","id":"plot-1","form":"line","height":8,"ser~ {"kind":"plot","id":"plot-1","form":"line","height":8,"ser~
+three                                                       four
+{"kind":"plot","id":"plot-1","form":"line","height":8,"ser~ {"kind":"plot","id":"plot-1","form":"line","height":8,"ser~

@@ -1,0 +1,2 @@
+[2mRegion  [22m  eu-west-1
+[2mReplicas[22m  3

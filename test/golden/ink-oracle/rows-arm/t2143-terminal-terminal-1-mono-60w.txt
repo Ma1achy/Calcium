@@ -1,0 +1,2 @@
+=== test session starts ===
+..... [ 4%][7m [27m

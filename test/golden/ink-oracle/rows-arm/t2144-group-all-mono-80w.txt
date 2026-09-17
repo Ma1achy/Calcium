@@ -1,0 +1,5 @@
+3 tiles
+one                                     two
+{"kind":"plot","id":"plot-1","form":"l~ {"kind":"plot","id":"plot-1","form":"l~
+three                                   four
+{"kind":"plot","id":"plot-1","form":"l~ {"kind":"plot","id":"plot-1","form":"l~
