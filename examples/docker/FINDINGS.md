@@ -53778,6 +53778,23 @@ took its predecessor's instrument with it** and the run kept pointing at the cor
 the anchors sweep saw nothing: the anchor resolved, the row ran, and the row was empty of the
 thing it was named for.
 
+**Measuring which row the mutation was hiding from turned the second half over.** The run's own
+prose said the orbit commits `stream`, so its period is the longer of 16 and the window, and a
+33 ms window halves the count T4.17u bounds at 55 of 62 wakes. Probed by hand, three points:
+**58 frames at a 16 ms window, 57 at 33, 47 at 200.** A window acting as a floor would give about
+five at 200. So the row does not read the window at all — its rate is set by `ORBIT_MS`, the
+copy, and `ORBIT-33` is caught for that reason rather than by coincidence. The assertion's own
+message, *“the orbit draws at the stream window's 60fps, not at 30”*, names a mechanism the row
+cannot see. **This is F1206's shape again** — a correct mechanism at a seam that does not govern,
+measuring as nothing — and it arrived by asking why a survivor survived rather than by repairing
+it.
+
+**The residue, named because it is not traced.** At a 200 ms window the orbit still writes 47
+chunks in 992 ms of the clock. Either the window does not floor a `stream` commit on this path,
+or `framesSince` counts writes the window does not gate. Both are worth knowing and neither is
+measured; what is measured is that the bound of 55 sits just under the 62 wakes, so the row reads
+*the arm fired* far more nearly than *the scheduler emitted a frame*.
+
 **And the constant has a second copy, watched where the original is not.** `ORBIT_MS = 16` in
 `src/shell/session.ts` is C03's `stream` window written again by hand, deliberately not imported
 — *naming them here rather than importing C03's table keeps L4 out of a constant L0 tunes at

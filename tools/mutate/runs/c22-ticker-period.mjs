@@ -10,14 +10,21 @@
 //
 // **The control arms nothing.** No wake, no orbit, and every rate row fails.
 //
-// The fourth mutation is C03's: the window longer than the interval it floors
-// (F1197's second half), which T4.35 in `spinner-wiring` sees and no row here does.
+// **Two of these mutate C03's window table, and the rows that see them are in
+// `test/unit/frame-scheduler.test.ts`** — T1.7 asserts `[80]` with F1197's own
+// *80 and not 100* beside it, T1.3 asserts `[16]`. Both survived until the
+// `CMD` was widened to run that file (F1214): each named a row in a suite the
+// `CMD` did execute, which is the only direction the harness checks, and the
+// exact witness sat one directory away. T4.35 is no longer one of them — the
+// surplus sampling that defeated aliasing, 150 ms x 30, also made it blind to a
+// 25% change in the window, so the row written against this mutation cannot
+// fail it.
 import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const CMD = "npx vitest run test/integration/orbit-wiring.test.ts test/integration/spinner-wiring.test.ts";
+const CMD = "npx vitest run test/unit/frame-scheduler.test.ts test/integration/orbit-wiring.test.ts test/integration/spinner-wiring.test.ts";
 const SESSION = "src/shell/session.ts";
 const SCHEDULER = "src/terminal/frame-scheduler.ts";
 
@@ -76,22 +83,26 @@ const results = runPass({
     {
       // **The second half**: the window back at 100 over an 80 ms set. The
       // period is the window, the frames fall on ticks 1, 2, 3, 5 of every
-      // five, and T4.35 sees nine glyphs of ten.
+      // five. **T4.35 was written for that and no longer sees it** (F1214); the
+      // row that does is T1.7, which asserts the integer itself.
       name: "WINDOW-100: C03's spinner window longer than the fastest glyph interval",
       file: SCHEDULER,
       from: "  spinner: 80,\n});",
       to: "  spinner: 100,\n});",
-      expect: "T4.35",
+      expect: "T1.7",
     },
     {
-      // **The window back at 33** (F1199). The orbit commits `stream` and its
-      // period is the longer of 16 and the window, so sixty 16 ms wakes draw
-      // thirty frames and T4.17u's orbit bound reads half.
+      // **The window back at 33** (F1199), and **the row that was said to see it
+      // does not** — measured, not inferred (F1214): T4.17u's orbit count over
+      // sixty-two 16 ms wakes reads **58 at a 16 ms window, 57 at 33 and 47 at
+      // 200**, where the window as a floor would give about five. Its rate is
+      // set by `ORBIT_MS`, which `ORBIT-33` mutates and which is caught. T1.3
+      // asserts the 16 this table arms, which is the only exact witness.
       name: "STREAM-33: C03's stream window at the 30 fps it shipped with",
       file: SCHEDULER,
       from: "  stream: 16,\n",
       to: "  stream: 33,\n",
-      expect: "T4.17u",
+      expect: "T1.3",
     },
     {
       // **The orbit's own cadence back at 33** with the window at 16: the
