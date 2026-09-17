@@ -53748,6 +53748,50 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1236 — `comparison`'s header names a column two cells to the right of where it sits ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `comparison`'s header row. The `b` column's values are prefixed with a verdict mark — `✓` or `✗` and a space — and the header label is not. |
+| **Reached for** | Held back from C09 I81's landing on purpose (F1233 §9): correcting it moves every capture at every width where the ladder moves twenty-one, and **a moved frame with two candidate causes is a bisect rather than a finding**. |
+| **Verdict** | **Real, and narrower than it was first written.** The header alone is wrong; the body is internally consistent. |
+
+**1 · Measured at four widths, and the first reading of it was half wrong.** The columns, by index
+rather than by eye:
+
+| width | header `run 5` | a verdict row's value | a row with no verdict | header `run 4` | the `a` values |
+|---|---|---|---|---|---|
+| 80 | **56** | 58 | 58 | 30 | 30 |
+| 60 | **42** | 44 | 44 | 22 | 22 |
+| 44 | **32** | 34 | 34 | 18 | 18 |
+| 32 | **24** | 26 | 26 | 14 | 14 |
+
+**The body is consistent with itself**: a row carrying a verdict and a row carrying none put their
+`b` value in the same column, because `markFor` pads to the reserved width for both. It was read as
+a body defect first — *the `errors` row's value sits further right* — and that reading came from
+counting spaces in a quoted frame rather than asking for the index. **The `a` column is correct at
+every width**, because nothing is prefixed to it, and that is what isolates the cause.
+
+**2 · The cause is one field.** `line()` builds the header and the body through the same function,
+and the header passes `reserve: 0` where the body passes `judgedRoom`. So the body reserves the
+verdict's two cells inside the `b` column and the header spends them on its label, which puts
+`run 5` on the mark rather than on the values it names.
+
+**3 · Why symmetry settles it rather than taste.** A header names a column; `run 4` sits exactly on
+the `a` values and `run 5` sits two cells left of the `b` values, so the block is already committed
+to the rule and keeps it on one column of two. The mark is not part of what `run 5` names: it is a
+verdict *about* the value, and a row with no verdict draws blanks there.
+
+**4 · Held back deliberately, and the reason expired when I81 landed.** The hold was not caution —
+it was that the shedding ladder was moving the same captures in the same landing, and two causes in
+one moved frame cannot be told apart. I81 is closed, its movers were named and read, so this
+landing's movers have exactly one candidate cause.
+
+**Open** — the header reserves what the body reserves; every `comparison` capture at every width
+where a verdict is declared moves, and the movers are named before the run.
+
+---
+
 ## F1235 — §10 was refused by measuring a different component, and its own step order defeats its motivating case ★★★★☆
 
 | | |
