@@ -22,7 +22,7 @@ const ROOT = process.cwd();
 const MOSAIC = "src/data/viewmodel/mosaic.ts";
 const CONTAINERS = "src/presentation/blocks/kinds/containers.ts";
 
-const FILES = "test/unit/mosaic.test.ts test/contract/blocks.test.ts test/contract/view-model.test.ts";
+const FILES = "test/unit/mosaic.test.ts test/contract/blocks.test.ts test/contract/view-model.test.ts test/contract/rows-arm.test.ts";
 
 const { read, write } = fsIo(ROOT);
 const run = () => {
@@ -76,7 +76,12 @@ const results = runPass({
       file: CONTAINERS,
       from: "        x: rect.left, top: rect.top, width: rect.width, height: rect.height,",
       to: "        x: rect.left, top: rect.top, width: 1000, height: rect.height,",
-      expect: "MG5",
+      // **It survived against MG5, and the reason is the construction.** Every
+      // child is rendered at `rect.width`, so its rows are already no wider and
+      // there is nothing for the cut to take — unless the child answers past
+      // the width it was given, which no kind C09 ships does and a consumer's
+      // may (I13, F1211). T2.147 registers `wide` in a cell for exactly that.
+      expect: "T2.147",
     },
     {
       // The other axis, so the run says which one each row is holding rather

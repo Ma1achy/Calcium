@@ -181,7 +181,13 @@ const results = runPass({
       file: C,
       from: "      if (rect === undefined || rect.width < 1 || rect.height < 1) return [];",
       to: "      if (rect === undefined) return [];",
-      expect: "T2.144",
+      // **It survived once, against T2.144.** Every byte is identical without
+      // the guard — `fitRow(row, 0)` is empty and `composeRow` skips an empty
+      // piece — so the composition drops the cell whatever the guard does, and
+      // only the *work* moves. C04 I72 says a region with no room is not drawn
+      // and drawn includes rendered; T2.147's title claimed it and no assertion
+      // carried it, so a render count was added there and this names it.
+      expect: "T2.147",
     },
     // **FALLBACK-DROPPED stood here** — an element child coerced to no rows,
     // so a group holding a mosaic lost it, caught by T3.89's first case. Its

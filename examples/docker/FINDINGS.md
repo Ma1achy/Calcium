@@ -53827,6 +53827,18 @@ the corpus can reach. This is the sibling of F1210 rather than a correction of i
 said *nothing reaches these declines*, which is true, and this one says *what they do when
 something does is worse than the thing they were guarding against*.
 
+**The clamp closed three rows' subjects as well as this one, and two of them had no other
+instrument.** Landing it, three mutations that had been caught went quiet — `CELL-EMPTY-DRAWN`,
+`the cell does not clip horizontally` and `aligned child rendered at the cell width`. None was a
+weak row: the clamp makes the *frame* correct whichever way each mutation goes, so what each one
+now moves is **work** and not bytes. A zero-wide cell composes to nothing whether or not it was
+rendered; a mosaic cell's row is already no wider than the width the child was rendered at; a
+child rendered at its cell rather than its content width is cut back to the same cells. **A repair
+takes its predecessor's instrument with it**, and the repair is the reason the rows read as weak.
+Each was given an instrument the clamp cannot satisfy — two render counts and, for the clip, the
+one construction that reaches it: a registered kind answering past its width, which is this
+finding's own subject.
+
 **The remedy is the clamp already ruled for two containers.** `mosaicRects` clamps a region and
 the row group clamps its first cell (I35, I73); the same cut, applied where a container composes a
 row, makes both failures impossible — the count stays right because a cut changes no row's

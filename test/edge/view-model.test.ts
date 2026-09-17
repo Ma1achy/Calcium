@@ -26,6 +26,8 @@ import {
   type ViewDocument,
 } from "../../src/data/viewmodel/index.js";
 import { ADVERSARIAL, doc, tableOf } from "../support/blocks.js";
+import type { BlockDefinition, RenderContext } from "../../src/presentation/blocks/index.js";
+import { rows } from "../../src/presentation/blocks/paint.js";
 // C04 I98's dispatcher clause is C04's rule and C23's code (F1015) — T3.83 is
 // the one row here that reaches L4, and it does so through the real store so the
 // assertion is the document rather than the id an arm passed.
@@ -809,6 +811,33 @@ describe("C04 §3 both axes — the frames (I100–I103)", () => {
     const rawHand = kit.renderToLines(b.group("row", [tall, b.raw(`${" ".repeat(17)}ab`)], { flex: shares }), 40);
     expect(trim(rawRight)).toEqual(trim(rawHand));
     expect(visible(rawRight[0] ?? "").indexOf("ab")).toBe(38);
+
+    // **And the width the child was asked for, because the frame can no longer
+    // tell.** The padding arm above was added when the first mutation pass
+    // showed this row could not separate a child rendered at its cell from one
+    // rendered at its content width (F818) — a `raw` pads, so at nineteen cells
+    // it spilled past its eight-cell box. It does not spill any more: the row
+    // group clamps each cell's rows to `at.width` (C09 I73, F1211), so a child
+    // rendered too wide is cut back to the same bytes and only the *work*
+    // moves. A repair that makes an older mutation unobservable takes its
+    // instrument with it, so the width is counted here rather than inferred
+    // from the frame.
+    const asked: number[] = [];
+    const watching: BlockDefinition = {
+      kind: "asked-width",
+      measure: () => 1,
+      render: (_block: Block, ctx: RenderContext) => {
+        asked.push(ctx.width);
+        return rows(["ab"]);
+      },
+      width: () => 2,
+    } as unknown as BlockDefinition;
+    const watched = measurable({ definitions: [watching as unknown as BlockDefinition<never>] });
+    watched.renderToLines(
+      b.group("row", [tall, { kind: "asked-width", id: "aw" } as unknown as Block], { flex: shares, align: ["top", "right"] }),
+      40,
+    );
+    expect(asked, "the child is rendered at its content width, not its cell's").toEqual([2]);
   });
 
   it("T3.70 (C04 I101): centre with an odd remainder floors — one cell left of the middle", () => {

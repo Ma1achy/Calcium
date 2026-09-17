@@ -1,17 +1,24 @@
 // C09 I72 — the rows arm against the element arm: the same block both ways, byte for byte.
 //
-// **The element arm is the reference here**, because it is what every frame
+// **The element arm was the reference here**, because it is what every frame
 // was made of before the rows arm existed: a block's rows lifted into a `Text`
-// per row and written by Ink. The rows arm must produce those bytes without
+// per row and written by Ink. The rows arm had to produce those bytes without
 // Ink, for every block the corpus holds, at every width and capability set,
-// and a sequence that mixes the two arms — with gaps, a floor and a cap —
-// must equal the sequence Ink would have written whole. The probe reads which
-// arm a block took, and exactly one of them.
+// and a sequence — with gaps, a floor and a cap — had to equal the sequence Ink
+// would have written whole.
+//
+// **The arm is deleted and the reference is committed** (F1209). Every
+// comparison below is against a capture taken while Ink existed, so the claim is
+// still about Ink's bytes and no longer about a second implementation in the
+// tree. T2.146 is what stops the corpus shrinking under it, and the probe still
+// reads the arm a block took — there is one, and a row asserting that is a row
+// asserting the composition happened at all.
 import { describe, expect, it } from "vitest";
 import { NO_PROBE, NO_SPAN } from "../../src/data/viewmodel/index.js";
 import type { Block, Probe } from "../../src/data/viewmodel/index.js";
 import { DEFAULT_WIDTHS } from "../../src/testing/measurement-conformance.js";
-import type { RenderContextInput } from "../../src/presentation/blocks/index.js";
+import type { BlockDefinition, RenderContextInput } from "../../src/presentation/blocks/index.js";
+import { rows } from "../../src/presentation/blocks/paint.js";
 import { renderSequenceToLines, renderToLines } from "../../src/presentation/render-lines.js";
 import { CORPUS, ONE_PER_KIND } from "../support/blocks.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, MONO_CAPS, registry } from "../support/render.js";
@@ -49,7 +56,7 @@ function recording(): Readonly<{ probe: Probe; names: string[] }> {
 }
 
 describe("C09 I72 — the two arms agree", () => {
-  it("T2.143 (C09 I72): over the corpus × seven widths × three capability sets the rows arm equals the block rendered through Ink byte for byte, a mixed sequence with gaps, a floor and a cap equals the whole sequence through Ink, and the probe reads rows or react for a block, never both", () => {
+  it("T2.143 (C09 I72): over the corpus × seven widths × three capability sets the rows arm equals the block rendered through Ink byte for byte, a mixed sequence with gaps, a floor and a cap equals the whole sequence through Ink, and the probe reads exactly one rows span for a block — it read rows or react while there were two arms (F1209)", () => {
     const r = registry();
     // **The union by identity, not by concatenation.** Every one of
     // `ONE_PER_KIND`'s twenty-two entries is the same object as a `CORPUS`
@@ -240,6 +247,69 @@ describe("C09 I72 — the two arms agree", () => {
       expect(got, `the floored mosaic at ${String(width)}`).toEqual(expected);
       expect(got, "one blank row, not none").toEqual([""]);
     }
+
+    // **A region with no room is not drawn, and *drawn* includes rendered**
+    // (C04 I72). The row's title claimed this and no assertion carried it, which
+    // is why `CELL-EMPTY-DRAWN` survived: removing the guard lets a zero-wide
+    // cell through, and the composition drops it anyway — `fitRow(row, 0)` is
+    // empty and `composeRow` skips an empty piece — so every byte is identical
+    // and only the work moves. **A count is the only instrument**, the same
+    // reason T1.33 counts renders rather than reading a frame.
+    //
+    // A fixed share wider than the grid is the construction: `{cells: 40}`
+    // against a width of 40 leaves the second column nothing.
+    let drawn = 0;
+    const counted: BlockDefinition = {
+      kind: "counted",
+      measure: () => 1,
+      render: () => {
+        drawn += 1;
+        return rows(["x"]);
+      },
+    } as unknown as BlockDefinition;
+    const r2 = registry([...TEST_KINDS, counted as unknown as BlockDefinition<never>]);
+    const squeezed = {
+      kind: "mosaic", id: "m-squeeze", height: 2, areas: "ab",
+      rows: [1], columns: [{ cells: 40 }, 1],
+      children: [
+        { kind: "raw", id: "sa", text: "wide" },
+        { kind: "counted", id: "sb" },
+      ],
+    } as unknown as Block;
+    const squeezedRows = renderToLines(r2, squeezed, 40, { theme: DARK_THEME, capabilities: FULL_CAPS });
+    // The control first: the fixture answers when it has room, or a count of
+    // zero says nothing about the guard (test/support/README.md).
+    expect(drawn, "the fixture is reached when the cell has room").toBe(0);
+    const roomy = { ...(squeezed as unknown as Record<string, unknown>), id: "m-room", columns: [1, 1] } as unknown as Block;
+    renderToLines(r2, roomy, 40, { theme: DARK_THEME, capabilities: FULL_CAPS });
+    expect(drawn, "and it is, once the column has cells").toBe(1);
+    expect(squeezedRows, "the squeezed grid is still its declared height").toHaveLength(2); // cells-ok — rows
+
+    // **A cell cuts a child that answers past its own width** (C09 I35, I73;
+    // F1211). No kind C09 ships does that, so the clip reads as redundant —
+    // every child is rendered at `rect.width` and its rows are already no wider.
+    // `wide` is the registered kind that breaks the contract, which is a
+    // consumer's prerogative (I13) and the only construction that reaches the
+    // cut. Without it the left cell's row runs into the right cell's column and
+    // every count still agrees, which is the half a frame's height cannot see.
+    //
+    // **Held to the rule and not to a capture**, because Ink is gone and this
+    // shape was never drawn through it: the row states the geometry C09 I35
+    // commits to.
+    const overflowing = {
+      kind: "mosaic", id: "m-wide", height: 1, areas: "ab",
+      rows: [1], columns: [1, 1],
+      children: [
+        { kind: "wide", id: "wl" },
+        { kind: "raw", id: "wr", text: "RIGHT" },
+      ],
+    } as unknown as Block;
+    const wideRows = renderToLines(r, overflowing, 20, { theme: DARK_THEME, capabilities: FULL_CAPS });
+    expect(wideRows, "one row, the grid's declared height").toHaveLength(1); // cells-ok — rows
+    const row0 = wideRows[0] ?? "";
+    expect(row0.startsWith("W".repeat(10)), `the left cell fills its ten columns: ${JSON.stringify(row0)}`).toBe(true);
+    expect(row0[10], "and stops there — the eleventh column is the right cell's").not.toBe("W");
+    expect(row0, "which is where RIGHT is").toContain("RIGHT");
   });
 
   it("T2.146 (C09 I72, I73; F1209): every capture the two rows ask for is a capture the tree holds, and every capture the tree holds is one a row asks for", () => {
