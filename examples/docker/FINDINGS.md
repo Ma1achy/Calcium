@@ -53616,3 +53616,47 @@ should fall, and the deficit from 1,500 should fall with them. The fps median is
 on a loaded host to be the gate — F1207's close carries that argument and the numbers behind
 it.
 
+## F1209 — the rows arm is proved against a live Ink render, so the pass that deletes Ink deletes its own oracle ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `elementOf` (`src/presentation/blocks/paint.ts:378`) is not only production code. **T2.143** and **T2.144** (`test/contract/rows-arm.test.ts`) and **T3.89** (`test/edge/rows.test.ts`) render each block both ways and assert the rows arm equals `throughInk(elementOf(...))` byte for byte, over the block corpus × seven widths × three capability sets, with `test/support/lifted.ts` supplying the lifting machinery. C09 I72's claim is *byte for byte the row Ink would have written*, and the only thing that knows what Ink would have written is Ink. |
+| **Reached for** | The layout pass deletes Ink. Reading step 5 against the suites: the three rows above lose their **reference implementation**, not a convenience. Nothing else in the tree can answer what Ink would have written, and the goldens cannot substitute — they hold frames the rows arm produced, which is the thing under test. |
+| **Verdict** | **Open.** |
+
+**And freezing the reference is not merely preservation — it strengthens the row, which is the
+part that reads as a nicety and is not.** T6.119 records two mutations that fail nothing and says
+why in its own text: *the cap's marker above the block's rows → T6.22, **not T2.143**, whose Ink
+side composes through the same registry and moves with the mutation*, and the floor padded one
+row short → T3.54 *for the same reason — `elementOf` lifts the padded rows, so both arms carry
+the shortfall.* **A live oracle that shares the registry with its subject moves when the subject
+moves.** A captured one does not, so both mutations begin to bite and
+`tools/mutate/runs/c09-rows-arm.mjs`'s expectations must be re-derived as part of the capture
+rather than after it.
+
+**The oracle surface is wider than the three suites, and the dispositions differ.** Reading every
+site that imports `ink` or calls `renderToString` under `test/`:
+
+| site | what Ink answers | disposition |
+|---|---|---|
+| `test/contract/rows-arm.test.ts` T2.143, T2.144 | the rows arm's reference | **capture** |
+| `test/edge/rows.test.ts` T3.89 | the declines and the over-tall body | **capture** |
+| `test/support/lifted.ts` | the lifting the two above run on | capture with them |
+| `test/support/ink.ts` → `test/contract/text-width.test.ts`, `test/revert/text-width.test.ts`, `test/unit/support-harness.test.ts` | Ink's own layout width, pinned against `cells()` (C09 I16, T2.16) | **retires** |
+| `test/unit/image-seam.test.ts`, `image-kitty.test.ts`, `image-placeholder.test.ts` | how Ink treats an APC byte and a placeholder's width | **decide per row** |
+
+**The width pair is the one that retires rather than needing a capture, and the reason is the
+whole argument for the pass.** `DEPENDENCIES.md`'s `ink` row says the duplication *cannot be
+deduplicated away* — *two implementations of one number* — and C09 I16 exists to pin them
+together. Delete Ink and there is no second implementation: the invariant becomes **vacuous
+rather than unproven**, which is A03 §2's class and must be written as a retirement with its
+reason, not left as a green row over an empty corpus.
+
+**Sized.** A generator on `tools/terminal-baseline.mjs`'s pattern, whose `expectedCount()`
+derives its total from `FORMS × CAPS × BASELINE_WIDTHS` so a literal cannot go stale
+(`tools/terminal-baseline.mjs:78`). One capture per block × width × capability set, committed as
+files rather than one blob, because a moved frame must be readable as a diff — a digest per entry
+would be smaller and would defeat the discipline the golden tier exists for. **Not** an edit to
+`DEFAULT_WIDTHS`: it is exported from `src/testing/index.ts:59` and shipped for consumer apps to
+sweep their own kinds, so narrow widths are a second constant beside it.
+
