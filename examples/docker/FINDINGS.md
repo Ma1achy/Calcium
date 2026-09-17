@@ -53748,6 +53748,50 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1217 — the layout plan's last step lists seven properties, four are built, and the one that remains is forbidden as written ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | Step 6 of the layout pass: *now expressible as properties of the row composer rather than things each surface remembers* — padding, margin, gap at the sequence level, minimum width, alignment, a container as tall as its contents, a bounded body's hidden-row residue. |
+| **Reached for** | Each of the seven, against the tree, before writing any of them. **`APPEARANCE.md` — the document the step's whole justification rests on — is in no file in this repository**; `find` and a repo-wide grep return nothing. The plan's Context paragraph is its only statement, which is F161's shape: a named source, cited as settled, with nothing behind it. |
+| **Verdict** | **Closed as a step, open as one entry.** Four of the seven are built, one is built at the wrong scope, and the remaining two are one subject — `padding` — which C04 already rules a **replacement** rather than an addition, so building it as a composer property is forbidden by a sentence written before the plan was. |
+
+| the property | where it is |
+|---|---|
+| gap at the sequence level | **Built.** `Gap.gapBefore`, and the height rule is at the sequence — `sequenceHeight` in `measure.ts:192` adds the row, never the block. |
+| alignment | **Built.** `Group.align?: readonly Valign[]`, read into `justifyContent` by `groupDefinition`, and T3.22 is the frame read roadmap 38 found it lacking. |
+| a container as tall as its contents | **Built.** A group is as tall as its tallest child — T3.22's own comment turns on it — and `height: "fill"`'s blocker expired when `ProducerContext.height` landed. |
+| a bounded body's hidden-row residue | **Built.** C04 I47 and I49; `containers.ts:244` decides the residue row from the content's total height, and a collapsed box is the residue row and nothing else. |
+| minimum width | **Built at the wrong scope.** `minWidth` is a table column's field (C11) and an adapter's measured ceiling. No block-level floor exists; `Floor` gives `minHeight` and says so. |
+| padding · margin | **Neither exists, and they are one subject.** |
+
+**The sentence that settles it was written before the plan and is not in the plan.** `types.ts:505`,
+on `Gap`: *if a general `padding` is ever added, this becomes its top edge — roadmap 38 asks for
+padding as a general property rather than `gapBefore` being the only spacing that exists, and a
+document with both would have two ways to say “a blank row above this block”, which every
+measurer, every container's child-width computation and every sequence would then have to agree
+about. **So the change is a replacement, not an addition.*** Roadmap 38's own status line agrees
+from the other side: *`padding` is the only one of the three still a separate step.*
+
+**So the rows arm did not make padding expressible, and padding was never blocked on the rows
+arm.** It is a change to C04's public vocabulary — one field removed, one added, every measurer
+and container and sequence agreeing about the replacement — which is the hard-to-reverse core,
+not a property of a composer. A pass scoped to *finish the rows arm and delete Ink* that ended by
+adding `padding` beside `gapBefore` would have landed exactly the document the ruling forbids.
+
+**And the deferral's note is where it should be, which is why this worked.** The `Gap` comment
+says outright: *the note is here rather than in the roadmap entry, because a condition written
+beside the deferral is the one nobody reads — three deferrals this project has recorded were
+satisfied elsewhere while their text stood unchanged. Whoever writes the second spacing field is
+reading this line.* That is the habit working as designed: the step said *build it*, the field's
+own doc comment said *replace, do not add*, and the only reason the two met is that the ruling was
+put where the writer would be standing.
+
+**What remains, stated as one entry rather than seven.** A block-level `padding` replacing
+`gapBefore`, with a block-level minimum width beside it if a surface needs one — a C04 change
+with its own walk, its own spec commit and its own migration of every `gapBefore` in the tree and
+in both examples. Not this pass's.
+
 ## F1216 — a navigable element is one rectangle, and the checker's three predicates are the written specification of that ★★★☆☆
 
 | | |
