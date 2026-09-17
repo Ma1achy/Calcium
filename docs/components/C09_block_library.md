@@ -2355,19 +2355,47 @@ the same overrun in smaller form.
 - **I79** — **A cut line is walked to the cut with the measurer's cursor, and no further.** `truncate` and `truncateParts` measure first (I9); a line over the width is then walked from its head by I63's cursor — a run of printable ASCII by its length, a unit of the table on its own (I74), otherwise one cluster from `containing` — and the walk ends at the first cluster that would overrun the budget, so no piece past the cut is built: the cost is the width's and not the line's. The `"start"` arm keeps the tail, so it takes the whole line's boundaries from the same cursor and walks them in reverse; both arms read one boundary source, which is what I9's one-implementation rule asks, and the cursor's boundaries are the segmenter iterator's on every input T1.40 and T1.51 sweep. Byte-identical to the whole-line segmentation it replaces because a cluster past the cut was built and dropped, which T1.53 holds against a reference cut made with the iterator; the observable is the segmenter's `containing` count on the cut path — the measure's asks plus the kept clusters' and the one refused — and no `Segments` iterated at all, which T3.90 counts (F1205).
 - **I80** — **The registry applies a block's padding, once, around every kind, and no kind sees it.** A block's `padding` (C04 §3a) is inset and padded by the registry rather than by each definition: `measure` answers `t + b + measure(kind, w − l − r)`, `width` answers `l + r + width(kind, at − l − r)`, `render` emits `t` blank rows, insets each of the kind's rows by `l` and cuts it to `w − l − r`, then emits `b` blank rows, and `elements` shifts every rectangle by `l` and `t`. **One application, because the alternative was measured**: `gapBefore` was the sequence's and three consumers rebuilt its blank row independently — `renderSequenceToLines`, C22's incremental `assemble` and this registry's own element walk — so the row belonged to no block and the three could only be kept in agreement by hand. A kind that reads `padding` itself is the second implementation this invariant exists to refuse (C04 I25, C29 §6, `docs/notes/C04_PADDING_WALK.md`). The identity C09 I43 asserts is taken **at the block's answered width**, which is two edges wider than the width the kind wrapped at, and T3.67 sweeps it over the corpus at every width (→ I1, I43, C04 I25, C04 I67).
 
-- **I81** — **A kind that runs out of width sheds a part and says so; it never shreds every part at
-  once.** The narrow ladder is the definition's, computed inside `render` from the width it is
-  handed — C29 I18 rules the engine chooses no representation and cannot, because a `paint` leaf is
-  opaque to it. Four kinds shipped one and four did not: measured at HEAD, `comparison` at twelve
-  columns drew `  field  b……` over `~ l…  3…  2…`, shredding every column at once, which is
-  `LAYOUT_ENGINE.md` §12's own *sheds, never shreds* violated; `keyValue` shredded both halves;
-  `events` spent eight of twelve cells on a timestamp nothing sheds; `steps` stubbed its label to
-  `✓ re…` where the state marks are the part worth keeping. So the rule is the one `status`'s
-  `widthRung` already implements — **shed the least informative part whole, in a declared order,
-  and keep what remains legible** — and the order is the kind's to declare because only the kind
-  knows which part carries the meaning. **Dropping an item is refused**: a kind that shed a row
-  would change its element ids and orphan a C26 focus, so an item that cannot be drawn is counted
-  in a withholding rather than removed (C29 I18, I34, C26 §5, F1228, `docs/notes/C29_REPRESENTATIONS_WALK.md`).
+- **I81** — **A kind that runs out of width sheds a part whole and says so; it never shreds every
+  part at once.** The narrow ladder is the **definition's**, computed inside `render` from the width
+  it is handed. That is not because the engine could not hold one — C29 I18 now chooses a container's
+  representation — but because a `paint` leaf is opaque to the engine by `Leaf`'s own declaration, so
+  a *kind's* parts are visible only inside it.
+
+  **Shedding and truncating are different mechanisms and these four reached for the wrong one.**
+  Truncation is for a single run too long for its box — a path, a message, a label. Shedding is for a
+  **row of parts** too narrow for all of them. Applying truncation to a shedding problem is why every
+  column degrades together: measured at HEAD, `comparison` at twelve columns drew `  field  b……` over
+  `~ l…  3…  2…`, four parts each cut to nothing at once; `keyValue` shredded both halves; `events`
+  spent eight of twelve cells on a timestamp nothing sheds; `steps` stubbed its label to `✓ re…`
+  where the state marks are the part worth keeping.
+
+  **Every part is content, decoration or a peer**, and the tier decides what running out does to it.
+  Content shrinks to its **floor** and then the container clips — visible and recoverable. Decoration
+  sheds with no trace, because nothing was lost. Peers are a row of equals: members go from the end
+  and the count is reported. **A part's minimum is a floor if it is content and a threshold if it is
+  decoration**, which is the same distinction as *decoration never widens its container*.
+
+  **The step, and it is four lines**: take the parts' natural widths; if they fit, stop; otherwise
+  shed the lowest-priority part whole, count it into the withholding, and go again; when only the
+  un-sheddable parts remain, distribute what is left among them, each at or above its own floor.
+  **The last line is the fix.** Today it runs on every part at once and the first three do not exist.
+
+  **The order is the kind's to declare**, because only the kind knows which part carries the meaning,
+  and each order below is a claim that can be argued with rather than an arithmetic consequence:
+
+  | kind | never sheds | sheds, in order | shrinks to a floor |
+  |---|---|---|---|
+  | `comparison` | the two values | the field label, then the change and verdict marks | `a` and `b`, together |
+  | `keyValue` | the key — a value with no key is not a fact | the bar, then its detail | the value |
+  | `events` | the time and the tone | the type | the message |
+  | `steps` | the active step — the agent tape's rule, *a switcher that cannot show you where you are is worse than no switcher* | the done steps from the ends, then the pending ones | the active step's label |
+
+  **Dropping an item is refused**: a kind that shed a row would change its element ids and orphan a
+  C26 focus, so an item that cannot be drawn is counted in a withholding rather than removed. **A
+  withholding is stated rather than silent** — the count of parts or items shed appears in the row —
+  which is what makes *shed* distinguishable from *lost* at a glance (C29 I18, I34, C26 §5, F1228,
+  F1232, `docs/notes/C29_REPRESENTATIONS_WALK.md`).
+
 ## 8. Commitments
 
 1. C09 owns the registry; C04 owns the schema and the measurement contract (I13).
