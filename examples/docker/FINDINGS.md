@@ -53748,6 +53748,39 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1221 — the trace ruled `stretch` into pass 4 by assuming the cross axis is height, and on a column it is width ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | Writing pass 2, against C29 I9 — *stretch resolves in pass 4, overrides a child's `FIT` on the cross axis only, never overrides `FIXED`, and is a no-op against `GROW`*. The first three clauses hold on both axes. **The pass number holds on one.** |
+| **Reached for** | Constructing the case rather than reading the clause: a **column** container, `align.x: "stretch"`, one `FIT` child of wrapped prose. The cross axis of a column is **width**, and width is solved in pass 2. |
+| **Verdict** | **Closed by an amendment.** I9's pass number becomes the axis's own: stretch resolves where the cross axis is solved — pass 2 when that axis is width, pass 4 when it is height. The other three clauses are unchanged. |
+
+**It is D1 again, one rule over.** Solve the column at inner 60; the child is `FIT`, so pass 1 gives
+it its natural width, say 24. Pass 3 wraps its text at 24 and commits a height. Pass 4 then stretches
+it to 60 — and the rows re-wrap at 60, fewer of them, while the height standing in the tree is 24's.
+`measure` returns 24's height and `compose` emits 60's, which is **C09 I1 false by construction** in
+the engine whose selling point is that I1 holds by construction. The repair inside pass 4 would be a
+second re-fit, and C29 I11 says one suffices.
+
+**The walk had the row and the row carried an assumption.** S3 reads *`stretch` overrides a child's
+`FIT` on the cross axis — **after** heights exist, which is why §11 says pass 4*. That sentence is
+true of a **row** container, where the cross axis is height and stretch cannot be resolved before
+pass 3 has produced one. It is false of a column, and nothing in the row names a direction: the
+source's §11 is written from the mosaic row, the only stretch the corpus has, and the trace inherited
+its frame of reference. **A ruling can be correct about the interaction and wrong about which axis it
+is on** — the sibling of *an artefact can be correct about the interaction it found and wrong about a
+mechanism it assumed existed* (CLAUDE.md, C23 §8a A4), and it fails the same way: no index by rule
+interaction reaches it, because the flaw is not between two rules but in a word the prose left
+implicit.
+
+**Which is the walk's stated blind spot arriving from the direction it was stated for.** The table
+indexes pairs; this is `stretch` × the re-fit × `direction`, three rules, and the walk wrote that
+*three-rule interactions surface at the pass boundaries rather than at rest* (F1220). It did. What
+found it is the instrument neither artefact is: **writing the pass and having to name the axis**,
+which is the implementation falsifying the walk rather than review catching it — a reader checking
+I9 against S3 finds them agreeing, because both say pass 4.
+
 ## F1220 — the engine's own selling point is violated twice by its pass ordering, found before a type existed ★★★★★
 
 | | |
