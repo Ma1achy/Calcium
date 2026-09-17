@@ -53746,3 +53746,39 @@ specifiable. A guard believed load-bearing because it is the only visible exit, 
 takes — the same shape as C22 I108 paced at the wrong seam (F1206), where every gate was green and
 695 of 706 slots were cancelled before they fired.
 
+---
+
+## F1211 — a child that answers a row wider than its cell breaks C09 I1 on one arm and overruns the frame on the other ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `composeRow` declines an overlap and `placeRows` a row wider than its cell, and until F1209 each decline sent its container to the element arm. F1210 measured the declines at **zero firings** across 6,281 tests and 458 goldens and ruled them cold. That ruling is about the corpus, and the corpus has no kind that answers a row wider than the width it was given. |
+| **Reached for** | Registering one — `wide`, which answers `"W".repeat(width + 4)` — and putting it in each container at a width of 20. **Neither arm is correct, and they are wrong in opposite directions.** A `panel` measures 3 and renders **4**; a `row` group measures 1 and renders **2** — both took `react`, the decline fell into Ink, and Yoga **wrapped** the over-wide row into a row nobody counted. A `column` group and a `scroll` stayed on the rows arm, kept their counts, and emitted a row of **24 cells at a width of 20**. |
+| **Verdict** | **Open.** |
+
+**The element arm's failure is the one C01 names as unrecoverable.** A wrapped line scrolls the
+alternate screen, and the application cannot see that it happened; C09 I1 exists to make the
+measure and the render agree precisely so a viewport's arithmetic stays true. So the decline is
+not a conservative fallback — it is the *worse* of the two answers, and it has been the answer for
+every container that declines since the arm was written.
+
+**The rows arm's failure is the same corruption one layer later.** A 24-cell row handed to a
+20-column terminal wraps at paint time rather than at layout time. The count is right, which is
+why nothing catches it: C09 I1 is a statement about rows, and every row-counting assertion passes.
+**A width disagreement has a safe direction** and neither arm takes it.
+
+**Why nothing found it.** The declines were read as cold because they are, and *cold* was inferred
+from a corpus rather than from the code — F1210's own measurement, correctly taken and then
+generalised one step too far. No shipped kind violates its width contract, so the only way to the
+case is to register a kind that does, which is a consumer's prerogative (I13) and not something
+the corpus can reach. This is the sibling of F1210 rather than a correction of it: that finding
+said *nothing reaches these declines*, which is true, and this one says *what they do when
+something does is worse than the thing they were guarding against*.
+
+**The remedy is the clamp already ruled for two containers.** `mosaicRects` clamps a region and
+the row group clamps its first cell (I35, I73); the same cut, applied where a container composes a
+row, makes both failures impossible — the count stays right because a cut changes no row's
+existence, and the row fits because that is what a cut is. It also makes the composers **total**,
+which is what the pass deleting Ink needs: a decline with no element arm to fall into has nowhere
+to go, and the honest answer is not to have one.
+
