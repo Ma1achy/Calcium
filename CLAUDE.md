@@ -76,7 +76,6 @@ Each of these produces code that compiles, passes review, and is wrong.
   measurer uses, or measurement drifts.
 - **Let `measure` see anything that animates.** Appearance animates; geometry never does.
 - **Add a dependency** without a row in `DEPENDENCIES.md`.
-- **Add an export** nothing consumes.
 - **Commit a frame** from L1, L2 or L3. L4 does that.
 
 ---
