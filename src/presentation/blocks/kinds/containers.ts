@@ -27,7 +27,7 @@ import {
 import type { Block, Group, MeasureFn, Mosaic, Panel, Scroll, WidthFn } from "../../../data/viewmodel/index.js";
 import { BORDER_INSET, axesOf, groupPlacements, groupRows, mosaicRects, parseAreas } from "../../../data/viewmodel/index.js";
 import type { NavElement } from "../types.js";
-import { cells, stripControl, truncate } from "../../text.js";
+import { cells, sliceCells, stripControl, truncate } from "../../text.js";
 import { glyphCells, glyphFor, glyphs } from "../glyphs.js";
 import { clampSpans, elementOf, paint, rows, tone } from "../paint.js";
 import { composeRow, placeRows, type Placed } from "../../rows.js";
@@ -924,18 +924,36 @@ export const groupDefinition: BlockDefinition<Group> = {
         while (lines.length < floor) lines.push(""); // cells-ok — a row count
         return lines;
       }
+      // **Each cell clamped to what is left of the width, as `mosaicRects`
+      // clamps a region** (I35, I73). `placeable` keeps at least one child, so
+      // a single child whose fixed `{cells: n}` share exceeds the group is
+      // placed wider than the group has room for — the one construction that
+      // reaches this, and the reason it existed as a decline to Ink. Measured
+      // against Ink before the decline was replaced: the over-wide child's row
+      // is cut at the group's edge, and a cell starting past the edge is not
+      // drawn **and contributes no height**, which is C04 I72's rule for a
+      // mosaic region arriving in the other container that clamps.
       const blocks: Placed[] = [];
       let x = 0;
       let tallest = 0;
       placed.forEach((_child, index) => {
         const at = ats[index] as (typeof ats)[number];
-        const rows = childRows[index] ?? [];
-        blocks.push({ x: x + at.left, top: at.top, width: at.width, rows });
-        tallest = Math.max(tallest, at.top + rows.length); // cells-ok — a row count
+        const left = x + at.left;
         x += (widths[index] ?? 1) + ROW_GUTTER;
+        // **No guard for a cell past the edge, because `placeable` is the
+        // guard.** It keeps a child only while `used + needed <= w`, so every
+        // placed child after the first ends inside the width; the one that can
+        // overrun is the **first**, which `placeable`'s floor of one keeps
+        // whatever its width. So the clamp bites exactly once, at `left = 0`,
+        // and a `room < 1` test was written here and survived its own mutation
+        // twice — unreachable, and the survivor is what said so.
+        const room = Math.min(at.width, width - left);
+        const rows = childRows[index] ?? [];
+        const cut = room === at.width ? rows : rows.map((row) => sliceCells(row, 0, room));
+        blocks.push({ x: left, top: at.top, width: room, rows: cut });
+        tallest = Math.max(tallest, at.top + cut.length); // cells-ok — a row count
       });
-      const fits = x - ROW_GUTTER <= width;
-      const lines = fits ? placeRows(blocks, Math.max(tallest, block.minRows ?? 0)) : null;
+      const lines = placeRows(blocks, Math.max(tallest, block.minRows ?? 0));
       if (lines !== null) return lines;
     }
 

@@ -106,6 +106,23 @@ describe("C09 I72 — rows at the edges", () => {
     expect(placeRows([{ x: 0, top: 0, width: 2, rows: ["abc"] }], 1)).toBeNull();
     expect(placeRows([{ x: 0, top: 0, width: 3, rows: ["abc"] }, { x: 2, top: 0, width: 3, rows: ["def"] }], 1)).toBeNull();
     expect(placeRows([{ x: 0, top: 0, width: 3, rows: ["abc"] }, { x: 4, top: 1, width: 3, rows: ["def"] }], 2)).toEqual(["abc", "    def"]);
+    // **One placed child wider than the group.** `placeable` keeps at least one
+    // child however narrow the group is, so a fixed `{cells: 50}` share at a
+    // width of 20 places a cell the group has no room for — the only
+    // construction that reaches what used to be a decline to Ink, and one that
+    // **no assertion built** while the row's text claimed it: the decline fired
+    // zero times across the whole suite and every golden (F1210). Ink cut the
+    // child's row at the group's edge and drew nothing for the cell starting
+    // past it, and the capture is that answer.
+    const over = B({ kind: "group", id: "g-over", direction: "row", flex: [{ cells: 50 }, 1], children: [
+      B({ kind: "raw", id: "ov-w", text: "W".repeat(50) }),
+      B({ kind: "raw", id: "ov-t", text: "t1\nt2\nt3\nt4\nt5" }),
+    ] });
+    const o = both(over, 20);
+    expect(o.got).toEqual(o.expected);
+    expect(o.got, "the over-wide child is cut at the group's edge").toEqual(["W".repeat(20)]);
+    expect(o.names.filter((n) => n === "react"), "and it composes rows rather than declining").toHaveLength(0);
+
     // **A short child**: measured three, answered one.
     const short = B({ kind: "group", id: "g-short", direction: "row", flex: [1, 1], children: [B({ kind: "short", id: "sh" }), B({ kind: "raw", id: "tall", text: "a\nb\nc" })] });
     const s = both(short, 40);

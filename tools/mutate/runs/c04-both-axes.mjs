@@ -59,8 +59,8 @@ const MUTATIONS = [
     also: [
       {
         file: CONTAINERS,
-        from: "      const lines = fits ? placeRows(blocks, Math.max(tallest, block.minRows ?? 0)) : null;\n",
-        to: "      const lines = fits ? placeRows(blocks, tallest) : null;\n",
+        from: "      const lines = placeRows(blocks, Math.max(tallest, block.minRows ?? 0));\n",
+        to: "      const lines = placeRows(blocks, tallest);\n",
       },
       {
         file: CONTAINERS,

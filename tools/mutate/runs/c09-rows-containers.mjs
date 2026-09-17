@@ -88,8 +88,8 @@ const results = runPass({
     {
       name: "ALIGN-DROPPED: the placement's left offset is not applied",
       file: C,
-      from: "        blocks.push({ x: x + at.left, top: at.top, width: at.width, rows });\n",
-      to: "        blocks.push({ x, top: at.top, width: at.width, rows });\n",
+      from: "        const left = x + at.left;",
+      to: "        const left = x;",
       also: [{
         file: C,
         from: "          const pad = at.left > 0 ? \" \".repeat(at.left) : \"\";\n",
@@ -119,6 +119,23 @@ const results = runPass({
       from: "          for (const line of drawn as readonly string[]) parts.push(line === \"\" ? \"\" : pad + line);\n",
       to: "          for (const line of drawn as readonly string[]) parts.push(line);\n",
       expect: "T2.144",
+    },
+    {
+      // **The clamp dropped**: a cell keeps its full allocation, so a child
+      // wider than the group writes past the group's edge.
+      //
+      // **Two further mutations were written here and both survived, and the
+      // survivor indicted them rather than the row**: a guard for a cell
+      // starting past the width, and the height taken from the uncut rows.
+      // `placeable` keeps a child only while `used + needed <= w`, so every
+      // placed child after the first ends inside the width and the only cell
+      // that can overrun is the first — the one its floor of one keeps. There
+      // was no second cell to guard, so the guard and its mutation are gone.
+      name: "CLAMP-DROPPED: a row group's cell is not clamped to what is left of the width",
+      file: C,
+      from: "        const room = Math.min(at.width, width - left);",
+      to: "        const room = at.width;",
+      expect: "T3.89",
     },
     {
       // **The child rendered twice**: once for the rows attempt and again for
