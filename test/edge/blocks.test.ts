@@ -671,4 +671,8 @@ describe("C09 §2 padding — the registry's one application", () => {
       r.measure(bare, 40) * 2 + r.measure(padded, 40),
     );
   });
+
+  it.todo(
+    "T3.92 (C04 I121): a container spends max(0, placed − 1) × childGap on its own axis and nothing else — one child or none spends nothing whatever the field says, a row charges per placed child rather than per declared one, a container with padding draws one gap above its first child rather than two, a document's top level has no childGap, and a gapped container is still windowable because the gap rows are the definition's — not deferred on a component: it lands with 2b's code commit, and this row is what SP9 holds open until it does",
+  );
 });

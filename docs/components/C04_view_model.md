@@ -312,11 +312,24 @@ the vocabulary rather than deprecated in it.
 
 Nothing else in the vocabulary produces space, and the S-series draws it
 everywhere: S08's success frame illustrates seventeen rows and composes to
-thirteen, the four extra being blank rows between regions. **And the horizontal
-edges are what the appearance rules are written in** — *every nested level costs
-exactly three columns*, *content stops one column before the right edge* — which
-`gapBefore` could not express at all, so those rules were re-derived per surface
-and the fourth surface disagreed with the first.
+thirteen, the four extra being blank rows between regions.
+
+**The horizontal edges were justified by two appearance rules and neither turned
+out to be theirs** (F1226). *Every nested level costs exactly three columns* is
+**four in the tree, and derived** — `GUTTER_UNIT = BODY_INDENT = HOOK_INDENT + 2`,
+the hook's column, the mark and its trailing space — so writing it as
+`padding.l = 3` would move every nested frame and replace a derivation with a
+literal. *Content stops one column before the right edge* belongs to the
+**region** C14 hands down and not to a block: four composers draw at the frame's
+width, and a mosaic divides its cells *before* a child's padding is applied, so
+as a `padding.r` the dividers would read the unnarrowed number.
+
+What the edges are actually for is what `gapBefore` could not express at all —
+space inside a box, on the axis the box is not stacked on — and the surfaces that
+needed it hand-composed a `raw` block at three widths instead (R19's evidence
+list). The appearance rules were the occasion for the field and are not its
+warrant; that distinction is F1226's, and the rules were checked rather than
+carried.
 
 **It is content, not view state.** A `merge` carries it, unlike `expanded` (I9):
 the space around a block is a property of the document's shape rather than of
@@ -360,6 +373,54 @@ which dropped the live part declared by the block's identity (F821).
 kind (C24 §4): a `table` or a `plot` following anything gets one, a second
 `pills` row does not. An adapter that wants a different rhythm sets the field;
 one that does not think about it gets the rhythm the surfaces already draw.
+
+### 3b. `childGap` — the container's space between its children
+
+```typescript
+childGap?: number   // on a container; default 1 across, 0 down
+```
+
+**`padding` is around, `childGap` is between, and the pair is why neither needs a
+margin.** `n` children take `n − 1` gaps on the container's own axis; the padding
+takes `t + b` outside all of them. So a container with `childGap: 1` and
+`padding: { t: 1 }` draws one row above the first child and one between each
+pair — never two above the first, which is the arithmetic a margin gets wrong
+when two adjacent blocks each contribute one row (`LAYOUT_ENGINE.md` §6).
+
+**The default differs by axis because the gutter already did.** A `row` group's
+children sit side by side and have always been separated by one column —
+`ROW_GUTTER = 1`, read in three places: the width division, the admission loop
+that charges one per *placed* child, and the element walk's offsets. A column's
+children sit one under the next and have never been separated by anything. So
+`childGap` absent is `1` across and `0` down, which reproduces every frame
+exactly and makes this a refactor rather than a change. **The field is not new
+behaviour; it is a name for behaviour that had three readers and no name**
+(F1226), and no surface could ask a row group for no gutter at all.
+
+**It is the container's, never the composer's** (C09 I17). `sequenceHeight` stays
+a bare fold and a document's top level has no `childGap`, because there is no
+object between the transcript and an entry for one to sit on — the blank row
+between entries is the entry's own closing run (C22 I85), which is why C14 can
+measure it. A composer that inserted a row a document does not declare would make
+a document's height unknowable from the document.
+
+**Charged per placed child, not per declared one.** A `row` group drops children
+that do not fit (I42), and a gap belongs to a *pair*: `(declared − 1) × childGap`
+charges for gaps between children that were never drawn. The admission loop has
+this right today and it is the cell most easily got wrong.
+
+**And the degenerate cases are the rule rather than a clause in it.** `max(0, n −
+1)` means a one-child container spends nothing whatever its `childGap`, and an
+empty one cannot spend a negative amount. A one-child column with `childGap: 5`
+is five rows shorter than a naive `n × gap` — §16's degenerate table is where the
+model is falsifiable, not housekeeping at the end of it.
+
+**A gapped container is still windowable**, and the first ruling said otherwise.
+`padding` is refused a window because the *registry* emits it, outside anything
+`definition.window` can reach (C09 I80, I33); `childGap` is read inside the
+definition, so the definition's own `window` slices its own gap rows. The
+correction is `C04_CHILDGAP_WALK.md` S4a, and its lesson is that a ruling
+borrowing another rule's reason inherits that rule's subject.
 
 ### Container widths, and the width a `row` group gives its children
 
@@ -3403,6 +3464,8 @@ split fails rather than passing on a message that reads as covering it.
   **And every declared kind carries `Padding & Floor`, which the implementation asked for and the walk did not.** `Block` is `BlockKinds[keyof BlockKinds] & Gap & Floor`. The layout reads `gapBefore` and `minHeight` off any block it is handed, so a member without them makes those reads a type error across the whole union — 41 of them, on the first augmentation written inside this program. Declaring the base here rather than asking an app to remember it is the difference between a contract the compiler holds and a sentence in a document; intersection distributes over a union, so `switch (b.kind)` narrows exactly as before. An app's build never re-checks `src/`, so the framework's own suite is the only place the omission can surface, and T4.2 is where it did. F405.
 
   **And the key must match the member.** `KnownBlockKind` derives from `KnownBlock["kind"]` rather than from `keyof KnownBlockKinds`, so a mistyped key would be invisible in the union it produces; the two are asserted equal at the type level (T2.129), which is the only place the mistake can be seen.
+
+- **I121** — **`childGap` is the container's space *between* its children, and it is charged per placed child.** A container spends `max(0, placed − 1) × childGap` on its own axis — `1` by default across and `0` down, which is `ROW_GUTTER`'s behaviour given a name (F1226) — and `padding` takes its edges outside all of them, so a container with both draws one gap above the first child rather than two (§3b). It is the container's and never the composer's (C09 I17): `sequenceHeight` adds nothing and a document's top level has no `childGap`, the row between entries being the entry's own closing run (C22 I85). A container with one child or none spends nothing, whatever the field says. A gapped container remains windowable, because the gap rows are the definition's rather than the registry's.
 
 ## 7. Commitments
 
