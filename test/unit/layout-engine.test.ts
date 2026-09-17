@@ -7,7 +7,7 @@
 // where a row can be, it constructs the cell where two rules meet: I3's growing
 // child in a fitting row, I5's second clamping round, I9's column whose cross
 // axis is width.
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   compose,
@@ -22,9 +22,11 @@ import { DEFAULT_WIDTHS } from "../../src/testing/measurement-conformance.js";
 import { art } from "../../src/presentation/art.js";
 import { widthRung } from "../../src/presentation/blocks/kinds/status.js";
 import { cells } from "../../src/presentation/text.js";
-import { FULL_CAPS } from "../support/render.js";
+import { FULL_CAPS, measurable } from "../support/render.js";
 import { sourceOf } from "../support/source.js";
 import { REGION, anchored, centred, placeIn } from "../support/overlay.js";
+import { block } from "../../src/data/viewmodel/index.js";
+import type { MeasureMemo } from "../../src/presentation/blocks/index.js";
 
 const rows = (id: string, ...lines: string[]): Box => ({ id, children: { kind: "rows", rows: lines } });
 
@@ -781,11 +783,53 @@ describe("C29 — the sizing core", () => {
     expect(flipped[0]?.truncated, "and it fitted there, so nothing was clipped").toBe(false);
   });
 
-  // The spec commit's row, before the assertion exists (SP9). C29 I20 and §7e:
-  // the engine holds no cache, and incremental layout is identity.
-  it.todo(
-    "T1.34 (C29 I20, \u00a77e, C22 I100, C09 I61): the engine's sources declare no cache, and one memo across asks at 80, 60 and 80 leaves the slot at each width in turn \u2014 not deferred on a component: the assertion is not yet written",
-  );
+  it("T1.34 (C29 I20, \u00a77e, C22 I100, C09 I61): the engine declares no cache, and the memo holds one slot per block", () => {
+    // **The engine's own sources, by equality over the directory.** An absence
+    // check on one file is satisfied by a cache in the next one along, and the
+    // claim is about the component rather than about `solve.ts`.
+    const files = readdirSync("src/presentation/layout").filter((f) => f.endsWith(".ts"));
+    expect(files.sort(), "every source the engine has, by equality").toEqual(
+      ["compose.ts", "distribute.ts", "index.ts", "solve.ts", "types.ts"].sort(),
+    );
+    for (const f of files) {
+      const text = sourceOf(`src/presentation/layout/${f}`);
+      expect(/\b(?:new\s+(?:Weak)?Map\b|memo)/u.test(text), `${f} declares no cache`).toBe(false);
+    }
+
+    // **The memo's shape, through a call.** One memo across three asks: 80, 60,
+    // 80. A map over widths and a single slot agree on every ask that does not
+    // revisit a width \u2014 which is every ask a static run makes \u2014 so the third
+    // ask is the whole of the assertion.
+    const kit = measurable({ capabilities: FULL_CAPS });
+    const subject = block({
+      kind: "panel",
+      id: "pn",
+      title: "a panel",
+      children: [
+        block({
+          kind: "notice",
+          id: "nt",
+          tone: "info",
+          text: "a line of prose long enough to wrap at sixty columns and not at eighty, which is the point of it",
+        }),
+      ],
+    });
+    const memo: MeasureMemo = new WeakMap();
+    const ask = (w: number): number => kit.registry.measureSequence([subject], w, memo);
+
+    ask(80);
+    expect(memo.get(subject)?.width, "the slot carries the width it was asked at").toBe(80);
+    ask(60);
+    expect(memo.get(subject)?.width, "and the next ask replaces it rather than joining it").toBe(60);
+    ask(80);
+    expect(memo.get(subject)?.width, "so returning to a width is a miss, not a hit").toBe(80);
+
+    // **And what the slot holds is the committed figure** (C09 I61): the same
+    // number the render path uses, not a natural size with the cap applied
+    // after each read. Asserted against the public measure rather than against
+    // a constant, so it moves with the definition.
+    expect(memo.get(subject)?.rows, "the stored rows are the ones the registry answers").toBe(ask(80));
+  });
 
   it("T1.17 (C29 I17): the module header names the clay port and the version read, and DEPENDENCIES.md carries the refusal", () => {
     // **Asserted on the source**, because a licence condition nobody reads is
