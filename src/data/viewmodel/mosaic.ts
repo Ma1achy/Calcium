@@ -153,10 +153,13 @@ export function divideShares(shares: readonly Share[], total: number, gaps: numb
  * The remainder, distributed rather than dropped — `facetWidths`' ruling, in the
  * one place it applies here.
  *
- * **Not in `divideShares`, and the difference is the gutter.** A `row` group
- * puts a cell between its children and T3.16 pins its remainder where it is, so
- * changing the shared rule would move a shipped frame for a decision that is not
- * the share rule's to make. A mosaic **tiles**: three columns of `floor(40/3)`
+ * **Not in `divideShares`, and the difference is a declared policy** (C04 I42,
+ * F1219). The leftover is not a property of the arithmetic: a group spends
+ * nothing and a mosaic tiles, and this function is the mosaic's half. **The row
+ * that pins the group's unspent cell is T3.17** — `52 + 26 + 1 = 79`, *one cell
+ * of the eighty goes to nobody*; this comment named T3.16, which asserts equal
+ * weights against the unweighted path and is invariant under every distribution
+ * rule, so it could not pin a remainder. A mosaic **tiles**: three columns of `floor(40/3)`
  * leave the right-hand column blank at every width that does not divide, which
  * is exactly what C12 §3 called *visible as a ragged edge in every faceted
  * frame*.

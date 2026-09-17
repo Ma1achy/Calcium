@@ -64,10 +64,17 @@ export function insetWidth(width: number): number {
  *     proportionally makes the separator between a 2 and a 1 narrower than the
  *     one between two 2s, and a gutter's job is identical between every pair.
  *   - **The remainder after flooring is unspent**, exactly as it is with no
- *     weights at all. Spending it — on the leftmost child, as C11 does with a
- *     table's residual — would make `flex: [1, 1]` differ from no `flex`, and a
- *     table's residual exists *to be absorbed* where a group has no child that
- *     claims it.
+ *     weights at all — **a declared policy and not a property of the
+ *     arithmetic** (C04 I42): a group spends nothing, a mosaic tiles by largest
+ *     remainder, and `spread` is the mosaic's half of one function. The reason
+ *     this clause used to lead with is **false and is corrected** (F1219):
+ *     *spending it would make `flex: [1, 1]` differ from no `flex`* is true of
+ *     C11's **leftmost** rule, the alternative it was written against, and false
+ *     of any rule applied uniformly — both arms resolve `flex ?? ones`, so a
+ *     rule that does not ask whether weights were written keeps them identical.
+ *     What rules is the clause beside it: a table's residual exists *to be
+ *     absorbed* where a group has no child that claims it, so distributing it
+ *     picks a child on the arithmetic's behalf.
  *   - **Absent weights are an equal split**, and the arithmetic below reduces to
  *     the old `floor((w - gaps) / n)` when every weight is equal. T3.16 asserts
  *     that against the unweighted path rather than against a number.
