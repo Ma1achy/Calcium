@@ -53748,6 +53748,73 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1216 — a navigable element is one rectangle, and the checker's three predicates are the written specification of that ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | The layout plan's second register-only entry: whether `NavElement` should carry a fragmented shape now that the rows arm composes every container. **Recorded, type untouched** — nothing in the tree produces a fragmented element and there is no hyperlink kind, so widening it now would be a shape with no producer. |
+| **Reached for** | `src/testing/navigation-conformance.ts:177-215`, read as a specification rather than as a check. Its three predicates — containment, reading order, per-level disjointness — all take `{rows, cols}` as **one** rectangle, and two of them give **false failures** for a real wrapped run. |
+| **Verdict** | **Open, by choice.** When a fragmented element is needed the shape already exists two layers over: `CellSpan` (`src/interaction/editor/layout.ts:198`) and `selectionSpans`, per-row spans produced by the same wrap walk that drew the rows. |
+
+**What breaks, stated per predicate, because the reason is the specification.** A run that starts
+mid-row, fills the rows below it to both margins and ends mid-row has a bounding box spanning the
+full column range on every row it touches.
+
+- **Disjointness** compares bounding boxes, so an element sitting in the columns the run does
+  *not* occupy on its first or last row shares a cell with it and is reported. The failure is in
+  the predicate, not in the layout.
+- **Reading order** sorts by `(rows.from, cols.from)`, and the union's `cols.from` is the
+  leftmost column of any of its rows — `0` for anything that wraps. A run beginning at column 30
+  sorts ahead of an element at column 5 of the same row.
+- **Containment** passes, which is the tell: *inside the bounds* is satisfied by every wrong
+  answer, and it is the one predicate a union rectangle cannot fail.
+
+**The shape to copy, and why it is not a new design.** `selectionSpans` answers a list of
+`{row, from, to}` from the same wrap walk that produced `displayRows` and `cursorCell` — one
+walk, three readers, which is what keeps the spans and the rows from drifting. A navigable
+element wanting fragments wants exactly that, produced where the rows are produced rather than
+recovered from them afterwards.
+
+**Constructed rather than argued, because a finding whose evidence is a reading gets planned and
+never checked.** A run at rows `[0,3)` × cols `[0,20)` — the union of a fragment starting at
+column 30 of row 0 — beside a neighbour at row 0, columns `[5,15)`, listed in true reading order,
+run through `checkElements` with a stub registry: **eight failures over the sweep's four widths,
+`order` and `disjoint` at every one of them, and `containment` at none.** The ordering message
+reads *run is drawn above before and listed after it* about an element that is drawn below and to
+the right of it. The layout is correct and the checker says otherwise, four times.
+
+**Recorded rather than built, and the condition is written here so it can be grepped from the
+satisfier**: the day a kind draws a hyperlink, or any element whose text wraps and is navigable,
+this entry is the design. Until then `NavElement` has no producer that needs it, and a widened
+type would be a deferral with nothing watching it.
+
+## F1215 — the scroll-over-atomic-child disagreement is ruled, tested and exercised by nothing ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | The layout plan owed this as a register entry with no code. The disagreement itself is **settled**: C09 I59 names it in its own text, T3.76 pins `measure 3 / rendered 9`, T2.126 watches the fourteen unsliceable kinds by equality, and F855/F856 are closed. What is open is the **instrument**. |
+| **Reached for** | The corpus and the sweep, read directly. `test/support/blocks.ts`'s only over-full scroll is `adv-overfull-scroll`, whose two children are `raw` — and `raw` is not in T2.126's fourteen, so it **declares a window** and is sliced. Every over-full scroll the suite renders therefore takes the repaired path. `DEFAULT_WIDTHS` in `src/testing/measurement-conformance.ts` is `[40, 60, 80, 100, 120, 160, 200]`. |
+| **Verdict** | **Partly** — the width half is closed by F1209's oracle, which captured at 2, 8, 12, 20, 24 and 32 columns as well as 40 and above. The corpus half stands: no fixture puts an atomic child in a bounded container. |
+
+**The corpus's own comment says the shape of this and stops one kind short.** Beside
+`adv-overfull-scroll` it reads *two children rather than one, and the first is short: a sweep
+whose only over-tall case is also the only case is one where “slice the child” and “drop every
+child but the first” draw the same thing* — F855's lesson, applied. The next axis is the child's
+**kind**, and it was not applied there: one over-full scroll, both children windowed, so the
+branch that runs when `windowChild` answers `null` is reached by no fixture in the sweep.
+
+**Why it is a register entry and not a change.** Windowing five more kinds moves a watched
+equality list in the middle of a compositor pass, and T2.126 is held by equality precisely so
+that cannot happen quietly. The fixture is the cheap half — an over-full scroll with a `plot` or
+a `panel` child, which are atomic permanently and atomic-for-now respectively — and it belongs
+with whoever next opens I59, because a new adversarial fixture moves the oracle, the goldens and
+the terminal baseline together.
+
+**The width half is closed and worth recording as closed**, because the plan asserted both halves
+and only one survived contact: the oracle's corpus holds 172 captures at width 2 and 172 at 12,
+which is well below where container disagreements were said to grow and below anything
+`DEFAULT_WIDTHS` reaches.
+
 ## F1214 — two mutation survivors are caught, exactly, by rows the run does not execute ★★★★☆
 
 | | |
