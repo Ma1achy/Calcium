@@ -53748,6 +53748,49 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1220 — the engine's own selling point is violated twice by its pass ordering, found before a type existed ★★★★★
+
+| | |
+|---|---|
+| **Surface** | The scheduled hand walk of C29, both artefacts — a classification table over the cells where two sizing rules meet at rest, and a sequence trace over the five passes. Twelve cells ruled; the two defects are in the **document**, not in a cell, and both are the same invariant. |
+| **Reached for** | The trace's pass boundaries, asking what each pass consumes that the one before it produced. §18 is the whole argument for the engine — *`measure` stops after pass 4 and reads the root's height; C09 I1 then holds **by construction** rather than by discipline, which is the property the Yoga route was going to buy*. Both defects make it false. |
+| **Verdict** | **Closed by two rulings**, written into the walk and owed to C29's spec. `docs/notes/C29_LAYOUT_WALK.md`. |
+
+**D1 · `aspect` is resolved after the pass whose input it invalidates.** §15 resolves it *after both
+axes have a size, by shrinking the axis with slack*. §4's pass 3 is the re-fit, where *text re-wraps
+at its solved width, so heights are only knowable now*. So an aspect that shrinks the width **after**
+pass 4 leaves every height computed in pass 3 standing at the old width: a box of wrapped prose
+solved at 40 and aspect-shrunk to 31 carries 40's height, and §18 has `measure` return exactly that
+number. **C09 I1 violated by construction, in the engine that exists to make it hold by
+construction.** Ruled: aspect resolves on the **width** axis in pass 2 and on the height axis in
+pass 4, because §4's whole argument is that width precedes height and an aspect is a width
+constraint like any other. What §15 describes is the shape of a solver that does both axes at once,
+which §4 is explicitly not. The residue is stated rather than papered over: the implied height
+becomes a target pass 3 can exceed, and then A9 applies and aspect loses.
+
+**D2 · nothing says the representation choice is a pure function of the tree and the width.** §12
+picks the widest fitting form *per element, bottom-up, during pass 2*, and a representation **is a
+different `Box`** — so choosing one changes the tree that §18 says both halves build. `measure` at
+`w` and `render` at `w` must choose the same one or C09 I1 is false, and §12 and §18 together never
+say they must. Ruled: **the choice reads the child's own solved share and nothing else**, which puts
+it under §20 rule 7 with everything else — no focus, no state, and in particular **not** *what was
+chosen last frame*. That last one is the tempting one, because it would stop a form flickering as a
+width crosses a threshold and it would make the frame depend on its predecessor. **So the flicker is
+named and given a remedy that keeps purity**: hysteresis lives in the declared `min` values, never in
+the engine's memory.
+
+**Both are the pass structure disagreeing with itself, which is what a sequence trace is for and
+what the classification table could not reach.** Twelve table cells produced twelve rulings and no
+defects — they are cells where two rules overlap and the overlap resolves. The trace has seven rows
+and one of them found both. **Evidence for CLAUDE.md's *two artefact shapes catch different
+interactions*, from the side that usually goes unexamined**: C19 needed a table and had a trace;
+this needed a trace and the table was the obvious artefact, because a sizing model reads as a
+classification problem.
+
+**And the table's blind spot is stated with it.** It indexes **pairs**. A cell where three rules meet
+— `aspect` on a `stretch`ed child with a `PERCENT` cross axis — is in neither artefact, and D1 is the
+evidence that three-rule interactions surface at the pass boundaries rather than at rest.
+
 ## F1219 — the distribution rule is two rules, and the reason written against changing it is false ★★★★☆
 
 | | |
