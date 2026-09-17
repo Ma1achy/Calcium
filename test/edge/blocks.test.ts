@@ -611,6 +611,16 @@ describe("C09 §2c width — the answers (I42–I44)", () => {
 });
 
 describe("C09 §2 padding — the registry's one application", () => {
+  // The spec commit's rows, before the ladders exist (SP9). C09 I81: a kind
+  // that runs out of width sheds a part and says so, and never shreds every
+  // part at once. Four kinds owe one (F1228).
+  it.todo(
+    "T3.93 (C09 I81, F1228): comparison, keyValue, events and steps swept from 4 to 80 columns and read as frames — every part still drawn is legible, the parts shed go in the declared order, and a withholding is stated — not deferred on a component: the four ladders are not built",
+  );
+  it.todo(
+    "T3.94 (C09 I81, C26 §5): a kind at its narrowest rung produces the same element ids as at its widest, so a shed part never drops an item — not deferred on a component: the four ladders are not built",
+  );
+
   it("T3.91 (C09 I80, C04 I25): the registry insets and pads every kind once, on all four seams", () => {
     // **The row SP9 held open through 2a's spec commit, written now that 2a has
     // landed.** All four seams against one block, because the claim is that one

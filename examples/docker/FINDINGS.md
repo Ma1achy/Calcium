@@ -53748,6 +53748,49 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1229 — an invariant whose worked example cannot be constructed ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | C29 I16 — *a contradictory declaration is refused at construction, never at layout* — whose example is **a `sticky` child that is `GROW` on the scroll axis**. |
+| **Reached for** | Phase 3's ruling on `LAYOUT_ENGINE.md` §14. Refusing `sticky` meant reading every citation of it, and I16 was the one that used it as its only instance. |
+| **Verdict** | **A03 §2's vacuity class, in a justification rather than in a rule.** The invariant's claim is sound and its example forbids nothing, because nothing can declare a `sticky` child at all. |
+
+**The invariant is right and its instance is imaginary.** *A throw mid-pass would abandon a
+half-solved tree and reach the frame as a fault rather than as a layout* — that is a real
+constraint, it is why `measure` is total (C09 I2), and it holds. What it lacked was anything a
+reader could construct to test it against: `sticky` is in no type, no validator and no block, so
+the sentence *this is refused at construction* has no subject to be refused.
+
+**Why review cannot reach it.** The example reads as the most careful part of the invariant — it
+names a specific contradiction and explains the mechanism of the loop it would create. A reader
+checks whether the sentence is *true*, and it is: a sticky child that grew into the space it is
+excluded from would loop. The question that reaches it is the mutation pass's — **can this be
+violated** — and F84's is the same one about a scope: *does this sentence constrain the decision it
+is attached to.* Here it constrains nothing, because the decision has no instances.
+
+**And it was written in the direction that makes it harmless.** An invariant with an imaginary
+example is not a false claim; it is a claim with an empty domain, which is exactly what passes a
+check indistinguishably from one that is satisfied. Four spec commits cited I16 and none of them
+could have noticed, because every one was about the *general* rule.
+
+**Corrected to a declaration that exists**: an `image` declaring both `width` and `aspect`, which
+C04 I62 refuses at construction with the reason *two ways to say one number*. And the boundary I16
+names is now stated rather than assumed — a `Box` is built by L1 from an already-validated block
+(`groupMeasureBox`, `panelMeasureBox`, `scrollMeasureBox`), so C04's validator is upstream of every
+field the engine reads. That sentence was the thing the `sticky` example was standing in for.
+
+**The class, and it is narrow but it has a home.** *An invariant is vacuous until its subject
+exists* is already a recorded rule about whole invariants. This is the same defect one level in:
+**the subject of the invariant existed and the subject of its example did not**, so the rule was
+live and the reason a reader would check it against was not. The cheap check is the one that found
+it — when a field is refused, read every citation of it, because a citation may be load-bearing for
+something other than the field.
+
+**Closed** — I16's example corrected, its boundary named, and `sticky` refused in C29 §7c.
+
+---
+
 ## F1228 — §12's four cited consumers are the four that do not need it, and the four that do are not named ★★★★☆
 
 | | |

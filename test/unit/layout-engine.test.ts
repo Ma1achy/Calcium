@@ -646,6 +646,16 @@ describe("C29 — the sizing core", () => {
     expect(measure(overSubscribed, 30)).toBe(1);
   });
 
+  // The spec commit's rows, before the code exists (SP9). C29 I18 and §7b/§7c:
+  // the engine chooses no representation, and the two owners that do exist are
+  // `art()` at the document layer and a definition's own ladder.
+  it.todo(
+    "T1.30 (C29 I18, §7b): Box declares no representations and no sticky, asserted as the field set by equality, and the two owners that exist answer through a call — not deferred on a component: the field set is not yet asserted",
+  );
+  it.todo(
+    "T1.31 (C29 I18, §7b, C09 I72): a variant's minimum is measured from the form and never declared beside it — two forms differing by one cell select differently at that one width — not deferred on a component: the assertion is not yet written",
+  );
+
   it("T1.17 (C29 I17): the module header names the clay port and the version read, and DEPENDENCIES.md carries the refusal", () => {
     // **Asserted on the source**, because a licence condition nobody reads is
     // how one gets found at publication. Zlib's only real condition is the
