@@ -538,6 +538,18 @@ export function placeRows(placed: readonly Placed[], height: number): readonly s
       if (row === undefined || row === "") continue;
       pieces.push({ x: p.x, row: fitRow(row, p.width) });
     }
+    // **Sorted, because `composeRow` walks a cursor left to right** and a piece
+    // behind it is cut to nothing. A row group hands its cells in column order
+    // and never needed this; a mosaic hands its cells in *region* order, which
+    // `parseAreas` takes from first appearance — `AAB/DEB/DCC` gives A, B, D, E,
+    // C, so B at column 90 arrives before D at column 0 and swallowed both cells
+    // of the middle band. **Nothing in the tree could see it** (F1213): every
+    // golden agreed, every count agreed, and the corpus holds no grid whose
+    // later region starts left of an earlier one. Until the arm was deleted the
+    // overlap made `composeRow` decline and the frame fell through to Ink, which
+    // drew it correctly — so the decline was carrying this, and removing it is
+    // what exposed it.
+    pieces.sort((a, b) => a.x - b.x);
     lines.push(composeRow(pieces));
   }
   return lines;

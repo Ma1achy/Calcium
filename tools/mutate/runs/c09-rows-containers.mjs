@@ -166,6 +166,18 @@ const results = runPass({
       expect: "T2.147",
     },
     {
+      // **The sort dropped**: pieces reach the composer in the order their
+      // container hands them over, which for a mosaic is region order and not
+      // column order. Every count survives it and every golden agrees, because
+      // no corpus grid has a later region starting left of an earlier one
+      // (F1213). T2.147's pinwheel is the one that does.
+      name: "PIECE-ORDER-DROPPED: a row's pieces are composed in the order they were placed",
+      file: R,
+      from: "    pieces.sort((a, b) => a.x - b.x);\n",
+      to: "",
+      expect: "T2.147",
+    },
+    {
       // **The cut a row long**: the frame moves rather than the arm, so this is
       // the byte half of the pair above — the region keeps one row too many.
       name: "CELL-CUT-LONG: a mosaic cell keeps one row past its region",

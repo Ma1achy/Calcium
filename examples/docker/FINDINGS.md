@@ -53748,6 +53748,67 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1213 — a mosaic whose regions are not in column order lost two of its five cells, and every gate agreed ★★★★★
+
+| | |
+|---|---|
+| **Surface** | The plan owed a measured before and after on *the mosaic scroll frame*, with a stated ceiling of **~87 ms of 145**. That figure is in **no file** — not FINDINGS, not a spec, not a roadmap row — and no instrument could have produced it: `tools/bench/stress.mjs` has twenty-seven cases and none draws a mosaic, and no surface either example ships uses one. The ceiling was carried from the brief the plan replaced, which the plan itself had already corrected in three other places. |
+| **Reached for** | Writing the missing instrument. A worktree at `789e4007` — the last commit with mosaic on the element arm — installed, built, and rendered against the same document as HEAD, digest first. Six kinds agreed byte for byte; the seventh, a pinwheel `AAB/DEB/DCC`, did not, and reading the frame showed **the whole middle band blank**: cells D and E drawn by the old tree and drawn by nothing in the new one. |
+| **Verdict** | **Closed — read, diagnosed and fixed.** `placeRows` sorts each row's pieces by column; T2.147 holds the pinwheel, `PIECE-ORDER-DROPPED` mutates the sort away, and the two trees' digests are equal at every width. The instrument that found it, `tools/bench/mosaic.mjs`, is the other half — with a `mosaic` case in `stress.mjs` beside it — see the measurement below. |
+
+**`parseAreas` orders regions by first appearance and `composeRow` walks a cursor left to
+right.** `AAB/DEB/DCC` yields A, B, D, E, C, so B — at column 20 of 30 — reaches the composer
+before D at column 0 and E at column 10. A piece behind the cursor is cut to nothing and
+contributes nothing, so both cells vanished. `placeRows` now sorts each row's pieces by column,
+and the frames agree at every width.
+
+**A row group hands its cells in column order, which is why this survived every test the move
+had.** The composer was written for the row group and its contract — *pieces are in column
+order* — was satisfied by construction at the only call site that existed. Mosaic is the second
+caller and it satisfies nothing of the kind; the contract was in a comment and in nothing that
+could fail.
+
+**What had been carrying it is the decline this pass removed.** Until the element arm went, a
+piece behind the cursor made `composeRow` answer `null`, the mosaic fell through to Ink, and Ink
+drew the grid correctly. So F1210's measurement — *the declines fire zero times across 6,281
+tests and 458 goldens* — was true of the corpus and true of nothing else: this frame fires one,
+and firing it was the only reason it was right. **A decline can be load-bearing precisely where
+no test reaches it**, which is the inverse of the reading that made removing it look free.
+
+**Every gate agreed, and it is worth listing which.** Forty rows, the declared height. Five
+children measured once and rendered once. `make golden` 458 passed with **0 movers**. `make test`
+green over 6,265 rows. The terminal baseline's 2,440 frames unmoved. The corpus holds no grid
+whose later region begins left of an earlier one, so the whole apparatus was blind in exactly the
+same place — **a corpus chosen for coverage of kinds is not a corpus of shapes**, and every
+instrument in the repository reads it.
+
+**The instrument is the finding's other half.** The ceiling could not be checked because nothing
+measured a mosaic, and nothing measured a mosaic because no shipped surface has one. A figure
+about a frame no instrument draws cannot be confirmed or refuted; it can only be repeated. Having
+written the bench, the paired reading is below — and it is not the ~87 of 145 the plan carried,
+in either direction.
+
+**The measurement.** `tools/bench/mosaic.mjs`, the pinwheel above filled with five sixty-line
+`logs` children at a height of 40, rendered through the public testing entry against each tree's
+`dist/`, 200 frames a reading, three paired rounds, `make load-down` first. Host load averages
+3.5–3.8 throughout, which is a desktop under use rather than a quiet machine — so the **paired
+per-round difference** is the figure and the absolute numbers are not.
+
+| round | before (`789e4007`) | after | difference |
+|---|---|---|---|
+| 1 | 22.10 ms/frame | 1.48 | **−20.6 ms · ×14.9** |
+| 2 | 20.67 | 1.68 | −19.0 · ×12.3 |
+| 3 | 19.26 | 1.80 | −17.5 · ×10.7 |
+
+**Three of three in the same direction, and the digests are equal on both sides of every round**
+— the same 8,000 rows, byte for byte, which is the assertion that makes the timing mean anything.
+The plan's ceiling said *~87 ms of 145, and most of what it removes is the SGR round-trip rather
+than layout; if it lands under half of that, say so plainly.* It is not under half: a mosaic
+frame that cost about twenty milliseconds costs about one and a half. But the ceiling was a
+figure about a frame nothing measured, so what this refutes is the premise and not the estimate —
+the honest statement is that **the mosaic path was between ten and fifteen times its new cost,
+and nobody knew because nothing drew one.**
+
 ## F1212 — deleting one dependency emptied six mechanisms in five components, and each was green the moment before ★★★★☆
 
 | | |

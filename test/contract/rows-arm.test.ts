@@ -310,6 +310,41 @@ describe("C09 I72 — the two arms agree", () => {
     expect(row0.startsWith("W".repeat(10)), `the left cell fills its ten columns: ${JSON.stringify(row0)}`).toBe(true);
     expect(row0[10], "and stops there — the eleventh column is the right cell's").not.toBe("W");
     expect(row0, "which is where RIGHT is").toContain("RIGHT");
+
+    // **A region declared before another that starts to its left** (C04 §3f,
+    // F1213). `parseAreas` orders regions by first appearance, so the pinwheel
+    // `AAB/DEB/DCC` yields A, B, D, E, C — and B, at the right-hand column,
+    // reaches the composer before D and E, which begin at column 0. `composeRow`
+    // walks a cursor left to right and cuts a piece behind it to nothing, so
+    // both cells of the middle band were dropped and **every count still
+    // agreed**: forty rows, the declared height, the right blocks rendered.
+    //
+    // The corpus has no such grid, so nothing saw it. What had been carrying it
+    // is the decline this pass removed — the overlap sent the frame to Ink,
+    // which drew it correctly (F1210, F1211).
+    const pinwheel = {
+      kind: "mosaic", id: "m-pin", height: 6, areas: "AAB/DEB/DCC",
+      rows: [1, 1, 1], columns: [1, 1, 1],
+      // **Every cell is filled to the grid's height**, because the defect needs
+      // B on the same line as D and E: a piece the composer meets first, at a
+      // column past theirs. A one-row child would leave the band empty and the
+      // row would pass over the bug.
+      children: ["A", "B", "D", "E", "C"].map((t) => ({
+        kind: "raw", id: `p${t.toLowerCase()}`, text: Array.from({ length: 6 }, () => t.repeat(4)).join("\n"),
+      })),
+    } as unknown as Block;
+    const pin = renderToLines(r, pinwheel, 30, { theme: DARK_THEME, capabilities: FULL_CAPS });
+    expect(pin, "the grid's declared height").toHaveLength(6); // cells-ok — rows
+    // Row 0 is the top band: A across two columns, B in the third.
+    expect(pin[0], "the top band").toBe(`AAAA${" ".repeat(16)}BBBB`);
+    expect(pin[1], "and its second row").toBe(`AAAA${" ".repeat(16)}BBBB`);
+    // Row 2 is the middle band, and it is the one that was blank: D at column 0,
+    // E at column 10, B continuing at column 20.
+    expect(pin[2], "the middle band — D and E are not swallowed by B").toBe(`DDDD${" ".repeat(6)}EEEE${" ".repeat(6)}BBBB`);
+    expect(pin[3], "and its second row").toBe(`DDDD${" ".repeat(6)}EEEE${" ".repeat(6)}BBBB`);
+    // Row 4 is the bottom band: D continuing at column 0, C across the rest.
+    expect(pin[4], "the bottom band").toBe(`DDDD${" ".repeat(6)}CCCC`);
+    expect(pin[5], "and its second row").toBe(`DDDD${" ".repeat(6)}CCCC`);
   });
 
   it("T2.146 (C09 I72, I73; F1209): every capture the two rows ask for is a capture the tree holds, and every capture the tree holds is one a row asks for", () => {

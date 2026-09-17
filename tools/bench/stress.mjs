@@ -237,6 +237,17 @@ const CASES = {
   panel: { n: 150, says: "a panel holding markdown and key-values per entry", entries: (n, r) => range(n, (i) => [b.panel(`panel ${String(i)}`, [...b.markdown(markdownSource(r, 2), { idPrefix: `pm${String(i)}-` }), b.kv({ owner: sentence(r, 2), state: "held", rows: String(i) }, { id: `pkv${String(i)}` })], { id: `pn${String(i)}` })]) },
   progress: { n: 300, says: "a progress bar per entry", entries: (n) => range(n, (i) => [b.progress({ id: `pg${String(i)}`, label: `job ${String(i)}`, current: i % 100, total: 100 })]) },
   image: { n: 60, env: "kitty", says: "a PNG per entry under kitty", entries: (n) => range(n, (i) => PNG === null ? [b.notice("warn", "out/probe.png is missing", undefined, { id: `img${String(i)}` })] : [b.image({ id: `img${String(i)}`, data: PNG, height: 12, alt: `picture ${String(i)}` })]) },
+  // **A mosaic, because there was none and that is how a ceiling went unchecked.**
+  // The plan for F1209 carried *~87 ms of 145 on the mosaic scroll frame*; no
+  // case here drew one and neither example ships a surface with one, so the
+  // figure could be repeated and never confirmed (F1213). The pinwheel is the
+  // shape a nested row and column cannot make (C04 §3f), and its regions are
+  // deliberately not in column order — `AAB/DEB/DCC` parses to A, B, D, E, C —
+  // which is the arrangement that lost two cells silently.
+  mosaic: { n: 40, says: "a pinwheel grid of five log panes per entry — the figure nested rows and columns cannot draw", entries: (n, r) => range(n, (i) => [b.mosaic({
+    id: `mo${String(i)}`, height: 24, areas: "AAB/DEB/DCC", columns: [2, 1, 1], rows: [1, 2, 1],
+    children: ["a", "b", "d", "e", "c"].map((t) => b.logs(logLines(r, 40), { id: `mo${String(i)}-${t}` })),
+  })]) },
   // plots
   everyplot: { n: 1, says: "every 2-D form once, still", entries: () => FORMS.filter((f) => f !== "plot3d").map((f, i) => [caption(`c${String(i)}`, `${f} · ${CATALOGUE[f].says}`), staticForm(f, 0)]) },
   everylive: { n: 1, animated: true, says: "every 2-D form once, live at 16 ms", entries: () => FORMS.filter((f) => f !== "plot3d").map((f, i) => [caption(`c${String(i)}`, f), liveForm(f, i, 16)]) },
@@ -291,7 +302,7 @@ function range(n, f) {
 
 const STANDARD = [
   "spinners", "steps", "stream", "text", "code", "logs", "table", "bigtable", "kv", "patch", "bigpatch",
-  "notice", "tip", "pills", "panel", "progress", "image", "everyplot", "everylive", "everymesh",
+  "notice", "tip", "pills", "panel", "progress", "image", "mosaic", "everyplot", "everylive", "everymesh",
   "live:line", "live:heatmap", "live:bar", "livemesh:suzanne", "livemesh:bunny", "session", "mixed",
 ];
 
