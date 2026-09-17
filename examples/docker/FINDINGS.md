@@ -53793,8 +53793,22 @@ constraints on it: a horizontal anchor is inert unless the thing anchored has a 
 float is sized by its own `FIT` and never by the frame. A6's asymmetry is C15's and stays C15's. The
 first walk is kept whole and none of its measurements are retracted.
 
-**Open** — §10 lands as `Box.floating`, resolved after pass 5 into a product beside the solved tree;
-the second walk is `docs/notes/C29_LAYERS_WALK.md`.
+**7 · And the scope is the whole section, which is the ruling that governs the rest of this pass.**
+The first three grounds of the refusal — no integer for the free-position arm, no subject on the
+horizontal axis, `frameRing` in no file — are each **a statement that the thing is unbuilt**, which is
+the premise of the phase rather than an argument against it. The section also has shipping subjects
+the refusal never looked for: `promptUnderMenu` is C15's own prompt-anchored float, `kind: "peek"` is
+the element-anchored float governed by I21–I23, the completion menu and `find` both float over the
+transcript, and a chip's preview does it in the prompt. **Three refusals in a row is one process
+fault repeated, not three judgements**, and CLAUDE.md gains the rule that says so: a groundwork pass
+builds, *anything named in an approved plan is queued*, and a premise check is a check rather than a
+veto.
+
+**Open** — §10 lands whole: `Box.floating` with all three `attachTo` forms, `anchor`, `offset`,
+`clipTo`, and the nudge on **both** axes, `x` first, resolved after pass 5 into a product beside the
+solved tree (§7f, I22); and the frame ring, the per-frame layer stack and the named positions as
+three types rather than one ladder (§7g, I23). The second walk is
+`docs/notes/C29_LAYERS_WALK.md`.
 
 ---
 

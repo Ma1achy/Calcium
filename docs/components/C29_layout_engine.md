@@ -330,6 +330,13 @@ anchor points, a nudge, `clipTo: "attachedAncestor"`, a named four-position stac
 **Two of those are built, one is built a layer above where the design puts it, and three have no
 subject** (F1230, `docs/notes/C29_LAYERS_WALK.md`).
 
+**§10 holds two mechanisms under one heading, and this section is about the first.** C15's *layer
+stack* — a list of layers placed against a region, which the engine does not touch — is what every
+ruling below measures. The *float declared in the tree* is a different thing that happens to share
+§10's vocabulary: it is a box, it is sized by the engine's own passes, and §10 step 2 resolves its
+attachment against **pass 5**, which is this engine's. That half is **built** and is §7f; the
+refusals here are not retracted by it, because they are about layers (F1235).
+
 **Built, in `place.ts`.** `sortLayers` partitions by `kind` — `view`, then `peek`, then `overlay`,
 stable within each — and no integer exists anywhere in C15, so §10's *refused: a free integer
 z-index* holds by construction rather than being owed. The nudge is step 7 and it is **one axis**,
@@ -368,6 +375,111 @@ rather than defaulted.
 are each one layer over one base, which **is** the frame stack with one member — *the correct
 outcome, not a wasted mechanism*, in the section's own words, with `INTERACTION.md` §14's *there are
 no pushed views* the ruling that keeps it so.
+
+## 7f. Floats — declared in the tree, skipped by every sizing pass, resolved after pass 5
+
+`floating` is a box that **takes no space**: it contributes nothing to its parent's `FIT`, displaces
+no sibling, and is absent from every distribution. It is declared inside the tree so that it has a
+parent to attach to, and it is resolved once the tree is positioned, into a product **beside** the
+solved box rather than inside it — `layoutCounted` returns `floats`, and `SolvedBox` never carries
+the field, because a float is resolved rather than carried.
+
+```ts
+floating?: {
+  attachTo: { kind: "parent" } | { kind: "element"; id: string } | { kind: "root" };
+  anchor:   { self: Point; target: Point };
+  offset?:  { x: number; y: number };
+  layer:    "float" | "overlay" | "debug";
+  clipTo?:  "none" | "attachedAncestor";
+}
+```
+
+**The engine owes six steps and §10 states them in the wrong order at two of them** (F1235,
+`docs/notes/C29_LAYERS_WALK.md` Artefact C).
+
+1. solve the base tree; floats are skipped **upward only** (C4)
+2. resolve `attachTo` against the **composited** rect — the offset applied, not the flow rect (C2)
+3. size the float by the same four passes, against its own `FIT` and never the frame's width (A3)
+4. position it by anchor, then by `offset`
+5. take the window: the attached ancestor's clip, or the frame when `clipTo` is `"none"` (C1)
+6. **nudge inside that window** on **both axes, one at a time, `x` first**, and clip only where it
+   cannot fit at all
+
+**Step 6 is §10's step 4 and it has moved.** §10 nudges into the *frame* and then intersects with the
+*ancestor's* clip, which are two different windows in that order: a tooltip near the bottom of a
+scroll block is nudged to a row the frame allows and the ancestor does not, then clipped to nothing —
+**moved to the one place it cannot be drawn**. The nudge answers to the window the float will be
+clipped to, so the window is chosen first. Every other step of §10 is right.
+
+**The nudge is both axes and it is ordered, `x` then `y`.** §10 states one rule for two axes and C15
+has one axis of it plus an unreachable clamp (I19) — that asymmetry is C15's history and not a design.
+A float is nudged by the **minimum shift** that brings it inside the window, horizontally first: the
+two axes are independent here because a whole-cell rect has no diagonal constraint, and the order is
+declared anyway so that a float too large on both axes lands at the window's origin deterministically
+rather than at whichever corner the implementation reached last.
+
+**The attach rect is the composited rect, and no fixture at offset zero can see the difference.** A
+float attached to row 9 of a list scrolled to row 3 belongs at screen row 6; resolved against
+`SolvedBox.rect` it sits at row 9 and detaches from the thing it points at, which is the whole of
+what a float is for. `collect` already applies the offset and the resolution reads the same number.
+
+**`floating` and `sticky` are opposites wearing one sentence.** Both read as *this child is not laid
+out normally*: a sticky child **occupies flow space** and is excluded from an offset (I21); a float
+**takes no space** at all. A box declaring both asks for a child that occupies flow space and does
+not, so the engine states the contradiction rather than picking a winner — `floating` is read first
+and a `sticky` beside it is refused.
+
+**An unresolvable attachment omits the float; it never throws.** `Box.id` has no uniqueness rule, so
+`{ kind: "element" }` takes the **first** match in document order — a choice, because throwing on a
+duplicate makes a float's validity depend on a box two subtrees away that it does not name. And a
+throw mid-walk abandons every float already placed, which is the rejection path both artefact shapes
+are blind to: C15 already omits a zero-row layer without dismissing it, and this is that rule one
+layer down. A float naming a float not yet placed is the same condition, so a cycle needs no
+detection of its own.
+
+**Order within a layer is document order**, which is the only total order a tree supplies, and the
+walk is stable. The four names are §10's and no integer exists: a layer that overlaps another
+destroys it, and an integer anyone can pick is two things claiming a cell with the larger number
+winning.
+
+## 7g. Frames — a ring, a stack within a tab, and a layer stack within a frame
+
+`LAYOUT_ENGINE.md` §10's last third is three shapes stated as one ladder, and **a ring and a stack
+must not share one** — `INTERACTION.md` §2 corrected that error once already, where nesting, modality
+and parallelism were all wearing the same ladder.
+
+```
+FRAME RING      tabs — main and its subagents. ⌃⇥ cycles sideways; esc never leaves one
+  FRAME STACK   within one tab: a view pushed over its base; esc pops
+    LAYERS      within one frame: base · float · overlay
+DEBUG           global, above every frame, and it survives a tab switch
+```
+
+**The ring is not a stack and the engine says so in its type.** A ring has `next`/`previous` and no
+`push`/`pop`; nothing is above anything, and there is no top. A stack has `push`/`pop` and no cycle.
+Giving them one type is what makes `esc` ambiguous, which is the defect §10 names and the reason the
+two are separate products here.
+
+**Each frame owns its own layer stack**, which is what makes tabs work and is free once the nesting
+is right: a question open in tab B does not block tab A, switching tabs dismisses nothing and pops
+nothing, a float in tab B is clipped by tab B's scroll block rather than by the visible frame, and a
+frame's scroll position is the frame's and survives a switch.
+
+**Only one frame composites.** Layers blend — a float draws over its base and both are visible —
+and frames do not: the frame you are in is the only one drawn. **So a frame switch is a full repaint**
+and the frame diff sees every cell. That is the honest cost of `⌃⇥`, it is bounded by the region, and
+it is stated here so that nobody reports the switch as slow and goes looking for a bug.
+
+**Debug is the exception and is global**, above every frame and outside the ring: the profiler's
+overlay must not vanish because you switched tabs to look at what it is measuring.
+
+**What this does not settle, and it is not the engine's to settle.** `INTERACTION.md` §14 says there
+are no pushed views and names what each one became. **That ruling is about usage, not about the
+mechanism**: content that belongs in the record must not leave it, and having a frame stack does not
+undo the rule — it means the shape exists and the rule governs what may occupy it. The test is
+unchanged: *does it have its own prompt and its own context?* A subagent passes; a log does not. If
+nothing else ever passes, a tab's frame stack has exactly one member and costs nothing, **which §10
+pre-authorises as the correct outcome rather than a wasted mechanism**.
 
 ## 7e. Incremental layout — the cache is C22's, and identity is the dirty mark
 
@@ -525,9 +637,13 @@ measured against.
   named partition and the nudge are `place.ts`'s today — the nudge on **one** axis, because the
   horizontal clamp beside it has no input that reaches it and the width clamp is what bounds that axis; a derived anchor is resolved by the caller and
   handed down as a number, which is what keeps `layout()` a pure function of the stack and the region
-  (→ C15 I5). A float attached by element id, an ancestor clip and a frame ring are refused: the
-  first two read state that is neither input, and all three have no subject — the one element-attached
-  layer in the tree spans its block's whole width, so there is no *beside* to anchor to (§7d, F1230).
+  (→ C15 I5). **Every refusal this invariant used to carry is now built and none of them was about a
+  layer's placement**: attachment by element id and an ancestor clip are §7f's, and both were refused
+  about a *layer*, whose resolution reads the viewport's scroll offset, rather than about a **float**,
+  whose resolution reads the solved tree the same call produced; the frame ring is §7g's, refused for
+  having one tab, which is a statement that the thing is unbuilt and is the premise of the phase. **A
+  refusal that names a purity property checks which signature holds it**, and a refusal that names an
+  absent member checks whether anything is *queued* to be one (§7d, §7f, §7g, F1230, F1235).
 - **I20** — **The engine holds no cache, and incremental layout is identity.** The memo §13 asks for
   is C22's, opened per session and keyed on the block object and the width (→ C22 I100); it stores the
   floored, capped figure the render path commits, never a natural size (→ C09 I61). The dirty rule
@@ -593,6 +709,31 @@ obvious artefact, and the table is the one that found nothing. **The table's bli
 with it** — it indexes pairs, and a cell where three rules meet is in neither artefact.
 
 ---
+- **I22** — **A float is declared in the tree, takes no space, and is resolved after pass 5 into a
+  product beside the solved tree.** `floating` is skipped **upward only**: the float's own subtree is
+  sized by the same four passes, and what it contributes to its parent is nothing. Attachment resolves
+  against the **composited** rect, so a float on a scrolled row follows the row; the window is the
+  attached ancestor's clip, or the frame when `clipTo` is `"none"`; and the **nudge answers to that
+  window rather than to the frame**, which is §10's step 4 corrected — nudging into the frame and then
+  clipping to the ancestor moves a tooltip to the one place it cannot be drawn. The nudge is the
+  **minimum shift on both axes, `x` first**, and the order is declared so a float too large on both
+  lands at the window's origin rather than at whichever corner the implementation reached last. An unresolvable or
+  not-yet-placed attachment **omits** the float rather than throwing, because a throw mid-walk
+  abandons the floats already placed; `{kind: "element"}` takes the first match in document order, and
+  order within a layer is document order. **`floating` and `sticky` are opposites and do not compose**
+  — one occupies flow space, the other takes none (§7f, I21, F1235).
+- **I23** — **A ring, a stack and a layer stack are three shapes and the engine gives them three
+  types.** The **frame ring** is tabs: `next`/`previous`, no `push`/`pop`, no top — nothing is above
+  anything and `esc` never leaves one. The **frame stack** is within a tab: a view over its base,
+  `push`/`pop`, and `esc` pops. The **layer stack** is within a frame — `base · float · overlay`,
+  named and never an integer, because a layer that overlaps another destroys it in a terminal and an
+  integer anyone can pick is two things claiming a cell with the larger number winning. **Each frame
+  owns its own layer stack**, so a question open in one tab blocks no other, a switch dismisses and
+  pops nothing, and a float is clipped by its own frame's containers. **Only one frame composites** —
+  layers blend and frames do not — so a switch is a full repaint, bounded by the region and stated
+  rather than discovered. **`debug` is global**, above every frame and outside the ring. Collapsing a
+  ring and a stack into one ladder is the error `INTERACTION.md` §2 corrected once; giving them one
+  type is what makes `esc` ambiguous (§7g, F1235).
 
 ## 9. Commitments
 
@@ -614,9 +755,11 @@ with it** — it indexes pairs, and a cell where three rules meet is in neither 
 16. A contradictory declaration is refused at construction; the engine never throws (I16, → C09 I2).
 17. The sizing model and the pass structure are ported from `nicbarker/clay` (Zlib); the module header carries the attribution and the version read, and taking it as a dependency is refused with a row in `DEPENDENCIES.md` (I17).
 18. **The engine chooses a container's representation in pass 2** (I18, §7b): an ordered list of whole boxes, the first that fits and the last regardless, the id the box's and the content the form's — `width` excepted, because the parent distributed against it a call above — and a form's minimum measured rather than declared. The other two families keep their owners — the definition and `art()`.
-19. **The engine places no layer** (I19, §7d). The named partition and the nudge are C15's, the nudge on one axis because the horizontal clamp is unreachable by construction; a derived anchor is the caller's, handed down as a number; and attachment by element id, an ancestor clip and a frame ring are refused for want of an input and of a subject alike (→ C15 I5).
+19. **The engine places no layer of C15's stack** (I19, §7d). The named partition and the nudge are `place.ts`'s, the nudge there on one axis because the horizontal clamp is unreachable by construction; a derived peek anchor is the caller's, handed down as a number. Nothing else is refused: attachment, the ancestor clip and the two-axis nudge are §7f's, and the frame ring is §7g's (→ C15 I5, F1235).
 20. **The engine holds no cache** (I20, §7e). The memo is C22's, keyed on the block object and the width, storing the committed figure rather than a natural size; the dirty rule holds by construction because blocks are frozen and replaced; and the single slot is a resize cost and a stable-width saving (→ C22 I100, → C09 I61).
 21. **Sticky is one field read at one site** (I21, §7c). The composer excludes a sticky child from `clip.offset` and collects it **first**, because `composeRow` gives a column's cells to the piece that reaches it earliest; every sizing pass is blind to it, and §14's `GROW` refusal is corrected rather than built because the loop it names cannot be expressed (F1234).
+22. **A float takes no space and is resolved after pass 5** (I22, §7f). It is skipped upward only, attached against the composited rect, sized by its own `FIT`, and nudged into the window it will be clipped to rather than into the frame — which is §10's step order corrected, because the other way round moves a tooltip to the one place it cannot be drawn. An unresolvable attachment omits the float and never throws; `floating` and `sticky` do not compose (F1235).
+23. **A ring, a stack and a layer stack are three types** (I23, §7g). The frame ring cycles and has no top; the frame stack pushes and pops within a tab; each frame owns its own layer stack, named and never an integer; only one frame composites, so a switch is a full repaint; and `debug` is global and outside the ring. Collapsing a ring and a stack into one ladder is the error `INTERACTION.md` §2 corrected once (F1235).
 
 ---
 
@@ -653,6 +796,43 @@ members, because a field added beside it is still the thing worth noticing.
   fails** and nothing else does, because no kind declares `representations` yet. That is the reading
   the row carries rather than a defect in it: a mechanism landed as groundwork is invisible to every
   frame until its first consumer, which is why the rows are about the engine's own arithmetic.
+
+**The rows for §7f** (I22) — every one a frame-read, because a float's resolution is invisible to the
+solved tree it is placed beside.
+
+- **T1.39** (I22, §7f): a float contributes **nothing upward** and is sized by its own subtree — the
+  same tree with and without the field solves to identical rects for every non-float box, and the
+  float's own rect is its `FIT` rather than the frame's width. The two halves are one row because the
+  natural implementation reads the flag inside the sizing pass and skips both, giving every float a
+  size of zero, which the first half alone cannot see.
+- **T1.40** (I22, §7f, I15): attachment resolves against the **composited** rect. A float attached to
+  row 9 of a list clipped at an offset of 3 lands on screen row 6, asserted at more than one offset —
+  **offset zero is where the flow rect and the composited rect agree**, so a row written there tests
+  nothing and reads as coverage.
+- **T1.41** (I22, §7f): the nudge answers to the **clip window** and not to the frame. A float near
+  the bottom edge of a clipping ancestor is nudged up into the ancestor rather than down into the
+  frame's spare rows, and the row is the one that fails when §10's step 4 and step 5 are swapped back.
+- **T1.43** (I22, §7f): the nudge is **both axes and ordered**, `x` then `y`, by the **minimum**
+  shift — a float overflowing on one axis moves on that axis alone, and one overflowing on both lands
+  at the window's origin. A shift larger than the minimum satisfies *it is inside the window* exactly
+  as well, which is why the row asserts the position and not the containment (*containment is not
+  correctness*).
+- **T1.44** (I22, §7f): the three `attachTo` forms resolve to three different boxes in one tree —
+  `parent` to the declaring box's container, `root` to the frame, `element` to a box in an unrelated
+  subtree — asserted in **one** tree so that a form resolving to the same rect as another by accident
+  is visible.
+- **T1.45** (I23, §7g): a ring and a stack are different types, asserted by their **field sets by
+  equality** — the ring has `next`/`previous` and no `push`/`pop`/`top`; the stack has `push`/`pop`
+  and no cycle. The row is the type and not a behaviour, because collapsing the two is a design error
+  that reads as correct at every call site (`INTERACTION.md` §2).
+- **T1.46** (I23, §7g): each frame owns its own layer stack — a layer pushed in one frame is absent
+  from another's, a switch pops and dismisses nothing, and `debug` is present in every frame's
+  composite while `overlay` is present in one. Read as the composed product rather than as a count,
+  because a stack that is shared and a stack that is copied agree on every length.
+- **T1.42** (I22, §7f): an unresolvable attachment **omits** the float and leaves the rest placed —
+  an id in no box, a float naming a float not yet placed, and a float naming itself, each with a
+  second float beside it that must still be in the product. The row is about what the rejection path
+  leaves behind, which neither artefact shape indexes.
 
 **The rows for §7d** (I19) — a refusal again, and asserted the same way: by naming what would exist
 if it were not taken.

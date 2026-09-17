@@ -901,6 +901,33 @@ describe("C29 — the sizing core", () => {
     expect(framed(scroller(3, "top"))[0], "and holds it whole, not half a body row").toBe("H0");
   });
 
+  // **The spec commit's rows, before the field exists** (SP9). C29 I22: a float
+  // takes no space and is resolved after pass 5, into a product beside the tree.
+  it.todo(
+    "T1.39 (C29 I22, \u00a77f, F1235): a float contributes nothing upward and is sized by its own subtree — every non-float rect is identical with and without the field, and the float's own rect is its FIT rather than the frame's width — not deferred on a component: Box.floating is not built",
+  );
+  it.todo(
+    "T1.40 (C29 I22, \u00a77f, I15, F1235): attachment resolves against the composited rect, so a float on row 9 of a list clipped at an offset of 3 lands on screen row 6 — asserted at more than one offset, because offset zero is where the two rects agree — not deferred on a component: Box.floating is not built",
+  );
+  it.todo(
+    "T1.41 (C29 I22, \u00a77f, F1235): the nudge answers to the clip window and not to the frame — a float near a clipping ancestor's bottom edge is nudged up into the ancestor rather than down into the frame's spare rows — not deferred on a component: Box.floating is not built",
+  );
+  it.todo(
+    "T1.43 (C29 I22, \u00a77f, F1235): the nudge is both axes and ordered, x then y, by the minimum shift — a float overflowing on one axis moves on that axis alone and one overflowing on both lands at the window's origin — not deferred on a component: Box.floating is not built",
+  );
+  it.todo(
+    "T1.44 (C29 I22, \u00a77f, F1235): the three attachTo forms resolve to three different boxes in one tree — parent to the declaring box's container, root to the frame, element to a box in an unrelated subtree — not deferred on a component: Box.floating is not built",
+  );
+  it.todo(
+    "T1.45 (C29 I23, \u00a77g, F1235): a ring and a stack are different types, asserted by their field sets by equality — the ring has next/previous and no push/pop/top, the stack has push/pop and no cycle — not deferred on a component: the frame ring is not built",
+  );
+  it.todo(
+    "T1.46 (C29 I23, \u00a77g, F1235): each frame owns its own layer stack — a layer pushed in one frame is absent from another's, a switch pops and dismisses nothing, and debug is in every frame's composite — not deferred on a component: the frame ring is not built",
+  );
+  it.todo(
+    "T1.42 (C29 I22, \u00a77f, F1235): an unresolvable attachment omits the float and leaves the rest placed — an id in no box, a float naming one not yet placed, and a float naming itself, each beside a float that must survive — not deferred on a component: Box.floating is not built",
+  );
+
   it("T1.34 (C29 I20, \u00a77e, C22 I100, C09 I61): the engine declares no cache, and the memo holds one slot per block", () => {
     // **The engine's own sources, by equality over the directory.** An absence
     // check on one file is satisfied by a cache in the next one along, and the
