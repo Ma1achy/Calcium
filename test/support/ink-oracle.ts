@@ -22,10 +22,58 @@
 // and the reason `settle()` exists: every capture the suite asks for is
 // compared against the set on disk by equality, both ways, so a block that
 // stopped being rendered is a failure and not a quieter run.
+//
+// **And a capture can be retired, which is the one thing this file could not
+// say** (F1233). Every argument above is about an oracle a subject must not be
+// able to rewrite, and it left no way to record the other case: a **ruling**
+// that deliberately changes what a kind draws. The only moves available were to
+// never change a kind again, or to delete a capture — and a deleted capture is
+// a gate that got quieter with nothing saying why. So a retirement is a named
+// entry with a reason, the file **stays on disk** as the record of what Ink
+// drew, and {@link InkOracle.retired} is **driven**: a row that retires a
+// capture asserts the bytes actually differ, so a retirement that stopped
+// changing anything fails as a stale exemption rather than sitting there.
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = join(import.meta.dirname, "..", "golden", "ink-oracle");
+
+/**
+ * Captures whose subject a ruling has changed, each with the ruling.
+ *
+ * **Twenty-one, and the widths are per block rather than a cross product.**
+ * The first draft of this list was three blocks × three widths, and the row
+ * below caught it: `keyValue` at twenty-four columns does not move, so three of
+ * the twenty-seven entries were true of nothing. An exemption list that is
+ * driven says so on its first run. C09 I81 replaced four kinds' truncate-everything
+ * with a shed step, so Ink's bytes for those frames are the shredding the
+ * invariant removes: `comparison` at twelve columns drew `  field  b……` over
+ * `~ l…  3…  2…`, four parts each cut to nothing at once.
+ *
+ * **The list is the blast radius, measured rather than argued.** `steps` is not
+ * in it — its corpus block fits at every captured width — and `comparison`'s
+ * wide captures are not either, which is the evidence that the header's own
+ * misalignment was held back for its own landing.
+ */
+const RETIRED: ReadonlyMap<string, string> = new Map(
+  (
+    [
+      ["keyValue-kv-1", [2, 12]],
+      ["events-events-1", [2, 12, 24]],
+      ["comparison-comparison-1", [2, 12]],
+    ] as const
+  ).flatMap(([key, widths]) =>
+    widths.flatMap((width) =>
+      ["full", "ascii", "mono"].map(
+        (caps) =>
+          [
+            oracleName(`t2143-${key}`, caps, width),
+            "C09 I81 (F1233): the kind's narrow ladder replaced a cut taken from every part at once",
+          ] as const,
+      ),
+    ),
+  ),
+);
 
 /**
  * Bytes to rows — **every row terminated, none separated.**
@@ -55,6 +103,17 @@ export class InkOracle {
 
   constructor(suite: string) {
     this.#dir = join(ROOT, suite);
+  }
+
+  /**
+   * The ruling that retired this capture, or `null` where none did.
+   *
+   * Counted as asked either way, so `settle()`'s equality both ways still holds
+   * and a retired capture cannot be quietly deleted as well.
+   */
+  retired(name: string): string | null {
+    this.#seen.add(name);
+    return RETIRED.get(name) ?? null;
   }
 
   /** A capture. Its producer is deleted, so a missing file cannot be restored. */

@@ -73,10 +73,21 @@ describe("C09 I72 — the two arms agree", () => {
     for (const b of blocks) {
       for (const width of WIDTHS) {
         for (const [capsName, capabilities] of NAMED_CAPS) {
-          const expected = oracle.frozen(oracleName(`t2143-${keyOf(b)}`, capsName, width));
+          const name = oracleName(`t2143-${keyOf(b)}`, capsName, width);
+          const expected = oracle.frozen(name);
           const { probe, names } = recording();
           const got = renderToLines(r, b, width, { theme: DARK_THEME, capabilities, probe });
-          expect(got, `${b.kind} at ${String(width)}`).toEqual(expected);
+          // **A retired capture is asserted to differ, never skipped** (F1233).
+          // A ruling changed what this kind draws, so Ink's bytes are the
+          // record of the frame before it — and the day the two agree again the
+          // retirement is a stale exemption and says so here rather than
+          // sitting in the list being true of nothing.
+          const ruling = oracle.retired(name);
+          if (ruling !== null) {
+            expect(got, `${name} is retired by ${ruling}, and still matches`).not.toEqual(expected);
+          } else {
+            expect(got, `${b.kind} at ${String(width)}`).toEqual(expected);
+          }
           // **One arm span per block, and the filter names one arm.** It
           // read `n === "rows" || n === "react"` while there were two; the
           // `react` span went with Ink (F1209), and leaving the term in would
