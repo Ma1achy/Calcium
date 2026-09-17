@@ -1544,12 +1544,12 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 // --- MG24 — a published interface member with no consumer -------------------
 //
-// **This was the interior half of "add no export nothing consumes"**, and the
-// edge half is gone: CLAUDE.md's rule against an export nothing consumes was
-// removed deliberately, because groundwork is a mechanism landed before its
-// consumer and the rule forbade exactly that. **This rule survives it and the
-// reason is that it was never the same rule.** The edge half was about excess —
-// a façade growing surface nobody asked for. This one is about a *gap*:
+// **The interior half of "add no export nothing consumes".** CLAUDE.md carries
+// that rule for the public API's edge — now with the scope clause it was missing,
+// *and nothing is queued to consume*, because the unqualified form is circular in
+// a groundwork pass and made one refuse itself. **This rule needs no such clause
+// and the reason is that it was never the same rule.** The edge half is about
+// excess — a façade growing surface nobody asked for. This one is about a *gap*:
 //
 //   **a component complete on its own side of a seam, with nothing on the
 //   other.**

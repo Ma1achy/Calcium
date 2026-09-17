@@ -76,6 +76,17 @@ Each of these produces code that compiles, passes review, and is wrong.
   measurer uses, or measurement drifts.
 - **Let `measure` see anything that animates.** Appearance animates; geometry never does.
 - **Add a dependency** without a row in `DEPENDENCIES.md`.
+- **Add an export** nothing consumes **and nothing is queued to consume**. The second
+  clause is not softening, it is the rule's scope, and it was missing: infrastructure
+  has no consumers *by definition* — that is what makes it groundwork — so the
+  unqualified form is **circular in a groundwork pass and guarantees it refuses
+  itself.** Measured, in this repository: three sections of `LAYOUT_ENGINE.md` were
+  refused in one pass on *no consumer exists*, and the engine pass landed as a
+  corrected record rather than as an engine. The rule was written for F21's shape —
+  `TableRow.actions` existed, the spec **claimed C11 surfaced them**, and no code
+  read the field — which is a claim of use with no reader, and is not what a
+  mechanism landed deliberately ahead of its first caller is. So: name the queued
+  consumer, or it is surface nobody asked for.
 - **Commit a frame** from L1, L2 or L3. L4 does that.
 
 ---
