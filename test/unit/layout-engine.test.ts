@@ -19,6 +19,10 @@ import {
   type SolvedBox,
 } from "../../src/presentation/layout/index.js";
 import { DEFAULT_WIDTHS } from "../../src/testing/measurement-conformance.js";
+import { art } from "../../src/presentation/art.js";
+import { widthRung } from "../../src/presentation/blocks/kinds/status.js";
+import { cells } from "../../src/presentation/text.js";
+import { FULL_CAPS } from "../support/render.js";
 
 const rows = (id: string, ...lines: string[]): Box => ({ id, children: { kind: "rows", rows: lines } });
 
@@ -646,15 +650,68 @@ describe("C29 — the sizing core", () => {
     expect(measure(overSubscribed, 30)).toBe(1);
   });
 
-  // The spec commit's rows, before the code exists (SP9). C29 I18 and §7b/§7c:
-  // the engine chooses no representation, and the two owners that do exist are
-  // `art()` at the document layer and a definition's own ladder.
-  it.todo(
-    "T1.30 (C29 I18, §7b): Box declares no representations and no sticky, asserted as the field set by equality, and the two owners that exist answer through a call — not deferred on a component: the field set is not yet asserted",
-  );
-  it.todo(
-    "T1.31 (C29 I18, §7b, C09 I72): a variant's minimum is measured from the form and never declared beside it — two forms differing by one cell select differently at that one width — not deferred on a component: the assertion is not yet written",
-  );
+  it("T1.30 (C29 I18, §7b): the engine declares no chooser, and the two owners that exist answer", () => {
+    // **The field set by equality, not two absence checks.** An absence
+    // assertion is not structural: `expect(box.representations).toBeUndefined()`
+    // passes on a box that simply did not set it, and says nothing the day the
+    // field is added. So the claim is on the *type's* members, read from the
+    // source, and a field added beside them fails here.
+    const types = readFileSync("src/presentation/layout/types.ts", "utf8");
+    const box = /export type Box = Readonly<\{([\s\S]*?)\n\}>;/u.exec(types);
+    expect(box, "the Box declaration is findable").not.toBeNull();
+    const members = [...(box?.[1] ?? "").matchAll(/^\s{2}(\w+)\??:/gmu)].map((m) => m[1]);
+    expect(members.sort(), "every field Box declares, by equality").toEqual(
+      [
+        "align",
+        "aspect",
+        "children",
+        "childGap",
+        "clip",
+        "direction",
+        "height",
+        "id",
+        "overflow",
+        "padding",
+        "spend",
+        "width",
+      ].sort(),
+    );
+
+    // **And the owners that do exist answer, through a call rather than a
+    // grep.** `art()` chooses at the document layer because a variant is a
+    // different block; `widthRung` computes inside a definition because a
+    // `paint` leaf is opaque to the engine. A refusal is asserted by naming
+    // what would exist if it were not taken.
+    const wide = art({ id: "a", text: "fallback", variants: { ascii: "WIDE FORM" } }, FULL_CAPS, 40);
+    expect(wide.kind, "a form that fits is the variant").toBe("raw");
+    const narrow = art({ id: "a", text: "fallback", variants: { ascii: "WIDE FORM" } }, FULL_CAPS, 4);
+    expect(narrow.kind, "and one that does not falls to the text").toBe("notice");
+
+    // `widthRung` is the leaf family's shape: features off, no list anywhere.
+    const roomy = widthRung(40, { border: true, pad: true, tag: true });
+    const tight = widthRung(4, { border: true, pad: true, tag: true });
+    expect(roomy.frame.border, "the border survives at forty").toBe(true);
+    expect(tight.frame.pad, "and the padding is shed at four").toBe(false);
+  });
+
+  it("T1.31 (C29 I18, §7b, C09 I72): a variant's minimum is measured from the form, never declared beside it", () => {
+    // **The row a declared `min` would pass.** Two forms of the same content
+    // whose widest rows differ by one cell must select differently at exactly
+    // that one width — which is true of a measurement and true of a hand-written
+    // number only until the form is edited. So the assertion is on `cells()` of
+    // the chosen form, and the pair brackets the boundary.
+    const eight = "12345678";
+    const nine = "123456789";
+    expect(cells(eight)).toBe(8);
+    expect(cells(nine)).toBe(9);
+
+    const pick = (variant: string, width: number): string =>
+      (art({ id: "a", text: "fb", variants: { ascii: variant } }, FULL_CAPS, width) as { text: string }).text;
+
+    expect(pick(nine, 9), "at its own width the form is taken").toBe(nine);
+    expect(pick(nine, 8), "one cell under it, the fallback").toBe("fb");
+    expect(pick(eight, 8), "and the shorter form still fits there").toBe(eight);
+  });
 
   it("T1.17 (C29 I17): the module header names the clay port and the version read, and DEPENDENCIES.md carries the refusal", () => {
     // **Asserted on the source**, because a licence condition nobody reads is
