@@ -145,13 +145,16 @@ const results = runPass({
       expect: "T2.143",
     },
     {
-      // **The floor a row short.** T2.143's Ink side lifts the same padded rows
-      // through `elementOf`, so it moves with the mutation and sees nothing —
-      // the floored block is C09's composition on both arms, and T3.54 is the
-      // row that reads the floor against the frame. (A pad of spaces rather
-      // than empty rows was run first and survived — the normaliser trims a
-      // blank row to nothing, so that mutation cannot reach the frame; T6.119
-      // records both.)
+      // **The floor a row short.** T2.143's Ink side used to lift the same
+      // padded rows through `elementOf`, so it moved with the mutation and saw
+      // nothing, and T3.54 — which reads the floor against the frame — was the
+      // only row that caught it. Since F1209 the Ink side is a committed
+      // capture that cannot move, and this fails T2.143's sequence at 24 as
+      // well: 26 rows where the capture holds 27. Both rows are named, and
+      // T3.54 stays the `expect` because it is the one that reads the frame.
+      // (A pad of spaces rather than empty rows was run first and survived —
+      // the normaliser trims a blank row to nothing, so that mutation cannot
+      // reach the frame whatever the oracle is; T6.119 records it.)
       name: "FLOOR-SHORT: the rows arm pads the floor one row short",
       file: REGISTRY,
       from: '      return [...lines, ...Array.from({ length: floor - lines.length }, () => "")]; // cells-ok — rows',
@@ -159,9 +162,12 @@ const results = runPass({
       expect: "T3.54",
     },
     {
-      // **The marker above the block**: C14 I24 puts it beneath. T2.143's
-      // Ink side composes through the same registry, so it moves with the
-      // mutation and sees nothing; T6.22 reads the marker as the last row.
+      // **The marker above the block**: C14 I24 puts it beneath. T2.143's Ink
+      // side used to compose through the same registry, so it moved with the
+      // mutation and saw nothing; T6.22, which reads the marker as the last
+      // row, was the only catch. Since F1209 the capture cannot move and
+      // T2.143's sequence at 24 fails too — 27 rows against 27, in the wrong
+      // order. T6.22 stays the `expect` as the row that names the position.
       name: "MARKER-FIRST: the cap's marker precedes the block's rows",
       file: REGISTRY,
       from: "    if (Array.isArray(drawn)) return [...(drawn as readonly string[]), marker];",
