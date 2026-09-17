@@ -20,7 +20,9 @@ import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const CMD = "npx vitest run test/unit/blocks.test.ts test/integration/render-cache.test.ts";
+const CMD =
+  "npx vitest run test/unit/blocks.test.ts test/integration/render-cache.test.ts " +
+  "test/unit/layout-engine.test.ts";
 const REG = "src/presentation/blocks/registry.ts";
 const SESSION = "src/shell/session.ts";
 const CONSTRUCT = "src/shell/construct.ts";
@@ -49,6 +51,18 @@ const results = runPass({
     why: "a memo hit answers one row too many — every group is taller on its second ask, which T1.9, T1.44 and the sequence rows all see",
   },
   mutations: [
+    {
+      // **The slot becomes write-once**, which is a map over widths wearing one
+      // slot's clothes: the first width is kept and every later one is answered
+      // from it. Every ask that does not revisit a width still agrees — which
+      // is every ask a static run makes — so only a row that asks 80, 60 and 80
+      // through one memo can see it (C29 I20, §7e, F1231).
+      name: "SLOT-WRITE-ONCE: the memo keeps the first width and never the last",
+      file: REG,
+      from: "      this.#memo?.set(block, Object.freeze({ width, rows: floored }));",
+      to: "      if (this.#memo?.get(block) === undefined) this.#memo?.set(block, Object.freeze({ width, rows: floored }));",
+      expect: "T1.34",
+    },
     {
       // **The handed memo ignored.** A fresh map per call as before: the
       // answers are right, the seams agree, and the second call through the

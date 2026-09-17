@@ -53820,7 +53820,29 @@ measures it as a defect.
 engine holds no cache, the memo is C22's, and §13's machine is an answer to mutability this tree does
 not have.
 
-**Open** — the ruling is taken and the spec edit is owed.
+**Closed** — landed as C29 I20 and §7e, with `docs/notes/C29_INCREMENTAL_WALK.md` the walk and T1.34
+the row. **No `src/` file changed**, as in F1230: the third record-only landing of the pass.
+
+**The walk's findings are all about what §13 leaves out rather than what it gets wrong**, and two are
+arguments for the built shape over the written one. **A3**: §13 says cache the *natural size*, and
+`#measured` stores the floored, capped figure — a cache of the natural size has the cap applied after
+each read, so the memo and the render path answer one question twice and agree only while both are
+right, which is MG24's shape in a cache. **A5**: §13 writes *(box identity, available width)* and
+never says that choosing the **object** as the key is what removes the eviction problem — the
+strongest argument for its own prescription is the one it does not make. And **S4** is the cell where
+a cache could be wrong and is not: a theme change leaves every memoised height valid, on a rule
+written a component away — appearance animates and geometry never does — which neither §13 nor C29
+states.
+
+**T1.34's own shape is the thing to keep.** A map over widths and a single slot **agree on every ask
+that does not revisit a width**, which is every ask a static run makes and every ask the 97-frame
+measurement above made. So the row is three asks — 80, 60, 80 — and the third is the whole of it;
+both arms were verified by fabricated violation, and the slot mutation is now permanent in
+`c22-measure-memo.mjs` as `SLOT-WRITE-ONCE`.
+
+Gates: `make test` 343 files · 6,292 passed / 6 todo; `make golden` 468/468 with no mover named and
+none moved; `make e2e` 24 files · 136 passed / 3 todo; `make enforce` at 24,656 references; anchors
+`0 known stale, and no run drifted`; `c22-measure-memo` 8 caught · 0 survived.
 
 ---
 
