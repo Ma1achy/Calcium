@@ -325,6 +325,49 @@ are each one layer over one base, which **is** the frame stack with one member �
 outcome, not a wasted mechanism*, in the section's own words, with `INTERACTION.md` §14's *there are
 no pushed views* the ruling that keeps it so.
 
+## 7e. Incremental layout — the cache is C22's, and identity is the dirty mark
+
+`LAYOUT_ENGINE.md` §13 asks for a DIRTY/CLEAN marking pass over the box tree, the rule that **a child
+whose natural size did not change cannot dirty its parent**, and a cache *keyed on (box identity,
+available width) and nothing else*. **The cache is built, one layer above the engine; the rule holds;
+the machine has nowhere to run** (F1231, `docs/notes/C29_INCREMENTAL_WALK.md`).
+
+**Built, and on §13's own key.** `construct.ts` opens a session `WeakMap<Block, {width, rows}>` before
+the viewport and hands it down (→ C22 I100); the registry's child seam reads it on every ask and
+reports a hit or a miss with its reason. The key is the block **object** and the width — §13's
+sentence with `Block` where it wrote `box`. The engine holds no cache of its own and must not: the
+memo stores the **floored, capped** figure the render path commits, so a hit is the same number by
+construction rather than by agreement (→ C09 I61), where a cache of the *natural* size would have the
+cap applied after each read and two answers to one question.
+
+**The dirty machine has no mutable tree.** Blocks are frozen and replaced on change, so a changed
+block **is** a new key, an unchanged child is the same object the memo answers without solving, and a
+parent holding a changed child is itself rebuilt. §13's rule is satisfied by construction — **stricter
+on one side**, because a block rebuilt with byte-identical content misses though its size did not
+change, and **free on the other**, because no marking pass, dirty bit or propagation loop exists to
+run. What identity also buys, and §13 does not say, is eviction: a settled entry's blocks are
+collected with it, so nothing evicts and nothing subscribes.
+
+**Measured rather than read**, because three of §13's four claims are about how often something
+misses. `tools/bench/stress.mjs panel` at 120×40, 150 entries, a page sweep of forty: **421 absent
+misses over 97 frames** against a corpus of roughly 750 measurable blocks — a population, not a rate —
+with **zero width misses**, and an identical line from a run four times as long. So §13's opening
+sentence, *the spec so far solves the whole tree every frame*, describes a tree with no cache above
+it.
+
+**The one limit, stated so nobody measures it as a defect.** The memo holds **one slot per block,
+carrying the last width** rather than a map over widths. Asked at 80, then 60, then 80 again through
+one memo, the slot reads 80, then 60, then 80 — so the third ask is a `width` miss. A resize sweep
+re-measures everything it touches twice; a stable terminal width never pays it, which is why the
+counter above reads zero and is the correct trade for a terminal.
+
+**Left unbuilt, with the measurement that says how small it is.** §13's step 5 — *re-position only the
+subtrees whose box actually moved* — is the one part with a subject, because the memo holds a height
+and never the solved rects, so a render re-solves the `Box` tree even where the height was a hit. In
+the panel case `panel` is 15.9% of self time and `group` 10.5%, of which the solve is a part. A second
+store would hold rects only a composition consumes, and the composition is what C22 I100's memo was
+measured against.
+
 ## 8. Invariants
 
 - **I1** — **Every dimension is a whole number of cells, at every pass, on both axes.** No float
@@ -423,6 +466,13 @@ no pushed views* the ruling that keeps it so.
   (→ C15 I5). A float attached by element id, an ancestor clip and a frame ring are refused: the
   first two read state that is neither input, and all three have no subject — the one element-attached
   layer in the tree spans its block's whole width, so there is no *beside* to anchor to (§7d, F1230).
+- **I20** — **The engine holds no cache, and incremental layout is identity.** The memo §13 asks for
+  is C22's, opened per session and keyed on the block object and the width (→ C22 I100); it stores the
+  floored, capped figure the render path commits, never a natural size (→ C09 I61). The dirty rule
+  holds by construction because blocks are frozen and replaced — a changed block is a new key, an
+  unchanged child is a hit, and eviction is the key's — so no marking pass exists. **One slot per
+  block, carrying the last width**: a resize sweep re-measures twice and a stable width never does
+  (§7e, F1231).
 
 ---
 
@@ -490,6 +540,7 @@ with it** — it indexes pairs, and a cell where three rules meet is in neither 
 17. The sizing model and the pass structure are ported from `nicbarker/clay` (Zlib); the module header carries the attribution and the version read, and taking it as a dependency is refused with a row in `DEPENDENCIES.md` (I17).
 18. **The engine chooses no representation** (I18, §7b, §7c). Three families want one and each has an owner elsewhere — the definition, `art()`, or nobody; `sticky` is refused, and a form's minimum is measured rather than declared.
 19. **The engine places no layer** (I19, §7d). The named partition and the nudge are C15's, the nudge on one axis because the horizontal clamp is unreachable by construction; a derived anchor is the caller's, handed down as a number; and attachment by element id, an ancestor clip and a frame ring are refused for want of an input and of a subject alike (→ C15 I5).
+20. **The engine holds no cache** (I20, §7e). The memo is C22's, keyed on the block object and the width, storing the committed figure rather than a natural size; the dirty rule holds by construction because blocks are frozen and replaced; and the single slot is a resize cost and a stable-width saving (→ C22 I100, → C09 I61).
 
 ---
 
@@ -542,6 +593,16 @@ if it were not taken.
   declares the field, so the row that catches it is about the type and the call, never about a
   rendering.
 
+**The row for §7e** (I20) — one, because the invariant is about a mechanism that exists and the
+claim is what it is keyed on:
+
+- **T1.34** (I20, §7e, → C22 I100, → C09 I61): the engine's own sources declare no cache, read by
+  **equality** over the directory rather than as an absence check; and the memo's shape is asserted
+  through a call — one memo across asks at 80, 60 and 80 leaves the slot at each width in turn, so the
+  third ask is a miss, and the stored `rows` is the **floored, capped** figure rather than the
+  definition's natural answer. The width sequence is the load-bearing half: a map over widths and a
+  single slot agree on every ask that does not revisit a width, which is every ask a static run makes.
+
 **And `tools/bench/mosaic.mjs kinds` runs on anything touching piece ordering or the composer's
 cursor**: it is the only instrument that saw F1213, where 440 goldens, 2,440 baseline frames and
 6,265 test rows all agreed while a mosaic was missing two of five cells.
@@ -550,7 +611,7 @@ cursor**: it is the only instrument that saw F1213, where 440 goldens, 2,440 bas
 
 ## 11. Owed — the sections that arrive with their phases
 
-`LAYOUT_ENGINE.md` §13 (incremental layout) is in scope for the pass and not in this document yet.
+**Nothing is owed.** Every section of `LAYOUT_ENGINE.md` in the pass's scope is discharged.
 
 **§12, §14 and §15 are discharged and no longer owed.** §12's three families are ruled in §7b and the
 engine owns none of them (I18); §14 is refused in §7c with its intent discharged by C25 I18 and by
@@ -558,9 +619,10 @@ composition; §15's aspect is built and is I10 — pass 2 against a `FIXED` heig
 width, both by `Math.min` so neither grows. **§15's last paragraph is a constraint on the tests
 rather than on the code**: it is lumpy — 40 × 9 at `aspect: 3.5` wants 31.5 columns and gets 31, a
 real ratio of 3.44 — so no row may assert an exact ratio, and a row that does is asserting the
-rounding. **§10 is discharged and no longer owed.** Its walk is `docs/notes/C29_LAYERS_WALK.md`, its rulings
-are §7d and I19, and the two mechanisms it asks the engine to build are C15's already. **§13 gets its
-own trace before it is built**, over dirty propagation and cache validity.
+rounding. **§10 is discharged.** Its walk is `docs/notes/C29_LAYERS_WALK.md`, its rulings are §7d and I19, and
+the two mechanisms it asks the engine to build are C15's already. **§13 is discharged.** Its walk is
+`docs/notes/C29_INCREMENTAL_WALK.md`, its ruling is §7e and I20, and the cache it asks for is C22's,
+keyed as it prescribes and measured holding across frames.
 
 C15 stays the owner of every layer stack and `layout()` stays pure (C15 I5) — the engine is called by
 `place()`, and it does not push, dismiss or decide what is on top.

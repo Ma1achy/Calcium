@@ -781,6 +781,12 @@ describe("C29 — the sizing core", () => {
     expect(flipped[0]?.truncated, "and it fitted there, so nothing was clipped").toBe(false);
   });
 
+  // The spec commit's row, before the assertion exists (SP9). C29 I20 and §7e:
+  // the engine holds no cache, and incremental layout is identity.
+  it.todo(
+    "T1.34 (C29 I20, \u00a77e, C22 I100, C09 I61): the engine's sources declare no cache, and one memo across asks at 80, 60 and 80 leaves the slot at each width in turn \u2014 not deferred on a component: the assertion is not yet written",
+  );
+
   it("T1.17 (C29 I17): the module header names the clay port and the version read, and DEPENDENCIES.md carries the refusal", () => {
     // **Asserted on the source**, because a licence condition nobody reads is
     // how one gets found at publication. Zlib's only real condition is the
