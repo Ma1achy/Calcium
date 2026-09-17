@@ -101,7 +101,6 @@ interface BlockRegistry {
   windowSequence(blocks: readonly Block[], width: number, from: number, to: number,
                  memo?: MeasureMemo, scratch?: RenderScratch):   // I70's memo; I76's scratch, handed to each kind's `window`
     Readonly<{ blocks: readonly Block[]; skipRows: number }>;
-  renderSequence(blocks: readonly Block[], ctx: RenderContext): ReactElement;   // the element arm of a sequence; render-lines composes rows block by block (I72)
   // C26 §5 — one block's elements, block-local; and a sequence's, lifted in BOTH axes.
   elementsOf(block: Block, width: number): readonly NavElement[];
   elementsIn(blocks: readonly Block[], width: number):
@@ -123,8 +122,9 @@ still paints its selected rows from one value (C11 I14). Absent and `[]` draw al
 
 `measure` and `render` on the registry are the dispatching entry points. An unregistered kind resolves to the `raw` definition rather than throwing — a document referencing an unknown kind still renders, degraded.
 
-**`measureSequence` and `renderSequence` are where `gapBefore` is applied** (C04
-§3a). A block's own height never includes the gap before it, so a sequence —
+**`measureSequence` and `renderSequenceToLines` are where `gapBefore` is
+applied** (C04 §3a) — the second in `render-lines`, since the registry's
+whole-sequence element arm went with the oracle it was kept for (F1209). A block's own height never includes the gap before it, so a sequence —
 a document's top level, a `panel`'s children, a `column` group's children — is
 `Σ measure(b, w)` plus one row per block declaring `gapBefore`. Stated once, on
 the registry, because every composer needs the same arithmetic and a composer
@@ -2042,7 +2042,7 @@ F969's other residue — a spacing mark the measurer counted as nothing — is
 Sealing matches C05's manifest store and C07's adapter registry. A kind registered mid-session would let a block measured before registration differ from the same block measured after — drift that only appears on scrollback.
 
 **One more piece of state, and its lifetime is the call (I61).** Every public member — `measure`,
-`render`, `width`, `measureSequence`, `renderSequence`, `elementsOf`, `elementsIn`,
+`render`, `width`, `measureSequence`, `elementsOf`, `elementsIn`,
 `windowSequence`, `windowChild` — opens a memo of the heights answered so far if none is open, and
 the outermost one drops it on return, on the throw path too. Every ask made through the child
 seam (`measureChild`, I7) and every height the registry commits for itself before drawing (I11)
