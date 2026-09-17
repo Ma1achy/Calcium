@@ -294,10 +294,17 @@ against the container's own edge instead. **It occupies flow space** — it disp
 the scrollable area is what remains — so nothing in the sizing passes reads it.
 
 **Two rules, and §14 states one.** Skipping the offset is half the mechanism. The other half is
-**paint order**: a sticky child sits where flow put it, its scrolling siblings are collected after it,
-and they draw over it — so a header excluded from the offset and left in declaration order is a header
-under its own body. Sticky children are collected **last**, after every sibling, which is the same
-decision C15 takes for a layer and for the same reason (F1234).
+**order**: a sticky child sits where flow put it, its scrolling siblings land on the same rows, and
+one of them wins. Sticky children are collected **first**, before every sibling.
+
+**First and not last, and the frame is what settled that.** The obvious reading of the second rule is
+a painter's — draw the sticky child after everything else so it covers them — and this document said
+exactly that until a frame refused it. `composeRow` walks a **cursor** left to right and cuts a piece
+that starts behind it (`rows.ts:477`), so the piece composited *later* at a column is the one that
+loses, not the one that wins. Collected last, `sticky: "top"` at `offset.y = 3` produced a frame
+**byte-identical to no sticky at all**: the field was read, the piece was emitted, and the row it
+belonged on had already been claimed. **A ruling that names an operation checks the operation
+exists** — this one named a painter and the layer below is a cursor (F1234).
 
 **The refusal clause is corrected rather than built.** §14 refuses *a sticky child that is `GROW` on
 the scroll axis* because *it would grow to fill the space it is excluded from, which is a loop* — and
@@ -536,9 +543,11 @@ measured against.
   composer, where `clip.offset` is applied — so no sizing pass sees it and a sticky child displaces
   its siblings like any other: the scrollable area is what remains. `"top"` keeps the position flow
   gave it; `"bottom"` is pinned to the container's far edge, which is the same exclusion said from
-  the other end. **Drawn last is half the rule and §14 states only the other half**: a child excluded
-  from the offset still sits where flow put it, and siblings collected after it draw over it, so a
-  header would end up under its own body. **The refusal beside it is corrected rather than built** —
+  the other end. **Collected first is half the rule and §14 states only the other half**: a child
+  excluded from the offset still sits where flow put it and its scrolling siblings land on the same
+  rows, so a header left in declaration order ends up under its own body. **First rather than last,
+  because `composeRow` is a cursor and not a painter** — the piece composited later at a column is
+  cut, so collecting the sticky child last drew a frame byte-identical to no sticky at all (§7c). **The refusal beside it is corrected rather than built** —
   *a sticky child cannot be `GROW` on the scroll axis* supposes the child is excluded from a *space*,
   and it is excluded from an *offset*; a `GROW` child of a container clipping on that axis resolves
   against the inner box and does not diverge, measured at five of six (§7c, I15, I16, F1234).
@@ -607,7 +616,7 @@ with it** — it indexes pairs, and a cell where three rules meet is in neither 
 18. **The engine chooses a container's representation in pass 2** (I18, §7b): an ordered list of whole boxes, the first that fits and the last regardless, the id the box's and the content the form's — `width` excepted, because the parent distributed against it a call above — and a form's minimum measured rather than declared. The other two families keep their owners — the definition and `art()`.
 19. **The engine places no layer** (I19, §7d). The named partition and the nudge are C15's, the nudge on one axis because the horizontal clamp is unreachable by construction; a derived anchor is the caller's, handed down as a number; and attachment by element id, an ancestor clip and a frame ring are refused for want of an input and of a subject alike (→ C15 I5).
 20. **The engine holds no cache** (I20, §7e). The memo is C22's, keyed on the block object and the width, storing the committed figure rather than a natural size; the dirty rule holds by construction because blocks are frozen and replaced; and the single slot is a resize cost and a stable-width saving (→ C22 I100, → C09 I61).
-21. **Sticky is one field read at one site** (I21, §7c). The composer excludes a sticky child from `clip.offset` and collects it last; every sizing pass is blind to it, and §14's `GROW` refusal is corrected rather than built because the loop it names cannot be expressed (F1234).
+21. **Sticky is one field read at one site** (I21, §7c). The composer excludes a sticky child from `clip.offset` and collects it **first**, because `composeRow` gives a column's cells to the piece that reaches it earliest; every sizing pass is blind to it, and §14's `GROW` refusal is corrected rather than built because the loop it names cannot be expressed (F1234).
 
 ---
 
@@ -688,9 +697,11 @@ cursor**: it is the only instrument that saw F1213, where 440 goldens, 2,440 bas
   tree with the field removed draws the body alone. **The row is the frame and not the rects**: a
   sticky child's `rect` is its flow rect either way, so every assertion about the solved tree agrees
   with itself whether or not the field is read (F1234).
-- **T1.38** (I21, §7c): a sticky child declared **before** its scrolling siblings is drawn over none
-  of them — the paint-order half, which no assertion about a position can see, since both children
-  hold the positions flow gave them and only the order they reach the compositor differs.
+- **T1.38** (I21, §7c): a sticky child declared **before** its scrolling siblings is drawn over by
+  none of them — the ordering half, which no assertion about a position can see, since both children
+  hold the positions flow gave them and only the order they reach the compositor differs. The row is
+  the one that fails when the collection order is reversed, and reversing it is what the mutation
+  pass does: at HEAD's first draft it produced a frame equal to the field being absent.
 ## 11. Owed — the sections that arrive with their phases
 
 **Nothing is owed.** Every section of `LAYOUT_ENGINE.md` in the pass's scope is discharged.

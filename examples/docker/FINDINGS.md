@@ -53789,9 +53789,37 @@ export nothing consumes*: the consumer argument was about surfaces, and the mech
 frame the engine already draws wrongly.
 
 **4 · And the build needs a second rule §14 does not state.** A sticky child excluded from the offset
-still sits where flow put it, and its scrolling siblings are collected after it — so they paint over
-it. Exclusion from the offset is half the mechanism; **paint order is the other half**, and a
-definition that names only the first draws a header under its own body.
+still sits where flow put it, and its scrolling siblings land on the same rows — so one of them wins.
+Exclusion from the offset is half the mechanism; **order is the other half**, and a definition that
+names only the first draws a header under its own body.
+
+**5 · §4 named a painter, and this compositor is a cursor — so the first build of the second rule
+did nothing at all.** The sentence above read *its scrolling siblings are collected after it, so they
+paint over it*, and the remedy it implies is to collect the sticky child **last**. Built that way,
+`sticky: "top"` at `offset.y = 3` drew
+
+```
+b2 b3 b4 b5 b6 b7          no sticky
+b2 b3 b4 b5 b6 b7          sticky top — byte-identical
+```
+
+The field was read, the piece was emitted, and nothing moved. `placeRows` sorts pieces by `x` and
+`composeRow` walks a **cursor** — `const at = Math.max(piece.x, cursor)` (`rows.ts:477`) — so a piece
+that starts behind the cursor is **cut**, and the piece composited *later* at a column is the one
+that loses. The rule for this engine is **collected first**. Reversed, the same frames read
+
+```
+H0 b3 b4 b5 b6 b7          sticky top, offset 3
+b3 b4 b5 b6 b7 T0          sticky bottom, offset 3
+```
+
+**This is C23 §8a A4's class, second measured instance** — *an artefact can be correct about the
+interaction it found and wrong about a mechanism it assumed existed*. §4's interaction is real and
+was the walk's job; the verb it reached for was **paint**, which no layer under this engine performs.
+CLAUDE.md's remedy held exactly as written: the finding survived and only the remedy changed. And
+the instrument that caught it was the one that caught everything else in this pass — **reading the
+frame**. Every assertion about the solved tree agrees with itself either way, because a sticky
+child's `rect` is its flow rect whichever order it is collected in.
 
 **Open** — §14 lands as `Box.sticky`, read where the offset is applied; the refusal is corrected
 rather than built.
