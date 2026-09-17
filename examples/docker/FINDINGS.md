@@ -53748,6 +53748,101 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1230 — §10's one live float is full-width by construction, and two of its mechanisms are already built ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `LAYOUT_ENGINE.md` §10 — a float declared in the tree with `attachTo: {kind:"element"; id}`, anchor points, a nudge, `clipTo: "attachedAncestor"`, a **named** four-position layer stack, and a frame ring above a frame stack above layers. The plan's phase 4 keeps C15 the owner and `layout()` pure. |
+| **Reached for** | The premise check F1226 is, run on the section phase 4 is — and then one grep, because the claim that decides the section is a claim about how many producers a field has. |
+| **Verdict** | **Six claims: two built, one built at L4 where the design puts it inside C15, and three with no subject.** The one that decides the phase is the fourth — the field that selects a float's subject is emitted at exactly one site, whose span is the full width, so there is no *beside* to draw in. |
+
+**1 · The named stack is built, and the names it has are the measurement.** `sortLayers`
+(`place.ts:29`) partitions by `kind` — `view`, then `peek`, then `overlay`, stable within each —
+and there is no integer in `place.ts` or `overlay/types.ts` anywhere. §10's *Refused: a free
+integer z-index* is refused by construction rather than owed. Its four positions are not the
+tree's three: `base` is not a layer at all (it is the composited frame beneath the stack), `float`
+has no member, and **`debug` has no member either — the profiler's overlay is `kind: "view"`**
+(`profile-view.ts:275`), a full-region layer sorted *bottom*-most, which is the exact opposite of
+§10's *global, above every frame*. The name §10 does not have is `peek`, and it is the only one
+with a subject.
+
+**2 · The nudge is built, on both axes.** §10: *a float that would land outside the frame is
+NUDGED, not clipped: shift it along the axis that overflows until it fits, and only clip if it
+cannot fit at all.* `place.ts` step 7:
+
+```ts
+height = Math.max(0, Math.min(height, region.height));
+if (height < capped) truncated = true;
+top = Math.max(0, Math.min(top, region.height - height));
+left = Math.max(0, Math.min(left, Math.max(0, region.width - width)));
+```
+
+Shift first, clip only where the height cannot fit, and `truncated` carries the clip up to the
+owner rather than swallowing it. The code also states the rule-interaction §10 does not — *height
+first, because clamping the top against a height that still exceeds the region leaves the bottom
+edge outside it* (C15 I6).
+
+**3 · *No layer's position can be derived from a box in the layer beneath it* is false on the
+vertical axis, and where it is false it is built at L4 — which is where the plan wants it.**
+`construct.ts:1801`:
+
+```ts
+const within = chromeRowsOf(entry, width) + found.element.rows.from - ve.skipRows;
+```
+
+The peek's anchor is a solved box's row, resolved through the entry's chrome and the viewport's
+scroll offset and handed to C15 as a number. **`layout()` is pure because the caller did the
+resolution, not because the resolution does not happen** — so §10's *what the engine owes* step 2,
+*resolve `attachTo` to a SOLVED box from pass 5*, describes work that exists, one layer above the
+function it proposes to put it in. `attachTo: {kind:"element"; id}` is refused for the reason
+`placement.row` is a number.
+
+**4 · The horizontal axis has no subject, and one grep settles it.** §10's four motivating cases —
+a tooltip, a hover card, an inline completion beside a token, a callout on a plot — every one wants
+a **column**. The only float that attaches to an element is the peek, and a peek exists only where
+a `NavElement` declares `detail`. **`detail` is emitted at exactly one site in the tree**,
+`table/definition.ts:475`, on an element whose span is
+
+```ts
+cols: Object.freeze({ from: 0, to: w }),
+```
+
+the table's whole width. **There is no beside.** The two emitters whose `cols` is narrower than
+their block — mosaic cells (`containers.ts:635`) and chips (`simple.ts:565`) — declare no `detail`
+and raise no peek, and C26 F1216 forbids widening `NavElement`, which is where a per-row span would
+have to go.
+
+And the field's own doc reads *what the rendering could not show of this element, **shown beside
+it** as C15's peek*. That is prose naming a geometry its only producer cannot supply — C23 §8a
+A4's shape, **a ruling that names an operation the layer below does not have**, here a ruling that
+names a position a corpus of one cannot occupy. `construct.ts:1825` already wrote the true reading
+and never met the doc that contradicts it: *anchored below … the width is the region's*. Two
+statements about one layer in two files; the one with no instance is the design's.
+
+**5 · `clipTo: "attachedAncestor"` cannot be resolved where §10 puts it.** A float inside a
+`scroll` must be clipped by the scroll block — but the ancestor is a box in the solved tree, and
+C15's `layout(stack, region)` holds `Block[]` and a region and nothing else. Resolving it inside
+costs C15 I5's purity, which the plan's *do not* list protects; resolving it outside is claim 3
+again, and refused with it.
+
+**6 · Frames have no subject, and §10 authorises that outcome in its own words.** `frameRing` is in
+no file in `src/` or `test/`. The four `kind: "view"` producers — `patch-view.ts:170`,
+`surface.ts:184`, `document-view.ts:334`, `profile-view.ts:275` — are each one layer over one base,
+which **is** the frame stack with one member. The ring is the part with nothing in it, and
+`INTERACTION.md` §14's *there are no pushed views* is the ruling that keeps it so. §10: *if nothing
+else ever passes, the frame stack has exactly one member per tab and costs nothing — which is the
+correct outcome, not a wasted mechanism.* The section pre-authorised its own refusal and the
+measurement takes it up.
+
+**So phase 4 is a refusal with two mechanisms recorded as built.** The engine does not place
+layers: C15 does, the caller resolves the anchor, and the two halves §10 asks the engine to build —
+the named stack and the nudge — are in `place.ts` today under different names and with the
+interaction stated. What changes is the record, not the tree.
+
+**Open** — the ruling is taken and the spec edit is owed.
+
+---
+
 ## F1229 — an invariant whose worked example cannot be constructed ★★★☆☆
 
 | | |
