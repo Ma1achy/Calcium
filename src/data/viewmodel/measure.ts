@@ -73,7 +73,24 @@ export function contentWidth(block: Padded, width: number): number {
 /** The border takes a column each side. `panel`, and a table's expanded detail. */
 export const BORDER_INSET = 2;
 
-/** One cell of gutter between each adjacent pair in a `row` group. */
+/**
+ * The gutter a container leaves between adjacent children, when it declares
+ * none (C04 I121).
+ *
+ * **Defaults by axis, because the constant it replaces did.** A `row` group's
+ * children have always been one column apart and a `column` group's have never
+ * been separated by anything, so absent is `1` across and `0` down and every
+ * frame is unchanged. `ROW_GUTTER = 1` was that rule with no way to say it —
+ * four readers and no name (F1226 — the walk counted three, and the fourth is
+ * in another file), and no surface could ask a row group for no gutter at all.
+ */
+export function childGapOf(block: Group): number {
+  const held = block.childGap;
+  if (typeof held === "number" && Number.isFinite(held)) return Math.max(0, Math.floor(held)); // cells-ok — a cell count
+  return block.direction === "row" ? ROW_GUTTER : 0;
+}
+
+/** One cell of gutter between each adjacent pair in a `row` group, by default. */
 export const ROW_GUTTER = 1;
 
 /** `panel` children, and a table row's `detail` blocks (§3). */
@@ -118,7 +135,7 @@ export function groupChildWidths(block: Group, width: number): readonly number[]
   const n = block.children.length;
   if (block.direction === "column" || n <= 1) return block.children.map(() => w);
 
-  const gaps = (n - 1) * ROW_GUTTER;
+  const gaps = (n - 1) * childGapOf(block);
   const shares = block.flex ?? block.children.map(() => 1);
 
   // **One implementation, called rather than restated** (I44, I72). The rule —
@@ -165,7 +182,7 @@ export function placeable(block: Panel | Group, width: number): number {
   let used = 0;
   let placed = 0;
   for (const each of widths) {
-    const needed = placed === 0 ? each : each + ROW_GUTTER;
+    const needed = placed === 0 ? each : each + childGapOf(block);
     if (used + needed > w) break;
     used += needed;
     placed += 1;

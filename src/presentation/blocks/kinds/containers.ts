@@ -15,10 +15,10 @@
 import { NO_SPAN } from "../../../data/viewmodel/index.js";
 import {
   childWidths,
+  childGapOf,
   insetWidth,
   normaliseWidth,
   placeable,
-  ROW_GUTTER,
   sequenceHeight,
 } from "../../../data/viewmodel/index.js";
 import type { Block, Group, MeasureFn, Mosaic, MosaicRect, Panel, Scroll, WidthFn } from "../../../data/viewmodel/index.js";
@@ -797,11 +797,16 @@ function groupMeasureBox(block: Group, width: number, own: Size, measureChild?: 
     // container's width, which on that box is the cross axis; a row hands each
     // child its own divided share, which is a `FIXED` on the main axis and has
     // nothing to stretch (C29 I9).
-    ...(column ? { align: { x: "stretch" as const } } : { childGap: ROW_GUTTER }),
+    ...(column ? { align: { x: "stretch" as const } } : {}),
+    childGap: childGapOf(block),
     // **A column is a sequence and a row is not** (C04 §3a): a row's children
-    // sit side by side, so a gap before one of them is meaningless and is
-    // ignored rather than being an error. A row's children are `FIXED` at the
-    // share `childWidths` divided, which is the other half of the same fact.
+    // are `FIXED` at the share `childWidths` divided, where a column's stretch
+    // to the container's width. A child's own `padding` is inside its own box
+    // in both directions — the old field was ignored side by side and space
+    // inside a box is not (C09 I80, `C04_PADDING_WALK` A4).
+    //
+    // **`childGap` is declared on both axes now** (C04 I121) and defaults to
+    // `0` down, so a column's box is unchanged while a row's still reads 1.
     children: column
       ? sequenceChildren(children, w, measureChild, widthChild)
       : children.map((child, i) => ({
@@ -1087,7 +1092,7 @@ export const groupDefinition: BlockDefinition<Group> = {
       placed.forEach((_child, index) => {
         const at = ats[index] as (typeof ats)[number];
         const left = x + at.left;
-        x += (widths[index] ?? 1) + ROW_GUTTER;
+        x += (widths[index] ?? 1) + childGapOf(block);
         // **No guard for a cell past the edge, because `placeable` is the
         // guard.** It keeps a child only while `used + needed <= w`, so every
         // placed child after the first ends inside the width; the one that can

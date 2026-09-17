@@ -48,8 +48,8 @@ const results = await runPass({
       // does not give it (C29 I9).
       name: "a column's children are measured at their natural width",
       file: F,
-      from: '...(column ? { align: { x: "stretch" as const } } : { childGap: ROW_GUTTER }),',
-      to: '...(column ? {} : { childGap: ROW_GUTTER }),',
+      from: '...(column ? { align: { x: "stretch" as const } } : {}),',
+      to: "",
       expect: "T2.18",
     },
     {
@@ -180,8 +180,10 @@ const results = await runPass({
       // fixed shares answers narrower than it draws.
       name: "a row of fixed shares answers without its gutters",
       file: F,
-      from: '{ childGap: ROW_GUTTER }',
-      to: "{}",
+      // Re-anchored 2026-09-17 (C04 I121): the gutter is a field now, declared
+      // on both axes and defaulting to 0 down, so the box reads `childGapOf`.
+      from: "    childGap: childGapOf(block),",
+      to: "    childGap: 0,",
       expect: "T3.69",
     },
     {

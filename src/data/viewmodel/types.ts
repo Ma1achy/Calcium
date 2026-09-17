@@ -2930,6 +2930,19 @@ export type Group = Readonly<{
    * applies that one outside the definition and the two compose.
    */
   minRows?: number;
+  /**
+   * The space this container leaves **between** adjacent children, on its own
+   * axis (I121). Absent is `1` on a `row` and `0` on a `column`, which is
+   * `ROW_GUTTER`'s behaviour given a name — the constant had four readers and
+   * no way for a surface to ask for a different one (F1226).
+   *
+   * **Between, never around**: `n` children take `n − 1` gaps and `padding`
+   * takes the edges outside all of them, so a container with both draws one row
+   * above its first child rather than two. Charged per *placed* child, since a
+   * gap belongs to a pair and a `row` group drops children that do not fit
+   * (I42). A container with one child or none spends nothing whatever this says.
+   */
+  childGap?: number;
 }> & Padded & Floor;
 
 /**

@@ -1,6 +1,6 @@
 // C09 tier 3 — the edges, where every arithmetic mistake shows.
 import { describe, expect, it } from "vitest";
-import { block } from "../../src/data/viewmodel/index.js";
+import { block, placeable, validateBlock } from "../../src/data/viewmodel/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import type { BlockFault, BlockRegistry } from "../../src/presentation/blocks/index.js";
@@ -672,7 +672,92 @@ describe("C09 §2 padding — the registry's one application", () => {
     );
   });
 
-  it.todo(
-    "T3.92 (C04 I121): a container spends max(0, placed − 1) × childGap on its own axis and nothing else — one child or none spends nothing whatever the field says, a row charges per placed child rather than per declared one, a container with padding draws one gap above its first child rather than two, a document's top level has no childGap, and a gapped container is still windowable because the gap rows are the definition's — not deferred on a component: it lands with 2b's code commit, and this row is what SP9 holds open until it does",
-  );
+  it("T3.92 (C04 I121): a container spends max(0, placed - 1) x childGap on its own axis and nothing else", () => {
+    const kit = measurable();
+    const r = kit.registry;
+    const cell = (id: string): Block => block({ kind: "raw", id, text: "x" } as never);
+    const row = (gap: number | undefined, n: number): Block =>
+      block({
+        kind: "group",
+        id: "g",
+        direction: "row",
+        ...(gap === undefined ? {} : { childGap: gap }),
+        children: Array.from({ length: n }, (_u, i) => cell(`c${String(i)}`)),
+        flex: Array.from({ length: n }, () => ({ cells: 10 })),
+      } as never);
+
+    // **The default is the old constant, which is what makes this a refactor.**
+    // Three children at ten cells each need two gutters: 32 fits, 31 drops one.
+    expect(placeable(row(undefined, 3) as never, 32)).toBe(3);
+    expect(placeable(row(undefined, 3) as never, 31)).toBe(2);
+    // Declaring the default explicitly is the same answer — the field and the
+    // constant are one rule, not two that agree.
+    expect(placeable(row(1, 3) as never, 31)).toBe(placeable(row(undefined, 3) as never, 31));
+
+    // **No gutter at all**, which is the thing the field exists to make sayable
+    // and which no surface could ask for before (F1226).
+    expect(placeable(row(0, 3) as never, 30)).toBe(3);
+    expect(placeable(row(undefined, 3) as never, 30)).toBe(2);
+    // And a wider gap costs more: two gutters of three need 36.
+    expect(placeable(row(3, 3) as never, 36)).toBe(3);
+    expect(placeable(row(3, 3) as never, 35)).toBe(2);
+
+    // **A column declares none by default**, so its height is the bare sum and
+    // C09 I17 is untouched.
+    const col = (gap: number | undefined): Block =>
+      block({
+        kind: "group",
+        id: "col",
+        direction: "column",
+        ...(gap === undefined ? {} : { childGap: gap }),
+        children: [cell("a"), cell("b"), cell("c")],
+      } as never);
+    expect(r.measure(col(undefined), 40)).toBe(3);
+    expect(r.measure(col(0), 40)).toBe(3);
+
+    // **One child or none spends nothing, whatever the field says** — the rule
+    // is `max(0, n - 1)` rather than a clause guarding it.
+    const one = block({ kind: "group", id: "one", direction: "column", childGap: 5, children: [cell("a")] } as never);
+    expect(r.measure(one, 40)).toBe(1);
+    const empty = block({ kind: "group", id: "none", direction: "row", childGap: 5, children: [] } as never);
+    expect(r.measure(empty, 40)).toBeGreaterThanOrEqual(0);
+
+    // **A document's top level has no childGap** (C09 I17): a sequence adds
+    // nothing, so three blocks measure three whatever any container declares.
+    expect(r.measureSequence([cell("a"), cell("b"), cell("c")], 40)).toBe(3);
+
+    // **The element walk reads the same gap as the widths do.** Three readers of
+    // one constant was the finding; a second answer here is the defect it names.
+    // A `raw` block declares no element, so the children are notices with an
+    // action — the control below is what caught that, on the fixture-responds
+    // rule (`test/support/README.md`).
+    const act = (id: string): Block =>
+      block({
+        kind: "notice",
+        id,
+        tone: "info",
+        text: "x",
+        action: { key: "⏎", label: "open", command: "c" },
+      } as never);
+    const actRow = (gap: number): Block =>
+      block({
+        kind: "group",
+        id: "ga",
+        direction: "row",
+        childGap: gap,
+        children: [act("c0"), act("c1")],
+        flex: [{ cells: 10 }, { cells: 10 }],
+      } as never);
+    const gapped = r.elementsIn([actRow(3)], 40);
+    const wide = r.elementsIn([actRow(9)], 40);
+    expect(gapped.length, "the fixture declares elements to move").toBeGreaterThan(0);
+    expect(wide.length).toBe(gapped.length);
+    const second = (list: typeof gapped): number => list.filter((f) => f.blockId === "c1")[0]?.element.cols.from ?? -1;
+    expect(second(wide) - second(gapped), "the second child moves by the extra gap").toBe(6);
+
+    // **Refused a wrong value at the boundary**, and zero is not wrong.
+    expect(validateBlock(row(0, 2)).ok).toBe(true);
+    expect(validateBlock(row(-1, 2)).ok).toBe(false);
+    expect(validateBlock(row(1.5, 2)).ok).toBe(false);
+  });
 });

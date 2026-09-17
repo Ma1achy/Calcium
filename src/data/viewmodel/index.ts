@@ -123,6 +123,7 @@ export { markdownBlocks } from "./markdown.js";
 
 export {
   BORDER_INSET,
+  childGapOf,
   ROW_GUTTER,
   atLeastOne,
   childWidths,

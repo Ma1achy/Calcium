@@ -9,7 +9,7 @@
  */
 import {
   BORDER_INSET,
-  ROW_GUTTER,
+  childGapOf,
   childWidths,
   contentWidth,
   groupPlacements,
@@ -785,16 +785,25 @@ class Registry implements BlockRegistry {
             });
             return;
           }
-          // Side by side: `childWidths` shares with `ROW_GUTTER` between each
-          // pair, the first `placeable` of them (C04 §3), and `gapBefore` is
-          // ignored here exactly as the renderer ignores it — a row has no
-          // "before" to put a gap in (C04 §3a).
+          // Side by side: `childWidths` shares with `childGap` between each
+          // pair, the first `placeable` of them (C04 §3, C04 I121). A child's own
+          // `padding` is inside its own box here as everywhere — the offset is
+          // applied in `#elements`, once, around whatever the definition
+          // answered (C09 I80).
+          //
+          // **This is `ROW_GUTTER`'s fourth reader and the walk counted three**
+          // (F1226): the width division, the admission loop and the element
+          // walk in `containers.ts` are in one file, and this cursor is in
+          // another. A count of readers taken by reading one file is a count of
+          // that file, and T3.92 failed on the element that did not move —
+          // which is the only reason the fourth was found.
           let col = left;
+          const gap = childGapOf(block);
           block.children.slice(0, placeable(block, atWidth)).forEach((child, i) => {
             const share = widths[i] ?? 1;
             const at = placements[i];
             place(child, top + (at?.top ?? 0), col + (at?.left ?? 0), at?.width ?? share);
-            col += share + ROW_GUTTER;
+            col += share + gap;
           });
           return;
         }

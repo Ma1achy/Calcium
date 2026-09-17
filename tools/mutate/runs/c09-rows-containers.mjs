@@ -63,7 +63,7 @@ const results = runPass({
     {
       name: "GUTTER-DROPPED: the cells are laid without the gutter",
       file: C,
-      from: "        x += (widths[index] ?? 1) + ROW_GUTTER;\n",
+      from: "        x += (widths[index] ?? 1) + childGapOf(block);\n",
       to: "        x += widths[index] ?? 1;\n",
       expect: "T2.144",
     },

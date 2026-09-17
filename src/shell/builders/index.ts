@@ -1409,7 +1409,7 @@ function scroll(
 function group(
   direction: "row" | "column",
   children: readonly Block[],
-  opts?: BlockOpts & { flex?: readonly Share[]; align?: readonly Align[]; minRows?: number },
+  opts?: BlockOpts & { flex?: readonly Share[]; align?: readonly Align[]; minRows?: number; childGap?: number },
 ): Group {
   const flex = opts?.flex;
   if (flex !== undefined) {
@@ -1438,6 +1438,13 @@ function group(
       `b.group: ${String(align.length)} alignments for ${String(children.length)} children`,
     );
   }
+  // **Zero is a legitimate `childGap` and not for `minRows`** (C04 I121): *no
+  // gutter at all* is the thing the field exists to make sayable, so the two
+  // boundaries differ by one and are written separately rather than shared.
+  const childGap = opts?.childGap;
+  if (childGap !== undefined && (!Number.isInteger(childGap) || childGap < 0)) {
+    throw new TypeError(`b.group: childGap is a whole number of cells, zero or more — got ${JSON.stringify(childGap)}`);
+  }
   const minRows = opts?.minRows;
   if (minRows !== undefined && (!Number.isInteger(minRows) || minRows < 1)) {
     throw new TypeError(`b.group: minRows is a whole number of rows above zero — got ${JSON.stringify(minRows)}`);
@@ -1452,6 +1459,7 @@ function group(
       ...(flex === undefined ? {} : { flex: [...flex] }),
       ...(align === undefined ? {} : { align: [...align] }),
       ...(minRows === undefined ? {} : { minRows }),
+      ...(childGap === undefined ? {} : { childGap }),
     } as Group,
     opts,
     false,
