@@ -23,7 +23,7 @@ import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const CMD = "npx vitest run test/unit/rows.test.ts test/contract/rows-arm.test.ts test/edge/rows.test.ts test/golden";
+const CMD = "npx vitest run test/unit/rows.test.ts test/unit/blocks-measure-once.test.ts test/contract/rows-arm.test.ts test/edge/rows.test.ts test/golden";
 const R = "src/presentation/rows.ts";
 const C = "src/presentation/blocks/kinds/containers.ts";
 const T = "src/presentation/table/definition.ts";
@@ -118,6 +118,49 @@ const results = runPass({
       file: T,
       from: "          for (const line of drawn as readonly string[]) parts.push(line === \"\" ? \"\" : pad + line);\n",
       to: "          for (const line of drawn as readonly string[]) parts.push(line);\n",
+      expect: "T2.144",
+    },
+    {
+      // **The child rendered twice**: once for the rows attempt and again for
+      // the element fallback, which is what the first form of this arm did.
+      // **Neither the captures nor the goldens can see it** — a second render
+      // produces the same bytes — so T1.33's count is the only instrument, and
+      // it is the reason a byte-for-byte oracle is not sufficient on its own.
+      name: "MOSAIC-RERENDER: the element fallback renders the child a second time",
+      file: C,
+      from: "            elementOf(drawn),",
+      to: "            elementOf(ctx.renderChild(child, rect.width)),",
+      expect: "T1.33",
+    },
+    {
+      // **The cut removed.** A mosaic cell's rows reach past their region, and
+      // cell `a`'s overflow collides with cell `c` — so `composeRow` declines
+      // and the mosaic falls back to the element arm, where Ink draws the
+      // right frame. **The bytes do not move; the arm does**, which is why
+      // T2.147 asserts the probe's arm count beside the capture and why this
+      // mutation is the one that showed the decline is not dead (C09 I73).
+      name: "CELL-CUT-DROPPED: a mosaic cell's rows are not cut to its region",
+      file: R,
+      from: "      if (p.height !== undefined && within >= p.height) continue;\n",
+      to: "\n",
+      expect: "T2.147",
+    },
+    {
+      // **The cut a row long**: the frame moves rather than the arm, so this is
+      // the byte half of the pair above — the region keeps one row too many.
+      name: "CELL-CUT-LONG: a mosaic cell keeps one row past its region",
+      file: R,
+      from: "      if (p.height !== undefined && within >= p.height) continue;",
+      to: "      if (p.height !== undefined && within > p.height) continue;",
+      expect: "T2.147",
+    },
+    {
+      // **A region with no room drawn anyway** (C04 I72): a zero-wide cell
+      // renders its child at a width of nothing and places it.
+      name: "CELL-EMPTY-DRAWN: a region under one cell wide or one row tall is drawn",
+      file: C,
+      from: "      if (rect === undefined || rect.width < 1 || rect.height < 1) return [];",
+      to: "      if (rect === undefined) return [];",
       expect: "T2.144",
     },
     {

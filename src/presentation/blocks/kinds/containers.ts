@@ -29,7 +29,7 @@ import { BORDER_INSET, axesOf, groupPlacements, groupRows, mosaicRects, parseAre
 import type { NavElement } from "../types.js";
 import { cells, stripControl, truncate } from "../../text.js";
 import { glyphCells, glyphFor, glyphs } from "../glyphs.js";
-import { clampSpans, elementOf, paint, tone } from "../paint.js";
+import { clampSpans, elementOf, paint, rows, tone } from "../paint.js";
 import { composeRow, placeRows, type Placed } from "../../rows.js";
 import type { BlockDefinition, Rendered, RenderContext, Windowed } from "../types.js";
 
@@ -633,7 +633,7 @@ export const mosaicDefinition: BlockDefinition<Mosaic> = {
     );
   },
 
-  render(block: Mosaic, ctx: RenderContext): ReactElement {
+  render(block: Mosaic, ctx: RenderContext): Rendered {
     // The child count, which is what a container's cost is proportional to and
     // what no duration states. Each child is its own node; this is how many.
     ctx.probe?.gauge("mosaic.children", block.children.length); // cells-ok — a count of items, not a display width
@@ -648,14 +648,45 @@ export const mosaicDefinition: BlockDefinition<Mosaic> = {
       ? mosaicRects(parsed.grid, width, block.height, block.columns, block.rows)
       : [];
 
-    const cellsDrawn = block.children.flatMap((child, i) => {
+    // **No floor here.** A height under one composes no lines and I14's floor
+    // makes an empty rows answer one blank row; the element arm needed its own
+    // because a `Box` of height zero draws nothing, and that duty moved with it.
+    const height = block.height; // cells-ok — a row count
+
+    // **The rows arm** (C09 I73). Each drawable cell's child is rendered at its
+    // rect's width and written at the rect's column and row, clipped to the
+    // rect's height — the clip per cell rather than the container's, because
+    // mosaic places absolutely and Ink's `overflow: hidden` is on each cell.
+    //
+    // **Each child is rendered once, here, and both arms read that** (I61).
+    // The first form rendered inside the rows attempt and again inside the
+    // element fallback, so a mosaic that declined drew every child twice —
+    // T1.33 caught it, and neither the captures nor the goldens could, because
+    // a second render produces the same bytes.
+    const drawable = block.children.flatMap((child, i) => {
       const rect = rects[i];
-      // **A cell with no room is not drawn** (C04 I72). `mosaicRects` clamps to
-      // the region because the container's clip cannot be relied on: a cell that
-      // clips its own child shadows the ancestor's clip rather than intersecting
-      // it, so the geometry is the guarantee (I35).
       if (rect === undefined || rect.width < 1 || rect.height < 1) return [];
-      return [
+      return [{ child, rect, drawn: ctx.renderChild(child, rect.width) }];
+    });
+
+    const childRows = rowsOfAll(drawable.map(({ drawn }) => drawn));
+    if (childRows !== null) {
+      const lines = placeRows(
+        drawable.map(({ rect }, i) => ({
+          x: rect.left, top: rect.top, width: rect.width, height: rect.height,
+          rows: childRows[i] ?? [],
+        })),
+        height,
+      );
+      if (lines !== null) return rows(lines);
+    }
+
+    // **A cell with no room is not drawn** (C04 I72). `mosaicRects` clamps to
+    // the region because the container's clip cannot be relied on: a cell that
+    // clips its own child shadows the ancestor's clip rather than intersecting
+    // it, so the geometry is the guarantee (I35).
+    const cellsDrawn = drawable.map(({ child, rect, drawn }) => {
+      return (
         createElement(
           Box,
           {
@@ -672,15 +703,15 @@ export const mosaicDefinition: BlockDefinition<Mosaic> = {
           createElement(
             Box,
             { flexShrink: 0, flexDirection: "column" as const },
-            elementOf(ctx.renderChild(child, rect.width)),
+            elementOf(drawn),
           ),
-        ),
-      ];
+        )
+      );
     });
 
     return createElement(
       Box,
-      { width, height: Math.max(1, block.height), overflowX: "hidden" as const }, // cells-ok — a row count
+      { width, height, overflowX: "hidden" as const },
       cellsDrawn,
     );
   },

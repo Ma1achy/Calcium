@@ -484,7 +484,7 @@ export function composeRow(pieces: readonly Piece[]): string | null {
 }
 
 /** A block of rows written at a column and a row of the grid (C09 I73). */
-export type Placed = Readonly<{ x: number; top: number; width: number; rows: readonly string[] }>;
+export type Placed = Readonly<{ x: number; top: number; width: number; height?: number; rows: readonly string[] }>;
 
 /**
  * The lines of a grid `height` tall holding every placed block (C09 I73) —
@@ -497,7 +497,9 @@ export function placeRows(placed: readonly Placed[], height: number): readonly s
   for (let y = 0; y < height; y += 1) { // cells-ok — a row index
     const pieces: Piece[] = [];
     for (const p of placed) {
-      const row = p.rows[y - p.top];
+      const within = y - p.top;
+      if (p.height !== undefined && within >= p.height) continue;
+      const row = p.rows[within];
       if (row === undefined || row === "") continue;
       if (rowCells(row) > p.width) return null;
       pieces.push({ x: p.x, row });

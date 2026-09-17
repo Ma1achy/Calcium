@@ -97,6 +97,28 @@ export class InkOracle {
   }
 
   /**
+   * A capture whose **producer no longer exists** — read in both modes.
+   *
+   * `rows` takes a thunk because recording calls it; a capture whose producer
+   * has been deleted has no thunk to call, and the first form of this made the
+   * thunk throw. That is honest and useless: recording the suite then cannot
+   * complete, so **one deleted producer freezes the whole set** and no later
+   * capture can ever be added. The distinction the recorder actually needs is
+   * not *this failed* but *this one is finished* — the bytes are committed, the
+   * thing that made them is gone, and both are permanent. So this reads the
+   * file whatever the mode, and counts as asked, which keeps `settle()`'s
+   * equality true rather than making the frozen capture look stale.
+   */
+  frozen(name: string): readonly string[] {
+    this.#seen.add(name);
+    const path = join(this.#dir, name);
+    if (!existsSync(path)) {
+      throw new Error(`${name} is frozen — its producer is deleted and the capture is missing, so nothing can restore it`);
+    }
+    return decode(readFileSync(path, "utf8"));
+  }
+
+  /**
    * Every capture asked for, against every capture committed — **by equality,
    * both ways.**
    *

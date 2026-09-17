@@ -92,9 +92,13 @@ describe("C09 I72 — rows at the edges", () => {
       const got = renderToLines(r, b, width, { theme: DARK_THEME, capabilities: FULL_CAPS, probe });
       return { got, expected, names };
     };
-    // **An element child**: the mosaic is the one kind left on the element arm.
-    const withMosaic = B({ kind: "group", id: "g-mosaic", direction: "column", children: [ONE_PER_KIND.notice, ONE_PER_KIND.mosaic] });
-    const m = both(withMosaic, 60);
+    // **An element child.** Since I73 reached `mosaic` no kind C09 ships answers
+    // an element, so the fallback's only constructor is a registered kind that
+    // does — `lifted`, which wraps its child's rows back into an element. A row
+    // asserting a fallback needs something able to reach it, and the previous
+    // subject (a mosaic) stopped being one in the same commit that moved it.
+    const withElement = B({ kind: "group", id: "g-element", direction: "column", children: [ONE_PER_KIND.notice, B({ kind: "lifted", id: "lf", inner: ONE_PER_KIND.notice })] });
+    const m = both(withElement, 60);
     expect(m.got).toEqual(m.expected);
     expect(m.names.filter((n) => n === "react")).toHaveLength(1);
     expect(m.names.filter((n) => n === "rows")).toHaveLength(0);

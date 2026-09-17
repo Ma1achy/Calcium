@@ -21,21 +21,11 @@ import { ASCII_CAPS, DARK_THEME, FULL_CAPS, MONO_CAPS, registry } from "../suppo
 import { TEST_KINDS, twin } from "../support/lifted.js";
 import { InkOracle, oracleName } from "../support/ink-oracle.js";
 
-const CAPS = [FULL_CAPS, ASCII_CAPS, MONO_CAPS] as const;
 /** The same sets, named, because a capture's file name carries the arm it was taken under. */
 const NAMED_CAPS = [["full", FULL_CAPS], ["ascii", ASCII_CAPS], ["mono", MONO_CAPS]] as const;
 /** A block's key in the capture directory — **kind and id**, because ids repeat across the two corpora. */
 const keyOf = (b: Block): string => `${b.kind}-${b.id}`;
 const oracle = new InkOracle("rows-arm");
-/**
- * A capture whose producer has been deleted. Reading it works; **re-recording
- * it cannot**, and the throw names what went rather than failing as a missing
- * member. The captures outlive the code that made them, which is the point of
- * F1209 — this is what that looks like from the recorder's side.
- */
-const gone = (what: string) => (): never => {
-  throw new Error(`${what} was deleted — its capture is read-only and cannot be re-recorded`);
-};
 /**
  * **Below `DEFAULT_WIDTHS`' floor of 40**, which is where container
  * disagreements grow rather than where they are comfortable: a rail pair and a
@@ -107,11 +97,15 @@ describe("C09 I72 — the two arms agree", () => {
     // Both arms were exercised — a corpus that took one arm alone would prove
     // nothing about the seam between them.
     expect(rowsArm).toBeGreaterThan(200);
-    // **The element arm is `mosaic`'s alone since C09 I73**: every corpus mosaic at
-    // every width under every capability set, and nothing else.
-    const mosaics = blocks.filter((b) => b.kind === "mosaic").length; // cells-ok — a count of blocks
-    expect(mosaics).toBeGreaterThan(0);
-    expect(elementArm).toBe(mosaics * WIDTHS.length * CAPS.length);
+    // **No kind this component ships answers an element** since I73 reached
+    // `mosaic`. Asserted as a count of zero rather than as a count naming the
+    // kind that takes the arm: the previous form was `mosaics × widths × caps`,
+    // which is exactly the shape that goes stale silently the day that kind
+    // moves — it would have passed a mosaic that had stopped rendering as
+    // readily as one that had moved. T3.89 keeps the fallback honest with a
+    // registered test kind, which is the only constructor left for it.
+    expect(blocks.some((b) => b.kind === "mosaic"), "the corpus still holds a mosaic").toBe(true);
+    expect(elementArm, "no corpus block reaches the element arm").toBe(0);
 
     // **The mixed sequence.** Rows blocks and element blocks side by side, a gap
     // before some, a floor taller than the block, and a cap with its marker —
@@ -138,10 +132,10 @@ describe("C09 I72 — the two arms agree", () => {
         // **The producer is gone and the capture is not.** `renderSequence`
         // was the registry's whole-sequence element arm; it had no caller in
         // `src/` and this row was the only thing that read it, so its bytes
-        // were captured first and the member deleted after. Re-recording this
-        // one is a refusal rather than a crash: the thing that could answer it
-        // no longer exists, and saying so is the honest form.
-        const expected = oracle.rows(oracleName("t2143-sequence", capsName, width), gone("the registry's renderSequence"));
+        // were captured first and the member deleted after. `frozen` rather
+        // than `rows`: there is no thunk to call, and this capture is finished
+        // rather than failing.
+        const expected = oracle.frozen(oracleName("t2143-sequence", capsName, width));
         const got = renderSequenceToLines(capped, sequence, width, { theme: DARK_THEME, capabilities });
         expect(got, `sequence at ${String(width)}`).toEqual(expected);
         // The fixture responds: the cap's marker is in the frame, and the floor's
@@ -225,6 +219,59 @@ describe("C09 I72 — the two arms agree", () => {
     expect(panel.length, "rails, body and a gap").toBeGreaterThan(5); // cells-ok — rows
     const short = r.render(containers[3] as Block, ctx) as readonly string[];
     expect(short.length, "the short child leaves its cell blank below its row").toBe(3); // cells-ok — rows
+  });
+
+  it("T2.147 (C09 I73, I35; F1210): a mosaic cuts each cell's rows to its own region and not to the grid, a region with no room draws nothing, and both equal the committed capture of the element path", () => {
+    const r = registry(TEST_KINDS);
+    // **A second grid row is what makes the cut observable.** A single row of
+    // cells is cut at the grid's height and per cell alike, so a one-row mosaic
+    // passes either rule. Here `a` and `b` share the top half and `c` holds the
+    // bottom: `a`'s child is eight rows in a region of three, and a cut taken at
+    // the grid's height would let those rows reach the rows that belong to `c`.
+    const block = {
+      kind: "mosaic", id: "m-clip", height: 6, areas: "ab/cc",
+      rows: [1, 1], columns: [1, 1],
+      children: [
+        { kind: "raw", id: "ca", text: "a1\na2\na3\na4\na5\na6\na7\na8" },
+        { kind: "raw", id: "cb", text: "b1\nb2" },
+        { kind: "raw", id: "cc", text: "c1\nc2\nc3" },
+      ],
+    } as unknown as Block;
+    for (const width of [8, 20, 60]) {
+      for (const [capsName, capabilities] of NAMED_CAPS) {
+        const ctx: RenderContextInput = { width, theme: DARK_THEME, capabilities, focus: null, tick: 0 };
+        const expected = oracle.rows(oracleName(`t2147-${keyOf(block)}`, capsName, width), () =>
+          // **`twin` and not the block itself.** Mosaic answers rows now, so
+          // `elementOf(r.render(block))` would lift the arm's own answer and
+          // compare it with itself — a comparison that cannot fail. `twin`
+          // lifts the leaves, which sends the container down its element path,
+          // and that path is Ink's independent layout.
+          throughInk(elementOf(r.render(twin(block), ctx)), width),
+        );
+        const { probe, names } = recording();
+        const got = renderToLines(r, block, width, { theme: DARK_THEME, capabilities, probe });
+        expect(got, `the clipped mosaic at ${String(width)}`).toEqual(expected);
+        expect(names.filter((n) => n === "react"), "the mosaic takes the rows arm").toHaveLength(0);
+        expect(got.length, "the grid is its declared height").toBe(6); // cells-ok — rows
+      }
+    }
+
+    // **A height below one draws one blank row.** C04 I71 refuses this at
+    // validation, so no valid document reaches it — and the refusal's own
+    // message says what the renderer draws for one, which makes this C09's
+    // degraded answer for a block that came in past the gate rather than dead
+    // code guarding an impossible state. Constructed by rendering the block
+    // directly, which is exactly what a consumer bypassing validation does.
+    const floored = { ...(block as unknown as Record<string, unknown>), id: "m-floor", height: 0 } as unknown as Block;
+    for (const width of [8, 20, 60]) {
+      const ctx: RenderContextInput = { width, theme: DARK_THEME, capabilities: FULL_CAPS, focus: null, tick: 0 };
+      const expected = oracle.rows(oracleName(`t2147-${keyOf(floored)}`, "full", width), () =>
+        throughInk(elementOf(r.render(twin(floored), ctx)), width),
+      );
+      const got = renderToLines(r, floored, width, { theme: DARK_THEME, capabilities: FULL_CAPS });
+      expect(got, `the floored mosaic at ${String(width)}`).toEqual(expected);
+      expect(got, "one blank row, not none").toEqual([""]);
+    }
   });
 
   it("T2.146 (C09 I72, I73; F1209): every capture the two rows ask for is a capture the tree holds, and every capture the tree holds is one a row asks for", () => {
