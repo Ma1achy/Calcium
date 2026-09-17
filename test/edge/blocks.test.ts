@@ -971,4 +971,10 @@ describe("C09 §2 padding — the registry's one application", () => {
     expect(validateBlock(row(-1, 2)).ok).toBe(false);
     expect(validateBlock(row(1.5, 2)).ok).toBe(false);
   });
+  // **The spec commit's row, before the field moves** (SP9). C09 I82: a column's
+  // header names the cells the column holds, not the cells reserved beside them.
+  it.todo(
+    "T3.95 (C09 I82, F1236): a column's header and the cells it names start at the same index — comparison's run 5 with every b value and run 4 with every a value, asked by index rather than read from a frame, both halves because the block was already correct on one — not deferred on a component: the header reserves nothing",
+  );
+
 });

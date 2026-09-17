@@ -2433,6 +2433,18 @@ the same overrun in smaller form.
   withholding is stated rather than silent** — the count of parts or items shed appears in the row —
   which is what makes *shed* distinguishable from *lost* at a glance (C29 I18, I34, C26 §5, F1228,
   F1232, `docs/notes/C29_REPRESENTATIONS_WALK.md`).
+- **I82** — **A column's header names the cells the column holds, not the cells reserved beside
+  them.** A value carrying a mark — `comparison`'s verdict, and any prefix a kind reserves inside a
+  column — starts where the reservation ends, and the label above it starts there too. The block was
+  already committed to this on one column of two: `comparison`'s `run 4` sits exactly on its `a`
+  values at every width, because nothing is prefixed to that column, and `run 5` sat **two cells
+  left** of its `b` values because the header passed a reservation of zero where the body passed the
+  verdict's. **The mark is not part of what the label names** — it is a verdict *about* a value, and
+  a row declaring none draws blanks in its place, so a header spanning it would be naming a column
+  that is sometimes empty. **Measured by index rather than read from a frame**: at 80, 60, 44 and 32
+  the header sat at 56, 42, 32 and 24 against values at 58, 44, 34 and 26, and the body was
+  consistent with itself throughout — a row with a verdict and a row without put their value in the
+  same column, because `markFor` pads to the reserved width for both (F1236, I81).
 
 ## 8. Commitments
 
@@ -2506,6 +2518,7 @@ the same overrun in smaller form.
 66. **The styled measurer's one pass takes the rasterised alphabets** (I77, F1202). `displayCells` fell off its scan at the first braille unit and paid a stripped copy and a second walk for every plot row of every frame — 13 µs a row against one or two, almost the cost of drawing the row. The set `rowCells` already admits at `narrow` is taken in the same pass, and anything else still returns the stripped measure whole.
 67. **A short row is padded, not walked** (I78, F1204). `fitStyled` measured every row and then walked every row under the width to emit the row it was handed — 16 µs against one — on nearly every row of every frame. The measure decides the pad now, and the walk is the cut path's alone.
 68. **A cut line is walked to the cut** (I79, F1205). `truncate` and `truncateParts` segmented the whole line — a record and a string per cluster — to keep its first hundred cells: 94 µs for a 329-cell markdown paragraph at width 118, on every `raw` line and every over-width `code` row of every miss frame. The cursor stops at the cut now, and the reverse arm reads the same boundaries.
+69. **A column's header names the cells the column holds** (I82). A reservation inside a column — `comparison`'s verdict mark, and any prefix a kind takes — is skipped by the label as well as by the value, because the mark is a verdict *about* a value rather than part of what the label names. The defect this closes was one field: `line()` builds `comparison`'s header and body through the same function, and the header passed `reserve: 0` (F1236).
 
 ---
 
@@ -2829,6 +2842,14 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T3.90** (I63, I79, F1205): a 400-cell CJK line — 200 clusters — truncated to 100 from the end asks the segmenter for **250** clusters through `containing` (200 for the measure, 49 kept and one refused at the boundary) and iterates **no** `Segments` (one iteration of 200 records before I79, and the same 200 asks); the same line kept from the tail asks **400** — the whole line's boundaries — and iterates none; a 400-cell ASCII line asks for none on either arm. Counted through `Segments.prototype.containing` and `Segments.prototype[Symbol.iterator]`, and not timed: the count *is* what I79 says, and a duration is a proxy for it.
 - **T3.91** (I73, F1209): T3.89's declines and over-tall body are compared against their own committed captures, and the set asked for equals the set on disk both ways.
 - **T3.93** (I81, F1228): the four kinds that owe a ladder — `comparison`, `keyValue`, `events`, `steps` — swept at every width from 4 to 80 against the shedding rule, **read as frames and not as row counts**. At each width every part still drawn is legible, meaning no part is reduced below its own declared minimum while another part is still at full width; the parts shed are shed **in the declared order**; and a withholding is stated rather than silent. The row that a truncating implementation passes is any row about the block's *height*, because shredding does not change it — which is why this asserts the row's content and why the defect shipped: measured at HEAD, `comparison` at twelve columns drew `  field  b……` over `~ l…  3…  2…`, four parts each cut to nothing at once.
+- **T3.95** (I82, F1236): a column's header and the cells it names start at the **same index**, asked
+  of the frame by index rather than read from it. Over `comparison` at every width in the sweep, the
+  `run 5` label and every `b` value begin at one column, and so do `run 4` and every `a` value —
+  **both halves, because the block was already correct on one of them** and a row asserting only the
+  marked column would pass against a header that had simply been moved two cells right of everything.
+  The row also fixes the body's own agreement: a row carrying a verdict and a row carrying none put
+  their value in the same column, which is what made the first reading of this finding half wrong.
+
 - **T3.94** (I81, C26 §5): a kind at its narrowest rung produces the **same element ids** as at its widest, swept over the four kinds and every width — the assertion that makes *shed a part, never an item* enforceable, since dropping an item is invisible to any assertion about widths and shows up only as a focus on a block that draws nothing (C29 I18).
 - **T3.87** (I68): the two frames, read rather than totalled — a bordered `status` in a 40-cell block at `ambiguousWidth: "wide"` has **every** row at 40 cells measured at that convention, the message row included; and a `comparison` at 44 keeps its last column's text whole, which is the arm no row total can see because `clampSpans` above it made the total right while the content was cut. In `test/edge/status.test.ts`.
 - **T3.88** (I72): a row that is only SGR normalises to `""`; a row holding an OSC control sequence loses it, as Ink drops it; a row ending in styled blanks keeps them and their closing codes; a row ending in plain blanks loses them; a wide character keeps its cells and its styles; `rows([])` answers one empty row (I14) and the frame has it.
