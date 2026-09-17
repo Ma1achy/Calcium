@@ -747,10 +747,16 @@ describe("C16 §4a — the crosshair, read from the painted frame", () => {
     expect(ruleRow().indexOf("▲"), "the mark is under the pointer").toBe(43);
     expect(text().join("\n"), "and the readout names the third sample").toMatch(/train: 30/u);
 
-    // A second click at sample 1's centre, seventeen cells left — the mark
+    // A second click at sample 1's centre, eighteen cells left — the mark
     // follows the data and not the mouse.
-    await type(sgrClick(areaRow, 26));
-    expect(ruleRow().indexOf("▲")).toBe(26);
+    //
+    // **The centre moved by one with C22 I109**: the plot draws in the region
+    // and the region is a column narrower than the terminal, so every sample
+    // centre shifts left. The input moves with it rather than the expectation,
+    // because the claim is *the mark is under the pointer at a centre* and an
+    // expectation edited alone turns that into *the mark is near the pointer*.
+    await type(sgrClick(areaRow, 25));
+    expect(ruleRow().indexOf("▲")).toBe(25);
     expect(text().join("\n")).toMatch(/train: 20/u);
     expect(text().join("\n")).not.toMatch(/train: 30/u);
   });
@@ -906,8 +912,10 @@ describe("C16 §4a — the hover, read from the painted frame", () => {
     expect(text().join("\n"), "and the readout names the third sample").toMatch(/train: 30/u);
     expect(cursorRow(), "and the cursor is still on the prompt row — focus did not move").toBe(promptRow);
 
-    await type(sgrHover(areaRow, 61));
-    expect(ruleRow().indexOf("▲")).toBe(61);
+    // One cell left of where this stood, for C22 I109's reason: the plot is
+    // drawn in the region and the region is a column narrower.
+    await type(sgrHover(areaRow, 60));
+    expect(ruleRow().indexOf("▲")).toBe(60);
     expect(text().join("\n")).toMatch(/train: 40/u);
     expect(cursorRow()).toBe(promptRow);
 

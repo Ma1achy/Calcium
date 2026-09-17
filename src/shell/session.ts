@@ -50,7 +50,7 @@ import type { RenderScratch } from "../presentation/blocks/types.js";
 import { contextAt } from "../interaction/completion/index.js";
 import { selectionSpans, type CellSpan } from "../interaction/editor/index.js";
 import { extentOf } from "../interaction/router/focus.js";
-import { PROMPT_GUTTER } from "./config.js";
+import { PROMPT_GUTTER, regionWidth } from "./config.js";
 import { cursorStyleFor, steadyWhileTyping } from "./cursor-style.js";
 import { createIdentityLoop } from "./identity.js";
 import {
@@ -1018,16 +1018,25 @@ class Session implements TuiInstance {
             // to. It partitions blocks and no run is measured here, which is why
             // this is affordable over every entry rather than the visible ones.
             graph.transcript.entries.flatMap((e) =>
-              entryLayout(e.doc.blocks, graph.lifecycle.size().columns)
+              entryLayout(e.doc.blocks, regionWidth(graph.lifecycle.size().columns))
                 .filter((run) => !run.blank)
                 .map((run) => ({ scope: e.id, blocks: run.blocks, width: run.width })),
             ),
             graph.capabilities,
             this.#sentImages,
-            // The frame's width, still — the fallback for a group declaring none,
+            // The **region's** width — the fallback for a group declaring none,
             // and the declared cell box is a render-time fact that was a
             // hardcoded `1` before F380.
-            graph.lifecycle.size().columns,
+            //
+            // **`regionWidth` rather than the region** (I109, §6l.9 row 7): the
+            // write seam runs after `composeFrame` has returned and holds no
+            // `Composed`, so the one implementation is reached for rather than
+            // the value. Spelling `columns - 1` here is what the helper exists
+            // to prevent — this seam and the layout above must read the number
+            // the blocks were measured at, and at 80 columns a card-nested
+            // picture declared 80 cells wide and addressed across 76 is what
+            // F1026 measured going wrong one width along.
+            regionWidth(graph.lifecycle.size().columns),
             graph.probe,
           )
         : "") + result.write;
@@ -1213,7 +1222,14 @@ class Session implements TuiInstance {
   }
 
   #paintDeps(graph: Graph, frame: Composed): PaintDeps {
-    const width = frame.size.columns;
+    // **The region's width, and every dep below draws content** (I109, §6l.9
+    // rows 3–4). The transcript's rows, the prompt's rows, its cursor and its
+    // selection spans are all laid out at this; the paint pads them to
+    // `frame.size.columns`, which is where the rules and the chrome are drawn.
+    // One local, because a frame carrying two widths fails by a composer
+    // reading the wrong one and a second `frame.size.columns` here is that
+    // failure spelled harmlessly.
+    const width = frame.region.width;
     return {
       registry: graph.blocks,
       theme: graph.theme.current,

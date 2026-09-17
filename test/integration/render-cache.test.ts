@@ -10,6 +10,8 @@
 // a whole sequence, so one call is one increment however many blocks an entry
 // holds.
 import { describe, expect, it, vi } from "vitest";
+import { regionWidth } from "../../src/shell/config.js";
+import { BODY_INDENT } from "../../src/shell/entry-layout.js";
 
 import { buildGraph, buildSession } from "../support/session.js";
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
@@ -172,6 +174,28 @@ function measuring(): { definition: BlockDefinition; measured: () => number } {
 }
 
 /** How many times the transcript's entry has been rendered. */
+/**
+ * A kind that records the **width it was asked at**, for C22 I109's row.
+ *
+ * The number, not the call — a caller that recomputes the margin at the call
+ * site is caught by the width the blocks were measured at and by nothing about
+ * the resize itself (§6l.9 row 3).
+ */
+function widthWatching(): { definition: BlockDefinition; widths: () => readonly number[] } {
+  const seen: number[] = [];
+  return {
+    widths: () => [...seen],
+    definition: {
+      kind: "count",
+      measure: (_b, width) => {
+        seen.push(width);
+        return 1;
+      },
+      render: () => inkRows(["counted"]),
+    },
+  };
+}
+
 function counting(): { definition: BlockDefinition; count: () => number } {
   let n = 0;
   return {
@@ -977,6 +1001,39 @@ describe("C22 I108 — the paced schedule, wired (F1207)", () => {
       await tui.stop("exit");
     } finally {
       spy.mockRestore();
+    }
+  });
+  it("T4.93 (C22 I109, C14 I22): the measurer is asked at the region's width at every size, and never at the terminal's", async () => {
+    const { definition, widths } = widthWatching();
+    const { type, resize } = await session(definition);
+    await type("\r");
+    expect(widths().length, "the entry was measured").toBeGreaterThan(0);
+
+    // **Asserted on the recorded widths rather than on the resize call.** A
+    // caller that spells `columns - 1` a second time at the call site passes
+    // every assertion about `resizeViewport`'s argument and is caught here.
+    for (const columns of [100, 61, 80]) {
+      const before = widths().length;
+      resize({ columns, rows: 20 });
+      await type("x");
+      // **The widest ask, not the last one.** A block inside a card body is
+      // measured at `width − 4` under the hook (I83, §6l.2 row 11), so the last
+      // recorded number is an indent below the region and the claim is about
+      // the ceiling: nothing is asked wider than the region, and something is
+      // asked at exactly it.
+      // Only the asks made since this resize: `widths()` accumulates over the
+      // whole loop, and a maximum taken over all of it is the widest *size*
+      // rather than the widest ask at this one.
+      const seen = widths().slice(before).filter((w) => w > 40); // cells-ok — columns
+      const widest = Math.max(...seen);
+      // Every block in this fixture is a card body, measured at `width − 4`
+      // under the hook (I83, §6l.2 row 11) — so the number to read is the
+      // region's less the indent, and it is `columns − 1 − 4` rather than
+      // `columns − 4`. That one column is the whole of what this row is about.
+      expect(widest, `the widest ask at ${String(columns)} columns`).toBe(
+        regionWidth(columns) - BODY_INDENT,
+      );
+      expect(widest, "and never off the terminal's width").not.toBe(columns - BODY_INDENT);
     }
   });
 });

@@ -25,6 +25,23 @@
  * stayed green. A derived arm is what makes a fourth theme join rather than pass
  * by, and the finding says the rendering worth having is a **frame** — this one.
  *
+ * **Two of these frames moved when C22 I109 landed, and they are the only two
+ * in 468 golden entries** — `window-wash` in its `styles` and its `writes`
+ * reading, the same scene twice. The wash now stops one column before the right
+ * edge and the base owns the last cell, which is `APPEARANCE.md` §15 rule 8
+ * arriving: *content stops one column before the right edge*. The three rule
+ * rows and the chrome's clusters are unmoved, which is the half that says the
+ * margin landed where §6l.9 put it rather than on the frame.
+ *
+ * **The count is the finding.** Naming the expected movers before the run
+ * predicted all 45 session entries; 43 did not move, and F1227's measurement had
+ * already said why — three content rows reached the last column across the whole
+ * corpus, and every frame that never touches the edge cannot see a margin. The
+ * measured number was right and the prediction taken from the change's *reach*
+ * was wrong, which is the same lesson as F1225's on the axis next door: a corpus
+ * that cannot distinguish a correct margin from a wrong one shows two frames
+ * moving either way.
+ *
  * **Three readings per scene, never one.** `states.test.ts` strips SGR on the
  * grounds that a snapshot carrying both the glyphs and the colours moves when
  * either does and then neither is protected. The same ruling here splits the

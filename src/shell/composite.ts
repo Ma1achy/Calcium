@@ -63,6 +63,23 @@ export type CompositeDeps = Readonly<{
   /** The region C15 placed against — its own coordinates (I28). */
   region: Readonly<{ width: number; height: number }>;
   /**
+   * **The frame's width, which is not the region's** (I109, F1227).
+   *
+   * The rows handed in are the painted frame — `size.rows` strings of
+   * `size.columns` — and a composited row must come back at that width, because
+   * the paint has already padded every row to it and the rules and the chrome
+   * are drawn at it. The *region* is what a box may not escape and is one
+   * column narrower.
+   *
+   * **This was `region.width`, and it was correct only while the two were the
+   * same number.** A name for one quantity standing in for another is invisible
+   * to every assertion as long as they agree: the escape check and the row's
+   * padding read one field, and T1.12c — which asserts the composited row is
+   * still the frame's width — went red the moment the margin landed, with
+   * nothing about layers having changed.
+   */
+  columns: number;
+  /**
    * The session's render scratch (C12 I107).
    *
    * **A layer is the other place a 3D plot renders**, and it is the one the
@@ -88,7 +105,10 @@ export function composite(
 ): readonly string[] {
   if (placed.length === 0) return rows;
 
-  const columns = deps.region.width;
+  // **The frame's width for the row, the region's for the escape** (I109). The
+  // one below is `deps.region`'s and is a different question: how far a box may
+  // reach, in the coordinates C15 placed it in.
+  const columns = deps.columns;
   // **Accumulated, not per-layer** (I29). Every layer composites onto what the
   // layers below it left, which is what makes "the top layer wins each cell"
   // and "the lower keeps the rest of its box" the same sentence.

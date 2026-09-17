@@ -142,10 +142,15 @@ describe("C22 §6 — the frame", () => {
       });
 
     // 30 − header 1 − its rule 1 (C22 I87) − rules 2 − prompt 1 − footer 0 (`[]`, C22 I82).
-    expect(at(30, 1).region).toEqual({ top: 2, height: 25 });
+    // The width is the terminal's less the margin (C22 I109) and is asserted
+    // here as part of the region rather than beside it: the region is one
+    // object, and a row that destructures the height alone stops noticing when
+    // an axis is added to it.
+    expect(at(30, 1).region).toEqual({ top: 2, height: 25, width: 99 });
     expect(at(30, 4).region, "a wrapped prompt takes the rows from the transcript").toEqual({
       top: 2,
       height: 22,
+      width: 99,
     });
 
     // Clamped, not negative. The size gate normally prevents this and normally
@@ -176,9 +181,15 @@ describe("C22 §6 — the frame", () => {
       promptRows: () => 1,
     });
 
-    expect(f.overlayRegion).toEqual({ width: 100, height: 25 });
-    expect(f.region).toEqual({ top: 2, height: 25 });
+    // **Both axes are the region's now** (C22 I109, §6l.9 row 5): a layer's
+    // content is content, so the box is placed against the narrowed width as
+    // well as the shared height. The two are still different *shapes* — the
+    // transcript region carries a `top` and the layer region does not — which
+    // is what this row is named for.
+    expect(f.overlayRegion).toEqual({ width: 99, height: 25 });
+    expect(f.region).toEqual({ top: 2, height: 25, width: 99 });
     expect(f.overlayRegion.height, "one number, not two").toBe(f.region.height);
+    expect(f.overlayRegion.width, "and one number on the other axis too").toBe(f.region.width);
   });
 });
 
@@ -230,6 +241,13 @@ describe("C22 §6 — the height the viewport is given", () => {
     expect(given, "one resize per frame").toHaveLength(1);
     expect(given[0]!.height, "the region's, not the terminal's").toBe(frame.region.height);
     expect(given[0]!.height, "and the two are not the same number here").not.toBe(frame.size.rows);
-    expect(given[0]!.width).toBe(frame.size.columns);
+    // **And the width is the region's too** (C22 I109, C14 I22). This row is
+    // the wiring for both axes: `uncited-46`'s two resize mutations are caught
+    // here and nowhere else, because a row that computes the numbers without
+    // driving `composeFrame` is green with either one applied.
+    expect(given[0]!.width, "the region's, not the terminal's").toBe(frame.region.width);
+    expect(given[0]!.width, "and the two are not the same number here").not.toBe(
+      frame.size.columns,
+    );
   });
 });

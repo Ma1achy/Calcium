@@ -72,8 +72,15 @@ const results = runPass({
       // **Re-anchored** (F1118): the region's height is the transcript's now
       // (I28) rather than the terminal's, so only the width still comes from
       // the sample. One re-read is the whole of what T4.11b counts.
-      from: "    overlayRegion: Object.freeze({ width: size.columns, height }),",
-      to: "    overlayRegion: Object.freeze({ width: deps.size().columns, height }),",
+      //
+      // **Re-anchored again** (I109, F1227): the overlay region's width is the
+      // *region's* now, so the size is read once into `content` and the literal
+      // no longer names `size`. The mutation is unchanged in substance — a
+      // second read of the terminal inside `compose`, where the two reads may
+      // disagree — and it now goes through the margin, which is the one
+      // implementation both widths come from.
+      from: "  const content = regionWidth(size.columns);",
+      to: "  const content = regionWidth(deps.size().columns);",
       expect: "T4.11b",
     },
     {

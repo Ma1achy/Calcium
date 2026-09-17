@@ -88,6 +88,40 @@ export function promptFor(caps: Pick<TerminalCapabilities, "unicode">): string {
 export const PROMPT_SUBSTITUTION: readonly [string, string] = PROMPT_FORMS;
 export const PROMPT_GUTTER = Object.freeze({ first: 2, cont: 2 });
 
+/**
+ * `APPEARANCE.md` §15 rule 8 — *content stops one column before the right edge*
+ * (I109, §6l.9).
+ *
+ * **Never configurable**, for I81's reason: a margin an app can switch off is a
+ * second frame shape to specify, and the frame's default look is C22's.
+ */
+export const CONTENT_MARGIN_R = 1;
+
+/**
+ * The region's width — the terminal's, less the margin (I109).
+ *
+ * Named for the region rather than for the content, because C09's `contentWidth`
+ * is a block's inside-the-padding width one layer down and two functions of one
+ * name over two subjects is MG24's shape.
+ *
+ * **One implementation, because the frame carries two widths and the failure is
+ * a composer reading the wrong one.** The paint pads every row to the
+ * terminal's; the document is measured and drawn at this. A caller spelling
+ * `columns - 1` agrees today and drifts the moment the margin moves, which is
+ * the drift `initialRegionHeight`'s own comment names on the other axis.
+ *
+ * **Three composers keep the terminal's width and each exemption is written
+ * down**: the three rule rows (I81, I87 — *full width … never configurable*),
+ * the header's and footer's clusters (I86 — *the clock at the right edge*), and
+ * the too-small fallback, which is drawn where no region exists.
+ *
+ * Floored at 1: no size the gate accepts reaches it, and a width of zero is a
+ * measurer's division by nothing rather than a narrow frame.
+ */
+export function regionWidth(columns: number): number {
+  return Math.max(1, columns - CONTENT_MARGIN_R); // cells-ok — a column count
+}
+
 /** C13 §5a — a number rather than "all"; doubling memory is how a debug mode
  * becomes one nobody turns on. */
 export const DEFAULT_RETAIN_PAYLOADS = 50;

@@ -961,8 +961,13 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
     const rows = screen().rows;
     const at = rows.findIndex((r) => r.includes("⏺︎ wide"));
     expect(at, "the card's header is on the screen").toBeGreaterThan(0);
-    expect(rows[at + 1]?.startsWith(`  ⎿ ${"a".repeat(96)}`), "the body's first row: the hook at 2 and 96 cells").toBe(true);
-    expect(rows[at + 2]?.trimEnd(), "the wrapped cells, under the bar (C22 I88)").toBe("  │ aaa");
+    // **95 and 4, where this read 96 and 3** (C22 I109): the body renders at
+    // the region's width less the hook's four cells, and the region is a column
+    // narrower than the terminal. The premise the row was written for is
+    // unchanged — a notice that fits the region and not the indented body, so
+    // it wraps once more under the hook — and only the split moved.
+    expect(rows[at + 1]?.startsWith(`  ⎿ ${"a".repeat(95)}`), "the body's first row: the hook at 2 and 95 cells").toBe(true);
+    expect(rows[at + 2]?.trimEnd(), "the wrapped cells, under the bar (C22 I88)").toBe("  │ aaaa");
     expect(rows[at + 3]?.trim(), "the entry's blank row (I85)").toBe("");
     expect(/^[─-]{20,}/u.test(rows[at + 4] ?? ""), "then the upper rule — nothing dropped between").toBe(true);
     expect(rows[at + 5]?.trimStart().startsWith("❯"), "and the prompt").toBe(true);

@@ -157,10 +157,14 @@ describe("C22 §6a — compositing", () => {
   it("T1.12 (C22 I28): the layer region is the viewport region, and the drawer adds its top", () => {
     const f = frameAt();
 
-    // The two are one number. Widening this to the terminal costs nothing any
-    // check can see — the sum holds at every width with every layer misplaced.
+    // The two are one number on both axes now (C22 I109, §6l.9 row 5): a
+    // layer's content is content, so the box is placed against the narrowed
+    // width as well as the shared height. Widening either to the terminal costs
+    // nothing any check can see — the sum holds at every width with every layer
+    // misplaced.
     expect(f.overlayRegion.height, "the same height as the transcript").toBe(f.region.height);
-    expect(f.overlayRegion.width).toBe(f.size.columns);
+    expect(f.overlayRegion.width, "and the same width").toBe(f.region.width);
+    expect(f.overlayRegion.width, "which is not the terminal's").toBe(f.size.columns - 1);
 
     // And a layer at the region's first row draws on the frame's third — below
     // the header and its rule (C22 I87) — so the header survives. This is the
@@ -259,7 +263,12 @@ describe("C22 §6a — compositing", () => {
     // in none of them, and must still be there at cell 20.
     expect(cells.slice(0, 20).join(""), "no base showing through the box").not.toContain("·");
     expect(cells[20], "and the base owns the cell past the box").toBe("·");
+    // **The frame's width, not the region's** (C22 I109, F1227). This is the
+    // row that found `composite` padding a composited row to `region.width`: a
+    // field named for one quantity standing in for another, invisible for as
+    // long as the two agreed and one cell short the moment the margin landed.
     expect(displayCells(row), "the row is still the frame's width").toBe(f.size.columns);
+    expect(f.size.columns, "and the region is narrower").toBeGreaterThan(f.overlayRegion.width);
   });
 
   it("T1.12d (C22 I30): a box escaping the region refuses the frame", () => {

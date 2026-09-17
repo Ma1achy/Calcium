@@ -665,6 +665,9 @@ export function paint(
       ...(deps.chrome === undefined ? {} : { chrome: deps.chrome }),
       regionTop: frame.region.top,
       region: frame.overlayRegion,
+      // The frame's width, not the region's (I109): the rows come back padded
+      // to what the paint built them at.
+      columns: width,
       ...(deps.scratch === undefined ? {} : { scratch: deps.scratch }),
     });
   }

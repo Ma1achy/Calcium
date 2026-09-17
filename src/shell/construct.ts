@@ -104,6 +104,7 @@ import {
   persistPolicy,
   persists,
 } from "./transcript-persist.js";
+import { regionWidth } from "./config.js";
 import type { ResolvedConfig } from "./config.js";
 import { anyBlinking, CURSOR_BLINK_MS } from "./cursor-style.js";
 import { createSessionStore, type SessionStore } from "./state.js";
@@ -833,7 +834,13 @@ export async function constructGraph(
     // The store *is* the view (C13 §2, `TranscriptStore extends TranscriptView`)
     // — C14 takes the reader half, and passing the store satisfies it.
     const viewport = createViewport(transcript, {
-      width: size.columns,
+      // **The region's width, not the terminal's** (C22 I109, C14 I22). The
+      // same rule as the height below, on the axis that acquired it later: the
+      // first `#render` overwrites this from the composed frame, and an initial
+      // value in the wrong axis is the same defect with a shorter life — a
+      // `visible()` answered before that frame exists would be measured a
+      // column wide.
+      width: regionWidth(size.columns),
       ...(deps.profiler === undefined ? {} : { probe: deps.profiler.asProbe() }),
       // **The region's height, not the terminal's** (C22 I34, C14 I22). The
       // first `#render` overwrites this from the composed frame; it is computed
