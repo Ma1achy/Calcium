@@ -63,7 +63,8 @@ type Box = Readonly<{
 
 type Leaf =
   | { kind: "rows"; rows: readonly string[] }
-  | { kind: "paint"; measure: (w: number) => number; render: (w: number, h: number) => readonly string[] };
+  | { kind: "paint"; natural?: number;             // its natural width; absent is 0 (I3)
+      measure: (w: number) => number; render: (w: number, h: number) => readonly string[] };
 
 type SolvedBox = Readonly<{
   id: string;
@@ -103,7 +104,11 @@ vertically to fill the tallest cell.
 
 **A `FIT` container's natural size** is the sum along its layout axis and the max across it, plus its
 own padding and gaps, computed bottom-up with the leaves as the base case. A `rows` leaf's natural
-width is its widest row by `cells()`; a `paint` leaf's is whatever it declares.
+width is its widest row by `cells()`; a `paint` leaf's is the `natural` it declares, and **absent is
+0** — which is `GROW`'s default by I3 and is what every paint kind in the tree wants: a plot, an
+image and an attached terminal all fill what they are given. The field exists so that the sentence
+*whatever it declares* has something behind it; a clause naming a declaration that cannot be written
+forbids nothing while reading as though it does (A03 §2).
 
 **`GROW` and `PERCENT` contribute their `min` to a `FIT` parent** (I3). Neither has a natural size —
 that is what they mean — and the two rules that could answer are circular: a parent derives from its
