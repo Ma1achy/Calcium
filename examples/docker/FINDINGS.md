@@ -53748,6 +53748,56 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1227 — the right margin is one row of forty-five frames, and three composers are exempt by invariants already written ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `APPEARANCE.md` §15 rule 8 — *content stops one column before the right edge* — 2b's one genuine item, confirmed unbuilt: `resizeViewport({ width: frame.size.columns, … })` hands the transcript the terminal. |
+| **Reached for** | `C04_CHILDGAP_WALK.md` A8's hazard before its ruling: *the transcript's rows, the prompt, the overlays and the rule are four composers at the frame's width, and a margin applied at three of four is a ragged edge nobody declared.* |
+| **Verdict** | **Three narrow, three are exempt, and every exemption is an invariant that already exists.** The raggedness A8 warned of is the case where the exemptions are chosen rather than cited; here they are cited, so the edge is declared. |
+
+**The measurement first, because it is the smaller number than the change.** Forty-five session
+goldens, the grid form with a column ruler. Rows reaching the frame's last column: **thirty in
+the chrome, three in the content — and the three are one row in three themes**, `/profile  open
+the profiler's deck; also \`snapshot\`, \`live\`, \`capture\`` at exactly eighty. So the rule's
+*visible* subject in the whole corpus is one line of help text, and everything else the change
+moves it moves by shifting a wrap point.
+
+**That cuts both ways and the ratio is the finding.** One touching row means nobody has been
+looking at a frame the rule would have improved; it also means the corpus cannot tell a correct
+margin from a wrong one, which is F1225's shape on the axis next door — *the gate had no padded
+block in it*. A margin landed against this corpus is landed against a blind gate, so the landing
+owes a frame whose content is wider than the region and a frame at the boundary.
+
+**The four composers, and who is exempt by what.**
+
+| composer | drawn at | by |
+|---|---|---|
+| the two prompt rules and the header's rule | the terminal's width | **C22 I81, I87** — *full width … never configurable*, three rules on every frame |
+| the header and footer rows | the terminal's width | **C22 I86** — *two clusters with the clock at the right edge* |
+| the transcript's blocks | **the region's width** | rule 8's subject; `C04_CHILDGAP_WALK.md` A8 |
+| the prompt's body | **the region's width** | rule 8's subject — a typed line is content |
+| an overlay's box | **the region's width** | A9's consequence: `place.ts` centres in `region.width` and clamps to it |
+
+**A rule crossing the gutter is not a ragged edge — it is what a margin looks like.** The
+distinction A8 could not make from a work list is between an exemption that is *argued* and one
+that is *left out*: a rule row spanning short of the edge would read as the defect, and I81 says
+so in the words *full width*, so the divider crossing the content's gutter is the declared shape.
+The clock is the same: I86 puts it at the right edge on purpose, and a margin applied to it would
+move a position an invariant fixes.
+
+**And the axis that made this findable is C14 I22, which already says it on the other axis.**
+*The height handed to `resize` is the transcript region's, not the terminal's* — with the reason
+that C14 holds no geometry above itself and cannot derive one from the other. The width is the
+same sentence: the region is narrower than the terminal by the margin, and only the composer
+knows by how much. So the spec edit is I22 gaining its second axis rather than a new invariant
+beside it, and the new one is C22's, because C22 owns the geometry.
+
+**Open** — the ruling is taken; the landing owes the region's `width`, the three narrowings, a
+fixture the corpus does not have, and a golden run whose movers are named first.
+
+---
+
 ## F1226 — a design document's four surface rules, checked against the tree: three move ★★★★☆
 
 | | |
