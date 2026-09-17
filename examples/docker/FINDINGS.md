@@ -53748,6 +53748,43 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1232 — three refusals rested on a rule that is now gone, and the sections are built as groundwork ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | C29 I18, I19 and I20 — §12's representations, §14's sticky, §10's floats and layers, §13's incremental cache. Each was refused on a measurement that **no consumer exists**, and each refusal cited CLAUDE.md's *never add an export nothing consumes*. |
+| **Reached for** | The owner's ruling: the sections are groundwork and are to be built. The rule is removed. |
+| **Verdict** | **The measurements stand and the conclusion does not.** Every *no subject* finding is still true of the tree at HEAD; what changed is that an absent consumer is no longer a reason to refuse a mechanism. |
+
+**1 · What the refusals got right, kept.** The measurements are not withdrawn and the build honours
+them:
+
+| the finding | what it measured | what the build does with it |
+|---|---|---|
+| §12's four ladders are four mechanisms | `widthRung` a struct of booleans, `layoutFor` a computed geometry, `table` a greedy loop, `image` a kind substitution | **none of the four is retrofitted.** The engine's chooser is new and lives beside them |
+| a declared `min` beside a form is a second record of one number | `art()` measures the form through `cells()` | **no `min` field.** `representations` is an ordered list and the minimum is the form's own fitted width |
+| the engine cannot see inside a leaf | `Leaf`'s own declaration: *the engine never looks inside one* | representations are **boxes**, not leaf forms, so the chooser stays outside the leaf |
+| `detail` is emitted at one site, full width | `table/definition.ts:475` | the float mechanism lands with **no** new `NavElement` emitter; F1216 still holds |
+| the memo already answers on §13's key | 421 absent misses over 97 frames, zero width misses | the engine's cache is **beside** it, keyed the same way, and holds what the memo does not — the solved rects |
+
+**2 · What was wrong, and it is a rule rather than a measurement.** *Never add an export nothing
+consumes* was written for F21's shape — `TableRow.actions` existed, the spec said C11 *surfaces its
+actions*, and no code read the field. **That is a claim of use with no reader, which is a different
+thing from a mechanism landed deliberately ahead of its first caller.** The rule does not distinguish
+them, and applied to a design document it converts *this is groundwork* into *this is refused*, which
+is what it did three times in this pass. Removed at `ad1ee1c4`; MG24 survives it and its note is
+corrected, because MG24 is about a **gap** across a seam and was never the same rule.
+
+**3 · The ordering, and why §12 is first.** Representations are the only one wholly inside the engine
+— they need no new C15 type, no new field on a block, and no cache. §14 follows, because sticky is a
+positioning rule over the same clip offset the engine already carries. §10 is third, because it is the
+only one that crosses a component. §13 is last, because a cache over the solved tree is only worth
+having once the tree has the shapes the other three add.
+
+**Open** — the ruling is taken and four landings are owed.
+
+---
+
 ## F1231 — §13's cache is built, its dirty machine has no mutable tree to run on, and its opening premise is false ★★★☆☆
 
 | | |
