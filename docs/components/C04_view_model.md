@@ -389,12 +389,16 @@ when two adjacent blocks each contribute one row (`LAYOUT_ENGINE.md` §6).
 
 **The default differs by axis because the gutter already did.** A `row` group's
 children sit side by side and have always been separated by one column —
-`ROW_GUTTER = 1`, read in three places: the width division, the admission loop
-that charges one per *placed* child, and the element walk's offsets. A column's
+`ROW_GUTTER = 1`, read in **four** places: the width division, the admission
+loop that charges one per *placed* child, the element walk's offsets in
+`containers.ts`, and the registry's own column cursor in `elementsIn`. The walk
+counted three, because three of the four are in one file and a count of readers
+taken by reading one file is a count of that file (F1226); the fourth was found
+by T3.92 failing on an element that did not move. A column's
 children sit one under the next and have never been separated by anything. So
 `childGap` absent is `1` across and `0` down, which reproduces every frame
 exactly and makes this a refactor rather than a change. **The field is not new
-behaviour; it is a name for behaviour that had three readers and no name**
+behaviour; it is a name for behaviour that had four readers and no name**
 (F1226), and no surface could ask a row group for no gutter at all.
 
 **It is the container's, never the composer's** (C09 I17). `sequenceHeight` stays

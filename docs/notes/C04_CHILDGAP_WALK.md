@@ -88,11 +88,17 @@ the check is one grep — *which file emits this row*. C23 §8a A4 is the record
 the second; both times the artefact was right about which two rules met and wrong about who holds
 one of them.
 
-### S5 · the finding — `ROW_GUTTER` is a field with no name, read in three places
+### S5 · the finding — `ROW_GUTTER` is a field with no name, read in four places
 
 `measure.ts:121` charges `(n − 1) × ROW_GUTTER` for a row's widths, `measure.ts:168`'s admission
-loop adds one per child after the first, and `registry.ts:708`'s element walk offsets by it. Three
-readers of one constant, which is what a field looks like before it has a name — and the reason
+loop adds one per child after the first, `containers.ts:1095`'s element walk offsets by it — and
+`registry.ts`'s own column cursor in `elementsIn` does too. **Four, and this section said three
+until T3.92 caught the fourth.** Three of them are in one file; the cursor is in another, and a
+count of readers taken by reading one file is a count of that file. The row that found it is the
+one asserting the *element* moves with the gap: the widths and the admission loop were converted,
+the frame was right, and the focus ring stayed where the constant put it — which no assertion about
+a width could see. Four readers of one constant, which is what a field looks like before it has a
+name — and the reason
 A3's refactor is worth doing even though it moves no frame. The day a surface wants a row group
 with no gutter, today's answer is a `raw` block hand-composed at three widths, which is the
 workaround C04 §3's `weights` deferral was paid for at (the third instance in CLAUDE.md's table).

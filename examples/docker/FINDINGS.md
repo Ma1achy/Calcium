@@ -53805,6 +53805,26 @@ the first time it has been run on a work list rather than on a belief.
 
 ---
 
+**Addendum, and it corrects this finding's own count.** The section above says `ROW_GUTTER` has
+**three** readers. It has **four**: the width division (`measure.ts:121`), the admission loop
+(`:168`), the element walk in `containers.ts:1095`, and **the registry's own column cursor in
+`elementsIn`** — which is in a different file. Three of the four are in one place, and *a count of
+readers taken by reading one file is a count of that file*.
+
+**What found it is the row, not a re-read.** T3.92 asserts that the *element* moves when the gap
+widens. The widths and the admission loop were converted, every frame was byte-identical, the
+whole suite was green — and the focus ring stayed where the constant put it, because the fourth
+reader had not been told. No assertion about a width could see that, and no golden frame could
+either: an element is not drawn.
+
+**So the finding's own instrument was the thing it was about.** F1226 exists because a work list
+was carried without being checked against the tree, and its own count of readers was carried the
+same way — one grep, taken in the file the subject lives in, restated in a walk, a spec, a type
+comment and a commit message. **Five records of one unmeasured count** is F58's shape in miniature,
+inside the finding that names it.
+
+---
+
 ## F1225 — the gate had no padded block in it, and the four things that came out of saying so ★★★★☆
 
 | | |
