@@ -53748,7 +53748,7 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
-## F1233 — four kinds shred where one step should shed, and three of the four declared orders did not survive a frame ★★★★☆
+## F1233 — four kinds shred where one step should shed, and neither the declared orders nor half the step's own rules survived being tested ★★★★★
 
 | | |
 |---|---|
@@ -53794,8 +53794,38 @@ time, reserved three cells for `⋯2` and had one left for the message, so the f
 and nothing else — a row saying only that it cannot say anything. Where the reservation would take
 the whole row the row wins and the mark is clipped, which is the container's job.
 
-**Open** — the step and the four kinds are written; T3.93 and T3.94 are the rows, and the goldens move
-for all four kinds.
+**6 · What the mutation pass found, and it is four more than the build did.** Every one is a claim
+that could not be violated — the vacuity class, arriving in a test, a tier, a member and a type.
+
+| the mutation | why it survived | what changed |
+|---|---|---|
+| the withholding is not budgeted for | T3.93's escape clause read *the row has no room for the mark*, which **any full-width row satisfies**. Unbudgeted, every mark vanishes from the frame — `clampSpans` cuts the **last** span, not the first — and the rows stayed full width | the discriminator is the count of parts still drawn: a row showing two and withholding a third had the room and spent it on the third part's cells |
+| decoration shrinks to its minimum | every kind declared `min` equal to the natural width, so the tier's rule was satisfied before it ran | `events` declares a smaller floor **on purpose**, and T3.93 asserts a decoration part is drawn whole or not at all — which is also what separates *shed* from *cut* for a probe reading a letter |
+| a shed part is drawn at its floor | `steps` read `shed` to decide whether to draw the detail, and the width beside it said the same thing — two spellings of *gone* | `shed` is unpublished and the width is the one answer; the mutation now puts the original defect back verbatim, a missing width defaulting to the declared minimum |
+| peers are not held in lockstep | the tier's one consumer hands its two columns **one** natural width between them, so their slack was equal before the lockstep ran; deleting the arm moved no frame at any width from 4 to 80 | the tier list is two, by a spec commit of its own. Equal columns are the kind's construction, stated where the widths are taken |
+
+**7 · And a fixture, which is where the `keyValue` reading came from.** The probe declared
+`bar: 0.61` where `Bar` is `{ value, max, format }`, so it drew a degenerate run with no number in
+it — and the frame then said, correctly about that block, that the bar duplicated a number the text
+already carried. T1.5c caught the inversion at the suite. **A fixture must be shown to respond to the
+thing under test before it is read from**, and this is the second instance of that rule reaching a
+*probe* rather than a test.
+
+**8 · The frozen Ink oracle learned to retire a capture.** Twenty-one captures draw kinds this ruling
+changed, and `ink-oracle.ts` could say only *never change a kind again* or *delete the capture* — the
+second being a gate that got quieter with nothing saying why. A retirement names its ruling, keeps the
+file as the record of what Ink drew, and is **driven**: the row asserts the bytes still differ, so a
+retirement that stopped changing anything fails as a stale exemption. Its first run caught three
+entries true of nothing, which is the list being a cross product where the movers are per block.
+
+**9 · Held back, named.** `comparison`'s header label never accounted for the verdict column and sits
+two cells left of what it names. Correcting it moves **every** capture at every width, where the
+ladder moves 21 — and a moved frame with two candidate causes is a bisect rather than a finding. Its
+own landing.
+
+**Closed** — landed at `e67e3f60`. Gates: enforce at 24,712 references, 343 files / 6,296 passed /
+4 todo, golden 468/468 with no mover named and none moved, tier 5 136 passed / 3 todo, anchors 0 known
+stale and no run drifted, `c09-shed` 10 caught / 0 survived.
 
 ---
 
