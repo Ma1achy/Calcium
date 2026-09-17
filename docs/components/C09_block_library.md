@@ -2369,11 +2369,19 @@ the same overrun in smaller form.
   spent eight of twelve cells on a timestamp nothing sheds; `steps` stubbed its label to `✓ re…`
   where the state marks are the part worth keeping.
 
-  **Every part is content, decoration or a peer**, and the tier decides what running out does to it.
+  **Every part is content or decoration**, and the tier decides what running out does to it.
   Content shrinks to its **floor** and then the container clips — visible and recoverable. Decoration
-  sheds with no trace, because nothing was lost. Peers are a row of equals: members go from the end
-  and the count is reported. **A part's minimum is a floor if it is content and a threshold if it is
-  decoration**, which is the same distinction as *decoration never widens its container*.
+  sheds with no trace, because nothing was lost. **A part's minimum is a floor if it is content and a
+  threshold if it is decoration**, which is the same distinction as *decoration never widens its
+  container* — so a decoration part's declared minimum is overruled by the step, and it is declared
+  smaller than its natural width on purpose, or the tier is a rule that cannot be disobeyed.
+
+  **There was a third tier and the mutation pass removed it** (F1233). `peer` held a row of equals in
+  lockstep — `comparison`'s two value columns, so neither could narrow while the other did not — and
+  the kind hands those columns **one** natural width between them, the widest of either, because two
+  columns of a comparison are one measurement. Their slack was therefore equal before the tier ran:
+  deleting the arm moved no frame at any width from 4 to 80. Equal columns are the kind's
+  construction, stated where the widths are taken, and the tier list is two.
 
   **The step, and it is four lines**: take the parts' natural widths; if they fit, stop; otherwise
   shed the lowest-priority part whole, count it into the withholding, and go again; when only the
