@@ -134,6 +134,55 @@ function isCells(share: Share): share is Readonly<{ cells: number }> {
   return typeof share === "object";
 }
 
+/**
+ * The leftover after flooring — **a declared policy, not the arithmetic's**
+ * (C04 I42, F1219).
+ *
+ * Declared here rather than in C29 because both consumers are below it: a
+ * group spends nothing, a mosaic tiles, and the engine's own distribution takes
+ * the same word. One declaration, so the two cannot drift apart into two
+ * vocabularies for one decision.
+ */
+export type Spend = "none" | "largest-remainder";
+
+/**
+ * `count` cells across `weights` by largest remainder, **ties by declaration
+ * order** (C04 I42, C29 I4).
+ *
+ * Every line gets `floor(share)`; the leftover goes one cell each down the
+ * fractional parts, descending. Declaration order as the tie-break is what
+ * makes a frame a pure function of the tree — a sort that is not total leaves
+ * the frame to the runtime's sort implementation, which a byte-exact golden
+ * cannot allow.
+ *
+ * **One implementation, and it lives at L0 because both callers do.** C29's
+ * `distribute` reads it downward; `mosaicRects` reads it here. The engine
+ * cannot own it without `mosaicRects` importing upward, and a second copy is
+ * the drift F1219 ruled against — the group and the mosaic disagreeing on a
+ * leftover cell is exactly the defect that ruling closed.
+ */
+export function largestRemainder(
+  weights: readonly number[],
+  count: number,
+  spend: Spend,
+): readonly number[] {
+  const total = weights.reduce((a, b) => a + b, 0);
+  if (total <= 0 || count <= 0) return weights.map(() => 0);
+  const exact = weights.map((w) => (count * w) / total);
+  const given = exact.map((e) => Math.floor(e)); // cells-ok — a cell count
+  let left = count - given.reduce((a, b) => a + b, 0); // cells-ok — a cell count
+  if (spend === "none" || left <= 0) return given;
+  const order = exact
+    .map((e, i) => ({ i, frac: e - Math.floor(e) }))
+    .sort((a, b) => (b.frac === a.frac ? a.i - b.i : b.frac - a.frac));
+  for (const { i } of order) {
+    if (left <= 0) break;
+    given[i] = (given[i] ?? 0) + 1; // cells-ok — a cell count
+    left -= 1;
+  }
+  return given;
+}
+
 export function divideShares(shares: readonly Share[], total: number, gaps: number): readonly number[] {
   const n = shares.length; // cells-ok — a share count
   if (n === 0) return [];
@@ -150,34 +199,35 @@ export function divideShares(shares: readonly Share[], total: number, gaps: numb
 }
 
 /**
- * The remainder, distributed rather than dropped — `facetWidths`' ruling, in the
- * one place it applies here.
+ * One axis of the grid: every line's size in cells (C04 I44, I72 · C29 I4).
  *
- * **Not in `divideShares`, and the difference is a declared policy** (C04 I42,
- * F1219). The leftover is not a property of the arithmetic: a group spends
- * nothing and a mosaic tiles, and this function is the mosaic's half. **The row
- * that pins the group's unspent cell is T3.17** — `52 + 26 + 1 = 79`, *one cell
- * of the eighty goes to nobody*; this comment named T3.16, which asserts equal
- * weights against the unweighted path and is invariant under every distribution
- * rule, so it could not pin a remainder. A mosaic **tiles**: three columns of `floor(40/3)`
- * leave the right-hand column blank at every width that does not divide, which
- * is exactly what C12 §3 called *visible as a ragged edge in every faceted
- * frame*.
+ * **A line is a proportion with a floor, not a grower with a minimum**, and the
+ * walk measured the difference (C29 §8a C10). Reserving a cell per line off the
+ * top before weighting — which is what `GROW` with `min: 1` means — turns a
+ * declared `[1, 3]` at width 8 into `[3, 5]`, and a reader who wrote 1:3 would
+ * be right to call that wrong. So the shares divide the whole budget by largest
+ * remainder and the floor bites only where a proportion falls below one cell.
  *
- * The leftover goes one cell each to the earliest lines that are not a fixed
- * `{cells: n}` — a cell count stays a cell count (C04 I44), so it can neither
- * absorb the remainder nor be shortened by it.
+ * Fixed `{cells: n}` lines come off the budget first and are neither shortened
+ * nor absorbers: a cell count that shrinks is a suggestion (C04 I44).
+ *
+ * **The leftover goes by largest remainder with ties in declaration order**,
+ * which is the mosaic's declared policy — a grid that leaves its right-hand
+ * column short is ragged in every faceted frame (C12 §3, F1219). `spread` used
+ * to give it to the earliest lines instead; the two agree on equal weights,
+ * which is why one function could replace both, and they differ wherever the
+ * weights are unequal and the budget does not divide.
  */
-function spread(lines: readonly number[], total: number, shares?: readonly Share[]): readonly number[] {
-  const used = lines.reduce((a, b) => a + b, 0);
-  let left = total - used; // cells-ok — a cell count
-  if (left <= 0) return lines;
-  return lines.map((n, i) => {
-    const fixed = shares !== undefined && shares[i] !== undefined && isCells(shares[i] as Share);
-    if (fixed || left <= 0) return n;
-    left -= 1;
-    return n + 1; // cells-ok — a cell count
-  });
+function gridLines(shares: readonly Share[], total: number): readonly number[] {
+  const n = shares.length; // cells-ok — a share count
+  if (n === 0) return [];
+  const fixed = shares.map((s) => (isCells(s) ? Math.max(1, s.cells) : 0)); // cells-ok — declared cell counts
+  const weights = shares.map((s) => (isCells(s) ? 0 : s));
+  const budget = total - fixed.reduce((a, b) => a + b, 0); // cells-ok — a cell count
+  const share = largestRemainder(weights, Math.max(0, budget), "largest-remainder");
+  return shares.map((s, i) =>
+    isCells(s) ? fixed[i]! : Math.max(1, share[i] ?? 0), // cells-ok — a cell count
+  );
 }
 
 /** One region's rectangle, in cells. */
@@ -199,32 +249,34 @@ export function mosaicRects(
   rows?: readonly Share[],
 ): readonly MosaicRect[] {
   const ones = (n: number): readonly Share[] => Array.from({ length: n }, () => 1);
-  const colWidths = spread(divideShares(columns ?? ones(grid.columns), width, 0), width, columns);
-  const rowHeights = spread(divideShares(rows ?? ones(grid.rows), height, 0), height, rows);
+  const colWidths = gridLines(columns ?? ones(grid.columns), width);
+  const rowHeights = gridLines(rows ?? ones(grid.rows), height);
   const sum = (xs: readonly number[], from: number, count: number): number =>
     xs.slice(from, from + count).reduce((a, b) => a + b, 0);
 
-  // **Clamped here, because the clip below cannot save it** (C09 I35). Ink keeps
-  // a stack of clipping regions and applies `clips.at(-1)` — the innermost — so
-  // a cell that clips its own child **shadows** the container's clip rather than
-  // intersecting with it, and the frame runs past the width with every count
-  // agreeing. Measured: three 1-wide cells in a container of 1 draw `"A"` with
-  // the container clipping alone and `"ABC"` once the cells clip too.
+  // **The geometry is not clamped, and the cut lives where the rows are
+  // written** (C29 §8a C9). It used to be one expression doing two jobs: the
+  // floor of 1 per grid line, which is geometry, and a clamp to `width - left`,
+  // which is a cut. Clamping in the geometry gave three answers to one
+  // arithmetic outcome — a cell measured at 1, a zero-width focusable element,
+  // and nothing drawn — each locally defensible and not the same fact.
   //
-  // So the geometry is the guarantee and the clip is not a backstop. The floor
-  // of 1 per grid line is what makes this reachable: a three-column grid asks
-  // for three cells at any width, including one.
+  // **Shrink, never drop.** A line never goes below one cell; where the floors
+  // do not fit, the grid is wider than its container and the container cuts. So
+  // a region here is what the grid says it is, and `render` cuts each piece to
+  // the room the grid actually has — the same place `fitRow` already cuts
+  // (F1211). Ink's clip stack is no longer the mechanism and the note it needed
+  // has gone with it.
   return grid.regions.map((r) => {
     const left = sum(colWidths, 0, r.col);
     const top = sum(rowHeights, 0, r.row);
     return Object.freeze({
       left,
       top,
-      // **A cell with no room is zero-wide and is not drawn**, which is the only
-      // one of the three answers that keeps both axes of C09 I1: drawing it
-      // over-runs the region, and widening the region is not this block's to do.
-      width: Math.max(0, Math.min(sum(colWidths, r.col, r.cols), width - left)), // cells-ok — a cell count
-      height: Math.max(0, Math.min(sum(rowHeights, r.row, r.rows), height - top)), // cells-ok — a row count
+      // **A region is the sum of what it spans, and nothing more is decided
+      // here.** Whether the grid has room for it is the container's question.
+      width: sum(colWidths, r.col, r.cols), // cells-ok — a cell count
+      height: sum(rowHeights, r.row, r.rows), // cells-ok — a row count
     });
   });
 }

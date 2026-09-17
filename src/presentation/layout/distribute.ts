@@ -12,6 +12,7 @@
  * and a mosaic tiles, because a grid that leaves its right-hand column short is
  * ragged in every faceted frame. One function serves both.
  */
+import { largestRemainder } from "../../data/viewmodel/index.js";
 import type { Spend } from "./types.js";
 
 /** What one child brings to a distribution on one axis. */
@@ -36,37 +37,6 @@ export type Distribution = Readonly<{
 
 const clamp = (n: number, lo: number, hi: number): number => Math.min(Math.max(n, lo), hi);
 
-/**
- * `count` cells handed out across `weights` by largest remainder, ties by
- * declaration order (C29 I4).
- *
- * Every line gets `floor(share)`; the leftover goes one cell each down the
- * fractional parts, descending, and a tie is broken by the order the author
- * wrote the children. **Declaration order is what makes the frame a pure
- * function of the tree**, which is what a byte-exact golden requires — a sort
- * that is not total leaves the frame to the engine's sort implementation.
- */
-function largestRemainder(
-  weights: readonly number[],
-  count: number,
-  spend: Spend,
-): readonly number[] {
-  const total = weights.reduce((a, b) => a + b, 0);
-  if (total <= 0 || count <= 0) return weights.map(() => 0);
-  const exact = weights.map((w) => (count * w) / total);
-  const given = exact.map((e) => Math.floor(e)); // cells-ok — a cell count
-  let left = count - given.reduce((a, b) => a + b, 0); // cells-ok — a cell count
-  if (spend === "none" || left <= 0) return given;
-  const order = exact
-    .map((e, i) => ({ i, frac: e - Math.floor(e) }))
-    .sort((a, b) => (b.frac === a.frac ? a.i - b.i : b.frac - a.frac));
-  for (const { i } of order) {
-    if (left <= 0) break;
-    given[i] = (given[i] ?? 0) + 1; // cells-ok — a cell count
-    left -= 1;
-  }
-  return given;
-}
 
 /**
  * The axis solved: every child's size, the rounds the clamp took and what did

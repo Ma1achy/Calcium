@@ -21,7 +21,7 @@ import {
   ROW_GUTTER,
   sequenceHeight,
 } from "../../../data/viewmodel/index.js";
-import type { Block, Group, MeasureFn, Mosaic, Panel, Scroll, WidthFn } from "../../../data/viewmodel/index.js";
+import type { Block, Group, MeasureFn, Mosaic, MosaicRect, Panel, Scroll, WidthFn } from "../../../data/viewmodel/index.js";
 import { axesOf, groupPlacements, mosaicRects, parseAreas } from "../../../data/viewmodel/index.js";
 import type { NavElement } from "../types.js";
 import { cells, sliceCells, stripControl, truncate } from "../../text.js";
@@ -567,6 +567,25 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
  * without this a mosaic at width 40 draws 60 cells with every count agreeing
  * (FINDINGS F244 §4).
  */
+/**
+ * What room the grid actually has for a region, or `null` when it has none
+ * (C29 §8a C9).
+ *
+ * **The cut the geometry used to make.** `mosaicRects` answers what the grid
+ * says; a container narrower than its own floors is wider than the room it has,
+ * and this is where that is paid — once, so `elements` and `render` cannot give
+ * two answers about the same cell.
+ */
+function mosaicRoom(
+  rect: MosaicRect,
+  width: number,
+  height: number,
+): Readonly<{ width: number; height: number }> | null {
+  const w = Math.min(rect.width, width - rect.left); // cells-ok — a cell count
+  const h = Math.min(rect.height, height - rect.top); // cells-ok — a row count
+  return w < 1 || h < 1 ? null : { width: w, height: h };
+}
+
 export const mosaicDefinition: BlockDefinition<Mosaic> = {
   kind: "mosaic",
 
@@ -592,17 +611,26 @@ export const mosaicDefinition: BlockDefinition<Mosaic> = {
   elements(block: Mosaic, width: number): readonly NavElement[] {
     const parsed = parseAreas(block.areas);
     if (!parsed.ok) return Object.freeze([]);
-    const rects = mosaicRects(parsed.grid, normaliseWidth(width), block.height, block.columns, block.rows);
+    const w = normaliseWidth(width);
+    const rects = mosaicRects(parsed.grid, w, block.height, block.columns, block.rows);
     return Object.freeze(
       block.children.flatMap((child, i) => {
         const rect = rects[i];
         if (rect === undefined) return [];
+        // **Cut to the grid, and a cell with no room is no target** (C29 §8a
+        // C3). The geometry is the grid's and may reach past a container too
+        // narrow to hold its own floors; what a reader can reach is what is
+        // drawn. This is the same cut `render` takes, so the two cannot give
+        // different answers — which they did, as a zero-width focusable
+        // element over a cell that was never painted.
+        const room = mosaicRoom(rect, w, block.height);
+        if (room === null) return [];
         return [
           Object.freeze({
             id: child.id,
             level: "block" as const,
-            rows: Object.freeze({ from: rect.top, to: rect.top + rect.height }),
-            cols: Object.freeze({ from: rect.left, to: rect.left + rect.width }),
+            rows: Object.freeze({ from: rect.top, to: rect.top + room.height }),
+            cols: Object.freeze({ from: rect.left, to: rect.left + room.width }),
             copy: copyTextOf(child),
           }),
         ];
@@ -641,16 +669,24 @@ export const mosaicDefinition: BlockDefinition<Mosaic> = {
     // declined drew every child twice — T1.33 caught it, and neither the
     // captures nor the goldens could, because a second render gives the same
     // bytes.
+    // **The cut is here and not in the geometry** (C29 §8a C9). `placeRows`
+    // takes the pieces and a height and no width, so the grid's own bound has
+    // to be applied to each piece as it is written — the same place `fitRow`
+    // cuts an over-wide row (F1211). A cell whose grid position leaves it no
+    // room is not drawn, which is what it has always been; what changed is that
+    // the rect no longer says it is zero cells wide.
     const drawable = block.children.flatMap((child, i) => {
       const rect = rects[i];
-      if (rect === undefined || rect.width < 1 || rect.height < 1) return [];
-      return [{ child, rect, drawn: ctx.renderChild(child, rect.width) }];
+      if (rect === undefined) return [];
+      const room = mosaicRoom(rect, width, height);
+      if (room === null) return [];
+      return [{ child, rect, room, drawn: ctx.renderChild(child, room.width) }];
     });
 
     const childRows = drawable.map(({ drawn }) => drawn);
     return rows(placeRows(
-      drawable.map(({ rect }, i) => ({
-        x: rect.left, top: rect.top, width: rect.width, height: rect.height,
+      drawable.map(({ rect, room }, i) => ({
+        x: rect.left, top: rect.top, width: room.width, height: room.height,
         rows: childRows[i] ?? [],
       })),
       height,

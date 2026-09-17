@@ -191,8 +191,12 @@ const results = runPass({
       // renders its child at a width of nothing and places it.
       name: "CELL-EMPTY-DRAWN: a region under one cell wide or one row tall is drawn",
       file: C,
-      from: "      if (rect === undefined || rect.width < 1 || rect.height < 1) return [];",
-      to: "      if (rect === undefined) return [];",
+      // 1.7 moved the test off the rect and onto the room the grid has
+      // (C29 §8a C9): the rect is now what the grid says and `mosaicRoom`
+      // answers `null` where there is nowhere to put it. The rule is unchanged
+      // and the line that carries it moved.
+      from: "      const room = mosaicRoom(rect, width, height);\n      if (room === null) return [];",
+      to: "      const room = mosaicRoom(rect, width, height) ?? { width: rect.width, height: rect.height };",
       // **It survived once, against T2.144.** Every byte is identical without
       // the guard — `fitRow(row, 0)` is empty and `composeRow` skips an empty
       // piece — so the composition drops the cell whatever the guard does, and

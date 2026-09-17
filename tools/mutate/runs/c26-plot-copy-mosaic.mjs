@@ -54,15 +54,15 @@ const results = runPass({
     {
       name: "every mosaic child full-width",
       file: CONTAINERS,
-      from: "cols: Object.freeze({ from: rect.left, to: rect.left + rect.width }),",
-      to: "cols: Object.freeze({ from: 0, to: normaliseWidth(width) }),",
+      from: "cols: Object.freeze({ from: rect.left, to: rect.left + room.width }),",
+      to: "cols: Object.freeze({ from: 0, to: w }),",
       expect: "T2.28",
     },
     {
       name: "two children's rectangles swapped",
       file: CONTAINERS,
-      from: "        const rect = rects[i];\n        if (rect === undefined) return [];\n        return [\n          Object.freeze({\n            id: child.id,",
-      to: "        const rect = rects[i === 0 ? 1 : i === 1 ? 0 : i];\n        if (rect === undefined) return [];\n        return [\n          Object.freeze({\n            id: child.id,",
+      from: "        const rect = rects[i];\n        if (rect === undefined) return [];",
+      to: "        const rect = rects[i === 0 ? 1 : i === 1 ? 0 : i];\n        if (rect === undefined) return [];",
       expect: "T2.27",
     },
     {

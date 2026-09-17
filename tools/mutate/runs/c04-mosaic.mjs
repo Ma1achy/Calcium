@@ -56,12 +56,16 @@ const results = runPass({
       expect: "MG2",
     },
     {
-      // **The clamp the build found and the walk did not.** Every count still
-      // agrees; only the width moves, and only at the widths nobody looks at.
-      name: "the rects are not clamped to the region",
-      file: MOSAIC,
-      from: "      width: Math.max(0, Math.min(sum(colWidths, r.col, r.cols), width - left)), // cells-ok — a cell count",
-      to: "      width: sum(colWidths, r.col, r.cols), // cells-ok — a cell count",
+      // **The clamp the build found and the walk did not** — and 1.7 moved it
+      // out of the geometry into the paint (C29 §8a C9), so the line this row
+      // holds is `mosaicRoom`'s cut rather than `mosaicRects`'. The rule is the
+      // same rule: a region reaching past the grid is cut to the room the grid
+      // has. Every count still agrees; only the width moves, and only at the
+      // widths nobody looks at.
+      name: "the rects are not cut to the room the grid has",
+      file: CONTAINERS,
+      from: "  const w = Math.min(rect.width, width - rect.left); // cells-ok — a cell count",
+      to: "  const w = rect.width; // cells-ok — a cell count",
       expect: "MG7",
     },
     {
@@ -74,8 +78,8 @@ const results = runPass({
       // that watched one said nothing about the other.
       name: "the cell does not clip horizontally",
       file: CONTAINERS,
-      from: "        x: rect.left, top: rect.top, width: rect.width, height: rect.height,",
-      to: "        x: rect.left, top: rect.top, width: 1000, height: rect.height,",
+      from: "        x: rect.left, top: rect.top, width: room.width, height: room.height,",
+      to: "        x: rect.left, top: rect.top, width: 1000, height: room.height,",
       // **It survived against MG5, and the reason is the construction.** Every
       // child is rendered at `rect.width`, so its rows are already no wider and
       // there is nothing for the cut to take — unless the child answers past
@@ -88,8 +92,8 @@ const results = runPass({
       // than reporting a single joint property.
       name: "the cell does not clip vertically",
       file: CONTAINERS,
-      from: "        x: rect.left, top: rect.top, width: rect.width, height: rect.height,\n",
-      to: "        x: rect.left, top: rect.top, width: rect.width,\n",
+      from: "        x: rect.left, top: rect.top, width: room.width, height: room.height,\n",
+      to: "        x: rect.left, top: rect.top, width: room.width,\n",
       expect: "MG6",
     },
     {

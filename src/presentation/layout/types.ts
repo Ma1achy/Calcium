@@ -14,6 +14,8 @@
  * was worth (C09 I72).
  */
 
+import type { Spend } from "../../data/viewmodel/index.js";
+
 /** How a box asks for its size on one axis (C29 §3). */
 export type Size =
   | Readonly<{ kind: "fixed"; n: number }>
@@ -47,8 +49,15 @@ export type Align = Readonly<{
   y?: "t" | "c" | "b" | "stretch";
 }>;
 
-/** The leftover after flooring — **a declared policy, not the arithmetic's** (C29 I4, C04 I42). */
-export type Spend = "none" | "largest-remainder";
+/**
+ * The leftover after flooring — **a declared policy, not the arithmetic's**
+ * (C29 I4, C04 I42).
+ *
+ * **Declared at L0 and re-exported here.** `mosaicRects` takes the same policy
+ * and cannot import upward, so one declaration lives beside `divideShares` and
+ * both halves of F1219's *one function* read it.
+ */
+export type { Spend };
 
 export type Padding = Readonly<{ l?: number; r?: number; t?: number; b?: number }>;
 

@@ -21,6 +21,10 @@ const CMD = "npx vitest run test/unit/layout-engine.test.ts";
 const S = "src/presentation/layout/solve.ts";
 const D = "src/presentation/layout/distribute.ts";
 const C = "src/presentation/layout/compose.ts";
+// **`largestRemainder` lives at L0**, because `mosaicRects` takes the same rule
+// and cannot import upward (1.7, F1219). The two rows below follow it there;
+// what they assert is unchanged.
+const M = "src/data/viewmodel/mosaic.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -57,7 +61,7 @@ const results = await runPass({
       // written against changing that was false (F1219), so the arm that
       // survives is the one a reader would delete as redundant.
       name: "the leftover is always handed out, whatever the policy says",
-      file: D,
+      file: M,
       from: '  if (spend === "none" || left <= 0) return given;',
       to: "  if (left <= 0) return given;",
       expect: "T1.4",
@@ -67,7 +71,7 @@ const results = await runPass({
       // the same and every total agrees; only declaration order makes the frame
       // a pure function of the tree, which is what a byte-exact golden needs.
       name: "a tie in the fractional parts is broken by the later child",
-      file: D,
+      file: M,
       from: "    .sort((a, b) => (b.frac === a.frac ? a.i - b.i : b.frac - a.frac));",
       to: "    .sort((a, b) => (b.frac === a.frac ? b.i - a.i : b.frac - a.frac));",
       expect: "T1.4",

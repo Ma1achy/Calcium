@@ -143,8 +143,10 @@ export {
 
 export {
   divideShares,
+  largestRemainder,
   mosaicRects,
   parseAreas,
+  type Spend,
   MOSAIC_HOLE,
   type MosaicGrid,
   type MosaicParse,

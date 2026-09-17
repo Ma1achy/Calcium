@@ -9,6 +9,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { mosaicRects, parseAreas, type Share } from "../../src/data/viewmodel/index.js";
+import { mosaicDefinition } from "../../src/presentation/blocks/kinds/containers.js";
 import { validateDocument } from "../../src/data/viewmodel/validate.js";
 import { b } from "../../src/shell/builders/index.js";
 import { cells } from "../../src/presentation/text.js";
@@ -247,5 +248,83 @@ describe("MG — the mosaic's grid", () => {
     expect(lines, "the outer's height wins, and the inner's is not read").toHaveLength(2);
     expect(plain(lines.join("\n"))).toMatch(/xxx/u);
     expect(plain(lines.join("\n"))).toMatch(/right/u);
+  });
+
+  it("MS10 (C04 I42, C04 I72 · C29 I4): unequal shares divide by largest remainder, and the leftover goes to the largest fractional part", () => {
+    // **The rows that made 1.7 visible.** The whole of phase 1 ran with every
+    // gate green while this changed: 458 goldens, 2,440 baseline frames and
+    // 6,281 test rows, and not one of them renders a mosaic whose weights are
+    // unequal at a width the weights do not divide. The three declarations in
+    // the tree are `[2,1]`, `[1,3]` and `[2,1]` on the rows — and `[1,3]`
+    // divides at all seven default widths, while the other two are rendered at
+    // no width where the two rules differ. **A corpus chosen for a property may
+    // not have it**, and this is the row that says the property is there.
+    //
+    // `spread` used to hand the leftover to the earliest non-fixed line, which
+    // agrees with largest remainder on equal weights — the reason one function
+    // could replace both (F1219) — and disagrees whenever the weights differ
+    // and the budget does not divide. At width 80 the declared ratio is 2:1 and
+    // the exact division is 53.33 : 26.67, so `[53, 27]` at 1.96:1 lands nearer
+    // the number the author wrote than `[54, 26]` at 2.08:1 did.
+    const parsed = parseAreas("ab");
+    if (!parsed.ok) throw new Error("the grid must parse");
+    const widths = (w: number, cols: readonly Share[]): readonly number[] =>
+      mosaicRects(parsed.grid, w, 4, cols, undefined).map((r) => r.width);
+
+    expect(widths(80, [2, 1]), "the leftover to the larger fraction").toEqual([53, 27]);
+    expect(widths(200, [2, 1]), "and at the widest default width").toEqual([133, 67]);
+    expect(widths(40, [2, 1]), "a budget that divides is unchanged either way").toEqual([27, 13]);
+    expect(widths(80, [1, 3]), "and so is every width [1,3] divides at").toEqual([20, 60]);
+
+    // **A fixed share is neither shortened nor an absorber** (C04 I44): it comes
+    // off the budget first and the weights divide what is left.
+    expect(widths(40, [{ cells: 10 }, 1]), "the cell count, then the remainder").toEqual([10, 30]);
+  });
+
+  it("MS11 (C09 I35, C29 §8a C1, C9): a grid too narrow for its own floors keeps its geometry and the container cuts", () => {
+    // **Three answers became one.** A cell with no room used to be measured at
+    // 1, emit a zero-width focusable element and not be drawn — each locally
+    // defensible, across three files, about one arithmetic outcome. The floor
+    // now lives in the geometry and the cut lives where the rows are written,
+    // so the rect says what the grid says and one cut decides both what is
+    // reachable and what is painted.
+    const parsed = parseAreas("abc");
+    if (!parsed.ok) throw new Error("the grid must parse");
+    expect(
+      mosaicRects(parsed.grid, 1, 3, undefined, undefined).map((r) => r.width),
+      "three columns ask for three cells at width 1",
+    ).toEqual([1, 1, 1]);
+
+    const block = b.mosaic({ height: 1, areas: "abc", children: [b.raw("A"), b.raw("B"), b.raw("C")] });
+    const lines = kit.renderToLines(block, 1);
+    expect(lines, "and one row is drawn").toHaveLength(1);
+    expect(plain(lines[0] ?? ""), "holding the only cell there is room for").toBe("A");
+
+    const elements = mosaicDefinition.elements?.(block, 1, () => 1) ?? [];
+    expect(
+      elements.map((e) => e.id),
+      "a cell with no room is no target, which is what the frame already said",
+    ).toEqual([(block.children[0] as { id: string }).id]);
+    expect(elements[0]?.cols, "and the one that survives is cut to the grid").toEqual({ from: 0, to: 1 });
+
+    // **The other axis, and it needed its own fixture.** A grid whose rows fit
+    // its declared height can never reach below it, so the horizontal case
+    // above says nothing about the vertical one — the mutation removing the
+    // height cut survived against it. Three grid rows in a box of one is the
+    // shape that has somewhere to overflow to.
+    const tallParse = parseAreas("a/b/c");
+    if (!tallParse.ok) throw new Error("the grid must parse");
+    expect(
+      mosaicRects(tallParse.grid, 4, 1, undefined, undefined).map((r) => r.height),
+      "three rows ask for three at a declared height of one",
+    ).toEqual([1, 1, 1]);
+
+    const tall = b.mosaic({ height: 1, areas: "a/b/c", children: [b.raw("A"), b.raw("B"), b.raw("C")] });
+    const tallElements = mosaicDefinition.elements?.(tall, 4, () => 1) ?? [];
+    expect(
+      tallElements.map((e) => e.id),
+      "and only the row the box has room for is a target",
+    ).toEqual([(tall.children[0] as { id: string }).id]);
+    expect(plain(kit.renderToLines(tall, 4).join("\n")), "the frame agrees").toBe("A");
   });
 });
