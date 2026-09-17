@@ -55,22 +55,32 @@ const ROOT = join(import.meta.dirname, "..", "golden", "ink-oracle");
  * wide captures are not either, which is the evidence that the header's own
  * misalignment was held back for its own landing.
  */
+const LADDER =
+  "C09 I81 (F1233): the kind's narrow ladder replaced a cut taken from every part at once";
+const HEADER =
+  "C09 I82 (F1236): the header reserves the verdict's cells, so its label names the column its values are in";
+
 const RETIRED: ReadonlyMap<string, string> = new Map(
   (
     [
-      ["keyValue-kv-1", [2, 12]],
-      ["events-events-1", [2, 12, 24]],
-      ["comparison-comparison-1", [2, 12]],
+      // **A retirement carries its own ruling, not the register's.** One reason
+      // string over every entry was right while there was one ruling; a second
+      // arrived, and a shared reason would have said `C09 I81` over captures
+      // that ruling never touched — a claim about a frame that nothing would re-read
+      // (F1236).
+      ["keyValue-kv-1", [2, 12], LADDER],
+      ["events-events-1", [2, 12, 24], LADDER],
+      ["comparison-comparison-1", [2, 12], LADDER],
+      // **Every width the ladder did not already take**, which is what makes
+      // this list a measurement rather than a guess: the header moves wherever
+      // the `b` column is drawn at all, and below 24 the ladder had already
+      // shed it. Named before the run and read after — 27 entries, and the diff
+      // is one row of each.
+      ["comparison-comparison-1", [24, 32, 40, 60, 80, 100, 120, 160, 200], HEADER],
     ] as const
-  ).flatMap(([key, widths]) =>
+  ).flatMap(([key, widths, why]) =>
     widths.flatMap((width) =>
-      ["full", "ascii", "mono"].map(
-        (caps) =>
-          [
-            oracleName(`t2143-${key}`, caps, width),
-            "C09 I81 (F1233): the kind's narrow ladder replaced a cut taken from every part at once",
-          ] as const,
-      ),
+      ["full", "ascii", "mono"].map((caps) => [oracleName(`t2143-${key}`, caps, width), why] as const),
     ),
   ),
 );

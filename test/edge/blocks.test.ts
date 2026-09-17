@@ -971,10 +971,63 @@ describe("C09 §2 padding — the registry's one application", () => {
     expect(validateBlock(row(-1, 2)).ok).toBe(false);
     expect(validateBlock(row(1.5, 2)).ok).toBe(false);
   });
-  // **The spec commit's row, before the field moves** (SP9). C09 I82: a column's
-  // header names the cells the column holds, not the cells reserved beside them.
-  it.todo(
-    "T3.95 (C09 I82, F1236): a column's header and the cells it names start at the same index — comparison's run 5 with every b value and run 4 with every a value, asked by index rather than read from a frame, both halves because the block was already correct on one — not deferred on a component: the header reserves nothing",
-  );
+  it("T3.95 (C09 I82, F1236): a column's header and the cells it names start at the same index", () => {
+    const kit = measurable();
+
+    // Two labels, two rows — **one carrying a verdict and one not** — because
+    // the body's own agreement is half the claim and the first reading of this
+    // finding got it wrong: `markFor` pads to the reserved width for a row with
+    // no verdict, so both rows put their value in the same column, and the
+    // header was the only thing out of line.
+    const subject = block({
+      kind: "comparison",
+      id: "cmp",
+      labels: ["Alpha", "Bravo"],
+      rows: [
+        { field: "latency", a: "AAA", b: "BBB", change: "changed", verdict: "better" },
+        { field: "errors", a: "CCC", b: "DDD" },
+      ],
+    });
+
+    // **Asked by index, never read from a frame.** Two cells is a shift a
+    // reader counts by eye and gets wrong — the first reading of F1236 named
+    // the body as the defect from exactly that — and every value here is a
+    // distinct token so an index is unambiguous.
+    let checked = 0;
+    for (const width of WIDTHS) {
+      const lines = kit.renderToLines(subject, width).map((l) => visible(l));
+      if (lines.length < 3) continue; // cells-ok — a row count
+      const [header, judged, plain] = lines as [string, string, string];
+
+      // Only where the column survives at all: the shedding ladder takes the
+      // values away at the narrow end (I81), and a row absent from the frame
+      // has no index to agree with.
+      if (!header.includes("Bravo") || !judged.includes("BBB") || !plain.includes("DDD")) continue;
+      checked += 1;
+
+      // **Both columns, because the block was already correct on one.** A row
+      // asserting only the marked column passes against a header moved two
+      // cells right of everything, which is the failure the fix could have
+      // introduced.
+      expect(header.indexOf("Bravo"), `w=${String(width)}: the b header names the b values`).toBe(
+        judged.indexOf("BBB"),
+      );
+      expect(header.indexOf("Alpha"), `w=${String(width)}: and the a header the a values`).toBe(
+        judged.indexOf("AAA"),
+      );
+
+      // And the body agrees with itself: the verdict's cells are reserved on
+      // every row, so a row declaring none is not shifted by the ones that do.
+      expect(plain.indexOf("DDD"), `w=${String(width)}: a row with no verdict sits in the same column`).toBe(
+        judged.indexOf("BBB"),
+      );
+      expect(plain.indexOf("CCC"), `w=${String(width)}: on the unmarked column too`).toBe(judged.indexOf("AAA"));
+    }
+
+    // **The sweep must have had something to check.** A filter that excluded
+    // every width would satisfy every assertion above and report nothing, which
+    // is this suite's own vacuity class (A03 §2).
+    expect(checked, "the sweep reached widths where the columns are drawn whole").toBeGreaterThan(20);
+  });
 
 });

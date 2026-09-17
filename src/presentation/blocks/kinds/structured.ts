@@ -792,12 +792,25 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
     // screen said otherwise. Truncated to the column like any other cell, so a
     // long container name cannot push the header wider than the rows beneath it
     // (F33).
+    // **The header reserves what the body reserves** (C09 I82, F1236). A label
+    // names the cells its column holds, and the verdict's cells are not among
+    // them: the mark is a verdict *about* a value, and a row declaring none
+    // draws blanks there, so a header spanning it would be naming a column that
+    // is sometimes empty.
+    //
+    // **The block was already committed to this on one column of two**, which
+    // is what made the defect legible once the columns were asked for by index
+    // rather than read from a frame: `run 4` sat exactly on its `a` values at
+    // every width, because nothing is prefixed to that column, and `run 5` sat
+    // two cells left of its `b` values. `markFor(undefined, …)` is the blank of
+    // the right width — the same function the body uses for a row with no
+    // verdict, rather than a second way to say two spaces.
     const header = line({
       change: null,
       field: "field",
       a: labelA,
-      verdict: "",
-      reserve: 0,
+      verdict: markFor(undefined, judgedRoom, ctx),
+      reserve: judgedRoom,
       b: labelB,
       style: () => dim,
     });
