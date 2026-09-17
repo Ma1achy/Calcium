@@ -53699,3 +53699,50 @@ Gates: `enforce` clean, **6,281 tests**, **458 goldens with zero movers**, **137
 `c09-rows-arm` at fourteen caught, none survived. Landed `94db84b9`, `51edd259`, `e5322add`,
 `6b35808d`.
 
+---
+
+## F1210 — the three geometry declines are unreachable from every block in the tree, so they are not what keeps Ink reachable ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `composeRow` (`src/presentation/rows.ts:479`) returns `null` when a piece would overlap the one before it; `placeRows` (`:495-510`) returns `null` when a child row is wider than its cell, and propagates `composeRow`'s. Each decline sends its container back to the element arm, which is Ink. The layout-pass brief reads them as *what keeps Ink reachable even when every child answered rows*, and schedules closing them **before** mosaic moves. |
+| **Reached for** | Counting them. Every decline site tallied to a file, then the whole suite and every golden frame: **6,281 tests, 318 repo rows, 458 goldens — four firings**, and all four are direct calls from two test rows with hand-made arguments. `test/edge/rows.test.ts` T3.89 makes three of them on purpose (`placeRows([{x:0,top:0,width:2,rows:["abc"]}],1)` and an overlapping pair); the fourth is `test/unit/rows.test.ts:183` passing `[{x:0,row:"abc"},{x:1,row:"|"}]`. **No block, at any of eleven widths, under any of three capability sets, has ever reached one.** |
+| **Verdict** | **Open.** |
+
+**The instrument was shown to respond before its zero was read.** T3.89 calls both declines
+directly, so the edge suite alone is the control: it produced `place-wide 3>2`,
+`compose-overlap x=2 cursor=3` and `place-compose-null` on the first run. A counter that reported
+four across the whole tree without first reporting three across one file would be the
+fabricated-violation class — a zero that means *the instrument is blind*, not *the path is cold*.
+
+**The first reading of the fourth firing was wrong, and the way it was wrong is the reason the
+context was widened.** `compose-overlap x=1 cursor=3` reads exactly like a panel: the panel
+composes its rails and body at `x = 0`, `1` and `1 + inner`, so a piece at 1 against a cursor of 3
+says a rail row measured three cells where a rail is one — a real defect, and interesting. Logging
+the pieces and the stack says it is `"abc"` and `"|"` from a unit row. **A decline's arguments are
+the only thing that identifies its caller**, and a site that logs only the arithmetic invites the
+reader to supply the caller from the shape of the numbers.
+
+**Why the premise was plausible and is still wrong.** The declines *are* the arm's only exits to
+Ink, and reading the code that is what they look like. What the code does not show is that both
+are screened upstream: the row group computes `fits = x - ROW_GUTTER <= width` and passes `null`
+without calling `placeRows` at all when the cells exceed the width, and a child's alignment offset
+is taken **within** its cell, so a conforming renderer cannot place a row past its allocation. The
+declines are defensive against a renderer that violates its width contract, and every shipped kind
+honours it.
+
+**What this changes about the pass, which is the part that matters.** Step 2 cannot be specified on
+its own. The declines become reachable at **step 3**, not before, because mosaic is the kind that
+places children absolutely and clips each — overlap and over-wide cells are mosaic's ordinary case
+rather than a contract violation. So a clipping rule written now would be written against no
+caller, verifiable only by the direct calls that are already the only things reaching it, and
+guessed rather than measured. **The behaviour must come from what Ink writes for a mosaic**, which
+is capturable exactly as long as Ink exists (F1209) — so step 2 folds into step 3 and the two land
+together.
+
+**And the brief's ordering argument inverts.** It scheduled the declines first *so that mosaic
+could move*; measured, mosaic is what gives them a caller, so moving mosaic is what makes them
+specifiable. A guard believed load-bearing because it is the only visible exit, in a path nothing
+takes — the same shape as C22 I108 paced at the wrong seam (F1206), where every gate was green and
+695 of 706 slots were cancelled before they fired.
+
