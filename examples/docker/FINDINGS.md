@@ -53622,7 +53622,7 @@ it.
 |---|---|
 | **Surface** | `elementOf` (`src/presentation/blocks/paint.ts:378`) is not only production code. **T2.143** and **T2.144** (`test/contract/rows-arm.test.ts`) and **T3.89** (`test/edge/rows.test.ts`) render each block both ways and assert the rows arm equals `throughInk(elementOf(...))` byte for byte, over the block corpus × seven widths × three capability sets, with `test/support/lifted.ts` supplying the lifting machinery. C09 I72's claim is *byte for byte the row Ink would have written*, and the only thing that knows what Ink would have written is Ink. |
 | **Reached for** | The layout pass deletes Ink. Reading step 5 against the suites: the three rows above lose their **reference implementation**, not a convenience. Nothing else in the tree can answer what Ink would have written, and the goldens cannot substitute — they hold frames the rows arm produced, which is the thing under test. |
-| **Verdict** | **Open.** |
+| **Verdict** | **Closed — captured and measured.** 1,904 files under `test/golden/ink-oracle`, one per block per width per capability arm, read by `test/support/ink-oracle.ts`. The recorder is the only thing left that calls Ink from those suites; when Ink goes the thunks go with it and the reads remain. |
 
 **And freezing the reference is not merely preservation — it strengthens the row, which is the
 part that reads as a nicety and is not.** T6.119 records two mutations that fail nothing and says
@@ -53659,4 +53659,43 @@ files rather than one blob, because a moved frame must be readable as a diff —
 would be smaller and would defeat the discipline the golden tier exists for. **Not** an edit to
 `DEFAULT_WIDTHS`: it is exported from `src/testing/index.ts:59` and shipped for consumer apps to
 sweep their own kinds, so narrow widths are a second constant beside it.
+
+---
+
+**Built, and the strengthening claim is now two failures rather than an argument.** The two
+mutations T6.119 recorded as failing T2.143 nothing were run by hand against the capture: the
+floor padded a row short gives **26 rows where the capture holds 27**, and the marker above the
+block gives **27 against 27 in the wrong order**, both on the sequence at width 24. The run's
+notes carry the measurement and `expect` stays on T3.54 and T6.22 — the rows that read the frame
+and name the position, rather than the one that merely notices. One mutation still fails nothing
+and stays written down: the floor's pad rows holding a space, which the normaliser trims to
+nothing, so no oracle however strict can reach it.
+
+**The capture can fail, shown three ways before it was trusted** — a byte changed in one file
+(T2.143 red at `notice at 60`), a file removed (`no captured Ink output for t2144-panel-p-empty`),
+and a file nothing asks for (T2.146 red, naming the ghost). The third is the one a subset check
+passes, and it is why the set comparison is an equality both ways: a block that stopped being
+rendered would otherwise make the run **quieter rather than red**.
+
+**The encoding's justification is measured rather than argued.** Rows are terminated, not joined,
+because `join("\n")` cannot tell `[]` from `[""]` — and the corpus holds both: `group-adv-empty`
+captures as 0 bytes and `code-adv-blank` as 1.
+
+**Two things the capture scheme found on its first run, neither of them what it was built for.**
+
+- **Twenty-two blocks were being rendered twice.** T2.143's corpus was
+  `[...Object.values(ONE_PER_KIND), ...CORPUS]`, and every one of `ONE_PER_KIND`'s twenty-two
+  entries is the **same object** as a `CORPUS` member — so a third of the sweep was duplicated
+  work and the arm tallies were taken over the doubled list. The key-collision assertion is what
+  caught it, at 61 blocks against 39 distinct keys, and it was written to stop one capture
+  standing for two blocks rather than to audit the corpus. The union is now taken by identity.
+- **The sweep never looked below 40.** `DEFAULT_WIDTHS` floors there. A rail pair and a gap cost
+  the same columns at 12 as at 200, so the *fraction* of the width the chrome takes is the axis
+  and the sweep sat at the comfortable end of it. `NARROW_WIDTHS` adds 2, 12, 24 and 32, held in
+  the suite rather than added to the exported constant — which is what the sizing above already
+  ruled and is now built that way.
+
+Gates: `enforce` clean, **6,281 tests**, **458 goldens with zero movers**, **137 e2e**, and
+`c09-rows-arm` at fourteen caught, none survived. Landed `94db84b9`, `51edd259`, `e5322add`,
+`6b35808d`.
 
