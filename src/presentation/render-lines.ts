@@ -159,13 +159,17 @@ export function renderSequenceToLines(
   // pays nothing for Ink; a block answering an element takes the Ink path
   // alone, in the same column box at the same width the registry's whole-
   // sequence element arm gave it, so its rows are the rows the whole tree would
-  // have written — that arm is gone (F1209) and its bytes are a capture. A `gapBefore`
-  // is one empty row, as the `Text` holding a space came out of Ink.
+  // have written — that arm is gone (F1209) and its bytes are a capture. A
+  // block's own padding row is one empty row, as the `Text` holding a space came
+  // out of Ink; the registry emits it now (C09 I80) and this composer does not.
   const probe = options.probe;
   const w = normaliseWidth(width);
   const out: string[] = [];
   for (const block of blocks) {
-    if (block.gapBefore === true) out.push("");
+    // **No gap row here, and that is the point of 2a** (C09 I80). A block's
+    // spacing is its own padding and the registry applies it, so this composer
+    // adds nothing to the document's height — which is C04 I25's half that did
+    // not change.
     let rendered: Rendered;
     {
       using _build = probe?.span("elements") ?? NO_SPAN;

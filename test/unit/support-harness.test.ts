@@ -475,7 +475,6 @@ describe("harness parameters — blocks, render, theme, manifest, ink", () => {
     tone: "error",
     glyph: "error",
     text: "a failure",
-    gapBefore: false,
   };
 
   it("measurable({ theme }): the theme reaches the rendered bytes", () => {
@@ -516,7 +515,6 @@ describe("harness parameters — blocks, render, theme, manifest, ink", () => {
       kind: "steps",
       id: "s",
       steps: [{ label: "working", state: "active" }],
-      gapBefore: false,
     } as Block;
 
     const frames = new Set(

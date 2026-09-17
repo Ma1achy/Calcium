@@ -4,7 +4,7 @@
 // deliberately naive `seq`.** The reason is T6.13: a `seq` that clears index 0
 // *unconditionally* passes every test anyone would naturally write, because the
 // common case is a first block that wanted no gap anyway. The property lives
-// only where an **explicit** `gapBefore: true` sits on the first block — the one
+// only where an **explicit** `padding: { t: 1 }` sits on the first block — the one
 // position where the builder's default and the caller's instruction can
 // disagree. So the boundary case is not an extra row here; it is the only row
 // that tests the rule.
@@ -40,11 +40,11 @@ const kit = (): ReturnType<typeof measurable> =>
 
 /** A block whose gap is the builder's preference — what a gapping builder returns. */
 const preferred = (id: string): Block =>
-  defaulted(block({ kind: "raw", id, text: id, gapBefore: true }));
+  defaulted(block({ kind: "raw", id, text: id, padding: { t: 1 } }));
 
 /** A block whose gap the caller asked for. Never marked. */
-const asked = (id: string, gapBefore: boolean): Block =>
-  block({ kind: "raw", id, text: id, gapBefore });
+const asked = (id: string, gap: boolean): Block =>
+  block({ kind: "raw", id, text: id, ...(gap ? { padding: { t: 1 } } : {}) });
 
 /** A block with no gap at all — what a non-gapping builder returns. */
 const plain = (id: string): Block => defaulted(block({ kind: "raw", id, text: id }));
@@ -53,24 +53,24 @@ describe("C24 §4a — b.seq", () => {
   it("T2.11 (I17): clears a defaulted gap on the first block and on no other", () => {
     const out = seq([preferred("a"), preferred("b"), preferred("c")]);
 
-    expect(out[0]?.gapBefore).toBeUndefined();
-    expect(out[1]?.gapBefore).toBe(true);
-    expect(out[2]?.gapBefore).toBe(true);
+    expect(out[0]?.padding?.t).toBeUndefined();
+    expect(out[1]?.padding?.t).toBe(1);
+    expect(out[2]?.padding?.t).toBe(1);
   });
 
   // The half that can be wrong. Everything above passes for a `seq` that
   // clears index 0 without consulting the marker at all.
-  it("T2.11 (I17): an EXPLICIT gapBefore: true on the first block survives", () => {
+  it("T2.11 (I17): an EXPLICIT top padding on the first block survives", () => {
     const out = seq([asked("a", true), preferred("b")]);
 
-    expect(out[0]?.gapBefore).toBe(true);
-    expect(out[1]?.gapBefore).toBe(true);
+    expect(out[0]?.padding?.t).toBe(1);
+    expect(out[1]?.padding?.t).toBe(1);
   });
 
-  it("T2.11 (I17): an explicit gapBefore: false on the first block is left alone", () => {
+  it("T2.11 (I17): a first block that asked for no padding is left alone", () => {
     const out = seq([asked("a", false), preferred("b")]);
 
-    expect(out[0]?.gapBefore).toBe(false);
+    expect(out[0]?.padding).toBeUndefined();
   });
 
   it("T2.11: a first block with no gap is returned unchanged, identically", () => {
@@ -93,7 +93,7 @@ describe("C24 §4a — b.seq", () => {
     const out = seq([head, preferred("b")]);
 
     expect(Object.isFrozen(out[0])).toBe(true);
-    expect(head.gapBefore).toBe(true); // the original is untouched
+    expect(head.padding?.t).toBe(1); // the original is untouched
     expect(out[0]).not.toBe(head);
   });
 
@@ -105,7 +105,7 @@ describe("C24 §4a — b.seq", () => {
 // --- the nineteen ----------------------------------------------------------
 
 /**
- * Every block-returning builder, its expected `gapBefore` default, and a call
+ * Every block-returning builder, its expected gap default, and a call
  * that produces a valid block.
  *
  * **The enumeration is the mechanism** (T2.9, T6.12). §4's prose listed fifteen
@@ -245,16 +245,21 @@ describe("C24 §4 — the twenty-four builders", () => {
     );
   });
 
-  it("T2.9 (I15): every builder sets its own gapBefore default", () => {
+  it("T2.9 (I15): every builder sets its own gap default, written as padding", () => {
     for (const { name, gaps, make } of BUILDERS) {
-      expect(make().gapBefore ?? false, `${name} default`).toBe(gaps);
+      expect((make().padding?.t ?? 0) > 0, `${name} default`).toBe(gaps);
     }
   });
 
   it("T2.9 (I15): an explicit gapBefore of either polarity overrides the default", () => {
+    // **`opts.gapBefore` is the builder's shorthand and the block's field is
+    // `padding.t`** (C04 §3a, C09 I80). The two names are one decision resolved
+    // at the builder, which is what keeps the *document* with a single way to
+    // say it — the duplication R19 refused was two fields on a block, not an
+    // ergonomic name at L4.
     for (const { name, make } of BUILDERS) {
-      expect(make({ gapBefore: true }).gapBefore, `${name} explicit true`).toBe(true);
-      expect(make({ gapBefore: false }).gapBefore ?? false, `${name} explicit false`).toBe(false);
+      expect(make({ gapBefore: true }).padding?.t, `${name} explicit true`).toBe(1);
+      expect(make({ gapBefore: false }).padding?.t ?? 0, `${name} explicit false`).toBe(0);
       // And an explicit value is never a preference, whichever way it went.
       expect(wasDefaulted(make({ gapBefore: true })), `${name} marked`).toBe(false);
       expect(wasDefaulted(make({ gapBefore: false })), `${name} marked`).toBe(false);
@@ -360,6 +365,11 @@ describe("C24 T4.2 — the two near-pairs, where only the frame separates them",
       kind: "comparison", id: "control-cmp", rows: [{ field: "cpu", a: "1", b: "2" }],
     });
 
+    // **No gap on either builder**, because the controls are hand-authored and
+    // carry no `padding`. Under C04 §3a the gap is the block's own row rather
+    // than the sequence's, so a block drawn alone draws it — where `gapBefore`
+    // was invisible there — and the frames would differ by a blank row that is
+    // not what this comparison is about.
     expect(frame(b.kv({ cpu: "1" }, { gapBefore: false }))).toBe(frame(expectedKv));
     expect(
       frame(b.comparison([{ field: "cpu", a: "1", b: "2" }], { gapBefore: false })),
@@ -569,11 +579,17 @@ describe("C24 §4 — the rulings that are not mechanical", () => {
    * builder that concatenated the two values into one row.
    */
   it("T1.3a (I18): b.kv given an array keeps a repeated label, in order", () => {
-    const ports = b.kv([
-      { label: "80/tcp", value: "0.0.0.0:8080" },
-      { label: "80/tcp", value: "[::]:8080" },
-      { label: "443/tcp", value: "127.0.0.1:9090" },
-    ]);
+    // No leading gap: the rows below are read by index, and `b.kv` gaps by
+    // default — which is the block's own padding row now (C04 §3a), drawn even
+    // when the block is alone.
+    const ports = b.kv(
+      [
+        { label: "80/tcp", value: "0.0.0.0:8080" },
+        { label: "80/tcp", value: "[::]:8080" },
+        { label: "443/tcp", value: "127.0.0.1:9090" },
+      ],
+      { gapBefore: false },
+    );
     expect(validateBlock(ports).ok).toBe(true);
 
     const lines = kit().renderToLines(ports, 60).map(visible);
@@ -595,7 +611,7 @@ describe("C24 §4 — the rulings that are not mechanical", () => {
   it("T3.3: b.kv with 200 rows is valid and measures linearly", () => {
     const rows: Record<string, string> = {};
     for (let i = 0; i < 200; i += 1) rows[`key${String(i)}`] = `value${String(i)}`;
-    const big = b.kv(rows);
+    const big = b.kv(rows, { gapBefore: false });
     expect(validateBlock(big).ok).toBe(true);
     expect(kit().measure(big, 80)).toBe(200);
   });
@@ -711,7 +727,7 @@ describe("C24 §5 — b.live", () => {
     // A consumer choosing a height reintroduces exactly that, so `height` is not
     // an argument. Asserted as the **absence of a way to pass one**: the third
     // positional is the attempt, and `BlockOpts` carries `id` and `gapBefore`.
-    const opts = { id: "mine", gapBefore: true } as const;
+    const opts = { id: "mine", padding: { t: 1 } } as const;
     const withOpts = b.status({ message: "x" }, null, 1, opts);
     expect(withOpts.id, "the id is the consumer's, as on every builder").toBe("mine");
     expect(withOpts.height, "the height is not").toBe(1);

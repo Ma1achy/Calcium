@@ -11,10 +11,12 @@ import {
   BORDER_INSET,
   ROW_GUTTER,
   childWidths,
+  contentWidth,
   groupPlacements,
   hasChildren,
   mosaicRects,
   normaliseWidth,
+  paddingOf,
   parseAreas,
   placeable,
   sequenceHeight,
@@ -24,6 +26,7 @@ import type { Block, Probe, Status } from "../../data/viewmodel/index.js";
 import { DEFAULT_DEFINITIONS } from "./defaults.js";
 import { clampSpans, paint, rows, tone } from "./paint.js";
 import { truncate } from "../text.js";
+import { fitRow } from "../rows.js";
 import { statusDefinition, statusRowsFor } from "./kinds/status.js";
 import type {
   MeasureMemo,
@@ -354,9 +357,15 @@ class Registry implements BlockRegistry {
       // floor after: the floor pads a short block and this bounds a tall one,
       // and a floored block over the cap takes `max(shown + 1, floor)`.
       const form = this.#form(block, width);
+      // **The padding is the registry's and no kind sees it** (C09 I80). The
+      // definition is asked for the content width and its answer carries the
+      // two vertical edges; the floor applies to the padded block, because that
+      // is what a layer above reserved space for (C04 I67, walk A6).
+      const pad = paddingOf(block);
       const rows =
-        form.definition.measure(form.block, width, this.#measureChild, this.probe) +
-        (form.capped === null ? 0 : 1);
+        form.definition.measure(form.block, contentWidth(block, width), this.#measureChild, this.probe) +
+        (form.capped === null ? 0 : 1) +
+        pad.t + pad.b; // cells-ok — row counts
       const floored = Math.max(rows, floor);
       this.#memo?.set(block, Object.freeze({ width, rows: floored }));
       return { ok: true, rows: floored };
@@ -618,8 +627,15 @@ class Registry implements BlockRegistry {
     const form = this.#formContained(block, w) ?? this.#resolve(block);
     const answer = form.definition.width;
     if (answer === undefined) return w;
+    // **The kind answers for its content and the edges are added back** (C09
+    // I80). C09 I43's identity — the same height at the answered width — is
+    // therefore taken at the *block's* width, which is two edges wider than the
+    // width the kind wrapped at (walk A7).
+    const pad = paddingOf(block);
+    const inner = contentWidth(block, w);
     try {
-      const got = answer(form.block, w, this.width);
+      const raw = answer(form.block, inner, this.width);
+      const got = Number.isInteger(raw) && raw >= 1 && raw <= inner ? raw + pad.l + pad.r : raw;
       if (Number.isInteger(got) && got >= 1 && got <= w) return got;
       this.#report(block, "width", new RangeError(`${block.kind}.width answered ${String(got)} at ${String(w)}`));
       return Number.isFinite(got) ? Math.max(1, Math.min(w, Math.trunc(got))) : w;
@@ -744,7 +760,6 @@ class Registry implements BlockRegistry {
             // agrees with (C09 I43).
             let row = top; // cells-ok — a row cursor, not a width
             block.children.forEach((child, i) => {
-              if (child.gapBefore === true) row += 1;
               const at = placements[i];
               place(child, row + (at?.top ?? 0), left + (at?.left ?? 0), at?.width ?? widths[0] ?? 1);
               row += this.#measureChild(child, widths[0] ?? 1);
@@ -792,7 +807,6 @@ class Registry implements BlockRegistry {
     const sequence = (seq: readonly Block[], top: number, left: number, atWidth: number): void => {
       let row = top; // cells-ok — a row cursor, not a width
       for (const block of seq) {
-        if (block.gapBefore === true) row += 1;
         place(block, row, left, atWidth);
         row += this.#measureChild(block, atWidth);
       }
@@ -838,14 +852,16 @@ class Registry implements BlockRegistry {
     let row = 0; // cells-ok — a row cursor, not a width
 
     for (const block of blocks) {
-      const gap = block.gapBefore === true ? 1 : 0;
+      // **No gap row is accounted for here, and that is 2a** (C04 I25). The
+      // spacing is the block's own `padding` and is inside the height, so the
+      // run is a plain cursor and a block is entirely above or below the window
+      // on its own bounds.
       const height = this.#measureChild(block, w);
-      const top = row + gap;
+      const top = row;
       const bottom = top + height;
       row = bottom;
 
-      // Entirely above or entirely below the window, gap included.
-      if (bottom <= lo || top - gap >= hi) continue;
+      if (bottom <= lo || top >= hi) continue;
 
       // **The capped form, and the window is taken over it** (C14 I25). A
       // window below the marker is the definition's window over the form with
@@ -876,12 +892,16 @@ class Registry implements BlockRegistry {
       // every kind declaring no `window` at all — and a floored block is small
       // by construction, because the reason it has a floor is that it failed to
       // draw.
-      const windowable = form === null || floorOf(block) > 0 ? undefined : form.definition.window;
+      // **And a padded block is kept whole on exactly the same ground.** Its
+      // padding rows are the registry's (C09 I80), outside anything
+      // `definition.window` can reach, so a `to` derived from the padded height
+      // would break I26's identity from outside the definition — which is the
+      // sentence above, one field later. The walk ruled it at S4.
+      const windowable =
+        form === null || windowRefused(block)
+          ? undefined
+          : form.definition.window;
 
-      // The gap row, when the window opens on or above it, is kept by keeping
-      // the block's own `gapBefore`; when the window opens *below* it the gap is
-      // dropped with it, which is why the flag is rewritten rather than carried.
-      const gapKept = gap === 1 && top - gap >= lo;
       const localFrom = Math.max(0, lo - top);
       const localTo = Math.min(height, hi - top);
 
@@ -905,11 +925,7 @@ class Registry implements BlockRegistry {
         piece = reachesMarker && capped !== null ? withCapped(out.block, capped) : stripCapped(out.block);
         dropped = out.skipRows + (localFrom - wFrom);
       }
-      if (gapKept !== (block.gapBefore === true)) {
-        piece = gapKept ? { ...piece, gapBefore: true } : stripGap(piece);
-      }
-
-      if (skipRows < 0) skipRows = dropped + (gapKept ? 0 : 0);
+      if (skipRows < 0) skipRows = dropped;
       kept.push(piece);
     }
 
@@ -931,6 +947,35 @@ class Registry implements BlockRegistry {
    * sides take the same number from the same field, so neither is trusted to
    * agree with the other.
    */
+  /**
+   * A block's padding, applied once (C09 I80, C04 §3a).
+   *
+   * **The rows the definition drew, inset and surrounded.** `t` blank rows
+   * above, `b` below, and each of the kind's rows moved right by `l` — cut to
+   * the content width first, because a kind answering wider than it was given
+   * would otherwise push the right edge out (F1211's rule, one layer up).
+   *
+   * **Why here and not in each kind**: `gapBefore` belonged to no block, so
+   * three consumers rebuilt its blank row independently and could only be kept
+   * in agreement by hand. One application is the whole of the change.
+   */
+  #padded(block: Block, rendered: Rendered, inner: number): Rendered {
+    const pad = paddingOf(block);
+    if (pad.l === 0 && pad.r === 0 && pad.t === 0 && pad.b === 0) return rendered;
+    // **The rows are touched only when a horizontal edge asks for it.** With
+    // `t` alone — which is what the old `gapBefore` was — the kind drew at the
+    // full width and its rows are already right; running them through `fitRow`
+    // would pad every short row out to the width and change bytes the frame had
+    // no reason to change. Found by the patch and `kv` rows, which carry spans
+    // a pad walks straight through.
+    const body =
+      pad.l === 0 && pad.r === 0
+        ? rendered
+        : rendered.map((row) => `${" ".repeat(pad.l)}${fitRow(row, inner)}`); // cells-ok — a cell count
+    const blank = (n: number): readonly string[] => Array.from({ length: n }, () => ""); // cells-ok — row counts
+    return [...blank(pad.t), ...body, ...blank(pad.b)];
+  }
+
   #floored(block: Block, rendered: Rendered): Rendered {
     const floor = floorOf(block);
     if (floor === 0) return rendered;
@@ -947,7 +992,8 @@ class Registry implements BlockRegistry {
    *
    * **The render-side seam beside `measureChild`**, and the three refusals are
    * one rule. A floored or capped block draws rows the definition never
-   * produced — the floor's padding and the cap's marker are the registry's own,
+   * produced — the floor's padding, the block's own padding (C09 I80) and the
+   * cap's marker are the registry's own,
    * outside `definition.render` — so a window over the definition's rows is not
    * a window over the block's; `windowSequence` refuses a floored block for
    * exactly this reason (I33) and this is the same line in the other caller. A
@@ -960,7 +1006,7 @@ class Registry implements BlockRegistry {
    */
   windowChild = (block: Block, width: number, from: number, to: number): Windowed | null => this.#scoped(() => {
     const w = normaliseWidth(width);
-    if (floorOf(block) > 0) return null;
+    if (windowRefused(block)) return null;
     const form = this.#formContained(block, w);
     if (form === null || form.capped !== null) return null;
     const windowable = form.definition.window;
@@ -972,9 +1018,13 @@ class Registry implements BlockRegistry {
 
   render = (block: Block, ctx: RenderContextInput): Rendered => this.#scoped(() => {
     const width = normaliseWidth(ctx.width);
+    // **The definition draws at the content width** (C09 I80): the edges are
+    // this registry's, applied once around every kind, so no definition has a
+    // second reading of `padding` to disagree with.
+    const inner = contentWidth(block, width);
     const childContext: RenderContext = {
       ...ctx,
-      width,
+      width: inner,
       measureChild: this.#measureChild,
       widthChild: this.width,
       renderChild: (child: Block, childWidth: number): Rendered =>
@@ -1000,7 +1050,11 @@ class Registry implements BlockRegistry {
       // level down: 4 of 5 rows dropped, in silence (F223).
       return this.#floored(
         block,
-        this.#errorBlock(Registry.#errorText(block, "measure", undefined), committed.rows, childContext),
+        this.#padded(
+          block,
+          this.#errorBlock(Registry.#errorText(block, "measure", undefined), committed.rows, childContext),
+          inner,
+        ),
       );
     }
 
@@ -1014,8 +1068,8 @@ class Registry implements BlockRegistry {
       const form = this.#form(block, width);
       const drawn = form.definition.render(form.block, childContext);
       const rendered =
-        form.capped === null ? drawn : this.#capped(drawn, this.#marker(form.capped, width, childContext));
-      return this.#floored(block, rendered);
+        form.capped === null ? drawn : this.#capped(drawn, this.#marker(form.capped, inner, childContext));
+      return this.#floored(block, this.#padded(block, rendered, inner));
     } catch (error) {
       // I11 — a throwing renderer is contained to its block, **and the
       // containment includes the row count**. The rest of the frame is
@@ -1030,9 +1084,9 @@ class Registry implements BlockRegistry {
         block,
         "render",
         error,
-        statusRowsFor(errorStatus(text, 1), width, childContext.capabilities),
+        statusRowsFor(errorStatus(text, 1), inner, childContext.capabilities),
       );
-      return this.#floored(block, this.#errorBlock(text, committed.rows, childContext));
+      return this.#floored(block, this.#padded(block, this.#errorBlock(text, committed.rows, childContext), inner));
     }
   });
 }
@@ -1094,8 +1148,27 @@ function floorOf(block: Block): number {
   return typeof held === "number" && Number.isInteger(held) && held > 0 ? held : 0;
 }
 
-/** A block without its `gapBefore`, so a dropped gap row is genuinely dropped. */
-function stripGap(block: Block): Block {
-  const { gapBefore: _gapBefore, ...rest } = block as Block & { gapBefore?: boolean };
-  return rest as Block;
+/**
+ * **Geometry the registry contributes that `definition.window` cannot see** — a
+ * floor's padding (C09 I33) and the block's own padding (C09 I80), both applied
+ * around the definition's rows in `render`. The vertical edges make a window
+ * over the definition's rows not a window over the block's, so a `to` derived
+ * from the block's height breaks C09 I26's identity from outside the
+ * definition. The horizontal edges do it on the other axis: the definition is
+ * asked at `w` here and drawn at `w - l - r` there, so the windowed rows would
+ * be measured against a wrapping the block never had.
+ *
+ * **One predicate because three callers ask the same question** and a rule
+ * written three times drifts: `windowSequence`, `windowChild`, and the
+ * measurement harness's stand-in for the seam, which had been dispatching
+ * straight to `definition.window` and so made neither refusal. That was green
+ * only because no swept fixture carried a floor that bit — the padding
+ * migration is what made it bite, and the harness was the defect rather than
+ * the fixtures.
+ */
+export function windowRefused(block: Block): boolean {
+  if (floorOf(block) > 0) return true;
+  const pad = paddingOf(block);
+  return pad.t > 0 || pad.b > 0 || pad.l > 0 || pad.r > 0;
 }
+

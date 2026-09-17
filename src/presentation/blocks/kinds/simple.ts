@@ -43,13 +43,14 @@ function proseWidth(width: number, prefix: number): number {
  * *sibling* — the one relationship the mark exists to deny. Every assertion
  * passed with it wrong; only a frame-read says otherwise.
  *
- * **A gutter and not a field.** An `indent` on `Notice` is the second spacing
- * field `Gap`'s note has been waiting for — *whoever writes the second spacing
- * field is reading this line* — and roadmap 38 rules that change a
- * *replacement* of `gapBefore` rather than an addition beside it. So the
- * smaller change is the one that is not a public type at all: the depth belongs
- * to the mark, which already knows it is a mark, and the block schema learns
- * nothing.
+ * **A gutter and not a field, and the replacement has since landed.** An
+ * `indent` on `Notice` was the second spacing field `Gap`'s note was waiting
+ * for, and that note has now been answered the way it asked: `gapBefore` became
+ * `padding` (C04 §3a), a replacement rather than an addition. **The ruling here
+ * is unchanged and is worth restating now that a general `padding.l` exists**:
+ * the depth belongs to the mark, which already knows it is a mark, and a
+ * horizontal padding declared per notice would be a second author of the same
+ * gutter — the duplication R19 refused, one level down.
  *
  * **Two cells, because that is where the command's text starts.** The mark
  * belongs under the first cell of the line it is subordinate to, and

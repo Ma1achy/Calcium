@@ -34,7 +34,7 @@ describe("C25 I10 — one pairing for the diff and the drawing", () => {
     const k = kit();
     for (let removes = 0; removes <= 3; removes += 1) {
       for (let adds = 0; adds <= 3; adds += 1) {
-        const patch = b.patch({ id: `r${String(removes)}a${String(adds)}`, path: "x", language: "", hunks: [{ header: "@@", lines: runOf(removes, adds) }] });
+        const patch = b.patch({ gapBefore: false, id: `r${String(removes)}a${String(adds)}`, path: "x", language: "", hunks: [{ header: "@@", lines: runOf(removes, adds) }] });
         const rows = k.renderToLines(patch, 120);
         // Path header, hunk header, context, the paired rows, context.
         const paired = Math.min(removes, adds);
@@ -51,13 +51,13 @@ describe("C25 I10 — one pairing for the diff and the drawing", () => {
   });
 
   it("T2.7 (C25 I10): unified draws the same spans one line per row — the remove's word on its row, the add's on its own", () => {
-    const patch = b.patch({ id: "u", path: "x", language: "", layout: "unified", hunks: [{ header: "@@", lines: runOf(2, 3) }] });
+    const patch = b.patch({ gapBefore: false, id: "u", path: "x", language: "", layout: "unified", hunks: [{ header: "@@", lines: runOf(2, 3) }] });
     const rows = kit().renderToLines(patch, 80);
     expect(rows.slice(3, 8).map(underlinedRuns)).toEqual([["b0"], ["b1"], ["c0"], ["c1"], []]);
   });
 
   it("T2.7 (C25 I10): the spans on the block are the ones the renderer painted — attributes only, underline alone", () => {
-    const patch = b.patch({ id: "s", path: "x", language: "", hunks: [{ header: "@@", lines: runOf(1, 1) }] });
+    const patch = b.patch({ gapBefore: false, id: "s", path: "x", language: "", hunks: [{ header: "@@", lines: runOf(1, 1) }] });
     const lines = patch.hunks[0]?.lines ?? [];
     expect(lines[1]?.spans).toEqual([{ from: 10, to: 12, underline: true }]);
     expect(lines[2]?.spans).toEqual([{ from: 10, to: 12, underline: true }]);

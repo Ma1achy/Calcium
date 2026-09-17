@@ -10,7 +10,7 @@
 import { describe, expect, it } from "vitest";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { createViewport } from "../../src/viewport/viewport/index.js";
-import { W, emptyDoc, measureSequence, rowsDoc, sumMeasure } from "../support/viewport.js";
+import { W, emptyDoc, measureSequence, renderedRows, rowsDoc, sumMeasure } from "../support/viewport.js";
 
 const mk = (height: number, cap?: number) => {
   const store = createTranscriptStore(cap === undefined ? {} : { cap });
@@ -132,17 +132,35 @@ describe("C14 unit — visibility", () => {
 });
 
 describe("C14 unit — heights", () => {
-  it("T2.9 (I1): an entry's height is measureSequence, not the sum of its blocks", () => {
-    // The two differ by exactly one row per `gapBefore` (C09 I17), and the
-    // summation is what a reader writes. The fixture declares a gap so the two
-    // functions disagree — a corpus without one lets the wrong choice pass.
-    const gapped = rowsDoc(4, "gapped", 2);
-    expect(measureSequence(gapped.blocks, W)).toBe(sumMeasure(gapped.blocks, W) + 1);
+  it("T2.9 (C14 I1, C04 I25): an entry's height is measureSequence, and 2a made that the sum of its blocks", () => {
+    // **The distinction this row was written for has dissolved, deliberately.**
+    // The two used to differ by one row per `gapBefore`, and the summation was
+    // the wrong answer a reader would write. Padding is inside a block now, so
+    // `measureSequence` *is* the sum — and what still has to hold is that the
+    // viewport reads the one function rather than arriving at the number its
+    // own way (C23 §2): a composer that added spacing would make a document's
+    // height unknowable from the document, whichever arithmetic it used.
+    const padded = rowsDoc(4, "padded", 2);
+    expect(
+      measureSequence(padded.blocks, W),
+      "the sum, now that the padded block carries its own row",
+    ).toBe(sumMeasure(padded.blocks, W));
+
+    // **And the frame, because the two numbers above cannot disagree** (F1224).
+    // Both fold the same per-block measures, so they are one answer counted
+    // twice and neither can see a spacing rule applied at the composer or
+    // applied twice. The rendered row count comes by C09 I1's other path.
+    expect(
+      renderedRows(padded.blocks, W),
+      "the frame is as tall as the measurement, padding included once",
+    ).toBe(measureSequence(padded.blocks, W));
+    // The control: the fixture has a padded block to lose. Without it every
+    // assertion here is satisfied by a document with no padding at all.
+    expect(padded.blocks.filter((b) => b.padding !== undefined)).toHaveLength(1);
 
     const { store, viewport } = mk(20);
-    store.append(gapped);
-    expect(viewport.scroll.totalRows).toBe(measureSequence(gapped.blocks, W));
-    expect(viewport.scroll.totalRows).not.toBe(sumMeasure(gapped.blocks, W));
+    store.append(padded);
+    expect(viewport.scroll.totalRows).toBe(measureSequence(padded.blocks, W));
   });
 
   it("T3.6: a zero-height entry consumes no row and does not break the index", () => {

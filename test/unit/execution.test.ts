@@ -2524,7 +2524,7 @@ describe("C23 §2, §3 — what the pipeline may not do", () => {
     // *composed* — the local handlers — and nowhere in the routing itself,
     // which is the division the invariant describes.
     expect(readFileSync("src/shell/local/handlers.ts", "utf8"), "declared, block by block").toMatch(
-      /gapBefore:\s*true/u,
+      /padding:\s*\{\s*t:\s*1\s*\}/u,
     );
   });
 

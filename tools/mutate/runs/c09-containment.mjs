@@ -78,8 +78,8 @@ const results = runPass({
       // row nothing has watched since the day it was written.
       // Re-pointed a third time, when the message became `Registry.#errorText`
       // so the fault's row count and the drawn box take one string.
-      from: "return this.#floored(block, this.#errorBlock(text, committed.rows, childContext));",
-      to: "return this.#floored(block, this.#errorBlock(text, 1, childContext));",
+      from: "this.#errorBlock(text, committed.rows, childContext)",
+      to: "this.#errorBlock(text, 1, childContext)",
       expect: "T3.34",
     },
     {
@@ -96,7 +96,7 @@ const results = runPass({
       // C09 I29 — the state both catches shipped in.
       name: "the render catch swallows without reporting",
       file: REG,
-      from: '      this.#report(\n        block,\n        "render",\n        error,\n        statusRowsFor(errorStatus(text, 1), width, childContext.capabilities),\n      );',
+      from: '      this.#report(\n        block,\n        "render",\n        error,\n        statusRowsFor(errorStatus(text, 1), inner, childContext.capabilities),\n      );',
       to: "",
       expect: "T3.35",
     },

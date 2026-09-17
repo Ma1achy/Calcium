@@ -9,6 +9,7 @@ import { createViewport } from "../../src/viewport/viewport/index.js";
 import { HeightIndex } from "../../src/viewport/viewport/index-tree.js";
 import { HeightCache } from "../../src/viewport/viewport/cache.js";
 import { W, measureSequence, rowsDoc, sumMeasure, wrappingDoc } from "../support/viewport.js";
+import type { Block } from "../../src/data/viewmodel/index.js";
 
 describe("C14 fail-on-revert", () => {
   it("T6.1 (I4): recomputing topRow from an index rather than the anchor → the view jumps", () => {
@@ -66,17 +67,43 @@ describe("C14 fail-on-revert", () => {
     expect(viewport.stats.indexCapacity).toBeLessThanOrEqual(2 * viewport.stats.entryCount);
   });
 
-  it("T6.16 (I1): summing measure instead of calling measureSequence → short by one row per gap", () => {
-    // The most likely single defect in this component, because the summation is
-    // what a reader writes. The fixture declares a gap so the two disagree.
-    const gapped = rowsDoc(4, "g", 2);
-    expect(measureSequence(gapped.blocks, W)).toBe(sumMeasure(gapped.blocks, W) + 1);
+  it("T6.16 (C14 I1, C09 I80): reading a block's padding at the sequence as well as inside measure → every padded block counted twice", () => {
+    // **This row replaces the one it is numbered after, and the replacement is
+    // the finding** (F1224). It used to revert `measureSequence` to `Σ measure`,
+    // short by one row per `gapBefore`, and it was the most likely single defect
+    // in this component because the summation is what a reader writes. Padding
+    // moved inside the block (C04 §3a, C09 I80), `sequenceHeight` became a bare
+    // fold, and that revert now changes no number at all — so the row could no
+    // longer fail. It went red on its own fixture line rather than quietly
+    // green, which is the only reason the emptying was visible.
+    //
+    // The defect moved with the rule. Spacing applied once, inside the block,
+    // makes a *second* application possible, and restoring the composer's
+    // arithmetic is exactly what a reader would write.
+    const padded = rowsDoc(4, "g", 2);
+    expect(measureSequence(padded.blocks, W), "the seam and the fold agree").toBe(
+      sumMeasure(padded.blocks, W),
+    );
 
     const store = createTranscriptStore();
     const viewport = createViewport(store, { width: W, height: 20, measureSequence });
-    store.append(gapped);
+    store.append(padded);
+    expect(viewport.scroll.totalRows).toBe(measureSequence(padded.blocks, W));
 
-    expect(viewport.scroll.totalRows).toBe(measureSequence(gapped.blocks, W));
+    // **The revert, applied.** A measurer that adds the padding at the sequence
+    // on top of what `measure` returns — one line, and the shape of the rule
+    // this component used to hold.
+    const twice = (blocks: readonly Block[], width: number): number =>
+      measureSequence(blocks, width) +
+      blocks.reduce((n, b) => n + (b.padding?.t ?? 0) + (b.padding?.b ?? 0), 0);
+
+    const store2 = createTranscriptStore();
+    const reverted = createViewport(store2, { width: W, height: 20, measureSequence: twice });
+    store2.append(padded);
+    expect(
+      reverted.scroll.totalRows,
+      "the double count is a different number, so the row can fail",
+    ).not.toBe(measureSequence(padded.blocks, W));
   });
 
   it("T6.17 (I1, I6): treating an append as a pure tail push → a blank screen over a full transcript", () => {

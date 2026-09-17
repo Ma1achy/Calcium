@@ -337,7 +337,6 @@ export const tableDefinition: BlockDefinition<Table> = {
       const inset = width - insetWidth(width);
       const pad = " ".repeat(inset);
       detailBlocks(block, row, plan, ctx.capabilities).forEach((child) => {
-        if (child.gapBefore === true) parts.push("");
         // **Cut to the width** (F1211): a detail child answering a row wider
         // than its inset used to become a padded Ink box, which wrapped.
         for (const line of ctx.renderChild(child, insetWidth(width))) {

@@ -95,12 +95,15 @@ describe("C25 integration", () => {
       language: "yaml",
       hunks: [hunkOf([" a: 1", "+b: 2"])],
     });
+    // **No gap**: `built` above is hand-authored and carries no `padding`, and
+    // under C04 §3a `b.patch`'s default gap is now a field of the block rather
+    // than a rule of the sequence — so the two would differ by that field.
     const viaBuilder = b.patch({
+      gapBefore: false,
       id: "built",
       path: "a.yaml",
       language: "yaml",
       hunks: [hunkOf([" a: 1", "+b: 2"])],
-      gapBefore: false,
     });
 
     expect(built.kind).toBe("patch");
@@ -173,7 +176,11 @@ describe("C25 integration", () => {
     // **The frame this row was read against**, before it was asserted: three lines,
     // one changed digit. `b.patch` is the writer, so the fixture goes through it
     // rather than through `patchOf`, which builds a block and writes nothing.
+    // **No leading gap**: under C04 §3a that row is the block's own `padding.t`
+    // rather than the sequence's, so a block rendered alone draws it — where
+    // `gapBefore` was invisible there — and the rows below are read by index.
     const patch = b.patch({
+      gapBefore: false,
       id: "frame",
       path: "deploy.yaml",
       language: "yaml",

@@ -514,7 +514,9 @@ export type MergeRow = Omit<TableRow, "expanded">;
  * project has recorded were satisfied elsewhere while their text stood
  * unchanged. Whoever writes the second spacing field is reading this line.
  */
-export type Gap = Readonly<{ gapBefore?: boolean }>;
+export type BlockPadding = Readonly<{ l?: number; r?: number; t?: number; b?: number }>;
+
+export type Padded = Readonly<{ padding?: BlockPadding }>;
 
 /**
  * A floor on the rows a block occupies, set by a layer above and read by none
@@ -575,7 +577,7 @@ export type Rule = Readonly<{
   spans?: readonly TextSpan[];
   meta?: string;
 }> &
-  Gap &
+  Padded &
   Floor;
 
 export type Notice = Readonly<{
@@ -596,7 +598,7 @@ export type Notice = Readonly<{
    * Absent, the notice declares nothing and is what it always was.
    */
   action?: Action;
-}> & Gap & Floor;
+}> & Padded & Floor;
 
 export type KeyValue = Readonly<{
   kind: "keyValue";
@@ -656,7 +658,7 @@ export type KeyValue = Readonly<{
    * exists so a *window* can say what its parent measured.
    */
   keyWidth?: number;
-}> & Gap & Floor;
+}> & Padded & Floor;
 
 export type Table = Readonly<{
   kind: "table";
@@ -709,7 +711,7 @@ export type Table = Readonly<{
    * the block cannot be checked against.
    */
   presorted?: boolean;
-}> & Gap & Floor;
+}> & Padded & Floor;
 
 export type Steps = Readonly<{
   kind: "steps";
@@ -719,13 +721,13 @@ export type Steps = Readonly<{
     detail?: string;
     state: "pending" | "active" | "done" | "failed";
   }>[];
-}> & Gap & Floor;
+}> & Padded & Floor;
 
 export type Logs = Readonly<{
   kind: "logs";
   id: string;
   lines: readonly Readonly<{ ts: string; level: string; message: string }>[];
-}> & Gap & Floor;
+}> & Padded & Floor;
 
 export type Events = Readonly<{
   kind: "events";
@@ -745,7 +747,7 @@ export type Events = Readonly<{
    * never carries alone (D29).
    */
   events: readonly Readonly<{ ts: string; type: string; message: string; tone?: Tone }>[];
-}> & Gap & Floor;
+}> & Padded & Floor;
 
 /**
  * A row of a **vector** field — `Series`' shape, with two numbers per position
@@ -1991,7 +1993,7 @@ export type Plot = Readonly<{
    * see a realised range from L0 (A02 §1).
    */
   axisCross?: AxisCross;
-}> & Gap & Floor;
+}> & Padded & Floor;
 
 /** Which corner of a plot area the data grows from (C04 I62, C12 §3ac). */
 export type Origin = "bottom-left" | "bottom-right" | "top-left" | "top-right";
@@ -2694,7 +2696,7 @@ export type Progress = Readonly<{
    * a colormap backing is admitted — the ink fills its cell and reads by area.
    */
   ramp?: Ramp;
-}> & Gap & Floor;
+}> & Padded & Floor;
 
 export type Code = Readonly<{
   kind: "code";
@@ -2726,7 +2728,7 @@ export type Code = Readonly<{
    * `validateDocument` refuses it from the far side (I67's set, third member).
    */
   lineRange?: readonly [number, number];
-}> & Gap & Floor;
+}> & Padded & Floor;
 
 export type Comparison = Readonly<{
   kind: "comparison";
@@ -2763,7 +2765,7 @@ export type Comparison = Readonly<{
     /** The judgement axis, and the only half that takes a colour. */
     verdict?: "better" | "worse";
   }>[];
-}> & Gap & Floor;
+}> & Padded & Floor;
 
 export type Hunk = Readonly<{
   header: string;
@@ -2828,7 +2830,7 @@ export type Patch = Readonly<{
    * it exists so a *window* can say what its parent measured.
    */
   numberWidth?: number;
-}> & Gap & Floor;
+}> & Padded & Floor;
 
 export type Pills = Readonly<{
   kind: "pills";
@@ -2839,14 +2841,14 @@ export type Pills = Readonly<{
     action?: Action;
     active?: boolean;
   }>[];
-}> & Gap & Floor;
+}> & Padded & Floor;
 
 export type Tip = Readonly<{
   kind: "tip";
   id: string;
   text: string;
   actions?: readonly Action[];
-}> & Gap & Floor;
+}> & Padded & Floor;
 
 export type Panel = Readonly<{
   kind: "panel";
@@ -2880,7 +2882,7 @@ export type Panel = Readonly<{
    */
   live?: boolean;
   children: readonly Block[];
-}> & Gap & Floor;
+}> & Padded & Floor;
 
 export type Group = Readonly<{
   kind: "group";
@@ -2928,7 +2930,7 @@ export type Group = Readonly<{
    * applies that one outside the definition and the two compose.
    */
   minRows?: number;
-}> & Gap & Floor;
+}> & Padded & Floor;
 
 /**
  * One child's share of a `row` group's width (I44).
@@ -3090,7 +3092,7 @@ export type Terminal = Readonly<{
    * presence, and a present zero would draw *0 lines dropped at the cap*.
    */
   dropped?: number;
-}> & Gap & Floor;
+}> & Padded & Floor;
 
 /** The block's own keys, for the far-side gate (I110). */
 export const TERMINAL_KEYS: ReadonlySet<string> = new Set([
@@ -3129,7 +3131,7 @@ export type Raw = Readonly<{
   /** The map a span's `value` reads through (I90). Required the moment any span carries one. */
   colormap?: ColormapName;
 }> &
-  Gap &
+  Padded &
   Floor;
 
 /**
@@ -3185,7 +3187,7 @@ export type Scroll = Readonly<{
    * arm names a row.
    */
   collapsed?: boolean;
-}> & Gap & Floor;
+}> & Padded & Floor;
 
 /**
  * A block that declares a height in cells and draws pixels into them (C04 §3g, I73).
@@ -3248,7 +3250,7 @@ export type Image = Readonly<{
    * lower rung of the same one.
    */
   overlay?: ImageOverlay;
-}> & Gap & Floor;
+}> & Padded & Floor;
 
 /**
  * The overlay's data: a matrix at **its own** resolution, resampled to whatever
@@ -3375,7 +3377,7 @@ export type Mosaic = Readonly<{
    */
   columns?: readonly Share[];
   rows?: readonly Share[];
-}> & Gap & Floor;
+}> & Padded & Floor;
 
 /**
  * The block a layer above knows about and the definition does not (C04 I66, C09 I31).
@@ -3433,7 +3435,7 @@ export type Status = Readonly<{
    * take it and MG27 holds that with a reason.
    */
   framed?: boolean;
-}> & Gap & Floor;
+}> & Padded & Floor;
 
 /**
  * The kinds the framework itself declares — **closed**, and the domain of every
@@ -3511,9 +3513,9 @@ export type KnownBlock = KnownBlockKinds[keyof KnownBlockKinds];
 export type KnownBlockKind = KnownBlock["kind"];
 
 /**
- * **Intersected with `Gap & Floor`, and the implementation is what asked for
- * it** (I119). Every framework kind already carries both; the layout reads
- * `gapBefore` and `minHeight` off any `Block` it is handed, so a member without
+ * **Intersected with `Padded & Floor`, and the implementation is what asked
+ * for it** (I119). Every framework kind already carries both; the layout reads
+ * `padding` and `minHeight` off any `Block` it is handed, so a member without
  * them makes those reads a type error on the whole union.
  *
  * Declaring the base here rather than asking an app to remember it is the
@@ -3527,7 +3529,7 @@ export type KnownBlockKind = KnownBlock["kind"];
  * `undefined` at runtime. The framework's own suite is the only place the
  * omission can surface, and T4.2 is where it did.
  */
-export type Block = BlockKinds[keyof BlockKinds] & Gap & Floor;
+export type Block = BlockKinds[keyof BlockKinds] & Padded & Floor;
 
 export type BlockKind = Block["kind"];
 

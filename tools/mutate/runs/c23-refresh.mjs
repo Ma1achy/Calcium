@@ -278,9 +278,9 @@ const results = runPass({
       expect: "T1.36",
     },
     {
-      name: "rhythm: drop the declared block's gapBefore on the first patch",
+      name: "rhythm: drop the declared block's padding on the first patch",
       file: "src/shell/refresh.ts",
-      from: "      existing?.gapBefore === true ? ({ ...base, gapBefore: true } as Block) : base;",
+      from: "      existing?.padding === undefined ? base : ({ ...base, padding: existing.padding } as Block);",
       to: "      base;",
       expect: "T1.35b",
     },

@@ -15,7 +15,7 @@
  * whichever width a child happens to wrap. A shared function cannot drift.
  */
 
-import type { Align, Block, Group, Halign, MeasureFn, Panel, Valign, WidthFn } from "./types.js";
+import type { Align, Block, Group, Halign, MeasureFn, Padded, Panel, Valign, WidthFn } from "./types.js";
 import { divideShares, mosaicRects, parseAreas } from "./mosaic.js";
 import type { ContainerBlock } from "./tree.js";
 
@@ -40,6 +40,34 @@ export function normaliseWidth(width: number): number {
 export function atLeastOne(rows: number): number {
   if (!Number.isFinite(rows)) return 1;
   return Math.max(1, Math.floor(rows));
+}
+
+/**
+ * A block's padding, defaulted (C04 §3a, C09 I80).
+ *
+ * **Resolved once, here, because four optional numbers are four places to
+ * write `?? 0` and one of them will differ.** The registry insets and pads with
+ * these and no kind reads them; C29's `Box` takes the same shape, so a block's
+ * padding and a box's are one vocabulary rather than two that agree today.
+ *
+ * Floored at 0 and integral, on `normaliseWidth`'s own ground: a negative or
+ * fractional edge is a document defect and the arithmetic below it must stay
+ * total either way.
+ */
+export function paddingOf(block: Padded): Readonly<{ l: number; r: number; t: number; b: number }> {
+  const p = block.padding;
+  if (p === undefined) return NO_PADDING;
+  const edge = (n: number | undefined): number =>
+    n === undefined || !Number.isFinite(n) ? 0 : Math.max(0, Math.floor(n)); // cells-ok — a cell count
+  return { l: edge(p.l), r: edge(p.r), t: edge(p.t), b: edge(p.b) };
+}
+
+const NO_PADDING = Object.freeze({ l: 0, r: 0, t: 0, b: 0 });
+
+/** The width a padded block's kind is asked for — **floored at 1**, as every width is. */
+export function contentWidth(block: Padded, width: number): number {
+  const p = paddingOf(block);
+  return normaliseWidth(normaliseWidth(width) - p.l - p.r);
 }
 
 /** The border takes a column each side. `panel`, and a table's expanded detail. */
@@ -179,22 +207,21 @@ export function childWidths(block: ContainerBlock, width: number): readonly numb
 }
 
 /**
- * The rows a *sequence* of blocks occupies: their heights, plus one row for
- * each block declaring `gapBefore` (§3a, I25).
+ * The rows a *sequence* of blocks occupies: **their heights, and nothing else**
+ * (§3a, I25).
  *
  * A sequence is a document's top level, a `panel`'s children, or a `column`
- * group's children — anything laid out one after another down the screen. A
- * `row` group is not one: its children sit side by side, so a gap before one of
- * them is meaningless and is ignored rather than being an error.
+ * group's children — anything laid out one after another down the screen.
  *
- * **No measurer counts a gap.** A block measures the same wherever it appears,
- * which is what lets C14 key its cache on the block and the width alone; the
- * arithmetic that differs between a block and a run of them lives here, once,
- * for the same reason `childWidths` does.
+ * **This function used to add a row per block declaring `gapBefore`, and the
+ * whole of phase 2a is that it does not.** The spacing is a block's own
+ * `padding` now, inside what `measureChild` returns, so a sequence is a plain
+ * sum and a `row` group's children are padded like any other child rather than
+ * being the one place a field was ignored.
  *
- * The first block's gap is a leading blank row, not a special case. Dropping it
- * would make the field mean two things depending on position, and a document
- * assembled by concatenating two others would render differently from either.
+ * **No composer adds spacing of its own**, which is the half of C04 I25 that
+ * did not change: a document's height has to be knowable from the document, and
+ * a run of blocks that is not the sum of its blocks is not.
  */
 export function sequenceHeight(
   blocks: readonly Block[],
@@ -202,18 +229,8 @@ export function sequenceHeight(
   measureChild: MeasureFn,
 ): number {
   let total = 0;
-  for (const block of blocks) {
-    total += measureChild(block, width);
-    if (block.gapBefore === true) total += 1;
-  }
+  for (const block of blocks) total += measureChild(block, width);
   return total;
-}
-
-/** The gap rows a sequence contributes, without measuring anything. */
-export function gapRows(blocks: readonly Block[]): number {
-  let gaps = 0;
-  for (const block of blocks) if (block.gapBefore === true) gaps += 1;
-  return gaps;
 }
 
 // --- both axes (C04 §3 *Both axes*, I100–I103) -----------------------------

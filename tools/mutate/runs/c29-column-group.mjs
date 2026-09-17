@@ -53,13 +53,24 @@ const results = await runPass({
       expect: "T2.18",
     },
     {
-      // **The `gapBefore` wrapper's padding dropped** — the field carrying *a
-      // gap child takes one blank row above it*. This is the shape `gapBefore`
-      // is replaced by in phase 2, arriving one kind early.
-      name: "a gapBefore child gets no blank row",
+      // **Re-pointed when phase 2a landed the replacement** (F1224). It used to
+      // drop the `padding: { t: 1 }` from a wrapper box built around a
+      // `gapBefore` child — the shape arriving one kind early. There is no
+      // wrapper: the block carries its own padding and `measureChild` returns
+      // it, so the spacing enters the engine through the leaf's height. The
+      // defect that reaches is a leaf answering the *kind's* height rather than
+      // the block's, which is a column short by every child's edges while every
+      // other number balances.
+      name: "a child's leaf measures without its own padding",
       file: F,
-      from: "    ...(child.gapBefore === true ? { padding: { t: 1 } } : {}),",
-      to: "",
+      // The row group builds the same leaf, so the anchor carries the `natural`
+      // line above it — the one thing the two sites do not share.
+      from:
+        "      natural: widthChild === undefined ? 0 : widthChild(child, at),\n" +
+        "      measure: (cw: number) => (measureChild === undefined ? 0 : measureChild(child, cw)),",
+      to:
+        "      natural: widthChild === undefined ? 0 : widthChild(child, at),\n" +
+        "      measure: (cw: number) => (measureChild === undefined ? 0 : measureChild(child, cw) - (child.padding?.t ?? 0) - (child.padding?.b ?? 0)),",
       expect: "T2.18",
     },
     {
@@ -174,14 +185,16 @@ const results = await runPass({
       expect: "T3.69",
     },
     {
-      // **A row treated as a sequence.** Its children sit side by side, so a
-      // gap before one of them is meaningless — ignored rather than an error,
-      // because a document moved from a column group to a row group should
-      // change layout, not fail validation (C04 §3a).
-      name: "a row group honours gapBefore",
+      // **A row treated as a sequence, and the rule it tests inverted** (F1224,
+      // C04_PADDING_WALK A4). A row's children used to ignore `gapBefore`
+      // outright; a padded child is a box like any other now, and draws its own
+      // edges wherever it sits. So this no longer adds spacing a row refuses —
+      // it adds it a *second* time, on top of what `measureChild` already
+      // returned, which is the double count the engine must not make.
+      name: "a row group counts a child's padding twice",
       file: F,
       from: '          id: `c${String(i)}`,\n          width: { kind: "fixed" as const, n: widths[i] ?? 1 },',
-      to: '          id: `c${String(i)}`,\n          ...(child.gapBefore === true ? { padding: { t: 1 } } : {}),\n          width: { kind: "fixed" as const, n: widths[i] ?? 1 },',
+      to: '          id: `c${String(i)}`,\n          ...(child.padding === undefined ? {} : { padding: child.padding }),\n          width: { kind: "fixed" as const, n: widths[i] ?? 1 },',
       expect: "T2.18",
     },
     {

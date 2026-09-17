@@ -67,20 +67,21 @@ const results = runPass({
       expect: "T2.141",
     },
     {
-      // **The gap rule.** Keeping every child exactly as declared keeps its
-      // `gapBefore` when the window opens below the gap, so the slice is one row
-      // too tall and holds a gap row the range excluded. I26 breaks with it, so
-      // T2.142's both-directions row catches it.
-      name: "GAP-NOT-STRIPPED: a child keeps its `gapBefore` whatever the window covers",
+      // **The gap rule, re-pointed when the gap moved inside the block** (F1224). It used to
+      // strip a kept child's `gapBefore` according to whether the window covered
+      // the row above it, and a piece keeping the field was one row too tall.
+      // There is no row above a child any more — the spacing is inside the
+      // child's own height (C04 I25, C09 I80) — so that mutation has no subject
+      // and re-pointing it at a neighbouring line would be a repair hiding the
+      // gap it exposed. The defect the new rule makes possible is the inverse:
+      // a cursor that asks the *kind* how tall the child is rather than the
+      // block, so every boundary below a padded child is off by its padding
+      // while the arithmetic still balances. I26 breaks with it, so T2.142's
+      // both-directions row catches it.
+      name: "PAD-BLIND-CURSOR: the row cursor asks the kind's height, not the block's",
       file: FILE,
-      from:
-        "      const piece =\n" +
-        "        gapKept === (gap === 1)\n" +
-        "          ? child\n" +
-        "          : gapKept\n" +
-        "            ? ({ ...child, gapBefore: true } as Block)\n" +
-        "            : ({ ...child, gapBefore: false } as Block);",
-      to: "      const piece = child;",
+      from: "      const h = measureChild(child, w);",
+      to: "      const h = measureChild(child, w) - (child.padding?.t ?? 0) - (child.padding?.b ?? 0);",
       expect: "T2.142",
     },
     {

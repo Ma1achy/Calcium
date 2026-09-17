@@ -433,7 +433,7 @@ describe("C22 §6c — the render cache", () => {
     // copy. Before I107 the copy was made on every call, twice a frame, and
     // the memo keyed on it missed once a frame for as long as the card stood.
     const { definition, measured } = measuring();
-    const children = Array.from({ length: 40 }, (_, i) => ({ kind: "count", id: `c-${String(i)}`, ...(i === 0 ? { gapBefore: true } : {}) }));
+    const children = Array.from({ length: 40 }, (_, i) => ({ kind: "count", id: `c-${String(i)}`, ...(i === 0 ? { padding: { t: 1 } } : {}) }));
     const { screen, type } = await session(definition, [
       { kind: "notice", id: "h", tone: "info", glyph: "step", text: "rows · ok" },
       ...children,
@@ -570,13 +570,20 @@ describe("C22 §6c — the render cache", () => {
     const registry = kit.registry;
     const options = { theme: DARK_THEME, capabilities: FULL_CAPS, tick: 0 };
     const raw = (id: string, text: string, gap = false): Block =>
-      block({ kind: "raw", id, text, ...(gap ? { gapBefore: true } : {}) } as never);
+      block({ kind: "raw", id, text, ...(gap ? { padding: { t: 1 } } : {}) } as never);
     const corpus: Readonly<Record<string, readonly Block[]>> = {
       "a column group": [
         block({
           kind: "group",
           id: "col",
           direction: "column",
+          // **The container's own padding, and it is not decoration** (C09 I80).
+          // Every block in this fixture was a padded *child*; no container had
+          // edges of its own, so the assembler's handling of them was covered by
+          // nothing — and phase 2b's surface rules put `padding.l` on exactly
+          // this shape. A mutation keeping the group's padding on each child
+          // rendered alone survived, which is how the hole was found.
+          padding: { t: 1, l: 2, b: 1 },
           align: ["left", "right", "left", "right", "left"],
           children: [
             raw("a", "alpha\nsecond line of alpha"),
@@ -589,7 +596,7 @@ describe("C22 §6c — the render cache", () => {
       ],
       "a sequence of whole blocks": [
         raw("x", "x-ray\nx-ray 2"),
-        block({ kind: "notice", id: "n", tone: "info", text: "a notice that wraps at forty cells, surely, given this length", gapBefore: true } as never),
+        block({ kind: "notice", id: "n", tone: "info", text: "a notice that wraps at forty cells, surely, given this length", padding: { t: 1 } } as never),
         raw("z", "zulu", true),
         block({ kind: "group", id: "g2", direction: "column", align: ["right"], children: [raw("w", "whiskey")] } as never),
       ],

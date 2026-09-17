@@ -230,7 +230,7 @@ describe("C23 §3b — part refresh", () => {
     // sequence (C04 I25), so a patch that drops it makes the renderer disagree
     // with the declaration while the block itself stays correct.
     const h = harness();
-    const declared = { ...panel("a", "a", raw("a-c", "…")), gapBefore: true } as Block;
+    const declared = { ...panel("a", "a", raw("a-c", "…")), padding: { t: 1 } } as Block;
     const id = h.transcript.append(docWith([declared]), { streaming: true });
 
     h.driver.declare({ kind: "entry", id }, [part({ id: "a" })]);
@@ -238,7 +238,7 @@ describe("C23 §3b — part refresh", () => {
 
     const after = h.transcript.entries[0]?.doc.blocks.find((x) => x.id === "a");
     expect(shown(h, id, "a"), "the control: it really did refresh").toBe("ok");
-    expect(after?.gapBefore, "and the rhythm survived it").toBe(true);
+    expect(after?.padding?.t, "and the rhythm survived it").toBe(1);
   });
 
   it("T1.32 (I21): backoff doubles and resets, and a sibling is untouched", async () => {
@@ -606,7 +606,7 @@ describe("C23 §3b — part refresh", () => {
     // a refresh keeps the declared block's `gapBefore` and it drives a
     // *transcript entry*, where `currentPanel` reads the real block. The view
     // arm reconstructed the panel through `livePanel`, which sets no gap — so
-    // `existing?.gapBefore === true` was structurally false here and only here,
+    // `existing?.padding?.t === 1` was structurally false here and only here,
     // and C24 I12 says `b.live` behaves identically in both.
     //
     // **Neither half of the suite could see it**: this file's `viewPanel` double
@@ -614,7 +614,7 @@ describe("C23 §3b — part refresh", () => {
     // the production defect rather than standing in for the interface. A fake
     // that is wrong in the same way as the code cannot fail on the difference.
     const h = harness();
-    const declared = { ...panel("p", "panel", raw("p-c", "…")), gapBefore: true } as Block;
+    const declared = { ...panel("p", "panel", raw("p-c", "…")), padding: { t: 1 } } as Block;
     h.views.set("dash", [declared]);
 
     h.driver.declare({ kind: "view", id: "dash" }, [part({ id: "p" })]);
@@ -627,7 +627,7 @@ describe("C23 §3b — part refresh", () => {
       after?.kind === "panel" && after.children[0]?.kind === "raw" && after.children[0].text,
       "the control: it really did refresh",
     ).toBe("ok");
-    expect(after?.gapBefore, "and the rhythm survived the replacement").toBe(true);
+    expect(after?.padding?.t, "and the rhythm survived the replacement").toBe(1);
   });
 
   it("T4.21 (C24 I12): a pushed view is driven by the same loop, and release stops it", async () => {

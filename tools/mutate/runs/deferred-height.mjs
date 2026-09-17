@@ -84,8 +84,9 @@ const results = runPass({
       name: "a floored block is windowed anyway",
       file: REG,
       // Re-anchored 2026-09-04: `windowSequence` windows the capped form (C14 §4b).
-      from: "      const windowable = form === null || floorOf(block) > 0 ? undefined : form.definition.window;",
-      to: "      const windowable = form === null ? undefined : form.definition.window;",
+      // Re-anchored 2026-09-17 (F1224): the two refusals are one predicate.
+      from: "        form === null || windowRefused(block)",
+      to: "        form === null",
       expect: "T3.52",
     },
     {

@@ -111,13 +111,13 @@ describe("C09 I72 — the two arms agree", () => {
     }));
     const sequence: readonly Block[] = [
       ONE_PER_KIND.notice,
-      { ...ONE_PER_KIND.logs, gapBefore: true } as Block,
+      { ...ONE_PER_KIND.logs, padding: { t: 1 } } as Block,
       { ...ONE_PER_KIND.rule, minHeight: 4 } as unknown as Block,
-      { ...ONE_PER_KIND.panel, gapBefore: true } as Block,
+      { ...ONE_PER_KIND.panel, padding: { t: 1 } } as Block,
       { ...ONE_PER_KIND.logs, id: "capped", lines } as Block,
-      { ...ONE_PER_KIND.table, gapBefore: true } as Block,
+      { ...ONE_PER_KIND.table, padding: { t: 1 } } as Block,
       ONE_PER_KIND.code,
-      { ...ONE_PER_KIND.group, gapBefore: true } as Block,
+      { ...ONE_PER_KIND.group, padding: { t: 1 } } as Block,
       ONE_PER_KIND.plot,
     ];
     for (const width of [24, 60, 100]) {
@@ -148,14 +148,14 @@ describe("C09 I72 — the two arms agree", () => {
       B({ kind: "group", id, direction: "column", children: [notice(`${id}-c`, text), ONE_PER_KIND.plot] });
     const containers: readonly Block[] = [
       B({ kind: "group", id: "g-col", direction: "column", align: ["left", "right", "centre"], minRows: 8,
-        children: [notice("g-col-a", "first"), { ...raw("g-col-b", "two lines\nof text"), gapBefore: true }, rule("g-col-c")] }),
+        children: [notice("g-col-a", "first"), { ...raw("g-col-b", "two lines\nof text"), padding: { t: 1 } }, rule("g-col-c")] }),
       B({ kind: "group", id: "g-row2", direction: "row", flex: [1, 1], children: [raw("g-row2-a", "left\nside"), notice("g-row2-b", "right")] }),
       B({ kind: "group", id: "g-row3", direction: "row", flex: [2, 1, 1], align: ["top-left", "middle-right", "bottom-centre"],
         children: [raw("g-row3-a", "tall\ntall\ntall"), rule("g-row3-b"), notice("g-row3-c", "c")] }),
       B({ kind: "group", id: "g-short", direction: "row", flex: [1, 1], children: [B({ kind: "short", id: "sh" }), raw("g-short-b", "a\nb\nc")] }),
       B({ kind: "group", id: "g-dangle", direction: "row", flex: [1, 1], children: [B({ kind: "dangling", id: "dg" }), notice("g-dangle-b", "after")] }),
       B({ kind: "group", id: "g-solid", direction: "row", flex: [1, 1], children: [B({ kind: "solid", id: "s1" }), B({ kind: "solid", id: "s2" })] }),
-      B({ kind: "panel", id: "p-title", title: "Summary", footer: "3 items", children: [raw("p-title-a", "two lines\nof text"), { ...notice("p-title-b", "n"), gapBefore: true }] }),
+      B({ kind: "panel", id: "p-title", title: "Summary", footer: "3 items", children: [raw("p-title-a", "two lines\nof text"), { ...notice("p-title-b", "n"), padding: { t: 1 } }] }),
       B({ kind: "panel", id: "p-live", title: "Live", live: true, children: [notice("p-live-a", "beating")] }),
       B({ kind: "panel", id: "p-empty", title: "", children: [] }),
       B({ kind: "panel", id: "p-tall", title: "Tall", children: [B({ kind: "tall", id: "tl" })] }),
@@ -164,7 +164,7 @@ describe("C09 I72 — the two arms agree", () => {
       B({ kind: "scroll", id: "sc-off", height: 2, children: [raw("sc-o-a", "one"), raw("sc-o-b", "two"), raw("sc-o-c", "three"), raw("sc-o-d", "four")] }),
       B({ ...(ONE_PER_KIND.table as unknown as Record<string, unknown>), id: "t-detail",
         rows: ((ONE_PER_KIND.table as unknown as { rows: readonly Record<string, unknown>[] }).rows).map((row, i) =>
-          i === 0 ? { ...row, expanded: true, detail: [notice("t-d-a", "detail"), { ...raw("t-d-b", "more"), gapBefore: true }] } : row) }),
+          i === 0 ? { ...row, expanded: true, detail: [notice("t-d-a", "detail"), { ...raw("t-d-b", "more"), padding: { t: 1 } }] } : row) }),
       B({ ...(ONE_PER_KIND.table as unknown as Record<string, unknown>), id: "t-actions", actionBar: true }),
       { ...(ONE_PER_KIND.image as unknown as Record<string, unknown>), id: "img-fault", data: "not-a-png" } as unknown as Block,
       ONE_PER_KIND.image,

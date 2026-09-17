@@ -1,0 +1,304 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`C09 I80 — a block's own padding, in a frame > dark-ascii at 30 1`] = `
+"── 1 · alone, top and bottom · measured 4 · rendered 4
+|.........|.........|.........
+[]
+[the quick brown fox jumps ove~]
+[]
+[]
+── 2 · horizontal, three in and one out · measured 1 · rendered 1
+|.........|.........|.........
+[   the quick brown fox jumps~]
+── 2b · horizontal, on a kind that wraps · measured 5 · rendered 5
+|.........|.........|.........
+[   [38;2;138;138;138mthe quick brown fox jumps[39m]
+[   [38;2;138;138;138mover the lazy dog and[39m]
+[   [38;2;138;138;138mkeeps going the quick[39m]
+[   [38;2;138;138;138mbrown fox jumps over the[39m]
+[   [38;2;138;138;138mlazy dog and keeps going[39m]
+── 3 · all four edges · measured 3 · rendered 3
+|.........|.........|.........
+[]
+[  the quick brown fox jumps~]
+[]
+── 4 · a row group, one child padded · measured 3 · rendered 3
+|.........|.........|.........
+[               a]
+[the quick bro~ b]
+[               c]
+── 5 · in a sequence — the row must not move · measured 4 · rendered 4
+|.........|.........|.........
+[first]
+[]
+[the quick brown fox jumps ove~]
+[third]"
+`;
+
+exports[`C09 I80 — a block's own padding, in a frame > dark-ascii at 40 1`] = `
+"── 1 · alone, top and bottom · measured 4 · rendered 4
+|.........|.........|.........|.........
+[]
+[the quick brown fox jumps over the lazy~]
+[]
+[]
+── 2 · horizontal, three in and one out · measured 1 · rendered 1
+|.........|.........|.........|.........
+[   the quick brown fox jumps over the ~]
+── 2b · horizontal, on a kind that wraps · measured 4 · rendered 4
+|.........|.........|.........|.........
+[   [38;2;138;138;138mthe quick brown fox jumps over the[39m]
+[   [38;2;138;138;138mlazy dog and keeps going the quick[39m]
+[   [38;2;138;138;138mbrown fox jumps over the lazy dog[39m]
+[   [38;2;138;138;138mand keeps going[39m]
+── 3 · all four edges · measured 3 · rendered 3
+|.........|.........|.........|.........
+[]
+[  the quick brown fox jumps over the ~]
+[]
+── 4 · a row group, one child padded · measured 3 · rendered 3
+|.........|.........|.........|.........
+[                    a]
+[the quick brown fo~ b]
+[                    c]
+── 5 · in a sequence — the row must not move · measured 4 · rendered 4
+|.........|.........|.........|.........
+[first]
+[]
+[the quick brown fox jumps over the lazy~]
+[third]"
+`;
+
+exports[`C09 I80 — a block's own padding, in a frame > dark-ascii at 80 1`] = `
+"── 1 · alone, top and bottom · measured 4 · rendered 4
+|.........|.........|.........|.........|.........|.........|.........|.........
+[]
+[the quick brown fox jumps over the lazy dog and keeps going]
+[]
+[]
+── 2 · horizontal, three in and one out · measured 1 · rendered 1
+|.........|.........|.........|.........|.........|.........|.........|.........
+[   the quick brown fox jumps over the lazy dog and keeps going]
+── 2b · horizontal, on a kind that wraps · measured 2 · rendered 2
+|.........|.........|.........|.........|.........|.........|.........|.........
+[   [38;2;138;138;138mthe quick brown fox jumps over the lazy dog and keeps going the quick brown[39m]
+[   [38;2;138;138;138mfox jumps over the lazy dog and keeps going[39m]
+── 3 · all four edges · measured 3 · rendered 3
+|.........|.........|.........|.........|.........|.........|.........|.........
+[]
+[  the quick brown fox jumps over the lazy dog and keeps going]
+[]
+── 4 · a row group, one child padded · measured 3 · rendered 3
+|.........|.........|.........|.........|.........|.........|.........|.........
+[                                        a]
+[the quick brown fox jumps over the laz~ b]
+[                                        c]
+── 5 · in a sequence — the row must not move · measured 4 · rendered 4
+|.........|.........|.........|.........|.........|.........|.........|.........
+[first]
+[]
+[the quick brown fox jumps over the lazy dog and keeps going]
+[third]"
+`;
+
+exports[`C09 I80 — a block's own padding, in a frame > dark-unicode at 30 1`] = `
+"── 1 · alone, top and bottom · measured 4 · rendered 4
+|.........|.........|.........
+[]
+[the quick brown fox jumps ove…]
+[]
+[]
+── 2 · horizontal, three in and one out · measured 1 · rendered 1
+|.........|.........|.........
+[   the quick brown fox jumps…]
+── 2b · horizontal, on a kind that wraps · measured 5 · rendered 5
+|.........|.........|.........
+[   [38;2;138;138;138mthe quick brown fox jumps[39m]
+[   [38;2;138;138;138mover the lazy dog and[39m]
+[   [38;2;138;138;138mkeeps going the quick[39m]
+[   [38;2;138;138;138mbrown fox jumps over the[39m]
+[   [38;2;138;138;138mlazy dog and keeps going[39m]
+── 3 · all four edges · measured 3 · rendered 3
+|.........|.........|.........
+[]
+[  the quick brown fox jumps…]
+[]
+── 4 · a row group, one child padded · measured 3 · rendered 3
+|.........|.........|.........
+[               a]
+[the quick bro… b]
+[               c]
+── 5 · in a sequence — the row must not move · measured 4 · rendered 4
+|.........|.........|.........
+[first]
+[]
+[the quick brown fox jumps ove…]
+[third]"
+`;
+
+exports[`C09 I80 — a block's own padding, in a frame > dark-unicode at 40 1`] = `
+"── 1 · alone, top and bottom · measured 4 · rendered 4
+|.........|.........|.........|.........
+[]
+[the quick brown fox jumps over the lazy…]
+[]
+[]
+── 2 · horizontal, three in and one out · measured 1 · rendered 1
+|.........|.........|.........|.........
+[   the quick brown fox jumps over the …]
+── 2b · horizontal, on a kind that wraps · measured 4 · rendered 4
+|.........|.........|.........|.........
+[   [38;2;138;138;138mthe quick brown fox jumps over the[39m]
+[   [38;2;138;138;138mlazy dog and keeps going the quick[39m]
+[   [38;2;138;138;138mbrown fox jumps over the lazy dog[39m]
+[   [38;2;138;138;138mand keeps going[39m]
+── 3 · all four edges · measured 3 · rendered 3
+|.........|.........|.........|.........
+[]
+[  the quick brown fox jumps over the …]
+[]
+── 4 · a row group, one child padded · measured 3 · rendered 3
+|.........|.........|.........|.........
+[                    a]
+[the quick brown fo… b]
+[                    c]
+── 5 · in a sequence — the row must not move · measured 4 · rendered 4
+|.........|.........|.........|.........
+[first]
+[]
+[the quick brown fox jumps over the lazy…]
+[third]"
+`;
+
+exports[`C09 I80 — a block's own padding, in a frame > dark-unicode at 80 1`] = `
+"── 1 · alone, top and bottom · measured 4 · rendered 4
+|.........|.........|.........|.........|.........|.........|.........|.........
+[]
+[the quick brown fox jumps over the lazy dog and keeps going]
+[]
+[]
+── 2 · horizontal, three in and one out · measured 1 · rendered 1
+|.........|.........|.........|.........|.........|.........|.........|.........
+[   the quick brown fox jumps over the lazy dog and keeps going]
+── 2b · horizontal, on a kind that wraps · measured 2 · rendered 2
+|.........|.........|.........|.........|.........|.........|.........|.........
+[   [38;2;138;138;138mthe quick brown fox jumps over the lazy dog and keeps going the quick brown[39m]
+[   [38;2;138;138;138mfox jumps over the lazy dog and keeps going[39m]
+── 3 · all four edges · measured 3 · rendered 3
+|.........|.........|.........|.........|.........|.........|.........|.........
+[]
+[  the quick brown fox jumps over the lazy dog and keeps going]
+[]
+── 4 · a row group, one child padded · measured 3 · rendered 3
+|.........|.........|.........|.........|.........|.........|.........|.........
+[                                        a]
+[the quick brown fox jumps over the laz… b]
+[                                        c]
+── 5 · in a sequence — the row must not move · measured 4 · rendered 4
+|.........|.........|.........|.........|.........|.........|.........|.........
+[first]
+[]
+[the quick brown fox jumps over the lazy dog and keeps going]
+[third]"
+`;
+
+exports[`C09 I80 — a block's own padding, in a frame > light-unicode at 30 1`] = `
+"── 1 · alone, top and bottom · measured 4 · rendered 4
+|.........|.........|.........
+[]
+[the quick brown fox jumps ove…]
+[]
+[]
+── 2 · horizontal, three in and one out · measured 1 · rendered 1
+|.........|.........|.........
+[   the quick brown fox jumps…]
+── 2b · horizontal, on a kind that wraps · measured 5 · rendered 5
+|.........|.........|.........
+[   [38;2;105;108;119mthe quick brown fox jumps[39m]
+[   [38;2;105;108;119mover the lazy dog and[39m]
+[   [38;2;105;108;119mkeeps going the quick[39m]
+[   [38;2;105;108;119mbrown fox jumps over the[39m]
+[   [38;2;105;108;119mlazy dog and keeps going[39m]
+── 3 · all four edges · measured 3 · rendered 3
+|.........|.........|.........
+[]
+[  the quick brown fox jumps…]
+[]
+── 4 · a row group, one child padded · measured 3 · rendered 3
+|.........|.........|.........
+[               a]
+[the quick bro… b]
+[               c]
+── 5 · in a sequence — the row must not move · measured 4 · rendered 4
+|.........|.........|.........
+[first]
+[]
+[the quick brown fox jumps ove…]
+[third]"
+`;
+
+exports[`C09 I80 — a block's own padding, in a frame > light-unicode at 40 1`] = `
+"── 1 · alone, top and bottom · measured 4 · rendered 4
+|.........|.........|.........|.........
+[]
+[the quick brown fox jumps over the lazy…]
+[]
+[]
+── 2 · horizontal, three in and one out · measured 1 · rendered 1
+|.........|.........|.........|.........
+[   the quick brown fox jumps over the …]
+── 2b · horizontal, on a kind that wraps · measured 4 · rendered 4
+|.........|.........|.........|.........
+[   [38;2;105;108;119mthe quick brown fox jumps over the[39m]
+[   [38;2;105;108;119mlazy dog and keeps going the quick[39m]
+[   [38;2;105;108;119mbrown fox jumps over the lazy dog[39m]
+[   [38;2;105;108;119mand keeps going[39m]
+── 3 · all four edges · measured 3 · rendered 3
+|.........|.........|.........|.........
+[]
+[  the quick brown fox jumps over the …]
+[]
+── 4 · a row group, one child padded · measured 3 · rendered 3
+|.........|.........|.........|.........
+[                    a]
+[the quick brown fo… b]
+[                    c]
+── 5 · in a sequence — the row must not move · measured 4 · rendered 4
+|.........|.........|.........|.........
+[first]
+[]
+[the quick brown fox jumps over the lazy…]
+[third]"
+`;
+
+exports[`C09 I80 — a block's own padding, in a frame > light-unicode at 80 1`] = `
+"── 1 · alone, top and bottom · measured 4 · rendered 4
+|.........|.........|.........|.........|.........|.........|.........|.........
+[]
+[the quick brown fox jumps over the lazy dog and keeps going]
+[]
+[]
+── 2 · horizontal, three in and one out · measured 1 · rendered 1
+|.........|.........|.........|.........|.........|.........|.........|.........
+[   the quick brown fox jumps over the lazy dog and keeps going]
+── 2b · horizontal, on a kind that wraps · measured 2 · rendered 2
+|.........|.........|.........|.........|.........|.........|.........|.........
+[   [38;2;105;108;119mthe quick brown fox jumps over the lazy dog and keeps going the quick brown[39m]
+[   [38;2;105;108;119mfox jumps over the lazy dog and keeps going[39m]
+── 3 · all four edges · measured 3 · rendered 3
+|.........|.........|.........|.........|.........|.........|.........|.........
+[]
+[  the quick brown fox jumps over the lazy dog and keeps going]
+[]
+── 4 · a row group, one child padded · measured 3 · rendered 3
+|.........|.........|.........|.........|.........|.........|.........|.........
+[                                        a]
+[the quick brown fox jumps over the laz… b]
+[                                        c]
+── 5 · in a sequence — the row must not move · measured 4 · rendered 4
+|.........|.........|.........|.........|.........|.........|.........|.........
+[first]
+[]
+[the quick brown fox jumps over the lazy dog and keeps going]
+[third]"
+`;

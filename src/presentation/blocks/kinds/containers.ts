@@ -165,8 +165,10 @@ export const panelDefinition: BlockDefinition<Panel> = {
     const childRows = rendered;
     {
       const body: string[] = [];
-      block.children.forEach((child, index) => {
-        if (child.gapBefore === true) body.push("");
+      // **No gap row is pushed here, and that is 2a.** A child's spacing is its
+      // own `padding` and is inside the rows `renderChild` returned (C09 I80),
+      // so a container that added one would be the second author of it.
+      block.children.forEach((_child, index) => {
         for (const row of childRows[index] ?? []) body.push(row);
       });
       // An empty body is one blank row, and the rail floor `Math.max(1, total)`
@@ -698,17 +700,18 @@ export const mosaicDefinition: BlockDefinition<Mosaic> = {
  * The child boxes of a **sequence** — a document's top level, a `panel`'s
  * children, or a `column` group's (C04 §3a).
  *
- * **A `gapBefore` child is a wrapper with one row of top padding.** C29 has no
- * margin on purpose (§6): a block carrying its own outer spacing is how two
- * adjacent blocks each contributing one row produce two. Padding is inside, so
- * the wrapper is one row taller and the blank row belongs to the thing that
- * contains it — exactly what `sequenceHeight` counts. This is the shape
- * `gapBefore` is replaced by in phase 2, arriving early because a sequence
- * cannot be expressed without it.
+ * **The wrapper is gone, and its absence is the change** (C04 §3a, C09 I80).
+ * A `gapBefore` child used to be wrapped in a box with one row of top padding,
+ * because a sequence could not be expressed without saying where that row came
+ * from. The block carries its own `padding` now and `measureChild` returns it,
+ * so each child is one box and the spacing is inside the height the leaf
+ * answers — which is the same arithmetic, one indirection shorter. C29 still has
+ * no margin on purpose (§6): a block carrying its own outer spacing is how two
+ * adjacent blocks each contributing one row produce two.
  *
  * **The leaf's `render` returns nothing and these boxes are never composed.**
  * Rendering still goes through `groupPlacements` and the panel's own frame, and
- * it moves when `padding` and `childGap` reach C04. The condition to grep from
+ * it moves when `childGap` reaches C04 in phase 2b. The condition to grep from
  * is `groupPlacements`: the day no container calls it, these leaves owe a real
  * `render`.
  *
@@ -727,7 +730,6 @@ function sequenceChildren(
 ): readonly Box[] {
   return children.map((child, i) => ({
     id: `c${String(i)}`,
-    ...(child.gapBefore === true ? { padding: { t: 1 } } : {}),
     children: {
       kind: "paint" as const,
       natural: widthChild === undefined ? 0 : widthChild(child, at),
@@ -749,13 +751,14 @@ function sequenceChildren(
  *     the child's `measure` see `w`. Stretch resolves in **pass 2** here, which
  *     is where the cross axis is width — the clause F1221 corrected, and this
  *     is the box that needed it.
- *   - *a `gapBefore` child takes one blank row above it* is **`padding.t = 1`**
- *     on a wrapper. C29 has no margin on purpose (§6): a block carrying its own
- *     outer spacing is how two adjacent blocks each contributing one row produce
- *     two. Padding is inside, so the wrapper is one row taller and the blank row
- *     belongs to the thing that contains it — exactly what `sequenceHeight`
- *     counts. This is the shape `gapBefore` is replaced by in phase 2, arriving
- *     one kind early because a column cannot be expressed without it.
+ *   - *a child's own spacing is inside its own height* — **no declaration at
+ *     all** (C04 §3a, C09 I80). This used to be `padding.t = 1` on a wrapper
+ *     box, the shape `gapBefore` was going to be replaced by, put here one kind
+ *     early because a column could not be expressed without it. Phase 2a landed
+ *     the replacement on the block, so `measureChild` returns the spacing and
+ *     the wrapper had nothing left to add. C29 still has no margin on purpose
+ *     (§6): a block carrying its own outer spacing is how two adjacent blocks
+ *     each contributing one row produce two.
  *   - *`minRows` floors the height, and a group is at least one row* is
  *     **`height: { kind: "fit", min: max(1, minRows) }`** (C29 I2). `groupRows`
  *     and `atLeastOne` were two clamps in sequence; a `FIT` size with a `min`
@@ -763,8 +766,8 @@ function sequenceChildren(
  *
  * **The leaf's `render` returns nothing, and this box is never composed.**
  * Rendering still goes through `groupPlacements`, which is where the horizontal
- * alignment and the element offsets live, and it moves when `padding` and
- * `childGap` reach C04 in phase 2. The condition to grep from is
+ * alignment and the element offsets live, and it moves when `childGap` reaches
+ * C04 in phase 2b. The condition to grep from is
  * `groupPlacements`: the day no container calls it, this leaf owes a real
  * `render` and the name below is wrong.
  *
@@ -964,29 +967,22 @@ export const groupDefinition: BlockDefinition<Group> = {
     let row = 0; // cells-ok — a row cursor, not a width
 
     for (const [i, child] of block.children.entries()) {
-      const gap = child.gapBefore === true ? 1 : 0;
+      // **The gap row is inside the child's height now** (C04 I25, C09 I80), so
+      // the cursor is a plain sum and there is no row above a child to keep or
+      // drop separately — which was the only reason this loop rewrote a field
+      // on the piece it hands back.
       const h = measureChild(child, w);
-      const top = row + gap;
+      const top = row;
       const bottom = top + h;
       row = bottom;
 
-      // Entirely above or entirely below the window, the gap row included.
-      if (bottom <= lo || top - gap >= hi) continue;
+      if (bottom <= lo || top >= hi) continue;
 
-      // The gap row is kept exactly when the window opens on or above it.
-      const gapKept = gap === 1 && top - gap >= lo;
-      const piece =
-        gapKept === (gap === 1)
-          ? child
-          : gapKept
-            ? ({ ...child, gapBefore: true } as Block)
-            : ({ ...child, gapBefore: false } as Block);
+      // **`skipRows` is set once, on the first kept child** — the rows of it
+      // that precede `from`.
+      if (skip < 0) skip = lo - top;
 
-      // **`skipRows` is set once, on the first kept child** — the rows of it that
-      // precede `from`, its kept gap row counted (`top - 1` is the gap row).
-      if (skip < 0) skip = lo - (gapKept ? top - 1 : top);
-
-      kept.push(piece);
+      kept.push(child);
       keptIdx.push(i);
       lastBottom = bottom;
     }
@@ -1052,9 +1048,8 @@ export const groupDefinition: BlockDefinition<Group> = {
     {
       if (block.direction === "column") {
         const lines: string[] = [];
-        placed.forEach((child, index) => {
+        placed.forEach((_child, index) => {
           const at = ats[index] as (typeof ats)[number];
-          if (child.gapBefore === true) lines.push("");
           const pad = at.left > 0 ? " ".repeat(at.left) : "";
           // **Cut to the width** (F1211). A column group pads and concatenates
           // rather than placing, so a child answering a row wider than the

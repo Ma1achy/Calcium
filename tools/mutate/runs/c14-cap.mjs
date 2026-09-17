@@ -41,9 +41,11 @@ const results = runPass({
       // one row taller than the index says — C09 I1 broken by the registry itself.
       name: "COUNT-DROPPED: `measure` stops counting the marker row",
       file: REGISTRY,
-      from:
-        "form.definition.measure(form.block, width, this.#measureChild, this.probe) +\n        (form.capped === null ? 0 : 1);",
-      to: "form.definition.measure(form.block, width, this.#measureChild, this.probe);",
+      // Re-anchored 2026-09-17: the sum gained the padding edges (C09 I80), so
+      // the anchor is the marker term alone plus the least context that makes it
+      // unique — the whole expression rots for reasons that are not this one.
+      from: "(form.capped === null ? 0 : 1) +",
+      to: "0 +",
       expect: "T6.22", // and T1.19
     },
     {

@@ -688,7 +688,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     const existing = currentPanel(host, part);
     const base = livePanel(part.spec.id, titleOf(part), child);
     const panel: Block =
-      existing?.gapBefore === true ? ({ ...base, gapBefore: true } as Block) : base;
+      existing?.padding === undefined ? base : ({ ...base, padding: existing.padding } as Block);
     // **One boolean and one meaning on this arm** (§8h): C15 answers whether the
     // layer is still there, and a view that cannot take a well-formed block is a
     // state this seam cannot report — stated as the limit it is.

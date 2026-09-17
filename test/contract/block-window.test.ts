@@ -540,7 +540,7 @@ describe("C09 §2a — a block reduced to a valid smaller block", () => {
     ({ kind: "notice", id, tone: "muted", text }) as Block;
   const col = (id: string, children: readonly Block[], extra: Record<string, unknown> = {}): Block =>
     ({ kind: "group", id, direction: "column", children, ...extra }) as Block;
-  const gapped = (b: Block): Block => ({ ...(b as object), gapBefore: true }) as Block;
+  const gapped = (b: Block): Block => ({ ...(b as object), padding: { t: 1 } }) as Block;
   const withId = (b: Block, id: string): Block => ({ ...(b as object), id }) as Block;
 
   it("T2.138 (C09 I69, I26): the sweep over column groups with gaps, align and nested rows", () => {

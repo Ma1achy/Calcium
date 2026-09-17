@@ -647,6 +647,18 @@ describe("C04 §7 — the update model and the view state, checked rather than c
         { kind: "patch", id: "p", path: "f", language: "ts", collapsedAfter: 1, hunks: [{ id: "h", header: "@@", lines: [{ kind: "add", text: "x" }, { kind: "add", text: "y" }] }] } as never,
         4, 5,
       ],
+      [
+        // **The fifth, and it arrived by the door this row was watching.** It
+        // was the counter-example below — *`gapBefore` is composition's field,
+        // not a height's; `measure` answers 1 either way* — until C04 §3a made
+        // the spacing the block's own (C09 I80). The claim did not merely stop
+        // being true: it changed sides, from the evidence that the set is closed
+        // to a member of it.
+        "Padded.padding",
+        { kind: "tip", id: "x", text: "a" } as never,
+        { kind: "tip", id: "x", text: "a", padding: { t: 1, b: 2 } } as never,
+        1, 4,
+      ],
     ];
 
     const moved: string[] = [];
@@ -655,15 +667,18 @@ describe("C04 §7 — the update model and the view state, checked rather than c
       expect(kit.measure(after, 60), `${name}: on`).toBe(isRows);
       moved.push(name);
     }
-    expect(moved, "the whole set, so a fifth fails here").toEqual([
-      "TableRow.expanded", "Scroll.collapsed", "Floor.minHeight", "Patch.collapsedAfter",
+    expect(moved, "the whole set, so a sixth fails here").toEqual([
+      "TableRow.expanded", "Scroll.collapsed", "Floor.minHeight", "Patch.collapsedAfter", "Padded.padding",
     ]);
 
-    // **`gapBefore` is deliberately absent, and measuring it is what makes the
-    // list a measurement.** It is composition's field, not a height's: `measure`
-    // answers 1 either way, and a list of *optional fields* would have caught it.
-    expect(kit.measure({ kind: "tip", id: "x", text: "a", gapBefore: false } as never, 60)).toBe(1);
-    expect(kit.measure({ kind: "tip", id: "x", text: "a", gapBefore: true } as never, 60)).toBe(1);
+    // **The counter-example that remains, and it is a different kind of field.**
+    // `align` is view state a *container* reads to place a child, and it moves
+    // nothing about how tall the child is — so it is the evidence the set is a
+    // measurement rather than a list of optional fields. The one that used to
+    // sit here was `gapBefore`, which crossed over: see `Padded.padding` above.
+    const cols = { kind: "group", id: "g", direction: "column", children: [{ kind: "tip", id: "x", text: "a" }] };
+    expect(kit.measure(cols as never, 60)).toBe(1);
+    expect(kit.measure({ ...cols, align: "bottom" } as never, 60)).toBe(1);
 
     // The complement, measured rather than argued: nothing accumulates outside
     // the block, so the same block measures the same after an unrelated one.

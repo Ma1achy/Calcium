@@ -636,32 +636,37 @@ describe("C29 1.5 — what the content column declares", () => {
     expect(lines.length, "and the frame agrees").toBe(1);
   });
 
-  it("T2.149 (C04 §3a, C04 I25): a scroll is not a sequence, so a `gapBefore` child costs it no row", () => {
-    // **The omission is the rule.** C04 §3a names the three sequences — a
-    // document's top level, a panel's children, a column group's children — and
-    // a scroll is none of them. The shared builder one function away adds the
-    // blank row, so this row is what keeps the two shapes from being merged
-    // because they look alike.
+  it("T2.149 (C04 §3a, C04 I25, C09 I80): a scroll is not a sequence, and a padded child still costs it the child's own row", () => {
+    // **The rule held and then 2a inverted half of it, which is the honest
+    // record.** C04 §3a still names the three sequences and a scroll is still
+    // none of them, so this container adds nothing of its own — that half is
+    // unchanged and is what `scrollMeasureBox` not reaching for
+    // `sequenceChildren` keeps true. What changed is the other half: the
+    // spacing is the *child's* padding now, inside what `measureChild` returns,
+    // so a padded child is taller wherever it sits, a scroll included. The row
+    // used to assert the two boxes were identical; they differ by exactly the
+    // child's own row, and no container decided that.
     //
-    // **The box has to be over-full or the gap is invisible.** A scroll's own
-    // height is declared, and `render` concatenates the shown children's rows
-    // and pads to the interior — so a gap row inside a box with room changes
-    // nothing anywhere. It is the content height that carries it, and the
-    // content height is read by the residue row and by the ranges the offset
-    // selects. A first version of this row used a box of three over two rows of
-    // content and passed under the mutation.
+    // **The box has to be over-full or the difference is invisible.** A
+    // scroll's own height is declared and `render` pads to the interior, so the
+    // content height is what carries it — read by the residue row and by the
+    // ranges the offset selects.
     const plain = scroll(1, [flat("a"), flat("b")], "sp");
-    const gapped = scroll(1, [flat("a"), { ...flat("b"), gapBefore: true } as Block], "sg");
-    expect(scrollDefinition.measure?.(gapped, 40, measureChild), "the same height").toBe(
-      scrollDefinition.measure?.(plain, 40, measureChild),
-    );
+    const padded = scroll(1, [flat("a"), { ...flat("b"), padding: { t: 1 } } as Block], "sg");
+    expect(
+      scrollDefinition.measure?.(padded, 40, measureChild),
+      "the declared height and a residue row, either way",
+    ).toBe(scrollDefinition.measure?.(plain, 40, measureChild));
+
     const rows = (box: Scroll): readonly string[] =>
       renderSequenceToLines(registry, [box], 40, { theme: DARK_THEME, capabilities: FULL_CAPS });
-    expect(rows(plain).at(-1), "one row hidden below, not two").toContain("1 below");
-    expect(rows(gapped), "and the same frame").toEqual(rows(plain));
+    expect(rows(plain).at(-1), "one row hidden below").toContain("1 below");
+    expect(rows(padded).at(-1), "and two once the child carries its own row").toContain("2 below");
 
     const ends = (box: Scroll): readonly number[] =>
       (scrollDefinition.elements?.(box, 40, measureChild) ?? []).map((e) => e.rows.to); // cells-ok — row indices
-    expect(ends(gapped), "the children sit at the same rows").toEqual(ends(plain));
+    expect(ends(padded), "the padded child ends one row lower").toEqual(
+      (ends(plain)[0] === undefined ? [] : [ends(plain)[0]!, ends(plain)[1]! + 1]),
+    );
   });
 });

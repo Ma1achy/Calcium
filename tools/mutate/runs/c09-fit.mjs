@@ -103,7 +103,7 @@ const results = runPass({
       // shell imported a constant it had no way to compute.
       name: "the render fault asks for one row rather than what it needs",
       file: REG,
-      from: "        statusRowsFor(errorStatus(text, 1), width, childContext.capabilities),",
+      from: "        statusRowsFor(errorStatus(text, 1), inner, childContext.capabilities),",
       to: "        1,",
       expect: "T4.57",
     },

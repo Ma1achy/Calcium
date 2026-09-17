@@ -187,7 +187,7 @@ describe("C09 §6 — a (block, width) is answered once per registry call (I61)"
             kind: "group",
             id: "gc",
             direction: "column",
-            children: [one("a"), { ...two("b"), gapBefore: true } as Block],
+            children: [one("a"), { ...two("b"), padding: { t: 1 } } as Block],
           }),
         children: ["a", "b"],
       },

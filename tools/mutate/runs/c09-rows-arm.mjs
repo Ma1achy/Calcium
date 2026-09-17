@@ -136,13 +136,28 @@ const results = runPass({
       expect: "T1.46",
     },
     {
-      // **A gap as a space**: Ink wrote the `Text` holding a space and trimmed
-      // it; the rows arm must write the trimmed form.
-      name: "GAP-SPACE: a gapBefore row is a single space",
-      file: LINES,
-      from: '    if (block.gapBefore === true) out.push("");',
-      to: '    if (block.gapBefore === true) out.push(" ");',
-      expect: "T2.143",
+      // **A padding row as a space**: Ink wrote the `Text` holding a space and
+      // trimmed it; whoever writes the row must write the trimmed form.
+      //
+      // **Re-pointed when the gap moved inside the block, and the move made it
+      // vacuous** (F1224, and c14-cap's MARKER-ROW-WINDOWED is the precedent for
+      // recording one rather than deleting it). It was `render-lines`'
+      // `out.push("")` above a `gapBefore` block — pushed straight into the
+      // output, past the arm's normalisation, which is what made writing a space
+      // there a defect a frame could hold. The rows are the registry's now and
+      // reach the frame through `linesOf` → `normaliseRow`, and **measured:
+      // `normaliseRow(" ")` is `""`** — so the byte cannot survive to a frame
+      // and no row can see this go. The property is real and is held one layer
+      // down by TRIM-DROPPED above, which is the row to keep green.
+      //
+      // Kept rather than deleted because the deletion would leave no record that
+      // the writer's obligation moved to the trim; what is recorded is that
+      // nothing constrains the writer itself.
+      name: "PAD-SPACE: a block's padding row is a single space",
+      file: REGISTRY,
+      from: 'const blank = (n: number): readonly string[] => Array.from({ length: n }, () => "");',
+      to: 'const blank = (n: number): readonly string[] => Array.from({ length: n }, () => " ");',
+      expect: "(none — expected to survive)",
     },
     {
       // **The floor a row short.** T2.143's Ink side used to lift the same
@@ -189,4 +204,10 @@ const results = runPass({
 });
 
 console.log(report(results));
-process.exit(results.some((r) => !r.killed) ? 1 : 0);
+// **One listed survivor whose `expect` says so** in the anchor sweep's reserved
+// words, as c14-cap does for F952: PAD-SPACE cannot reach a frame because
+// `normaliseRow(" ")` is `""` (F1224, measured). The exit code stays one honest
+// bit for every other row — a run whose exit is a lie about one row is a run
+// nobody reads the rest of.
+const unexpected = results.filter((r) => !r.killed && r.expect !== "(none — expected to survive)");
+process.exit(unexpected.length > 0 ? 1 : 0);

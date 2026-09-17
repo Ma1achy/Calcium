@@ -73,14 +73,25 @@ describe("phase 2 · the three compositions, against §3h's claim", () => {
       255 * Math.exp(-(((x - 32) / 22) ** 2 + ((y - 16) / 11) ** 2)),
     );
 
-    const composed = b.group("row", [
-      b.image({ id: "pic", data: png, height: 8, alt: "the sample" }),
+    // **`gapBefore: false` on the plot, and the frame is why** (C04_PADDING_WALK
+    // A4). `b.plot` gaps by default, and under C04 §3a that row is the block's
+    // own padding rather than a rule the sequence applies — so a `row` group no
+    // longer ignores it: the histogram's box starts one row below the picture's
+    // and the two columns are out of step by a row for their whole height. The
+    // default form is read below; this one is the composition §3h's claim is
+    // about.
+    const plotOf = (gap: boolean): Parameters<typeof b.group>[1][number] =>
       b.plot({
+        gapBefore: gap,
         id: "hist",
         form: "histogram",
         height: 8,
         series: [{ label: "luminance", values }],
-      }),
+      });
+
+    const composed = b.group("row", [
+      b.image({ id: "pic", data: png, height: 8, alt: "the sample" }),
+      plotOf(false),
     ]);
 
     const v = validateBlock(JSON.parse(JSON.stringify(composed)));
@@ -95,10 +106,18 @@ describe("phase 2 · the three compositions, against §3h's claim", () => {
     expect(lines.some((l) => drawsPicture(l)), "the picture is drawn").toBe(true);
     // **Both halves on the same rows**, which is the whole of what "a row
     // group" claims and the only thing a frame read can confirm.
-    expect(
-      lines.filter((l) => drawsPicture(l) && /[▏▎▍▌▋▊▉█]/u.test(l)).length,
-      "picture and histogram share their rows",
-    ).toBeGreaterThanOrEqual(7);
+    const shared = (rows: readonly string[]): number =>
+      rows.filter((l) => drawsPicture(l) && /[▏▎▍▌▋▊▉█]/u.test(l)).length;
+    expect(shared(lines), "picture and histogram share their rows").toBeGreaterThanOrEqual(7);
+
+    // **The default form, measured rather than argued.** The same composition
+    // with the plot's default gap loses exactly one shared row — the padding row
+    // the histogram now draws at the top of its own box — and grows a row
+    // overall. This is the move A4 named as expected for 2a, read here so it is
+    // a recorded number rather than a surprise the next reader bisects.
+    const gapped = draw(b.group("row", [b.image({ id: "pic", data: png, height: 8, alt: "the sample" }), plotOf(true)]));
+    expect(gapped.length, "one row taller, and it is the plot's own").toBe(lines.length + 1); // cells-ok — a row count
+    expect(shared(gapped), "one shared row fewer, and exactly one").toBe(shared(lines) - 1);
   });
 
   it("C1b (§3h): the consumer who holds only a PATH has no route to the pixels", () => {

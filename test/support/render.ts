@@ -6,6 +6,7 @@
 // (T4.2, T2.2).
 import {
   createBlockRegistry,
+  windowRefused,
   type BlockDefinition,
   type BlockFault,
   type BlockRegistry,
@@ -187,6 +188,13 @@ export function measurable(
     from: number,
     to: number,
   ) => Readonly<{ block: Block; skipRows: number; dropRows: number }> | undefined;
+  /** The same dispatch with the registry's refusals skipped — see the body. */
+  windowDefinition: (
+    block: Block,
+    width: number,
+    from: number,
+    to: number,
+  ) => Readonly<{ block: Block; skipRows: number; dropRows: number }> | undefined;
 }> {
   const r = registry(options.definitions ?? [], options.onError ?? LOUD, options.maxBlockRows);
   const render: RenderOptions = {
@@ -207,12 +215,35 @@ export function measurable(
     kinds: r.kinds,
     registry: r,
     window: (block, width, from, to) => {
+      // **The seam's refusals, not only its dispatch** (C09 I33, I80). This is a
+      // stand-in for `registry.windowChild`, and a stand-in that skips the real
+      // one's guards measures something the tree never does: the definition is
+      // asked at the block's full width and its rows are compared against a
+      // height that includes the registry's own edges. `windowRefused` is that
+      // guard, shared rather than restated.
+      //
+      // **Sharing it costs something, and `windowDefinition` below is the
+      // price** (F277). A row comparing this against `registry.windowChild`
+      // cannot see a defect in the guard, because both sides now ask the same
+      // function — which a mutation found by surviving. A row about the *rule*
+      // takes the unguarded dispatch and restates the predicate itself.
+      if (windowRefused(block)) return undefined;
       const definition = r.get(block.kind);
       // **`r.measure` is the child seam** (C09 I26a). Handing the suite's own
       // measurer here rather than a stub is what keeps the property honest for a
       // kind whose unit boundaries are a child's height.
       return definition?.window?.(block, width, from, to, r.measure);
     },
+    /**
+     * **The definition's own answer, with none of the registry's refusals.**
+     *
+     * For rows that assert *which blocks the seam refuses and why*: comparing
+     * `window` against `windowChild` cannot, since both consult `windowRefused`
+     * and agree by construction however wrong it is. The conformance sweep must
+     * not use this — it checks the seam as callers meet it, refusals included.
+     */
+    windowDefinition: (block, width, from, to) =>
+      r.get(block.kind)?.window?.(block, width, from, to, r.measure),
   };
 }
 

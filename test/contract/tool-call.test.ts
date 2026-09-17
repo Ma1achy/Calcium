@@ -38,15 +38,15 @@ describe("C09 §4 — the `step` glyph", () => {
 
 describe("§9c — the header, the body, and the row the body already has", () => {
   it("C23 T1.50 (C23 I57, F821): entryLayout clears the body's first leading gap in the body run, keeps the rest, and the stored document keeps its blocks by identity", () => {
-    const first = block({ kind: "notice", id: "a", tone: "muted", text: "first", gapBefore: true });
-    const second = block({ kind: "notice", id: "b", tone: "muted", text: "second", gapBefore: true });
+    const first = block({ kind: "notice", id: "a", tone: "muted", text: "first", padding: { t: 1 } });
+    const second = block({ kind: "notice", id: "b", tone: "muted", text: "second", padding: { t: 1 } });
     const step = block({ kind: "notice", id: "h", tone: "info", glyph: "step", text: "ps · ok" });
 
     // The body run: the first block's gap is dropped, the second keeps its gap.
     const body = cardBody([first, second]);
-    expect(body[0]?.gapBefore, "the first body block's gap is cleared").toBeUndefined();
+    expect(body[0]?.padding?.t, "the first body block's gap is cleared").toBeUndefined();
     expect(body[0]?.id).toBe("a");
-    expect(body[1]?.gapBefore, "the second keeps its gap").toBe(true);
+    expect(body[1]?.padding?.t, "the second keeps its gap").toBe(1);
 
     // **The stored document is untouched — clearing is per-frame, in the layout**
     // (F821): the card's blocks are the very objects handed in, so a live part
@@ -55,8 +55,8 @@ describe("§9c — the header, the body, and the row the body already has", () =
     const runs = entryLayout(card, 40);
     const bodyRun = runs.find((r) => r.indent > 0);
     expect(card[1], "the document keeps the original object").toBe(first);
-    expect(first.gapBefore, "and the original still carries its gap").toBe(true);
-    expect(bodyRun?.blocks[0]?.gapBefore, "only the run's copy has it cleared").toBeUndefined();
+    expect(first.padding?.t, "and the original still carries its gap").toBe(1);
+    expect(bodyRun?.blocks[0]?.padding?.t, "only the run's copy has it cleared").toBeUndefined();
 
     // A body whose first block has no leading gap is returned by identity.
     const plain = block({ kind: "notice", id: "c", tone: "muted", text: "plain" });
@@ -65,8 +65,8 @@ describe("§9c — the header, the body, and the row the body already has", () =
 
   it("C22 T1.62 (C22 I107, F1203): entryLayout over one card array hands out the same body objects every call, and a fresh array a fresh body", () => {
     const step = block({ kind: "notice", id: "h", tone: "info", glyph: "step", text: "ps · ok" });
-    const first = block({ kind: "notice", id: "a", tone: "muted", text: "first", gapBefore: true });
-    const second = block({ kind: "notice", id: "b", tone: "muted", text: "second", gapBefore: true });
+    const first = block({ kind: "notice", id: "a", tone: "muted", text: "first", padding: { t: 1 } });
+    const second = block({ kind: "notice", id: "b", tone: "muted", text: "second", padding: { t: 1 } });
     const card = Object.freeze([step, first, second]);
     const bodyOf = (runs: ReturnType<typeof entryLayout>) => runs.find((r) => r.indent > 0)?.blocks;
 
@@ -76,19 +76,19 @@ describe("§9c — the header, the body, and the row the body already has", () =
     const one = bodyOf(entryLayout(card, 40));
     const two = bodyOf(entryLayout(card, 40));
     expect(one?.[0], "the cleared first block, by identity across calls").toBe(two?.[0]);
-    expect(one?.[0]?.gapBefore, "cleared").toBeUndefined();
+    expect(one?.[0]?.padding?.t, "cleared").toBeUndefined();
     expect(one?.[0]).not.toBe(first);
     expect(card[1], "the document's own block untouched (C23 I57)").toBe(first);
-    expect(first.gapBefore).toBe(true);
+    expect(first.padding?.t).toBe(1);
     expect(one?.[1], "later blocks are the document's own").toBe(second);
 
     // **Per array, not per content**: an equal card in a fresh array is a fresh
     // body, derived from that array's own first block.
-    const again = block({ kind: "notice", id: "a", tone: "muted", text: "first", gapBefore: true });
+    const again = block({ kind: "notice", id: "a", tone: "muted", text: "first", padding: { t: 1 } });
     const fresh = bodyOf(entryLayout(Object.freeze([step, again, second]), 40));
     expect(fresh?.[0], "a different array: a different body").not.toBe(one?.[0]);
     expect(fresh?.[0]?.id).toBe("a");
-    expect(fresh?.[0]?.gapBefore).toBeUndefined();
+    expect(fresh?.[0]?.padding?.t).toBeUndefined();
 
     // **A nested card the same, keyed on its children.** The parent's body is
     // a plain notice and the nested card; the nested body run is the one at
@@ -98,7 +98,7 @@ describe("§9c — the header, the body, and the row the body already has", () =
     const deepest = (runs: ReturnType<typeof entryLayout>) => runs.reduce((a, r) => (r.indent > a.indent ? r : a));
     const n1 = deepest(entryLayout(parent, 60)).blocks;
     const n2 = deepest(entryLayout(parent, 60)).blocks;
-    expect(n1[0]?.gapBefore, "the nested body's first gap is cleared").toBeUndefined();
+    expect(n1[0]?.padding?.t, "the nested body's first gap is cleared").toBeUndefined();
     expect(n1[0], "and held across calls").toBe(n2[0]);
   });
 

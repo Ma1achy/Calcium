@@ -248,9 +248,16 @@ function bodyRuns(
  */
 export function cardBody(blocks: readonly Block[]): readonly Block[] {
   const [first, ...rest] = blocks;
-  if (first === undefined || first.gapBefore !== true) return blocks;
-  const { gapBefore: _gap, ...cleared } = first;
-  return [rebuild(cleared as Block), ...rest];
+  const padding = first?.padding;
+  if (first === undefined || padding === undefined || (padding.t ?? 0) === 0) return blocks;
+  // **The top edge only** (C04 §3a). The hook goes on the body's first row, so
+  // a leading blank row would put the mark over nothing; the other three edges
+  // are the block's own shape and the card has no quarrel with them. Under
+  // `gapBefore` this dropped one boolean and could not tell the difference.
+  const { t: _dropped, ...edges } = padding;
+  const { padding: _was, ...bare } = first;
+  const kept = Object.keys(edges).length === 0 ? bare : { ...bare, padding: edges };
+  return [rebuild(kept as Block), ...rest];
 }
 
 /** The rows an entry's blocks take — C14's `measureSequence`, through the layout. */
@@ -351,13 +358,13 @@ export function windowEntry(
 
 type RenderOptions = Parameters<typeof renderSequenceToLines>[3];
 
-/** A gap row is an empty row — what the sequence and the group both draw for `gapBefore` (C22 I101). */
-const GAP_ROW = "";
 
-/** The lines less the gap row the sequence form draws above a `gapBefore` block. */
-function ownRows(block: Block, lines: readonly string[]): readonly string[] {
-  return block.gapBefore === true ? lines.slice(1) : lines;
-}
+
+// **`ownRows` is gone, and its absence is the change** (C09 I80). It stripped
+// the blank row the sequence form drew above a `gapBefore` block, so a cached
+// part held the block's rows and the assembler put the row back. A block's
+// padding is now inside its own rows: what is cached is what is drawn, and
+// there is nothing to strip or to re-add.
 
 /**
  * The window's rows from the parts a range miss kept, rendering only what
@@ -389,18 +396,32 @@ function assemble(
   const render = (blocks: readonly Block[]): readonly string[] =>
     renderSequenceToLines(registry, blocks, width, options);
   for (const block of piece.windowed.blocks) {
-    if (block.gapBefore === true) rows.push(GAP_ROW);
-    if (block.kind === "group" && (block as Group).direction === "column" && (block as Group).minRows === undefined) {
+    // **A padded column group is assembled whole, on the window seam's ground**
+    // (C09 I80, I33). Its children are rendered alone and their rows pushed end
+    // to end, which draws none of the *group's* own edges — the fresh render
+    // draws them once around the whole, so an assembled window over a padded
+    // group was short its top row and missing its inset on every line. Found by
+    // a mutation that survived because no fixture had a padded container; the
+    // fixture gained one and this branch went red without any mutation at all.
+    //
+    // Keeping it whole costs one cache part and is the same answer `windowChild`
+    // gives a padded block. Re-deriving the edges here would be the third place
+    // that knows the padding rule, which is what 2a exists to stop.
+    if (
+      block.kind === "group" &&
+      (block as Group).direction === "column" &&
+      (block as Group).minRows === undefined &&
+      block.padding === undefined
+    ) {
       const group = block as Group;
       group.children.forEach((child, i) => {
-        if (child.gapBefore === true) rows.push(GAP_ROW);
         const align = group.align?.[i] ?? "left";
         // The separator keeps a child's key apart from a top-level block's, which is its id alone.
         const key = `${child.id}\u0000${align}`;
         let lines = held.part(key);
         if (lines === undefined) {
-          const alone: Group = { ...group, gapBefore: false, children: [child], align: [align] };
-          lines = ownRows(child, render([alone]));
+          const alone: Group = { ...group, children: [child], align: [align] };
+          lines = render([alone]);
           held.hold(key, lines);
         }
         rows.push(...lines);
@@ -408,7 +429,7 @@ function assemble(
     } else if (whole.has(block)) {
       let lines = held.part(block.id);
       if (lines === undefined) {
-        lines = ownRows(block, render([block]));
+        lines = render([block]);
         held.hold(block.id, lines);
       }
       rows.push(...lines);
@@ -416,7 +437,7 @@ function assemble(
       const window = `${String(piece.localFrom)}\u0000${String(piece.take)}`;
       let lines = held.slice(block.id, window);
       if (lines === undefined) {
-        lines = ownRows(block, render([block]));
+        lines = render([block]);
         held.holdSlice(block.id, window, lines);
       }
       rows.push(...lines);

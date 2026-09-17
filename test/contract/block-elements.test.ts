@@ -492,7 +492,7 @@ describe("C26 §5 — the lifted list, in both axes (C09 §2)", () => {
     expect(at(inNarrow, "b", "r1").cols).toEqual([2, 3]);
 
     // A `gapBefore` on a row-group child adds no row: the renderer ignores it.
-    const gapped = rowGroup(a, block({ ...b, gapBefore: true }));
+    const gapped = rowGroup(a, block({ ...b, padding: { t: 1 } }));
     expect(at(k.registry.elementsIn([gapped], 40), "b", "r1").rows).toEqual([1, 2]);
   });
 });

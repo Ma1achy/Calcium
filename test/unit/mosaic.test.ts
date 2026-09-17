@@ -162,6 +162,10 @@ describe("MG — the mosaic's grid", () => {
     // **The row count agrees whether this is right or wrong**, which is why the
     // frame is read. A six-row child in a two-row cell either keeps rows 0 and 1
     // or is squashed into rows 2 and 5 — and `measure` says 6 either way.
+    // **No leading gap on the child** (C04 §3a). `b.steps` gaps by default and
+    // that row is the block's own now, so a cell's child draws it where a
+    // mosaic used to ignore the field — which would put `one` on row 1 and cut
+    // `six`. The rows below are read by index, so the fixture opts out.
     const tall = b.steps([
       { label: "one", state: "done" },
       { label: "two", state: "done" },
@@ -169,7 +173,7 @@ describe("MG — the mosaic's grid", () => {
       { label: "four", state: "done" },
       { label: "five", state: "done" },
       { label: "six", state: "done" },
-    ]);
+    ], { gapBefore: false });
     const block = b.mosaic({ height: 6, areas: "AB", children: [tall, b.raw("right")] });
     const lines = kit.renderToLines(block, 40).map((l) => plain(l).slice(0, 20));
     expect(lines).toHaveLength(6);

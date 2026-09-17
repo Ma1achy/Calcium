@@ -244,7 +244,7 @@ export function surfaceDrops(file: string, column = 1): readonly SurfaceDrops[] 
 const S07_IDENTITY: Block = block({
   kind: "comparison",
   id: "s07-identity",
-  gapBefore: true,
+  padding: { t: 1 },
   rows: [
     { field: "family", a: "digit-classifier", b: "digit-classifier", change: "unchanged" },
     { field: "kind", a: "candidate", b: "experiment", change: "changed" },
@@ -259,7 +259,7 @@ const S07_IDENTITY: Block = block({
 const S07_METRICS: Block = block({
   kind: "comparison",
   id: "s07-metrics",
-  gapBefore: true,
+  padding: { t: 1 },
   rows: [
     { field: "loss", a: "0.0312", b: "0.0372", verdict: "better" },
     { field: "val_accuracy", a: "0.968", b: "0.958", verdict: "better" },
@@ -274,7 +274,7 @@ const S07_METRICS: Block = block({
 const S08_STEPS_OK: Block = block({
   kind: "steps",
   id: "s08-steps",
-  gapBefore: true,
+  padding: { t: 1 },
   steps: [
     { label: "importing target", state: "done", detail: "job resolved" },
     { label: "tier-1 rules", state: "done", detail: "22 rules · 0 errors · 587ms" },
@@ -295,7 +295,7 @@ const S08_STEPS_OK: Block = block({
 const S04_LOSS_PLOT: Block = block({
   kind: "plot",
   id: "s04-loss",
-  gapBefore: true,
+  padding: { t: 1 },
   form: "line",
   height: 5,
   axes: true,
@@ -314,7 +314,7 @@ const S04_LOSS_PLOT: Block = block({
 const S04_METRICS: Block = block({
   kind: "table",
   id: "s04-metrics",
-  gapBefore: true,
+  padding: { t: 1 },
   showHeader: false,
   columns: [
     { key: "loss", label: "loss", align: "left", priority: 90, minWidth: 18, flex: true, sortable: false },
@@ -345,7 +345,7 @@ const S04_METRICS: Block = block({
 const S09_SMOKE_STEPS: Block = block({
   kind: "steps",
   id: "s09-smoke",
-  gapBefore: true,
+  padding: { t: 1 },
   steps: [
     { label: "1 batch through forward", state: "done", detail: "output shape (4, 10)" },
     { label: "loss.compute on output + targets", state: "done", detail: "value 2.31" },
@@ -358,7 +358,7 @@ const S09_SMOKE_STEPS: Block = block({
 const S09_USER_TESTS: Block = block({
   kind: "table",
   id: "s09-user-tests",
-  gapBefore: true,
+  padding: { t: 1 },
   showHeader: false,
   columns: [
     { key: "glyph", label: "", align: "left", priority: 100, minWidth: 1, sortable: false },
@@ -375,7 +375,7 @@ const S09_USER_TESTS: Block = block({
 const S08_RESOLVED: Block = block({
   kind: "keyValue",
   id: "s08-resolved",
-  gapBefore: true,
+  padding: { t: 1 },
   rows: [
     { label: "model", value: "fmx_models.models:DigitClassifier" },
     { label: "train_data", value: "fmx_models.data.pipeline:train_pipeline" },
@@ -441,7 +441,7 @@ function cellsOfRow(
 const S03_TABLE: Block = block({
   kind: "table",
   id: "s03-runs",
-  gapBefore: true,
+  padding: { t: 1 },
   columns: cols("docs/surfaces/S03_ps_list.md"),
   rows: [
     cellsOfRow("a3f9b21", { uuid: "a3f9b21", kind: "candidate", family: "digit-classifier", status: "running", detail: "ep 17/40", metric: "0.0372", age: "23m", owner: "malachy", mr: "!1248" }, "running"),
@@ -454,7 +454,7 @@ const S03_TABLE: Block = block({
 const S05_TABLE: Block = block({
   kind: "table",
   id: "s05-services",
-  gapBefore: true,
+  padding: { t: 1 },
   columns: cols("docs/surfaces/S05_serving.md"),
   rows: ["digit-classifier", "flow-predictor", "volatility-estimator", "orderbook-pressure"].map(
     (name, i) => cellsOfRow(name, { name, replicas: "3/3", status: "healthy", errors: "0.02%", version: "de29117", p99: "45ms", "req/s": "432", p50: "18ms", age: `${String(i + 2)}d` }),
@@ -464,7 +464,7 @@ const S05_TABLE: Block = block({
 const S06_FAMILIES: Block = block({
   kind: "table",
   id: "s06-families",
-  gapBefore: true,
+  padding: { t: 1 },
   columns: cols("docs/surfaces/S06_models.md"),
   rows: ["digit-classifier", "flow-predictor", "orderbook-pressure", "latency-anomaly-gnn", "fill-rate"].map(
     (family) => cellsOfRow(family, { family, serving: "de29117", latest: "de29117", versions: "4", updated: "2h ago" }),
@@ -474,7 +474,7 @@ const S06_FAMILIES: Block = block({
 const S06_VERSIONS: Block = block({
   kind: "table",
   id: "s06-versions",
-  gapBefore: true,
+  padding: { t: 1 },
   columns: cols("docs/surfaces/S06_models.md", 1),
   rows: ["de29117", "b4f0c12", "9e2a55d", "1f0c8b3"].map((version) =>
     cellsOfRow(version, { version, state: "serving", metric: "AUC 0.912", run: "c4e1f23", mr: "!1244", created: "2h ago" }),
@@ -484,7 +484,7 @@ const S06_VERSIONS: Block = block({
 const S14_KEYS: Block = block({
   kind: "table",
   id: "s14-keys",
-  gapBefore: true,
+  padding: { t: 1 },
   columns: cols("docs/surfaces/S14_config.md"),
   rows: [
     ["current_context", "fmx-prod", "config"],
@@ -502,7 +502,7 @@ const S14_KEYS: Block = block({
 const S14_CONTEXTS: Block = block({
   kind: "table",
   id: "s14-contexts",
-  gapBefore: true,
+  padding: { t: 1 },
   showHeader: false,
   columns: cols("docs/surfaces/S14_config.md", 1),
   rows: [
@@ -514,7 +514,7 @@ const S14_CONTEXTS: Block = block({
 const S15_SECRETS: Block = block({
   kind: "table",
   id: "s15-secrets",
-  gapBefore: true,
+  padding: { t: 1 },
   columns: cols("docs/surfaces/S15_identity.md"),
   rows: [
     cellsOfRow("gitlab-readonly-token", { name: "gitlab-readonly-token", owner: "research-infra", age: "34d" }, "running"),
@@ -535,7 +535,7 @@ const S11_RUN: readonly Block[] = [
   block({
     kind: "steps",
     id: "s11-steps",
-    gapBefore: true,
+    padding: { t: 1 },
     steps: [
       { label: "importing target", state: "done", detail: "job resolved" },
       { label: "resources resolved", state: "done", detail: "1×GPU · 8Gi  (satisfied)" },
@@ -546,14 +546,14 @@ const S11_RUN: readonly Block[] = [
   block({
     kind: "keyValue",
     id: "s11-run",
-    gapBefore: true,
+    padding: { t: 1 },
     rows: [{ label: "run", value: "7f3a2c1  ·  ./prism-runs/7f3a2c1…/" }],
   }),
-  block({ kind: "progress", id: "s11-progress", gapBefore: true, label: "epoch", current: 7, total: 10 }),
+  block({ kind: "progress", id: "s11-progress", padding: { t: 1 }, label: "epoch", current: 7, total: 10 }),
   block({
     kind: "plot",
     id: "s11-loss",
-    gapBefore: true,
+    padding: { t: 1 },
     form: "line",
     height: 3,
     axes: true,
@@ -568,13 +568,13 @@ const S11_RUN: readonly Block[] = [
   block({
     kind: "keyValue",
     id: "s11-metrics",
-    gapBefore: true,
+    padding: { t: 1 },
     rows: [{ label: "", value: "train_loss 0.312 ↓    val_loss 0.298 ↓    val_accuracy 0.871 ↑" }],
   }),
   block({
     kind: "tip",
     id: "s11-tip",
-    gapBefore: true,
+    padding: { t: 1 },
     text: "last checkpoint  epoch_7.pt                              ⌃c to stop",
   }),
 ];
@@ -606,7 +606,7 @@ const S12_LOGS: Block = block({
         "14:23:02.774  INFO   [trainer] step 2417 · loss=0.0372 · lr=3e-4",
       ].join("\n"),
     }),
-    block({ kind: "rule", id: "s12-rule", gapBefore: true, label: "" }),
+    block({ kind: "rule", id: "s12-rule", padding: { t: 1 }, label: "" }),
     block({
       kind: "keyValue",
       id: "s12-status",
@@ -636,18 +636,18 @@ const S02_WELCOME: readonly Block[] = [
     id: "s02-logo",
     text: fences("docs/surfaces/S02_the_welcome.md")[0]!.split("\n").slice(0, 8).join("\n"),
   }),
-  block({ kind: "notice", id: "s02-version", gapBefore: true, tone: "muted", text: "v1.0.0" }),
+  block({ kind: "notice", id: "s02-version", padding: { t: 1 }, tone: "muted", text: "v1.0.0" }),
   block({
     kind: "keyValue",
     id: "s02-connection",
-    gapBefore: true,
+    padding: { t: 1 },
     rows: [
       { label: "", value: "Connected to prism.fmx.io as malachy.doherty@fmx.io" },
       { label: "Teams", value: "vision · ml-platform-readonly" },
       { label: "Token", value: "expires in 30d" },
     ],
   }),
-  block({ kind: "rule", id: "s02-outstanding-rule", gapBefore: true, label: "Outstanding" }),
+  block({ kind: "rule", id: "s02-outstanding-rule", padding: { t: 1 }, label: "Outstanding" }),
   block({
     kind: "table",
     id: "s02-outstanding",
@@ -658,7 +658,7 @@ const S02_WELCOME: readonly Block[] = [
       cellsOfRow("runs", { what: "2 running experiments", detail: "" }),
     ],
   }),
-  block({ kind: "rule", id: "s02-recent-rule", gapBefore: true, label: "Recent" }),
+  block({ kind: "rule", id: "s02-recent-rule", padding: { t: 1 }, label: "Recent" }),
   block({
     kind: "table",
     id: "s02-recent",
@@ -672,7 +672,7 @@ const S02_WELCOME: readonly Block[] = [
   block({
     kind: "tip",
     id: "s02-tip",
-    gapBefore: true,
+    padding: { t: 1 },
     text: "Type /help for commands · ? for context help",
   }),
 ];
@@ -734,7 +734,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
       block({
         kind: "progress",
         id: "s04-progress",
-        gapBefore: true,
+        padding: { t: 1 },
         label: "",
         current: 17,
         total: 40,
@@ -756,14 +756,14 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
       block({
         kind: "rule",
         id: "s09-smoke-rule",
-        gapBefore: true,
+        padding: { t: 1 },
         label: "implicit smoke test · structural · read-only · 1 batch",
       }),
       S09_SMOKE_STEPS,
       block({
         kind: "notice",
         id: "s09-smoke-total",
-        gapBefore: true,
+        padding: { t: 1 },
         tone: "ok",
         glyph: "ok",
         text: "smoke passed · 1.1s · sinks not invoked · callbacks did not fire",
@@ -771,14 +771,14 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
       block({
         kind: "rule",
         id: "s09-user-rule",
-        gapBefore: true,
+        padding: { t: 1 },
         label: "user tests · @prism.test · 3",
       }),
       S09_USER_TESTS,
       block({
         kind: "notice",
         id: "s09-total",
-        gapBefore: true,
+        padding: { t: 1 },
         tone: "ok",
         glyph: "ok",
         text: "4 / 4 passed · 1 smoke + 3 user · 2.6s                            2.6s",
@@ -793,7 +793,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
     blocks: [
       block({ kind: "rule", id: "s07-rule", label: "diff · a3f9b21 ↔ 7c2d4e1" }),
       S07_IDENTITY,
-      block({ kind: "rule", id: "s07-metrics-rule", label: "metrics", gapBefore: true }),
+      block({ kind: "rule", id: "s07-metrics-rule", label: "metrics", padding: { t: 1 } }),
       S07_METRICS,
       // **Not converted: the bar follows a `diff`**, which is C25's kind and has
       // no rows to carry actions. C11 I17's bar belongs to a table, so a surface
@@ -805,7 +805,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
       block({
         kind: "pills",
         id: "s07-actions",
-        gapBefore: true,
+        padding: { t: 1 },
         chips: [{ label: "≡ a3f9b21" }, { label: "≡ 7c2d4e1" }, { label: "{ } json" }],
       }),
     ],
@@ -826,7 +826,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
       block({
         kind: "notice",
         id: "s08-warning",
-        gapBefore: true,
+        padding: { t: 1 },
         tone: "warn",
         glyph: "warn",
         text:
@@ -837,7 +837,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
       block({
         kind: "tip",
         id: "s08-tip",
-        gapBefore: true,
+        padding: { t: 1 },
         text: "next: /test …   /experiment submit …                                  587ms",
       }),
     ],
@@ -856,7 +856,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
       block({
         kind: "steps",
         id: "s08f-steps",
-        gapBefore: true,
+        padding: { t: 1 },
         steps: [
           { label: "importing target", state: "done", detail: "job resolved" },
           { label: "tier-1 rules", state: "failed", detail: "22 rules · 2 errors" },
@@ -866,7 +866,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
       block({
         kind: "keyValue",
         id: "s08f-first",
-        gapBefore: true,
+        padding: { t: 1 },
         rows: [
           { label: "T1-008", value: "TrainingConfig requires at least one of: max_epochs, total_steps" },
           { label: "file", value: "fmx_models/jobs/training.py:18" },
@@ -877,7 +877,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
       block({
         kind: "keyValue",
         id: "s08f-second",
-        gapBefore: true,
+        padding: { t: 1 },
         rows: [
           { label: "Rule 5", value: "Callback supports mismatch" },
           { label: "file", value: "fmx_models/jobs/training.py:24" },
@@ -889,7 +889,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
       block({
         kind: "tip",
         id: "s08f-tip",
-        gapBefore: true,
+        padding: { t: 1 },
         text: "? T1-008 for the full rule                                    exit 1",
       }),
     ],
@@ -904,7 +904,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
       block({
         kind: "pills",
         id: "s03-kinds",
-        gapBefore: true,
+        padding: { t: 1 },
         chips: [{ label: "all ×11" }, { label: "training ×9" }, { label: "evaluation ×2" }],
       }),
       block({
@@ -958,7 +958,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
     blocks: [
       block({ kind: "rule", id: "s14-rule", label: "config · .calcium/config.toml" }),
       S14_KEYS,
-      block({ kind: "rule", id: "s14-contexts-rule", label: "contexts · 2", gapBefore: true }),
+      block({ kind: "rule", id: "s14-contexts-rule", label: "contexts · 2", padding: { t: 1 } }),
       withActions(S14_CONTEXTS, ["⏎ edit", "␣ expand", "↕ switch context", "⊘ reset"]),
     ],
   },
@@ -973,7 +973,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
       block({
         kind: "notice",
         id: "s15-notice",
-        gapBefore: true,
+        padding: { t: 1 },
         tone: "muted",
         text: "Values are never shown by the CLI.",
       }),
@@ -991,7 +991,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
       block({
         kind: "pills",
         id: "s15-actions",
-        gapBefore: true,
+        padding: { t: 1 },
         chips: [{ label: "≡ /secrets <target>" }],
       }),
     ],

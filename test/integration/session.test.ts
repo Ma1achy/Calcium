@@ -898,7 +898,7 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
         // A leading `gapBefore`, as C24 §4 gives a `table` by default — the card
         // clears it so the hook marks content, not a blank (C23 I57). The kind
         // does not matter to the clearing; the default's own mechanism is C23 T1.50.
-        blocks: [{ kind: "notice", id: "row", tone: "muted", text: "web running", gapBefore: true }],
+        blocks: [{ kind: "notice", id: "row", tone: "muted", text: "web running", padding: { t: 1 } }],
       }),
       note: () => ({
         schema: "tui.view/1",

@@ -424,7 +424,7 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
         block({
           kind: "keyValue",
           id: blockId("help-shell"),
-          gapBefore: true,
+          padding: { t: 1 },
           rows: shell.map((t) => ({ label: `/${t.name}`, value: t.summary })),
         }),
         // **A pointer, not the payload.** One line naming the other question,
@@ -432,7 +432,7 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
         block({
           kind: "tip",
           id: blockId("help-more"),
-          gapBefore: true,
+          padding: { t: 1 },
           text: "/help keys",
           actions: [{ kind: "fill", label: "Use", command: "/help keys" }],
         }),
@@ -574,7 +574,7 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
         }),
       ];
       if (m.stderr !== "") {
-        blocks.push(block({ kind: "raw", id: blockId("debug-stderr"), gapBefore: true, text: m.stderr }));
+        blocks.push(block({ kind: "raw", id: blockId("debug-stderr"), padding: { t: 1 }, text: m.stderr }));
       }
       return doc("/debug", blocks);
     },

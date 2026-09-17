@@ -81,13 +81,23 @@ export function seq(blocks: readonly Block[]): readonly Block[] {
   // rule: a gap the caller asked for at position 0 is the one place an explicit
   // value and a default can disagree, and dropping this clause passes every
   // test written about the common case (T6.13).
-  const clear = first.gapBefore === true && wasDefaulted(first);
+  const clear = (first.padding?.t ?? 0) > 0 && wasDefaulted(first);
   const head = clear ? withoutGap(first) : first;
   return Object.freeze([head, ...blocks.slice(1)]);
 }
 
-/** A copy of `blk` with no leading gap, rebuilt through C04's constructor. */
+/**
+ * A copy of `blk` with no leading space, rebuilt through C04's constructor.
+ *
+ * **The top edge only.** `gapBefore` was one boolean and dropping it dropped
+ * the whole of a block's spacing; `padding` has four edges and only the top one
+ * is a leading blank row, so the horizontal edges survive a card's hook (C23
+ * I57) exactly as they should.
+ */
 function withoutGap<B extends Block>(blk: B): B {
-  const { gapBefore: _dropped, ...rest } = blk;
-  return rebuild(rest as B);
+  const { padding, ...rest } = blk;
+  if (padding === undefined) return rebuild(rest as B);
+  const { t: _dropped, ...edges } = padding;
+  const kept = Object.keys(edges).length === 0 ? {} : { padding: edges };
+  return rebuild({ ...rest, ...kept } as B);
 }
