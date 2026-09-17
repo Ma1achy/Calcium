@@ -53793,8 +53793,48 @@ same sentence: the region is narrower than the terminal by the margin, and only 
 knows by how much. So the spec edit is I22 gaining its second axis rather than a new invariant
 beside it, and the new one is C22's, because C22 owns the geometry.
 
-**Open** — the ruling is taken; the landing owes the region's `width`, the three narrowings, a
-fixture the corpus does not have, and a golden run whose movers are named first.
+**Closed, and it produced two findings of its own.**
+
+**1 · `composite` was padding every composited row to `region.width`.** The rows handed to it are
+the painted frame — `size.rows` strings of `size.columns`, which its own doc comment says — and the
+region is a different question: *how far a box may reach*, in the coordinates C15 placed it in. One
+field was answering both, and it was **correct for exactly as long as the two numbers agreed**. No
+assertion anywhere could distinguish them, because there was nothing to distinguish; T1.12c, which
+asserts the composited row is still the frame's width, went red the moment the margin landed with
+nothing about layers having changed. **This is MG24's shape in a field name rather than in a
+justification**: a name for one quantity standing in for another, where every reader checking the
+line finds it true.
+
+**2 · the named movers said forty-five and two moved.** Both are the `window-wash` scene, in its
+styles and its bytes reading — the wash stops a column short and the base owns the last cell, which
+is rule 8 arriving — and the three rule rows and the clock are unmoved, which is the half that says
+the margin landed where §6l.9 put it and not on the frame. **Forty-three session frames did not
+move, and this finding's own measurement had already said why**: three content rows reached the last
+column across the whole corpus, so a frame that never touches the edge cannot see a margin.
+
+**The prediction was taken from the change's reach and the measurement from the corpus, and the
+corpus was right.** That is worth separating from being merely over-cautious: naming every frame a
+change *could* touch reads as the careful thing to do, and it is the reading that cannot be wrong —
+so it carries no information, and a mover list that cannot be wrong is not a gate. The one that can
+be wrong is the count of corpus members that carry the property, and it is the number that was
+already in hand.
+
+| | before the run | after |
+|---|---|---|
+| named as expected to move | 45 of 468 | — |
+| this finding's measured subject | 3 content rows, all one help line | — |
+| moved | — | **2 of 468**, one scene in two readings |
+
+**And the fixture the landing owed was written**: T3.42 renders a document exactly at the region's
+width and one cell wider, because a margin and an off-by-one are indistinguishable without both
+halves — a frame drawn at `size.columns` passes every containment assertion while overrunning the
+gutter by one cell.
+
+**Gates**: 343 files / 6,287 passed / 4 todo · golden 468/468, two regenerated with the reason in
+the file's header · `c22-frame-session` and `uncited-46` every mutation caught, the second carrying
+a new width mutation whose catcher is T4.11f rather than T6.124 — *a test that calls the mechanism
+misses the wiring* · tier 5 136 passed / 3 todo · enforce green at 24,559 references · anchors 0
+missing across 240 runs.
 
 ---
 
