@@ -119,7 +119,7 @@ describe("A03 SP1 — commitment/invariant pairing", () => {
     // gap worth closing by adding one: a todo count moves on every spec-first
     // commit by design, where a spec count moves only when the corpus does.
     const files = specFiles();
-    expect(files.length).toBe(28);
+    expect(files.length).toBe(29);
 
     const total = files.reduce((n, f) => n + commitmentsOf(f).length, 0);
     expect(total).toBeGreaterThan(300);
@@ -387,7 +387,7 @@ describe("A03 SP2 — invariants are numbered 1..n, in order", () => {
     // The vacuity half. `checkOrdering` skips a spec declaring nothing, so a
     // parser that stopped matching would report twenty-six clean documents.
     const files = specFiles();
-    expect(files.length).toBe(28);
+    expect(files.length).toBe(29);
 
     const total = files.reduce((n, f) => n + invariantOrderOf(f).length, 0);
     expect(total, "355 invariants at the last audit; the parser must still see them").toBeGreaterThan(
@@ -496,7 +496,7 @@ describe("A03 SP9 — every invariant is named by at least one test row", () => 
     // that stopped seeing tests, reports every spec clean in the same green
     // line the correct answer prints.
     const files = specFiles();
-    expect(files.length).toBe(28);
+    expect(files.length).toBe(29);
     const r = checkInvariantCoverage(files, walkTests());
     expect(r.declared, "768 invariants at the last count; the parser must still see them")
       .toBeGreaterThan(700); // cells-ok — an invariant count
@@ -604,7 +604,7 @@ describe("A03 SP7 — a test row's number is unique within its spec", () => {
     // no test rows is skipped, so a parser that stopped matching would report
     // twenty-six clean documents in the same green line.
     const files = specFiles();
-    expect(files.length).toBe(28);
+    expect(files.length).toBe(29);
 
     const total = files.reduce((n, f) => n + testRowsOf(f).length, 0);
     expect(total, "1,100 test rows at the last count; the parser must still see them").toBeGreaterThan(
@@ -720,7 +720,7 @@ describe("A03 SP10 — a mnemonic test-row label is unique within its spec", () 
     // a parser that stopped matching would skip every file and report the same
     // green line. The count is what a reader watches, not the verdict.
     const files = specFiles();
-    expect(files.length).toBe(28);
+    expect(files.length).toBe(29);
 
     const declaring = files.filter((f) => mnemonicRowsOf(f).length > 0);
     expect(declaring.map((f) => (f.split("/").pop() ?? "").slice(0, 3)), "C09, C12 and C22 name rows by mnemonic").toEqual([
@@ -954,7 +954,7 @@ describe("A03 SP11 — a commitment's number is unique within its spec", () => {
     // accident. A reader that stopped matching reports every spec unique and
     // exits 0 exactly as a clean corpus does.
     const files = specFiles();
-    expect(files.length).toBe(28);
+    expect(files.length).toBe(29);
 
     const total = files.reduce((n, f) => n + commitmentsOf(f).length, 0);
     expect(total, "920 commitments at the last count; the parser must still see them").toBeGreaterThan(900);
@@ -1083,7 +1083,7 @@ describe("A03 SP13 — a spec's commitments ascend in document order", () => {
     // ascending corpus does, so the corpus is asserted before it is asserted
     // clean.
     const files = specFiles();
-    expect(files.length).toBe(28);
+    expect(files.length).toBe(29);
 
     const total = files.reduce((n, f) => n + commitmentsOf(f).length, 0);
     expect(total, "935 commitments at the last count; the parser must still see them").toBeGreaterThan(900);
@@ -1259,7 +1259,7 @@ describe("A03 SP3 — invariant references resolve outside the specs too", () =>
     // other twenty-five stayed invisible.
     const files = referenceFiles();
     const components = files.filter((f) => f.startsWith("docs/components/"));
-    expect(components.length, "all 28 component specs").toBe(28);
+    expect(components.length, "all 29 component specs").toBe(29);
 
     const { resolved } = checkReferences(components);
     expect(resolved, "the densest citation corpus in the project").toBeGreaterThan(1500);

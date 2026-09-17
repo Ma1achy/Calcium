@@ -104,6 +104,13 @@ export const COMPONENT_SOURCES = Object.freeze({
   // spec header said *spec'd, unbuilt*; the directory has held 384 lines since
   // `3f3be973` and one `ls` settles it (F891).
   C27: "src/data/emulator/emulator.ts",
+  // The passes, now that they exist — added on the commit that makes the path
+  // real, never before: a path that does not exist reads as "not implemented"
+  // forever, so every deferral waiting on C29 would be silently exempt. The
+  // passes rather than `types.ts` or the barrel, which are declarations and
+  // re-exports; TD3's rule is that a row names the file holding the
+  // *behaviour*, and `solve.ts` is where the five passes are.
+  C29: "src/presentation/layout/solve.ts",
 
   // **C26 has no row, and that is a refusal rather than a gap.** Measured
   // rather than assumed (F891): the component is *built* — 24 invariants, 40

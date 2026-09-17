@@ -8,7 +8,7 @@
 | **Depends on** | `cells()` and the wrap functions (C09 `presentation/text`) · `divideShares` (C04) · nothing above L1 |
 | **Consumed by** | C09's registry and container kinds · C11 · C15's `place()` · anything that needs a solved box |
 | **Source** | `docs/design/layout/LAYOUT_ENGINE.md` §§1–22 · `docs/notes/C29_LAYOUT_WALK.md` · F1219, F1220 |
-| **Status** | Draft — the sizing core. §§10–13 of the source arrive with their own phases. |
+| **Status** | The sizing core is built — `src/presentation/layout/`, seventeen tier-1 rows. **No container kind is on it yet**; §§10–13 of the source arrive with their own phases. |
 
 ---
 
