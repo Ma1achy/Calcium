@@ -14,7 +14,6 @@
  */
 import { NO_SPAN } from "../../../data/viewmodel/index.js";
 import {
-  atLeastOne,
   childWidths,
   insetWidth,
   normaliseWidth,
@@ -23,7 +22,7 @@ import {
   sequenceHeight,
 } from "../../../data/viewmodel/index.js";
 import type { Block, Group, MeasureFn, Mosaic, Panel, Scroll, WidthFn } from "../../../data/viewmodel/index.js";
-import { BORDER_INSET, axesOf, groupPlacements, mosaicRects, parseAreas } from "../../../data/viewmodel/index.js";
+import { axesOf, groupPlacements, mosaicRects, parseAreas } from "../../../data/viewmodel/index.js";
 import type { NavElement } from "../types.js";
 import { cells, sliceCells, stripControl, truncate } from "../../text.js";
 import { glyphCells, glyphFor, glyphs } from "../glyphs.js";
@@ -52,12 +51,11 @@ export const panelDefinition: BlockDefinition<Panel> = {
   kind: "panel",
 
   measure(block: Panel, width: number, measureChild: MeasureFn): number {
-    // A panel's children are a sequence, so `gapBefore` applies inside a panel
-    // exactly as it does at a document's top level (C04 §3a).
-    const total = sequenceHeight(block.children, insetWidth(width), measureChild);
-    // The border, one row each side. An empty panel is still two rows: the
-    // border is content, unlike an empty group (C04 I17).
-    return atLeastOne(total) + 2;
+    // **The engine's** (C29 I12). A panel's children are a sequence, so
+    // `gapBefore` applies inside a panel exactly as it does at a document's top
+    // level (C04 §3a) — and the border is one row of padding each side, so
+    // *an empty panel is still two rows* falls out of the shape.
+    return solveHeight(panelMeasureBox(block, width, { kind: "grow" }, measureChild), normaliseWidth(width));
   },
 
   /**
@@ -70,9 +68,11 @@ export const panelDefinition: BlockDefinition<Panel> = {
    */
   width(block: Panel, width: number, widthChild: WidthFn): number {
     const w = normaliseWidth(width);
-    const inner = insetWidth(w);
-    let widest = 1;
-    for (const child of block.children) widest = Math.max(widest, widthChild(child, inner));
+    // **The same box, asked the other question** (C29 I2): a `FIT` column's
+    // natural width is the widest child, and the border is the padding round
+    // it. The `widest` loop and the `+ BORDER_INSET` were those two facts
+    // written as arithmetic.
+    const framed = layout(panelMeasureBox(block, w, { kind: "fit", min: 1 }, undefined, widthChild), w).rect.width;
     const rail = (text: string | undefined, live: boolean): number => {
       const shown = stripControl(text ?? "");
       if (shown === "") return 0;
@@ -80,7 +80,7 @@ export const panelDefinition: BlockDefinition<Panel> = {
     };
     return Math.max(
       1,
-      Math.min(w, Math.max(widest + BORDER_INSET, rail(block.title, block.live === true), rail(block.footer, false))),
+      Math.min(w, Math.max(framed, rail(block.title, block.live === true), rail(block.footer, false))),
     );
   },
 
@@ -620,6 +620,49 @@ export const mosaicDefinition: BlockDefinition<Mosaic> = {
 };
 
 /**
+ * The child boxes of a **sequence** — a document's top level, a `panel`'s
+ * children, or a `column` group's (C04 §3a).
+ *
+ * **A `gapBefore` child is a wrapper with one row of top padding.** C29 has no
+ * margin on purpose (§6): a block carrying its own outer spacing is how two
+ * adjacent blocks each contributing one row produce two. Padding is inside, so
+ * the wrapper is one row taller and the blank row belongs to the thing that
+ * contains it — exactly what `sequenceHeight` counts. This is the shape
+ * `gapBefore` is replaced by in phase 2, arriving early because a sequence
+ * cannot be expressed without it.
+ *
+ * **The leaf's `render` returns nothing and these boxes are never composed.**
+ * Rendering still goes through `groupPlacements` and the panel's own frame, and
+ * it moves when `padding` and `childGap` reach C04. The condition to grep from
+ * is `groupPlacements`: the day no container calls it, these leaves owe a real
+ * `render`.
+ *
+ * **Each caller supplies the half its own question needs**, and the other is
+ * absent rather than stubbed with a plausible number: a `width` arm has no
+ * `measureChild` and gets height 0 from every leaf, a `measure` arm has no
+ * `widthChild` and gets natural 0. Both are unread on their own side, so a box
+ * built for one question cannot be asked the other and give a confident wrong
+ * answer.
+ */
+function sequenceChildren(
+  children: readonly Block[],
+  at: number,
+  measureChild?: MeasureFn,
+  widthChild?: WidthFn,
+): readonly Box[] {
+  return children.map((child, i) => ({
+    id: `c${String(i)}`,
+    ...(child.gapBefore === true ? { padding: { t: 1 } } : {}),
+    children: {
+      kind: "paint" as const,
+      natural: widthChild === undefined ? 0 : widthChild(child, at),
+      measure: (cw: number) => (measureChild === undefined ? 0 : measureChild(child, cw)),
+      render: () => [],
+    },
+  }));
+}
+
+/**
  * A `group` as a C29 box — **the first kind on the engine** (C29 §4).
  *
  * The three rules a column had, each as a declaration rather than as
@@ -677,20 +720,60 @@ function groupMeasureBox(block: Group, width: number, own: Size, measureChild?: 
     // child its own divided share, which is a `FIXED` on the main axis and has
     // nothing to stretch (C29 I9).
     ...(column ? { align: { x: "stretch" as const } } : { childGap: ROW_GUTTER }),
-    children: children.map((child, i) => ({
-      id: `c${String(i)}`,
-      // **A gap belongs to a sequence and a row is not one** (C04 §3a): its
-      // children sit side by side, so a gap before one of them is meaningless
-      // and is ignored rather than being an error.
-      ...(column && child.gapBefore === true ? { padding: { t: 1 } } : {}),
-      ...(column ? {} : { width: { kind: "fixed" as const, n: widths[i] ?? 1 } }),
-      children: {
-        kind: "paint" as const,
-        natural: widthChild === undefined ? 0 : widthChild(child, column ? w : (widths[i] ?? 1)),
-        measure: (cw: number) => (measureChild === undefined ? 0 : measureChild(child, cw)),
-        render: () => [],
+    // **A column is a sequence and a row is not** (C04 §3a): a row's children
+    // sit side by side, so a gap before one of them is meaningless and is
+    // ignored rather than being an error. A row's children are `FIXED` at the
+    // share `childWidths` divided, which is the other half of the same fact.
+    children: column
+      ? sequenceChildren(children, w, measureChild, widthChild)
+      : children.map((child, i) => ({
+          id: `c${String(i)}`,
+          width: { kind: "fixed" as const, n: widths[i] ?? 1 },
+          children: {
+            kind: "paint" as const,
+            natural: widthChild === undefined ? 0 : widthChild(child, widths[i] ?? 1),
+            measure: (cw: number) => (measureChild === undefined ? 0 : measureChild(child, cw)),
+            render: () => [],
+          },
+        })),
+  };
+}
+
+/**
+ * A `panel` as a C29 box (C29 §6).
+ *
+ * **The border is padding of one on every side.** A panel's height was
+ * `atLeastOne(sequenceHeight(...)) + 2` and its width `widest + BORDER_INSET`;
+ * both are one `padding` and the content's own `min` of one. **An empty panel
+ * is still two rows** because the border is content, unlike an empty group
+ * (C04 I17) — which falls out of the padding rather than needing a clause.
+ *
+ * The content's own size mirrors the question being asked: `FIT`, so the
+ * children's naturals decide the panel's width; `GROW`, so they are handed the
+ * inset width when a height is wanted. Its `min` of one is what keeps a panel
+ * at width 2 measuring its children at 1 rather than at 0, which is
+ * `insetWidth`'s own floor.
+ *
+ * **The rails are not here.** A title and a footer are furniture rather than
+ * children, and their width is the panel's own arithmetic in `width` below.
+ */
+function panelMeasureBox(block: Panel, width: number, own: Size, measureChild?: MeasureFn, widthChild?: WidthFn): Box {
+  const inner = insetWidth(normaliseWidth(width));
+  const content: Size = own.kind === "fit" ? { kind: "fit", min: 1 } : { kind: "grow", min: 1 };
+  return {
+    id: "panel",
+    width: own,
+    padding: { l: 1, r: 1, t: 1, b: 1 },
+    children: [
+      {
+        id: "panel\u00b7content",
+        direction: "column",
+        width: content,
+        height: { kind: "fit", min: 1 },
+        align: { x: "stretch" },
+        children: sequenceChildren(block.children, inner, measureChild, widthChild),
       },
-    })),
+    ],
   };
 }
 

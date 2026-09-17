@@ -1,4 +1,5 @@
-// C29 1.2 and 1.3 — the `group` kind on the engine, both directions. Mutated.
+// C29 1.2, 1.3 and 1.4 — `group` in both directions and `panel`, on the
+// engine. Mutated.
 //
 // **The move is a refactor with a byte-exact gate**, so every row here asks a
 // question the golden gate already answers — and that is the point of running
@@ -57,7 +58,7 @@ const results = await runPass({
       // is replaced by in phase 2, arriving one kind early.
       name: "a gapBefore child gets no blank row",
       file: F,
-      from: "      ...(column && child.gapBefore === true ? { padding: { t: 1 } } : {}),",
+      from: "    ...(child.gapBefore === true ? { padding: { t: 1 } } : {}),",
       to: "",
       expect: "T2.18",
     },
@@ -153,7 +154,7 @@ const results = await runPass({
       // cell, so a wrapping child in a narrow column is the wrong height.
       name: "a row's children are not fixed at their divided share",
       file: F,
-      from: '      ...(column ? {} : { width: { kind: "fixed" as const, n: widths[i] ?? 1 } }),',
+      from: '          width: { kind: "fixed" as const, n: widths[i] ?? 1 },\n',
       to: "",
       // **T1.32 and not T2.18e.** The sharpest row is not a height row at all:
       // a `FIT` child is measured at its content width *and* rendered at its
@@ -179,9 +180,65 @@ const results = await runPass({
       // change layout, not fail validation (C04 §3a).
       name: "a row group honours gapBefore",
       file: F,
-      from: "      ...(column && child.gapBefore === true ? { padding: { t: 1 } } : {}),",
-      to: "      ...(child.gapBefore === true ? { padding: { t: 1 } } : {}),",
+      from: '          id: `c${String(i)}`,\n          width: { kind: "fixed" as const, n: widths[i] ?? 1 },',
+      to: '          id: `c${String(i)}`,\n          ...(child.gapBefore === true ? { padding: { t: 1 } } : {}),\n          width: { kind: "fixed" as const, n: widths[i] ?? 1 },',
       expect: "T2.18",
+    },
+    {
+      // **The panel's border is padding of one on every side** (1.4). Removing
+      // it takes the frame's two rows and two columns out of the measurement
+      // while the frame is still drawn, which is C09 I1 by two.
+      name: "a panel's border costs nothing",
+      file: F,
+      from: "    padding: { l: 1, r: 1, t: 1, b: 1 },",
+      to: "",
+      expect: "T2.18",
+    },
+    {
+      // **An empty panel is still two rows** (C04 I17) — the border is content,
+      // unlike an empty group. It falls out of the content's `min` of one
+      // rather than needing a clause, and this is the clause it replaced.
+      name: "an empty panel loses its content row",
+      file: F,
+      from: '  const content: Size = own.kind === "fit" ? { kind: "fit", min: 1 } : { kind: "grow", min: 1 };',
+      to: '  const content: Size = own.kind === "fit" ? { kind: "fit" } : { kind: "grow" };',
+      // **T3.11 and not T2.18.** The floor's subject is the panel at width 2,
+      // where the inset is 0 and `insetWidth` floors at 1 — the row named for
+      // exactly that, determined by applying the mutation by hand. T3.8 and
+      // T3.67 fall over with it, one width apart.
+      expect: "T3.11",
+    },
+    {
+      // **A panel's children measured at the panel's width rather than the
+      // inset one.** Two columns wider than they are drawn, so anything that
+      // wraps is short a row — the drift `insetWidth` exists to prevent, and
+      // the reason C04 owns the widths rather than each container inventing
+      // them (C04 §3).
+      name: "a panel's children are measured at the outer width",
+      file: F,
+      from: "  const inner = insetWidth(normaliseWidth(width));",
+      to: "  const inner = normaliseWidth(width);",
+      // **T3.69 and not T3.67.** I43's corpus sweep is blind to this: measuring
+      // the child outside the border changes the answered *width* and leaves the
+      // *height* identical at both widths, so the identity holds while the
+      // number is wrong. The row that sees it is the one asserting the number,
+      // and it needed a notice whose wrap straddles the two columns.
+      expect: "T3.69",
+    },
+    {
+      // **The panel's content fitting when a height was asked for.** `FIT`
+      // takes the children's naturals rather than the inset width, so a
+      // wrapping child is measured narrow and the panel is too tall — and
+      // every number in it is self-consistent.
+      name: "a panel's content fits rather than filling when asked for a height",
+      file: F,
+      from: '  const content: Size = own.kind === "fit" ? { kind: "fit", min: 1 } : { kind: "grow", min: 1 };',
+      to: '  const content: Size = { kind: "fit", min: 1 };',
+      // **T1.33 and not T3.67.** The height arm's own measurement stays
+      // self-consistent — it is short by the same amount in both halves — so
+      // I43's identity holds and the row that sees it is the one comparing the
+      // measured height against the rendered rows.
+      expect: "T1.33",
     },
     {
       // **The unplaceable children kept.** `placeable` drops the children a row

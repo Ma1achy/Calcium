@@ -579,6 +579,20 @@ describe("C09 §2c width — the answers (I42–I44)", () => {
     expect(w(aligned, 40), "a column with an aligned child fills").toBe(40);
     const panel = block({ kind: "panel", id: "p", title: "", children: [column] });
     expect(w(panel, 40), "the widest child plus the border").toBe(14);
+
+    // **The children are measured at the inset width, not the panel's own.**
+    // The two answers only differ where a wrap differs across those two
+    // columns, which is why no corpus row reached it: this notice is one row of
+    // 20 at width 20 and two rows of 10 at width 18, so measuring the child
+    // outside the border answers 20 and measuring it inside answers 12. Both
+    // satisfy C09 I43 — the height is 4 either way — so the number is the only
+    // thing that sees it. A mutation dropping `insetWidth` survived the whole
+    // suite on this cell.
+    const straddle = block({ kind: "notice", id: "ns", tone: "info", text: "aaaaaaaaaa bbbbbbbbb" });
+    expect(w(straddle, 18), "two rows of ten inside the border").toBe(10);
+    expect(w(straddle, 20), "one row of twenty outside it").toBe(20);
+    const inset = block({ kind: "panel", id: "pi", title: "", children: [straddle] });
+    expect(w(inset, 20), "the child measured at the inset, plus the border").toBe(12);
     const titled = block({ kind: "panel", id: "pt", title: "abcdefghijklmnopqrst", children: [column] });
     const cw = w(titled, 40);
     // **The furniture is measured rather than counted**: the top border at the
