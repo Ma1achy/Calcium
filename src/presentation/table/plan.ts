@@ -18,6 +18,7 @@
  * differently is a drift found only at the widths nobody looks at.
  */
 import { normaliseWidth } from "../../data/viewmodel/index.js";
+import { distribute, type Demand } from "../layout/index.js";
 import type { ColumnDef } from "../../data/viewmodel/index.js";
 
 /** Cells between adjacent columns (§3 step 1). */
@@ -145,7 +146,7 @@ export function planColumns(cols: readonly ColumnDef[], width: number): PlannedC
   // never position: dropping `owner` must not reorder `uuid` and `status` (I4).
   const kept = [...admitted].sort((a, b) => a.index - b.index);
 
-  const widths = distribute(kept, available, overflowed);
+  const widths = columnWidths(kept, available, overflowed);
 
   const keptKeys = new Set(kept.map((k) => k.index));
   const dropped = candidates.filter((c) => !keptKeys.has(c.index)).map((c) => c.column.key);
@@ -163,63 +164,46 @@ export function planColumns(cols: readonly ColumnDef[], width: number): PlannedC
 /**
  * Steps 6 to 8 — residual width to the flex columns, `maxWidth` respected.
  *
+ * **The loop is C29's** (C29 I4, I5, I6). Steps 6 to 8 were a second copy of
+ * the engine's surplus arm, down to the fixed point: share the residual among
+ * the open columns, pin one that reaches its cap, share what that frees again.
+ * The two even agreed on the leftover cell — C11 gave it to the leftmost flex
+ * column and the engine gives it by largest remainder with ties in declaration
+ * order, and under equal weights those are the same column. One loop now, and
+ * the cap-and-re-run is written once.
+ *
  * Step 8 is the one that looks like an omission and is a decision: with no flex
  * column the residual is **left unused** and the table renders narrower than the
- * terminal, rather than stretching columns arbitrarily. C07's fallback is exactly
- * this shape — every column `minWidth: 3`, none flex — which is why its rendered
- * output is a finding about C07 §5 rather than about this function.
+ * terminal, rather than stretching columns arbitrarily. That is `weight: 0` on
+ * every column, and the engine leaves the pot alone rather than needing a
+ * clause. C07's fallback is exactly this shape — every column `minWidth: 3`,
+ * none flex — which is why its rendered output is a finding about C07 §5 rather
+ * than about this function.
  */
-function distribute(
+function columnWidths(
   kept: readonly Candidate[],
   available: number,
   overflowed: boolean,
 ): readonly number[] {
-  // One slot per kept column, so the width, the cap and the flex flag travel
-  // together. Parallel arrays indexed in a loop is where an off-by-one in a
-  // redistribution hides.
-  const slots = kept.map((k) => ({
-    width: k.min,
-    cap: maxOf(k.column),
-    flex: k.column.flex === true,
-  }));
-
   // The forced column is the only one that may be narrower than its minimum, and
   // it is truncated to the terminal rather than overflowing it (I5).
-  if (overflowed) return [Math.min(slots[0]?.width ?? 1, available)];
+  if (overflowed) return [Math.min(kept[0]?.min ?? 1, available)];
 
-  let residual = available - required(slots.map((s) => s.width));
-  if (residual <= 0) return slots.map((s) => s.width);
-
-  // Only flex columns absorb, and only up to `maxWidth`. A column reaching its
-  // maximum leaves the pool and what that frees is shared out again — which is
-  // step 7, and the reason this is a loop rather than one division.
-  const hasRoom = (s: (typeof slots)[number]): boolean =>
-    s.flex && (s.cap === null || s.width < s.cap);
-
-  while (residual > 0 && slots.some(hasRoom)) {
-    const open = slots.filter(hasRoom);
-    const share = Math.floor(residual / open.length); // cells-ok
-    // The remainder goes to the leftmost flex column, so the extra cell lands in
-    // one predictable place rather than wherever a rounding error puts it (T1.6).
-    let remainder = residual - share * open.length; // cells-ok
-
-    let given = 0;
-    for (const slot of open) {
-      const want = share + (remainder > 0 ? 1 : 0);
-      if (remainder > 0) remainder -= 1;
-      if (want === 0) continue;
-
-      const room = slot.cap === null ? want : Math.max(0, slot.cap - slot.width);
-      const take = Math.min(want, room);
-      slot.width += take;
-      given += take;
-    }
-
-    // Nothing moved: every open column is at its cap, so the rest of the residual
-    // is genuinely unusable. Step 8's outcome, reached from step 7.
-    if (given === 0) break;
-    residual -= given;
-  }
-
-  return slots.map((s) => s.width);
+  // **The gaps come out of the budget, not out of a column.** `required` adds
+  // them back when the planner asks whether a set fits; here they are simply
+  // not on the table, which is what `childGap` is on a C29 row.
+  const gaps = Math.max(0, kept.length - 1) * COLUMN_GAP; // cells-ok — a cell count
+  const demands: readonly Demand[] = kept.map((k) => {
+    const cap = maxOf(k.column);
+    return {
+      base: k.min,
+      min: k.min,
+      max: cap === null ? Infinity : cap,
+      // **`flex` is the weight and the weights are equal** (§3 step 6). A
+      // column that does not flex does not grow, which is `weight: 0` and the
+      // engine's own pinning rather than a filter here.
+      weight: k.column.flex === true ? 1 : 0,
+    };
+  });
+  return distribute(demands, available - gaps, "largest-remainder").sizes;
 }
