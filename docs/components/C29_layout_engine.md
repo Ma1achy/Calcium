@@ -8,7 +8,7 @@
 | **Depends on** | `cells()` and the wrap functions (C09 `presentation/text`) · `divideShares` (C04) · nothing above L1 |
 | **Consumed by** | C09's registry and container kinds · C11 · C15's `place()` · anything that needs a solved box |
 | **Source** | `docs/design/layout/LAYOUT_ENGINE.md` §§1–22 · `docs/notes/C29_LAYOUT_WALK.md` · F1219, F1220 |
-| **Status** | The sizing core is built — `src/presentation/layout/`, seventeen tier-1 rows. **No container kind is on it yet**; §§10–13 of the source arrive with their own phases. |
+| **Status** | Built — `src/presentation/layout/`, the sizing core plus sticky (I21), floats and frames (I22, I23). **No container kind is on it yet**, which is the remaining work and is a migration rather than a mechanism; §§10–15 of the source have all landed or been ruled. |
 
 ---
 
@@ -58,7 +58,19 @@ type Box = Readonly<{
   aspect?: number;                         // width / height, in CELLS
   overflow?: Readonly<{ x?: Overflow; y?: Overflow }>;
   clip?: Readonly<{ x?: boolean; y?: boolean; offset?: { x: number; y: number } }>;
+  sticky?: "top" | "bottom";               // excluded from the parent's offset (I21)
+  floating?: Floating;                     // takes no space; resolved after pass 5 (I22)
   children: readonly Box[] | Leaf;
+}>;
+
+type Point = "tl"|"tc"|"tr"|"cl"|"cc"|"cr"|"bl"|"bc"|"br";
+
+type Floating = Readonly<{
+  attachTo: { kind: "parent" } | { kind: "element"; id: string } | { kind: "root" };
+  anchor:   Readonly<{ self: Point; target: Point }>;
+  offset?:  Readonly<{ x: number; y: number }>;      // whole cells, before the nudge
+  layer:    "float" | "overlay" | "debug";           // NAMED, never an integer
+  clipTo?:  "none" | "attachedAncestor";             // default attachedAncestor
 }>;
 
 type Leaf =
@@ -70,6 +82,8 @@ type SolvedBox = Readonly<{
   id: string;
   rect: Readonly<{ x: number; y: number; width: number; height: number }>;   // parent-relative
   clip?: Readonly<{ x: boolean; y: boolean; offset: Readonly<{ x: number; y: number }> }>;
+  sticky?: "top" | "bottom";                                  // carried, not resolved (I21)
+  floats?: readonly { solved: SolvedBox; floating: Floating }[];  // beside the children (I22)
   leaf?: Leaf;
   children: readonly SolvedBox[];
 }>;
@@ -77,7 +91,15 @@ type SolvedBox = Readonly<{
 function measure(box: Box, width: number): number;              // stops after pass 4
 function layout(box: Box, width: number): SolvedBox;            // all five passes
 function compose(solved: SolvedBox): readonly string[];         // rows, through C09's composers
+function composeSited(solved: SolvedBox):                       // one walk, two products (I22)
+  { rows: readonly string[]; sites: Sites };
+function placeFloats(sites: Sites, frame: Window): readonly PlacedFloat[];
 ```
+
+**`sticky`, `floating` and the frame types were added to the tree before this block listed them**,
+which is a spec's own interface becoming a second record of its exports and drifting from the first.
+The engine's `.d.ts` and this table are both derived from `types.ts`, and only one of them is checked
+(F1235).
 
 **`compose` is not new.** It writes C09's `Placed` (`presentation/rows.ts`) and hands it to
 `placeRows`, which already composes a grid of pieces into rows and already sorts by column (F1213).
@@ -915,8 +937,12 @@ refusal clause corrected rather than built (§7c, F1234); §15's aspect is built
 width, both by `Math.min` so neither grows. **§15's last paragraph is a constraint on the tests
 rather than on the code**: it is lumpy — 40 × 9 at `aspect: 3.5` wants 31.5 columns and gets 31, a
 real ratio of 3.44 — so no row may assert an exact ratio, and a row that does is asserting the
-rounding. **§10 is discharged.** Its walk is `docs/notes/C29_LAYERS_WALK.md`, its rulings are §7d and I19, and
-the two mechanisms it asks the engine to build are C15's already. **§13 is discharged.** Its walk is
+rounding. **§10 is built.** Its walks are both halves of `docs/notes/C29_LAYERS_WALK.md`, and its rulings are
+**four**: §7d and I19 for C15's layer stack, whose two mechanisms are `place.ts`'s already; §7f and
+I22 for the float declared in the tree; §7g and I23 for the ring, the stack and the layer stack. **The
+first walk's refusals were about a layer and §10 step 2 names pass 5**, which is this engine's own —
+and this sentence said *discharged* for a landing after that stopped being true, which is a
+correction stopping at its own sentence while the neighbouring claim ages (F1235). **§13 is discharged.** Its walk is
 `docs/notes/C29_INCREMENTAL_WALK.md`, its ruling is §7e and I20, and the cache it asks for is C22's,
 keyed as it prescribes and measured holding across frames.
 
