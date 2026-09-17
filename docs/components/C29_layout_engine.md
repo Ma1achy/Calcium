@@ -423,11 +423,23 @@ float attached to row 9 of a list scrolled to row 3 belongs at screen row 6; res
 `SolvedBox.rect` it sits at row 9 and detaches from the thing it points at, which is the whole of
 what a float is for. `collect` already applies the offset and the resolution reads the same number.
 
-**`floating` and `sticky` are opposites wearing one sentence.** Both read as *this child is not laid
-out normally*: a sticky child **occupies flow space** and is excluded from an offset (I21); a float
-**takes no space** at all. A box declaring both asks for a child that occupies flow space and does
-not, so the engine states the contradiction rather than picking a winner — `floating` is read first
-and a `sticky` beside it is refused.
+**`floating` and `sticky` are opposites wearing one sentence, and they are I16's missing worked
+example.** Both read as *this child is not laid out normally*: a sticky child **occupies flow space**
+and is excluded from an offset (I21); a float **takes no space** at all. A box declaring both asks
+for a child that occupies flow space and does not.
+
+**And the engine does not throw on it** — I16 is exact and it governs: *a contradictory declaration
+is refused at construction, never at layout*, because `measure` is pure and total and a throw
+mid-pass abandons a half-solved tree. The first draft of this section threw in `build`, which is
+precisely the thing I16 forbids; it also **fired for nothing**, because a float never reaches `build`
+through its parent, and the frame-read said `NOT REFUSED` where the check read as obviously correct.
+
+So the engine is **total on the contradiction and does not resolve it by preference**: `sticky`
+modifies a child's place in **the flow**, and a float has no place in the flow, so on a float the
+field has no subject rather than a losing claim. The refusal belongs at C04's boundary with every
+other construction error. **This is the example I16 has been missing** — it was corrected off a
+`sticky` child that is `GROW` on the scroll axis because *the contradiction cannot be expressed*, and
+this one can (I16, F1235).
 
 **An unresolvable attachment omits the float; it never throws.** `Box.id` has no uniqueness rule, so
 `{ kind: "element" }` takes the **first** match in document order — a choice, because throwing on a
@@ -603,6 +615,13 @@ measured against.
   that `sticky` is in no type; it is in one now. The second is that the contradiction cannot be
   expressed: sticky occupies flow space, so it is excluded from no space, and a `GROW` child of a
   clipping container resolves against the inner box rather than diverging — measured at five of six.
+  **And the example it was missing has arrived: `floating` beside `sticky`** (§7f, I22, F1235). A
+  float takes no space and a sticky child occupies it, which is a contradiction that **can** be
+  constructed — unlike the one this invariant was corrected off — and it is refused at C04's boundary
+  rather than in a pass. The engine stays total: on a float, `sticky` modifies a place in the flow
+  that the float does not have, so the field has no subject rather than a losing claim. **A first
+  draft threw in `build` and was wrong twice over** — it is the fault this invariant names, and it
+  fired for nothing anyway, because a float never reaches `build` through its parent.
   An invariant whose worked example cannot be constructed forbids nothing while reading as though it
   forbade something, which is A03 §2's vacuity class arriving in a justification rather than in a
   rule, and **a refusal accumulates reasons: the one to keep is the one a build cannot remove**.
@@ -721,7 +740,9 @@ with it** — it indexes pairs, and a cell where three rules meet is in neither 
   not-yet-placed attachment **omits** the float rather than throwing, because a throw mid-walk
   abandons the floats already placed; `{kind: "element"}` takes the first match in document order, and
   order within a layer is document order. **`floating` and `sticky` are opposites and do not compose**
-  — one occupies flow space, the other takes none (§7f, I21, F1235).
+  — one occupies flow space, the other takes none — and that contradiction is **I16's missing worked
+  example**, refused at construction rather than in a pass, because `measure` is total and a throw
+  mid-walk abandons a half-solved tree (§7f, I16, I21, F1235).
 - **I23** — **A ring, a stack and a layer stack are three shapes and the engine gives them three
   types.** The **frame ring** is tabs: `next`/`previous`, no `push`/`pop`, no top — nothing is above
   anything and `esc` never leaves one. The **frame stack** is within a tab: a view over its base,
@@ -758,7 +779,7 @@ with it** — it indexes pairs, and a cell where three rules meet is in neither 
 19. **The engine places no layer of C15's stack** (I19, §7d). The named partition and the nudge are `place.ts`'s, the nudge there on one axis because the horizontal clamp is unreachable by construction; a derived peek anchor is the caller's, handed down as a number. Nothing else is refused: attachment, the ancestor clip and the two-axis nudge are §7f's, and the frame ring is §7g's (→ C15 I5, F1235).
 20. **The engine holds no cache** (I20, §7e). The memo is C22's, keyed on the block object and the width, storing the committed figure rather than a natural size; the dirty rule holds by construction because blocks are frozen and replaced; and the single slot is a resize cost and a stable-width saving (→ C22 I100, → C09 I61).
 21. **Sticky is one field read at one site** (I21, §7c). The composer excludes a sticky child from `clip.offset` and collects it **first**, because `composeRow` gives a column's cells to the piece that reaches it earliest; every sizing pass is blind to it, and §14's `GROW` refusal is corrected rather than built because the loop it names cannot be expressed (F1234).
-22. **A float takes no space and is resolved after pass 5** (I22, §7f). It is skipped upward only, attached against the composited rect, sized by its own `FIT`, and nudged into the window it will be clipped to rather than into the frame — which is §10's step order corrected, because the other way round moves a tooltip to the one place it cannot be drawn. An unresolvable attachment omits the float and never throws; `floating` and `sticky` do not compose (F1235).
+22. **A float takes no space and is resolved after pass 5** (I22, §7f). It is skipped upward only, attached against the composited rect, sized by its own `FIT`, and nudged into the window it will be clipped to rather than into the frame — which is §10's step order corrected, because the other way round moves a tooltip to the one place it cannot be drawn. An unresolvable attachment omits the float and never throws, and neither does the `floating`-beside-`sticky` contradiction — it is refused at construction and is the worked example I16 had lost (F1235).
 23. **A ring, a stack and a layer stack are three types** (I23, §7g). The frame ring cycles and has no top; the frame stack pushes and pops within a tab; each frame owns its own layer stack, named and never an integer; only one frame composites, so a switch is a full repaint; and `debug` is global and outside the ring. Collapsing a ring and a stack into one ladder is the error `INTERACTION.md` §2 corrected once (F1235).
 
 ---
@@ -829,10 +850,12 @@ solved tree it is placed beside.
   from another's, a switch pops and dismisses nothing, and `debug` is present in every frame's
   composite while `overlay` is present in one. Read as the composed product rather than as a count,
   because a stack that is shared and a stack that is copied agree on every length.
-- **T1.42** (I22, §7f): an unresolvable attachment **omits** the float and leaves the rest placed —
-  an id in no box, a float naming a float not yet placed, and a float naming itself, each with a
-  second float beside it that must still be in the product. The row is about what the rejection path
-  leaves behind, which neither artefact shape indexes.
+- **T1.42** (I22, I16, §7f): an unresolvable attachment **omits** the float and leaves the rest
+  placed — an id in no box, a float naming a float not yet placed, and a float naming itself, each
+  with a second float beside it that must still be in the product. The row is about what the
+  rejection path leaves behind, which neither artefact shape indexes. **And nothing throws**,
+  including a box declaring `floating` beside `sticky`: the engine is total and that refusal is
+  C04's, which is I16 said about a contradiction that can be constructed for the first time.
 
 **The rows for §7d** (I19) — a refusal again, and asserted the same way: by naming what would exist
 if it were not taken.
