@@ -96,6 +96,31 @@ export type Box = Readonly<{
   representations?: readonly Box[];
   overflow?: Readonly<{ x?: Overflow; y?: Overflow }>;
   clip?: Readonly<{ x?: boolean; y?: boolean; offset?: Readonly<{ x: number; y: number }> }>;
+  /**
+   * Excluded from this box's **parent's** scroll offset, and drawn last —
+   * C29 §7c, I21.
+   *
+   * A table header that stays while its body scrolls is neither flow nor float:
+   * it **occupies flow space**, displacing its siblings so the scrollable area
+   * is what remains, and it is the container's `clip.offset` it sits out. So no
+   * sizing pass reads this field — `collect` does, and nothing else.
+   *
+   * `"top"` keeps the position flow gave it; `"bottom"` is pinned to the
+   * container's far edge, which is the same exclusion said from the other end.
+   *
+   * **Drawn last is half the rule, and the design document states only the
+   * other half** (F1234). A child excluded from the offset still sits where
+   * flow put it, and siblings collected after it draw over it — so a header
+   * left in declaration order ends up under its own body.
+   *
+   * **No `GROW` refusal beside it.** `LAYOUT_ENGINE.md` §14 refuses a sticky
+   * child that is `GROW` on the scroll axis, because it *would grow to fill the
+   * space it is excluded from* — and a child occupying flow space is excluded
+   * from no space, only from an offset. Measured: such a child solves to the
+   * inner height less its siblings, five of six, and does not diverge (I15,
+   * I16).
+   */
+  sticky?: "top" | "bottom";
   children: readonly Box[] | Leaf;
 }>;
 
@@ -106,6 +131,17 @@ export type SolvedBox = Readonly<{
   id: string;
   rect: Rect;
   clip?: Readonly<{ x: boolean; y: boolean; offset: Readonly<{ x: number; y: number }> }>;
+  /**
+   * Carried, not resolved — C29 I21.
+   *
+   * **`aspect`, `sticky` and a float are resolved rather than carried** is the
+   * rule §1 states, and sticky is the exception that proves which passes it is
+   * about: the *sizing* passes resolve everything and this reaches none of
+   * them. It is the composer that applies `clip.offset`, so it is the composer
+   * that must know which child sits the offset out — and a `rect` cannot say
+   * so, because a sticky child's rect is its flow rect either way.
+   */
+  sticky?: "top" | "bottom";
   leaf?: Leaf;
   children: readonly SolvedBox[];
 }>;

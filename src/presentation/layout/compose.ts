@@ -80,7 +80,42 @@ function collect(node: SolvedBox, ox: number, oy: number, window: Window, out: P
   });
   const dx = x - (clip?.offset.x ?? 0);
   const dy = y - (clip?.offset.y ?? 0);
-  for (const child of node.children) collect(child, dx, dy, inner, out);
+
+  // **A sticky child sits the offset out, and is collected first** (C29 I21,
+  // §7c).
+  //
+  // Two rules, and `LAYOUT_ENGINE.md` §14 states one. Skipping the offset is
+  // what makes a header stay while its body scrolls; **order is what makes it
+  // visible**, because a sticky child sits where flow put it and its scrolling
+  // siblings land on the same rows.
+  //
+  // **First and not last, and the frame is what settled that** (F1234). The
+  // obvious reading is a painter's: draw the sticky child after everything so
+  // it covers them. This compositor is not a painter — `composeRow` walks a
+  // **cursor** left to right and cuts a piece that starts behind it, so the
+  // piece composited *later* at the same column is the one that loses. Written
+  // last, `sticky: "top"` produced a frame byte-identical to no sticky at all:
+  // the field was read, the piece was emitted, and the row it belonged on had
+  // already been claimed. **A ruling that names an operation checks the
+  // operation exists** — and this one assumed a mechanism the layer below does
+  // not have.
+  //
+  // Nothing else in the engine reads the field: a sticky child's `rect` is its
+  // flow rect, it displaces its siblings like any other, and the scrollable
+  // area is what remains.
+  for (const child of node.children) {
+    if (child.sticky === undefined) continue;
+    // `"top"` keeps the position flow gave it, against the container's own
+    // origin. `"bottom"` is pinned to the far edge — the same exclusion said
+    // from the other end, and the arithmetic cancels the child's own flow `y`
+    // so a footer declared anywhere lands on the last row.
+    const oyOf =
+      child.sticky === "bottom" ? y + own.h - child.rect.height - child.rect.y : y; // cells-ok — a row count
+    collect(child, x, oyOf, inner, out);
+  }
+  for (const child of node.children) {
+    if (child.sticky === undefined) collect(child, dx, dy, inner, out);
+  }
 }
 
 /** The rows a solved tree draws — `measure` is their count, by construction (C29 I12). */

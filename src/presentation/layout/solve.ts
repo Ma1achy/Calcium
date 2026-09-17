@@ -501,6 +501,10 @@ function rootWidth(node: Node, width: number): number {
 const freeze = (node: Node): SolvedBox => ({
   id: node.box.id,
   rect: { x: node.x, y: node.y, width: node.w, height: node.h },
+  // **Copied, never computed** (C29 I21). No sizing pass read it; the composer
+  // is the one site that does, and it needs the declaration rather than a
+  // consequence of it.
+  ...(node.box.sticky === undefined ? {} : { sticky: node.box.sticky }),
   ...(node.box.clip === undefined
     ? {}
     : {

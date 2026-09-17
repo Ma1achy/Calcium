@@ -660,7 +660,9 @@ describe("C29 — the sizing core", () => {
     // presence in the same way, because neither an absence nor a presence check
     // on one field is structural — what catches a fifth field arriving is the
     // equality. It did its job on the way past: adding `representations` turned
-    // this row red with nothing else in the suite moving.
+    // this row red with nothing else in the suite moving. It did it a second
+    // time for `sticky` (I21), which is the count that makes the equality worth
+    // its cost: two fields, two reds, neither one anticipated by the row.
     const types = readFileSync("src/presentation/layout/types.ts", "utf8");
     const box = /export type Box = Readonly<\{([\s\S]*?)\n\}>;/u.exec(types);
     expect(box, "the Box declaration is findable").not.toBeNull();
@@ -679,6 +681,7 @@ describe("C29 — the sizing core", () => {
         "padding",
         "representations",
         "spend",
+        "sticky",
         "width",
       ].sort(),
     );
@@ -785,14 +788,118 @@ describe("C29 — the sizing core", () => {
     expect(flipped[0]?.truncated, "and it fitted there, so nothing was clipped").toBe(false);
   });
 
-  // **The spec commit's rows, before the field exists** (SP9). C29 I21: a
-  // sticky child is excluded from its container's scroll offset and drawn last.
-  it.todo(
-    "T1.37 (C29 I21, \u00a77c, F1234): a clipping container at an offset draws its sticky header at its own edge and its body from the offset, and the same tree without the field draws the body alone — read as a frame, because a sticky child's rect is its flow rect either way — not deferred on a component: Box.sticky is not built",
-  );
-  it.todo(
-    "T1.38 (C29 I21, \u00a77c, F1234): a sticky child declared before its scrolling siblings is drawn over by none of them — the paint-order half, which no assertion about a position can see — not deferred on a component: Box.sticky is not built",
-  );
+  // **C29 I21, and both rows read a frame** (\u00a77c, F1234). A sticky child's
+  // `rect` is its flow rect whether or not the field is read \u2014 the composer
+  // is the only site that sees it \u2014 so every assertion about the solved tree
+  // agrees with itself either way, and the numbers cannot tell the two apart.
+  const scroller = (offset: number, sticky: "top" | "bottom" | undefined): Box => ({
+    id: "scroll",
+    direction: "column",
+    height: { kind: "fixed", n: 6 },
+    clip: { y: true, offset: { x: 0, y: offset } },
+    children: [
+      {
+        id: "header",
+        width: { kind: "grow" },
+        ...(sticky === undefined ? {} : { sticky }),
+        children: { kind: "rows", rows: ["H0"] },
+      },
+      { id: "body", children: { kind: "rows", rows: Array.from({ length: 12 }, (_, i) => `b${String(i)}`) } },
+    ],
+  });
+
+  const framed = (box: Box): readonly string[] => compose(layout(box, 20));
+
+  it("T1.37 (C29 I21, \u00a77c, F1234): a clipping container at an offset draws its sticky header at its own edge and its body from the offset", () => {
+    // Without the field, `collect` applies the offset to every child and the
+    // header scrolls away with the content \u2014 the frame this invariant exists
+    // to correct, and the engine draws it today with no new type to construct it.
+    expect(framed(scroller(3, undefined)), "no sticky: the header is gone").toEqual([
+      "b2",
+      "b3",
+      "b4",
+      "b5",
+      "b6",
+      "b7",
+    ]);
+
+    // With it, the header holds row 0 and the body starts one row further in,
+    // because the header still occupies flow space: it is excluded from the
+    // offset, not from the layout.
+    expect(framed(scroller(3, "top")), "sticky top: the header stays and the body scrolls").toEqual([
+      "H0",
+      "b3",
+      "b4",
+      "b5",
+      "b6",
+      "b7",
+    ]);
+
+    // At an offset that outruns the content the header is still there, which is
+    // what distinguishes exclusion from a clamp.
+    expect(framed(scroller(9, "top")), "sticky top at an offset past the content").toEqual([
+      "H0",
+      "b9",
+      "b10",
+      "b11",
+      "",
+      "",
+    ]);
+
+    // `"bottom"` is the same exclusion from the other end: pinned to the
+    // container's far edge at every offset, including none.
+    const footer = (offset: number): Box => ({
+      id: "scroll",
+      direction: "column",
+      height: { kind: "fixed", n: 6 },
+      clip: { y: true, offset: { x: 0, y: offset } },
+      children: [
+        { id: "body", children: { kind: "rows", rows: Array.from({ length: 12 }, (_, i) => `b${String(i)}`) } },
+        { id: "total", width: { kind: "grow" }, sticky: "bottom", children: { kind: "rows", rows: ["T0"] } },
+      ],
+    });
+    expect(framed(footer(0)), "sticky bottom at offset 0").toEqual(["b0", "b1", "b2", "b3", "b4", "T0"]);
+    expect(framed(footer(3)), "sticky bottom at offset 3").toEqual(["b3", "b4", "b5", "b6", "b7", "T0"]);
+
+    // **And an offset that carries the footer's flow row back inside the
+    // window, which is the cell the three offsets above cannot reach.** A
+    // sticky child is collected once: the guard that keeps it out of the
+    // scrolling walk is load-bearing, and everywhere else the second piece
+    // would be clipped away and the guard would look decorative. At nine the
+    // footer's flow position is row 3 — blank, because the body ran out — so a
+    // duplicate has somewhere to land and the row sees it (F1234).
+    expect(framed(footer(9)), "sticky bottom at offset 9: row 3 is blank, not a second footer").toEqual([
+      "b9",
+      "b10",
+      "b11",
+      "",
+      "",
+      "T0",
+    ]);
+  });
+
+  it("T1.38 (C29 I21, \u00a77c, F1234): a sticky child declared before its scrolling siblings is drawn over by none of them", () => {
+    // **The ordering half, and the row is the frame because nothing else moves.**
+    // The two trees differ by one optional field that no sizing pass reads, so
+    // every rect is identical \u2014 asserted, rather than assumed, because the
+    // first build of this mechanism was invisible to exactly these numbers.
+    const shape = (box: Box): string =>
+      JSON.stringify(layout(box, 20), (key, value: unknown) => (key === "sticky" ? undefined : value));
+    expect(shape(scroller(3, "top")), "the solved trees are equal but for the field").toBe(
+      shape(scroller(3, undefined)),
+    );
+
+    // And the frames are not. `composeRow` walks a cursor and cuts a piece that
+    // starts behind it, so a column's cells go to whichever piece reaches it
+    // first: the sticky child is collected **before** its siblings, not after.
+    // Collected last \u2014 the painter's reading, which \u00a714 implies and this
+    // compositor does not support \u2014 the frame is byte-identical to the one
+    // above with no field at all.
+    expect(framed(scroller(3, "top")).join("|"), "the header holds the row it was given").not.toBe(
+      framed(scroller(3, undefined)).join("|"),
+    );
+    expect(framed(scroller(3, "top"))[0], "and holds it whole, not half a body row").toBe("H0");
+  });
 
   it("T1.34 (C29 I20, \u00a77e, C22 I100, C09 I61): the engine declares no cache, and the memo holds one slot per block", () => {
     // **The engine's own sources, by equality over the directory.** An absence
