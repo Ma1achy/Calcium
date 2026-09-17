@@ -53748,6 +53748,63 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1226 — a design document's four surface rules, checked against the tree: three move ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `APPEARANCE.md` §5/§15 rules 5–8 and `LAYOUT_ENGINE.md:667`, as phase 2b's work list: `padding.l = 3` per nested level, root `padding.r = 1`, `childGap = 1` between entries, no leading or trailing blank row. |
+| **Reached for** | The plan's own instruction, applied to the section it was never applied to. It says *four of §21's nine lines are already true and must not be rebuilt* and runs that check for §21 — and §5 and §15 got a work list instead of a check. |
+| **Verdict** | **Three of four move, and 2b is two edits rather than five.** One is built by a better mechanism, one is falsified by a number, one is retired by 2a, and one is genuinely owed. |
+
+**1 · *A blank row between entries* is built, by the mechanism its own spelling forbids.** The
+design wants `childGap = 1` at the sequence level. `ENTRY_GAP = 1` and a blank *run* per entry
+have been there since C22 I85, and the comment beside them carries the argument the design is
+missing: *the entry's own, so C14 measures it through the wrapper and the frame draws it through
+the same layout — a composer adding spacing of its own is the C04 I25 shape one layer up*. A
+document's top level has no container for a `childGap` to sit on, so the design's spelling is not
+merely redundant, it is unavailable.
+
+**And the two are not the same rule, which is the part a work list cannot show.** A closing blank
+on *every* entry puts one after the last, above the rule; *between* entries would leave the last
+content row against it. C22 §6l.8 rows 18–19 rule the drawn behaviour correct, so the design's
+wording is the thing that is wrong — not the tree.
+
+**2 · *Exactly three columns* is four, and the four is derived.** `GUTTER_UNIT = BODY_INDENT =
+HOOK_INDENT + 2` — the hook's column, the mark and its trailing space — held to the body's indent
+by a row that draws both, *because two constants agreeing is not the claim*. `padding.l = 3` would
+move every nested frame and replace a derivation with a literal. **A number in a design document
+is a claim like any other**, and this one had a mechanism behind it that the document does not
+mention.
+
+**3 · *A block emits no leading or trailing blank row* was retired by 2a**, deliberately. A padded
+block emits exactly that. The rule was about *who owns vertical space*, written when the answer
+was the sequence, and its content survives as C09 I17's *a composer inserts no spacing of its
+own*. Rule 7 and rule 5's `padding` are one document contradicting itself — F1224's shape, one
+layer up: the clause that reads as forbidding the defect was the clause the change falsified.
+
+**4 · The right margin is owed, and it is not a block's `padding`.** Confirmed at the call site:
+`resizeViewport({ width: frame.size.columns, … })` — the full terminal width, unnarrowed. It lands
+on the **region** C14 hands down, because four composers draw at the frame's width (the
+transcript's rows, the prompt, the overlays, the rule) and a margin applied at three of four is a
+ragged edge nobody declared. A mosaic divides its cells *before* a child's padding is applied, so
+as a `padding.r` the dividers would read the unnarrowed number — the cell that would have been
+wrong the other way round.
+
+**And the one thing genuinely worth building is not on the list at all.** `ROW_GUTTER = 1` is read
+in three places — a row's widths, the admission loop that adds one per placed child, and the
+element walk's offsets. Three readers of one constant is what a field looks like before it has a
+name, and no surface can ask for a row group without a gutter: today's answer is a `raw` block
+hand-composed at three widths, which is C04 §3's `weights` deferral being paid for again at a
+different call site (CLAUDE.md's third instance, now a fourth).
+
+**The class, and it is the record rather than the code.** *Ask where a settled claim is written
+down* — pointed at a design document instead of at a finding. Four rules, each stated as a
+property to build, none measured against the tree since the tree acquired the mechanisms that
+answer them. The instrument's total is now **four claims disproved and four produced**, and this is
+the first time it has been run on a work list rather than on a belief.
+
+---
+
 ## F1225 — the gate had no padded block in it, and the four things that came out of saying so ★★★★☆
 
 | | |
