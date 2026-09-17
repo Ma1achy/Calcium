@@ -487,7 +487,13 @@ measured against.
   form is edited (C09 I72), which is why the field is `readonly Box[]` and not `{min, box}[]`. The
   other two families keep their owners: a leaf's forms stay inside its definition, because `Leaf` is
   opaque to the engine by declaration, and an authored variant stays with `art()`, because a variant
-  is a different *block* (§7b, F1228, F1232). **Dropping is refused twice over and from two
+  is a different *block* (§7b, F1228, F1232). **The leaf family is now built and is the evidence for
+  that split rather than an argument for it** — C09 I81's shed step, shared by the four kinds that
+  owe a narrow ladder, computes inside `render` from the width it is handed and is invisible here by
+  construction. What it shows is that the two families need different mechanisms and not one: this
+  invariant chooses between **whole boxes** on a natural width, and a kind's ladder ranks **parts of
+  a row**, sheds the lowest whole and states the withholding. A single mechanism spanning both would
+  have to look inside a leaf to find the parts (F1233). **Dropping is refused twice over and from two
   components**: the sizing core replaced C09 I35's clamp with a floor, and a form that dropped a child
   would leave a C26 focus on a block that draws nothing.
 - **I19** — **The engine places no layer, and the two mechanisms §10 asks it for are C15's.** The
