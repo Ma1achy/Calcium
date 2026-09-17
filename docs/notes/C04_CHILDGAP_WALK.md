@@ -64,7 +64,29 @@ different times, one of which does not exist yet when the other is drawn.
 | S1 | entry *n* settles → entry *n+1* appends | the blank row | it is entry *n*'s closing run and is already drawn; nothing is inserted when *n+1* arrives. A `childGap` would have to be re-decided on every append, and the frame between the two appends would be a row short |
 | S2 | the last entry → the lower rule | the blank row | it is drawn, above the rule (C22 §6l.8 row 19). *Between entries* would leave it undrawn and the rule would sit against the last content row. **The built behaviour is the specified one and the design's wording contradicts it** |
 | S3 | an entry evicted from the front (C13's cap) | the evicted entry's blank | it goes with the entry, because it is the entry's. Under a sequence-level `childGap` the surviving first entry would gain or lose a leading row depending on how the composer counts, which is a frame moving on an eviction — the class F1212 measured |
-| S4 | a window over a container with `childGap` | the gap rows | **the same refusal as padding** (C09 I80, I33): the gap rows are the container's, emitted between children the definition's `window` slices, so a `to` derived from the gapped height breaks C09 I26 from outside the definition. `windowRefused` gains the third arm and stays one predicate — the fourth caller in three commits, which is the argument for having factored it |
+| S4 | a window over a container with `childGap` | the gap rows | **windowable, and the first ruling here was wrong** — see S4a. The gap rows are the *definition's*, not the registry's, so the definition's own `window` can slice them and `windowRefused` gains no third arm |
+
+### S4a · the correction — a ruling correct about the interaction and wrong about the mechanism
+
+**This walk made the mistake CLAUDE.md names, on its own first pass.** S4 originally ruled that a
+container with `childGap` is refused a window on padding's ground — *the gap rows are the
+container's, outside anything `definition.window` can reach* — and the interaction it names is
+real. The mechanism is not. Padding is refused because the **registry** emits it, in `#padded`,
+around whatever the definition returned; `childGap` is read *inside* the definition —
+`containers.ts:800` builds the engine box with it and `:1090` advances the element walk by it, both
+in `groupDefinition`, and `measure.ts:121,168` are called from there. Nothing about it is outside
+the definition's reach.
+
+So a gapped container stays windowable and its own `window` counts its own gaps, which is the
+answer that costs nothing. Had the first ruling landed, every column group any surface gapped
+would have been kept whole — the transcript's cache losing its per-child parts for a field with a
+default of zero.
+
+**The tell was available before the code**: the wrong ruling cited C09 I80, and I80 is a statement
+about *the registry*. A ruling that borrows another rule's reason inherits that rule's subject, and
+the check is one grep — *which file emits this row*. C23 §8a A4 is the recorded instance and this is
+the second; both times the artefact was right about which two rules met and wrong about who holds
+one of them.
 
 ### S5 · the finding — `ROW_GUTTER` is a field with no name, read in three places
 
