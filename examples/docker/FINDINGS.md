@@ -53869,7 +53869,24 @@ where the measurement says the shredding is; `status`, `plot`, `table` and `imag
 ladders and the refusal is recorded rather than the four being retrofitted to a list they do not
 fit; `pills` is left alone with its reason written down.
 
-**Open** — the ruling is taken and the build is owed.
+**Closed, and the disposition is three different things rather than one.**
+
+- **§12's engine-level `representations` is refused** (C29 I18, §7b). Three families want a
+  representation and the engine owns none: a leaf's forms are the definition's, because `Leaf` is
+  opaque to the engine by its own declaration; an authored alternative is `art()`'s, because a
+  variant is a different block and choosing one in pass 2 would mean rebuilding a subtree mid-solve;
+  and a container choosing a subtree has no subject in the tree.
+- **§14 is refused** (C29 §7c), its intent discharged by C25 I18 and by composition, and C29 I16's
+  worked example is corrected off it (F1229).
+- **§15 is built** and is C29 I10. Its lumpiness is a constraint on the tests, not on the code.
+- **The shredding is C09 I81**, which is new work this finding produced rather than §12's own. Four
+  kinds owe a ladder and it is scheduled after the plan's remaining phases, with T3.93 and T3.94
+  carrying the blocker.
+
+**The one figure to keep**: §12 names four consumers and has none, and the four kinds that shred are
+named nowhere in it. A design section can be right about the need and wrong about every instance it
+cites — and the instances are the part a reader checks, because the need is stated as a sentence and
+the instances are stated as facts.
 
 ---
 
