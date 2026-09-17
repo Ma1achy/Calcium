@@ -491,9 +491,20 @@ describe("C26 §5 — the lifted list, in both axes (C09 §2)", () => {
     expect(new Set(inNarrow.map((f) => f.blockId)), "the unplaced child contributes nothing").toEqual(new Set(["a", "b"]));
     expect(at(inNarrow, "b", "r1").cols).toEqual([2, 3]);
 
-    // A `gapBefore` on a row-group child adds no row: the renderer ignores it.
+    // **A padded child of a row group shifts, and this row asserted the
+    // opposite** (C04 §3a, C09 I80). The old rule was *a `gapBefore` on a
+    // row-group child adds no row: the renderer ignores it*, and 2a inverted it
+    // — a row's child is a box like any other and draws its own edges
+    // (`C04_PADDING_WALK` A4). The frame moved when 2a landed; **this row stayed
+    // green, because `#elements` was not applying the offset at all**, so the
+    // element sat a row above the thing it addressed and the assertion agreed
+    // with it. Both are fixed together, and the number moving by exactly `t` is
+    // what says they agree now.
     const gapped = rowGroup(a, block({ ...b, padding: { t: 1 } }));
-    expect(at(k.registry.elementsIn([gapped], 40), "b", "r1").rows).toEqual([1, 2]);
+    expect(at(k.registry.elementsIn([gapped], 40), "b", "r1").rows).toEqual([2, 3]);
+    // The control: the same child unpadded is where it was, so the shift is the
+    // field's and not a change to how a row group places anything.
+    expect(at(k.registry.elementsIn([rowGroup(a, b)], 40), "b", "r1").rows).toEqual([1, 2]);
   });
 });
 

@@ -610,8 +610,65 @@ describe("C09 §2c width — the answers (I42–I44)", () => {
   });
 });
 
-describe("C09 §2 padding — the registry's one application, owed at the spec commit", () => {
-  it.todo(
-    "T3.91 (C09 I80, C04 I25): the registry insets and pads every kind once — measure answers t + b over the kind at w - l - r, width answers l + r over the kind's, render emits the blank rows and cuts each inset row to the content width, and elements shift by l and t; no definition reads padding, and a sequence adds nothing — not deferred on a component: it lands with 2a's migration, and this row is what SP9 holds open until it does",
-  );
+describe("C09 §2 padding — the registry's one application", () => {
+  it("T3.91 (C09 I80, C04 I25): the registry insets and pads every kind once, on all four seams", () => {
+    // **The row SP9 held open through 2a's spec commit, written now that 2a has
+    // landed.** All four seams against one block, because the claim is that one
+    // application answers for all of them: a definition that read `padding`
+    // itself would satisfy any one of these and disagree with the other three.
+    const kit = measurable();
+    const r = kit.registry;
+    const PAD = { l: 3, r: 1, t: 2, b: 1 };
+    const inner = 40 - PAD.l - PAD.r;
+    const text = "the quick brown fox jumps over the lazy dog and keeps on going past the edge";
+    const bare = block({ kind: "notice", id: "n", tone: "info", text } as never);
+    const padded = block({ kind: "notice", id: "n", tone: "info", text, padding: PAD } as never);
+
+    // The control: the kind wraps differently at 40 and at the content width, so
+    // every assertion below distinguishes "asked at `w`" from "asked at `w−l−r`".
+    expect(r.measure(bare, 40), "the fixture responds to the inset").not.toBe(r.measure(bare, inner));
+
+    // 1 · measure is `t + b` over the kind at the content width.
+    expect(r.measure(padded, 40)).toBe(PAD.t + PAD.b + r.measure(bare, inner));
+
+    // 2 · width is `l + r` over the kind's own answer at the content width.
+    expect(r.width(padded, 40)).toBe(PAD.l + PAD.r + r.width(bare, inner));
+
+    // 3 · render emits the blank rows and insets the rest, cut to the content
+    // width — read as a frame, not only as a count.
+    const rows = renderToLines(r, padded, 40, { theme: DARK_THEME, capabilities: FULL_CAPS, tick: 0 });
+    expect(rows).toHaveLength(r.measure(padded, 40)); // cells-ok — a row count
+    expect(rows.slice(0, PAD.t), "the top edge is blank rows").toEqual(["", ""]);
+    expect(rows.slice(rows.length - PAD.b), "and the bottom edge").toEqual([""]);
+    for (const row of rows.slice(PAD.t, rows.length - PAD.b)) {
+      expect(visible(row).startsWith(" ".repeat(PAD.l)), `inset by l: ${visible(row)}`).toBe(true);
+      expect(cells(visible(row)), `within l + inner: ${visible(row)}`).toBeLessThanOrEqual(PAD.l + inner);
+    }
+
+    // 4 · elements shift by `l` and `t`. A notice with an action declares one.
+    const withAction = (pad: boolean): Block =>
+      block({
+        kind: "notice",
+        id: "act",
+        tone: "info",
+        text: "short",
+        action: { key: "⏎", label: "open", command: "x" },
+        ...(pad ? { padding: PAD } : {}),
+      } as never);
+    const before = r.elementsIn([withAction(false)], inner);
+    const after = r.elementsIn([withAction(true)], 40);
+    expect(before, "the fixture declares an element to move").not.toEqual([]);
+    expect(after).toHaveLength(before.length);
+    for (const [i, e] of after.entries()) {
+      const was = before[i]?.element;
+      expect(e.element.rows.from - (was?.rows.from ?? 0), "rows shift by t").toBe(PAD.t);
+      expect(e.element.cols.from - (was?.cols.from ?? 0), "cols shift by l").toBe(PAD.l);
+    }
+
+    // And no definition reads it: a sequence adds nothing, so the padded block
+    // measures the same alone as it does among others (C09 I17).
+    expect(r.measureSequence([bare, padded, bare], 40)).toBe(
+      r.measure(bare, 40) * 2 + r.measure(padded, 40),
+    );
+  });
 });

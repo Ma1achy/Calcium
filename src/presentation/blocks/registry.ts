@@ -436,7 +436,26 @@ class Registry implements BlockRegistry {
       const form = this.#form(block, width);
       const declared = form.definition.elements;
       if (declared === undefined) return NO_ELEMENTS;
-      return { elements: declared(form.block, width, this.#measureChild), owned: true };
+      // **The padding is applied here too, and it was the one seam that missed
+      // it** (C09 I80). Found by writing T3.91, the row the 2a spec commit left
+      // as an `it.todo` — three of I80's four clauses were built and this one
+      // was not, which no green run could say. Two halves, both wrong in the
+      // same line: the definition was asked at the block's full width, so a
+      // padded block's elements were computed against a wrapping it never had;
+      // and the answers were block-local to the *kind* rather than to the
+      // block, so a focus ring sat `t` rows above and `l` columns left of the
+      // thing it was ringing.
+      const pad = paddingOf(block);
+      const elements = declared(form.block, contentWidth(block, width), this.#measureChild);
+      if (pad.l === 0 && pad.t === 0) return { elements, owned: true };
+      return {
+        elements: elements.map((e) => ({
+          ...e,
+          rows: { from: e.rows.from + pad.t, to: e.rows.to + pad.t }, // cells-ok — row indices
+          cols: { from: e.cols.from + pad.l, to: e.cols.to + pad.l }, // cells-ok — cell indices
+        })),
+        owned: true,
+      };
     } catch (error) {
       this.#report(block, "elements", error);
       return NO_ELEMENTS;
