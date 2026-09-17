@@ -219,15 +219,54 @@ function childRanges(
   width: number,
   measureChild: MeasureFn,
 ): readonly Readonly<{ child: Block; from: number; to: number }>[] {
-  const out: { child: Block; from: number; to: number }[] = [];
-  const widths = childWidths(block, width);
-  let at = 0; // cells-ok — a row cursor, not a width
-  for (const [i, child] of block.children.entries()) {
-    const height = measureChild(child, widths[i] ?? 1);
-    out.push({ child, from: at, to: at + height });
-    at += height;
-  }
-  return out;
+  const w = normaliseWidth(width);
+  const solved = layout(scrollMeasureBox(block, w, measureChild), w);
+  return block.children.map((child, i) => {
+    // A child the engine did not place cannot happen — the box is built from
+    // these children — and the fallback is the degenerate range rather than a
+    // throw, because `elements` and `render` both walk this and a missing child
+    // must cost nothing rather than take the frame down.
+    const rect = solved.children[i]?.rect;
+    const from = rect?.y ?? 0; // cells-ok — a row cursor, not a width
+    return { child, from, to: from + (rect?.height ?? 0) };
+  });
+}
+
+/**
+ * A scroll's content as a C29 box (C29 §6) — **the column the offset scrolls**.
+ *
+ * `FIXED` at the full width, because a scroll insets nothing: its box is drawn
+ * by bounding rows rather than by a border (C04 I49), which is the arm
+ * `childWidths` carries for this kind and the reason it is not `insetWidth`'s.
+ *
+ * **Not `sequenceChildren`, and the omission is the rule.** C04 §3a's sequence
+ * is a document's top level, a panel's children or a column group's children; a
+ * scroll is none of the three and never counted a `gapBefore` row. Reaching for
+ * the shared builder here would add a row to every scroll holding a gap child —
+ * a frame moving because two shapes look alike.
+ *
+ * **The clip is not on this box.** The offset selects children in `render` and
+ * an unsliceable child is still drawn whole (T2.28b, F855, F1215); C29 I15's
+ * `clip` plus a negative offset is what that becomes when the render arm moves,
+ * and putting it here now would bound a box nothing is yet cutting to.
+ */
+function scrollMeasureBox(block: Scroll, width: number, measureChild: MeasureFn): Box {
+  return {
+    id: "scroll\u00b7content",
+    direction: "column",
+    width: { kind: "fixed", n: normaliseWidth(width) },
+    height: { kind: "fit" },
+    align: { x: "stretch" },
+    children: block.children.map((child, i) => ({
+      id: `c${String(i)}`,
+      children: {
+        kind: "paint" as const,
+        natural: 0,
+        measure: (cw: number) => measureChild(child, cw),
+        render: () => [],
+      },
+    })),
+  };
 }
 
 /**

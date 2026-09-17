@@ -612,3 +612,56 @@ describe("C09 §6b — the second caller, and the bound it applies", () => {
     ).not.toEqual([]);
   });
 });
+
+describe("C29 1.5 — what the content column declares", () => {
+  // **Both rows here are mutation survivors.** The ranges moved onto a C29 box
+  // and two of its fields could be deleted with 5,494 rows still green: the
+  // full width, and the absence of a `gapBefore` wrapper. Neither is exotic —
+  // they are the two ways a scroll differs from the panel and the column group
+  // whose builder sits beside it — and neither had a fixture that could see it.
+
+  it("T2.148 (C04 I49, C29 I9): a scroll insets nothing, so its children are measured at the full width", () => {
+    // **The width has to straddle a wrap or the two answers agree.** This
+    // notice is one row of 40 at width 40 and two rows at width 38, so
+    // measuring the children inside a border they do not have puts the content
+    // over a box of one and buys a residue row that the frame does not.
+    const text = `${"a".repeat(20)} ${"b".repeat(19)}`;
+    const child = wrapping("w", text);
+    expect(registry.measure(child, 40), "one row at the full width").toBe(1);
+    expect(registry.measure(child, 38), "two rows two columns narrower").toBe(2);
+
+    const box = scroll(1, [child]);
+    expect(scrollDefinition.measure?.(box, 40, measureChild), "the box, and no residue").toBe(1);
+    const lines = renderSequenceToLines(registry, [box], 40, { theme: DARK_THEME, capabilities: FULL_CAPS });
+    expect(lines.length, "and the frame agrees").toBe(1);
+  });
+
+  it("T2.149 (C04 §3a, C04 I25): a scroll is not a sequence, so a `gapBefore` child costs it no row", () => {
+    // **The omission is the rule.** C04 §3a names the three sequences — a
+    // document's top level, a panel's children, a column group's children — and
+    // a scroll is none of them. The shared builder one function away adds the
+    // blank row, so this row is what keeps the two shapes from being merged
+    // because they look alike.
+    //
+    // **The box has to be over-full or the gap is invisible.** A scroll's own
+    // height is declared, and `render` concatenates the shown children's rows
+    // and pads to the interior — so a gap row inside a box with room changes
+    // nothing anywhere. It is the content height that carries it, and the
+    // content height is read by the residue row and by the ranges the offset
+    // selects. A first version of this row used a box of three over two rows of
+    // content and passed under the mutation.
+    const plain = scroll(1, [flat("a"), flat("b")], "sp");
+    const gapped = scroll(1, [flat("a"), { ...flat("b"), gapBefore: true } as Block], "sg");
+    expect(scrollDefinition.measure?.(gapped, 40, measureChild), "the same height").toBe(
+      scrollDefinition.measure?.(plain, 40, measureChild),
+    );
+    const rows = (box: Scroll): readonly string[] =>
+      renderSequenceToLines(registry, [box], 40, { theme: DARK_THEME, capabilities: FULL_CAPS });
+    expect(rows(plain).at(-1), "one row hidden below, not two").toContain("1 below");
+    expect(rows(gapped), "and the same frame").toEqual(rows(plain));
+
+    const ends = (box: Scroll): readonly number[] =>
+      (scrollDefinition.elements?.(box, 40, measureChild) ?? []).map((e) => e.rows.to); // cells-ok — row indices
+    expect(ends(gapped), "the children sit at the same rows").toEqual(ends(plain));
+  });
+});
