@@ -53748,6 +53748,70 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1225 — the gate had no padded block in it, and the four things that came out of saying so ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | Phase 2a: `gapBefore` replaced by block-level `padding`, the registry applying it around every kind (C04 §3a, C09 I80). |
+| **Reached for** | 16 of 458 golden frames moved and all 16 were in one file. A change to the box model moving 3.5% of the corpus is either a very careful change or a corpus that cannot see it. |
+| **Verdict** | **The corpus.** 51 blocks in the shared corpus, **0 with padding**; the terminal baseline is one plot per frame, so its 2,440 frames are blind by construction. Three of the model's four claims shipped with no picture behind them and the fourth was watched by accident. |
+
+**The measurement first, because the 16 look like diligence.** They are all one case in
+`test/golden/patch.test.ts`, which renders each block **alone** — and a block drawn outside a
+sequence now draws its own leading row where `gapBefore` was inert there, because the row belonged
+to a composer that was not running. Every one of the 32 changed lines is that row plus the caption
+counting it. The frames that moved moved correctly; the finding is the frames that could not.
+
+**Four defects came out of the four subjects being given one**, and none was visible from a green
+run:
+
+**1 · The assembler loses a padded container's edges.** `entry-layout.ts` assembles a cached
+window over a column group by rendering each child alone and laying the rows end to end — which
+draws none of the *group's* own padding, where the fresh render draws it once around the whole. A
+re-pointed mutation survived; giving T4.89b's fixture a padded container turned the row **red with
+no mutation applied at all**, the assembly missing the top row and the 2-column inset on every
+line. Ruled the way the window seam already rules it: **a padded group is assembled whole**, one
+cache part, and no third place that knows the padding rule.
+
+**2 · `l` and `r` were code with a rule, a test and no picture.** `#padded` insets each row and
+narrows the width the kind is asked for, and **nothing in the tree declares either edge** — so
+both effects were unwatched. It takes two frames rather than one: `raw` truncates, so the inset
+shows and the narrowing does not, and a single case showing the inset reads as covering both.
+
+**3 · Sharing a predicate blinded the row that checks it** (F277's warning, met exactly). The
+floor's refusal and padding's became one `windowRefused`, called by both window callers *and* by
+the measurement harness's stand-in — which is right for the seam and fatal for T2.124, whose whole
+method is comparing the seam against the definition. Both sides consulted one function and agreed
+however wrong it was, and the mutation survived. The harness gained `windowDefinition`, the
+unguarded dispatch, and the row restates the rule in literal clauses as it already did for the
+floor and the cap. **A shared implementation is the right answer and it costs a row its
+independence; the row has to be told.**
+
+**4 · A mutation made vacuous by a layer below it.** PAD-SPACE writes the padding row as a single
+space, which was a real defect when `render-lines` pushed the row straight into its output past
+the arm's normalisation. The row is the registry's now and reaches a frame through `normaliseRow`,
+and **measured: `normaliseRow(" ")` is `""`**. The byte cannot survive to a frame, so no row can
+see it go. Recorded as an expected survivor rather than deleted — the obligation moved to the
+trim, which TRIM-DROPPED holds one line above, and deleting the row would leave no record that it
+moved.
+
+**And the corpus gap is the thing to fix, because 2b is worse.** Phase 2b puts `padding.l = 3` per
+nested level and `padding.r = 1` on the root — padded *containers*, which is defect 1's subject
+exactly. `test/golden/padding.test.ts` is the subject the gate was missing: six cases (alone,
+horizontal on a kind that truncates, horizontal on one that wraps, all four edges, a row group
+with one child padded, and a sequence) × 3 widths × 3 variants, with a column ruler so an inset is
+readable, and the arithmetic beside the picture. The fifth case is the control and the one that
+must **not** move: the row changed owner and not position, which is what the migration claims.
+
+**The class, and it is the one CLAUDE.md already names.** *A corpus chosen for a property may not
+have it* — T2.124's own comment had counted three instances of it in this component before padding
+made four, and each was found the same way: a mutation surviving for want of a fixture. Three
+instances is a rule and four is a habit, so the question belongs in the landing cycle rather than
+in the mutation report: **before moving a property, count the corpus members that carry it.** Zero
+is the answer that looks like green.
+
+---
+
 ## F1224 — a fail-on-revert row whose defect can no longer be built, found by its own premise going red ★★★☆☆
 
 | | |
