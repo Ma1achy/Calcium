@@ -53748,6 +53748,88 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1228 — §12's four cited consumers are the four that do not need it, and the four that do are not named ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `LAYOUT_ENGINE.md` §12 — *responsive representations*: `representations?: { min, box }[]`, the engine picks the widest that fits, per element, bottom-up, in pass 2. The plan's phase 3 says it **generalises four ladders that already exist** rather than inventing one. |
+| **Reached for** | The premise check F1226 is, run on the section the plan did apply it to — and then the frame-read, because the first table was of the wrong fixture and its numbers were almost right. |
+| **Verdict** | **§12's mechanism is sound and its evidence is inverted.** The four ladders it would generalise do not share its shape, two of its four worked examples have no subject in the tree, and the four kinds that genuinely shred at a narrow width are named nowhere in it. |
+
+**1 · Two of the four worked examples have no subject.** `sidebar` and `tabBar` are in no file in
+`src/` — the headline sentence, *a sidebar should not vanish at 60 columns, it should become a
+rail*, is about a block that does not exist. The **footer** example is the frame's chrome, whose
+height C22 I82 caps and whose content is the app's `ChromeFn`, not a block that could declare
+representations. F161's shape exactly: **a count of consumers is an argument only if the consumers
+share a shape**, and here two of them are not consumers at all.
+
+**2 · The four ladders that do exist are four different mechanisms.** §12 proposes a **list of
+discrete forms, chosen by width**. Measured, at HEAD:
+
+| the ladder | what it actually is |
+|---|---|
+| `status`'s `widthRung(width, frame)` | a **modified frame plus a tag fit** — it turns *features* off: border, then pad, then the tag. A struct of booleans resolved at a width, with no list anywhere |
+| `plot`'s `layoutFor(...)` | `Layout \| null` — a **computed geometry** carrying an *ordering of what loses width* (labels → furniture → curve). The rungs are a priority, not forms |
+| `table`'s shedding | a **greedy loop**: admit columns while `Σ min + gaps ≤ width`, stop at the first non-fit (`plan.ts:113`) |
+| `image` and the heatmap | a **substitution of kind** — they degrade *into a status box*. Not a representation of the same block |
+
+Going to each of the four, as F161's method requires: one already has the slot, two are functions of
+the width rather than lists, and the fourth is a different block. **So §12 must invent its
+mechanism rather than generalise; the plan's phase 3 sentence is false, and it is false in the
+direction that makes the work look smaller.**
+
+**3 · And the subject is real — it is just none of those four.** Twelve kinds rendered at 80, 40,
+24, 12 and 6 columns, read as frames:
+
+```
+comparison  w=12   "  field  b……"  /  "~ l…  3…  2…"
+keyValue    w=6    "f…  f…"        /  "s…  s…"
+events      w=12   "22:13:20  s…"
+steps       w=6    "✓ re…" / "⠋ fi…" / "◌ ad…"
+pills       w=6    "alpha" / "bravo" / "charl…" / "delta"
+```
+
+**`comparison` at twelve columns shreds every column at once**, which is the precise thing §12's
+own *sheds, never shreds* forbids. `keyValue` shreds both halves. `events` spends eight of twelve
+cells on a timestamp and loses the message entirely — the rung wants the timestamp shed first, and
+nothing sheds it. `steps` truncates the label to a stub and never sheds it in favour of the state
+marks, which is §12's *a rail — marks and counts, no labels* on a kind the design does not mention.
+
+**`pills` is the one that inverts the design outright.** §12 wants a tab bar to collapse to
+`⋯ n more`; `pills` **wraps to a row per chip** and at six columns shows four chips on four rows
+with one truncated. Nothing is silently lost, which is what dropping to `⋯ n more` would do — so
+the built mechanism is the better one and the design's spelling is what would regress it. That is
+F1226's first pattern again: *built, by the mechanism its own spelling forbids.*
+
+**4 · The correction this finding needs about itself, and it nearly shipped.** The first table was
+taken with **hand-written fixtures that five of the twelve kinds rejected** — `pills` takes `chips`
+and not `pills`, `steps` and `keyValue` take `label` and not `key`/`text`, `comparison` takes
+`field`/`a`/`b`. Every one rendered C09 I34's **contained failure notice**, and the notice narrows
+like any text. So the table read:
+
+```
+comparison   2r/51c   2r/38c   2r/24c   2r/12c   2r/6c      ← the failure notice
+comparison   2r/61c   2r/34c   2r/23c   2r/12c   2r/6c      ← the kind
+```
+
+**Three of the five columns agree to the cell and the other two are within three.** A measurement
+of the wrong subject was within noise of the right one, so no number in the table could have
+distinguished them — and the conclusion drawn from the wrong table would have been *every kind
+truncates cleanly and nothing sheds*, which is the opposite of what the frames say. **Only the
+frame-read separated them**, on its second run, and `test/support/README.md`'s rule is the one that
+should have come first: *a fixture must be shown to respond to the thing under test before it is
+asserted against.* The tell available in the numbers was one cell of one row — `status` measuring
+`NaN` — and it was a cast in the probe rather than a defect in the tree.
+
+**So phase 3's shape changes.** §12 is built for `comparison`, `keyValue`, `events` and `steps`,
+where the measurement says the shredding is; `status`, `plot`, `table` and `image` keep their
+ladders and the refusal is recorded rather than the four being retrofitted to a list they do not
+fit; `pills` is left alone with its reason written down.
+
+**Open** — the ruling is taken and the build is owed.
+
+---
+
 ## F1227 — the right margin is one row of forty-five frames, and three composers are exempt by invariants already written ★★★☆☆
 
 | | |
