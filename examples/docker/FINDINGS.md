@@ -53748,12 +53748,46 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1218 — four design documents and 596 references were outside the enforcement corpus, and the first run found a citation pointing at the wrong invariant ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | Adopting the layout bundle into `docs/design/layout/`. Committing it changed no counter in `make enforce` — dangling section citations stayed at 334 of 9507, across 175 targets — which is how it emerged that **`referenceFiles()` does not walk `docs/design`**: it walks `architecture`, `components`, `surfaces`, `behaviours`, `notes` and `reference-app`, and the directory holding four design documents was never in the list. |
+| **Reached for** | Adding the walk and reading what fired. **Nine SP3 violations, gated**, every one a bare invariant id with no owning spec: eight in the new bundle (`I1` throughout, meaning C09 I1) and **one pre-existing** — `AGENT_TUI_DESIGN.md:1141`'s *if it lives on focus it is I17's forbidden case*. |
+| **Verdict** | **Closed.** The directory is walked, the bundle's eight citations name C09, and the pre-existing one is corrected to **C09 I2** with the reason written beside it. |
+
+**The pre-existing citation resolves against the wrong invariant under either owner, which is the
+class the audit says cannot be automated — and a bare id is the half that can.** The sentence is
+about a height that depends on focus. **C09 I17** is `gapBefore`'s sequence rule; **C04 I17** is
+*every measurer returns at least 1 for a present block*. Neither forbids anything the sentence
+describes. What does is **C09 I2** — `measure` is pure and total, a function of `(block, width)` —
+and it is two invariants away from the number that was written. SP3 cannot tell a wrong citation
+from a right one; what it can tell is that nobody said *which spec*, and pointing it at an unwatched
+directory turned an unresolvable pointer into a resolvable wrong one, which is a reader's job from
+there.
+
+**The obvious fix for one half broke the other, and the counter is what said so.** Declaring
+`{ path: "docs/design/layout", spec: "C09" }` in `OWNERS` resolved all eight bare invariants at
+once — and made every bare `§13`, `§15` and `§19` in those documents, which are **their own
+section numbering**, resolve as `C09 §13` and report *C09 has no such section*. A misattributed
+citation reads as a defect in C09; an unattributed one reads as what it is. So the owner entry was
+reverted and the eight invariants were named in the prose instead, where a reader sees them:
+**0 dangling in the bundle, 23 correctly classed as naming no document.**
+
+**And the authority these documents defer to is not here either.** Their README says *when they
+disagree, the picture wins — it was measured and this was written*, naming
+`calcium-design-language.html` and `calcium-interaction-prototype.html`. **Neither is in the
+repository.** So the tie-break the rules rest on is unavailable, and a rule justified by *the
+drawing was measured* cannot be checked against the drawing. Written into the bundle's own README
+rather than left in a session, because it is the same shape as the finding above it one level
+down — and this time the record says where to look.
+
 ## F1217 — the layout plan's last step lists seven properties, four are built, and the one that remains is forbidden as written ★★★★☆
 
 | | |
 |---|---|
 | **Surface** | Step 6 of the layout pass: *now expressible as properties of the row composer rather than things each surface remembers* — padding, margin, gap at the sequence level, minimum width, alignment, a container as tall as its contents, a bounded body's hidden-row residue. |
-| **Reached for** | Each of the seven, against the tree, before writing any of them. **`APPEARANCE.md` — the document the step's whole justification rests on — is in no file in this repository**; `find` and a repo-wide grep return nothing. The plan's Context paragraph is its only statement, which is F161's shape: a named source, cited as settled, with nothing behind it. |
+| **Reached for** | Each of the seven, against the tree, before writing any of them. **`APPEARANCE.md` — the document the step's whole justification rests on — was in no file in this repository**; `find` and a repo-wide grep returned nothing. **Corrected the next day: the document exists, outside the tree**, and is now committed at `docs/design/layout/APPEARANCE.md` with its six companions. The finding's mechanism is unchanged and the correction sharpens it — the claim was *unverifiable from here*, not *fabricated*, and the difference is exactly what F161 gets wrong in the other direction. |
 | **Verdict** | **Closed as a step, open as one entry.** Four of the seven are built, one is built at the wrong scope, and the remaining two are one subject — `padding` — which C04 already rules a **replacement** rather than an addition, so building it as a composer property is forbidden by a sentence written before the plan was. |
 
 | the property | where it is |

@@ -1949,6 +1949,7 @@ export function referenceFiles() {
   walk("docs/behaviours", /\.md$/);
   walk("docs/notes", /\.md$/);
   walk("docs/reference-app", /\.md$/);
+  walk("docs/design", /\.md$/);
 
   return [
     ...out.filter((f) => !/\.d\.tsx?$/.test(f)),
