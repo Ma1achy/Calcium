@@ -53748,6 +53748,82 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1231 — §13's cache is built, its dirty machine has no mutable tree to run on, and its opening premise is false ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `LAYOUT_ENGINE.md` §13 — *incremental layout*: a DIRTY/CLEAN marking pass, the rule that **a child whose natural size did not change cannot dirty its parent**, five numbered steps, and a cache *keyed on (box identity, available width) and nothing else*. The plan's phase 5 calls it *mostly a wiring exercise, because the cache is built and correct*. |
+| **Reached for** | The premise check F1226 is, run on the last section of the pass — and then `tools/bench/stress.mjs`, because three of the four claims are about how often something misses and none of them had a number. |
+| **Verdict** | **The prescribed cache is built, session-scoped, and keyed exactly as §13 asks. The dirty machine has nowhere to live. And §13's opening sentence — *the spec so far solves the whole tree every frame* — is false at HEAD.** |
+
+**1 · The cache §13 prescribes exists, one layer above the engine.** `construct.ts:830` opens a
+`WeakMap<Block, {width, rows}>` before the viewport and hands it down (C22 I100); `registry.ts`'s
+`#measureChild` reads it on every child ask and reports `hit` or `miss` with a reason. Its key is the
+block **object** and the width — *(box identity, available width) and nothing else*, which is §13's
+own sentence with `Block` where it wrote `box`. The engine holds no cache of its own:
+`src/presentation/layout/` contains no `Map`, no `WeakMap` and no memo in 864 lines.
+
+**2 · It holds across frames, measured.** `stress.mjs panel` at 120×40, 150 entries, a PageUp/PageDown
+sweep of forty:
+
+```
+misses: measure absent 421 · chrome absent 2/rev 83 · height absent 1/rev 1 · render absent 1
+        over 97 frames
+```
+
+**421 absent misses over 97 frames, against a corpus of roughly 750 measurable blocks** — so the count
+is a population and not a rate, and re-entering a window costs nothing. **Zero `width` misses**, which
+is the other half: nothing in a static run is ever re-measured at a second width. The same run at four
+seconds instead of one returns the identical line, so the misses are tied to frames and the frames to
+content.
+
+**3 · §13's opening premise is false.** *The spec so far solves the whole tree every frame. That is
+slower than what it replaces.* The engine's callers are `panel`, `scroll` and the two groups, each
+entered through `measure`, and every child ask inside the `Box` they build goes through the memo
+first. The engine is reached on a miss, and the miss rate is the figure above. The sentence describes
+a tree with no cache above it, and there has been one since C22 I100.
+
+**4 · The dirty machine has no mutable tree to run on, and its effect is already delivered.** §13's
+five steps — *mark the changed boxes dirty · solve each dirty box's natural size · if it equals the
+cached one, STOP · if it differs, dirty the parent and repeat* — presuppose boxes that are marked and
+re-solved in place. **Calcium's blocks are frozen and replaced on change**, so:
+
+| §13's step | what identity already does |
+|---|---|
+| *mark the changed boxes dirty* | a changed block **is** a new object, so the mark is the key |
+| *solve its natural size; if it equals the cached one, STOP* | an unchanged child is the same frozen object and the memo answers without solving |
+| *if it differs, dirty the parent and repeat* | a parent holding a changed child is itself rebuilt, so it is a new key, and one that is not is a hit |
+
+So the rule *a child whose natural size did not change cannot dirty its parent* is **satisfied by
+construction and slightly differently**: identity is stricter on one side — a block rebuilt with
+byte-identical content is a new key and misses, though its size did not change — and free on the
+other, because no marking pass has to run at all. The registry's own comment says the stricter half
+outright: *a rebuilt block is a new key and a settled entry's blocks are collected with it; nothing
+evicts and nothing subscribes.*
+
+**5 · The one property §13 does not have, now measured rather than read.** The plan recorded it off the
+type — *one slot per block holding the last width, not a map over widths, so alternating widths
+thrash* — and a claim read off a type is a claim. Asked at 80, then 60, then 80 again through one memo:
+
+```
+slot after 80:  { width: 80, rows: 4 }
+slot after 60:  { width: 60, rows: 4 }
+slot after 80:  { width: 80, rows: 4 }
+```
+
+The slot moves each time, so the third ask was a `width` miss and not a hit. **A resize sweep
+re-measures everything it touches twice; a stable terminal width never pays it** — which is the
+correct trade for a terminal and is the reason the counter above reads zero. It is stated so nobody
+measures it as a defect.
+
+**So phase 5 lands as a refusal with the mechanism recorded and its one measured limit stated.** The
+engine holds no cache, the memo is C22's, and §13's machine is an answer to mutability this tree does
+not have.
+
+**Open** — the ruling is taken and the spec edit is owed.
+
+---
+
 ## F1230 — §10's one live float is full-width by construction, and two of its mechanisms are already built ★★★★☆
 
 | | |
