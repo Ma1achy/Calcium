@@ -53748,6 +53748,56 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1234 — §14's refusal clause describes a different mechanism from §14's own definition ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `LAYOUT_ENGINE.md` §14, sticky. Two sentences: sticky is a child **excluded from its container's scroll offset** that **occupies flow space** — *it is not a float, it displaces its siblings* — and *a sticky child cannot be `GROW` on the scroll axis*, because *it would grow to fill the space it is excluded from, which is a loop*. |
+| **Reached for** | The field, and the refusal beside it, per the plan's phase 3. |
+| **Verdict** | **The definition is buildable and the refusal has no reachable input.** A child that occupies flow space is excluded from no space — only from an offset — so there is nothing for it to grow into. |
+
+**1 · Measured, because a loop is a claim about arithmetic.** A container clipping on `y` at a fixed
+height of 6, holding a one-row header and a `GROW` body:
+
+```
+GROW body inside a clipping container: measure=6
+scroll  x=0 y=0 w=3 h=6
+  header x=0 y=0 w=2 h=1
+  body   x=0 y=1 w=3 h=5
+```
+
+The body solves to 5 and does not diverge. The clip hands `POSITIVE_INFINITY` to the **distribution**
+— a clipping container does not impose its size on the axis it clips (C29 §7, I15) — while `GROW`
+still resolves against the inner box. So the refusal's premise is false about this engine whichever
+way the child is declared, and it would be a validation path nothing reaches.
+
+**2 · This is F1229's finding with the reason replaced.** C29 I16's worked example was *a sticky
+child that is `GROW` on the scroll axis*, and it was corrected off on the ground that **`sticky` is in
+no type** — true, and the weaker of the two reasons. The stronger one survives the field being built:
+the example names a contradiction this engine's sizing cannot express. **A refusal accumulates
+reasons, and the one that outlives the build is the one to keep.**
+
+**3 · The subject is real and it is a frame.** The same container with `offset.y = 3` draws
+
+```
+b2 b3 b4 b5 b6 b7
+```
+
+— the header is gone, because `collect` applies the offset to every child. That is what sticky is
+for, it is constructible today with no new type, and it is the answer to §7c's *the field would be an
+export nothing consumes*: the consumer argument was about surfaces, and the mechanism's subject is a
+frame the engine already draws wrongly.
+
+**4 · And the build needs a second rule §14 does not state.** A sticky child excluded from the offset
+still sits where flow put it, and its scrolling siblings are collected after it — so they paint over
+it. Exclusion from the offset is half the mechanism; **paint order is the other half**, and a
+definition that names only the first draws a header under its own body.
+
+**Open** — §14 lands as `Box.sticky`, read where the offset is applied; the refusal is corrected
+rather than built.
+
+---
+
 ## F1233 — four kinds shred where one step should shed, and neither the declared orders nor half the step's own rules survived being tested ★★★★★
 
 | | |
