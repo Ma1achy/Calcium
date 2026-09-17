@@ -53748,6 +53748,57 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1219 — the distribution rule is two rules, and the reason written against changing it is false ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `LAYOUT_ENGINE.md` §5 asks for largest-remainder distribution with ties by declaration order, and the plan asserted it *agrees with today exactly when the shares are equal*. Settled before a type exists, because everything the engine computes is written against this rule. |
+| **Reached for** | Running both rules over every share vector the tree actually contains, at the gates' widths. **The assertion is false, and it was false because there are two rules.** `mosaicRects` is `divideShares` **plus `spread`** — leftover one cell each to the earliest non-fixed lines. `groupChildWidths` is `divideShares` **alone** — the leftover is **unspent**. So largest-remainder agrees with the mosaic on equal shares and differs from the group on *every* share vector whose budget does not divide, `[1, 1]` included. |
+| **Verdict** | **Closed by a ruling.** The leftover is a **declared policy**, not a property of the arithmetic: a group spends nothing, a mosaic tiles by largest remainder with ties by declaration order, one function serves both. C04 I42 amended. |
+
+**Measured, both rules over the vectors the tree holds** — every `flex` in `src/` and both examples,
+at 40, 60, 80, 120 and 200:
+
+| shares | today | largest remainder |
+|---|---|---|
+| `[1, 1]` at 80 | `[39, 39]`, one cell unspent | `[40, 39]` |
+| `[2, 1]` at 80 | `[52, 26]` | `[53, 26]` |
+| `[3, 2, 1]` at 40 | `[19, 12, 6]` | `[19, 13, 6]` |
+| `[8, 4, 2, 1]` at 40 | `[19, 9, 4, 2]` | `[20, 10, 5, 2]` |
+| `[1, {cells: 9}]` | unchanged at every width | unchanged |
+
+**`[1, 1]` is the row that matters, because it is the common case and the plan's claim exempted
+it.** Every unweighted row group resolves `flex ?? ones`, so *equal shares* is not a corner — it is
+what most of the corpus is.
+
+**The reason the spec gives for not spending the leftover is false against the rule being
+proposed.** I42 read *spending it would make `flex: [1, 1]` differ from no `flex`*. Both arms
+resolve `flex ?? ones` and take one path, so a rule that does not ask whether weights were written
+keeps them identical — measured, not argued. The clause is true of exactly one alternative: C11's
+**leftmost** rule, which spends the residual on the first child *when weights are present*, and
+that is the alternative it was written against. **A correct sentence justifying the wrong
+decision** (CLAUDE.md's MG24 case): it constrains a decision nobody is making now, and it is the
+first clause a reader meets.
+
+**What does rule is the second clause, which was already there.** *A table's residual exists to be
+absorbed and a group has no child that claims it.* A flex column claims the residual; no child of a
+group does, so distributing it picks a child on the arithmetic's behalf. Largest remainder makes
+that choice reproducible, not principled.
+
+**And the cost of changing it is the constraint that fixed the direction.** The corpus's row group
+is captured at eleven widths under three capability arms — thirty-three frozen files — and at every
+width whose budget is odd the second child moves one column right: at 40 the capture reads
+`left` + 16 spaces + `right`, and largest remainder makes it 17. **Those captures cannot be
+regenerated**: the recorder left with Ink (F1209), and the whole point of the corpus is that
+nothing in the tree can produce it again. So the choice was between a ruling and retiring
+unregenerable evidence to gain one cell of width.
+
+**One citation corrected on the way.** `spread`'s comment and the plan both say *T3.16 pins the row
+group's remainder where it is*. T3.16 asserts **equal weights against the unweighted path** and is
+invariant under every distribution rule — it cannot pin a remainder. The row that pins it is
+**T3.17**: `52 + 26 + 1 = 79`, *one cell of the eighty goes to nobody*. Same class as F1218's `I17`,
+one file over, found the same way: by going to read the row the citation names.
+
 ## F1218 — four design documents and 596 references were outside the enforcement corpus, and the first run found a citation pointing at the wrong invariant ★★★☆☆
 
 | | |
