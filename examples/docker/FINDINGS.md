@@ -53821,8 +53821,22 @@ the instrument that caught it was the one that caught everything else in this pa
 frame**. Every assertion about the solved tree agrees with itself either way, because a sticky
 child's `rect` is its flow rect whichever order it is collected in.
 
-**Open** — §14 lands as `Box.sticky`, read where the offset is applied; the refusal is corrected
-rather than built.
+**6 · And the mutation pass found a sixth thing, about the row rather than the code.** The guard
+keeping a sticky child out of the scrolling walk looked decorative: collected twice, the second
+piece is clipped away at every offset the fixture used, so the mutation survived. It is not
+decorative — a footer at `offset.y = 9` has its flow row back inside the window and blank, because
+the body ran out, and the duplicate has somewhere to land. **The fixture's offsets were the reason
+the cell could not be constructed**, which is the disposition F277 asks for before a row is
+rewritten. The harness also refused to start: the two rows passed `layout` a third argument it does
+not take, and `tsx` — the probe's runner all pass — never type-checks.
+
+**Closed** — §14 is `Box.sticky`, carried by `freeze` and read in `collect`, the one site that
+applies `clip.offset`; the refusal is corrected rather than built. T1.37 and T1.38 are the rows, both
+frame-reads, and T1.38 asserts the solved trees are equal on purpose. Mutation `c29-sticky` **5
+caught / 0 survived**. enforce 24,731 references · `make test` 343 files, 6,298 passed, 4 todo ·
+`make golden` **468/468 with nothing moved, predicted before the run** — `sticky` is optional and no
+existing tree declares it · `make e2e` 24 files, 136 passed, 3 todo · anchors 0 known stale, no run
+drifted. Commits `a37085be` (open), `70a143ec` and `aa23d21f` (spec, each alone), `030c21c3` (code).
 
 ---
 
