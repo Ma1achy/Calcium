@@ -53748,6 +53748,40 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1223 — a group whose children all measure zero measures one row and draws none, in both directions ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | C09 I1 — `measure(b, w)` equals the rendered row count — against a `group` holding nothing but an empty `group`. Measured **1**, rendered **0**, for `direction: "column"` and `"row"` alike. `panel` is unaffected: its border carries rows of its own. |
+| **Reached for** | A mutation that survived. C29 1.2 moved the column's height onto the engine, and removing the floor of one killed nothing — so the floor looked unreachable, because C04 I17 is usually read as *every measurer returns at least 1* without its one exception. **An empty container measures 0**, so a column holding one sums to zero and the floor is the only thing standing between that and a zero-row group. |
+| **Verdict** | **Pre-existing and fixed.** `measure` floors at one through `atLeastOne`; `render` floors at `block.minRows ?? 0` and at nothing else. Both arms of `render` take the same floor the measurer does. |
+
+**Two records of one height, disagreeing in exactly one case.** `groupHeight` is C09 I69's *one
+computation* and it is one — for `measure` and for `window`'s decline branch, which are the two the
+invariant names. **`render` was never in it.** It re-derives the height from the rows it produced and
+pads to `minRows`, which agrees with the measurer everywhere `minRows` is the binding constraint and
+everywhere a child draws something. The gap is the third clause, the floor of one, which `render`
+never had.
+
+**It could not be found by reading either arm.** `atLeastOne(groupRows(block, content))` is correct
+and `while (lines.length < (block.minRows ?? 0))` is correct; they are the same rule with one clause
+missing from one of them, and the clause is the one nobody thinks about because it reads as defensive.
+**The mutation is what asked whether it was defensive**, and the answer was no — CLAUDE.md's *a
+mutation that fails nothing is a finding about the tests*, arriving as a finding about a rule two
+files away from the one being mutated.
+
+**And the direction of the disagreement is the safe one, which is why nothing noticed.** Measuring
+one row and drawing none leaves a blank row in the frame; measuring none and drawing one wraps the
+line below it. A frame with a spare blank row looks like a layout choice, and the golden corpus holds
+no group whose children all measure zero — so 440 snapshot entries, 2,440 baseline frames and 6,277
+test rows all agree with a violated invariant, because none of them constructs the input.
+
+**The residue**: `render` still derives its own height rather than being handed the measurer's, so
+the two remain two records with three clauses each rather than one record. Calling `groupHeight` from
+`render` would settle it and costs a second measurement of every child, which C09 I61 forbids
+(T1.33). The floor is duplicated in the same shape instead, and the row that now constructs the case
+is what watches them agreeing.
+
 ## F1222 — `childOffset` had nothing to move, because the container had already shrunk the child to fit ★★★★☆
 
 | | |
