@@ -68,3 +68,62 @@ and the only place an event-mediated interaction can live.
 4. **Frames are refused by their own section**, which named this outcome as the correct one.
 
 Nothing here is owed to phase 4 as code. What was owed was the record.
+
+---
+
+# The second walk — §10 as the engine's, not as C15's
+
+The walk above is kept whole and it is not retracted: every measurement in it holds. What it
+measured is **C15's layer stack**, and §10 asks for two different things under one heading.
+
+**The conflation, and it is the finding this walk exists to correct.** §10 step 2 reads *resolve
+`attachTo` to a SOLVED box from **pass 5***. Pass 5 is the **engine's** — it is the positioning pass
+this component owns and had already built when the first walk ran. A4 refused attachment because
+*the resolution reads `ve.skipRows`, the viewport's scroll offset, which is neither the stack nor the
+region* — true of **C15's** `layout(stack, region)`, and about a different function. Inside
+`layout(box, width)` the resolution reads the solved tree the call just produced and nothing else, so
+it is pure by construction rather than by restraint. **A refusal that names a purity property checks
+which signature holds it.**
+
+The same correction runs through A1, A7, A8 and A9, which refuse for want of a *member* — a name with
+no layer, an ancestor clip with no narrow layer, a ring with one tab. That is *no consumer exists*,
+and this repository has ruled on it: **infrastructure has no consumers by definition**. The rule's
+honest form is *nothing consumes it **and** nothing is queued to consume it*, and a float declared in
+the tree is queued by §10's four named cases — a tooltip, a hover card, an inline completion, a
+callout on a plot — none of which can be written while the mechanism is absent.
+
+**A2, A3 and A6 survive, and they change the design rather than refusing it.** A3 is the sharpest: a
+horizontal anchor with no width is silently inert, because the width clamp returns the resolved
+column to zero. In the engine the equivalent is a float whose own sizing is unconstrained — so a
+float is solved against the **frame**, and a float that fills the frame has no anchor worth
+resolving. The engine's answer is that a float's width is its own `FIT`, never the frame's, which is
+what makes a column mean something.
+
+---
+
+## Artefact C — the classification table, over the mechanism
+
+Rows where two of the engine's own rules hold at rest. A row governed by one rule is a restatement.
+
+| # | the cell | rule A | rule B | ruling |
+|---|---|---|---|---|
+| C1 | the nudge × `clipTo: "attachedAncestor"` | §10 step 4: nudge inside the **frame** | §10 step 5: intersect with the **attached ancestor's** clip | **Two windows, and the order §10 gives makes the mechanism fail its own motivating case.** Nudged into the frame and then clipped to a scroll block, a tooltip near the block's bottom edge is nudged to a row the frame allows and the ancestor does not, and is clipped to nothing — having been moved *to* the place it cannot be drawn. The nudge must target the window the float will be clipped to: **clip first, nudge second**, with the frame as the window only when `clipTo` is `"none"`. §10's step order is wrong and the steps are otherwise right |
+| C2 | `attachTo: {kind:"element"}` × a clipping ancestor with an offset | §10: any box, anywhere in the tree | C29 I15: a clipping container places its child at a negative offset | **The attach rect is the composited position, not the flow position.** A tooltip on row 9 of a list scrolled to row 3 belongs at screen row 6. Resolving against `SolvedBox.rect` alone gives row 9 and the tooltip detaches from the thing it points at — the defect is invisible at `offset 0`, which is every fixture written without thinking about it |
+| C3 | `floating` × `sticky` on one box | I21: excluded from the offset, **occupies flow space** | §10: takes **no** space, skipped by every sizing pass | **They are opposites and must not compose.** Both read as *this child is not laid out normally*, and a box declaring both is asking for a child that occupies flow space and does not. Refused at the type rather than resolved: `floating` is checked first and a `sticky` beside it is a contradiction the engine states |
+| C4 | a float's own children × the float being skipped | §10: floats contribute nothing to `FIT` and displace no sibling | C29 I2: a container's `FIT` is the sum of its children | **The skip is at the parent's walk, not at the float's own.** A float is solved by the same four passes against its own subtree, so its children size it normally; what is skipped is its contribution *upward*. Stated because the natural implementation — a flag read inside the sizing pass — skips both and gives every float a zero size |
+| C5 | `attachTo: {kind:"element"; id}` × id resolution | §10: any box anywhere | C29: `Box.id` is a string with no uniqueness rule anywhere in the tree | **First match in document order, and it is a choice rather than a fallback.** The alternative — throw on a duplicate — makes a float's validity depend on a box two subtrees away that it does not name, and **a throw mid-resolution abandons the floats already placed**. An unresolvable id is the float omitted, not the layout refused: C15 already omits a zero-row layer without dismissing it, and this is that rule one layer down |
+| C6 | a float attached to a float | §10: any box anywhere in the tree | the float's own rect is not known until it is placed | **Resolution is ordered, and a cycle is omitted.** Floats resolve in document order against boxes already placed; a float naming a float placed after it, or naming itself through a chain, has no rect to attach to and is omitted by C5's rule. No cycle detection beyond *not yet placed*, because that is the same condition |
+| C7 | the layer name × declaration order across subtrees | §10: four named positions, within a position the stack order decides | the tree has no stack — it has two subtrees | **Document order is the stack order**, which is the only total order the tree supplies, and it is stable because the walk is. Named here because *stack order* is C15's word for a list and the engine has a tree; two floats in one layer declared in unrelated subtrees are ordered by the walk that found them and by nothing about their position |
+| C8 | `offset` × the nudge | §10: offset in whole cells, **applied last** | §10: nudge until it fits | **The offset is applied before the nudge, and §10's *last* is about the anchor.** Applied after the nudge it re-pushes the float back outside the window the nudge just fitted it into — the nudge is the last operation on the position by definition, because it is the one that answers to the window |
+| C9 | a float wider than its window | §10: nudge, and *only clip if it cannot fit at all* | I1: every dimension is a whole number of cells | **Nudge to the window's origin and clip.** The clip is the intersection and produces a whole-cell rect either way; what must not happen is a negative width, which is what `origin + width > window` produces when the shift is computed without a floor at zero |
+| C10 | a zero-row float × the layer being named | §10: *a zero-row float is omitted and not dismissed* | C7: order is document order | **Omitted from the product entirely**, and the ordering is unaffected because it is computed over what the walk found rather than over indices |
+
+## What the second walk rules
+
+1. **§10's own step order is wrong at step 4/5** (C1) — the nudge must target the clip window, not
+   the frame, or the mechanism defeats its motivating case.
+2. **The attach rect is the composited rect** (C2), which no fixture at offset zero can see.
+3. **`floating` and `sticky` are opposites** (C3) and the engine says so rather than resolving it.
+4. **An unresolvable attachment omits the float** (C5, C6) — it never throws, because a throw
+   mid-walk abandons the floats already placed.
+5. **A float is solved by the same four passes**; what is skipped is its contribution upward (C4).

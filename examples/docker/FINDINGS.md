@@ -53748,6 +53748,56 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1235 — §10 was refused by measuring a different component, and its own step order defeats its motivating case ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `LAYOUT_ENGINE.md` §10 — a float declared in the tree, attached to a box by id, anchored point-to-point, nudged into its window and clipped to its ancestor; four named layer positions; a frame ring. |
+| **Reached for** | Phase 4 of the layout-engine plan, which the first walk discharged as a refusal (C29 I19, §7d). |
+| **Verdict** | **The refusal answers about C15's layers and §10 step 2 names the engine's pass 5.** The mechanism is buildable, pure, and its design has two defects a build finds and a refusal cannot. |
+
+**1 · The conflation.** §10 step 2 reads *resolve `attachTo` to a **SOLVED box from pass 5***. Pass 5
+is this engine's positioning pass, which was built before the first walk ran. A4 refused attachment
+because the resolution *reads `ve.skipRows`, the viewport's scroll offset, which is neither the stack
+nor the region* — true, and about **C15's** `layout(stack, region)`. Inside `layout(box, width)` the
+resolution reads the solved tree the call has just produced and nothing else: pure by construction
+rather than by restraint. **A refusal that names a purity property checks which signature holds it.**
+
+**2 · And the rest of the refusal is *no consumer exists*.** A1, A7, A8 and A9 each refuse for want
+of a **member** — a layer name with nothing in it, an ancestor clip with no narrow layer, a ring with
+one tab. CLAUDE.md rules on exactly this: infrastructure has no consumers by definition, and the
+honest form is *nothing consumes it **and** nothing is queued to consume it*. §10's four cases — a
+tooltip, a hover card, an inline completion beside a token, a callout on a plot — are the queue, and
+not one of them is writable while the mechanism is absent.
+
+**3 · §10's step order is wrong, and the build is what shows it.** Step 4 nudges the float inside the
+**frame**; step 5 intersects it with the **attached ancestor's** clip. Two windows, applied in that
+order: a tooltip near the bottom of a scroll block is nudged to a row the frame allows and the
+ancestor does not, and is then clipped to nothing — **moved to the one place it cannot be drawn**.
+The nudge must target the window the float will be clipped to. Clip first, nudge second; the frame is
+the window only when `clipTo` is `"none"`. Every other step is right.
+
+**4 · The attach rect is the composited rect, and no fixture at offset zero can see it.** A float
+attached to row 9 of a list scrolled to row 3 belongs at screen row 6. Resolving against
+`SolvedBox.rect` gives row 9 and the tooltip detaches from the thing it points at — which is the
+whole of what a float is for. The engine already applies the offset in `collect`; the attachment must
+read the same number.
+
+**5 · `floating` and `sticky` are opposites wearing one sentence.** Both read as *this child is not
+laid out normally*: sticky **occupies flow space** and is excluded from an offset (I21), a float
+**takes no space** and is skipped by every sizing pass. A box declaring both asks for a child that
+occupies flow space and does not, and the engine says so rather than picking one.
+
+**6 · What survives from the first walk unchanged.** A2 and A3 are not refusals of the mechanism but
+constraints on it: a horizontal anchor is inert unless the thing anchored has a width of its own, so a
+float is sized by its own `FIT` and never by the frame. A6's asymmetry is C15's and stays C15's. The
+first walk is kept whole and none of its measurements are retracted.
+
+**Open** — §10 lands as `Box.floating`, resolved after pass 5 into a product beside the solved tree;
+the second walk is `docs/notes/C29_LAYERS_WALK.md`.
+
+---
+
 ## F1234 — §14's refusal clause describes a different mechanism from §14's own definition ★★★★☆
 
 | | |
