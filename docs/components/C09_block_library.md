@@ -2385,10 +2385,40 @@ the same overrun in smaller form.
 
   | kind | never sheds | sheds, in order | shrinks to a floor |
   |---|---|---|---|
-  | `comparison` | the two values | the field label, then the change and verdict marks | `a` and `b`, together |
-  | `keyValue` | the key — a value with no key is not a fact | the bar, then its detail | the value |
-  | `events` | the time and the tone | the type | the message |
-  | `steps` | the active step — the agent tape's rule, *a switcher that cannot show you where you are is worse than no switcher* | the done steps from the ends, then the pending ones | the active step's label |
+  | `comparison` | the field name | the change and verdict marks, then `a` | `a` and `b`, together, as `peer`s |
+  | `keyValue` | the key — a value with no key is not a fact | the bar, then the value | the value |
+  | `events` | the message | the type, then the time | the message, and the time between its two forms |
+  | `steps` | the label; the state mark is reserved before the ladder is asked | the detail | the label |
+
+  **Three of those four rows are corrections, and a frame is what corrected each
+  of them** (F1233). The rows this table carried first were claims about which
+  part of a row carries the meaning, which is exactly the kind of claim a
+  measurement can answer and an assertion cannot — so each was built as declared,
+  read as a frame, and rewritten where the frame disagreed.
+
+  | kind | what this table declared | what it drew |
+  |---|---|---|
+  | `events` | *the time and the tone never shed* | `22:13:20   ⋯2` at sixteen columns — a column of bare timestamps, which is not an event log. **The message is what the row says**, so it is the last part standing; the time still sheds after the type and never before it, which is the half the frame agreed with |
+  | `comparison` | *never sheds the two values; sheds the field label first* | `run…  run 5` over `312…  289 …` at sixteen — two anonymous numbers, which is what a comparison is not. **A field name with one value is still a reading**; two values with no field name is nothing at all. *Peers go from the end* is the half that survives |
+  | `steps` | *sheds the done steps from the ends, then the pending ones* | an order about a **horizontal tape**, and this kind draws one step per row. Shedding an item is refused three paragraphs below, so the order asked for the one thing the invariant forbids. Its parts are the mark, the label and the detail |
+  | `keyValue` | *never sheds the key; sheds the bar, then its detail* | **kept** — the only one of the four that was right, and the bar's own reading is the correction: a column too narrow for both kept the bar and dropped the text, which is a drawing of a number with the number taken away |
+
+  **A kind's cap on a column is the same defect wearing the kind's own name.**
+  `events` capped its type at a quarter of the row and `steps` its label at a
+  half, and both caps **cut a label the ladder would have shed whole** —
+  `schedul…` at thirty-two columns, from the kind that declares the type is
+  drawn whole or not at all. Under the ladder the neighbouring part's floor is
+  the guard the cap was, stated once where every floor is (F1233).
+
+  **The withholding is budgeted before the widths are settled, and it gives way
+  where it would make the row clip.** A mark appended after takes its cells from
+  the clamp, which takes them from whichever part is last — silently, and from
+  the part the order protected. And the reservation is worth its cells only
+  while the row still fits without cutting: at four columns `events` shed its
+  type and its time, reserved three cells for `⋯2` and had one left for the
+  message, so the frame was the withholding and nothing else. The mark is the
+  `residue` slot (C09 I22, C04 I49) — `⋯` against `~`, one cell at both
+  conventions — and never a literal.
 
   **Dropping an item is refused**: a kind that shed a row would change its element ids and orphan a
   C26 focus, so an item that cannot be drawn is counted in a withholding rather than removed. **A
