@@ -609,3 +609,9 @@ describe("C09 §2c width — the answers (I42–I44)", () => {
     expect(w(dropped, 40)).toBe(30);
   });
 });
+
+describe("C09 §2 padding — the registry's one application, owed at the spec commit", () => {
+  it.todo(
+    "T3.91 (C09 I80, C04 I25): the registry insets and pads every kind once — measure answers t + b over the kind at w - l - r, width answers l + r over the kind's, render emits the blank rows and cuts each inset row to the content width, and elements shift by l and t; no definition reads padding, and a sequence adds nothing — not deferred on a component: it lands with 2a's migration, and this row is what SP9 holds open until it does",
+  );
+});
