@@ -279,6 +279,48 @@ be `GROW` on the scroll axis* — would be a validation path nothing reaches. **
 than left owed**, so the next reader finds the answer and not the gap; I16's example is corrected off
 it for the same reason.
 
+## 7d. Layers — the engine places none, and the two mechanisms are C15's
+
+`LAYOUT_ENGINE.md` §10 asks the engine for floats declared in the tree, `attachTo` by element id,
+anchor points, a nudge, `clipTo: "attachedAncestor"`, a named four-position stack and a frame ring.
+**Two of those are built, one is built a layer above where the design puts it, and three have no
+subject** (F1230, `docs/notes/C29_LAYERS_WALK.md`).
+
+**Built, in `place.ts`.** `sortLayers` partitions by `kind` — `view`, then `peek`, then `overlay`,
+stable within each — and no integer exists anywhere in C15, so §10's *refused: a free integer
+z-index* holds by construction rather than being owed. The nudge is step 7 on **both** axes: shift
+along the axis that overflows, clip only where the height cannot fit, and carry `truncated` to the
+owner. §10's four positions are not the tree's three, and the difference is the measurement — `base`
+is not a layer, `float` has no member, and `debug` has none either, because the profiler's overlay is
+`kind: "view"` and therefore sorts bottom-most.
+
+**A derived anchor is the caller's.** `construct.ts` resolves the peek's row through the entry's
+chrome and the viewport's scroll offset and hands C15 a number. So §10's *no layer's position can be
+derived from a box in the layer beneath it* is false on the vertical axis, and `layout()` is pure
+because the caller resolved — not because the resolution does not happen. `attachTo: {kind:
+"element"; id}` and `clipTo: "attachedAncestor"` are **refused for that reason**: both read the
+solved tree and the scroll offset, neither of which is the stack or the region (→ C15 I5).
+
+**The horizontal axis has no subject.** §10's motivating cases — a tooltip, a hover card, an inline
+completion beside a token, a callout on a plot — each want a *column*. The only layer attached to an
+element is the peek; a peek exists only where a `NavElement` declares `detail`; and `detail` is
+emitted at exactly one site, on an element whose span is the table's whole width. There is no
+*beside*. The two narrow-span emitters declare no `detail`, and C26 F1216 refuses widening
+`NavElement`, which is where a per-row span would have to go. **The field's own documentation says
+*shown beside it***, which is a position its only producer cannot occupy — and C19's `menuLayer`
+already ruled the design's second example the other way, in writing: *a menu narrower than the region
+leaves whatever is behind it visible on the same rows.*
+
+**And the mechanism would have been inert.** A layer declaring a column and no width takes
+`region.width` from `resolveWidth`, so the clamp returns its `left` to zero: the field would do
+nothing for every layer that did not also declare a width (walk A3). A horizontal anchor is refused
+rather than defaulted.
+
+**Frames are refused by §10 itself.** `frameRing` is in no file; the four `kind: "view"` producers
+are each one layer over one base, which **is** the frame stack with one member — *the correct
+outcome, not a wasted mechanism*, in the section's own words, with `INTERACTION.md` §14's *there are
+no pushed views* the ruling that keeps it so.
+
 ## 8. Invariants
 
 - **I1** — **Every dimension is a whole number of cells, at every pass, on both axes.** No float
@@ -370,6 +412,12 @@ it for the same reason.
   is edited (C09 I72). `sticky` is refused with it (§7b, §7c, F1228). **Dropping is refused twice
   over and from two components**: the sizing core replaced C09 I35's clamp with a floor, and a form
   that dropped a child would leave a C26 focus on a block that draws nothing.
+- **I19** — **The engine places no layer, and the two mechanisms §10 asks it for are C15's.** The
+  named partition and the nudge are `place.ts`'s today; a derived anchor is resolved by the caller and
+  handed down as a number, which is what keeps `layout()` a pure function of the stack and the region
+  (→ C15 I5). A float attached by element id, an ancestor clip and a frame ring are refused: the
+  first two read state that is neither input, and all three have no subject — the one element-attached
+  layer in the tree spans its block's whole width, so there is no *beside* to anchor to (§7d, F1230).
 
 ---
 
@@ -401,6 +449,14 @@ said so, and the measured ruling is that a mosaic's lines are **proportions with
 growers with a minimum — `base` from the largest-remainder share and `min: 1`, where taking the
 floor off the budget first distorts every width.
 
+**`docs/notes/C29_LAYERS_WALK.md` is the second walk**, run over §10 for phase 4, and it is the one
+where the table earned its place: nine cells, and A3 is a defect no trace could reach — a column
+anchor on a layer that declares no width is **silently inert**, because `resolveWidth` gives the
+region and the clamp returns `left` to zero. Structural, with no event between the two rules, which is
+C18's shape exactly. The six-row trace found no defect and produced the row worth keeping instead —
+S1 and S2, where the peek's anchor is maintained by the key path and by the viewport's subscription,
+**each blind to the other's case**, so a reader checking either alone would cut it as duplication.
+
 That is CLAUDE.md's *two artefact shapes catch different interactions* arriving from the side that
 usually goes unexamined: a sizing model reads as a classification problem, so the table is the
 obvious artefact, and the table is the one that found nothing. **The table's blind spot is stated
@@ -428,6 +484,7 @@ with it** — it indexes pairs, and a cell where three rules meet is in neither 
 16. A contradictory declaration is refused at construction; the engine never throws (I16, → C09 I2).
 17. The sizing model and the pass structure are ported from `nicbarker/clay` (Zlib); the module header carries the attribution and the version read, and taking it as a dependency is refused with a row in `DEPENDENCIES.md` (I17).
 18. **The engine chooses no representation** (I18, §7b, §7c). Three families want one and each has an owner elsewhere — the definition, `art()`, or nobody; `sticky` is refused, and a form's minimum is measured rather than declared.
+19. **The engine places no layer** (I19, §7d). The named partition and the nudge are C15's; a derived anchor is the caller's, handed down as a number; and attachment by element id, an ancestor clip and a frame ring are refused for want of an input and of a subject alike (→ C15 I5).
 
 ---
 
@@ -458,6 +515,26 @@ asserted by naming what would exist if it were not taken:
   is invisible to every frame until a kind declares one, so the row that catches it has to be about
   the type rather than about a rendering.
 
+**The rows for §7d** (I19) — a refusal again, and asserted the same way: by naming what would exist
+if it were not taken.
+
+- **T1.32** (I19, §7d, → C15 I5): `Placement`'s anchored arm declares no column field, asserted as the
+  field set by **equality** (`kind`, `prefer`, `row`, `rows`), and the behaviour behind it through a
+  call — `place()` gives an anchored layer `left: 0` whatever its width, and sets a `left` only for
+  `centred`. The equality is the load-bearing half: a column added beside `row` would be **silently
+  inert** for any layer that declares no width (walk A3), so no assertion about a placed result could
+  see it and only the type can.
+- **T1.33** (I19, §7d): the nudge is C15's on **both** axes — a layer wider than the region and one
+  anchored outside it both come back shifted inside rather than cut, and `truncated` is set only where
+  the height could not fit. The row exists because §10 states one rule for two axes that are not
+  symmetric: the vertical carries a flip and a fraction cap above the nudge and the horizontal is a
+  single clamp.
+- **T6.7** (I19): making `place()` derive a `left` for an anchored layer → **T1.32 fails**, and
+  nothing else does, because every layer that reaches `place` today is either full-region or centred.
+  That is the reading the row carries: the refusal is invisible to every frame until something
+  declares the field, so the row that catches it is about the type and the call, never about a
+  rendering.
+
 **And `tools/bench/mosaic.mjs kinds` runs on anything touching piece ordering or the composer's
 cursor**: it is the only instrument that saw F1213, where 440 goldens, 2,440 baseline frames and
 6,265 test rows all agreed while a mosaic was missing two of five cells.
@@ -466,8 +543,7 @@ cursor**: it is the only instrument that saw F1213, where 440 goldens, 2,440 bas
 
 ## 11. Owed — the sections that arrive with their phases
 
-`LAYOUT_ENGINE.md` §10 (floats, layers and frames) and §13 (incremental layout) are in scope for the
-pass and not in this document yet.
+`LAYOUT_ENGINE.md` §13 (incremental layout) is in scope for the pass and not in this document yet.
 
 **§12, §14 and §15 are discharged and no longer owed.** §12's three families are ruled in §7b and the
 engine owns none of them (I18); §14 is refused in §7c with its intent discharged by C25 I18 and by
@@ -475,9 +551,9 @@ composition; §15's aspect is built and is I10 — pass 2 against a `FIXED` heig
 width, both by `Math.min` so neither grows. **§15's last paragraph is a constraint on the tests
 rather than on the code**: it is lumpy — 40 × 9 at `aspect: 3.5` wants 31.5 columns and gets 31, a
 real ratio of 3.44 — so no row may assert an exact ratio, and a row that does is asserting the
-rounding. **Each gets its own trace before it is built**: §10's events are attach, detach and
-the nudge; §13's are dirty propagation and cache validity. Walking them now would be walking a design
-the sizing core's rulings have not yet constrained.
+rounding. **§10 is discharged and no longer owed.** Its walk is `docs/notes/C29_LAYERS_WALK.md`, its rulings
+are §7d and I19, and the two mechanisms it asks the engine to build are C15's already. **§13 gets its
+own trace before it is built**, over dirty propagation and cache validity.
 
 C15 stays the owner of every layer stack and `layout()` stays pure (C15 I5) — the engine is called by
 `place()`, and it does not push, dismiss or decide what is on top.

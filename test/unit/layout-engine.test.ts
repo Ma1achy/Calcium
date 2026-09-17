@@ -713,6 +713,16 @@ describe("C29 — the sizing core", () => {
     expect(pick(eight, 8), "and the shorter form still fits there").toBe(eight);
   });
 
+  // The spec commit's rows, before the assertions exist (SP9). C29 I19 and §7d:
+  // the engine places no layer, the named partition and the nudge are C15's,
+  // and a derived anchor is the caller's, handed down as a number.
+  it.todo(
+    "T1.32 (C29 I19, \u00a77d, C15 I5): Placement's anchored arm declares no column field, asserted as the field set by equality, and place() gives an anchored layer left 0 whatever its width \u2014 not deferred on a component: the field set is not yet asserted",
+  );
+  it.todo(
+    "T1.33 (C29 I19, \u00a77d): the nudge is C15's on both axes \u2014 a layer wider than the region and one anchored outside it come back shifted inside rather than cut \u2014 not deferred on a component: the assertion is not yet written",
+  );
+
   it("T1.17 (C29 I17): the module header names the clay port and the version read, and DEPENDENCIES.md carries the refusal", () => {
     // **Asserted on the source**, because a licence condition nobody reads is
     // how one gets found at publication. Zlib's only real condition is the
