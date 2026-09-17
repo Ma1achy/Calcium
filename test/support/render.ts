@@ -11,7 +11,7 @@ import {
   type BlockRegistry,
 } from "../../src/presentation/blocks/index.js";
 import { defaultTheme, loadTheme, type ResolvedTheme } from "../../src/presentation/theme/index.js";
-import { renderToLines, type RenderOptions } from "../../src/presentation/render-lines.js";
+import { renderSequenceToLines, renderToLines, type RenderOptions } from "../../src/presentation/render-lines.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 import { DITHER_ASCII, HALF_BLOCK } from "../../src/presentation/image/index.js";
@@ -160,6 +160,17 @@ export function measurable(
 ): Readonly<{
   measure: (block: Block, width: number) => number;
   renderToLines: (block: Block, width: number) => readonly string[];
+  /**
+   * A **sequence** of blocks, which is what a document's top level is.
+   *
+   * Present because wrapping a sequence in a `column` group is not the same
+   * thing and a harness that did it hid a defect for as long as it existed
+   * (F1223): the wrapper is a block in its own right, with its own floor of one
+   * row, so a sum taken over the children and a render taken over the wrapper
+   * are two different quantities that agree on everything except a child that
+   * measures zero.
+   */
+  renderSequence: (blocks: readonly Block[], width: number) => readonly string[];
   kinds: readonly string[];
   registry: BlockRegistry;
   /**
@@ -192,6 +203,7 @@ export function measurable(
   return {
     measure: (block, width) => r.measure(block, width),
     renderToLines: (block, width) => renderToLines(r, block, width, render),
+    renderSequence: (blocks, width) => renderSequenceToLines(r, blocks, width, render),
     kinds: r.kinds,
     registry: r,
     window: (block, width, from, to) => {

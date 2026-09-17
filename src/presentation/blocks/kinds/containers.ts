@@ -29,6 +29,7 @@ import { cells, sliceCells, stripControl, truncate } from "../../text.js";
 import { glyphCells, glyphFor, glyphs } from "../glyphs.js";
 import { clampSpans, paint, rows, tone } from "../paint.js";
 import { composeRow, fitRow, placeRows, type Placed } from "../../rows.js";
+import { layout, measure as solveHeight, type Box, type Size } from "../../layout/index.js";
 import type { BlockDefinition, Rendered, RenderContext, Windowed } from "../types.js";
 
 // **`rowsOfAll` stood here and is gone with the arm it gated.** It answered
@@ -621,17 +622,81 @@ export const mosaicDefinition: BlockDefinition<Mosaic> = {
 };
 
 /**
+ * A `column` group as a C29 box — **the first kind on the engine** (C29 §4).
+ *
+ * The three rules a column had, each as a declaration rather than as
+ * arithmetic:
+ *
+ *   - *every child gets the container's width* is **`align.x: "stretch"`**
+ *     (C29 I9). A C29 column would otherwise give a `FIT` child its natural
+ *     width; C04's column is a stretching column, and saying so is what makes
+ *     the child's `measure` see `w`. Stretch resolves in **pass 2** here, which
+ *     is where the cross axis is width — the clause F1221 corrected, and this
+ *     is the box that needed it.
+ *   - *a `gapBefore` child takes one blank row above it* is **`padding.t = 1`**
+ *     on a wrapper. C29 has no margin on purpose (§6): a block carrying its own
+ *     outer spacing is how two adjacent blocks each contributing one row produce
+ *     two. Padding is inside, so the wrapper is one row taller and the blank row
+ *     belongs to the thing that contains it — exactly what `sequenceHeight`
+ *     counts. This is the shape `gapBefore` is replaced by in phase 2, arriving
+ *     one kind early because a column cannot be expressed without it.
+ *   - *`minRows` floors the height, and a group is at least one row* is
+ *     **`height: { kind: "fit", min: max(1, minRows) }`** (C29 I2). `groupRows`
+ *     and `atLeastOne` were two clamps in sequence; a `FIT` size with a `min`
+ *     is one.
+ *
+ * **The leaf's `render` returns nothing, and this box is never composed.**
+ * Rendering still goes through `groupPlacements`, which is where the horizontal
+ * alignment and the element offsets live, and it moves when `padding` and
+ * `childGap` reach C04 in phase 2. The condition to grep from is
+ * `groupPlacements`: the day no container calls it, this leaf owes a real
+ * `render` and the name below is wrong.
+ *
+ * **Each caller supplies the half its own question needs**, and the other is
+ * absent rather than stubbed with a plausible number: `width` has no
+ * `measureChild` and gets height 0 from every leaf, `measure` has no
+ * `widthChild` and gets natural 0. Both are unread on their own side — a
+ * stretched child's width comes from the container and a height comes from the
+ * leaf — and a box built for one question cannot be asked the other and get a
+ * confident wrong answer.
+ */
+function columnMeasureBox(block: Group, width: number, own: Size, measureChild?: MeasureFn, widthChild?: WidthFn): Box {
+  const w = normaliseWidth(width);
+  return {
+    id: "group",
+    direction: "column",
+    width: own,
+    height: { kind: "fit", min: Math.max(1, block.minRows ?? 0) },
+    align: { x: "stretch" },
+    children: block.children.map((child, i) => ({
+      id: `c${String(i)}`,
+      ...(child.gapBefore === true ? { padding: { t: 1 } } : {}),
+      children: {
+        kind: "paint" as const,
+        natural: widthChild === undefined ? 0 : widthChild(child, w),
+        measure: (cw: number) => (measureChild === undefined ? 0 : measureChild(child, cw)),
+        render: () => [],
+      },
+    })),
+  };
+}
+
+/**
  * A group's own measured height (C04 I102) — **the one computation, so
  * `measure` and `window`'s decline branch cannot drift** (C09 I69). A column is
- * a sequence and takes `sequenceHeight`; a row takes its tallest placed child;
- * both floor at `minRows`.
+ * a C29 box and takes `measure`; a row takes its tallest placed child and
+ * floors at `minRows`.
  */
 function groupHeight(block: Group, width: number, measureChild: MeasureFn): number {
   const widths = childWidths(block, width);
   const placed = block.children.slice(0, placeable(block, width));
   if (placed.length === 0) return 0; // cells-ok
   if (block.direction === "column") {
-    return atLeastOne(groupRows(block, sequenceHeight(block.children, widths[0] ?? width, measureChild)));
+    // **The column arm is the engine's** (C29 I12). `GROW` on the width, because
+    // the box is being asked for a height at a width it has been given —
+    // `FIT` would take the root's natural width, which is the *other* question
+    // this shape answers, in `width` below.
+    return solveHeight(columnMeasureBox(block, width, { kind: "grow" }, measureChild), widths[0] ?? width);
   }
   let tallest = 0;
   for (const height of childHeights(placed, widths, measureChild)) tallest = Math.max(tallest, height);
@@ -663,9 +728,12 @@ export const groupDefinition: BlockDefinition<Group> = {
     const w = normaliseWidth(width);
     if (block.direction === "column") {
       if (block.children.some((_child, i) => axesOf(block.align?.[i]).h !== "left")) return w;
-      let widest = 1;
-      for (const child of block.children) widest = Math.max(widest, widthChild(child, w));
-      return Math.min(w, widest);
+      // **The same box, asked the other question** (C29 I2). A `FIT` container's
+      // natural width is the max across its axis, which is the widest child —
+      // and the floor of 1 is the `min`, not a `Math.max` after the fact. The
+      // stretch is pass 2's and does not reach pass 1, so the natural the
+      // children declare is still what decides this.
+      return layout(columnMeasureBox(block, w, { kind: "fit", min: 1 }, undefined, widthChild), w).rect.width;
     }
     const shares = block.flex;
     if (shares === undefined || shares.some((share) => typeof share !== "object")) return w;
@@ -827,7 +895,18 @@ export const groupDefinition: BlockDefinition<Group> = {
           // the row wrapping at paint time, where nothing can see it.
           for (const row of childRows[index] ?? []) lines.push(row === "" ? "" : fitRow(pad + row, width));
         });
-        const floor = block.minRows ?? 0;
+        // **The measurer's floor, not `minRows` alone** (F1223, C09 I1).
+        // `groupHeight` floors a non-empty group at one row and this floored at
+        // `minRows` and at nothing else, so a column holding nothing but an
+        // empty `group` measured 1 and drew 0. C04 I17's *every measurer
+        // returns at least 1* has exactly one exception — an empty container —
+        // and that exception is the whole of the case.
+        //
+        // **Duplicated rather than derived.** Calling `groupHeight` from here
+        // is the version that cannot drift, and it measures every child a
+        // second time, which C09 I61 forbids (T1.33). So the same three clauses
+        // are written twice and T2.18e is what watches them agreeing.
+        const floor = placed.length === 0 ? 0 : Math.max(1, block.minRows ?? 0); // cells-ok — a row count
         while (lines.length < floor) lines.push(""); // cells-ok — a row count
         return lines;
       }
@@ -860,7 +939,9 @@ export const groupDefinition: BlockDefinition<Group> = {
         blocks.push({ x: left, top: at.top, width: room, rows: cut });
         tallest = Math.max(tallest, at.top + cut.length); // cells-ok — a row count
       });
-      return placeRows(blocks, Math.max(tallest, block.minRows ?? 0));
+      // The same floor as the column arm's, for the same reason (F1223).
+      const floor = placed.length === 0 ? 0 : Math.max(1, block.minRows ?? 0); // cells-ok — a row count
+      return placeRows(blocks, Math.max(tallest, floor));
     }
 
   },

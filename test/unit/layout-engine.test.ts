@@ -245,6 +245,52 @@ describe("C29 — the sizing core", () => {
     expect(find(solved, "b").rect.x).toBe(4);
     expect(compose(solved)[0]).toBe("aa  bb");
 
+    // **Padding on a LEAF is inside it too**, and this is the row that was
+    // vacuous. T1.12's corpus held a padded leaf and asserted only that
+    // `measure` equalled the composed count — true of any two agreeing wrong
+    // numbers — and the padding was dropped for every leaf in the tree until a
+    // column group asked for a blank row above a child.
+    const padLeaf: Box = {
+      id: "note",
+      padding: { l: 2, r: 1, t: 1, b: 2 },
+      children: { kind: "rows", rows: ["abc"] },
+    };
+    expect(layout(padLeaf, 80).rect.width).toBe(6);
+    expect(measure(padLeaf, 80)).toBe(4);
+    expect(compose(layout(padLeaf, 80))).toEqual(["", "  abc", "", ""]);
+
+    // And the content is measured at what the padding left it, not at the box.
+    const padWrap: Box = {
+      id: "wrapped",
+      width: { kind: "fixed", n: 10 },
+      padding: { l: 4, r: 4 },
+      overflow: { x: "wrap" },
+      children: { kind: "rows", rows: ["aa bb cc"] },
+    };
+    expect(measure(padWrap, 10)).toBe(3);
+
+    // **And the content fills what the padding left, rather than taking its
+    // natural size inside it.** The two agree whenever the content is wider
+    // than the inner — which both rows above are — so the case that separates
+    // them is a leaf narrower than its box whose height depends on its width.
+    const painted: Box = {
+      id: "plot",
+      width: { kind: "fixed", n: 20 },
+      height: { kind: "fixed", n: 5 },
+      padding: { l: 2, r: 2, t: 1, b: 1 },
+      children: {
+        kind: "paint",
+        natural: 4,
+        measure: (w: number) => Math.max(1, Math.ceil(24 / Math.max(1, w))),
+        render: (w: number, h: number) => Array.from({ length: h }, () => "#".repeat(Math.max(0, w))),
+      },
+    };
+    // Sixteen columns inside, not the four it asks for: 24 / 16 is two rows.
+    expect(find(layout(painted, 20), "plot\u00b7content").rect.width).toBe(16);
+    // And three rows of the five, so `render` is given the box it was left.
+    expect(find(layout(painted, 20), "plot\u00b7content").rect.height).toBe(3);
+    expect(compose(layout(painted, 20))).toEqual(["", `  ${"#".repeat(16)}`, `  ${"#".repeat(16)}`, `  ${"#".repeat(16)}`, ""]);
+
     // **Padding wider than the box clamps, and `childGap` clamps with it** —
     // the inner size reaches 0 rather than going negative (§8a A8).
     const squeezed: Box = {

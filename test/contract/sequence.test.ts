@@ -97,6 +97,37 @@ describe("C09 T2.18 — sequences", () => {
     });
     expect(kit.measure(row, 60), "max of one and one, and no gap").toBe(1);
     expect(kit.renderToLines(row, 60)).toHaveLength(1);
+
+    // **A column whose children all measure zero is one row, and the case is
+    // reachable rather than defensive** (C04 I17). *Every measurer returns at
+    // least 1* has exactly one exception — an empty container, absence of
+    // content rather than empty content — so a column holding nothing but empty
+    // groups sums to zero and is floored to one. The empty group itself stays
+    // zero: the floor belongs to the thing that has children.
+    //
+    // Nothing constructed this until the floor was mutated away and no row
+    // noticed (C29 1.2). It read as unreachable because I17 is usually read
+    // without its exception.
+    const hollow = block({
+      kind: "group",
+      id: "g-hollow",
+      direction: "column",
+      children: [block({ kind: "group", id: "g-empty", direction: "column", children: [] })],
+    });
+    expect(kit.measure(hollow, 60), "zero summed, floored to one").toBe(1);
+    expect(kit.renderToLines(hollow, 60), "and drawn, which it was not (F1223)").toHaveLength(1);
+
+    // The row arm had the same gap: its height floored at `minRows` and at
+    // nothing else, so the tallest of nothing was nothing.
+    const hollowRow = block({
+      kind: "group",
+      id: "g-hollow-row",
+      direction: "row",
+      children: [block({ kind: "group", id: "g-empty-r", direction: "column", children: [] })],
+    });
+    expect(kit.measure(hollowRow, 60)).toBe(1);
+    expect(kit.renderToLines(hollowRow, 60)).toHaveLength(1);
+    expect(kit.measure(block({ kind: "group", id: "g-none", direction: "column", children: [] }), 60), "and the empty group is still zero").toBe(0);
   });
 
   it("T2.18f: the arithmetic is one function, shared by C04 and C09", () => {

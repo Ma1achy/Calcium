@@ -247,6 +247,58 @@ const results = await runPass({
       expect: "T1.12",
     },
     {
+      // **A padded leaf's padding dropped** — the defect the first consumer
+      // found (1.2). Every pass would otherwise need an arm asking whether the
+      // padding it was about to apply belonged to a box with a leaf in it, and
+      // the arm that was written skipped it. **The row that should have caught
+      // it was vacuous**: T1.12's corpus held a padded leaf and asserted only
+      // that `measure` equalled the composed count, which is true of any two
+      // agreeing wrong numbers.
+      name: "a leaf's padding is not inside it",
+      file: S,
+      from: "  if (!isLeaf(box.children) || !padded(box)) return box;",
+      to: "  if (true) return box;",
+      expect: "T1.7",
+    },
+    {
+      // **The content not stretched into what the padding left.** The wrapper
+      // is the right shape and the leaf takes its natural size inside it, so a
+      // wrapping child is measured at a width the box does not give it — and
+      // the box's own height is right for the wrong wrap.
+      name: "a padded leaf's content takes its natural width rather than the inner one",
+      file: S,
+      from: '    align: { x: "stretch" },',
+      to: "",
+      expect: "T1.7",
+    },
+    {
+      // **The content not filling a box that has a size of its own.** Putting
+      // padding round something means the something occupies what is left —
+      // and where the box is `FIT` the content already decides the size, so
+      // the two arms agree on every box that derives its own height. The case
+      // that separates them is a `FIXED` height, where the content must be
+      // handed the interior rather than its natural.
+      //
+      // **`GROW` and not a stretch**, because height is the wrapper's main
+      // axis and stretch is a cross-axis rule (C29 I9).
+      name: "a padded leaf's content keeps its natural height inside a sized box",
+      file: S,
+      from: '        ...(fills ? { height: { kind: "grow" as const } } : {}),\n',
+      to: "",
+      expect: "T1.7",
+    },
+    {
+      // **`overflow` left on the outer box.** It describes what the *content*
+      // does when it does not fit, and the content is on the inside of the
+      // padding — so a padded box declaring `wrap` stops wrapping, silently,
+      // and its rows are cut instead.
+      name: "overflow stays on the frame rather than travelling to the content",
+      file: S,
+      from: "        ...(overflow === undefined ? {} : { overflow }),\n",
+      to: "",
+      expect: "T1.7",
+    },
+    {
       // **The clip window not intersected with the ancestor's.** A nested clip
       // then shows what its grandparent already cut away, and every rectangle
       // in the solved tree is unchanged.

@@ -39,11 +39,22 @@ export const measureSequence = (blocks: readonly Block[], width: number): number
 export const sumMeasure = (blocks: readonly Block[], width: number): number =>
   blocks.reduce((n, b) => n + kit.measure(b, width), 0);
 
+/**
+ * An entry's rows — **the sequence renderer, not a `column` group round it**.
+ *
+ * **The wrapper was load-bearing and wrong** (F1223). A group is a block in its
+ * own right: it has a floor of one row, and it draws its children rather than
+ * being them. T4.1 sums the *blocks'* measured heights and compared them
+ * against the *wrapper's* rendered rows, and the two agreed everywhere except a
+ * block measuring zero — where the wrapper measured one, drew none, and the two
+ * errors cancelled. The day the group's render floor was repaired, T4.1 went
+ * red on a harness defect that had been holding it green.
+ *
+ * A stand-in must make the reads the real one makes: the viewport renders a
+ * sequence, so this renders a sequence.
+ */
 export const renderEntry = (blocks: readonly Block[], width: number): readonly string[] =>
-  kit.renderToLines(
-    block({ kind: "group", id: "seq", direction: "column", children: [...blocks] }),
-    width,
-  );
+  kit.renderSequence(blocks, width);
 
 /** `n` single-row blocks, so an entry's measured height is exactly `n`. */
 export function rowsDoc(n: number, id: string, gapAt = -1): ViewDocument {

@@ -26,6 +26,7 @@ import { cells, wrapCells } from "../text.js";
 import { distribute, type Demand } from "./distribute.js";
 import {
   boxesOf,
+  isLeaf,
   leafOf,
   type Box,
   type Leaf,
@@ -54,7 +55,62 @@ type Node = {
   wrapped: readonly string[] | undefined;
 };
 
-const build = (box: Box): Node => ({
+/**
+ * **A padded leaf is a container of one unpadded leaf** (C29 §6, I2).
+ *
+ * Padding is *inside* the box, around its children — and a leaf has content
+ * rather than children, so every pass would have had a second arm asking
+ * whether the padding it was about to apply belonged to a box with a leaf in
+ * it. Normalising the shape once, here, is the alternative: after this, padding
+ * only ever appears on a container, which is the only case the passes handle.
+ *
+ * The wrapper stretches on both axes so the content fills what the padding left
+ * it — a `FIT` child would otherwise take its natural size and be measured at a
+ * width the box does not give it.
+ *
+ * **The first consumer found this, and the row that should have was vacuous.**
+ * T1.12's corpus held a padded leaf and asserted only that `measure` equalled
+ * the composed count, which is true of any pair of agreeing wrong numbers.
+ */
+const padded = (box: Box): boolean => {
+  const p = box.padding;
+  return p !== undefined && ((p.l ?? 0) + (p.r ?? 0) + (p.t ?? 0) + (p.b ?? 0)) > 0;
+};
+
+const normalise = (box: Box): Box => {
+  if (!isLeaf(box.children) || !padded(box)) return box;
+  // **`overflow` travels inward with the content it describes.** It says what
+  // the *content* does when it does not fit — `wrap` reflows the text, and the
+  // text is on the inside of the padding. `clip` stays on the outer box, which
+  // is the thing with an edge to cut against.
+  const { overflow, ...frame } = box;
+  // **The content's own size follows the frame's intent, per axis.** Where the
+  // box is `FIT` the content keeps `FIT`, because the box's size is derived
+  // from it; where the box has a size of its own the content **fills** what the
+  // padding left, because that is what putting padding round something means.
+  //
+  // Width is the cross axis of the wrapper, so `stretch` does that job
+  // (C29 I9). **Height is the main axis, and stretch is not defined there** —
+  // filling a main axis is `GROW`, which is why this reads as two rules rather
+  // than one alignment.
+  const fills = (box.height ?? { kind: "fit" as const }).kind !== "fit";
+  return {
+    ...frame,
+    align: { x: "stretch" },
+    children: [
+      {
+        id: `${box.id}\u00b7content`,
+        ...(fills ? { height: { kind: "grow" as const } } : {}),
+        ...(overflow === undefined ? {} : { overflow }),
+        children: box.children,
+      },
+    ],
+  };
+};
+
+const build = (input: Box): Node => {
+  const box = normalise(input);
+  return {
   box,
   children: boxesOf(box).map(build),
   leaf: leafOf(box),
@@ -65,7 +121,8 @@ const build = (box: Box): Node => ({
   x: 0,
   y: 0,
   wrapped: undefined,
-});
+  };
+};
 
 /** `padding`, clamped to the box so the inner size reaches 0 rather than going negative (C29 I7, §8a A8). */
 function insets(node: Node, axis: "x" | "y"): { readonly near: number; readonly far: number; readonly inner: number } {

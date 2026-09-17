@@ -53776,6 +53776,20 @@ line below it. A frame with a spare blank row looks like a layout choice, and th
 no group whose children all measure zero — so 440 snapshot entries, 2,440 baseline frames and 6,277
 test rows all agree with a violated invariant, because none of them constructs the input.
 
+**And the repair turned a gate red on a harness defect the defect was holding green.** T4.1 — C14's
+drift test, *summed measured heights equal the rows drawn, at seven widths* — went to `measured 83,
+drew 84` at every width. Its `renderEntry` wrapped each entry's blocks in a **`column` group** and
+rendered that, while the sum it compared against was taken over the blocks themselves. A group is a
+block in its own right: it has a floor of one row. So the two quantities differed by exactly one for
+any entry whose blocks measured zero — and `adv-empty-group` in the corpus is one — **and the
+wrapper's own violation of C09 I1 cancelled it**. Fixing the group made the wrapper honest and the
+cancellation stopped.
+
+*A stand-in must make the reads the real one makes*: the viewport renders a **sequence**, so
+`renderEntry` renders a sequence now, through `renderSequenceToLines`. **T4.1 is the test the file's
+own header calls *the drift test and the reason the rest of the suite is worth having***, and it was
+green on two errors of opposite sign since the wrapper was written.
+
 **The residue**: `render` still derives its own height rather than being handed the measurer's, so
 the two remain two records with three clauses each rather than one record. Calling `groupHeight` from
 `render` would settle it and costs a second measurement of every child, which C09 I61 forbids
