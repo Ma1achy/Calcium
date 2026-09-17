@@ -270,10 +270,16 @@ contract at the box layer and the reason the fallback may not be empty. The choi
 box's children are distributed, so the rest of pass 2 and every later pass see one tree and never a
 candidate set.
 
-**The id is the box's; everything else is the form's.** Choosing a form replaces the box — its
-direction, padding, gap, overflow, alignment, sizing and children — and keeps the outer `id`, so a
-solved tree is addressable by the same name whichever form was taken. A merge of the two would be a
-second rule about which half wins per field, and every field would need one.
+**The id is the box's; the content is the form's.** Choosing a form replaces the box — direction,
+padding, gap, overflow, alignment, spend, aspect, clip, height and children — and keeps the outer
+`id`, so a solved tree is addressable by the same name whichever form was taken. A merge of the two
+would be a second rule about which half wins per field, and every field would need one.
+
+**`width` is the single exception and it is not a merge rule.** Pass 2 asks the parent before it asks
+the child, so the box's declared width is what the parent distributed against, one call above the
+point where the form is chosen. A form's own width would be a number nobody reads. Stated here
+because the build is what made the ordering visible, and a reader checking the sentence above against
+the code would otherwise find it false in one field.
 
 **What this does not move.** A leaf's forms stay inside its definition, because `Leaf`'s own
 declaration says the engine never looks inside one; an authored variant stays at the document layer
@@ -471,8 +477,12 @@ measured against.
 - **I18** — **The engine chooses a container's representation, in pass 2, in one pass and never a
   search.** `representations` is an ordered list of whole boxes: pass 1 fits every form, pass 2 takes
   the first whose natural width fits and the last regardless, and the choice is made before the box's
-  children are distributed, so no later pass sees a candidate set. **The id is the box's and
-  everything else is the form's.** A form's minimum is **measured from the form** and never declared
+  children are distributed, so no later pass sees a candidate set. **The id is the box's and the
+  content is the form's** — direction, padding, gap, alignment, spend, aspect, overflow, clip, height
+  and children all travel with the chosen form. **`width` is the one field that cannot**, and the
+  reason is an ordering fact rather than a rule about which half wins: the parent distributed against
+  the box's declared width in the pass above, before this box was asked, so a form's width would be a
+  number nobody reads. A form's minimum is **measured from the form** and never declared
   beside it — a hand-written `min` is a second record of one number that disagrees the first time the
   form is edited (C09 I72), which is why the field is `readonly Box[]` and not `{min, box}[]`. The
   other two families keep their owners: a leaf's forms stay inside its definition, because `Leaf` is
@@ -559,7 +569,7 @@ with it** — it indexes pairs, and a cell where three rules meet is in neither 
 15. Overflow and clipping are per axis, a clipping container does not impose its size on the axis it clips, and a clip never changes a measured height (I15).
 16. A contradictory declaration is refused at construction; the engine never throws (I16, → C09 I2).
 17. The sizing model and the pass structure are ported from `nicbarker/clay` (Zlib); the module header carries the attribution and the version read, and taking it as a dependency is refused with a row in `DEPENDENCIES.md` (I17).
-18. **The engine chooses a container's representation in pass 2** (I18, §7b): an ordered list of whole boxes, the first that fits and the last regardless, the id the box's and everything else the form's, and a form's minimum measured rather than declared. The other two families keep their owners — the definition and `art()`.
+18. **The engine chooses a container's representation in pass 2** (I18, §7b): an ordered list of whole boxes, the first that fits and the last regardless, the id the box's and the content the form's — `width` excepted, because the parent distributed against it a call above — and a form's minimum measured rather than declared. The other two families keep their owners — the definition and `art()`.
 19. **The engine places no layer** (I19, §7d). The named partition and the nudge are C15's, the nudge on one axis because the horizontal clamp is unreachable by construction; a derived anchor is the caller's, handed down as a number; and attachment by element id, an ancestor clip and a frame ring are refused for want of an input and of a subject alike (→ C15 I5).
 20. **The engine holds no cache** (I20, §7e). The memo is C22's, keyed on the block object and the width, storing the committed figure rather than a natural size; the dirty rule holds by construction because blocks are frozen and replaced; and the single slot is a resize cost and a stable-width saving (→ C22 I100, → C09 I61).
 
