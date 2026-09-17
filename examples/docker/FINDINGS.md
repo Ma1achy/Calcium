@@ -53778,7 +53778,13 @@ left = Math.max(0, Math.min(left, Math.max(0, region.width - width)));
 ```
 
 Shift first, clip only where the height cannot fit, and `truncated` carries the clip up to the
-owner rather than swallowing it. The code also states the rule-interaction §10 does not — *height
+owner rather than swallowing it. **Corrected in the landing, by the mutation pass**: this reads *both
+axes* above and it is one. Removing the `left` clamp outright leaves C15's unit and contract suites
+wholly green, and the reason is constructive rather than corpus-shaped — `resolveWidth` bounds the
+width by the region, an anchored layer takes `left = 0`, and a centred one takes a column already
+inside `[0, region.width - width]`, so **no input reaches it**. It is a guard; the width clamp is
+what bounds that axis. The sentence was a day old and read as a measurement because the code it
+describes is there. The code also states the rule-interaction §10 does not — *height
 first, because clamping the top against a height that still exceeds the region leaves the bottom
 edge outside it* (C15 I6).
 

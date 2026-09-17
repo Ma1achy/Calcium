@@ -288,9 +288,13 @@ subject** (F1230, `docs/notes/C29_LAYERS_WALK.md`).
 
 **Built, in `place.ts`.** `sortLayers` partitions by `kind` — `view`, then `peek`, then `overlay`,
 stable within each — and no integer exists anywhere in C15, so §10's *refused: a free integer
-z-index* holds by construction rather than being owed. The nudge is step 7 on **both** axes: shift
-along the axis that overflows, clip only where the height cannot fit, and carry `truncated` to the
-owner. §10's four positions are not the tree's three, and the difference is the measurement — `base`
+z-index* holds by construction rather than being owed. The nudge is step 7 and it is **one axis**,
+not two: it shifts a layer whose anchor leaves no room inside the region, clips only where the height
+cannot fit, and carries `truncated` to the owner. **The horizontal clamp beside it is unreachable** —
+measured by removing it, which leaves C15's unit and contract suites wholly green, and constructive
+rather than corpus-shaped: `resolveWidth` bounds the width by the region, an anchored layer takes
+`left = 0`, and a centred one takes a column already inside `[0, region.width - width]`. It is a
+guard, and what bounds the horizontal is the width clamp (C15 I16). §10's four positions are not the tree's three, and the difference is the measurement — `base`
 is not a layer, `float` has no member, and `debug` has none either, because the profiler's overlay is
 `kind: "view"` and therefore sorts bottom-most.
 
@@ -413,7 +417,8 @@ no pushed views* the ruling that keeps it so.
   over and from two components**: the sizing core replaced C09 I35's clamp with a floor, and a form
   that dropped a child would leave a C26 focus on a block that draws nothing.
 - **I19** — **The engine places no layer, and the two mechanisms §10 asks it for are C15's.** The
-  named partition and the nudge are `place.ts`'s today; a derived anchor is resolved by the caller and
+  named partition and the nudge are `place.ts`'s today — the nudge on **one** axis, because the
+  horizontal clamp beside it has no input that reaches it and the width clamp is what bounds that axis; a derived anchor is resolved by the caller and
   handed down as a number, which is what keeps `layout()` a pure function of the stack and the region
   (→ C15 I5). A float attached by element id, an ancestor clip and a frame ring are refused: the
   first two read state that is neither input, and all three have no subject — the one element-attached
@@ -484,7 +489,7 @@ with it** — it indexes pairs, and a cell where three rules meet is in neither 
 16. A contradictory declaration is refused at construction; the engine never throws (I16, → C09 I2).
 17. The sizing model and the pass structure are ported from `nicbarker/clay` (Zlib); the module header carries the attribution and the version read, and taking it as a dependency is refused with a row in `DEPENDENCIES.md` (I17).
 18. **The engine chooses no representation** (I18, §7b, §7c). Three families want one and each has an owner elsewhere — the definition, `art()`, or nobody; `sticky` is refused, and a form's minimum is measured rather than declared.
-19. **The engine places no layer** (I19, §7d). The named partition and the nudge are C15's; a derived anchor is the caller's, handed down as a number; and attachment by element id, an ancestor clip and a frame ring are refused for want of an input and of a subject alike (→ C15 I5).
+19. **The engine places no layer** (I19, §7d). The named partition and the nudge are C15's, the nudge on one axis because the horizontal clamp is unreachable by construction; a derived anchor is the caller's, handed down as a number; and attachment by element id, an ancestor clip and a frame ring are refused for want of an input and of a subject alike (→ C15 I5).
 
 ---
 
@@ -524,11 +529,13 @@ if it were not taken.
   `centred`. The equality is the load-bearing half: a column added beside `row` would be **silently
   inert** for any layer that declares no width (walk A3), so no assertion about a placed result could
   see it and only the type can.
-- **T1.33** (I19, §7d): the nudge is C15's on **both** axes — a layer wider than the region and one
-  anchored outside it both come back shifted inside rather than cut, and `truncated` is set only where
-  the height could not fit. The row exists because §10 states one rule for two axes that are not
-  symmetric: the vertical carries a flip and a fraction cap above the nudge and the horizontal is a
-  single clamp.
+- **T1.33** (I19, §7d, → C15 I16): the nudge is the **vertical** axis's, and the horizontal bound is
+  the width clamp. §10 states one rule for two axes and the tree has one axis of it: removing step 7's
+  `left` clamp leaves C15's unit and contract suites green, because `resolveWidth` bounds the width and
+  both placements then produce a column already inside the region. So the row asserts the property the
+  clamp guards *and* the thing that delivers it, then the vertical shift and the flip above it —
+  **written the other way round first, and the mutation is what said so**, which is the documented
+  class arriving on a sentence a day old.
 - **T6.7** (I19): making `place()` derive a `left` for an anchored layer → **T1.32 fails**, and
   nothing else does, because every layer that reaches `place` today is either full-region or centred.
   That is the reading the row carries: the refusal is invisible to every frame until something
