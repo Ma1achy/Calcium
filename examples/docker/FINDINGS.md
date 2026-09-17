@@ -53748,6 +53748,44 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1214 — two mutation survivors are caught, exactly, by rows the run does not execute ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | The carried note that `c22-ticker-period` had rotted. Re-run: **4 caught, 2 survived** — `WINDOW-100` (C03's spinner window 80 → 100) and `STREAM-33` (its stream window 16 → 33), both constants in one frozen table in `src/terminal/frame-scheduler.ts`. |
+| **Reached for** | Not the tests the run names, but `grep` for the constants. `test/unit/frame-scheduler.test.ts` asserts **both, to the millisecond**: T1.3 `expect(clock.armed).toEqual([16])` and T1.7 `toEqual([80])`, the latter carrying F1197's own comment *“**80 and not 100**”*. The run's `CMD` is the two integration suites and nothing else. |
+| **Verdict** | **Open.** The survivors are a property of the run's scope, not of the tree. `CMD` widened to include the unit file and both `expect` rows re-pointed at T1.7 and T1.3; what stays open is T4.35, and the rule the harness does not have. |
+
+**The harness checks one direction of the anchor and the defect lives in the other.** *An
+`expect` row must name a test in a file the run's `CMD` executes* is written down, enforced, and
+was satisfied by both survivors: `WINDOW-100` named T4.35 in `spinner-wiring`, which the `CMD`
+runs. What nothing asks is whether the row named is **the nearest row that can see the
+mutation**. It was not. The exact witness — a row asserting the mutated integer itself — sat in
+a file the `CMD` omitted, and the run reported a survivor while a green assertion of `80` was one
+directory away.
+
+**So a survivor has a fourth disposition.** Three were known: the mutation indicts the test, the
+spec sentence, or itself (F897, F949, and *a mutation can indict its subject*). This one indicts
+**the run** — its scope, not its anchors. It reads identically to the first from the report, and
+the discriminator is cheap: grep the mutated text for an existing assertion before writing a new
+row.
+
+**T4.35 is the other half, and it is the repair-blind class again.** Its job was F1197's second
+half on screen — nine glyphs of ten under a window longer than the set's interval. The surplus
+sampling added to defeat aliasing, 150 ms × 30, also made it insensitive to a 25 % change in
+the window, so the row that was written against this mutation no longer fails it. **A repair
+took its predecessor's instrument with it** and the run kept pointing at the corpse, which is why
+the anchors sweep saw nothing: the anchor resolved, the row ran, and the row was empty of the
+thing it was named for.
+
+**And the constant has a second copy, watched where the original is not.** `ORBIT_MS = 16` in
+`src/shell/session.ts` is C03's `stream` window written again by hand, deliberately not imported
+— *naming them here rather than importing C03's table keeps L4 out of a constant L0 tunes at
+construction; the reason is what binds them, and that is asserted.* The argument holds. What it
+produced is that `ORBIT-33`, which mutates the **copy**, is caught by the integration rows, and
+`STREAM-33`, which mutates the **original**, is not. A hand copy bound by a sentence acquires the
+coverage the sentence's consumer has, and the thing it was copied from keeps its own.
+
 ## F1213 — a mosaic whose regions are not in column order lost two of its five cells, and every gate agreed ★★★★★
 
 | | |
