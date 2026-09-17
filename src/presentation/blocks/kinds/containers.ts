@@ -23,7 +23,7 @@ import {
   sequenceHeight,
 } from "../../../data/viewmodel/index.js";
 import type { Block, Group, MeasureFn, Mosaic, Panel, Scroll, WidthFn } from "../../../data/viewmodel/index.js";
-import { BORDER_INSET, axesOf, groupPlacements, groupRows, mosaicRects, parseAreas } from "../../../data/viewmodel/index.js";
+import { BORDER_INSET, axesOf, groupPlacements, mosaicRects, parseAreas } from "../../../data/viewmodel/index.js";
 import type { NavElement } from "../types.js";
 import { cells, sliceCells, stripControl, truncate } from "../../text.js";
 import { glyphCells, glyphFor, glyphs } from "../glyphs.js";
@@ -40,13 +40,11 @@ import type { BlockDefinition, Rendered, RenderContext, Windowed } from "../type
 // decision. The four read their children's rows directly now.
 
 /** A container's own height, over children measured at the width it gives them. */
-function childHeights(
-  children: readonly Block[],
-  widths: readonly number[],
-  measureChild: MeasureFn,
-): readonly number[] {
-  return children.map((child, index) => measureChild(child, widths[index] ?? 1));
-}
+// **`childHeights` stood here and is gone with the arm it served** (C29 1.3).
+// It mapped a row's placed children onto `measureChild(child, widths[i])`, and
+// the engine's pass 3 does exactly that from the leaf: a `paint` leaf's
+// `measure` is called at the width pass 2 solved, so the map and the `tallest`
+// loop over it are both C29 I2's *max across the axis*.
 
 // --- panel -----------------------------------------------------------------
 
@@ -622,7 +620,7 @@ export const mosaicDefinition: BlockDefinition<Mosaic> = {
 };
 
 /**
- * A `column` group as a C29 box — **the first kind on the engine** (C29 §4).
+ * A `group` as a C29 box — **the first kind on the engine** (C29 §4).
  *
  * The three rules a column had, each as a declaration rather than as
  * arithmetic:
@@ -660,20 +658,35 @@ export const mosaicDefinition: BlockDefinition<Mosaic> = {
  * leaf — and a box built for one question cannot be asked the other and get a
  * confident wrong answer.
  */
-function columnMeasureBox(block: Group, width: number, own: Size, measureChild?: MeasureFn, widthChild?: WidthFn): Box {
+function groupMeasureBox(block: Group, width: number, own: Size, measureChild?: MeasureFn, widthChild?: WidthFn): Box {
   const w = normaliseWidth(width);
+  const column = block.direction === "column";
+  // **A row's children are the placed ones and their divided widths** (C04
+  // I42). `placeable` and `childWidths` stay where they are: the division has
+  // its own leftover policy — a group spends nothing — and moving it into the
+  // engine's distribution is 1.7's ruling, not this one (F1219).
+  const widths = childWidths(block, w);
+  const children = column ? block.children : block.children.slice(0, placeable(block, w));
   return {
     id: "group",
-    direction: "column",
+    direction: column ? "column" : "row",
     width: own,
     height: { kind: "fit", min: Math.max(1, block.minRows ?? 0) },
-    align: { x: "stretch" },
-    children: block.children.map((child, i) => ({
+    // **A column stretches and a row does not.** A column hands every child the
+    // container's width, which on that box is the cross axis; a row hands each
+    // child its own divided share, which is a `FIXED` on the main axis and has
+    // nothing to stretch (C29 I9).
+    ...(column ? { align: { x: "stretch" as const } } : { childGap: ROW_GUTTER }),
+    children: children.map((child, i) => ({
       id: `c${String(i)}`,
-      ...(child.gapBefore === true ? { padding: { t: 1 } } : {}),
+      // **A gap belongs to a sequence and a row is not one** (C04 §3a): its
+      // children sit side by side, so a gap before one of them is meaningless
+      // and is ignored rather than being an error.
+      ...(column && child.gapBefore === true ? { padding: { t: 1 } } : {}),
+      ...(column ? {} : { width: { kind: "fixed" as const, n: widths[i] ?? 1 } }),
       children: {
         kind: "paint" as const,
-        natural: widthChild === undefined ? 0 : widthChild(child, w),
+        natural: widthChild === undefined ? 0 : widthChild(child, column ? w : (widths[i] ?? 1)),
         measure: (cw: number) => (measureChild === undefined ? 0 : measureChild(child, cw)),
         render: () => [],
       },
@@ -688,19 +701,16 @@ function columnMeasureBox(block: Group, width: number, own: Size, measureChild?:
  * floors at `minRows`.
  */
 function groupHeight(block: Group, width: number, measureChild: MeasureFn): number {
-  const widths = childWidths(block, width);
   const placed = block.children.slice(0, placeable(block, width));
   if (placed.length === 0) return 0; // cells-ok
-  if (block.direction === "column") {
-    // **The column arm is the engine's** (C29 I12). `GROW` on the width, because
-    // the box is being asked for a height at a width it has been given —
-    // `FIT` would take the root's natural width, which is the *other* question
-    // this shape answers, in `width` below.
-    return solveHeight(columnMeasureBox(block, width, { kind: "grow" }, measureChild), widths[0] ?? width);
-  }
-  let tallest = 0;
-  for (const height of childHeights(placed, widths, measureChild)) tallest = Math.max(tallest, height);
-  return atLeastOne(groupRows(block, tallest));
+  // **Both arms are the engine's** (C29 I12). `GROW` on the width, because the
+  // box is being asked for a height at a width it has been given — `FIT` would
+  // take the root's natural width, which is the *other* question this shape
+  // answers, in `width` below.
+  //
+  // A column sums along its axis and a row maxes across it, which is C29 I2 and
+  // is the whole of what `sequenceHeight` and the `tallest` loop used to be.
+  return solveHeight(groupMeasureBox(block, width, { kind: "grow" }, measureChild), normaliseWidth(width));
 }
 
 export const groupDefinition: BlockDefinition<Group> = {
@@ -733,15 +743,14 @@ export const groupDefinition: BlockDefinition<Group> = {
       // and the floor of 1 is the `min`, not a `Math.max` after the fact. The
       // stretch is pass 2's and does not reach pass 1, so the natural the
       // children declare is still what decides this.
-      return layout(columnMeasureBox(block, w, { kind: "fit", min: 1 }, undefined, widthChild), w).rect.width;
+      return layout(groupMeasureBox(block, w, { kind: "fit", min: 1 }, undefined, widthChild), w).rect.width;
     }
     const shares = block.flex;
     if (shares === undefined || shares.some((share) => typeof share !== "object")) return w;
-    const widths = childWidths(block, w);
-    const placed = placeable(block, w);
-    let total = 0;
-    for (let i = 0; i < placed; i += 1) total += (widths[i] ?? 1) + (i > 0 ? ROW_GUTTER : 0);
-    return Math.max(1, Math.min(w, total));
+    // **The same box, asked the other question.** A `FIT` row's natural width
+    // is the sum along its axis plus its gaps (C29 I2) — which is the fixed
+    // shares and their gutters, and the floor of 1 is the `min`.
+    return layout(groupMeasureBox(block, w, { kind: "fit", min: 1 }, undefined, widthChild), w).rect.width;
   },
 
   /**

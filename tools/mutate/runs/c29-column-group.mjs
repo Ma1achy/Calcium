@@ -1,4 +1,4 @@
-// C29 1.2 — the `column` group on the engine. Mutated.
+// C29 1.2 and 1.3 — the `group` kind on the engine, both directions. Mutated.
 //
 // **The move is a refactor with a byte-exact gate**, so every row here asks a
 // question the golden gate already answers — and that is the point of running
@@ -13,7 +13,7 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CMD =
   "npx vitest run test/contract/sequence.test.ts test/contract/block-window.test.ts " +
-  "test/unit/blocks-measure-once.test.ts test/edge/blocks.test.ts";
+  "test/unit/blocks-measure-once.test.ts test/edge/blocks.test.ts test/contract/view-model.test.ts";
 const F = "src/presentation/blocks/kinds/containers.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
@@ -35,8 +35,8 @@ const results = await runPass({
     // A column measures nothing. Every row below reads a column group's height
     // or a window over one, so a pass where the arm answers zero cannot observe
     // a kill.
-    from: "    return solveHeight(columnMeasureBox(block, width, { kind: \"grow\" }, measureChild), widths[0] ?? width);",
-    to: "    return 0;",
+    from: "  return solveHeight(groupMeasureBox(block, width, { kind: \"grow\" }, measureChild), normaliseWidth(width));",
+    to: "  return 0;",
     why: "every row reads a column group's measured height or a window over one; an arm answering zero sees no kill",
   },
   mutations: [
@@ -47,8 +47,8 @@ const results = await runPass({
       // does not give it (C29 I9).
       name: "a column's children are measured at their natural width",
       file: F,
-      from: '    align: { x: "stretch" },\n    children: block.children.map',
-      to: "    children: block.children.map",
+      from: '...(column ? { align: { x: "stretch" as const } } : { childGap: ROW_GUTTER }),',
+      to: '...(column ? {} : { childGap: ROW_GUTTER }),',
       expect: "T2.18",
     },
     {
@@ -57,7 +57,7 @@ const results = await runPass({
       // is replaced by in phase 2, arriving one kind early.
       name: "a gapBefore child gets no blank row",
       file: F,
-      from: "      ...(child.gapBefore === true ? { padding: { t: 1 } } : {}),",
+      from: "      ...(column && child.gapBefore === true ? { padding: { t: 1 } } : {}),",
       to: "",
       expect: "T2.18",
     },
@@ -117,8 +117,8 @@ const results = await runPass({
       // build the same shape and differ in exactly this field.
       name: "the height arm takes the box's natural width rather than the one it was given",
       file: F,
-      from: 'return solveHeight(columnMeasureBox(block, width, { kind: "grow" }, measureChild), widths[0] ?? width);',
-      to: 'return solveHeight(columnMeasureBox(block, width, { kind: "fit", min: 1 }, measureChild), widths[0] ?? width);',
+      from: 'return solveHeight(groupMeasureBox(block, width, { kind: "grow" }, measureChild), normaliseWidth(width));',
+      to: 'return solveHeight(groupMeasureBox(block, width, { kind: "fit", min: 1 }, measureChild), normaliseWidth(width));',
       // **T2.138 and not T2.18e.** The column collapses to its floor of one, and
       // T2.18e's own columns are one and three rows — the window sweep is what
       // has a column tall enough for the collapse to be visible at every
@@ -132,9 +132,68 @@ const results = await runPass({
       // width, which is the whole point of the arm.
       name: "the width arm fills rather than fitting its widest child",
       file: F,
-      from: 'return layout(columnMeasureBox(block, w, { kind: "fit", min: 1 }, undefined, widthChild), w).rect.width;',
-      to: 'return layout(columnMeasureBox(block, w, { kind: "grow" }, undefined, widthChild), w).rect.width;',
+      // **Two call sites now**, the column's and the row's, and the `also`
+      // carries the second: 1.3 moved the row's width arm onto the same box, so
+      // a mutation naming one would leave the other holding the rule.
+      from: '      return layout(groupMeasureBox(block, w, { kind: "fit", min: 1 }, undefined, widthChild), w).rect.width;\n    }',
+      to: '      return layout(groupMeasureBox(block, w, { kind: "grow" }, undefined, widthChild), w).rect.width;\n    }',
+      also: [
+        {
+          file: F,
+          from: '    return layout(groupMeasureBox(block, w, { kind: "fit", min: 1 }, undefined, widthChild), w).rect.width;\n  },',
+          to: '    return layout(groupMeasureBox(block, w, { kind: "grow" }, undefined, widthChild), w).rect.width;\n  },',
+        },
+      ],
       expect: "T3.69",
+    },
+    {
+      // **A row given the whole width rather than each child its share.** The
+      // children are `FIXED` at what `childWidths` divided, and dropping that
+      // makes every one `FIT` — measured at its own content rather than at its
+      // cell, so a wrapping child in a narrow column is the wrong height.
+      name: "a row's children are not fixed at their divided share",
+      file: F,
+      from: '      ...(column ? {} : { width: { kind: "fixed" as const, n: widths[i] ?? 1 } }),',
+      to: "",
+      // **T1.32 and not T2.18e.** The sharpest row is not a height row at all:
+      // a `FIT` child is measured at its content width *and* rendered at its
+      // cell, so the registry answers `(block, width)` twice for one child and
+      // C09 I61 fires before any assertion about a row count does.
+      expect: "T1.32",
+    },
+    {
+      // **The gutter dropped from the row.** `childGap` is the one cell between
+      // adjacent cells (C04 I103), and `n` children have `n - 1` of them
+      // (C29 I7) — so the width arm's sum is short by the gutters and a row of
+      // fixed shares answers narrower than it draws.
+      name: "a row of fixed shares answers without its gutters",
+      file: F,
+      from: '{ childGap: ROW_GUTTER }',
+      to: "{}",
+      expect: "T3.69",
+    },
+    {
+      // **A row treated as a sequence.** Its children sit side by side, so a
+      // gap before one of them is meaningless — ignored rather than an error,
+      // because a document moved from a column group to a row group should
+      // change layout, not fail validation (C04 §3a).
+      name: "a row group honours gapBefore",
+      file: F,
+      from: "      ...(column && child.gapBefore === true ? { padding: { t: 1 } } : {}),",
+      to: "      ...(child.gapBefore === true ? { padding: { t: 1 } } : {}),",
+      expect: "T2.18",
+    },
+    {
+      // **The unplaceable children kept.** `placeable` drops the children a row
+      // has no room for, left to right and never by size, and a child that
+      // cannot be placed contributes to neither the rendered rows nor the
+      // measured height — the only one of the three available answers that
+      // keeps them agreeing (C04 I42).
+      name: "a row measures children it cannot place",
+      file: F,
+      from: "  const children = column ? block.children : block.children.slice(0, placeable(block, w));",
+      to: "  const children = block.children;",
+      expect: "T3.70",
     },
     {
       // **The non-left guard removed.** A column holding a `right` child would
