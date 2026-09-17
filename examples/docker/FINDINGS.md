@@ -53845,7 +53845,31 @@ layers: C15 does, the caller resolves the anchor, and the two halves §10 asks t
 the named stack and the nudge — are in `place.ts` today under different names and with the
 interaction stated. What changes is the record, not the tree.
 
-**Open** — the ruling is taken and the spec edit is owed.
+**Closed** — landed as C29 I19 and §7d, with `docs/notes/C29_LAYERS_WALK.md` the walk and T1.32,
+T1.33 and T6.7 the rows. **No `src/` file changed**: what was owed was the record, and the landing's
+own findings are two.
+
+**The first is the correction above** — *both axes* written as though measured, and the mutation pass
+is what asked the sentence whether it could be violated, on a sentence a day old.
+
+**The second is the shape of T1.32, and it is walk A3 arriving as a test.** The refusal cannot be
+asserted on a placed result at all: a column added beside `row` would be inert for any layer that
+declares no width, so every number `place()` reports stays correct while the field sits there doing
+nothing. The row is therefore on the **type**, read by equality, and both halves were verified by
+fabricated violation before the gates — a `col?: number` on the arm fails the field set, and centring
+an anchored layer fails the placement. **A refusal whose violation is invisible to the mechanism can
+only be watched at the declaration.**
+
+And the unreachable clamp is declared in `c15-centred-width.mjs`'s `EXPECTED_SURVIVORS` rather than
+deleted or silently kept: removing it can fail nothing today, and the day a placement can produce a
+column of its own the mutation starts being caught and the pass fails as a **stale exemption**, which
+is the notice that the refusal has been lifted somewhere. A guard with a watch on its own
+unreachability.
+
+Gates: `make test` 343 files · 6,291 passed / 6 todo; `make golden` 468/468 with **no mover named and
+none moved**, which is the expected reading for a landing that changed no source; `make e2e` 24 files
+· 136 passed / 3 todo; `make enforce` at 24,628 references; anchors `0 known stale, and no run
+drifted`; `c15-centred-width` 10 caught · 1 survived · 1 expected.
 
 ---
 
