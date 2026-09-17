@@ -40,8 +40,8 @@ const results = runPass({
   run,
   control: {
     file: LINES,
-    from: "    return (rendered as readonly string[]).map(normaliseRow);",
-    to: "    return rendered as readonly string[];",
+    from: "  return rendered.map(normaliseRow);",
+    to: "  return rendered;",
     why: "the rows arm hands back paint's form, reset-closed, and every styled corpus row differs from Ink's",
   },
   mutations: [
@@ -157,8 +157,8 @@ const results = runPass({
       // reach the frame whatever the oracle is; T6.119 records it.)
       name: "FLOOR-SHORT: the rows arm pads the floor one row short",
       file: REGISTRY,
-      from: '      return [...lines, ...Array.from({ length: floor - lines.length }, () => "")]; // cells-ok — rows',
-      to: '      return [...lines, ...Array.from({ length: floor - lines.length - 1 }, () => "")]; // cells-ok — rows',
+      from: '    return [...rendered, ...Array.from({ length: floor - rendered.length }, () => "")]; // cells-ok — rows',
+      to: '    return [...rendered, ...Array.from({ length: floor - rendered.length - 1 }, () => "")]; // cells-ok — rows',
       expect: "T3.54",
     },
     {
@@ -170,16 +170,19 @@ const results = runPass({
       // order. T6.22 stays the `expect` as the row that names the position.
       name: "MARKER-FIRST: the cap's marker precedes the block's rows",
       file: REGISTRY,
-      from: "    if (Array.isArray(drawn)) return [...(drawn as readonly string[]), marker];",
-      to: "    if (Array.isArray(drawn)) return [marker, ...(drawn as readonly string[])];",
+      from: "    return [...drawn, marker];",
+      to: "    return [marker, ...drawn];",
       expect: "T6.22",
     },
     {
-      // **Both spans for one block**: the deck would count the rows arm as Ink.
-      name: "SPAN-BOTH: the rows arm opens the react span as well",
+      // **Two arm spans for one block**: the deck would count it twice. It
+      // opened `react` beside `rows` while the element arm existed; that span
+      // is gone (F1209), so the mutation opens the same one twice, which is the
+      // same defect in the deck and the same assertion catching it.
+      name: "SPAN-BOTH: the rows arm opens its span twice for one block",
       file: LINES,
-      from: '    using _rows = probe?.span("rows") ?? NO_SPAN;\n    return (rendered as readonly string[]).map(normaliseRow);',
-      to: '    using _rows = probe?.span("rows") ?? NO_SPAN;\n    using _also = probe?.span("react") ?? NO_SPAN;\n    return (rendered as readonly string[]).map(normaliseRow);',
+      from: '  using _rows = probe?.span("rows") ?? NO_SPAN;\n  return rendered.map(normaliseRow);',
+      to: '  using _rows = probe?.span("rows") ?? NO_SPAN;\n  using _also = probe?.span("rows") ?? NO_SPAN;\n  return rendered.map(normaliseRow);',
       expect: "T2.143",
     },
   ],

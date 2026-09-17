@@ -20,12 +20,11 @@
  * drift that shows only once a child wraps.
  */
 import { NO_SPAN } from "../../data/viewmodel/index.js";
-import { Box, Text } from "ink";
-import { createElement, type ReactElement } from "react";
 import { atLeastOne, insetWidth, normaliseWidth, sequenceHeight } from "../../data/viewmodel/index.js";
 import type { Block, MeasureFn, Table, TableRow } from "../../data/viewmodel/index.js";
 import { cells } from "../text.js";
-import { clampSpans, elementOf, paint, selectionStyle, tone, type Span } from "../blocks/paint.js";
+import { fitRow } from "../rows.js";
+import { clampSpans, paint, selectionStyle, tone, type Span } from "../blocks/paint.js";
 import type { BlockDefinition, NavElement, Rendered, RenderContext, Windowed } from "../blocks/types.js";
 import { emptySpans, headerSpans, markedSeriesColumns, rowSpans } from "./cells.js";
 import { detailBlocks, isExpandable } from "./detail.js";
@@ -279,9 +278,11 @@ export const tableDefinition: BlockDefinition<Table> = {
     const washed = (spans: readonly Span[]): readonly Span[] =>
       spans.map((s) => ({ ...s, style: { ...(s.style ?? {}), ...wash } }));
 
-    // **Rows until a detail child answers an element** (C09 I73): every part
-    // is a row, and `finishTable` answers rows when they all are.
-    const parts: Array<string | ReactElement> = [];
+    // **Every part is a row** (C09 I73). There was a `finishTable` here that
+    // answered rows when they all were and lifted them into a column of `Text`
+    // when one was not; a detail child is the only part that could be the
+    // second, and since F1209 it cannot be.
+    const parts: string[] = [];
 
     if (hasHeader(block)) {
       parts.push(paint(clampSpans(headerSpans(block, plan, ctx), width, ctx.capabilities)));
@@ -289,7 +290,7 @@ export const tableDefinition: BlockDefinition<Table> = {
 
     if (!hasBody(block)) {
       parts.push(paint(clampSpans(emptySpans(block, width, ctx), width, ctx.capabilities)));
-      return finishTable(parts, width);
+      return parts;
     }
 
     // Sorting is a permutation, so this changes the order of what follows and
@@ -335,19 +336,12 @@ export const tableDefinition: BlockDefinition<Table> = {
       // row; a child that answers an element is its padded box, as before.
       const inset = width - insetWidth(width);
       const pad = " ".repeat(inset);
-      detailBlocks(block, row, plan, ctx.capabilities).forEach((child, index) => {
+      detailBlocks(block, row, plan, ctx.capabilities).forEach((child) => {
         if (child.gapBefore === true) parts.push("");
-        const drawn = ctx.renderChild(child, insetWidth(width));
-        if (Array.isArray(drawn)) {
-          for (const line of drawn as readonly string[]) parts.push(line === "" ? "" : pad + line);
-        } else {
-          parts.push(
-            createElement(
-              Box,
-              { key: `detail-${row.id}-${child.id === "" ? String(index) : child.id}`, flexDirection: "column", width, paddingLeft: inset },
-              elementOf(drawn),
-            ),
-          );
+        // **Cut to the width** (F1211): a detail child answering a row wider
+        // than its inset used to become a padded Ink box, which wrapped.
+        for (const line of ctx.renderChild(child, insetWidth(width))) {
+          parts.push(line === "" ? "" : fitRow(pad + line, width));
         }
       });
     }
@@ -367,34 +361,11 @@ export const tableDefinition: BlockDefinition<Table> = {
       );
     }
 
-    return finishTable(parts, width);
+    return parts;
   },
 };
 
-/**
- * A painted row, or a space.
- *
- * Ink drops an empty `Text`, so a blank row measured and not drawn is a
- * disagreement of one — `paint.ts`'s `rows()` handles this for the kinds that
- * emit a flat list of strings, and a table interleaves rows with detail boxes, so
- * it applies the same floor itself.
- */
-function textOf(line: string): string {
-  return line === "" ? " " : line;
-}
 
-/**
- * The table's parts as rows when every part is one, else as the column of
- * elements the element arm always built — a row lifted to a `Text` (C09 I73).
- */
-function finishTable(parts: readonly (string | ReactElement)[], width: number): Rendered {
-  if (parts.every((p) => typeof p === "string")) return parts as readonly string[];
-  return createElement(
-    Box,
-    { flexDirection: "column", width },
-    parts.map((p, i) => (typeof p === "string" ? createElement(Text, { key: String(i) }, textOf(p)) : p)),
-  );
-}
 
 /**
  * C26 §5 — what a table offers to keyboard and pointer, from one declaration.

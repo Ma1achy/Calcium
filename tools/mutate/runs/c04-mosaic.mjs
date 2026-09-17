@@ -65,22 +65,26 @@ const results = runPass({
       expect: "MG7",
     },
     {
-      // **`flexShrink: 0`, which is the half that is easy to read as redundant**
-      // beside the clip. Without it the child is squashed before it can overflow
-      // and draws rows out of its own middle — `measure` unchanged.
-      name: "the cell's content may shrink",
+      // **The pair was `flexShrink: 0` and `overflow: "hidden"`** on the cell's
+      // Ink box — the squash and the clip, split so the run said which property
+      // each row held. Both are gone with the element arm (F1209) and the clip
+      // is geometric now: the cell's own `width` and `height` on the composed
+      // record (C09 I35). Nothing squashes a row, so the first half has no
+      // successor; the second is two, because the clip has two axes and a row
+      // that watched one said nothing about the other.
+      name: "the cell does not clip horizontally",
       file: CONTAINERS,
-      from: "            { flexShrink: 0, flexDirection: \"column\" as const },",
-      to: "            { flexDirection: \"column\" as const },",
+      from: "        x: rect.left, top: rect.top, width: rect.width, height: rect.height,",
+      to: "        x: rect.left, top: rect.top, width: 1000, height: rect.height,",
       expect: "MG5",
     },
     {
-      // The other half of the pair, so the run says which one each row is
-      // holding rather than reporting a single joint property.
-      name: "the cell does not clip",
+      // The other axis, so the run says which one each row is holding rather
+      // than reporting a single joint property.
+      name: "the cell does not clip vertically",
       file: CONTAINERS,
-      from: "            overflow: \"hidden\" as const,\n            flexDirection: \"column\" as const,",
-      to: "            flexDirection: \"column\" as const,",
+      from: "        x: rect.left, top: rect.top, width: rect.width, height: rect.height,\n",
+      to: "        x: rect.left, top: rect.top, width: rect.width,\n",
       expect: "MG6",
     },
     {

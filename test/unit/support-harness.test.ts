@@ -61,7 +61,6 @@ import { tableDefinition } from "../../src/presentation/table/index.js";
 import { cells } from "../../src/presentation/text.js";
 import { caps, mutable, store, withTone } from "../support/theme.js";
 import { largeManifest, toolNamed } from "../support/manifest.js";
-import { inkWidth } from "../support/ink.js";
 
 describe("harness parameters — fake-terminal", () => {
   it("capabilities(over): each field of the override reaches the record", () => {
@@ -564,11 +563,10 @@ describe("harness parameters — blocks, render, theme, manifest, ink", () => {
     expect((largeManifest(50)["tools"] as unknown[]).length).toBe(50);
   });
 
-  it("inkWidth(text, box): the box width changes what fits", () => {
-    // A box narrower than the text wraps it, so the reported width differs.
-    expect(inkWidth("hello")).toBe(5);
-    expect(inkWidth("a".repeat(40), 10)).toBeLessThanOrEqual(10);
-  });
+  // **`inkWidth(text, box)` had a row here** — a box narrower than the text
+  // wraps it, so the reported width differs — because a harness parameter that
+  // is silently ignored is this file's whole subject. `test/support/ink.ts` went
+  // with Ink (F1209) and there is no parameter left to watch.
 });
 
 /**

@@ -33,9 +33,8 @@ import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { createViewport } from "../../src/viewport/viewport/index.js";
 import { measureSequence, rowsDoc } from "../support/viewport.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
-import type { RenderContext } from "../../src/presentation/blocks/index.js";
-import { Box, Text } from "ink";
-import { createElement, type ReactElement } from "react";
+import type { RenderContext, Rendered } from "../../src/presentation/blocks/index.js";
+import { rows } from "../../src/presentation/blocks/paint.js";
 import {
   checkMeasurement,
   formatReport,
@@ -52,14 +51,10 @@ function unwrap(r: ReturnType<typeof applyPatch>): ViewDocument {
  * A consumer's block kind, written the way a consumer would write one: two
  * rows, resolved tones, no privileged access to anything.
  */
-function renderBanner(block: Block, ctx: RenderContext): ReactElement {
+function renderBanner(block: Block, ctx: RenderContext): Rendered {
   const text = (block as unknown as { text: string }).text;
   const lines = [`== ${text} ==`, "-".repeat(Math.max(1, ctx.width - 4))];
-  return createElement(
-    Box,
-    { flexDirection: "column" },
-    lines.map((line, i) => createElement(Text, { key: i }, line)),
-  );
+  return rows(lines);
 }
 
 describe("C04 integration — the document lifecycle", () => {

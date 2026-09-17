@@ -515,11 +515,17 @@ describe("C28 — the report's way out", () => {
   it("T1.65 (C28 I41): a report holding both populations → the session spans carry no share and the residue is not negative", () => {
     // The measured shape of F888, at the ratio that produced it: 755.9 ms of
     // between-frame work beside 2515.7 ms of in-frame work, against 2946.3 ms.
+    //
+    // **The largest span was `react` in that run and is `rows` here.** F1209
+    // deleted the element arm and its span; the figure is the one measured and
+    // the name is the live one for the same `draw` bucket, because a fixture
+    // naming a span the table does not know files 1605 ms under *no phase* and
+    // goes on reading as a measurement.
     const r = report({
       frames: 611,
       latency: { work: hist({ sum: 2946.3 }), wait: hist() },
       spans: {
-        react: hist({ sum: 1605.0 }),
+        rows: hist({ sum: 1605.0 }),
         assemble: hist({ sum: 760.7 }),
         elements: hist({ sum: 71.2 }),
         chrome: hist({ sum: 24.5 }),
@@ -564,7 +570,7 @@ describe("C28 — the report's way out", () => {
       frames: 3,
       latency: { work: hist({ sum: 100 }), wait: hist() },
       spans: {
-        react: hist({ sum: 40 }),
+        rows: hist({ sum: 40 }),
         assemble: hist({ sum: 30 }),
         "group.place": hist({ sum: 5 }),
         frame: hist({ sum: 10 }),
@@ -591,7 +597,7 @@ describe("C28 — the report's way out", () => {
       report({
         frames: 1,
         latency: { work: hist({ sum: 10 }), wait: hist() },
-        spans: { react: hist({ sum: 40 }), frame: hist({ sum: 1 }) },
+        spans: { rows: hist({ sum: 40 }), frame: hist({ sum: 1 }) },
       }),
     );
     expect(crossed.residue, "a residue below zero is reported, not clamped").toBeCloseTo(-31, 6);

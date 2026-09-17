@@ -115,6 +115,44 @@ export function invariantsOf(file, readFile = (f) => readFileSync(f, "utf8")) {
 }
 
 /**
+ * An invariant listed as retired: `- **I16** — **Retired …** (F####)`.
+ *
+ * **A third disposition, because the first two were both the wrong record.** An
+ * invariant can stop having a subject — C09 I16 held *Ink's layout width agrees
+ * with `cells()`*, a rule over two implementations of one number, and F1209
+ * deleted the second. SP9 read that as *named by no test row*, which is true and
+ * says the wrong thing: nothing is owed. Putting it on `UNCITED_INVARIANTS`
+ * would have claimed a row is owed on a list that may only shrink.
+ *
+ * **The finding number is required on the line**, because a retirement is a
+ * settled claim and a settled claim with no record is a belief (CLAUDE.md, the
+ * sixth blind spot). The marker is read from the listing rather than from prose
+ * anywhere in the document: a paragraph saying an invariant *is retired* is
+ * discussion, and a reader following the number lands on the list.
+ *
+ * The listing may carry a finding of its own between the id and the em dash —
+ * `- **I37** (F1192) — **Retired …**` — which is how the older entries are
+ * written, so the id and the marker are matched across it rather than adjacent.
+ *
+ * *Stated blind spot*: it reads the word and not the state. An invariant marked
+ * retired whose subject is still in the tree leaves the coverage population on
+ * the strength of a sentence, and nothing here can tell the difference — which
+ * is why the opposite arm is gated rather than reported: a retired invariant a
+ * row still names fails, so a wrong retirement has to delete a row to land.
+ */
+const RETIRED = /^-\s+\*\*(I\d+[a-z]?)\*\*[^—\n]*—\s*\*\*Retired\b[^\n]*?\(F\d+\)/gmu;
+
+/** Every invariant id a spec lists as retired, with a finding number. */
+export function retiredInvariantsOf(file, readFile = (f) => readFileSync(f, "utf8")) {
+  const out = new Set();
+  const src = readFile(file);
+  RETIRED.lastIndex = 0;
+  let m;
+  while ((m = RETIRED.exec(src))) out.add(m[1]);
+  return out;
+}
+
+/**
  * The Commitments section's numbered lines.
  *
  * Bounded by the heading and the next `---`, so a numbered list anywhere else in
@@ -1731,9 +1769,21 @@ export function checkInvariantCoverage(
   }
 
   const uncited = [];
+  const named = [];
+  let retiredCount = 0;
   for (const file of specs) {
     const id = (file.split("/").pop() ?? "").slice(0, 3);
+    const retired = retiredInvariantsOf(file, readFile);
+    retiredCount += retired.size;
     for (const n of invariantsOf(file, readFile)) {
+      // **Retired leaves the population and joins the opposite rule.** A row
+      // naming a rule whose subject is gone is green over nothing, which is the
+      // vacuity class arriving through the citation instead of the assertion —
+      // and it reads as coverage from every direction.
+      if (retired.has(n)) {
+        if (cited.has(`${id} ${n}`)) named.push(`${id} ${n}`);
+        continue;
+      }
       if (!cited.has(`${id} ${n}`)) uncited.push(`${id} ${n}`);
     }
   }
@@ -1755,6 +1805,19 @@ export function checkInvariantCoverage(
         `satisfied. Cite it from the row that covers it, or add a row.`,
     });
   }
+  if (named.length > 0) {
+    violations.push({
+      rule: "SP9",
+      file: "docs/components",
+      spec: "A03 §7a · FINDINGS",
+      message:
+        `${String(named.length)} retired invariant(s) are still named by a test ` +
+        `row — ${named.slice().sort().join(", ")}. A retirement says the rule has ` +
+        `nothing left to be wrong about; a row citing it is green over an absent ` +
+        `subject and reads exactly like coverage. Retire the row with the ` +
+        `invariant, or un-retire the invariant.`,
+    });
+  }
   if (cleared.length > 0) {
     violations.push({
       rule: "SP9",
@@ -1767,7 +1830,7 @@ export function checkInvariantCoverage(
         `outlive its reason unread.`,
     });
   }
-  return { violations, uncited: found.length, declared: specs.reduce((n, f) => n + invariantsOf(f, readFile).size, 0) };
+  return { violations, uncited: found.length, retired: retiredCount, declared: specs.reduce((n, f) => n + invariantsOf(f, readFile).size, 0) };
 }
 
 export function checkSectionReferences(

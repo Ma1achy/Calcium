@@ -1,59 +1,42 @@
-// The Ink arm's output, captured while Ink still exists (F1209).
+// The Ink arm's output, captured while Ink existed (F1209).
 //
 // **C09 I72's claim is that a row is byte for byte the row Ink would have
-// written, and the only thing that knows what Ink would have written is Ink.**
-// T2.143, T2.144 and T3.89 proved it by rendering each block both ways in the
-// same run. The layout pass deletes Ink, which deletes that reference — so the
-// reference is committed first and the rows arm is held to the committed bytes
-// instead.
+// written, and the only thing that knew what Ink would have written was Ink.**
+// T2.143, T2.144, T2.147 and T3.89 proved it by rendering each block both ways
+// in the same run. The layout pass deleted Ink, which deleted that reference —
+// so the reference was committed first and the rows arm is held to the
+// committed bytes instead.
 //
-// **Freezing it strengthens the rows rather than preserving them.** A live
+// **Freezing it strengthened the rows rather than preserving them.** A live
 // oracle composes through the same registry as its subject, so it moves when
-// the subject moves: T6.119 records the cap's marker and the floor's short pad
-// as mutations that fail nothing for exactly that reason. A captured oracle does
-// not move, and both begin to bite.
+// the subject moves: T6.119 recorded the cap's marker and the floor's short pad
+// as mutations that failed nothing for exactly that reason, and both fail now.
+//
+// **Every capture here is final.** The recorder is gone with Ink, which is what
+// `frozen` says: these bytes cannot be regenerated, because the thing that
+// produced them is not in the tree any more. That is the point rather than a
+// limitation — an oracle a subject can rewrite is not an oracle.
 //
 // **A checker that walked the committed directory alone would agree with a
 // corpus that had silently shrunk** — `tools/terminal-baseline.mjs`'s argument,
-// and the reason `settle()` exists: every capture the suite asked for is
+// and the reason `settle()` exists: every capture the suite asks for is
 // compared against the set on disk by equality, both ways, so a block that
 // stopped being rendered is a failure and not a quieter run.
-//
-// Recording: `INK_ORACLE_RECORD=1 npx vitest run <the suites>`. The recorder is
-// the only thing that calls Ink; when Ink goes, the thunks go with it and the
-// reads remain.
-//
-// **Recording adds and overwrites; it never clears.** The first draft cleared
-// the directory before writing, so that a capture whose block had left the
-// corpus could not sit there being compared against. That is the right worry
-// and the wrong owner — `settle()` already catches a stale file, by equality
-// both ways, which is what it exists for. What the clear bought was nothing,
-// and what it cost appeared the moment a producer was deleted: a thunk that
-// can no longer answer throws, and it throws *after* the directory has been
-// emptied, so the recovery mode destroys the artefact before failing. A
-// recorder whose producers outlive it one at a time must be able to run over
-// a set it can only partly regenerate.
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = join(import.meta.dirname, "..", "golden", "ink-oracle");
 
-/** Writing rather than checking. The recorder's only switch. */
-export const RECORDING = process.env.INK_ORACLE_RECORD === "1";
-
 /**
- * Rows to bytes, losslessly — **every row terminated, none separated.**
+ * Bytes to rows — **every row terminated, none separated.**
  *
  * `join("\n")` cannot tell `[]` from `[""]`, and both occur: an empty block
- * answers no rows and a block of one blank row answers one. Terminating each row
- * instead makes the empty list the empty file and the single blank row one
- * newline, and the reader's "drop the tail after the last terminator" inverts it
- * exactly.
+ * answers no rows and a block of one blank row answers one. The recorder
+ * terminated each row instead, so the empty list is the empty file and the
+ * single blank row one newline, and dropping the tail after the last terminator
+ * inverts it exactly. The corpus holds both — `group-adv-empty` captured as 0
+ * bytes and `code-adv-blank` as 1 — so this is measured rather than argued.
  */
-function encode(rows: readonly string[]): string {
-  return rows.map((r) => `${r}\n`).join("");
-}
-
 function decode(bytes: string): readonly string[] {
   const parts = bytes.split("\n");
   return parts.slice(0, Math.max(0, parts.length - 1)); // cells-ok — rows, not columns
@@ -65,55 +48,21 @@ export function oracleName(key: string, capsName: string, width: number): string
   return `${safe}-${capsName}-${String(width)}w.txt`;
 }
 
-/**
- * One suite's captured Ink output.
- *
- * `rows(name, compute)` is the seam: recording, it calls `compute` — which is
- * Ink — and writes; checking, it reads the committed file and never calls Ink at
- * all. So the same loop records and checks, and the corpus has one definition
- * rather than one in the writer and one in the reader.
- */
+/** One suite's captured Ink output, read. */
 export class InkOracle {
   readonly #dir: string;
   readonly #seen = new Set<string>();
 
   constructor(suite: string) {
     this.#dir = join(ROOT, suite);
-    if (RECORDING) mkdirSync(this.#dir, { recursive: true });
   }
 
-  rows(name: string, compute: () => readonly string[]): readonly string[] {
-    this.#seen.add(name);
-    const path = join(this.#dir, name);
-    if (RECORDING) {
-      const got = compute();
-      writeFileSync(path, encode(got));
-      return got;
-    }
-    if (!existsSync(path)) {
-      throw new Error(`no captured Ink output for ${name} — run INK_ORACLE_RECORD=1 while Ink still exists`);
-    }
-    return decode(readFileSync(path, "utf8"));
-  }
-
-  /**
-   * A capture whose **producer no longer exists** — read in both modes.
-   *
-   * `rows` takes a thunk because recording calls it; a capture whose producer
-   * has been deleted has no thunk to call, and the first form of this made the
-   * thunk throw. That is honest and useless: recording the suite then cannot
-   * complete, so **one deleted producer freezes the whole set** and no later
-   * capture can ever be added. The distinction the recorder actually needs is
-   * not *this failed* but *this one is finished* — the bytes are committed, the
-   * thing that made them is gone, and both are permanent. So this reads the
-   * file whatever the mode, and counts as asked, which keeps `settle()`'s
-   * equality true rather than making the frozen capture look stale.
-   */
+  /** A capture. Its producer is deleted, so a missing file cannot be restored. */
   frozen(name: string): readonly string[] {
     this.#seen.add(name);
     const path = join(this.#dir, name);
     if (!existsSync(path)) {
-      throw new Error(`${name} is frozen — its producer is deleted and the capture is missing, so nothing can restore it`);
+      throw new Error(`${name} is missing — Ink is gone, so nothing in this tree can produce it again`);
     }
     return decode(readFileSync(path, "utf8"));
   }
@@ -124,7 +73,8 @@ export class InkOracle {
    *
    * A subset check passes a corpus that shrank, which is the whole reason the
    * baseline generator holds its corpus in one place rather than walking a
-   * directory.
+   * directory. It is also the failure mode a captured oracle has and a live one
+   * could not: a live oracle was computed from the corpus that ran.
    */
   settle(): Readonly<{ asked: readonly string[]; committed: readonly string[] }> {
     const committed = existsSync(this.#dir) ? readdirSync(this.#dir).filter((f) => f.endsWith(".txt")) : [];

@@ -13,8 +13,6 @@
  * wraps (C04 §3).
  */
 import { NO_SPAN } from "../../../data/viewmodel/index.js";
-import { Box, Text } from "ink";
-import { createElement, type ReactElement } from "react";
 import {
   atLeastOne,
   childWidths,
@@ -29,19 +27,16 @@ import { BORDER_INSET, axesOf, groupPlacements, groupRows, mosaicRects, parseAre
 import type { NavElement } from "../types.js";
 import { cells, sliceCells, stripControl, truncate } from "../../text.js";
 import { glyphCells, glyphFor, glyphs } from "../glyphs.js";
-import { clampSpans, elementOf, paint, rows, tone } from "../paint.js";
-import { composeRow, placeRows, type Placed } from "../../rows.js";
+import { clampSpans, paint, rows, tone } from "../paint.js";
+import { composeRow, fitRow, placeRows, type Placed } from "../../rows.js";
 import type { BlockDefinition, Rendered, RenderContext, Windowed } from "../types.js";
 
-/** Every child's rows, or `null` when one answers an element and the container composes elements (C09 I73). */
-function rowsOfAll(rendered: readonly Rendered[]): readonly (readonly string[])[] | null {
-  const out: (readonly string[])[] = [];
-  for (const r of rendered) {
-    if (!Array.isArray(r)) return null;
-    out.push(r as readonly string[]);
-  }
-  return out;
-}
+// **`rowsOfAll` stood here and is gone with the arm it gated.** It answered
+// `null` when any child returned an element, and every container branched on
+// that answer — which is what made it the seam C09 I73 was written at. Since
+// F1209 narrowed `Rendered` to `readonly string[]` it was `rendered.map((r) => r)`:
+// a gate with nothing to refuse, four callers deep, and a name still promising a
+// decision. The four read their children's rows directly now.
 
 /** A container's own height, over children measured at the width it gives them. */
 function childHeights(
@@ -168,8 +163,8 @@ export const panelDefinition: BlockDefinition<Panel> = {
     // at column 1, the other rail at `1 + inner`. The rails are as tall as the
     // measured body and the body as tall as its rows; whichever is taller
     // leaves the other's column blank, as the row box does.
-    const childRows = rowsOfAll(rendered);
-    if (childRows !== null) {
+    const childRows = rendered;
+    {
       const body: string[] = [];
       block.children.forEach((child, index) => {
         if (child.gapBefore === true) body.push("");
@@ -181,71 +176,23 @@ export const panelDefinition: BlockDefinition<Panel> = {
       const rail = side.split("\n");
       const height = Math.max(rail.length, body.length); // cells-ok — a row count
       const lines: string[] = [top];
-      let composed = true;
-      for (let y = 0; y < height && composed; y += 1) { // cells-ok — a row index
-        const bodyRow = body[y] ?? "";
+      for (let y = 0; y < height; y += 1) { // cells-ok — a row index
+        // **The body row cut to the inset** (F1211). A child answering a row
+        // wider than the width it was given used to push the right rail into
+        // its own columns, `composeRow` declined, and the panel fell back to
+        // Ink — which **wrapped**, so the frame drew four rows where `measure`
+        // committed three. The cut keeps the count and closes the border.
+        const bodyRow = fitRow(body[y] ?? "", width < 3 ? width : inner);
         const railRow = rail[y] ?? "";
-        const line = composeRow(
+        lines.push(composeRow(
           width < 3
             ? [{ x: 0, row: bodyRow }]
             : [{ x: 0, row: railRow }, { x: 1, row: bodyRow }, { x: 1 + inner, row: railRow }],
-        );
-        if (line === null) composed = false;
-        else lines.push(line);
+        ));
       }
-      if (composed) {
-        lines.push(bottom);
-        return lines;
-      }
+      lines.push(bottom);
+      return lines;
     }
-
-    const inside =
-      block.children.length === 0 // cells-ok
-        ? [createElement(Text, { key: "empty" }, " ")]
-        : block.children.flatMap((child, index) => {
-            const drawn = createElement(
-              Box,
-              { key: child.id === "" ? String(index) : child.id },
-              elementOf(rendered[index] as Rendered),
-            );
-            return child.gapBefore === true
-              ? [createElement(Text, { key: `gap-${index}` }, " "), drawn]
-              : [drawn];
-          });
-
-    const body = createElement(
-      Box,
-      { key: "children", flexDirection: "column", width: inner },
-      inside,
-    );
-
-    // The border column is as tall as the children *measure*. If a child's two
-    // halves disagree, the frame draws a border that does not close — which is
-    // the one place an I1 violation is visible in the frame rather than only in
-    // the viewport's drift, six screenfuls later — `total` and `side` above.
-
-    // Below three columns there is no room for two borders and a column of
-    // content: `insetWidth` floors the inside at one, so sides plus inside is
-    // three whatever the width. The sides are dropped rather than the content,
-    // and the children keep the width they were *measured* at — rendering them
-    // wider to fill the gap would change their height and break I1 to save a
-    // border nobody can see.
-    const rowsOfBody =
-      width < 3
-        ? [body]
-        : [
-            createElement(Text, { key: "left" }, side),
-            body,
-            createElement(Text, { key: "right" }, side),
-          ];
-
-    return createElement(
-      Box,
-      { flexDirection: "column", width },
-      createElement(Text, { key: "top" }, top),
-      createElement(Box, { key: "body", flexDirection: "row" }, rowsOfBody),
-      createElement(Text, { key: "bottom" }, bottom),
-    );
   },
 };
 
@@ -471,11 +418,6 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
         from === 0 && to === height ? r.child : (ctx.windowChild(r.child, width, from, to)?.block ?? r.child);
       return { child: r.child, rendered: ctx.renderChild(piece, width) };
     });
-    const children: ReactElement[] = pieces.map((p) =>
-      createElement(Box, { key: p.child.id, width, flexDirection: "column" }, elementOf(p.rendered)),
-    );
-
-    const residue: ReactElement[] = [];
     let residueRow: string | null = null;
     // **The residue, both directions** (C04 I49). A settled container keeps the
     // offset it had, so content is hidden above as well as below — and a
@@ -507,7 +449,6 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
           ? `${g.residue} +${String(content)} more`
           : `${g.residue} ${String(above)} above, ${String(below)} below`;
       residueRow = paint(clampSpans([{ text: truncate(text, width, ctx.capabilities), style: dim }], width, ctx.capabilities));
-      residue.push(createElement(Text, { key: "residue" }, residueRow));
     }
 
     // **The box states its height, and the sentence that said otherwise was
@@ -549,21 +490,19 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
 
     // **The rows arm** (C09 I73): the shown pieces' rows, the pads as empty
     // rows, the residue row — a column, so a concatenation.
-    const pieceRows = rowsOfAll(pieces.map((p) => p.rendered));
-    if (pieceRows !== null) {
+    const pieceRows = pieces.map((p) => p.rendered);
+    {
       const lines: string[] = [];
-      for (const rows of pieceRows) for (const row of rows) lines.push(row);
+      // **Cut to the width** (F1211). A scroll takes the full width and insets
+      // nothing, so a child answering a row wider than that put an over-wide
+      // row straight into the frame — the count right, the row wrapping at
+      // paint time where nothing could see it.
+      for (const rows of pieceRows) for (const row of rows) lines.push(fitRow(row, width));
       for (let i = 0; i < padCount; i += 1) lines.push(""); // cells-ok — a row count
       if (residueRow !== null) lines.push(residueRow);
       return lines;
     }
 
-    const pads = Array.from(
-      { length: padCount }, // cells-ok — a row count, not a width
-      (_unused, i) => createElement(Text, { key: `pad-${String(i)}` }, " "),
-    );
-
-    return createElement(Box, { flexDirection: "column", width }, ...children, ...pads, ...residue);
   },
 };
 
@@ -653,67 +592,31 @@ export const mosaicDefinition: BlockDefinition<Mosaic> = {
     // because a `Box` of height zero draws nothing, and that duty moved with it.
     const height = block.height; // cells-ok — a row count
 
-    // **The rows arm** (C09 I73). Each drawable cell's child is rendered at its
-    // rect's width and written at the rect's column and row, clipped to the
-    // rect's height — the clip per cell rather than the container's, because
-    // mosaic places absolutely and Ink's `overflow: hidden` is on each cell.
+    // Each drawable cell's child is rendered at its rect's width and written
+    // at the rect's column and row, **its rows cut to the rect's height** — the
+    // cut per cell rather than the grid's, because a child taller than its
+    // region must lose its own tail and a grid-wide cut would let one cell's
+    // overflow decide another's (I35).
     //
-    // **Each child is rendered once, here, and both arms read that** (I61).
-    // The first form rendered inside the rows attempt and again inside the
-    // element fallback, so a mosaic that declined drew every child twice —
-    // T1.33 caught it, and neither the captures nor the goldens could, because
-    // a second render produces the same bytes.
+    // **Each child is rendered once** (I61). The first form rendered inside the
+    // rows attempt and again inside the element fallback, so a mosaic that
+    // declined drew every child twice — T1.33 caught it, and neither the
+    // captures nor the goldens could, because a second render gives the same
+    // bytes.
     const drawable = block.children.flatMap((child, i) => {
       const rect = rects[i];
       if (rect === undefined || rect.width < 1 || rect.height < 1) return [];
       return [{ child, rect, drawn: ctx.renderChild(child, rect.width) }];
     });
 
-    const childRows = rowsOfAll(drawable.map(({ drawn }) => drawn));
-    if (childRows !== null) {
-      const lines = placeRows(
-        drawable.map(({ rect }, i) => ({
-          x: rect.left, top: rect.top, width: rect.width, height: rect.height,
-          rows: childRows[i] ?? [],
-        })),
-        height,
-      );
-      if (lines !== null) return rows(lines);
-    }
-
-    // **A cell with no room is not drawn** (C04 I72). `mosaicRects` clamps to
-    // the region because the container's clip cannot be relied on: a cell that
-    // clips its own child shadows the ancestor's clip rather than intersecting
-    // it, so the geometry is the guarantee (I35).
-    const cellsDrawn = drawable.map(({ child, rect, drawn }) => {
-      return (
-        createElement(
-          Box,
-          {
-            key: child.id,
-            position: "absolute" as const,
-            left: rect.left,
-            top: rect.top,
-            width: rect.width,
-            height: rect.height,
-            overflow: "hidden" as const,
-            flexDirection: "column" as const,
-          },
-          // **`flexShrink: 0` first, or the clip above has nothing to do** (I35).
-          createElement(
-            Box,
-            { flexShrink: 0, flexDirection: "column" as const },
-            elementOf(drawn),
-          ),
-        )
-      );
-    });
-
-    return createElement(
-      Box,
-      { width, height, overflowX: "hidden" as const },
-      cellsDrawn,
-    );
+    const childRows = drawable.map(({ drawn }) => drawn);
+    return rows(placeRows(
+      drawable.map(({ rect }, i) => ({
+        x: rect.left, top: rect.top, width: rect.width, height: rect.height,
+        rows: childRows[i] ?? [],
+      })),
+      height,
+    ));
   },
 };
 
@@ -910,15 +813,19 @@ export const groupDefinition: BlockDefinition<Group> = {
     // placement's offset, as tall as the tallest child or `minRows`. Declined
     // when a child answers an element, or when the cells would exceed the
     // width, where the row box shrinks and clips and this arm would not.
-    const childRows = rowsOfAll(rendered);
-    if (childRows !== null) {
+    const childRows = rendered;
+    {
       if (block.direction === "column") {
         const lines: string[] = [];
         placed.forEach((child, index) => {
           const at = ats[index] as (typeof ats)[number];
           if (child.gapBefore === true) lines.push("");
           const pad = at.left > 0 ? " ".repeat(at.left) : "";
-          for (const row of childRows[index] ?? []) lines.push(row === "" ? "" : pad + row);
+          // **Cut to the width** (F1211). A column group pads and concatenates
+          // rather than placing, so a child answering a row wider than the
+          // group put that row straight into the frame — the count right and
+          // the row wrapping at paint time, where nothing can see it.
+          for (const row of childRows[index] ?? []) lines.push(row === "" ? "" : fitRow(pad + row, width));
         });
         const floor = block.minRows ?? 0;
         while (lines.length < floor) lines.push(""); // cells-ok — a row count
@@ -953,72 +860,8 @@ export const groupDefinition: BlockDefinition<Group> = {
         blocks.push({ x: left, top: at.top, width: room, rows: cut });
         tallest = Math.max(tallest, at.top + cut.length); // cells-ok — a row count
       });
-      const lines = placeRows(blocks, Math.max(tallest, block.minRows ?? 0));
-      if (lines !== null) return lines;
+      return placeRows(blocks, Math.max(tallest, block.minRows ?? 0));
     }
 
-    const children = placed
-      .flatMap((child, index) => {
-        const at = ats[index] as (typeof ats)[number];
-        // The cell — the allocation wide, stretched to the row's height by the
-        // row's default `alignItems` — and inside it the child at its placement.
-        // **No height is stated on the cell, and a dead guard is why that is
-        // written down.** A first version passed the row's height here; the row
-        // leaves `alignItems` at stretch, so every cell is already the row's
-        // height and the arithmetic changed nothing. It was added while
-        // diagnosing a consumer's failing frame that turned out to be a stale
-        // `dist/`, which is how a guard comes to be justified by a sentence that
-        // is true and not about the decision it is attached to.
-        const drawn = createElement(
-          Box,
-          {
-            key: child.id === "" ? String(index) : child.id,
-            width: widths[index] ?? 1,
-            flexDirection: "column",
-          },
-          createElement(
-            Box,
-            {
-              width: at.width,
-              flexDirection: "column",
-              flexShrink: 0,
-              ...(at.left === 0 ? {} : { marginLeft: at.left }),
-              ...(at.top === 0 ? {} : { marginTop: at.top }),
-            },
-            elementOf(rendered[index] as Rendered),
-          ),
-        );
-        return block.direction === "column" && child.gapBefore === true
-          ? [createElement(Text, { key: `gap-${index}` }, " "), drawn]
-          : [drawn];
-      });
-
-    // A `row` group takes the max of its children, so a short child leaves the
-    // rest of its column blank rather than pulling the group up. `alignItems`
-    // stays at its default stretch for exactly that reason.
-    //
-    // `overflowX: hidden` is the narrow-width case, and it is not cosmetic.
-    // C04 \u00a73 floors a child's width at 1, so at a width too narrow to split —
-    // two children at width 1 — the children and their gutter are wider than
-    // the group. Clipping keeps the row inside the width it was measured at;
-    // without it the terminal wraps the excess into a row nobody counted, which
-    // is I1 broken by a case that only appears at the widths nobody looks at.
-    // Height is unaffected: each child was laid out at its own width already.
-    return createElement(
-      Box,
-      {
-        flexDirection: block.direction === "row" ? "row" : "column",
-        width,
-        // `columnGap`, never `gap`. The shorthand sets the row gap too, and a
-        // row gap on a flex row is a blank line above the children — one extra
-        // row, present at every width and invisible until something counts.
-        columnGap: block.direction === "row" ? ROW_GUTTER : 0,
-        overflowX: "hidden",
-        // The author's floor (C04 I102) — `minHeight`, never `height`, on §3d's
-        // measured argument: an over-full fixed box drops its first row.
-        ...(block.minRows === undefined ? {} : { minHeight: block.minRows }),
-      },
-      children,
-    );
   },
 };

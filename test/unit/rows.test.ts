@@ -179,8 +179,15 @@ describe("C09 I72 — normaliseRow", () => {
     expect(composeRow([{ x: 0, row: "日" }, { x: 2, row: "|" }])).toBe("日|");
     expect(composeRow([{ x: 0, row: "e\u0301" }, { x: 1, row: "|" }])).toBe("e\u0301|");
     expect(composeRow([{ x: 0, row: `${ESC}[31m${ESC}[39m` }, { x: 0, row: "|" }])).toBe("|");
-    // Overlap declines: the grid overwrites and this does not.
-    expect(composeRow([{ x: 0, row: "abc" }, { x: 1, row: "|" }])).toBeNull();
+    // **An overlap is cut, not declined and not overwritten** (F1210, F1211).
+    // This returned `null` and the frame fell through to Ink, which overwrote;
+    // the arm that answered is deleted, so the composer is total and the later
+    // piece keeps only the cells past the cursor. A piece wholly behind it
+    // contributes nothing — the only caller this decline ever had was this line
+    // (F1210), which is why the behaviour is stated here rather than inferred
+    // from a frame.
+    expect(composeRow([{ x: 0, row: "abc" }, { x: 1, row: "|" }])).toBe("abc");
+    expect(composeRow([{ x: 0, row: "abc" }, { x: 1, row: "||||" }])).toBe("abc||");
   });
 });
 

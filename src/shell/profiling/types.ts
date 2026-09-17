@@ -39,7 +39,8 @@ export const TIER_RANK: Readonly<Record<Tier, number>> = Object.freeze({
  * **`body`, `prompt`, `composite` and `based` are `assemble`'s parts** (C28 §2).
  *
  * Added because `assemble` was **58 % of a frame's work with no breakdown** —
- * 358.2 ms of self time over 34 frames against `react`'s 151.9 ms, in the run
+ * 358.2 ms of self time over 34 frames against the element arm's 151.9 ms (the
+ * `react` span, gone with Ink — F1209), in the run
  * whose job was to rank what to fix. A span that large with nothing under it
  * names the file and not the work, and a ranking built on it has a hole where
  * its first entry should be (F936).
@@ -48,7 +49,7 @@ export const TIER_RANK: Readonly<Record<Tier, number>> = Object.freeze({
  * unchanged and only the breakdown improves.
  */
 export type SpanName =
-  | "frame" | "compose" | "measure" | "elements" | "paint" | "react" | "assemble" | "write"
+  | "frame" | "compose" | "measure" | "elements" | "paint" | "assemble" | "write"
   | "body" | "prompt" | "composite" | "based" | "transcript" | "visible"
   | "decode" | "route" | "handler" | "local" | "transport" | "adapt" | "stream" | "livefetch"
   | "completion" | "overlays" | "chrome" | "rows";
@@ -124,7 +125,6 @@ export const SPAN_SITE: Readonly<Record<SpanName, SpanSite>> = Object.freeze({
   chrome: "frame",
   overlays: "frame",
   paint: "frame",
-  react: "frame",
   rows: "frame",
   assemble: "frame",
   // `assemble`'s parts, so necessarily where `assemble` is.
@@ -157,7 +157,6 @@ export const PHASE_GROUP: Readonly<Record<SpanName, PhaseGroup>> = Object.freeze
   chrome: "compute",
   overlays: "compute",
   paint: "draw",
-  react: "draw",
   rows: "draw",
   assemble: "draw",
   // **`draw`, with `assemble`, and that is the point.** They are its children,

@@ -17,47 +17,17 @@ import { FULL_CAPS } from "../support/render.js";
 
 const execFileP = promisify(execFile);
 
-describe("C24 I37 — prepareLaunch narrows Ink's es-toolkit import to one module", () => {
-  it("T5.7 (C24 I37, F1192): a child under the import trace calling prepareLaunch() then importing dist/index.js lists under ten es-toolkit modules and none of the barrel's re-exports, the same child without the call over a thousand, and the armed child renders a block through Ink; exports[\"./launch\"] resolves to ./dist/launch.js", async () => {
-    // **Both arms in one row.** The plain child is the fabricated violation
-    // — a consumer who never called it — and it is what shows the trace sees
-    // the barrel at all; a small armed count with no large plain count would
-    // be an instrument that lists nothing.
-    const here = new URL("../support/", import.meta.url);
-    const dir = mkdtempSync(join(tmpdir(), "launch-graph-"));
-    const child = async (mode: "armed" | "plain"): Promise<string[]> => {
-      const out = join(dir, `${mode}.jsonl`);
-      await execFileP(process.execPath, [
-        "--import", fileURLToPath(new URL("import-trace.mjs", here)),
-        fileURLToPath(new URL("launch-graph-child.mjs", here)),
-        out, mode,
-      ], { timeout: 60_000 });
-      return readFileSync(out, "utf8").split("\n").filter((l) => l.startsWith("{"));
-    };
-    try {
-      const [armed, plain] = await Promise.all([child("armed"), child("plain")]);
-      const armedGraph = JSON.parse(armed[0] ?? "{}") as { status?: string; esToolkit?: string[] };
-      const plainGraph = JSON.parse(plain[0] ?? "{}") as { status?: string; esToolkit?: string[] };
-      const rendered = JSON.parse(armed[1] ?? "{}") as { rendered?: string };
-      expect(armedGraph.status, "the hooks were installed on this Node").toBe("hooked");
-      expect(plainGraph.status).toBe("not called");
-      const plainCount = (plainGraph.esToolkit ?? []).length; // cells-ok
-      const armedCount = (armedGraph.esToolkit ?? []).length; // cells-ok
-      expect(plainCount, "the barrel, unnarrowed, is over a thousand modules").toBeGreaterThan(1000);
-      expect(armedCount, `armed: ${(armedGraph.esToolkit ?? []).join(", ")}`).toBeLessThan(10);
-      expect(armedGraph.esToolkit ?? [], "none of the barrel's re-exports").not.toContainEqual(expect.stringContaining("/compat/array/chunk.mjs"));
-      expect(plainGraph.esToolkit ?? [], "the plain child does list them").toContainEqual(expect.stringContaining("/compat/array/chunk.mjs"));
-      expect(rendered.rendered, "Ink ran with the redirected throttle").toContain("armed");
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-    const pkg = JSON.parse(readFileSync(fileURLToPath(new URL("../../package.json", import.meta.url)), "utf8")) as { exports: Record<string, { types: string; default: string }> };
-    expect(pkg.exports["./launch"]).toEqual({ types: "./dist/launch.d.ts", default: "./dist/bundle/launch.js" });
-  }, 120_000);
-});
+// **T5.7 stood here** (F1192, and the invariant C24 §5 retires): a child under the import trace calling
+// `prepareLaunch()` and then importing `dist/index.js`, listing under ten
+// es-toolkit modules where the same child without the call listed over a
+// thousand — both arms in one row, the plain one the fabricated violation. The
+// invariant is retired with Ink (F1209): the barrel it narrowed belonged to a
+// dependency that is no longer in the tree, the entry point is deleted, and a
+// row here would be counting resolutions of a package nothing installs.
+
 
 describe("C24 I38 — every entry resolves into one bundled graph", () => {
-  it("T5.8 (C24 I38, F1193): the armed bundled runtime under the import trace is under four hundred modules with nothing from the emulator or the renderer, the six entries' export keys equal the tsc files', a b.live declaration made through the runtime is read by the testing entry's liveParts, the emulator chunk appears only after a shell command, and exports resolve into dist/bundle beside files that exist", async () => {
+  it("T5.8 (C24 I38, F1193): the bundled runtime under the import trace is under four hundred modules with nothing from the emulator or the renderer, the five entries' export keys equal the tsc files', a b.live declaration made through the runtime is read by the testing entry's liveParts, the emulator chunk appears only after a shell command, and exports resolve into dist/bundle beside files that exist", async () => {
     const here = new URL("../support/", import.meta.url);
     const dir = mkdtempSync(join(tmpdir(), "bundle-graph-"));
     const out = join(dir, "trace.jsonl");
@@ -73,24 +43,31 @@ describe("C24 I38 — every entry resolves into one bundled graph", () => {
     }
     const lines = readFileSync(out, "utf8").split("\n").filter((l) => l.startsWith("{"));
     rmSync(dir, { recursive: true, force: true });
-    const graph = JSON.parse(lines[0] ?? "{}") as { status?: string; afterImport?: string[] };
+    const graph = JSON.parse(lines[0] ?? "{}") as { afterImport?: string[] };
     const names = (JSON.parse(lines[1] ?? "{}") as { names?: Record<string, { bundled: string[]; tree: string[] }> }).names ?? {};
     const live = (JSON.parse(lines[2] ?? "{}") as { live?: unknown }).live;
     const before = (JSON.parse(lines[3] ?? "{}") as { beforeShell?: string[] }).beforeShell ?? [];
     const after = JSON.parse(lines[4] ?? "{}") as { afterShell?: string[]; seen?: boolean };
 
-    // **The graph.** Armed, bundled: a few hundred where the tree was 1,130.
-    expect(graph.status).toBe("hooked");
+    // **The graph.** Bundled: a few hundred where the tree was 1,130. It opened
+    // by reading the launcher's `"hooked"` back off the child, which is gone
+    // with the entry (F1209) — the bound below is what the row was ever about.
     const imported = graph.afterImport ?? [];
     const count = imported.length; // cells-ok
-    expect(count, "modules on the bundled runtime's import").toBeGreaterThan(50);
+    // **The floor was 50 and the graph is 40**, measured 2026-09-17 after Ink,
+    // react and es-toolkit left the tree (F1209, F1212) — the third bound in
+    // this repository taken from the population it bounds, and so the third to
+    // inverse the moment that population is what the work is shrinking. The
+    // ceiling is the claim and the floor only refutes *nothing was traced*, so
+    // the floor moves to ten and the ceiling stays where it was.
+    expect(count, "modules on the bundled runtime's import").toBeGreaterThan(10);
     expect(count).toBeLessThan(400);
     const forbidden = (urls: readonly string[]): string[] => urls.filter((u) => u.includes("/@xterm/headless/") || u.includes("/beautiful-mermaid/") || u.includes("/elkjs/") || /\/emulator-[^/]*\.js$/.test(u));
     expect(forbidden(imported), "nothing from the emulator or the renderer").toEqual([]);
     expect(imported.some((u) => u.includes("/dist/bundle/index.js")), "the bundled runtime is what loaded").toBe(true);
 
-    // **The same names, six times.**
-    const entries = ["index.js", "launch.js", "mermaid.js", "testing/index.js", "fixtures/index.js", "shell/profiling/index.js"];
+    // **The same names, five times** — six until `./launch` went with Ink (F1209).
+    const entries = ["index.js", "mermaid.js", "testing/index.js", "fixtures/index.js", "shell/profiling/index.js"];
     expect(Object.keys(names).sort()).toEqual([...entries].sort());
     for (const e of entries) expect(names[e]?.bundled, `${e}: the bundled entry's names are the tree's`).toEqual(names[e]?.tree);
     expect(names["index.js"]?.bundled ?? [], "and the runtime has its names").toContain("createTui");
@@ -108,11 +85,11 @@ describe("C24 I38 — every entry resolves into one bundled graph", () => {
     expect(emulator.some((u) => /\/emulator-[^/]*\.js$/.test(u)), "the emulator chunk is loaded by the command").toBe(true);
     expect(emulator.some((u) => u.includes("/@xterm/headless/")), "and the emulator's package with it").toBe(true);
 
-    // **The map.** Six defaults under dist/bundle, six types under dist, every one a file.
+    // **The map.** Five defaults under dist/bundle, five types under dist, every one a file.
     const root = new URL("../../", import.meta.url);
     const pkg = JSON.parse(readFileSync(new URL("package.json", root), "utf8")) as { exports: Record<string, { types: string; default: string }> };
     const subpaths = Object.keys(pkg.exports);
-    expect(subpaths).toHaveLength(6);
+    expect(subpaths).toHaveLength(5);
     for (const sub of subpaths) {
       const target = pkg.exports[sub];
       if (target === undefined) throw new Error(sub);

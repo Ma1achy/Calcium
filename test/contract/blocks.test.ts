@@ -17,10 +17,8 @@ import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable, visible } f
 import { cells, hasEmojiForm, TEXT_PRESENTATION } from "../../src/presentation/text.js";
 import { SPINNER_SETS } from "../../src/presentation/blocks/glyphs.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
-import { fit } from "../../src/presentation/blocks/paint.js";
+import { fit, rows } from "../../src/presentation/blocks/paint.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
-import { Text } from "ink";
-import { createElement } from "react";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import type { BlockDefinition, RenderContext } from "../../src/presentation/blocks/index.js";
 import { patchDefinition } from "../../src/presentation/patch/index.js";
@@ -567,7 +565,7 @@ describe("C09 contract — the slice seam", () => {
       measure: () => 1,
       render: (_block: Block, ctx: RenderContext) => {
         seen.push(ctx);
-        return createElement(Text, null, "x");
+        return rows(["x"]);
       },
     } as unknown as BlockDefinition;
     const r = createBlockRegistry({ defaults: true });

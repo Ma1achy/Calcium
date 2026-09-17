@@ -8,17 +8,14 @@
 // must equal the sequence Ink would have written whole. The probe reads which
 // arm a block took, and exactly one of them.
 import { describe, expect, it } from "vitest";
-import { Box, Text, renderToString } from "ink";
-import { createElement } from "react";
 import { NO_PROBE, NO_SPAN } from "../../src/data/viewmodel/index.js";
 import type { Block, Probe } from "../../src/data/viewmodel/index.js";
 import { DEFAULT_WIDTHS } from "../../src/testing/measurement-conformance.js";
 import type { RenderContextInput } from "../../src/presentation/blocks/index.js";
-import { elementOf } from "../../src/presentation/blocks/paint.js";
 import { renderSequenceToLines, renderToLines } from "../../src/presentation/render-lines.js";
 import { CORPUS, ONE_PER_KIND } from "../support/blocks.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, MONO_CAPS, registry } from "../support/render.js";
-import { TEST_KINDS, twin } from "../support/lifted.js";
+import { TEST_KINDS } from "../support/lifted.js";
 import { InkOracle, oracleName } from "../support/ink-oracle.js";
 
 /** The same sets, named, because a capture's file name carries the arm it was taken under. */
@@ -36,16 +33,6 @@ const oracle = new InkOracle("rows-arm");
  */
 const NARROW_WIDTHS: readonly number[] = [2, 12, 24, 32];
 const WIDTHS: readonly number[] = [...NARROW_WIDTHS, ...DEFAULT_WIDTHS];
-
-/** The element arm, as `render-lines` ran it for every block before C09 I72: a sentinel row below, then split. */
-function throughInk(element: Parameters<typeof renderToString>[0], width: number): readonly string[] {
-  const painted = renderToString(
-    createElement(Box, { flexDirection: "column" }, element, createElement(Text, { key: "sentinel" }, ".")),
-    { columns: width },
-  );
-  const lines = painted.split("\n");
-  return lines.slice(0, Math.max(0, lines.length - 1)); // cells-ok — rows, not columns
-}
 
 /** A probe that records the spans it is asked to open, and nothing else. */
 function recording(): Readonly<{ probe: Probe; names: string[] }> {
@@ -73,24 +60,23 @@ describe("C09 I72 — the two arms agree", () => {
     // for one.
     const blocks = [...new Set([...Object.values(ONE_PER_KIND), ...CORPUS])];
     let rowsArm = 0;
-    let elementArm = 0;
     // **Keys must not collide**, or one capture stands for two blocks and the
     // one it does not match is never compared.
     expect(new Set(blocks.map(keyOf)).size, "every block has its own key").toBe(blocks.length);
     for (const b of blocks) {
       for (const width of WIDTHS) {
         for (const [capsName, capabilities] of NAMED_CAPS) {
-          const ctx: RenderContextInput = { width, theme: DARK_THEME, capabilities, focus: null, tick: 0 };
-          const expected = oracle.rows(oracleName(`t2143-${keyOf(b)}`, capsName, width), () =>
-            throughInk(elementOf(r.render(b, ctx)), width),
-          );
+          const expected = oracle.frozen(oracleName(`t2143-${keyOf(b)}`, capsName, width));
           const { probe, names } = recording();
           const got = renderToLines(r, b, width, { theme: DARK_THEME, capabilities, probe });
           expect(got, `${b.kind} at ${String(width)}`).toEqual(expected);
-          const arms = names.filter((n) => n === "rows" || n === "react");
+          // **One arm span per block, and the filter names one arm.** It
+          // read `n === "rows" || n === "react"` while there were two; the
+          // `react` span went with Ink (F1209), and leaving the term in would
+          // have been a live-looking clause over a name nothing can open.
+          const arms = names.filter((n) => n === "rows");
           expect(arms, `${b.kind} at ${String(width)} opened ${names.join(",")}`).toHaveLength(1);
-          if (arms[0] === "rows") rowsArm += 1;
-          else elementArm += 1;
+          rowsArm += 1;
         }
       }
     }
@@ -98,14 +84,14 @@ describe("C09 I72 — the two arms agree", () => {
     // nothing about the seam between them.
     expect(rowsArm).toBeGreaterThan(200);
     // **No kind this component ships answers an element** since I73 reached
-    // `mosaic`. Asserted as a count of zero rather than as a count naming the
-    // kind that takes the arm: the previous form was `mosaics × widths × caps`,
-    // which is exactly the shape that goes stale silently the day that kind
-    // moves — it would have passed a mosaic that had stopped rendering as
-    // readily as one that had moved. T3.89 keeps the fallback honest with a
-    // registered test kind, which is the only constructor left for it.
+    // `mosaic`, and there is no element arm at all since F1209. This asserted
+    // `elementArm === 0` over a tally of the second span, which was the right
+    // row while the arm existed and is a count of something unconstructable
+    // now: every block opens `rows` or the assertion above fails, so the zero
+    // has nothing left to be wrong about (A03 §2). What is kept is the corpus
+    // check — the sweep is over a corpus that still holds the kind that was
+    // last to move.
     expect(blocks.some((b) => b.kind === "mosaic"), "the corpus still holds a mosaic").toBe(true);
-    expect(elementArm, "no corpus block reaches the element arm").toBe(0);
 
     // **The mixed sequence.** Rows blocks and element blocks side by side, a gap
     // before some, a floor taller than the block, and a cap with its marker —
@@ -191,13 +177,7 @@ describe("C09 I72 — the two arms agree", () => {
     for (const b of withPlacement) {
       for (const width of widths) {
         for (const [capsName, capabilities] of capsFor(b)) {
-          const ctx: RenderContextInput = {
-            width, theme: DARK_THEME, capabilities, focus: null, tick: 0, scrollOffsets,
-            ...(b.id === "img-place" ? { placementScope: "e1" } : {}),
-          };
-          const expected = oracle.rows(oracleName(`t2144-${keyOf(b)}`, capsName, width), () =>
-            throughInk(elementOf(r.render(twin(b), ctx)), width),
-          );
+          const expected = oracle.frozen(oracleName(`t2144-${keyOf(b)}`, capsName, width));
           const { probe, names } = recording();
           const got = renderToLines(r, b, width, {
             theme: DARK_THEME, capabilities, probe, scrollOffsets,
@@ -205,7 +185,6 @@ describe("C09 I72 — the two arms agree", () => {
           } as never);
           expect(got, `${b.id} at ${String(width)}`).toEqual(expected);
           expect(names.filter((n) => n === "rows"), `${b.id} at ${String(width)} took the rows arm`).toHaveLength(1);
-          expect(names.filter((n) => n === "react"), `${b.id} at ${String(width)} never opened react`).toHaveLength(0);
           compared += 1;
         }
       }
@@ -239,19 +218,11 @@ describe("C09 I72 — the two arms agree", () => {
     } as unknown as Block;
     for (const width of [8, 20, 60]) {
       for (const [capsName, capabilities] of NAMED_CAPS) {
-        const ctx: RenderContextInput = { width, theme: DARK_THEME, capabilities, focus: null, tick: 0 };
-        const expected = oracle.rows(oracleName(`t2147-${keyOf(block)}`, capsName, width), () =>
-          // **`twin` and not the block itself.** Mosaic answers rows now, so
-          // `elementOf(r.render(block))` would lift the arm's own answer and
-          // compare it with itself — a comparison that cannot fail. `twin`
-          // lifts the leaves, which sends the container down its element path,
-          // and that path is Ink's independent layout.
-          throughInk(elementOf(r.render(twin(block), ctx)), width),
-        );
+        const expected = oracle.frozen(oracleName(`t2147-${keyOf(block)}`, capsName, width));
         const { probe, names } = recording();
         const got = renderToLines(r, block, width, { theme: DARK_THEME, capabilities, probe });
         expect(got, `the clipped mosaic at ${String(width)}`).toEqual(expected);
-        expect(names.filter((n) => n === "react"), "the mosaic takes the rows arm").toHaveLength(0);
+        expect(names.filter((n) => n === "rows"), "the mosaic takes the rows arm").toHaveLength(1);
         expect(got.length, "the grid is its declared height").toBe(6); // cells-ok — rows
       }
     }
@@ -264,10 +235,7 @@ describe("C09 I72 — the two arms agree", () => {
     // directly, which is exactly what a consumer bypassing validation does.
     const floored = { ...(block as unknown as Record<string, unknown>), id: "m-floor", height: 0 } as unknown as Block;
     for (const width of [8, 20, 60]) {
-      const ctx: RenderContextInput = { width, theme: DARK_THEME, capabilities: FULL_CAPS, focus: null, tick: 0 };
-      const expected = oracle.rows(oracleName(`t2147-${keyOf(floored)}`, "full", width), () =>
-        throughInk(elementOf(r.render(twin(floored), ctx)), width),
-      );
+      const expected = oracle.frozen(oracleName(`t2147-${keyOf(floored)}`, "full", width));
       const got = renderToLines(r, floored, width, { theme: DARK_THEME, capabilities: FULL_CAPS });
       expect(got, `the floored mosaic at ${String(width)}`).toEqual(expected);
       expect(got, "one blank row, not none").toEqual([""]);

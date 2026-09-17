@@ -5,7 +5,6 @@
  * implementations that satisfy it and the registry that pairs each with a
  * renderer (C09 §1).
  */
-import type { ReactElement } from "react";
 
 /**
  * What a renderer answers (I72): the block's rows at the width, each already
@@ -15,7 +14,7 @@ import type { ReactElement } from "react";
  * that ends in `rows()` answers rows, and a sequence is composed block by
  * block, so a rows block beside an element block pays nothing for its neighbour.
  */
-export type Rendered = ReactElement | readonly string[];
+export type Rendered = readonly string[];
 import type { Action, Block, BlockKind, Camera, Measure, MeasureFn, Probe, WidthFn } from "../../data/viewmodel/index.js";
 import type { ResolvedTheme } from "../theme/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";

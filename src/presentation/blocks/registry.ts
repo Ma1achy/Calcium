@@ -7,8 +7,6 @@
  * imports the registry (I7) — the layering at L1 holds because of this one
  * argument, and it is the most copied-wrong pattern in a block library.
  */
-import { Box } from "ink";
-import { createElement, type ReactElement } from "react";
 import {
   BORDER_INSET,
   ROW_GUTTER,
@@ -24,7 +22,7 @@ import {
 import { NO_PROBE } from "../../data/viewmodel/index.js";
 import type { Block, Probe, Status } from "../../data/viewmodel/index.js";
 import { DEFAULT_DEFINITIONS } from "./defaults.js";
-import { clampSpans, elementOf, paint, rows, tone } from "./paint.js";
+import { clampSpans, paint, rows, tone } from "./paint.js";
 import { truncate } from "../text.js";
 import { statusDefinition, statusRowsFor } from "./kinds/status.js";
 import type {
@@ -402,7 +400,9 @@ class Registry implements BlockRegistry {
    * as characters. The tag ` ERROR ` keeps its own, because those are real.
    */
   #errorBlock(text: string, height: number, ctx: RenderContext): Rendered {
-    if (height <= 0) return createElement(Box, { flexDirection: "column" });
+    // **No room is no rows.** This was an empty `Box` while the element arm
+    // existed; an empty rows answer is the same frame and needs no Ink for it.
+    if (height <= 0) return [];
     // **Through the `status` definition, not a private figure** (C09 I31). The
     // boundary's box and the box a live part draws while it is retrying are the
     // same picture, so they are one implementation — and the height handed in is
@@ -593,8 +593,7 @@ class Registry implements BlockRegistry {
    * `Text` beneath, in a column box, which is the same row once Ink has written it.
    */
   #capped(drawn: Rendered, marker: string): Rendered {
-    if (Array.isArray(drawn)) return [...(drawn as readonly string[]), marker];
-    return createElement(Box, { flexDirection: "column" }, drawn as ReactElement, elementOf([marker]));
+    return [...drawn, marker];
   }
 
   // **Every public member opens the call's memo** (I61) — this one included,
@@ -938,12 +937,8 @@ class Registry implements BlockRegistry {
     // **Rows are padded with empty rows** (I72): Ink's `minHeight` fills the box
     // with blank cells and trims them to nothing on the way out, so an empty
     // row is what the element arm wrote, and a tall block is left as it was.
-    if (Array.isArray(rendered)) {
-      const lines = rendered as readonly string[];
-      if (lines.length >= floor) return lines; // cells-ok — rows, not columns
-      return [...lines, ...Array.from({ length: floor - lines.length }, () => "")]; // cells-ok — rows
-    }
-    return createElement(Box, { flexDirection: "column", minHeight: floor }, rendered as ReactElement);
+    if (rendered.length >= floor) return rendered; // cells-ok — rows, not columns
+    return [...rendered, ...Array.from({ length: floor - rendered.length }, () => "")]; // cells-ok — rows
   }
 
   /**

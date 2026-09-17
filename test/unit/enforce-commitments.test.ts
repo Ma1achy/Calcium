@@ -477,8 +477,14 @@ describe("A03 SP9 — every invariant is named by at least one test row", () => 
 
   /** A spec and a test corpus, in the real form, parsed before it is judged. */
   function run(invariants: readonly string[], testSource: string, exempt: readonly string[]) {
+    // An entry may carry its own listing text after a `|`, which is how a
+    // retired invariant is built: the marker is read from the listing, so a
+    // fabrication that wrote it anywhere else would test nothing.
     const spec = ["# C99 — fabricated", "", "## Invariants", "",
-      ...invariants.map((n) => `- **${n}** — text.`), ""].join("\n");
+      ...invariants.map((n) => {
+        const [id, text] = n.split("|");
+        return `- **${id ?? n}** — ${text ?? "text."}`;
+      }), ""].join("\n");
     const read = (f: string): string => (f === SPEC ? spec : testSource);
     return checkInvariantCoverage([SPEC], [TEST], read, exempt);
   }
@@ -510,6 +516,58 @@ describe("A03 SP9 — every invariant is named by at least one test row", () => 
     // and this rule would demand rows that already exist.
     const { violations } = run(["I1", "I2"], 'it("T1.1 (C99 I1, I2): text", () => {});', []);
     expect(violations).toEqual([]);
+  });
+
+  it("SP9: a retired invariant leaves the coverage population, and its marker must carry a finding", () => {
+    // **The third disposition** (F1209, A03 §7a). C09's width pair held *Ink's
+    // layout width agrees with `cells()`*, a rule over two implementations of one
+    // number, and deleting Ink left it with nothing to be wrong about. SP9 read
+    // that as debt, which is the wrong record: nothing is owed.
+    //
+    // **The pair is named here and not cited**, which is this rule catching its
+    // own test: writing the qualified number in a comment makes the retired
+    // invariant *named by a test row* — the citation scan reads every line —
+    // and the opposite arm below went red on the real tree the moment it was
+    // typed. F907's laundering class, found by the rule written against it.
+    const retired = "I2|**Retired with Ink** (F1209). It read: text.";
+    expect(
+      run(["I1", retired], 'it("T1.1 (C99 I1): text", () => {});', []).violations,
+      "the retired one is not named and that is not a violation",
+    ).toEqual([]);
+    // **The finding number is what makes it a record rather than a claim.** The
+    // same line without one is a sentence, and the invariant stays in the
+    // population — so a retirement cannot be asserted into being.
+    const unrecorded = "I2|**Retired with Ink**. It read: text.";
+    const { violations } = run(["I1", unrecorded], 'it("T1.1 (C99 I1): text", () => {});', []);
+    expect(violations, "a retirement with no finding is still uncited").toHaveLength(1);
+    expect(violations[0]?.message).toContain("C99 I2");
+  });
+
+  it("SP9: a row naming a retired invariant fails — the opposite rule, and the half that carries the weight", () => {
+    // **A green row over an absent subject reads as coverage from every
+    // direction**, which is A03 §2's vacuity class arriving through the
+    // citation instead of the assertion. It is also what stops a wrong
+    // retirement landing quietly: retiring an invariant whose subject is still
+    // in the tree has to delete the row that covers it.
+    const retired = "I2|**Retired with Ink** (F1209). It read: text.";
+    const { violations } = run(["I1", retired], 'it("T1.1 (C99 I1, I2): text", () => {});', []);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.rule).toBe("SP9");
+    expect(violations[0]?.message).toContain("C99 I2");
+    expect(violations[0]?.message, "and it says what to do about it").toContain("un-retire");
+  });
+
+  it("SP9: the retired count is reported, not silently subtracted", () => {
+    // **Count an exemption rather than excluding it.** A population that shrinks
+    // by an exemption is invisible as the absence of a complaint, so the number
+    // is on the green line beside the coverage figures.
+    const retired = "I2|**Retired with Ink** (F1209). It read: text.";
+    const r = run(["I1", retired], 'it("T1.1 (C99 I1): text", () => {});', []);
+    expect(r.retired, "the fabrication has one").toBe(1);
+    expect(r.declared, "and it is still declared — SP1 and SP2 read the whole list").toBe(2);
+    // The real tree: C09's width pair and C24's launcher hooks, both retired by
+    // F1209 in the same pass, and the count is what moves when a third lands.
+    expect(checkInvariantCoverage(specFiles(), walkTests()).retired, "two, both F1209's").toBe(2);
   });
 
   it("SP9: the exemption list is compared by equality, both ways", () => {

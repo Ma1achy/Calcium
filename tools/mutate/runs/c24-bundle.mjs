@@ -57,9 +57,10 @@ const results = runPass({
       expect: "T5.8",
     },
     {
-      // **Packages bundled in.** Ink's `ink.js` is never a module of its own,
-      // `prepareLaunch()`'s load hook never sees the line, and the launcher's
-      // process resolves no es-toolkit module at all — R4.7's count reads zero.
+      // **Packages bundled in.** A consumer's `node_modules` copy of a runtime
+      // dependency is never a module of its own, so the tree the child traces
+      // holds the bundle's own copy instead — T5.8 reads the entries' names
+      // against the `tsc` tree's and sees the divergence.
       name: "PACKAGES-BUNDLED: node_modules are bundled rather than external",
       file: B,
       from: '  packages: "external",',
@@ -76,11 +77,14 @@ const results = runPass({
       expect: "T5.5",
     },
     {
-      // **An entry dropped.** `exports["./launch"]` names a file that is not
-      // written, and the child cannot import it.
-      name: "DROP-ENTRY: the launch entry is not bundled",
+      // **An entry dropped.** `exports["./mermaid"]` names a file that is not
+      // written, and the child cannot import it. It was `./launch`, whose entry
+      // went with Ink (F1209, C24 I37 retired); any entry serves, because what
+      // the row watches is that the bundler's list and the export map are one
+      // fact.
+      name: "DROP-ENTRY: an entry is not bundled",
       file: B,
-      from: '  "dist/launch.js",\n',
+      from: '  "dist/mermaid.js",\n',
       to: "",
       expect: "T5.8",
     },

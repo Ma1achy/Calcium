@@ -4,8 +4,6 @@
  * **The dither is the arm that runs on most terminals**, so it is the one built
  * first and the one every capability set but `kitty` reaches.
  */
-import { Box, Text } from "ink";
-import { createElement } from "react";
 import { columnsForAspect } from "../../plot/aspect.js";
 import {
   decodeImage,
@@ -20,7 +18,7 @@ import {
 } from "../../image/index.js";
 import { placementFits, placementIdOf, placementRows } from "../../image/kitty.js";
 import { overlayColour, overlayField } from "../../image/overlay.js";
-import { elementOf, paint, rows as rowsOf, type Span } from "../paint.js";
+import { paint, rows as rowsOf, type Span } from "../paint.js";
 import { statusDefinition } from "./status.js";
 import type { Image, MeasureFn, Probe, Status } from "../../../data/viewmodel/index.js";
 import { truncate } from "../../text.js";
@@ -321,13 +319,12 @@ export const imageDefinition: BlockDefinition<Image> = {
       const alt = truncate(block.alt, ctx.width, ctx.capabilities);
       // **The fault box's rows and the alt text dimmed** (C09 I73) — `dim` is
       // the one attribute Ink's `dimColor` set, so the bytes are the same.
-      if (Array.isArray(box)) return [...(box as readonly string[]), paint([{ text: alt, style: { dim: true } }])];
-      return createElement(
-        Box,
-        { flexDirection: "column", width: ctx.width },
-        createElement(Box, { key: "box" }, elementOf(box)),
-        createElement(Text, { key: "alt", dimColor: true }, alt),
-      );
+      // **The fault box's rows and the alt text dimmed.** The element arm below
+      // this was unreachable before it was deleted: `box` is
+      // `statusDefinition.render`, which has answered rows since I72, so the
+      // `Array.isArray` test could only go one way. The layout pass deleted the
+      // arm rather than the test, and then the test with it (F1209).
+      return [...box, paint([{ text: alt, style: { dim: true } }])];
     }
 
     // **The half-block rung, and the refused placement re-enters here** (I37,

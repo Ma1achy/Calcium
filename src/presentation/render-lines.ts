@@ -19,8 +19,6 @@
  * expressed as lines, beside the registry that drives it. `src/testing/` keeps
  * the two conformance suites, which a consumer genuinely runs.
  */
-import { Box, Text, renderToString } from "ink";
-import { createElement, type ReactElement } from "react";
 import { NO_SPAN, normaliseWidth } from "../data/viewmodel/index.js";
 import type { Block } from "../data/viewmodel/index.js";
 import type { BlockRegistry, RenderContext, RenderContextInput, Rendered } from "./blocks/index.js";
@@ -32,9 +30,6 @@ import type { TerminalCapabilities } from "../terminal/capabilities.js";
  * Everything a render needs that is not the registry or the block. Defaulted
  * so a caller asserting about geometry does not have to assemble a theme.
  */
-/** One cell, below the block, so a blank final row still ends in a newline. */
-const SENTINEL = ".";
-
 export type RenderOptions = Readonly<{
   theme: ResolvedTheme;
   capabilities: TerminalCapabilities;
@@ -102,49 +97,22 @@ export function renderToLines(
     using _build = probe?.span("elements") ?? NO_SPAN;
     rendered = registry.render(block, ctx);
   }
-  return linesOf(rendered, width, probe);
+  return linesOf(rendered, probe);
 }
 
 /**
- * The two arms (C09 I72). Rows are the frame's rows once each is in the form
- * Ink's output layer writes; an element goes through Ink as it always did. The
- * probe reads `rows` for the one and `react` for the other, never both for one
- * block, which is how the deck says what a document is made of.
- */
-function linesOf(rendered: Rendered, width: number, probe: RenderContext["probe"]): readonly string[] {
-  if (Array.isArray(rendered)) {
-    using _rows = probe?.span("rows") ?? NO_SPAN;
-    return (rendered as readonly string[]).map(normaliseRow);
-  }
-  using _react = probe?.span("react") ?? NO_SPAN;
-  return inked(rendered as ReactElement, width);
-}
-
-/**
- * An element's rows through Ink, counted against a sentinel row rather than by
- * splitting the output.
+ * A render's rows, each put into the form Ink's output layer wrote (C09 I72).
  *
- * Ink trims a blank row's trailing space, so an empty container — which
- * occupies no rows — and an empty `notice` — which occupies one blank row, the
- * case C04 I17 exists for — both paint the empty string. Splitting cannot tell
- * them apart, and the harness would have to be wrong about one of them.
- *
- * A row appended below the block gives every real row a newline to its right,
- * so the count is the number of newlines before the sentinel: zero for the
- * container, one for the notice.
+ * **There is one arm.** This tested whether the answer was rows or an element
+ * and sent the second through Ink, and the probe opened `rows` for the one and
+ * `react` for the other so the deck could say what a document was made of. No
+ * kind answers an element since I73 reached `mosaic`, and `Rendered` narrowed
+ * to rows with Ink's removal (F1209); the `react` span is gone with it, which
+ * is why the deck's arm counts are now a statement about history.
  */
-function inked(element: ReactElement, width: number): readonly string[] {
-  const painted = renderToString(
-    createElement(
-      Box,
-      { flexDirection: "column" },
-      element,
-      createElement(Text, { key: "sentinel" }, SENTINEL),
-    ),
-    { columns: width },
-  );
-  const lines = painted.split("\n");
-  return lines.slice(0, Math.max(0, lines.length - 1)); // cells-ok — rows, not columns
+function linesOf(rendered: Rendered, probe: RenderContext["probe"]): readonly string[] {
+  using _rows = probe?.span("rows") ?? NO_SPAN;
+  return rendered.map(normaliseRow);
 }
 
 /**
@@ -196,25 +164,14 @@ export function renderSequenceToLines(
   const probe = options.probe;
   const w = normaliseWidth(width);
   const out: string[] = [];
-  for (const [index, block] of blocks.entries()) {
+  for (const block of blocks) {
     if (block.gapBefore === true) out.push("");
     let rendered: Rendered;
     {
       using _build = probe?.span("elements") ?? NO_SPAN;
       rendered = registry.render(block, { ...ctx, width: w });
     }
-    const element = Array.isArray(rendered)
-      ? rendered
-      : createElement(
-          Box,
-          { flexDirection: "column", width: w },
-          createElement(
-            Box,
-            { key: block.id === "" ? `block-${String(index)}` : block.id, flexDirection: "column" },
-            rendered as ReactElement,
-          ),
-        );
-    for (const line of linesOf(element, w, probe)) out.push(line);
+    for (const line of linesOf(rendered, probe)) out.push(line);
   }
   return out;
 }

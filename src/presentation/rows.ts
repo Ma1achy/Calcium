@@ -33,7 +33,7 @@
  * the table of sequences stays where SS14 puts it.
  */
 import { SGR_RESET } from "../terminal/escapes.js";
-import { cells, soloUnit } from "./text.js";
+import { cells, sliceCells, soloUnit } from "./text.js";
 
 /** A code as the tokeniser holds it: the sequence, and the sequence that ends it. */
 type Code = Readonly<{ code: string; end: string }>;
@@ -458,6 +458,26 @@ export function rowCells(row: string): number {
   return cells(visibleOf(row)); // narrow-ok — Ink reads a row's width through `string-width`, which is narrow for the ambiguous; this is T2.16's pinned pair (C09 I73)
 }
 
+/**
+ * A row cut to the width it has to fit in (C09 I1, F1211).
+ *
+ * **The safe direction of a width disagreement.** A row wider than the space it
+ * is written into is not a harmless overrun: the terminal wraps it, so the frame
+ * gains a row nobody counted and the alternate screen scrolls where the
+ * application cannot see it (C01 §5). Cutting changes no row's *existence*, so
+ * the count the measurer committed survives it — which is why this is the one
+ * answer that keeps both halves of I1 rather than trading them.
+ *
+ * Measured before it was written. A registered kind answering `width + 4` made
+ * a panel measure 3 and render **4** and a row group measure 1 and render **2**,
+ * because the composers declined and Ink's own layout wrapped; a column group
+ * and a scroll kept their counts and emitted a 24-cell row at a width of 20.
+ * Neither arm took the safe direction (F1211).
+ */
+export function fitRow(row: string, width: number): string {
+  return rowCells(row) <= width ? row : sliceCells(row, 0, width); // narrow-ok — `rowCells`' own width (I73)
+}
+
 /** A row written at a column of a composed line (C09 I73). */
 export type Piece = Readonly<{ x: number; row: string }>;
 
@@ -466,19 +486,31 @@ export type Piece = Readonly<{ x: number; row: string }>;
  * each piece normalised, placed after a pad of unstyled spaces that runs from
  * where the previous piece ended to this piece's column, and the line
  * normalised again so the transitions across pieces are the ones Ink emits
- * between adjacent characters. Pieces are in column order and do not overlap;
- * `null` when one would, because the grid overwrites and this does not.
+ * between adjacent characters. Pieces are in column order and do not overlap.
+ *
+ * **Total, and it used to decline** (F1209, F1211). An overlap returned `null`
+ * and the container fell back to the element arm; with no element arm there is
+ * nowhere to fall, and the arm it fell into was the one that wrapped. It is also
+ * unreachable by construction now that every caller cuts a row to its cell
+ * (`fitRow`) and every caller's cells are disjoint — a mosaic's regions come
+ * from a grid parse, a row group's cells are laid left to right and clamped, a
+ * panel's rails sit either side of a body cut to the inset. So the overlapping
+ * head is dropped rather than written: an answer that cannot be reached still
+ * has to be *an* answer, and this one keeps the line inside the width, which is
+ * the property the decline was giving away.
  */
-export function composeRow(pieces: readonly Piece[]): string | null {
+export function composeRow(pieces: readonly Piece[]): string {
   let out = "";
   let cursor = 0;
   for (const piece of pieces) {
     const row = normaliseRow(piece.row);
     if (row === "") continue;
-    if (piece.x < cursor) return null;
-    if (piece.x > cursor) out += " ".repeat(piece.x - cursor);
-    out += row;
-    cursor = piece.x + rowCells(row);
+    const at = Math.max(piece.x, cursor);
+    const kept = at === piece.x ? row : sliceCells(row, at - piece.x, rowCells(row)); // narrow-ok — I73's width
+    if (kept === "") continue;
+    if (at > cursor) out += " ".repeat(at - cursor);
+    out += kept;
+    cursor = at + rowCells(kept);
   }
   return normaliseRow(out);
 }
@@ -488,11 +520,14 @@ export type Placed = Readonly<{ x: number; top: number; width: number; height?: 
 
 /**
  * The lines of a grid `height` tall holding every placed block (C09 I73) —
- * `composeRow` per line over the pieces that reach it. `null` when a row is
- * wider than its block's cell or two blocks would overlap on a line, which is
- * where Ink's grid overwrites and clips and this arm declines.
+ * `composeRow` per line over the pieces that reach it.
+ *
+ * **Total, and a row wider than its cell is cut rather than declined** (F1211).
+ * The decline sent the container to the element arm, where Ink wrapped the
+ * over-wide row and the frame gained a row nobody counted; the cut keeps the
+ * count and the width both, which is the only answer that keeps C09 I1 whole.
  */
-export function placeRows(placed: readonly Placed[], height: number): readonly string[] | null {
+export function placeRows(placed: readonly Placed[], height: number): readonly string[] {
   const lines: string[] = [];
   for (let y = 0; y < height; y += 1) { // cells-ok — a row index
     const pieces: Piece[] = [];
@@ -501,12 +536,9 @@ export function placeRows(placed: readonly Placed[], height: number): readonly s
       if (p.height !== undefined && within >= p.height) continue;
       const row = p.rows[within];
       if (row === undefined || row === "") continue;
-      if (rowCells(row) > p.width) return null;
-      pieces.push({ x: p.x, row });
+      pieces.push({ x: p.x, row: fitRow(row, p.width) });
     }
-    const line = composeRow(pieces);
-    if (line === null) return null;
-    lines.push(line);
+    lines.push(composeRow(pieces));
   }
   return lines;
 }

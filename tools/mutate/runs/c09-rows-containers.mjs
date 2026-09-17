@@ -46,8 +46,8 @@ const results = runPass({
   run,
   control: {
     file: R,
-    from: "    if (piece.x > cursor) out += \" \".repeat(piece.x - cursor);\n",
-    to: "    if (piece.x > cursor) out += \" \";\n",
+    from: "    if (at > cursor) out += \" \".repeat(at - cursor);\n",
+    to: "    if (at > cursor) out += \" \";\n",
     why: "every pad is one space; every row group and panel body moves in T2.144 and in the goldens",
   },
   mutations: [
@@ -56,8 +56,8 @@ const results = runPass({
       // ended: the next cell lands early by the row's width.
       name: "PAD-FROM-CELL: the cursor advances to the piece's column, not past its row",
       file: R,
-      from: "    cursor = piece.x + rowCells(row);\n",
-      to: "    cursor = piece.x;\n",
+      from: "    cursor = at + rowCells(kept);\n",
+      to: "    cursor = at;\n",
       expect: "T2.144",
     },
     {
@@ -116,8 +116,8 @@ const results = runPass({
     {
       name: "DETAIL-INSET-DROPPED: an expanded row's detail is not padded left",
       file: T,
-      from: "          for (const line of drawn as readonly string[]) parts.push(line === \"\" ? \"\" : pad + line);\n",
-      to: "          for (const line of drawn as readonly string[]) parts.push(line);\n",
+      from: "          parts.push(line === \"\" ? \"\" : fitRow(pad + line, width));\n",
+      to: "          parts.push(line === \"\" ? \"\" : fitRow(line, width));\n",
       expect: "T2.144",
     },
     {
@@ -138,15 +138,18 @@ const results = runPass({
       expect: "T3.89",
     },
     {
-      // **The child rendered twice**: once for the rows attempt and again for
-      // the element fallback, which is what the first form of this arm did.
+      // **The child rendered twice**: once into `drawable` and again where its
+      // rows are read, which is what the first form of this arm did — it drew
+      // for the rows attempt and drew again for the element fallback.
       // **Neither the captures nor the goldens can see it** — a second render
       // produces the same bytes — so T1.33's count is the only instrument, and
       // it is the reason a byte-for-byte oracle is not sufficient on its own.
-      name: "MOSAIC-RERENDER: the element fallback renders the child a second time",
+      // Re-anchored 2026-09-17 (F1209): there is one arm, and the site that can
+      // still render twice is the map that reads what was drawn.
+      name: "MOSAIC-RERENDER: the mosaic renders each child a second time",
       file: C,
-      from: "            elementOf(drawn),",
-      to: "            elementOf(ctx.renderChild(child, rect.width)),",
+      from: "    const childRows = drawable.map(({ drawn }) => drawn);",
+      to: "    const childRows = drawable.map(({ child, rect }) => ctx.renderChild(child, rect.width));",
       expect: "T1.33",
     },
     {
@@ -180,15 +183,13 @@ const results = runPass({
       to: "      if (rect === undefined) return [];",
       expect: "T2.144",
     },
-    {
-      // **The fallback dropped**: an element child is read as no rows, and a
-      // group holding a mosaic loses it — T3.89's first case.
-      name: "FALLBACK-DROPPED: an element child is coerced to no rows",
-      file: C,
-      from: "    if (!Array.isArray(r)) return null;\n    out.push(r as readonly string[]);\n",
-      to: "    out.push(Array.isArray(r) ? (r as readonly string[]) : []);\n",
-      expect: "T3.89",
-    },
+    // **FALLBACK-DROPPED stood here** — an element child coerced to no rows,
+    // so a group holding a mosaic lost it, caught by T3.89's first case. Its
+    // subject was `rowsOfAll`'s refusal, and there is nothing to refuse since
+    // F1209 narrowed `Rendered`: the function was an identity map and is
+    // deleted. A mutation with no expression in the tree is removed rather
+    // than re-anchored onto something adjacent, which would be a row watching
+    // a site that never carried the defect.
   ],
 });
 

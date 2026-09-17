@@ -33,12 +33,6 @@ import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 
 const run = promisify(execFile);
-const COUNTING_HOOK = "data:text/javascript," + encodeURIComponent(
-  'import { registerHooks } from "node:module"; import { writeFileSync } from "node:fs";' +
-  'let n = 0; registerHooks({ resolve(s, c, next) { const r = next(s, c); if (r.url.includes("/es-toolkit/")) n += 1; return r; } });' +
-  'process.on("exit", () => writeFileSync(process.env.LAUNCH_COUNT_OUT, String(n)));',
-);
-
 const root = new URL("../", import.meta.url);
 const pkg = JSON.parse(readFileSync(new URL("package.json", root), "utf8")) as {
   bin: Record<string, string>;
@@ -112,24 +106,13 @@ describe("F56: the bin is a claim about an executable", () => {
     expect(stdout).toContain("needs a terminal");
   }, 40_000);
 
-  it("R01 R4.7 (C24 I37, F1192): spawned under a counting resolve hook, the launcher resolves fewer than ten es-toolkit modules — the barrel Ink imports one name from is over a thousand", async () => {
-    // **The count, not the source** (R5.9). The hook registers first, so it
-    // is innermost and sees every resolution the launcher's own hook lets
-    // through: three or so as shipped, and the whole barrel with the call
-    // removed or moved below the app import.
-    const tmp = mkdtempSync(join(tmpdir(), "docker-tui-launch-"));
-    try {
-      const out = join(tmp, "count.txt");
-      const env: Record<string, string> = { ...(process.env as Record<string, string>), LAUNCH_COUNT_OUT: out };
-      const { stdout } = await run(process.execPath, ["--import", COUNTING_HOOK, binPath], { env, timeout: 30_000 });
-      expect(stdout, "the launcher ran to the no-TTY branch").toContain("needs a terminal");
-      const count = Number(readFileSync(out, "utf8"));
-      expect(count, "es-toolkit resolutions in the launcher's process").toBeGreaterThan(0);
-      expect(count).toBeLessThan(10);
-    } finally {
-      rmSync(tmp, { recursive: true, force: true });
-    }
-  }, 40_000);
+  // **R4.7 stood here** — the launcher spawned under a counting resolve hook,
+  // asserting between one and ten `es-toolkit/` resolutions where the barrel Ink
+  // imported one name from is over a thousand. Retired with Ink (F1209, and the
+  // invariant with it): `prepareLaunch()` is deleted, es-toolkit is not in the tree, and the
+  // count the row read is zero by construction — a row that cannot fail rather
+  // than one that passes.
+
   it("R4.6: spawned with a fresh TMPDIR and no NODE_COMPILE_CACHE, the launcher leaves compile-cache files under it", async () => {
     // **The artefact, not the source.** `enableCompileCache()` with no argument
     // writes under the platform's temporary directory, which `TMPDIR` names on
@@ -145,7 +128,14 @@ describe("F56: the bin is a claim about an executable", () => {
       const cache = join(tmp, "node-compile-cache");
       expect(existsSync(cache), "the cache directory appeared under the fresh TMPDIR").toBe(true);
       const files = readdirSync(cache, { recursive: true }).filter((f) => statSync(join(cache, String(f))).isFile());
-      expect(files.length, "and it holds compiled modules").toBeGreaterThan(50);
+      // **The floor was 50 and the graph is now 50** — three runs, 2026-09-17,
+      // stable — because deleting Ink took about a hundred modules of its own
+      // and es-toolkit's barrel with them (F1209, F1212). A bound taken from the
+      // population it bounds inverts the moment that population is what the work
+      // is shrinking: it was a guard against an empty cache and became a ratchet
+      // against a smaller graph. Refounded at twenty, which still refutes *no
+      // cache* and does not go red the next time the graph gets smaller.
+      expect(files.length, "and it holds compiled modules").toBeGreaterThan(20);
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

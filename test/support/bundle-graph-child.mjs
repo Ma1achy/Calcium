@@ -1,5 +1,5 @@
 // C24 T5.8 (C24 I38) — the child under `import-trace.mjs` over the bundled
-// entries: the armed runtime's graph, the six entries' names against the tsc
+// entries: the runtime's graph, the five entries' names against the tsc
 // tree's, one instance across runtime and testing, and the emulator chunk only
 // after a shell command (F1193).
 import { performance } from "node:perf_hooks";
@@ -10,12 +10,15 @@ const emit = (o) => appendFileSync(OUT, JSON.stringify(o) + "\n");
 const trace = globalThis.__importTrace;
 if (typeof trace !== "function") throw new Error("run under --import ./test/support/import-trace.mjs");
 
-const status = (await import("../../dist/bundle/launch.js")).prepareLaunch();
+// **`prepareLaunch()` was called here first** and its `"hooked"` reported back
+// as `status`, because the graph this child traces was the narrowed one. The
+// entry is gone with Ink (F1209) and so is the field: the runtime is imported
+// the way any consumer imports it.
 const runtime = await import("../../dist/bundle/index.js");
-emit({ status, afterImport: trace() });
+emit({ afterImport: trace() });
 
 // **The same names.** Each bundled entry against the tsc file it was built from.
-const ENTRIES = ["index.js", "launch.js", "mermaid.js", "testing/index.js", "fixtures/index.js", "shell/profiling/index.js"];
+const ENTRIES = ["index.js", "mermaid.js", "testing/index.js", "fixtures/index.js", "shell/profiling/index.js"];
 const names = {};
 for (const e of ENTRIES) {
   const bundled = await import(`../../dist/bundle/${e}`);

@@ -6,10 +6,7 @@
 // real one, and what it answers is read against the row it would fail. The
 // mutations themselves are `tools/mutate/runs/c09-text-zero-width.mjs`.
 import { describe, expect, it } from "vitest";
-import { Text } from "ink";
-import { createElement } from "react";
 import { cells } from "../../src/presentation/text.js";
-import { renderToLines } from "../support/ink.js";
 
 describe("C09 §5 — the cluster sum and the zero-width set, fail-on-revert", () => {
   it("T6.111 (I65): the sum stops at the base — the old model — → T1.37 fails on `aः`", () => {
@@ -29,25 +26,14 @@ describe("C09 §5 — the cluster sum and the zero-width set, fail-on-revert", (
     expect(baseOnly("\u{1F468}\u200d\u{1F469}"), "and a family is its first face either way").toBe(cells("\u{1F468}\u200d\u{1F469}"));
   });
 
-  it("T6.112 (I65, I1): a spacing mark counted as none → T2.133 reads two rows", () => {
-    // **The state**: a row padded to the width by a measure that gives a
-    // spacing mark nothing — the old answer — and handed to Ink at that width.
-    // Ink counts the mark, so the row is two cells over and wraps into the
-    // second row the measurer never counted; padded by the real measure the
-    // same row is one. Through Ink directly rather than the registry, because
-    // the registry now cuts by the real measure and would repair the row on
-    // the way — which is the fix, and not the state this row constructs.
-    const zeroMc = (text: string): number => cells(text.replace(/\p{Mc}/gu, ""));
-    const text = "a\u0903 \u0915\u093f";
-    expect(zeroMc(text), "the old answer for the row").toBe(3);
-    expect(cells(text), "the real one").toBe(5);
-    for (const width of [40, 80]) {
-      const old = `${text}${" ".repeat(width - zeroMc(text))}`;
-      const now = `${text}${" ".repeat(width - cells(text))}`;
-      expect(renderToLines(createElement(Text, null, old), width).length, `padded by the old measure at ${String(width)}`).toBe(2); // cells-ok — rows
-      expect(renderToLines(createElement(Text, null, now), width).length, `padded by the real measure at ${String(width)}`).toBe(1); // cells-ok — rows
-    }
-  });
+  // **T6.112 stood here** — a row padded to the width by a measure that gives a
+  // spacing mark nothing, handed to Ink at that width, wrapping into a second
+  // row the measurer never counted. It needed Ink to build its state: a second
+  // width implementation that would disagree with `cells()` and wrap. F1209
+  // deleted it, and with one implementation the over-full row is cut by
+  // `sliceCells` — which asks `cells()` — so the state cannot be constructed in
+  // this tree at all. What still watches the number is the terminal baseline's
+  // 2,440 committed frames, compared byte for byte against a real terminal.
 
   it("T6.113 (I65): the joiner no longer ends the sum → T1.37 fails on the family (6)", () => {
     // **The state**: the sum carried past U+200D, every pictograph counted —

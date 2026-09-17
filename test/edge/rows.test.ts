@@ -6,30 +6,17 @@
 // the normaliser.
 import { describe, expect, it } from "vitest";
 import { styledCharsFromTokens, styledCharsToString, tokenize } from "@alcalzone/ansi-tokenize";
-import { Box, Text, renderToString } from "ink";
-import { createElement } from "react";
 import { NO_PROBE, NO_SPAN } from "../../src/data/viewmodel/index.js";
 import type { Block, Probe } from "../../src/data/viewmodel/index.js";
-import type { BlockDefinition, RenderContextInput } from "../../src/presentation/blocks/index.js";
-import { elementOf, rows } from "../../src/presentation/blocks/paint.js";
+import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
+import { rows } from "../../src/presentation/blocks/paint.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
 import { normaliseRow, placeRows } from "../../src/presentation/rows.js";
-import { ONE_PER_KIND } from "../support/blocks.js";
-import { TEST_KINDS, twin } from "../support/lifted.js";
+import { TEST_KINDS } from "../support/lifted.js";
 import { DARK_THEME, FULL_CAPS, registry } from "../support/render.js";
 import { InkOracle, oracleName } from "../support/ink-oracle.js";
 
 const oracle = new InkOracle("edge-rows");
-
-/** The element arm as `render-lines` ran it for every block before C09 I72: a sentinel row below, then split. */
-function throughInk(element: Parameters<typeof renderToString>[0], width: number): readonly string[] {
-  const painted = renderToString(
-    createElement(Box, { flexDirection: "column" }, element, createElement(Text, { key: "sentinel" }, ".")),
-    { columns: width },
-  );
-  const lines = painted.split("\n");
-  return lines.slice(0, Math.max(0, lines.length - 1)); // cells-ok — rows, not columns
-}
 
 const reference = (row: string): string =>
   styledCharsToString(styledCharsFromTokens(tokenize(row))).trimEnd();
@@ -69,42 +56,29 @@ describe("C09 I72 — rows at the edges", () => {
       measure: () => 1,
       render: () => rows([]),
     } as unknown as BlockDefinition;
-    const inked: BlockDefinition = {
-      kind: "one-text",
-      measure: () => 1,
-      render: () => createElement(Text, null, " "),
-    } as unknown as BlockDefinition;
-    const r = registry([empty, inked]);
+    // **This pair had a second half**, `one-text`, a kind answering a single
+    // `Text` holding a space — the element arm's way of writing the same row,
+    // asserted to give the same `[""]`. It went with the arm (F1209), and what
+    // it proved is the floor's alone now.
+    const r = registry([empty]);
     const options = { theme: DARK_THEME, capabilities: FULL_CAPS };
     expect(renderToLines(r, { kind: "empty-rows", id: "e" } as unknown as Block, 20, options)).toEqual([""]);
-    expect(renderToLines(r, { kind: "one-text", id: "t" } as unknown as Block, 20, options)).toEqual([""]);
   });
-  it("T3.89 (C09 I73): a group with a mosaic child composes elements and the probe reads react; placeRows declines a row wider than its cell and composeRow an overlap; a row group with a short child is the tallest child's height with the short cell blank below, and a panel whose body answers more rows than measured extends below the rails — each equal to the element path through Ink", () => {
+  it("T3.89 (C09 I73, F1209): a row group whose fixed share exceeds its width cuts the child at the group's edge; a row group with a short child is the tallest child's height with the short cell blank below, and a panel whose body answers more rows than measured extends below the rails — each equal to the capture Ink wrote", () => {
     const r = registry(TEST_KINDS);
     const B = (spec: Record<string, unknown>): Block => spec as unknown as Block;
     const both = (b: Block, width: number): { got: readonly string[]; expected: readonly string[]; names: string[] } => {
-      const ctx: RenderContextInput = { width, theme: DARK_THEME, capabilities: FULL_CAPS, focus: null, tick: 0 };
-      const expected = oracle.rows(oracleName(`${b.kind}-${b.id}`, "full", width), () =>
-        throughInk(elementOf(r.render(twin(b), ctx)), width),
-      );
+      const expected = oracle.frozen(oracleName(`${b.kind}-${b.id}`, "full", width));
       const names: string[] = [];
       const probe: Probe = { ...NO_PROBE, on: true, span: (name: string) => { names.push(name); return NO_SPAN; } };
       const got = renderToLines(r, b, width, { theme: DARK_THEME, capabilities: FULL_CAPS, probe });
       return { got, expected, names };
     };
-    // **An element child.** Since I73 reached `mosaic` no kind C09 ships answers
-    // an element, so the fallback's only constructor is a registered kind that
-    // does — `lifted`, which wraps its child's rows back into an element. A row
-    // asserting a fallback needs something able to reach it, and the previous
-    // subject (a mosaic) stopped being one in the same commit that moved it.
-    const withElement = B({ kind: "group", id: "g-element", direction: "column", children: [ONE_PER_KIND.notice, B({ kind: "lifted", id: "lf", inner: ONE_PER_KIND.notice })] });
-    const m = both(withElement, 60);
-    expect(m.got).toEqual(m.expected);
-    expect(m.names.filter((n) => n === "react")).toHaveLength(1);
-    expect(m.names.filter((n) => n === "rows")).toHaveLength(0);
-    // **The declines**: a row wider than its cell, and two pieces overlapping.
-    expect(placeRows([{ x: 0, top: 0, width: 2, rows: ["abc"] }], 1)).toBeNull();
-    expect(placeRows([{ x: 0, top: 0, width: 3, rows: ["abc"] }, { x: 2, top: 0, width: 3, rows: ["def"] }], 1)).toBeNull();
+    // **This row opened with an element child** — a `lifted` block wrapping
+    // its child's rows back into an element — and with the two composer
+    // declines, `placeRows` on a row wider than its cell and `composeRow` on an
+    // overlap. Both are gone: the arm they selected is deleted, and the
+    // composers are total (F1210, F1211). What is left is the geometry.
     expect(placeRows([{ x: 0, top: 0, width: 3, rows: ["abc"] }, { x: 4, top: 1, width: 3, rows: ["def"] }], 2)).toEqual(["abc", "    def"]);
     // **One placed child wider than the group.** `placeable` keeps at least one
     // child however narrow the group is, so a fixed `{cells: 50}` share at a
@@ -121,7 +95,7 @@ describe("C09 I72 — rows at the edges", () => {
     const o = both(over, 20);
     expect(o.got).toEqual(o.expected);
     expect(o.got, "the over-wide child is cut at the group's edge").toEqual(["W".repeat(20)]);
-    expect(o.names.filter((n) => n === "react"), "and it composes rows rather than declining").toHaveLength(0);
+    expect(o.names.filter((n) => n === "rows"), "and it composes rows rather than declining").not.toHaveLength(0);
 
     // **A short child**: measured three, answered one.
     const short = B({ kind: "group", id: "g-short", direction: "row", flex: [1, 1], children: [B({ kind: "short", id: "sh" }), B({ kind: "raw", id: "tall", text: "a\nb\nc" })] });

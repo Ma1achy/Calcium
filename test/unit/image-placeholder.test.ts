@@ -4,19 +4,19 @@
  *
  * `CALCIUM_ROADMAP.md` states *measurement is free — the placeholder grid IS
  * rows x cols of ordinary characters*. That is true of the terminal. It is a
- * claim about **three** width implementations agreeing, and only one of them is
- * the terminal's:
+ * claim about width implementations agreeing, and it used to be three:
+ * `cells()`, which every `measure` in the tree uses (SS23); Ink's own string
+ * width, which laid out the `Box` the placeholder sat in; and the terminal's,
+ * which is what actually draws.
  *
- *   - `cells()`, which every `measure` in the tree uses (SS23);
- *   - Ink's own string width, which lays out the `Box` the placeholder sits in;
- *   - the terminal's, which is what actually draws.
- *
- * If the first two disagree with each other, the image floats and the roadmap's
- * three *free* rows are all false — before any protocol question is asked.
+ * **F1209 deleted the middle one, and that is a loss worth stating.** With one
+ * implementation in the tree there is nothing left to compare `cells()` against
+ * here, so the row that did it is gone rather than kept green over an absent
+ * second arm (A03 §2's vacuity class). What still watches the number from
+ * outside is the terminal baseline: 2,440 committed frames compared byte for
+ * byte, which a width drift moves.
  */
 import { describe, expect, it } from "vitest";
-import { Box, Text, renderToString } from "ink";
-import { createElement as h } from "react";
 import { cells, truncate, stripControl } from "../../src/presentation/text.js";
 import { ASCII_CAPS, FULL_CAPS } from "../support/render.js";
 
@@ -48,10 +48,9 @@ describe("images — the gating measurement", () => {
   it("the placeholder's width, by every implementation this framework holds", () => {
     const rows: string[] = [];
     const probe = (label: string, s: string): void => {
-      const inkWidth = renderToString(h(Box, null, h(Text, null, s)), { columns: 40 }).split("\n")[0]?.length ?? 0;
       rows.push(
         `${label.padEnd(34)} cells()=${String(cells(s, "narrow"))} ` +
-          `.length=${String(s.length)} codepoints=${String([...s].length)} ink=${String(inkWidth)}`,
+          `.length=${String(s.length)} codepoints=${String([...s].length)}`,
       );
     };
     probe("one placeholder", PH);
@@ -72,18 +71,11 @@ describe("images — the gating measurement", () => {
     expect(cells(PH.repeat(4), "narrow"), "so a 4-cell tile is 4 cells").toBe(4);
   });
 
-  it("Ink lays out the same width `cells()` measures — or the image floats", () => {
-    // **The one that decides it.** `measure` uses `cells()` and Ink lays out the
-    // Box; a disagreement is C09 I1 broken by the content rather than by a rule,
-    // and it would be invisible to every assertion about the protocol.
-    for (const n of [1, 2, 4, 8]) {
-      const s = PH.repeat(n);
-      const drawn = renderToString(h(Box, { width: 20 }, h(Text, null, s)), { columns: 20 });
-      const line = drawn.split("\n")[0] ?? "";
-      console.log(`n=${String(n)} cells()=${String(cells(s, "narrow"))} ink drew ${String([...line].length)} codepoints`);
-      expect([...line].length, `${String(n)} placeholders`).toBe(cells(s, "narrow"));
-    }
-  });
+  // **A row stood here comparing Ink's layout width against `cells()` at 1, 2,
+  // 4 and 8 placeholders** — the one that decided it, because a disagreement is
+  // C09 I1 broken by the content rather than by a rule and would be invisible to
+  // every assertion about the protocol. Its second implementation is deleted
+  // (F1209); see the header for what watches the number now.
 
   it("the text path survives a plane-16 character", () => {
     // A surrogate pair through the two functions every rendered run passes.

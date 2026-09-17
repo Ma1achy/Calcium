@@ -10,9 +10,6 @@
  * them and lays out no text of its own (C09 §3).
  */
 import type { AmbiguousWidth } from "../text.js";
-import { Box, Text } from "ink";
-import { createElement, type ReactElement } from "react";
-import type { Rendered } from "./types.js";
 import { SGR_RESET, sgr } from "../../terminal/escapes.js";
 import { resolve, resolveBackground, resolveTone, type Style } from "../theme/index.js";
 import type { ColourRef, ColourValue, ResolvedTheme } from "../theme/index.js";
@@ -368,20 +365,6 @@ export function rows(lines: readonly string[]): readonly string[] {
   // Ink's output layer wrote. A kind that composes an Ink tree does not come
   // through here either, and `elementOf` is how it takes a rows-answering child.
   return lines.length === 0 ? [""] : lines; // cells-ok
-}
-
-/**
- * A render's answer as an element (I72) — the rows arm lifted onto the Ink
- * path, for a container that places a child inside its own tree. A `Text` per
- * row, an empty row a single space so Ink keeps the row; an element is itself.
- */
-export function elementOf(rendered: Rendered): ReactElement {
-  if (!Array.isArray(rendered)) return rendered as ReactElement;
-  return createElement(
-    Box,
-    { flexDirection: "column" },
-    rendered.map((line, index) => createElement(Text, { key: index }, line === "" ? " " : line)),
-  );
 }
 
 /** One row, as an element. */

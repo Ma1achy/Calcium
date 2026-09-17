@@ -157,9 +157,11 @@ const MUTATIONS = [
     // renderer fits its output to the width it is handed.
     name: "the vertical axis is never applied",
     file: CONTAINERS,
-    // Re-anchored 2026-09-05 (C04 I103): the axis is a margin now.
-    from: "              ...(at.top === 0 ? {} : { marginTop: at.top }),",
-    to: "",
+    // Re-anchored 2026-09-05 (C04 I103): the axis is a margin now. Re-anchored
+    // 2026-09-17 (F1209): the margin was Ink's and the axis is the composed
+    // row's `top`.
+    from: '        blocks.push({ x: left, top: at.top, width: room, rows: cut });',
+    to: '        blocks.push({ x: left, top: 0, width: room, rows: cut });',
     expect: "T3.22",
   },
   {

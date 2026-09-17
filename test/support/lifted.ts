@@ -1,30 +1,20 @@
-// Test-only kinds for C09 I73's rows arm — **the reference is the element arm
-// the containers still carry**, reached by making every leaf answer an element.
+// Test-only kinds for C09 I73's rows arm — fixtures the corpus lacks.
 //
-// `lifted` wraps a block and answers `elementOf(its rows)`, which is what every
-// leaf answered before I72; a container whose children are lifted takes its
-// element path, and Ink writes what Ink wrote. `twin(block)` lifts the leaves
-// under a container, recursively, so a nested container also falls back. The
-// other kinds are fixtures the corpus lacks: a row ending in an open style, a
-// row filling its cell in one style, a child answering fewer rows than it
-// measures, and one answering more.
-import { elementOf, rows } from "../../src/presentation/blocks/paint.js";
+// **`lifted` and `twin` were here and are gone with Ink** (F1209). `lifted`
+// wrapped a block and answered `elementOf(its rows)`, which is what every leaf
+// answered before I72, and `twin` lifted the leaves under a container so the
+// container took its element path and Ink wrote the reference. That reference
+// is committed now (`ink-oracle.ts`), and there is no element path to reach.
+//
+// What is left is the fixtures: a row ending in an open style, a row filling
+// its cell in one style, a child answering fewer rows than it measures, one
+// answering more, and one answering a row **wider than the width it was given**
+// — the last added by F1211, which is the only way to reach a composer's cut.
+import { rows } from "../../src/presentation/blocks/paint.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 
 const ESC = "\x1b";
-
-export type Lifted = Readonly<{ kind: "lifted"; id: string; inner: Block }>;
-
-export const liftedDefinition = {
-  kind: "lifted",
-  measure: (b: Lifted, width: number, measureChild: (block: Block, width: number) => number): number =>
-    measureChild(b.inner, width),
-  width: (b: Lifted, width: number, widthChild: (block: Block, width: number) => number): number =>
-    widthChild(b.inner, width),
-  render: (b: Lifted, ctx: { width: number; renderChild: (block: Block, width: number) => unknown }) =>
-    elementOf(ctx.renderChild(b.inner, ctx.width) as never),
-} as unknown as BlockDefinition<never>;
 
 /** A row that ends in an open red, so a pad after it must not inherit the style. */
 export const danglingDefinition = {
@@ -39,6 +29,13 @@ export const solidDefinition = {
   measure: (): number => 1,
   render: (_b: Block, ctx: { width: number }): readonly string[] =>
     rows([`${ESC}[31m${"x".repeat(ctx.width)}${ESC}[39m`]),
+} as unknown as BlockDefinition<never>;
+
+/** Answers a row wider than the width it was given — the only way to reach a composer's decline. */
+export const wideDefinition = {
+  kind: "wide",
+  measure: (): number => 1,
+  render: (_b: Block, ctx: { width: number }): readonly string[] => rows(["W".repeat(ctx.width + 4)]),
 } as unknown as BlockDefinition<never>;
 
 /** Measures three rows and answers one — the short child of a row group. */
@@ -57,31 +54,10 @@ export const tallDefinition = {
 } as unknown as BlockDefinition<never>;
 
 export const TEST_KINDS: readonly BlockDefinition<never>[] = [
-  liftedDefinition,
+  wideDefinition,
   danglingDefinition,
   solidDefinition,
   shortDefinition,
   tallDefinition,
 ];
 
-// **The wrapper carries what the parent reads off a child** — `gapBefore` — or
-// the twin silently drops every gap, which is how the first draft compared a
-// gapped group against a gapless one and blamed the arm.
-const lift = (b: Block): Block =>
-  ({ kind: "lifted", id: `lifted-${b.id}`, inner: b, ...(b.gapBefore === true ? { gapBefore: true } : {}) }) as unknown as Block;
-
-/** The block with every leaf lifted, so each container composes elements. */
-export function twin(b: Block): Block {
-  const any = b as unknown as Record<string, unknown>;
-  if (b.kind === "group" || b.kind === "panel" || b.kind === "scroll") {
-    return { ...any, children: (any.children as readonly Block[]).map(twin) } as unknown as Block;
-  }
-  if (b.kind === "table") {
-    const rowsOf = any.rows as readonly Record<string, unknown>[];
-    return {
-      ...any,
-      rows: rowsOf.map((r) => (r.detail === undefined ? r : { ...r, detail: (r.detail as readonly Block[]).map(twin) })),
-    } as unknown as Block;
-  }
-  return lift(b);
-}

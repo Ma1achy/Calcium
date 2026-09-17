@@ -13,8 +13,6 @@
 // constructor like every other row's, and the registry resolves it exactly as
 // it resolves the shipped one. `defaults: false` is what makes the count this
 // file's own: nothing else in the registry can reach the definition.
-import { Box, Text } from "ink";
-import { createElement } from "react";
 import { describe, expect, it } from "vitest";
 
 import { block } from "../../src/data/viewmodel/index.js";
@@ -27,6 +25,7 @@ import {
   panelDefinition,
   scrollDefinition,
 } from "../../src/presentation/blocks/kinds/containers.js";
+import { rows } from "../../src/presentation/blocks/paint.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
 import { DARK_THEME, FULL_CAPS, LOUD } from "../support/render.js";
 
@@ -72,11 +71,7 @@ function tally(opts: Readonly<{ narrow?: boolean; windowed?: boolean }> = {}): T
     },
     render: (b) => {
       rendered.push(b.id);
-      return createElement(
-        Box,
-        { flexDirection: "column" },
-        ...linesOf(b).map((line, i) => createElement(Text, { key: String(i) }, line)),
-      );
+      return rows(linesOf(b));
     },
     ...(opts.narrow === true ? { width: (_b: Block, w: number) => Math.min(w, 5) } : {}),
     ...(opts.windowed === true
@@ -121,7 +116,7 @@ function booming(): BlockDefinition {
     measure: () => {
       throw new Error("boom measures nothing");
     },
-    render: () => createElement(Text, {}, "never drawn"),
+    render: () => rows(["never drawn"]),
   };
 }
 const boom = (id: string): Block => ({ kind: "boom", id }) as unknown as Block;
@@ -159,7 +154,7 @@ describe("C09 §6 — a (block, width) is answered once per registry call (I61)"
       tick: 0,
       measureChild: counting,
       widthChild: (_child, w) => w,
-      renderChild: () => createElement(Text, {}, "x"),
+      renderChild: () => ["x"],
       windowChild: () => null,
     };
     groupDefinition.measure(group as Group, 80, counting);

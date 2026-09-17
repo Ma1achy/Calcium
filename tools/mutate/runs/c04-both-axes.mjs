@@ -51,21 +51,16 @@ const MUTATIONS = [
     // T6.88's other half — the floor dropped from the render while the measure keeps it.
     name: "minRows dropped from the render only",
     file: CONTAINERS,
-    // **On both arms** (C09 I73): the rows arm's column floor and row height,
-    // and the element arm's `minHeight` — a floor left on any one of the three
-    // is a floor the frame keeps.
+    // **On both arms** (C09 I73): the column floor and the row height. It was
+    // three, with the element arm's `minHeight`; that arm is gone (F1209) and a
+    // floor left on either of the two remaining is a floor the frame keeps.
     from: "        const floor = block.minRows ?? 0;\n",
     to: "        const floor = 0;\n",
     also: [
       {
         file: CONTAINERS,
-        from: "      const lines = placeRows(blocks, Math.max(tallest, block.minRows ?? 0));\n",
-        to: "      const lines = placeRows(blocks, tallest);\n",
-      },
-      {
-        file: CONTAINERS,
-        from: "        ...(block.minRows === undefined ? {} : { minHeight: block.minRows }),\n",
-        to: "",
+        from: "      return placeRows(blocks, Math.max(tallest, block.minRows ?? 0));\n",
+        to: "      return placeRows(blocks, tallest);\n",
       },
     ],
     expect: "T3.72",

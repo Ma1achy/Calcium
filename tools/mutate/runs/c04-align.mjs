@@ -30,9 +30,11 @@ const MUTATIONS = [
     name: "align is declared and ignored",
     file: SRC,
     // Re-anchored 2026-09-05: the axis is a margin read from `groupPlacements`
-    // now (C04 I103), not a Yoga `justifyContent`.
-    from: "              ...(at.top === 0 ? {} : { marginTop: at.top }),",
-    to: "",
+    // now (C04 I103), not a Yoga `justifyContent`. Re-anchored again 2026-09-17
+    // (F1209): the margin was the element arm's and the placement is a row
+    // composition's `top`, which is the same number at the only site left.
+    from: '        blocks.push({ x: left, top: at.top, width: room, rows: cut });',
+    to: '        blocks.push({ x: left, top: 0, width: room, rows: cut });',
     expect: "T3.22",
   },
 ];
