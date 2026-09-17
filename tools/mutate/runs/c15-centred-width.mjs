@@ -23,9 +23,12 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CMD =
   "npx vitest run test/unit/overlay.test.ts test/integration/confirm.test.ts " +
-  "test/integration/history.test.ts test/unit/profile-view.test.ts";
+  "test/integration/history.test.ts test/unit/profile-view.test.ts " +
+  "test/unit/layout-engine.test.ts";
 const MANAGER = "src/viewport/overlay/manager.ts";
 const CONFIRM = "src/shell/confirm.ts";
+const TYPES = "src/viewport/overlay/types.ts";
+const PLACE = "src/viewport/overlay/place.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -125,6 +128,39 @@ const MUTATIONS = [
     to: "        content: render(opts, selected()),\n        dismissable: opts.placement === \"anchored\",",
     expect: "T4.18",
   },
+  {
+    // **C29 I19's refusal arriving as a field.** A column beside `row` is
+    // *silently inert* for any layer that declares no width: `resolveWidth`
+    // gives such a layer the region and step 7's clamp returns its `left` to
+    // zero. So no assertion about a placed result can see it, and only the
+    // field set read by equality can — which is why T1.32 is written that way
+    // (C29 §7d, walk A3, F1230).
+    name: "the anchored arm gains a column",
+    file: TYPES,
+    from: '      prefer: "above" | "below";',
+    to: '      col?: number;\n      prefer: "above" | "below";',
+    expect: "T1.32",
+  },
+  {
+    // The behavioural half of the same refusal: an anchored layer given a
+    // column at all. Every height assertion in C15's suite still passes — the
+    // box is the right size and in the right rows — and it is beside the thing
+    // it points at rather than under it.
+    name: "an anchored layer is centred horizontally",
+    file: PLACE,
+    from: "    } else {\n      const r = placeAnchored(layer.placement, height, region);",
+    to: "    } else {\n      left = Math.floor((region.width - width) / 2);\n      const r = placeAnchored(layer.placement, height, region);",
+    expect: "T1.32",
+  },
+  {
+    // **The declared survivor, and it is a watch rather than a gap.** See
+    // EXPECTED_SURVIVORS below.
+    name: "step 7's horizontal clamp removed",
+    file: PLACE,
+    from: "    left = Math.max(0, Math.min(left, Math.max(0, region.width - width)));\n",
+    to: "",
+    expect: null,
+  },
 ];
 
 /**
@@ -135,7 +171,18 @@ const MUTATIONS = [
  * if a listed mutation is caught after all, so an entry cannot outlive its
  * reason.
  */
-const EXPECTED_SURVIVORS = new Map([]);
+const EXPECTED_SURVIVORS = new Map([
+  [
+    "step 7's horizontal clamp removed",
+    "**unreachable by construction, and this entry is the watch on that** (C29 I19, F1230). " +
+      "`resolveWidth` bounds the width by the region, an anchored layer takes `left = 0`, and a " +
+      "centred one takes a column already inside `[0, region.width - width]` — so no input reaches " +
+      "the clamp and removing it can fail nothing. It stays in the tree as a guard. The day a " +
+      "placement can produce a column of its own the mutation starts being caught, and this pass " +
+      "then fails as a stale exemption, which is the notice that C29 I19's refusal has been lifted " +
+      "somewhere and the ruling is owed a re-reading",
+  ],
+]);
 
 const results = await runPass({
   read,
