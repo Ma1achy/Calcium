@@ -53748,6 +53748,58 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1212 — deleting one dependency emptied six mechanisms in five components, and each was green the moment before ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | F1209's plan named what Ink's removal would touch: the element arm, `elementOf`, `inked`, three registry decorations, image's dead arm, and the `ink` and `react` rows in `DEPENDENCIES.md`. Every one of those landed. |
+| **Reached for** | The gates found six more, none in the plan, each two or more components away from anything the pass edited: `SpanName`'s `react` member (MG30, C28 I39); C09 commitment 13, a promise about two width implementations agreeing; `test/support/ink.ts` and T2.16's three consumers; `rowsOfAll`, the gate every container branched on, reduced to `rendered.map((r) => r)`; `@fmx/calcium/launch` — a public entry, one commitment, one invariant, three rows and two example bins — whose whole subject was Ink's import line; and R01 R4.6's `> 50`, a threshold over a module graph that had just shrunk to exactly 50. |
+| **Verdict** | **Open.** |
+
+**The shape is one fact stated six times: a rule can lose its subject somewhere else.** Each of
+the six is locally correct and locally unchanged — nobody edited `SpanName`, nobody edited the
+launcher, nobody touched the compile-cache row. What moved was a dependency two layers down, and
+every one of them read as satisfied the instant before it read as empty. That is A03 §2's vacuity
+class arriving by deletion rather than by drafting, and the reason it is worth a number is that
+the drafting form is the one the repository has instruments for.
+
+**The instruments that found them were not the ones aimed at Ink.** MG30 found the span member —
+a rule about union members nothing opens, written for C28 I39 and pointed at nothing in
+particular. SP9 found the commitment, by way of an invariant it could no longer place. `make test`
+found the launcher, through a count that went to zero, and the compile-cache row, through a
+threshold that had been a floor and became a ceiling. **Not one was found by reading the diff**,
+which is the argument for running the whole chain on a deletion rather than the suites the
+deletion names.
+
+**SP9 had no word for what had happened, which is the finding's own remedy.** An invariant whose
+subject is gone is neither *covered* nor *debt*, and those were the only two dispositions. Putting
+C09 I16 on `UNCITED_INVARIANTS` would have claimed a row was owed, on a list whose whole rule is
+that it may only shrink. A03 §7a now carries a third: **retired**, read from the listing and
+carrying a finding number, gated in both directions — a retired invariant leaves the coverage
+population, *and* a test row naming one is a violation, because a green row over an absent subject
+reads as coverage from every direction. The rule caught its own test on the first run: a comment
+in the row written for it spelled `C09 I16` and made the retired invariant *named by a test row*,
+which is F907's laundering class, found by the rule written against it.
+
+**The threshold is the one to keep in mind, because it fails in the direction that reads as a
+regression — and there are three of them.** `R4.6` asserted more than fifty compile-cache files as
+a guard against an empty cache, and the graph now produces exactly fifty (three runs, 2026-09-17,
+stable); the plots demo's copy of that row is the second; and C24 T5.8's *more than fifty modules
+on the bundled runtime's import* is the third, measuring **40**. None of the numbers drifted. The
+population did, and it shrank because the work succeeded. **A floor taken from the population it
+bounds inverts the moment that population is what is being reduced** — it was a guard against
+*nothing happened* and became a ratchet against a smaller graph. All three are refounded low
+enough to still refute the absence they were written for and low enough not to fail the next time
+the graph shrinks; in T5.8's case the *ceiling* was always the claim and the floor only ever said
+the trace saw something.
+
+**And the launcher is the largest of the six because it was the most load-bearing.** C24 I37 was
+a real invariant with a measured win behind it — 1,319 modules of a cold import's 2,442, 235 → 208
+ms without the compile cache and 205 → 162 with it, six of six interleaved pairs. All of that was
+about *Ink's* import line. The entry is removed rather than left registering loader hooks that can
+never arm, and the measurement is written into the retirement so it is not re-derived as an
+argument for adding something back.
+
 ## F1211 — a child that answers a row wider than its cell breaks C09 I1 on one arm and overruns the frame on the other ★★★★★
 
 | | |
