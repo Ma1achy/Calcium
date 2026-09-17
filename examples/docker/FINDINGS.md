@@ -53748,6 +53748,43 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1222 — `childOffset` had nothing to move, because the container had already shrunk the child to fit ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | C29 I15 — *clipping is per axis with a `childOffset`, and a clip never changes a measured height* — and §7's *`scroll` is `clip` plus a `childOffset`: the container clips and the child is placed at a negative offset. One mechanism for mosaic cells, scroll blocks and attached terminals.* |
+| **Reached for** | T1.15, constructing the mechanism rather than asserting a property of it: a two-row window over a five-row child with `offset.y = 2`, expecting rows 2 and 3. **The frame came back two blank rows.** |
+| **Verdict** | **Closed by a clause.** A container that clips on an axis does not impose its size on that axis: the surplus still distributes, and only the deficit is refused. I15 gains the sentence and `budgetOf` is where it lives. |
+
+**Pass 4 had already done the thing the clip exists to undo.** The window is `height: FIXED(2)` with one
+`FIT` child of five rows, so the height distribution saw a deficit of three and shrank the child to
+two — correctly, by every rule written down. What was then clipped was a child that already fitted,
+and the offset moved a two-row child two rows off the top of a two-row box. Every number in the
+solved tree was defensible and the frame was empty.
+
+**This is A03 §2's vacuity class arriving in a pass rather than in a rule.** `offset` was a published
+field, set by the caller, read by the composer, and carried all the way to a `Placed` — and there
+was no input at which it could change what was drawn, because the only boxes that clip are the ones
+whose children were made to fit first. A clause that forbids nothing reads exactly like a clause that
+is satisfied, and so does a mechanism that cannot act. **The engine's own I14 fix, found the same
+minute by the row above it, is the ordinary kind of defect by comparison**: `measure` returned 1 for
+a box solved to width 0, because a `rows` leaf's row count does not depend on its width and nothing
+in pass 3 asked. That one was a rule stated correctly and implemented wrongly. This one was a rule
+that was never stated.
+
+**And the two artefacts could not have reached it.** The classification table indexes cells where two
+sizing rules meet at rest, and *clip* is not a sizing rule; the sequence trace indexes pass
+boundaries, and this is a pass doing exactly what its own boundary says it does. What found it is the
+same instrument that found F1221 — **building the mechanism and giving it something to do** — which
+is the third time in one component that the finding came from the code rather than from a reading
+(F1220's two came from the walk, F1221 and this from the build).
+
+**The residue, stated**: *surplus still distributes* is a choice, not a derivation. A clipping
+container with slack is an ordinary container, which keeps a `clip` declared defensively from
+changing a frame that fits. A clipping container with a deficit is the scroll case and is the whole
+point. Nothing in the source distinguishes them, and if a caller ever wants a clip that also refuses
+the surplus, that is a second flag rather than a change to this one.
+
 ## F1221 — the trace ruled `stretch` into pass 4 by assuming the cross axis is height, and on a column it is width ★★★★☆
 
 | | |
