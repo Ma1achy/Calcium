@@ -53748,6 +53748,57 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1233 — four kinds shred where one step should shed, and three of the four declared orders did not survive a frame ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `comparison`, `keyValue`, `events` and `steps` — the four kinds C09 I81 names. Each degrades by truncating every part of its row at once, which is the mechanism for a single run too long for its box applied to a row of parts too narrow for all of them. |
+| **Reached for** | One shed step, shared. `status`'s `widthRung` and `plot`'s `layoutFor` are the shape of a narrow ladder and neither has a shed step; four private ones is how a repository comes to hold eight ladders (F1232, F1228). |
+| **Verdict** | **The step holds and the orders did not.** `shed.ts` is one implementation and the four kinds are on it; three of the four orders C09 I81 declared were overturned by reading a frame, and each overturning is recorded rather than applied quietly. |
+
+**1 · The step.** A part is `{ id, natural, min, tier, rank }`, higher rank more important. Shrink by
+**most slack first**, equal slack split by largest remainder; then shed the lowest rank whole and go
+again; the highest-ranked part never sheds. The tier decides what the minimum means — a **floor** for
+content, a **threshold** for decoration, which is *decoration never widens its container* said the
+other way — and `peer` is the third, a group given the tightest slack in it so equals narrow together.
+
+**2 · Three findings about the step, each from a frame and none from an assertion.**
+
+| what the frame showed | the reading |
+|---|---|
+| a row whose last part was two cells narrower than its plan | **the withholding is budgeted before the widths are settled.** A mark appended after takes its cells from the clamp, which takes them from whichever part is last — silently, and from the part the order protected |
+| `sta…` beside `⋯2`, a message three cells wide next to a mark saying it had gone | **a shed part is not drawn.** Defaulting a missing width to the part's floor put it back on the row; no number in the plan was wrong |
+| a timestamp cut at forty columns where the whole time fitted twice over | **the shrink order is derived and only the shed order is declared.** Taken from the rank it is right for `events` and wrong for `keyValue` — in one the important part is the elastic one, in the other it is not — and slack tells them apart with nothing declared |
+
+**3 · The orders, and this is the part that was declared wrongly.** Each row below is a claim C09 I81
+made, and the frame that answered it.
+
+| kind | what I81 declared | what the frame drew | what it is now |
+|---|---|---|---|
+| `events` | *the time and the tone never shed* | `22:13:20   ⋯2` at sixteen columns — a column of bare timestamps, which is not an event log | the **message** is the last part standing; the time still sheds after the type and never before it |
+| `comparison` | *never sheds the two values; sheds the field label first* | `run…  run 5` over `312…  289 …` at sixteen — two anonymous numbers, which is what a comparison is not | the marks go first, then `a`; the **field name** is the last part standing, and the values stay peers while both are drawn |
+| `steps` | *sheds the done steps from the ends, then the pending ones* | — | an order about a horizontal tape. This kind draws **one step per row**, and shedding an item is refused by I81 two paragraphs on. Its parts are the mark, the label and the detail |
+| `keyValue` | *never sheds the key; sheds the bar, then its detail* | | **kept**, and the only one of the four that was right |
+
+**4 · Two kind-level findings from the same read.** `events` capped its type column at a quarter of
+the row and `steps` its label at a half. Both caps **cut a label the ladder would have shed whole** —
+`schedul…` at thirty-two columns — which is the shredding this invariant removes, applied by the very
+kind that declares the part is drawn whole or not at all. Under the ladder the neighbouring part's
+floor is the guard the cap was, stated once where every floor is. And `keyValue`'s bar is declared
+**per row**: as a block-level part it reserved eleven cells on two rows that had no bar. It sheds
+inside the value column instead, where the row that owns it is in hand — and **the bar goes before
+the number**, where it read the other way round.
+
+**5 · The mark gives way to the last part standing.** At four columns `events` shed its type and its
+time, reserved three cells for `⋯2` and had one left for the message, so the frame was the withholding
+and nothing else — a row saying only that it cannot say anything. Where the reservation would take
+the whole row the row wins and the mark is clipped, which is the container's job.
+
+**Open** — the step and the four kinds are written; T3.93 and T3.94 are the rows, and the goldens move
+for all four kinds.
+
+---
+
 ## F1232 — three refusals rested on a rule that is now gone, and the sections are built as groundwork ★★★★☆
 
 | | |
