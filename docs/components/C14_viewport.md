@@ -109,7 +109,9 @@ This is the Ink plan's "Page Up does not jump when a streaming message grows", a
 
 Deciding what is visible needs a prefix sum over entry heights. A linear walk is O(n) per frame and dies at a hundred thousand entries.
 
-**An entry's height is `measureSequence(entry.doc.blocks, width)`, not `Σ measure(b, w)`.** The two differ by one row per block declaring `gapBefore`, which C09 I17 applies at the sequence and never at the block — and a surface like S07 declares it on most of its blocks, so the natural summation is short on nearly every entry. Naming the function is the whole of the fix: "measured height" is otherwise ambiguous between two functions that disagree, and the symptom of picking the wrong one is §1's drift rather than anything that looks like a bug.
+**An entry's height is `measureSequence(entry.doc.blocks, width)`, and it is now equal to `Σ measure(b, w)`.** It was not: the two differed by one row per block declaring `gapBefore`, which C09 I17 applied at the sequence and never at the block, and a surface like S07 declares spacing on most of its blocks — so the natural summation was short on nearly every entry. **That gap closed when the spacing moved inside the block** (C04 §3a, C09 I80): `sequenceHeight` is a fold of `measureChild` and nothing else.
+
+**Name the function anyway, and the reason changed rather than went away.** It is no longer *the summation is wrong*; it is that `measureSequence` is the seam carrying the memo and the containment (C09 I11, C09 I26a), so a caller that folds by hand gets the right number today and loses both the moment a kind's measure throws. The old symptom — §1's drift, invisible because it looks like nothing — is what the equality removed; the remaining cost of hand-folding is ordinary and visible.
 
 **A Fenwick tree over per-entry heights.** Append is O(log n), patch is O(log n) on the delta, and the "which entry contains row R" query is O(log n). Eviction from the front is handled by an offset rather than a rebuild.
 
@@ -413,7 +415,7 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 
 ## 8. Invariants
 
-- **I1** — Measured heights are the sole basis for visibility; C14 never renders to decide. An entry's height is `measureSequence(doc.blocks, width)` and never `Σ measure(b, w)` — the two differ by one row per `gapBefore` (C09 I17), and the summation is the natural thing to write.
+- **I1** — Measured heights are the sole basis for visibility; C14 never renders to decide. An entry's height is `measureSequence(doc.blocks, width)`, which equals `Σ measure(b, w)` since a block carries its own space (C09 I17, C09 I80) — the seam is required for the memo and the containment it shares, not for a different answer.
 - **I2** — `topRow` is always in `[0, max(0, totalRows − viewportHeight)]`.
 - **I3** — A cached height is valid iff its entry's `rev` and the current `width` both match the ones it was measured at. Theme, colour depth and unicode mode are excluded by construction. **This is a validity predicate over one slot per entry, not a composite map key**, so the cache holds at most one height per entry and a stale revision has nowhere to accumulate: after any number of patches, `cache.size ≤ entries.length`.
 - **I4** — Content growing above the viewport never moves the visible rows while detached.
@@ -464,7 +466,7 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 14. C14 never calls C03; scrolling reports a change and L4 commits (I12).
 15. The eviction marker is an ordinary entry and needs no special handling (I13).
 16. `VisibleRange` marks the live entry; the frame draws the live gutter, and no measurement includes it (I18).
-17. An entry's height is `measureSequence`, so `gapBefore` is counted — never `Σ measure`, which is short by one row per gap (I1, C09 I17).
+17. An entry's height is `measureSequence`, and a block's own spacing is inside each `measure` rather than added between them (I1, → C09 I17, → C09 I80).
 18. A region row resolves to an entry and a row within it here, once, and C16 does not recompute the mapping (I19).
 19. Row-occupying chrome is measured and column-occupying chrome is not; the command line is the first and the live gutter is the second (I20, I18).
 20. A resize to the size already held does nothing and emits nothing (I21).
@@ -520,7 +522,7 @@ Fake heights, no rendering.
 - **T2.3b** (I3, the post-condition): after any number of patches, appends and evictions, `cache.size ≤ entries.length`. A composite map key passes T2.3 and fails this. Checked after each *operation*, never inside a `Change` callback — one `append()` emits two changes and the store is half-applied between them.
 - **T2.8** (I9, the post-condition): after any operation, `index.length ≤ 2 × entries.length`, over a session that appends and evicts continuously without ever resizing.
 - **T2.10** (I1, I6): after an `append` that evicts, the index still mirrors `entries` exactly — same length, same order, same total. The regression guard for a handler that assumed an `append` is a pure tail push, whose symptom was an empty viewport over a non-empty transcript.
-- **T2.9** (I1): an entry's height equals `measureSequence(doc.blocks, width)`, and for a document whose blocks declare *k* gaps it exceeds `Σ measure(b, w)` by exactly *k*. The two must be distinguishable by the test, or the wrong one passes.
+- **T2.9** (I1, C09 I17, C09 I80): an entry's height equals `measureSequence(doc.blocks, width)`, and for a document whose blocks declare padding it equals `Σ measure(b, w)` — the fold and the seam agree, and the padded blocks are what makes the agreement worth asserting. The row it replaces required the two to *differ* by the gap count, which was the whole of its evidence that the right function had been called; that evidence is gone with the difference, so the row now carries the equality and the **height against the frame** — `measureSequence` equals the rendered row count for the same document, which no summation can satisfy by accident.
 - **T2.4** (I11): a source scan finds no clock, no `fs`, no clipboard shell-out in `viewport/`.
 - **T2.5** (I12): the module graph shows no import from `terminal/`.
 - **T2.6** (I1): a spy on the block registry proves `render` is never called during a visibility query.
@@ -620,7 +622,7 @@ Fake heights, no rendering.
 - **T6.21** (I23): removing `code`'s `window`, or dropping the `lineRange` pin so the slice re-tokenises from its first line → T1.18 fails on the row count in the first case and on the comment slot in the second; the frame is byte-identical for every block that has no multi-line token, which is why the pin's row is the comment one.
 - **T6.22** (I24): removing the capped-form resolution from `measure` alone → T1.19 fails on the count while `render` still draws the marker, and I1 is broken by the registry itself; removing it from `render` alone → T1.19 fails on the frame while the count holds, which is the silent-truncation class the marker exists to end. Removing the `capped` re-attachment in `windowSequence` → T1.20's `[9, 11)` piece measures 2 and the frame's last row is a content row, with every count in T2.1 still balancing.
 - **T6.23** (I26): consulting a list of kinds instead of `definition.window !== undefined` → T1.19's `panel` child row passes and the row for a test kind that declares `window` fails, because the list did not know it.
-- **T6.16** (I1): summing `measure(b, w)` instead of calling `measureSequence` → T2.9 fails, and every entry with a `gapBefore` is short by one row per gap. The most likely single defect in this component, because the summation is what a reader writes.
+- **T6.16** (I1, C09 I80): reading a block's `padding` at the sequence — adding `t + b` between the children — instead of letting `measure` return it → every padded block is counted twice and T2.9 fails. **This row replaces the one it is numbered after**, which reverted `measureSequence` to `Σ measure(b, w)`: under C09 I17 as it now reads those are the same fold, so that revert changes no number and the row could no longer fail. The defect moved with the rule, and this is where it went — the spacing is applied once, inside the block, and a second application is what a reader adding it back at the composer would write. C04_PADDING_WALK A9a has the finding.
 
 ---
 

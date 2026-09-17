@@ -59,6 +59,41 @@ two layers, not two rules.
 | A6 | `minRows` / `op: "reserve"` floors the rows (C04 I67) × padding | the floor is over the kind's rows | **the floor is over the padded block** | ruled: the floor is what the block occupies, which is what a layer above reserved space for |
 | A7 | `width` answers the content edge (C09 I43) × `padding.l/.r` | `width` is the kind's | `l + r + kindWidth(at - l - r)` | and C09 I43's identity — same height at the answered width — must be re-checked under the inset, because the kind now wraps at a narrower width than the block reports |
 | A8 | `elements` are block-relative (C26 I3) × padding | rows from 0 | rows shift by `t`, cols by `l` | one offset, applied where the padding is applied, so the frame and the targets cannot disagree |
+| A9 | *an entry's height is `measureSequence`, never `Σ measure`* (C09 I17, C14 I1) × padding is inside the block | the two differ by one row per gap block, and the summation is the wrong answer | `sequenceHeight` is a fold of `measureChild` and nothing else, so **the two are equal by construction** | **the invariant inverts and the row that guards it empties** — see A9a. Found after the code, by a fail-on-revert row going red with nothing wrong |
+
+
+### A9a · the finding — a fail-on-revert row whose defect can no longer be built
+
+**Three rows and a harness comment guard `Σ measure` against `measureSequence`**, and under B
+there is nothing between them. `sequenceHeight` became `for (const block of blocks) total +=
+measureChild(block, width)` — the fold and nothing else — so `measureSequence(bs, w)` **is** `Σ
+measure(b, w)`, not by coincidence but by construction. C14 T6.16 reverts to the summation and
+measures the same number; it fails today only because its own fixture asserts the disagreement
+(`measureSequence(gapped) === sumMeasure(gapped) + 1`) before it exercises the viewport.
+
+**This is A03 §2's vacuity class, arriving from the other side.** The usual shape is a rule that
+never could be violated. This is a rule that *was* violable, whose subject the change removed —
+so the row does not go quietly green, it goes red on its own premise, which is the only reason it
+was found at all. `test/support/viewport.ts` states the same premise in prose (*the defect T2.9
+and T6.16 guard against is picking `Σ measure`*) and `sumMeasure` is exported for no other reason.
+
+**Ruled.** The invariants are rewritten rather than deleted, because the *seam* still carries
+weight and only its arithmetic claim is gone: `measureSequence` is where the memo and the
+containment are shared (C09 I11, I26a), and a composer still must not insert spacing of its own —
+that half of I17 is what makes a document's height knowable from the document (C23 §2) and it
+survives B intact. What goes is *the sequence adds a row*, and with it the only construction in
+which a summation was short.
+
+What replaces T6.16 is A1's strengthened form, which is a stronger row than the one it retires:
+**a block measures the same in a document, in a panel and alone**, so the revert to guard is a
+measurer that reads `padding` at the sequence instead of inside the block — the defect B actually
+makes possible. `sumMeasure` stays, its comment corrected: it is no longer the wrong answer, it
+is the same answer, and a row asserting they agree is what keeps the fold honest.
+
+**And the reason this was not in the table before the code**: every other cell pairs two rules
+about *a block*. This one pairs a rule about a block with a rule about *the container's
+arithmetic*, which the artefact's own index — *where two sizing rules meet at rest* — reads as
+out of scope. The index is right and its subject was drawn one layer too narrow.
 
 ---
 
