@@ -53804,11 +53804,41 @@ fault repeated, not three judgements**, and CLAUDE.md gains the rule that says s
 builds, *anything named in an approved plan is queued*, and a premise check is a check rather than a
 veto.
 
-**Open** — §10 lands whole: `Box.floating` with all three `attachTo` forms, `anchor`, `offset`,
-`clipTo`, and the nudge on **both** axes, `x` first, resolved after pass 5 into a product beside the
-solved tree (§7f, I22); and the frame ring, the per-frame layer stack and the named positions as
-three types rather than one ladder (§7g, I23). The second walk is
-`docs/notes/C29_LAYERS_WALK.md`.
+**8 · Three defects in the build itself, and not one came from review.**
+
+- **A throw on the contradiction**, which is the fault C29 I16 names in as many words — *refused at
+  construction, never at layout* — and which **fired for nothing anyway**, because a float never
+  reaches `build` through its parent: `boxesOf` has taken it out and `solveFloat` strips the field.
+  The frame-read said `NOT REFUSED` where the check read as obviously correct. I16 gains back the
+  worked example it lost at F1234, because this contradiction **can** be constructed.
+- **T1.34's cache check was a proxy.** It grepped every engine source for `new Map`, and the claim
+  is about **state that survives a call** — a per-call index built and dropped inside `composeSited`
+  is not a cache. It went red on two of them while I20 was untouched. It now asserts module scope
+  and carries a fabricated violation, because an absence check that cannot fail is this suite's own
+  vacuity class.
+- **T1.44's three floats were declared in the order the layer sort produces**, so the sort was
+  unfalsifiable and removing it left the product byte-identical. The **mutation pass** is what said
+  so; declared in reverse, the row has something to assert.
+
+**Closed** — landed at `96e03810`. `Box.floating` with all three `attachTo` forms, `anchor` over nine
+points, `offset`, `clipTo`, and the nudge on **both** axes by the minimum shift, `x` first, resolved
+after pass 5 into a product beside the solved tree (§7f, I22); the frame ring, the frame stack and
+the per-frame layer stack as three types rather than one ladder (§7g, I23). **`composeSited` is one
+walk with two products** — the composited rect of every box is a by-product of drawing it, and a
+second traversal computing the same offsets is a second place for `clip.offset` to be applied
+differently, which is F1213's shape exactly.
+
+**The golden prediction was stated before the run and it is the strongest gate available here**: a
+float takes no space and `compose` draws none, so **zero frames move**, and a mover would have meant
+the float was in the flow. 468/468, nothing moved.
+
+Gates: enforce at 24,812 references, 343 files / 6,306 passed / 4 todo, golden 468/468 with zero
+movers named and none moved, tier 5 24 files / 136 passed / 3 todo, anchors 0 known stale and no run
+drifted, `c29-floats` **12 caught / 0 survived**, `c29-sticky` re-run after repointing 5 caught / 0
+survived. The second walk is `docs/notes/C29_LAYERS_WALK.md`; CLAUDE.md carries the groundwork rule;
+`FrameRing.tabs`, `FrameRing.at` and `FrameStack.frames` are in `UNCONSUMED_MEMBERS` with the queued
+consumer named. Commits `ccb056db` (open), `68282f38` and `902c0927` (spec, each alone), `96e03810`
+(code).
 
 ---
 
