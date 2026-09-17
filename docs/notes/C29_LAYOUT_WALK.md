@@ -28,7 +28,9 @@ Source: `docs/design/layout/LAYOUT_ENGINE.md` §§1–22. Section numbers below 
 | A12 | a representation chosen before a sibling's clamp shrinks the share | **it stands** — one pass, never a search (§12), and the consequence is named |
 
 **Two defects found, both in the document rather than in a cell**: D1 (the aspect/re-fit ordering)
-and D2 (`measure` and `representations` disagree). They are below the trace.
+and D2 (`measure` and `representations` disagree). They are below the trace. **A third, D3, came
+from writing the pass rather than from either artefact** (F1221), and it is a defect in this
+document: S3's own ruling.
 
 ---
 
@@ -190,7 +192,7 @@ boundary where the later pass consumes something the earlier one produced.
 |---|---|---|---|
 | S1 | 1 → 2 | natural widths | `GROW`/`PERCENT` contributed `min` (A1, A2), so pass 2 distributes against a base that already counted them |
 | S2 | 2 → 3 | solved widths | text re-wraps **here and only here**; a height computed before this is stale |
-| S3 | 3 → 4 | natural heights | `stretch` (§11) overrides a child's `FIT` on the cross axis — **after** heights exist, which is why §11 says pass 4 |
+| S3 | 3 → 4 | natural heights | `stretch` (§11) overrides a child's `FIT` on the cross axis — **D3, see below**: this row assumed the cross axis is height |
 | S4 | 4 → 5 | solved heights | positioning applies padding, gap, alignment; alignment reads slack that only now exists |
 | S5 | 2 → 2 | the clamping loop | A4's fixed point, inside one pass |
 | S6 | 4 → ? | `aspect` | **D1 — see below** |
@@ -241,6 +243,38 @@ representation's `min` swaps forms every frame. The remedy that keeps purity is 
 declaration** — a representation declares the width it becomes legible at, and the engine may not
 add a second threshold — so if flicker is observed the fix is the `min` values, not the engine's
 memory.
+
+### D3 · S3 ruled `stretch` into pass 4 by assuming the cross axis is height
+
+**Added after the fact, because the build found it and neither artefact could.** S3 read *`stretch`
+overrides a child's `FIT` on the cross axis — **after** heights exist, which is why §11 says pass 4*.
+That is true of a **row** container, whose cross axis is height and whose stretch therefore cannot
+resolve before pass 3 has produced one. **A `column`'s cross axis is width**, and width is solved in
+pass 2.
+
+```
+column, inner 60, align.x = "stretch"
+  child   FIT, wrapped prose, natural 24
+    pass 1   24
+    pass 3   wraps at 24, commits that height
+    pass 4   stretched to 60 — the rows re-wrap, and the committed height is 24's
+```
+
+`measure` returns 24's count and `compose` emits 60's: **C09 I1 false by construction**, in the
+engine whose selling point is that it holds by construction. Repairing it inside pass 4 means a
+second re-fit, which §4 forbids.
+
+**Ruled: stretch resolves where its cross axis is solved** — pass 2 for width, pass 4 for height.
+The other three clauses of §11 are unchanged and hold on both axes.
+
+**What this says about the artefacts.** It is D1 one rule over, and no reading finds it: a reader
+checking the invariant against this row sees them agree, because both say pass 4. The row named no
+direction, and the source's §11 is written from the mosaic row — the only stretch the corpus has —
+so the trace inherited its frame of reference. **A ruling can be correct about the interaction it
+found and wrong about which axis it is on**, which is the sibling of CLAUDE.md's *correct about the
+interaction, wrong about a mechanism it assumed existed*: the flaw is not between two rules but in a
+word the prose left implicit, so no index by rule interaction reaches it. The instrument that did is
+**writing the pass and having to name the axis**.
 
 ---
 

@@ -128,11 +128,12 @@ percentages, which is §6's *spacing belongs to the container* stated backwards.
 ```
 1  FIT, bottom-up, WIDTH      each box's natural width from its children
 2  GROW/SHRINK, top-down      distribute leftover or deficit across the width axis,
-                              clamped by each child's min and max; aspect's width half
+                              clamped by each child's min and max; aspect's width half;
+                              stretch, when the cross axis is width
 3  RE-FIT, HEIGHT             text re-wraps at its solved width, so heights are only
                               knowable now. Fit bottom-up on height
-4  GROW/SHRINK, top-down      the same distribution on the height axis; stretch; aspect's
-                              height half
+4  GROW/SHRINK, top-down      the same distribution on the height axis; aspect's height
+                              half; stretch, when the cross axis is height
 5  POSITION                   walk down applying padding, gap and alignment
 ```
 
@@ -190,10 +191,18 @@ or the bottom. With a `GROW` child there is no slack by definition, so alignment
 declared alignment with no slack on that axis is a **counted no-op** (I8), so *why is my alignment
 ignored* has a number for an answer rather than a reading of the source.
 
-**Stretch resolves in pass 4** and overrides a child's `FIT` on the cross axis only. A child with
-`FIXED` on that axis is never stretched — an explicit size beats an inherited one. Against `GROW` on
-the cross axis it is a no-op and not an error, because the default for a mosaic row **is** stretch
-and an error would fire on the default (I9).
+**Stretch resolves where the cross axis is solved** — pass 2 when the cross axis is width, which is
+a `column`'s, and pass 4 when it is height, which is a `row`'s (I9, F1221). It overrides a child's
+`FIT` on the cross axis only. A child with `FIXED` on that axis is never stretched — an explicit size
+beats an inherited one. Against `GROW` on the cross axis it is a no-op and not an error, because the
+default for a mosaic row **is** stretch and an error would fire on the default.
+
+**The pass number is the axis's and not a constant, and it was a constant until pass 2 was written.**
+A stretch that widens a `FIT` child after pass 3 has wrapped its text leaves the committed height
+standing at the pre-stretch width — F1220's D1 exactly, one rule over, and repairing it inside pass 4
+would be the second re-fit I11 forbids. The walk's S3 row reads *after heights exist, which is why
+§11 says pass 4*, which is true of a `row` and names no direction; the source's §11 is written from
+the mosaic row, the only stretch the corpus has.
 
 ---
 
@@ -250,9 +259,12 @@ with no slack on either axis it loses.
   slack on that axis is a counted no-op.** A `GROW` sibling consumes the slack by definition, so the
   field is set and nothing happens — which is correct, and which the engine reports as a number
   rather than leaving to be read out of the source (§8a A6).
-- **I9** — **Stretch resolves in pass 4, overrides `FIT` on the cross axis only, never overrides
-  `FIXED`, and is a no-op against `GROW`.** An explicit size beats an inherited one, always; and
-  making the `GROW` case an error would fire on the mosaic row's own default (§8a A5).
+- **I9** — **Stretch resolves where the cross axis is solved — pass 2 when that axis is width, pass 4
+  when it is height — overrides `FIT` on the cross axis only, never overrides `FIXED`, and is a no-op
+  against `GROW`.** An explicit size beats an inherited one, always; and making the `GROW` case an
+  error would fire on the mosaic row's own default (§8a A5). **The pass number is the axis's**: a
+  stretch applied to a width after pass 3 has wrapped at the unstretched one leaves the committed
+  height false, which is I10's defect one rule over and needs a second re-fit I11 forbids (F1221).
 - **I10** — **Aspect resolves on the width axis in pass 2 and the height axis in pass 4, only ever
   shrinks, and loses when neither axis has slack.** Resolving it after pass 4 leaves every height
   from pass 3 standing at the pre-aspect width, which makes `measure` return a number for a width the
@@ -300,6 +312,12 @@ the source document rather than in a cell** — D1 (aspect resolved after the pa
 invalidates) and D2 (nothing making the representation choice a pure function of the tree and the
 width). Both make §18's *C09 I1 holds by construction* false, which is the engine's whole argument.
 
+**A third arrived from the build and belongs here** (F1221): S3's ruling on `stretch` is correct
+about the interaction and wrong about which axis it is on, because the row names no direction and
+the source's stretch is the mosaic row's. It is the same defect as D1 and no reading of the artefacts
+reaches it — a reader checking I9 against S3 finds them agreeing, since both say pass 4. **Writing
+the pass is what named the axis**, which is the implementation falsifying the walk.
+
 That is CLAUDE.md's *two artefact shapes catch different interactions* arriving from the side that
 usually goes unexamined: a sizing model reads as a classification problem, so the table is the
 obvious artefact, and the table is the one that found nothing. **The table's blind spot is stated
@@ -317,7 +335,7 @@ with it** — it indexes pairs, and a cell where three rules meet is in neither 
 6. `min` is a hard floor; a container that cannot fit its minima clips rather than dropping a child (I6).
 7. Padding is inside and `childGap` is between; a zero-width child keeps its gap; padding and gaps clamp together (I7).
 8. Alignment acts on slack alone, centring rounds down, and a no-op alignment is counted (I8).
-9. Stretch is pass 4, cross-axis, `FIT`-only, and silent against `GROW` (I9).
+9. Stretch resolves where its cross axis is solved — pass 2 for width, pass 4 for height — and is cross-axis, `FIT`-only and silent against `GROW` (I9).
 10. Aspect is pass 2 on width and pass 4 on height, shrinks only, and loses without slack (I10).
 11. The passes run in order; one re-fit suffices and height never feeds back into width (I11).
 12. `measure` stops after pass 4 and equals the composed row count, so C09 I1 holds by construction (I12, → C09 I1).
