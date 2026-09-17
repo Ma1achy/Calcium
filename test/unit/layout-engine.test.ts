@@ -23,6 +23,8 @@ import { art } from "../../src/presentation/art.js";
 import { widthRung } from "../../src/presentation/blocks/kinds/status.js";
 import { cells } from "../../src/presentation/text.js";
 import { FULL_CAPS } from "../support/render.js";
+import { sourceOf } from "../support/source.js";
+import { REGION, anchored, centred, placeIn } from "../support/overlay.js";
 
 const rows = (id: string, ...lines: string[]): Box => ({ id, children: { kind: "rows", rows: lines } });
 
@@ -713,15 +715,71 @@ describe("C29 — the sizing core", () => {
     expect(pick(eight, 8), "and the shorter form still fits there").toBe(eight);
   });
 
-  // The spec commit's rows, before the assertions exist (SP9). C29 I19 and §7d:
-  // the engine places no layer, the named partition and the nudge are C15's,
-  // and a derived anchor is the caller's, handed down as a number.
-  it.todo(
-    "T1.32 (C29 I19, \u00a77d, C15 I5): Placement's anchored arm declares no column field, asserted as the field set by equality, and place() gives an anchored layer left 0 whatever its width \u2014 not deferred on a component: the field set is not yet asserted",
-  );
-  it.todo(
-    "T1.33 (C29 I19, \u00a77d): the nudge is C15's on both axes \u2014 a layer wider than the region and one anchored outside it come back shifted inside rather than cut \u2014 not deferred on a component: the assertion is not yet written",
-  );
+  it("T1.32 (C29 I19, \u00a77d, C15 I5): Placement's anchored arm declares no column, and an anchored layer lands flush left at any width", () => {
+    // **The field set by equality, and here the equality is the whole row.**
+    // A column added beside `row` would be **silently inert** for any layer
+    // that declares no width: `resolveWidth` gives such a layer the region's
+    // width, and step 7's clamp then returns its `left` to zero. So no
+    // assertion about a placed result could see the field arrive, and the type
+    // is the only place the refusal is visible (walk A3).
+    //
+    // **A cross-component source assertion**, declared in
+    // `test/unit/source-subjects.test.ts` so a C15 lane can look itself up
+    // (F1070).
+    const types = sourceOf("src/viewport/overlay/types.ts");
+    const anchoredArm = /kind: "anchored";([\s\S]*?)\n {4}\}>/u.exec(types);
+    expect(anchoredArm, "the anchored arm is findable").not.toBeNull();
+    const members = [...(anchoredArm?.[1] ?? "").matchAll(/^\s{6}(\w+)\??:/gmu)].map((m) => m[1]);
+    expect(members.sort(), "every field the anchored arm declares, by equality").toEqual(
+      ["prefer", "row", "rows"].sort(),
+    );
+
+    // And the behaviour behind it, through a call. A narrow anchored layer is
+    // flush left; only `centred` computes a column at all.
+    const narrow = placeIn([anchored("a", 2, { row: 5, prefer: "below" }, { width: 10 })]);
+    expect(narrow[0]?.width, "the layer got the width it asked for").toBe(10);
+    expect(narrow[0]?.left, "and an anchored layer is flush left whatever its width").toBe(0);
+    const middle = placeIn([centred("c", 2, { width: 10 })]);
+    expect(middle[0]?.left, "centred is the one placement that computes a column").toBe(
+      Math.floor((REGION.width - 10) / 2),
+    );
+  });
+
+  it("T1.33 (C29 I19, \u00a77d): the nudge is the vertical axis's, and the horizontal is delivered by the width clamp", () => {
+    // **\u00a710 states one rule for two axes and the tree has one axis of it.**
+    // Removing step 7's `left` clamp outright leaves C15's unit and contract
+    // suites wholly green \u2014 measured \u2014 and the reason is constructive rather
+    // than corpus-shaped: `resolveWidth` bounds the width by the region, an
+    // anchored layer takes `left = 0`, and a centred one takes
+    // `floor((region.width - width) / 2)`, which is already inside
+    // `[0, region.width - width]`. **No input reaches the clamp**, so it is a
+    // guard and not a mechanism, and this row asserts the property it guards
+    // together with the thing that actually delivers it.
+    const wide = placeIn([centred("w", 2, { width: REGION.width + 20 })]);
+    expect(wide[0]?.width, "the width clamp is what bounds the horizontal (C15 I16)").toBe(REGION.width);
+    expect((wide[0]?.left ?? 0) + (wide[0]?.width ?? 0), "so no layer reaches past the region").toBe(
+      REGION.width,
+    );
+
+    // The vertical nudge, which **is** a mechanism: an anchor past the bottom
+    // edge has no room below, and the layer is shifted inside rather than drawn
+    // off the end.
+    const past = placeIn([anchored("p", 3, { row: REGION.height + 4, prefer: "below" })]);
+    expect(past[0]?.top ?? -1, "the top is inside the region").toBeGreaterThanOrEqual(0);
+    expect((past[0]?.top ?? 0) + (past[0]?.height ?? 0), "and so is the bottom edge").toBeLessThanOrEqual(
+      REGION.height,
+    );
+
+    // And the asymmetry the design does not state: the vertical flips before it
+    // clamps, so a layer with no room below its anchor lands *above* it \u2014 a
+    // move the horizontal has no equivalent of, because there is no `prefer`
+    // across columns.
+    const flipped = placeIn([anchored("f", 6, { row: REGION.height - 1, prefer: "below" })]);
+    expect((flipped[0]?.top ?? 0) + (flipped[0]?.height ?? 0), "it went above the anchor").toBeLessThanOrEqual(
+      REGION.height - 1,
+    );
+    expect(flipped[0]?.truncated, "and it fitted there, so nothing was clipped").toBe(false);
+  });
 
   it("T1.17 (C29 I17): the module header names the clay port and the version read, and DEPENDENCIES.md carries the refusal", () => {
     // **Asserted on the source**, because a licence condition nobody reads is
