@@ -831,6 +831,15 @@ describe("C29 — the sizing core", () => {
     expect(memo.get(subject)?.rows, "the stored rows are the ones the registry answers").toBe(ask(80));
   });
 
+  // The spec commit's rows, before the code exists (SP9). C29 I18 and \u00a77b:
+  // the engine chooses a container's representation in pass 2.
+  it.todo(
+    "T1.35 (C29 I18, \u00a77b): pass 2 takes the first form whose natural width fits and the last regardless, with the choice made before the children are distributed \u2014 not deferred on a component: the chooser is not yet built",
+  );
+  it.todo(
+    "T1.36 (C29 I18, \u00a77b, C09 I72): a form's minimum is its own pass-1 fitted width, so two forms differing by one cell select differently at that one width \u2014 not deferred on a component: the chooser is not yet built",
+  );
+
   it("T1.17 (C29 I17): the module header names the clay port and the version read, and DEPENDENCIES.md carries the refusal", () => {
     // **Asserted on the source**, because a licence condition nobody reads is
     // how one gets found at publication. Zlib's only real condition is the

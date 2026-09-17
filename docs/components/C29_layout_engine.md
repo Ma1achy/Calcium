@@ -234,17 +234,18 @@ with no slack on either axis it loses.
 
 ---
 
-## 7b. Representations — and the engine owns none of the three families
+## 7b. Representations — the engine owns the third family, and the other two keep their owners
 
-`LAYOUT_ENGINE.md` §12 proposes `representations?: { min, box }[]` on a box, picked by the engine in
-pass 2. **Measured against the tree, the intent has three families and this component owns none of
-them** (F1228, `C04_REPRESENTATIONS_WALK.md` — see `docs/notes/C29_REPRESENTATIONS_WALK.md` A1–A3).
+`LAYOUT_ENGINE.md` §12 proposes representations on a box, picked by the engine in pass 2. **Measured
+against the tree, the intent has three families and the engine owns the third** (F1228, F1232,
+`docs/notes/C29_REPRESENTATIONS_WALK.md` A1–A3). The first two have owners already and are not moved
+here; the third had no owner and now has one.
 
 | family | the owner | built? |
 |---|---|---|
 | a **leaf** degrading — fewer features, a shorter label, a shed column | the **definition**, inside `render` | `status`'s `widthRung`, `plot`'s `layoutFor`, `table`'s admission loop, `image`'s fall to a status box. Four built; `comparison`, `keyValue`, `events` and `steps` owe one (C09 I81) |
 | an **authored** alternative — a wordmark, a piece of art | the **document layer**, `art()` | built, with a consumer across the seam: the docker banner's `wordmarkFor` |
-| a **container** choosing a different subtree | nobody, and there is no subject | `sidebar` and `tabBar` are in no file in `src/`; the two row groups that exist — the chrome's clusters and the banner — each already carry a width ladder of their own |
+| a **container** choosing a different subtree | **the engine**, in pass 2 | **built** — `Box.representations`, forms in preference order, the first that fits taken and the last taken regardless. It had no consumer in `src/` when it landed and was built as groundwork (F1232) |
 
 **A `paint` leaf is opaque to the engine by its own declaration** — `Leaf`'s doc comment reads *the
 engine never looks inside one* — so pass 2 cannot see a leaf's forms however they are declared. That
@@ -256,11 +257,28 @@ definitions rather than lists outside them.
 tree built *from* blocks; choosing a variant inside pass 2 would mean rebuilding a subtree mid-solve,
 which is the search §12's own last paragraph forbids.
 
-**One thing §12's spelling gets worse than the built mechanism**, and it is worth stating because the
-field would have shipped with it: a declared `min: number` beside a form is a **second record of one
-number**, and it disagrees with the form the first time the form is edited. `art` tests
-`widthOf(declared) <= width` — the form's own measured width, through the one width authority (C09
+**One thing §12's spelling gets worse than the built mechanism, and the field ships without it**: a
+declared `min: number` beside a form is a **second record of one number**, and it disagrees with the
+form the first time the form is edited. So `representations` is `readonly Box[]` and **not**
+`{min, box}[]`: a form's minimum is its own pass-1 fitted width, through the one width authority (C09
 I72). A hand-written minimum is the drift C09 I1 exists to prevent, declared voluntarily.
+
+**How it resolves, and it is one pass with no search.** Pass 1 fits every form, so each has a natural
+width measured the same way every other box's is. Pass 2, once the box's own width is known, takes the
+**first form whose natural width fits**, and the **last form regardless** — which is `art()`'s
+contract at the box layer and the reason the fallback may not be empty. The choice is made before the
+box's children are distributed, so the rest of pass 2 and every later pass see one tree and never a
+candidate set.
+
+**The id is the box's; everything else is the form's.** Choosing a form replaces the box — its
+direction, padding, gap, overflow, alignment, sizing and children — and keeps the outer `id`, so a
+solved tree is addressable by the same name whichever form was taken. A merge of the two would be a
+second rule about which half wins per field, and every field would need one.
+
+**What this does not move.** A leaf's forms stay inside its definition, because `Leaf`'s own
+declaration says the engine never looks inside one; an authored variant stays at the document layer
+with `art()`, because a variant is a different *block* and choosing one in pass 2 would mean
+rebuilding a subtree mid-solve. Neither of the four built ladders is retrofitted to this list.
 
 ## 7c. Sticky — refused, and its intent is discharged twice
 
@@ -450,15 +468,18 @@ measured against.
   looked at is how one gets found at publication (`DEPENDENCIES.md`'s `elkjs` row is the precedent).
   The refusal is a row rather than a silence, because *we wrote our own* and *we considered theirs
   and measured why not* read identically from outside and only one of them survives being asked.
-- **I18** — **The engine chooses no representation, and the three families that want one each have
-  an owner elsewhere.** A leaf's forms are computed inside its definition, because `Leaf` is opaque
-  to the engine by declaration; an authored alternative is chosen by `art()` at the document layer,
-  because a variant is a different *block*; and a container choosing a subtree has no subject in the
-  tree. A form's minimum is **measured from the form** through `cells()` and never declared beside
-  it — a hand-written `min` is a second record of one number that disagrees the first time the form
-  is edited (C09 I72). `sticky` is refused with it (§7b, §7c, F1228). **Dropping is refused twice
-  over and from two components**: the sizing core replaced C09 I35's clamp with a floor, and a form
-  that dropped a child would leave a C26 focus on a block that draws nothing.
+- **I18** — **The engine chooses a container's representation, in pass 2, in one pass and never a
+  search.** `representations` is an ordered list of whole boxes: pass 1 fits every form, pass 2 takes
+  the first whose natural width fits and the last regardless, and the choice is made before the box's
+  children are distributed, so no later pass sees a candidate set. **The id is the box's and
+  everything else is the form's.** A form's minimum is **measured from the form** and never declared
+  beside it — a hand-written `min` is a second record of one number that disagrees the first time the
+  form is edited (C09 I72), which is why the field is `readonly Box[]` and not `{min, box}[]`. The
+  other two families keep their owners: a leaf's forms stay inside its definition, because `Leaf` is
+  opaque to the engine by declaration, and an authored variant stays with `art()`, because a variant
+  is a different *block* (§7b, F1228, F1232). **Dropping is refused twice over and from two
+  components**: the sizing core replaced C09 I35's clamp with a floor, and a form that dropped a child
+  would leave a C26 focus on a block that draws nothing.
 - **I19** — **The engine places no layer, and the two mechanisms §10 asks it for are C15's.** The
   named partition and the nudge are `place.ts`'s today — the nudge on **one** axis, because the
   horizontal clamp beside it has no input that reaches it and the width clamp is what bounds that axis; a derived anchor is resolved by the caller and
@@ -538,7 +559,7 @@ with it** — it indexes pairs, and a cell where three rules meet is in neither 
 15. Overflow and clipping are per axis, a clipping container does not impose its size on the axis it clips, and a clip never changes a measured height (I15).
 16. A contradictory declaration is refused at construction; the engine never throws (I16, → C09 I2).
 17. The sizing model and the pass structure are ported from `nicbarker/clay` (Zlib); the module header carries the attribution and the version read, and taking it as a dependency is refused with a row in `DEPENDENCIES.md` (I17).
-18. **The engine chooses no representation** (I18, §7b, §7c). Three families want one and each has an owner elsewhere — the definition, `art()`, or nobody; `sticky` is refused, and a form's minimum is measured rather than declared.
+18. **The engine chooses a container's representation in pass 2** (I18, §7b): an ordered list of whole boxes, the first that fits and the last regardless, the id the box's and everything else the form's, and a form's minimum measured rather than declared. The other two families keep their owners — the definition and `art()`.
 19. **The engine places no layer** (I19, §7d). The named partition and the nudge are C15's, the nudge on one axis because the horizontal clamp is unreachable by construction; a derived anchor is the caller's, handed down as a number; and attachment by element id, an ancestor clip and a frame ring are refused for want of an input and of a subject alike (→ C15 I5).
 20. **The engine holds no cache** (I20, §7e). The memo is C22's, keyed on the block object and the width, storing the committed figure rather than a natural size; the dirty rule holds by construction because blocks are frozen and replaced; and the single slot is a resize cost and a stable-width saving (→ C22 I100, → C09 I61).
 
@@ -553,23 +574,30 @@ Tier 1 in `test/unit/layout-engine.test.ts`, one row per invariant, plus the con
 equality both ways — and the **unregenerable** oracle beneath it (1,916 captures, F1209). Expected
 movers are named before a run and explained after it.
 
-**The rows for §7b and §7c** (I18) — three, because the invariant is a refusal and a refusal is
-asserted by naming what would exist if it were not taken:
+**The rows for §7b** (I18) — four, and the field set row survives the build inverted: it asserted the
+**absence** of `representations` and now asserts its presence in the same way, by equality over `Box`'s
+members, because a field added beside it is still the thing worth noticing.
 
-- **T1.30** (I18, §7b): `Box` declares no `representations` and no `sticky`, asserted as the field
-  set by **equality** rather than by two absence checks — an absence assertion is not structural, and
-  a field added beside them is the thing this row exists to notice. And the two owners that do exist
-  answer: `art()` picks a variant by measured width at the document layer, and `widthRung` computes
-  one inside a definition, both asserted through a call rather than through a grep.
-- **T1.31** (I18, §7b, C09 I72): a variant's minimum is **measured, never declared** — two forms of
-  the same content whose widest rows differ by one cell select differently at that one width, and
-  `art` is asked at both. The row that a declared `min` would pass is the one where the form is
-  edited and the number is not, so the assertion is on `cells()` of the chosen form and not on a
-  constant.
-- **T6.6** (I18): giving `Box` a `representations` field that pass 2 consults → T1.30 fails on the
-  field set, and **nothing else in the suite moves**, which is the reading: an engine-level chooser
-  is invisible to every frame until a kind declares one, so the row that catches it has to be about
-  the type rather than about a rendering.
+- **T1.30** (I18, §7b): `Box`'s field set by **equality**, `representations` and `sticky` among them.
+  An absence assertion was never structural and neither is a presence one; the equality is what
+  catches a fifth field arriving. And the two owners the engine does **not** take answer through a
+  call: `art()` picks a variant by measured width at the document layer, and `widthRung` computes one
+  inside a definition.
+- **T1.31** (I18, §7b, C09 I72): a form's minimum is **measured, never declared** — two forms of the
+  same content whose widest rows differ by one cell select differently at that one width. Asserted of
+  `art` at the document layer and of `representations` in the engine, because the rule is the same
+  rule twice and a declared `min` would pass at either site alone.
+- **T1.35** (I18, §7b): pass 2 takes the **first form whose natural width fits** and the **last
+  regardless**, and the choice is made **before the children are distributed**. The ordering half is
+  the load-bearing one: a chooser that ran after distribution would hand the slack of one form to the
+  children of another, and every width in the subtree would be self-consistent and wrong.
+- **T1.36** (I18, §7b): **the id is the box's and everything else is the form's** — a solved tree is
+  addressable by the same name whichever form was taken, and the chosen form's direction, padding, gap
+  and overflow are its own. Asserted by solving one box at two widths and reading both trees.
+- **T6.6** (I18): removing the selection from pass 2 so the preferred form always stands → **T1.35
+  fails** and nothing else does, because no kind declares `representations` yet. That is the reading
+  the row carries rather than a defect in it: a mechanism landed as groundwork is invisible to every
+  frame until its first consumer, which is why the rows are about the engine's own arithmetic.
 
 **The rows for §7d** (I19) — a refusal again, and asserted the same way: by naming what would exist
 if it were not taken.
@@ -614,7 +642,7 @@ cursor**: it is the only instrument that saw F1213, where 440 goldens, 2,440 bas
 **Nothing is owed.** Every section of `LAYOUT_ENGINE.md` in the pass's scope is discharged.
 
 **§12, §14 and §15 are discharged and no longer owed.** §12's three families are ruled in §7b and the
-engine owns none of them (I18); §14 is refused in §7c with its intent discharged by C25 I18 and by
+engine owns the third and it is built (I18); §14 is refused in §7c with its intent discharged by C25 I18 and by
 composition; §15's aspect is built and is I10 — pass 2 against a `FIXED` height, pass 4 against the
 width, both by `Math.min` so neither grows. **§15's last paragraph is a constraint on the tests
 rather than on the code**: it is lumpy — 40 × 9 at `aspect: 3.5` wants 31.5 columns and gets 31, a
