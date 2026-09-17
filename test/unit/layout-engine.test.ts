@@ -654,12 +654,13 @@ describe("C29 — the sizing core", () => {
     expect(measure(overSubscribed, 30)).toBe(1);
   });
 
-  it("T1.30 (C29 I18, §7b): the engine declares no chooser, and the two owners that exist answer", () => {
-    // **The field set by equality, not two absence checks.** An absence
-    // assertion is not structural: `expect(box.representations).toBeUndefined()`
-    // passes on a box that simply did not set it, and says nothing the day the
-    // field is added. So the claim is on the *type's* members, read from the
-    // source, and a field added beside them fails here.
+  it("T1.30 (C29 I18, §7b): Box's field set by equality, and the two owners the engine does not take", () => {
+    // **The field set by equality, and the row survives the build inverted.**
+    // It asserted the *absence* of `representations` and now asserts its
+    // presence in the same way, because neither an absence nor a presence check
+    // on one field is structural — what catches a fifth field arriving is the
+    // equality. It did its job on the way past: adding `representations` turned
+    // this row red with nothing else in the suite moving.
     const types = readFileSync("src/presentation/layout/types.ts", "utf8");
     const box = /export type Box = Readonly<\{([\s\S]*?)\n\}>;/u.exec(types);
     expect(box, "the Box declaration is findable").not.toBeNull();
@@ -676,16 +677,17 @@ describe("C29 — the sizing core", () => {
         "id",
         "overflow",
         "padding",
+        "representations",
         "spend",
         "width",
       ].sort(),
     );
 
-    // **And the owners that do exist answer, through a call rather than a
-    // grep.** `art()` chooses at the document layer because a variant is a
-    // different block; `widthRung` computes inside a definition because a
-    // `paint` leaf is opaque to the engine. A refusal is asserted by naming
-    // what would exist if it were not taken.
+    // **And the two owners the engine does NOT take answer, through a call
+    // rather than a grep.** `art()` chooses at the document layer because a
+    // variant is a different block; `widthRung` computes inside a definition
+    // because a `paint` leaf is opaque to the engine. Those two stay where they
+    // are, and neither is retrofitted to the list the engine now reads.
     const wide = art({ id: "a", text: "fallback", variants: { ascii: "WIDE FORM" } }, FULL_CAPS, 40);
     expect(wide.kind, "a form that fits is the variant").toBe("raw");
     const narrow = art({ id: "a", text: "fallback", variants: { ascii: "WIDE FORM" } }, FULL_CAPS, 4);
@@ -831,14 +833,78 @@ describe("C29 — the sizing core", () => {
     expect(memo.get(subject)?.rows, "the stored rows are the ones the registry answers").toBe(ask(80));
   });
 
-  // The spec commit's rows, before the code exists (SP9). C29 I18 and \u00a77b:
-  // the engine chooses a container's representation in pass 2.
-  it.todo(
-    "T1.35 (C29 I18, \u00a77b): pass 2 takes the first form whose natural width fits and the last regardless, with the choice made before the children are distributed \u2014 not deferred on a component: the chooser is not yet built",
-  );
-  it.todo(
-    "T1.36 (C29 I18, \u00a77b, C09 I72): a form's minimum is its own pass-1 fitted width, so two forms differing by one cell select differently at that one width \u2014 not deferred on a component: the chooser is not yet built",
-  );
+  it("T1.35 (C29 I18, \u00a77b): pass 2 takes the first form that fits and the last regardless, before the children are distributed", () => {
+    // Three forms of one row, nine, five and two cells wide, with a fallback of
+    // one. **Each form's minimum is its own pass-1 width** and nothing declares
+    // a number (C09 I72), so the selection boundaries are the forms' own widths.
+    const ladder = (): Box => ({
+      id: "rung",
+      representations: [rows("wide", "123456789"), rows("mid", "12345"), rows("narrow", "12")],
+      children: { kind: "rows", rows: ["!"] },
+    });
+
+    const drawn = (w: number): readonly string[] => compose(layout(ladder(), w)).map((r) => r.trimEnd());
+    expect(drawn(9), "at its own width the preferred form stands").toEqual(["123456789"]);
+    expect(drawn(8), "one cell under it, the next form").toEqual(["12345"]);
+    expect(drawn(5), "and at exactly five it is still that one").toEqual(["12345"]);
+    expect(drawn(4), "under five, the third").toEqual(["12"]);
+    expect(drawn(1), "and under every form, the box's own children \u2014 the fallback is structural").toEqual(["!"]);
+
+    // **The ordering half, which is the load-bearing one.** A chooser running
+    // after distribution would hand the slack of one form to the children of
+    // another: here the row's two children are distributed inside the chosen
+    // form, so the widths belong to the form that was actually taken.
+    const shared: Box = {
+      id: "outer",
+      direction: "row",
+      width: { kind: "fixed", n: 20 },
+      representations: [
+        {
+          id: "two",
+          direction: "row",
+          children: [
+            { id: "a", width: { kind: "grow" }, children: { kind: "rows", rows: ["aaaaaaaaaaaaaaa"] } },
+            { id: "b", width: { kind: "grow" }, children: { kind: "rows", rows: ["bbbbbbbbbbbbbbb"] } },
+          ],
+        },
+      ],
+      children: { kind: "rows", rows: ["fallback"] },
+    };
+    const solved = layout(shared, 20);
+    expect(solved.children.map((c) => c.rect.width), "the grown children share the chosen form's width").toEqual([
+      10, 10,
+    ]);
+    expect(solved.id, "and the id is the box's, not the form's").toBe("outer");
+  });
+
+  it("T1.36 (C29 I18, \u00a77b, C09 I72): a form's minimum is its own fitted width, and the content is the form's", () => {
+    // **The row a declared `min` would pass.** Two forms whose widest rows
+    // differ by one cell must select differently at exactly that one width —
+    // true of a measurement and true of a hand-written number only until the
+    // form is edited.
+    const pick = (form: string, w: number): readonly string[] =>
+      compose(layout({ id: "p", representations: [rows("f", form)], children: { kind: "rows", rows: ["\u00b7"] } }, w)).map(
+        (r) => r.trimEnd(),
+      );
+    expect(pick("123456789", 9), "at its own width the form is taken").toEqual(["123456789"]);
+    expect(pick("123456789", 8), "one cell under it, the fallback").toEqual(["\u00b7"]);
+    expect(pick("12345678", 8), "and the shorter form still fits there").toEqual(["12345678"]);
+
+    // **The content is the form's and the id is the box's** — direction,
+    // padding and children all travel with the chosen form, and the solved tree
+    // answers to the outer name whichever was taken.
+    const box: Box = {
+      id: "outer",
+      representations: [{ id: "roomy", padding: { l: 2 }, children: { kind: "rows", rows: ["ab"] } }],
+      children: { kind: "rows", rows: ["x"] },
+    };
+    const roomy = layout(box, 10);
+    expect(roomy.id, "the outer id survives the choice").toBe("outer");
+    expect(compose(roomy).map((r) => r.trimEnd()), "the form's padding is applied").toEqual(["  ab"]);
+    const tight = layout(box, 1);
+    expect(tight.id, "and the same id when the fallback is taken").toBe("outer");
+    expect(compose(tight).map((r) => r.trimEnd()), "with no padding, because that was the form's").toEqual(["x"]);
+  });
 
   it("T1.17 (C29 I17): the module header names the clay port and the version read, and DEPENDENCIES.md carries the refusal", () => {
     // **Asserted on the source**, because a licence condition nobody reads is

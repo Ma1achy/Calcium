@@ -42,9 +42,15 @@ const hi = (s: Size): number => (s.kind === "fixed" ? s.n : (s.max ?? Number.POS
 
 /** The mutable node the passes write into. A `SolvedBox` is taken from it at the end. */
 type Node = {
-  readonly box: Box;
-  readonly children: Node[];
-  readonly leaf: Leaf | undefined;
+  /** Mutable, because choosing a representation replaces it (C29 I18, §7b). */
+  box: Box;
+  children: Node[];
+  leaf: Leaf | undefined;
+  /**
+   * Candidate forms in preference order, **the fallback last** — `undefined`
+   * where the box declares none, which is every box but the ones that do.
+   */
+  forms: Node[] | undefined;
   natW: number;
   natH: number;
   w: number;
@@ -108,20 +114,61 @@ const normalise = (box: Box): Box => {
   };
 };
 
+/**
+ * The box with its representations stripped — **the fallback form**, and the
+ * reason there is no empty-list case (C29 I18).
+ *
+ * `children` is required on a `Box`, so a box that declares forms always has
+ * one more behind them. A list that could produce nothing is what `art`'s
+ * fallback chain refuses, and here the type refuses it instead.
+ */
+const fallbackOf = (box: Box): Box => {
+  const { representations: _forms, ...rest } = box;
+  return rest;
+};
+
 const build = (input: Box): Node => {
   const box = normalise(input);
-  return {
-  box,
-  children: boxesOf(box).map(build),
-  leaf: leafOf(box),
-  natW: 0,
-  natH: 0,
-  w: 0,
-  h: 0,
-  x: 0,
-  y: 0,
-  wrapped: undefined,
+  const declared = box.representations;
+  const node: Node = {
+    box,
+    children: boxesOf(box).map(build),
+    leaf: leafOf(box),
+    forms: undefined,
+    natW: 0,
+    natH: 0,
+    w: 0,
+    h: 0,
+    x: 0,
+    y: 0,
+    wrapped: undefined,
   };
+  if (declared === undefined || declared.length === 0) return node; // cells-ok — a form count
+  // **The fallback is built last and is the box itself.** Preference order is
+  // the declaration's, and falling off the end is taking this box's own
+  // children, which is the case every other pass already handles.
+  node.forms = [...declared.map(build), build(fallbackOf(box))];
+  return node;
+};
+
+/**
+ * Adopt a chosen form — **the id is the box's, the content is the form's**
+ * (C29 I18, §7b).
+ *
+ * `width` is the one field not taken, and the reason is an ordering fact rather
+ * than a rule about which half wins: the parent distributed against this box's
+ * declared width in the pass above, before this box was asked, so a form's
+ * width would be a number nobody reads. Every other field is read after this
+ * runs.
+ */
+const adopt = (node: Node, form: Node): void => {
+  node.box = { ...form.box, id: node.box.id };
+  node.children = form.children;
+  node.leaf = form.leaf;
+  node.natW = form.natW;
+  node.natH = form.natH;
+  node.wrapped = form.wrapped;
+  node.forms = undefined;
 };
 
 /** `padding`, clamped to the box so the inner size reaches 0 rather than going negative (C29 I7, §8a A8). */
@@ -177,6 +224,18 @@ function naturalOf(size: Size, content: number): number {
 
 /** Pass 1 — natural widths, bottom-up, leaves as the base case (C29 I2). */
 function fitWidth(node: Node): void {
+  // **Every form is fitted, and the box's own natural width is the preferred
+  // form's** (C29 I18, §7b). Fitting them all is what makes pass 2's choice one
+  // pass and not a search: each candidate's minimum is its own measured width,
+  // taken through the same arithmetic as every other box, so there is nothing
+  // left to compute when the width arrives. Taking the *preferred* form's
+  // number rather than the fallback's is what makes a `FIT` parent size to the
+  // form it would rather draw.
+  if (node.forms !== undefined) {
+    for (const form of node.forms) fitWidth(form);
+    node.natW = node.forms[0]!.natW;
+    return;
+  }
   for (const child of node.children) fitWidth(child);
   const leaf = node.leaf;
   let content: number;
@@ -259,6 +318,20 @@ function crossOf(size: Size, natural: number, inner: number, stretch: boolean): 
  * pass 4 is the second re-fit C29 I11 forbids.
  */
 function growWidth(node: Node, counts: SolveCounts): void {
+  // **The choice is made here, before anything else in this pass** (C29 I18,
+  // §7b). Before the aspect clamp, before the children are distributed, and
+  // before the recursion — so every rule below and every later pass sees one
+  // tree and never a candidate set. A chooser that ran after distribution would
+  // hand the slack of one form to the children of another, and every width in
+  // the subtree would be self-consistent and wrong.
+  //
+  // **The first that fits, and the last regardless.** The last is the box's own
+  // children with the forms stripped, so falling off the end is not a case.
+  if (node.forms !== undefined) {
+    const forms = node.forms;
+    adopt(node, forms.find((f) => f.natW <= node.w) ?? forms[forms.length - 1]!); // cells-ok — a form count
+  }
+
   const aspect = node.box.aspect;
   const height = node.box.height ?? FIT;
   if (aspect !== undefined && aspect > 0 && height.kind === "fixed") {

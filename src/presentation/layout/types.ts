@@ -72,6 +72,28 @@ export type Box = Readonly<{
   spend?: Spend;
   /** width / height, in **cells** (C29 I10). A terminal cell is roughly 1:2. */
   aspect?: number;
+  /**
+   * Alternative forms, in **preference order** — C29 §7b, I18.
+   *
+   * Pass 1 fits every form, so each has a natural width measured the way every
+   * other box's is; pass 2 takes the **first whose natural width fits**, and
+   * falls through to this box's own `children` when none does. **So the
+   * fallback is structural**: `children` is required, which is why there is no
+   * empty-list case to refuse.
+   *
+   * **No `min` beside a form** (C09 I72). `LAYOUT_ENGINE.md` §12 writes
+   * `{min, box}[]` and a declared minimum is a second record of one number that
+   * disagrees the first time the form is edited — `art()` made the same choice
+   * at the document layer and for the same reason.
+   *
+   * **The id is this box's; the content is the form's.** Choosing a form
+   * replaces `direction`, `padding`, `childGap`, `align`, `spend`, `aspect`,
+   * `overflow`, `clip`, `height` and `children`. The one field it cannot
+   * replace is `width`, because the parent distributed against it in the pass
+   * above before this box was asked — an ordering fact rather than a rule about
+   * which half wins.
+   */
+  representations?: readonly Box[];
   overflow?: Readonly<{ x?: Overflow; y?: Overflow }>;
   clip?: Readonly<{ x?: boolean; y?: boolean; offset?: Readonly<{ x: number; y: number }> }>;
   children: readonly Box[] | Leaf;
