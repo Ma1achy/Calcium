@@ -128,6 +128,16 @@ describe("C22 §6l — the frame's default look", () => {
     expect(Object.keys(resolved).sort()).toEqual(["footer", "header"]);
   });
 
+  // The spec commit's rows, before the code exists (SP9). C22 I109 and §6l.9:
+  // the region carries a width one column narrower than the terminal, and the
+  // three rule rows, the chrome's clusters and the fallback keep the terminal's.
+  it.todo(
+    "T1.64 (C22 I109, §6l.9 rows 1–4): compose at 24×80 gives region.width 79, the three rule rows and the chrome's clusters draw at 80, and the prompt's body is laid out at 79 − PROMPT_GUTTER.first — not deferred on a component: the region's width is not built",
+  );
+  it.todo(
+    "T3.42 (C22 I109): a document whose widest row is exactly region.width renders untouched and one a cell wider wraps — the pair the corpus did not have (F1227) — not deferred on a component: the region's width is not built",
+  );
+
   it("T1.47 (C22 I87, §6l.7 row 21): a default frame paints a rule on row HEADER_ROWS, byte-identical to the rule above the prompt, and the region starts below it", () => {
     for (const columns of [80, 100, 60]) {
       const f = frameAt(24, makeDefaultChrome("plots-tui", "/usr/local/bin/plots"), 1, columns);
