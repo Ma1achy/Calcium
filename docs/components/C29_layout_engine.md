@@ -217,6 +217,14 @@ is placed at a negative offset. One mechanism for mosaic cells, scroll blocks an
 **A clip never changes a measured height** (I15): the height was committed before anything was drawn,
 and a clip that shortened it would make C09 I1 false one frame later.
 
+**And a container that clips on an axis does not impose its size on that axis** (I15, F1222). Both
+halves of the mechanism need the child to be *bigger* than the box, and a container that had already
+shrunk it to fit has nothing left to clip and nowhere for the offset to move to. Surplus still
+distributes — a clipping container with slack is an ordinary container, so a `clip` declared
+defensively cannot move a frame that fits — and only the deficit is refused. **That split is a choice
+rather than a derivation**: a caller wanting a clip that also refuses its surplus wants a second flag,
+not a change to this one.
+
 **Aspect resolves on the width axis in pass 2 and the height axis in pass 4** (I10, F1220 D1). The
 source resolves it *after both axes have a size*, which leaves every height computed in pass 3
 standing at the pre-aspect width — a box of wrapped prose solved at 40 and shrunk to 31 carries 40's
@@ -285,9 +293,14 @@ with no slack on either axis it loses.
   and measures 0; a child at 0 is **kept in the tree** and emits nothing rather than being dropped; a
   container one row tall gets no border, because the border would be the whole box and content wins
   over chrome.
-- **I15** — **Overflow is declared per axis, clipping is per axis with a `childOffset`, and a clip
-  never changes a measured height.** The height was committed before anything was drawn (C09 I1), and
-  a clip that shortened it would make the measurement false one frame later.
+- **I15** — **Overflow is declared per axis; clipping is per axis with a `childOffset`; a container
+  that clips on an axis does not impose its size on that axis; and a clip never changes a measured
+  height.** The height was committed before anything was drawn (C09 I1), and a clip that shortened it
+  would make the measurement false one frame later. **The third clause is what makes the first two
+  mean anything**: `clip` drops what is outside the box and `scroll` moves it, and a container that
+  had already shrunk its child to fit has nothing outside to drop and nowhere to move it — a
+  published, set, read field with no input at which it changes a frame, which reads exactly like a
+  field that works (A03 §2, F1222). Surplus still distributes; only the deficit is refused.
 - **I16** — **A contradictory declaration is refused at construction, never at layout.** A `sticky`
   child that is `GROW` on the scroll axis would grow to fill the space it is excluded from; the
   refusal belongs at C04's boundary with every other construction error, because `measure` is pure
@@ -341,7 +354,7 @@ with it** — it indexes pairs, and a cell where three rules meet is in neither 
 12. `measure` stops after pass 4 and equals the composed row count, so C09 I1 holds by construction (I12, → C09 I1).
 13. The tree and the width are the only inputs, the representation choice included (I13).
 14. The degenerate sizes are answers: 0 measures 0, a zero child is kept, a one-row container drops its border (I14).
-15. Overflow and clipping are per axis, and a clip never changes a measured height (I15).
+15. Overflow and clipping are per axis, a clipping container does not impose its size on the axis it clips, and a clip never changes a measured height (I15).
 16. A contradictory declaration is refused at construction; the engine never throws (I16, → C09 I2).
 17. The sizing model and the pass structure are ported from `nicbarker/clay` (Zlib); the module header carries the attribution and the version read, and taking it as a dependency is refused with a row in `DEPENDENCIES.md` (I17).
 
