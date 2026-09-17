@@ -785,6 +785,15 @@ describe("C29 — the sizing core", () => {
     expect(flipped[0]?.truncated, "and it fitted there, so nothing was clipped").toBe(false);
   });
 
+  // **The spec commit's rows, before the field exists** (SP9). C29 I21: a
+  // sticky child is excluded from its container's scroll offset and drawn last.
+  it.todo(
+    "T1.37 (C29 I21, \u00a77c, F1234): a clipping container at an offset draws its sticky header at its own edge and its body from the offset, and the same tree without the field draws the body alone — read as a frame, because a sticky child's rect is its flow rect either way — not deferred on a component: Box.sticky is not built",
+  );
+  it.todo(
+    "T1.38 (C29 I21, \u00a77c, F1234): a sticky child declared before its scrolling siblings is drawn over by none of them — the paint-order half, which no assertion about a position can see — not deferred on a component: Box.sticky is not built",
+  );
+
   it("T1.34 (C29 I20, \u00a77e, C22 I100, C09 I61): the engine declares no cache, and the memo holds one slot per block", () => {
     // **The engine's own sources, by equality over the directory.** An absence
     // check on one file is satisfied by a cache in the next one along, and the

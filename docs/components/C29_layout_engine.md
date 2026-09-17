@@ -286,22 +286,35 @@ declaration says the engine never looks inside one; an authored variant stays at
 with `art()`, because a variant is a different *block* and choosing one in pass 2 would mean
 rebuilding a subtree mid-solve. Neither of the four built ladders is retrofitted to this list.
 
-## 7c. Sticky — refused, and its intent is discharged twice
+## 7c. Sticky — built, and its refusal clause names a loop this engine cannot express
 
-`sticky?: "top" | "bottom"`, with *`childOffset` applied to every child except the sticky ones*,
-needs a container holding a scroll offset **and** a header that is a sibling of the body. Neither
-place that wants the effect has that shape:
+`sticky?: "top" | "bottom"` is a child **excluded from its container's scroll offset**, and it is one
+field read at one site: `collect` applies `clip.offset` to every child, and a sticky one is placed
+against the container's own edge instead. **It occupies flow space** — it displaces its siblings and
+the scrollable area is what remains — so nothing in the sizing passes reads it.
 
-- **C25 I18** — a window of a patch is a `Patch` rebuilt from a slice of its lines, and the path and
-  hunk headers travel with it because no field suppresses them, *forced by the block shape rather
-  than chosen*. A window's content budget is smaller by exactly their rows.
-- **`documents.ts`** — a tool call's result notice is a sibling pushed **before** the `scroll`, not a
-  child inside it. It does not scroll because it is not in the scrolling container.
+**Two rules, and §14 states one.** Skipping the offset is half the mechanism. The other half is
+**paint order**: a sticky child sits where flow put it, its scrolling siblings are collected after it,
+and they draw over it — so a header excluded from the offset and left in declaration order is a header
+under its own body. Sticky children are collected **last**, after every sibling, which is the same
+decision C15 takes for a layer and for the same reason (F1234).
 
-So the field would be an export nothing consumes, and its own refusal clause — *a sticky child cannot
-be `GROW` on the scroll axis* — would be a validation path nothing reaches. **Refused here rather
-than left owed**, so the next reader finds the answer and not the gap; I16's example is corrected off
-it for the same reason.
+**The refusal clause is corrected rather than built.** §14 refuses *a sticky child that is `GROW` on
+the scroll axis* because *it would grow to fill the space it is excluded from, which is a loop* — and
+a child that occupies flow space is excluded from **no space**, only from an offset, so there is
+nothing for it to grow into. Measured: a `GROW` child of a container clipping on `y` at a fixed height
+of six, beside a one-row header, solves to **five** and does not diverge; the clip hands
+`POSITIVE_INFINITY` to the *distribution*, because a clipping container does not impose its size on
+the axis it clips (I15), while `GROW` still resolves against the inner box. A refusal whose premise
+the arithmetic cannot produce is a validation path nothing reaches, which is what I16's example was
+corrected off — and **that correction now rests on the mechanism rather than on the field's absence**.
+
+**What §7c used to say, and why it was wrong to leave it there.** The field was refused as *an export
+nothing consumes*, naming C25 I18's patch window and `documents.ts`'s result notice as the two places
+that want the effect and have the wrong shape. Both readings stand and neither is the question: **the
+mechanism's subject is a frame, not a surface.** A container clipping on `y` with `offset.y = 3` draws
+its body from `b2` and its header is gone — the engine draws that wrongly today, with no new type
+needed to construct it.
 
 ## 7d. Layers — the engine places none, and the two mechanisms are C15's
 
@@ -466,9 +479,14 @@ measured against.
   tree and reach the frame as a fault rather than as a layout (§8a A10). A `Box` is built by L1 from
   an already-validated block — `groupMeasureBox`, `panelMeasureBox`, `scrollMeasureBox` — so the
   boundary this names is upstream of every field the engine reads. **The example was a `sticky`
-  child that is `GROW` on the scroll axis, and `sticky` is refused** (§7c): an invariant whose
-  worked example cannot be constructed forbids nothing while reading as though it forbade something,
-  which is A03 §2's vacuity class arriving in a justification rather than in a rule (F1229).
+  child that is `GROW` on the scroll axis, and it is still corrected off — on the second of its two
+  reasons, which is the one that survived the field being built** (§7c, F1229, F1234). The first was
+  that `sticky` is in no type; it is in one now. The second is that the contradiction cannot be
+  expressed: sticky occupies flow space, so it is excluded from no space, and a `GROW` child of a
+  clipping container resolves against the inner box rather than diverging — measured at five of six.
+  An invariant whose worked example cannot be constructed forbids nothing while reading as though it
+  forbade something, which is A03 §2's vacuity class arriving in a justification rather than in a
+  rule, and **a refusal accumulates reasons: the one to keep is the one a build cannot remove**.
 - **I17** — **The port is attributed in the module header with the version read, and the dependency
   is refused in writing.** Zlib's only real condition is the acknowledgement, and a licence nobody
   looked at is how one gets found at publication (`DEPENDENCIES.md`'s `elkjs` row is the precedent).
@@ -513,6 +531,17 @@ measured against.
 
 ---
 
+- **I21** — **A sticky child is excluded from its container's scroll offset and drawn last, and it
+  occupies flow space either way.** `sticky?: "top" | "bottom"` is read at exactly one site — the
+  composer, where `clip.offset` is applied — so no sizing pass sees it and a sticky child displaces
+  its siblings like any other: the scrollable area is what remains. `"top"` keeps the position flow
+  gave it; `"bottom"` is pinned to the container's far edge, which is the same exclusion said from
+  the other end. **Drawn last is half the rule and §14 states only the other half**: a child excluded
+  from the offset still sits where flow put it, and siblings collected after it draw over it, so a
+  header would end up under its own body. **The refusal beside it is corrected rather than built** —
+  *a sticky child cannot be `GROW` on the scroll axis* supposes the child is excluded from a *space*,
+  and it is excluded from an *offset*; a `GROW` child of a container clipping on that axis resolves
+  against the inner box and does not diverge, measured at five of six (§7c, I15, I16, F1234).
 ## 8a. The walk
 
 `docs/notes/C29_LAYOUT_WALK.md`, run before any type existed. **Both artefacts**, because the
@@ -578,6 +607,7 @@ with it** — it indexes pairs, and a cell where three rules meet is in neither 
 18. **The engine chooses a container's representation in pass 2** (I18, §7b): an ordered list of whole boxes, the first that fits and the last regardless, the id the box's and the content the form's — `width` excepted, because the parent distributed against it a call above — and a form's minimum measured rather than declared. The other two families keep their owners — the definition and `art()`.
 19. **The engine places no layer** (I19, §7d). The named partition and the nudge are C15's, the nudge on one axis because the horizontal clamp is unreachable by construction; a derived anchor is the caller's, handed down as a number; and attachment by element id, an ancestor clip and a frame ring are refused for want of an input and of a subject alike (→ C15 I5).
 20. **The engine holds no cache** (I20, §7e). The memo is C22's, keyed on the block object and the width, storing the committed figure rather than a natural size; the dirty rule holds by construction because blocks are frozen and replaced; and the single slot is a resize cost and a stable-width saving (→ C22 I100, → C09 I61).
+21. **Sticky is one field read at one site** (I21, §7c). The composer excludes a sticky child from `clip.offset` and collects it last; every sizing pass is blind to it, and §14's `GROW` refusal is corrected rather than built because the loop it names cannot be expressed (F1234).
 
 ---
 
@@ -653,13 +683,21 @@ cursor**: it is the only instrument that saw F1213, where 440 goldens, 2,440 bas
 
 ---
 
+- **T1.37** (I21, §7c): a container clipping on `y` at an offset draws its sticky header **and** its
+  scrolled body — the header at the container's own edge, the body from the offset — and the same
+  tree with the field removed draws the body alone. **The row is the frame and not the rects**: a
+  sticky child's `rect` is its flow rect either way, so every assertion about the solved tree agrees
+  with itself whether or not the field is read (F1234).
+- **T1.38** (I21, §7c): a sticky child declared **before** its scrolling siblings is drawn over none
+  of them — the paint-order half, which no assertion about a position can see, since both children
+  hold the positions flow gave them and only the order they reach the compositor differs.
 ## 11. Owed — the sections that arrive with their phases
 
 **Nothing is owed.** Every section of `LAYOUT_ENGINE.md` in the pass's scope is discharged.
 
 **§12, §14 and §15 are discharged and no longer owed.** §12's three families are ruled in §7b and the
-engine owns the third and it is built (I18); §14 is refused in §7c with its intent discharged by C25 I18 and by
-composition; §15's aspect is built and is I10 — pass 2 against a `FIXED` height, pass 4 against the
+engine owns the third and it is built (I18); §14 is **built** and is I21 — one field, read where the offset is applied, with its
+refusal clause corrected rather than built (§7c, F1234); §15's aspect is built and is I10 — pass 2 against a `FIXED` height, pass 4 against the
 width, both by `Math.min` so neither grows. **§15's last paragraph is a constraint on the tests
 rather than on the code**: it is lumpy — 40 × 9 at `aspect: 3.5` wants 31.5 columns and gets 31, a
 real ratio of 3.44 — so no row may assert an exact ratio, and a row that does is asserting the
