@@ -28,6 +28,15 @@ const NAMED_CAPS = [["full", FULL_CAPS], ["ascii", ASCII_CAPS], ["mono", MONO_CA
 const keyOf = (b: Block): string => `${b.kind}-${b.id}`;
 const oracle = new InkOracle("rows-arm");
 /**
+ * A capture whose producer has been deleted. Reading it works; **re-recording
+ * it cannot**, and the throw names what went rather than failing as a missing
+ * member. The captures outlive the code that made them, which is the point of
+ * F1209 — this is what that looks like from the recorder's side.
+ */
+const gone = (what: string) => (): never => {
+  throw new Error(`${what} was deleted — its capture is read-only and cannot be re-recorded`);
+};
+/**
  * **Below `DEFAULT_WIDTHS`' floor of 40**, which is where container
  * disagreements grow rather than where they are comfortable: a rail pair and a
  * gap cost the same columns at 12 as at 200, so the fraction of the width the
@@ -126,13 +135,13 @@ describe("C09 I72 — the two arms agree", () => {
     ];
     for (const width of [24, 60, 100]) {
       for (const [capsName, capabilities] of NAMED_CAPS) {
-        const ctx: RenderContextInput = { width, theme: DARK_THEME, capabilities, focus: null, tick: 0 };
-        // **Captured before `renderSequence` goes.** It has no caller in `src/`
-        // and the pass deletes it; this row is the only thing that reads it, so
-        // its Ink side has to be on disk before the deletion, not after.
-        const expected = oracle.rows(oracleName("t2143-sequence", capsName, width), () =>
-          throughInk(capped.renderSequence(sequence, ctx), width),
-        );
+        // **The producer is gone and the capture is not.** `renderSequence`
+        // was the registry's whole-sequence element arm; it had no caller in
+        // `src/` and this row was the only thing that read it, so its bytes
+        // were captured first and the member deleted after. Re-recording this
+        // one is a refusal rather than a crash: the thing that could answer it
+        // no longer exists, and saying so is the honest form.
+        const expected = oracle.rows(oracleName("t2143-sequence", capsName, width), gone("the registry's renderSequence"));
         const got = renderSequenceToLines(capped, sequence, width, { theme: DARK_THEME, capabilities });
         expect(got, `sequence at ${String(width)}`).toEqual(expected);
         // The fixture responds: the cap's marker is in the frame, and the floor's

@@ -652,7 +652,6 @@ export interface BlockRegistry {
    * causes.
    */
   windowChild(block: Block, width: number, from: number, to: number): Windowed | null;
-  renderSequence(blocks: readonly Block[], ctx: RenderContextInput): ReactElement;
   readonly kinds: readonly string[];
   readonly sealed: boolean;
 }

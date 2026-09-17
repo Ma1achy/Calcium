@@ -22,7 +22,18 @@
 // Recording: `INK_ORACLE_RECORD=1 npx vitest run <the suites>`. The recorder is
 // the only thing that calls Ink; when Ink goes, the thunks go with it and the
 // reads remain.
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+//
+// **Recording adds and overwrites; it never clears.** The first draft cleared
+// the directory before writing, so that a capture whose block had left the
+// corpus could not sit there being compared against. That is the right worry
+// and the wrong owner — `settle()` already catches a stale file, by equality
+// both ways, which is what it exists for. What the clear bought was nothing,
+// and what it cost appeared the moment a producer was deleted: a thunk that
+// can no longer answer throws, and it throws *after* the directory has been
+// emptied, so the recovery mode destroys the artefact before failing. A
+// recorder whose producers outlive it one at a time must be able to run over
+// a set it can only partly regenerate.
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = join(import.meta.dirname, "..", "golden", "ink-oracle");
@@ -68,13 +79,7 @@ export class InkOracle {
 
   constructor(suite: string) {
     this.#dir = join(ROOT, suite);
-    if (RECORDING) {
-      // Cleared before writing: a capture whose block left the corpus would
-      // otherwise sit in the directory being compared against, and `settle()`
-      // would report it as missing from a run that is correct.
-      rmSync(this.#dir, { recursive: true, force: true });
-      mkdirSync(this.#dir, { recursive: true });
-    }
+    if (RECORDING) mkdirSync(this.#dir, { recursive: true });
   }
 
   rows(name: string, compute: () => readonly string[]): readonly string[] {

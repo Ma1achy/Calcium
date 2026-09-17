@@ -189,8 +189,9 @@ export function renderSequenceToLines(
   // frame (F1168), which is why the sequence is now composed **block by block**
   // (C09 I72): a block answering rows is normalised into the frame's rows and
   // pays nothing for Ink; a block answering an element takes the Ink path
-  // alone, in the same column box at the same width `renderSequence` gave it,
-  // so its rows are the rows the whole tree would have written. A `gapBefore`
+  // alone, in the same column box at the same width the registry's whole-
+  // sequence element arm gave it, so its rows are the rows the whole tree would
+  // have written — that arm is gone (F1209) and its bytes are a capture. A `gapBefore`
   // is one empty row, as the `Text` holding a space came out of Ink.
   const probe = options.probe;
   const w = normaliseWidth(width);

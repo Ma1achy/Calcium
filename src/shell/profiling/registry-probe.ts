@@ -4,7 +4,7 @@
  * **This is the whole per-element story, and it costs C09 nothing.** Every
  * interesting member of `Registry` is an arrow property assigned in the class
  * body — `measure`, `width`, `measureSequence`, `elementsOf`, `elementsIn`,
- * `windowSequence`, `renderSequence`, `windowChild`, `render` — so each is an
+ * `windowSequence`, `windowChild`, `render` — so each is an
  * *own property of the instance*, not a prototype method. Reassigning one from
  * out here replaces the property that the class's own `this.measure` and
  * `this.render` resolve through. `renderChild` is `this.render` exactly;

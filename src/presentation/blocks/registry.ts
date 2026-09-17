@@ -7,7 +7,7 @@
  * imports the registry (I7) — the layering at L1 holds because of this one
  * argument, and it is the most copied-wrong pattern in a block library.
  */
-import { Box, Text } from "ink";
+import { Box } from "ink";
 import { createElement, type ReactElement } from "react";
 import {
   BORDER_INSET,
@@ -916,26 +916,6 @@ class Registry implements BlockRegistry {
 
     return Object.freeze({ blocks: Object.freeze(kept), skipRows: Math.max(0, skipRows) });
   }, memo, scratch);
-
-  renderSequence = (blocks: readonly Block[], ctx: RenderContext): ReactElement => this.#scoped(() => {
-    const width = normaliseWidth(ctx.width);
-    const children: ReactElement[] = [];
-
-    blocks.forEach((block, index) => {
-      if (block.gapBefore === true) {
-        children.push(createElement(Text, { key: `gap-${index}` }, " "));
-      }
-      children.push(
-        createElement(
-          Box,
-          { key: block.id === "" ? `block-${index}` : block.id, flexDirection: "column" },
-          elementOf(this.render(block, { ...ctx, width })),
-        ),
-      );
-    });
-
-    return createElement(Box, { flexDirection: "column", width }, children);
-  });
 
   /**
    * The other half of C04's floor: the element, padded to it (I33).
