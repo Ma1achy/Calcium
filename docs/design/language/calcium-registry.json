@@ -18675,6 +18675,20 @@
    "supersededBy": null,
    "legacyIds": [],
    "contentDigest": "d9697b8022b51adebae7dd17d5e00dcc7cc7cbcbc94675fad1b85ed29cf4add3"
+  },
+  {
+   "id": "R-STA-004",
+   "title": "Availability ranks above a semantic extent",
+   "text": "Availability takes its place in the one-ground precedence, above a semantic extent and below a hover preview, so that a disabled element keeps its well where an invalid one would otherwise take the error ground. The reason is that tab skips a disabled element, so it is not a thing anyone can act on, and a ground saying that something went wrong on a thing nobody can act on asks for an action the element will refuse. The displaced validity keeps its mark and its outcome word, which is two carriers and neither of them colour, so the rank costs that fact nothing. The state axes are seven and the precedence names three of them, so a composition drawn from choice or disclosure is still unruled; freshness is ruled here only in that it contests no ground at all, because a stale reading dims its content and says when it was taken rather than taking a ground, and the chrome around it does not dim.",
+   "status": "current",
+   "sectionKey": "current-contract",
+   "tags": [
+    "contract"
+   ],
+   "supersedes": [],
+   "supersededBy": null,
+   "legacyIds": [],
+   "contentDigest": "be1eb95765e80f07837bdba25e95d11dff5bcfbc9adabd8ace6c830d8599be6d"
   }
  ],
  "sections": [

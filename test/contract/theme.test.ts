@@ -1209,3 +1209,59 @@ describe("C10 §4j — the categorical separation debt", () => {
       .toEqual(["tritan m2/m8 1.5"]);
   });
 });
+
+/**
+ * C10 §4k — the six compositions, owed at the spec commit.
+ *
+ * **Three of the four rows are `it.todo` and the fourth is not**, which is the
+ * point of the set. T2.45–T2.47 wait on M3's code; T2.48 asserts the *absence*
+ * that makes three of the six golden frames undrawable, and an absence asserted
+ * later is an absence nobody watched — the gap would widen silently in exactly
+ * the window where somebody is building painters.
+ */
+describe("C10 §4k — focus, selection and the facts that contest a ground", () => {
+  it.todo(
+    "T2.45 (I47, R-SEL-006): focused and selected take two grounds and one mark — the ground resolves to `surface.selection` and `\u25b8` is on the head row, at 24-bit, at 1-bit where the row is `inverse`, and in ASCII where the mark is `>`; asserted as a pair, because the mechanism this replaces draws one ground and tells the two apart by ink, which satisfies any row naming a single fact — not deferred on a component: the ground and the mark land with §4k's resolver change in this same MR",
+  );
+  it.todo(
+    "T2.46 (I47, R-STA-003): hover and focus hold disjoint carrier sets at every rung — focus has `\u25b8` at all three and hover never does; at 1-bit, where hover's ground is gone, hover holds bold and focus does not. A disjointness over sets, because two rows each naming one carrier agree while the two facts render identically — not deferred on a component: it lands with §4k's resolver change, and its hover half is exercised through a constructed state until C16 reaches mouse mode 1003",
+  );
+  it.todo(
+    "T2.47 (I47, R-STA-004): where availability meets validity the well takes the ground and the error keeps two carriers — its mark and its outcome word. The row asserts the count, not just the winner: a row naming only which ground won passes a ruling that left validity with nothing — not deferred on a component: it lands with §4k's resolver change, on a constructed availability state until a block declares one",
+  );
+
+  /**
+   * **A negative row, and the one that expires by its condition rather than by
+   * its remedy** (F855, F856). Three of the facts §4k.1 tabulates have no
+   * subject in this tree, and a fourth composition is unconstructible for a
+   * different reason — which is why the row has two halves rather than one
+   * sweep. A comment saying so watches nothing; this goes red the day any of
+   * them acquires a subject, which is the day §4k.4's list needs re-reading.
+   *
+   * **The first draft of this row asserted the wrong absence**, and it is the
+   * reason the row exists in this shape. It claimed nothing painted the diff
+   * grounds; the grep behind that claim was truncated and `patch/lines.ts` was
+   * below the cut. The grounds and the `+` / `−` marks both ship. What is
+   * missing is the **addressability** — `patch` declares no elements and reads
+   * `ctx.focus` nowhere — so the assertion is on the seam and not on the slot.
+   */
+  it("T2.48 (I47, §4k.1): the facts with no subject are asserted to have none", () => {
+    // **Case 3's blocker is addressability, not the ground.** `patch` paints
+    // `surface.diffAdd` and the marks already; what it does not do is declare
+    // an element or read focus, so no patch row can be selected.
+    const patch = new URL("../../src/presentation/patch/", import.meta.url);
+    const patchSrc = readdirSync(patch)
+      .filter((f) => f.endsWith(".ts"))
+      .map((f) => readFileSync(new URL(f, patch), "utf8"))
+      .join("\n");
+    expect(/surface\.diffAdd/.test(patchSrc), "the diff ground is painted").toBe(true);
+    expect(/ctx\.focus|\belements\s*[:(]/.test(patchSrc), "and no patch row is addressable").toBe(false);
+
+    // No block declares availability, freshness, or a pointer hover.
+    const types = readFileSync(new URL("../../src/presentation/blocks/types.ts", import.meta.url), "utf8");
+    const declared = ["disabled", "stale", "hovered"].filter((f) =>
+      new RegExp(`^\\s*${f}\\??:`, "m").test(types),
+    );
+    expect(declared, "no block carries an availability, freshness or hover field").toEqual([]);
+  });
+});

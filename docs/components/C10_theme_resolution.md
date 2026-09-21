@@ -993,6 +993,160 @@ neighbour and impossible to make theme-dependent by accident.
 
 ---
 
+## 4k. Six compositions, walked by hand — which fact takes the ground
+
+`focusGround` has shipped as a token with a gate and no reader since R-THM-004 widened the
+floor's scope, and the reason it has no reader is in this section: **the tree has one ground
+for two facts.** `selectionStyle` (`presentation/blocks/paint.ts:216`) answers *the selection
+wash, or `inverse` where there is no colour*, and every focus site in the tree composes it with
+a tone — `accent` for the head, `default` for the extent (`table/definition.ts:265`,
+`kinds/simple.ts:607`, `:329`). Focus and selection are therefore told apart by **ink on one
+ground**, where R-SEL-006 tells them apart by **two grounds and a mark**, and the mark does not
+exist: `▸` ships as `expand: ["▸", ">"]` in `GLYPH_TABLE` and **no file in `src` reads it**.
+
+This is a structural walk and not a trace — every row below is two facts that both hold at
+rest, with no event between them (A03, *index the artefact by rule interaction*). The six
+compositions are the ones where two facts each want the same cell.
+
+### 4k.1 — the measurement, before the ruling
+
+Taken against the tree at `09c2776a`, because three of the six compositions turn out to have no
+subject and a table that did not say so would be read as six frames' worth of coverage.
+
+| the fact | what paints it today | the design's carrier |
+|---|---|---|
+| focus, on a row | `tone.accent` over `surface.selection` | `focusGround` **or** the accent, plus `▸` (§017: *four grounds, four jobs*) |
+| focus, on a frame | `frameTone` — `accent` where `muted`, bold at 1-bit (`plot/furniture.ts:157`) | the border or the axes, data untouched (R-FOC-004) — **already matches** |
+| copy selection | `surface.selection`, or `inverse` at 1-bit | `selectionGround` plus `▌` in a gutter column (§017) |
+| hover preview | **nothing.** `types.ts:456` — *hover is not reachable at mouse mode 1002* | the element's own ground, and never the focus mark (R-STA-003) |
+| a diff ground | `patch/lines.ts:62` — `surface.diffAdd` / `diffRemove` as a row's background, `+` / `−` as the marks, `ok` / `error` as the tones | the same, displaced by selection, with `+` / `−` carrying it (R-SEL-006) — **already matches**, and the marks the displacement depends on already ship |
+| failed | `step.state === "failed"` → a glyph and a tone (`structured.ts:917`), plus the outcome word (`FAILURE_WORDS`) | a mark and a word — **already matches**, and it is R-COR-003's two carriers |
+| disabled | **nothing.** No field on any block; in no registry rule | a **WELL** (§017), and `⇥` skips it |
+| stale | **nothing.** No field, no painter | the content dims, the chrome does not (§047); a stale reading says when it was taken (R-HON-002) |
+| running | the spinner in the duration slot (`documents.ts`, `toolCallHeader`) | the same — **already matches** |
+
+**Three facts of nine have no subject in this tree**: hover, disabled and stale. That is the
+finding this walk exists to produce, and it is reported rather than worked around — a golden
+frame built on a state no producer can construct asserts the harness, not the subject.
+
+**The diff row above is a correction, and the instrument made the error rather than the
+reading.** This table's first draft said `diffAdd` and `diffRemove` were painted by nothing. The
+grep behind it ended in `| head -15`, and `tokens.generated.ts` alone holds ten matches — so
+`patch/lines.ts`, the one painter, was **below the cut**. An instrument can manufacture evidence
+by truncation, and a negative claim is where it does the most damage: the output read as a
+complete answer because every line in it was true. Re-taken with `grep -rl` over the whole tree,
+the painter is the second file named. The row is still right that case 3 cannot be drawn, and
+**right for a different reason with a different remedy**, which is §4k.4.
+
+### 4k.2 — the classification table: which fact owns the cell
+
+| the composition | fact A | fact B | which takes the ground | what the displaced fact keeps |
+|---|---|---|---|---|
+| **focused + selected + failed** | copy selection | focus, and failure | **A.** R-SEL-006 names this composition by hand: *focused and selected takes selectionGround and keeps the focus mark* | focus keeps **`▸`**; failure keeps its **glyph and its word**, and its `error` tone survives outside a band |
+| **hovering one link while another has keyboard focus** | hover preview, on link 1 | focus, on link 2 | **Neither displaces the other — they are different cells.** Each takes its own ground; R-STA-002's precedence is not engaged | nothing is displaced. The binding rule is R-STA-003: hover must **not** receive `▸`, or the two read alike. Link 2's link-ness is displaced by its own focus and keeps **the underline** (§017: *cyan, and the underline stays*) |
+| **selection over a diff ground** | copy selection | a semantic extent | **A**, and R-SEL-006 states it outright: *selection wins the ground over a diff ground* | the diff keeps **`+` and `−`**, which is why it can afford to lose the ground at all — and both the ground and the marks already ship (`patch/lines.ts:48, :62`) |
+| **focus over a heatmap ground** | focus | the data's own colour | **Neither.** R-FOC-004 takes focus onto the border or the axes *rather than painting the data* — a plot's ground is its reading, so focus never competes for it | nothing is displaced. Focus's carrier is the frame, and at 1-bit it is a **weight** (bold where the frame was dim, F34) |
+| **disabled + error** | availability | validity | **A — the well.** §017 makes the well disabled's own ground and `⇥` skip the element; an error ground on something you cannot act on invites an action that is then refused | error keeps its **mark and its word** — R-COR-003's pair, and it costs no ground |
+| **stale + running** | freshness | liveness | **Neither, and the structural surface keeps the cell.** §047 puts staleness on the **content's weight**, not on a ground; liveness is the spinner in the duration slot | nothing is displaced. This row is in the table precisely because the precedence list is not always engaged, and a set of five rows would have suggested it always is |
+
+Two of the six are cells no reader enumerating R-STA-002's rungs reaches. **Row 2** is the one
+where precedence does not apply at all and the real constraint is a *different* rule
+(R-STA-003's non-colour carrier), so a reader indexing by the precedence list finds nothing to
+decide and moves on. **Row 5** is a composition R-STA-002's six rungs **do not rank**: `disabled`
+is an availability fact and `error` a validity fact (§110's seven axes), and neither word
+appears in the precedence list. It is a gap in the design's own ordering, ruled below rather
+than left.
+
+### 4k.3 — the rulings
+
+**1 · Focus takes a ground of its own, and the ground it takes depends on the scope.** §017 is
+explicit and the tree has neither half: `focusGround` is *a REGION you are on* and the accent
+is *the ITEM you are on*. In transcript scope the focused **entry** washes with `focusGround`
+and the head row carries `▸`; in block scope the entry settles back and the focused **row**
+paints. That is one ground the tree never paints and one scope distinction `FocusState` cannot
+express — it carries `blockId` and `rowId` and no scope.
+
+**2 · `▸` is focus's carrier at every rung, and it is the whole of focus at 1-bit.** §017 argues
+it three ways — it survives to 1-bit where no ground exists, it survives a reader who overrode
+the terminal's background, and it **points**, which in a four-row entry is the only thing that
+says which row is the head. It is free: the glyph ships and nothing reads it. Bold is **not**
+added beside it; `pills` bolds its head at 1-bit today (`simple.ts:627`) and once `▸` is on the
+row that bold is a second carrier for a fact that already has two.
+
+**3 · Where disabled meets error, the well takes the ground.** R-STA-002 ranks six interaction
+facts and does not rank availability, so this is an addition to the rule rather than a reading
+of it: **availability sits above semantic extent and below hover preview.** The reason is the
+one §017 already gives — `⇥` skips a disabled element, so it is not a thing you can act on, and
+a ground that says *this went wrong* on a thing you cannot act on asks for an action the
+element will refuse. Error keeps its mark and its word, which is R-COR-003's pair intact. It
+lands as **`R-STA-004`**, and the HTML regenerates in the same commit.
+
+**And it lands as an addition because the registry cannot take it any other way** — which is a
+property of the two gates and not a preference. The first draft superseded R-STA-002 and
+restated the whole list; `build-calcium.mjs` refused it, because every `supersededBy` must name
+a **current** rule and `R-SEC-106` — released — points at R-STA-002. Moving that link is what
+`lint-immutable.mjs` forbids. So **a released rule with an inbound supersession link cannot be
+superseded**, and every amendment to one is additive. R-THM-003 and R-THM-004 already have that
+shape; this is the first time the constraint that produces it was measured rather than
+followed.
+
+**4 · Hover's carrier at 1-bit is weight, and the mark stays focus's alone.** R-STA-003 requires
+focus to hold a *persistent non-colour* carrier so hover cannot be mistaken for it. At 1-bit
+hover's only carrier — its ground — is gone, so without a second one hover would render as
+nothing at all. §055 supplies it: *the underline and bold*. So hover takes **bold**, focus takes
+**`▸`**, and the two never share a carrier at any rung.
+
+**5 · The heatmap case already matches and is left alone.** `frameTone` takes `accent` under
+focus and `muted` otherwise, with bold as the 1-bit rung, and the flag *can change no glyph and
+no width* (C11 I17). That is R-FOC-004 built. **One clause of §017 is not built and does not
+land here**: *focused + inside* takes the **heavy** border pair, which is a second focus rung
+and belongs with the ownership ladder in M5, not here. Recorded so M5 does not discover it.
+
+**6 · Stale and running contest nothing, and the frame is worth drawing anyway.** It is the
+control in the set: six compositions of which two engage the precedence list only to find it
+does not apply. A table of four would have read as *the list always decides*.
+
+### 4k.4 — what the rulings leave behind
+
+- **Three of the six frames cannot be drawn, and the three reasons are not one reason.**
+  *Hover* has no producer at all — mouse mode 1002 sends no motion (`types.ts:456`), so the fact
+  cannot arise. *Disabled* and *stale* are fields no block carries, so the fact cannot be
+  declared. **The diff case is neither, and it is the one worth the correction above**: both
+  facts are fully built — `patch/lines.ts` paints the grounds and the `+` / `−` marks, and
+  `selectionStyle` paints the wash — and they cannot meet, because `patch` **declares no
+  elements and reads `ctx.focus` nowhere**, so no patch row can be focused or selected. The
+  ground is not missing; the **addressability** is. That is a C25 change and not a C10 one, and
+  it is the only one of the three whose remedy does not begin with a new field.
+- **So the classification above is the ruling for all six, and the golden frames land for the
+  compositions a producer can construct** — focused+selected+failed and focus over a heatmap
+  today, the other four with the change that gives each a subject. A frame that fakes the state
+  is not drawn, because a fixture must be shown to respond to the thing under test before it is
+  asserted against (`test/support/README.md`).
+- **`FocusState` cannot say which scope holds focus**, so ruling 1's two-ground split has
+  nowhere to read from. The store knows — `graph.focus.current.at` — and `focusFor`
+  (`session.ts:1836`) drops it, returning `null` for everything but `liveBlock`. The seam is one
+  field, and it is named here rather than discovered in M5.
+- **`selectionStyle` is the ladder for two facts and will be the ladder for one.** Both copies —
+  `blocks/paint.ts:216` and `shell/paint.ts:375` — document themselves as *the selection wash,
+  or reverse video*, which stays true; what changes is that focus stops calling them. The three
+  call sites that compose a tone with the wash to mean *focus* (`table/definition.ts:278`,
+  `simple.ts:330`, `:628`) each become a ground plus a mark, and the comment at `simple.ts:320`
+  arguing that *the ground is the channel no notice datum uses* is answered rather than
+  contradicted: focus gets a channel of its own instead of borrowing selection's.
+- **`▌` has no reader either.** §017's copy gutter is the selection's mark the way `▸` is
+  focus's, and the tree paints selection as a full-row wash with no gutter column. It is not
+  ruled here: the wash is R-SEL-006's `selectionGround` and it is correct, and whether a gutter
+  column is added beside it is a width question C11 I14 owns. Recorded so the next reader of
+  §017 does not read the missing `▌` as this section's oversight.
+- **The precedence list stops being closed, and R-STA-004 does not close it.** The list was
+  read as covering every fact that could want a cell, and §110 names seven state axes of which
+  it mentions two. The remaining four — choice, disclosure, freshness, validity — are ruled here
+  only where they met something: validity in row 5, freshness in row 6. **Whether choice and
+  disclosure ever contest a ground is unasked**, and it is the same shape as this section's own
+  finding: a list read as total because nobody had composed a pair it omits.
+
+---
+
 ## 5. Switching
 
 `/theme` switches variant. The change is **atomic**: the store swaps a resolved theme in one assignment, so no frame is ever half-themed.
@@ -1218,6 +1372,7 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 - **I44** — **A curated table is pinned by its exact value, and the set of curated tables is driven from the modules' own exports.** A table in `src/presentation/theme/` or in the glyph alphabets that was hand-chosen rather than computed is asserted **by value** — its canonical form is pinned in `test/support/curated-pinned.json` and compared by equality, so any legal-but-different substitution fails, and the failure **names the entries that moved with their old and new values** (`syntax.type: 3 → 11`) rather than a hash. A digest is equally total and unreadable at the moment it fires, which makes a legitimate change reviewable only by reading two revisions of the module side by side; the entries are the review. Beside them, the entries whose docblocks argue for them are written out, so the reasoning arrives with the failure. The set is **compared by equality against every exported frozen table in those modules**: a table pinned by neither a value nor a stated reason for being derived is a failure, and a stated reason whose table no longer exists is a failure too. **What it does not reach**, stated because an unrecorded limit reads as strength: a table private to its module is pinned through the projection that ships it — `glyphs(caps)`, `barStyle(name)` — which is the better subject anyway, being what a caller receives; a value that is *both* derived and load-bearing, like the generated token sets, is pinned by the instrument that owns it and named as derived here rather than pinned twice; and **one table's bulk is reduced, with the reason stated where the reduction is made** — `COLORMAPS` is 142 maps of 256 transcribed matplotlib samples, so which maps ship and each one's `kind` are pinned by value and the sample array by a digest, which still names the map that moved. An unstated reduction would be a pin with a hole in it; 1.5 MB of samples nobody chose would be a pin nobody reads. **And re-taking the pin is an act, not a flag**: `npx tsx tools/curated/pin.ts --write`, with no update path from the suite, because a snapshot regenerated by a keystroke records what the code does where a pin records what was chosen.
 - **I45** — *(R-THM-003)* **A high-contrast theme takes focus and selection as bands, and a band's ink is total.** A band declares one ground and **one ink**, and everything drawn on that band takes that ink whatever slot it names — `ThemeTokens.bandInk`, which `inkOn` answers from before any composition or flat slot. That totality is the whole point: composing ink by ink keeps a promise only for the slots somebody listed, and the measured failure was exactly that — `hcDark`'s selection shipped a group of **nine** where the theme has **nineteen** meaning slots, and the ten it omitted fell through to flat inks below the promise with nothing to report it. **Four contrasts bind and `validateBands` checks each as stated**, because they bind for four different reasons and a reader meeting a failure needs the reason: every ink keeps the theme's declared ratio against its own band; the selection band keeps **3 : 1** against the page, because the ground is selection's only carrier (R-SEL-006 gives selection the ground and focus the mark); the focus band keeps **3 : 1** against the selection band, because the two can be adjacent rows; and the focus band keeps only **2 : 1** against the page, because the focus mark already carries focus at the declared ratio and the band need only read as an extent. **It follows that the focus band is the one nearer the page and selection the one further from it** — a consequence of the constraints and not a choice, which is why `hcDark`'s selection is the bright band and `hcLight`'s is the dark one. The two constraints on the focus band fail in **opposite directions**, so no single move breaks both: the band is pinned between the page and the other band. Tone is spent on a banded row, and what pays for it is the glyph and the outcome word — the one-bit rung's carrier, asked per cell.
 - **I46** — *(R-THM-004)* **A floor's scope is every ground the theme paints text on, and `focusGround` is one of them.** `textSurfaces` carries `bg`, `bgElev` and `focusGround`; a focused region washes its whole extent, head and body, so every meaning ink lands there and a code body's palette lands there with it. **`spectrum` does not**, and the exclusion is the design's: R-FOC-004 puts a plot's focus on its border or axes *rather than painting its data*, so a series colour never meets this ground — which is §4's own argument for excluding `bgDeep`, applied to a palette instead of a surface. Where a ground costs an ink its margin the theme composes a nearer ink for it, hue kept and value moved by the least that clears; where the palette is **lent** rather than carried by the registry — `syntax` and `categorical`, which the registry does not hold at all — the composition is authored beside the values it replaces, in the token file, and the generated set merges the two **per ground** so neither author's record replaces the other's. **The rule is the scope, because the scope is what kept failing**: `nord`'s diff grounds, `hcLight`'s `bgElev`, and then nine inks across `dark` and `light` on `focusGround` — three instances, each found by widening the scope and none by a failure. And the same shape one level in: three separate sites formed a pair and each had its own copy of the composition lookup, so a new mechanism was invisible at all three; they call `inkOn` now, so a fourth site gets every mechanism by calling it rather than by being remembered.
+- **I47** — *(R-STA-002, R-STA-004, R-SEL-006, R-FOC-004)* **Focus and selection are two facts with two grounds, and where facts contest a cell the precedence decides which one takes it.** Focus takes `focusGround` on a region and the accent on an item; selection takes `surface.selection`; **focus keeps `▸` whichever of the two took the ground**, which is what makes the pair readable when both hold. Six compositions are ruled and the table is §4k.2: *focused + selected + failed* gives the ground to selection, focus keeping `▸` and failure keeping its glyph, its word and its tone; *hover beside focus* engages no precedence at all because the two are different cells, and the binding rule is R-STA-003 — hover never receives the mark, and at 1-bit it takes **bold** where focus takes `▸`, so the two share no carrier at any rung; *selection over a diff ground* gives the ground to selection with `+` and `−` carrying the diff; *focus over a heatmap* contests nothing, because R-FOC-004 takes focus onto the border or the axes and a plot's ground is its reading — which is `frameTone` as already built, `accent` over `muted` and bold at 1-bit; *disabled + error* gives the ground to the **well**, on R-STA-004's new rung, error keeping its mark and its word; and *stale + running* contests nothing, freshness being a weight on the content and liveness the spinner in the duration slot. **The precedence list is not closed**, and R-STA-004 does not close it: seven state axes exist and the list names three, so a composition drawn from choice or disclosure is unruled and is a gap of the same shape as the one that produced R-STA-004. **What this does not reach, stated because an unrecorded limit reads as strength**: three of the nine facts have **no subject in this tree** — hover is unreachable at mouse mode 1002, and `disabled` and `stale` are fields no block carries — and a fourth composition is unconstructible for a different reason: the diff ground and its marks both ship (`patch/lines.ts`), and `patch` declares no elements and reads `ctx.focus` nowhere, so no patch row can be selected. So the classification is the ruling for all six and the golden frames are drawn only for the compositions a producer can construct (§4k.4).
 
   **Why the field exists rather than a constant.** `FLOORS` names the minimum *every* theme must clear, so before this a theme that promised more had no way to declare it and no way to be held to it — which left `high-contrast` as a name and one contract row as the only thing standing between that name and nothing. **And that is precisely how the promise went stale.** 7 : 1 lived in roadmap 24 and in T2.24, asserted against the tokens as they stood, which is not a constraint on the tokens that follow: porting the themes to the registry left `hcLight` at **6.55 : 1** on `bgElev` for eight refs, with every gate green. A claim asserted in one row about one palette is a measurement, not an invariant (`a design measurement is a claim until a row runs`).
 
@@ -1263,6 +1418,7 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 34. **A colour the theme did not choose still degrades here** (I38). One entry point, the existing rungs, no theme parameter — and `ansi16` left alone, because the child named the user's palette rather than a colour.
 35. **The shipped set's quantisations are generated, shipped and checked** (I41). `tools/theme/quantised.mjs` writes `src/presentation/theme/quantised.generated.ts` from `dist/`; the resolver reads it before it computes; T3.73 holds the two in step.
 36. **A theme's promise is a field, not a name** (I43, R-THM-002). The high-contrast themes were named for a ratio and shipped without one; `floor` makes the ratio declarable, `validateHighContrast` refuses a theme that breaks it, and the remedy when a ground costs an ink its margin is a composed ink for that ground rather than a lighter ground.
+37. **Focus is a ground of its own, and `▸` is what survives when it is not** (I47, §4k, R-STA-004). The tree told focus and selection apart by *ink on one ground* where the design tells them apart by *two grounds and a mark*, which is why `focusGround` shipped with a gate and no reader and why `▸` ships in `GLYPH_TABLE` read by nothing. Six compositions are classified rather than discovered one at a time, availability joins the precedence because *disabled + error* was a composition the list could not rank, and the four facts with no subject in this tree are named so a frame is not drawn for a state no producer can construct.
 
 ---
 
@@ -1353,6 +1509,10 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.42** (I45, R-THM-003): the four band contrasts each fire on their own — one value moved per row, asserted on the **path** the failure names rather than on a count, because the message is the reason and a count would pass for any four. The shipped set clears all four, so a sweep over it agrees with a gate that checks none; these rows are what distinguishes the two. The focus band's two constraints are shown failing in **opposite directions**, which is the correction the gate made to this row's first draft: sliding the band onto the page moves it away from selection, and no single move breaks both.
 - **T2.43** (I45, R-THM-003): every meaning ink on a band resolves to the band's ink — all nineteen slots of both palettes on both bands in both high-contrast themes, **including slots no enumeration named**, which is the property an enumeration cannot have and the one that makes the promise hold by construction.
 - **T2.44** (I46, R-THM-004): the floor's scope is three named surfaces — `bg`, `bgElev`, `focusGround` — asserted as a **membership** and not as a sweep, because every ratio row in the file passes over a narrower scope and that is exactly how `focusGround` went unmeasured. `spectrum`'s exclusion is asserted with them: 22 of its slots across four themes sit below 4.5 on `focusGround` and every one is a pairing nothing draws, because R-FOC-004 puts a plot's focus on its border or axes rather than painting its data. An exclusion stated in a comment is an exclusion nothing checks.
+- **T2.45** (I47, R-SEL-006) — `it.todo` until M3's code lands: **focused and selected take two grounds and one mark.** The composition is built at all three rungs and the assertion is on the pair — the ground resolves to `surface.selection` and `▸` is on the head row — because the defect this replaces draws *one* ground and tells the two apart by ink, which passes any assertion naming a single fact. At 1-bit the row is `inverse` and `▸` persists; in ASCII the mark is `>` and the ground is unchanged, a ground being no glyph.
+- **T2.46** (I47, R-STA-003) — `it.todo`: **hover and focus never share a carrier at any rung.** Over the three rungs, the set of carriers hover holds and the set focus holds are disjoint: focus has `▸` at every rung and hover never does, and at 1-bit — where hover's ground is gone — hover holds **bold** and focus does not. Asserted as a disjointness over sets rather than two separate rows, because two rows each naming one carrier agree while the two facts render identically.
+- **T2.47** (I47, R-STA-004) — `it.todo`: **where availability meets validity the well takes the ground**, and the error keeps its mark and its word. The row asserts the displaced fact still has **two** carriers, which is R-COR-003's floor and the whole reason the rank is affordable; a row asserting only which ground won would pass a ruling that left validity with nothing.
+- **T2.48** (I47, §4k.1) — **the four facts with no subject are asserted to have none.** `surface.diffAdd` and `diffRemove` are read by no file in `src`; no block declares a `disabled`, `stale` or hover field. It is a **negative** row and it is the one that expires: the day any of them acquires a painter it goes red, and the entry it sends the reader to is §4k.4's list rather than a comment nobody watches. Without it, the three undrawn golden frames are a gap with no watcher, which is the disagreement-row shape F855 records — except that this row watches the **condition** and not the remedy, so it fires when the condition is met rather than staying green while the gap widens.
 ### Tier 3 — edge cases
 
 - **T3.1**: an override naming an unknown tone → ignored, no throw.
@@ -1441,6 +1601,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.101** (I42): `shadePacked` shading the wrong channel — the green channel shifted into red's place → T1.43 on the first mixed-channel triple; `samplePacked` packing without rounding → T1.43 on the first interpolated `t`; `packedHex` reading the channels in `b, g, r` order → T1.43 on the first non-grey sample. `tools/mutate/runs/c10-colormap.mjs`.
 - **T6.102** (I44): handing `hcDark` the ordinary dark map — `variant === "light" ? LIGHT : DARK`, which is what the generator did — → T2.39 and T2.39a fail. **Nothing else does**, and that is the measurement rather than the claim: the substitution was live for a whole MR with every row about that theme green, because `DARK_FOUR_BIT` is legal and keeps the five tones distinct.
 - **T6.103** (I45, I46): enumerating a band's ink slot by slot instead of declaring it on the band → T2.43 fails for whatever the enumeration omits, and for nothing else. **The revert that already shipped**: the nine-slot group `hcDark` carried was this, and every row about that theme was green while ten slots sat below the promise. And its sibling — narrowing `textSurfaces` back to two surfaces → T2.29a's pair count fails while every ratio row still passes, because a floor whose scope is a list is silent about whatever is not on the list.
+- **T6.104** (I47, §4k.3) — `it.todo`: giving focus back `surface.selection` — the tree's own mechanism, one ground told apart by ink — fails **T2.45**, and it fails on the ground rather than on the mark, so the revert is caught by the half that actually changed.
+- **T6.105** (I47, R-STA-004) — `it.todo`: dropping the availability rung so validity outranks it fails **T2.47** on the ground, with the mark and the word still asserted present — which is what distinguishes this revert from one that deleted the carriers instead.
 
 ---
 
