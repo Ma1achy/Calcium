@@ -182,8 +182,28 @@ const results = runPass({
       // both directions, which is why it survived to be an invariant.
       name: "the viewport is given the terminal's height",
       file: FRAME,
-      from: "  deps.resizeViewport({ width: frame.size.columns, height: frame.region.height });",
-      to: "  deps.resizeViewport({ width: frame.size.columns, height: frame.size.rows });",
+      // **Re-anchored** (C22 I109, F1227): the width is the region's too now, so
+      // the call names neither of the terminal's axes. The mutation is the same
+      // one — the terminal's height where the region's belongs.
+      from: "  deps.resizeViewport({ width: frame.region.width, height: frame.region.height });",
+      to: "  deps.resizeViewport({ width: frame.region.width, height: frame.size.rows });",
+      expect: "T4.11f",
+    },
+    {
+      // **C22 I109 — the terminal's width where the region's belongs**, the
+      // same defect on the axis that acquired the rule later. Silent in the
+      // safe direction: every wrapping block answers one row too few and the
+      // paint pads the surplus column, so the frame is short rather than
+      // overrun and no height anywhere disagrees (§6l.9 row 8).
+      name: "the viewport is given the terminal's width",
+      file: FRAME,
+      from: "  deps.resizeViewport({ width: frame.region.width, height: frame.region.height });",
+      to: "  deps.resizeViewport({ width: frame.size.columns, height: frame.region.height });",
+      // **T4.11f and not T6.124.** T6.124 states the cost in numbers — the
+      // wrap that moves, the centred box that shifts — and never calls the
+      // composer, so it is green with this applied: *a test that calls the
+      // mechanism misses the wiring*. T4.11f drives `composeFrame` and reads
+      // the size the viewport was actually handed, on both axes.
       expect: "T4.11f",
     },
     {

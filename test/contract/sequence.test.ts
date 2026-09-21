@@ -5,17 +5,17 @@
 // system: a block measures the same wherever it appears, and the arithmetic that
 // differs between one block and a run of them lives in one function.
 import { describe, expect, it } from "vitest";
-import { block, sequenceHeight, gapRows } from "../../src/data/viewmodel/index.js";
+import { block, sequenceHeight } from "../../src/data/viewmodel/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import { DARK_THEME, FULL_CAPS, measurable } from "../support/render.js";
 
-const line = (id: string, gapBefore?: boolean): Block =>
+const line = (id: string, gap?: boolean): Block =>
   block(
-    gapBefore === undefined
-      ? { kind: "raw", id, text: "one line" }
-      : { kind: "raw", id, text: "one line", gapBefore },
+    gap === true
+      ? { kind: "raw", id, text: "one line", padding: { t: 1 } }
+      : { kind: "raw", id, text: "one line" },
   );
 
 function rowsOf(blocks: readonly Block[], width = 60): readonly string[] {
@@ -35,13 +35,24 @@ describe("C09 T2.18 — sequences", () => {
     expect(rowsOf(blocks)).toHaveLength(6);
   });
 
-  it("T2.18b (C04 I25): no block's own height includes its gap", () => {
-    // The property that keeps C14's cache keyed on the block and the width
-    // alone: the same block measures the same with the field set and unset.
+  it("T2.18b (C04 I25, C09 I80): a block's own height includes its padding, and that is the inversion 2a made", () => {
+    // **This row asserted the opposite until phase 2a**, and the sentence it
+    // rested on — *no measurer counts a gap* — was true of a field the sequence
+    // owned. Padding is inside the block, so the two answers differ by exactly
+    // the top edge.
+    //
+    // **The property it was written for survives and is stronger.** What C14's
+    // cache needs is that a block measures the same *wherever it appears*, not
+    // that spacing is invisible to `measure` — and now the key covers the
+    // spacing too, where before it sat outside every key.
     const kit = measurable();
 
-    expect(kit.measure(line("x", true), 60)).toBe(kit.measure(line("x"), 60));
-    expect(kit.measure(line("x", true), 60)).toBe(1);
+    expect(kit.measure(line("x", true), 60), "one row of content and one of padding").toBe(2);
+    expect(kit.measure(line("x"), 60), "and the unpadded block is one").toBe(1);
+    expect(
+      kit.measure(line("x", true), 60),
+      "the same block, measured in a panel, answers the same",
+    ).toBe(kit.measure(line("x", true), 60));
   });
 
   it("T2.18c: the first block's gap is a leading blank row, not a special case", () => {
@@ -95,8 +106,43 @@ describe("C09 T2.18 — sequences", () => {
       direction: "row",
       children: [line("r-a"), line("r-b", true)],
     });
-    expect(kit.measure(row, 60), "max of one and one, and no gap").toBe(1);
-    expect(kit.renderToLines(row, 60)).toHaveLength(1);
+    // **And a row group's child keeps its padding**, which is the frame
+    // movement 2a named in advance (walk A4). `gapBefore` was meaningless side
+    // by side and was ignored; space *inside* a box is not, so the padded child
+    // is two rows and the row is as tall as its tallest child.
+    expect(kit.measure(row, 60), "the padded child is two rows, and a row maxes").toBe(2);
+    expect(kit.renderToLines(row, 60)).toHaveLength(2);
+
+    // **A column whose children all measure zero is one row, and the case is
+    // reachable rather than defensive** (C04 I17). *Every measurer returns at
+    // least 1* has exactly one exception — an empty container, absence of
+    // content rather than empty content — so a column holding nothing but empty
+    // groups sums to zero and is floored to one. The empty group itself stays
+    // zero: the floor belongs to the thing that has children.
+    //
+    // Nothing constructed this until the floor was mutated away and no row
+    // noticed (C29 1.2). It read as unreachable because I17 is usually read
+    // without its exception.
+    const hollow = block({
+      kind: "group",
+      id: "g-hollow",
+      direction: "column",
+      children: [block({ kind: "group", id: "g-empty", direction: "column", children: [] })],
+    });
+    expect(kit.measure(hollow, 60), "zero summed, floored to one").toBe(1);
+    expect(kit.renderToLines(hollow, 60), "and drawn, which it was not (F1223)").toHaveLength(1);
+
+    // The row arm had the same gap: its height floored at `minRows` and at
+    // nothing else, so the tallest of nothing was nothing.
+    const hollowRow = block({
+      kind: "group",
+      id: "g-hollow-row",
+      direction: "row",
+      children: [block({ kind: "group", id: "g-empty-r", direction: "column", children: [] })],
+    });
+    expect(kit.measure(hollowRow, 60)).toBe(1);
+    expect(kit.renderToLines(hollowRow, 60)).toHaveLength(1);
+    expect(kit.measure(block({ kind: "group", id: "g-none", direction: "column", children: [] }), 60), "and the empty group is still zero").toBe(0);
   });
 
   it("T2.18f: the arithmetic is one function, shared by C04 and C09", () => {
@@ -105,28 +151,37 @@ describe("C09 T2.18 — sequences", () => {
     const blocks = [line("a"), line("b", true), line("c", true)];
     const registry = createBlockRegistry({});
 
-    expect(gapRows(blocks)).toBe(2);
+    // **`gapRows` is gone with the field.** A sequence's height is the sum of
+    // its blocks and nothing else now (C04 I25), so there is no separate count
+    // of rows the run contributes — the two padded blocks carry their own.
+    expect(sequenceHeight(blocks, 60, registry.measure), "the two padded blocks carry their rows").toBe(
+      registry.measure(line("a"), 60) + 2 * (registry.measure(line("a"), 60) + 1),
+    );
     expect(sequenceHeight(blocks, 60, registry.measure)).toBe(
       registry.measureSequence(blocks, 60),
     );
   });
 
-  it("T6.17 (I15): counting the gap inside measure → a block measures differently in a panel", () => {
-    // The revert this guards: `+1` moved into a kind's measurer. It looks right
-    // at a document's top level and doubles inside a panel, because the panel
-    // would add the gap again — and it breaks the cache key silently.
+  it("T6.17 (C09 I80, C04 I25): counting the padding twice → a block measures differently in a panel", () => {
+    // **The same failure, one layer over.** This row used to guard against a
+    // `+1` moving *into* a kind's measurer, when the gap was the sequence's.
+    // The registry counts the padding now, once, outside every definition — so
+    // the revert it guards is a kind that reads `padding` itself, or a
+    // container that adds the row again around a child that already drew it.
+    // Both look right at a document's top level and double inside a panel,
+    // exactly as the old one did.
     const kit = measurable();
-    const gapped = line("g", true);
+    const padded = line("g", true);
 
-    const inDocument = createBlockRegistry({}).measureSequence([gapped], 60);
+    const inDocument = createBlockRegistry({}).measureSequence([padded], 60);
     const inPanel = kit.measure(
-      block({ kind: "panel", id: "p2", title: "t", children: [gapped] }),
+      block({ kind: "panel", id: "p2", title: "t", children: [padded] }),
       60,
     );
 
-    expect(inDocument, "one row of content, one of gap").toBe(2);
-    expect(inPanel, "the same two rows, plus the border").toBe(4);
-    expect(kit.measure(gapped, 60), "and the block itself is one row, always").toBe(1);
+    expect(kit.measure(padded, 60), "one row of content and one of padding").toBe(2);
+    expect(inDocument, "a sequence of it is those two rows and nothing added").toBe(2);
+    expect(inPanel, "and the panel adds its border, not a second gap row").toBe(4);
   });
 });
 

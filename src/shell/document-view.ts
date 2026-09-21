@@ -142,6 +142,22 @@ export interface DocumentView {
    */
   blockAt(blockId: string): Block | null;
   move(motion: DocumentViewMotion): boolean;
+  /**
+   * `tab`/`⇧tab` — the section gesture, which for a document is a **heading**
+   * (C16 I33).
+   *
+   * A heading here is a `rule` block: C04 has no `heading` kind, and a `rule`
+   * with a label is what every framework document and every app document uses
+   * to divide itself — `/help`'s sections, `/ps`'s, the profiler's own header.
+   * Reading the kind rather than a member an app must remember to set is what
+   * makes the gesture work on a document the framework never wrote.
+   *
+   * Clamps at both ends and answers `false` there, which is the same `false` a
+   * document with no rule in it gives (I33); the difference is on screen, not in
+   * the return.
+   */
+  sectionNext(): boolean;
+  sectionPrev(): boolean;
   /** `Esc`. Appends nothing — B03 §2, and there is no entry to touch (I45). */
   pop(): boolean;
   /** The command this view was opened for, or `null` when nothing is open. */
@@ -340,6 +356,33 @@ export function createDocumentView(deps: DocumentViewDeps): DocumentView {
     return 0;
   };
 
+  /**
+   * The next `rule` block's offset in `direction`, or `false` at the end.
+   *
+   * **Clamped against `lastOffset`**, for the same reason `move` is: an offset
+   * past the last window shows the tail under a header nothing scrolled to, and
+   * the reader's place is lost with nothing on screen saying it moved.
+   */
+  const toSection = (direction: 1 | -1): boolean => {
+    const at = state;
+    if (at === null) return false;
+    const end = lastOffset(at);
+    const rules: number[] = [];
+    at.blocks.forEach((block, i) => {
+      if (block.kind === "rule") rules.push(i);
+    });
+    const wanted =
+      direction === 1
+        ? rules.find((i) => i > at.offset)
+        : [...rules].reverse().find((i) => i < at.offset);
+    if (wanted === undefined) return false;
+    const next = Math.max(0, Math.min(wanted, end));
+    if (next === at.offset) return false;
+    state = { ...at, offset: next };
+    render(state);
+    return true;
+  };
+
   // **Torn down by whichever caller removed the layer** (C15 I25, F944). C16's
   // ⌃c ladder answers a pushed view with `overlays.pop()` and asks no owner,
   // so `openFor` kept naming its command over an empty stack and `keys.ts`
@@ -481,6 +524,13 @@ export function createDocumentView(deps: DocumentViewDeps): DocumentView {
       state = { ...at, offset: next };
       render(state);
       return true;
+    },
+
+    sectionNext() {
+      return toSection(1);
+    },
+    sectionPrev() {
+      return toSection(-1);
     },
 
     pop() {

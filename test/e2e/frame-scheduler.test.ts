@@ -26,7 +26,7 @@ function resultOf(bytes: string): Record<string, number> {
 
 describe("C03 e2e", () => {
   it(
-    "T5.1: a 1,000 line/s stream holds ~30 frames/s at the 33 ms default, cheaply",
+    "T5.1: a 1,000 line/s stream holds ~60 frames/s at the 16 ms default, cheaply",
     async () => {
       const run = await runInPty(`${FIXTURE} scheduler-stream 10`);
       const r = resultOf(run.bytes);
@@ -35,16 +35,17 @@ describe("C03 e2e", () => {
       expect(r["commits"]).toBeGreaterThan(9_000);
 
       // A ceiling approached from below, not a band around a cadence. The
-      // window is armed after the previous frame completes, so the real gap is
-      // window + frame cost + timer slop — about 39 ms measured, against the
-      // 33 ms window. Exceeding the ceiling would mean the window is not being
-      // honoured; collapsing below 20/s would mean it is being honoured badly.
-      expect(r["framesPerSecond"], "the 33 ms ceiling must hold").toBeLessThanOrEqual(30.4);
-      expect(r["framesPerSecond"], "and must not collapse").toBeGreaterThan(20);
+      // window opens as each write begins (C03 I17, F1200), so the real gap is
+      // window + timer slop; before that it was window + frame cost + slop —
+      // about 39 ms measured against the 33 ms window it shipped with.
+      // Exceeding the ceiling would mean the window is not being honoured;
+      // collapsing below 40/s would mean it is being honoured badly.
+      expect(r["framesPerSecond"], "the 16 ms ceiling must hold").toBeLessThanOrEqual(62.5);
+      expect(r["framesPerSecond"], "and must not collapse").toBeGreaterThan(40);
 
-      // Coalescing is the point: two orders of magnitude fewer frames than
+      // Coalescing is the point: an order of magnitude fewer frames than
       // commits, and a quarter of a core is the ceiling.
-      expect(r["frames"]).toBeLessThan(r["commits"]! / 20);
+      expect(r["frames"]).toBeLessThan(r["commits"]! / 10);
       expect(r["cpuFraction"]).toBeLessThan(0.25);
     },
     60_000,

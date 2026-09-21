@@ -386,6 +386,16 @@ export type KeyAction =
   | "viewBottom"
   | "viewPageUp"
   | "viewPageDown"
+  // **The section gesture, and it is one row per key rather than one per owner**
+  // (I33, added 2026-09-12). `n`/`p` move the view's own unit — a hunk, a block,
+  // a card — and these move its *section*: a file, a heading, a group. The
+  // ruling that nothing would be added to this target held while the profiler
+  // had four panes and is withdrawn at thirty-seven cards (C28 §3c). The member
+  // is required on every owner rather than optional, because an owner that
+  // answers nothing is indistinguishable from a view with one section, and a
+  // reader who learns the key does nothing here stops pressing it everywhere.
+  | "viewNextSection"
+  | "viewPrevSection"
   | "viewPop"
   // --- copy mode (C16 §5b) -------------------------------------------------
   //

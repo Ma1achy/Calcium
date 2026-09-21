@@ -8,8 +8,9 @@
 // separates watching from checking-on-the-next-keystroke. Each needs a
 // *sequence*, and each passes trivially when driven one step at a time.
 import { describe, expect, it } from "vitest";
-import { block } from "../../src/data/viewmodel/index.js";
-import type { Block, Hunk, Patch, ViewDocument } from "../../src/data/viewmodel/index.js";
+import { NO_PROBE, block } from "../../src/data/viewmodel/index.js";
+import type { Block, Hunk, Patch, Probe, ViewDocument } from "../../src/data/viewmodel/index.js";
+import { windowPatch, windowPlan } from "../../src/presentation/patch/window.js";
 import { createOverlayManager } from "../../src/viewport/overlay/index.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { createPatchView, PATCH_VIEW_ID } from "../../src/shell/patch-view.js";
@@ -58,17 +59,18 @@ const docWith = (blocks: readonly Block[]): ViewDocument => ({
   },
 });
 
-function harness() {
+function harness(opts: { probe?: Probe; region?: () => { width: number; height: number } } = {}) {
   const overlays = createOverlayManager({ registry });
   const transcript = createTranscriptStore();
   let frames = 0;
   const view = createPatchView({
     overlays,
     transcript,
-    region: () => REGION,
+    region: opts.region ?? (() => REGION),
     redraw: () => {
       frames += 1;
     },
+    ...(opts.probe === undefined ? {} : { probe: opts.probe }),
   });
   return { overlays, transcript, view, frames: () => frames };
 }
@@ -313,7 +315,7 @@ describe("C22 §3 — the fullscreen patch view", () => {
 });
 
 describe("C25 §3b — what the view may read, and where its motions land", () => {
-  it("T2.10 (C25 I17): the view's dependencies are overlays, transcript, region and redraw — no data seam", () => {
+  it("T2.10 (C25 I17): the view's dependencies are overlays, transcript, region, redraw and an instrument-only probe — no data seam", () => {
     /**
      * ***Never needs data the block does not carry* is a claim about the
      * dependency list**, and no assertion about output can see it. A view that
@@ -328,8 +330,8 @@ describe("C25 §3b — what the view may read, and where its motions land", () =
     const deps = source
       .slice(source.indexOf("export type PatchViewDeps"), source.indexOf("export interface PatchView"))
       .replace(/\/\*[\s\S]*?\*\//gu, "");
-    expect([...deps.matchAll(/^ {2}(\w+):/gmu)].map((m) => m[1])).toEqual([
-      "overlays", "transcript", "region", "redraw",
+    expect([...deps.matchAll(/^ {2}(\w+)\??:/gmu)].map((m) => m[1])).toEqual([
+      "overlays", "transcript", "region", "redraw", "probe",
     ]);
 
     // And the fullscreen form is every hunk of *this* block: walked to the
@@ -425,5 +427,95 @@ describe("C25 §3b — what the view may read, and where its motions land", () =
     expect(h.view.move("pageDown")).toBe(false);
     expect(h.view.open(entry, "p1"), "clean after the ladder").toBeNull();
     expect(h.overlays.stack.map((l) => l.id)).toEqual([PATCH_VIEW_ID]);
+  });
+});
+
+describe("C22 I41 — the view holds the window plan beside its offset", () => {
+  it("T3.41 (C22 I41, C25 I22, F1187): one plan miss `absent` on open and none over four motions, one `rev` when the entry is patched, one `width` on a resize to the other layout, and every frame is a window of the live block at the live width", () => {
+    /**
+     * **A cache and not a cursor.** The offset is the view's one piece of state
+     * (C22 I41); the plan beside it is derived from the block and the width and
+     * nothing else, so its misses have exactly two honest reasons after the
+     * first — and the frames must not be able to tell it is there.
+     */
+    const events: string[] = [];
+    const probe: Probe = {
+      ...NO_PROBE,
+      hit: (cache) => void events.push(`hit:${cache}`),
+      miss: (cache, reason) => void events.push(`miss:${cache}:${reason}`),
+      on: true,
+    };
+    const misses = (): readonly string[] => events.filter((e) => e.startsWith("miss:patch-view-plan:"));
+    let region = { width: 80, height: 10 };
+    const h = harness({ probe, region: () => region });
+
+    // A hunk with a run of one removed and two added lines, long enough that the
+    // window cannot show it whole: the run costs three rows unified and two
+    // split, so the same budget shows one more context line in split layout.
+    const RUN: Hunk = {
+      header: "@@ -1,14 +1,15 @@",
+      lines: [
+        { kind: "context", text: "head" },
+        { kind: "remove", text: "old" },
+        { kind: "add", text: "new-1" },
+        { kind: "add", text: "new-2" },
+        ...Array.from({ length: 10 }, (_, i) => ({ kind: "context" as const, text: `ctx-${String(i)}` })),
+      ],
+    };
+    const patchOf = (id: string, hunks: readonly Hunk[]): Patch =>
+      block({ kind: "patch", id, path: "serving/estimator.yaml", language: "yaml", hunks } as Patch);
+    const live = (entryId: string): Patch => {
+      const found = h.transcript.entries.find((e) => e.id === entryId)?.doc.blocks[0];
+      if (found === undefined || found.kind !== "patch") throw new Error("the live block is a patch");
+      return found;
+    };
+    /** The layer's content is some window `windowPatch` builds of the live block at the live width. */
+    const frameIsLive = (entryId: string): void => {
+      const content = h.overlays.top?.content;
+      const patch = live(entryId);
+      const plan = windowPlan(patch, region.width);
+      const windows = plan.starts.map((o) => windowPatch(patch, region.width, o, region.height));
+      expect(content).toHaveLength(1);
+      expect(windows).toContainEqual(content?.[0]);
+    };
+
+    const entry = h.transcript.append(docWith([patchOf("p1", [RUN, HUNK("@@ -60,4 +60,4 @@", 30), HUNK("@@ -90,4 +90,4 @@")])]));
+    expect(h.view.open(entry, "p1")).toBeNull();
+    expect(misses(), "one miss on open, and it is absent").toEqual(["miss:patch-view-plan:absent"]);
+    frameIsLive(entry);
+    expect(shownHeaders(h)[0]).toBe("@@ -1,14 +1,15 @@");
+    expect(h.overlays.top?.content[0]?.kind === "patch" ? h.overlays.top.content[0].hunks[0]?.lines.length : -1, "unified: 8 body rows are 8 lines").toBe(8);  // cells-ok — a line count, not a width
+
+    for (const motion of ["pageDown", "pageUp", "nextHunk", "bottom"] as const) {
+      expect(h.view.move(motion)).toBe(true);
+      frameIsLive(entry);
+    }
+    expect(misses(), "no miss over four motions").toHaveLength(1);
+    expect(events.filter((e) => e === "hit:patch-view-plan"), "every motion hit").toHaveLength(4);
+
+    // Patched: the block is a new object, and the plan misses on `rev`.
+    const replaced = patchOf("p1", [{ header: "@@ -1,1 +1,1 @@", lines: [{ kind: "context", text: "REWRITTEN" }] }]);
+    const outcome = h.transcript.patch(entry, { op: "replace", blockId: "p1", block: replaced }, "shell");
+    expect(outcome.ok, JSON.stringify(outcome)).toBe(true);
+    expect(misses()).toEqual(["miss:patch-view-plan:absent", "miss:patch-view-plan:rev"]);
+    expect(firstLine(h)).toBe("REWRITTEN");
+    frameIsLive(entry);
+    expect(h.view.move("top")).toBe(true);
+    expect(misses(), "the new plan is held").toHaveLength(2);
+
+    // Resized to the other layout: the plan misses on `width`, and the window is
+    // the other layout's.
+    const back = h.transcript.patch(entry, { op: "replace", blockId: "p1", block: patchOf("p1", [RUN]) }, "shell");
+    expect(back.ok).toBe(true);
+    expect(misses()).toHaveLength(3);
+    region = { width: 120, height: 10 };
+    expect(h.view.move("top")).toBe(true);
+    expect(misses().at(-1)).toBe("miss:patch-view-plan:width");
+    expect(misses()).toHaveLength(4);
+    frameIsLive(entry);
+    expect(h.overlays.top?.content[0]?.kind === "patch" ? h.overlays.top.content[0].hunks[0]?.lines.length : -1, "split: the run is two rows, so nine lines fit").toBe(9);  // cells-ok — a line count, not a width
+    expect(h.view.move("pageDown")).toBe(true);
+    expect(misses(), "held again at the new width").toHaveLength(4);
+    frameIsLive(entry);
   });
 });

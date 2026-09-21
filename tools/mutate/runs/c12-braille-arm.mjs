@@ -78,8 +78,8 @@ const results = await runPass({
       // stippled with its bottom dot row set 3 times against 76.
       name: "the surface writes its density glyph on the dot grid too",
       file: SCATTER,
-      from: "      mark[i] = sub ? undefined : densityGlyph(k, ctx.capabilities);",
-      to: "      mark[i] = half ? undefined : densityGlyph(k, ctx.capabilities);",
+      from: "  const density = sub ? undefined : densitySteps(ctx.capabilities);",
+      to: "  const density = half ? undefined : densitySteps(ctx.capabilities);",
       expect: "BR6",
     },
     {

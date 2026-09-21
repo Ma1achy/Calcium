@@ -17,8 +17,8 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
-import { Box, Text, renderToString } from "ink";
-import { createElement } from "react";
+import { normaliseRow } from "../../src/presentation/rows.js";
+import { stripControl } from "../../src/presentation/text.js";
 import {
   imageId,
   imageKey,
@@ -128,26 +128,36 @@ describe("IK — the kitty arm, as properties", () => {
     expect("rows" in placementRows(1, MAX_PLACEHOLDER_SPAN, 1), "the boundary itself is legal").toBe(true);
   });
 
-  it("IK5 (C09 §4c): Ink strips the escape, which is why the arm has no call site", () => {
-    // **The row that records the falsification.** The arm shipped on a ruling —
-    // *transmission rides with placement, so no seam is needed* — built from
-    // three true statements: `a=T` replaces at a stable id, Ink writes nothing
-    // when nothing changes, therefore no session state. The conclusion was about
-    // a mechanism nobody had run.
+  it("IK5 (C09 §4c, F1209): the compositor no longer strips the escape, and the split stands on the sanitiser instead", () => {
+    // **The row that records the falsification, and now the second one.** The
+    // arm shipped on a ruling — *transmission rides with placement, so no seam
+    // is needed* — built from three true statements: `a=T` replaces at a stable
+    // id, Ink writes nothing when nothing changes, therefore no session state.
+    // The conclusion was about a mechanism nobody had run, and measuring it
+    // showed Ink discarded the APC outright.
+    //
+    // **Ink is gone, so that reason is gone.** `normaliseRow` carries the
+    // escape whole, which means the compositor is no longer what forbids a
+    // transmission in a row. Saying so is the point, and so is what replaces
+    // it: nothing. `stripControl` takes the introducer out of any text entering
+    // a block, but it does that to every escape family alike, so it is not a
+    // rule about transmissions. The seam is held by C09 §4c's layering alone.
     const esc = transmit(7, "AAAA", 2, 1);
-    const drawn = renderToString(
-      createElement(Box, null, createElement(Text, null, `${esc}xy`)),
-      { columns: 20 },
-    );
-    expect(drawn, "the APC is discarded and the text survives").toBe("xy");
-    expect(drawn.includes(`${ESC}_G`), "so a frame cannot carry a transmission").toBe(false);
-    // SGR is the control: Ink's tokeniser understands one escape family and not
-    // the other, so this is about APC rather than about escapes.
-    const sgr = renderToString(
-      createElement(Box, null, createElement(Text, null, `${ESC}[38;2;1;2;3mxy${ESC}[39m`)),
-      { columns: 20 },
-    );
-    expect(sgr, "SGR survives unchanged").toContain(`${ESC}[38;2;1;2;3m`);
+    expect(normaliseRow(`${esc}xy`), "the serialiser carries it").toBe(`${esc}xy`);
+    expect(stripControl(`${esc}xy`).includes(`${ESC}_G`), "the sanitiser does not").toBe(false);
+    // **SGR was written here as the control and it is not one**, which is the
+    // half of this that had to be measured rather than assumed: `stripControl`
+    // drops the ESC byte, so it takes the introducer off an SGR exactly as it
+    // does off an APC. Ink discriminated — it understood one escape family and
+    // not the other — and nothing in the tree does now.
+    expect(
+      stripControl(`${ESC}[38;2;1;2;3mxy${ESC}[39m`),
+      "the sanitiser takes SGR's introducer too: it discriminates nothing",
+    ).not.toContain(`${ESC}[38;2;1;2;3m`);
+    expect(
+      normaliseRow(`${ESC}[38;2;1;2;3mxy${ESC}[39m`),
+      "and the serialiser carries SGR, as it carries the APC",
+    ).toContain(`${ESC}[38;2;1;2;3m`);
   });
 
   it("IK6 (C09 §4c): the placeholders go through Ink and the transmission does not", () => {
@@ -160,9 +170,10 @@ describe("IK — the kitty arm, as properties", () => {
     expect(kitty.join("").includes(PLACEHOLDER), "kitty places").toBe(true);
     expect(plain.join("").includes(PLACEHOLDER), "and everything else dithers").toBe(false);
 
-    // **No transmission in the frame**, because Ink would strip it and the
-    // shell writes it instead. This is the property that keeps the two halves
-    // in their own layers.
+    // **No transmission in the frame**, because the shell writes it instead.
+    // This is the property that keeps the two halves in their own layers, and
+    // since F1209 it is the *only* thing holding them apart — the compositor
+    // would carry the escape now (IK5).
     expect(kitty.join("").includes(`${ESC}_G`), "the escape is not in the rendered lines").toBe(false);
     const { rows } = imageCells(block, 40);
     expect(kitty, "and it is the committed height").toHaveLength(rows);

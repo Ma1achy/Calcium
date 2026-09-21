@@ -77,17 +77,56 @@ export function sampleGrid(width: number, height: number): Readonly<{ width: num
 /** A point set's per-axis bounds. */
 export type Extent3 = Readonly<{ min: Vec3; max: Vec3 }>;
 
+/** What an empty set's bounds are, so nothing divides by nothing (C12 I86) — and the union's answer when no carrier has a point (C12 I126, §6o row 12). */
+export const UNIT_EXTENT: Extent3 = Object.freeze({
+  min: Object.freeze({ x: -1, y: -1, z: -1 }),
+  max: Object.freeze({ x: 1, y: 1, z: 1 }),
+});
+
+/**
+ * The bounds of a set with at least one point, or `undefined` for none.
+ *
+ * **`undefined` and not the unit cube**, because this is what a carrier holds in
+ * the caller's scratch and what `unionOf` folds (C12 I126, §6o row 12): an
+ * empty cloud beside a surface contributes nothing, where the unit cube would
+ * widen the surface's extent to ±1 and draw it at the wrong scale inside the box.
+ * `extentOf` is this with the unit cube for the empty answer.
+ *
+ * **Six scalars and no allocation per point.** The previous form rebuilt `lo`
+ * and `hi` as objects on every step — two allocations a point, 71,894 a bunny
+ * frame (F1153). `Math.min` from `Infinity` is the same minimum as from the
+ * first point, to the bit: `-0` and `NaN` behave identically on both paths.
+ */
+export function boundsOf(points: readonly Vec3[]): Extent3 | undefined {
+  if (points.length === 0) return undefined; // cells-ok — a point count, not a width
+  let x0 = Infinity; let y0 = Infinity; let z0 = Infinity;
+  let x1 = -Infinity; let y1 = -Infinity; let z1 = -Infinity;
+  for (const p of points) {
+    x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); z0 = Math.min(z0, p.z);
+    x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); z1 = Math.max(z1, p.z);
+  }
+  return { min: { x: x0, y: y0, z: z0 }, max: { x: x1, y: y1, z: z1 } };
+}
+
 /** The bounds of a set. An empty set is the unit cube, so nothing divides by nothing. */
 export function extentOf(points: readonly Vec3[]): Extent3 {
-  // cells-ok — a point count, not a width
-  if (points.length === 0) return { min: { x: -1, y: -1, z: -1 }, max: { x: 1, y: 1, z: 1 } }; // cells-ok — a point count
-  let lo = points[0] as Vec3;
-  let hi = lo;
-  for (const p of points) {
-    lo = { x: Math.min(lo.x, p.x), y: Math.min(lo.y, p.y), z: Math.min(lo.z, p.z) };
-    hi = { x: Math.max(hi.x, p.x), y: Math.max(hi.y, p.y), z: Math.max(hi.z, p.z) };
-  }
-  return { min: lo, max: hi };
+  return boundsOf(points) ?? UNIT_EXTENT;
+}
+
+/**
+ * The bounds of two sets together, with `undefined` as the identity (C12 I126).
+ *
+ * Bit-exact against `extentOf` over the concatenation: a minimum over per-set
+ * minima is the minimum over the points, in any order, and `Math.min` carries
+ * `NaN` and `-0` the same way through either fold.
+ */
+export function unionOf(a: Extent3 | undefined, b: Extent3 | undefined): Extent3 | undefined {
+  if (a === undefined) return b;
+  if (b === undefined) return a;
+  return {
+    min: { x: Math.min(a.min.x, b.min.x), y: Math.min(a.min.y, b.min.y), z: Math.min(a.min.z, b.min.z) },
+    max: { x: Math.max(a.max.x, b.max.x), y: Math.max(a.max.y, b.max.y), z: Math.max(a.max.z, b.max.z) },
+  };
 }
 
 /**
@@ -136,6 +175,75 @@ export const cross = (a: Vec3, b: Vec3): Vec3 => ({
   z: a.x * b.y - a.y * b.x,
 });
 /**
+ * `Math.hypot`, without the builtin (C12 I133).
+ *
+ * V8's `MathHypot` is variadic and copies its arguments into a fresh double
+ * array on every call, and the raster called it twice per shaded sample and
+ * three times per face (F1172). These are the builtin's algorithm statement
+ * for statement — the largest magnitude found first over the absolute values,
+ * `Infinity` answered before `NaN` and `NaN` before the zero case, the squares
+ * of the values normalised by the largest Kahan-summed in argument order, the
+ * root scaled back — so the result is `Math.hypot`'s bit for bit, which T1.145
+ * holds over the extremes the early returns exist for. Unrolled rather than
+ * looped, because a loop over an arguments array is the allocation.
+ */
+export function hypot3(a: number, b: number, c: number): number {
+  const aa = Math.abs(a);
+  const ab = Math.abs(b);
+  const ac = Math.abs(c);
+  let max = 0;
+  if (aa > max) max = aa;
+  if (ab > max) max = ab;
+  if (ac > max) max = ac;
+  if (max === Infinity) return Infinity;
+  if (aa !== aa || ab !== ab || ac !== ac) return NaN;
+  if (max === 0) return 0;
+  let sum = 0;
+  let compensation = 0;
+  let n = aa / max;
+  let summand = n * n - compensation;
+  let preliminary = sum + summand;
+  compensation = preliminary - sum - summand;
+  sum = preliminary;
+  n = ab / max;
+  summand = n * n - compensation;
+  preliminary = sum + summand;
+  compensation = preliminary - sum - summand;
+  sum = preliminary;
+  n = ac / max;
+  summand = n * n - compensation;
+  preliminary = sum + summand;
+  compensation = preliminary - sum - summand;
+  sum = preliminary;
+  return Math.sqrt(sum) * max;
+}
+
+/** The two-argument form of `hypot3`, for the screen-space edge lengths (C12 I133). */
+export function hypot2(a: number, b: number): number {
+  const aa = Math.abs(a);
+  const ab = Math.abs(b);
+  let max = 0;
+  if (aa > max) max = aa;
+  if (ab > max) max = ab;
+  if (max === Infinity) return Infinity;
+  if (aa !== aa || ab !== ab) return NaN;
+  if (max === 0) return 0;
+  let sum = 0;
+  let compensation = 0;
+  let n = aa / max;
+  let summand = n * n - compensation;
+  let preliminary = sum + summand;
+  compensation = preliminary - sum - summand;
+  sum = preliminary;
+  n = ab / max;
+  summand = n * n - compensation;
+  preliminary = sum + summand;
+  compensation = preliminary - sum - summand;
+  sum = preliminary;
+  return Math.sqrt(sum) * max;
+}
+
+/**
  * A vector normalised, **and a zero-length one comes back unchanged rather than
  * as `NaN`** — which is `axis`'s rule one dimension up: the caller that produced
  * it is degenerate and the picture it draws is empty, not corrupt.
@@ -148,7 +256,7 @@ export const cross = (a: Vec3, b: Vec3): Vec3 => ({
  * already draws a collapsed set rather than dropping it.
  */
 export const unit = (a: Vec3): Vec3 => {
-  const n = Math.hypot(a.x, a.y, a.z);
+  const n = hypot3(a.x, a.y, a.z);
   return n === 0 ? a : { x: a.x / n, y: a.y / n, z: a.z / n };
 };
 
@@ -256,8 +364,21 @@ export function project(basis: Basis, p: Vec3): Projected | null {
   return { x: sx * 0.5 + 0.5, y: 0.5 - sy * 0.5, depth: z };
 }
 
-/** The depth buffer: one `Float32Array`, cleared to `+Infinity`. */
-export type Depth = Readonly<{ width: number; height: number; z: Float32Array }>;
+/**
+ * The depth buffer: one `Float32Array`, cleared to `+Infinity` — and beside it
+ * **the shade's lane** (C12 I136), eight doubles the raster writes a sample's
+ * normal, view position and depth into and reads the intensity back from, so
+ * no double crosses the shade's call boundary as a heap number. Per render
+ * with the buffer, which is I11's requirement and what keeps it off the module.
+ */
+export type Depth = Readonly<{
+  width: number;
+  height: number;
+  z: Float32Array;
+  lane: Float64Array;
+  /** The sub-cell triangles skipped this render, one slot, reported as `plot3d.hidden` (C12 I138). */
+  hidden: Int32Array;
+}>;
 
 /**
  * A buffer for one render, sized from the sample grid (C12 I84, C12 I11).
@@ -272,7 +393,7 @@ export function createDepth(width: number, height: number): Depth {
   const h = Math.max(1, Math.floor(height)); // cells-ok — a sample count
   const z = new Float32Array(w * h);
   z.fill(Infinity);
-  return { width: w, height: h, z };
+  return { width: w, height: h, z, lane: new Float64Array(8), hidden: new Int32Array(1) }; // cells-ok — the lane's slots (C12 I136) and one counter (C12 I138)
 }
 
 /**

@@ -647,7 +647,7 @@ describe("C22 I77 — the wake", () => {
       const gif = b.image({ id: "g", data: A, height: 3, alt: "red then green" });
       const spinner = { kind: "steps", id: "s", steps: [{ label: "building", state: "active" }] };
       // **Synchronised update pinned on**, for T4.17j's reason: the floor under
-      // the wake is 33 ms with it and 100 without, and a frame boundary is seen
+      // the wake is 16 ms with it and 100 without, and a frame boundary is seen
       // at the first wake after it — so without the capability a change at 100
       // ms is drawn at 160 (the spinner's next wake) and this row would measure
       // the cap rather than the cadence.
@@ -659,23 +659,24 @@ describe("C22 I77 — the wake", () => {
       // 80 ms spinner and a 100/200 GIF: the timer fires at 80 for the spinner
       // and the frame must **not** move — a step per wake would show frame 1
       // from that wake and frame 0 again from the next. **Two windows sit
-      // between a boundary and its picture**: a `stream` commit flushes 33 ms
+      // between a boundary and its picture**: a `stream` commit flushes 16 ms
       // after its wake (C03 §3), and the ticker is re-armed from that render,
-      // not from the wake. So: wake 80 → render 113 → armed for `due` 20,
-      // floored to 33 → wake 146 (frame 1) → render 179; wake 259 (spinner) →
-      // render 292 → armed 41 → wake 333 (frame 0) → render 366. Measured with
-      // the validator patched. Two earlier drafts of this row were wrong about
+      // not from the wake. So: wake 80 → render 96 → armed for `due` 4,
+      // floored to 16 → wake 112 (frame 1) → render 128; wake 240 (spinner) →
+      // render 256 → armed 44 → wake 300 (frame 0) → render 316. (At the 33 ms
+      // window this row was written against: 113, 146, 179, 292, 333, 366 —
+      // F1199.) Measured with the validator patched. Two earlier drafts of this row were wrong about
       // the harness rather than the store: one assumed the re-arm ran from the
       // wake, and one advanced the clock by whole steps so the 333 ms wake read
       // 400 and walked a frame too far — which is why `wake` above is a loop.
       await wake(bg, 80);
       expect(g.frames().at(-1), "80 ms in: still frame 0").toBe(0);
       await wake(bg, 120);
-      expect(g.frames().at(-1), "200 ms in: frame 1, rendered at 179").toBe(1);
+      expect(g.frames().at(-1), "200 ms in: frame 1, rendered at 128").toBe(1);
       await wake(bg, 80);
       expect(g.frames().at(-1), "280 ms in: still frame 1").toBe(1);
       await wake(bg, 120);
-      expect(g.frames().at(-1), "400 ms in: frame 0, rendered at 366").toBe(0);
+      expect(g.frames().at(-1), "400 ms in: frame 0, rendered at 316").toBe(0);
       expect(g.frames().length - before, "and the spinner kept the frames coming").toBeGreaterThan(3);
     } finally {
       vi.useRealTimers();

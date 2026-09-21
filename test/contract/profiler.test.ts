@@ -20,7 +20,8 @@
 import { describe, expect, it } from "vitest";
 
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
-import { PANES, profilePane } from "../../src/shell/profiling/panes.js";
+import { CARDS } from "../../src/shell/profiling/panes/index.js";
+import { cardBlocks, cardText, deckText } from "../support/profile.js";
 import type {
   ResourceProbe,
   ResourceSample,
@@ -186,10 +187,16 @@ describe("C28 — profiler, tier 2", () => {
       { tier: "spans", sampleMs: 1 },
       { elapsed: realElapsed, probe, schedule, node: process.version, cpus: 1 },
     );
-    (schedule as unknown as { fire: () => boolean }).fire();
+    // **Fired until the figures have a population**, which is the fixture-responds
+    // rule one step on from F1005's: a single sample satisfies *the resolution is
+    // on the sample* and draws no loop figure at all — the spectrogram needs
+    // three sampled windows and the utilisation two — so the sweep below would
+    // have run over a deck where no card draws the delay and agreed with itself.
+    for (let i = 0; i < 4; i += 1) (schedule as unknown as { fire: () => boolean }).fire();
 
     const sample = prof.report().samples[0];
     expect(sample?.loopDelayResolutionMs, "the resolution is on the sample").toBe(10);
+    expect(prof.report().samples.length, "and there are enough for a figure").toBeGreaterThanOrEqual(3);
 
     // **The second half, and the one the field exists for.** A p50 of 0.004 ms
     // over four observations is *under 10 ms* and not *nothing*, so a figure
@@ -202,17 +209,59 @@ describe("C28 — profiler, tier 2", () => {
     // the sentence written for the second was being printed over the first
     // until `loopDelaySamples` existed to separate them.
     //
-    // **Asserted over every pane rather than the one that draws it**, because a
-    // row naming `memory` passes on the day a second pane starts printing the
-    // figure on its own, which is exactly when the invariant first has
+    // **Asserted over every card rather than the one that draws it**, because a
+    // row naming the spectrogram passes on the day a second card starts printing
+    // the figure on its own, which is exactly when the invariant first has
     // something to be wrong about.
+    //
+    // **And the subject is the drawing, not the declaration.** `CardSpec.loopDelay`
+    // is what puts the resolution in a footer, so a loop of the declared cards
+    // would be asking the register about itself — the cards are swept by what
+    // their text says instead, and the two directions are both asserted: a card
+    // that mentions the loop carries the resolution, and the set that does is
+    // not empty. The panes this replaces filtered on a label that the deck does
+    // not draw, so the same row would have swept thirty-seven cards and asserted
+    // nothing (the vacuity class, A03 §2).
     const report = prof.report();
-    for (const pane of PANES) {
-      const text = JSON.stringify(profilePane(report, pane));
-      if (!text.includes("loop delay p50")) continue;
-      expect(text, `${pane} draws the p50 with its resolution`).toContain("at resolution 10 ms");
-      expect(text, `${pane} says what the figure is`).toContain("a floor, not a reading");
+    // **A card draws a loop figure when one of its *plots* is about the loop**,
+    // which is the discriminator this row went through two drafts to get right.
+    // Sweeping the card's whole text matched the verdict, whose contents hint
+    // names every card in the deck and therefore names `the-loop-spectrogram` —
+    // a menu entry read as a figure, which is the *matcher that sees one
+    // encoding* class pointed the other way. A `plot` block is a figure.
+    const flat = (blocks: readonly unknown[]): readonly unknown[] =>
+      blocks.flatMap((b) => {
+        const blk = b as { children?: unknown };
+        return [b, ...(Array.isArray(blk.children) ? flat(blk.children) : [])];
+      });
+    const drawsLoop = (id: string): boolean =>
+      flat(cardBlocks(report, id)).some((b) => {
+        const blk = b as { kind?: string };
+        return blk.kind === "plot" && JSON.stringify(blk).includes("loop");
+      });
+
+    const drawing = CARDS.filter((c) => drawsLoop(c.id));
+    // **Five, not two, and the three extra are why the discriminator matters.**
+    // `vitals` draws a loop-delay band beside frame cost and heap; `co-variance`
+    // and `the-pairs` carry loop delay as one of the six measured series. All
+    // three drew the figure with no resolution beside it until this row was
+    // tightened from *the card mentions the loop* to *one of the card's plots
+    // is about the loop* — F1137's fifth instance, and the one found by the
+    // instrument rather than by the rewrite that caused the other four.
+    expect(drawing.map((c) => c.id), "the cards whose figure is about the loop").toEqual([
+      "vitals", "the-loop-spectrogram", "the-loop-utilisation", "co-variance", "the-pairs",
+    ]);
+    for (const c of drawing) {
+      const text = cardText(report, c.id);
+      expect(text, `${c.id} draws the delay with its resolution`).toContain("at resolution 10 ms");
+      expect(text, `${c.id} says what the figure is`).toContain("a floor, not a reading");
     }
+    // **And the register's declaration is what puts it there**, so the two lists
+    // are compared: a card that starts drawing a delay without declaring one
+    // fails here rather than shipping a bare percentile.
+    expect(CARDS.filter((c) => c.loopDelay === true).map((c) => c.id), "declared, and drawn").toEqual(
+      drawing.map((c) => c.id),
+    );
   });
 
   // T2.4 (C28 I21) is in `test/unit/profiler-seams.test.ts`, with SS59's row
@@ -300,7 +349,7 @@ describe("C28 — profiler, tier 2", () => {
     // attribution is a canary; forty-two rendered as though the profiler knew
     // whose they were is a claim it cannot make, and the pane is where a figure
     // turns into a sentence.
-    const text = JSON.stringify(profilePane(report, "memory"));
+    const text = deckText(report);
     expect(text, "the count is drawn").toContain("42");
     expect(text, "with what it cannot say beside it").toContain("the profiler raises no marks");
   });

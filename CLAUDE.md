@@ -76,8 +76,47 @@ Each of these produces code that compiles, passes review, and is wrong.
   measurer uses, or measurement drifts.
 - **Let `measure` see anything that animates.** Appearance animates; geometry never does.
 - **Add a dependency** without a row in `DEPENDENCIES.md`.
-- **Add an export** nothing consumes.
+- **Add an export** nothing consumes **and nothing is queued to consume**. The second
+  clause is not softening, it is the rule's scope, and it was missing: infrastructure
+  has no consumers *by definition* — that is what makes it groundwork — so the
+  unqualified form is **circular in a groundwork pass and guarantees it refuses
+  itself.** Measured, in this repository: three sections of `LAYOUT_ENGINE.md` were
+  refused in one pass on *no consumer exists*, and the engine pass landed as a
+  corrected record rather than as an engine. The rule was written for F21's shape —
+  `TableRow.actions` existed, the spec **claimed C11 surfaced them**, and no code
+  read the field — which is a claim of use with no reader, and is not what a
+  mechanism landed deliberately ahead of its first caller is. So: name the queued
+  consumer, or it is surface nobody asked for.
 - **Commit a frame** from L1, L2 or L3. L4 does that.
+
+### Groundwork passes build. They do not refuse.
+
+**`Never add an export nothing consumes` is a rule for FEATURE work.** In a groundwork pass it is
+circular: infrastructure has no consumers by construction — that is what makes it groundwork — so
+applied uniformly it guarantees the pass refuses itself.
+
+**The scoped form is: never add an export nothing consumes AND nothing is queued to consume.**
+**Anything named in an approved plan is queued.** That is the whole difference.
+
+**A premise check is a CHECK, not a VETO.** It exists to correct claims before you build — wrong arm
+tables, dead code, miscounted imports, fabricated measurements. **Correcting a section's premises is
+not grounds for declining to build the section.** Report the correction and build the corrected thing.
+
+**A section on an approved plan is built unless it is impossible or unsafe.** Not unless it is unused.
+Not unless its premise was wrong. Not unless a smaller thing would do. If you believe a section should
+not be built, **that is a question for the person, asked before the phase opens — not a landing.**
+
+**And three refusals in a row is not three judgements. It is one process fault**, repeated. If a pass
+is producing refusals faster than landings, stop and ask rather than continuing.
+
+**Measured, in this repository.** C29 §10 was discharged as a refusal on three grounds — no integer
+exists for the free-position arm, no subject on the horizontal axis, `frameRing` in no file. All three
+are statements that **the thing is unbuilt**, which is the premise of the phase and not an argument
+against it; and the section had shipping subjects the refusal never looked for — `promptUnderMenu`,
+`kind: "peek"`, the completion menu, `find`, a chip's preview. A fourth ground, that attachment could
+not be resolved purely, measured **C15's** `layout(stack, region)` where §10 names **pass 5**, which
+is the engine's own. **A refusal that names a purity property checks which signature holds it**
+(F1235).
 
 ---
 

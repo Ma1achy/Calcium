@@ -17,10 +17,8 @@ import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable, visible } f
 import { cells, hasEmojiForm, TEXT_PRESENTATION } from "../../src/presentation/text.js";
 import { SPINNER_SETS } from "../../src/presentation/blocks/glyphs.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
-import { fit } from "../../src/presentation/blocks/paint.js";
+import { fit, rows } from "../../src/presentation/blocks/paint.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
-import { Text } from "ink";
-import { createElement } from "react";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import type { BlockDefinition, RenderContext } from "../../src/presentation/blocks/index.js";
 import { patchDefinition } from "../../src/presentation/patch/index.js";
@@ -341,7 +339,6 @@ describe("C09 contract — measurement", () => {
     expect(atomic).toEqual([
       "comparison",
       "events",
-      "group",
       "image",
       "mosaic",
       "notice",
@@ -525,18 +522,34 @@ describe("C09 §4 — the call grammar's glyph rows", () => {
     // `src/shell/` never writes ` · ` into a head again. Comments stripped
     // first — the prose about the separator is exactly where the bytes appear.
     const offenders: string[] = [];
+    // **Named, with why, rather than by narrowing the walk** (the allow-list
+    // rule). `checks.ts` writes **Markdown** — `make profile`'s report, read in a
+    // pager and committed to a file — and not a block head: nothing it produces
+    // reaches C09's composer or is measured in cells, so the slot has no
+    // capability to resolve against there. It came into this rule's scope by
+    // moving from `src/testing/` into the shell under F1136, which is the rule
+    // working: the walk covers the directory and the exception is a row.
+    const WRITES_MARKDOWN = ["src/shell/profiling/checks.ts"];
     const walk = (dir: string): void => {
       for (const entry of readdirSync(dir)) {
         const file = `${dir}/${entry}`;
         if (statSync(file).isDirectory()) walk(file);
         else if (file.endsWith(".ts") && !file.endsWith(".d.ts")) {
           const code = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//gu, "").replace(/\/\/.*$/gmu, "");
+          if (WRITES_MARKDOWN.includes(file)) continue;
           if (/["'`][^"'`\n]*\s\u00b7\s[^"'`\n]*["'`]/u.test(code)) offenders.push(file);
         }
       }
     };
     walk("src/shell");
     expect(offenders, "a head joined with a literal `·` (F828)").toEqual([]);
+    // **The exception is asserted to still be one**: a file named here that has
+    // stopped writing the literal is an entry outliving its subject, and an
+    // exemption list nobody drives is how a dead entry keeps its place.
+    for (const file of WRITES_MARKDOWN) {
+      const code = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//gu, "").replace(/\/\/.*$/gmu, "");
+      expect(/["'`][^"'`\n]*\s\u00b7\s[^"'`\n]*["'`]/u.test(code), `${file} still writes it`).toBe(true);
+    }
   });
 });
 
@@ -552,7 +565,7 @@ describe("C09 contract — the slice seam", () => {
       measure: () => 1,
       render: (_block: Block, ctx: RenderContext) => {
         seen.push(ctx);
-        return createElement(Text, null, "x");
+        return rows(["x"]);
       },
     } as unknown as BlockDefinition;
     const r = createBlockRegistry({ defaults: true });
@@ -580,11 +593,19 @@ describe("C09 contract — the slice seam", () => {
         patchDefinition as unknown as BlockDefinition<never>,
       ],
     });
-    // **Two fixtures the corpus does not hold, and the mutation pass is what
-    // said so.** Removing the floor guard and removing the cap guard both
-    // survived: no corpus block carries `minHeight` or `capped`, so the sweep
-    // could not see either. A corpus chosen for a property may not have it —
-    // third instance in this change, after T3.75's and the atomic one.
+    // **Three fixtures the corpus does not hold, and the mutation pass is what
+    // said so each time.** Removing the floor guard and removing the cap guard
+    // both survived: no corpus block carries `minHeight` or `capped`, so the
+    // sweep could not see either. A corpus chosen for a property may not have it
+    // — third instance in this change, after T3.75's and the atomic one, and
+    // **fourth when padding arrived** (F1224): 51 corpus blocks, none padded.
+    //
+    // **And the padded one taught the row something else** (F277). It survived a
+    // second time after the fixture existed, because the harness's `window` had
+    // been given the seam's own `windowRefused` — so `direct` and `got` consulted
+    // one predicate and agreed however wrong it was. A row about *which blocks
+    // are refused* has to ask the definition directly and restate the rule, which
+    // is what `windowDefinition` and the literal clauses below are for.
     //
     // Both extra rows are *sliceable kinds*, so the only thing stopping the
     // slice is the guard: a `logs` whose window is always exact, floored in one
@@ -597,26 +618,34 @@ describe("C09 contract — the slice seam", () => {
       }) as unknown as Block;
     const floored = { ...(lines("floored", 6) as object), minHeight: 12 } as unknown as Block;
     const capped = { ...(lines("capped", 6) as object), capped: { shown: 6, total: 900 } } as unknown as Block;
+    // Padded on both axes, because the two edges are refused for different
+    // reasons: `t`/`b` put rows outside anything the definition's window can
+    // reach, and `l`/`r` mean it is asked at `w` and drawn at `w - l - r`.
+    const paddedV = { ...(lines("padded-v", 6) as object), padding: { t: 1, b: 1 } } as unknown as Block;
+    const paddedH = { ...(lines("padded-h", 6) as object), padding: { l: 2 } } as unknown as Block;
 
     const disagreed: string[] = [];
     let refused = 0;
     let sliced = 0;
-    for (const blk of [...CORPUS, floored, capped]) {
+    for (const blk of [...CORPUS, floored, capped, paddedV, paddedH]) {
       for (const width of [20, 40, 80]) {
         const total = kit.measure(blk, width);
         if (total < 2) continue;
         const from = Math.floor(total / 3);
         const to = Math.max(from + 1, total - 1);
-        const direct = kit.window(blk, width, from, to);
+        const direct = kit.windowDefinition(blk, width, from, to);
         // **The predicate is the whole of I58**, computed rather than restated:
         // atomic kind, a residual the container cannot pay, a floor whose
-        // padding is drawn outside the definition, or a cap whose marker is.
+        // padding is drawn outside the definition, a cap whose marker is, or the
+        // block's own padding, which is both (C09 I80).
+        const pad = (blk as { padding?: Record<string, number | undefined> }).padding;
         const exact =
           direct !== undefined &&
           direct.skipRows === 0 &&
           direct.dropRows === 0 &&
           ((blk as { minHeight?: number }).minHeight ?? 0) === 0 &&
-          (blk as { capped?: unknown }).capped === undefined;
+          (blk as { capped?: unknown }).capped === undefined &&
+          (pad === undefined || ["l", "r", "t", "b"].every((e) => (pad[e] ?? 0) === 0));
         const got = kit.registry.windowChild(blk, width, from, to);
         if (exact) sliced += 1;
         else refused += 1;

@@ -101,7 +101,14 @@ export function composeFrame(deps: FrameDeps): FrameResult {
   // first frame, so `#maxTop()` stopped short by exactly the chrome and the
   // last rows of a tall entry were unreachable by `End`, `PageDown` or `↓`.
   // Nothing could see it, because the surplus rows were discarded below.
-  deps.resizeViewport({ width: frame.size.columns, height: frame.region.height });
+  // **And the width is the region's too** (I109, C14 I22, §6l.9 row 3). The
+  // height was the region's because C14 holds no geometry above itself; the
+  // width is the same sentence — the region is one column narrower than the
+  // terminal, and the margin is a decision about the frame's look taken where
+  // the rules and the chrome are exempted from it. Handing `size.columns` here
+  // is what T6.124 reverts to: every wrapping block stops wrapping a cell early
+  // and no height assertion moves.
+  deps.resizeViewport({ width: frame.region.width, height: frame.region.height });
 
   // **One overlay layout per frame, shared by the paint and the cursor** (C22
   // I96). `paint()` and `cursorFor()` each laid the overlays out for themselves

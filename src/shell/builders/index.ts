@@ -122,12 +122,17 @@ function finish<B extends Block>(spec: B, opts: BlockOpts | undefined, gapDefaul
   const explicit = opts?.gapBefore;
   const gap = explicit ?? gapDefault;
 
-  // **Written only when it is true.** C04's `Gap` is `gapBefore?: boolean` and
-  // `measure` counts `=== true`, so `false` and absent are the same block said
-  // two ways — and a builder that emitted `gapBefore: false` where `block()`
-  // omits it would produce something that renders identically and compares
-  // unequal. T4.6's pairing assertion found exactly that.
-  const withGap = gap ? { ...spec, gapBefore: true } : spec;
+  // **Written only when it is true.** C04's field is `padding?` and absent is
+  // no space, so `padding: {}` and absent would be the same block said two ways
+  // — and a builder that emitted the empty object where `block()` omits it
+  // would produce something that renders identically and compares unequal.
+  // T4.6's pairing assertion found exactly that, when the field was `gapBefore`.
+  //
+  // **`opts.gapBefore` is the builder's shorthand and not a second field on the
+  // block** (C04 §3a, R19). The vocabulary has one way to say *a blank row above
+  // this block* — `padding.t` — and this is the ergonomic name L4 writes it
+  // under, resolved here rather than carried into the document.
+  const withGap = gap ? { ...spec, padding: { t: 1 } } : spec;
 
   const built = rebuild(withGap as B);
   if (explicit === undefined) defaulted(built);
@@ -1404,7 +1409,7 @@ function scroll(
 function group(
   direction: "row" | "column",
   children: readonly Block[],
-  opts?: BlockOpts & { flex?: readonly Share[]; align?: readonly Align[]; minRows?: number },
+  opts?: BlockOpts & { flex?: readonly Share[]; align?: readonly Align[]; minRows?: number; childGap?: number },
 ): Group {
   const flex = opts?.flex;
   if (flex !== undefined) {
@@ -1433,6 +1438,13 @@ function group(
       `b.group: ${String(align.length)} alignments for ${String(children.length)} children`,
     );
   }
+  // **Zero is a legitimate `childGap` and not for `minRows`** (C04 I121): *no
+  // gutter at all* is the thing the field exists to make sayable, so the two
+  // boundaries differ by one and are written separately rather than shared.
+  const childGap = opts?.childGap;
+  if (childGap !== undefined && (!Number.isInteger(childGap) || childGap < 0)) {
+    throw new TypeError(`b.group: childGap is a whole number of cells, zero or more — got ${JSON.stringify(childGap)}`);
+  }
   const minRows = opts?.minRows;
   if (minRows !== undefined && (!Number.isInteger(minRows) || minRows < 1)) {
     throw new TypeError(`b.group: minRows is a whole number of rows above zero — got ${JSON.stringify(minRows)}`);
@@ -1447,6 +1459,7 @@ function group(
       ...(flex === undefined ? {} : { flex: [...flex] }),
       ...(align === undefined ? {} : { align: [...align] }),
       ...(minRows === undefined ? {} : { minRows }),
+      ...(childGap === undefined ? {} : { childGap }),
     } as Group,
     opts,
     false,

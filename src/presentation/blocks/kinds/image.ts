@@ -4,8 +4,6 @@
  * **The dither is the arm that runs on most terminals**, so it is the one built
  * first and the one every capability set but `kitty` reaches.
  */
-import { Box, Text } from "ink";
-import { createElement, type ReactElement } from "react";
 import { columnsForAspect } from "../../plot/aspect.js";
 import {
   decodeImage,
@@ -20,18 +18,18 @@ import {
 } from "../../image/index.js";
 import { placementFits, placementIdOf, placementRows } from "../../image/kitty.js";
 import { overlayColour, overlayField } from "../../image/overlay.js";
-import { paint, type Span } from "../paint.js";
+import { paint, rows as rowsOf, type Span } from "../paint.js";
 import { statusDefinition } from "./status.js";
 import type { Image, MeasureFn, Probe, Status } from "../../../data/viewmodel/index.js";
 import { truncate } from "../../text.js";
-import type { BlockDefinition, RenderContext } from "../types.js";
+import type { BlockDefinition, RenderContext, Rendered } from "../types.js";
 
 /**
  * Decoded pixels, memoised on the block's digest.
  *
  * **On the digest and never on the data**, which is what §3g.2's identity is for:
  * `measure` and `render` both need the dimensions, and a decode per call would
- * do the expensive half twice per frame. `lowlight`'s memoisation on
+ * do the expensive half twice per frame. The tokeniser's memoisation on
  * `(text, language)` is the precedent.
  */
 const DECODED = new Map<string, Decoded>();
@@ -236,7 +234,7 @@ export const imageDefinition: BlockDefinition<Image> = {
     return imageCells(block, width, probe).rows;
   },
 
-  render(block: Image, ctx: RenderContext): ReactElement {
+  render(block: Image, ctx: RenderContext): Rendered {
     const { cols, rows } = imageCells(block, ctx.width, ctx.probe);
     // C28 I45 — the payload, which the decode and the kitty transmission both
     // walk in full, and which `cols * rows` cannot stand in for: the drawn cell
@@ -275,11 +273,8 @@ export const imageDefinition: BlockDefinition<Image> = {
       // **The overlay is not here at `kitty` and that is the whole ruling**
       // (C04 §3h.2): the cell's rendering is the terminal's, so it is composited
       // into the pixels by `transmitImage` before the bytes ever leave L4.
-      return createElement(
-        Box,
-        { flexDirection: "column", width: cols },
-        placed.rows.map((line, i) => createElement(Text, { key: String(i) }, line)),
-      );
+      // Rows, not a `Text` per row (C09 I73).
+      return rowsOf(placed.rows);
     }
 
     // **Below here every arm rasterises, so this is where the refusal goes**
@@ -322,12 +317,14 @@ export const imageDefinition: BlockDefinition<Image> = {
       // **Truncated by C09's own function**, not by Ink's `wrap`, which emits
       // `…` at every capability where I22 substitutes `~` under `ascii`.
       const alt = truncate(block.alt, ctx.width, ctx.capabilities);
-      return createElement(
-        Box,
-        { flexDirection: "column", width: ctx.width },
-        createElement(Box, { key: "box" }, box),
-        createElement(Text, { key: "alt", dimColor: true }, alt),
-      );
+      // **The fault box's rows and the alt text dimmed** (C09 I73) — `dim` is
+      // the one attribute Ink's `dimColor` set, so the bytes are the same.
+      // **The fault box's rows and the alt text dimmed.** The element arm below
+      // this was unreachable before it was deleted: `box` is
+      // `statusDefinition.render`, which has answered rows since I72, so the
+      // `Array.isArray` test could only go one way. The layout pass deleted the
+      // arm rather than the test, and then the test with it (F1209).
+      return [...box, paint([{ text: alt, style: { dim: true } }])];
     }
 
     // **The half-block rung, and the refused placement re-enters here** (I37,
@@ -341,15 +338,9 @@ export const imageDefinition: BlockDefinition<Image> = {
     // are the right size.
     if (halfBlockEligible(ctx.capabilities, block.overlay !== undefined)) {
       const cellRows = halfBlockRows(px, cols, rows, ctx.capabilities.colourDepth);
-      return createElement(
-        Box,
-        { flexDirection: "column", width: cols },
-        cellRows.map((line, i) =>
-          createElement(
-            Text,
-            { key: String(i) },
-            paint(line.map((cell) => ({ text: HALF_BLOCK, style: { colour: cell.top, background: cell.bottom } }))),
-          ),
+      return rowsOf(
+        cellRows.map((line) =>
+          paint(line.map((cell) => ({ text: HALF_BLOCK, style: { colour: cell.top, background: cell.bottom } }))),
         ),
       );
     }
@@ -380,10 +371,6 @@ export const imageDefinition: BlockDefinition<Image> = {
             });
           })();
 
-    return createElement(
-      Box,
-      { flexDirection: "column", width: cols },
-      lines.map((line, i) => createElement(Text, { key: String(i) }, line)),
-    );
+    return rowsOf(lines);
   },
 };

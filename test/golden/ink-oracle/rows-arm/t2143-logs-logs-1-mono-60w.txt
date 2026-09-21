@@ -1,0 +1,2 @@
+12:00:01  info   listening on :8080
+12:00:02  [1mwarn [22m  slow query: 1.2s

@@ -412,7 +412,7 @@ The *report* is deduplicated on the unordered pair. One error for one mistake �
 Three consequences, each checked rather than assumed:
 
 - **`hidden` is the mechanism for anything an app should not see in completion**, and `/debug` uses it. `visibleTools` drops it and `findTool` still resolves it, which is exactly the pair that field means (§ToolDef). The other five are ordinary.
-- **The seven need no eighth `ArgType`.** `/theme` and `/profile` take an `enum` — `/profile`'s is optional, its four values C28's `PANES` written at L0 and held equal by C23 T1.67 — `/history` and `/debug` an optional `int`. EX5 claims the union stays domain-free, and the framework's own verbs failing it would have been the strongest counterexample there could be. They do not.
+- **The seven need no eighth `ArgType`.** `/theme` and `/profile` take an `enum` — `/profile`'s is optional, its five values C28's three `SECTIONS` and the two document verbs, written at L0 and held equal by C23 T1.67 — `/history` and `/debug` an optional `int`. EX5 claims the union stays domain-free, and the framework's own verbs failing it would have been the strongest counterexample there could be. They do not.
 - **They are a `ToolDef[]`, not a `Manifest` fragment.** A fragment implies a schema version and a merge of two schemas; an array is just tools, and tools is all this is.
 
 ### The partition lives on `Manifest`, not on `ToolDef`

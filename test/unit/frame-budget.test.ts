@@ -21,6 +21,8 @@ import {
   MAX_FOOTER_ROWS,
   MIN_ROWS,
   RULE_ROWS,
+  CONTENT_MARGIN_R,
+  regionWidth,
   resolveConfig,
   type Ambient,
 } from "../../src/shell/config.js";
@@ -126,6 +128,83 @@ describe("C22 §6l — the frame's default look", () => {
     // **No field to refuse** (§6l.4 F): the resolved chrome is two functions.
     const resolved = resolveConfig(BASE, AMBIENT).chrome;
     expect(Object.keys(resolved).sort()).toEqual(["footer", "header"]);
+  });
+
+  it("T1.64 (C22 I109, §6l.9 rows 1–4): the region is a column narrower than the terminal, and the rules and the chrome are not", () => {
+    const f = frameAt(24, makeDefaultChrome("plots-tui", "/usr/local/bin/plots"), 1, 80);
+    expect(f.region.width, "the terminal's less CONTENT_MARGIN_R").toBe(80 - CONTENT_MARGIN_R);
+    expect(regionWidth(80)).toBe(f.region.width);
+    // **The same width for a layer's box** (I28, §6l.9 row 5): an overlay's
+    // content is content.
+    expect(f.overlayRegion.width).toBe(f.region.width);
+
+    // **Both numbers in one frame, because either one alone is
+    // self-consistent.** The defect this landing can produce is a composer
+    // reading the terminal's width for content or the region's for a rule, and
+    // a frame drawn wholly at 79 sums exactly as one drawn wholly at 80.
+    const lines = paint(f, deps({ promptRows: () => ["a typed line"] }));
+    for (const row of lines) expect(displayCells(row)).toBe(80);
+    // The three rule rows span the terminal (C22 I81, C22 I87) — trimmed, they are 80
+    // glyphs, not 79.
+    const rule = lines[HEADER_ROWS];
+    expect(rule).toBeDefined();
+    expect(displayCells(strip(rule ?? ""))).toBe(80);
+    const above = lines[f.region.top + f.region.height];
+    expect(displayCells(strip(above ?? "")), "the rule above the prompt").toBe(80);
+    // The header's right cluster ends at the terminal's last column (C22 I86), so
+    // the chrome is not narrowed with the document.
+    expect(displayCells(strip(lines[0] ?? "")), "the header's clock at the edge").toBe(80);
+
+    // The prompt's body is the region's width less the gutter (§6l.9 row 4).
+    expect(f.promptWanted).toBe(1);
+    const promptWidths = new Set([60, 80, 120].map((c) => frameAt(24, FOOTER(1), 1, c).region.width));
+    expect([...promptWidths].sort((a, b) => a - b)).toEqual([59, 79, 119]);
+
+    // The floor at 1 is reached by no size the gate accepts, and is asserted
+    // directly rather than through a frame.
+    expect(regionWidth(1)).toBe(1);
+    expect(regionWidth(0)).toBe(1);
+  });
+
+  it("T3.42 (C22 I109): a row exactly at the region's width is untouched and one cell wider wraps — the pair the corpus did not have", () => {
+    // **F1227**: three content rows reached the frame's last column across 45
+    // session goldens, and all three were one help line. A margin and an
+    // off-by-one are indistinguishable without both halves of this pair, since
+    // a document drawn at `size.columns` passes every containment assertion
+    // while overrunning the gutter by one cell.
+    const f = frameAt(24, FOOTER(1), 1, 80);
+    const w = f.region.width;
+    // Words rather than one long run, so the wrap is the wrap and not a
+    // truncation: a kind that truncates would show the inset and not the
+    // narrowing, which is F1225's case 2b one component along.
+    const words = (cells: number): string => {
+      const out: string[] = [];
+      let n = 0;
+      while (n < cells) {
+        const word = "ab";
+        out.push(word);
+        n += word.length + 1; // cells-ok — ascii words and one space
+      }
+      return out.join(" ").slice(0, cells);
+    };
+    const fits = words(w);
+    const over = words(w + 1);
+    const rowsOf = (text: string): readonly string[] =>
+      renderSequenceToLines(REGISTRY, [notice("t", text)], w, {
+        theme: DARK_THEME,
+        capabilities: FULL_CAPS,
+      });
+    expect(rowsOf(fits).length, "exactly at the region's width").toBe(1);
+    expect(rowsOf(over).length, "one cell wider").toBe(2);
+    // And at the terminal's width the wider row does *not* wrap, which is the
+    // whole of what the margin changes.
+    expect(
+      renderSequenceToLines(REGISTRY, [notice("t", over)], 80, {
+        theme: DARK_THEME,
+        capabilities: FULL_CAPS,
+      }).length,
+      "the gutter overrun the margin prevents",
+    ).toBe(1);
   });
 
   it("T1.47 (C22 I87, §6l.7 row 21): a default frame paints a rule on row HEADER_ROWS, byte-identical to the rule above the prompt, and the region starts below it", () => {

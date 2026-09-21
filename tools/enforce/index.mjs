@@ -285,7 +285,12 @@ if (violations.length === 0) {
       `  ${DIM}invariant coverage · ${String(coverage.uncited)} of ` +
       `${String(coverage.declared)} invariants named by no test row, all listed ` +
       `(SP9, gated by equality); ${String(deferredOnly)} more are named by no row that ` +
-      `runs — an it.todo, a describe title or a comment (F896, F907, reported not gated)${RESET}\n` +
+      `runs — an it.todo, a describe title or a comment (F896, F907, reported not gated); ` +
+      // **The retired are counted, not silently excluded.** A population that
+      // shrinks by an exemption is invisible as an absence of complaint, and a
+      // retirement is the one disposition that takes an invariant out of the
+      // coverage question altogether (CLAUDE.md §count an exemption).
+      `${String(coverage.retired)} retired, and no row may name one${RESET}\n` +
       `  ${DIM}section citations · ${String(sectionsDangling.length)} of ` +
       `${String(sectionRefs.resolved + sectionsDangling.length)} resolve to no section, across ` +
       `${String(sectionTargets)} targets; ${String(sectionsUnowned)} more name no document ` +

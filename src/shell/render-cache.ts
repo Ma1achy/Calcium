@@ -74,7 +74,49 @@ type Slot = Readonly<{
   width: number;
   focus: string;
   theme: string;
+  /** The spinner counter — the second axis whose miss keeps the parts (I103). */
+  tick: string;
+  /** The window range the rows are of — the one axis the parts do not carry (I101). */
+  range: string;
   lines: readonly string[];
+  /**
+   * The lines of every block rendered whole under this slot's stable key, by
+   * the block's id and its `align` (I101), and one slice per block the window
+   * sliced, under its id with the window it is of (I104). Bounded by the
+   * entry's own blocks and dropped with the slot on a miss on any axis but
+   * the range and the tick.
+   */
+  parts: Held;
+}>;
+
+/**
+ * What a slot holds beside its rows (I101, I104): the lines of every block
+ * rendered whole, by key; and for a block the window sliced, one slice —
+ * its rows and the run-local window they are of — by the block's id, replaced
+ * whenever another window renders it. Bounded by the entry's own shape.
+ */
+type Held = Readonly<{
+  whole: Map<string, readonly string[]>;
+  slices: Map<string, Readonly<{ window: string; lines: readonly string[] }>>;
+}>;
+
+const freshHeld = (): Held => ({ whole: new Map(), slices: new Map() });
+
+/**
+ * The parts of one entry, open to the render that follows a **range** miss
+ * (I101): `part` reads a block rendered whole under the same stable key, and
+ * `hold` keeps one rendered now for the next range. `slice` reads the rows of
+ * a block the window sliced, if they were rendered for this very window, and
+ * `holdSlice` keeps them under the block's id for the next miss that reaches
+ * it — replacing whatever window that id held before (I104). Handed out by
+ * `parts()` only after a range or a tick miss, so a miss on any other axis
+ * assembles nothing from before it.
+ */
+export type EntryParts = Readonly<{
+  part(key: string): readonly string[] | undefined;
+  hold(key: string, lines: readonly string[]): void;
+  slice(id: string, window: string): readonly string[] | undefined;
+  holdSlice(id: string, window: string, lines: readonly string[]): void;
 }>;
 
 /**
@@ -112,7 +154,7 @@ export function focusKey(
 
 /** `HeightCache`'s two axes and the three this one adds (C28 I8, C14 I27). */
 export type RenderMisses = Readonly<
-  Record<"absent" | "rev" | "width" | "theme" | "focus" | "nothing-changed", number>
+  Record<"absent" | "rev" | "width" | "theme" | "focus" | "tick" | "range" | "nothing-changed", number>
 >;
 
 /**
@@ -134,10 +176,17 @@ export class RenderCache {
   readonly #slots = new Map<EntryId, Slot>();
   readonly #probe: Probe;
   #hits = 0;
-  readonly #misses = { absent: 0, rev: 0, width: 0, theme: 0, focus: 0, "nothing-changed": 0 };
+  readonly #misses = { absent: 0, rev: 0, width: 0, theme: 0, focus: 0, tick: 0, range: 0, "nothing-changed": 0 };
 
   /** The slot `get` most recently rejected, and its lines — see `set` (C14 I28). */
   #discarded: Readonly<{ id: EntryId; lines: readonly string[] }> | null = null;
+
+  /**
+   * The parts a **range** miss (I101) or a **tick** miss (I103) left open for
+   * the render that follows it, or `null` after any other miss — the render after a `rev` miss holds
+   * whatever it renders whole into a fresh map, and reads nothing from before.
+   */
+  #open: Readonly<{ id: EntryId; parts: Held }> | null = null;
 
   /**
    * C28's seam, or none (C28 I30).
@@ -178,18 +227,30 @@ export class RenderCache {
     width: number,
     focus: string,
     theme: string,
+    range: string,
+    tick = "",
   ): readonly string[] | undefined {
     const slot = this.#slots.get(id);
-    if (slot === undefined) return this.#miss(id, "absent", undefined);
+    if (slot === undefined) return this.#miss(id, "absent", undefined, null);
     // **The order is the invariant** (C28 I8). A slot can disagree on several
     // axes at once and the reason reported is the first checked, so this
     // sequence is what a count means. Coarsest first: `rev` moves on any content
     // change at all, so an entry that changed reports `rev` even if the width
     // moved too — right, because the re-render was owed either way.
-    if (slot.rev !== rev) return this.#miss(id, "rev", slot.lines);
-    if (slot.width !== width) return this.#miss(id, "width", slot.lines);
-    if (slot.theme !== theme) return this.#miss(id, "theme", slot.lines);
-    if (slot.focus !== focus) return this.#miss(id, "focus", slot.lines);
+    if (slot.rev !== rev) return this.#miss(id, "rev", slot.lines, null);
+    if (slot.width !== width) return this.#miss(id, "width", slot.lines, null);
+    if (slot.theme !== theme) return this.#miss(id, "theme", slot.lines, null);
+    if (slot.focus !== focus) return this.#miss(id, "focus", slot.lines, null);
+    // **The tick keeps the parts too** (I103): a spinner moved one block's rows
+    // and no other's, so the slot's parts are right for every block that does
+    // not animate — the assembly is what skips the ones that do. Folded into
+    // `focus` this was a whole-entry render every 80 ms, reported under the
+    // wrong name (F1189).
+    if (slot.tick !== tick) return this.#miss(id, "tick", slot.lines, slot.parts);
+    // **The range last, and it is the other miss that keeps the parts** (I101):
+    // every axis above agreed, so what the slot rendered whole is what this
+    // window would render whole, and only the rows are of the wrong range.
+    if (slot.range !== range) return this.#miss(id, "range", slot.lines, slot.parts);
     this.#hits += 1;
     this.#probe.hit("render");
     return slot.lines;
@@ -197,13 +258,35 @@ export class RenderCache {
 
   #miss(
     id: EntryId,
-    reason: "absent" | "rev" | "width" | "theme" | "focus",
+    reason: "absent" | "rev" | "width" | "theme" | "focus" | "tick" | "range",
     discarded: readonly string[] | undefined,
+    parts: Held | null,
   ): undefined {
     this.#misses[reason] += 1;
     this.#probe.miss("render", reason);
     this.#discarded = discarded === undefined ? null : { id, lines: discarded };
+    this.#open = parts === null ? null : { id, parts };
     return undefined;
+  }
+
+  /**
+   * The parts left open for `id` by a range or a tick miss (I101, I103), or `undefined` when
+   * the last miss for it was on any other axis — or was another entry's.
+   */
+  parts(id: EntryId): EntryParts | undefined {
+    const open = this.#open;
+    if (open === null || open.id !== id) return undefined;
+    return {
+      part: (key) => open.parts.whole.get(key),
+      hold: (key, lines) => void open.parts.whole.set(key, lines),
+      // **One slice per id, and the window is the condition** (I104): a slice
+      // held for another window is not these rows, and holding replaces it.
+      slice: (id, window) => {
+        const held = open.parts.slices.get(id);
+        return held !== undefined && held.window === window ? held.lines : undefined;
+      },
+      holdSlice: (id, window, lines) => void open.parts.slices.set(id, { window, lines }),
+    };
   }
 
   set(
@@ -212,7 +295,9 @@ export class RenderCache {
     width: number,
     focus: string,
     theme: string,
+    range: string,
     lines: readonly string[],
+    tick = "",
   ): void {
     // **C14 I28's comparison, on lines rather than a height.** `slot` above is
     // seven fields joined per entry per frame, so a key that churns while the
@@ -230,7 +315,13 @@ export class RenderCache {
     // say so: occupancy counts slots, and a slot that was overwritten leaves no
     // trace in it at all.
     this.#probe.track("render-cache.lines", lines);
-    this.#slots.set(id, Object.freeze({ rev, width, focus, theme, lines }));
+    // **The parts survive a range miss and a tick miss and nothing else** (I101, I103): the map the
+    // miss left open is the one stored back, grown by what this render held;
+    // after any other miss it is a fresh one.
+    const open = this.#open;
+    const parts = open !== null && open.id === id ? open.parts : freshHeld();
+    this.#open = null;
+    this.#slots.set(id, Object.freeze({ rev, width, focus, theme, tick, range, lines, parts }));
   }
 
   /** `evict` deletes by id — no key enumeration, because there is one slot. */

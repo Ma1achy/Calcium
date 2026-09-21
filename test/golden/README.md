@@ -1,6 +1,6 @@
 # golden
 
-**14 test files — 1 frame, 2 byte corpora, 10 renderings of blocks, 1 census.**
+**15 test files — 1 frame, 2 byte corpora, 11 renderings of blocks, 1 census.**
 
 Those five figures are asserted against the directory by `corpus.test.ts`, and the
 table below is parsed from this file rather than restated in code. **The reason is
@@ -21,6 +21,7 @@ now fails a row.
 | `continuation.test.ts` | lines | the continuation mark under a command's first character, at 2 widths | `config.js` `documents.js` `paint.js` |
 | `corpus.test.ts` | census | this table against the directory — the row that fails when the description stops being true | — |
 | `fallback-docker.test.ts` | lines | docker's real JSON through C07's fallback, unadapted | — |
+| `padding.test.ts` | lines | a block's own padding — alone, inset, in a row group and in a sequence, at 3 widths × 3 variants | `builders/index.js` |
 | `patch.test.ts` | lines | C25's patch block at 4 widths × 4 modes | `builders/index.js` |
 | `plot-forms.test.ts` | lines | every plot form, plus the vertical and candlestick corpora | — |
 | `plot-meshes.test.ts` | lines | the mesh forms at one width | — |

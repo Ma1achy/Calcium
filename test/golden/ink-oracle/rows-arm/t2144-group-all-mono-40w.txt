@@ -1,0 +1,5 @@
+3 tiles
+one                 two
+{"kind":"plot","id~ {"kind":"plot","id~
+three               four
+{"kind":"plot","id~ {"kind":"plot","id~

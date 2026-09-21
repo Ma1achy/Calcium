@@ -1,9 +1,30 @@
 // C09 tier 1 — the registry's state machine, and each kind's documented height.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { createLowlight } from "lowlight";
+import type { LanguageFn } from "highlight.js";
+import bash from "highlight.js/lib/languages/bash";
+import css from "highlight.js/lib/languages/css";
+import diff from "highlight.js/lib/languages/diff";
+import dockerfile from "highlight.js/lib/languages/dockerfile";
+import go from "highlight.js/lib/languages/go";
+import ini from "highlight.js/lib/languages/ini";
+import java from "highlight.js/lib/languages/java";
+import javascript from "highlight.js/lib/languages/javascript";
+import json from "highlight.js/lib/languages/json";
+import markdown from "highlight.js/lib/languages/markdown";
+import python from "highlight.js/lib/languages/python";
+import rust from "highlight.js/lib/languages/rust";
+import sql from "highlight.js/lib/languages/sql";
+import typescript from "highlight.js/lib/languages/typescript";
+import xml from "highlight.js/lib/languages/xml";
+import yaml from "highlight.js/lib/languages/yaml";
+
+/** The default set again, for the reference tokeniser (T1.45). */
+const GRAMMARS = { bash, css, diff, dockerfile, go, ini, java, javascript, json, markdown, python, rust, sql, typescript, xml, yaml };
 import { displayCells } from "../../src/presentation/text.js";
-import { block, validateBlock } from "../../src/data/viewmodel/index.js";
-import type { Group, MeasureFn } from "../../src/data/viewmodel/index.js";
+import { NO_PROBE, block, validateBlock } from "../../src/data/viewmodel/index.js";
+import type { Block, Group, MeasureFn, Probe } from "../../src/data/viewmodel/index.js";
 import { groupDefinition } from "../../src/presentation/blocks/kinds/containers.js";
 import {
   createBlockRegistry,
@@ -13,11 +34,35 @@ import {
   tokenise,
   UNSLOTTED,
 } from "../../src/presentation/blocks/index.js";
+import { SLOTS, type Token } from "../../src/presentation/blocks/kinds/code.js";
 import type { RenderContextInput } from "../../src/presentation/blocks/index.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
 import { ONE_PER_KIND } from "../support/blocks.js";
-import { ASCII_CAPS, DARK_THEME, FULL_CAPS, MONO_CAPS, measurable, visible } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LOUD, MONO_CAPS, measurable, visible } from "../support/render.js";
+import { RenderScratchStore } from "../../src/shell/render-scratch.js";
+import { rows as inkRows } from "../../src/presentation/blocks/paint.js";
+import type { BlockDefinition } from "../../src/presentation/blocks/types.js";
 import { cells } from "../../src/presentation/text.js";
+
+/** One sample per default grammar, ASCII throughout (T3.32, T1.45). */
+const SAMPLES: Readonly<Record<string, string>> = {
+  bash: 'for f in *.ts; do echo "$f"; done # c',
+  css: ".a { color: #fff; } /* c */",
+  diff: "--- a\n+++ b\n@@ -1 +1 @@\n-old\n+new\n",
+  dockerfile: "FROM node:22\nRUN npm ci\n",
+  go: 'func main() { fmt.Println("hi") } // c',
+  ini: "[s]\nk = v ; c\n",
+  java: "public class A { public static void main(String[] a) {} }",
+  javascript: "async function f(a) { return await g(a); } // c",
+  json: '{"a": 1, "b": [true, null]}',
+  markdown: "# h\n\n`code` and text\n",
+  python: "def f(x):\n    return [i for i in range(x)]  # c",
+  rust: "fn main() { let v: Vec<u8> = vec![1]; } // c",
+  sql: "SELECT id FROM t WHERE x > 1; -- c",
+  typescript: "export const f = (x: number): string => `n`; // c",
+  xml: '<a href="x">t</a><!-- c -->',
+  yaml: "a: 1\nb:\n  - x\n",
+};
 
 describe("C09 §6 — the registry's transition table", () => {
 
@@ -63,24 +108,6 @@ describe("C09 §6 — the registry's transition table", () => {
     // grammar row can only be written for the ones already known. `markdown`
     // is the row that failed before `SLOTS` was extended: four runs, none
     // slotted, which is indistinguishable from not shipping it (F123).
-    const SAMPLES: Readonly<Record<string, string>> = {
-      bash: 'for f in *.ts; do echo "$f"; done # c',
-      css: ".a { color: #fff; } /* c */",
-      diff: "--- a\n+++ b\n@@ -1 +1 @@\n-old\n+new\n",
-      dockerfile: "FROM node:22\nRUN npm ci\n",
-      go: 'func main() { fmt.Println("hi") } // c',
-      ini: "[s]\nk = v ; c\n",
-      java: "public class A { public static void main(String[] a) {} }",
-      javascript: "async function f(a) { return await g(a); } // c",
-      json: '{"a": 1, "b": [true, null]}',
-      markdown: "# h\n\n`code` and text\n",
-      python: "def f(x):\n    return [i for i in range(x)]  # c",
-      rust: "fn main() { let v: Vec<u8> = vec![1]; } // c",
-      sql: "SELECT id FROM t WHERE x > 1; -- c",
-      typescript: "export const f = (x: number): string => `n`; // c",
-      xml: '<a href="x">t</a><!-- c -->',
-      yaml: "a: 1\nb:\n  - x\n",
-    };
 
     // The set drives the samples, not the other way round: a grammar added with
     // no sample fails here rather than being silently uncovered.
@@ -634,6 +661,83 @@ describe("C09 §6 — kinds", () => {
     expect(calls, "an empty container measures no children").toEqual([]);
   });
 
+  it("T1.44 (I70): a column group measured twice through one caller-owned memo measures each child once across both calls, the answers equal the memo-less answers, and another width and a rebuilt child miss through", () => {
+    const kit = measurable();
+    // **The registry's own probe, so the row reads hits and misses where the
+    // profiler does** (C28 I31) — a count taken from a wrapper round `measure`
+    // would miss the hit path by construction, because a hit never reaches it.
+    const events: string[] = [];
+    const probe: Probe = {
+      ...NO_PROBE,
+      hit: (cache) => void events.push(`hit:${cache}`),
+      miss: (cache, reason) => void events.push(`miss:${cache}:${reason}`),
+      on: true,
+    };
+    (kit.registry as unknown as { probe: Probe }).probe = probe;
+    const measures = (): readonly string[] => events.filter((e) => e.includes(":measure"));
+
+    const kids = Array.from({ length: 12 }, (_, i) => ({
+      kind: "raw" as const,
+      id: `m-${String(i)}`,
+      text: `line ${String(i)}\nand another`,
+    }));
+    const column = block({ kind: "group", id: "g-memo", direction: "column", children: [...kids] });
+
+    // The memo-less answers first: the claim is equality with them — the rows,
+    // and the pattern of asks. A column group asks each child twice in one call
+    // and the per-call memo answers the second ask, so a fresh call reads as
+    // twelve misses then twelve hits; that pattern is the baseline, not a
+    // number this row invents.
+    const plain80 = kit.registry.measure(column, 80);
+    const fresh = measures();
+    expect(fresh.slice(0, kids.length), "a fresh call: every child absent first").toEqual(
+      kids.map(() => "miss:measure:absent"),
+    );
+    expect(fresh.filter((e) => e.startsWith("miss")), "and absent once each").toHaveLength(kids.length);
+    const plain40 = kit.registry.measure(column, 40);
+
+    const memo = new WeakMap<Block, Readonly<{ width: number; rows: number }>>();
+    events.length = 0;
+    expect(kit.registry.measure(column, 80, memo), "the first call answers as without a memo").toBe(plain80);
+    expect(measures(), "and asks exactly as a fresh call does").toEqual(fresh);
+
+    events.length = 0;
+    expect(kit.registry.measure(column, 80, memo), "the second call answers the same").toBe(plain80);
+    expect(measures(), "and asked nothing: the group itself is held, so no child is reached").toEqual([]);
+
+    // **Across members** (I70): `measureSequence` through the same memo reads
+    // the answers `measure` wrote, which is what lets C14's measurer and the
+    // session's window share one (C22 I100).
+    events.length = 0;
+    expect(kit.registry.measureSequence(kids as never, 80, memo)).toBe(plain80);
+    expect(measures(), "the sequence read every child back: every ask a hit, no miss").toEqual(
+      kids.map(() => "hit:measure"),
+    );
+    const asWidth = fresh.map((e) => e.replace("absent", "width"));
+
+    // A rebuilt child — the same content as a new object — is a new question.
+    const rebuilt = block({
+      kind: "group",
+      id: "g-memo",
+      direction: "column",
+      children: kids.map((k) => ({ ...k })),
+    });
+    events.length = 0;
+    expect(kit.registry.measure(rebuilt, 80, memo)).toBe(plain80);
+    expect(measures(), "identity, never content").toEqual(fresh);
+
+    // Another width misses through with the width's reason, and answers right.
+    events.length = 0;
+    expect(kit.registry.measure(column, 40, memo)).toBe(plain40);
+    expect(measures(), "held for one width").toEqual(asWidth);
+
+    // **The registry holds no reference**: a call without the memo is a call
+    // with a fresh one, whatever the caller's still holds.
+    events.length = 0;
+    expect(kit.registry.measure(column, 40)).toBe(plain40);
+    expect(measures(), "afresh").toEqual(fresh);
+  });
+
   it("T1.10 (I10): an unknown kind renders through raw and never throws", () => {
     const kit = measurable();
     const foreign = { kind: "sparkline-3000", id: "x-1", values: [1, 2, 3] } as unknown as never;
@@ -909,5 +1013,165 @@ describe("C09 I28 — a progress bar clamps its fill and never its number", () =
     expect(drawn).toContain("0%");
     expect(drawn).not.toContain("NaN");
     expect(drawn).not.toContain("Infinity");
+  });
+});
+
+describe("C09 I71 — the tokeniser's run is emitted straight from the emitter seam", () => {
+  // **The reference is the tree**: `lowlight`'s hast over the same grammars,
+  // flattened by §4a's rule as `code.ts` had it — a text node's slot is the
+  // innermost mapped class on its path, an unmapped class never dropped.
+  type Hast = Readonly<{ type: string; value?: string; properties?: Readonly<{ className?: readonly string[] | string }>; children?: readonly Hast[] }>;
+  const flatten = (node: Hast, inherited: string | null): Token[] => {
+    if (node.type === "text") return node.value === undefined || node.value === "" ? [] : [{ text: node.value, slot: inherited }];
+    const classes = node.properties?.className;
+    const list = typeof classes === "string" ? [classes] : (classes ?? []);
+    let here = inherited;
+    for (const name of list) { const mapped = SLOTS[name]; if (mapped !== undefined) here = mapped; }
+    const out: Token[] = [];
+    for (const child of node.children ?? []) out.push(...flatten(child, here));
+    return out;
+  };
+  // **A grammar with a sublanguage under a scoped mode**, because none of the
+  // sixteen has one (their `subLanguage` modes carry no scope) and the clause
+  // about a sublanguage's unslotted tokens taking the enclosing slot is
+  // unobservable without it: the JSON between `<<` and `>>` sits in a
+  // `string` scope, and its whitespace and colons — `null` in JSON's own run —
+  // read as `string` here.
+  const holding: LanguageFn = () => ({ contains: [{ scope: "string", begin: "<<", end: ">>", subLanguage: "json" }] });
+  const DOCUMENTS: Readonly<Record<string, readonly string[]>> = {
+    markdown: ["# h\n\n```js\nconst a = 1;\n```\n\ntext <b>bold</b> and `code`\n"],
+    xml: ['<html><style>.a { color: red; }</style><script>let x = 1; // c</script><p class="q">t</p></html>'],
+    javascript: ["const s = `a ${f(1)} b`; const h = html`<b>${x}</b>`; function g() {} // c"],
+    holding: ["k <<{\"a\": [1, true]}>> v", "<<>> <<1>>"],
+  };
+
+  it("T1.45 (C09 I71): over every default grammar's sample, a markdown document with a fenced block, an xml document with style and script bodies and a javascript template literal, tokenise's run equals lowlight's tree flattened by §4a's rule token for token, and a grammar registered after the first call tokenises on the next", () => {
+    // Every key of the table carries the prefix, which is what licenses looking
+    // up the first segment alone (I71).
+    expect(Object.keys(SLOTS).every((k) => k.startsWith("hljs-"))).toBe(true);
+    // ASCII throughout, so I64's cluster pass is the identity and the run is
+    // the emitter's own.
+    const corpus = [...Object.entries(SAMPLES).map(([l, s]) => [l, s] as const), ...Object.entries(DOCUMENTS).flatMap(([l, ds]) => ds.map((d) => [l, d] as const))];
+    for (const [, text] of corpus) expect(/^[\x00-\x7f]*$/u.test(text), "ASCII").toBe(true);
+
+    // The grammar arriving after the first call: `tokenise` has run for the
+    // default set (T3.32 above, and the first arm here), and `holding` is
+    // registered now, on both sides.
+    registerGrammar("holding", holding);
+    const reference = createLowlight({ ...GRAMMARS, holding });
+
+    let compared = 0;
+    for (const [language, text] of corpus) {
+      const ours = tokenise(text, language);
+      const theirs = flatten(reference.highlight(language, text) as Hast, null);
+      expect(ours, `${language}: ${JSON.stringify(text)}`).toEqual(theirs);
+      expect(ours.map((t) => t.text).join(""), "the run is the text").toBe(text);
+      compared += 1;
+    }
+    expect(compared).toBe(corpus.length);
+    // The clause the hand grammar exists for: an unslotted JSON token under the
+    // `string` scope reads as `string`, and the sublanguage's own slots hold.
+    const held = tokenise(DOCUMENTS["holding"]?.[0] ?? "", "holding");
+    // The delimiters, and JSON's two spaces — after the colon and the comma —
+    // which JSON's own run leaves unslotted; the colon itself is JSON's
+    // punctuation and keeps that.
+    expect(held.filter((t) => t.slot === "string").map((t) => t.text).join("")).toBe("<<  >>");
+    expect(held.some((t) => t.slot === "number"), "JSON's own number slot survives").toBe(true);
+    // A sample with two adjacent scopes, the boundary the merge mutation moves.
+    expect(tokenise("a: 1", "yaml").length).toBeGreaterThan(2); // cells-ok — a token count
+  });
+});
+
+describe("C09 I76 — the window seam takes the caller's scratch, and the form is held in it", () => {
+  it("T2.145 (C09 I76, F1191): a windowable block resolves once per width through one scratch — over the cap and within it — the seam hands `window` the same bare block both times, `render` touches the store not at all, another width resolves again, and a kind with no `window` leaves the store untouched", () => {
+    const measured: Block[] = [];
+    const windowed: Block[] = [];
+    const linesOf = (b: Block): readonly string[] => (b as unknown as { lines: readonly string[] }).lines;
+    const tall: BlockDefinition = {
+      kind: "tall",
+      measure: (b) => {
+        measured.push(b);
+        return linesOf(b).length; // cells-ok — a row count
+      },
+      render: (b) => inkRows(linesOf(b)),
+      window: (b, _w, from, to) => {
+        windowed.push(b);
+        return { block: { ...(b as object), lines: linesOf(b).slice(from, to) } as unknown as Block, skipRows: 0, dropRows: 0 };
+      },
+    };
+    const r = createBlockRegistry({ maxBlockRows: 10, onError: LOUD });
+    r.register(tall);
+    const events: string[] = [];
+    const probe: Probe = {
+      ...NO_PROBE,
+      hit: (cache) => void events.push(`hit:${cache}`),
+      miss: (cache, reason) => void events.push(`miss:${cache}:${reason}`),
+      on: true,
+    };
+    const scratch = new RenderScratchStore(probe);
+    const scratchEvents = (): readonly string[] => events.filter((e) => e.includes(":scratch"));
+
+    // **Over the cap.** Forty lines against a cap of ten: the form is the
+    // kind's own window to [0, cap) with the marker attached (§2b).
+    const big = { kind: "tall", id: "big", lines: Array.from({ length: 40 }, (_, i) => `l${String(i)}`) } as unknown as Block;
+    const on = (b: Block, list: readonly Block[]): number => list.filter((x) => x === b).length; // cells-ok — a call count
+    const first = r.windowSequence([big], 80, 0, 5, undefined, scratch);
+    expect(on(big, measured), "the whole block measured once to decide the cap").toBe(1);
+    expect(on(big, windowed), "and windowed once to the cap").toBe(1);
+    const handed = windowed.filter((b) => b !== big);
+    expect(handed, "the sequence windowed the form's bare block").toHaveLength(1);
+    expect(scratchEvents().some((e) => e.startsWith("miss:scratch")), "the first call missed the store").toBe(true);
+
+    const second = r.windowSequence([big], 80, 0, 5, undefined, scratch);
+    expect(second, "the same window").toEqual(first);
+    expect(on(big, measured), "the whole block measured no further time").toBe(1);
+    expect(on(big, windowed), "nor windowed to the cap again").toBe(1);
+    const handedAgain = windowed.filter((b) => b !== big);
+    expect(handedAgain, "the sequence windowed the bare block again").toHaveLength(2);
+    expect(handedAgain[1], "and it is the same object (I76)").toBe(handed[0]);
+    expect(scratchEvents().filter((e) => e === "hit:scratch").length, "a scratch hit on the second call").toBeGreaterThanOrEqual(1); // cells-ok — a count
+
+    // **`render` touches the store not at all** (I76): the block it is handed
+    // on the transcript path is the frame's slice, a new object every frame.
+    const scratchBefore = scratchEvents().length;
+    renderToLines(r, big, 80, { theme: DARK_THEME, capabilities: FULL_CAPS, tick: 0, scratch });
+    expect(scratchEvents().length, "render neither read nor wrote the store").toBe(scratchBefore);
+
+    // **Another width resolves again** — the width is the key. Relative to
+    // the count after the render, which measures as it always did (F942).
+    const beforeWidth = on(big, measured);
+    r.windowSequence([big], 40, 0, 5, undefined, scratch);
+    expect(on(big, measured), "a new width is a new form").toBe(beforeWidth + 1);
+    r.windowSequence([big], 40, 0, 5, undefined, scratch);
+    expect(on(big, measured), "and is held at that width").toBe(beforeWidth + 1);
+
+    // **Within the cap**, the form is the block itself and is held likewise:
+    // the whole-block measure that decided the cap is the cost either way.
+    // Through the session's memo too (I70), because `#measured` commits the
+    // height with a measure of its own (F942's second half) and that one is
+    // the memo's to answer — so the reading is *no further measure on the
+    // second call*, not a count of one.
+    const small = { kind: "tall", id: "small", lines: ["a", "b", "c", "d", "e"] } as unknown as Block;
+    const memo = new WeakMap<Block, Readonly<{ width: number; rows: number }>>();
+    r.windowSequence([small], 80, 0, 3, memo, scratch);
+    const afterFirstSmall = on(small, measured);
+    expect(afterFirstSmall, "the first call measured the block").toBeGreaterThanOrEqual(1);
+    r.windowSequence([small], 80, 0, 3, memo, scratch);
+    expect(on(small, measured), "a block within the cap resolved no further time").toBe(afterFirstSmall);
+
+    // **A kind with no `window`** has no form to hold and touches the store
+    // not at all. Its own kind, because `raw` divides (block-cap's `raw(n)`).
+    r.register({ kind: "atom", measure: () => 1, render: () => inkRows(["atom"]) });
+    const before = scratchEvents().length;
+    r.windowSequence([{ kind: "atom", id: "a" } as unknown as Block], 80, 0, 1, undefined, scratch);
+    expect(scratchEvents().length, "no scratch read or write for a kind with no window").toBe(before);
+
+    // **Without a scratch**, as before: every call resolves the form twice —
+    // once for the height (`#measureChild`), once for the window — which is
+    // the cost F1191 measured and the scratch removes.
+    const beforePlain = on(big, measured);
+    r.windowSequence([big], 80, 0, 5);
+    r.windowSequence([big], 80, 0, 5);
+    expect(on(big, measured), "two calls with no scratch, two whole-block measures each").toBe(beforePlain + 4);
   });
 });

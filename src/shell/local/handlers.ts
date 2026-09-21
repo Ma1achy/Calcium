@@ -18,11 +18,16 @@ import { block } from "../../data/viewmodel/index.js";
 import type { Block, LocalDocument } from "../../data/viewmodel/index.js";
 import type { TranscriptStore } from "../../viewport/transcript/index.js";
 import type { HistoryEntry } from "../../interaction/history/types.js";
+import { glyphs } from "../../presentation/blocks/index.js";
+import type { GlyphCaps } from "../../presentation/blocks/index.js";
 import type { ThemeStore } from "../../presentation/theme/index.js";
 import { b } from "../builders/index.js";
 import { blockId, compose, warnNotice } from "../documents.js";
-import { PANES } from "../profiling/panes.js";
-import type { PaneName } from "../profiling/panes.js";
+import { CARDS, SECTIONS, profileCard } from "../profiling/panes/index.js";
+import { ms } from "../profiling/panes/kit.js";
+import type { ProfileSection } from "../profiling/panes/index.js";
+import { TIER_RANK } from "../profiling/types.js";
+import type { CaptureResult, ProfileReport } from "../profiling/types.js";
 import type { ProfileView } from "../profile-view.js";
 import type { LocalHandler } from "./registry.js";
 import type { StopReason } from "../types.js";
@@ -61,20 +66,45 @@ export type HandlerDeps = Readonly<{
    * outside the round that wrote it (T1.64's second arm watched that).
    */
   profileView: ProfileView;
+  /**
+   * The report, for `/profile snapshot` and `/profile live` (C23 I69, amended).
+   *
+   * **A reader and not a profiler.** The two verbs put a card in the transcript
+   * and neither may raise the tier — a transcript part has no close, so a raise
+   * would pin the tier for the session and reset the ring doing it (C28 I50,
+   * I18). Handing over `() => ProfileReport | null` rather than the recorder is
+   * what makes `setTier` unreachable from here rather than merely unused.
+   *
+   * `null` when the session was built without `TuiConfig.profile`, which is the
+   * same state `profileView.open` refuses on.
+   */
+  profileReport: () => ProfileReport | null;
+  /**
+   * `/profile capture`'s one operation, `null` where no profiler exists
+   * (C28 I64).
+   *
+   * **A capability rather than the recorder**, so the verb cannot raise a tier
+   * even by mistake — the raise resets the ring (C28 I18), which turns *let me
+   * look* into *discard what I was watching*. The refusal below `deep` is read
+   * off the report's own `regime.tier` and nothing here can change it.
+   */
+  profileCapture: ((ms: number) => Promise<CaptureResult>) | null;
 }>;
 
-const isPane = (x: unknown): x is PaneName =>
-  typeof x === "string" && (PANES as readonly string[]).includes(x);
+const isSection = (x: unknown): x is ProfileSection =>
+  typeof x === "string" && (SECTIONS as readonly string[]).includes(x);
 
 /**
- * `/profile [pane]` — open C28's view (C23 I68, I69).
+ * `/profile [section]` — open C28's view (C23 I68, I69).
  *
- * **It appends a notice and never the report.** The panes are drawn in the
- * layer the view refreshes; a document holding them would freeze one report
- * into the transcript's record and read as current on every later frame, which
- * is I18's stale-data shape with the framework's own figures inside it.
+ * **It appends a notice and never the cards.** The deck is drawn in the layer
+ * the view refreshes; a document holding a report would freeze one reading into
+ * the transcript's record and read as current on every later frame, which is
+ * I18's stale-data shape with the framework's own figures inside it. The two
+ * verbs that *do* put a card in the transcript — `snapshot` and `live` — carry a
+ * stamp or a cadence for exactly that reason (C23 I69, amended).
  *
- * **The pane comes from `ctx.args`, never from `argv[0]`** (C22 I66), for
+ * **The section comes from `ctx.args`, never from `argv[0]`** (C22 I66), for
  * `/theme`'s reason: C05 parsed and enum-checked it, and a second reader of one
  * fact drifts from the first. `argv` is read on the failure arm alone — `args`
  * is empty there, because a local verb is not gated on validation — to quote
@@ -82,22 +112,230 @@ const isPane = (x: unknown): x is PaneName =>
  *
  * Every refusal is a document on this route rather than a throw (C23 I2): the
  * view's own strings for *no profiler* and *something is open*, and a usage
- * line for a pane that is not one of C28's four.
+ * line for a section that is not one of C28's three.
  */
-const profileHandler = (view: ProfileView): LocalHandler => (argv, ctx) => {
-  const wanted = ctx.args["pane"];
-  const pane: PaneName | null = isPane(wanted) ? wanted : argv.length === 0 ? "overview" : null;
-  if (pane === null) {
-    return doc("/profile", [
-      warnNotice(`usage: /profile [${PANES.join("|")}] — got \`${argv[0] ?? ""}\``, blockId("profile-usage")),
+/**
+ * The stamp (C23 I69, amended).
+ *
+ * **Four fields, and the reason each is there is that a reader a week later
+ * cannot work it out.** The frame range and the elapsed time say *when*; the
+ * tier says what was being recorded, because a figure at `counters` is a count
+ * and not a duration; and the ring's reset point says how far back the window
+ * reaches, since a raise resets it (C28 I18) and a percentile over a reset ring
+ * describes the time since, not the session.
+ *
+ * A stamp claims the opposite of current on its own face, forever, which is the
+ * property I69's first form tried to get by forbidding the document.
+ */
+const sepOf = (caps: GlyphCaps): string => ` ${glyphs(caps).separator} `;
+
+const stampOf = (r: ProfileReport, card: string, caps: GlyphCaps): string => {
+  const frames = `${String(r.frames)} frames`;
+  const dropped = r.dropped.frames > 0 ? `, ${String(r.dropped.frames)} past the ring` : "";
+  const elapsed = `${(r.regime.durationMs / 1000).toFixed(1)} s`;
+  const reset = r.regime.ringReset > 0
+    ? `ring reset ${(r.regime.ringReset / 1000).toFixed(1)} s in`
+    : "ring never reset";
+  // **The separator is resolved, never written** (C09 I49, F828). A title is a
+  // head measured in cells, and `·` is ambiguous-width — T2.116 caught the
+  // literal here, which is the rule doing exactly what it is for.
+  const sep = sepOf(caps);
+  return [
+    card,
+    `${frames}${dropped}`,
+    `captured ${elapsed}`,
+    `tier ${r.regime.tier}`,
+    reset,
+  ].join(sep);
+};
+
+/** How often a live card refetches — the view's cadence, for the view's reasons. */
+const LIVE_EVERY_MS = 1000;
+
+/**
+ * The rows a snapshot card is drawn at.
+ *
+ * **A figure and not the region**, which is the whole of why the verb exists:
+ * the overlay is one screen and does not scroll, so an icicle of a 47 ms frame
+ * is cramped there and right in scrollback, where it can be scrolled past and
+ * compared with the next one. `ctx.height` is the *viewport's* height and would
+ * reproduce the cramping in the one place that is not bound by it.
+ *
+ * The width is `ctx.width` — that one is a real constraint, and a card drawn
+ * wider than the transcript wraps (C01's width rule, the direction that
+ * corrupts).
+ */
+const SNAPSHOT_ROWS = 32;
+
+/**
+ * The card a document verb draws, named or defaulted.
+ *
+ * **The verdict rather than whatever the view is showing**, and the difference
+ * matters: the prompt takes no keys while a view is top (C16 §3), so a reader
+ * who has walked to `frame on a clock` has to close the view before they can
+ * type `/profile snapshot` — and by then there is no open card to mean. The
+ * card is named on the line or it is the verdict.
+ */
+const cardFor = (wanted: unknown): string =>
+  typeof wanted === "string" && CARDS.some((c) => c.id === wanted) ? wanted : "verdict";
+
+/**
+ * How long `/profile capture` samples for, and what a reader may ask instead.
+ *
+ * **400 ms rather than a second**, because a capture blocks the prompt and the
+ * route shows a stall notice past its own threshold: a window long enough to
+ * hold a few hundred samples at V8's 100 µs interval, and short enough that
+ * pressing it does not read as a hang. The bounds are the honest ones — under
+ * 50 ms a window holds too few samples to be a distribution, and over 10 s the
+ * profile is large enough that the cap starts deciding what it holds.
+ */
+const CAPTURE_MS = 400;
+const CAPTURE_MIN = 50;
+const CAPTURE_MAX = 10_000;
+
+const profileHandler =
+  (view: ProfileView, report: () => ProfileReport | null,
+   take: ((ms: number) => Promise<CaptureResult>) | null): LocalHandler =>
+  async (argv, ctx) => {
+  const wanted = ctx.args["section"];
+  const card = cardFor(ctx.args["card"]);
+
+  // --- the capture verb (C28 I64) --------------------------------------------
+  if (wanted === "capture") {
+    const r = report();
+    if (r === null || take === null) {
+      return doc("/profile capture", [
+        warnNotice(
+          "no profiler to capture with — this session was built without `TuiConfig.profile`",
+          blockId("profile-refused"),
+        ),
+      ]);
+    }
+    // **It names the tier and does not take it** (C28 I64, I18). The inspector
+    // exists only at `deep`, and a verb that raised the tier to get one would
+    // reset the ring the reader has been watching — so the refusal is the
+    // whole of the arm, and the sentence says what to change rather than what
+    // went wrong.
+    if (TIER_RANK[r.regime.tier] < TIER_RANK.deep) {
+      return doc("/profile capture", [
+        warnNotice(
+          `a CPU capture needs tier \`deep\` and this session is at \`${r.regime.tier}\` — ` +
+            "set `profile: { tier: \"deep\" }` and restart; raising it from here would reset " +
+            "the ring every figure on the deck is drawn from (C28 I18)",
+          blockId("profile-capture-tier"),
+        ),
+      ]);
+    }
+    const asked = Number(ctx.args["card"] ?? CAPTURE_MS);
+    const window = Number.isFinite(asked)
+      ? Math.min(CAPTURE_MAX, Math.max(CAPTURE_MIN, asked))
+      : CAPTURE_MS;
+    const result = await take(window);
+    const stacks = result.stacks;
+    const sep = sepOf(ctx.capabilities);
+    if (stacks === null) {
+      return doc("/profile capture", [
+        warnNotice(
+          `nothing was sampled in ${String(window)} ms${sep}the process was idle for the ` +
+            `whole window, or every sample fell in a synthetic frame${sep}${result.path}`,
+          blockId("profile-capture-empty"),
+        ),
+      ]);
+    }
+    const idle = Object.values(stacks.excluded).reduce((n: number, us: number) => n + us, 0);
+    // **The measured window, not the asked one.** `setTimeout(r, ms)` is a
+    // floor, and V8's `timeDeltas` describe what actually elapsed: measured at
+    // 700 asked against 710.6 sampled on an idle process, and **839 against the
+    // same 700 under the running TUI**. Printing the ask beside shares of the
+    // real window put two incommensurable figures in one sentence, and read on
+    // the frame as 140 + 699 of 700.
+    return doc("/profile capture", [
+      b.notice(
+        "info",
+        `captured over ${ms(result.durationMs)} ms${sep}${ms(stacks.root.total / 1000)} ms on the stack` +
+          `${sep}${ms(idle / 1000)} ms in synthetic frames${sep}${result.path}` +
+          `${sep}\`/profile framework\` and walk to \`sampled-stacks\``,
+        undefined,
+        { id: blockId("profile-capture") },
+      ),
     ]);
   }
-  const refused = view.open(pane);
+
+  // --- the two document verbs (C23 I69, amended) -----------------------------
+  if (wanted === "snapshot" || wanted === "live") {
+    const r = report();
+    if (r === null) {
+      return doc("/profile", [
+        warnNotice(
+          "no profiler to show — this session was built without `TuiConfig.profile`",
+          blockId("profile-refused"),
+        ),
+      ]);
+    }
+    if (wanted === "snapshot") {
+      // **One-shot and stamped**, which is the pair: the document is a reading
+      // taken at a moment and it says which moment on its own title.
+      return doc("/profile snapshot", [
+        b.panel(stampOf(r, card, ctx.capabilities), [...profileCard(r, card, { w: ctx.width, rows: SNAPSHOT_ROWS }, ctx.capabilities)], {
+          id: blockId("profile-snapshot"),
+        }),
+      ]);
+    }
+    // **Live and unstamped**, which is the other half: a part that refetches is
+    // current because it is refreshed, so a stamp on it would be a second claim
+    // about the same fact and the two would disagree between ticks.
+    //
+    // **It calls no `setTier`** — there is no recorder here to call it on. At a
+    // tier below `spans` it draws C28's own notice rather than silently turning
+    // the profiler on behind the reader, which is what makes the rule honest
+    // rather than merely observed.
+    return doc("/profile live", [
+      b.live({
+        id: blockId("profile-live"),
+        // The same resolved separator as the stamp's (C09 I49) — a title is a
+        // head, whichever verb composed it.
+        title: `${card}${sepOf(ctx.capabilities)}live`,
+        every: LIVE_EVERY_MS,
+        fetch: () => Promise.resolve(report()),
+        render: (data, pctx) => {
+          const now = (data as ProfileReport | null) ?? r;
+          if (TIER_RANK[now.regime.tier] < TIER_RANK.spans) {
+            return b.notice(
+              "warn",
+              `the tier is \`${now.regime.tier}\` and a live card never raises it — ` +
+                "open `/profile` to watch the deck, which raises to `spans` while it is open " +
+                "and restores the tier on close (C28 I50)",
+              undefined,
+              { id: `${blockId("profile-live")}-tier` },
+            );
+          }
+          const rows = pctx.height ?? 24;
+          const only = profileCard(now, card, { w: pctx.width, rows }, pctx.capabilities)[0];
+          return only ?? b.notice("warn", `no card \`${card}\``, undefined, { id: `${blockId("profile-live")}-gone` });
+        },
+      }),
+    ]);
+  }
+
+  const section: ProfileSection | null = isSection(wanted)
+    ? wanted
+    : argv.length === 0
+      ? "verdict"
+      : null;
+  if (section === null) {
+    return doc("/profile", [
+      warnNotice(
+        `usage: /profile [${SECTIONS.join("|")}|snapshot|live|capture] [card] — got \`${argv[0] ?? ""}\``,
+        blockId("profile-usage"),
+      ),
+    ]);
+  }
+  const refused = view.open(section);
   if (refused !== null) {
     return doc("/profile", [warnNotice(refused, blockId("profile-refused"))]);
   }
   return doc("/profile", [
-    b.notice("muted", `profiler: ${pane}`, undefined, { id: blockId("profile") }),
+    b.notice("muted", `profiler: ${section}`, undefined, { id: blockId("profile") }),
   ]);
 };
 
@@ -186,7 +424,7 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
         block({
           kind: "keyValue",
           id: blockId("help-shell"),
-          gapBefore: true,
+          padding: { t: 1 },
           rows: shell.map((t) => ({ label: `/${t.name}`, value: t.summary })),
         }),
         // **A pointer, not the payload.** One line naming the other question,
@@ -194,7 +432,7 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
         block({
           kind: "tip",
           id: blockId("help-more"),
-          gapBefore: true,
+          padding: { t: 1 },
           text: "/help keys",
           actions: [{ kind: "fill", label: "Use", command: "/help keys" }],
         }),
@@ -336,7 +574,7 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
         }),
       ];
       if (m.stderr !== "") {
-        blocks.push(block({ kind: "raw", id: blockId("debug-stderr"), gapBefore: true, text: m.stderr }));
+        blocks.push(block({ kind: "raw", id: blockId("debug-stderr"), padding: { t: 1 }, text: m.stderr }));
       }
       return doc("/debug", blocks);
     },
@@ -350,6 +588,6 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
     },
 
     // The seventh (C23 §2, I68).
-    profile: profileHandler(deps.profileView),
+    profile: profileHandler(deps.profileView, deps.profileReport, deps.profileCapture),
   };
 }

@@ -20,13 +20,12 @@
  * drift that shows only once a child wraps.
  */
 import { NO_SPAN } from "../../data/viewmodel/index.js";
-import { Box, Text } from "ink";
-import { createElement, type ReactElement } from "react";
 import { atLeastOne, insetWidth, normaliseWidth, sequenceHeight } from "../../data/viewmodel/index.js";
 import type { Block, MeasureFn, Table, TableRow } from "../../data/viewmodel/index.js";
 import { cells } from "../text.js";
+import { fitRow } from "../rows.js";
 import { clampSpans, paint, selectionStyle, tone, type Span } from "../blocks/paint.js";
-import type { BlockDefinition, NavElement, RenderContext, Windowed } from "../blocks/types.js";
+import type { BlockDefinition, NavElement, Rendered, RenderContext, Windowed } from "../blocks/types.js";
 import { emptySpans, headerSpans, markedSeriesColumns, rowSpans } from "./cells.js";
 import { detailBlocks, isExpandable } from "./detail.js";
 import { planColumns } from "./plan.js";
@@ -247,7 +246,7 @@ export const tableDefinition: BlockDefinition<Table> = {
     });
   },
 
-  render(block: Table, ctx: RenderContext): ReactElement {
+  render(block: Table, ctx: RenderContext): Rendered {
     const width = normaliseWidth(ctx.width);
     const probe = ctx.probe;
     // **Rows and columns separately, because they are different failures.** A
@@ -279,27 +278,19 @@ export const tableDefinition: BlockDefinition<Table> = {
     const washed = (spans: readonly Span[]): readonly Span[] =>
       spans.map((s) => ({ ...s, style: { ...(s.style ?? {}), ...wash } }));
 
-    const lines: ReactElement[] = [];
+    // **Every part is a row** (C09 I73). There was a `finishTable` here that
+    // answered rows when they all were and lifted them into a column of `Text`
+    // when one was not; a detail child is the only part that could be the
+    // second, and since F1209 it cannot be.
+    const parts: string[] = [];
 
     if (hasHeader(block)) {
-      lines.push(
-        createElement(
-          Text,
-          { key: "header" },
-          textOf(paint(clampSpans(headerSpans(block, plan, ctx), width, ctx.capabilities))),
-        ),
-      );
+      parts.push(paint(clampSpans(headerSpans(block, plan, ctx), width, ctx.capabilities)));
     }
 
     if (!hasBody(block)) {
-      lines.push(
-        createElement(
-          Text,
-          { key: "empty" },
-          textOf(paint(clampSpans(emptySpans(block, width, ctx), width, ctx.capabilities))),
-        ),
-      );
-      return createElement(Box, { flexDirection: "column", width }, lines);
+      parts.push(paint(clampSpans(emptySpans(block, width, ctx), width, ctx.capabilities)));
+      return parts;
     }
 
     // Sorting is a permutation, so this changes the order of what follows and
@@ -328,9 +319,7 @@ export const tableDefinition: BlockDefinition<Table> = {
         ctx.capabilities,
       );
 
-      lines.push(
-        createElement(Text, { key: `row-${row.id}` }, textOf(paint(isSelected ? washed(spans) : spans))),
-      );
+      parts.push(paint(isSelected ? washed(spans) : spans));
 
       if (row.expanded !== true) continue;
       // **A count, not a span.** Each detail child goes through `renderChild`,
@@ -343,27 +332,17 @@ export const tableDefinition: BlockDefinition<Table> = {
       // Indented by two cells, and the children are rendered at the width they
       // were *measured* at. `paddingLeft` plus a `width` of the whole leaves a
       // content box of exactly `insetWidth`, so the two halves see one number.
-      lines.push(
-        createElement(
-          Box,
-          {
-            key: `detail-${row.id}`,
-            flexDirection: "column",
-            width,
-            paddingLeft: width - insetWidth(width),
-          },
-          detailBlocks(block, row, plan, ctx.capabilities).flatMap((child, index) => {
-            const drawn = createElement(
-              Box,
-              { key: child.id === "" ? String(index) : child.id },
-              ctx.renderChild(child, insetWidth(width)),
-            );
-            return child.gapBefore === true
-              ? [createElement(Text, { key: `gap-${index}` }, " "), drawn]
-              : [drawn];
-          }),
-        ),
-      );
+      // **The detail's rows padded left by the inset** (C09 I73), one part per
+      // row; a child that answers an element is its padded box, as before.
+      const inset = width - insetWidth(width);
+      const pad = " ".repeat(inset);
+      detailBlocks(block, row, plan, ctx.capabilities).forEach((child) => {
+        // **Cut to the width** (F1211): a detail child answering a row wider
+        // than its inset used to become a padded Ink box, which wrapped.
+        for (const line of ctx.renderChild(child, insetWidth(width))) {
+          parts.push(line === "" ? "" : fitRow(pad + line, width));
+        }
+      });
     }
 
     // **The action bar** (I17, §5). Present because the data says so; empty
@@ -373,39 +352,19 @@ export const tableDefinition: BlockDefinition<Table> = {
     if (hasActionBar(block)) {
       const row = focused === null ? undefined : block.rows.find((r) => r.id === focused);
       const labels = (row?.actions ?? []).map((a) => a.label).join("   ");
-      lines.push(createElement(Text, { key: "actions-gap" }, " "));
-      lines.push(
-        createElement(
-          Text,
-          { key: "actions" },
-          textOf(
-            paint(
-              clampSpans(
-                [{ text: labels, style: tone("meta", ctx.theme, ctx.capabilities) }],
-                width,
-                ctx.capabilities,
-              ),
-            ),
-          ),
+      parts.push("");
+      parts.push(
+        paint(
+          clampSpans([{ text: labels, style: tone("meta", ctx.theme, ctx.capabilities) }], width, ctx.capabilities),
         ),
       );
     }
 
-    return createElement(Box, { flexDirection: "column", width }, lines);
+    return parts;
   },
 };
 
-/**
- * A painted row, or a space.
- *
- * Ink drops an empty `Text`, so a blank row measured and not drawn is a
- * disagreement of one — `paint.ts`'s `rows()` handles this for the kinds that
- * emit a flat list of strings, and a table interleaves rows with detail boxes, so
- * it applies the same floor itself.
- */
-function textOf(line: string): string {
-  return line === "" ? " " : line;
-}
+
 
 /**
  * C26 §5 — what a table offers to keyboard and pointer, from one declaration.

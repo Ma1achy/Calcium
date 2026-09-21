@@ -16,7 +16,7 @@
  * list tightness, lazy continuation and entity handling are **out by name**, not
  * by omission — a reader who finds one of them unhandled is looking at a
  * decision rather than at a gap. That is the whole reason there is no
- * dependency: `lowlight` was taken because a lexer per language is a large
+ * dependency: `highlight.js` was taken because a lexer per language is a large
  * domain where rendering is incidental, and this subset is neither large nor
  * open.
  *

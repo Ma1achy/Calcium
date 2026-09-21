@@ -1,0 +1,4 @@
+head
+row 0
+row 1
+[38;2;138;138;138m⋯ 0 above, 10 below[39m

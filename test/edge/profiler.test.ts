@@ -22,7 +22,7 @@ import { describe, expect, it } from "vitest";
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
 import { toNdjson } from "../../src/shell/profiling/export.js";
 import { createResourceProbe } from "../../src/shell/profiling/node.js";
-import { profilePane } from "../../src/shell/profiling/panes.js";
+import { deckText } from "../support/profile.js";
 import type { ProfileReport, ResourceSample, Tier } from "../../src/shell/profiling/types.js";
 
 /**
@@ -156,32 +156,29 @@ describe("C28 — profiler, tier 3 spec-first rows", () => {
       // count is what separates a floor from an absence, and it is zero here for
       // the same reason the figures are — no window has passed.
       expect(s.loopDelaySamples, "no window, so no samples").toBe(0);
-      const empty = JSON.stringify(profilePane(reportWith([s]), "memory"));
-      // **The label and its value together, because the notice is on two rows.**
-      // The first draft read `toContain("— no window sampled yet")` and survived
-      // deleting the maximum's own branch: the p50's copy of the notice
-      // satisfied it. An assertion over a pane's whole text is a proxy for the
-      // row it means, and two rows carrying one sentence is where the proxy
-      // parts company with its subject.
-      expect(empty, "the maximum is the absence and not a figure").toContain(
-        '{"label":"loop delay max","value":"— no window sampled yet"}',
+      const empty = deckText(reportWith([s]));
+      // **The absence, in the footer every loop card carries** (C28 I13). The
+      // panes this replaces put the sentence in two `keyValue` rows and the
+      // first draft of this row was satisfied by either of them; the deck states
+      // it once, generated from the register, so there is one place for it to be
+      // and one place for it to go missing (F1137).
+      expect(empty, "no window sampled is an absence and not a figure").toContain(
+        "loop delay : no window sampled yet",
       );
-      expect(empty, "and the p50 says so too, with the resolution").toContain(
-        '{"label":"loop delay p50","value":"— no window sampled yet, at resolution 10 ms"}',
+      expect(empty, "and no resolution is quoted over a figure nobody took").not.toContain(
+        "at resolution 10 ms",
       );
 
       // **And the control, which has to be a sample that did have a window.**
-      // Without it the assertion above is satisfied by a pane that never prints
-      // a maximum at all, which is the same green for the opposite defect.
+      // Without it the assertion above is satisfied by a deck that never
+      // mentions the loop at all, which is the same green for the opposite
+      // defect.
       const measured = { ...s, loopDelaySamples: 4, loopDelayMax: 12.5, loopDelayP50: 0.5 };
-      const drawn = JSON.stringify(profilePane(reportWith([measured]), "memory"));
-      expect(drawn, "a measured maximum is the figure").toContain(
-        '{"label":"loop delay max","value":"12.5 ms"}',
+      const drawn = deckText(reportWith([measured]));
+      expect(drawn, "the figure carries its floor").toContain(
+        "loop delay at resolution 10 ms : a figure under it is a floor, not a reading",
       );
-      expect(drawn, "the p50 is the figure and its floor").toContain(
-        '"loop delay p50","value":"0.50 ms at resolution 10 ms — a floor, not a reading"',
-      );
-      expect(drawn, "and no row claims an absence").not.toContain("— no window sampled yet");
+      expect(drawn, "and nothing claims an absence").not.toContain("no window sampled yet");
     } finally {
       probe.dispose();
     }
@@ -285,6 +282,7 @@ describe("C28 — profiler, tier 3 spec-first rows", () => {
               droppedBytes: 0,
               durationMs: 1,
               abandoned: false,
+              stacks: null,
             }),
           dispose: () => undefined,
         },
@@ -528,22 +526,25 @@ describe("C28 — profiler, tier 3 spec-first rows", () => {
       // **The headline skips it.** With a suspended sample newest, the figures
       // must still come from the last running one; the series may hold both,
       // and the caption has to say the series is not continuous.
-      const mixed = JSON.stringify(profilePane(reportWith([running, paused]), "memory"));
-      expect(mixed, "the pane says how many were suspended").toContain("1 of them suspended");
+      const mixed = deckText(reportWith([running, paused]));
+      expect(mixed, "the card says how many were suspended").toContain("1 of 2 suspended");
       expect(mixed, "and why that matters to the series").toContain("not continuous");
 
       // **Every sample suspended is a refusal, not a drawing.** There is no
       // reading of a running process to headline, and a pane that fell back to
       // the newest sample anyway would present a stopped clock as the answer.
-      const allPaused = JSON.stringify(profilePane(reportWith([paused, paused]), "memory"));
-      expect(allPaused, "it refuses").toContain("no reading of a running process");
-      expect(allPaused, "and draws no series").not.toContain("me-heap");
+      const allPaused = deckText(reportWith([paused, paused]));
+      expect(allPaused, "it refuses").toContain("no sample of a running process");
+      expect(allPaused, "and draws no series").not.toContain("mem-area");
 
-      // The control: with nothing suspended the pane is unchanged — a guard
-      // that qualified every report would satisfy both arms above.
-      const clean = JSON.stringify(profilePane(reportWith([running, running]), "memory"));
-      expect(clean, "no suspension, no caveat").not.toContain("suspended");
-      expect(clean, "and the series is drawn").toContain("me-heap");
+      // The control: with nothing suspended the deck is unchanged — a guard that
+      // qualified every report would satisfy both arms above. **On the clause
+      // rather than on the word**: the utilisation card draws a series *labelled*
+      // `suspended`, so a `not.toContain("suspended")` here is a control that
+      // fails for a reason that has nothing to do with the caveat (F1137).
+      const clean = deckText(reportWith([running, running]));
+      expect(clean, "no suspension, no caveat").not.toContain("the series is not continuous");
+      expect(clean, "and the series is drawn").toContain("mem-area");
     } finally {
       probe.dispose();
     }

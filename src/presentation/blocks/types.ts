@@ -5,7 +5,16 @@
  * implementations that satisfy it and the registry that pairs each with a
  * renderer (C09 §1).
  */
-import type { ReactElement } from "react";
+
+/**
+ * What a renderer answers (I72): the block's rows at the width, each already
+ * clamped by `paint`, or an Ink element for a kind that composes a tree. Rows
+ * are the frame's rows once `normaliseRow` has put them in the form Ink's
+ * output layer writes; an element takes the Ink path unchanged. Every kind
+ * that ends in `rows()` answers rows, and a sequence is composed block by
+ * block, so a rows block beside an element block pays nothing for its neighbour.
+ */
+export type Rendered = readonly string[];
 import type { Action, Block, BlockKind, Camera, Measure, MeasureFn, Probe, WidthFn } from "../../data/viewmodel/index.js";
 import type { ResolvedTheme } from "../theme/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
@@ -257,7 +266,8 @@ export type RenderContext = Readonly<{
   measureChild: MeasureFn;
   /** The registry's `width` (§2c) — a container asks a child's content width through this and never imports the registry. */
   widthChild: WidthFn;
-  renderChild: (block: Block, width: number) => ReactElement;
+  /** The registry's `render` of a child (I72): rows, or an element — `elementOf` lifts either into a container's tree. */
+  renderChild: (block: Block, width: number) => Rendered;
   /**
    * The registry's slice of a child, or `null` when it cannot take one (I58, §6b).
    *
@@ -488,7 +498,7 @@ export type AnyBlockDefinition = {
 export interface BlockDefinition<B extends Block = Block> {
   kind: string;
   measure: Measure<B>;
-  render: (block: B, ctx: RenderContext) => ReactElement;
+  render: (block: B, ctx: RenderContext) => Rendered;
   /**
    * A valid smaller block covering rows `[from, to)` of this one (I25, I26).
    *
@@ -513,6 +523,14 @@ export interface BlockDefinition<B extends Block = Block> {
     from: number,
     to: number,
     measureChild: MeasureFn,
+    /**
+     * The caller's scratch, through the seam (I76, F1191). A kind whose window
+     * derives something from the block and the width alone — C25's plan — may
+     * hold it here, keyed on the block's own payload, and read it back on the
+     * next window over the same object; the registry hands the same store
+     * `RenderContext.scratch` carries. Absent when the caller holds nothing.
+     */
+    scratch?: RenderScratch,
   ) => Windowed;
   /**
    * What this block offers to keyboard and pointer (C26 §5, I3).
@@ -560,16 +578,34 @@ export interface BlockDefinition<B extends Block = Block> {
   keymap?: (block: B) => readonly BlockKeyBinding[];
 }
 
+/**
+ * A measure memo a caller owns and the registry reads and writes as its own
+ * (I70).
+ *
+ * The shape of the registry's per-call memo — `get` and `set` by block
+ * identity, the width in the value — and nothing more, so a `Map` and a
+ * `WeakMap` both satisfy it. Sound on identity alone: a block is frozen (C04
+ * I1) and replaced on any change (C23 I34), an answer is held for one width and
+ * any other misses through, and geometry moves with neither theme nor
+ * capabilities nor tick. The registry keeps no reference past the call; the
+ * owner is L4, for the life of the session (C22 I100).
+ */
+export interface MeasureMemo {
+  get(block: Block): Readonly<{ width: number; rows: number }> | undefined;
+  set(block: Block, held: Readonly<{ width: number; rows: number }>): unknown;
+}
+
 export interface BlockRegistry {
   register(definition: AnyBlockDefinition): void;
   get(kind: string): BlockDefinition | undefined;
   seal(): void;
-  measure(block: Block, width: number): number;
+  /** `memo` — a caller-owned memo that is this call's, read and written as the registry's own (I70). */
+  measure(block: Block, width: number, memo?: MeasureMemo): number;
   /** §2c — a block's content width at `width`, clamped to `[1, width]`; the width itself for a kind declaring none (I42). */
   width(block: Block, width: number): number;
-  render(block: Block, ctx: RenderContextInput): ReactElement;
+  render(block: Block, ctx: RenderContextInput): Rendered;
   /** A run of blocks laid out down the screen, `gapBefore` included (C04 §3a). */
-  measureSequence(blocks: readonly Block[], width: number): number;
+  measureSequence(blocks: readonly Block[], width: number, memo?: MeasureMemo): number;
   /**
    * What one block offers to keyboard and pointer; `[]` for an atomic kind
    * (C26 §5). `measureChild` is supplied here, never by the caller.
@@ -600,6 +636,9 @@ export interface BlockRegistry {
     width: number,
     from: number,
     to: number,
+    memo?: MeasureMemo,
+    /** The caller's scratch, handed to each kind's `window` and holding each form (I76). */
+    scratch?: RenderScratch,
   ): Readonly<{ blocks: readonly Block[]; skipRows: number }>;
   /**
    * One block's slice, for a container that bounds its own rows (I58, §6b).
@@ -612,7 +651,6 @@ export interface BlockRegistry {
    * causes.
    */
   windowChild(block: Block, width: number, from: number, to: number): Windowed | null;
-  renderSequence(blocks: readonly Block[], ctx: RenderContextInput): ReactElement;
   readonly kinds: readonly string[];
   readonly sealed: boolean;
 }

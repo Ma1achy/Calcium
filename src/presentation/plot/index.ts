@@ -29,4 +29,17 @@ export { valueBar } from "./bar.js";
  * arithmetic — `region − reserve`, floored at 1, and what to do when the region
  * is `null` — to be re-derived by every surface that wants a plot to fill.
  */
-export { fillHeight } from "./height.js";
+export { fillHeight, plotHeight } from "./height.js";
+/**
+ * The inverse of `fillHeight`, and published with it for that reason (F1133).
+ *
+ * `fillHeight` answers *what height should I ask for*; nothing answered *how
+ * tall will the block then be*, and the two are not the same number — every
+ * `axes: true` form spends three more rows on the lid, the axis rule and the
+ * x-labels, and several forms ignore `height` altogether. A caller choosing a
+ * height from a region could therefore ask for exactly the region and overflow
+ * it by its form's furniture, every time, with nothing on either side of the
+ * seam able to say so. Measured at 35 rows in a 32-row region across nineteen
+ * of C28's cards before this was exported.
+ */
+export type { PlotGeometry } from "./height.js";

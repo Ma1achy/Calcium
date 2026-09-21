@@ -158,8 +158,8 @@ export function cells(text: string, ambiguous: AmbiguousWidth = "narrow"): numbe
       i = run;
       continue;
     }
-    segments ??= GRAPHEMES.segment(clean);
-    const cluster = clusterAt(segments, i);
+    // **A unit of the rasterised alphabets is taken without asking** (I74).
+    const cluster = soloAt(clean, i) ? clean.charAt(i) : clusterAt((segments ??= GRAPHEMES.segment(clean)), i);
     if (cluster === "") break;
     total += clusterCells(cluster, ambiguous);
     i += cluster.length;   // cells-ok: advancing the cursor past what was consumed
@@ -207,6 +207,38 @@ function plainRun(text: string, i: number): number {
  * escape inside a cluster in the first place, which makes this a corner and
  * not a path.
  */
+/**
+ * A code unit of the rasterised alphabets — `CELL_PER_UNIT_RANGES` — which is
+ * a cluster of its own unless the unit after it can extend it (C09 I74). Read
+ * by the rows arm's `swallowed` too: after an SGR's `m`, one of these cannot
+ * have joined the `m`.
+ */
+const CC_CR = 0x0d;
+
+export function soloUnit(c: number): boolean {
+  return inRanges(c, CELL_PER_UNIT_RANGES);
+}
+
+/**
+ * Whether the unit at `i` is a whole cluster on its own, decided from the next
+ * unit and never from the segmenter (C09 I74, F1177, F1178). By UAX #29 a
+ * character that is not Hangul, a Prepend, a regional indicator or the joiner
+ * is followed by a boundary unless the next unit is Extend, ZWJ or SpacingMark
+ * — and no unit below U+0300 is any of those seven (Extend begins at U+0300,
+ * the joiner is U+200D, the first Prepend is U+0600), nor is any unit of the
+ * table. **The one exception below U+0300 is the carriage return**, which a
+ * line feed joins (GB3), so it always goes to the segmenter. A plot row is
+ * eighty table units and no ASCII, and a notice is ASCII prose the wrap
+ * segmented whole: every one of those units went to the segmenter for a
+ * segment record before this.
+ */
+function soloAt(text: string, i: number): boolean {
+  const c = text.charCodeAt(i);
+  if (c >= 0x300 ? !soloUnit(c) : c === CC_CR) return false;
+  const n = text.charCodeAt(i + 1);
+  return Number.isNaN(n) || n < 0x300 || soloUnit(n);
+}
+
 function clusterAt(segments: Segments, i: number): string {
   const found = segments.containing(i);
   if (found === undefined) return "";
@@ -283,6 +315,20 @@ export function displayCells(text: string, ambiguous: AmbiguousWidth = "narrow")
         continue;
       }
     }
+    // **A unit of the rasterised alphabets, at `narrow`** (I77, F1202). The set
+    // `rowCells` admits as a checked claim — one cell per unit, T1.40 — taken
+    // in the same pass, so a plot row measures without the stripped copy and
+    // the second walk it paid for at the first braille unit: 13 µs a row
+    // against one or two, on every row of every frame the guard re-measures.
+    // No next-unit test here, and one could not be violated: an extender is
+    // itself a unit of no kind the scan takes, and the line below answers the
+    // whole row through the cluster walk — a unit before a selector is two
+    // cells there, as it always was.
+    if (ambiguous === "narrow" && soloUnit(c)) {
+      total += 1;
+      i += 1;
+      continue;
+    }
     return cells(text.replace(sgrPattern(), ""), ambiguous);
   }
   return total;
@@ -338,7 +384,16 @@ export function fitStyled(
   reset: string,
   ambiguous: AmbiguousWidth = "narrow",
 ): string {
-  if (displayCells(text, ambiguous) === width) return text;
+  const measured = displayCells(text, ambiguous);
+  if (measured === width) return text;
+  // **A short row is padded, not walked** (I78, F1204). The walk below cannot
+  // change a row it does not cut — every escape, run and cluster is copied
+  // through whole — and its `used` is the measurer's count (I63, T1.39), so
+  // its answer on a short row is the row and the shortfall in blanks. It
+  // walked every such row anyway, 16 µs against one, on nearly every row of
+  // every frame of prose, code and patch. The pad is the measure's; the walk
+  // is the cut path's alone.
+  if (measured < width) return text + " ".repeat(width - measured);
 
   const sgr = sgrAt();
   let segments: Segments | null = null;
@@ -382,8 +437,7 @@ export function fitStyled(
     }
 
     // One cluster, whole or not at all (I9, I63).
-    segments ??= GRAPHEMES.segment(text);
-    const cluster = clusterAt(segments, i);
+    const cluster = soloAt(text, i) ? text.charAt(i) : clusterAt((segments ??= GRAPHEMES.segment(text)), i); // C09 I74
     if (cluster === "") break;
     const w = pieceCells(cluster, c, ambiguous);
     if (used + w > width) {
@@ -498,8 +552,7 @@ export function sliceCells(
       continue;
     }
 
-    segments ??= GRAPHEMES.segment(text);
-    const cluster = clusterAt(segments, i);
+    const cluster = soloAt(text, i) ? text.charAt(i) : clusterAt((segments ??= GRAPHEMES.segment(text)), i); // C09 I74
     if (cluster === "") break;
     const w = pieceCells(cluster, c, ambiguous);
 
@@ -558,7 +611,13 @@ export function sliceCells(
  */
 export function graphemes(text: string): readonly string[] {
   const out: string[] = [];
-  for (const { segment } of GRAPHEMES.segment(text)) out.push(segment);
+  let segments: Segments | null = null;
+  for (let i = 0; i < text.length; ) { // cells-ok — a code-unit cursor
+    const segment = soloAt(text, i) ? text.charAt(i) : clusterAt((segments ??= GRAPHEMES.segment(text)), i); // C09 I74
+    if (segment === "") break;
+    out.push(segment);
+    i += segment.length; // cells-ok — past the cluster
+  }
   return out;
 }
 
@@ -700,17 +759,7 @@ export function truncate(
   // than two implementations: a second pass over the same grapheme stream would
   // round differently at the boundary in exactly the CJK and ZWJ cases this
   // module exists for (C09 I9).
-  const clusters = [...GRAPHEMES.segment(clean)].map((s) => s.segment);
-  const order = from === "start" ? [...clusters].reverse() : clusters;
-
-  let kept = "";
-  let used = 0;
-  for (const segment of order) {
-    const w = clusterCells(segment, caps.ambiguousWidth);
-    if (used + w > budget) break;
-    kept = from === "start" ? segment + kept : kept + segment;
-    used += w;
-  }
+  const { kept, used } = keptWithin(clean, budget, caps.ambiguousWidth, from);
 
   // A double-width glyph refused at the boundary leaves a cell to fill, so the
   // result is exactly `limit` cells rather than `limit - 1`. The padding sits
@@ -718,6 +767,94 @@ export function truncate(
   // flush against the end it was kept from.
   const pad = " ".repeat(budget - used);
   return from === "start" ? marker + pad + kept : kept + pad + marker;
+}
+
+/**
+ * The clusters of `text` that fit within `budget` cells — from its head, or
+ * from its tail when `from` is `"start"` — as the kept string and the cells it
+ * uses. `text` is already stripped of controls.
+ *
+ * **Walked with the measurer's cursor, to the cut and no further** (I79,
+ * F1205). Both arms used to build every cluster of the whole line through the
+ * segmenter's iterator — a record and a string per cluster — and then walk from
+ * the front until the budget was spent, so a 329-cell paragraph kept to 117
+ * cost 94 µs and the clusters past the cut were built to be dropped. The head
+ * arm now steps as `cells` steps (I63, I74): a run of printable ASCII by its
+ * length, cut inside the run where the budget ends; a unit of the table on its
+ * own; otherwise one cluster from `containing`, kept whole or refused whole
+ * (I9) — and stops at the first cluster that would overrun. The tail arm needs
+ * the whole line's boundaries and takes them from the same cursor, so the two
+ * arms read one boundary source, which is I9's reason for one implementation.
+ *
+ * Byte-identical to the iterator walk: the cursor's clusters are the
+ * segmenter's on every input (I63, T1.40, T1.51), a run's units are clusters
+ * of one cell each (§5), and the old walk kept nothing past its first refusal
+ * either. A zero-cell cluster after a run that spends the budget exactly is
+ * still kept, as it was — the run does not end the walk, only an overrun does.
+ */
+function keptWithin(
+  text: string,
+  budget: number,
+  ambiguous: AmbiguousWidth | undefined,
+  from: "start" | "end",
+): Readonly<{ kept: string; used: number }> {
+  let segments: Segments | null = null;
+  if (from === "end") {
+    let used = 0;
+    let i = 0;
+    while (i < text.length) {   // cells-ok: a cursor, not a width
+      const run = plainRun(text, i);
+      if (run > i) {
+        const room = budget - used;
+        if (run - i > room) {   // cells-ok — one cell per unit inside a run (§5)
+          used = budget;
+          i += room;   // cells-ok: the cursor moves by the cells the run has room for, one per unit
+          break;
+        }
+        used += run - i;   // cells-ok — one cell per unit
+        i = run;
+        continue;
+      }
+      const cluster = soloAt(text, i) ? text.charAt(i) : clusterAt((segments ??= GRAPHEMES.segment(text)), i); // C09 I74
+      if (cluster === "") break;
+      const w = clusterCells(cluster, ambiguous);
+      if (used + w > budget) break;
+      used += w;
+      i += cluster.length;   // cells-ok: advancing the cursor past what was consumed
+    }
+    return { kept: text.slice(0, i), used };
+  }
+
+  // The tail is kept, so every boundary is needed before the first is chosen:
+  // one pass of the cursor records where each cluster starts and what it
+  // measures, and the reverse walk reads them back.
+  const starts: number[] = [];
+  const widths: number[] = [];
+  let i = 0;
+  while (i < text.length) {   // cells-ok: a cursor, not a width
+    const run = plainRun(text, i);
+    if (run > i) {
+      for (; i < run; i += 1) {   // cells-ok: a code-unit cursor over a run of one-cell units
+        starts.push(i);
+        widths.push(1);
+      }
+      continue;
+    }
+    const cluster = soloAt(text, i) ? text.charAt(i) : clusterAt((segments ??= GRAPHEMES.segment(text)), i); // C09 I74
+    if (cluster === "") break;
+    starts.push(i);
+    widths.push(clusterCells(cluster, ambiguous));
+    i += cluster.length;   // cells-ok: advancing the cursor past what was consumed
+  }
+  let used = 0;
+  let at = text.length;   // cells-ok — a code-unit offset
+  for (let k = starts.length - 1; k >= 0; k -= 1) {   // cells-ok — a count of clusters, walked from the last
+    const w = widths[k] ?? 0;
+    if (used + w > budget) break;
+    used += w;
+    at = starts[k] ?? at;
+  }
+  return { kept: text.slice(at), used };
 }
 
 /**
@@ -760,17 +897,7 @@ export function truncateParts(
   // the clusters in reverse and keeps the tail, so `kept` is an exact suffix
   // and `start` is its code-unit offset — a caller slicing spans against it
   // adds `start` rather than assuming zero.
-  const clusters = [...GRAPHEMES.segment(whole)].map((s) => s.segment);
-  const order = from === "start" ? [...clusters].reverse() : clusters;
-
-  let kept = "";
-  let used = 0;
-  for (const segment of order) {
-    const w = clusterCells(segment, caps.ambiguousWidth);
-    if (used + w > budget) break;
-    kept = from === "start" ? segment + kept : kept + segment;
-    used += w;
-  }
+  const { kept, used } = keptWithin(whole, budget, caps.ambiguousWidth, from); // C09 I79
 
   const pad = " ".repeat(budget - used);
   return from === "start"
@@ -832,8 +959,12 @@ export function hardWrapCells(
   let line = "";
   let used = 0;
 
-  for (const raw of GRAPHEMES.segment(text)) {
-    const segment = placeable(raw.segment, limit);
+  let segments: Segments | null = null;
+  for (let i = 0; i < text.length; ) { // cells-ok — a code-unit cursor
+    const raw = soloAt(text, i) ? text.charAt(i) : clusterAt((segments ??= GRAPHEMES.segment(text)), i); // C09 I74
+    if (raw === "") break;
+    i += raw.length; // cells-ok — past the cluster
+    const segment = placeable(raw, limit);
     const w = clusterCells(segment, ambiguous);
     if (used + w > limit && line !== "") {
       out.push(line);
@@ -920,8 +1051,12 @@ export function wrapCellsParts(
     let line = "";
     let lineStart = base;
     let used = 0;
-    for (const raw of GRAPHEMES.segment(paragraph)) {
-      const segment = placeable(raw.segment, limit);
+    let segments: Segments | null = null;
+    for (let i = 0; i < paragraph.length; ) { // cells-ok — a code-unit cursor
+      const raw = soloAt(paragraph, i) ? paragraph.charAt(i) : clusterAt((segments ??= GRAPHEMES.segment(paragraph)), i); // C09 I74
+      if (raw === "") break;
+      i += raw.length; // cells-ok — past the cluster
+      const segment = placeable(raw, limit);
       const w = clusterCells(segment, ambiguous);
 
       if (used + w > limit && line !== "") {
@@ -1008,7 +1143,13 @@ export function placeableClusters(text: string, width: number): string {
   }
   if (ascii) return text;
   let out = "";
-  for (const { segment } of GRAPHEMES.segment(text)) out += placeable(segment, limit);
+  let segments: Segments | null = null;
+  for (let i = 0; i < text.length; ) { // cells-ok — a code-unit cursor
+    const segment = soloAt(text, i) ? text.charAt(i) : clusterAt((segments ??= GRAPHEMES.segment(text)), i); // C09 I74
+    if (segment === "") break;
+    i += segment.length; // cells-ok — past the cluster
+    out += placeable(segment, limit);
+  }
   return out;
 }
 
@@ -1031,7 +1172,10 @@ export function clusterEnds(text: string): readonly number[] {
   if (ascii) return [];
   const out: number[] = [];
   let at = 0;
-  for (const { segment } of GRAPHEMES.segment(text)) {
+  let segments: Segments | null = null;
+  while (at < text.length) { // cells-ok — a code-unit cursor
+    const segment = soloAt(text, at) ? text.charAt(at) : clusterAt((segments ??= GRAPHEMES.segment(text)), at); // C09 I74
+    if (segment === "") break;
     at += segment.length; // cells-ok — a code-unit cursor
     out.push(at);
   }
@@ -1161,18 +1305,24 @@ function placeable(segment: string, limit: number): string {
 }
 
 /**
- * Where to break a full line: after the last space, or nowhere.
+ * Where to break a full line: after the last space that is a cluster of its
+ * own, or nowhere.
  *
  * Null when the line holds no space to break at — an unbroken token — in which
  * case the caller breaks at the cluster boundary rather than growing past the
  * width. A line that overflows is a row the terminal adds and nobody counted.
+ * **A space the next unit can extend is not a break point** (C09 §5, F1179):
+ * the search found the space by code unit and cut after it, so a joiner or a
+ * mark on the space began the next row alone. `soloAt` decides it as I74
+ * decides any cluster — from the next unit, never from the segmenter.
  */
 function breakPoint(line: string, lineStart: number, atoms: readonly Atom[]): number | null {
   let at = line.lastIndexOf(" ");
   while (at > 0) {
     // The break lands after the space; a break strictly inside an atom is not
-    // one, and the search continues towards the row's start (C04 I90).
-    if (atomAround(lineStart + at + 1, atoms) === undefined) return at + 1; // cells-ok — a code-unit offset
+    // one, nor is a space carrying an extender, and the search continues
+    // towards the row's start (C04 I90, C09 §5).
+    if (soloAt(line, at) && atomAround(lineStart + at + 1, atoms) === undefined) return at + 1; // cells-ok — a code-unit offset
     at = line.lastIndexOf(" ", at - 1);
   }
   return null;

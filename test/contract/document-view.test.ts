@@ -37,7 +37,11 @@ const registry = createBlockRegistry();
  * control below is what failed when the view stopped measuring a block at a
  * time, which is the whole reason it names the number instead of assuming it.
  */
-const ROWS = 3;
+// A `chunk`'s measured height: two border rows, one content row, and the panel's
+// own top padding, which `b.panel` gaps by default (C04 §3a, C09 I80). It was 3
+// while the gap belonged to the sequence; the *sequence* total is unchanged —
+// two chunks still fill the region exactly — and only the per-block figure moved.
+const ROWS = 4;
 const REGION = { width: 40, height: 8 };
 
 const chunk = (id: string, text: string): Block =>
@@ -106,8 +110,10 @@ describe("C22 §13a — the document view", () => {
     expect(registry.measure(chunk("probe", "x"), REGION.width)).toBe(ROWS);
     // **Measured as a sequence, because that is what the view now asks and what
     // the frame draws.** Stating it as `height / ROWS` was the arithmetic the
-    // code used rather than the one the terminal does, and the two differ by a
-    // separator per block.
+    // code used rather than the one the terminal does. The two used to differ by
+    // a separator per block; they agree now (C09 I17), and the assertion stays
+    // because it is the sequence the view calls and the frame the terminal draws
+    // that have to match, not the arithmetic that happens to reach them.
     const two = [chunk("p", "x"), chunk("q", "y")];
     expect(registry.measureSequence(two, REGION.width)).toBe(REGION.height);
     expect(
@@ -595,7 +601,7 @@ describe("C22 §13a — a live part hosted by a pushed view", () => {
         shown: child !== null && child.kind === "raw" ? child.text : null,
         // The read seam's own figure, and the only one here that a working
         // write cannot supply.
-        gap: panel !== null && panel.kind === "panel" ? panel.gapBefore === true : null,
+        gap: panel !== null && panel.kind === "panel" ? panel.padding?.t === 1 : null,
       };
     };
 

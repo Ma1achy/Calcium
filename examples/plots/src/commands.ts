@@ -13,11 +13,10 @@
  * returns blocks and touches no clock, no session and no terminal, which is
  * what makes `everyDocument()` in the suite able to validate all of them.
  */
-import { b, barStyleNames, halfBlockEligible, PANES, profilePane, spinnerSetNames } from "@fmx/calcium";
+import { b, barStyleNames, CARDS, halfBlockEligible, profileCard, SECTIONS, spinnerSetNames } from "@fmx/calcium";
 import type {
   AdapterDocument,
   Block,
-  PaneName,
   ProfileReport,
   TerminalCapabilities,
   ViewDocument,
@@ -1025,8 +1024,13 @@ export function barStyles(): Block {
  * ask for a profiler sees, and it is the arm a document test can construct. The
  * present arm needs a live session — `ProfileReport` is reachable only through
  * `ctx.profile()`, with no constructor on the public surface or in
- * `@fmx/calcium/testing` (F917) — and `profilePane` itself is covered across
- * every pane by the framework's own `test/unit/profiler.test.ts`.
+ * `@fmx/calcium/testing` (F917) — and `profileCard` itself is covered across
+ * every card by the framework's own `test/unit/profile-deck.test.ts`.
+ *
+ * **A card and not a section**, which is what the deck made of this: `argv[0]`
+ * names one of thirty-seven cards, a section is a group of them, and an app
+ * embedding one figure wants the figure. The unknown id falls to the verdict,
+ * which is `profileCard`'s own rule.
  */
 export function profileBlocks(
   report: ProfileReport | undefined,
@@ -1040,10 +1044,10 @@ export function profileBlocks(
       }),
     ];
   }
-  const asked = (argv[0] ?? "overview") as PaneName;
-  const pane: PaneName = PANES.includes(asked) ? asked : "overview";
+  const asked = argv[0] ?? "verdict";
+  const card = CARDS.some((c) => c.id === asked) ? asked : "verdict";
   return [
-    b.notice("info", `pane \`${pane}\` · ${PANES.join(" · ")}`, undefined, { id: "prof-nav" }),
-    ...profilePane(report, pane, capabilities),
+    b.notice("info", `card \`${card}\` · ${SECTIONS.join(" · ")}`, undefined, { id: "prof-nav" }),
+    ...profileCard(report, card, { w: 80, rows: 24 }, capabilities),
   ];
 }

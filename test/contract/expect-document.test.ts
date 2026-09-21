@@ -23,13 +23,12 @@
 // options parameter taking extra `BlockDefinition`s, which a consumer with a
 // custom kind needs anyway (F1); it is not built, and saying so here is
 // cheaper than a comment that implies these two lines are tested.
-import { createElement } from "react";
-import { Text } from "ink";
 import { describe, expect, it } from "vitest";
 import { block, document } from "../../src/data/viewmodel/index.js";
 import type { Block, ViewDocument } from "../../src/data/viewmodel/index.js";
 import { b } from "../../src/shell/builders/index.js";
 import type { AnyBlockDefinition } from "../../src/presentation/blocks/index.js";
+import { rows } from "../../src/presentation/blocks/paint.js";
 import { expectDocument, liveParts } from "../../src/testing/index.js";
 import { producerContext, FULL_CAPABILITIES as FULL } from "../support/producer-context.js";
 import { CORPUS, doc } from "../support/blocks.js";
@@ -563,7 +562,7 @@ describe("liveParts — what `b.live` declared (C24 I24, F28)", () => {
       // renderer produced; a definition whose `measure` says four and whose
       // render draws one would pass a row that only read `measure`, and the
       // fallback this is separating from draws exactly one.
-      render: () => createElement(Text, null, "a\nb\nc\nd"),
+      render: () => rows(["a", "b", "c", "d"]),
     };
 
     expect(

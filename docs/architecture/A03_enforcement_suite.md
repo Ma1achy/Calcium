@@ -590,7 +590,7 @@ The suite governs the source. **SP1 governs the documents the source is written 
 | SP6 | Every finding is keyed in `TRIAGE.md`, and its declared total is compared by equality | FINDINGS F142 · F87 | A03 §7a |
 | SP7 | A test row's number is unique within its spec; `Tn.x` placeholders exempt | `docs/components/` | A03 §2 · A03 §7a |
 | SP8 | Every `§` reference resolves against the document that owns it — **reported, not gated** | `src/`, `test/`, `tools/`, `docs/` outside `notes/` | A02 §1 · A03 §7a |
-| SP9 | Every invariant is named by at least one test row; the uncited are an exemption list compared **by equality** | `docs/components/` against `test/**/*.ts` | A03 §7a · FINDINGS |
+| SP9 | Every invariant is named by at least one test row; the uncited are an exemption list compared **by equality**. A **retired** invariant leaves that population and joins the opposite rule: no row may name it | `docs/components/` against `test/**/*.ts` | A03 §7a · FINDINGS |
 | SP10 | A mnemonic test-row label — `SK10`, `HZ4` — is unique **within one document**; reuse across specs is legitimate and not gated | `docs/components/` | A03 §2 · A03 §7a |
 | SP11 | A commitment's number is unique within its spec; the duplicates outstanding are a debt list compared **by equality** | `docs/components/` | A03 §2 · A03 §7a |
 | SP12 | The register's **open set** — every keyed row whose current disposition reads *open* or *partly* — is a list compared **by equality**; rows stating no disposition are counted and reported, not gated | `examples/docker/TRIAGE.md` | A03 §2 · A03 §7a |
@@ -624,6 +624,25 @@ exists on the day the invariant does; the body is owed to a named commit rather 
 condition; and the todo-expiry guard already reads the marker. Adding the invariants to
 `UNCITED_INVARIANTS` is not the route — that list may only shrink, and a debt list that grows for
 convenience stops being a debt list.
+
+**An invariant can stop having a subject, and SP9 read that as debt.** C09 I16 held *Ink's
+layout width agrees with `cells()`* — a rule over two implementations of one number. F1209
+deleted the second implementation, so the rule has nothing left to be wrong about, and A03 §2
+says a rule in that state passes exactly like one that is satisfied. The spec retired it in
+writing; SP9 reported it as *named by no test row*, because the only dispositions the rule knew
+were **covered** and **on the debt list**, and neither is what a retirement is. Putting it on
+`UNCITED_INVARIANTS` would have been the wrong record twice over: that list may only shrink, and
+the entry would have claimed a row is owed.
+
+**So retirement is a third disposition, and it is gated in both directions.** An invariant listed
+as `- **I16** — **Retired …** (F####)` leaves the coverage population — and a *test row naming a
+retired invariant is a violation*, which is the half that carries the weight. A green row citing
+a rule whose subject is gone is the vacuity class arriving through the citation rather than
+through the assertion, and it reads as coverage from every direction. The finding number is
+required on the line for the reason the sixth blind spot gives: a retirement is a settled claim,
+and a settled claim with no record is a belief. **Counted rather than excluded** — the retired
+total is printed beside SP9's own numbers, so the population shrinking is visible instead of
+being the absence of a complaint.
 
 **SP7 is SP2's argument applied to the numbers tests actually cite, and it was missing for the
 whole build.** SP2 makes invariant ids unique because *"C13 I17 is the cap"* locates something

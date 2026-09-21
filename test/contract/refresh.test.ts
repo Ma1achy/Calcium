@@ -230,7 +230,7 @@ describe("C23 §3b — part refresh", () => {
     // sequence (C04 I25), so a patch that drops it makes the renderer disagree
     // with the declaration while the block itself stays correct.
     const h = harness();
-    const declared = { ...panel("a", "a", raw("a-c", "…")), gapBefore: true } as Block;
+    const declared = { ...panel("a", "a", raw("a-c", "…")), padding: { t: 1 } } as Block;
     const id = h.transcript.append(docWith([declared]), { streaming: true });
 
     h.driver.declare({ kind: "entry", id }, [part({ id: "a" })]);
@@ -238,7 +238,7 @@ describe("C23 §3b — part refresh", () => {
 
     const after = h.transcript.entries[0]?.doc.blocks.find((x) => x.id === "a");
     expect(shown(h, id, "a"), "the control: it really did refresh").toBe("ok");
-    expect(after?.gapBefore, "and the rhythm survived it").toBe(true);
+    expect(after?.padding?.t, "and the rhythm survived it").toBe(1);
   });
 
   it("T1.32 (I21): backoff doubles and resets, and a sibling is untouched", async () => {
@@ -606,7 +606,7 @@ describe("C23 §3b — part refresh", () => {
     // a refresh keeps the declared block's `gapBefore` and it drives a
     // *transcript entry*, where `currentPanel` reads the real block. The view
     // arm reconstructed the panel through `livePanel`, which sets no gap — so
-    // `existing?.gapBefore === true` was structurally false here and only here,
+    // `existing?.padding?.t === 1` was structurally false here and only here,
     // and C24 I12 says `b.live` behaves identically in both.
     //
     // **Neither half of the suite could see it**: this file's `viewPanel` double
@@ -614,7 +614,7 @@ describe("C23 §3b — part refresh", () => {
     // the production defect rather than standing in for the interface. A fake
     // that is wrong in the same way as the code cannot fail on the difference.
     const h = harness();
-    const declared = { ...panel("p", "panel", raw("p-c", "…")), gapBefore: true } as Block;
+    const declared = { ...panel("p", "panel", raw("p-c", "…")), padding: { t: 1 } } as Block;
     h.views.set("dash", [declared]);
 
     h.driver.declare({ kind: "view", id: "dash" }, [part({ id: "p" })]);
@@ -627,7 +627,7 @@ describe("C23 §3b — part refresh", () => {
       after?.kind === "panel" && after.children[0]?.kind === "raw" && after.children[0].text,
       "the control: it really did refresh",
     ).toBe("ok");
-    expect(after?.gapBefore, "and the rhythm survived the replacement").toBe(true);
+    expect(after?.padding?.t, "and the rhythm survived the replacement").toBe(1);
   });
 
   it("T4.21 (C24 I12): a pushed view is driven by the same loop, and release stops it", async () => {
@@ -1118,6 +1118,75 @@ describe("C23 §3d — a source does not poll while nothing is looking", () => {
     h.driver.visibilityChanged();
     await h.tick(0);
     expect(shown(h, id, "a"), "the declaration survived the pause").toBe("1");
+  });
+  it("T2.48 (I72, F1206): the next deadline is one interval after the last, and one after the settle only when the far side is slower than its cadence", async () => {
+    // **The deadline sequence, read from the timer the driver arms.** The
+    // cadence cannot be read from a frame — C03 coalesces `stream` either way —
+    // and a duration would measure the machine, so the assertion is on
+    // `nextTimer`, which is `min(dueAt)` and the thing I72 is about.
+    //
+    // A wake fires late by the timer's granularity and the fetch takes what it
+    // takes. Dated from the settle, both join the period and neither is ever
+    // recovered: `every: 16` polled every 18 and a screen of parts drew 55
+    // frames a second (F1206).
+
+    // --- a fast source, woken late ten times over ---------------------------
+    const fast = harness();
+    const fid = fast.transcript.append(docWith([panel("a", "a", raw("a-c", "…"))]));
+    fast.driver.declare({ kind: "entry", id: fid }, [
+      part({ id: "a", intervalMs: 16, fetch: () => Promise.resolve("ok") }),
+    ]);
+    // The first poll is due the moment it is declared, which the chain leaves
+    // alone: the deadline it starts from is the declaration's own.
+    expect(fast.nextTimer(), "the first poll is due at once").toBe(fast.at());
+
+    const deadlines: number[] = [];
+    // Each round wakes 1 to 3 ms after the deadline, as a real timer does.
+    for (let k = 0; k < 11; k += 1) {
+      const due = fast.nextTimer();
+      if (due === null) throw new Error("nothing armed");
+      await fast.tick(due - fast.at() + 1 + (k % 3));
+      const next = fast.nextTimer();
+      if (next === null) throw new Error("nothing re-armed");
+      deadlines.push(next);
+    }
+    const first = deadlines[0] ?? 0;
+    for (let k = 1; k < deadlines.length; k += 1) {
+      expect(deadlines[k], `deadline ${String(k)} is one interval after ${String(k - 1)}`).toBe((deadlines[k - 1] ?? 0) + 16);
+    }
+    expect((deadlines[10] ?? 0) - first, "ten intervals, and none of the lateness").toBe(160);
+
+    // --- a far side slower than its own cadence -----------------------------
+    // **The clamp, and what it is for**: a 40 ms fetch on a 16 ms interval is
+    // three deadlines behind the moment it lands. Chained, it would fire three
+    // overdue sweeps at once; clamped, it restarts from where it finished.
+    const slow = harness();
+    const sid = slow.transcript.append(docWith([panel("b", "b", raw("b-c", "…"))]));
+    slow.driver.declare({ kind: "entry", id: sid }, [
+      part({
+        id: "b",
+        intervalMs: 16,
+        fetch: () => {
+          slow.skew(40);
+          return Promise.resolve("ok");
+        },
+      }),
+    ]);
+    await slow.tick(0);
+    const after = slow.nextTimer();
+    expect(after, "something is armed").not.toBeNull();
+    expect((after ?? 0) > slow.at(), "the next poll is in the future, not three overdue").toBe(true);
+    expect((after ?? 0) - slow.at(), "a fresh interval from where the fetch finished").toBe(16);
+
+    // --- a failure lengthens the gap from the deadline it had ---------------
+    const bad = harness();
+    const bid = bad.transcript.append(docWith([panel("c", "c", raw("c-c", "…"))]));
+    bad.driver.declare({ kind: "entry", id: bid }, [
+      part({ id: "c", intervalMs: 16, fetch: () => Promise.reject(new Error("no")) }),
+    ]);
+    const hadDue = bad.nextTimer() ?? 0;
+    await bad.tick(2);
+    expect(bad.nextTimer(), "backoffOf after the deadline it had, not after the rejection").toBe(hadDue + 32);
   });
 
   it("T3.32 (I45, §8c C2): a resolution with no referrers is dropped, not a failure", async () => {

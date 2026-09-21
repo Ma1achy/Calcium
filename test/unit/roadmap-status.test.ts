@@ -150,11 +150,17 @@ describe("roadmap-status — the Order column's verifier", () => {
     // says so. The strict alternative is worse: row 17 legitimately names two
     // symbols and cites one file for each, so "every identifier in every file"
     // fails every correct multi-file row.
+    //
+    // **Derived, not spelled — RS2b's rule applied one row over** (F1233). The
+    // anchor read `structured.ts:232` until C09 I81 moved `logs`' window down
+    // the file, and the row went red on a repair that was correct, which is
+    // what RS2b's own comment says happens to a pinned citation. The row
+    // asserts the *masking*, never which line the citation names, so the line
+    // comes out of the document.
+    const anchor = /`logs` \(`src\/presentation\/blocks\/kinds\/structured\.ts:\d+`\)/u.exec(ROADMAP);
+    expect(anchor, "row 17's `logs` citation is in the roadmap").not.toBeNull();
     const masked = run(
-      mutate(
-        "`logs` (`src/presentation/blocks/kinds/structured.ts:232`)",
-        "`logs` (`src/presentation/blocks/kinds/simple.ts:1`)",
-      ),
+      mutate(anchor![0], "`logs` (`src/presentation/blocks/kinds/simple.ts:1`)"),
     );
     expect(masked.ok, "the known limit: a two-file row hides a wrong citation").toBe(true);
   });

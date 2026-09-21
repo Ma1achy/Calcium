@@ -48,8 +48,9 @@ const results = await runPass({
     // Every triangle dropped. Ten of the eleven rows below read a rendered
     // surface or a refusal about one, so a pass in which no face can be drawn
     // cannot observe a kill.
-    from: "  const lit = lightDirOf(block.light3, scene.basis);\n  for (const t of scene.tris) {",
-    to: "  const lit = lightDirOf(block.light3, scene.basis);\n  for (const t of [] as typeof scene.tris) {",
+    // Anchored on the fill's index loop (C12 I133); the span pass has its own loop.
+    from: "  for (let ti = 0; ti < tris.length; ti += 1) { // cells-ok — a triangle index\n    const t = tris[ti] as Tri3;",
+    to: "  for (let ti = 0; ti < 0; ti += 1) { // cells-ok — a triangle index\n    const t = tris[ti] as Tri3;",
     why: "every row reads a drawn surface or a refusal about one; a pass where no face draws sees nothing",
   },
   mutations: [
@@ -61,8 +62,10 @@ const results = await runPass({
       // it draws is a Gaussian with its peak at ambient and its rim lit.
       name: "the normal is dotted with the light in world space",
       file: F,
-      from: "    n: viewDir(basis, w.n),",
-      to: "    n: w.n,",
+      // **The one arm of `toScreenAt`** (C12 I139): every record — a vertex's
+      // or a cut's — is written into its slot by this projection.
+      from: "  S[o + S_NX] = nx0 * r.x + ny0 * r.y + nz0 * r.z;\n  S[o + S_NY] = nx0 * u.x + ny0 * u.y + nz0 * u.z;\n  S[o + S_NZ] = nx0 * f.x + ny0 * f.y + nz0 * f.z;",
+      to: "  S[o + S_NX] = nx0;\n  S[o + S_NY] = ny0;\n  S[o + S_NZ] = nz0;",
       // **SF3a and not SF3.** SF3 asserts smooth carries more shades than flat,
       // which is true under this defect — it survived that row, and the row it
       // needed is the one about the light's *direction* (F459).
@@ -75,7 +78,7 @@ const results = await runPass({
       // keeping its line.
       name: "a degenerate triangle is filled rather than stroked",
       file: F,
-      from: "  if (!(Math.abs(area) >= 1)) {\n    strokeThin(s, tri, e, grid, depth, light, span, paint);\n    return;\n  }",
+      from: "  if (!(Math.abs(area) >= 1)) {\n    strokeThin(L, ia, ib, ic, tri, e, grid, depth, light, span, paint);\n    return;\n  }",
       to: "  if (!(Math.abs(area) >= 1)) {\n    return;\n  }",
       expect: "SF1",
     },
@@ -122,8 +125,8 @@ const results = await runPass({
       // scheme: the reason named the one input on which the two options agree.
       name: "smooth normals are unit-averaged rather than accumulated",
       file: F,
-      from: "      const n = faceN[f] as Vec3;\n      for (const k of idx[f] as readonly [number, number, number]) {",
-      to: "      const n = unit(faceN[f] as Vec3);\n      for (const k of idx[f] as readonly [number, number, number]) {",
+      from: "      const ax = nx;\n      const ay = ny;\n      const az = nz;",
+      to: "      const l = hypot3(nx, ny, nz) || 1;\n      const ax = nx / l;\n      const ay = ny / l;\n      const az = nz / l;",
       expect: "SF3",
     },
     {
@@ -141,8 +144,8 @@ const results = await runPass({
       // `extentOf([])`'s unit cube — on screen, in bounds, wrong scale.
       name: "the extent is taken without the surfaces",
       file: S,
-      from: "  for (const sf of skins) for (const p of surfacePoints(sf)) all.push(p);",
-      to: "  for (const sf of [] as typeof skins) for (const p of surfacePoints(sf)) all.push(p);",
+      from: "    acc = unionOf(acc, own);\n  }\n  const extent = acc ?? UNIT_EXTENT;",
+      to: "    acc = unionOf(acc, undefined);\n  }\n  const extent = acc ?? UNIT_EXTENT;",
       expect: "SF6",
     },
     {
@@ -185,8 +188,8 @@ const results = await runPass({
       // cannot read the eye's position.
       name: "the cull tests a view-space constant rather than the face's own direction",
       file: F,
-      from: "  return dot(tri.fn, sub(c, basis.eye)) * tri.skin.cull > 0;",
-      to: "  return dot(tri.fn, basis.forward) * tri.skin.cull > 0;",
+      from: "  return (nx * (cx - e.x) + ny * (cy - e.y) + nz * (cz - e.z)) * tri.skin.cull > 0;",
+      to: "  return (nx * basis.forward.x + ny * basis.forward.y + nz * basis.forward.z) * tri.skin.cull > 0;",
       expect: "WF1",
     },
     {
@@ -246,8 +249,8 @@ const results = await runPass({
       // and every assertion about the wireframe itself still passes.
       name: "`wireframe: true` does not clear the samples it claims",
       file: S,
-      from: "      if (wire === true && !sm.edge) {",
-      to: "      if (wire === \"over\" && !sm.edge) {",
+      from: "    if (wire === true && !edge) {",
+      to: "    if (wire === \"over\" && !edge) {",
       expect: "WF6",
     },
     {
@@ -276,8 +279,8 @@ const results = await runPass({
       // satisfied and the set is wrong at the silhouette.
       name: "the cull reads a shading normal rather than the face's",
       file: F,
-      from: "  return dot(tri.fn, sub(c, basis.eye)) * tri.skin.cull > 0;",
-      to: "  return dot(tri.a.n, sub(c, basis.eye)) * tri.skin.cull > 0;",
+      from: "  const nx = N[o] as number;\n  const ny = N[o + 1] as number;\n  const nz = N[o + 2] as number;",
+      to: "  const nn = cornerAt(L, L.idx[o] as number).n;\n  const nx = nn.x;\n  const ny = nn.y;\n  const nz = nn.z;",
       expect: "WF9",
     },
   ],

@@ -399,8 +399,16 @@ describe("C26 §5 — the lifted list, in both axes (C09 §2)", () => {
   });
 
   it("T2.30 (C26 I4, I5, I6): containment, disjointness and stability hold of the lifted list across blocks; order within each — and a fabricated old walk fails disjointness", () => {
-    const a = tableOf(2, "a");
-    const b = tableOf(2, "b");
+    // **The group window made this a document, not a bag of blocks.** `tableOf`
+    // numbers every table `r1..rn`, so two of them share row ids — harmless to
+    // the per-block checks, which key on `blockId`, but the `window` × `elements`
+    // agreement keys on element id alone (a document's ids are unique, C04 I14),
+    // and a column group now declares a window. So the corpus's tables carry
+    // block-qualified row ids, which is what a real document holds.
+    const uniqueRows = (t: ReturnType<typeof tableOf>): Block =>
+      block({ ...t, rows: t.rows.map((row) => ({ ...row, id: `${t.id}:${row.id}` })) });
+    const a = uniqueRows(tableOf(2, "a"));
+    const b = uniqueRows(tableOf(2, "b"));
     const corpus: readonly Block[] = [
       rowGroup(a, b),
       columnGroup(a, b),
@@ -408,7 +416,7 @@ describe("C26 §5 — the lifted list, in both axes (C09 §2)", () => {
       // Nested: a panel inside a row, so both origins compose.
       rowGroup(a, panel([b])),
       // Three children, so `placeable` drops one at the sweep's narrowest width.
-      rowGroup(a, b, [tableOf(1, "c")]),
+      rowGroup(a, b, [uniqueRows(tableOf(1, "c"))]),
     ];
     const report = checkElements(lifted(), corpus);
     // **Reading order is a per-block predicate.** Across blocks the lifted list
@@ -483,9 +491,20 @@ describe("C26 §5 — the lifted list, in both axes (C09 §2)", () => {
     expect(new Set(inNarrow.map((f) => f.blockId)), "the unplaced child contributes nothing").toEqual(new Set(["a", "b"]));
     expect(at(inNarrow, "b", "r1").cols).toEqual([2, 3]);
 
-    // A `gapBefore` on a row-group child adds no row: the renderer ignores it.
-    const gapped = rowGroup(a, block({ ...b, gapBefore: true }));
-    expect(at(k.registry.elementsIn([gapped], 40), "b", "r1").rows).toEqual([1, 2]);
+    // **A padded child of a row group shifts, and this row asserted the
+    // opposite** (C04 §3a, C09 I80). The old rule was *a `gapBefore` on a
+    // row-group child adds no row: the renderer ignores it*, and 2a inverted it
+    // — a row's child is a box like any other and draws its own edges
+    // (`C04_PADDING_WALK` A4). The frame moved when 2a landed; **this row stayed
+    // green, because `#elements` was not applying the offset at all**, so the
+    // element sat a row above the thing it addressed and the assertion agreed
+    // with it. Both are fixed together, and the number moving by exactly `t` is
+    // what says they agree now.
+    const gapped = rowGroup(a, block({ ...b, padding: { t: 1 } }));
+    expect(at(k.registry.elementsIn([gapped], 40), "b", "r1").rows).toEqual([2, 3]);
+    // The control: the same child unpadded is where it was, so the shift is the
+    // field's and not a change to how a row group places anything.
+    expect(at(k.registry.elementsIn([rowGroup(a, b)], 40), "b", "r1").rows).toEqual([1, 2]);
   });
 });
 

@@ -36,6 +36,7 @@ import {
   MAX_FOOTER_ROWS,
   PROMPT_GUTTER,
   PROMPT_SUBSTITUTION,
+  regionWidth,
   RULE_ROWS,
 } from "./config.js";
 import type { TerminalSize } from "../terminal/lifecycle.js";
@@ -54,8 +55,14 @@ export type Composed = Readonly<{
    * painter read one number (I80).
    */
   footerRows: number;
-  /** Where the transcript sits — C16's `region`, `{ top, height }`. */
-  region: Readonly<{ top: number; height: number }>;
+  /**
+   * Where the transcript sits — C16's `region`, and the width it is drawn at.
+   *
+   * `width` is the terminal's less `CONTENT_MARGIN_R` (I109): the transcript is
+   * resized, measured and rendered at it, and the paint pads what comes back to
+   * `size.columns`. C16 reads `top` and `height` and nothing else.
+   */
+  region: Readonly<{ top: number; height: number; width: number }>;
   /**
    * How big a layer may be — C15's `Region`, `{ width, height }`.
    *
@@ -149,7 +156,12 @@ export function compose(deps: ComposeDeps): Composed {
   // lines is a real thing people do (C17 T5.2), and an uncapped prompt consumes
   // the whole frame and leaves the viewport at zero — the transcript vanishes
   // while you are typing, which is the moment you most want it.
-  const wanted = Math.max(1, deps.promptRows(size.columns, PROMPT_GUTTER));
+  // **The region's width, not the terminal's** (I109, §6l.9 row 4). A typed
+  // line is content, and the gutter is a left inset that says nothing about the
+  // right edge — so the body is `region.width − PROMPT_GUTTER.first`. Taken
+  // before the height, because `promptRows` is what the height subtracts.
+  const content = regionWidth(size.columns);
+  const wanted = Math.max(1, deps.promptRows(content, PROMPT_GUTTER));
   const promptRows = Math.max(1, Math.min(wanted, Math.floor(size.rows / 2)));
 
   // Clamped at zero: a terminal too short for chrome plus a prompt gets a
@@ -165,15 +177,23 @@ export function compose(deps: ComposeDeps): Composed {
     header,
     footer,
     footerRows,
-    // Below the header and its rule (I87, §6l.7).
-    region: Object.freeze({ top: HEADER_ROWS + HEADER_RULE_ROWS, height }),
-    // **The same height as the transcript region** (I28). It was the whole
+    // Below the header and its rule (I87, §6l.7), and one column narrower than
+    // the terminal (I109, §6l.9): the transcript is measured and drawn at this,
+    // while the paint pads every row to `size.columns`. The frame is the
+    // terminal's width and the *document* is narrower — the one distinction a
+    // composer can read the wrong side of.
+    region: Object.freeze({ top: HEADER_ROWS + HEADER_RULE_ROWS, height, width: content }),
+    // **The same height and now the same width as the transcript region** (I28,
+    // I109 · §6l.9 row 5). A layer's content is content: `place.ts` centres at
+    // `⌊(region.width − width) / 2⌋` and clamps to it, so a centred layer moves
+    // by nought or one column and a layer declaring no width is one cell
+    // narrower — right for the reason the transcript's rows are. It was the whole
     // terminal, and nothing could see it: a layer floats above the four regions
     // rather than taking rows, so `heightsSum` holds at every width with every
     // layer misplaced, and no component drew a `Placed` at all. A pushed view
     // laid out at `top: 0, height: rows` covers the header, the prompt and the
     // footer — C15 T4.4's opposite.
-    overlayRegion: Object.freeze({ width: size.columns, height }),
+    overlayRegion: Object.freeze({ width: content, height }),
     promptRows,
     /** What the prompt asked for, before the cap. Beyond it, S01 §3 windows. */
     promptWanted: wanted,

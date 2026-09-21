@@ -20,8 +20,10 @@ import { describe, expect, it } from "vitest";
 import { basisOf, extentOf, project } from "../../src/presentation/plot/project3.js";
 import {
   backfaceCulled,
+  cornersOf,
+  faceNormalOf,
+  geometryOf,
   surfacePoints,
-  trianglesOf,
   type Tri3,
 } from "../../src/presentation/plot/surface3.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -223,10 +225,10 @@ const REF = { azimuth: 0.5, elevation: Math.PI / 6, distance: 6 } as const;
 const SYM = { azimuth: Math.PI / 4, elevation: Math.PI / 6, distance: 6 } as const;
 
 const tris = (s: Record<string, unknown>): readonly Tri3[] => {
-  const surf = s as unknown as Parameters<typeof trianglesOf>[0];
-  return trianglesOf(surf, extentOf(surfacePoints(surf)), 0);
+  const surf = s as unknown as Parameters<typeof geometryOf>[0];
+  return geometryOf(surf, extentOf(surfacePoints(surf)), 0).tris;
 };
-const zeroNormal = (t: Tri3): boolean => Math.hypot(t.fn.x, t.fn.y, t.fn.z) < 1e-12;
+const zeroNormal = (t: Tri3): boolean => { const n = faceNormalOf(t); return Math.hypot(n.x, n.y, n.z) < 1e-12; };
 const kept = (s: Record<string, unknown>, camera: Record<string, number>): number => {
   const basis = basisOf(camera as never, WIDTH / 28);
   let n = 0; // cells-ok — a face count
@@ -249,7 +251,7 @@ describe("plot — the geometry suite", () => {
       expect(ts.length, `${axis}=0 face count`).toBe(72);
       expect(ts.filter(zeroNormal).length, `${axis}=0 has no zero normal`).toBe(0);
       const [ex, ey, ez] = expected[axis] as readonly [number, number, number];
-      const n = ts[0]?.fn as { x: number; y: number; z: number };
+      const n = faceNormalOf(ts[0] as Tri3);
       const len = Math.hypot(n.x, n.y, n.z);
       expect(n.x / len, `${axis}=0 normal x`).toBeCloseTo(ex, 6);
       expect(n.y / len, `${axis}=0 normal y`).toBeCloseTo(ey, 6);
@@ -272,7 +274,7 @@ describe("plot — the geometry suite", () => {
       const basis = basisOf(cams[axis] as never, WIDTH / 28);
       let flat = 0; // cells-ok — a face count
       for (const t of tris(m as unknown as Record<string, unknown>)) {
-        const p = [t.a.p, t.b.p, t.c.p].map((v) => project(basis, v));
+        const p = cornersOf(t).map((w) => project(basis, w.p));
         if (!p.every((q) => q !== null)) continue;
         const [A, B, C] = p as unknown as readonly [
           { x: number; y: number },

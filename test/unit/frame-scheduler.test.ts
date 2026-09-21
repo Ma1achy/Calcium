@@ -26,7 +26,7 @@ describe("C03 commit classification", () => {
     scheduler.commit("input");
 
     expect(render).toHaveBeenCalledTimes(1);
-    expect(clock.outstanding).toBe(0);
+    expect(clock.outstanding, "the slot the write opened (I17), nothing pending in it").toBe(1);
     expect(scheduler.pending).toBe(false);
   });
 
@@ -36,19 +36,19 @@ describe("C03 commit classification", () => {
     scheduler.commit("completion");
 
     expect(render).toHaveBeenCalledTimes(1);
-    expect(clock.outstanding).toBe(0);
+    expect(clock.outstanding, "the slot (I17)").toBe(1);
   });
 
-  it("T1.3: commit(stream) schedules at 33 ms and renders only when it arrives", () => {
+  it("T1.3: commit(stream) schedules at 16 ms and renders only when it arrives", () => {
     const { scheduler, render, clock } = build();
 
     scheduler.commit("stream");
 
     expect(render).not.toHaveBeenCalled();
     expect(scheduler.pending).toBe(true);
-    expect(clock.armed).toEqual([33]);
+    expect(clock.armed).toEqual([16]);
 
-    clock.advance(32);
+    clock.advance(15);
     expect(render).not.toHaveBeenCalled();
 
     clock.advance(1);
@@ -60,17 +60,17 @@ describe("C03 commit classification", () => {
     const { scheduler, render, clock } = build();
 
     scheduler.commit("stream");
-    clock.advance(10);
+    clock.advance(5);
     scheduler.commit("stream");
-    clock.advance(10);
+    clock.advance(5);
     scheduler.commit("stream");
 
     expect(clock.outstanding).toBe(1);
-    // One arm, not three: 33 is not strictly shorter than 33, so the window
+    // One arm, not three: 16 is not strictly shorter than 16, so the window
     // cannot slide (I3, T6.2).
-    expect(clock.arms).toEqual([33]);
+    expect(clock.arms).toEqual([16]);
 
-    clock.advance(13); // 33 ms from the *first* commit.
+    clock.advance(6); // 16 ms from the *first* commit.
     expect(render).toHaveBeenCalledTimes(1);
   });
 
@@ -82,11 +82,14 @@ describe("C03 commit classification", () => {
     scheduler.commit("input");
 
     expect(render).toHaveBeenCalledTimes(1);
-    expect(clock.outstanding).toBe(0);
+    expect(clock.outstanding, "the cancelled window is gone; what stands is the slot (I17)").toBe(1);
+    expect(scheduler.pending).toBe(false);
 
-    // Past the window the cancelled timer would have fired in.
+    // Past the window the cancelled timer would have fired in, and past the
+    // slot, which lapses without writing.
     clock.advance(40);
     expect(render).toHaveBeenCalledTimes(1);
+    expect(clock.outstanding).toBe(0);
   });
 
   it("T1.6: flush() writes the pending frame now and cancels the timer", () => {
@@ -96,19 +99,80 @@ describe("C03 commit classification", () => {
     scheduler.flush();
 
     expect(render).toHaveBeenCalledTimes(1);
-    expect(clock.outstanding).toBe(0);
+    expect(clock.outstanding, "the spinner's 80 is cancelled; the slot stands (I17)").toBe(1);
+    expect(clock.armed).toEqual([16]);
     expect(scheduler.pending).toBe(false);
 
     clock.advance(200);
     expect(render).toHaveBeenCalledTimes(1);
   });
 
-  it("T1.7: commit(spinner) schedules at 100 ms, not at the 33 ms stream window", () => {
+  it("T1.26 (I17): a continuous source draws frames sixteen apart, not window plus frame", () => {
+    // **The rate, not the latency** (F1200). A source whose next commit lands
+    // the moment a frame returns is the shape every live part has — its timers
+    // cannot fire inside a synchronous write, so they fire just after. Dated
+    // from that commit the frames sat at 16, 33, 50; the write opening the
+    // next window puts them at 16, 32, 48.
+    const { scheduler, render, clock } = build();
+    // The fake fires a due timer at its due time, and every step below ends
+    // on one, so the step's target is the frame's time.
+    const at: number[] = [];
+    let now = 0;
+    const step = (ms: number): void => {
+      now += ms;
+      clock.advance(ms);
+    };
+    render.mockImplementation(() => void at.push(now));
+
+    scheduler.commit("stream");
+    step(16);
+    expect(render).toHaveBeenCalledTimes(1);
+    expect(clock.outstanding, "the slot the frame opened").toBe(1);
+
+    step(1);
+    scheduler.commit("stream");
+    expect(clock.arms, "the commit inside the slot armed nothing").toEqual([16, 16]);
+    expect(scheduler.pending).toBe(true);
+
+    step(15); // t = 32: the slot closes, 16 after the frame began.
+    expect(render).toHaveBeenCalledTimes(2);
+
+    step(1);
+    scheduler.commit("stream");
+    step(15); // t = 48
+    expect(render).toHaveBeenCalledTimes(3);
+    expect(at, "sixteen apart").toEqual([16, 32, 48]);
+    expect(clock.arms, "four arms in all: the first commit's window and a slot per frame").toEqual([16, 16, 16, 16]);
+  });
+
+  it("T1.27 (I17): a slot nobody commits into lapses without a write, and the next commit starts from idle", () => {
+    const { scheduler, render, clock } = build();
+
+    scheduler.commit("stream");
+    clock.advance(16);
+    expect(render).toHaveBeenCalledTimes(1);
+    expect(clock.outstanding, "the slot stands").toBe(1);
+    expect(scheduler.pending, "with nothing pending in it").toBe(false);
+
+    clock.advance(16);
+    expect(render, "a lapse writes nothing").toHaveBeenCalledTimes(1);
+    expect(clock.outstanding, "and leaves no timer").toBe(0);
+
+    scheduler.commit("stream");
+    expect(clock.armed, "a fresh window, as from idle").toEqual([16]);
+    clock.advance(16);
+    expect(render).toHaveBeenCalledTimes(2);
+  });
+
+
+  it("T1.7: commit(spinner) schedules at 80 ms — the braille set's interval — not at the 16 ms stream window", () => {
     const { scheduler, clock } = build();
 
     scheduler.commit("spinner");
 
-    expect(clock.armed).toEqual([100]);
+    // **80 and not 100** (F1197): a window longer than the glyph interval it
+    // floors skipped two glyphs of ten in a fixed pattern.
+    expect(clock.armed).toEqual([80]);
   });
 
   it("T1.14: a custom stream window is the one that is armed", () => {
@@ -163,7 +227,8 @@ describe("C03 contamination", () => {
 
     expect(repaint).toHaveBeenCalledTimes(1);
     expect(render).not.toHaveBeenCalled();
-    expect(clock.outstanding).toBe(0);
+    expect(clock.outstanding, "the slot (I17)").toBe(1);
+    expect(scheduler.pending).toBe(false);
     expect(scheduler.contaminated).toBe(false);
   });
 
@@ -216,7 +281,13 @@ describe("C03 contamination", () => {
 
     expect(repaint, "written before the window elapsed").toHaveBeenCalledTimes(1);
     expect(render, "and not as an ordinary diffed frame").not.toHaveBeenCalled();
-    expect(clock.outstanding, "the resize's timer was cancelled, not left standing").toBe(0);
+    // The resize's timer was cancelled, not left standing: what stands is the
+    // slot the repaint opened (I17), and letting it lapse writes nothing more.
+    expect(clock.outstanding).toBe(1);
+    expect(scheduler.pending).toBe(false);
+    clock.advance(16);
+    expect(repaint).toHaveBeenCalledTimes(1);
+    expect(clock.outstanding).toBe(0);
   });
 });
 

@@ -27,7 +27,7 @@
 import { createAdapterRegistry } from "../data/adapters/index.js";
 import { blankRowsAbove, commandRows } from "./paint.js";
 import { noticeDoc } from "./documents.js";
-import type { NavElement } from "../presentation/blocks/index.js";
+import type { MeasureMemo, NavElement } from "../presentation/blocks/index.js";
 import { initialRegionHeight } from "./frame.js";
 import { elementsOfEntry, measureEntry } from "./entry-layout.js";
 import { createManifestStore, parseManifest, withThemeNames } from "../data/manifest/index.js";
@@ -51,10 +51,13 @@ import { createTranscriptStore } from "../viewport/transcript/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
 import { createViewport } from "../viewport/viewport/index.js";
 import { RenderCache } from "./render-cache.js";
+import { ChromeCache } from "./chrome-cache.js";
 import { Cameras } from "./cameras.js";
 import { Frames } from "./frames.js";
 import { CursorPositions } from "./cursor-positions.js";
 import { SeriesVisibility } from "./series-visibility.js";
+import { VisibleIds } from "./visible-ids.js";
+import { pacedSchedule } from "./paced-schedule.js";
 import { RenderScratchStore } from "./render-scratch.js";
 import { ScrollOffsets } from "./scroll-offsets.js";
 import { createOverlayManager, takesInput } from "../viewport/overlay/index.js";
@@ -80,7 +83,7 @@ import { openHistory, SEARCH_ID } from "../interaction/history/index.js";
 import { detectCapabilities, type TerminalCapabilities } from "../terminal/capabilities.js";
 import { glyphs } from "../presentation/blocks/index.js";
 import { createFrameScheduler, type CommitReason } from "../terminal/frame-scheduler.js";
-import type { Profiler, ProfileReport, TraceFn } from "./profiling/types.js";
+import type { CaptureResult, Profiler, ProfileReport, TraceFn } from "./profiling/types.js";
 import { instrumentRegistry, type ProbeableRegistry } from "./profiling/registry-probe.js";
 import { recordWriter, recordTransport, type Recording } from "./profiling/record.js";
 import {
@@ -101,6 +104,7 @@ import {
   persistPolicy,
   persists,
 } from "./transcript-persist.js";
+import { regionWidth } from "./config.js";
 import type { ResolvedConfig } from "./config.js";
 import { anyBlinking, CURSOR_BLINK_MS } from "./cursor-style.js";
 import { createSessionStore, type SessionStore } from "./state.js";
@@ -470,6 +474,8 @@ export type Graph = Readonly<{
    * asked for again.
    */
   rendered: RenderCache;
+  /** C22 I102 — header, footer and layer lines held per content, one session's worth. */
+  chrome: ChromeCache;
   scrollOffsets: ScrollOffsets;
   cameras: Cameras;
   /** C22 I77 — the frame each animated image is on, keyed like the two above and dropped with them. */
@@ -483,6 +489,14 @@ export type Graph = Readonly<{
    * caller's own arrays, so nothing evicts it and nothing subscribes.
    */
   scratch: RenderScratchStore;
+  /**
+   * The session's measure memo (C22 I100, C09 I70). One `WeakMap` keyed by the
+   * block for the session's life, handed to C14's measurer and to the window,
+   * so the two agree by construction and a still document is measured once.
+   * A rebuilt block is a new key and a settled entry's blocks are collected
+   * with it; nothing evicts and nothing subscribes — `scratch`'s arrangement.
+   */
+  measures: MeasureMemo;
   overlays: ReturnType<typeof createOverlayManager>;
   /**
    * C28 §3c's view, on the graph so a row can open it without a verb.
@@ -812,13 +826,21 @@ export async function constructGraph(
     commandRows(entry.doc.command, width, detection.capabilities).length;
 
   const stores = await (async () => {
+    // Before the viewport, whose measurer reads it (C22 I100).
+    const measures: MeasureMemo = new WeakMap<Block, Readonly<{ width: number; rows: number }>>();
     const transcript = createTranscriptStore(
       config.retainPayloads > 0 ? { retainPayloads: config.retainPayloads } : {},
     );
     // The store *is* the view (C13 §2, `TranscriptStore extends TranscriptView`)
     // — C14 takes the reader half, and passing the store satisfies it.
     const viewport = createViewport(transcript, {
-      width: size.columns,
+      // **The region's width, not the terminal's** (C22 I109, C14 I22). The
+      // same rule as the height below, on the axis that acquired it later: the
+      // first `#render` overwrites this from the composed frame, and an initial
+      // value in the wrong axis is the same defect with a shorter life — a
+      // `visible()` answered before that frame exists would be measured a
+      // column wide.
+      width: regionWidth(size.columns),
       ...(deps.profiler === undefined ? {} : { probe: deps.profiler.asProbe() }),
       // **The region's height, not the terminal's** (C22 I34, C14 I22). The
       // first `#render` overwrites this from the composed frame; it is computed
@@ -856,7 +878,10 @@ export async function constructGraph(
       measureSequence: (blocks, width, entryId) => {
         using _entry =
           entryId === undefined ? NO_SPAN : (deps.profiler?.entry(entryId) ?? NO_SPAN);
-        return measureEntry(built.blocks.measureSequence, blocks, width);
+        // **Through the session's memo** (C22 I100, C09 I70) — the same one
+        // `visibleRows`' window reads, so a height C14 counted is a height the
+        // window never re-measures.
+        return measureEntry((run, w) => built.blocks.measureSequence(run, w, measures), blocks, width);
       },
       // C14 I20 / C22 I33 — the command line is chrome the composer draws, so
       // it is part of the height the index virtualises against. **The same
@@ -872,6 +897,9 @@ export async function constructGraph(
     // hold a rendered document nothing can reach, for the life of the session.
     // C14's `HeightCache` takes the same two changes for the same reason.
     const rendered = new RenderCache(deps.profiler?.asProbe());
+    // **Beside it, the chrome's** (C22 I102): three slots by role and the live
+    // layers, nothing to evict and nothing to subscribe.
+    const chrome = new ChromeCache(deps.profiler?.asProbe());
     // **One subscription for both** (C04 I48). The rendered rows and the offset
     // that chose them are the same fact about the same entry, and two callbacks
     // would be two places for a future eviction path to reach one and miss the
@@ -1154,12 +1182,14 @@ export async function constructGraph(
       transcript,
       viewport,
       rendered,
+      chrome,
       scrollOffsets,
       cameras,
       cursorPositions,
       seriesVisibility,
       frames,
       scratch,
+      measures,
       overlays,
       history,
       editor,
@@ -1225,6 +1255,20 @@ export async function constructGraph(
       capabilities: detection.capabilities,
       lifecycle,
       write: (s) => void lifecycle.writer.write(s),
+      // C22 I108 — a window dated from the firing it belongs to, on the clock
+      // C03 has not. **The untapped clock** (C28 I53): a read per arm on the
+      // recording's positional channel lands where no replay reaches, and the
+      // dating enters no frame.
+      // **Live only** (C28 I14). A paced window is dated from a clock reading,
+      // and a replay serves a recorded sequence of them positionally — so the
+      // number of arms, and with it the cadence, is the one thing a replay
+      // cannot reproduce. C28 I53 already takes the sampler off that channel
+      // for the same reason; this takes the scheduler off it, and a replay
+      // gets the ambient schedule its recording was driven by.
+      schedule:
+        config.profile?.replay === undefined
+          ? pacedSchedule(config.sampleClock, config.schedule)
+          : config.schedule,
     });
     const prof = deps.profiler;
     if (prof === undefined) return inner;
@@ -1421,6 +1465,8 @@ export async function constructGraph(
     transcript: stores.transcript,
     region: deps.frame.overlayRegion,
     redraw: () => void scheduler.commit("input"),
+    // C22 I41 — the plan's misses reach the deck (C28 I30).
+    ...(deps.profiler === undefined ? {} : { probe: deps.profiler.asProbe() }),
   });
 
   /**
@@ -1457,7 +1503,7 @@ export async function constructGraph(
    * bracket. Nothing about the seam changed for this — which was the point of
    * writing it that way.
    *
-   * `detection.capabilities` whole (C09 I49, F828): `profilePane`'s ASCII
+   * `detection.capabilities` whole (C09 I49, F828): `profileCard`'s ASCII
    * default is for a caller with no terminal, and this one has the resolved
    * record — after C22 I49's overrides, as every other consumer here takes it.
    */
@@ -1487,6 +1533,10 @@ export async function constructGraph(
    */
   let suppressBackground = false;
 
+  // **The visible range's ids as a set** (C22 I106, F1201). Not on the graph
+  // and not on the drop subscription: it holds no entry state, it is keyed on
+  // the range object C14 I30 returns, and its one reader is the gate below.
+  const visibleIds = new VisibleIds();
   const pipeline = at("pipeline", () => {
     const p = config.pipeline({
       // A function, not a snapshot: the store freezes a fresh object per write,
@@ -1503,7 +1553,15 @@ export async function constructGraph(
       // would be the upward edge MG1 exists to refuse.
       ...(deps.profiler === undefined
         ? {}
-        : { profile: (): ProfileReport => deps.profiler?.report() as ProfileReport }),
+        : {
+            profile: (): ProfileReport => deps.profiler?.report() as ProfileReport,
+            // The capture verb's one operation (C28 I64). `cpu` is fixed here:
+            // the card folds `.cpuprofile` stacks and a heap snapshot has no
+            // tree to draw, so a kind argument would be a knob with one useful
+            // value and one that produces a card-shaped nothing.
+            profileCapture: (ms: number): Promise<CaptureResult> =>
+              deps.profiler?.capture("cpu", ms) as Promise<CaptureResult>,
+          }),
       // `for(verb)` is the seam and not the two `invoke` calls, because
       // `VerbTransport` is what execution holds — wrapping the lookup reaches
       // `invoke` and `stream` without either call site changing (C28 I36).
@@ -1555,7 +1613,7 @@ export async function constructGraph(
        */
       visible: (host) =>
         host.kind === "view" ||
-        stores.viewport.visible().entries.some((e) => e.id === host.id),
+        visibleIds.of(stores.viewport.visible()).has(host.id), // C22 I106
       confirm,
       theme: stores.theme,
       // **On the change, not at exit** (I40). Fire-and-forget for the same

@@ -41,9 +41,11 @@ const results = runPass({
       // one row taller than the index says — C09 I1 broken by the registry itself.
       name: "COUNT-DROPPED: `measure` stops counting the marker row",
       file: REGISTRY,
-      from:
-        "form.definition.measure(form.block, width, this.#measureChild, this.probe) +\n        (form.capped === null ? 0 : 1);",
-      to: "form.definition.measure(form.block, width, this.#measureChild, this.probe);",
+      // Re-anchored 2026-09-17: the sum gained the padding edges (C09 I80), so
+      // the anchor is the marker term alone plus the least context that makes it
+      // unique — the whole expression rots for reasons that are not this one.
+      from: "(form.capped === null ? 0 : 1) +",
+      to: "0 +",
       expect: "T6.22", // and T1.19
     },
     {
@@ -51,8 +53,8 @@ const results = runPass({
       // 2 000 as if it had 2 000 rows. The silent-truncation class.
       name: "MARKER-DROPPED: `render` draws the capped form and no marker",
       file: REGISTRY,
-      from: "      const element =\n        form.capped === null\n          ? drawn\n          : createElement(",
-      to: "      const element =\n        form.capped === null || form.capped !== null\n          ? drawn\n          : createElement(",
+      from: "      const rendered =\n        form.capped === null ? drawn : this.#capped(",
+      to: "      const rendered =\n        form.capped === null || form.capped !== null ? drawn : this.#capped(",
       expect: "T6.22", // and T1.19
     },
     {
@@ -60,8 +62,9 @@ const results = runPass({
       // fails, and the panel row fails on the child.
       name: "CAP-INERT: the capped form is never produced",
       file: REGISTRY,
-      from: "    if (!(total > this.#cap)) return { ...resolved, capped: null };",
-      to: "    if (!(total > this.#cap) || total > 0) return { ...resolved, capped: null };",
+      // Re-anchored 2026-09-16 (C09 I76, F1191): the form carries `bare` and is frozen.
+      from: "    if (!(total > this.#cap)) return Object.freeze({ ...resolved, bare: resolved.block, capped: null });",
+      to: "    if (!(total > this.#cap) || total > 0) return Object.freeze({ ...resolved, bare: resolved.block, capped: null });",
       expect: "T1.19", // and T1.20, T2.13, T3.20–T3.23, T4.11, T6.22, T6.23
     },
     {
@@ -112,8 +115,9 @@ const results = runPass({
       // app's kind that declares `window` does not.
       name: "LIST-OF-KINDS: the cap consults kind names instead of `definition.window`",
       file: REGISTRY,
-      from: "    if (windowable === undefined) return { ...resolved, capped: null };",
-      to: '    if (windowable === undefined || !["logs", "raw", "code", "keyValue", "table", "patch"].includes(resolved.definition.kind)) return { ...resolved, capped: null };',
+      // Re-anchored 2026-09-16 (C09 I76, F1191): the form carries `bare`.
+      from: "    if (windowable === undefined) return { ...resolved, bare: resolved.block, capped: null };",
+      to: '    if (windowable === undefined || !["logs", "raw", "code", "keyValue", "table", "patch"].includes(resolved.definition.kind)) return { ...resolved, bare: resolved.block, capped: null };',
       expect: "T6.23", // and T1.19's `lanek` row
     },
     {
@@ -123,8 +127,9 @@ const results = runPass({
       // would window it to one row and attach a second marker.
       name: "RECAP: a piece carrying `capped` is measured for the cap again",
       file: REGISTRY,
-      from: "    if (held !== null) return { ...resolved, capped: held };",
-      to: "    if (held !== null && false) return { ...resolved, capped: held };",
+      // Re-anchored 2026-09-16 (C09 I76, F1191): the form carries `bare`.
+      from: "    if (held !== null) return { ...resolved, bare: stripCapped(resolved.block), capped: held };",
+      to: "    if (held !== null && false) return { ...resolved, bare: stripCapped(resolved.block), capped: held };",
       expect: "T6.22", // and T1.20
     },
     {

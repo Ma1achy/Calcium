@@ -1,0 +1,2 @@
+12:00:01  info   listen~
+12:00:02  [1mwarn [22m  slow q~

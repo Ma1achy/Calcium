@@ -8,18 +8,22 @@ import { describe, expect, it } from "vitest";
 import {
   CELL_PER_UNIT_RANGES,
   cells,
+  clusterEnds,
   clusterWidth,
   displayCells,
   expandTabs,
   fitStyled,
   graphemes,
   hardWrapCells,
+  placeableClusters,
   rowCells,
+  soloUnit,
   sliceCells,
   stripControl,
   truncate,
   wrapCells,
   wrapCellsParts,
+  truncateParts,
 } from "../../src/presentation/text.js";
 import { SGR_RESET } from "../../src/terminal/escapes.js";
 
@@ -201,6 +205,39 @@ describe("wrapCells (§3)", () => {
     expect(early).toEqual([]);
   });
 
+  it("T3.10e (C09 I74, C04 I84, F1179): a space carrying a joiner, a combining mark or the emoji-presentation selector is not a break point — the later space breaks, the joined space stays whole, and with no other space the token is cut on a cluster boundary with no row beginning on the extender", () => {
+    const SEG = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+    const starts = (text: string): Set<number> => new Set([0, ...[...SEG.segment(text)].map((s) => s.index)]);
+    for (const [kind, ext] of [["the joiner", "\u200D"], ["a combining mark", "\u0301"], ["the emoji-presentation selector", "\uFE0F"]] as const) {
+      // `ab ‍cd ef` at the joined prefix's own width — the selector makes
+      // its space two cells — the last space is plain and breaks; the first
+      // is joined and, narrower, is not a break: the row cuts the token.
+      const joined = `ab ${ext}cd ef`;
+      expect(wrapCellsParts(joined, cells(`ab ${ext}cd`)).map((r) => r.text), `${kind}: the later space breaks`).toEqual([`ab ${ext}cd`, "ef"]);
+      for (const w of [3, 4]) { // cells-ok — a width sweep
+        const rows = wrapCellsParts(joined, w);
+        const bounds = starts(joined);
+        for (const row of rows) {
+          expect(bounds.has(row.start), `${kind} at ${w}: row ${JSON.stringify(row.text)} at ${row.start} begins on a boundary`).toBe(true);
+          expect(row.text.startsWith(ext), `${kind} at ${w}: no row begins with the extender`).toBe(false);
+        }
+        expect(rows.map((r) => r.text).join(" ").replace(/  +/g, " ").trim().length, `${kind} at ${w}: nothing lost`).toBeGreaterThan(0);
+      }
+      // No other space: the token is cut at a cluster boundary, never after
+      // the joined space by code unit.
+      const only = `abcd ${ext}efgh`;
+      for (const w of [2, 3, 4, 5, 6]) { // cells-ok — a width sweep
+        const bounds = starts(only);
+        for (const row of wrapCellsParts(only, w)) {
+          expect(bounds.has(row.start), `${kind}, one space, at ${w}: row ${JSON.stringify(row.text)} at ${row.start}`).toBe(true);
+          expect(row.text.startsWith(ext), `${kind}, one space, at ${w}: no row begins with the extender`).toBe(false);
+        }
+      }
+    }
+    // The F1179 row itself.
+    const rows = wrapCellsParts("é\u200D\u{1F468} \u200D\u{1F468}\u0301", 4);
+    expect(rows.every((r) => starts("é\u200D\u{1F468} \u200D\u{1F468}\u0301").has(r.start)), "F1179's row begins on boundaries").toBe(true);
+  });
   it("T3.10c: an unbroken token breaks mid-word rather than overflowing", () => {
     const rows = wrapCells("x".repeat(25), 10);
 
@@ -461,6 +498,206 @@ describe("C09 §5a — the three pieces, and where the segmenter is asked (I63)"
     expect(sliceCells("ae\u0301b", 0, 2)).toBe("ae\u0301");
     expect(sliceCells("ae\u0301b", 0, 2).length, "two cells, three code units").toBe(3); // cells-ok — a code-unit count, deliberately
     expect(sliceCells(`${RED}ae\u0301${SGR_RESET}b`, 0, 2)).toBe(`${RED}ae\u0301${SGR_RESET}${SGR_RESET}`);
+  });
+});
+
+describe("C09 I74 — a unit of the rasterised alphabets is its own cluster unless the next unit can extend it", () => {
+  const RED = "\u001b[31m";
+  const SGR = /\u001b\[[0-9;]*m/g;
+  const SEG = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+  const clustersOf = (row: string): readonly string[] => [...SEG.segment(row)].map((s) => s.segment);
+  /** `fitStyled` over the segmenter's clusters, for a row with no escape — the walk's own conditions. */
+  const fitRef = (row: string, width: number): string => {
+    if (cells(row) === width) return row;
+    let out = ""; let used = 0;
+    for (const g of clustersOf(row)) {
+      const w = cells(g);
+      if (used + w > width) break;
+      out += g; used += w;
+    }
+    return out + " ".repeat(Math.max(0, width - used));
+  };
+  /** `sliceCells` over the segmenter's clusters, for a row with no escape — the walk's own conditions. */
+  const sliceRef = (row: string, from: number, to: number): string => {
+    if (to <= from) return "";
+    let out = ""; let used = 0; let started = false;
+    for (const g of clustersOf(row)) {
+      const w = cells(g);
+      if (used < from && used + w > from) { started = true; out += " ".repeat(used + w - from); used += w; continue; }
+      if (used >= from && !started) started = true;
+      if (used >= to) break;
+      if (used >= from && used + w > to) { out += " ".repeat(to - used); break; }
+      if (started) out += g;
+      used += w;
+    }
+    return out;
+  };
+  const lcg = (seed: number): (() => number) => {
+    let x = seed >>> 0;
+    return () => { x = (Math.imul(x, 1664525) + 1013904223) >>> 0; return x / 4294967296; };
+  };
+  const TABLE_BMP: [number, number][] = [];
+  for (let i = 0; i < CELL_PER_UNIT_RANGES.length; i += 2) { // cells-ok — a pair index
+    const lo = CELL_PER_UNIT_RANGES[i]!; const hi = CELL_PER_UNIT_RANGES[i + 1]!;
+    if (hi <= 0xffff) TABLE_BMP.push([lo, hi]);
+  }
+  const EXTENDERS: readonly [string, string][] = [
+    ["a combining mark", "́"], ["an enclosing mark", "⃣"], ["a spacing mark", "ः"],
+    ["the joiner and a pictograph", "‍\u{1F468}"], ["the emoji-presentation selector", "️"], ["a skin-tone modifier", "\u{1F3FB}"],
+  ];
+
+  it("T1.48 (C09 I74, F1177): every range of the table paired with every kind of extender keeps the cluster whole through cells, fitStyled and sliceCells, two table units cut between, and a seeded corpus measures the same by both paths", () => {
+    expect(TABLE_BMP.length, "the table has BMP ranges").toBeGreaterThanOrEqual(3);
+    let pairs = 0;
+    for (const [lo, hi] of TABLE_BMP) {
+      for (const cp of [lo, (lo + hi) >> 1, hi]) {
+        const u = String.fromCharCode(cp);
+        for (const [kind, ext] of EXTENDERS) {
+          const pair = u + ext;
+          const first = clustersOf(pair)[0] as string;
+          const label = `U+${cp.toString(16)} with ${kind}`;
+          // **The pair measures as the segmenter clusters it**: the first
+          // cluster's width plus the rest's, never the unit plus a stray.
+          expect(cells(pair), label).toBe(clustersOf(pair).reduce((t, g) => t + cells(g), 0));
+          const w = cells(first);
+          // **Kept whole by both walks**, at the cluster's own width and cut at one.
+          expect(sliceCells(`${pair}x`, 0, w), `${label}: sliceCells keeps the cluster`).toBe(sliceRef(`${pair}x`, 0, w));
+          expect(sliceCells(`${pair}x`, 0, 1), `${label}: a window of one`).toBe(sliceRef(`${pair}x`, 0, 1));
+          expect(fitStyled(`${pair}x`, w, SGR_RESET), `${label}: fitStyled keeps the cluster`).toBe(fitRef(`${pair}x`, w));
+          expect(fitStyled(`${pair}x`, 1, SGR_RESET), `${label}: fitStyled at one`).toBe(fitRef(`${pair}x`, 1));
+          pairs += 1;
+        }
+        // **Two units of the table are two clusters**, cut between.
+        expect(fitStyled(`${u}${u}`, 1, SGR_RESET), `two of U+${cp.toString(16)}`).toBe(u);
+        expect(sliceCells(`${u}${u}`, 1, 2), `the second of U+${cp.toString(16)}`).toBe(u);
+        expect(cells(`${u}${u}`)).toBe(2);
+      }
+    }
+    expect(pairs).toBe(TABLE_BMP.length * 3 * EXTENDERS.length);
+
+    // **The seeded corpus**: the table's units among ASCII, escapes, every
+    // extender, Hangul, CJK, a Prepend and a flag — rows the fast path answers
+    // and rows the segmenter must.
+    const PIECES = [
+      "a", "b", " ", "xy", "─", "│", "┌", "█", "▄", "⠿", "⠁", "→", "↔", "▁",
+      "́", "⃣", "ः", "‍\u{1F468}", "️", "\u{1F3FB}",
+      "한", "日", "؀", "\u{1F1EC}\u{1F1E7}", "\u{1F44D}", "é",
+    ];
+    const EXT_FIRST = new Set(["́", "⃣", "ः", "‍\u{1F468}", "️", "\u{1F3FB}"]);
+    const isTableUnit = (s: string): boolean => s.length === 1 && TABLE_BMP.some(([lo, hi]) => s.charCodeAt(0) >= lo && s.charCodeAt(0) <= hi);
+    const rand = lcg(0x5eed_c09_74);
+    let fast = 0; let slow = 0; let escaped = 0;
+    for (let n = 0; n < 3000; n += 1) {
+      const count = 1 + Math.floor(rand() * 8);
+      const pieces: string[] = [];
+      for (let k = 0; k < count; k += 1) pieces.push(PIECES[Math.floor(rand() * PIECES.length)] as string);
+      const plain = pieces.join("");
+      for (let k = 0; k + 1 < pieces.length; k += 1) {
+        if (isTableUnit(pieces[k] as string)) {
+          if (EXT_FIRST.has(pieces[k + 1] as string)) slow += 1; else fast += 1;
+        }
+      }
+      const total = cells(plain);
+      expect(cells(plain), `row ${n}: cells by clusters`).toBe(clustersOf(plain).reduce((t, g) => t + cells(g), 0));
+      for (let w = 0; w <= total + 1; w += 1) { // cells-ok — a width sweep
+        expect(fitStyled(plain, w, SGR_RESET), `row ${n} fit ${w}: ${JSON.stringify(plain)}`).toBe(fitRef(plain, w));
+      }
+      for (let a = 0; a <= total; a += 1) { // cells-ok — a window sweep
+        for (const b of [a + 1, a + 2, total]) {
+          if (b <= a) continue;
+          expect(sliceCells(plain, a, b), `row ${n} slice [${a}, ${b}): ${JSON.stringify(plain)}`).toBe(sliceRef(plain, a, b));
+        }
+      }
+      // **Escapes between clusters only** (I63's clause): before a piece that
+      // is not an extender.
+      let styled = "";
+      for (let k = 0; k < pieces.length; k += 1) {
+        const piece = pieces[k] as string;
+        if (!EXT_FIRST.has(piece) && rand() < 0.4) { styled += rand() < 0.5 ? RED : SGR_RESET; escaped += 1; }
+        styled += piece;
+      }
+      expect(displayCells(styled), `row ${n}: displayCells`).toBe(cells(styled.replace(SGR, "")));
+      for (const w of [0, 1, Math.floor(total / 2), total, total + 3]) {
+        expect(displayCells(fitStyled(styled, w, SGR_RESET)), `row ${n}: fitStyled measures ${w}`).toBe(w);
+      }
+    }
+    expect(fast, "rows the fast path answers").toBeGreaterThan(500);
+    expect(slow, "and table units the segmenter must still decide").toBeGreaterThan(300);
+    expect(escaped, "and escapes placed between clusters").toBeGreaterThan(1000);
+  });
+  it("T1.49 (C09 I74, F1178): graphemes, clusterEnds, placeableClusters, hardWrapCells and wrapCellsParts answer the segmenter's own clusters over a seeded corpus of ASCII, Latin, controls, the table's units, every extender, Hangul, CJK, a Prepend, a flag and a pictograph, at every width", () => {
+    // **The reference is the segmenter itself**, iterated whole as the walks
+    // used to iterate it — not a reconstruction of the rule the walks apply.
+    const PIECES = [
+      "a", "bc", " ", "x y", "é", "ÿ", "ȧ", "˿", "­", "\t", "\r", "\n", "\r\n",
+      "─", "│", "█", "▄", "⠿", "→",
+      "́", "⃣", "ः", "‍\u{1F468}", "️", "\u{1F3FB}", "̀",
+      "한", "日本", "؀", "\u{1F1EC}\u{1F1E7}", "\u{1F44D}", "\u{1F468}",
+    ];
+    const EXT_FIRST = new Set(["́", "⃣", "ः", "‍\u{1F468}", "️", "\u{1F3FB}", "̀"]);
+    const isSolo = (s: string): boolean => s.length === 1 && s !== "\r" && (s.charCodeAt(0) < 0x300 || TABLE_BMP.some(([lo, hi]) => s.charCodeAt(0) >= lo && s.charCodeAt(0) <= hi));
+    const ends = (text: string): readonly number[] => {
+      const out: number[] = []; let at = 0;
+      for (const g of clustersOf(text)) { at += g.length; out.push(at); }
+      return out;
+    };
+    const SUB = placeableClusters("日", 1);
+    expect(SUB, "the substitute is one cell and not the cluster").not.toBe("日");
+    expect(cells(SUB)).toBe(1);
+    const rand = lcg(0x5eed_c09_49);
+    let fast = 0; let slow = 0; let crlf = 0; let wrapped = 0;
+    for (let n = 0; n < 2000; n += 1) {
+      const count = 1 + Math.floor(rand() * 8);
+      const pieces: string[] = [];
+      for (let k = 0; k < count; k += 1) pieces.push(PIECES[Math.floor(rand() * PIECES.length)] as string);
+      const text = pieces.join("");
+      for (let k = 0; k + 1 < pieces.length; k += 1) {
+        if (isSolo(pieces[k] as string)) { if (EXT_FIRST.has(pieces[k + 1] as string)) slow += 1; else fast += 1; }
+      }
+      if (text.includes("\r\n")) crlf += 1;
+      const ref = clustersOf(text);
+      const label = `row ${n}: ${JSON.stringify(text)}`;
+      expect(graphemes(text), `${label}: graphemes`).toEqual(ref);
+      expect(clusterEnds(text), `${label}: clusterEnds`).toEqual(text.split("").every((ch) => ch >= " " && ch <= "~") ? [] : ends(text));
+      const total = cells(text);
+      for (let w = 1; w <= total + 1; w += 1) { // cells-ok — a width sweep
+        // `placeable` is private: an unplaceable cluster is one wider than the
+        // width, written as the substitute `SUB` — so the reference is the
+        // segmenter's clusters, each kept or substituted by its own width.
+        // `clusterWidth` is `placeable`'s own measure, where `cells` strips a control.
+        const fits = ref.every((g) => clusterWidth(g) <= w);
+        expect(placeableClusters(text, w), `${label}: placeableClusters at ${w}`).toBe(ref.map((g) => (clusterWidth(g) > w ? SUB : g)).join(""));
+        // **Every wrapped row begins on a boundary of its paragraph**, and is
+        // an exact slice at its `start` — of the paragraph as `wrapRuns` hands
+        // it over, every cluster already placed, since `start` counts the
+        // units the wrap wrote and a substitute is one unit.
+        for (const raw of text.split("\n")) {
+          const paragraph = placeableClusters(raw, w);
+          const bounds = new Set([0, ...ends(paragraph)]);
+          const rows = wrapCellsParts(paragraph, w);
+          let last = -1;
+          for (const row of rows) {
+            // **Every row, no exception**: the cut after a space carrying an
+            // extender that this sweep found is F1179, closed by T3.10e.
+            expect(bounds.has(row.start), `${label}: wrap at ${w} starts row ${JSON.stringify(row.text)} at ${row.start}`).toBe(true);
+            expect(row.start, `${label}: wrap at ${w} advances`).toBeGreaterThan(last);
+            last = row.start;
+            expect(paragraph.slice(row.start, row.start + row.text.length), `${label}: wrap at ${w} slices`).toBe(row.text);
+            wrapped += 1;
+          }
+        }
+        if (fits) {
+          const hard = hardWrapCells(text, w);
+          expect(hard.join(""), `${label}: hardWrapCells at ${w} is the text in pieces`).toBe(text);
+          let at = 0; const all = new Set([0, ...ends(text)]);
+          for (const row of hard) { at += row.length; expect(all.has(at), `${label}: hardWrapCells at ${w} cuts on a boundary`).toBe(true); }
+        }
+      }
+    }
+    expect(fast, "rows the fast path answers").toBeGreaterThan(2000);
+    expect(slow, "and units the segmenter must still decide").toBeGreaterThan(500);
+    expect(crlf, "and a carriage return before a line feed").toBeGreaterThan(30);
+    expect(wrapped, "and rows wrapped").toBeGreaterThan(10000);
   });
 });
 
@@ -1034,5 +1271,171 @@ describe("rowCells — a row as cells, and the fast set is a checked claim (C09 
     // refuses, so the assertion above is not one every code point satisfies.
     expect(cells("日", "narrow")).toBe(2);
     expect(cells("\u0301", "narrow")).toBe(0);
+  });
+});
+
+describe("displayCells — the one pass takes the rasterised alphabets (C09 §5, I77, F1202)", () => {
+  const ESC = "\u001b";
+  const SGR = /\u001b\[[0-9;]*m/g;
+  const dim = `${ESC}[2m`;
+  const colour = (n: number): string => `${ESC}[38;5;${String(n)}m`;
+  const FAMILY = "\u{1F468}\u200d\u{1F469}\u200d\u{1F467}";
+  const KEYCAP = "1\ufe0f\u20e3";
+  /** A plot-shaped row: eighty braille units under a colour change every twenty. */
+  const braille = Array.from({ length: 4 }, (_, k) => `${colour(20 + k)}${"\u2801\u2802\u2800\u28ff\u2847".repeat(4)}`).join("") + SGR_RESET;
+  /** A panel row: a dim rail, box drawing, a dim rail. */
+  const panel = `${dim}\u2502${SGR_RESET}${"\u2500\u256d\u2570\u2534".repeat(20)}${dim}\u2502${SGR_RESET}`;
+
+  it("T1.51 (I77): displayCells equals cells of the stripped text over every arm, at narrow and at wide", () => {
+    const corpus = [
+      braille, panel, "\u2581\u2584\u2588\u2192\u2197", `${colour(3)}\u2500\ufe0f${SGR_RESET}`, "\u2500\u0301x", "\u2500\u200d\u2500",
+      "\u{1FB00}\u{1FB3B}", `${colour(9)}図表${SGR_RESET}`, FAMILY, KEYCAP, "plain ascii row", "", `${dim}x${SGR_RESET}\u2500図`,
+    ];
+    for (const ambiguous of ["narrow", "wide"] as const) {
+      for (const row of corpus) {
+        expect(displayCells(row, ambiguous), `${JSON.stringify(row)} at ${ambiguous}`).toBe(cells(row.replace(SGR, ""), ambiguous));
+      }
+    }
+    // **The arm that is the finding**: every visible unit of the braille row is
+    // a table unit, so the scan's answer is that count — a sweep of `soloUnit`
+    // over the stripped row, which the cluster walk would also give, asserted
+    // so a unit counted as two or none here fails before a frame does.
+    const stripped = braille.replace(SGR, "");
+    let units = 0; // cells-ok — a unit count that is the width by I77
+    for (let i = 0; i < stripped.length; i += 1) { // cells-ok — a code-unit cursor
+      expect(soloUnit(stripped.charCodeAt(i)), `unit ${String(i)} is of the table`).toBe(true);
+      units += 1;
+    }
+    expect(displayCells(braille, "narrow")).toBe(units);
+    expect(displayCells(braille, "narrow")).toBe(80);
+    // **At `wide` the set is not admitted**: box drawing is Ambiguous and
+    // measures two there (I65), braille is Neutral and stays one.
+    expect(displayCells(panel, "wide")).toBe(2 * 82);
+    expect(displayCells(braille, "wide")).toBe(80);
+    // **A table unit before a selector leaves the scan**, and the cluster walk
+    // answers two — the arm a next-unit test would have duplicated.
+    expect(displayCells(`${colour(3)}\u2500\ufe0f${SGR_RESET}`, "narrow")).toBe(2);
+  });
+});
+
+describe("fitStyled — a short row is padded, not walked (C09 §5a, I78, F1204)", () => {
+  const ESC = "\u001b";
+  const SGR = /\u001b\[[0-9;]*m/g;
+  const RED = `${ESC}[31m`;
+  const FAMILY = "\u{1F468}\u200d\u{1F469}\u200d\u{1F467}";
+  const KEYCAP = "1\ufe0f\u20e3";
+  const LINK = `${ESC}]8;;https://example.test${ESC}\\`;
+
+  it("T1.52 (I78): a row under the width comes back as the row, the shortfall in blanks, and nothing else", () => {
+    // **Held from outside** — the answer's width, prefix and suffix, not its
+    // construction — so a pad that disagreed with the measure, or a walk that
+    // dropped or closed something on a row it did not cut, fails here rather
+    // than in a frame.
+    const corpus = [
+      `${RED}styled ascii${SGR_RESET}`, "plain ascii", `a ${FAMILY} b ${KEYCAP}`, "e\u0301x", `tab\there`, `${LINK}link${ESC}]8;;${ESC}\\ after`,
+      `${RED}\u2801\u2802\u28ff${ESC}[32m\u2847\u2800${SGR_RESET}`, "",
+    ];
+    for (const row of corpus) {
+      const w = displayCells(row);
+      expect(fitStyled(row, w, SGR_RESET), `${JSON.stringify(row)} at its own width: itself`).toBe(row);
+      for (const extra of [1, 20]) {
+        const width = w + extra;
+        const out = fitStyled(row, width, SGR_RESET);
+        expect(displayCells(out), `${JSON.stringify(row)} + ${String(extra)}: exactly the width`).toBe(width);
+        expect(out.startsWith(row), "the row, byte for byte, first").toBe(true);
+        expect(out.slice(row.length), "then the shortfall in blanks").toBe(" ".repeat(extra));
+        expect((out.match(SGR) ?? []).length, "and no reset the row did not carry").toBe((row.match(SGR) ?? []).length);
+      }
+    }
+    // **The cut path is the walk's still** (I9, T1.30): over the width, cut and
+    // closed; a straddling glyph dropped and blanked.
+    expect(fitStyled(`${RED}abcdef${SGR_RESET}`, 3, SGR_RESET)).toBe(`${RED}abc${SGR_RESET}`);
+    expect(fitStyled("a日b", 2, SGR_RESET)).toBe("a ");
+  });
+  it("T1.53 (I9, I79, F1205): truncate and truncateParts from both ends equal a reference cut made with the segmenter's iterator, over a corpus at every width", () => {
+    // **The walk this replaces, re-stated rather than imported.** Before I79
+    // both arms built every cluster of the whole line through the iterator and
+    // walked from the front until the budget was spent; the cursor walk must
+    // give the same bytes at every width, which only the old walk can say.
+    const SEG = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+    type Caps = Readonly<{ unicode: "full" | "bmp" | "ascii"; ambiguousWidth?: "narrow" | "wide" }>;
+    const reference = (text: string, width: number, caps: Caps, from: "start" | "end"): string => {
+      const amb = caps.ambiguousWidth ?? "narrow";
+      const limit = Math.max(0, Math.floor(width));
+      if (limit === 0) return "";
+      const clean = stripControl(text);
+      if (cells(clean, amb) <= limit) return clean;
+      const marker = caps.unicode === "ascii" ? "~" : "\u2026";
+      const markerCells = cells(marker, amb);
+      if (markerCells > limit) return " ".repeat(limit);
+      const budget = limit - markerCells;
+      if (budget <= 0) return marker;
+      const clusters = [...SEG.segment(clean)].map((c) => c.segment);
+      const order = from === "start" ? [...clusters].reverse() : clusters;
+      let kept = "";
+      let used = 0;
+      for (const segment of order) {
+        const w = cells(segment, amb);
+        if (used + w > budget) break;
+        kept = from === "start" ? segment + kept : kept + segment;
+        used += w;
+      }
+      const pad = " ".repeat(budget - used);
+      return from === "start" ? marker + pad + kept : kept + pad + marker;
+    };
+
+    const ZWJ = "\u200d";
+    const FAMILY = `\u{1F468}${ZWJ}\u{1F469}${ZWJ}\u{1F467}${ZWJ}\u{1F466}`;
+    const KEYCAP = "1\ufe0f\u20e3";
+    const corpus: readonly string[] = [
+      "the frame holds under load and the joint carries weight",
+      "図表図表図表図表図表図表",
+      "ab図cd図ef",
+      `a${FAMILY}b${KEYCAP}c`,
+      "cafe\u0301 au lait, abe\u0301",
+      "ab\u0007cd\u001befg\u009fh",
+      "⠁⠃⠉⠙⠑⠋⠛⠓",
+      `x図${FAMILY}e\u0301⠁\u0007${KEYCAP}yz`,
+    ];
+    const capsList: readonly Caps[] = [
+      { unicode: "full", ambiguousWidth: "narrow" },
+      { unicode: "full", ambiguousWidth: "wide" },
+      { unicode: "ascii", ambiguousWidth: "narrow" },
+    ];
+    let checked = 0;
+    for (const text of corpus) {
+      for (const caps of capsList) {
+        const amb = caps.ambiguousWidth ?? "narrow";
+        const clean = stripControl(text);
+        const lineCells = cells(clean, amb);
+        for (let width = 1; width <= lineCells + 1; width += 1) {
+          for (const from of ["end", "start"] as const) {
+            const label = `${JSON.stringify(text)} at ${String(width)} from ${from} (${caps.unicode}/${amb})`;
+            const expected = reference(text, width, caps, from);
+            const whole = truncate(text, width, caps, from);
+            expect(whole, `truncate ${label}`).toBe(expected);
+            expect(cells(whole, amb), `width of ${label}`).toBe(Math.min(width, lineCells));
+            const parts = truncateParts(text, width, caps, from);
+            expect(parts.prefix + parts.kept + parts.suffix, `truncateParts ${label}`).toBe(expected);
+            if (from === "end") {
+              expect(clean.startsWith(parts.kept), `kept is a prefix ${label}`).toBe(true);
+              expect(parts.start, `start ${label}`).toBe(0);
+            } else {
+              expect(clean.endsWith(parts.kept), `kept is a suffix ${label}`).toBe(true);
+              // An empty `kept` — the marker refused or the budget spent on it
+              // — has no offset to report, and the edge answers 0 on both arms.
+              if (parts.kept !== "") expect(parts.start, `start is the suffix's offset ${label}`).toBe(clean.length - parts.kept.length);
+            }
+            checked += 1;
+          }
+        }
+      }
+    }
+    // **The fixture responds**: the corpus reaches a cut inside a wide glyph,
+    // a refused family and a control stripped before the cut, and the sweep
+    // is not a handful of widths.
+    expect(checked).toBeGreaterThan(800);
+    expect(truncate("ab図cd", 4, { unicode: "full" })).toBe("ab …");
+    expect(truncate("ab図cd", 4, { unicode: "full" }, "start")).toBe("… cd");
   });
 });

@@ -193,7 +193,15 @@ const tui = createTui({
   // and a rate needs two samples: the default 1000 ms never fires inside a
   // sub-second scripted session, and the row comes back refused for a reason
   // that has nothing to do with the code under test.
-  profile: { tier: TIER, sampleMs: 25, onReport: (r) => void (report = r) },
+  //
+  // **Five, not twenty-five — the subject outran the parameter** (F1164's
+  // round). At 25 ms the `300 6` run T5.3 drives took one sample: the first
+  // yield after the recorder exists is 128 ms later (the greeting's build and
+  // first mount are synchronous), and the six keystrokes then run in 32 ms,
+  // which is one interval. Measured with the timers logged: tick scheduled at
+  // 768 ms, fired at 918, session over at 950. A sample is `process.cpuUsage`
+  // and `memoryUsage`, tens of microseconds, so 5 ms costs the run nothing.
+  profile: { tier: TIER, sampleMs: 5, onReport: (r) => void (report = r) },
 });
 
 console.log(`# make profile — ${String(LINES)} patch lines + a 40-row table + a 200-point plot, ${String(ENTRIES)} transcript ${ENTRIES === 1 ? "entry" : "entries"}`);

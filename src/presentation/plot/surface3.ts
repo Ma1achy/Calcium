@@ -26,8 +26,8 @@ import {
   cross,
   dot,
   NEAR,
-  project,
-  strokeSeg,
+  hypot2,
+  hypot3,
   sub,
   unit,
   unitOf,
@@ -39,51 +39,241 @@ import {
   type Vec3,
 } from "./project3.js";
 
-/** A vertex with everything a sample interpolated from it needs. */
-type Vert = Readonly<{ p: Vec3; n: Vec3; v: number | undefined }>;
+/**
+ * A vertex as the raster reads it. `p`, `n` and `v` are the geometry's and
+ * never move; `rec`, `s` and `stamp` are the raster's own record on it (C12
+ * I130) — the screen projection taken under a frame stamp, read back only
+ * under that same stamp, so a projection from the last camera is never
+ * reused. The object lives in the caller's scratch (I107) and nowhere else.
+ *
+ * **`rec` is allocated once and written in place.** A held vertex is
+ * old-generation, and a fresh record stored on it every frame is a write
+ * barrier and a promotion per projection — F1152's class, measured again on
+ * F1166's first cut: `toScreen` self time rose while its call count fell.
+ * `s` is this frame's answer: `rec` when the vertex projects, `null` when it
+ * is behind the eye.
+ */
+/** A raster vertex as a record — what `cornersOf` and `geometryFrom` exchange with a row; the raster reads the lanes (C12 I139). */
+export type Corner = Readonly<{ p: Vec3; n: Vec3; v: number | undefined }>;
 
 /**
- * What a whole surface decides, held once and shared by reference across its
- * triangles (C12 I95).
+ * The geometry as lanes (C12 I139, F1184).
  *
- * `cull` is `0` for *do not*, and otherwise the sign the mesh's own signed
- * volume gave — never the caller's winding (§6i row 3, F461).
+ * A raster vertex is a referenced mesh vertex under smooth shading, in
+ * first-reference order, and a face corner under flat; `idx` names three per
+ * face. `screen` holds the per-frame record — `S_STRIDE` doubles a vertex under
+ * `stamps` (C12 I130). Every lane but `idx` and `stamps` carries `SPARE`
+ * slots past the last vertex for the clip path's cut vertices (C12 I140): a
+ * cut is written into them and projected as a vertex is, so no double crosses
+ * the projection's call (F1185). `cen` and `fnrm` are the face lanes (C12
+ * I141): a face's centroid by the cull's own expression and its unit normal,
+ * three doubles a face, read by the cull in face order (F1186).
  */
+export type Lanes = Readonly<{
+  count: number;
+  pos: Float64Array;
+  nrm: Float64Array;
+  value: readonly (number | undefined)[];
+  idx: Uint32Array;
+  screen: Float64Array;
+  stamps: Int32Array;
+  cen: Float64Array;
+  fnrm: Float64Array;
+}>;
+
+export type RasterFrame = { readonly stamp: number; projected: number };
+
+export type Geometry3 = Readonly<{ tris: readonly Tri3[]; lanes: Lanes }> & { frame: number };
+
 export type Skin = Readonly<{ cull: 0 | 1 | -1; wire: boolean | "over" }>;
 
-/**
- * One triangle of one surface, in **unit** space.
- *
- * **`fn` is the face's own normal and it is not the shading normal.** Under
- * `shading: "smooth"` the vertices carry averages, and an average over adjacent
- * faces does not describe any face's orientation — so the cull reads this and
- * the lighting reads `a.n`/`b.n`/`c.n` (§6i row 12). The smooth arm computed it
- * already; storing it costs nothing.
- *
- * **`edges` is which of `ab`, `bc`, `ca` the *caller* drew**, in that order,
- * matching `fill`'s `w0`/`w1`/`w2`. A height field's cell diagonal is not one
- * of them; a mesh's triangles are all the structure a mesh has (§6i row 9).
- */
+/** A face over its geometry's lanes: `idx[f · 3 … f · 3 + 2]` are its corners (C12 I139). */
 export type Tri3 = Readonly<{
-  a: Vert;
-  b: Vert;
-  c: Vert;
-  fn: Vec3;
+  f: number;
+  lanes: Lanes;
   edges: readonly [boolean, boolean, boolean];
   series: number;
   skin: Skin;
 }>;
 
+/** The screen slot's layout (C12 I139): eight doubles a raster vertex. */
+const S_STRIDE = 8;
+const S_X = 0;
+const S_Y = 1;
+const S_VX = 2;
+const S_VY = 3;
+const S_VZ = 4;
+const S_NX = 5;
+const S_NY = 6;
+const S_NZ = 7;
+/** Slots past the last vertex for the clip path's cut vertices — two triangles share at most two cuts. */
+const SPARE = 3;
+
+/** The lanes for `count` raster vertices and `faces` faces, unfilled. */
+function makeLanes(count: number, faces: number): Lanes {
+  return {
+    count,
+    pos: new Float64Array((count + SPARE) * 3), // cells-ok — a vertex count
+    nrm: new Float64Array((count + SPARE) * 3), // cells-ok — a vertex count
+    value: new Array<number | undefined>(count + SPARE).fill(undefined), // cells-ok — a vertex count
+    idx: new Uint32Array(faces * 3), // cells-ok — a face count
+    screen: new Float64Array((count + SPARE) * S_STRIDE), // cells-ok — a vertex count
+    stamps: new Int32Array(count), // cells-ok — a vertex count
+    cen: new Float64Array(faces * 3), // cells-ok — a face count
+    fnrm: new Float64Array(faces * 3), // cells-ok — a face count
+  };
+}
+
+/** A raster vertex's value — a cut's sits in the lane's spare slots (C12 I139, I140). */
+function valueAt(L: Lanes, k: number): number | undefined {
+  return L.value[k];
+}
+
+/** A face's unit normal read back from its lane — for rows, not the raster (C12 I141). */
+export function faceNormalOf(tri: Tri3): Vec3 {
+  const N = tri.lanes.fnrm;
+  const o = tri.f * 3;
+  return { x: N[o] as number, y: N[o + 1] as number, z: N[o + 2] as number };
+}
+
+/** A raster vertex read back as a record — for rows and the clip path, not the raster (C12 I139). */
+export function cornerAt(L: Lanes, k: number): Corner {
+  const q = k * 3;
+  return {
+    p: { x: L.pos[q] as number, y: L.pos[q + 1] as number, z: L.pos[q + 2] as number },
+    n: { x: L.nrm[q] as number, y: L.nrm[q + 1] as number, z: L.nrm[q + 2] as number },
+    v: L.value[k],
+  };
+}
+
+/** A face's three corners as records, in `idx` order (C12 I139). */
+export function cornersOf(t: Tri3): readonly [Corner, Corner, Corner] {
+  const L = t.lanes;
+  const o = t.f * 3;
+  return [cornerAt(L, L.idx[o] as number), cornerAt(L, L.idx[o + 1] as number), cornerAt(L, L.idx[o + 2] as number)];
+}
+
+/** A raster vertex's screen slot read back as a record (C12 I130, I139). */
+export function screenAt(
+  L: Lanes,
+  k: number,
+): Readonly<{ x: number; y: number; vx: number; vy: number; vz: number; nx: number; ny: number; nz: number }> {
+  const S = L.screen;
+  const o = k * S_STRIDE;
+  return {
+    x: S[o + S_X] as number, y: S[o + S_Y] as number,
+    vx: S[o + S_VX] as number, vy: S[o + S_VY] as number, vz: S[o + S_VZ] as number,
+    nx: S[o + S_NX] as number, ny: S[o + S_NY] as number, nz: S[o + S_NZ] as number,
+  };
+}
+
+/** Writes a raster vertex's screen slot — for a row that places a record by hand (C12 I138, I139). */
+export function placeScreen(
+  L: Lanes,
+  k: number,
+  x: number,
+  y: number,
+  vz: number,
+  vx = 0,
+  vy = 0,
+  nx = 0,
+  ny = 0,
+  nz = 1,
+): void {
+  const S = L.screen;
+  const o = k * S_STRIDE;
+  S[o + S_X] = x;
+  S[o + S_Y] = y;
+  S[o + S_VX] = vx;
+  S[o + S_VY] = vy;
+  S[o + S_VZ] = vz;
+  S[o + S_NX] = nx;
+  S[o + S_NY] = ny;
+  S[o + S_NZ] = nz;
+}
+
+/**
+ * A face's centroid into its lane, by the cull's own expression over the
+ * position lane (C12 I141): the same three sums and divisions the cull made
+ * per frame, made once.
+ */
+function writeCentroid(lanes: Lanes, f: number): void {
+  const P = lanes.pos;
+  const o = f * 3;
+  const a = (lanes.idx[o] as number) * 3;
+  const b = (lanes.idx[o + 1] as number) * 3;
+  const c = (lanes.idx[o + 2] as number) * 3;
+  lanes.cen[o] = ((P[a] as number) + (P[b] as number) + (P[c] as number)) / 3;
+  lanes.cen[o + 1] = ((P[a + 1] as number) + (P[b + 1] as number) + (P[c + 1] as number)) / 3;
+  lanes.cen[o + 2] = ((P[a + 2] as number) + (P[b + 2] as number) + (P[c + 2] as number)) / 3;
+}
+
+/**
+ * A geometry from explicit corners and faces — the shape a row builds a
+ * triangle in, with the normals it chooses (C12 I139). Every corner is a raster
+ * vertex in order; a face normal not given is `unit(cross(b − a, c − a))`.
+ */
+export function geometryFrom(
+  corners: readonly Corner[],
+  faces: readonly (readonly [number, number, number])[],
+  shape: Readonly<{
+    fn?: readonly Vec3[];
+    edges?: readonly (readonly [boolean, boolean, boolean])[];
+    series?: number;
+    skin?: Skin;
+  }> = {},
+): Geometry3 {
+  const count = corners.length; // cells-ok — a vertex count
+  const lanes = makeLanes(count, faces.length); // cells-ok — a face count
+  for (let k = 0; k < count; k += 1) { // cells-ok — a vertex index
+    const c = corners[k] as Corner;
+    const q = k * 3;
+    lanes.pos[q] = c.p.x;
+    lanes.pos[q + 1] = c.p.y;
+    lanes.pos[q + 2] = c.p.z;
+    lanes.nrm[q] = c.n.x;
+    lanes.nrm[q + 1] = c.n.y;
+    lanes.nrm[q + 2] = c.n.z;
+    (lanes.value as (number | undefined)[])[k] = c.v;
+  }
+  const skin: Skin = shape.skin ?? { cull: 0, wire: false };
+  const series = shape.series ?? 0;
+  const tris: Tri3[] = new Array<Tri3>(faces.length); // cells-ok — a face count
+  for (let f = 0; f < faces.length; f += 1) { // cells-ok — a face index
+    const face = faces[f] as readonly [number, number, number];
+    const o = f * 3;
+    lanes.idx[o] = face[0];
+    lanes.idx[o + 1] = face[1];
+    lanes.idx[o + 2] = face[2];
+    const a = (corners[face[0]] as Corner).p;
+    const b = (corners[face[1]] as Corner).p;
+    const c = (corners[face[2]] as Corner).p;
+    const fn = shape.fn?.[f] ?? unit(cross(sub(b, a), sub(c, a)));
+    lanes.fnrm[o] = fn.x;
+    lanes.fnrm[o + 1] = fn.y;
+    lanes.fnrm[o + 2] = fn.z;
+    writeCentroid(lanes, f);
+    tris[f] = { f, lanes, edges: shape.edges?.[f] ?? [true, true, true], series, skin };
+  }
+  return { tris, lanes, frame: 0 };
+}
+
 /** What a shaded sample hands back to whoever is composing the raster. */
-export type Shaded = Readonly<{
-  depth: number;
-  value: number | undefined;
-  series: number;
-  /** The clamped lighting, `[0, 1]`. Ambient is its floor and it is never zero. */
-  intensity: number;
-  /** On one of the caller's own edges, within `EDGE_HALF` of a sample (C12 I95). */
-  edge: boolean;
-}>;
+/**
+ * The painter, **called with the sample as scalars** (C12 I129): the sample's
+ * offset, its view-space depth, its interpolated value, the series, the
+ * clamped lighting `[0, 1]` — ambient is its floor and it is never zero —
+ * and whether it lies on one of the caller's own edges within `EDGE_HALF` of
+ * a sample (I95). No record is built per sample, which is the invariant.
+ */
+type Painter = (
+  i: number,
+  depth: number,
+  value: number | undefined,
+  series: number,
+  intensity: number,
+  edge: boolean,
+) => void;
 
 /**
  * The shading terms, and **they sum to 1 by construction** (C12 I94, F457).
@@ -240,48 +430,206 @@ function gridPoints(s: Surface3): readonly Vec3[] {
  * nothing — where averaging *unit* normals by count would let it pull its
  * neighbours toward an answer it does not have.
  */
-export function trianglesOf(s: Surface3, extent: Extent3, series: number): readonly Tri3[] {
-  const pts = surfacePoints(s).map((p) => unitOf(p, extent));
+/**
+ * The triangles and the referenced vertices together (C12 I127, §6o row 15).
+ *
+ * **One corner per distinct referenced vertex and never one per face corner.**
+ * The ramp span takes a minimum and a maximum over the set, and a minimum over
+ * a multiset is the minimum over its support — so a bunny vertex on six faces
+ * is projected once toward the same answer (F1154). **A vertex no face
+ * references is not here**, as it was not in the corner walk this replaces: it
+ * is in the extent, because `surfacePoints` returns it, and in nothing that is
+ * drawn.
+ */
+/** `unit` over three scalars (C12 I137): `hypot3` and three divisions, or the values unchanged at zero length, as `unit` answers. */
+function unit3(x: number, y: number, z: number): Vec3 {
+  const n = hypot3(x, y, z);
+  return n === 0 ? { x, y, z } : { x: x / n, y: y / n, z: z / n };
+}
+
+export function geometryOf(s: Surface3, extent: Extent3, series: number): Geometry3 {
+  const src = surfacePoints(s);
+  const count = src.length; // cells-ok — a vertex count
+  const pts: Vec3[] = new Array<Vec3>(count);
+  for (let k = 0; k < count; k += 1) pts[k] = unitOf(src[k] as Vec3, extent); // cells-ok — a vertex index
   const idx = facesOf(s);
-  const mask = edgeMask(s, idx.length); // cells-ok — a face count
+  const faces = idx.length; // cells-ok — a face count
+  const mask = edgeMask(s, faces);
   const skin: Skin = { cull: cullSign(s, pts, idx), wire: s.wireframe ?? false };
   const flat = s.shading === "flat";
-  // The face normals, unnormalised — their length is twice the area, which is
-  // what makes the accumulation below area-weighted without a second term.
-  const faceN = idx.map(([a, b, c]) =>
-    cross(sub(pts[b] as Vec3, pts[a] as Vec3), sub(pts[c] as Vec3, pts[a] as Vec3)));
-  const vertN: Vec3[] = pts.map(() => ({ x: 0, y: 0, z: 0 }));
-  if (!flat) {
-    for (let f = 0; f < idx.length; f += 1) { // cells-ok — a face index
-      const n = faceN[f] as Vec3;
-      for (const k of idx[f] as readonly [number, number, number]) {
-        const acc = vertN[k] as Vec3;
-        vertN[k] = { x: acc.x + n.x, y: acc.y + n.y, z: acc.z + n.z };
+  // **The normals in two lanes** (C12 I137, F1181). The face normal is
+  // `cross(sub(b, a), sub(c, a))` written out — the same six differences and
+  // six products in the same order — unnormalised, so its length is twice the
+  // area and the accumulation below is area-weighted without a second term.
+  // The vertex sum adds the lane's three per corner in face order, exactly as
+  // the object form summed, so every double is the same double; what was
+  // three objects a face and three more a face corner is two typed lanes.
+  const faceN = new Float64Array(faces * 3); // cells-ok — a face count
+  const vertN = new Float64Array(count * 3); // cells-ok — a vertex count
+  for (let f = 0; f < faces; f += 1) { // cells-ok — a face index
+    const face = idx[f] as readonly [number, number, number];
+    const ia = face[0];
+    const ib = face[1];
+    const ic = face[2];
+    const a = pts[ia] as Vec3;
+    const b = pts[ib] as Vec3;
+    const c = pts[ic] as Vec3;
+    const ux = b.x - a.x;
+    const uy = b.y - a.y;
+    const uz = b.z - a.z;
+    const vx = c.x - a.x;
+    const vy = c.y - a.y;
+    const vz = c.z - a.z;
+    const nx = uy * vz - uz * vy;
+    const ny = uz * vx - ux * vz;
+    const nz = ux * vy - uy * vx;
+    const o = f * 3;
+    faceN[o] = nx;
+    faceN[o + 1] = ny;
+    faceN[o + 2] = nz;
+    if (!flat) {
+      // Accumulated unnormalised (§6j row 7): a large face moves a shared
+      // vertex's normal more than a sliver does.
+      const ax = nx;
+      const ay = ny;
+      const az = nz;
+      let q = ia * 3;
+      vertN[q] = (vertN[q] as number) + ax;
+      vertN[q + 1] = (vertN[q + 1] as number) + ay;
+      vertN[q + 2] = (vertN[q + 2] as number) + az;
+      q = ib * 3;
+      vertN[q] = (vertN[q] as number) + ax;
+      vertN[q + 1] = (vertN[q + 1] as number) + ay;
+      vertN[q + 2] = (vertN[q + 2] as number) + az;
+      q = ic * 3;
+      vertN[q] = (vertN[q] as number) + ax;
+      vertN[q + 1] = (vertN[q + 1] as number) + ay;
+      vertN[q + 2] = (vertN[q + 2] as number) + az;
+    }
+  }
+  const values = valuesOf(s, count);
+  // **The lanes** (C12 I139): a raster vertex per referenced mesh vertex in
+  // first-reference order under smooth shading — one lane index for every face
+  // that names it (I130) — and one per face corner under flat, where the
+  // normal is the face's. The index lane is written first so the count is
+  // known before the position and normal lanes are sized.
+  const slotOf = new Int32Array(count).fill(-1); // cells-ok — a vertex count
+  const idxLane = new Uint32Array(faces * 3); // cells-ok — a face count
+  let n = 0;
+  for (let f = 0; f < faces; f += 1) { // cells-ok — a face index
+    const face = idx[f] as readonly [number, number, number];
+    for (let m = 0; m < 3; m += 1) { // cells-ok — a corner index
+      const k = face[m] as number;
+      if (flat) {
+        idxLane[f * 3 + m] = n;
+        n += 1;
+      } else {
+        let j = slotOf[k] as number;
+        if (j < 0) {
+          j = n;
+          slotOf[k] = j;
+          n += 1;
+        }
+        idxLane[f * 3 + m] = j;
       }
     }
-    for (let k = 0; k < vertN.length; k += 1) vertN[k] = unit(vertN[k] as Vec3); // cells-ok — a vertex index
   }
-  const values = valuesOf(s, pts.length); // cells-ok — a vertex count
-  const out: Tri3[] = [];
-  for (let f = 0; f < idx.length; f += 1) { // cells-ok — a face index
-    const [ia, ib, ic] = idx[f] as readonly [number, number, number];
-    const fn = unit(faceN[f] as Vec3);
-    const at = (k: number): Vert => ({
-      p: pts[k] as Vec3,
-      n: flat ? fn : (vertN[k] as Vec3),
-      v: values[k],
-    });
-    out.push({
-      a: at(ia),
-      b: at(ib),
-      c: at(ic),
-      fn,
-      edges: mask[f] as readonly [boolean, boolean, boolean],
-      series,
-      skin,
-    });
+  const lanes = makeLanes(n, faces);
+  lanes.idx.set(idxLane);
+  const pos = lanes.pos;
+  const nrm = lanes.nrm;
+  const fnrm = lanes.fnrm;
+  const value = lanes.value as (number | undefined)[];
+  const written = new Uint8Array(n); // cells-ok — a vertex count
+  const out: Tri3[] = new Array<Tri3>(faces);
+  for (let f = 0; f < faces; f += 1) { // cells-ok — a face index
+    const face = idx[f] as readonly [number, number, number];
+    const o = f * 3;
+    // **The face normal, `unit` over the lane's three, into the normal lane** (I137, I141).
+    const fn = unit3(faceN[o] as number, faceN[o + 1] as number, faceN[o + 2] as number);
+    fnrm[o] = fn.x;
+    fnrm[o + 1] = fn.y;
+    fnrm[o + 2] = fn.z;
+    for (let m = 0; m < 3; m += 1) { // cells-ok — a corner index
+      const k = face[m] as number;
+      const j = idxLane[o + m] as number;
+      if (written[j] === 1) continue;
+      written[j] = 1;
+      const p = pts[k] as Vec3;
+      const q = j * 3;
+      pos[q] = p.x;
+      pos[q + 1] = p.y;
+      pos[q + 2] = p.z;
+      if (flat) {
+        // **A flat raster vertex's normal is its face's lane entry** (I141).
+        nrm[q] = fnrm[o] as number;
+        nrm[q + 1] = fnrm[o + 1] as number;
+        nrm[q + 2] = fnrm[o + 2] as number;
+      } else {
+        // **The vertex normal, once per raster vertex**: `unit` over the sum lane (I137).
+        const vq = k * 3;
+        const vn = unit3(vertN[vq] as number, vertN[vq + 1] as number, vertN[vq + 2] as number);
+        nrm[q] = vn.x;
+        nrm[q + 1] = vn.y;
+        nrm[q + 2] = vn.z;
+      }
+      value[j] = values[k];
+    }
+    // **The centroid, once the face's corners are in the lane** (I141).
+    writeCentroid(lanes, f);
+    out[f] = { f, lanes, edges: mask[f] as readonly [boolean, boolean, boolean], series, skin };
   }
-  return out;
+  return { tris: out, lanes, frame: 0 };
+}
+
+/**
+ * The ramp span over a surface's referenced vertices, from the bounds the
+ * clouds and paths set — **one function, scalars, one record** (C12 I131, I135).
+ *
+ * **The depth is `project`'s first dot in place** (I131): the same three
+ * subtractions and three products in the same order, and a corner at or behind
+ * `NEAR` is skipped exactly where `project` refuses it — `<=`, so the frozen
+ * `NaN` arm is `project`'s too. **The bounds are parameters and locals, and no
+ * closure captures them** (I135): V8 keeps a captured variable in a context
+ * object, whose slots hold tagged values, so a double assigned to one is a heap
+ * number allocated on every assignment — four a corner over 35,947 corners a
+ * bunny frame when the span was a closure (F1175). **The folds are comparisons
+ * carrying `Math.min`'s and `Math.max`'s answers exactly** — the `NaN` arm on
+ * both bounds, the signed-zero arm on the values — because `Math.min` over a
+ * bound that arrives as a parameter keeps the loop-carried value tagged and
+ * boxes it on every iteration: 22.5 MB a twenty-frame heap with `Math.min`,
+ * nothing with these, nothing with `Math.min` over `nearD - 0` either, which
+ * names the representation and not the arithmetic (I135). The depth has no
+ * zero arm because a depth past `NEAR` is positive.
+ */
+export function spanOverCorners(
+  basis: Basis,
+  lanes: Lanes,
+  nearD: number,
+  farD: number,
+  loV: number,
+  hiV: number,
+): Readonly<{ nearD: number; farD: number; loV: number; hiV: number }> {
+  const e = basis.eye;
+  const f = basis.forward;
+  const P = lanes.pos;
+  const V = lanes.value;
+  for (let i = 0; i < lanes.count; i += 1) { // cells-ok — a corner index
+    const q = i * 3;
+    const px = P[q] as number;
+    const py = P[q + 1] as number;
+    const pz = P[q + 2] as number;
+    const z = (px - e.x) * f.x + (py - e.y) * f.y + (pz - e.z) * f.z;
+    if (z <= NEAR) continue;
+    if (z < nearD || z !== z) nearD = z;
+    if (z > farD || z !== z) farD = z;
+    const v = V[i];
+    if (v !== undefined) {
+      if (v < loV || v !== v || (v === 0 && loV === 0 && 1 / v < 0)) loV = v;
+      if (v > hiV || v !== v || (v === 0 && hiV === 0 && 1 / v > 0)) hiV = v;
+    }
+  }
+  return { nearD, farD, loV, hiV };
 }
 
 /**
@@ -341,8 +689,13 @@ function cullSign(
 ): 0 | 1 | -1 {
   if (s.closed !== true) return 0;
   let v = 0;
-  for (const [a, b, c] of idx) {
-    v += dot(pts[a] as Vec3, cross(pts[b] as Vec3, pts[c] as Vec3));
+  // `dot(a, cross(b, c))` written out, term by term in its order (C12 I137).
+  for (let f = 0; f < idx.length; f += 1) { // cells-ok — a face index
+    const face = idx[f] as readonly [number, number, number];
+    const a = pts[face[0]] as Vec3;
+    const b = pts[face[1]] as Vec3;
+    const c = pts[face[2]] as Vec3;
+    v += a.x * (b.y * c.z - b.z * c.y) + a.y * (b.z * c.x - b.x * c.z) + a.z * (b.x * c.y - b.y * c.x);
   }
   v /= 6;
   return Math.abs(v) < VOLUME_EPS ? 0 : v < 0 ? -1 : 1;
@@ -383,17 +736,18 @@ function valuesOf(s: Surface3, count: number): readonly (number | undefined)[] {
   return out;
 }
 
-/** A vertex projected into sample coordinates, carrying its view position. */
-type Screen = Readonly<{ x: number; y: number; vp: Vec3; n: Vec3; v: number | undefined }>;
-
 const lerpV = (a: Vec3, b: Vec3, t: number): Vec3 => ({
   x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t,
 });
 
-const lerpVert = (a: Vert, b: Vert, t: number): Vert => ({
+/** A vertex through the clip path: a lane vertex by index, or a cut with no slot yet (C12 I139). */
+type ClipVert = { p: Vec3; n: Vec3; v: number | undefined; k: number };
+
+const lerpClipVert = (a: ClipVert, b: ClipVert, t: number): ClipVert => ({
   p: lerpV(a.p, b.p, t),
   n: lerpV(a.n, b.n, t),
   v: a.v === undefined || b.v === undefined ? a.v ?? b.v : a.v + (b.v - a.v) * t,
+  k: -1,
 });
 
 /**
@@ -412,18 +766,87 @@ export function drawTri(
   depth: Depth,
   light: Vec3,
   span: Readonly<{ nearD: number; farD: number }>,
-  paint: (i: number, sample: Shaded) => void,
-): void {
-  if (backfaceCulled(tri, basis)) return;
-  const zOf = (p: Vec3): number => dot(sub(p, basis.eye), basis.forward);
-  const vs = [tri.a, tri.b, tri.c];
-  const behind = vs.filter((w) => zOf(w.p) <= NEAR);
-  if (behind.length === 3) return; // cells-ok — a vertex count
-  for (const t of clipNear(vs as [Vert, Vert, Vert], tri.edges, zOf)) {
-    const s = t.v.map((w) => toScreen(w, basis, grid));
-    if (s.some((q) => q === null)) continue;
-    fill(s as [Screen, Screen, Screen], tri, t.e, grid, depth, light, span, paint);
+  paint: Painter,
+  frame?: RasterFrame,
+): boolean {
+  if (backfaceCulled(tri, basis)) return false;
+  const L = tri.lanes;
+  const o = tri.f * 3;
+  const ia = L.idx[o] as number;
+  const ib = L.idx[o + 1] as number;
+  const ic = L.idx[o + 2] as number;
+  // **The records decide the path** (C12 I139): `toScreen` refuses a corner at
+  // or behind the plane on the expression the three view depths were read by,
+  // so three records is the direct path and none is a face wholly behind.
+  const pa = screenOf(L, ia, basis, grid, frame);
+  const pb = screenOf(L, ib, basis, grid, frame);
+  const pc = screenOf(L, ic, basis, grid, frame);
+  if (pa && pb && pc) {
+    fill(L, ia, ib, ic, tri, tri.edges, grid, depth, light, span, paint);
+    return false;
   }
+  if (!pa && !pb && !pc) return false;
+  // **The clip path**, taken only when a corner is at or behind the plane; the
+  // return value is what lets the caller count it. **In its own function**
+  // (C12 I134, F1173): its closure captured `basis`, and a captured parameter
+  // is a context allocated on every entry to this function — before the cull,
+  // for every triangle — not only on the path that builds the closure.
+  return clipPath(tri, ia, ib, ic, basis, grid, depth, light, span, paint, frame);
+}
+
+/** The clip path of `drawTri`, holding the one closure the raster builds per straddling face (C12 I134). */
+function clipPath(
+  tri: Tri3,
+  ia: number,
+  ib: number,
+  ic: number,
+  basis: Basis,
+  grid: Readonly<{ width: number; height: number }>,
+  depth: Depth,
+  light: Vec3,
+  span: Readonly<{ nearD: number; farD: number }>,
+  paint: Painter,
+  frame: RasterFrame | undefined,
+): boolean {
+  const L = tri.lanes;
+  const zOf = (p: Vec3): number => dot(sub(p, basis.eye), basis.forward);
+  const clipVert = (k: number): ClipVert => {
+    const c = cornerAt(L, k);
+    return { p: c.p, n: c.n, v: c.v, k };
+  };
+  const vs: readonly [ClipVert, ClipVert, ClipVert] = [clipVert(ia), clipVert(ib), clipVert(ic)];
+  // **A cut vertex takes a spare slot in every lane** (C12 I139, I140): its
+  // position, normal and value written there, projected as a lane vertex is —
+  // by the slot, no double across the call (F1185) — counted as one was, and
+  // read by the same fill.
+  const P = L.pos;
+  const Nn = L.nrm;
+  const V = L.value as (number | undefined)[];
+  let spare = 0;
+  for (const t of clipNear(vs, tri.edges, zOf)) {
+    let drawn = true;
+    for (let m = 0; m < 3 && drawn; m += 1) { // cells-ok — a corner index
+      const w = t.v[m] as ClipVert;
+      if (w.k >= 0) continue;
+      if (spare >= SPARE) throw new Error("the clip path cut more vertices than it has slots for");
+      const slot = L.count + spare;
+      const q = slot * 3;
+      P[q] = w.p.x;
+      P[q + 1] = w.p.y;
+      P[q + 2] = w.p.z;
+      Nn[q] = w.n.x;
+      Nn[q + 1] = w.n.y;
+      Nn[q + 2] = w.n.z;
+      V[slot] = w.v;
+      spare += 1;
+      w.k = slot;
+      if (frame !== undefined) frame.projected += 1;
+      if (!toScreenAt(L, slot, basis, grid)) drawn = false;
+    }
+    if (!drawn) continue;
+    fill(L, (t.v[0] as ClipVert).k, (t.v[1] as ClipVert).k, (t.v[2] as ClipVert).k, tri, t.e, grid, depth, light, span, paint);
+  }
+  return true;
 }
 
 /**
@@ -449,12 +872,23 @@ export function drawTri(
  */
 export function backfaceCulled(tri: Tri3, basis: Basis): boolean {
   if (tri.skin.cull === 0) return false;
-  const c = {
-    x: (tri.a.p.x + tri.b.p.x + tri.c.p.x) / 3,
-    y: (tri.a.p.y + tri.b.p.y + tri.c.p.y) / 3,
-    z: (tri.a.p.z + tri.b.p.z + tri.c.p.z) / 3,
-  };
-  return dot(tri.fn, sub(c, basis.eye)) * tri.skin.cull > 0;
+  // **Six doubles in face order** (C12 I141, F1186): the centroid lane holds
+  // `(P[a] + P[b] + P[c]) / 3` per component as this function computed it
+  // 69,451 times a bunny frame through the index lane, and the normal lane
+  // holds `unit` over the face's sum — 0.9 → 0.3 ms a frame measured, the
+  // same doubles read from a lane the face owns.
+  const L = tri.lanes;
+  const C = L.cen;
+  const N = L.fnrm;
+  const o = tri.f * 3;
+  const cx = C[o] as number;
+  const cy = C[o + 1] as number;
+  const cz = C[o + 2] as number;
+  const e = basis.eye;
+  const nx = N[o] as number;
+  const ny = N[o + 1] as number;
+  const nz = N[o + 2] as number;
+  return (nx * (cx - e.x) + ny * (cy - e.y) + nz * (cz - e.z)) * tri.skin.cull > 0;
 }
 
 /**
@@ -466,10 +900,10 @@ export function backfaceCulled(tri: Tri3, basis: Basis): boolean {
  * exists to get it past.
  */
 function clipNear(
-  v: readonly [Vert, Vert, Vert],
+  v: readonly [ClipVert, ClipVert, ClipVert],
   edges: readonly [boolean, boolean, boolean],
   zOf: (p: Vec3) => number,
-): readonly Readonly<{ v: readonly [Vert, Vert, Vert]; e: readonly [boolean, boolean, boolean] }>[] {
+): readonly Readonly<{ v: readonly [ClipVert, ClipVert, ClipVert]; e: readonly [boolean, boolean, boolean] }>[] {
   const IN = NEAR * (1 + 1e-6);
   const z = v.map((w) => zOf(w.p));
   const inFront = (i: number): boolean => (z[i] as number) > NEAR;
@@ -485,19 +919,19 @@ function clipNear(
   const ON = [0b101, 0b011, 0b110]; // vertex 0 → edges ca,ab · 1 → ab,bc · 2 → bc,ca
   const between = (x: number, y: number): number =>
     1 << ((x + y === 1 ? 0 : x + y === 3 ? 1 : 2)); // cells-ok — an edge index
-  const cut = (a: number, b: number): { w: Vert; on: number } => {
-    const va = v[a] as Vert;
-    const vb = v[b] as Vert;
+  const cut = (a: number, b: number): { w: ClipVert; on: number } => {
+    const va = v[a] as ClipVert;
+    const vb = v[b] as ClipVert;
     const za = zOf(va.p);
     const zb = zOf(vb.p);
-    return { w: lerpVert(va, vb, (IN - za) / (zb - za)), on: between(a, b) };
+    return { w: lerpClipVert(va, vb, (IN - za) / (zb - za)), on: between(a, b) };
   };
-  const orig = (i: number): { w: Vert; on: number } => ({ w: v[i] as Vert, on: ON[i] as number });
+  const orig = (i: number): { w: ClipVert; on: number } => ({ w: v[i] as ClipVert, on: ON[i] as number });
   const shape = (
-    p: { w: Vert; on: number },
-    q: { w: Vert; on: number },
-    r: { w: Vert; on: number },
-  ): Readonly<{ v: readonly [Vert, Vert, Vert]; e: readonly [boolean, boolean, boolean] }> => {
+    p: { w: ClipVert; on: number },
+    q: { w: ClipVert; on: number },
+    r: { w: ClipVert; on: number },
+  ): Readonly<{ v: readonly [ClipVert, ClipVert, ClipVert]; e: readonly [boolean, boolean, boolean] }> => {
     const kept3 = [[p, q], [q, r], [r, p]].map(([x, y]) => {
       const shared = (x as { on: number }).on & (y as { on: number }).on;
       if (shared === 0) return false;
@@ -537,20 +971,76 @@ function clipNear(
  * it commutes with the interpolation below, so a smooth normal may be rotated
  * per vertex rather than per sample.
  */
-function toScreen(
-  w: Vert,
+/**
+ * The vertex's projection for this frame, taken once (C12 I130). Under a
+ * frame the record on the vertex is read back when its stamp is the frame's;
+ * without one — the tests' direct calls — every corner projects, as before.
+ */
+function screenOf(
+  L: Lanes,
+  k: number,
   basis: Basis,
   grid: Readonly<{ width: number; height: number }>,
-): Screen | null {
-  const pr = project(basis, w.p);
-  if (pr === null) return null;
-  return {
-    x: pr.x * grid.width,
-    y: pr.y * grid.height,
-    vp: viewDir(basis, sub(w.p, basis.eye)),
-    n: viewDir(basis, w.n),
-    v: w.v,
-  };
+  frame: RasterFrame | undefined,
+): boolean {
+  if (frame === undefined) return toScreenAt(L, k, basis, grid);
+  const held = L.stamps[k] as number;
+  if (held === frame.stamp) return true;
+  if (held === -frame.stamp) return false;
+  const shown = toScreenAt(L, k, basis, grid);
+  L.stamps[k] = shown ? frame.stamp : -frame.stamp;
+  frame.projected += 1;
+  return shown;
+}
+
+/**
+ * A lane vertex — or a cut in a spare slot — projected into its own slot
+ * (C12 I139, I140): the position and normal read from the lanes at the slot,
+ * so two records and an integer cross the call and no double (F1185).
+ */
+function toScreenAt(L: Lanes, slot: number, basis: Basis, grid: Readonly<{ width: number; height: number }>): boolean {
+  const q = slot * 3;
+  const px0 = L.pos[q] as number;
+  const py0 = L.pos[q + 1] as number;
+  const pz0 = L.pos[q + 2] as number;
+  const nx0 = L.nrm[q] as number;
+  const ny0 = L.nrm[q + 1] as number;
+  const nz0 = L.nrm[q + 2] as number;
+  // **One record, eight numbers in a slot** (C12 I128, I139): `viewDir(basis,
+  // sub(p, eye))` and `viewDir(basis, n)` component by component, each `dot`
+  // in its own order, where this was a `Projected`, a `sub` and two `Vec3`s a
+  // vertex.
+  const dx = px0 - basis.eye.x;
+  const dy = py0 - basis.eye.y;
+  const dz = pz0 - basis.eye.z;
+  const r = basis.right;
+  const u = basis.up;
+  const f = basis.forward;
+  // **The position in scalars** (C12 I134, F1174): `vz` is `project`'s `z`,
+  // `vx` its `x` and `vy` its `y` — the same `sub` and the same three `dot`s —
+  // so the near cull, the divisor, the fold of `f` and the aspect and the
+  // half-and-shift follow in `project`'s expression order, and the record is
+  // `project`'s to the bit (T1.146) without its vector and its return.
+  const vz = dx * f.x + dy * f.y + dz * f.z;
+  if (vz <= NEAR) return false;
+  const vx = dx * r.x + dy * r.y + dz * r.z;
+  const vy = dx * u.x + dy * u.y + dz * u.z;
+  const divisor = basis.orthographic ? basis.distance : vz;
+  const sx = (vx * basis.f) / basis.aspect / divisor;
+  const sy = (vy * basis.f) / divisor;
+  const px = sx * 0.5 + 0.5;
+  const py = 0.5 - sy * 0.5;
+  const S = L.screen;
+  const o = slot * S_STRIDE;
+  S[o + S_X] = px * grid.width;
+  S[o + S_Y] = py * grid.height;
+  S[o + S_VX] = vx;
+  S[o + S_VY] = vy;
+  S[o + S_VZ] = vz;
+  S[o + S_NX] = nx0 * r.x + ny0 * r.y + nz0 * r.z;
+  S[o + S_NY] = nx0 * u.x + ny0 * u.y + nz0 * u.z;
+  S[o + S_NZ] = nx0 * f.x + ny0 * f.y + nz0 * f.z;
+  return true;
 }
 
 /**
@@ -571,101 +1061,107 @@ function toScreen(
  * the frame is unbounded work for no ink.
  */
 function fill(
-  s: readonly [Screen, Screen, Screen],
+  L: Lanes,
+  ia: number,
+  ib: number,
+  ic: number,
   tri: Tri3,
   e: readonly [boolean, boolean, boolean],
   grid: Readonly<{ width: number; height: number }>,
   depth: Depth,
   light: Vec3,
   span: Readonly<{ nearD: number; farD: number }>,
-  paint: (i: number, sample: Shaded) => void,
+  paint: Painter,
 ): void {
-  const [a, b, c] = s;
+  // **The three records read from their slots** (C12 I139) — the same doubles
+  // the records held, at another address.
+  const S = L.screen;
+  const A = ia * S_STRIDE;
+  const B = ib * S_STRIDE;
+  const C = ic * S_STRIDE;
+  const ax = S[A + S_X] as number;
+  const ay = S[A + S_Y] as number;
+  const bx = S[B + S_X] as number;
+  const by = S[B + S_Y] as number;
+  const cx = S[C + S_X] as number;
+  const cy = S[C + S_Y] as number;
   const series = tri.series;
-  const area = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
+  const area = (bx - ax) * (cy - ay) - (cx - ax) * (by - ay);
+  // **A triangle under one cell of projected area is stroked, not filled**
+  // (C12 I95, F453): a sample centre can miss every such triangle and a shape
+  // of thousands of them would vanish.
   if (!(Math.abs(area) >= 1)) {
-    strokeThin(s, tri, e, grid, depth, light, span, paint);
+    strokeThin(L, ia, ib, ic, tri, e, grid, depth, light, span, paint);
     return;
   }
-  // **The edge lengths, folded once** (C12 I95, §6i row 8). `w0` is twice the
-  // sub-triangle's area, so `w0 / |ab|` is the perpendicular distance to `ab`
-  // in samples — and the whole test is skipped when no edge of this triangle
-  // is the caller's, which is every triangle of a surface with no wireframe.
+  const avx = S[A + S_VX] as number;
+  const avy = S[A + S_VY] as number;
+  const avz = S[A + S_VZ] as number;
+  const anx = S[A + S_NX] as number;
+  const any = S[A + S_NY] as number;
+  const anz = S[A + S_NZ] as number;
+  const bvx = S[B + S_VX] as number;
+  const bvy = S[B + S_VY] as number;
+  const bvz = S[B + S_VZ] as number;
+  const bnx = S[B + S_NX] as number;
+  const bny = S[B + S_NY] as number;
+  const bnz = S[B + S_NZ] as number;
+  const cvx = S[C + S_VX] as number;
+  const cvy = S[C + S_VY] as number;
+  const cvz = S[C + S_VZ] as number;
+  const cnx = S[C + S_NX] as number;
+  const cny = S[C + S_NY] as number;
+  const cnz = S[C + S_NZ] as number;
+  const va = valueAt(L, ia);
+  const vb = valueAt(L, ib);
+  const vc = valueAt(L, ic);
   const wire = tri.skin.wire !== false && (e[0] || e[1] || e[2]);
-  const len: readonly [number, number, number] = [
-    Math.hypot(b.x - a.x, b.y - a.y),
-    Math.hypot(c.x - b.x, c.y - b.y),
-    Math.hypot(a.x - c.x, a.y - c.y),
-  ];
-  const lo = (f: (q: Screen) => number): number =>
-    Math.max(0, Math.floor(Math.min(f(a), f(b), f(c)))); // cells-ok — a sample coordinate
-  const hi = (f: (q: Screen) => number, n: number): number =>
-    Math.min(n - 1, Math.floor(Math.max(f(a), f(b), f(c)))); // cells-ok — a sample coordinate
-  const x0 = lo((q) => q.x);
-  const x1 = hi((q) => q.x, grid.width);
-  const y0 = lo((q) => q.y);
-  const y1 = hi((q) => q.y, grid.height);
+  const lane = depth.lane;
+  // **Scalar edge lengths, bounds and weights** (C12 I128): the arithmetic the
+  // vector forms had, in the order they had it, with nothing allocated.
+  const len0 = hypot2(bx - ax, by - ay);
+  const len1 = hypot2(cx - bx, cy - by);
+  const len2 = hypot2(ax - cx, ay - cy);
+  const x0 = Math.max(0, Math.floor(Math.min(ax, bx, cx))); // cells-ok — a sample coordinate
+  const x1 = Math.min(grid.width - 1, Math.floor(Math.max(ax, bx, cx))); // cells-ok — a sample coordinate
+  const y0 = Math.max(0, Math.floor(Math.min(ay, by, cy))); // cells-ok — a sample coordinate
+  const y1 = Math.min(grid.height - 1, Math.floor(Math.max(ay, by, cy))); // cells-ok — a sample coordinate
   const sign = area > 0 ? 1 : -1;
+  const m = Math.abs(area);
+  const eps = m * 1e-6;
   for (let py = y0; py <= y1; py += 1) { // cells-ok — a sample coordinate
     for (let px = x0; px <= x1; px += 1) { // cells-ok — a sample coordinate
-      // **The sample's centre, which is `+0.5` because every writer here floors**
-      // (F453): sample `i` covers `[i, i + 1)`, so its centre is `i + 0.5`.
-      const cx = px + 0.5;
-      const cy = py + 0.5;
-      const w0 = ((b.x - a.x) * (cy - a.y) - (cx - a.x) * (b.y - a.y)) * sign;
-      const w1 = ((c.x - b.x) * (cy - b.y) - (cx - b.x) * (c.y - b.y)) * sign;
-      const w2 = ((a.x - c.x) * (cy - c.y) - (cx - c.x) * (a.y - c.y)) * sign;
-      // **A shared edge is claimed by both triangles or by neither, and
-      // floating point decides which** (C12 I104, F493).
-      //
-      // The test was `w < 0`, which accepts a sample exactly *on* an edge — so
-      // two triangles sharing one both take it, and the depth test settles it.
-      // That is right in exact arithmetic. In floating point the two compute the
-      // same edge from **different operands**, so a sample on it can evaluate to
-      // `-1e-13` for both and be dropped by both: a **crack**, one sample wide,
-      // along every shared edge in the mesh.
-      //
-      // **It was invisible until the grid doubled.** At `width × 1` the cracks
-      // fell between samples; at `width × 2` there are four times as many
-      // chances to land on one, and they surfaced as half-cell holes punched
-      // into a solid surface — which reads as a rendering fault and is a
-      // sampling one. Found by looking at a magnified frame, not by any
-      // assertion about coverage.
-      //
-      // The epsilon is relative to the triangle's own area so it scales with the
-      // mesh, and it errs toward double coverage, which `writeDepth` already
-      // resolves.
-      const eps = Math.abs(area) * 1e-6;
+      const cxs = px + 0.5;
+      const cys = py + 0.5;
+      const w0 = ((bx - ax) * (cys - ay) - (cxs - ax) * (by - ay)) * sign;
+      const w1 = ((cx - bx) * (cys - by) - (cxs - bx) * (cy - by)) * sign;
+      const w2 = ((ax - cx) * (cys - cy) - (cxs - cx) * (ay - cy)) * sign;
       if (w0 < -eps || w1 < -eps || w2 < -eps) continue;
-      const m = Math.abs(area);
-      const [ua, ub, uc] = [w1 / m, w2 / m, w0 / m];
-      // **Depth interpolates linearly across the screen triangle**, which is not
-      // perspective-correct and is deliberate: `strokeSeg` interpolates its `z`
-      // the same way, and a wireframe edge z-fighting its own face *because the
-      // two primitives interpolate differently* is a defect no assertion about
-      // either one alone would find.
-      const z = a.vp.z * ua + b.vp.z * ub + c.vp.z * uc;
+      const ua = w1 / m;
+      const ub = w2 / m;
+      const uc = w0 / m;
+      const z = avz * ua + bvz * ub + cvz * uc;
       if (!writeDepth(depth, px, py, z)) continue; // cells-ok — a sample coordinate
-      const n = {
-        x: a.n.x * ua + b.n.x * ub + c.n.x * uc,
-        y: a.n.y * ua + b.n.y * ub + c.n.y * uc,
-        z: a.n.z * ua + b.n.z * ub + c.n.z * uc,
-      };
-      const vp = {
-        x: a.vp.x * ua + b.vp.x * ub + c.vp.x * uc,
-        y: a.vp.y * ua + b.vp.y * ub + c.vp.y * uc,
+      // **The six interpolated scalars and the depth into the lane** (C12 I136).
+      lane[LANE_NX] = anx * ua + bnx * ub + cnx * uc;
+      lane[LANE_NY] = any * ua + bny * ub + cny * uc;
+      lane[LANE_NZ] = anz * ua + bnz * ub + cnz * uc;
+      lane[LANE_VX] = avx * ua + bvx * ub + cvx * uc;
+      lane[LANE_VY] = avy * ua + bvy * ub + cvy * uc;
+      lane[LANE_VZ] = z;
+      lane[LANE_DEPTH] = z;
+      shadeAt(lane, light, span);
+      paint(
+        py * grid.width + px, // cells-ok — a sample offset
         z,
-      };
-      paint(py * grid.width + px, { // cells-ok — a sample offset
-        depth: z,
-        value: blend(a.v, b.v, c.v, ua, ub, uc),
+        blend(va, vb, vc, ua, ub, uc),
         series,
-        intensity: shade(n, vp, light, z, span),
-        edge: wire
-          && ((e[0] && w0 / (len[0] as number) < EDGE_HALF)
-            || (e[1] && w1 / (len[1] as number) < EDGE_HALF)
-            || (e[2] && w2 / (len[2] as number) < EDGE_HALF)),
-      });
+        lane[LANE_INTENSITY] as number,
+        wire
+          && ((e[0] && w0 / len0 < EDGE_HALF)
+            || (e[1] && w1 / len1 < EDGE_HALF)
+            || (e[2] && w2 / len2 < EDGE_HALF)),
+      );
     }
   }
 }
@@ -677,40 +1173,173 @@ function fill(
  * because the barycentric weights are exactly what this arm exists to avoid
  * computing.
  */
+/**
+ * Whether a sub-cell triangle can write no sample, so its edges need not be
+ * walked (C12 I138, F1183).
+ *
+ * **The bound is the walk's own arithmetic.** An edge sample's depth is
+ * `p.vz + (q.vz − p.vz) · t` for `t` in `[0, 1]` — at least the smaller
+ * endpoint less the subtraction's rounding, which is under an ulp of the
+ * larger magnitude — so the triangle's floor is its nearest corner less a
+ * relative margin of `1e-9`, through `Math.fround` as `writeDepth` takes the
+ * sample. The walk's coordinate is `(p.x / width) · width`, the corner's to
+ * within an ulp and one cell below it when the corner sits on an integer —
+ * `(1 / 49) · 49` is `0.9999999999999999` — while the interpolation at `t = 1`
+ * lands on or above the far endpoint's floor; so the cells are the corners'
+ * floors widened by the same margin and clamped to the grid, where
+ * `writeDepth` refuses. A cell at or under the floor refuses every sample the
+ * triangle could put in it, the depth test being strict.
+ *
+ * **The nearest corner's own cell first**, because most of the triangles this
+ * does not mark fail there, and the scan is then never entered.
+ */
+export function hiddenThin(
+  L: Lanes,
+  ia: number,
+  ib: number,
+  ic: number,
+  grid: Readonly<{ width: number; height: number }>,
+  depth: Depth,
+): boolean {
+  const S = L.screen;
+  const A = ia * S_STRIDE;
+  const B = ib * S_STRIDE;
+  const C = ic * S_STRIDE;
+  const ax = S[A + S_X] as number;
+  const ay = S[A + S_Y] as number;
+  const avz = S[A + S_VZ] as number;
+  const bx = S[B + S_X] as number;
+  const by = S[B + S_Y] as number;
+  const bvz = S[B + S_VZ] as number;
+  const cx = S[C + S_X] as number;
+  const cy = S[C + S_Y] as number;
+  const cvz = S[C + S_VZ] as number;
+  const z = depth.z;
+  const w = grid.width;
+  const h = grid.height;
+  const zspan = Math.max(Math.abs(avz), Math.abs(bvz), Math.abs(cvz));
+  const zlo = Math.fround(Math.min(avz, bvz, cvz) - zspan * MARGIN);
+  const fx = Math.floor(ax); // cells-ok — a sample coordinate
+  const fy = Math.floor(ay); // cells-ok — a sample coordinate
+  if (fx >= 0 && fy >= 0 && fx < w && fy < h && !((z[fy * w + fx] as number) <= zlo)) return false; // cells-ok — a sample offset
+  const minx = Math.min(ax, bx, cx);
+  const maxx = Math.max(ax, bx, cx);
+  const miny = Math.min(ay, by, cy);
+  const maxy = Math.max(ay, by, cy);
+  const dx = Math.max(Math.abs(minx), Math.abs(maxx)) * MARGIN;
+  const dy = Math.max(Math.abs(miny), Math.abs(maxy)) * MARGIN;
+  const x0 = Math.max(0, Math.floor(minx - dx)); // cells-ok — a sample coordinate
+  const x1 = Math.min(w - 1, Math.floor(maxx + dx)); // cells-ok — a sample coordinate
+  const y0 = Math.max(0, Math.floor(miny - dy)); // cells-ok — a sample coordinate
+  const y1 = Math.min(h - 1, Math.floor(maxy + dy)); // cells-ok — a sample coordinate
+  for (let yy = y0; yy <= y1; yy += 1) { // cells-ok — a sample coordinate
+    const row = yy * w; // cells-ok — a sample offset
+    for (let xx = x0; xx <= x1; xx += 1) { // cells-ok — a sample coordinate
+      if (!((z[row + xx] as number) <= zlo)) return false;
+    }
+  }
+  return true;
+}
+
+/** The relative margin `hiddenThin` widens its bounds by — far above an ulp, far below a cell (C12 I138). */
+const MARGIN = 1e-9;
+
 function strokeThin(
-  s: readonly [Screen, Screen, Screen],
+  L: Lanes,
+  ia: number,
+  ib: number,
+  ic: number,
   tri: Tri3,
   e: readonly [boolean, boolean, boolean],
   grid: Readonly<{ width: number; height: number }>,
   depth: Depth,
   light: Vec3,
   span: Readonly<{ nearD: number; farD: number }>,
-  paint: (i: number, sample: Shaded) => void,
+  paint: Painter,
 ): void {
+  // **Asked before the edges are walked** (C12 I138): a triangle whose every
+  // reachable cell already holds a nearer depth writes nothing, and on the
+  // bunny that is four of five — counted, since the frame cannot show it.
+  if (hiddenThin(L, ia, ib, ic, grid, depth)) {
+    depth.hidden[0] = (depth.hidden[0] as number) + 1;
+    return;
+  }
   const series = tri.series;
-  const pairs: readonly (readonly [Screen, Screen, boolean])[] = [
-    [s[0], s[1], e[0]], [s[1], s[2], e[1]], [s[2], s[0], e[2]],
-  ];
-  // **All three still stroke, and only the caller's carry `edge`.** A degenerate
-  // triangle is a line whichever member is set, so the arm that keeps it does
-  // not change; what changes is which of its three strokes a wireframe paints.
-  for (const [p, q, own] of pairs) {
-    const asProjected = (w: Screen): { x: number; y: number; depth: number } => ({
-      x: w.x / grid.width, y: w.y / grid.height, depth: w.vp.z,
-    });
-    // **Strictly nearer**: this arm writes a colour, and a colour has one
-    // question — a tie belongs to whoever drew first (C12 I101, F452).
-    strokeSeg(asProjected(p), asProjected(q), grid, depth, (i, t, z) => {
-      const n = lerpV(p.n, q.n, t);
-      const vp = { ...lerpV(p.vp, q.vp, t), z };
-      paint(i, {
-        depth: z,
-        value: p.v === undefined || q.v === undefined ? p.v ?? q.v : p.v + (q.v - p.v) * t,
-        series,
-        intensity: shade(n, vp, light, z, span),
-        edge: own && tri.skin.wire !== false,
-      });
-    }, false);;
+  const wire = tri.skin.wire !== false;
+  // **Three explicit edges, not a `pairs` array of tuples** (C12 I128), through
+  // a module function rather than a closure of this call (I129).
+  thinEdge(L, ia, ib, e[0] && wire, series, grid, depth, light, span, paint);
+  thinEdge(L, ib, ic, e[1] && wire, series, grid, depth, light, span, paint);
+  thinEdge(L, ic, ia, e[2] && wire, series, grid, depth, light, span, paint);
+}
+
+/**
+ * One edge of a thin triangle, stroked (C12 I129). **`strokeSeg`'s stepping,
+ * restated in its own loop** — the dominant-axis count, F453's floor, the
+ * depth lerped by `t`, `writeDepth` strictly nearer — because a callback is a
+ * closure and a context per edge (F1159). The two copies are held to one
+ * rule by PR15's thin half, which restates it a third time as the referee.
+ * The per-sample lerps are `lerpV`'s expression, `a + (b − a) · t`, on
+ * components, and `shadeAt` is `shade`'s arithmetic; nothing is allocated.
+ */
+function thinEdge(
+  L: Lanes,
+  ip: number,
+  iq: number,
+  own: boolean,
+  series: number,
+  grid: Readonly<{ width: number; height: number }>,
+  depth: Depth,
+  light: Vec3,
+  span: Readonly<{ nearD: number; farD: number }>,
+  paint: Painter,
+): void {
+  const S = L.screen;
+  const P = ip * S_STRIDE;
+  const Q = iq * S_STRIDE;
+  const pvx = S[P + S_VX] as number;
+  const pvy = S[P + S_VY] as number;
+  const pvz = S[P + S_VZ] as number;
+  const pnx = S[P + S_NX] as number;
+  const pny = S[P + S_NY] as number;
+  const pnz = S[P + S_NZ] as number;
+  const qvx = S[Q + S_VX] as number;
+  const qvy = S[Q + S_VY] as number;
+  const qvz = S[Q + S_VZ] as number;
+  const qnx = S[Q + S_NX] as number;
+  const qny = S[Q + S_NY] as number;
+  const qnz = S[Q + S_NZ] as number;
+  const pv = valueAt(L, ip);
+  const qv = valueAt(L, iq);
+  // The normalised coordinates `strokeSeg` took, multiplied back as it did.
+  const lane = depth.lane;
+  const x0 = ((S[P + S_X] as number) / grid.width) * grid.width;
+  const y0 = ((S[P + S_Y] as number) / grid.height) * grid.height;
+  const x1 = ((S[Q + S_X] as number) / grid.width) * grid.width;
+  const y1 = ((S[Q + S_Y] as number) / grid.height) * grid.height;
+  const steps = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)))); // cells-ok — a sample count
+  for (let s = 0; s <= steps; s += 1) { // cells-ok — a sample index
+    const t = s / steps; // cells-ok — a sample index
+    const px = Math.floor(x0 + (x1 - x0) * t); // cells-ok — a sample coordinate
+    const py = Math.floor(y0 + (y1 - y0) * t); // cells-ok — a sample coordinate
+    const z = pvz + (qvz - pvz) * t;
+    if (!writeDepth(depth, px, py, z)) continue;
+    lane[LANE_NX] = pnx + (qnx - pnx) * t;
+    lane[LANE_NY] = pny + (qny - pny) * t;
+    lane[LANE_NZ] = pnz + (qnz - pnz) * t;
+    lane[LANE_VX] = pvx + (qvx - pvx) * t;
+    lane[LANE_VY] = pvy + (qvy - pvy) * t;
+    lane[LANE_VZ] = z;
+    lane[LANE_DEPTH] = z;
+    shadeAt(lane, light, span);
+    paint(
+      py * grid.width + px, // cells-ok — a sample offset
+      z,
+      pv === undefined || qv === undefined ? pv ?? qv : pv + (qv - pv) * t,
+      series,
+      lane[LANE_INTENSITY] as number,
+      own,
+    );
   }
 }
 
@@ -753,9 +1382,66 @@ export function shade(
   depth: number,
   span: Readonly<{ nearD: number; farD: number }>,
 ): number {
-  // **A zero-length normal survives as itself** (F456). `dot` is then `0`, so
-  // the face takes ambient and nothing divides by anything.
-  const raw = unit(normal);
+  // **The object form is the wrapper** (C12 I129): the arithmetic lives in
+  // `shadeAt` on the components, so the reference and the per-sample path are
+  // one function — **over a lane per call** (I136): the reference is per
+  // figure and per test row, and the raster's lane is on its depth record.
+  const lane = new Float64Array(8); // cells-ok — the lane's slots
+  lane[LANE_NX] = normal.x;
+  lane[LANE_NY] = normal.y;
+  lane[LANE_NZ] = normal.z;
+  lane[LANE_VX] = viewPos.x;
+  lane[LANE_VY] = viewPos.y;
+  lane[LANE_VZ] = viewPos.z;
+  lane[LANE_DEPTH] = depth;
+  shadeAt(lane, light, span);
+  return lane[LANE_INTENSITY] as number;
+}
+
+/**
+ * The lane's layout (C12 I136): the normal, the view position, the depth in,
+ * the intensity out. Slot numbers rather than a record, because the record is
+ * the allocation this exists to remove.
+ */
+const LANE_NX = 0;
+const LANE_NY = 1;
+const LANE_NZ = 2;
+const LANE_VX = 3;
+const LANE_VY = 4;
+const LANE_VZ = 5;
+const LANE_DEPTH = 6;
+const LANE_INTENSITY = 7;
+
+/**
+ * `shade` on scalars (C12 I129) — `unit`, the flip, `dot`, `unit` again and
+ * the reflection, each on components in the same operation order, with no
+ * record built. The comments on the arithmetic are `shade`'s and are kept
+ * with it. **Every input is read from the lane and the answer is written to
+ * it** (I136), never passed or returned:
+ * this function's bytecode is past V8's inlining size, so it is a real call
+ * from `fill` and `thinEdge`, and each double argument to a real call is a
+ * heap number — seven in and one out per painted sample, 33.6 MB of a
+ * twenty-frame bunny heap before the lane (F1176).
+ */
+function shadeAt(
+  lane: Float64Array,
+  light: Vec3,
+  span: Readonly<{ nearD: number; farD: number }>,
+): void {
+  const nx0 = lane[LANE_NX] as number;
+  const ny0 = lane[LANE_NY] as number;
+  const nz0 = lane[LANE_NZ] as number;
+  const vx = lane[LANE_VX] as number;
+  const vy = lane[LANE_VY] as number;
+  const vz = lane[LANE_VZ] as number;
+  const depth = lane[LANE_DEPTH] as number;
+  // **A zero-length normal survives as itself** (F456): `unit`'s rule — the
+  // hypot, and the divide only when it is not zero — so `dot` is then `0`, the
+  // face takes ambient and nothing divides by anything.
+  const len = hypot3(nx0, ny0, nz0);
+  const rx = len === 0 ? nx0 : nx0 / len;
+  const ry = len === 0 ? ny0 : ny0 / len;
+  const rz = len === 0 ? nz0 : nz0 / len;
   // **The flip's tie at `raw.z === 0` is not reachable and there is no
   // tie-break here** (F464). It looks like it needs one: reversing a mesh's
   // winding negates every normal **exactly** — measured, 1728 of 1728 vertex
@@ -766,16 +1452,24 @@ export function shade(
   // view-space `z` of `6.123e-17` rather than `0`, which is `Math.cos(π/2)`.
   // The two windings' residue is the **rasteriser's** shared-edge tie instead,
   // and it is recorded on I95 rather than repaired here.
-  const n = raw.z > 0 ? { x: -raw.x, y: -raw.y, z: -raw.z } : raw;
-  const nl = dot(n, light);
+  const flip = rz > 0;
+  const nx = flip ? -rx : rx;
+  const ny = flip ? -ry : ry;
+  const nz = flip ? -rz : rz;
+  const nl = nx * light.x + ny * light.y + nz * light.z;
   const lit = nl > 0 ? nl : 0;
-  const toEye = unit({ x: -viewPos.x, y: -viewPos.y, z: -viewPos.z });
-  const r = { x: 2 * nl * n.x - light.x, y: 2 * nl * n.y - light.y, z: 2 * nl * n.z - light.z };
-  const rv = dot(r, toEye);
+  const ex = -vx;
+  const ey = -vy;
+  const ez = -vz;
+  const elen = hypot3(ex, ey, ez);
+  const tx = elen === 0 ? ex : ex / elen;
+  const ty = elen === 0 ? ey : ey / elen;
+  const tz = elen === 0 ? ez : ez / elen;
+  const rv = (2 * nl * nx - light.x) * tx + (2 * nl * ny - light.y) * ty + (2 * nl * nz - light.z) * tz;
   const spec = rv > 0 ? SPECULAR * Math.pow(rv, SHINE) : 0;
   const far = span.farD > span.nearD ? (depth - span.nearD) / (span.farD - span.nearD) : 0;
   const i = (AMBIENT + DIFFUSE * lit + spec) * (1 - FALLOFF * far);
-  return i < 0 ? 0 : i > 1 ? 1 : i;
+  lane[LANE_INTENSITY] = i < 0 ? 0 : i > 1 ? 1 : i;
 }
 
 /**
@@ -796,11 +1490,13 @@ export function shade(
 export const edgeIntensity = (intensity: number, wire: boolean | "over"): number =>
   wire === "over" ? intensity * EDGE_DIM : intensity;
 
-export function densityGlyph(
-  intensity: number,
-  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
-): string {
-  const steps = [...ladderFor("density", caps).steps];
+/** The density ladder's steps for a capability set, read once per render rather than per write (C12 I132). */
+export function densitySteps(caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">): readonly string[] {
+  return [...ladderFor("density", caps).steps];
+}
+
+/** The step an intensity selects, on steps already read: floor of intensity × steps, clamped to the ladder. */
+export function densityGlyphOf(steps: readonly string[], intensity: number): string {
   const k = Math.min(steps.length - 1, Math.max(0, Math.floor(intensity * steps.length))); // cells-ok — a ladder index
   return steps[k] as string;
 }

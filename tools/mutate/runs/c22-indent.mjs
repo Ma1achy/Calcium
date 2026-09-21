@@ -112,8 +112,8 @@ const MUTATIONS = [
     // C23 T6.87 (I57) — the leading gap kept: the hook marks a blank row.
     name: "cardBody returns its input unconditionally",
     file: LAYOUT,
-    from: "  if (first === undefined || first.gapBefore !== true) return blocks;",
-    to: "  if (first === undefined || first.gapBefore !== true || true) return blocks;",
+    from: "  if (first === undefined || padding === undefined || (padding.t ?? 0) === 0) return blocks;",
+    to: "  if (first === undefined || padding === undefined || (padding.t ?? 0) === 0 || true) return blocks;",
     expect: "T1.50",
   },
 ];

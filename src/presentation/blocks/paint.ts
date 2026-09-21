@@ -10,8 +10,6 @@
  * them and lays out no text of its own (C09 §3).
  */
 import type { AmbiguousWidth } from "../text.js";
-import { Box, Text } from "ink";
-import { createElement, type ReactElement } from "react";
 import { SGR_RESET, sgr } from "../../terminal/escapes.js";
 import { resolve, resolveBackground, resolveTone, type Style } from "../theme/index.js";
 import type { ColourRef, ColourValue, ResolvedTheme } from "../theme/index.js";
@@ -354,24 +352,22 @@ export function clampSpans(
  * counting the blank and a renderer losing it disagree by one, which is I1
  * violated by the framework rather than by the kind.
  */
-export function rows(lines: readonly string[]): ReactElement {
+export function rows(lines: readonly string[]): readonly string[] {
   // I14's floor, applied where every non-container renderer ends rather than in
   // each of them: a block that is present occupies at least one row, so a
   // `logs` with no lines renders one blank row rather than nothing. The
   // containers do not come through here, which is what keeps the one legitimate
   // zero — an empty `group` — expressible.
-  const floored = lines.length === 0 ? [""] : lines; // cells-ok
-
-  return createElement(
-    Box,
-    { flexDirection: "column" },
-    floored.map((line, index) =>
-      createElement(Text, { key: index }, line === "" ? " " : line),
-    ),
-  );
+  //
+  // **The rows are the answer** (I72). They used to be wrapped in a `Text` per
+  // row here and unwrapped again by Ink, tokenised twice on the way; now the
+  // registry composes them and `render-lines` normalises each into the form
+  // Ink's output layer wrote. A kind that composes an Ink tree does not come
+  // through here either, and `elementOf` is how it takes a rows-answering child.
+  return lines.length === 0 ? [""] : lines; // cells-ok
 }
 
 /** One row, as an element. */
-export function row(spans: readonly Span[]): ReactElement {
+export function row(spans: readonly Span[]): readonly string[] {
   return rows([paint(spans)]);
 }

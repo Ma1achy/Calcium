@@ -13,13 +13,12 @@
  * removed a row would reintroduce I1's divergence through the one path built to
  * preserve it.
  */
-import type { ReactElement } from "react";
 import { normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Status } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate, wrapCells } from "../../text.js";
 import { glyphs, spinnerFrames } from "../glyphs.js";
 import { background, fit, paint, rows, slot as surface, tone, withBackground, type Span } from "../paint.js";
-import type { BlockDefinition, RenderContext } from "../types.js";
+import type { BlockDefinition, RenderContext, Rendered } from "../types.js";
 import type { Style } from "../../theme/index.js";
 
 /**
@@ -398,7 +397,7 @@ export const statusDefinition: BlockDefinition<Status> = {
   // and cannot measure less without becoming a different box. `scroll`'s
   // argument, and the same one.
 
-  render(block: Status, ctx: RenderContext): ReactElement {
+  render(block: Status, ctx: RenderContext): Rendered {
     const width = normaliseWidth(ctx.width);
     const g = glyphs(ctx.capabilities);
     const height = Math.max(1, Math.floor(block.height)); // cells-ok — a row count

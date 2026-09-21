@@ -36,9 +36,19 @@ export const COLORMAPS: Readonly<Record<string, Colormap>> = COLORMAPS_WITH_REVE
  * adjacent entries. At the ends, clamps rather than wraps.
  */
 export function sample(map: Colormap, t: number): string {
+  return rgbHex(sampleRgb(map, t));
+}
+
+/**
+ * The eight-bit channels `sample` rounds, before they become a hex string
+ * (C10 I40). `sample` is `rgbHex(sampleRgb(...))`, one interpolation expressed
+ * once, so a per-sample caller can hold the ints instead of a hex it would parse
+ * straight back — the round-trip F1150 measured on the 3-D grid.
+ */
+export function sampleRgb(map: Colormap, t: number): readonly [number, number, number] {
   const data = map.data;
-  if (data.length === 0) return "#000000"; // cells-ok — a data length
-  if (!Number.isFinite(t)) return rgbHex(data[0]!);
+  if (data.length === 0) return [0, 0, 0]; // cells-ok — a data length
+  if (!Number.isFinite(t)) return data[0]!;
   const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
   const scaled = clamped * (data.length - 1); // cells-ok — a data length
   const low = Math.floor(scaled);
@@ -46,17 +56,18 @@ export function sample(map: Colormap, t: number): string {
   const frac = scaled - low;
   const lo = data[low]!;
   const hi = data[high]!;
-  const r = Math.round(lo[0] + (hi[0] - lo[0]) * frac);
-  const g = Math.round(lo[1] + (hi[1] - lo[1]) * frac);
-  const b = Math.round(lo[2] + (hi[2] - lo[2]) * frac);
-  return `#${hex2(r)}${hex2(g)}${hex2(b)}`;
+  return [
+    Math.round(lo[0] + (hi[0] - lo[0]) * frac),
+    Math.round(lo[1] + (hi[1] - lo[1]) * frac),
+    Math.round(lo[2] + (hi[2] - lo[2]) * frac),
+  ];
 }
 
 function hex2(n: number): string {
   return n.toString(16).padStart(2, "0");
 }
 
-function rgbHex(c: readonly [number, number, number]): string {
+export function rgbHex(c: readonly [number, number, number]): string {
   return `#${hex2(c[0])}${hex2(c[1])}${hex2(c[2])}`;
 }
 
@@ -139,6 +150,82 @@ const toSrgb = (c: number): number =>
   c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
 
 /**
+ * `toLinear` over its whole domain (C10 I40). `overChannels` only ever gives
+ * `toLinear` an eight-bit channel over 255, so a 256-entry table is exact rather
+ * than approximate — `LINEAR_LUT[i]` is `toLinear(i / 255)` — and it takes three
+ * of the six `Math.pow` a shaded sample paid (F1150).
+ */
+const LINEAR_LUT: readonly number[] = Array.from({ length: 256 }, (_, i) => toLinear(i / 255));
+
+/**
+ * `shadeColour`'s rgb arm on the bare channels (C10 I40): `overChannels`' own
+ * sequence, `toLinear` read from the table, `k` clamped to `[0, 1]`. Equal
+ * bit-for-bit to `overChannels(colour, c => toSrgb(toLinear(c) * k))` over every
+ * eight-bit channel, because the table's domain is exactly the inputs it sees.
+ */
+export function shadeRgb(
+  r: number,
+  g: number,
+  b: number,
+  k: number,
+): readonly [number, number, number] {
+  const kk = k < 0 ? 0 : k > 1 ? 1 : k;
+  return [shadeChannel(r, kk), shadeChannel(g, kk), shadeChannel(b, kk)];
+}
+
+/**
+ * One channel under a clamped intensity — `overChannels`' sequence on an
+ * eight-bit input, the table standing in for `toLinear` over its whole domain
+ * (I40). **One function for both forms** (I42): `shadeRgb` and `shadePacked`
+ * call this, so a tuple and a packed integer shade the same way by construction.
+ */
+function shadeChannel(c: number, kk: number): number {
+  const v = toSrgb((LINEAR_LUT[c] ?? toLinear(c / 255)) * kk);
+  return Math.max(0, Math.min(255, Math.round(v * 255)));
+}
+
+/**
+ * `sampleRgb`'s three channels as one integer, `r·2¹⁶ + g·2⁸ + b` (I42) — the
+ * form a per-sample caller holds in a typed array so a write allocates nothing
+ * (C12 I132). The same interpolation, expressed on the same arithmetic.
+ */
+export function samplePacked(map: Colormap, t: number): number {
+  const data = map.data;
+  if (data.length === 0) return 0; // cells-ok — a data length
+  if (!Number.isFinite(t)) {
+    const d = data[0]!;
+    return (d[0] << 16) | (d[1] << 8) | d[2];
+  }
+  const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
+  const scaled = clamped * (data.length - 1); // cells-ok — a data length
+  const low = Math.floor(scaled);
+  const high = Math.min(data.length - 1, low + 1); // cells-ok — a data length
+  const frac = scaled - low;
+  const lo = data[low]!;
+  const hi = data[high]!;
+  return (
+    (Math.round(lo[0] + (hi[0] - lo[0]) * frac) << 16)
+    | (Math.round(lo[1] + (hi[1] - lo[1]) * frac) << 8)
+    | Math.round(lo[2] + (hi[2] - lo[2]) * frac)
+  );
+}
+
+/** `shadeRgb` on a packed integer (I42): each channel unpacked, shaded by the one channel function, packed back. */
+export function shadePacked(packed: number, k: number): number {
+  const kk = k < 0 ? 0 : k > 1 ? 1 : k;
+  return (
+    (shadeChannel((packed >> 16) & 255, kk) << 16)
+    | (shadeChannel((packed >> 8) & 255, kk) << 8)
+    | shadeChannel(packed & 255, kk)
+  );
+}
+
+/** `rgbHex` of a packed integer's channels (I42). */
+export function packedHex(packed: number): string {
+  return `#${hex2((packed >> 16) & 255)}${hex2((packed >> 8) & 255)}${hex2(packed & 255)}`;
+}
+
+/**
  * A colour under an illumination of `intensity`, **scaled in linear light**
  * (C12 I94, FINDINGS F455).
  *
@@ -164,6 +251,10 @@ const toSrgb = (c: number): number =>
 export function shadeColour(colour: ColourValue, intensity: number): ColourValue {
   const k = intensity < 0 ? 0 : intensity > 1 ? 1 : intensity;
   if (k === 1) return colour;
+  // **Deliberately not `shadeRgb`** (C10 I40): this arm keeps `overChannels`'
+  // direct `toLinear` so it is an implementation independent of the LUT, and
+  // T1.42's sweep compares the two. Routed through `shadeRgb`, the sweep would
+  // compare the table to itself and a wrong entry would pass it.
   return overChannels(colour, (c) => toSrgb(toLinear(c) * k));
 }
 

@@ -187,7 +187,13 @@ export function fakeClock(): { now: () => number; advance: (ms: number) => void 
 export function fakeAmbient(clock = fakeClock()): Ambient {
   return {
     clock: clock.now,
-    elapsed: () => 0,   // profiling is off in this fixture; read for durations, which stay at zero (C23 I54)
+    // **Monotonic, and it moves.** A constant zero is honest about profiling
+    // being off — durations read zero (C23 I54) — and it silently freezes
+    // every consumer that dates an interval from it, which reads as the
+    // consumer being inert rather than the fixture being still. The injected
+    // wall clock is the only time this harness has, so `elapsed` is its
+    // offset from the session's start.
+    elapsed: () => clock.now() - 1_700_000_000_000,
     cwd: "/work",
     fs: fakeFs(),
     schedule: (fn, ms) => {
@@ -244,7 +250,13 @@ export async function buildSession(
     env: { TERM: "xterm-256color", LANG: "en_GB.UTF-8" },
     cwd: "/work",
     clock: clock.now,
-    elapsed: () => 0,   // profiling is off in this fixture; read for durations, which stay at zero (C23 I54)
+    // **Monotonic, and it moves.** A constant zero is honest about profiling
+    // being off — durations read zero (C23 I54) — and it silently freezes
+    // every consumer that dates an interval from it, which reads as the
+    // consumer being inert rather than the fixture being still. The injected
+    // wall clock is the only time this harness has, so `elapsed` is its
+    // offset from the session's start.
+    elapsed: () => clock.now() - 1_700_000_000_000,
     fs: fakeFs(),
     stdout: stdout as unknown as NodeJS.WriteStream,
     stdin: fakeStdin(),

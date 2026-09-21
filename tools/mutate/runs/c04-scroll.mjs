@@ -151,8 +151,9 @@ const MUTATIONS = [
     name: "the box does not pad to its declared height",
     file: SRC,
     // Re-anchored 2026-09-05 (`interior`), applied by hand and T2.28 died.
-    from: "{ length: Math.max(0, interior - drawn) }, // cells-ok",
-    to: "{ length: 0 }, // cells-ok",
+    // Re-anchored again for C09 I73: the count both arms pad by.
+    from: "    const padCount = Math.max(0, interior - drawn); // cells-ok — a row count, not a width",
+    to: "    const padCount = 0; // cells-ok — a row count, not a width",
     expect: "T2.28",
   },
   {

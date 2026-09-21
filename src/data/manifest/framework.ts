@@ -123,22 +123,46 @@ export const FRAMEWORK_TOOLS: readonly ToolDef[] = Object.freeze([
     flags: [],
   }),
   // **The seventh, and the one whose handler needs the root** (C23 §2, C23 I68).
-  // `/profile` opens C28's view; the pane is an `enum` so C05 parses and checks
-  // it before the handler sees it, and `/profile foo` reaches the handler with
-  // `args` empty and answers a usage notice (C22 I66's reason: one reader of
-  // one fact). The four values are C28's `PANES` written down at L0, because
-  // this file may not import L4 — C23 T1.67 holds the two lists equal.
+  // `/profile` opens C28's view; the section is an `enum` so C05 parses and
+  // checks it before the handler sees it, and `/profile foo` reaches the handler
+  // with `args` empty and answers a usage notice (C22 I66's reason: one reader
+  // of one fact). The three values are C28's `SECTIONS` written down at L0,
+  // because this file may not import L4 — C23 T1.67 holds the two lists equal.
+  // They were the four pane names until the deck replaced the panes, and the
+  // rename travelled through T1.67 rather than through a reader noticing.
   Object.freeze({
     name: "profile",
     local: true,
-    summary: "open the profiler's view; `/profile frame` opens it on that pane",
+    // **Within the family's width, and the golden frame is what says so.** The
+    // other six summaries run 15 to 57 characters; a 102-character one was
+    // truncated with an ellipsis in `/help`'s column, losing the half that
+    // named the two document verbs. The detail lives on the argument's own
+    // summary, which `/help` renders on its own line.
+    summary: "open the profiler's deck; also `snapshot`, `live`, `capture`",
     args: [
       Object.freeze({
-        name: "pane",
+        name: "section",
         type: "enum" as const,
         required: false,
-        values: Object.freeze(["overview", "frame", "distribution", "memory"]),
-        summary: "`overview`, `frame`, `distribution` or `memory`; default `overview`",
+        // **Three sections and two document verbs in one enum**, because they
+        // occupy one positional slot and C05 has to accept both: `/profile app`
+        // opens the view on a group and `/profile snapshot` appends a stamped
+        // card (C23 I69, amended). The alternative was a flag, which would make
+        // `/profile --snapshot` the spelling of a verb and read as a modifier of
+        // an open that does not happen.
+        values: Object.freeze(["verdict", "app", "framework", "snapshot", "live", "capture"]),
+        summary: "`verdict`, `app` or `framework` to open the view; `snapshot` or `live` to append a card; `capture` takes a CPU profile",
+      }),
+      Object.freeze({
+        name: "card",
+        type: "string" as const,
+        required: false,
+        // **One slot, read two ways**, because `capture` needs a duration and
+        // the alternative is a second positional nobody else can use. The
+        // handler decides which reading applies from the verb, and a value that
+        // is neither a card nor a number is refused by the handler rather than
+        // by C05 — a `string` here is what lets both through (C22 I66).
+        summary: "which card `snapshot` or `live` draws, or `capture`'s window in ms; default the verdict",
       }),
     ],
     flags: [],

@@ -81,8 +81,8 @@ const results = await runPass({
       // the wrong scale.
       name: "the extent is taken from the clouds alone",
       file: S,
-      from: "  for (const l of paths) for (const p of l.points) all.push(p);",
-      to: "  for (const l of [] as typeof paths) for (const p of l.points) all.push(p);",
+      from: "  for (const l of paths) acc = unionOf(acc, pointsExtent(l.points, scratch));",
+      to: "  for (const l of [] as typeof paths) acc = unionOf(acc, pointsExtent(l.points, scratch));",
       expect: "LN1",
     },
     {

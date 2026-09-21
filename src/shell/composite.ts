@@ -36,6 +36,8 @@
  */
 
 import { renderSequenceToLines } from "../presentation/render-lines.js";
+import type { ChromeCache } from "./chrome-cache.js";
+import type { Block } from "../data/viewmodel/index.js";
 import type { RenderScratch } from "../presentation/blocks/types.js";
 import { sliceCells } from "../presentation/text.js";
 import { SGR_RESET } from "../terminal/escapes.js";
@@ -50,6 +52,8 @@ export type CompositeDeps = Readonly<{
   registry: BlockRegistry;
   theme: ResolvedTheme;
   capabilities: TerminalCapabilities;
+  /** C22 I102 — a layer's lines held by its content's identity. */
+  chrome?: ChromeCache;
   /**
    * C28's seam (I30). Absent is not recording, and that is the usual case.
    */
@@ -58,6 +62,23 @@ export type CompositeDeps = Readonly<{
   regionTop: number;
   /** The region C15 placed against — its own coordinates (I28). */
   region: Readonly<{ width: number; height: number }>;
+  /**
+   * **The frame's width, which is not the region's** (I109, F1227).
+   *
+   * The rows handed in are the painted frame — `size.rows` strings of
+   * `size.columns` — and a composited row must come back at that width, because
+   * the paint has already padded every row to it and the rules and the chrome
+   * are drawn at it. The *region* is what a box may not escape and is one
+   * column narrower.
+   *
+   * **This was `region.width`, and it was correct only while the two were the
+   * same number.** A name for one quantity standing in for another is invisible
+   * to every assertion as long as they agree: the escape check and the row's
+   * padding read one field, and T1.12c — which asserts the composited row is
+   * still the frame's width — went red the moment the margin landed, with
+   * nothing about layers having changed.
+   */
+  columns: number;
   /**
    * The session's render scratch (C12 I107).
    *
@@ -84,7 +105,10 @@ export function composite(
 ): readonly string[] {
   if (placed.length === 0) return rows;
 
-  const columns = deps.region.width;
+  // **The frame's width for the row, the region's for the escape** (I109). The
+  // one below is `deps.region`'s and is a different question: how far a box may
+  // reach, in the coordinates C15 placed it in.
+  const columns = deps.columns;
   // **Accumulated, not per-layer** (I29). Every layer composites onto what the
   // layers below it left, which is what makes "the top layer wins each cell"
   // and "the lower keeps the rest of its box" the same sentence.
@@ -132,15 +156,21 @@ export function composite(
  * whole (I29).
  */
 function layerRows(p: Placed, deps: CompositeDeps): readonly string[] {
+  const render = (blocks: readonly Block[], width: number): readonly string[] =>
+    renderSequenceToLines(deps.registry, blocks, width, {
+      theme: deps.theme,
+      capabilities: deps.capabilities,
+      ...(deps.scratch === undefined ? {} : { scratch: deps.scratch }),
+      ...(deps.probe === undefined ? {} : { probe: deps.probe }),
+    });
+  // **Once per content** (C22 I102): a layer's owner replaces the array when
+  // the content changes, and that identity is the key.
   const lines =
     p.layer.content.length === 0
       ? []
-      : renderSequenceToLines(deps.registry, p.layer.content, p.width, {
-          theme: deps.theme,
-          capabilities: deps.capabilities,
-          ...(deps.scratch === undefined ? {} : { scratch: deps.scratch }),
-          ...(deps.probe === undefined ? {} : { probe: deps.probe }),
-        });
+      : deps.chrome === undefined
+        ? render(p.layer.content, p.width)
+        : deps.chrome.layer(p.layer.content, p.width, deps.theme.name, render);
 
   const out: string[] = [];
   for (let i = 0; i < p.height; i += 1) out.push(exact(lines[i] ?? "", p.width));

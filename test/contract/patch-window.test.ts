@@ -20,7 +20,13 @@ import {
   hunkHeaderRows,
   totalRows,
   windowPatch,
+  windowPlan,
+  windowRows,
+  type WindowPlan,
 } from "../../src/presentation/patch/window.js";
+import { patchDefinition } from "../../src/presentation/patch/definition.js";
+import type { RenderScratch } from "../../src/presentation/blocks/types.js";
+import { numberWidth } from "../../src/presentation/patch/layout.js";
 import { hunkRows, isCollapsed, layoutFor, pairedRows } from "../../src/presentation/patch/height.js";
 import { globSync, readFileSync } from "node:fs";
 import { PATCH_CORPUS } from "../support/blocks.js";
@@ -535,5 +541,165 @@ describe("C25 §7 — the invariants that had no row", () => {
       const drawn = valid.map((o) => JSON.stringify(windowPatch(THREE, width, o, height)));
       expect(new Set(drawn).size, `${String(width)}: the offsets do reach distinct windows`).toBeGreaterThan(1);
     }
+  });
+});
+
+describe("C25 I22 — a window is built over a plan", () => {
+  it("T1.24 (C25 I22, F1187): the plan's lists equal the patch-taking functions over the corpus at both widths, the planned window and clamp equal the unplanned ones at every offset and two heights, windowRows over the plan equals windowRows on the patch, the plan is frozen and heightless, and a plan for another block or width is refused", () => {
+    /**
+     * **The plan is a value the caller holds, so the row's job is that holding
+     * it changes no byte.** Every function that accepts one is compared with
+     * itself given none, at every offset the view could hold — and two past the
+     * end, where the clamp's ceiling does the work — at two heights, because
+     * the bottom search is the one arm whose walks depend on the height.
+     */
+    // Three rows is the height that puts the ceiling near the end of every
+    // corpus patch — at ten and twenty-four the ceiling is offset 0 for most of
+    // them, and the start-row arm would be comparing one offset.
+    const HEIGHTS = [3, 10, 24] as const;
+    let compared = 0;
+    let interior = 0;
+    for (const candidate of PATCH_CORPUS) {
+      if (candidate.kind !== "patch") throw new Error("the corpus is patches");
+      const patch: Patch = candidate;
+      for (const width of [UNIFIED, SPLIT]) {
+        const plan = windowPlan(patch, width);
+        const total = totalRows(patch, width);
+
+        expect(plan.rows.length, "one record per row of the full rendering").toBe(total);  // cells-ok — a row count, not a width
+        expect([...plan.headers], "the header rows").toEqual([...hunkHeaderRows(patch, width)]);
+        expect(plan.numberWidth, "the pinned gutter (I21a)").toBe(numberWidth(patch));
+        expect(plan.layout).toBe(layoutFor(patch, width));
+        expect(Object.isFrozen(plan) && Object.isFrozen(plan.starts) && Object.isFrozen(plan.rows), "a frozen value").toBe(true);
+        expect("height" in plan, "no reference to a height").toBe(false);
+        interior += plan.rows.length - plan.starts.length;  // cells-ok — row counts, not widths
+        // Every header is a row a window may begin at, and the starts are exactly
+        // the offsets the clamp leaves where they are, up to the ceiling.
+        for (const h of plan.headers) expect(plan.starts).toContain(h);
+        for (const height of HEIGHTS) {
+          const bottom = clampOffset(patch, width, height, Number.MAX_SAFE_INTEGER);
+          const fixed: number[] = [];
+          for (let o = 0; o <= bottom; o += 1) if (clampOffset(patch, width, height, o) === o) fixed.push(o);
+          expect(plan.starts.filter((s) => s <= bottom), `start rows up to the ceiling at h=${String(height)}`).toEqual(fixed);
+
+          for (let o = 0; o < total + 2; o += 1) {
+            expect(clampOffset(patch, width, height, o, plan)).toBe(clampOffset(patch, width, height, o));
+            expect(windowPatch(patch, width, o, height, plan)).toEqual(windowPatch(patch, width, o, height));
+            compared += 1;
+          }
+        }
+        for (let from = 0; from < total; from += 1) {
+          expect(windowRows(patch, width, from, from + 10, plan)).toEqual(windowRows(patch, width, from, from + 10));
+        }
+      }
+    }
+    expect(compared, "the sweep ran").toBeGreaterThan(200);
+    // The corpus has interior rows to see — a run of three removes and one add
+    // in split layout — or the start-row arm is a restatement of "every row".
+    expect(interior, "the sweep saw interior rows").toBeGreaterThan(0);
+
+    // A plan for another block, or the same block at another width, is a caller
+    // error and is refused rather than read — a stale plan slices the new lines
+    // by the old rows and shows a diff the block does not hold.
+    const [a, b] = PATCH_CORPUS;
+    if (a?.kind !== "patch" || b?.kind !== "patch") throw new Error("the corpus has two patches");
+    const planA = windowPlan(a, UNIFIED);
+    expect(() => windowPatch(b, UNIFIED, 0, 10, planA)).toThrow(/I22/u);
+    expect(() => clampOffset(a, SPLIT, 10, 0, planA)).not.toThrow(); // offset 0 returns before the plan is read
+    expect(() => clampOffset(a, SPLIT, 10, 1, planA)).toThrow(/I22/u);
+    expect(() => hunkHeaderRows(a, SPLIT, planA)).toThrow(/I22/u);
+    expect(() => windowRows(a, SPLIT, 0, 5, planA)).toThrow(/I22/u);
+  });
+});
+
+describe("C25 I22 — the plan travels through the seam, and a planned window costs the window", () => {
+  it("T1.25 (C25 I22, F1191): over the corpus at both layouts and every start row, a planned windowRows reads no row index outside [from, to) and equals the unplanned window byte for byte; bodyStarts equal each hunk's first body row by a full scan, -1 for none", () => {
+    let windows = 0;
+    for (const candidate of PATCH_CORPUS) {
+      if (candidate.kind !== "patch") throw new Error("the corpus is patches");
+      const patch: Patch = candidate;
+      for (const width of [UNIFIED, SPLIT]) {
+        const plan = windowPlan(patch, width);
+        // **The full scan the plan replaces**, as the row's reference.
+        const scanned = patch.hunks.map(() => -1);
+        plan.rows.forEach((row, i) => {
+          if (row.kind === "body" && scanned[row.hunk] === -1) scanned[row.hunk] = i;
+        });
+        expect([...plan.bodyStarts], "bodyStarts are the first body rows").toEqual(scanned);
+        expect(Object.isFrozen(plan.bodyStarts)).toBe(true);
+
+        // **A recording proxy over the rows**: every numeric index read is noted.
+        const seen = new Set<number>();
+        const recording = new Proxy(plan.rows, {
+          get(target, key, receiver) {
+            if (typeof key === "string" && /^\d+$/u.test(key)) seen.add(Number(key));
+            return Reflect.get(target, key, receiver);
+          },
+        });
+        const recorded: WindowPlan = { ...plan, rows: recording };
+        for (const from of plan.starts) {
+          const to = from + 10;
+          seen.clear();
+          const planned = windowRows(patch, width, from, to, recorded);
+          expect(planned, `the planned window at ${String(from)}`).toEqual(windowRows(patch, width, from, to));
+          const outside = [...seen].filter((i) => i < from || i >= to);
+          expect(outside, `rows read outside [${String(from)}, ${String(to)})`).toEqual([]);
+          windows += 1;
+        }
+      }
+    }
+    expect(windows, "the sweep ran").toBeGreaterThan(50);
+  });
+
+  it("T1.26 (C25 I22, F1191): the definition's window through a caller's scratch derives one plan per patch and width — set once, read back after, the block equal to a scratch-less call — and rebuilds for another width or another patch sharing the hunks array; with no scratch, as before", () => {
+    // A stand-in with the seam's shape (C12 I107): one slot per owner.
+    const slots = new Map<object, { key: string; value: unknown }>();
+    let sets = 0;
+    let gets = 0;
+    const scratch: RenderScratch = {
+      get: (owner, key) => {
+        gets += 1;
+        const slot = slots.get(owner);
+        return slot !== undefined && slot.key === key ? slot.value : undefined;
+      },
+      set: (owner, key, value) => {
+        sets += 1;
+        slots.set(owner, { key, value });
+      },
+    };
+    const window = patchDefinition.window;
+    if (window === undefined) throw new Error("patch declares a window");
+    const measure = (): number => 0;
+    const candidate = PATCH_CORPUS.find((b) => b.kind === "patch" && (b as Patch).hunks.length >= 2);
+    if (candidate === undefined || candidate.kind !== "patch") throw new Error("a two-hunk patch in the corpus");
+    const patch: Patch = candidate;
+
+    const plain = window(patch, SPLIT, 2, 8, measure);
+    const a = window(patch, SPLIT, 2, 8, measure, scratch);
+    expect(a, "the first call equals a call with no scratch").toEqual(plain);
+    expect(sets, "one plan set").toBe(1);
+    const b = window(patch, SPLIT, 3, 9, measure, scratch);
+    expect(b).toEqual(window(patch, SPLIT, 3, 9, measure));
+    expect(sets, "read back, not rebuilt").toBe(1);
+    expect(gets).toBe(2);
+    expect(slots.has(patch.hunks), "keyed on the hunks array").toBe(true);
+
+    // **Another width rebuilds** — the key.
+    window(patch, UNIFIED, 2, 8, measure, scratch);
+    expect(sets, "a new width is a new plan").toBe(2);
+
+    // **Another patch sharing the hunks array is refused, not read**: the held
+    // plan's `patch` is not this block, so it is rebuilt and overwrites.
+    const twin: Patch = block({ ...patch, id: `${patch.id}-twin`, path: `${patch.path}.twin` } as Patch) as Patch;
+    expect(twin.hunks, "the twin shares the array").toBe(patch.hunks);
+    const fromTwin = window(twin, UNIFIED, 2, 8, measure, scratch);
+    expect(sets, "rebuilt for the twin").toBe(3);
+    expect(fromTwin).toEqual(window(twin, UNIFIED, 2, 8, measure));
+    expect((fromTwin.block as Patch).path, "the twin's own path, not the held plan's").toBe(twin.path);
+
+    // **No scratch**: nothing is read or written and the bytes are the same.
+    const before = sets + gets;
+    expect(window(patch, SPLIT, 2, 8, measure)).toEqual(plain);
+    expect(sets + gets).toBe(before);
   });
 });

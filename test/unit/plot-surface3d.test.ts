@@ -11,14 +11,17 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { validateBlock } from "../../src/data/viewmodel/index.js";
+import { block, NO_PROBE, validateBlock, type Probe } from "../../src/data/viewmodel/index.js";
+import { plotDefinition } from "../../src/presentation/plot/definition.js";
+import { renderToLines } from "../../src/presentation/render-lines.js";
+import { DARK_THEME, FULL_CAPS, registry } from "../support/render.js";
 import { b } from "../../src/shell/builders/index.js";
 import {
-  basisOf, createDepth, extentOf, project, viewDir, type Vec3,
+  basisOf, createDepth, cross, dot, extentOf, NEAR, project, sub, unit, unitOf, viewDir, writeDepth, type Vec3,
 } from "../../src/presentation/plot/project3.js";
 import {
-  backfaceCulled, densityGlyph, drawTri, edgeIntensity, lightDirOf, shade,
-  surfacePoints, trianglesOf, type Tri3,
+  backfaceCulled, cornerAt, cornersOf, densityGlyphOf, densitySteps, drawTri, edgeIntensity, faceNormalOf, geometryFrom, hiddenThin, lightDirOf,
+  placeScreen, screenAt, shade, geometryOf, surfacePoints, type Lanes, type Tri3,
 } from "../../src/presentation/plot/surface3.js";
 import { ladderFor } from "../../src/presentation/plot/ramp.js";
 import { COLORMAPS, continuousColour, shadeColour } from "../../src/presentation/theme/colormap.js";
@@ -28,6 +31,10 @@ import { slot } from "../../src/presentation/blocks/paint.js";
 // @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
 import { CAPS, frameFor, groundRgb, stripSgr } from "../../tools/plot-catalogue.mjs";
 import { parseLine } from "../../tools/catalogue-png.mjs";
+import { loadMesh } from "../support/obj.js";
+
+/** The triangles alone — `geometryOf` also returns the referenced vertices (C12 I127), which these rows do not read. */
+const trianglesOf = (...args: Parameters<typeof geometryOf>): readonly Tri3[] => geometryOf(...args).tris;
 
 const CAP = CAPS as readonly { name: string; caps: Record<string, unknown> }[];
 const capsFor = (name: string): Record<string, unknown> =>
@@ -235,8 +242,8 @@ const maskOf = (s: unknown): { edge: number; fill: number } => {
   const depth = createDepth(grid.width, grid.height);
   const kind = new Int8Array(grid.width * grid.height).fill(-1); // cells-ok — a sample count
   for (const t of tris) {
-    drawTri(t, basis, grid, depth, lightDirOf(undefined, basis), { nearD: 4, farD: 8 }, (i, sm) => {
-      kind[i] = sm.edge ? 1 : 0;
+    drawTri(t, basis, grid, depth, lightDirOf(undefined, basis), { nearD: 4, farD: 8 }, (i, _z, _v, _s, _k, edge) => {
+      kind[i] = edge ? 1 : 0;
     });
   }
   let edge = 0;
@@ -346,6 +353,26 @@ describe("plot — the surface carrier", () => {
     expect(nearly, "and it is still a line rather than a fill").toBeLessThan(oblique / 2);
   });
 
+  it("SF2b (C12 I94, I129, F456): a zero-length normal shades finite — no diffuse, and the reflection of nothing is the negated light, so the specular term is the light's own alignment with the eye", () => {
+    // `unit` hands the zero vector back and the scalar core keeps that rule, so
+    // `n · l` is 0 and the reflection `2 (n · l) n − l` is `−l`. With the light
+    // along the view axis and the eye straight ahead, `−l · toEye` is 1, the
+    // specular term is `SPECULAR · 1^16 = 0.2`, and the sample reads
+    // `AMBIENT + SPECULAR = 0.4` at the near plane. **A core that divided the
+    // zero normal by its length would give `NaN`**, which every comparison
+    // swallows into `0.2` — finite, at ambient, and wrong by the whole
+    // highlight; a finiteness assertion passes either way, and this is the
+    // value that does not.
+    const zero = { x: 0, y: 0, z: 0 };
+    const ahead = { x: 0, y: 0, z: 5 };
+    const towardEye = { x: 0, y: 0, z: 1 };
+    const span = { nearD: 0, farD: 1 };
+    expect(shade(zero, ahead, towardEye, 0, span), "ambient plus the reflection of nothing").toBe(0.4);
+    // And with the light away from the eye the reflection points away too:
+    // ambient alone, which is the floor the invariant names.
+    expect(shade(zero, ahead, { x: 0, y: 0, z: -1 }, 0, span), "ambient alone").toBe(0.2);
+  });
+
   it("SF2 (C12 I94, F456): a zero-width range shades at ambient, and the degenerate is the projector's", () => {
     // **Constant along the axis that collapses, and that is the condition.**
     // A zero-width `xRange` alone is *not* enough — after the collapse the cross
@@ -361,7 +388,7 @@ describe("plot — the surface carrier", () => {
       { min: { x: 0, y: 0, z: 0.1 }, max: { x: 0, y: 2, z: 0.9 } },
       0,
     );
-    const zero = flat.filter((t) => Math.hypot(t.a.n.x, t.a.n.y, t.a.n.z) === 0);
+    const zero = flat.filter((t) => { const n = cornersOf(t)[0].n; return Math.hypot(n.x, n.y, n.z) === 0; });
     expect(zero.length, "every face's normal is the zero vector").toBe(flat.length);
     // **The second control, and it is the one that narrowed the rule**: the same
     // collapsed axis with heights that vary along it keeps every normal.
@@ -371,7 +398,7 @@ describe("plot — the surface carrier", () => {
       0,
     );
     expect(
-      varying.filter((t) => Math.hypot(t.a.n.x, t.a.n.y, t.a.n.z) === 0).length,
+      varying.filter((t) => { const n = cornersOf(t)[0].n; return Math.hypot(n.x, n.y, n.z) === 0; }).length,
       "a collapsed axis the surface varies along is not degenerate",
     ).toBe(0);
     // The control: the same heights over a real range keep their normals.
@@ -380,7 +407,7 @@ describe("plot — the surface carrier", () => {
       { min: { x: 0, y: 0, z: 0.1 }, max: { x: 2, y: 2, z: 0.9 } },
       0,
     );
-    expect(wide.every((t) => Math.hypot(t.a.n.x, t.a.n.y, t.a.n.z) > 0.5), "the control has normals").toBe(true);
+    expect(wide.every((t) => { const n = cornersOf(t)[0].n; return Math.hypot(n.x, n.y, n.z) > 0.5; }), "the control has normals").toBe(true);
     // **And it renders rather than throwing or vanishing** — I86 draws a
     // collapsed set rather than refusing it, and `unit` returns the zero vector
     // unchanged, so nothing divides by a normal's length. The picture is a line
@@ -456,7 +483,7 @@ describe("plot — the surface carrier", () => {
       let worst = 0;
       tris.forEach((t, i) => {
         const face = mesh.faces[i] as [number, number, number];
-        [t.a, t.b, t.c].forEach((w, k) => {
+        cornersOf(t).forEach((w, k) => {
           const u = avg[face[k] as number] as Vec3;
           const d = Math.min(1, Math.max(-1, w.n.x * u.x + w.n.y * u.y + w.n.z * u.z));
           worst = Math.max(worst, (Math.acos(d) * 180) / Math.PI);
@@ -623,8 +650,9 @@ describe("plot — the surface carrier", () => {
     }
     // **And never a marker from the tier table** (§6g row 5 one carrier along):
     // `glyph[]` packs `tier × clouds + series`, and a surface is neither.
-    expect(densityGlyph(0.2, caps as never), "ambient is the ladder's second rung").toBe(":");
-    expect(densityGlyph(1, caps as never), "full light is its last").toBe("@");
+    const steps = densitySteps(caps as never);
+    expect(densityGlyphOf(steps, 0.2), "ambient is the ladder's second rung").toBe(":");
+    expect(densityGlyphOf(steps, 1), "full light is its last").toBe("@");
   });
 
   it("SF9 (C12 I94, F455, F480): the field's hue ratio under shading, per colormap", () => {
@@ -791,16 +819,13 @@ describe("plot — the surface carrier", () => {
       (p.x - basis.eye.x) * basis.forward.x + (p.y - basis.eye.y) * basis.forward.y
       + (p.z - basis.eye.z) * basis.forward.z;
     const vert = (p: Vec3) => ({ p, n: { x: 0, y: 0, z: 1 }, v: undefined });
-    const plain = {
-      fn: { x: 0, y: 0, z: 1 },
-      edges: [true, true, true] as const,
-      series: 0,
-      skin: { cull: 0, wire: false } as const,
-    };
+    // The shape a row gives the lane builder (C12 I139): one face, a normal along z, every edge its own.
+    const plain = { fn: [{ x: 0, y: 0, z: 1 }], edges: [[true, true, true] as const], series: 0, skin: { cull: 0, wire: false } as const };
+    type Three = { a: ReturnType<typeof vert>; b: ReturnType<typeof vert>; c: ReturnType<typeof vert> };
+    const triOf = (t: Three): Tri3 => geometryFrom([t.a, t.b, t.c], [[0, 1, 2]], plain).tris[0] as Tri3;
     // One corner behind the eye and two in front, at the default `distance: 1`.
-    const straddle = {
+    const straddle: Three = {
       a: vert({ x: -1, y: -1, z: 0 }), b: vert({ x: 1, y: 1, z: 0 }), c: vert({ x: 1, y: -1, z: 0 }),
-      ...plain,
     };
     expect(
       [straddle.a, straddle.b, straddle.c].filter((w) => zOf(w.p) <= 0.01).length,
@@ -810,19 +835,18 @@ describe("plot — the surface carrier", () => {
       [straddle.a, straddle.b, straddle.c].filter((w) => zOf(w.p) > 0.01).length,
       "and it really does have a front half",
     ).toBeGreaterThan(0);
-    const painted = (t: typeof straddle): number => {
+    const painted = (t: Three): number => {
       const d = createDepth(grid.width, grid.height);
       let n = 0;
-      drawTri(t, basis, grid, d, lightDirOf(undefined, basis), { nearD: 0, farD: 2 }, () => { n += 1; });
+      drawTri(triOf(t), basis, grid, d, lightDirOf(undefined, basis), { nearD: 0, farD: 2 }, () => { n += 1; });
       return n; // cells-ok — a sample count
     };
     expect(painted(straddle), "the front half is drawn rather than the face dropped").toBeGreaterThan(0);
     // **The control is a face entirely behind**, which must draw nothing — or
     // the row above passes against a clip that never refuses anything.
     // Past the eye along `+x`, where the camera sits at `distance: 1`.
-    const away = {
+    const away: Three = {
       a: vert({ x: 2, y: -1, z: 0 }), b: vert({ x: 3, y: 1, z: 0 }), c: vert({ x: 3, y: -1, z: 1 }),
-      ...plain,
     };
     expect(
       [away.a, away.b, away.c].every((w) => zOf(w.p) <= 0.01),
@@ -844,7 +868,7 @@ describe("plot — the surface carrier", () => {
     // 3's ruling instead of row 1's and reports 92.7% at every distance. This
     // row is about the *direction* alone, so the sign is held fixed.
     const byConstant = (t: Tri3, basis: ReturnType<typeof basisOf>): boolean =>
-      viewDir(basis, t.fn).z * t.skin.cull > 0;
+      viewDir(basis, faceNormalOf(t)).z * t.skin.cull > 0;
     const at = (distance: number): { dis: number; kept: number; keptConst: number } => {
       const basis = basisOf({ distance }, 2);
       let dis = 0;
@@ -896,13 +920,15 @@ describe("plot — the surface carrier", () => {
     // which is why the frame is no help: two-sided shading lights the far
     // hemisphere correctly and a sphere's silhouette is the same either way.
     const naive = ta.map((t) => {
+      const [a, b, c3] = cornersOf(t);
       const c = {
-        x: (t.a.p.x + t.b.p.x + t.c.p.x) / 3,
-        y: (t.a.p.y + t.b.p.y + t.c.p.y) / 3,
-        z: (t.a.p.z + t.b.p.z + t.c.p.z) / 3,
+        x: (a.p.x + b.p.x + c3.p.x) / 3,
+        y: (a.p.y + b.p.y + c3.p.y) / 3,
+        z: (a.p.z + b.p.z + c3.p.z) / 3,
       };
-      return !(t.fn.x * (c.x - basis.eye.x) + t.fn.y * (c.y - basis.eye.y)
-        + t.fn.z * (c.z - basis.eye.z) > 0);
+      const fn = faceNormalOf(t);
+      return !(fn.x * (c.x - basis.eye.x) + fn.y * (c.y - basis.eye.y)
+        + fn.z * (c.z - basis.eye.z) > 0);
     });
     const agree = naive.filter((v, i) => v === ka[i]).length; // cells-ok — a face count
     expect(agree / ka.length, "trusting the winding draws the other hemisphere").toBeLessThan(0.15);
@@ -1045,21 +1071,20 @@ describe("plot — the surface carrier", () => {
     // band about **one sample wide**, and that is a ratio against the projected
     // perimeter rather than a count — measured `0.916` at 0.7, and four times
     // that at 3.
-    const big = {
-      a: { p: { x: 0, y: -0.8, z: -0.8 }, n: { x: 0, y: 0, z: -1 }, v: undefined },
-      b: { p: { x: 0, y: 0.8, z: -0.8 }, n: { x: 0, y: 0, z: -1 }, v: undefined },
-      c: { p: { x: 0, y: 0, z: 0.8 }, n: { x: 0, y: 0, z: -1 }, v: undefined },
-      fn: { x: 1, y: 0, z: 0 },
-      edges: [true, true, true] as const,
-      series: 0,
-      skin: { cull: 0, wire: "over" } as const,
-    };
+    const bigCorners = [
+      { p: { x: 0, y: -0.8, z: -0.8 }, n: { x: 0, y: 0, z: -1 }, v: undefined },
+      { p: { x: 0, y: 0.8, z: -0.8 }, n: { x: 0, y: 0, z: -1 }, v: undefined },
+      { p: { x: 0, y: 0, z: 0.8 }, n: { x: 0, y: 0, z: -1 }, v: undefined },
+    ];
+    const big = geometryFrom(bigCorners, [[0, 1, 2]], {
+      fn: [{ x: 1, y: 0, z: 0 }], edges: [[true, true, true]], series: 0, skin: { cull: 0, wire: "over" },
+    }).tris[0] as Tri3;
     const box = { width: 200, height: 200 };
     const bs = basisOf({ azimuth: 0, elevation: 0, distance: 6 }, 1);
     let band = 0; // cells-ok — a sample count
     drawTri(big, bs, box, createDepth(box.width, box.height), lightDirOf(undefined, bs),
-      { nearD: 5, farD: 7 }, (_i, sm) => { if (sm.edge) band += 1; }); // cells-ok — a sample count
-    const corners = [big.a, big.b, big.c].map((w) => {
+      { nearD: 5, farD: 7 }, (_i, _z, _v, _s, _k, edge) => { if (edge) band += 1; }); // cells-ok — a sample count
+    const corners = bigCorners.map((w) => {
       const pr = project(bs, w.p) as { x: number; y: number };
       return { x: pr.x * box.width, y: pr.y * box.height }; // cells-ok — a sample coordinate
     });
@@ -1135,24 +1160,23 @@ describe("plot — the surface carrier", () => {
     const edgesOf = (tri: Tri3): number => {
       const d = createDepth(grid.width, grid.height);
       let n = 0; // cells-ok — a sample count
-      drawTri(tri, basis, grid, d, lightDirOf(undefined, basis), { nearD: 0, farD: 2 }, (_i, sm) => {
-        if (sm.edge) n += 1; // cells-ok — a sample count
+      drawTri(tri, basis, grid, d, lightDirOf(undefined, basis), { nearD: 0, farD: 2 }, (_i, _z, _v, _s, _k, edge) => {
+        if (edge) n += 1; // cells-ok — a sample count
       });
       return n;
     };
-    const straddle = {
-      a: vert({ x: -1, y: -1, z: 0 }), b: vert({ x: 1, y: 1, z: 0 }), c: vert({ x: 1, y: -1, z: 0 }),
-      fn: { x: 0, y: 0, z: -1 }, series: 0, skin: wire,
-    };
-    const none = edgesOf({ ...straddle, edges: [false, false, false] });
-    const all = edgesOf({ ...straddle, edges: [true, true, true] });
+    const straddleCorners = [vert({ x: -1, y: -1, z: 0 }), vert({ x: 1, y: 1, z: 0 }), vert({ x: 1, y: -1, z: 0 })];
+    const straddle = (edges: readonly [boolean, boolean, boolean]): Tri3 =>
+      geometryFrom(straddleCorners, [[0, 1, 2]], { fn: [{ x: 0, y: 0, z: -1 }], edges: [edges], series: 0, skin: wire }).tris[0] as Tri3;
+    const none = edgesOf(straddle([false, false, false]));
+    const all = edgesOf(straddle([true, true, true]));
     expect(none, "with no caller edge the clip contributes none of its own").toBe(0);
     expect(all, "and the surviving originals still draw").toBeGreaterThan(0);
     // **The row**: exactly the two edges that survive the clip are marked, so
     // marking a third — the cut — would add samples. Asserted against the
     // rejected alternative: one caller edge at a time, summing to the whole.
     const one = ([0, 1, 2] as const).map((k) =>
-      edgesOf({ ...straddle, edges: [k === 0, k === 1, k === 2] }));
+      edgesOf(straddle([k === 0, k === 1, k === 2])));
     expect(one.filter((v) => v > 0).length, "two of the three original sides survive").toBe(2);
     expect(one.reduce((x, y) => x + y, 0), "and together they are the whole edge set")
       .toBeGreaterThanOrEqual(all);
@@ -1170,14 +1194,694 @@ describe("plot — the surface carrier", () => {
     // was culled* is satisfied either way.
     const smooth = trianglesOf({ ...s, shading: "smooth" }, ext, 0);
     const byVertex = smooth.map((t) => {
+      const [a, b, c3] = cornersOf(t);
       const c = {
-        x: (t.a.p.x + t.b.p.x + t.c.p.x) / 3,
-        y: (t.a.p.y + t.b.p.y + t.c.p.y) / 3,
-        z: (t.a.p.z + t.b.p.z + t.c.p.z) / 3,
+        x: (a.p.x + b.p.x + c3.p.x) / 3,
+        y: (a.p.y + b.p.y + c3.p.y) / 3,
+        z: (a.p.z + b.p.z + c3.p.z) / 3,
       };
-      return t.a.n.x * (c.x - basis.eye.x) + t.a.n.y * (c.y - basis.eye.y)
-        + t.a.n.z * (c.z - basis.eye.z) < 0;
+      return a.n.x * (c.x - basis.eye.x) + a.n.y * (c.y - basis.eye.y)
+        + a.n.z * (c.z - basis.eye.z) < 0;
     });
     expect(byVertex, "and a vertex normal answers differently").not.toEqual(set("smooth"));
+  });
+});
+
+describe("C12 I129 — the per-sample path", () => {
+  const grid = { width: 240, height: 96 };
+  const basis = basisOf({ azimuth: 0.6, elevation: 0.35, distance: 3.5 }, grid.width / (grid.height * 0.5));
+  const light = lightDirOf(undefined, basis);
+  const span = { nearD: 3, farD: 7 };
+  type Corner = { p: Vec3; n: Vec3; v: number | undefined };
+  /** The test's own screen record: `project` for the position, `viewDir` for the rest. */
+  const screenOf = (w: Corner) => {
+    const pr = project(basis, w.p);
+    if (pr === null) throw new Error("a corner behind the eye");
+    const vp = viewDir(basis, { x: w.p.x - basis.eye.x, y: w.p.y - basis.eye.y, z: w.p.z - basis.eye.z });
+    const vn = viewDir(basis, w.n);
+    return { x: pr.x * grid.width, y: pr.y * grid.height, vp, vn, v: w.v }; // cells-ok — a sample coordinate
+  };
+  type Sample = { z: number; v: number | undefined; k: number; edge: boolean };
+  const tri = (a: Corner, b: Corner, c: Corner, edges: readonly [boolean, boolean, boolean]): Tri3 =>
+    geometryFrom([a, b, c], [[0, 1, 2]], { fn: [{ x: 0, y: 0, z: 1 }], edges: [edges], series: 0, skin: { cull: 0, wire: "over" } }).tris[0] as Tri3;
+  const painted = (t: Tri3): Map<number, Sample> => {
+    const got = new Map<number, Sample>();
+    drawTri(t, basis, grid, createDepth(grid.width, grid.height), light, span, (i, z, v, _s, k, edge) => {
+      got.set(i, { z, v, k, edge });
+    });
+    return got;
+  };
+
+  it("PR15 (C12 I129, I94, I136): every painted sample's intensity through drawTri equals shade over the test's own barycentric interpolation of the corners, and the value the same weights over the corners' values", () => {
+    // Three corners, three normals, three values — so a crossed component or a
+    // crossed weight moves something at almost every sample.
+    const A: Corner = { p: { x: -0.8, y: -0.6, z: 0.1 }, n: { x: 0.2, y: 0.1, z: 0.97 }, v: 1 };
+    const B: Corner = { p: { x: 0.9, y: -0.4, z: -0.2 }, n: { x: -0.3, y: 0.4, z: 0.86 }, v: 2 };
+    const C: Corner = { p: { x: 0.1, y: 0.8, z: 0.3 }, n: { x: 0.1, y: -0.5, z: 0.86 }, v: 3 };
+    const [a, b, c] = [screenOf(A), screenOf(B), screenOf(C)];
+    const got = painted(tri(A, B, C, [true, true, true]));
+    expect(got.size, "a precondition: the fill paints").toBeGreaterThan(100); // cells-ok — a sample count
+    // **`fill`'s weights, restated**: the sample centre against each edge, the
+    // signed area as the divisor.
+    const area = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
+    expect(Math.abs(area), "a precondition: the fill path, not the stroke").toBeGreaterThanOrEqual(1);
+    const sign = area > 0 ? 1 : -1;
+    const m = Math.abs(area);
+    const ks = new Set<number>();
+    for (const [i, s] of got) {
+      const cx = (i % grid.width) + 0.5; // cells-ok — a sample coordinate
+      const cy = Math.floor(i / grid.width) + 0.5; // cells-ok — a sample coordinate
+      const w0 = ((b.x - a.x) * (cy - a.y) - (cx - a.x) * (b.y - a.y)) * sign;
+      const w1 = ((c.x - b.x) * (cy - b.y) - (cx - b.x) * (c.y - b.y)) * sign;
+      const w2 = ((a.x - c.x) * (cy - c.y) - (cx - c.x) * (a.y - c.y)) * sign;
+      const ua = w1 / m;
+      const ub = w2 / m;
+      const uc = w0 / m;
+      const z = a.vp.z * ua + b.vp.z * ub + c.vp.z * uc;
+      const n = { x: a.vn.x * ua + b.vn.x * ub + c.vn.x * uc, y: a.vn.y * ua + b.vn.y * ub + c.vn.y * uc, z: a.vn.z * ua + b.vn.z * ub + c.vn.z * uc };
+      const vp = { x: a.vp.x * ua + b.vp.x * ub + c.vp.x * uc, y: a.vp.y * ua + b.vp.y * ub + c.vp.y * uc, z };
+      expect(s.z, `the depth at ${String(i)}`).toBe(z);
+      expect(s.v, `the value at ${String(i)}`).toBe(1 * ua + 2 * ub + 3 * uc);
+      expect(s.k, `the intensity at ${String(i)}`).toBe(shade(n, vp, light, z, span));
+      ks.add(s.k);
+    }
+    expect(ks.size, "and the intensity varies across the face").toBeGreaterThan(10); // cells-ok — a distinct count
+  });
+
+  it("PR15 thin (C12 I129, I94, I136): a stroked triangle's samples equal shade over the edge's own t, in strokeSeg's steps and its first-writer order", () => {
+    // Two corners and a third on the second: the screen area is zero, so the
+    // three edges are stroked — a→b, b→c of no length, and c→a back again.
+    const A: Corner = { p: { x: -0.95, y: -0.8, z: 0 }, n: { x: 0.3, y: 0.2, z: 0.93 }, v: 1 };
+    const B: Corner = { p: { x: 0.95, y: 0.8, z: 0.1 }, n: { x: -0.4, y: 0.1, z: 0.91 }, v: 4 };
+    const [a, b] = [screenOf(A), screenOf(B)];
+    const got = painted(tri(A, B, B, [true, false, true]));
+    expect(got.size, "a precondition: the stroke paints").toBeGreaterThan(20); // cells-ok — a sample count
+    // **`strokeSeg`'s stepping, restated**, with the tree's own `writeDepth` so
+    // the first writer wins as it does in the stroke.
+    const want = new Map<number, Sample>();
+    const d = createDepth(grid.width, grid.height);
+    const edge = (p: typeof a, q: typeof a, own: boolean): void => {
+      const x0 = (p.x / grid.width) * grid.width;
+      const y0 = (p.y / grid.height) * grid.height;
+      const x1 = (q.x / grid.width) * grid.width;
+      const y1 = (q.y / grid.height) * grid.height;
+      const steps = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)))); // cells-ok — a sample count
+      for (let s = 0; s <= steps; s += 1) { // cells-ok — a sample index
+        const t = s / steps; // cells-ok — a sample index
+        const px = Math.floor(x0 + (x1 - x0) * t); // cells-ok — a sample coordinate
+        const py = Math.floor(y0 + (y1 - y0) * t); // cells-ok — a sample coordinate
+        const z = p.vp.z + (q.vp.z - p.vp.z) * t;
+        if (!writeDepth(d, px, py, z)) continue;
+        const n = { x: p.vn.x + (q.vn.x - p.vn.x) * t, y: p.vn.y + (q.vn.y - p.vn.y) * t, z: p.vn.z + (q.vn.z - p.vn.z) * t };
+        const vp = { x: p.vp.x + (q.vp.x - p.vp.x) * t, y: p.vp.y + (q.vp.y - p.vp.y) * t, z };
+        const v = p.v === undefined || q.v === undefined ? p.v ?? q.v : p.v + (q.v - p.v) * t;
+        want.set(py * grid.width + px, { z, v, k: shade(n, vp, light, z, span), edge: own }); // cells-ok — a sample offset
+      }
+    };
+    edge(a, b, true);
+    edge(b, b, false);
+    edge(b, a, true);
+    expect([...got.keys()].sort((x, y) => x - y), "the same samples").toEqual([...want.keys()].sort((x, y) => x - y));
+    for (const [i, s] of got) expect(s, `the sample at ${String(i)}`).toEqual(want.get(i));
+    expect(new Set([...got.values()].map((s) => s.k)).size, "and the intensity varies along the edge").toBeGreaterThan(5); // cells-ok — a distinct count
+  });
+
+  it("T1.148 (C12 I136, F1176): createDepth's record carries an eight-slot Float64Array lane, and after drawTri its slots hold the last painted sample's normal, view position, depth and intensity by the documented layout, with shade over slots 0–6 answering slot 7 to the bit", () => {
+    const fresh = createDepth(grid.width, grid.height);
+    expect(fresh.lane).toBeInstanceOf(Float64Array);
+    expect([...fresh.lane], "eight zeros beside the buffer").toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
+    // PR15's triangle: three normals, three values, so the slots read a sample
+    // no other sample shares.
+    const A: Corner = { p: { x: -0.8, y: -0.6, z: 0.1 }, n: { x: 0.2, y: 0.1, z: 0.97 }, v: 1 };
+    const B: Corner = { p: { x: 0.9, y: -0.4, z: -0.2 }, n: { x: -0.3, y: 0.4, z: 0.86 }, v: 2 };
+    const C: Corner = { p: { x: 0.1, y: 0.8, z: 0.3 }, n: { x: 0.1, y: -0.5, z: 0.86 }, v: 3 };
+    const [a, b, c] = [screenOf(A), screenOf(B), screenOf(C)];
+    const held = createDepth(grid.width, grid.height);
+    let count = 0;
+    let last: { i: number; z: number; k: number } | undefined;
+    drawTri(tri(A, B, C, [true, true, true]), basis, grid, held, light, span, (i, z, _v, _s, k, _edge) => {
+      count += 1;
+      last = { i, z, k };
+    });
+    expect(count, "more than one sample, so the last is a claim").toBeGreaterThan(100); // cells-ok — a sample count
+    if (last === undefined) throw new Error("nothing painted");
+    // **The row's own interpolation at the last sample's centre** — PR15's weights.
+    const area = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
+    const sign = area > 0 ? 1 : -1;
+    const m = Math.abs(area);
+    const cx = (last.i % grid.width) + 0.5; // cells-ok — a sample coordinate
+    const cy = Math.floor(last.i / grid.width) + 0.5; // cells-ok — a sample coordinate
+    const w0 = ((b.x - a.x) * (cy - a.y) - (cx - a.x) * (b.y - a.y)) * sign;
+    const w1 = ((c.x - b.x) * (cy - b.y) - (cx - b.x) * (c.y - b.y)) * sign;
+    const w2 = ((a.x - c.x) * (cy - c.y) - (cx - c.x) * (a.y - c.y)) * sign;
+    const ua = w1 / m;
+    const ub = w2 / m;
+    const uc = w0 / m;
+    const lane = held.lane;
+    const want = [
+      a.vn.x * ua + b.vn.x * ub + c.vn.x * uc,
+      a.vn.y * ua + b.vn.y * ub + c.vn.y * uc,
+      a.vn.z * ua + b.vn.z * ub + c.vn.z * uc,
+      a.vp.x * ua + b.vp.x * ub + c.vp.x * uc,
+      a.vp.y * ua + b.vp.y * ub + c.vp.y * uc,
+      last.z,
+      last.z,
+      last.k,
+    ];
+    for (let slot = 0; slot < 8; slot += 1) { // cells-ok — a slot index
+      expect(Object.is(lane[slot], want[slot]), `slot ${String(slot)}: ${String(lane[slot])} vs ${String(want[slot])}`).toBe(true);
+    }
+    // **`shade` over the first seven slots answers the eighth**: the reference
+    // and the raster's answer are one function over one lane layout.
+    const n = { x: lane[0] as number, y: lane[1] as number, z: lane[2] as number };
+    const vp = { x: lane[3] as number, y: lane[4] as number, z: lane[5] as number };
+    expect(Object.is(shade(n, vp, light, lane[6] as number, span), lane[7]), "shade over slots 0–6 answers slot 7").toBe(true);
+    // The fixture responds: a slot moved changes the answer.
+    expect(Object.is(shade({ ...n, x: n.x + 0.25 }, vp, light, lane[6] as number, span), lane[7])).toBe(false);
+  });
+});
+
+describe("C12 I137 — the builder's normals live in two lanes", () => {
+  type Sf = Parameters<typeof geometryOf>[0];
+  /** `geometryOf` as it was written over the `Vec3` helpers — the reference the lanes must equal to the bit. */
+  type RefCorner = { p: Vec3; n: Vec3; v: number | undefined };
+  type RefTri = { a: RefCorner; b: RefCorner; c: RefCorner; fn: Vec3; edges: readonly [boolean, boolean, boolean]; series: number; skin: Tri3["skin"] };
+  type RefGeometry = { tris: RefTri[]; corners: { p: Vec3; v: number | undefined }[] };
+  const referenceOf = (s: Sf, extent: ReturnType<typeof extentOf>, series: number): RefGeometry => {
+    const pts = surfacePoints(s).map((p) => unitOf(p, extent));
+    const idx: readonly (readonly [number, number, number])[] = s.faces ?? (() => {
+      const h = s.heights as readonly (readonly number[])[]; const rows = h.length; const cols = h[0]!.length;
+      const out: [number, number, number][] = [];
+      const at = (i: number, j: number): number => j * cols + i;
+      for (let j = 0; j + 1 < rows; j += 1) for (let i = 0; i + 1 < cols; i += 1) { out.push([at(i, j), at(i + 1, j), at(i + 1, j + 1)]); out.push([at(i, j), at(i + 1, j + 1), at(i, j + 1)]); }
+      return out;
+    })();
+    const flat = s.shading === "flat";
+    const faceN = idx.map(([a, b, c]) => cross(sub(pts[b]!, pts[a]!), sub(pts[c]!, pts[a]!)));
+    let vertN: Vec3[] = pts.map(() => ({ x: 0, y: 0, z: 0 }));
+    if (!flat) {
+      for (let f = 0; f < idx.length; f += 1) { const n = faceN[f]!; for (const k of idx[f]!) { const acc = vertN[k]!; vertN[k] = { x: acc.x + n.x, y: acc.y + n.y, z: acc.z + n.z }; } }
+      vertN = vertN.map((v) => unit(v));
+    }
+    const values: (number | undefined)[] = s.vertices !== undefined ? s.vertices.map((p) => p.value) : (s.field ?? s.heights)!.flatMap((row) => [...row]);
+    const seen = new Uint8Array(pts.length);
+    const corners: { p: Vec3; v: number | undefined }[] = [];
+    for (const face of idx) for (const k of face) { if (seen[k] === 1) continue; seen[k] = 1; corners.push({ p: pts[k]!, v: values[k] }); }
+    let cull = 0; for (const [a, b, c] of idx) cull += dot(pts[a]!, cross(pts[b]!, pts[c]!)); cull /= 6;
+    const skin = { cull: s.closed !== true ? 0 : Math.abs(cull) < 1e-12 ? 0 : cull < 0 ? -1 : 1, wire: s.wireframe ?? false } as Tri3["skin"];
+    const mask = s.vertices !== undefined ? idx.map(() => [true, true, true] as const) : idx.map((_, f) => (f % 2 === 0 ? [true, true, false] : [false, true, true]) as readonly [boolean, boolean, boolean]);
+    const shared: (RefCorner | undefined)[] = new Array(pts.length);
+    const tris = idx.map(([ia, ib, ic], f) => {
+      const fn = unit(faceN[f]!);
+      const at = (k: number): RefCorner => { if (flat) return { p: pts[k]!, n: fn, v: values[k] }; const held = shared[k]; if (held !== undefined) return held; const made = { p: pts[k]!, n: vertN[k]!, v: values[k] }; shared[k] = made; return made; };
+      return { a: at(ia), b: at(ib), c: at(ic), fn, edges: mask[f]!, series, skin };
+    });
+    return { tris, corners };
+  };
+  /** A lane triangle in the reference's shape — its three corners read back through `cornersOf` (C12 I139). */
+  const objectForm = (t: Tri3): RefTri => { const [a, b, c] = cornersOf(t); return { a, b, c, fn: faceNormalOf(t), edges: t.edges, series: t.series, skin: t.skin }; };
+  const cornersForm = (L: Lanes): { p: Vec3; v: number | undefined }[] => Array.from({ length: L.count }, (_v, k) => { const c = cornerAt(L, k); return { p: c.p, v: c.v }; }); // cells-ok — a vertex count
+  /** The first path where the two differ — `Object.is` on every number — or null; one assertion per surface, not one per number. */
+  const firstDifference = (x: unknown, y: unknown, path: string): string | null => {
+    if (typeof x === "number" || typeof y === "number") return Object.is(x, y) ? null : `${path}: ${String(x)} vs ${String(y)}`;
+    if (typeof x !== "object" || x === null || typeof y !== "object" || y === null) return x === y ? null : `${path}: ${String(x)} vs ${String(y)}`;
+    const kx = Object.keys(x as object); const ky = Object.keys(y as object);
+    if (kx.length !== ky.length) return `${path}: ${String(kx.length)} keys vs ${String(ky.length)}`;
+    for (const k of kx) { const d = firstDifference((x as Record<string, unknown>)[k], (y as Record<string, unknown>)[k], `${path}.${k}`); if (d !== null) return d; }
+    return null;
+  };
+  const lcg = (seed: number): (() => number) => { let x = seed >>> 0; return () => { x = (Math.imul(x, 1664525) + 1013904223) >>> 0; return x / 4294967296; }; };
+  it("T1.149 (C12 I137, F1181): over the three meshes and seeded grids under both shadings, geometryOf equals the reference over the Vec3 helpers by Object.is on every number and shares vertex records as it does; a degenerate face keeps the zero normal", () => {
+    const rand = lcg(0x5eed_c12_137);
+    const surfaces: [string, Sf][] = [];
+    for (const name of ["suzanne", "teapot", "stanford-bunny"] as const) {
+      const m = loadMesh(name);
+      for (const shading of ["smooth", "flat"] as const) surfaces.push([`${name} ${shading}`, { vertices: m.vertices, faces: m.faces, closed: true, shading } as Sf]);
+    }
+    for (let g = 0; g < 6; g += 1) {
+      const rows = 2 + Math.floor(rand() * 7); const cols = 2 + Math.floor(rand() * 9);
+      const heights = Array.from({ length: rows }, () => Array.from({ length: cols }, () => (rand() - 0.5) * 4));
+      // one level grid: every face normal is along z and every vertex sum is a plain multiple
+      if (g === 0) for (const row of heights) row.fill(1);
+      surfaces.push([`grid ${g} smooth`, { heights, xRange: [-1, 2], yRange: [0, 3], shading: "smooth", wireframe: g % 2 === 0 } as Sf]);
+      surfaces.push([`grid ${g} flat`, { heights, shading: "flat" } as Sf]);
+    }
+    // **A degenerate face**: one that names a vertex twice has the zero normal, which `unit` keeps.
+    const quad = { vertices: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0.5 }, { x: 1, y: 1, z: 0 }, { x: 0, y: 1, z: 1 }], faces: [[0, 1, 2], [0, 1, 1], [2, 3, 0]] as [number, number, number][] };
+    surfaces.push(["degenerate smooth", { ...quad, shading: "smooth" } as Sf], ["degenerate flat", { ...quad, shading: "flat" } as Sf]);
+    let zeroNormals = 0; let sharedSmooth = 0;
+    for (const [name, sf] of surfaces) {
+      const extent = extentOf(surfacePoints(sf));
+      const got = geometryOf(sf, extent, 2);
+      const ref = referenceOf(sf, extent, 2);
+      expect(got.tris.length, `${name}: triangles`).toBe(ref.tris.length);
+      // **The lanes' shape** (C12 I139): flat shading holds three raster
+      // vertices per face in face order; smooth holds the referenced mesh
+      // vertices once each in first-reference order — the reference's `corners`.
+      const flat = sf.shading === "flat";
+      const laneRef = flat ? ref.tris.flatMap((t) => [t.a, t.b, t.c]).map((c) => ({ p: c.p, v: c.v })) : ref.corners;
+      expect(got.lanes.count, `${name}: raster vertices`).toBe(laneRef.length);
+      expect(firstDifference(got.tris.map(objectForm), ref.tris, name), `${name}: every number by Object.is`).toBeNull();
+      expect(firstDifference(cornersForm(got.lanes), laneRef, `${name} corners`), `${name}: the lanes in order`).toBeNull();
+      // **Sharing as the reference shares**: two corners hold one record in
+      // the build exactly where they hold one in the reference — a mesh may
+      // carry two vertices at one position, so identity is the test, not
+      // the coordinates. Under flat shading neither shares anything.
+      const fwd = new Map<RefCorner, number>(); const back = new Map<number, RefCorner>();
+      let shared = 0; let sharingDiffers: string | null = null;
+      for (let f = 0; f < got.tris.length && sharingDiffers === null; f += 1) {
+        for (const [m, c] of (["a", "b", "c"] as const).entries()) {
+          const r = ref.tris[f]![c]; const g = got.lanes.idx[f * 3 + m] as number;
+          const seen = fwd.get(r);
+          if (seen === undefined) { if (back.has(g)) sharingDiffers = `face ${String(f)} ${c} shares a record the reference does not`; fwd.set(r, g); back.set(g, r); }
+          else if (seen !== g) sharingDiffers = `face ${String(f)} ${c} does not share the record the reference shares`;
+          else shared += 1;
+        }
+      }
+      expect(sharingDiffers, `${name}: sharing`).toBeNull();
+      if (sf.shading === "flat") expect(shared, `${name}: flat shares nothing`).toBe(0);
+      else sharedSmooth += shared;
+      for (const t of got.tris) { const fn = faceNormalOf(t); if (fn.x === 0 && fn.y === 0 && fn.z === 0) zeroNormals += 1; }
+    }
+    expect(sharedSmooth, "smooth meshes share records").toBeGreaterThan(100000);
+    expect(zeroNormals, "the degenerate faces have the zero normal, kept").toBe(2);
+  });
+});
+
+describe("C12 I138 — a hidden thin triangle is not walked", () => {
+  /** A screen record's three fields the predicate reads. */
+  /** One lane triangle with nothing placed; a row writes the three slots it reads (C12 I139). */
+  const Z = { p: { x: 0, y: 0, z: 0 }, n: { x: 0, y: 0, z: 1 }, v: undefined };
+  const blankLanes = (): Lanes => geometryFrom([Z, Z, Z], [[0, 1, 2]]).lanes;
+  const lcg = (seed: number): (() => number) => { let x = seed >>> 0; return () => { x = (Math.imul(x, 1664525) + 1013904223) >>> 0; return x / 4294967296; }; };
+
+  it("T1.150 (C12 I138, F1183): a triangle hiddenThin marks writes no sample through drawTri and the depth counts it, the two rounding cases are not marked, and plot3d.hidden counts the skipped triangles of a rendered mesh while plot3d.paint is the count without the check", () => {
+    // **The corpus arm — through the walk itself, not a restatement of it.**
+    // Sub-cell world triangles at seeded places, the buffer around each seeded
+    // near its corners' depths, the predicate asked on the test's own screen
+    // records (PR15's mirror of `project` and `viewDir`), and `drawTri` run.
+    const grid = { width: 160, height: 176 };
+    const basis = basisOf({ azimuth: 0.6, elevation: 0.35, distance: 3.5 }, grid.width / (grid.height * 0.5));
+    const light = lightDirOf(undefined, basis);
+    const span = { nearD: 3, farD: 7 };
+    type Corner = { p: Vec3; n: Vec3; v: number | undefined };
+    const screenOf = (w: Corner): { x: number; y: number; vx: number; vy: number; vz: number; nx: number; ny: number; nz: number; v: number | undefined } => {
+      const pr = project(basis, w.p);
+      if (pr === null) throw new Error("a corner behind the eye");
+      const vp = viewDir(basis, { x: w.p.x - basis.eye.x, y: w.p.y - basis.eye.y, z: w.p.z - basis.eye.z });
+      const vn = viewDir(basis, w.n);
+      return { x: pr.x * grid.width, y: pr.y * grid.height, vx: vp.x, vy: vp.y, vz: vp.z, nx: vn.x, ny: vn.y, nz: vn.z, v: w.v }; // cells-ok — a sample coordinate
+    };
+    const tri = (a: Corner, b: Corner, c: Corner): Tri3 =>
+      geometryFrom([a, b, c], [[0, 1, 2]], { fn: [{ x: 0, y: 0, z: 1 }], edges: [[true, true, true]], series: 0, skin: { cull: 0, wire: "over" } }).tris[0] as Tri3;
+    const rand = lcg(0x5eed_c12_138);
+    let hidden = 0;
+    let walked = 0;
+    let walkedAndPainted = 0;
+    for (let i = 0; i < 400; i += 1) {
+      const o = { x: (rand() - 0.5) * 1.6, y: (rand() - 0.5) * 1.6, z: (rand() - 0.5) * 1.6 };
+      const corner = (): Corner => ({
+        p: { x: o.x + (rand() - 0.5) * 0.004, y: o.y + (rand() - 0.5) * 0.004, z: o.z + (rand() - 0.5) * 0.004 },
+        n: unit({ x: rand() - 0.5, y: rand() - 0.5, z: rand() - 0.5 }),
+        v: rand(),
+      });
+      const [A, B, C] = [corner(), corner(), corner()];
+      const [sa, sb, sc] = [screenOf(A), screenOf(B), screenOf(C)];
+      const area = (sb.x - sa.x) * (sc.y - sa.y) - (sc.x - sa.x) * (sb.y - sa.y);
+      expect(Math.abs(area), `triangle ${i} is sub-cell, so the thin stroke is the path`).toBeLessThan(1);
+      const depth = createDepth(grid.width, grid.height);
+      const zmin = Math.min(sa.vz, sb.vz, sc.vz);
+      const x0 = Math.floor(Math.min(sa.x, sb.x, sc.x)) - 1; // cells-ok — a sample coordinate
+      const y0 = Math.floor(Math.min(sa.y, sb.y, sc.y)) - 1; // cells-ok — a sample coordinate
+      const shape = i % 5;
+      for (let yy = y0; yy <= y0 + 3; yy += 1) { // cells-ok — a sample coordinate
+        for (let xx = x0; xx <= x0 + 3; xx += 1) { // cells-ok — a sample coordinate
+          if (xx < 0 || yy < 0 || xx >= grid.width || yy >= grid.height) continue;
+          // every cell nearer · the corner's depth exactly · a spread about it · one cell left open · untouched
+          const seeded = shape === 0 ? zmin - 0.01 : shape === 1 ? Math.fround(zmin)
+            : shape === 2 ? zmin + (rand() - 0.5) * 0.002 : shape === 3 && xx === x0 + 1 && yy === y0 + 1 ? Infinity : shape === 3 ? zmin - 0.01 : Infinity;
+          depth.z[yy * grid.width + xx] = seeded; // cells-ok — a sample offset
+        }
+      }
+      // **The predicate over the test's own records, placed in the triangle's slots** (C12 I139).
+      const t = tri(A, B, C);
+      for (const [k, r] of [sa, sb, sc].entries()) placeScreen(t.lanes, k, r.x, r.y, r.vz, r.vx, r.vy, r.nx, r.ny, r.nz);
+      const marked = hiddenThin(t.lanes, 0, 1, 2, grid, depth);
+      const before = Float32Array.from(depth.z);
+      let paints = 0;
+      drawTri(t, basis, grid, depth, light, span, () => { paints += 1; });
+      expect(depth.hidden[0], `triangle ${i}: the depth record counts the skip and nothing else`).toBe(marked ? 1 : 0);
+      if (marked) {
+        hidden += 1;
+        expect(paints, `triangle ${i} was marked hidden and painted`).toBe(0);
+        let moved = -1;
+        for (let k = 0; k < before.length && moved < 0; k += 1) if (before[k] !== depth.z[k]) moved = k; // cells-ok — a sample index
+        expect(moved, `triangle ${i} was marked hidden and wrote the buffer`).toBe(-1);
+      } else {
+        walked += 1;
+        if (paints > 0) walkedAndPainted += 1;
+      }
+    }
+    expect(hidden, "the corpus marks some").toBeGreaterThan(60); // cells-ok — a triangle count
+    expect(walked, "and leaves some").toBeGreaterThan(60); // cells-ok — a triangle count
+    expect(walkedAndPainted, "and some of those it leaves do paint, so the fixture responds").toBeGreaterThan(30); // cells-ok — a triangle count
+
+    // **The depth rounding case.** `1 + (1e-20 − 1) · 1` is `0`, below the
+    // smaller endpoint; a cell holding exactly that endpoint's `fround` would
+    // accept the sample, so the triangle is not hidden — and it is, once the
+    // cell holds a depth under the margin.
+    {
+      const g = { width: 8, height: 1 };
+      const d = createDepth(g.width, g.height);
+      const L = blankLanes();
+      placeScreen(L, 0, 2.3, 0.5, 1);
+      placeScreen(L, 1, 2.6, 0.5, 1e-20);
+      placeScreen(L, 2, 2.4, 0.6, 1);
+      const sample = screenAt(L, 0).vz + (screenAt(L, 1).vz - screenAt(L, 0).vz) * 1;
+      expect(sample, "the far sample's depth rounds to zero").toBe(0);
+      d.z[2] = Math.fround(1e-20);
+      expect(Math.fround(sample) < (d.z[2] as number), "and the cell would take it").toBe(true);
+      expect(hiddenThin(L, 0, 1, 2, g, d), "so the triangle is walked").toBe(false);
+      d.z[2] = Math.fround(-1e-9);
+      expect(hiddenThin(L, 0, 1, 2, g, d), "a cell under the margin hides it").toBe(true);
+    }
+    // **The coordinate rounding case.** The walk's `(1 / 49) · 49` floors to
+    // cell 0; the corner's own floor is 1. Every cell from 1 up is nearer and
+    // cell 0 is open, so the walk writes there and the triangle is not hidden.
+    {
+      const g = { width: 49, height: 1 };
+      const d = createDepth(g.width, g.height);
+      const L = blankLanes();
+      placeScreen(L, 0, 1, 0.5, 5);
+      placeScreen(L, 1, 1.3, 0.5, 5);
+      placeScreen(L, 2, 1.2, 0.6, 5);
+      expect(Math.floor((screenAt(L, 0).x / g.width) * g.width), "the walked coordinate is one cell below the corner").toBe(0); // cells-ok — a sample coordinate
+      d.z.fill(4, 1);
+      expect(hiddenThin(L, 0, 1, 2, g, d), "cell 0 is open, so the triangle is walked").toBe(false);
+      d.z[0] = 4;
+      expect(hiddenThin(L, 0, 1, 2, g, d), "cell 0 nearer too, and it is hidden").toBe(true);
+    }
+
+    // **The count arm.** The three meshes under a probe: `plot3d.hidden` above
+    // zero on each and above ten thousand on the bunny; `plot3d.paint` the
+    // figure the same render gave on the build before the check (dist-A at
+    // 01dc31a6: bunny 8,163, teapot 3,719, suzanne 2,950), which is the count
+    // of the same frame without it; and the probe changes no byte.
+    const r = registry([plotDefinition]);
+    const counting = (): Probe & { counts: Map<string, number> } => {
+      const counts = new Map<string, number>();
+      return { ...NO_PROBE, count: (name: string, by = 1): void => { counts.set(name, (counts.get(name) ?? 0) + by); }, counts };
+    };
+    const paintsBefore = { "stanford-bunny": 8163, teapot: 3719, suzanne: 2950 } as const;
+    for (const name of ["stanford-bunny", "teapot", "suzanne"] as const) {
+      const m = loadMesh(name);
+      const plot = block({
+        kind: "plot", id: "ab", form: "plot3d", height: 22, series: [], points3: [], lines3: [], colourBy: "depth", colormap: "coolwarm",
+        camera: { azimuth: 2.2, elevation: 0.25, distance: 5 },
+        surfaces3: [{ label: name, vertices: m.vertices, faces: m.faces, closed: true, shading: "smooth" }],
+      } as never);
+      const probe = counting();
+      const bare = renderToLines(r, plot, 80, { theme: DARK_THEME, capabilities: FULL_CAPS, tick: 0 });
+      expect(renderToLines(r, plot, 80, { theme: DARK_THEME, capabilities: FULL_CAPS, tick: 0, probe }), `${name}: the probe changes no byte`).toEqual(bare);
+      expect(probe.counts.get("plot3d.hidden") ?? 0, `${name}: some triangles are hidden`).toBeGreaterThan(0);
+      expect(probe.counts.get("plot3d.paint"), `${name}: the paints of the frame without the check`).toBe(paintsBefore[name]);
+      if (name === "stanford-bunny") expect(probe.counts.get("plot3d.hidden") ?? 0, "the bunny hides four of nine").toBeGreaterThan(10000); // cells-ok — a triangle count
+    }
+  });
+});
+
+describe("C12 I139 — the geometry is lanes", () => {
+  const cube = {
+    vertices: [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]]
+      .map(([x, y, z]) => ({ x: x as number, y: y as number, z: z as number })),
+    faces: [[0, 1, 2], [0, 2, 3], [4, 6, 5], [4, 7, 6], [0, 5, 1], [0, 4, 5], [3, 2, 6], [3, 6, 7], [0, 3, 7], [0, 7, 4], [1, 5, 6], [1, 6, 2]],
+  };
+  const grid = { width: 160, height: 176 };
+  const aspect = grid.width / (grid.height * 0.5);
+  it("T1.151 (C12 I139, F1184): the lanes carry three spare slots past the vertices and eight doubles a slot; after a frame every slot under the negated stamp is a position project refuses and every slot under the stamp one it accepts; a cube and two meshes straddling the near plane count plot3d.project as the distinct vertices of their non-culled faces plus two cuts per straddling face; the lane builder lays corners out in order with an untouched stamp lane", () => {
+    // **The layout** (C12 I139): one slot per raster vertex and three past them for
+    // the clip path's cuts, eight doubles each, the stamps zero until a frame.
+    const surface = { vertices: cube.vertices, faces: cube.faces, closed: true, shading: "smooth" };
+    const g = geometryOf(surface as never, extentOf(surfacePoints(surface as never)), 0);
+    expect(g.lanes.count, "eight distinct vertices").toBe(8);
+    expect(g.lanes.screen.length, "eight doubles a slot, three spare slots").toBe((8 + 3) * 8); // cells-ok — a lane length
+    expect(g.lanes.stamps.length, "one stamp per vertex").toBe(8); // cells-ok — a lane length
+    expect(g.lanes.idx.length, "three indices a face").toBe(cube.faces.length * 3); // cells-ok — a lane length
+    expect(Array.from(g.lanes.stamps).every((v) => v === 0), "no frame has stamped anything").toBe(true);
+
+    // **The straddling frame**: a camera inside the cube's reach puts corners
+    // on both sides of the near plane. The count is built from the model —
+    // `backfaceCulled` names the faces the raster reaches, `project` says which
+    // corner it refuses — and the raster's tally is held to it exactly.
+    const meshes = [
+      { name: "cube", g, camera: { azimuth: 0.4, elevation: 0.3, distance: 1.2 } },
+      { name: "suzanne", g: (() => { const m = loadMesh("suzanne"); const sf = { vertices: m.vertices, faces: m.faces, closed: true, shading: "smooth" }; return geometryOf(sf as never, extentOf(surfacePoints(sf as never)), 0); })(), camera: { azimuth: 2.2, elevation: 0.25, distance: 1.1 } },
+      { name: "bunny", g: (() => { const m = loadMesh("stanford-bunny"); const sf = { vertices: m.vertices, faces: m.faces, closed: true, shading: "flat" }; return geometryOf(sf as never, extentOf(surfacePoints(sf as never)), 0); })(), camera: { azimuth: 2.2, elevation: 0.25, distance: 1.1 } },
+    ];
+    let stamp = 100;
+    for (const { name, g: G, camera } of meshes) {
+      const basis = basisOf(camera, aspect);
+      const light = lightDirOf(undefined, basis);
+      stamp += 1;
+      const frame = { stamp, projected: 0 };
+      const depth = createDepth(grid.width, grid.height);
+      let paints = 0;
+      for (const t of G.tris) drawTri(t, basis, grid, depth, light, { nearD: 0.01, farD: 4 }, () => { paints += 1; }, frame);
+      // the model's count
+      const touched = new Set<number>();
+      let straddling = 0; let behind = 0; let front = 0;
+      for (const t of G.tris) {
+        if (backfaceCulled(t, basis)) continue;
+        const o = t.f * 3;
+        let refused = 0;
+        for (let m = 0; m < 3; m += 1) { // cells-ok — a corner index
+          const k = G.lanes.idx[o + m] as number;
+          touched.add(k);
+          if (project(basis, cornerAt(G.lanes, k).p) === null) refused += 1;
+        }
+        if (refused > 0 && refused < 3) straddling += 1;
+      }
+      expect(straddling, `${name}: the camera straddles some faces`).toBeGreaterThan(0);
+      expect(frame.projected, `${name}: plot3d.project is the distinct vertices of the non-culled faces plus two cuts a straddling face`).toBe(touched.size + 2 * straddling);
+      expect(paints, `${name}: the straddling frame paints`).toBeGreaterThan(0);
+      // **Every stamp against `project`** (C12 I139): the negation marks a refused
+      // position, the stamp an accepted one, and a vertex no face reached holds
+      // neither.
+      for (let k = 0; k < G.lanes.count; k += 1) { // cells-ok — a vertex index
+        const held = G.lanes.stamps[k] as number;
+        const want = project(basis, cornerAt(G.lanes, k).p);
+        if (!touched.has(k)) { expect(held, `${name}: vertex ${String(k)} untouched`).not.toBe(stamp); expect(held).not.toBe(-stamp); continue; }
+        if (want === null) { behind += 1; expect(held, `${name}: vertex ${String(k)} refused`).toBe(-stamp); continue; }
+        front += 1;
+        expect(held, `${name}: vertex ${String(k)} accepted`).toBe(stamp);
+        const rec = screenAt(G.lanes, k);
+        expect(Object.is(rec.x, want.x * grid.width) && Object.is(rec.y, want.y * grid.height) && Object.is(rec.vz, want.depth), `${name}: vertex ${String(k)}'s slot is project's`).toBe(true);
+      }
+      expect(behind, `${name}: some vertices are behind the plane`).toBeGreaterThan(0);
+      expect(front, `${name}: some are in front`).toBeGreaterThan(0);
+    }
+
+    // **The lane builder**: corners in order, faces as given, nothing stamped.
+    const corners = [
+      { p: { x: 0, y: 0, z: 0 }, n: { x: 0, y: 0, z: 1 }, v: 1 },
+      { p: { x: 1, y: 0, z: 0 }, n: { x: 0, y: 1, z: 0 }, v: undefined },
+      { p: { x: 0, y: 1, z: 0 }, n: { x: 1, y: 0, z: 0 }, v: -2 },
+      { p: { x: 1, y: 1, z: 0 }, n: { x: 0, y: 0, z: -1 }, v: 3 },
+    ];
+    const built = geometryFrom(corners, [[0, 1, 2], [1, 3, 2]]);
+    expect(built.lanes.count).toBe(4);
+    expect(built.tris.length).toBe(2);
+    expect(Array.from(built.lanes.idx)).toEqual([0, 1, 2, 1, 3, 2]);
+    for (const [k, c] of corners.entries()) expect(cornerAt(built.lanes, k), `corner ${String(k)}`).toEqual(c);
+    expect(cornersOf(built.tris[1] as Tri3).map((c) => c.v)).toEqual([undefined, 3, -2]);
+    expect(built.lanes.screen.length).toBe((4 + 3) * 8); // cells-ok — a lane length
+    expect(Array.from(built.lanes.stamps)).toEqual([0, 0, 0, 0]);
+  });
+});
+
+describe("C12 I140 — the projection reads its lanes", () => {
+  type Corner = { p: Vec3; n: Vec3; v: number | undefined };
+  const grid = { width: 160, height: 176 };
+  const basis = basisOf({ azimuth: 0.7, elevation: 0.2, distance: 3 }, grid.width / (grid.height * 0.5));
+  const light = lightDirOf(undefined, basis);
+  /** A position `s` along the view, `a` to the right and `b` up from the eye. */
+  const at = (s: number, a: number, b: number): Vec3 => ({
+    x: basis.eye.x + basis.forward.x * s + basis.right.x * a + basis.up.x * b,
+    y: basis.eye.y + basis.forward.y * s + basis.right.y * a + basis.up.y * b,
+    z: basis.eye.z + basis.forward.z * s + basis.right.z * a + basis.up.z * b,
+  });
+  const zOf = (p: Vec3): number => dot(sub(p, basis.eye), basis.forward);
+  const IN = NEAR * (1 + 1e-6);
+  /** The clip's own cut: `kept + (dropped − kept)·t` at `t = (IN − z_kept) / (z_dropped − z_kept)`, component by component. */
+  const lerp = (a: Vec3, b: Vec3, t: number): Vec3 => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t });
+  const cutOf = (kept: Corner, dropped: Corner): Corner => {
+    const t = (IN - zOf(kept.p)) / (zOf(dropped.p) - zOf(kept.p));
+    return {
+      p: lerp(kept.p, dropped.p, t),
+      n: lerp(kept.n, dropped.n, t),
+      v: kept.v === undefined || dropped.v === undefined ? kept.v ?? dropped.v : kept.v + (dropped.v - kept.v) * t,
+    };
+  };
+  const same = (got: Corner, want: Corner, what: string): void => {
+    for (const k of ["x", "y", "z"] as const) {
+      expect(Object.is(got.p[k], want.p[k]), `${what}: p.${k} ${String(got.p[k])} vs ${String(want.p[k])}`).toBe(true);
+      expect(Object.is(got.n[k], want.n[k]), `${what}: n.${k} ${String(got.n[k])} vs ${String(want.n[k])}`).toBe(true);
+    }
+    expect(Object.is(got.v, want.v), `${what}: v ${String(got.v)} vs ${String(want.v)}`).toBe(true);
+  };
+  const N = (x: number, y: number, z: number): Vec3 => unit({ x, y, z });
+  it("T1.152 (C12 I140, F1185): the position, normal and value lanes hold count + 3 entries; after drawTri with a frame over a triangle straddling the near plane its two cuts sit in the spare slots by the clip's own interpolation — kept + (dropped − kept)·t — with values interpolated or the defined corner's, and each cut's screen slot equals project of that position by Object.is; a triangle with no cut leaves the spare slots as they were", () => {
+    // **A is behind the plane, B and C in front**: the quad remainder is two
+    // triangles sharing the cut on C–A, which takes the first spare slot; the
+    // cut on B–A takes the second.
+    const A: Corner = { p: at(-0.4, 0.1, 0.05), n: N(0.2, 0.3, 0.9), v: 1 };
+    const B: Corner = { p: at(2, 0.6, -0.2), n: N(-0.3, 0.1, 0.9), v: 3 };
+    const C: Corner = { p: at(2.5, -0.5, 0.4), n: N(0.1, -0.4, 0.9), v: 5 };
+    expect(zOf(A.p) <= NEAR, "A is behind the plane").toBe(true);
+    expect(zOf(B.p) > NEAR && zOf(C.p) > NEAR, "B and C are in front").toBe(true);
+    const g = geometryFrom([A, B, C], [[0, 1, 2]]);
+    const L = g.lanes;
+    // **Every lane carries the three spare slots** (C12 I140).
+    expect(L.count).toBe(3);
+    expect(L.pos.length, "positions: count + 3 vertices").toBe((3 + 3) * 3); // cells-ok — a lane length
+    expect(L.nrm.length, "normals: count + 3 vertices").toBe((3 + 3) * 3); // cells-ok — a lane length
+    expect(L.value.length, "values: count + 3 entries").toBe(3 + 3); // cells-ok — a lane length
+    expect(L.screen.length, "screen: count + 3 slots").toBe((3 + 3) * 8); // cells-ok — a lane length
+    expect(L.value.slice(3), "the spare values start undefined").toEqual([undefined, undefined, undefined]);
+    const frame = { stamp: 9, projected: 0 };
+    let paints = 0;
+    drawTri(g.tris[0] as Tri3, basis, grid, createDepth(grid.width, grid.height), light, { nearD: NEAR, farD: 5 }, () => { paints += 1; }, frame);
+    expect(paints, "the straddling triangle paints").toBeGreaterThan(0);
+    expect(frame.projected, "three corners and two cuts").toBe(5);
+    expect(L.stamps[0], "A refused").toBe(-9);
+    expect(L.stamps[1], "B accepted").toBe(9);
+    expect(L.stamps[2], "C accepted").toBe(9);
+    // **The cuts, by the clip's own arithmetic**: kept first, dropped second.
+    same(cornerAt(L, 3), cutOf(C, A), "slot 3, the cut on C–A");
+    same(cornerAt(L, 4), cutOf(B, A), "slot 4, the cut on B–A");
+    expect(L.value[5], "the third spare slot untouched").toBeUndefined();
+    // **Each cut's screen slot is `project` of its own position.**
+    for (const slot of [3, 4]) {
+      const want = project(basis, cornerAt(L, slot).p);
+      if (want === null) throw new Error(`slot ${String(slot)}: project refused a cut on the plane`);
+      const rec = screenAt(L, slot);
+      expect(Object.is(rec.x, want.x * grid.width) && Object.is(rec.y, want.y * grid.height) && Object.is(rec.vz, want.depth), `slot ${String(slot)}: the record is project's`).toBe(true);
+    }
+    // **The value arm**: an undefined corner makes the cut the defined one's;
+    // two undefined make it undefined.
+    const B2: Corner = { ...B, v: undefined };
+    const g2 = geometryFrom([A, B2, C], [[0, 1, 2]]);
+    drawTri(g2.tris[0] as Tri3, basis, grid, createDepth(grid.width, grid.height), light, { nearD: NEAR, farD: 5 }, () => {}, { stamp: 10, projected: 0 });
+    same(cornerAt(g2.lanes, 3), cutOf(C, A), "g2 slot 3, both defined");
+    expect(cornerAt(g2.lanes, 4).v, "g2 slot 4: B undefined, so A's value").toBe(1);
+    const g3 = geometryFrom([{ ...A, v: undefined }, B2, C], [[0, 1, 2]]);
+    drawTri(g3.tris[0] as Tri3, basis, grid, createDepth(grid.width, grid.height), light, { nearD: NEAR, farD: 5 }, () => {}, { stamp: 11, projected: 0 });
+    expect(cornerAt(g3.lanes, 4).v, "g3 slot 4: both undefined").toBeUndefined();
+    // **One kept**: B and C behind, A's cuts in the order the clip makes them —
+    // cut(A, B) then cut(A, C).
+    const A4: Corner = { p: at(2, 0.1, 0.05), n: A.n, v: 1 };
+    const B4: Corner = { p: at(-0.5, 0.6, -0.2), n: B.n, v: 3 };
+    const C4: Corner = { p: at(-0.8, -0.5, 0.4), n: C.n, v: 5 };
+    const g4 = geometryFrom([A4, B4, C4], [[0, 1, 2]]);
+    const f4 = { stamp: 12, projected: 0 };
+    drawTri(g4.tris[0] as Tri3, basis, grid, createDepth(grid.width, grid.height), light, { nearD: NEAR, farD: 5 }, () => {}, f4);
+    expect(f4.projected, "three corners and two cuts").toBe(5);
+    same(cornerAt(g4.lanes, 3), cutOf(A4, B4), "g4 slot 3, the cut on A–B");
+    same(cornerAt(g4.lanes, 4), cutOf(A4, C4), "g4 slot 4, the cut on A–C");
+    // **No cut, no write**: sentinels in the spare slots survive a frame.
+    const g5 = geometryFrom([{ ...A, p: at(1, 0.1, 0.05) }, B, C], [[0, 1, 2]]);
+    const L5 = g5.lanes;
+    L5.pos.fill(7, 9); L5.nrm.fill(8, 9);
+    (L5.value as (number | undefined)[])[3] = 42;
+    L5.screen.fill(-1, 3 * 8);
+    const f5 = { stamp: 13, projected: 0 };
+    drawTri(g5.tris[0] as Tri3, basis, grid, createDepth(grid.width, grid.height), light, { nearD: NEAR, farD: 5 }, () => {}, f5);
+    expect(f5.projected, "three corners, no cut").toBe(3);
+    expect(Array.from(L5.pos.slice(9)).every((v) => v === 7) && Array.from(L5.nrm.slice(9)).every((v) => v === 8), "the spare position and normal slots as they were").toBe(true);
+    expect(L5.value[3]).toBe(42);
+    expect(Array.from(L5.screen.slice(3 * 8)).every((v) => v === -1), "the spare screen slots as they were").toBe(true);
+  });
+});
+
+describe("C12 I141 — the cull reads two face lanes", () => {
+  type Sf = Parameters<typeof geometryOf>[0];
+  const lcg = (seed: number): (() => number) => { let x = seed >>> 0; return () => { x = (Math.imul(x, 1664525) + 1013904223) >>> 0; return x / 4294967296; }; };
+  it("T1.153 (C12 I141, F1186): over the three meshes and seeded grids under both shadings every face's centroid lane is (P[a] + P[b] + P[c]) / 3 over the position lane and its normal lane is unit over cross(b − a, c − a) by Object.is, faceNormalOf reads that lane, a flat raster vertex's normal is its face's entry; backfaceCulled equals the allocating form on ten thousand seeded triangles under both signs, and the bunny keeps 30,747 faces under the profile camera", () => {
+    const rand = lcg(0x5eed_c12_141);
+    const surfaces: [string, Sf][] = [];
+    for (const name of ["suzanne", "teapot", "stanford-bunny"] as const) {
+      const m = loadMesh(name);
+      for (const shading of ["smooth", "flat"] as const) surfaces.push([`${name} ${shading}`, { vertices: m.vertices, faces: m.faces, closed: true, shading } as Sf]);
+    }
+    for (let g = 0; g < 4; g += 1) {
+      const rows = 2 + Math.floor(rand() * 7); const cols = 2 + Math.floor(rand() * 9);
+      const heights = Array.from({ length: rows }, () => Array.from({ length: cols }, () => (rand() - 0.5) * 4));
+      surfaces.push([`grid ${g} smooth`, { heights, shading: "smooth" } as Sf], [`grid ${g} flat`, { heights, shading: "flat" } as Sf]);
+    }
+    let faces = 0;
+    for (const [name, sf] of surfaces) {
+      const G = geometryOf(sf, extentOf(surfacePoints(sf)), 1);
+      const L = G.lanes;
+      const P = L.pos;
+      expect(L.cen.length, `${name}: three doubles a face`).toBe(G.tris.length * 3); // cells-ok — a lane length
+      expect(L.fnrm.length, `${name}: three doubles a face`).toBe(G.tris.length * 3); // cells-ok — a lane length
+      let wrong: string | null = null;
+      for (const t of G.tris) {
+        const o = t.f * 3;
+        const a = (L.idx[o] as number) * 3; const b = (L.idx[o + 1] as number) * 3; const c = (L.idx[o + 2] as number) * 3;
+        // **The centroid lane is the cull's expression over the position lane.**
+        const want = [
+          ((P[a] as number) + (P[b] as number) + (P[c] as number)) / 3,
+          ((P[a + 1] as number) + (P[b + 1] as number) + (P[c + 1] as number)) / 3,
+          ((P[a + 2] as number) + (P[b + 2] as number) + (P[c + 2] as number)) / 3,
+        ];
+        for (let m = 0; m < 3; m += 1) if (!Object.is(L.cen[o + m], want[m])) { wrong = `${name} face ${String(t.f)}: centroid[${String(m)}] ${String(L.cen[o + m])} vs ${String(want[m])}`; break; } // cells-ok — a component index
+        if (wrong !== null) break;
+        // **The normal lane is `unit` over the face's cross product**, as T1.149's reference has it.
+        const [ca, cb, cc] = cornersOf(t);
+        const n = unit(cross(sub(cb.p, ca.p), sub(cc.p, ca.p)));
+        const got = faceNormalOf(t);
+        if (!Object.is(got.x, n.x) || !Object.is(got.y, n.y) || !Object.is(got.z, n.z)) { wrong = `${name} face ${String(t.f)}: normal ${JSON.stringify(got)} vs ${JSON.stringify(n)}`; break; }
+        if (!Object.is(L.fnrm[o], got.x) || !Object.is(L.fnrm[o + 1], got.y) || !Object.is(L.fnrm[o + 2], got.z)) { wrong = `${name} face ${String(t.f)}: faceNormalOf is not the lane`; break; }
+        // **A flat raster vertex's normal is its face's entry.**
+        if (sf.shading === "flat") {
+          for (const w of [ca, cb, cc]) if (!Object.is(w.n.x, got.x) || !Object.is(w.n.y, got.y) || !Object.is(w.n.z, got.z)) { wrong = `${name} face ${String(t.f)}: a flat vertex normal is not the face's`; break; }
+          if (wrong !== null) break;
+        }
+        faces += 1;
+      }
+      expect(wrong, `${name}`).toBeNull();
+    }
+    expect(faces, "a corpus, not a sample").toBeGreaterThan(150_000); // cells-ok — a face count
+    // **The cull against its allocating form**, both signs, normals of their own.
+    const basis = basisOf({ azimuth: 0.7, elevation: 0.4, distance: 3 }, 160 / 88);
+    const r = lcg(1141);
+    const reference = (t: Tri3): boolean => {
+      if (t.skin.cull === 0) return false;
+      const [a, b, c3] = cornersOf(t);
+      const c = { x: (a.p.x + b.p.x + c3.p.x) / 3, y: (a.p.y + b.p.y + c3.p.y) / 3, z: (a.p.z + b.p.z + c3.p.z) / 3 };
+      return dot(faceNormalOf(t), sub(c, basis.eye)) * t.skin.cull > 0;
+    };
+    const vert = () => ({ p: { x: r() * 4 - 2, y: r() * 4 - 2, z: r() * 4 - 2 }, n: { x: 0, y: 0, z: 1 }, v: undefined });
+    const seen = { culled: 0, kept: 0 };
+    for (let i = 0; i < 10_000; i += 1) { // cells-ok — a corpus index
+      const cull = r() < 0.5 ? 1 : -1;
+      const fn = { x: r() * 2 - 1, y: r() * 2 - 1, z: r() * 2 - 1 };
+      const tri = geometryFrom([vert(), vert(), vert()], [[0, 1, 2]], { fn: [fn], skin: { cull, wire: false } }).tris[0] as Tri3;
+      expect(faceNormalOf(tri), `triangle ${String(i)}: the given normal is the lane's`).toEqual(fn);
+      const ours = backfaceCulled(tri, basis);
+      if (ours !== reference(tri)) throw new Error(`triangle ${String(i)}: cull ${String(ours)} vs reference ${String(!ours)}`);
+      if (ours) seen.culled += 1; else seen.kept += 1;
+    }
+    expect(seen.culled, "the corpus holds culled faces").toBeGreaterThan(1000);
+    expect(seen.kept, "and kept ones").toBeGreaterThan(1000);
+    // **The bunny under the profile camera keeps what the object form kept** (F1186's probe).
+    const bunny = loadMesh("stanford-bunny");
+    const sf = { vertices: bunny.vertices, faces: bunny.faces, closed: true, shading: "smooth" } as Sf;
+    const G = geometryOf(sf, extentOf(surfacePoints(sf)), 0);
+    const profile = basisOf({ azimuth: 2.2, elevation: 0.25, distance: 5 }, 160 / 88);
+    let kept = 0;
+    for (const t of G.tris) if (!backfaceCulled(t, profile)) kept += 1;
+    expect(kept, "kept faces").toBe(30_747); // cells-ok — a face count
   });
 });

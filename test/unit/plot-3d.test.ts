@@ -8,15 +8,21 @@
 // implementation written test-last would ship.
 import { describe, expect, it } from "vitest";
 
-import { block, CAMERA_DEFAULT, type Plot } from "../../src/data/viewmodel/index.js";
+import { block, CAMERA_DEFAULT, NO_PROBE, type Plot, type Probe } from "../../src/data/viewmodel/index.js";
 import { plotDefinition } from "../../src/presentation/plot/definition.js";
+import { backfaceCulled, cornerAt, cornersOf, drawTri, faceNormalOf, geometryFrom, geometryOf, lightDirOf, screenAt, spanOverCorners, surfacePoints, type Lanes, type Tri3 } from "../../src/presentation/plot/surface3.js";
 import type { RenderScratch } from "../../src/presentation/blocks/types.js";
-import { measurable } from "../support/render.js";
+import { DARK_THEME, FULL_CAPS, measurable, registry } from "../support/render.js";
+import { renderToLines } from "../../src/presentation/render-lines.js";
+import { NEAR, dot, hypot2, hypot3, sub } from "../../src/presentation/plot/project3.js";
+import { loadMesh } from "../support/obj.js";
 import {
   basisOf,
+  boundsOf,
   createDepth,
   extentOf,
   project,
+  unionOf,
   AREA_ROWS,
   sampleGrid,
   unitOf,
@@ -330,14 +336,15 @@ describe("C12 I107 — the geometry scratch", () => {
    * A `RenderScratch` that counts, because **the build count is what the row is
    * about and elapsed time is not** — a timing assertion is what F507 is about.
    * `set` is called exactly once per build, so `writes` *is* the number of times
-   * `trianglesOf` ran.
+   * `geometryOf` ran.
    *
    * One slot per owner, which is the implementation the invariant names and the
    * cheapest thing that can be wrong in the right direction: a store keeping
    * every key would pass every row here and leak.
    */
-  const counting = (): RenderScratch & { writes: () => number; reads: () => number } => {
+  const counting = (): RenderScratch & { writes: () => number; reads: () => number; writesTo: (owner: object) => number } => {
     const held = new WeakMap<object, { key: string; value: unknown }>();
+    const perOwner = new WeakMap<object, number>();
     let writes = 0;
     let reads = 0;
     return {
@@ -348,10 +355,14 @@ describe("C12 I107 — the geometry scratch", () => {
       },
       set: (owner, key, value) => {
         writes += 1;
+        perOwner.set(owner, (perOwner.get(owner) ?? 0) + 1);
         held.set(owner, { key, value });
       },
       writes: () => writes,
       reads: () => reads,
+      // **Per owner, because I126 gives a cloud its own slot** — a total counts
+      // the cloud's write beside the surface's, and the row is about the surface.
+      writesTo: (owner) => perOwner.get(owner) ?? 0,
     };
   };
 
@@ -410,7 +421,7 @@ describe("C12 I107 — the geometry scratch", () => {
 
     // **The assertion the whole entry exists for** (§6o row 5). Two cameras,
     // one build — the carriers did not move and the camera is not one of
-    // `trianglesOf`'s arguments.
+    // `geometryOf`'s arguments.
     expect(s.writes(), "two cameras, one build").toBe(1);
   });
 
@@ -431,7 +442,9 @@ describe("C12 I107 — the geometry scratch", () => {
     // triangles. Keyed on the surface alone this hits and draws the figure at
     // the wrong scale, inside the box, with every arithmetic assertion passing.
     warm.renderToLines(plot({ points3: [{ points: [{ x: 9, y: 9, z: 9 }] }] }), 60);
-    expect(s.writes(), "a cloud gaining a point moves the extent, so it misses").toBe(2);
+    expect(s.writesTo(MESH.faces), "a cloud gaining a point moves the extent, so the surface misses").toBe(2);
+    // The third write is the cloud's own slot (C12 I126), not a second miss.
+    expect(s.writes(), "the surface twice and the cloud once").toBe(3);
   });
 
   it("PR10c (C12 I107): two surfaces in one block do not share a slot", () => {
@@ -452,5 +465,744 @@ describe("C12 I107 — the geometry scratch", () => {
       60,
     );
     expect(s.writes(), "one slot each").toBe(2);
+  });
+});
+
+describe("C12 I128 — the direct path", () => {
+  /** A probe that counts and does nothing else, on `NO_PROBE`'s shape. */
+  const counting = (): Probe & { counts: Map<string, number> } => {
+    const counts = new Map<string, number>();
+    return {
+      ...NO_PROBE,
+      count: (name: string, by = 1): void => { counts.set(name, (counts.get(name) ?? 0) + by); },
+      counts,
+    };
+  };
+  const VERTICES = Array.from({ length: 81 }, (_v, i) => ({ // cells-ok — a vertex count
+    x: ((i % 9) / 4) - 1, // cells-ok — a vertex index
+    y: (Math.floor(i / 9) / 4) - 1, // cells-ok — a vertex index
+    z: Math.sin((i % 9) / 2) * Math.cos(Math.floor(i / 9) / 2), // cells-ok — a vertex index
+  }));
+  const FACES = Array.from({ length: 64 }, (_v, k) => { // cells-ok — a cell count
+    const r = Math.floor(k / 8); // cells-ok — a cell index
+    const c = k % 8; // cells-ok — a cell index
+    const a = r * 9 + c; // cells-ok — a vertex offset
+    return [a, a + 1, a + 9] as [number, number, number];
+  });
+  const plot = (camera: { azimuth: number; elevation: number; distance: number }): Plot =>
+    block({
+      kind: "plot", id: "pr13", form: "plot3d", height: 12, series: [], axes3: false, box3: "none",
+      colormap: "viridis", camera,
+      surfaces3: [{ vertices: VERTICES, faces: FACES, closed: true }],
+    } as unknown as Plot);
+  const r = registry([plotDefinition]);
+  const render = (p: Plot, probe?: Probe): readonly string[] =>
+    renderToLines(r, p, 60, { theme: DARK_THEME, capabilities: FULL_CAPS, tick: 0, ...(probe === undefined ? {} : { probe }) });
+  /**
+   * How many faces the clip path takes, from the geometry the renderer builds:
+   * not culled as a back face, a corner at or behind the near plane, and a
+   * corner in front of it — a face wholly behind is dropped before the clip.
+   */
+  const straddling = (camera: { azimuth: number; elevation: number; distance: number }): number => {
+    const surface = { vertices: VERTICES, faces: FACES, closed: true };
+    const g = geometryOf(surface as never, extentOf(surfacePoints(surface as never)), 0);
+    // The renderer's basis takes the grid's aspect; the view depth and the cull do not read it.
+    const b = basisOf(camera, 1);
+    const zOf = (p: { x: number; y: number; z: number }): number =>
+      (p.x - b.eye.x) * b.forward.x + (p.y - b.eye.y) * b.forward.y + (p.z - b.eye.z) * b.forward.z;
+    return g.tris.filter((t) => {
+      if (backfaceCulled(t, b)) return false;
+      const zs = cornersOf(t).map((w) => zOf(w.p));
+      return zs.some((z) => z <= NEAR) && zs.some((z) => z > NEAR);
+    }).length; // cells-ok — a face count
+  };
+
+  it("PR13 (C12 I128): plot3d.clip is zero for a mesh wholly in front across three cameras and equals the straddling face count at a camera behind the near plane, the frames unchanged", () => {
+    const front = [0.3, 1.1, 2.4].map((azimuth) => ({ azimuth, elevation: 0.3, distance: 6 }));
+    for (const camera of front) {
+      expect(straddling(camera), "a precondition: nothing straddles at distance 6").toBe(0);
+      const probe = counting();
+      const bare = render(plot(camera));
+      expect(render(plot(camera), probe), "the probe changes no byte").toEqual(bare);
+      expect(probe.counts.get("plot3d.clip") ?? 0, `no clip at azimuth ${String(camera.azimuth)}`).toBe(0);
+    }
+    // **The camera inside the figure.** At distance 0.2 the eye sits among the
+    // vertices and the near plane cuts faces; the count is the faces it cuts.
+    const inside = { azimuth: 0.7, elevation: 0.2, distance: 0.2 };
+    const expected = straddling(inside);
+    expect(expected, "a precondition: the near plane cuts something").toBeGreaterThan(0);
+    // A face wholly behind the plane is culled before the clip and is not counted.
+    const probe = counting();
+    const bare = render(plot(inside));
+    expect(render(plot(inside), probe), "byte-identical through the clip path too").toEqual(bare);
+    expect(probe.counts.get("plot3d.clip") ?? 0, "every face with a corner at or behind the plane, a corner in front, and not culled").toBe(expected);
+    // The frame is not blank: the clip path drew something.
+    expect(bare.some((line) => line.trim().length > 0), "the clip path paints").toBe(true); // cells-ok — a blank test
+  });
+
+  it("PR13b (C12 I128, I95): the edge band is the geometry's and not the vertex order's — a 1 : 4 scalene wireframe triangle marks the same edge samples under every cyclic order", () => {
+    // Legs of 1.6 and 0.4 in unit space, facing the eye; a grid cell's legs are
+    // equal, which is why no grid row could see an edge measured by its
+    // neighbour's length.
+    const P = { a: { x: -0.8, y: -0.2, z: 0 }, b: { x: 0.8, y: -0.2, z: 0 }, c: { x: -0.8, y: 0.2, z: 0 } };
+    const n = { x: 0, y: 0, z: 1 };
+    const vert = (p: { x: number; y: number; z: number }) => ({ p, n, v: undefined });
+    const tri = (a: keyof typeof P, b: keyof typeof P, c: keyof typeof P): Tri3 =>
+      geometryFrom([vert(P[a]), vert(P[b]), vert(P[c])], [[0, 1, 2]], { fn: [n], edges: [[true, true, true]], series: 0, skin: { cull: 0, wire: "over" } }).tris[0] as Tri3;
+    const grid = sampleGrid(60, 12);
+    const basis = basisOf({ azimuth: 0.4, elevation: 0.5, distance: 5 }, grid.width / (grid.height * 0.5));
+    const light = lightDirOf(undefined, basis);
+    const shot = (t: Tri3): { painted: string; edges: string } => {
+      const painted: number[] = [];
+      const edges: number[] = [];
+      drawTri(t, basis, grid, createDepth(grid.width, grid.height), light, { nearD: 4, farD: 6 }, (i, _z, _v, _s, _k, edge) => {
+        painted.push(i);
+        if (edge) edges.push(i);
+      });
+      return { painted: painted.sort((x, y) => x - y).join(","), edges: edges.sort((x, y) => x - y).join(",") };
+    };
+    const first = shot(tri("a", "b", "c"));
+    expect(first.edges.length, "a precondition: the band marks samples").toBeGreaterThan(0); // cells-ok — a string length
+    expect(first.painted.length, "and the fill paints more than the band").toBeGreaterThan(first.edges.length); // cells-ok — a string length
+    for (const order of [["b", "c", "a"], ["c", "a", "b"]] as const) {
+      const other = shot(tri(order[0], order[1], order[2]));
+      expect(other.painted, `the fill under ${order.join("")}`).toBe(first.painted);
+      expect(other.edges, `the band under ${order.join("")}`).toBe(first.edges);
+    }
+  });
+});
+
+describe("C12 I127 — the span over referenced vertices", () => {
+  const counting = (): RenderScratch & { writes: () => number } => {
+    const held = new WeakMap<object, { key: string; value: unknown }>();
+    let writes = 0;
+    return {
+      get: (owner, key) => {
+        const slot = held.get(owner);
+        return slot !== undefined && slot.key === key ? slot.value : undefined;
+      },
+      set: (owner, key, value) => { writes += 1; held.set(owner, { key, value }); },
+      writes: () => writes,
+    };
+  };
+  /** The 9×9 grid PR10 uses; its faces reference 80 of the 81 vertices, so a stray already exists (index 80) and a second is added on purpose. */
+  const VERTICES = Array.from({ length: 81 }, (_v, i) => ({ // cells-ok — a vertex count
+    x: ((i % 9) / 4) - 1, // cells-ok — a vertex index
+    y: (Math.floor(i / 9) / 4) - 1, // cells-ok — a vertex index
+    z: Math.sin((i % 9) / 2) * Math.cos(Math.floor(i / 9) / 2), // cells-ok — a vertex index
+  }));
+  const FACES = Array.from({ length: 64 }, (_v, k) => { // cells-ok — a cell count
+    const r = Math.floor(k / 8); // cells-ok — a cell index
+    const c = k % 8; // cells-ok — a cell index
+    const a = r * 9 + c; // cells-ok — a vertex offset
+    return [a, a + 1, a + 9] as [number, number, number];
+  });
+  const CAMERA = { azimuth: Math.PI / 4, elevation: 0.3, distance: 6 };
+  const referenced = new Set(FACES.flat());
+  const zs = VERTICES.map((v) => v.z);
+  const zLo = Math.min(...zs);
+  const zHi = Math.max(...zs);
+  /**
+   * The stray: inside the mesh's own extent so the extent is unchanged with or
+   * without it, and **nearer the eye than every referenced vertex** so a span
+   * that read every vertex would move the depth ramp. Chosen among the cube's
+   * near corners by measuring, and the precondition is asserted, because a row
+   * whose fabricated violation could not have moved the frame proves nothing.
+   */
+  const extent = extentOf(VERTICES);
+  const basis = basisOf(CAMERA, 1);
+  const depthOf = (p: { x: number; y: number; z: number }): number => project(basis, unitOf(p, extent))?.depth ?? Infinity;
+  const candidates = [-0.999, 0.999].flatMap((x) => [-0.999, 0.999].flatMap((y) => [zLo + 1e-6, zHi - 1e-6].map((z) => ({ x, y, z }))));
+  const STRAY = candidates.reduce((best, c) => (depthOf(c) < depthOf(best) ? c : best));
+  const nearestReferenced = Math.min(...[...referenced].map((k) => depthOf(VERTICES[k] as { x: number; y: number; z: number })));
+
+  const plot = (surface: Record<string, unknown>, over: Record<string, unknown> = {}): Plot =>
+    block({
+      kind: "plot", id: "pr12", form: "plot3d", height: 12, series: [], axes3: false, box3: "none",
+      colormap: "viridis", colourBy: "depth", camera: CAMERA,
+      surfaces3: [{ faces: FACES, closed: true, ...surface }],
+      ...over,
+    } as unknown as Plot);
+  const kit = (scratch?: RenderScratch) =>
+    measurable({ definitions: [plotDefinition], ...(scratch === undefined ? {} : { scratch }) });
+
+  it("PR12 (C12 I127): a stray vertex no face references is in the extent and not in the span — the frame equals the mesh without it", () => {
+    expect(depthOf(STRAY), "the stray is nearer than every referenced vertex").toBeLessThan(nearestReferenced);
+    const withStray = [...VERTICES, STRAY];
+    expect(extentOf(withStray), "and inside the extent, so the extent is unchanged").toStrictEqual(extent);
+    const bare = kit();
+    const alone = bare.renderToLines(plot({ vertices: VERTICES }), 60);
+    expect(bare.renderToLines(plot({ vertices: withStray }), 60), "a span over every vertex would move the depth ramp; this one does not").toEqual(alone);
+    // The same through the scratch, which holds the referenced set beside the triangles.
+    expect(kit(counting()).renderToLines(plot({ vertices: withStray }), 60)).toEqual(alone);
+  });
+
+  it("PR12b (C12 I127, §6o row 15): geometryOf holds one corner per distinct referenced vertex, the triangles' own p objects, the stray absent, and the orbit's write count unchanged", () => {
+    const surface = { vertices: [...VERTICES, STRAY], faces: FACES, closed: true } as const;
+    const g = geometryOf(surface as never, extentOf(surfacePoints(surface as never)), 0);
+    expect(g.lanes.count, "one raster vertex per distinct referenced vertex").toBe(referenced.size); // cells-ok — a vertex count
+    const held = new Set<number>(g.lanes.idx);
+    expect(held.size, "the triangles name exactly that many distinct lane indices").toBe(referenced.size); // cells-ok — a vertex count
+    for (const k of held) expect(k, "a triangle's index is within the lanes").toBeLessThan(g.lanes.count);
+    const strayUnit = unitOf(STRAY, extentOf(surfacePoints(surface as never)));
+    const positions = Array.from({ length: g.lanes.count }, (_v, k) => cornerAt(g.lanes, k)); // cells-ok — a vertex count
+    expect(positions.some((c) => c.p.x === strayUnit.x && c.p.y === strayUnit.y && c.p.z === strayUnit.z), "the stray is not a raster vertex").toBe(false);
+    expect(positions.some((c) => c.v !== undefined), "a mesh without values carries none").toBe(false);
+
+    const s = counting();
+    const warm = kit(s);
+    warm.renderToLines(plot({ vertices: VERTICES }), 60);
+    warm.renderToLines(plot({ vertices: VERTICES }, { camera: { ...CAMERA, azimuth: CAMERA.azimuth + 0.4 } }), 60);
+    expect(s.writes(), "two cameras, one build — the second resident costs no write").toBe(1);
+  });
+});
+
+describe("C12 I126 — the extent scratch", () => {
+  const counting = (): RenderScratch & { writes: () => number; writesTo: (owner: object) => number } => {
+    const held = new WeakMap<object, { key: string; value: unknown }>();
+    const perOwner = new WeakMap<object, number>();
+    let writes = 0;
+    return {
+      get: (owner, key) => {
+        const slot = held.get(owner);
+        return slot !== undefined && slot.key === key ? slot.value : undefined;
+      },
+      set: (owner, key, value) => {
+        writes += 1;
+        perOwner.set(owner, (perOwner.get(owner) ?? 0) + 1);
+        held.set(owner, { key, value });
+      },
+      writes: () => writes,
+      writesTo: (owner) => perOwner.get(owner) ?? 0,
+    };
+  };
+
+  /** A 9×9 mesh, the same shape PR10 uses; the rows count writes, not milliseconds. */
+  const MESH = Object.freeze({
+    vertices: Array.from({ length: 81 }, (_v, i) => ({ // cells-ok — a vertex count
+      x: ((i % 9) / 4) - 1, // cells-ok — a vertex index
+      y: (Math.floor(i / 9) / 4) - 1, // cells-ok — a vertex index
+      z: Math.sin((i % 9) / 2) * Math.cos(Math.floor(i / 9) / 2), // cells-ok — a vertex index
+    })),
+    faces: Array.from({ length: 64 }, (_v, k) => { // cells-ok — a cell count
+      const r = Math.floor(k / 8); // cells-ok — a cell index
+      const c = k % 8; // cells-ok — a cell index
+      const a = r * 9 + c; // cells-ok — a vertex offset
+      return [a, a + 1, a + 9] as [number, number, number];
+    }),
+  });
+  /** A 5×5 height field — one carrier, which is the row 11 shape. */
+  const HEIGHTS: readonly (readonly number[])[] = Object.freeze(
+    Array.from({ length: 5 }, (_r, j) => Object.freeze(Array.from({ length: 5 }, (_c, i) => Math.sin(i) * Math.cos(j)))), // cells-ok — a grid
+  );
+  const CLOUD = Object.freeze([{ x: 0.2, y: -0.4, z: 0.6 }, { x: -0.7, y: 0.1, z: -0.3 }, { x: 0.5, y: 0.5, z: 0.5 }]);
+  const PATH = Object.freeze([{ x: -0.9, y: -0.9, z: 0 }, { x: 0, y: 0.3, z: 0.4 }, { x: 0.8, y: -0.2, z: -0.6 }]);
+  const EMPTY: readonly { x: number; y: number; z: number }[] = Object.freeze([]);
+  const FAR = { azimuth: Math.PI / 4 + 0.4, elevation: 0.3, distance: 6 };
+
+  const plot = (over: Record<string, unknown> = {}): Plot =>
+    block({
+      kind: "plot",
+      id: "pr11",
+      form: "plot3d",
+      height: 12,
+      series: [],
+      axes3: false,
+      box3: "none",
+      colormap: "viridis",
+      camera: { azimuth: Math.PI / 4, elevation: 0.3, distance: 6 },
+      ...over,
+    } as unknown as Plot);
+
+  const kit = (scratch?: RenderScratch) =>
+    measurable({
+      definitions: [plotDefinition],
+      ...(scratch === undefined ? {} : { scratch }),
+    });
+
+  it("PR11 (C12 I126): the extent scratch changes no byte over a cloud, a path, a mesh and an empty cloud at two cameras, and each carrier is written once", () => {
+    const carriers = {
+      points3: [{ points: CLOUD }, { points: EMPTY }],
+      lines3: [{ points: PATH }],
+      surfaces3: [{ vertices: MESH.vertices, faces: MESH.faces, closed: true }],
+    };
+    const here = plot(carriers);
+    const there = plot({ ...carriers, camera: FAR });
+    const bare = kit();
+    const coldHere = bare.renderToLines(here, 60);
+    const coldThere = bare.renderToLines(there, 60);
+    expect(coldHere, "the two cameras draw different pictures").not.toEqual(coldThere);
+
+    // **The control first**: a cache whose absence changes a picture is not a cache.
+    const s = counting();
+    const warm = kit(s);
+    expect(warm.renderToLines(here, 60), "the scratch changes no byte").toEqual(coldHere);
+    expect(warm.renderToLines(there, 60), "at either camera").toEqual(coldThere);
+
+    // **Each carrier once, and the empty cloud takes no slot** (§6o row 12).
+    expect(s.writesTo(CLOUD), "the cloud's points").toBe(1);
+    expect(s.writesTo(PATH), "the path's points").toBe(1);
+    expect(s.writesTo(MESH.faces), "the surface's triangle owner").toBe(1);
+    expect(s.writesTo(EMPTY), "an empty carrier holds nothing").toBe(0);
+    expect(s.writes(), "three writes, no fourth").toBe(3);
+  });
+
+  it("PR11b (C12 I126, §6o row 12): an empty carrier contributes nothing — a surface beside an empty cloud renders as the surface alone, and the unit cube's corners as points move the frame", () => {
+    // A mesh inside [−1, 1] already spans the cube; scale it into [0, 0.5] so a
+    // unit-cube contribution would be visible as a smaller figure inside the box.
+    const small = Object.freeze({
+      vertices: MESH.vertices.map((v) => ({ x: v.x / 4 + 0.25, y: v.y / 4 + 0.25, z: v.z / 4 + 0.25 })),
+      faces: MESH.faces.map((f) => [...f] as [number, number, number]),
+    });
+    const alone = plot({ surfaces3: [{ vertices: small.vertices, faces: small.faces, closed: true }] });
+    const beside = plot({
+      surfaces3: [{ vertices: small.vertices, faces: small.faces, closed: true }],
+      points3: [{ points: EMPTY }],
+    });
+    const bare = kit();
+    const reference = bare.renderToLines(alone, 60);
+    expect(bare.renderToLines(beside, 60), "an empty cloud is invisible, without the scratch").toEqual(reference);
+    expect(kit(counting()).renderToLines(beside, 60), "and with it").toEqual(reference);
+
+    // **The fabricated violation, at the union**: what the frame would be if an
+    // empty carrier contributed the unit cube.
+    const cube = plot({
+      surfaces3: [{ vertices: small.vertices, faces: small.faces, closed: true }],
+      points3: [{ points: [{ x: -1, y: -1, z: -1 }, { x: 1, y: 1, z: 1 }], marker: "none" }],
+    });
+    expect(bare.renderToLines(cube, 60), "the unit cube in the extent shrinks the figure").not.toEqual(reference);
+  });
+
+  it("PR11c (C12 I126, §6o rows 10, 11, 13): a height field has one slot and one write per build; a cloud gaining a point rebuilds the geometry inside the held slot and the frame equals the bare frame", () => {
+    const field = (over: Record<string, unknown> = {}): Plot =>
+      plot({ surfaces3: [{ heights: HEIGHTS, xRange: [0, 1], yRange: [0, 1] }], ...over });
+    const s = counting();
+    const warm = kit(s);
+    const bare = kit();
+
+    expect(warm.renderToLines(field(), 60), "cold, byte-identical").toEqual(bare.renderToLines(field(), 60));
+    expect(s.writesTo(HEIGHTS), "one carrier, one slot, one write").toBe(1);
+    expect(s.writes(), "and nothing else written").toBe(1);
+
+    expect(warm.renderToLines(field({ camera: FAR }), 60), "a second camera, byte-identical")
+      .toEqual(bare.renderToLines(field({ camera: FAR }), 60));
+    expect(s.writes(), "the camera writes nothing").toBe(1);
+
+    // **The block extent moves under a cloud** — the slot is still valid (its
+    // carriers and ranges did not move), the geometry inside it is not.
+    const cloud = [{ x: 3, y: 3, z: 3 }];
+    const moved = field({ points3: [{ points: cloud }] });
+    expect(warm.renderToLines(moved, 60), "rebuilt inside the held slot — asserted on the frame")
+      .toEqual(bare.renderToLines(moved, 60));
+    expect(s.writesTo(HEIGHTS), "one more write, carrying the new geometry").toBe(2);
+    expect(s.writesTo(cloud), "and the cloud's own").toBe(1);
+  });
+
+  it("PR11d (C12 I126): xRange moved on a height field misses and matches the bare frame; a new Surface3 around the same heights and ranges hits", () => {
+    const field = (xRange: readonly [number, number]): Plot =>
+      plot({ surfaces3: [{ heights: HEIGHTS, xRange, yRange: [0, 1] }] });
+    const s = counting();
+    const warm = kit(s);
+    const bare = kit();
+    warm.renderToLines(field([0, 1]), 60);
+    expect(s.writesTo(HEIGHTS), "cold").toBe(1);
+
+    const wide = field([0, 2]);
+    expect(warm.renderToLines(wide, 60), "the range is in the key, and the frame is the bare one")
+      .toEqual(bare.renderToLines(wide, 60));
+    expect(s.writesTo(HEIGHTS), "a moved range misses").toBe(2);
+
+    // **The live path** (§6o row 2): a fresh wrapper, the same carrier and ranges.
+    warm.renderToLines(field([0, 2]), 60);
+    expect(s.writesTo(HEIGHTS), "a new Surface3 around the same heights hits").toBe(2);
+  });
+
+  it("PR11e (C12 I126, §6o row 12): the union over per-carrier bounds equals extentOf over the concatenation to the bit, and boundsOf([]) is undefined", () => {
+    expect(boundsOf([]), "never the unit cube").toBeUndefined();
+    expect(unionOf(undefined, undefined), "the union of nothing").toBeUndefined();
+
+    const sets: (readonly { x: number; y: number; z: number }[])[] = [
+      [],
+      [{ x: -0, y: 0, z: 1 }],
+      [{ x: 0, y: -0, z: -1 }, { x: 0, y: -0, z: -1 }],
+      [{ x: 2.5, y: -3.25, z: 0.125 }, { x: -2.5, y: 3.25, z: -0.125 }, { x: 1e-9, y: 1e9, z: -1e-9 }],
+      [{ x: Number.NaN, y: 4, z: 4 }],
+      [],
+      [{ x: 7, y: -7, z: 0.3 }],
+    ];
+    // Every prefix, and every pair — the fold's order is the thing under test.
+    for (let n = 0; n <= sets.length; n += 1) { // cells-ok — a set count
+      const chosen = sets.slice(0, n);
+      const folded = chosen.reduce<ReturnType<typeof boundsOf>>((acc, set) => unionOf(acc, boundsOf(set)), undefined);
+      const together = extentOf(chosen.flat());
+      expect(folded ?? extentOf([]), `over the first ${String(n)} sets`).toStrictEqual(together);
+      // `toStrictEqual` treats −0 and 0 as different, which is what "to the bit" means here.
+    }
+  });
+});
+
+describe("C12 I130 — a vertex is projected once per frame", () => {
+  const counting = (): Probe & { counts: Map<string, number> } => {
+    const counts = new Map<string, number>();
+    return { ...NO_PROBE, count: (name: string, by = 1): void => { counts.set(name, (counts.get(name) ?? 0) + by); }, counts };
+  };
+  /** The smallest scratch that holds: one slot per owner, as the store keeps it. */
+  const scratchOf = (): RenderScratch => {
+    const slots = new Map<object, { key: string; value: unknown }>();
+    return {
+      get: (owner, key) => { const s = slots.get(owner); return s !== undefined && s.key === key ? s.value : undefined; },
+      set: (owner, key, value) => { slots.set(owner, { key, value }); },
+    };
+  };
+  // **A closed cube with every face wound the same way** (C12 I130) — inward
+  // here, which the renderer reads from the signed volume and never from the caller (C12 I95).
+  const CUBE_V = [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]]
+    .map(([x, y, z]) => ({ x: x as number, y: y as number, z: z as number }));
+  const CUBE_F: [number, number, number][] = [
+    [0, 1, 2], [0, 2, 3], [4, 6, 5], [4, 7, 6], [0, 5, 1], [0, 4, 5], [3, 2, 6], [3, 6, 7], [0, 3, 7], [0, 7, 4], [1, 5, 6], [1, 6, 2],
+  ];
+  const cube = (shading: "smooth" | "flat", camera: { azimuth: number; elevation: number; distance: number }): Plot =>
+    block({
+      kind: "plot", id: "i130", form: "plot3d", height: 12, series: [], axes3: false, box3: "none",
+      colormap: "viridis", camera, surfaces3: [{ vertices: CUBE_V, faces: CUBE_F, closed: true, shading }],
+    } as unknown as Plot);
+  const r = registry([plotDefinition]);
+  const render = (p: Plot, extra: Record<string, unknown> = {}): readonly string[] =>
+    renderToLines(r, p, 60, { theme: DARK_THEME, capabilities: FULL_CAPS, tick: 0, ...extra } as never);
+  const GENERIC = { azimuth: 0.7, elevation: 0.4, distance: 6 };
+
+  it("T1.142 (C12 I130): a closed cube rendered smooth reports plot3d.project as the distinct vertices among its drawn faces and flat as three per drawn face; a second camera projects in full and equals a fresh render; the bunny's smooth count is at most its vertex count", () => {
+    // **Flat first, because it fixes the drawn-face count the smooth figure is
+    // read against**: three projections per drawn face, and a generic camera
+    // sees three sides of a cube — six faces, eighteen.
+    const flat = counting();
+    render(cube("flat", GENERIC), { probe: flat });
+    expect(flat.counts.get("plot3d.project"), "flat: three per drawn face, six faces").toBe(18);
+    // Smooth: the same six faces reach seven distinct vertices — every corner
+    // but the one the three hidden sides meet at.
+    const smooth = counting();
+    const bare = render(cube("smooth", GENERIC), { probe: smooth });
+    expect(smooth.counts.get("plot3d.project"), "smooth: the distinct vertices among the drawn faces").toBe(7);
+    expect(bare.some((line) => line.trim().length > 0), "the cube paints").toBe(true); // cells-ok — a blank test
+
+    // **Two cameras over one scratch.** The geometry is held across the two
+    // renders (C12 I107), so the vertex objects carry the first camera's records
+    // into the second; the stamp is what keeps them from being read. The
+    // second count is taken in full, and the frame is a fresh render's.
+    const scratch = scratchOf();
+    const p = cube("smooth", GENERIC);
+    const first = counting();
+    const one = render(p, { probe: first, scratch });
+    expect(one, "the scratch changes no byte").toEqual(bare);
+    const moved = { azimuth: 1.9, elevation: -0.3, distance: 6 };
+    const second = counting();
+    const two = render(p, { probe: second, scratch, cameras: { i130: moved } });
+    expect(second.counts.get("plot3d.project"), "the second camera projects its drawn vertices in full").toBe(7);
+    expect(two, "and equals a render with no record to read").toEqual(render(cube("smooth", moved)));
+    expect(two, "which is a different frame from the first camera's").not.toEqual(one);
+
+    // **The bunny**: a smooth closed mesh shares each vertex across about six
+    // faces, so the count is bounded by the vertex count and sits well under
+    // three per face — the figure F1166 was opened on.
+    const bunny = loadMesh("stanford-bunny");
+    const probe = counting();
+    render(block({
+      kind: "plot", id: "i130", form: "plot3d", height: 22, series: [], axes3: false, box3: "none", colormap: "coolwarm", colourBy: "depth",
+      camera: { azimuth: 2.2, elevation: 0.25, distance: 5 },
+      surfaces3: [{ label: "bunny", vertices: bunny.vertices, faces: bunny.faces, closed: true, shading: "smooth" }],
+    } as unknown as Plot), { probe });
+    const projected = probe.counts.get("plot3d.project") ?? 0;
+    expect(projected, "at most the vertex count").toBeLessThanOrEqual(bunny.vertices.length); // cells-ok — a vertex count
+    expect(projected, "and under a fifth of three per face").toBeLessThan((3 * bunny.faces.length) / 5); // cells-ok — a face count
+    expect(projected, "and not nothing").toBeGreaterThan(1000);
+  });
+});
+
+
+describe("C12 I131 — the span's depth is project's first dot, and the cull allocates nothing", () => {
+  // A seeded generator, so the corpus is the same on every run and a last-bit
+  // difference is reproducible rather than a flake.
+  const lcg = (seed: number): (() => number) => {
+    let x = seed >>> 0;
+    return () => { x = (Math.imul(x, 1664525) + 1013904223) >>> 0; return x / 4294967296; };
+  };
+  it("T1.143 (C12 I131): backfaceCulled equals the allocating form on every seeded triangle under both cull signs", () => {
+    const basis = basisOf({ azimuth: 0.7, elevation: 0.4, distance: 3 }, ASPECT(80, 24));
+    const r = lcg(1131);
+    // **The cull against its allocating form**, both signs, on triangles whose
+    // normals are their own — so the sign test reads both answers.
+    const reference = (t: Tri3): boolean => {
+      if (t.skin.cull === 0) return false;
+      const [a, b, c3] = cornersOf(t);
+      const c = { x: (a.p.x + b.p.x + c3.p.x) / 3, y: (a.p.y + b.p.y + c3.p.y) / 3, z: (a.p.z + b.p.z + c3.p.z) / 3 };
+      return dot(faceNormalOf(t), sub(c, basis.eye)) * t.skin.cull > 0;
+    };
+    const vert = () => ({ p: { x: r() * 4 - 2, y: r() * 4 - 2, z: r() * 4 - 2 }, n: { x: 0, y: 0, z: 1 }, v: undefined });
+    const seen = { culled: 0, kept: 0 };
+    for (let i = 0; i < 10_000; i += 1) { // cells-ok — a corpus index
+      const cull = r() < 0.5 ? 1 : -1;
+      const tri = geometryFrom([vert(), vert(), vert()], [[0, 1, 2]], { fn: [{ x: r() * 2 - 1, y: r() * 2 - 1, z: r() * 2 - 1 }], skin: { cull, wire: false } }).tris[0] as Tri3;
+      const ours = backfaceCulled(tri, basis);
+      expect(ours, `triangle ${i}`).toBe(reference(tri));
+      if (ours) seen.culled += 1; else seen.kept += 1;
+    }
+    expect(seen.culled, "the corpus holds culled faces").toBeGreaterThan(1000);
+    expect(seen.kept, "and kept ones").toBeGreaterThan(1000);
+  });
+  it("T1.147 (C12 I131, I135, F1175): spanOverCorners from open bounds answers project's least and greatest depth over the accepted corners and the least and greatest value among them, a refused corner moves neither, and enclosing incoming bounds come back unchanged", () => {
+    const basis = basisOf({ azimuth: 0.7, elevation: 0.4, distance: 3 }, ASPECT(80, 24));
+    const r = lcg(1135);
+    // **Corners around and behind the camera**: a cube of side 8 about the
+    // origin at distance 3 puts a share of them at or behind the near plane;
+    // half carry a value, so the value bounds read a subset of the depth's.
+    type Corner = { p: { x: number; y: number; z: number }; v: number | undefined };
+    const corners: Corner[] = [];
+    for (let i = 0; i < 10_000; i += 1) { // cells-ok — a corpus index
+      corners.push({ p: { x: r() * 8 - 4, y: r() * 8 - 4, z: r() * 8 - 4 }, v: r() < 0.5 ? r() * 20 - 10 : undefined });
+    }
+    // **The corners as lanes** (C12 I139): every corner a raster vertex in order, no faces.
+    const N = { x: 0, y: 0, z: 1 };
+    const lanesOf = (cs: readonly Corner[]): Lanes => geometryFrom(cs.map((c) => ({ p: c.p, n: N, v: c.v })), []).lanes;
+    const lanes = lanesOf(corners);
+    // **The reference is `project` itself**, over the corners it accepts.
+    let nearD = Infinity; let farD = -Infinity; let loV = Infinity; let hiV = -Infinity;
+    let refused = 0; let accepted = 0; let valueless = 0;
+    for (const c of corners) {
+      const full = project(basis, c.p);
+      if (full === null) { refused += 1; continue; }
+      accepted += 1;
+      nearD = Math.min(nearD, full.depth);
+      farD = Math.max(farD, full.depth);
+      if (c.v === undefined) valueless += 1;
+      else { loV = Math.min(loV, c.v); hiV = Math.max(hiV, c.v); }
+    }
+    expect(refused, "the corpus holds corners project refuses").toBeGreaterThan(100);
+    expect(accepted, "and corners it accepts").toBeGreaterThan(1000);
+    expect(valueless, "and accepted corners without a value").toBeGreaterThan(100);
+    // **A refused corner moves neither pair**: the reference above skipped it,
+    // and a refused corner nearer than every accepted one would show in `nearD`.
+    const open = spanOverCorners(basis, lanes, Infinity, -Infinity, Infinity, -Infinity);
+    expect(Object.is(open.nearD, nearD), `nearD ${String(open.nearD)} vs ${String(nearD)}`).toBe(true);
+    expect(Object.is(open.farD, farD), `farD ${String(open.farD)} vs ${String(farD)}`).toBe(true);
+    expect(Object.is(open.loV, loV), `loV ${String(open.loV)} vs ${String(loV)}`).toBe(true);
+    expect(Object.is(open.hiV, hiV), `hiV ${String(open.hiV)} vs ${String(hiV)}`).toBe(true);
+    // **The incoming bounds honoured** when they enclose the corpus — the
+    // clouds and paths read before the surfaces (C04 I78, I79).
+    const enclosing = spanOverCorners(basis, lanes, nearD - 1, farD + 1, loV - 1, hiV + 1);
+    expect(enclosing).toEqual({ nearD: nearD - 1, farD: farD + 1, loV: loV - 1, hiV: hiV + 1 });
+    // And partial bounds tighten only where the corpus reaches past them.
+    const partial = spanOverCorners(basis, lanes, nearD + 0.5, farD - 0.5, Infinity, -Infinity);
+    expect(partial).toEqual({ nearD, farD, loV, hiV });
+    // **The fixture responds**: an empty corpus answers the bounds it was handed.
+    expect(spanOverCorners(basis, lanesOf([]), 1, 2, 3, 4)).toEqual({ nearD: 1, farD: 2, loV: 3, hiV: 4 });
+    // **The arms `Math.min` has and a comparison lacks, by name** (C12 I135).
+    const front = corners.find((c) => project(basis, c.p) !== null) as Corner;
+    const nanCorner: Corner = { p: { x: NaN, y: 0, z: 0 }, v: undefined };
+    expect(project(basis, nanCorner.p), "project accepts a NaN coordinate").not.toBeNull();
+    const nanDepth = spanOverCorners(basis, lanesOf([front, nanCorner, front]), Infinity, -Infinity, Infinity, -Infinity);
+    expect(Number.isNaN(nanDepth.nearD) && Number.isNaN(nanDepth.farD), "NaN propagates as Math.min's does").toBe(true);
+    const nanValue = spanOverCorners(basis, lanesOf([{ p: front.p, v: 1 }, { p: front.p, v: NaN }, { p: front.p, v: 2 }]), Infinity, -Infinity, Infinity, -Infinity);
+    expect(Number.isNaN(nanValue.loV) && Number.isNaN(nanValue.hiV), "a NaN value").toBe(true);
+    for (const order of [[0, -0], [-0, 0]] as const) {
+      const zeros = spanOverCorners(basis, lanesOf(order.map((v) => ({ p: front.p, v }))), Infinity, -Infinity, Infinity, -Infinity);
+      expect(Object.is(zeros.loV, -0), `loV is −0 after ${order.map((v) => (Object.is(v, -0) ? "−0" : "+0")).join(", ")}`).toBe(true);
+      expect(Object.is(zeros.hiV, 0), "hiV is +0").toBe(true);
+    }
+  });
+});
+
+describe("C12 I132 — the painter writes an integer and the records are built once", () => {
+  const counting = (): Probe & { counts: Map<string, number> } => {
+    const counts = new Map<string, number>();
+    return {
+      ...NO_PROBE,
+      count: (name: string, by = 1): void => { counts.set(name, (counts.get(name) ?? 0) + by); },
+      counts,
+    };
+  };
+  // Two height fields over the same footprint, the lower one first in the
+  // list: every sample the upper one covers was written by the lower one
+  // before, so writes exceed the records the frame keeps.
+  const sheet = (lift: number): { vertices: { x: number; y: number; z: number }[]; faces: [number, number, number][]; shading: "smooth" } => ({
+    vertices: Array.from({ length: 81 }, (_v, i) => ({ // cells-ok — a vertex count
+      x: ((i % 9) / 4) - 1, // cells-ok — a vertex index
+      y: (Math.floor(i / 9) / 4) - 1, // cells-ok — a vertex index
+      z: lift + 0.15 * Math.sin((i % 9) / 2) * Math.cos(Math.floor(i / 9) / 2), // cells-ok — a vertex index
+    })),
+    faces: Array.from({ length: 64 }, (_v, k) => { // cells-ok — a cell count
+      const r = Math.floor(k / 8); // cells-ok — a cell index
+      const c = k % 8; // cells-ok — a cell index
+      const a = r * 9 + c; // cells-ok — a vertex offset
+      return [a, a + 1, a + 9] as [number, number, number];
+    }),
+    shading: "smooth",
+  });
+  const plot = (surfaces: unknown[]): Plot =>
+    block({
+      kind: "plot", id: "t1144", form: "plot3d", height: 14, series: [], axes3: false, box3: "none",
+      colormap: "viridis", camera: { azimuth: 0.6, elevation: 1.1, distance: 5 },
+      surfaces3: surfaces,
+    } as unknown as Plot);
+  const r = registry([plotDefinition]);
+  const render = (p: Plot, probe: Probe, capabilities = FULL_CAPS): readonly string[] =>
+    renderToLines(r, p, 60, { theme: DARK_THEME, capabilities, tick: 0, probe });
+
+  it("T1.144 (C12 I132, F1171): two surfaces at 24-bit with the farther drawn first count more plot3d.paint than plot3d.ink, plot3d.ink is at most the grid and equals the surface-owned samples, no empty hex in the frame, and colourDepth 8 counts no plot3d.ink", () => {
+    const two = plot([sheet(-0.4), sheet(0.4)]);
+    const probe = counting();
+    const frame = render(two, probe);
+    const paints = probe.counts.get("plot3d.paint") ?? 0;
+    const records = probe.counts.get("plot3d.ink") ?? 0;
+    expect(records, "records were built").toBeGreaterThan(0);
+    expect(paints, "the lower sheet's samples were written again by the upper").toBeGreaterThan(records);
+    // The grid is w·2 × rows·8 (I84) at the plot's area; the records cannot exceed it.
+    expect(records).toBeLessThanOrEqual(60 * 2 * 14 * 8); // cells-ok — a sample bound
+    // No mark escaped into the frame: an escaped PENDING_INK would paint an
+    // empty hex, and `sgr` on an empty hex is not a sequence any row carries.
+    expect(frame.some((line) => line.includes("#")), "no raw hex in the frame").toBe(false);
+    expect(frame.some((line) => /\x1b\[38;2;;/.test(line)), "no empty channel triple").toBe(false);
+    expect(frame.some((line) => line.trim().length > 0), "the surfaces painted").toBe(true); // cells-ok — a blank test
+
+    // **The records equal the surface-owned samples.** One sheet alone writes
+    // each sample once, so its records equal its writes; the count is the
+    // number of samples the surface owns in the composed frame.
+    const one = counting();
+    render(plot([sheet(0)]), one);
+    expect(one.counts.get("plot3d.paint"), "a single sheet writes each sample once").toBe(one.counts.get("plot3d.ink"));
+
+    // **The eight-bit arm is untouched**: it builds its record through colourOf
+    // and shadeColour per write, and counts no records.
+    const eight = counting();
+    render(two, eight, { ...FULL_CAPS, colourDepth: 8 });
+    expect(eight.counts.get("plot3d.ink") ?? 0, "no packed records on the eight-bit arm").toBe(0);
+    expect(eight.counts.get("plot3d.paint") ?? 0, "the writes are still counted").toBeGreaterThan(0);
+  });
+  it("T1.145 (C12 I133, F1172): hypot3 and hypot2 equal Math.hypot bit for bit over a seeded corpus of a million tuples in each arity drawn from a pool with the extremes, and over every pure-extreme tuple enumerated", () => {
+    // **The builtin is the reference and Object.is is the comparison**: `-0`
+    // and `NaN` are answers the early returns exist for, and `toBe` on
+    // numbers is `Object.is` — so a `0` for a `-0`, or a `NaN` for an
+    // `Infinity`, is a mismatch and not an agreement.
+    const EXTREMES = [0, -0, Number.MIN_VALUE, -Number.MIN_VALUE, 1e-308, -1e-308, 1e308, -1e308, Infinity, -Infinity, NaN];
+    // A magnitude anywhere in the exponent range, either sign — the corpus
+    // where Kahan's compensation and the normalisation by the largest are
+    // both load-bearing.
+    let seed = 0x5eed_c12_1;
+    const rand = (): number => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed / 0x100000000;
+    };
+    const draw = (): number => {
+      const r = rand();
+      if (r < 0.08) return EXTREMES[Math.floor(rand() * EXTREMES.length)] as number;
+      const mantissa = rand() * 2 - 1;
+      const exponent = Math.floor(rand() * 600) - 300;
+      return mantissa * 10 ** exponent;
+    };
+    // A plain loop that counts, and one assertion naming the first mismatch —
+    // a million `expect` calls is the harness's cost, not the row's.
+    let differ3 = 0; // tuples where the naive sum of squares is not the builtin — the fixture responding
+    let wrong3 = 0;
+    let first3 = "";
+    for (let i = 0; i < 1_000_000; i += 1) {
+      const a = draw();
+      const b = draw();
+      const c = draw();
+      const want = Math.hypot(a, b, c);
+      if (!Object.is(hypot3(a, b, c), want)) {
+        wrong3 += 1;
+        if (first3 === "") first3 = `hypot3(${String(a)}, ${String(b)}, ${String(c)}) = ${String(hypot3(a, b, c))}, builtin ${String(want)}`;
+      }
+      if (!Object.is(Math.sqrt(a * a + b * b + c * c), want)) differ3 += 1;
+    }
+    expect(wrong3, first3).toBe(0);
+    let differ2 = 0;
+    let wrong2 = 0;
+    let first2 = "";
+    for (let i = 0; i < 1_000_000; i += 1) {
+      const a = draw();
+      const b = draw();
+      const want = Math.hypot(a, b);
+      if (!Object.is(hypot2(a, b), want)) {
+        wrong2 += 1;
+        if (first2 === "") first2 = `hypot2(${String(a)}, ${String(b)}) = ${String(hypot2(a, b))}, builtin ${String(want)}`;
+      }
+      if (!Object.is(Math.sqrt(a * a + b * b), want)) differ2 += 1;
+    }
+    expect(wrong2, first2).toBe(0);
+    // The corpus is one the naive form gets wrong — otherwise the row would
+    // pass for any square root of a sum.
+    expect(differ3).toBeGreaterThan(100_000);
+    expect(differ2).toBeGreaterThan(100_000);
+    // **Every pure-extreme tuple**, so the order of the early returns is
+    // tested at each cell of the table and not where the sample happened to land.
+    for (const a of EXTREMES) {
+      for (const b of EXTREMES) {
+        expect(hypot2(a, b), `hypot2(${String(a)}, ${String(b)})`).toBe(Math.hypot(a, b));
+        for (const c of EXTREMES) {
+          expect(hypot3(a, b, c), `hypot3(${String(a)}, ${String(b)}, ${String(c)})`).toBe(Math.hypot(a, b, c));
+        }
+      }
+    }
+    // The named cells of T6.109: the builtin answers Infinity over NaN, and a
+    // finite answer at the top of the range where the naive sum overflows.
+    expect(hypot2(Infinity, NaN)).toBe(Infinity);
+    expect(hypot3(NaN, Infinity, 1)).toBe(Infinity);
+    expect(Number.isFinite(hypot3(1e308, 1e308, 1e308))).toBe(true);
+  });
+  it("T1.146 (C12 I134, F1174): after drawTri under a frame each stamped vertex's record has x, y and vz equal to project's x·width, y·height and depth by Object.is, over the cube, suzanne and the bunny under two perspective cameras and an orthographic camera at two distances, and more than a thousand vertices are compared", () => {
+    // **`project` is the reference**: the scalar projection in `toScreen` is a
+    // second implementation of it, verified by the first over every vertex the
+    // raster stamps — the record on the vertex is what the fill reads.
+    const cube = {
+      vertices: [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]]
+        .map(([x, y, z]) => ({ x: x as number, y: y as number, z: z as number })),
+      faces: [[0, 1, 2], [0, 2, 3], [4, 6, 5], [4, 7, 6], [0, 5, 1], [0, 4, 5], [3, 2, 6], [3, 6, 7], [0, 3, 7], [0, 7, 4], [1, 5, 6], [1, 6, 2]],
+    };
+    const meshes = [
+      { name: "cube", ...cube },
+      { name: "suzanne", ...loadMesh("suzanne") },
+      { name: "bunny", ...loadMesh("stanford-bunny") },
+    ];
+    const cameras = [
+      CAMERA_DEFAULT,
+      { ...CAMERA_DEFAULT, azimuth: 2.2, elevation: 0.25, distance: 5 },
+      { ...CAMERA_DEFAULT, projection: "orthographic" as const, distance: 6 },
+      { ...CAMERA_DEFAULT, projection: "orthographic" as const, azimuth: 1.1, elevation: -0.3, distance: 2.5 },
+    ];
+    const grid = sampleGrid(80, 22);
+    let compared = 0;
+    let wrong = 0;
+    let first = "";
+    // **The stamp advances per camera** (C12 I130): a record under the last
+    // camera's stamp would be read back as this camera's, and the first draft
+    // of this row did exactly that.
+    let stamp = 0;
+    for (const mesh of meshes) {
+      const surface = { vertices: mesh.vertices, faces: mesh.faces, closed: true, shading: "smooth" };
+      const g = geometryOf(surface as never, extentOf(surfacePoints(surface as never)), 0);
+      for (const camera of cameras) {
+        const basis = basisOf(camera, ASPECT(80, 22));
+        const light = lightDirOf(undefined, basis);
+        stamp += 1;
+        const frame = { stamp, projected: 0 };
+        const depth = createDepth(grid.width, grid.height);
+        for (const t of g.tris) drawTri(t, basis, grid, depth, light, { nearD: 1, farD: 20 }, () => {}, frame);
+        // **Each stamped slot against `project`** (C12 I139): the record is the slot's.
+        for (let k = 0; k < g.lanes.count; k += 1) { // cells-ok — a vertex index
+          if (g.lanes.stamps[k] !== frame.stamp) continue;
+          const held = screenAt(g.lanes, k);
+          const want = project(basis, cornerAt(g.lanes, k).p);
+          compared += 1;
+          if (want === null || !Object.is(held.x, want.x * grid.width) || !Object.is(held.y, want.y * grid.height) || !Object.is(held.vz, want.depth)) {
+            wrong += 1;
+            if (first === "") first = `${mesh.name} under ${JSON.stringify(camera)}: held (${String(held.x)}, ${String(held.y)}, ${String(held.vz)}), project ${JSON.stringify(want)}`;
+          }
+        }
+        // The fixture responds: the frame stamped its drawn vertices.
+        expect(frame.projected, `${mesh.name} projected under ${JSON.stringify(camera)}`).toBeGreaterThan(0);
+      }
+    }
+    expect(wrong, first).toBe(0);
+    expect(compared).toBeGreaterThan(1000);
   });
 });

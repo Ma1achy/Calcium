@@ -49030,3 +49030,6317 @@ the box-less shot also marks, which a rescale would break and an occlusion canno
 The general form is worth the entry: **a control must be measured in a quantity the
 thing under test does not move.** It read as a natural control precisely because it
 was the same measurement one colour over.
+
+---
+
+## F1126 — one rule at two gates, and the validator's own message contradicts its condition ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/builders/index.ts:668` · `src/data/viewmodel/validate.ts:509` · C04 I70 |
+| **Reached for** | choosing a `sankey` for C28's flow card, and checking the member list against both gates before writing it |
+| **Verdict** | **open** — the divergence is measured; which arm is right is C04's ruling |
+
+`graphLayout` is refused by the builder on anything but `graph`:
+
+    if (graphLayout !== undefined && drawn !== "graph")
+
+and by the validator only when the form is neither `graph` nor `sankey`:
+
+    if (form !== "graph" && form !== "sankey")
+
+So **`graphLayout` on a `sankey` passes the validator and throws at the builder.** A
+document read back from disk is accepted and the same document built locally is
+refused — the two gates C04 keeps deliberately in step, out of step.
+
+**Which arm is intended is not in doubt**, which is what makes this cheap to fix and
+worth recording rather than guessing: the builder's own comment two lines above says
+*"`sankey` takes `graph` on `graph`'s own rule … and `graphLayout` stays `graph`'s
+alone"*, and C04 I70 reads the same way.
+
+**The tell is inside the loose arm.** The validator's message is
+
+    "graphLayout" on form "sankey" (C04 I70) — only a graph takes a graph layout
+
+which is a sentence that cannot be emitted: the condition that produces it has
+already excluded `sankey`. **The text and the predicate disagree in one function**,
+and the text is the one that agrees with the invariant. A reader checking the message
+against I70 finds them identical and moves on — the same shape as F398, where two
+copies of the `IS_MATRIX` rule disagreed under a comment asserting they were one.
+
+**Distinct from SK10.** `test/unit/plot-sankey.test.ts:311` is a deferred row about
+the `graph` *member* on `sankey`, which both gates now admit. This is the sibling
+member, and nothing watches it.
+
+---
+
+## F1127 — one span name, two populations, and both cards are right ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `src/shell/profiling/recorder.ts:251`, `:684` · `ProfileReport.spans` against `ProfileReport.timeline` |
+| **Reached for** | C28's front end, deciding which cards can carry a distribution |
+| **Verdict** | **open** — the fix is a label on every card, and the label has to be specified before the cards are written |
+
+`record()` feeds two stores from one close:
+
+    hist(spanHists, node.name).add(self);
+    frameSpans[node.name] = (frameSpans[node.name] ?? 0) + self;
+
+The histogram is **unbounded since the last tier reset**. The frame record goes into
+a ring of **512**. So at frame 600 the report holds `spans.measure.count === 600` and
+`timeline.length === 512`, over the same name, in the same report.
+
+**Nothing in the report says so.** `dropped.frames` counts what the ring discarded and
+is the only trace, and it is a property of `timeline` sitting nowhere near `spans`.
+
+**The cost is a front end that disagrees with itself and is not wrong anywhere.** A
+`dotplot` of `measure`'s p50 reads the histogram; a `boxplot` of `measure` computes
+real quartiles from the 512 per-frame samples — which is the only way to get `q1` and
+`q3`, the histogram having neither. Two cards, one span, two medians, and a reader
+comparing them has no way to learn why.
+
+**It is not a bug in either store.** The histogram is right to be unbounded — it is
+what survives the ring — and the ring is right to be bounded. What is missing is that
+**a figure never names the population it was taken over**, so the two are silently
+interchangeable at the point of use.
+
+Ruled for C28's deck: every card states its population in the panel footer — *over the
+last 512 frames* or *over all 600 since the reset at 12.1 s* — and the kit's two
+extractors are named for their population rather than for their shape.
+
+---
+
+## F1128 — the worst set is recomputed per report, so a card indexed into it changes underneath the reader ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `src/shell/profiling/recorder.ts:684` · C28 I32 · C28 §3c's 1 s refresh |
+| **Reached for** | C28's flame and icicle cards, deciding what a card is addressed by |
+| **Verdict** | **open** — ruled for the deck; the ruling is what the spec edit carries |
+
+`report()` computes the retained set fresh, every call:
+
+    const worst = [...drawn].sort((a, b) => b.work - a.work).slice(0, worstKeep);
+
+This is correct and I32 says why — *which frames are worst is not known until later*.
+What follows from it had no reader until there was a card per retained frame.
+
+**The view refreshes every second.** So a card addressed as *the third worst frame*
+is a **different frame** at the next tick whenever a slower frame arrives or an older
+one falls out of the 512-frame ring. A reader looking at a flame graph of a 31 ms
+frame looks up and is looking at a 28 ms one, with nothing changed on screen but the
+numbers.
+
+**The naive design is the one that fails**, and it fails silently: an index into
+`worst` is the obvious address, it is stable in every fixture with fewer than ten
+frames, and it is wrong the moment the session is busy enough to be worth profiling.
+
+Ruled: **a card is addressed by the frame's `seq`, never by its position**, re-resolved
+against `worst` on each draw. A `seq` that has left the set is said so and the card
+clamps to the nearest rather than silently redrawing a different frame — because the
+frame leaving the worst set is itself a reading.
+
+---
+
+## F1129 — `NodeStat` has no ordinal, so *cost against position* is not constructible ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/profiling/tree.ts`'s `NodeStat` and `Aggregate` · `ProfileReport.byEntry` |
+| **Reached for** | C28's *does cost rise with position in the document* card |
+| **Verdict** | **open** — the card is deferred, and its blocker is `NodeStat.firstFrame` |
+
+The question is a real one and the framework's `scatter` is the form for it: plot each
+entry's cost against where it sits in the transcript, and a slope is an O(n) nobody
+declared.
+
+**The report cannot express the abscissa.** `byEntry` is a `Record<string, Histogram>`
+keyed by entry id, and `NodeStat` is
+`{key, entry?, measures, renders, calls, self, total, max, frames}` — nine members and
+**not one of them is ordinal**. `snapshot()` sorts by `self`, so even the map's
+insertion order is gone by the time a consumer sees it.
+
+**`Aggregate` holds the answer privately.** Its rows carry `lastFrame`, kept to decide
+whether to increment `frames`, and it is never published. A `firstFrame` beside it
+would be one assignment and would make the card constructible.
+
+Recorded rather than built, because the round that found it is the front end and the
+change is to the backend's published type — and a card that fabricated an ordering
+from the sort it happens to receive would be a figure whose x axis is a rendering
+artefact. **Deferred, blocker `NodeStat.firstFrame`**, so picking the entry up begins
+by grepping the symbol.
+
+---
+
+## F1130 — the view has no failure path, and the forms it is about to draw refuse rather than degrade ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `src/shell/profile-view.ts`'s `arm` and `paneBlocks` · `b.plot`'s forty construction refusals |
+| **Reached for** | C28's deck, asking what a card does when the region is too small for its form |
+| **Verdict** | **open** — it cannot fire today, and the deck is what arms it |
+
+`profile-view.ts` contains **no `try` and no `catch`**. The refresh is
+
+    timer = deps.schedule(() => {
+      timer = null;
+      const at = state;
+      if (at === null) return;
+      at.blocks = paneBlocks(profiler, at.pane);
+      render(profiler, at, "stream");
+      arm(profiler);
+    }, VIEW_REFRESH_MS);
+
+**`arm` is the last statement.** So anything `paneBlocks` throws escapes a scheduled
+callback *and* takes the re-arm with it: the timer is already `null`, nothing
+re-schedules, and the view stops refreshing — with the tier still raised, because the
+restore runs from `pop()` and the ring reset that raised it already happened.
+
+**The failure is worse than a crash because it looks like nothing.** A frozen pane
+showing a one-second-old report is indistinguishable from a quiet session.
+
+**It cannot fire today**, and that is the reason it has never been seen: the four
+panes build `bar` and `line` with two series and computed heights, and `b.plot`'s
+refusals are all about the members and shapes those two never carry.
+
+**The deck arms it.** `b.plot` throws — not degrades — on a `violin` with fewer than
+two rows per band, a `boxplot` with fewer rows than bands, a ninth series on a
+non-matrix form, a second series on a `bubble`, `width` with `aspect`, and thirty-five
+more. Every one is a function of the region, the report's shape, or both, and the
+region is not bounded below.
+
+Ruled for the deck: **the kit refuses above the form.** A card declares the floor its
+form needs, the kit compares it to the region before building, and a card that cannot
+be drawn draws a notice saying which. The `try` is the second line of defence and not
+the first — a caught throw one second later is still a pane that cannot draw itself,
+and the notice is the honest version of that.
+
+---
+
+## F1131 — two cards named a question whose data has no time axis, and the deck read as complete ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | C28 §3c's `far side` and `cache over time` cards · `ProfileReport.spans` · `FrameRecord` |
+| **Reached for** | the report-coverage register (C28 I61), written before the cards |
+| **Verdict** | **closed** — both recut onto a carrier that has the axis |
+
+Two rows of the deck named a form, a question and a source, and read as finished:
+
+- **`far side` — `gantt`, `offsets` per start.** Session-site spans publish a `Histogram`
+  each. A histogram has a count, a sum and seven order statistics, and **no start**, so
+  there is nothing to offset by. A `gantt` without `offsets` is a bar chart, which the
+  row itself says.
+- **`cache over time` — `step`, are misses accumulating.** `misses` is a
+  `Record<string, Record<MissReason, number>>` taken at the instant `report()` is
+  called, and `FrameRecord` carries `seq`, `reason`, `work`, `wait`, `spans`, `tree?`,
+  `outcome`, `selfInflicted` and `at` — **no counters**. A card is a pure function of one
+  report, so it cannot difference two of them, and the only accumulation it could draw
+  is the one it was handed.
+
+**Neither row is wrong about anything it states.** The form is right for the question,
+the question is worth asking, and the source named does hold the quantity — it holds it
+*without the axis the form plots it against*. That is why a reader checking the deck one
+row at a time agrees: the failure is between the form's second axis and the source's
+shape, and no row of the table carries both.
+
+**What found it was the coverage register asking a different question.** Working out
+which `ProfileReport` key each card reads is how the absence surfaced — `far side` could
+not be given a key that carried starts, and `cache over time` could not be given one that
+carried time. The register is about keys; the cards fell out of it.
+
+**Both recut onto the carrier that does have the axis, and both are better cards:**
+
+- The `gantt` becomes **one retained frame's span tree on the frame's own clock**.
+  `TreeNode.startedAt` exists and its comment says why it is carried rather than derived:
+  a parent's children do not tile it, the gaps between them are the parent's own self
+  time, and a consumer laying them end to end produces a timeline that is well-formed,
+  plausible and not what happened. The deck now has the consumer that comment was
+  written for.
+- The `step` becomes **the cumulative counters in the resource ring** — GC counts, major
+  page faults, involuntary context switches over the 64 samples. Those are monotone
+  counters on a wall clock, which is precisely the datum a step function is for and a
+  line lies about.
+
+**The far side keeps `far side cost`**, the `dotplot` of p50 against p95, which is the
+summary honestly drawn and was always the row that did not overreach.
+
+---
+
+## F1132 — a form named in a card's note is not a form dispositioned ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | C28 §3c's form register · `PlotForm` |
+| **Reached for** | the form register (C28 I59), compared to the union by equality |
+| **Verdict** | **closed** — `bubble` refused, with the reason the card already carried |
+
+`PlotForm` has forty-eight members. The deck's cards and the refusal table accounted for
+forty-seven, and the missing one was **`bubble`** — which appears in §3c, in the
+`cost per unit` card's own note: *`sizes` carries total cost, because `bubble` takes
+exactly one series.*
+
+**The sentence is true, it is the right reason, and it is in the wrong table.** A reader
+scanning §3c for `bubble` finds it, reads a correct account of why the card does not use
+it, and concludes the form was considered — which it was. What was missing is the row
+that makes the consideration **countable**, and I59's whole argument is that a deck
+reaching for thirty forms and leaving eighteen unmentioned is indistinguishable from one
+that considered eighteen and rejected them.
+
+This is the citation-reads-as-coverage shape pointed at a register rather than a
+roadmap: the test is never *does this mention the form*, it is *would a gate see it*.
+Nothing but the equality comparison would have asked, because the form is genuinely
+discussed — in prose, one table away from the list that is compared.
+
+Filed at three stars rather than four: the outcome was a row, not a picture. The reason
+it is filed at all is that the same shape at the other register cost a card (F1131), and
+a register whose gaps are only ever found by the register is a register worth having.
+
+---
+
+## F1133 — `fillHeight` is published and its inverse is not, so a card sized to its region overflows it every time ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/height.ts`'s `plotHeight` · `src/presentation/plot/index.ts` |
+| **Reached for** | C28's deck — thirty-seven cards each choosing a figure height from a region |
+| **Verdict** | **closed** — `plotHeight` and `PlotGeometry` published beside `fillHeight` |
+
+`fillHeight(region, fallback, reserve)` is on C12's public surface **because the caller
+is an app choosing a plot height from the region it was handed** — roadmap 38's
+subject, and the comment above it says exactly that. The deck is its second
+consumer, and the second consumer is where the first one's assumptions break.
+
+**`height` is the plot *area*, and the block is taller.** `plotHeight` is
+`plotAreaRows + FURNITURE_ROWS[form] + legendRows + titleRows`, and for every
+`axes: true` form the furniture is three rows: the lid, the axis rule and the
+x-labels. So a card that asked `fillHeight` for its region got back the region,
+built a block three rows taller than the region, and there was **nothing on either
+side of the seam able to say so** — `fillHeight` answers *what should I ask for* and
+nothing answered *how tall will it then be*.
+
+Measured before the fix: **19 of 37 cards at 35 rows in a 32-row region**, every one
+of them an `axes: true` form, every one by exactly three.
+
+**Nothing but reading the frames finds it.** Every card renders, every figure is
+correct, and each is three rows past its box — which a windowing view absorbs by
+scrolling, so it presents as *the deck always pages by a little* rather than as a
+defect. `panes.ts`'s own comment has carried the number for a year — *the lid, the
+axis rule and the x-labels are three more, and they are the plot's own furniture* —
+as a sentence in a comment rather than as a function anyone could call.
+
+**Closed by publishing the inverse**, not by subtracting three. A constant that
+agrees with `FURNITURE_ROWS` today is a second expression of the same rule, and the
+one that drifts is the copy. `plotHeight` and `PlotGeometry` are now exported from
+`plot/index.ts`, and the kit searches down from the region for the largest height
+whose `plotHeight` fits — using the same function the renderer measures with.
+
+### The second half: a form whose height is a declared parameter
+
+The same read found the mirror defect. Several forms do not scale to `height` at all;
+their picture is a *different* number that the caller already holds:
+
+| form | its natural height | what the region gave it |
+|---|---|---|
+| `horizon` | `bands` | four bands in twenty-eight rows |
+| `bullet`, `lollipop`, `dotplot`, `gantt`, `dumbbell` | the category count | three bars in twenty-one rows |
+| `icicle`, `flame` | the tree's depth | three rows of twenty-seven |
+| `tree` | the leaf count | thirteen rows of thirty |
+
+**Blank space is not a smaller figure; it reads as one that failed.** A reader who
+opens a card and sees three bars above eighteen empty rows concludes the plot broke,
+which is the same harm as a zero drawn where a measurement is absent (C28 I11) with
+the arithmetic the other way up. So the kit now takes a *natural* height beside the
+region and asks for the smaller of the two, and each card reads its own number off
+the datum — `depth(tree)` and `leaves(tree)` differ by an order of magnitude on the
+same tree, so neither can stand in for the other.
+
+---
+
+## F1134 — the *no card throws* gate passed over four cards it never built ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `test/unit/profile-deck.test.ts`'s fixtures · C28's `by-kind` card |
+| **Reached for** | a second consumer of the deck, written to read the frames |
+| **Verdict** | **closed** — the fixtures record elements, and the treemap's root carries a value |
+
+T3.20 drives every card of the deck against four report fixtures at two regions and
+asserts that none throws — which is C28 I60's whole subject, because C12 refuses
+rather than degrades and a throw escapes a scheduled callback whose `arm` has already
+run (F1130). It was green.
+
+**Its four fixtures never opened an element span.** `frameOf` recorded `compose`,
+`measure`, `paint` and `write` and called `count`, `gauge`, `hit` and `miss` — so
+`nodes` and `byKind` were empty in all four, and the four cards over them
+(`elements-ranked`, `cost-per-unit`, `by-kind`, `element-space`) returned a *nothing
+measured yet* notice on every row of the cross-product. **The gate was vacuous for
+exactly the four cards it most needed to cover**, and vacuous in the way A03 §2
+describes: a card that is never built passes identically to one that builds.
+
+**A second consumer found it in one run.** A probe written to dump every card for
+reading — the same deck, a different fixture — threw on `by-kind`:
+*`hierarchy.value` must be a number of at least zero.* `hierarchyFault` walks **every**
+node when the form divides space in proportion to value, the root included, and the
+card's root was `{label: "total", children: [...]}` with no value.
+
+**A corpus chosen for a property it did not have.** The fixtures were written to
+exercise the deck and did exercise most of it; nothing in them says *and this one has
+elements in it*, and nothing could have been read off a green run to find out. The
+repair is the fixture rather than the card — `frameOf` now opens a `measure` and a
+`render` element span per kind, so the four cards build on every row — and the card's
+root now carries the sum.
+
+**Both halves matter and only one is a bug.** Fixing the treemap alone would leave a
+gate that cannot see the next one.
+
+---
+
+## F1135 — a mark is an instant and `timeline` draws intervals, so the card was wrong and rendered ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | C28's `marks` card · `ProfileReport.marks` · `CaptureResult` |
+| **Reached for** | reading the deck's frames in colour |
+| **Verdict** | **closed** — the card is a `dotplot`; `timeline` is deferred, blocker `CaptureResult.startedAt` |
+
+`timeline` draws an interval per row from a `start`, a `mid` and an `end` series — the
+catalogue's entry is explicit about it. `report.marks` is
+`{ at: number; label: string }[]`: **instants**, with no extent.
+
+Fed one series per row, the form drew **the first mark as a full-width bar and the
+second as nothing**. Both readings are wrong, neither throws, and the card renders —
+which is why no assertion reached it. The frame did, immediately.
+
+**The first repair made it worse and is the part worth recording.** The card put
+captures on the same axis to give the form its three series, and a `CaptureResult`
+carries `durationMs` and **no start** — so a capture row was anchored at zero and
+drawn against wall-clock instants. Two kinds of row in two coordinate systems, in one
+figure that reads as though they are in one. **That is F1131's class, third instance**,
+and the second time on this deck that a form's second axis met a source that has no
+such axis.
+
+**Closed as a `dotplot`** — one point per mark at its elapsed time, which is exactly
+what the datum is — and `timeline` goes to the deferrals rather than the refusals,
+because the form is right and the report has nothing for it: the only interval with a
+start is a span inside a frame, which the `gantt` already draws on the frame's own
+clock (F1131). The blocker is a symbol, `CaptureResult.startedAt`, so picking the
+entry up begins by grepping it.
+
+---
+
+## F1136 — a budget check is a reading of a report, and it was written where only tests could reach it ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/testing/profile.ts` → `src/shell/profiling/checks.ts` · C28's verdict card |
+| **Reached for** | the verdict card, which **reads** `checkBudget`'s rows rather than recomputing them (C28 I55) |
+| **Verdict** | **closed** — the implementation moved to the shell, `testing/` re-exports it |
+
+C28 I55 is right and so is the ruling it produced: `checkBudget` already returns
+`closed` / `justified` / `undecided`, and a `marginal` flag for a crossing inside the
+histogram's own error, against A01 Appendix B's thresholds quoted verbatim. A second
+expression of that arithmetic is a second expression to keep in step, and **the one
+that drifts is always the one on screen**. So the card reads it.
+
+**It lived in `src/testing/`, which C24 I8 makes a dev-only entry point** — a module
+outside it that imports one puts the whole thing in the production bundle. MG26 said
+so the moment the import landed, which is the rule working exactly as intended and is
+also the only thing that would have caught it: nothing about the import reads as
+wrong, and the file it points at is 924 lines of pure functions over a published type.
+
+**The mistake is in where it was first written, not in the ruling.** A budget check
+takes a `ProfileReport` — a published value a consumer can hold — and returns a
+verdict. It constructs nothing, runs nothing and asserts nothing. The only thing that
+ever made it look like a test helper is that its first consumer was a test, and the
+module's own header says as much: *runner-free and parameterised, like every sibling
+here: it returns a value and the caller asserts.* Every sibling being a test helper is
+not an argument that this one is.
+
+**Closed by moving the implementation to `src/shell/profiling/checks.ts` and leaving
+`src/testing/profile.ts` as the re-export**, so every existing consumer is unchanged
+and the dev-only door still opens. The alternative — the card recomputing six
+thresholds — is what I55 exists to forbid, and it would have been the easy repair.
+
+**The shape to keep**: a helper written beside its first consumer acquires that
+consumer's layer, and nothing revisits it until a second consumer appears in a
+different one. This is the sixth blind spot's neighbour — not *where is this claim
+written down*, but *why is this code where it is*, with the same answer: because of
+who happened to need it first.
+
+---
+
+## F1137 — a totality gate keyed by report field is blind to the sentences inside one ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `src/shell/profiling/panes/index.ts` · C28 I61's coverage gate · the four qualifiers |
+| **Reached for** | rewiring the view onto the deck, which deleted the panes the qualifiers lived in |
+| **Verdict** | **closed** — the four are generated in the panel footer, from the register |
+
+**I61 compares `ProfileReport`'s keys against the cards that draw them, by equality in
+both directions.** It is a real gate and it passed. What it cannot see is a *field* of
+a covered key, or a sentence a pane drew beside a figure — and the panes that became a
+deck were carrying four of those:
+
+| what was lost | the invariant | where it lived |
+|---|---|---|
+| `at resolution 10 ms — a floor, not a reading` | I13 | the memory pane's loop rows |
+| `n of them suspended — the series is not continuous` | I27 | the memory pane's caption |
+| `42 timing entries … the profiler raises no marks` | I25 | the memory pane |
+| `raise the tier to \`spans\`` | I11, I23 | the overview and the frame pane |
+
+**Every one is inside a key the gate counts as covered**: the first three are fields of
+`samples`, which sixteen cards draw, and the fourth is a property of `regime`, which
+the verdict reads. `samples` is covered, so `loopDelayResolutionMs` is covered, so
+nothing said the sentence that qualifies it had gone.
+
+**Three of the four were found by a test and one by reading.** T2.3, T3.3 and T3.10
+are rows about what a figure *says*, and they went red because they assert text; the
+tier sentence was found by T1.16b's control, which is the arm that exists because a
+guard on the right branch can print the wrong sentence. **The rows that found them are
+all controls** — the arm asserting the caveat is *absent* on a clean report, the arm
+asserting the tier sentence is *present* below `spans` — which is the shape worth
+noting: a row asserting a sentence appears would have been satisfied by any of the
+thirty-seven cards carrying it, and it was two of thirty-seven that did.
+
+**The repair is generation rather than restoration.** The four are in `footerOf`,
+which builds every card's footer from the register — the population from `site`, the
+resolution from a declared `loopDelay`, the suspended count and the timing entries
+derived from what the card draws. A card that had to remember to state its population
+is a card that will forget (C28 I57's own argument), and the same sentence had already
+been written twice and drifted once: `NO_DURATIONS` ended *which is the one reading a
+profiler must not produce* in `app.ts` and stopped a clause earlier in `framework.ts`,
+with neither reader able to see the other. It is one export in the kit now.
+
+**What this says about the gate**: a coverage rule at the granularity of a type's keys
+measures whether a *datum* reaches a figure, and says nothing about whether a *reading*
+reaches a sentence. The second is where the invariants are. No gate is proposed here —
+the sentences are prose and matching them against invariants is the citation-resolving-
+against-the-wrong-thing class the audit argues against automating (A03) — but the rows
+that caught these four are named in the specs as the instrument, and the footer being
+generated from one place is what makes them non-vacuous.
+
+---
+
+## F1138 — a one-block card cannot be scrolled, so the window's four motions are dead ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/profile-view.ts`'s window · C28 I51 · C15 I8 |
+| **Reached for** | T1.115b, driving `pageDown` at a region the verdict card overflows |
+| **Verdict** | **open** — recorded, with both remedies named; T1.115b is the row |
+
+The view windows **on block boundaries**, which is `document-view.ts`'s projection and
+was right when a pane was six blocks. **A card is one `panel`**, so the windowed
+sequence is one block long, every offset clamps to zero, and `g`, `G`, `pageUp` and
+`pageDown` answer `false` at every card and every region — including the region where
+a card does not fit.
+
+**The overflow is real rather than hypothetical.** The verdict card measures 11 rows
+on an empty ring and its parts do not shrink: two frame rows, a two-row `kv`, a key
+hint and a `bullet` whose height is its category count. At a region of eight the layer
+holds the header, the hidden-rows notice and the card, C15 clips what is past the
+bottom (C15 I8), and the notice says how many rows went — with no gesture that reaches
+them.
+
+**Two remedies, both larger than this round:**
+
+- **A row window through the registry.** The measurement belongs to C09 (C09 I1) and
+  the view has no way to slice a block's rows, so this is a seam that does not exist.
+- **A refusal above the form** (C28 I60). `room()` already compares a form's floor to
+  the region and draws `cannotDraw` — but it measures the *figure*, and a card's
+  non-figure rows (the panel's two, a `kv`, a hint) are outside the comparison. Making
+  the floor account for them would turn this overflow into an honest refusal.
+
+The second is the smaller of the two and is where the entry points. **What made it
+findable was driving the motion rather than the member**: every row until T1.115b
+called `move` on a pane and asserted where the window went, and a pane always had two
+blocks to move between.
+
+## F1139 — SP7 reads a spec's declarations, so one number declared once and used twice is invisible ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `tools/enforce/commitments.mjs`'s SP7 · `docs/components/C16_input_router.md` §9, §9b row **k** |
+| **Reached for** | Writing T1.3q's `it.todo` into a row, and finding `T1.3q` already above it in the same file |
+| **Verdict** | **closed** — the instance is fixed; the class is measured and left ungated, with the number that says why |
+
+C16's section-gesture row was numbered **T1.3q**, and `T1.3q` was already
+`router-dispatch.test.ts`'s mouse-modality row a hundred lines above — the row §9b
+row **k** cites. The mouse row was declared in **no** §9 list, so the spec held one
+`T1.3q`, SP7 counted one, and the gate stayed green while the number stopped locating
+anything. A03 §2's failure arriving at the citation rather than at the rule, which is
+what SP7's own comment says it exists to prevent.
+
+**SP7 reads `docs/` and not `test/`**, by construction: `rowIdsOf` matches
+`- **T4.13**` list items in a spec. A number used twice in the tree and declared once
+is outside its corpus in both directions — nothing is missing and nothing dangles.
+
+**The obvious gate is wrong, and the measurement is what says so.** Counting
+`it("T…")` calls per file gives **148** files with a repeated id, because one spec row
+routinely lands as several `it`s — arms split for legibility, `T1.12` seven times in
+`plot.test.ts`. So *two tests share an id* is the convention, not the defect; the
+defect is *two tests about different subjects share an id*, and no mechanical reading
+separates those. This is the class `docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass
+argues against automating, one family over.
+
+**What is cheap is the other half**: the mouse row had no §9 entry at all, and that is
+what let the number be reused without anyone seeing it. Written down now, with the
+gesture renumbered **T1.3v** and moved to `session-keys.test.ts`, where the three
+owners it is about actually live.
+
+## F1140 — the published error is a half-width and the estimator returned an edge ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/profiling/histogram.ts`'s `at` · C28 I10, I56 |
+| **Reached for** | T1.108, asserting `q1` and `q3` against a population whose quartiles are known by construction |
+| **Verdict** | **closed** — the estimate is the bucket's midpoint; both figures below are from the same sweep |
+
+`Histogram.error` is published as **half a sub-bucket at the widest** — `1/(2·SUB)`,
+1.5625% — and every consumer reads it as a `±`. `at(q)` returned `valueOf(k)`, the
+bucket's **lower edge**, so the observation lies in `[edge, edge + width)` and the
+estimate is up to a **full** bucket low and never high. The published figure was
+therefore both too small and the wrong shape: a one-sided interval described as a
+symmetric one.
+
+**Measured, over fifteen populations — 50, 100 and 1000 observations at five
+magnitudes — and five quantiles each:**
+
+| estimator | worst relative error | against the declared 1.5625% |
+|---|---|---|
+| the bucket's lower edge | **2.1329%** (n=1000, q3) | 1.36× over, and low every time |
+| the bucket's midpoint | **1.1200%** (n=50, median) | inside |
+
+The single reading that found it is smaller and sharper: 1 to 100 ms, one observation
+each, `q1` read **24.576** against a true 25 — 1.70%, outside the published bound on a
+population whose quartiles are 25, 50 and 75 by construction.
+
+**The repair is the estimate, not the figure.** Within an octave the buckets are
+evenly spaced, so half a width *is* half a sub-bucket: the midpoint makes the
+published bound exact rather than optimistic, and costs one addition. Clamped into
+`[min, max]`, which are the true observed values, because a top bucket's midpoint can
+otherwise sit past the largest thing ever measured.
+
+**What made it findable was a population with known quartiles.** Every earlier row
+over a histogram asserted an ordering, a count or a bound the figure was already
+inside — all of which the edge satisfies. `error` is the only thing an estimate can
+be checked *against*, and nothing had checked it against one.
+
+## F1141 — the violin's box rung scales a supplied summary to the samples' extent ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/definition.ts`'s `violin` arm · `scale.ts`'s `seriesRange` · C12 §3w |
+| **Reached for** | T1.108's second half — *does the figure respond to the summary it was handed* |
+| **Verdict** | **open** — measured, with the mechanism named; the row asserts what is true today and cites this |
+
+`quartiles` is the datum of five forms, `violin` among them, and its rung ladder falls
+to the **box** exactly when there are too few samples to estimate a density —
+`rungFor`'s own comment says why: *there is only one honest figure below a density,
+the five-number summary, which needs no estimate*. The box is then drawn against
+`shared`, which is `seriesRange(block.series, block)` — **the samples' extent, with
+the quartiles not folded in**.
+
+So the fallback chosen because the samples are too few is scaled by those same few
+samples. Measured, at height 8 and width 40, one category, summary `1 / 25 / 50 / 75 /
+100`:
+
+| samples | drawn |
+|---|---|
+| one, at 50 | a single `◈`. The domain is `[50, 50]`, the whole summary collapses to a point |
+| three, at 40, 50, 60 | a box spanning the **entire** width — the whiskers at 1 and 100 clipped to the axis ends, which says *this span covers everything* while the summary says the opposite |
+| sixty, spanning 1.6 to 96 | correct; the figure responds to the summary |
+
+**Inside the bounds and about a different population**, which is this repository's own
+shape: every assertion of containment passes, and the three-sample figure is the one a
+reader would act on.
+
+**The repair is in the domain and not in the rung.** `seriesRange` folds series values
+and OHLC wicks; a form whose datum is `quartiles` wants them folded too, the way
+`boxplot`, `forest` and `bullet` already derive theirs — those three respond to a
+summary at every sample count, which is the control that says this is the violin's arm
+and not the family's.
+
+**What made it findable was rendering rather than constructing.** The row began as
+`expect(() => b.plot({...})).not.toThrow()` over the four forms, and **all four accept
+`quartiles: []` and a summary whose `q1` is above its `q3`** — so *it did not throw*
+was an assertion over an empty population, A03 §2's vacuity class with a picture on it.
+
+## F1142 — I41's own defect, reintroduced deliberately, failed nothing ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/profiling/panes/kit.ts`'s `frameSamples` · C28 I41, I57 |
+| **Reached for** | P9's named control — *frame-site and session-site spans merged* — run on landing |
+| **Verdict** | **closed** — T1.120 is the row; it fails the mutation and its precondition is asserted |
+
+`frameSamples` filters on `SPAN_SITE` because a session-site name appearing in a
+`FrameRecord.spans` is **the window it closed in**, not a per-frame measurement — the
+thing F888 measured at a −460.5 ms residue. Removing the filter, so every name yields
+a per-frame series, was run against `profile-deck`, `profile-register`, `profiler` and
+the contract suite: **26 tests, all green**.
+
+**The deck's population rows are all about the register and the footers.** T1.109b asks
+every card to *declare* its population, T1.116 asks the footers to *say* different
+things, T1.109 asks the two *counts* to differ. Not one of them reads a card's series
+and asks which population the numbers came from — so the declaration, the sentence and
+the count are all correct on a deck drawing the wrong figure.
+
+**A footer is a claim about a figure and no row joined them.** That is the shape: three
+instruments pointed at the label and none at the thing labelled.
+
+The row that closes it asserts the extractor directly and asserts its precondition
+first — the fixture must contain a session-site name inside `timeline[].spans`, or the
+emptiness it checks is emptiness for the wrong reason.
+
+## F1143 — a card with two populations, and a footer chain that names one ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/profiling/panes/index.ts`'s `footerOf` · C28 I57, I27 |
+| **Reached for** | Reading the rendered deck — the first card of group A drew one curve of four |
+| **Verdict** | **closed** — the samples clause is its own `if`; T1.121 is the row |
+
+`vitals` is four horizons sharing an x axis — frame ms, heap, cpu, loop delay — so
+that a spike in one can be read against the others. Two of those come from the frame
+ring and two from the resource ring, and the card declares both: `draws: ["timeline",
+"samples"]`, `site: "frame"`.
+
+`footerOf` names the population in a chain: *frame site*, **else** *session site*,
+**else** *has samples*, **else** *the session so far*. A card declaring a span site
+therefore never reaches the samples clause, so `vitals` — the only card in the deck
+with both — stated the frame ring's bound and **said nothing at all about the resource
+ring**.
+
+**What that looks like on a report with no sampler running**: one curve, three blank
+bands, and a footer reading `frame-site spans · 120 frames in the ring`. Every figure
+correct, every sentence true, and no way to tell *the machine was quiet* from *three
+of these four series have no data*. The card's whole question is *did the spikes
+coincide*, and it was answering it from one series.
+
+**One card of thirty-seven, and it is the first one after the verdict.** The clause
+now stands on its own, and the *no population at all* fallback becomes a question
+about both clauses rather than the tail of one chain: `frame-site spans · 120 frames
+in the ring · 0 resource samples`.
+
+**A chain that names one population hides the other**, which is the generalisation —
+F1137 generated these clauses so a card could not forget to state its population, and
+the generator then made *one* population per card structurally unstateable.
+
+**What made it findable was reading the frame**, not the numbers: every row over this
+card passes, because every row asks whether the footer contains the clause the card is
+*declared* to have.
+
+## F1144 — the scatter has no per-point x, so `cost-per-unit` answers a one-dimensional question ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/data/viewmodel/types.ts`'s series contract · `src/shell/profiling/panes/app.ts`'s `costPerUnit` · C12 |
+| **Reached for** | Reading the rendered deck at 140 columns — the x axis read `0 … 19` |
+| **Verdict** | **open** — the card is honest about what it draws and the question it was designed for is not expressible |
+
+The card's question is two-dimensional by design: **expensive per unit** against **how
+many units**, so that the defect sits up and to the left and a big block sits bottom
+right and is nobody's bug. A table sorted by either buries the other, which is the
+whole argument for a scatter here.
+
+**A `Series` is `values: readonly (number | null)[]` and nothing else.** The abscissa
+is `xMin … xMax` spread **evenly by index** when declared, and the sample index
+otherwise — measured across the type: no form in the library takes a per-point `x`.
+So `costPerUnit` plots `self / calls` against the element's **ordinal position in the
+array**, with `calls` reaching the figure only as the `sizes` channel's area.
+
+Read on the frame: twenty elements, an x axis reading `0` to `19`. Every point is
+correctly placed and the axis is a list index wearing a log scale.
+
+**The card is not wrong about what it draws** — its footer and its question are what
+disagree, and the question is the one the plan wrote it for. The two honest options
+are a `sizes`-only reading (rename the question to what a one-dimensional scatter can
+say) or a per-point x on `Series`, which is a C12 change with every form's layout
+behind it.
+
+**What made it findable was reading the axis rather than the ink.** Every row over
+this card passes: it builds, it draws, it names itself, it refuses below its floor,
+and the register's `draws` list is correct. Nothing asserts what the abscissa *means*.
+
+## F1145 — `yFormat: "duration"` takes seconds, and five cards hand it milliseconds ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/axes.ts`'s `formatDuration` · `src/shell/profiling/panes/framework.ts` ×5 · C04 I41's `Y_FORMATS` |
+| **Reached for** | Reading the framework deck's first card in a real terminal — a four-second session with a y axis topping out at `7m 30s` |
+| **Verdict** | **open** — measured at both ends; the card-side repair is available today and the vocabulary is C04's |
+
+`formatDuration`'s own comment says *"Seconds to a duration"*, and it is right: it
+rounds to whole seconds and climbs a `s → m → h` ladder. `Y_FORMATS` is
+`number · fraction · percent · bytes · duration` — **there is no millisecond unit**,
+and every duration the profiler holds is in milliseconds.
+
+Measured through `dist`:
+
+| value handed in | rendered | what it was |
+|---|---|---|
+| `0.4` | `0s` | 0.4 ms |
+| `18` | `18s` | 18 ms |
+| `400` | `6m 40s` | 400 ms |
+| `969` | `16m 9s` | 969 ms |
+
+Five sites in `framework.ts` pass `yFormat: "duration"` over millisecond values —
+`phases` and `phase-composition` (the phase sums), `spans-compared` (quartiles from
+`frameSamples`), `against-the-budget` (`f.work`), `by-reason` (`byReason`'s p50/p95)
+and `marks-and-captures` (an offset from the first mark). On the captured frame the
+phases card reads a top tick of **`7m 30s` on a session four seconds old**.
+
+**Only the labels are wrong, and uniformly by 1000×.** Every point, band and reference
+line sits where it belongs, because the data and the annotation share the unit — the
+budget line at `16` is still at the sixteenth millisecond of the population. So the
+figure is correct and its axis describes a different quantity, which is the exact
+shape the frame read exists to catch and which no arithmetic assertion reaches.
+
+**Dividing by a thousand at the card is not the repair.** `formatDuration` rounds, so
+every label on every profiler card would become `0s`. The pattern that already works
+is two cards away: `frame-cost` carries no `yFormat` at all and puts the unit in the
+series label — `969 ms` on the captured frame, correct. The two honest options are
+that, applied to all five, or a millisecond member on `Y_FORMATS`, which is a C04
+change with `formatReadout`, the annotation formatter and `xFormat` behind it.
+
+**What made it findable was reading the frame rather than the numbers.** Every row
+over these cards passes — they build, refuse below their floors, declare their
+populations and state their exclusions — and `yFormat` is a member whose value is
+asserted as *declared*, never as *rendered*.
+
+## F1146 — a second capture rejects, and the report keeps no record that it was taken ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/profiling/recorder.ts`'s `capture` · `src/shell/profiling/node.ts`'s `createInspector` · C28 I17 |
+| **Reached for** | Walking the sampled-stack card's sequence trace — S15 asked what two presses of a capture verb do, and the ruling deferred to a guard that turned out not to exist |
+| **Verdict** | **open** — measured; the guard is the recorder's, and the verb that makes it reachable is not written yet |
+
+`createInspector` holds **one** `node:inspector` session, and `Profiler.start` on it
+is a single recording. `capture()` guards the tier, the disposal and the missing
+inspector, and guards nothing about a capture already running.
+
+Measured, two concurrent `cpu` captures through the real inspector:
+
+```
+0 fulfilled 2963 bytes
+1 rejected  Error [ERR_INSPECTOR_COMMAND]: Inspector error -32000: No recording profiles found
+```
+
+The first capture's `Profiler.stop` ends the only recording, so the second's `stop`
+has nothing to take.
+
+**The rejection is not the finding — where it lands is.** `capture()` reaches
+`inspector.capture` inside a `try`/`finally` whose `finally` only clears `inFlight`,
+so the throw propagates and **`self.addCapture(result)` is never reached**. The
+report therefore holds no entry at all for the second capture: not `abandoned`, not
+`truncated`, not zero bytes — absent. C28 I17 was written for exactly this shape at
+shutdown and says a capture still running is *recorded, not dropped silently*, with
+`abandoned` there because *a zero would read as nothing was lost*. The same argument
+holds one rung out and the code does not make it: an embedder that fires two captures
+sees one file on disk, one entry in the report, and nothing anywhere saying a second
+was asked for.
+
+**Reachable today only from an embedder**, which is why it has not been seen: nothing
+in the shell calls `capture()`. It becomes a double keypress the moment a capture verb
+exists, which is what the walk was asking about.
+
+The repair is the recorder's and has two halves — refuse a concurrent capture with the
+kind and the path of the one already running, and record the refusal as a
+`CaptureResult` so the report can say a capture was asked for and not taken. Neither
+belongs in the caller: a verb that serialised on its own would leave the same hole for
+the next caller.
+
+## F1147 — the capture samples the capture, because the prompt is idle while it runs ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `/profile capture`'s timing · `src/shell/profiling/panes/framework.ts`'s `sampledStacks` · C28 I64 |
+| **Reached for** | Reading the new card in a real terminal — every frame on the tree was the profiler's own await chain |
+| **Verdict** | **open** — the card is right, the window is wrong, and the remedy is C23's route rather than the card's |
+
+The frame, at 130 columns on the plots example at tier `deep`, after
+`/profile capture 700`:
+
+```
+post
+(anonymous)
+post
+capture
+processTicksAndRejections
+(root)
+V8's sampler · 859 ms capture · 700 ms in (idle) · excluded · 141 ms on the tree
+```
+
+**One hundred per cent of the tree is the capture's own continuation.** The
+shell is at the prompt, so the process is idle; the only thing on the stack for
+the length of the window is `capture` awaiting `Profiler.stop`. The figure is
+correct, every number conserves — 141 + 700 against an 859 ms capture — and it
+answers *the framework spends all its time in `post`*, which is true of that
+window and true of nothing else.
+
+**The card is not the defect and the control says so.** Driven from a probe with
+real work under the sampler, the same fold and the same card drew `burn` at
+149.6 ms self beneath `compose` and `paint`, with `compose` twice `paint`'s
+width against a workload constructed at 2e6 against 1e6 iterations. The tree is
+right whenever there is something in it.
+
+**What is wrong is when the window runs.** A reader can only type the verb at
+the prompt, the prompt takes no keys while a route is in flight (C16 §3), and
+the route is the only time the framework does any work — so the one moment a
+capture can be asked for is the one moment there is nothing to sample. The verb
+as built serves an embedder calling `capture()` during work and nobody else.
+
+The remedy is to **arm** rather than to take: `/profile capture` marks the next
+submitted command, and the sampling window is the route's. That is C23's seam
+and not the card's, it needs a rule for a command that outruns the cap, and it
+is a separate commit. Two smaller ones are worth recording beside it — a capture
+taken while a `b.live` part is polling has something to sample, and an embedder
+already has the honest path.
+
+**And the profiler's own frames are not excluded from the tree, where C28 I12
+excludes its own frames from every duration.** The frame-level rule cannot reach
+a stack sample: excluding by `url` is brittle and wrong the moment the framework
+is bundled. Recorded at the card rather than filtered, with the figure — the
+`capture`/`post` column was about 15% of a 500 ms window on the probe and 100%
+of an idle one here.
+
+## F1148 — a type published under an alias, and the accident that hid it ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `tools/enforce/module-graph.mjs`'s MG29 · `src/index.ts`'s `Region as CardRegion` |
+| **Reached for** | Nine lines added to an unrelated function body turned MG29 red, on two exports neither of which had changed |
+| **Verdict** | **closed** — the alias is resolved; the proximity heuristic that hid it is recorded below and not repaired |
+
+**Two defects in one rule, cancelling.**
+
+The first: `published` keeps the **exported** half of `export type { Region as
+CardRegion }`, which is right for the surface and wrong for the comparison MG29
+makes. A parameter is written in the declaring module's vocabulary, so the check
+asks after `Region` and the set holds `CardRegion`. `profileCard` and
+`profileDeck` were therefore always outside the rule's reach, and its message —
+*a consumer cannot supply the argument* — is false of both: `CardRegion` is on
+the public surface and has been.
+
+The second is what kept it quiet. `reachable` grows by scanning **4000
+characters** forward from each published `export type` for lines shaped like a
+member, and the pattern — `^\s+(?:readonly\s+)?\w+\??:\s*([A-Z]\w+)` — is line
+anchored and indented, so it matches a **function parameter** as readily as a
+member. `Region` was reaching the set off `profileCard(… region: Region, …)`,
+177 lines below an unrelated `export type ProfileSection` and inside the window
+by however much the stripped text happened to allow.
+
+**Adding nine lines to a function body between them ended it.** Nothing about
+either export changed, nothing about `Region` changed, and a rule that had been
+passing for a reason unrelated to its subject went red on unrelated growth.
+
+Closed by resolving the alias: the entry's type re-exports contribute their
+**inner** name to `reachable` as well, which is the true statement — a type
+published under another name is published.
+
+**The proximity heuristic is left as it is, and recorded.** Its own comment
+already says it *under-reports rather than over-reports, deliberately*, and that
+remains the safe direction; what this finding adds is that the window makes the
+rule's verdict a function of how much code sits between two unrelated
+declarations. A repair wants a real member scan bounded by the declaration's own
+braces, which is a parser rather than a regex.
+
+
+## F1149 — the column group declines the window seam, so `/all` renders every figure every frame ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/blocks/kinds/containers.ts`'s `groupDefinition` · `registry.windowSequence` · `examples/plots`'s `/all` |
+| **Reached for** | `tools/bench/plots.mjs`, written for this pass — the `/all` scroll frame, measured three runs a side |
+| **Verdict** | **closed** — Phase A landed a `window` on the column arm (C09 I69); the `/all` scroll frame fell from 479 ms to 27 ms at p50, and react from ~145 renders a frame to ~3. See the close below |
+
+**Measured, `/all` at 80×24, one PageUp/PageDown per keystroke, medians of three
+runs (F936: shares, not absolutes).**
+
+```
+frame work        p50   479 ms   p95   680 ms   max  1020 ms
+react (Ink)             60.3 %   of work
+plot.form.plot3d        23.0 %   of work
+plot renders / frame    ~145             — the whole document, on every keystroke
+```
+
+At 130×42 the median falls to ~20 ms only because more of the document is on
+screen at once and fewer keystrokes cross a figure boundary; the p95 is still
+**926 ms**, and it is the same mechanism.
+
+**The mechanism is the one F424 measured and this list already named.** `/all` is
+one transcript entry: a root `group("column")` of ~73 `group("row")` pairs, each
+holding two `group("column", [caption, plot])` tiles — ~145 plots. `groupDefinition`
+declares no `window` (`containers.ts:632`), and `registry.windowSequence`
+(`registry.ts:761`) keeps a kind that declares none **whole**, paying its
+off-screen rows out of `skipRows` and letting `entry-layout.ts:379` slice ~30
+rows out of the full rendering. So every figure's `render` runs every frame and
+Ink mounts and tears down a tree of ~450 blocks per keystroke — `react` at 60%.
+
+**Silent by design, which is why it is group 8.** Declining a window produces no
+error, no fault, no warning — only a slower frame (C09 T2.136's kept-whole half,
+which names `group` as *a container… bounded by the registry's row cap rather
+than by a window*). F424 measured the same decline on `code` at **913.79 ms**
+against `logs`' **0.65 ms**, a factor of 1 400. `/all` is that defect on a
+container: the cap bounds a single tall child, but a column of 145 short
+children is 145 renders under the cap, and nothing bounds the count.
+
+**The remedy is a `window` on the column arm** (Phase A). A column group's rows
+are its children's, laid end to end with `gapBefore`, so a window is a
+contiguous subsequence kept whole with the partial first and last child's rows
+charged to `skipRows`/`dropRows` — I26's identity, `logs`' shape one level up.
+The row arm declines (its children are side by side, not a sequence), as does a
+column carrying `minRows` (its height is declared). Recursion into a windowed
+child is deferred: a `/all` tile is ≤ 10 rows, so the slack is ≤ two tiles.
+
+**Closed — Phase A, the same bench three runs a side after the window landed
+(`git 539acac9`).** `groupDefinition.window` divides a column by whole children;
+the row arm and a `minRows` column decline. Byte-identical: `make golden` moved
+0 of 2 130 frames.
+
+```
+                        before (open)      after (Phase A)
+frame work  p50           479 ms             27 ms      17.7× 
+frame work  p95           680 ms             85 ms       8.0× 
+frame work  max         1 020 ms            272 ms       3.8× 
+react renders / frame       ~145             ~3         a subsequence, kept whole
+```
+
+At 130×42 the p95 was the honest figure — the median hid the cost because more
+of the document was on screen — and it fell from **926 ms to 91 ms**, the same
+mechanism from the other size.
+
+**What A left for the phases after it.** With the count bounded, the residue is
+what one visible figure costs, not how many render: `react` (Ink) still holds
+~40 % of the frame and `notice` captions 20 %, which is Phase H's subject
+(per-figure render cost), and `measure absent 74 694` over the run is Phase B's
+(per-rev derived layout). Neither is a regression A introduced; both are what
+was always under the 145 renders and only now visible.
+
+## F1150 — the 3-D per-sample colour round-trips through a hex string, six `Math.pow` a sample ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/scatter3.ts`'s `colourOf`/fill loop · `src/presentation/theme/colormap.ts`'s `sample`/`shadeColour`/`overChannels` |
+| **Reached for** | `tools/bench/plots.mjs orbit`, the 3-D bench F507 said did not exist, three meshes measured |
+| **Verdict** | **closed** — F1 landed (C10 I40, `0a8a7f54`): the fill holds eight-bit ints between sample and shade, one hex built at the end. Suzanne 9.1→3.5 ms a render, bunny 55.8→47.6; 0 of 2 130 goldens moved. See the close below |
+
+**Measured, `orbit` at 80×24, `o` for two seconds of the framework's own tick,
+medians of 40 reps (F936: shares, not absolutes).**
+
+```
+mesh      faces     frame p50   plot3d self / render   plot3d share of work
+bunny    69 451       63.0 ms          55.8 ms                78.9 %
+teapot    6 320       18.7 ms           8.6 ms                45.8 %
+suzanne     968       22.3 ms           9.1 ms                30.1 %
+```
+
+**Suzanne at 968 faces costs nearly what teapot at 6 320 does per render** — the
+grid floor, not the triangle count, is what a small mesh pays. The grid is
+`w·2 × rows·8` = 30 720 samples at 80×24 (C12 I84), and every painted sample runs
+the colour path once. Bunny's 55.8 ms is that floor plus 69 451 vertices
+projected twice a frame (F2's subject); the floor itself is F1's.
+
+**The path, confirmed at HEAD.** `colourOf` (`scatter3.ts:402`) calls
+`colormapFor(block)` **per sample** — a map lookup and a `by` branch that are
+constant across the whole plot. Then, on the 24-bit arm, `continuousColour →
+sample` (`colormap.ts:38`) builds a `#rrggbb` string, and `shadeColour →
+overChannels` (`colormap.ts:119`) **parses it back** — `parseInt` three times —
+scales each channel through `toLinear` and `toSrgb` (**six `Math.pow` a sample**,
+`colormap.ts:136`), reformats to hex. F511 named this the string half of the
+frame that the GPU could not have taken anyway: it is CPU work, and it is
+arithmetic, so it can be made numeric.
+
+**The remedy is F1** (Phase F). `sampleRgb(map, t)` returns the 8-bit ints
+`sample` hexes, and `sample` becomes `rgbHex(sampleRgb(...))` so the two cannot
+drift; `shadeRgb(r, g, b, k)` runs `overChannels`' sequence on ints, with
+`toLinear` over a 256-entry LUT — a pure function of an 8-bit input, so
+bit-identical by construction. The fill loop hoists `colormapFor` and `by` out,
+and one `{kind: "rgb", hex}` is built per painted sample from the ints, with no
+parse-back. Verified against the current arithmetic over all 256 × 1 001
+(channel, k) pairs: **0 mismatches**. The golden tier's `plot-meshes` frames are
+the integration gate, byte for byte.
+
+**F2–F6 are the rest of Phase F** and are measured against the post-F1 profile:
+one projection per vertex into a struct-of-arrays (bunny's other half),
+allocation-free `fill`/`shade`, typed sample buffers, the `nearestOf` mask, and
+extent/ticks in scratch. Each is byte-identical and its own cut; this entry is
+F1's.
+
+**Closed — F1, the same bench three runs a side after `0a8a7f54`.** `sampleRgb`
+and `shadeRgb` in `colormap.ts` (C10 I40), the surface fill in `scatter3.ts`
+hoisting `colormapFor` and `colourBy` and holding the channels as ints — one hex
+per painted sample, nothing parsed back, three of six `Math.pow` read from the
+table. `make golden` moved 0 of 2 130 frames.
+
+```
+mesh      plot3d self / render          frame p50
+          before     after   ratio    before   after
+suzanne    9.1 ms    3.5 ms   2.6×    22.3 ms  12.9 ms
+teapot     8.6 ms    7.2 ms   1.2×    18.7 ms  16.6 ms
+bunny     55.8 ms   47.6 ms   1.17×   63.0 ms  56.8 ms
+```
+
+**The floor moved and the projection did not, which is what the entry
+predicted.** Suzanne — 968 faces, all grid — takes the whole 2.6×; bunny — 69 451
+vertices projected twice a frame — takes 15%, and its remainder is F2's subject
+(one projection per vertex into a struct-of-arrays). The host was loaded by other
+sessions' containers during every reading (load 20, `dtui-load` back up), so
+the absolutes carry that; the ratios held across three runs.
+
+**Two things the cut taught about its own tests.** T1.42's first draft swept
+1 024 t × 64 k over every map — ten million calls of the slow reference,
+re-testing `sampleRgb` against `sample` (which delegates to it) and timing out
+under load at 23 s against a 30 s ceiling: a control written as a magnitude. The
+domain the LUT claims is the 256 channels, and that is what the row sweeps now.
+And `shadeColour` was first routed through `shadeRgb`, which made T1.42 compare
+the table to itself — every mutation survived until `shadeColour` was put back on
+`overChannels`' direct arithmetic as an independent implementation.
+
+**And one thing it taught about the register.** I40's insertion dropped C10's
+`## 8. Commitments` heading, every anchor matched, `make enforce` stayed green
+three times, and SP13's own fabrication test was the only thing that saw it
+(F1151).
+
+## F1151 — a spec can lose a section heading and `make enforce` stays green ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `tools/enforce/commitments.mjs`'s `commitmentsOf` · every rule that reads a spec by section · C10 §8 |
+| **Reached for** | SP13's own fabrication test (`enforce-commitments.test.ts`), which fabricates a descent on C10 and found nothing to descend |
+| **Verdict** | **open** — the remedy is a rule that every spec carries its canonical section headings, or that no spec's commitment count is zero while its invariant count is not; recorded with the discriminator |
+
+**What happened.** The edit adding C10 I40 anchored on the paragraph before
+`## 8. Commitments` for uniqueness and re-emitted the paragraph without the
+heading. The script asserted the anchor matched and printed `ok`. `make enforce`
+ran green three times with the heading gone — at the spec commit, at the code
+commit's pre-commit hook, and by hand. `commitmentsOf(C10)` returned **0** for a
+file holding 34 numbered commitments, and every rule downstream of it — SP13's
+order check, SP11's descent list — was satisfied by the empty answer exactly as
+by a correct one. A03 §2's vacuity class, arriving in a section boundary.
+
+**What caught it, and why only that.** SP13's fabrication test swaps commitments
+33 and 34 in a scratch copy of C10 and expects one descent. With no heading the
+parser saw no commitments, the swap moved nothing it could see, and the row
+reported *expected 1, got 0*. It is the only instrument in the tree that asks a
+spec section whether it is still there, and it asks C10 by accident of which
+file F1066 happened in.
+
+**The discriminator, so it can be run rather than read**: for every spec,
+`commitmentsOf(f).length === 0 && invariantsOf(f).length > 0` is the shape;
+today it is false everywhere and was true on C10 for three commits.
+
+**The edit-script half is the sibling of the rule this repository already
+carries.** *An edit script asserts every replacement matched* was written for
+anchors that do not fire; this is an anchor that fires and a replacement that
+drops what the anchor carried for context. The assert that reaches it is on the
+*artefact* after the write — the heading count, the section count — and not on
+the anchor before it (→ CLAUDE.md, F1150).
+
+## F1152 — a 3-D vertex is projected once per corner per pass, six times a frame ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/scatter3.ts`'s span pass · `src/presentation/plot/surface3.ts`'s `drawTri`, `clipNear`, `toScreen` |
+| **Reached for** | `tools/bench/plots.mjs orbit bunny`, after F1 — 47.6 ms a render, 75% of the frame, and the floor already cut |
+| **Verdict** | **closed — measured and not built.** The identity-keyed memo was built, gated, and measured **2× slower** on the bunny in a same-minute A/B; the HEAD profile puts projection at ~12% of plot time, so no memo can pay for what it costs. C12 I126 retracted. See the close below |
+
+**Measured after F1 (F1150's close): bunny 47.6 ms a render at 69 451 faces,
+teapot 7.2 ms, suzanne 3.5 ms.** F1 moved suzanne 2.6× and bunny 15%, which is
+the entry's own prediction: a large mesh's cost is in its vertices, not the grid.
+
+**The path, confirmed at HEAD.** `trianglesOf` builds a `Vert` per *corner*
+(`at(k)` allocates one each call) but its `p` and `n` are the mesh's own shared
+`Vec3` references. Per frame, for every triangle: the span pass calls `project`
+on all three corners (`scatter3.ts` *And the surfaces*); `drawTri` computes
+`zOf` — `dot(sub(p, eye), forward)`, which is `project`'s own `z` — for the
+behind test, `clipNear` computes it again for all three, and `toScreen` calls
+`project` a fourth time plus two `viewDir`s. Six view-space transforms per
+corner, three corners a face, and a bunny vertex sits on ~6 faces: **~36
+transforms per vertex per frame** where one would do, with an allocation for
+each `Projected`, each `vs` array, each `behind` filter, each `Screen`.
+
+**The remedy is F2.** A `View` per render — a memo keyed on the identity of the
+position and normal `Vec3`s, computed on first sight by the same `project`,
+`viewDir` and `dot` expressions — read by the span pass, by `drawTri`'s behind
+test and clip, and by `toScreen`. Same functions, same inputs, once: byte-
+identical by construction, the `plot-meshes` golden its gate. A vertex the clip
+cuts is new and computed on miss. The memo is a local of the render, dropped
+with it (C12 I11), and `drawTri` given none builds its own so every existing
+caller is unchanged. **What it does not reach**: `backfaceCulled`'s centroid, one
+per face and not per corner; and the Map lookup itself, ~200 k a frame on the
+bunny, cheaper than the projection it replaces and the figure F3's typed
+buffers would take next.
+
+**Closed — built, measured, reverted.** The memo landed as specified (C12 I126,
+`viewOf(basis)`, a `Map` keyed on the position and normal `Vec3`s, read by the
+span pass, `drawTri`, `clipNear` and `toScreen`), was byte-identical — 458 of 458
+goldens, PM1/PM2 green — and was **slower**:
+
+```
+                            HEAD           with the memo
+plot-meshes golden, bunny   0.68 s          1.80 s           2.6×
+orbit bunny, same minute    240 ms/render   381–647 ms       ~2×
+```
+
+**The profile says why, and it is not the hash.** A microbench of 250 k `Map`
+lookups over 35 k frozen keys runs in 12 ms, so the frozen-document hypothesis
+was wrong. `--cpu-prof` on the memo build put `at` at **560 ms self** and the
+garbage collector at 712 ms: three heap objects per vertex that escape into a
+`Map` cost more than the six inline projections they replaced, which V8 was
+scalar-replacing. **And the HEAD profile says the ceiling was never there** —
+over 1 876 ms of `plot/` self time on the bunny orbit:
+
+```
+plot3dArea (sample loops)                    26.7 %
+drawTri + strokeThin + fill + shade          ~24 %
+drawnOf + extentOf                           14.3 %   every point pushed and the extent re-derived, per frame
+trianglesOf                                   6.4 %   the cold build, once
+project + clipNear + zOf + toScreen + dot    ~12 %
+```
+
+Projection is twelve percent. F2 as planned — a struct-of-arrays refactor of
+`Tri3` — would buy at most that, for a change to a type six callers hold. Not
+built; F916's class. **The two findings that replace it**: `drawnOf` rebuilds
+`all` from every carrier and re-derives the extent every frame, camera-
+independent work keyed exactly like I107's geometry — that is F6, and it is
+next; and the sample loops in `plot3dArea` and the raster are the halves worth
+the typed-buffer work (F3/F4).
+
+**And a reading about the instrument.** HEAD measured 47.6 ms a render at F1's
+close and 240 ms two hours later on the same code and container — the host's
+other containers moved that much. **Only a same-minute A/B is a comparison**;
+the numbers above are pairs, and every earlier absolute in this ledger is a
+reading of the machine that day (F936).
+
+## F1153 — the 3-D extent is re-derived from every point every frame, and none of them moves ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/scatter3.ts`'s `drawnOf` · `src/presentation/plot/project3.ts`'s `extentOf` |
+| **Reached for** | F1152's close: the HEAD profile of `tools/bench/plots.mjs orbit bunny` puts `drawnOf` + `extentOf` at **14.3%** of `plot/` self time |
+| **Verdict** | **closed — built and measured.** C12 I126; the work is gone from the profile and the bunny frame is 3–20 ms lighter in every paired run; a thousand-face mesh is unmoved, as expected. See the close below |
+
+**The path, at HEAD.** `drawnOf` builds `all: Vec3[]` by pushing every point of
+every cloud, every path and every surface — `surfacePoints` hands back the
+mesh's own `vertices` for a mesh and *allocates the whole grid* for a height
+field — and then `extentOf(all)` walks it allocating **two objects per point**
+(`lo` and `hi` rebuilt on every step). On the bunny that is 35 947 pushes and
+71 894 allocations a frame for an answer the camera cannot move: the extent is
+a function of the carriers and nothing else, which is exactly the argument I107
+made for the triangles, and the triangles cannot even be looked up until the
+extent is known — it is in their key.
+
+**The remedy.** Each carrier's own extent held in the caller's scratch, owned by
+the carrier's array, and the block's extent the union of them — the unit cube
+when no carrier has a point, as `extentOf([])` answers today. **The one
+interaction that shapes it**: the scratch holds one slot per owner, and a
+height-field surface's only carrier *is* the triangle slot's owner, so a second
+slot would thrash the first on every frame with no counter reporting it. So a
+surface's slot holds its extent *and* its geometry under one key — the carriers
+and the ranges — with the geometry's own validity (the block extent, the series)
+checked inside the value, and the slot written once per build, carrying both.
+Byte-identical by construction: `Math.min` over a union of per-carrier minima
+is the minimum over the points, and the mesh goldens are the gate. Measured on
+landing in a same-minute A/B, three runs a side, and recorded here.
+
+**Closed — built and measured** (C12 I126, §6o rows 10–14). Three instruments,
+because the machine's load average sat at 16 throughout with another session's
+load generator up, and the first two could not see the change.
+
+**The pieces at rest, before**, on the bunny in isolation (`out/probe-f6.mjs`,
+200 reps after warm-up, two runs):
+
+```
+all.push over 35 947 vertices          0.8 – 1.5 ms
+extentOf over the built array          0.8 – 1.2 ms
+the two together                       5.0 – 5.2 ms     GC — the array and 71 894 objects in one young generation
+tris copied into Scene.tris (69 451)   1.4 – 2.1 ms
+a six-scalar walk, the replacement     0.3 – 0.5 ms
+```
+
+So the §6o residue's *0.6 ms* was true of the walk and false of the frame: the
+build and the copy it sat between are 6–7 ms of a 47 ms bunny frame at rest.
+
+**The session bench could not see it.** `tools/bench/plots.mjs orbit` at
+80×24, three runs a side alternating builds: `plot.form.plot3d` p50 read
+137 / 122 / 95 ms on HEAD and 112 / 154 / 85 ms with F6 — nine to twelve
+renders a run at that load, and a 4× spread within a side.
+
+**Two profiles, separate processes, sixty renders each** (`--cpu-prof` on a
+renderer-level probe): `drawnOf` 249 ms self and 3.4% of process time on HEAD,
+**absent from the top twelve with F6** (under 0.7%); `extentOf` likewise;
+garbage collection 14.1% → 13.9%. The untouched raster chain read heavier in
+the F6 profile — `project` 210 → 447 ms, `zOf` appearing at 292 — which was
+either load drift between the two processes or a regression, and a share
+comparison cannot say which.
+
+**The paired probe said which.** Both builds imported into one process, a
+render of each per round with the leading side alternating, the difference
+taken per round so drift cancels (`out/probe-f6-pair.mjs`):
+
+```
+bunny, 40 rounds, four runs     B faster in 24 / 27 / 28 / 23 of 40
+                                paired B−A median  −3.4 / −9.3 / −20.0 / −6.7 ms
+                                on p50s of 93–186 ms under load
+suzanne, 60 rounds, six runs    25–34 of 60, paired median within ±2.3 ms either way
+teapot, 40 rounds, two runs     18 and 21 of 40, within ±1.3 ms
+```
+
+A thousand-face mesh has 500 vertices to walk and nothing to save; the bunny
+has 36k, and every paired run put it lighter. The raster chain's heavier
+reading was drift. **Only the paired, interleaved form was a comparison at
+this load** — F1152's *same-minute* rule turns out to need *same process,
+alternating* once the load is high enough, and that is the instrument to reach
+for first next time rather than third.
+
+**Gates.** Goldens 458 of 458 with no mover. c12-extent-scratch: five caught
+and the control — a cloud's extent recomputed every frame, correct and slower
+— seen only by PR11's write count. c12-lines3d and c12-surface3d re-anchored,
+every mutation caught. `make test` red on 24 files at that load, all 24 green
+serially. **What F6 does not reach**: a multi-surface block still copies its
+triangles per frame (§6o row 14, none in the catalogue), and a cloud's
+normalised points are still `unitOf`'d per frame — a slot's worth if a
+large cloud ever measures.
+
+## F1154 — the ramp span projects every corner of every face, six times a vertex, for a minimum and a maximum ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/scatter3.ts`'s `plot3dArea`, the span pass over `scene.tris` |
+| **Reached for** | F1153's profiles: `plot3dArea` self 796–976 ms over sixty bunny renders, `project` 210–447 ms, the largest remaining item outside the raster |
+| **Verdict** | **closed — built and measured.** C12 I127; the bunny frame 12–29 ms lighter in every paired run, a thousand-face mesh unmoved. See the close below |
+
+**The path, at HEAD.** Before the raster, `plot3dArea` takes the depth and
+value extrema the ramps are keyed to — every drawn point, both ends of every
+stroke, **and every corner of every triangle**: `for (const t of scene.tris)
+for (const w of [t.a, t.b, t.c]) project(scene.basis, w.p)`. On the bunny that
+is 69 451 array literals and 208 353 projections a frame for 35 947 distinct
+vertices — a mesh vertex sits on about six faces, so each is projected six
+times toward a `Math.min` and a `Math.max` that cannot tell. The rule itself
+is right (C04 I78, I79: a landscape under a cloud must not saturate one end of
+the map) and lives only in a code comment.
+
+**The remedy.** The distinct referenced vertices are a function of the faces
+and the normalised points — exactly the triangles' inputs, none of them the
+camera — so they are built by the same call that builds the triangles and held
+beside them in the surface's slot (C12 I126 row 13: one write, carrying both).
+The span pass projects each once. **Byte-identical by construction**: a
+minimum over a multiset is the minimum over its support, a vertex no face
+references is excluded now and excluded then, and the cull is the same
+`project` returning `null`. The fabricated violation is the other set — every
+vertex, referenced or not — which a stray vertex distinguishes on the frame.
+
+**Closed — built and measured** (C12 I127, §6o row 15). `geometryOf` builds
+the triangles and the distinct referenced vertices in one pass; the surface's
+slot holds both under one key, written once (PR12b asserts the write count is
+unmoved); the span pass projects each corner once. The paired interleaved
+probe F1153 settled on, F6's build as the A side and this as the B:
+
+```
+bunny, 40 rounds, four runs     B faster in 28 / 34 / 31 / 31 of 40
+                                paired B−A median  −12.1 / −29.2 / −26.5 / −16.3 ms
+                                on A p50s of 90.5 / 138.9 / 106.0 / 88.6 ms under load
+suzanne, 60 rounds, two runs    21 and 38 of 60, paired median +2.2 and −1.5 ms
+teapot, 40 rounds, two runs     17 and 19 of 40, within +2.2 ms
+```
+
+Fourteen to twenty-seven percent of the loaded bunny frame, which is the
+208 353 projections and 69 451 array literals the pass no longer makes; a mesh
+with a thousand faces had a few hundred to save and shows nothing. **The
+gates**: goldens 458 of 458 with no mover; c12-span-corners three caught and
+the control — the span skipping the surfaces — seen by the mesh goldens;
+c12-extent-scratch re-run after the slot's record changed shape, five caught;
+the suite 6215 green in full this time. **What it leaves**: the raster itself —
+`drawTri`, `strokeThin`, `clipNear`, `shade`, `fill` and the per-sample
+callback, about a third of process time on the bunny in F1153's profiles — is
+F3's, and it is next.
+
+## F1155 — the raster allocates about twenty objects per triangle before it paints a sample ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/surface3.ts`'s `drawTri`, `clipNear`, `toScreen`, `fill`, `strokeThin` |
+| **Reached for** | F1153's profiles: `drawTri` 1 007 ms self, `strokeThin` 470, `clipNear` 265, `zOf` 292, the garbage collector 14% — about a third of process time on the bunny over sixty renders |
+| **Verdict** | **closed — built and measured.** C12 I128; the bunny 10–18 ms lighter on a 52–67 ms frame in every paired run, the teapot 2 ms on 16–20. See the close below |
+
+**The path, at HEAD, per triangle and before any sample is painted.** `drawTri`
+builds `vs`, filters it into `behind` with a closure, and calls `clipNear` on
+every triangle — which maps a `z` array, filters `kept`, and returns a fresh
+`[{ v, e }]` even when nothing is clipped, which on a mesh in front of the
+camera is every triangle. `t.v.map(toScreen)` is another array and three
+`Screen`s, each carrying a `Projected`, a `sub` and two `viewDir` results —
+five objects a vertex. `fill` then allocates `len`, four closures for the
+bounds and a `[ua, ub, uc]` tuple per sample; `strokeThin`, which most bunny
+triangles take because they are smaller than a sample, allocates a `pairs`
+array of three tuples, a closure and two `asProjected` objects per edge, and
+per sample two `lerpV` results and a spread. Twenty allocations a triangle
+before the first sample, 69 451 triangles a frame, and the collector's 14% is
+where they go.
+
+**The remedy.** A direct path for the common case: the three view depths as
+scalars, and a triangle wholly in front of the near plane handed to the fill
+without `clipNear` — the same three screen vertices the clip would have
+returned untouched, so byte-identical by construction; `plot3d.clip` counts
+the triangles that take the other path, which is the observable. One flat
+screen record a vertex — position, view direction and normal as nine numbers,
+`project` for the position and `dot`'s order for each component. Scalar edge
+lengths, bounds and weights in the fill; explicit edges in the thin stroke.
+`shade` stays as it is, the object form and the reference the goldens hold.
+Measured on landing with the paired probe, F7's build the A side.
+
+**Closed — built and measured** (C12 I128). The paired interleaved probe,
+F7's build the A side, on a machine that had quietened to a 52 ms bunny frame:
+
+```
+bunny, 40 rounds, four runs     B faster in 36 / 38 / 39 / 36 of 40
+                                paired B−A median  −9.8 / −12.6 / −17.7 / −9.8 ms
+                                on A p50s of 52.1 / 52.7 / 66.6 / 53.0 ms
+teapot, 40 rounds, two runs     30 and 32 of 40, −2.1 and −1.9 ms on 15.8 and 19.5
+suzanne, 60 rounds, two runs    39 and 37 of 60, −0.8 and −0.3 ms on 12.1 and 12.4
+```
+
+Nineteen to twenty-seven percent of the bunny frame and about twelve of the
+teapot's, which is the twenty allocations a triangle the direct path no longer
+makes; suzanne has a thousand faces and the same share of nothing much.
+
+**What the first mutation pass found.** `EDGE-LENGTH-CROSSED` — the second
+edge's band measured by the first edge's length — survived WF5 and the mesh
+goldens, because a grid cell's legs are equal and the meshes' faces near
+enough to it that no sample moved. A rewrite that pairs a length with the
+wrong edge was invisible to every row in the tree. PR13b now draws a 1 : 4
+scalene wireframe triangle under all three cyclic vertex orders and asserts
+the edge samples are one set — the band is the geometry's, and under the
+mutation which edge gets the wrong length changes with the order. Four caught
+on the second pass; the control, every triangle clipped, is byte-identical
+and seen only by PR13's count.
+
+**Gates.** Goldens 458 of 458 with no mover, three times over the rewrite.
+c12-surface3d re-anchored on the new `toScreen` components and the new
+`strokeThin` call, every mutation caught; c12-geometry's stale anchor was
+found by `make test`'s inventory rows rather than by the anchors sweep I ran
+by hand, which reported *1 problems* once and I read past it — the rows are
+the gate. **What it leaves**: `shade`'s five allocations a painted sample and
+the `Shaded` record itself, the compose arms over the sample grid, and the
+per-sample `{ kind, hex }` in the fill callback — the per-sample half, next
+if it measures.
+
+## F1156 — a mesh vertex is projected to the screen once per face it sits on, six times a frame ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/surface3.ts`'s `drawTri` and `toScreen`; `geometryOf`'s `Vert` |
+| **Reached for** | the F1155 close's profile: `toScreen` 357 ms self, 8.6% of process time, on a 40 ms bunny frame — 208 353 calls a frame for 35 947 vertices |
+| **Verdict** | **closed — built, measured, reverted.** The slots landed as specified, cut the calls about five-fold, and the paired interleaved probe saw nothing: nine bunny runs between −0.6 and +2.9 ms on a 31–46 ms frame, the teapot and suzanne level. The count the entry reached for was F1154's span-pass figure, never `toScreen`'s; and F1152's close had already said why a record that escapes costs what six inline projections do not. See the close below |
+
+**The path, at HEAD.** `geometryOf` builds a `Vert` per face corner — `at(k)`
+is a fresh record each call — so a bunny vertex on six faces is six `Vert`s
+holding the same `p`, `n` and `v`, and `drawTri` calls `toScreen` on each: six
+`project`s and six nine-number records a frame for one screen position. F1152
+tried a `Map` keyed on the `Vec3`s and measured slower, because a hash lookup
+and three escaping objects a vertex cost more than the projections they saved
+(F1152's close). **What was wrong was the key, not the idea**: a vertex has an
+index, and an array indexed by it is a load, not a hash.
+
+**The remedy.** A `Vert` carries an `id` — under smooth shading the vertex's
+index and one shared record per vertex; under flat shading a fresh id per
+corner, because the corner's normal is the face's and two faces' corners at one
+vertex are different records. `Geometry3` reports how many ids it issued. The
+raster takes a per-render slot array per surface and `drawTri` reads the
+screen record through it, computing `toScreen` on the first face and reading
+it on the other five; a vertex the near-plane clip cuts is fresh, carries no
+id, and is computed as before. **Byte-identical by construction**: `toScreen`
+is a function of the `Vert`, the basis and the grid, and the record read on
+the sixth face is the record the first computed. The observable is the slot
+count filled per render, which is the referenced vertex count under smooth
+and three times the face count under flat; a raster that ignores the slots
+fills none.
+
+**Closed — built, measured, reverted** (C12 I129 written and reversed). The
+remedy landed exactly as the entry names it — `id` on the `Vert`, one shared
+record per vertex under smooth, a per-render slot array per surface,
+`plot3d.projected` counting the slots filled — and held every gate: 334 unit
+files, goldens 458 of 458 with no mover, four mutations caught with the
+never-cache control seen only by PR14's count. The paired interleaved probe,
+F8's build the A side, then measured nothing:
+
+```
+bunny, 40 rounds, nine runs    B faster in 27 / 31 / 13 / 22 / 4 / 10 / 23 / 18 / 17 of 40
+                               paired B−A median  −0.3 / −0.6 / +1.3 / −0.6 / +2.9 / +2.9 / −0.6 / +1.5 / +0.6 ms
+                               on A p50s of 31–46 ms; the +2.9s under SWAP=1 and after
+                               hoisting the slot lookup out of drawTri's closure
+teapot, 40 rounds, two runs    21 and 19 of 40, 0.0 ms on 12.4 and 10.4
+suzanne, 40 rounds, two runs   18 and 18 of 40, +0.1 ms on 9.3 and 10.0
+--max-semi-space-size=64       12 and 19 of 40, +1.9 and +0.1 — the nursery is not it
+garbage collector, --cpu-prof  10.1 % on A, 10.0 % on B — nor the collector
+```
+
+**Two claims were carried and neither was measured, and the record held both
+answers.** The *208 353 calls a frame* in the *Reached for* row is F1154's
+count of the span pass, which F7 had already reduced to one read per
+referenced vertex; `toScreen` never ran on a culled face, and the slots the
+render fills — `plot3d.projected` on the probe's bunny camera — are **16 539**,
+against some ninety thousand corner reads on the faces the cull keeps. A
+five-fold cut, and still a cut in the wrong currency. The second claim is the
+one F1152's close had already written down: *three heap objects per vertex
+that escape into a `Map` cost more than the six inline projections they
+replaced, which V8 was scalar-replacing.* A `Screen` consumed inline by
+`fill` is never allocated; a `Screen` written to a slot array is a real
+record, a write barrier and a holey-array load on every later read, and the
+arithmetic it saves is smaller than that. The key was not the whole of what
+was wrong with F1152, and this entry read only the half it wanted. The
+instrument that reaches this is *ask where a settled claim is written down*,
+run on the entry's own *Reached for* row before the spec commit; the profile
+share it cited was a separate-process figure for a function the optimiser
+inlines, which is a reading about the optimiser (F1153's close).
+
+**What it leaves.** The projection is not where the bunny's time is, in any
+form this tree can express without the SoA rewrite of Phase F2, and F2 is
+gated on a profile that no longer names it. The per-sample half — `shade`'s
+allocations, the `Shaded` record, the fill callback's `{ kind, hex }` — and
+`strokeSeg` are what the F8 profile ranks, and they are next. The spec
+reversal is the commit after this one; nothing of I129 ships.
+
+## F1157 — the raster allocates about a hundred megabytes a bunny frame, and a third of it is the fill's per-sample records ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/surface3.ts`'s `fill`, `strokeThin` and `shade`; `project3.ts`'s `strokeSeg`; the paint callback in `scatter3.ts`'s `plot3dArea` |
+| **Reached for** | a sampling heap profile that **includes collected objects** — `HeapProfiler.startSampling` at a 2 048-byte interval with both `includeObjectsCollectedBy…GC` flags, sixty bunny renders on F8's build — because `--heap-prof` reports what is retained and showed the cached geometry, not the garbage; the CPU profile's collector at 10.1% |
+| **Verdict** | **closed — built and measured.** C12 I129; the bunny 5–8 ms lighter on a 38–42 ms frame in every paired run (35–39 of 40), 97 to 74 MB a render with `fill` gone from the table; the teapot half a millisecond. See the close below |
+
+**The measurement, by allocation site, sixty renders.** The instrument is
+new to this pass and is committed with the remedy as `tools/bench/alloc3d.mjs`;
+the figures below were taken by hand with the same calls.
+
+```
+bunny, 5 829 MB sampled over 60 renders — about 97 MB a render
+  fill                       1 979 MB   33.9 %      33 MB a render
+  toScreen                   1 201 MB   20.6 %      the Screen record a drawn corner
+  plot3dArea                   712 MB   12.2 %      the six boxed sample arrays and the rows
+  drawTri                      586 MB   10.0 %      strokeThin inlined: its closures and Projected pairs
+  strokeThin's callback        337 MB    5.8 %      per stroked sample
+  project (span pass)          180 MB    3.1 %
+  the paint callback           173 MB    3.0 %      { kind, hex } and the hex per painted sample
+teapot, 1 236 MB over 60 — about 21 MB a render
+  toScreen 13.4 %  fill 9.6 %  plot3dArea 8.6 %  strokeThin 8.0 %  the paint callback 6.7 %
+```
+
+**What a painted sample allocates, read against the sites.** `fill` builds a
+normal and a view position as `Vec3`s and a `Shaded` record, and `shade` —
+untouched by I128 as the object-form reference — builds four more: `unit`'s
+result, the flipped normal, `toEye` and the reflection. Seven records a
+sample, and the thin stroke's callback the same seven, plus per thin triangle
+an `edge` closure, three segment callbacks and six `Projected`s for
+`strokeSeg`'s signature. **F1156 said the optimiser scalar-replaces these,
+and the sampler says it does not**: 33 MB a render at `fill`'s line is about
+eighty thousand painted samples at some four hundred bytes each. The claim
+was true of a record consumed inline by its own function and false of one
+handed across a call the optimiser did not inline, and the measurement was
+the only way to tell which — which is why the row above names the instrument.
+
+**The remedy.** The lighting takes scalars: `shade`'s arithmetic moves to a
+scalar core in the same operation order — `Math.hypot`, the divide, the
+flip on the sign of the view-space `z`, the two dots, the power — and `shade`
+becomes the object-form wrapper over it, so the reference and the path are
+one function and cannot drift. `fill` and the thin stroke interpolate the
+normal and view position as six scalars and hand the painter **scalars** —
+`(i, depth, value, series, intensity, edge)` — so no `Shaded` exists; the
+thin stroke's edges go through a scalar segment core that `strokeSeg` wraps,
+taking the normalised coordinates it multiplied before, with no `Projected`
+pair and no `edge` closure; the eight-bit colour arm, the only reader of a
+reading record, builds it on that arm alone. Byte-identical by construction
+and the 458 goldens the gate. **What it leaves, with the count**: three
+segment callbacks per thin triangle; the colour objects per painted sample —
+the tuple from `sampleRgb`, the tuple from `shadeRgb`, the hex and the
+`{ kind, hex }` — which are the compose arms' contract and the next entry;
+`toScreen`'s record per drawn corner, which `fill` reads by field and only
+Phase F2's SoA form removes. The observable is the sampled bytes a render at
+the fill and stroke sites, taken by the committed bench, and the paired
+interleaved probe for the time.
+
+**Closed — built and measured** (C12 I129). The paired interleaved probe,
+F8's build the A side, and the committed allocation bench on both:
+
+```
+bunny, 40 rounds, five runs    B faster in 39 / 37 / 35 / 36 / 35 of 40 (the last under SWAP=1)
+                               paired B−A median  −5.7 / −6.2 / −7.9 / −7.9 / −5.3 ms
+                               on A p50s of 39.4 / 41.8 / 40.6 / 38.0 / 39.0 ms
+teapot, 40 rounds, two runs    28 and 25 of 40, −0.5 and −0.3 ms on 12.6 and 12.1
+suzanne, 40 rounds, two runs   24 and 25 of 40, −0.4 and −0.6 ms on 14.4 and 10.5
+
+allocation a render            before        after
+  bunny                        97 MB         74 MB     fill 33 MB → absent; the thin stroke's callback 5.6 → 0
+  teapot                       21 MB         18 MB     fill 2.0 → 1.3, the stroke's callback 0.8 → 0
+```
+
+Fourteen to nineteen percent of the bunny frame. What remains on the
+bunny, from the bench: `toScreen` 20 MB a render — the `Screen` record a
+drawn corner, which `fill` reads by field and Phase F2's SoA form is the
+only thing that removes; `thinEdge` 17 MB — the segment callback closure
+per edge and, the sampler's line suggests, the doubles boxed on the way
+into a painter the optimiser did not inline; `drawTri` 10 MB and
+`plot3dArea` 9 MB, neither yet read against its lines; the paint callback's
+colour objects 2.7 MB, F11's subject.
+
+**What the first mutation pass found.** `ZERO-NORMAL-DIVIDES` survived:
+`shade`'s guard for the zero-length normal — F456's rule, *nothing divides
+by anything* — was asserted by no row. SF2 asserts the geometry's normals
+and c12-surface3d's mutation of `unit` is caught there, so the shading
+half of the rule had been a comment for as long as it existed. A `NaN`
+from the divide is swallowed by every comparison into ambient, which is
+finite and at the floor, so a finiteness row would have passed the
+mutation too; SF2b asserts the value — ambient plus the specular of the
+reflection of nothing, `0.4` with the light along the eye — which the
+divide turns into `0.2`. And `TO-EYE-UNNORMALISED` was caught elsewhere
+than PR15: PR15's reference is `shade`, which is the core under test, so a
+mutation inside the core moves both sides equally; the goldens are the row
+that sees it, and the run says so now.
+
+**Gates.** 334 unit files, goldens 458 of 458 with no mover, anchors 0
+missing after c10-colormap, c12-direct-path and c12-surface3d were
+re-anchored on the scalar callback and `thinEdge`; four mutation runs
+every one caught.
+
+## F1158 — the painter is built once per triangle, and it is the same closure every time ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/scatter3.ts`'s `plot3dArea`, the callback handed to `drawTri` |
+| **Reached for** | F1157's close, the residue rows: `plot3dArea` 8.9 MB a render on the bunny and the paint callback 2.7 MB; then two experiments on copies of the F10 build under `out/`, each measured by the allocation bench and the paired interleaved probe against F10 |
+| **Verdict** | **closed — built and measured.** C12 I128 amended; the bunny 2–4 ms lighter on 37–46 ms in five paired runs (28–35 of 40), 74 to 70 MB a render; teapot and suzanne level. See the close below |
+
+**The path, at HEAD.** `for (const t of scene.tris)` reads `t.skin.wire` into
+a local and hands `drawTri` an arrow function that closes over it — so the
+function literal is one, and the closure is new per triangle: 69 451
+closures a bunny frame, each with its context, for a painter whose only
+per-triangle input is `wire`. That is I128's class one function out: an
+allocation per triangle the sample loop does not need.
+
+**Two experiments, on copies, before anything was written into the tree.**
+
+```
+E1  the painter hoisted above the loop, `wire` a `let` it reads
+      allocation a render        74 → 69 MB   (plot3dArea 8.9 → 6.6, the painter 2.7 → 1.5)
+      paired B−A, three runs     −2.8 / −2.8 / −3.0 ms on 36–40 ms   31 / 32 / 33 of 40
+E2  E1 plus the sample handed through one shared Float64Array, the painter (i, series, edge)
+      allocation a render        73 MB — fill back in the table at 18 MB, thinEdge unchanged at 17
+      paired B−A, three runs     −0.9 / −1.1 / −2.0 ms                 25 / 26 / 30 of 40
+```
+
+E1 is the remedy: seven to eight percent of the frame for a `let` and a
+moved brace. **E2 is a hypothesis falsified and worth the line**: F1157's
+close guessed the thin stroke's 17 MB was doubles boxed on the way into a
+painter the optimiser did not inline. A typed scratch that boxes nothing
+measured *slower* than E1 alone and moved `thinEdge`'s bytes not at all —
+so those bytes are the segment callback closure and its context per edge,
+three a thin triangle, about 190 bytes each over ninety thousand edges,
+and a scratch record for the doubles is not a remedy for anything. What
+would remove them is a stroke core that steps without a callback, which
+duplicates `strokeSeg`'s stepping rule (F453's floor) or restructures it;
+recorded here, not built on suspicion.
+
+**The remedy.** The painter is one closure per render, declared above the
+triangle loop, reading the current triangle's `wire` through a `let` the
+loop assigns; nothing else it closes over changes per triangle. Byte-
+identical by construction — the same function body, the same reads — and
+the goldens are the gate; the allocation bench is the observable.
+
+**Closed — built and measured** (C12 I128). In the tree, the paired
+interleaved probe against F10 and the allocation bench:
+
+```
+bunny, 40 rounds, five runs    B faster in 35 / 28 / 30 / 30 / 29 of 40 (the last under SWAP=1)
+                               paired B−A median  −3.9 / −1.9 / −3.1 / −3.5 / −2.4 ms
+                               on A p50s of 39.3 / 38.8 / 38.6 / 46.0 / 37.1 ms
+teapot, two runs               19 and 20 of 40, +0.4 and 0.0 — level
+suzanne, two runs              18 and 22 of 40, +0.3 and −0.1 — level
+allocation a render, bunny     74 → 70 MB; plot3dArea 8.9 → 6.6, the painter 2.7 → 2.7
+```
+
+Weaker than the copy measured (28–35 wins against 31–33, −1.9 to −3.9
+against −2.8 to −3.0), the same sign in every run, and the same bytes.
+Six to nine percent of the bunny frame for a `let` and a moved brace; the
+teapot's six thousand faces are too few for it to show. The bunny now
+renders in **about 35 ms at rest** against F6's 60-plus, and the
+remaining allocation table is `toScreen` 20 MB, the thin stroke's
+callback closures 17 MB, `drawTri` 9 MB, `plot3dArea` 7 MB, the colour
+objects 3 MB.
+
+## F1159 — the thin stroke builds a closure per edge for a stepping rule of four lines ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/surface3.ts`'s `thinEdge`; `project3.ts`'s `strokeSeg` and `strokeSegAt` |
+| **Reached for** | F1158's close: `thinEdge` 17 MB a render on the bunny, F1157's E2 having shown the bytes are the closures and not boxing; then an experiment on a copy of the F11 build, the segment loop restated inside `thinEdge` with no callback, measured by the allocation bench and the paired probe against F11 |
+| **Verdict** | **closed — built and measured.** C12 I129 amended; the bunny 70 to 55 MB a render with `thinEdge` gone from the table, and 2–3.5 ms lighter on 31–35 ms in four quiet paired runs of 60 (39–53 wins), after five runs under a load average of 7 had split. See the close below |
+
+**The path, at HEAD.** A thin triangle strokes three edges, and each edge
+hands `strokeSegAt` an arrow function closing over the two corners, the
+series, the light, the span and the painter — a closure and a context per
+edge, three per triangle, some ninety thousand a bunny frame at about 190
+bytes each. The callback exists so that one function owns the stepping
+rule — F453's floor, the dominant-axis step count — and every stroke in
+the renderer takes it from `strokeSeg`.
+
+**The experiment.** `thinEdge` with the four-line rule restated in its
+own loop, calling `writeDepth` and then the painter directly:
+
+```
+E3   allocation a render      70 → 56 MB   (thinEdge absent from the table)
+     paired B−A, three runs   −2.4 / −2.7 / −2.9 ms on 29.0–29.3 ms     35 / 34 / 34 of 40
+```
+
+Eight to ten percent of the frame. **The cost is a second copy of the
+stepping rule**, and the discipline says what pays for it: PR15's thin
+half already restates the rule in the test as the referee, so the two
+copies in the tree are held equal by a third that is not in the tree; a
+mutation that rounds either copy is caught by that row or by the polyline
+rows (F453). And `strokeSegAt`, F1157's scalar core, loses its only
+consumer and comes out — `strokeSeg` takes its own loop back — because an
+export nothing consumes is MG25's.
+
+**The remedy.** `thinEdge` steps its three edges in its own loop, the same
+expressions in the same order as `strokeSeg`; no callback, no `Projected`,
+no scalar core. C12 I129's sentence about the segment core is rewritten to
+say this and why.
+
+**Closed — built and measured** (C12 I129). The allocation bench first,
+which does not care about the load:
+
+```
+bunny    70 → 55 MB a render    thinEdge 17.4 → 0.8, nothing else moved
+teapot   18 → 16 MB a render
+```
+
+Then the paired probe against F11, **and the first five runs are the
+number that undercuts the ordering**, so they are here:
+
+```
+load average 7, 40 rounds      −6.8 / −0.3 / −5.3 / +2.1 / +1.6 ms on 54–58 ms    26 / 22 / 24 / 16 / 19 of 40
+load average 5, 60 rounds      −1.3 / −9.6 / −0.1 / −3.8 ms on 33–62 ms           33 / 41 / 32 / 51 of 60
+load average 4, 60 rounds      −3.0 / −1.8 / −2.7 / −3.5 ms on 31–35 ms           53 / 39 / 46 / 52 of 60
+```
+
+The quiet rows agree with E3 (−2.4 to −2.9 on 29, 34–35 of 40) and the
+loaded rows agree with nothing, including each other — a baseline that
+doubled between one run and the next is the machine, and the paired
+form cancels drift within a round, not a load that changes the
+optimiser's decisions between rounds. The bunny at rest is now **about
+29 ms**, against 60-odd when this pass began at F6.
+
+**What remains, from the bench**: `toScreen` 20 MB a render, the `Screen`
+record per drawn corner; `drawTri` 10 MB, which the sampler attributes
+there because `fill` is inlined into it and is still worth a read;
+`plot3dArea` 8 MB, the six boxed sample arrays and the rows; the colour
+objects 1.5 MB. And on the other side of the ask, the `all` bench at
+80×24 reads 33 ms p50 a frame with React at 44% of the work, which is
+Phase H's gate firing.
+
+## F1160 — a frame measures every block of the entry to find the window, and the registry's memo does not outlive the call ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/blocks/registry.ts`'s `#scoped` memo; `src/shell/entry-layout.ts`'s `windowEntry` and `measureEntry`; the session's `visibleRows` |
+| **Reached for** | the `all` bench at 80×24 on the F12 build: 88 frames, `visibleRows` 3 492 ms inclusive, of which `windowEntry` 975 ms — `windowSequence` 484, `measureSequence` 490 — and the profiler's `measure absent 74 694`, about 850 a frame; `wrapCellsParts` and `placeableClusters` 7.6% of process self time under `wrapRuns` |
+| **Verdict** | **closed — built and measured.** C09 I70 and C22 I100: one `WeakMap` for the session, read by C14's measurer and by the window. The `all` bench at 80×24, three pairs interleaved against the pre-cut build: work p50 35.3 / 38.4 / 35.3 → 25.3 / 30.5 / 23.3 ms, `measure absent` 74 694 → 3 809 over 88 frames. See the close below |
+
+**Closed — built and measured** (C09 I70, C22 I100). The registry's
+`measure`, `measureSequence` and `windowSequence` take a caller-owned memo
+and use it as the call's; the graph holds one `WeakMap` keyed by the block,
+and both seams — the measurer wrapper C14 receives and `visibleRows`'
+window — read through it. The profiler's wrapper forwards it, and T4.88
+runs at `spans` so a wrapper that dropped it is a red row and not a quiet
+regression on exactly the profiled runs.
+
+```
+all 80×24, 88 frames, interleaved A/B, load average 2–4
+
+          work p50            measure absent
+A (F12)   35.3  38.4  35.3    74 694   about 850 a frame
+B (F13)   25.3  30.5  23.3     3 809   about 43 a frame
+```
+
+Three pairs, the new build ahead in each by 5–12 ms on 35–38. The
+mutation run caught six of six, one of them the wrapper: dropping the
+memo from C14's measurer alone leaves the frame count green — the
+window's first frame writes the memo and the second reads it — and is
+seen only by the patch half, where the re-measure on a new `rev` misses
+the group and all forty children instead of the two objects that changed.
+
+**What remains**: 3 809 `measure` misses over the run, about 43 a frame,
+from scopes the memo is not handed — `renderSequence`'s own on a render
+miss, `elementsIn`, `width` — not attributed further here. And the
+render slot still keys on the window range, so a row of scroll re-renders
+every kept tile: that is F1161, next.
+
+**The path, at HEAD.** `windowEntry` asks the registry for each run's rows
+and then for the window, and the registry answers through `#measureChild`,
+which reads a memo `#scoped` creates at the top of the call and drops at
+its end. So the memo never sees a second frame: `/all`'s column of 64 row
+groups is walked every frame — 145 tiles, each a caption and a figure —
+and a caption's measure wraps its text, which is where the two text
+functions at the top of the profile come from. Eleven milliseconds of a
+forty-millisecond frame, measuring a document that has not changed.
+
+**Why the memo may outlive the call.** The registry's memo is identity-
+keyed on the block with the width in the value, and a block is frozen
+(C04 I1) and replaced on any change (C23 I34), so an entry that is the
+same object measures the same at the same width on every frame; C14's
+`HeightCache` rests on the same premise one level up, and its header says
+why theme and capabilities are not in the key — C09 §4's substitutions
+are 1:1 by cell count and C10 T4.1 holds geometry equal across themes.
+Nothing measure sees animates, by the rule in `CLAUDE.md`.
+
+**The remedy.** The registry's `measure`, `measureSequence` and
+`windowSequence` accept a caller-owned memo — the memo's own shape, keyed
+by the block, `get` and `set` — and read and write it as they read and
+write their own; without one, the per-call memo as before. The session
+owns one `WeakMap` for the life of the session and hands it to `windowEntry`
+and to the C14 measurer through the closures they already take, so the
+two seams agree by construction; a rebuilt block is a new key and a
+settled entry's blocks are collected with it. The observable is the
+profiler's `measure` misses on a still document: about 850 a frame today,
+none after the first frame.
+
+## F1161 — the window range is in the render slot, so a row of scroll re-renders every tile it keeps ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `src/shell/render-cache.ts`; `src/shell/session.ts`'s `visibleRows`; `src/shell/entry-layout.ts`'s `renderEntryPieces` |
+| **Reached for** | the same bench: `renderEntryPieces` 2 491 ms inclusive of `visibleRows`' 3 492, `react` 43.5% of frame work; `render` misses `focus 80` over 88 frames, which is the slot's string moving with the window; then a probe over `/all`'s root at width 80, 64 children and 773 rows |
+| **Verdict** | **closed — built and measured.** C22 I101: the slot splits on the range and holds the parts; a range miss renders what enters. The `all` bench at 80×24, three pairs interleaved against the F13 build: work p50 24.8 / 23.3 / 23.8 → 6.2 / 7.4 / 8.1 ms; at 130×42, 16.6 → 4.8. See the close below |
+
+**Closed — built and measured** (C22 I101). The slot's key lost the range
+and gained it back as its own axis, checked last; a miss there keeps the
+map of parts — a column group's children by id and `align`, a top-level
+block the window kept whole by id — and the render after it assembles
+the window from them, rendering the entering blocks alone in a
+single-child group and holding them. A sliced block is rendered and held
+by nobody. Any other miss drops the parts with the rows, so nothing was
+added to the invalidation story. T4.89b is the referee: every window
+position over gaps, a right-aligned child, a nested row and a sequence of
+whole blocks, byte for byte against the fresh render; the goldens 458
+with no mover.
+
+```
+all 80×24, 88 frames, interleaved, load average 2–4
+
+          work p50            work sum           render misses
+F13       24.8  23.3  23.8    2 799  2 694  2 878    focus 80
+F14        6.2   7.4   8.1    1 336  1 455  1 621    range 80
+
+all 130×42, one pair:  16.6 → 4.8 ms p50
+```
+
+The eighty scroll frames that read `focus` before read `range` now, which
+is the same frames with the axis named: the range had been living inside
+the focus string. Against the F12 build this pass started from, the
+`/all` scroll frame is 33–38 → 6–8 ms p50 — F1160 and F1161 together.
+
+**What the first range miss costs**: the first frame after `/all` renders
+the sequence as before and holds nothing, so the first row of scroll
+renders every kept tile alone and holds it; the second scroll is the
+cheap one. T4.89a's row text was corrected to say so. Holding on the
+first frame would spend one Ink render per tile where the sequence
+render spends one, and was not measured worth it.
+
+**What remains**: `measure absent` 2 885 over the run (about 33 a frame)
+from scopes the memo does not reach; the first-frame cost of `/all`
+itself, which is 145 figures through Ink once — Phase H's question, now
+the whole of what a reader waits for.
+
+**The path, at HEAD.** The render slot's key is nine axes joined, and the
+window range is one of them. A scroll of one row moves the range, the slot
+misses, and `renderEntryPieces` hands the windowed group — the same four
+to six tiles, one of them new — to Ink again. Phase A (C09 I69) made the
+window a subsequence of children; it did not make the kept children's
+rows reusable, so `/all` renders its visible figures once per keystroke
+and the profile is 44% React.
+
+**The identity the remedy rests on, measured before it was written.** Over
+the whole `/all` root, byte for byte: a column group's render equals its
+children rendered alone, in order, with an empty row for each `gapBefore`;
+a sequence's render equals its blocks rendered alone the same way; and a
+right-aligned child rendered alone in a single-child group with its own
+`align` equals its rows in the full group. That is C09 I25 and I69 read
+from the other side, and it held on 773 rows with no exception.
+
+**The remedy.** The slot holds, beside the window's rows, the lines of each
+block it has rendered whole under the same stable key — every axis but the
+range — keyed by the block's id and its `align`. A miss on the range alone
+is a **range** miss: the pieces are rebuilt, and for each kept block a
+column group's children are taken from the held lines or rendered alone in
+a single-child group and held; a top-level block the sequence kept whole
+— the same object as the run's — likewise; a sliced block is rendered as
+before and not held. A gap is an empty row. A miss on any other axis drops
+the held lines with the rows, so no new invalidation reasoning exists:
+what invalidated the rows invalidates the parts. The lines held are
+bounded by the entry's own rows and dropped with the slot. The observable
+is the kind renders on a one-row scroll — the entering child's alone —
+and the frames equal a fresh render at every window position.
+
+## F1162 — the header and the footer go through Ink on every frame, and the footer is measured again each time ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/paint.ts`'s `region`; `src/shell/frame.ts`'s `chromeOf` and the footer's `measureSequence`; `src/shell/composite.ts`'s `layerRows`; `src/shell/chrome.ts`'s `clusters` |
+| **Reached for** | the `all` bench at 80×24 on the F14 build, quiet: 88 frames, work p50 6–8 ms; `region` 306 ms inclusive under `paint` — 3.5 ms a frame; 176 of the 234 `react` spans are the header and the footer, at a p50 of 1.3 ms each; `group#chrome.footer` and `group#chrome.header` rendered 88 times each, `pills#chrome.footer.left` measured 2.03 times a frame; `measure absent` 2 885 over the run, of which the chrome's own blocks — rebuilt by `clusters` every frame, so a new identity to the session's memo — are about nine a frame |
+| **Verdict** | **closed — built and measured.** C22 I102: the chrome cache holds the header's and the footer's lines and the footer's height per content, width and theme, and a layer's lines per content. The `all` bench at 80×24, three pairs interleaved against the F14 build: work p50 5.7 / 6.5 / 6.6 → 5.2 / 4.3 / 4.2 ms, `react` spans 234 → 145 a run, the header rendered 88 → 3 times; at 130×42, 4.5 → 2.8. See the close below |
+
+**The path, at HEAD.** `compose` calls the app's `header` and `footer`
+functions every frame with a context carrying `now`, and the default chrome
+builds two `group` blocks of two `pills` each through `block()` — fresh
+objects, structurally identical to the last frame's except when the clock's
+second changes. `frame.ts` measures the footer through C14's measurer, whose
+memo is keyed by identity, so the fresh blocks miss and are measured again;
+`paint` then renders header and footer through `renderSequenceToLines`, which
+is a React mount and teardown each, before the transcript's rows — which
+F1160 and F1161 just made nearly free — are spliced between them. On a
+scroll frame the chrome is now over half the work. Overlay layers take the
+same path in `composite.ts`: a layer's content is set once per change and
+rendered once per frame.
+
+**Remedy.** A session-owned chrome cache (C22 I102): the header's and the
+footer's lines and the footer's measured height keyed by the blocks'
+serialised structure, the width and the theme's name — three slots — and a
+layer's lines keyed by its content's identity in a `WeakMap`. A frame whose
+chrome came back equal paints the held lines and measures nothing; the
+clock's tick is a `rev` miss once a second. Misses reported as `chrome` with
+the axis, so the deck can see it.
+
+**Closed — built and measured** (C22 I102). `ChromeCache`, owned by the
+graph: the header's and the footer's lines keyed by the blocks' serialised
+structure, the width and the theme's name, the footer's measured height in
+the same slot, a pushed layer's lines by its content's identity. `paint`'s
+`region` and `composite`'s `layerRows` ask it before rendering; a frame
+whose chrome came back equal paints the held lines and measures nothing.
+Misses reported as `chrome` on `absent|rev|width|theme`. T4.90a–c are the
+rows; the mutation run caught 7 of 7 with the control killed; the goldens
+458 with no mover.
+
+```
+all 80×24, 88 frames, interleaved, load average 2–4
+
+          work p50            work sum             react spans   header renders
+F14        5.7   6.5   6.6    1 414  1 320  1 382    234           88
+F15        5.2   4.3   4.2    1 265  1 319  1 248    145           3
+
+all 130×42, one pair:  4.5 → 2.8 ms p50, work sum 1 598 → 1 407
+```
+
+**The footer still renders on 83–86 of 88 frames, and that is the
+instrument, not the subject.** Its `chrome` misses are all `rev`: the
+default footer carries C24 I32's `last N.Nms` cell while a profiler is
+attached, and the bench always attaches one, so the footer's content
+moves on every frame whose cost differs from the last. A session that is
+not profiling has no such cell and its footer hits along with the header.
+Reading that figure as a defect in the cache would be a reading about the
+process taken for one about its subject; the header's 3 renders — the
+clock's second changing — are the cache's own figure.
+
+**What remains**: `measure absent` 2 680 a run, about 30 a frame, from
+scopes the memo does not reach; the first-frame cost of `/all` itself —
+145 figures through Ink once — which is Phase H's question and now the
+whole of what a reader waits for.
+
+## F1163 — the theme store validates the painted floors at load, and it costs a cold session about sixty milliseconds ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/theme/store.ts`'s `loadTheme`; `src/presentation/theme/resolve.ts`'s `validatePaintedFloors`, `quantisedHex`, `quantiseSet` |
+| **Reached for** | `loadTheme(defaultTheme)` in `dist/`, six calls in one process: 56.8, 29.5, 25.6, 10.6, 3.2, 4.9 ms; the `all` bench's profile attributes 87.8 ms inclusive to `validatePaintedFloors` from the store's constructor, of which `quantisedHex` 51 ms self and `quantiseSet` 35 ms self — for the two themes of three that paint a surface (`light`, `high-contrast`) |
+| **Verdict** | **closed — built and measured.** C10 I41: the shipped sets' quantisations generated into a table `quantiseSet` reads before the DP; cold `loadTheme` on a native filesystem 65–78 → 1.4 ms. See the close below |
+
+**The path, at HEAD.** `loadTheme` runs both validators over every theme in
+the set (C10 I26, I27). `validatePaintedFloors` is a no-op for a theme that
+inherits the terminal's background and, for one that paints, quantises the
+surface set to find what an 8-bit terminal would paint for `bg` — and that
+walk recomputes each cube entry's Lab on every comparison rather than once.
+It is paid once per session, before the first frame, and the warm figures
+say most of it is work the first call does and the later ones do not.
+
+**Remedy.** The cube's Lab beside its hex in `buildCube`, computed once at
+module load, and the quantisation of a theme's surfaces memoised by the
+surfaces' values — the same answer, once. Measured against the six-call
+series above; no spec change, C10's own contrast rows are the gate.
+
+**Re-measured before building, and the remedy above is wrong in both halves.**
+`buildCube` has held each entry's Lab beside its hex since it was written, and
+every comparison reads it; nothing recomputes it. And the six-call decay is
+not repeated work being skipped: `quantisedHex(light, "bg")` alone, eight
+calls in one process, reads 34.3, 34.9, 17.6, 21.9, 4.2, 1.1, 1.3, 1.1 ms —
+the interpreter running the DP's half-million inner steps until the
+optimiser takes it, then a millisecond a call. Memoising by value would save
+nothing on a cold session, whose two calls are on two different themes.
+
+What the cold cost is: two DP runs at load, one for each shipped theme that
+paints (`light`, `high-contrast`), 65–78 ms of a 600 ms native startup
+(F1164's figures, `/tmp` inside the container; the bind mount makes every
+number here seven times larger and is not the product's). A profile of one
+cold load attributes 44.5 ms self to `quantiseSet` and 32.2 to `quantisedHex`,
+the second being the first inlined.
+
+**Corrected remedy.** The answer for a shipped theme is a constant: the same
+set of hexes gives the same picks on every machine. So the quantisations of
+the shipped sets — three themes' surfaces and their palettes — are computed
+once by a generator and shipped as a table keyed by the set's own values;
+`quantiseSet` reads the table before it computes, and a set the table does
+not hold (an app's own theme, a patched one) computes as today. A test row
+sweeps every table entry against the computation and every shipped set
+against the table, so a theme edit without a regeneration is a red row and
+not a stale constant. Exact by construction — the table *is* the
+computation's output — and the DP never runs for a shipped theme.
+
+**Closed — built and measured** (C10 I41). `quantise.ts` holds the cube,
+the distance and the DP; `quantiseSet` reads `quantised.generated.ts` — 14
+sets over the three themes, each theme's surfaces and each of its
+palettes, written by `tools/theme/quantised.mjs` from `dist/` under
+`make quantised` — and computes only for a set the table does not hold.
+T3.73 sweeps every entry against `computeQuantisation` and every shipped
+set against the table, and reads identity to see the DP did not run; the
+mutation run caught 5 of 5 with the control killed; the goldens 458 with
+no mover.
+
+```
+cold loadTheme(defaultTheme), container-local copy, three processes
+
+before   77.8   76.7   65.2 ms
+after     1.5    1.4    1.4 ms
+```
+
+**What remains of F1164's list after this**: the launchers' compile cache
+landed beside it (R01 R4.6); the emulator's dynamic import and the
+highlighter's grammars are still open there.
+
+## F1164 — the built package's import is the startup, and the theme, the highlighter's every grammar and a headless terminal are all in it ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `dist/index.js`'s module graph — 381 files under `dist/` and the dependencies they pull in; `src/presentation/blocks/kinds/code.ts`'s `createLowlight` at module scope; `src/data/emulator/emulator.ts`'s `@xterm/headless`; the examples' launchers `bin/docker-tui.js` and `bin/plots-tui.js` |
+| **Reached for** | a probe importing `dist/index.js`, constructing a session over fakes and waiting for the first frame, on a container-local copy so the bind mount is out of the figure: import 471–847 ms, first frame 100–197 ms after it, total 572–1 045 ms over five runs at load average 1–2; on the bind mount the import alone is 4 400–5 000 ms. A profile of the import: 353 ms self in Node's ESM loader (resolve, stat, read, compile, link), `ink`'s own graph 205–250 ms of it, `lowlight` 37–73 (its barrel imports every grammar highlight.js ships, ~190, where the code block registers sixteen), `@xterm/headless` 35, `yoga-layout` 39, `elkjs` 4; `dist:presentation` 76 ms self, of which the theme's two cold quantisations are 65–78 (F1163). With Node 22's on-disk compile cache (`NODE_COMPILE_CACHE`), five interleaved pairs: total 1 045 → 694, 883 → 560, 667 → 650, 676 → 592, 572 → 522 ms — five of five, paired median −84 ms |
+| **Verdict** | **closed — built and measured.** All four remedies built: the compile cache (R01 R4.6), the quantisation table (C10 I41), the emulator off the graph (C23 I71) and the highlighter's grammars off it (C09 I71) — the last −36 ms container-local and −120 ms on the bind mount, paired |
+
+**The path, at HEAD.** An app's launcher sets `NODE_ENV` and dynamically
+imports its `main.ts`, which statically imports `@fmx/calcium`; the barrel
+statically imports every component, so every module Calcium can ever need is
+resolved, read, compiled and linked before `createTui` is called. That is the
+design — a block kind is a module and the registry is built from them — and
+it puts three things on the startup path that no first frame uses: the
+highlighter and all of highlight.js's grammars (the code block's module
+builds its `lowlight` at module scope, and `lowlight`'s only export is a
+barrel that imports `all` and `common`), the headless terminal emulator (used
+by the shell route, on an `async` path), and two cold runs of the theme's
+quantisation DP (F1163). The rest is the loader's own cost over 381 small
+files and `ink`'s graph, which is Node's per-module floor and not Calcium's
+code.
+
+**Remedies, ranked by measured share.**
+
+1. **The compile cache, in the launchers** (R01 R4.5): `module.enableCompileCache()` before the dynamic import, where `NODE_ENV` already goes and for the same reason — a static import hoists past it. Five of five pairs, −84 ms median on a 600 ms start. A consumer's own launcher does the same; it is a recipe, not a Calcium seam.
+2. **The theme's quantisations as a shipped table** (F1163's corrected remedy, C10 I41): −65 ms cold.
+3. **The emulator behind a dynamic import on the shell route** (C23): −35 ms, and the route is already `async`. A startup-graph row asserts the barrel never loads it.
+4. **The highlighter's grammars off the barrel's path**: −37 ms. `lowlight` exports one entry and it imports every grammar; the honest forms are a vendored `createLowlight` over `highlight.js/lib/core` (150 lines, MIT, a `DEPENDENCIES.md` row) or a deferred engine the pipeline warms before committing a document that needs it. Not chosen yet; measured after 1–3 land.
+
+**Remedy 3, built** (C23 I71). `createEmulator` through a dynamic import at
+the top of `runShell`; T5.22 reads the startup graph through
+`test/support/import-trace.mjs` — nothing from `@xterm/headless` after the
+import, the emulator after one shell command through the route. Paired
+against the F15 build on the native copy, five of five: 528 → 475, 350 →
+346, 351 → 344, 367 → 333, 351 → 336 ms, median −15. The direct figure is
+the package's own cold import, 34.5 ms; the pairs sit under it because the
+loader's cost over 380 files is the noise floor here.
+
+**Remedy 4, built** (C09 I71). Neither of the two forms sized above: the
+wrapper's 482 lines are mostly its hast tree and the `common`/`all`
+tables, and what the code block takes from it is the emitter seam —
+`startScope`/`endScope`, `addText`, `__addSublanguage` — which is sixty
+lines when it emits the token run directly instead of a tree to flatten.
+So `code.ts` runs a `highlight.js/lib/core` instance of its own through
+that emitter, and `lowlight` moves to the development table as the
+reference T1.45 checks the run against, token for token, over every
+default grammar's sample and four documents with sublanguages. T5.6 reads
+the code block's graph in a real child: the core, the sixteen grammar
+files, nothing from `lowlight`.
+
+**The premise was re-measured before it was built, and nearly overturned
+by reading the wrong file.** `lowlight/lib/index.js` imports only
+`highlight.js/lib/core` and `devlop`, and a correction to this entry was one
+commit away; the package's `exports` is its root `index.js`, which
+re-exports `all` and `common` — 156 grammar imports — beside
+`createLowlight`, and admits no deeper path. Timed as a marginal import in
+one process, `highlight.js/lib/core` then `lowlight`: 22–30 ms
+container-local, 73–89 ms on the bind mount. The startup profile under the
+launchers' configuration (production React, the compile cache) is 256–266
+ms container-local, the CommonJS lexer its largest item at 60 ms — the
+reconciler's development and production builds are both lexed for named
+exports, 733 and 398 KB, and `elkjs`'s 1.5 MB bundle — and the ESM compile
+33 ms; the highlighter's own self time was 2–5 ms, which is where a
+profile by package hides a cost the loader carries.
+
+```
+cold import of dist/index.js, one process per reading, interleaved pairs,
+NODE_ENV=production, NODE_COMPILE_CACHE warm — A the F18 build, B this one
+
+container-local   A 257 273 352 247 245 224   B 221 268 199 210 206 220   B lighter 6/6, median −36 ms
+bind mount        A 803 693 567 547           B 661 570 488 429           B lighter 4/4, median −120 ms
+```
+
+**What is left of the startup is the loader**: about 250 ms container-local
+of which the CommonJS lexer is 60, the ESM compile 33 and format detection
+and package-scope reads most of the rest — the shape only bundling changes,
+recorded below with its number.
+
+**What is not on the list**: bundling `dist/` into one file per entry would take the loader's 350 ms down with it, and it changes the published shape every deep import in `test/` and the examples rely on — recorded as the architecture-level lever, with the number, for the day the rest is spent.
+
+## F1165 — the profile tool's sampler was outrun by the session it samples, and the appendix row refused for a second sample ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `tools/profile.mjs`'s `sampleMs`; C28 T5.3 |
+| **Reached for** | `node tools/profile.mjs 300 6` after F14–F17: `Streaming CPU — unanswerable: a rate needs two samples in the window and there is 1; the session ran 150 ms`. Timers logged with a `--import` hook: the sampler's first tick scheduled at 768 ms, fired at 918 (the first yield after the recorder exists — the greeting's build and first mount are synchronous), the six keystrokes over in 32 ms, the session over at 950. The same run read four samples over 235 ms when T5.3 was written |
+| **Verdict** | **closed — built and measured.** `sampleMs` 25 → 5 in the tool; three runs read two refusals, T5.3 green |
+
+**The shape.** A harness parameter chosen against the subject's speed on
+the day it was written, with no row that watches the margin: the
+optimisations of this pass took the row's own fixture under one sampling
+interval, and the refusal read as a defect in the profiler. It is the
+process's reading and not the subject's — the CPU row is a rate over
+samples, and a session faster than the interval has no rate to report. Five
+milliseconds is under the 32 ms the keystrokes now take by six; a sample is
+`process.cpuUsage` and `memoryUsage`, tens of microseconds. T5.4's red in
+the same run was a typing race under a load average of 18 and passed on the
+rerun at 3.
+
+## F1166 — the raster projects a vertex once per face that references it, and allocates the screen record each time ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/surface3.ts`'s `toScreen`, `drawTri` and `geometryOf`'s `at`; `src/presentation/plot/scatter3.ts`'s triangle loop |
+| **Reached for** | the `orbit` bench at 80×24 on the F17 build under production React: bunny work p50 37.4 ms, `plot.form.plot3d` 72% of it at 33.3 ms a frame; suzanne 34.3 and 26.4. Self time over 14 renders: `drawTri` 90–104 ms, `toScreen` 70–88, `plot3dArea` 46–80, `thinEdge` 37–50, `project` 11–21. The bunny is 35947 vertices and 69451 faces; `geometryOf`'s `at` builds one `Vert` per face corner, so the smooth mesh holds 208,353 vertex objects for 35947 vertices and the raster calls `toScreen` — `project`, three dots for the position and three for the normal, one object — up to three times per drawn face, about six times per vertex on a closed mesh |
+| **Verdict** | **closed — built and measured.** One vertex object per mesh vertex under smooth shading, the projection held on it in a record written in place under the geometry record's frame stamp; the bunny 2.1 ms lighter a frame, paired |
+
+**The path, before.** `drawTri` takes the direct path (I128) and projects
+`tri.a`, `tri.b`, `tri.c` through `toScreen`, which returns a fresh `Screen`
+each call; the geometry cache (I107) holds the triangles across frames but
+nothing about the frame's projection, which is right — the camera moves —
+and nothing shares a projection between the faces that meet at a vertex
+inside one frame either. On a smooth mesh the vertex's position and its
+normal are the same for every face that references it, so five of the six
+projections are the first one repeated.
+
+**Remedy.** `geometryOf` builds one vertex object per mesh vertex when the
+shading is smooth (flat shading keeps one per face corner, since the normal
+is the face's), and the raster holds each vertex's screen record on the
+geometry's own scratch under a per-frame stamp: the first face to reach a
+vertex projects it, the rest read it back. `toScreen` is pure in (vertex,
+basis, grid), so the frame is byte-identical by construction; `plot3d.project`
+counts the projections, which is the observable a row reads.
+
+**Closed — built and measured** (C12 I130). `geometryOf` shares one `Vert`
+per mesh vertex under smooth shading and builds one per corner under flat;
+`screenOf` reads the record back under the frame's stamp and otherwise
+projects into the record the vertex already holds. The stamp is a counter on
+the held geometry record — the spec's first wording put it on the block's
+scratch, which is a slot and a write per render and exactly what PR10, PR11
+and PR12b count under I126; the spec was corrected alone before the code.
+T1.142 reads 18 flat and 7 smooth on a closed cube at a generic camera, the
+second camera counted in full and byte-equal to a fresh render, and the
+bunny at most its vertex count: measured, 17,125 projections a frame against
+three per drawn face. Mutation: `c12-vertex-once` 3 of 3 with the control
+killed, `c12-direct-path` 4 of 4, `c12-surface3d` 21 of 21 after its
+world-space-normal mutation was re-anchored over both arms of `toScreen`.
+Goldens 458 with no mover; 6231 tests.
+
+**The first cut measured nothing, and the profile said why.** With a fresh
+`Screen` stored on the held vertex each frame the paired probe read B−A
++1.5 and −0.1 ms, B faster in 11 and 21 of 40 rounds, and `toScreen`'s self
+time over 30 bunny frames was 74–148 ms against A's 59–61 — more time in a
+third of the calls. A held vertex is old-generation, so each store is a write
+barrier and a promotion, 17k a frame: F1152's class, the cache of a record
+that was being scalar-replaced. With the record allocated once and written
+in place, `toScreen` self is 41–54 ms and the probe reads:
+
+```
+paired A/B in one process, 40 rounds, bunny and suzanne, both orders
+
+bunny    A p50 27.2  B p50 25.5  B−A median −2.1 ms  B faster in 34/40
+bunny    A p50 27.5  B p50 25.3  B−A median −2.1 ms  B faster in 37/40   (swapped)
+suzanne  A p50 8.7   B p50 8.9   B−A median −0.0 ms  B faster in 21/40
+suzanne  A p50 8.9   B p50 8.8   B−A median −0.2 ms  B faster in 22/40   (swapped)
+```
+
+Suzanne's 7.8k faces are a small share of its frame and it does not move.
+The `orbit` bench at load 5–7 reads the bunny at work p50 33.3–37.4 ms over
+three runs against 34–37 before, which is the bench not resolving a 2 ms cut
+rather than the cut not landing; the paired probe is the instrument (F1153).
+
+**A correction to this entry's own figures.** The "suzanne 34.3 and 26.4"
+in *Reached for* was the bunny: the bench takes the rung as its fifth
+argument, and `orbit suzanne 80x24` fails its size check while `orbit 80x24
+40` with no rung defaults to the bunny — the frames-and-renders shape of
+that run, 25 and 14, is the bunny's. Suzanne under the bench today is work
+p50 9.9–14.7 ms with `plot3d` at 2.8–7.4 ms a render.
+
+## F1167 — the bench profiled React's development build, and the frame it reported carried React's own instrumentation ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `tools/bench/plots.mjs`; every figure F12–F17 took from it |
+| **Reached for** | `createElement cjs/react.development.js` in the `all` profile's top twenty, 39 ms self; the bench set no `NODE_ENV`, while both launchers set `production` before their import (F853). Same build, `all` at 80×24: work sum 924 ms under development, 800 and 742 under production; `react` span 456 → 346 ms; work p50 2.3 → 2.3 and 1.6 |
+| **Verdict** | **closed — built and measured.** `tools/bench/env.mjs`, the bench's first import, sets `NODE_ENV ??= "production"` before `dist/` evaluates |
+
+**The shape.** An instrument that measures a configuration nothing ships:
+the launchers pick React's production build, the bench did not, and every
+paired A/B in this pass compared two development builds. The pairs stay
+valid — both sides carried the same overhead — and the absolute figures
+were high by the development build's share, which is the `react` span's
+110 ms of 924 here. From this entry on the bench's numbers are the shipped
+configuration's.
+
+## F1168 — every rendered row goes through Ink to be measured again, and on a 3-D orbit that is half the frame ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/blocks/paint.ts`'s `Text` per row; `src/presentation/render-lines.ts`'s `react` span around `renderToString`; Ink's `Output`, `@alcalzone/ansi-tokenize`, `string-width` |
+| **Reached for** | the `orbit` bench at 80×24 on the F19 build, suzanne: work p50 11.6 ms, the `react` span 48.5% at 190 ms over 46 renders (p50 1.1, p95 11.1) against `plot.form.plot3d` 34.5% at 135 over 16 — 7.3 ms of Ink a frame against 6.8 of raster. The bunny: `react` 21% at 166 ms over 42 renders beside a 31 ms raster. By package over the bunny run, `@alcalzone/ansi-tokenize` 57 ms, `ink` 27, `string-width` 19; by function, `tokenize` 37 ms, `stringWidth` 13, `tokenizeAnsi` 10. The `all` scroll: `react` 46.7% of 800 ms of work, though at 1.6–2.3 ms a frame after F1149 it is not the complaint there |
+| **Verdict** | **closed — built and measured.** The rows arm (C09 I72): the bunny −7.3 and −8.0 ms a frame paired, suzanne −7.1 and −6.7 on an 11.6 ms frame, B faster in 159 of 160 rounds |
+
+**The path, at HEAD.** A block's renderer produces its rows as strings — each
+row already `exact()` at the width, each cell's colour already an SGR run
+from C10 — and `paint.ts` wraps every row in an Ink `Text`. `renderToString`
+then mounts a React tree, lays it out through Yoga (which measures each
+row by stripping and counting its ANSI through `string-width`), walks the
+tree writing each row into Ink's `Output` (which tokenises the ANSI again
+to slice and place it), reads the screen back as one string, and unmounts.
+For a row of plain text that is cheap; for a 3-D raster row, where nearly
+every cell changes colour, the row is a few hundred SGR bytes and the two
+tokenisations dominate — which is why the share rises with the figure's
+colour density and not its size, and why the `all` scroll, mostly axes and
+plain series, pays a tenth of it.
+
+**Remedy, sized.** A block whose renderer returns exact rows needs no
+layout: the registry has measured it (C09 I1) and the rows are the frame's.
+The seam is a second render arm on the kind definition — rows rather than
+an element — with the registry composing rows itself for a sequence of
+such kinds and falling back to Ink for a sequence holding any other. The
+containers (`group`, `panel`, `scroll`) place children by rows already
+(`group.place`), so the fallback is the rarer case. This is C09's render
+signature and C22's frame path, a spec across two components before a
+line lands, and the gate is the figure above: **half the orbit frame**.
+Not built on suspicion; built on this entry.
+
+**Closed — built and measured** (C09 I72). `render` answers `Rendered` — rows,
+or an element — and every kind that ended in `rows()` answers rows; the
+registry composes the gap, the floor and the cap's marker as rows, and
+`renderSequenceToLines` composes a document block by block, normalising each
+rows block through `normaliseRow` (a sixty-line reimplementation of Ink's
+output form, held against `@alcalzone/ansi-tokenize`'s own serialiser over the
+corpus and ten thousand seeded rows, T1.46) and sending only element blocks
+through Ink (T2.143 holds the two arms equal over the corpus and a mixed
+sequence). **Paired, one process, both orders** (`out/probe-f6-pair.mjs`, 40
+rounds, frames asserted identical before timing): the bunny A p50 25.4 → B
+17.7 ms and 27.3 → 18.7, paired B−A median **−7.3 and −8.0 ms**, B faster in
+40/40 and 39/40; suzanne 11.6 → 4.3 and 11.3 → 4.7, **−7.1 and −6.7 ms**,
+40/40 both orders. The `orbit` bench's shares: suzanne's `react` 48.5% → 22.2%
+of work (56 ms over 31 renders at 1.2 ms p50 — the chrome and prompt, not
+the plot), with `rows` at 10.6% (27 ms over 17 at 1.3 ms p50) where the
+raster's rows are normalised; the bunny's `react` 21% → 5.9%, `rows` 3.4%.
+Goldens 458 frames, 0 movers; tier 5 133 green; the mutation run eleven
+caught, none survived, with two mutations recorded in C09 T6.119 as ones the
+row cannot see and why. **What remains is F1170**: the `all` scroll's root is
+a `group`, an element, so its `react` is 64.2% of that bench's work at 1.3 ms
+p50 and 22.8 p95 a frame — the containers, `table` and `image` are the
+residue, and the cost is now theirs alone. 2026-09-16.
+
+## F1169 — the ramp span projects every referenced vertex in full to read its depth, and the cull allocates a centroid and a difference per triangle ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/scatter3.ts`'s corners loop before `drawTri`; `src/presentation/plot/surface3.ts`'s `backfaceCulled` |
+| **Reached for** | line ticks in the F19 bunny profile: `plot3dArea`'s self time (107 ms over 14 renders) has 30% on the two lines of the corners loop — `project(scene.basis, c.p)` for 35,947 vertices a frame, of which the span reads `depth` alone — and `drawTri`'s (105 ms) has 26% on `backfaceCulled`'s centroid literal, two objects per triangle per frame, 69,451 triangles |
+| **Verdict** | **closed — built and measured.** `viewDepth` for the span and a scalar cull (C12 I131); the bunny 1.6–2.3 ms lighter a frame, paired |
+
+**The path, before.** `project` computes `sub(p, eye)`, three dots, the
+divide and the two screen coordinates, and returns a record; the span loop
+reads `depth`, which is the first of the three dots. `backfaceCulled` builds
+the centroid as a `Vec3`, subtracts the eye into another, and dots — the
+same arithmetic as the direct path's scalar view depths (I128), allocated.
+
+**Remedy.** A `viewDepth(basis, p)` that is `project`'s first dot as scalars
+— the same `(p − eye) · forward` in the same order, `null` under the same
+`NEAR` — for the span; the cull's centroid and difference as scalars in the
+same order. Byte-identical by construction, which the goldens and a row
+against the allocating forms hold.
+
+**Closed — built and measured** (C12 I131). T1.143 reads `viewDepth`
+against `project`'s depth bit for bit over ten thousand seeded points, a
+share of them behind the camera, and the scalar cull against the `Vec3`
+form over ten thousand seeded triangles under both signs. Mutation:
+`c12-span-depth` 2 of 2 with the control killed; the three runs anchored on
+the old lines re-anchored, 31 of 31. Goldens 458 with no mover. **One
+mutation survived and was written into T6.107 rather than the test
+rewritten**: the centroid divided once after the dot is the same figure in
+exact arithmetic, and the cull is a sign — a last-bit change moves no
+verdict on any corpus a row can hold, so the operation order is held by the
+goldens and by nothing sharper.
+
+```
+paired A/B in one process, 40 rounds, both orders — A the F19 build
+
+bunny    A p50 23.8  B p50 22.5  B−A median −1.6 ms  B faster in 29/40
+bunny    A p50 27.4  B p50 25.3  B−A median −2.3 ms  B faster in 35/40   (swapped)
+suzanne  A p50 10.1  B p50 10.3  B−A median +0.8 ms  B faster in 15/40
+suzanne  A p50 8.7   B p50 8.7   B−A median +0.2 ms  B faster in 15/40   (swapped)
+```
+
+Suzanne's 7.8k faces and 4k vertices are under the probe's noise; the cut
+is proportional to the mesh, which is what F1169's line ticks said.
+
+## F1170 — the containers, the table and the image compose Ink trees, so the rows arm passes them by ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/blocks/kinds/containers.ts` (`group`, `panel`, `scroll`), `src/presentation/table/definition.ts`, `src/presentation/blocks/kinds/image.ts` — the five kinds that build their own Ink elements rather than ending in `rows()` |
+| **Reached for** | F1168's design: a rows arm on `render` (C09 I72) takes every kind that ends in `rows()` off Ink, per block, and leaves a block that composes an element on the Ink path unchanged. These five compose elements — a `group` places children by `renderChild`, a `panel` draws its border around them in a `row` box, `scroll` pads, `table` and `image` emit a `Text` per row — so a document built of them keeps paying Ink. The `all` scroll is the measured case: its root is a `column` group of `row` groups of `column` tiles, `react` 46.7% of 800 ms of work on the F17 build, though at 1.6–2.3 ms a frame after F1149 |
+| **Verdict** | **closed** — built and measured: C09 I73, `composeRow`/`placeRows`, T1.47, T2.144, T3.89, `c09-rows-containers` | · measured after F1168 closed: the `all` bench's `react` 64.2% of work, 1.3 ms p50 and 22.8 p95 a frame, `rows` 0.3% — the root `group` kept the whole document on the element arm; re-measured on the F1174 build before the cut: `react` 61.2% and 67.7% of work at 80×24 and 130×42, 1.3 and 3.0 ms p50, 10.6 and 24.3 p95, the frame's work 125 and 253 ms over fourteen frames
+
+**Why they are left.** A `column` composition is concatenation and takes
+the arm for free; a `row` composition and a border need each child's rows
+padded to its width, which is a `cells()` measure per row — the width
+Ink computes today through `string-width`, and C09 §*What a renderer
+emits* records that the two implementations are pinned to agree (T2.16)
+rather than known to. Composing rows for a `row` group is therefore a
+second cut with its own measurement — what a `/all` scroll frame pays
+after I72 — and its own row on the agreement, not a line in the first.
+`table` and `image` emit one `Text` per row already and are the cheap
+half: `rows()` in place of the elements.
+
+**Closed — built and measured.** C09 I73. The composition is Ink's output
+grid restated in `rows.ts`: `composeRow` places each child's normalised row
+after a pad from where the previous row ended, measured as Ink measures it,
+and normalises the line again; `placeRows` does it for a grid of placed
+blocks and declines where the grid would overwrite or clip. `group`, `panel`,
+`scroll`, `table` and `image` answer rows when every child does and fall back
+to their unchanged element path otherwise; every child is rendered once where
+it was rendered twice. **The reference is the element path itself**, reached
+in T2.144 by a test-only kind that lifts each leaf into an element, over
+eighteen containers at eight widths under three capability sets and the
+placement arm; the goldens hold every frame, 458 with no mover. The mutation
+pass caught nine and found two statements over-determined — the empty panel's
+body row is drawn three ways at once — which T6.120 records. Measured, three
+runs a side on the same fourteen scroll frames:
+
+| | before | after |
+|---|---|---|
+| 80×24 work, sum | 125 ms | 53–60 ms |
+| 80×24 work p50 / p95 | 2.2 / 33.8 ms | 1.1–1.6 / 12.8–14.2 ms |
+| 130×42 work, sum | 253 ms | 109–116 ms |
+| 130×42 work p50 / p95 | 2.9 / 76.8 ms | 2.1–2.3 / 35–38 ms |
+| `react` share | 61.2% · 67.7% | not in the table; `rows` 3–4% |
+
+The mesh pair, whose document sits in a container: **bunny 17.8 → 15.6 and
+15.2 → 13.2 ms, B−A median −2.3 and −1.8, B faster in 35 and 33 of 40**;
+suzanne 0.0 over a hundred rounds. **What it does not reach**: `mosaic`,
+which places children absolutely and clips each and stays on the element
+arm; and the miss frame itself, 13–14 ms at 80 columns, which is now the
+figures' own rendering rather than Ink's.
+
+## F1171 — the surface painter allocates two tuples, a hex string and a colour record per write, and a sample is written many times before the nearest wins ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/scatter3.ts`'s `painter` fast arm — `sampleRgb`, `shadeRgb`, `rgbHex`, the `{ kind: "rgb", hex }` record — and `densityGlyph`'s `[...steps]` copy per call on the glyph arm |
+| **Reached for** | the inspector's sampling heap profiler over twenty bunny orbit frames on the F1168 build, both collected flags on: **379 MB sampled, 19 MB a frame** — `plot3dArea` 103 MB, `drawTri` 55.8, `painter` 55.0, `toScreen` 33.7, `shadeAt` 18.8, `hypot` 17.6, `thinEdge` 16.1, `toString` 11.8 (that is `hex2`), `mixedRows` 10.5, `toSrgb` 8.2; the CPU profile over thirty frames puts the garbage collector at 131 ms of 1 839, 7.1%, **4.4 ms a frame**. Sized on a scratch copy of the build with the colour held as one packed integer per sample and the records built once after the surfaces: `painter` gone from the table, `toString` 11.8 → 4.4, the total 379 → 318 MB; paired in one process both orders, the bunny 20.8 → 19.0 and 21.0 → 18.9 ms, **B−A median −1.5 and −2.1 ms**, B faster in 29 and 37 of 40; suzanne 0.0 both orders. Bisected: with no triangle drawn `plot3dArea` samples 47.8 MB (the per-frame buffers); with the painter a no-op it still samples 104 and `drawTri` 55 — so what those two allocate is boxed doubles crossing the painter call, not anything the painter builds |
+| **Verdict** | **closed — built and measured.** One packed integer per sample, the records built once (C10 I42, C12 I132): the bunny −3.7 and −2.8 ms a frame paired, B faster in 36 and 38 of 40; the painter gone from the allocation table, 379 → 325 MB over twenty frames |
+
+**The path, at HEAD.** The fast arm (C10 I40) already holds the channels as
+ints between sample and shade — but `sampleRgb` returns them in a fresh tuple,
+`shadeRgb` returns another and creates its `ch` closure on the way, `rgbHex`
+builds a string through three `toString(16)` calls, and the record is a fresh
+object, all per **write**. A sample is written every time a nearer carrier
+reaches it — three thin edges of every sub-sample bunny triangle, then the
+faces — so the frame builds a colour for every write and keeps one per sample.
+`densityGlyph` copies the ladder's steps into a new array per call on the
+glyph arm; the braille and half-block arms do not reach it.
+
+**Remedy, sized.** The painter writes one packed integer — `r·2¹⁶ + g·2⁸ + b`
+— into an `Int32Array` beside `ink` and a shared pending mark into `ink`; after
+the last surface has drawn and before the frame does, one pass builds the
+record for every sample still pending, so the frame holds one record per
+painted sample however many writes it took. `samplePacked`, `shadePacked` and
+`packedHex` are I40's forms on one integer, equal bit for bit by the same
+sweep that holds I40, so the bytes do not move. The ladder's steps are read
+once per render. **What it does not reach**: the boxed doubles the bisect
+named — `z` and the intensity crossing into the painter, `shadeAt`'s return,
+`Math.hypot`'s — which are a call-boundary cost and a different cut.
+
+**Closed — built and measured** (C10 I42, C12 I132). `samplePacked`,
+`shadePacked` and `packedHex` through one shared channel function; the painter
+writes `inkRgb[i]` and a pending mark, one pass after the surfaces loop and
+before the frame builds the records, and `plot3d.paint` / `plot3d.ink` count
+the writes and the records. The density ladder's steps are read once per
+render. **Paired, one process, both orders** (40 rounds, frames asserted
+identical): the bunny A p50 23.3 → B 18.4 ms and 17.2 → 15.0, paired B−A
+median **−3.7 and −2.8 ms**, B faster in 36/40 and 38/40 — more than the
+scratch build's −1.5/−2.1, the ladder read once and the shade's closure gone
+being the difference; suzanne −0.0 and −0.1, 21/40 and 25/40, its frame too
+short to hold much of this. The sampled heap over twenty bunny frames 379 →
+325 MB: `painter` and `toString` gone from the table, `plot3dArea` 103 → 110,
+`drawTri` 55.8 → 56.2, `toScreen` 33.7 → 33.5, `thinEdge` 16.1 → 21.7,
+`shadeAt` 18.8 → 19.1, `hypot` 17.6 → 17.9 — the boxed-double residue the
+bisect named, unmoved and now the whole of what the raster allocates. Goldens
+458 frames, 0 movers; tier 5 133 green; `c12-packed-ink` four caught,
+`c10-colormap` seven, none survived. 2026-09-16.
+
+## F1172 — the builtin `Math.hypot` allocates an array per call and is called twice per shaded sample, and `for…of` over the frozen triangle array allocates an iterator result per triangle ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/surface3.ts`'s `shadeAt` (two `Math.hypot` per sample) and `fill` (three per face); `src/presentation/plot/scatter3.ts`'s `for (const t of scene.tris)` |
+| **Reached for** | the sampled heap over twenty bunny frames on the F1171 build: `plot3dArea` 110 MB of 325, `hypot` 17.9 as its own frame, with the painter's allocation gone. Bisected on the F1168 build: with no triangle drawn `plot3dArea` samples 47.8 MB, with the painter a no-op it samples 104 — so the loop statement itself allocates about 2.8 MB a frame. V8's `Math.hypot` is a variadic builtin (`MathHypot` in `math.tq`) that allocates a `FixedDoubleArray` for its arguments on every call; `for…of` over a frozen array does not take the unallocating fast path, and the triangle array is `deepFreeze`d geometry. A register for the doubles crossing into the painter — the diagnosis the F1171 bisect suggested — was tried first on a scratch build and moved nothing: `drawTri` 55.6, `plot3dArea` 110.6, the total 325 → 318; a fix that changes nothing indicts the diagnosis. Sized on a scratch build with an index loop and a JS replica of V8's algorithm: `plot3dArea` 110 → 54.7 MB, `hypot` gone, the total 325 → 241; paired both orders the bunny 21.3 → 16.8 and 19.4 → 16.9 ms, **B−A median −3.8 and −2.6 ms**, B faster in 39 and 36 of 40; suzanne −0.3 and −0.1. The replica against `Math.hypot` over four million calls with a pool of extremes — `±0`, denormals, `1e308`, `±Infinity`, `NaN`: **0 mismatches** |
+| **Verdict** | **closed** — built and measured: I133, `hypot3`/`hypot2` and the index loop, T1.145, `c12-hypot` |
+
+**The path, at HEAD.** `shadeAt` normalises the interpolated normal and the
+view vector with `Math.hypot`, per sample, as I129 says it does; `fill` takes
+three edge lengths with it per face. The builtin is exact and it allocates —
+`MathHypot` copies its arguments into a fresh double array before it scans
+for the largest magnitude — so a shaded sample costs two arrays and a face
+three, under a name that reads as arithmetic. The triangle loop is `for…of`
+over `scene.tris`, which `geometryOf` returns frozen (I107); V8 takes its
+fast path for a plain packed array and not for a frozen one, so every step
+builds a `{ value, done }`.
+
+**Remedy, sized.** `hypot3` and `hypot2` in `project3.ts`, V8's algorithm
+statement for statement — the largest magnitude found first, `Infinity` and
+`NaN` answered before the sum, the squares of the values normalised by the
+largest Kahan-summed in argument order, the root scaled back — so the result
+is `Math.hypot`'s to the bit, held by a seeded corpus with the extremes; and
+an index loop over the triangles. Byte-identical by construction: the
+goldens hold every mesh frame and T1.145 holds the replica. **What it does
+not reach**: `drawTri` 55.9, `toScreen` 33.1, `thinEdge` 18.6 and `shadeAt`
+15.2 MB of the 241 that remain, which the register experiment says are not
+boxed call arguments and which nothing has yet named.
+
+**Closed — built and measured.** C12 I133; `hypot3` and `hypot2` in
+`project3.ts`, called by `unit`, `shadeAt` and `fill`; the fill loop indexes
+`scene.tris`. T1.145 holds the replica to the builtin over a million tuples per
+arity and the enumerated extreme table; `c12-hypot` control seen and four
+caught (the compensation dropped, the normalisation dropped, the early returns
+swapped in each arity); `c12-surface3d`'s control re-anchored on the index
+loop. Gates green, goldens 458 with no mover. Paired against the F1171 build,
+both orders, forty rounds: **bunny 16.4 → 14.4 and 21.3 → 17.6 ms, B−A median
+−2.0 and −3.9 ms, B faster in 33 and 38 of 40**; suzanne 0.0 and −0.1, as the
+scratch build said. The sampled heap over twenty bunny frames **325 → 241 MB**;
+`hypot` no longer appears as a frame. What remains, by allocation: `drawTri`
+55.6, `plot3dArea` 54.8, `toScreen` 33.4, `thinEdge` 19.0, `shadeAt` 15.0,
+`mixedRows` 10.2, and the rows arm's `between` with its `Set`s about 14.5 —
+the next things to name.
+
+## F1173 — the raster allocates a context on every entry to `drawTri`, culled triangles included, because the clip path's closure captures a parameter ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/surface3.ts`'s `drawTri`: `const zOf = (p) => dot(sub(p, basis.eye), basis.forward)` on the clip path, capturing the `basis` parameter |
+| **Reached for** | the sampled heap after F1172: `drawTri` 55.6 MB of 241 over twenty bunny frames, about 40 bytes for each of the 69,451 triangles, constant per frame over sixty (so not warm-up), with no deoptimisation of the raster in a `--trace-deopt` run. Nothing in the direct path builds an object. Four hypotheses tried on a scratch build and each moved `drawTri` by nothing: `shadeAt`'s nine doubles through a typed lane (that took `shadeAt` and half of `thinEdge` off the list — 18 MB — but not this), the depth write's double through the lane, the painter's two doubles through the lane, the three edge lengths computed inline. The fifth held: **the clip path moved into its own function, `drawTri` 55.9 → 0**. V8 allocates a function's context in its prologue when any of its variables is captured by an inner closure, and `basis` is a parameter captured by `zOf` — so every call pays for the closure the clip path would have built, before `backfaceCulled` runs, whether or not the path is taken. Paired with F1174 on one scratch build: bunny −2.4 and −3.1 ms, B faster in 35 and 39 of 40; suzanne −0.2 and 0.0 over a hundred rounds each way, a self-pair in the swapped position reading +0.1 |
+| **Verdict** | **closed** — built and measured: I134, `clipPath`, T6.110's recorded survivor |
+
+**The path, at HEAD.** I128 put the direct path first — three view depths as
+scalars, an early return for a triangle wholly in front — so that the clip
+path's allocations are paid only by a straddling face. The closure sits after
+that return in the source and before it in the machine: a captured parameter
+means a context object per entry, which the reader cannot see and the sampler
+attributes to the function. F1158 named a closure per triangle one function
+out; this is the same class one statement in, and it was invisible to I128's
+"allocates nothing the sample loop does not need" because it is not the
+sample loop's.
+
+**Remedy, sized.** The clip path in its own function, taking `basis` as a
+parameter of its own, so `drawTri` captures nothing and its prologue allocates
+nothing. Byte-identical by construction: the same statements, one call
+boundary further in. **What it does not reach**: the closure itself, built
+once per straddling face, which is the clip path's cost and stays.
+
+**Closed — built and measured.** C12 I134; `clipPath` with `basis` as its
+own parameter, `drawTri` declaring no closure. No row can see a context per
+entry, and T6.110 records the survivor. Gates green, goldens 458 with no
+mover. With F1174 in one commit, paired against the F1172 build both orders:
+**bunny 15.9 → 13.7 and 19.4 → 16.5 ms, B−A median −1.8 and −3.0 ms, B faster
+in 33 and 39 of 40**; suzanne 0.0 and −0.1 over a hundred rounds each way,
+against a self-pair of identical builds reading +0.2 in the same slot — the
+instrument's bias at that scale, and the figure a suzanne reading has to
+clear. The sampled heap over twenty bunny frames **241 → 151 MB**; `drawTri`
+gone from the list.
+
+## F1174 — `toScreen` builds a difference vector and a projection record per vertex per frame, through `project`, for three numbers it then copies ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/surface3.ts`'s `toScreen`, calling `project(basis, w.p)`; `project3.ts`'s `project`, whose `sub` allocates a `Vec3` and whose return is a fresh record |
+| **Reached for** | the sampled heap after F1172: `toScreen` 33.4 MB of 241 over twenty bunny frames. I130 projects each vertex once per frame into a record the vertex holds, so the remaining allocation is inside the projection itself: `sub` builds the eye-relative vector as an object, and `project` returns `{ x, y, depth }` — two objects per vertex per frame, read for three numbers and dropped. `toScreen` already computes the three view-space components `vx`, `vy`, `vz` from the same differences in `dot`'s order — and `vz` **is** `project`'s `z`, `vx` its `x`, `vy` its `y` — so the projection is four more scalar statements on values the function already holds. On a scratch build, the projection in scalars: **`toScreen` 34.0 → 0** |
+| **Verdict** | **closed** — built and measured: I134, T1.146, `c12-scalar-project` |
+
+**Remedy, sized.** `toScreen` projects in scalars: the near test on `vz`, the
+divisor by the orthographic flag, `f`, the aspect and the half-and-shift in
+`project`'s expression order, so the result is `project`'s to the bit — held
+by a row comparing the record the vertex holds after a `drawTri` against
+`project` over the meshes, perspective and orthographic. `project` stays for
+its other four callers, which are per figure and not per vertex. Sized with
+F1173 on one scratch build, see there; the heap over twenty bunny frames
+**241 → 155 MB** for the two together.
+
+**Closed — built and measured.** C12 I134; `toScreen`'s position from the
+`vx`, `vy`, `vz` it holds in `project`'s expression order; `project` no longer
+imported by `surface3.ts`. T1.146 compares the record every stamped vertex
+holds against `project` over the cube, suzanne and the bunny under two
+perspective and two orthographic cameras, by `Object.is`. `c12-scalar-project`
+control seen and three caught (the orthographic divisor, the aspect fold, the
+`y` flip); the near return loosened survived on the first run because
+`clipNear` cuts above the plane and the direct path requires every corner
+beyond it, so the arm is unreachable from the raster — kept, and recorded in
+T6.110. `Basis.orthographic` left MG24's exemption list with its reason met on
+its own terms: a second reader of the arm, held to the first by T1.146. Gates
+green, goldens 458 with no mover; `toScreen` gone from the heap list; the
+paired figures are F1173's. What remains, by allocation: `plot3dArea` 54.7 MB
+of 151 — the per-frame sample buffers — `thinEdge` and `shadeAt` 31 together,
+the doubles boxed at `shadeAt`'s boundary, `mixedRows` 10, the rows arm's
+`between` and its `Set`s about 15.
+
+## F1175 — the ramp span's four bounds are written into a closure's context per corner, and a double written to a context slot is an allocation ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/scatter3.ts`'s `plot3dArea`: `let nearD … hiV` captured by the `reading` closure, called for every drawn point, stroke end and mesh corner; `project3.ts`'s `viewDepth`, whose `number \| null` return crosses the call boundary |
+| **Reached for** | the sampled heap after F1174: `plot3dArea` 54.9 MB of 150.6 over twenty bunny frames — the largest frame left, under a name that reads as the buffers. Sized before it was believed: the colour records are 2,921 a frame with 2,514 distinct, so interning them saves a seventh of a small number; the corners loop as an index loop moved the figure by nothing, because the corners array is not frozen and `for…of` has its fast path. With inlining off the figure resolves into its callees: **`reading` 22.3 MB, `viewDepth` 11.3, the three boxed sample arrays 13.5**. V8 holds a `let` any closure captures in a context object, and a context slot holds a tagged value — so `nearD = Math.min(nearD, depth)` allocates a fresh heap number on every write, four writes a corner over 35,947 corners, whether or not the bound moved; and `viewDepth`'s return is a heap number whenever the call is not inlined. On a scratch build: the four bounds as scalars no closure captures, `viewDepth` still called, **54.9 → 32.8**; the dot written in place as well, **54.9 → 21.4**, the twenty-frame total **150.6 → 116.9 MB**; the bunny paired **−3.1 ms** (18.7 → 15.6 p50), B faster in 36 of 40 |
+| **Verdict** | **closed** — built and measured: I135, T1.147, `c12-span-depth` |
+
+**Remedy, sized.** The corner pass is one function, `spanOverCorners(basis,
+corners, nearD, farD, loV, hiV)` beside `geometryOf`, holding its bounds in
+locals and returning the ramp span once a frame; the depth is `project`'s
+first dot in place — `viewDepth`'s three subtractions and three products in
+its order, its `<= NEAR` refusal verbatim — so `viewDepth` loses its one
+consumer and goes, and T1.143's arm re-homes onto the span against
+`project`'s depths over the seeded corpus. The drawn and stroke readings in
+`plot3dArea` become the same `Math.min`/`Math.max` statements over bounds
+no closure captures. Byte-identical by construction: the same operations in
+the same order, `Math.min` kept for its `NaN` and signed-zero arms. What it
+does not reach: the three boxed sample arrays (13.5 MB), `thinEdge` and
+`shadeAt`'s boxing at the call boundary (31), `mixedRows` (10).
+
+**Closed — built and measured.** C12 I135; `reading` gone from `plot3dArea`,
+the drawn and stroke readings as statements, the corners through
+`spanOverCorners` beside `geometryOf`; `viewDepth` gone with its one consumer.
+**The landed function allocated where the scratch loop had not** — 22.5 MB
+under its own name — and the cause was not the closure: `Math.min` over a
+bound that arrives as a parameter keeps the loop-carried value tagged and
+boxes it per iteration. Comparisons carrying `Math.min`'s `NaN` and
+signed-zero answers took it to nothing, and so did `Math.min` over the
+parameters coerced by `- 0` at entry, which is what names the representation
+rather than the arithmetic; the comparisons landed because they say what they
+do. T1.147 holds the span to `project`'s depths and the corners' values over
+ten thousand seeded corners, with enclosing and partial incoming bounds and
+the `NaN` and `±0` cases by `Object.is`; T1.143 keeps the cull.
+`c12-span-depth` re-anchored onto the pass, control seen, six caught (the near
+cull, the dot along `up`, the incoming bounds, the value swap, the `NaN` arm,
+the signed-zero arm), none survived; `c12-span-corners` control re-anchored,
+three caught. Gates green, goldens 458 with no mover.
+
+| | before | after |
+|---|---|---|
+| twenty-frame bunny heap | 150.6 MB | 119.8 MB |
+| `plot3dArea` | 54.9 MB | 21.2 MB |
+| bunny paired, A→B / swapped | — | −3.6 ms (37/40) / −1.6 ms (31/40) |
+| suzanne paired, four readings | — | 0.0, +0.4, −0.0, 0.0 ms; self-pair −0.0 |
+
+What remains, by allocation: `plot3dArea` 21.2 — the three boxed sample
+arrays 13.5 and the colour records 8; `thinEdge` 18.8 and `shadeAt` 14.8,
+the doubles boxed at `shadeAt`'s nine-argument boundary; `mixedRows` 10.1; the
+rows arm's `between`, its `Set`s and `normaliseRow` about 22.
+
+## F1176 — every double the raster hands the shade, and the one it gets back, is boxed at the call boundary, because `shadeAt` is too large for V8 to inline ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/surface3.ts`'s `shadeAt`, nine parameters, seven of them doubles, called per painted sample from `fill` and `thinEdge`; its double return |
+| **Reached for** | the sampled heap after F1175: `thinEdge` 18.8 MB and `shadeAt` 14.8 of 119.8 over twenty bunny frames — 130 and 92 bytes a painted sample, about eight and six heap numbers. `--trace-turbo-inlining` shows `hypot3` inlined into `shadeAt` and `writeDepth`, the painter, `ramped`, `shadePacked`, `toSrgb` inlined into `thinEdge`, and **`shadeAt` inlined into nothing**: its bytecode is 511 bytes against V8's `max-inlined-bytecode-size` of 460, so every call is a real call, and a double crossing a real call is a heap number in each direction. Sized before it was believed: a lane through the arguments alone, the wrapper calling `shadeAt` as before, moved nothing (119.7) — that moved the boundary rather than removing it; the shade call removed outright took both names off the list (94.6); the six inputs and the depth written into a `Float64Array` lane and the answer read back from it, **119.8 → 96.3**, both names gone; the answer returned as a double instead, 101.9, the return's 5.6 MB. Bunny paired **−1.9 ms** (30/40) and **−2.2 swapped** (36/40), against a bunny self-pair reading −0.6 ms in B's slot (24/40) — so the swapped figure is the one measured against the bias |
+| **Verdict** | **closed** — built and measured: I136, T1.148, `c12-shade-lane` |
+
+**Remedy, sized.** The lane is a per-render `Float64Array` of eight on the
+depth-buffer record `createDepth` builds — the one record every raster
+function already holds, allocated per render as C12 I11 requires and never
+module state. `fill` and `thinEdge` write the interpolated normal, the view
+position and the depth into it and call `shadeAt(lane, light, span)`, which
+reads them and writes the intensity to the last slot; the painter takes it
+from there. `shade`, the reference, allocates a lane per call, which is per
+figure and per test row and not per sample. Byte-identical by construction
+— the same expressions in the same order, one store and one load apart — and
+PR15 holds the painter's intensity to `shade` at every painted sample already,
+through the raster end to end. What it does not reach: `plot3dArea`'s three
+boxed sample arrays and colour records (21), `mixedRows` (10), the rows arm.
+
+**Closed — built and measured.** C12 I136; the lane on `createDepth`'s
+record, `fill` and `thinEdge` writing six scalars and the depth and reading
+the intensity back, `shadeAt(lane, light, span)` answering in slot 7,
+`shade` over a lane per call. T1.148 holds the layout on the public record
+after a draw — every slot by `Object.is` against the painter's record of the
+last sample and the row's own interpolation, and `shade` over slots 0–6
+against slot 7 — and PR15 cites I136 through the whole path. `c12-shade-lane`:
+control seen, three caught (a normal into a view slot at the fill, the thin
+stroke's depth slot left to the previous sample, the answer written over the
+depth), none survived; `c12-sample-scalars` re-anchored onto the lane
+writes, seven caught. Gates green, goldens 458 with no mover.
+
+| | before | after |
+|---|---|---|
+| twenty-frame bunny heap | 119.8 MB | 96.1 MB |
+| `thinEdge` / `shadeAt` | 18.8 / 14.8 MB | 5.5 / 4.2 MB |
+| bunny paired, A→B / swapped | — | −2.4 ms (35/40) / −2.6 ms (36/40) |
+| suzanne paired, both orders | — | 0.0 / −0.0 ms |
+
+What remains, by allocation: `plot3dArea` 21.3 — the three boxed sample
+arrays 13.5 and the colour records 8; the rows arm's `between`, its `Set`s
+and `normaliseRow` about 22 together; `mixedRows` 10.2; `thinEdge` and
+`shadeAt` 9.7 between them still, a residue the lane did not name.
+
+## F1177 — the measurer asks the segmenter for every isolated glyph, and a plot row is nothing but isolated glyphs ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/text.ts`'s three cluster walks — `cells`, `fitStyled`, `sliceCells` — at the arm past `plainRun`: `clusterAt(segments, i)`, a `containing` call and a segment record per glyph; `src/presentation/rows.ts`'s `swallowed`, which slices the row's tail and segments it after every SGR whose next unit is at or above U+0300 |
+| **Reached for** | the `/all` profile at 408 frames and the forms bench at ten repetitions, both on the F1176 build: `clusterAt` 83 ms of 1,870 (4.5 %, the largest frame-path function), `cells` 34, `swallowed` 20, `wrapCellsParts` 18, `normaliseRow` 15, `placeableClusters` 14, `partsOf` 13; on the forms bench `clusterAt` 786 ms, `cells` 418, `swallowed` 281, `placeableClusters` 253, `partsOf` 243, `between` 195, `normaliseRow` 183. I63's fast path counts a run of printable ASCII by its length and hands the segmenter what follows one — the shape F955 found, a gutter glyph among ASCII. A plot row inverts it: eighty braille or box-drawing units and no ASCII at all, so every unit is handed to `containing`, which builds a segment record, and `swallowed` after each SGR sees a next unit at U+2800 and segments the rest of the row. **A boundary after such a glyph is decidable from the next unit**: by UAX #29, a character that is not Hangul, Prepend, a regional indicator or a joiner is followed by a boundary unless the next unit is Extend, ZWJ or SpacingMark — and no unit below U+0300 other than the joiner is any of those, nor is any unit of the box-drawing, block, geometric, braille, arrow, Latin-1 or punctuation ranges. Sized on the built tree, three runs a side under `make load-down`: forms sum **287 / 485 / 302 → 250 / 233 / 364 ms**, the `rows` span **374 / 446 / 351 → 293 / 299 / 300**, `/all` work over 408 frames **671 / 616 / 717 → 583 / 591 / 557 ms** |
+| **Verdict** | **closed** — built and measured: C09 I74, T1.48, T3.85, `c09-solo-cluster` |
+
+**Remedy, sized.** A unit in one of those ranges whose next unit cannot
+extend it is its own cluster, measured by `clusterCells` as the segmenter's
+one-unit cluster would be — the same function on the same string — so the
+three walks take the unit without asking, and `swallowed` answers zero when
+the unit after the `m` is in a range that cannot extend it. The segmenter
+still decides everything else: a mark, a selector, a joiner, an enclosing
+keycap, a spacing mark, an emoji, a flag, Hangul, CJK, and every unit outside
+the ranges. Byte-identical by construction, and the row that holds it pairs
+every range with every extender kind and asks the walks to keep the cluster
+whole. What it does not reach: `placeableClusters` and `wrapCellsParts`,
+which iterate the segmenter over whole text rather than asking `containing`;
+`partsOf` and `between` in the rows arm.
+
+**Closed — built and measured.** C09 I74; `soloUnit` is the table
+`CELL_PER_UNIT_RANGES` already held for `rowCells`, and `soloAt` decides from
+the next unit — the end, a unit below U+0300, or another unit of the table —
+in `cells`, `fitStyled` and `sliceCells`; `swallowed` answers zero after an
+SGR before one. **One correction to the entry above**: it said *no unit below
+U+0300 other than the joiner* can extend, and the joiner is U+200D, above
+U+0300 — the clause excepting it was dead, the mutation admitting it survived
+on the first run as a no-op, and T6.121 records the survivor as the code's.
+T1.48 pairs every BMP range of the table with every extender kind through
+all three walks and sweeps three thousand seeded rows at every width and
+window against references written over the segmenter's own clusters; T3.85
+now counts zero asks for the gutter glyph and two for a glyph outside the
+table; T1.46's corpus carries the alphabets. `c09-solo-cluster`: control seen,
+two caught, none survived; `quadratic-cursor` re-anchored, sixteen caught.
+Gates green, goldens 458 with no mover.
+
+| three runs a side, `make load-down` | before | after |
+|---|---|---|
+| forms sum | 287 / 485 / 302 ms | 267 / 300 / 283 ms |
+| `rows` span, forms | 374 / 446 / 351 ms | 276 / 311 / 307 ms |
+| `/all` work, 408 frames | 671 / 616 / 717 ms | 485 / 712 / 576 ms |
+| `/all` p95 | 5.4 / 4.9 / 5.8 ms | 4.0 / 5.7 / 4.7 ms |
+
+What remains: `placeableClusters` and `wrapCellsParts` iterate the segmenter
+over whole text; `partsOf` and `between` build arrays and `Set`s per style
+transition; `plot3dArea`'s boxed sample arrays.
+
+## F1178 — the wrap and the placeable pass segment every paragraph whole, and I74's answer stops at the three styled walks ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/text.ts`'s five whole-text walks — `wrapCellsParts`, `hardWrapCells`, `placeableClusters`, `clusterEnds`, `graphemes` — each a `for … of GRAPHEMES.segment(text)`, a segment record per cluster; `soloAt`, which decides a unit of the rasterised alphabets alone |
+| **Reached for** | the `/all` profile at 408 frames and the forms bench at ten repetitions on the F1177 build: `wrapCellsParts` 11.2 ms and `placeableClusters` 8.1 of 576 on `/all`, both under `wrapRuns` ← `noticeRows`; on the forms bench `wrapCellsParts` 74.6 ms, `placeableClusters` 68.4, `graphemes` 36.5, `clusterAt` 58.7 of 2,399. `placeableClusters` and `clusterEnds` return early on all-ASCII text and the wrap never does — a notice of ASCII prose is segmented whole, a segment record per character — and a plot row's box and braille units go the same way because the iterator asks the segmenter for every cluster where the styled walks, since I74, ask only where the next unit can extend one. I74 is stated for the table's units, and the ground it stands on is wider: by UAX #29 no unit below U+0300 is Extend, ZWJ, SpacingMark, Hangul, Prepend, a regional indicator or the joiner, so every such unit other than the carriage return — which a line feed joins — is its own cluster whenever the next unit is below U+0300 or in the table. Sized on the built tree with the five walks stepping by `soloAt` and the rule widened, three runs a side under `make load-down`: forms sum **260 / 247 / 289 → 259 / 415 / 224 ms**, the `rows` span **323 / 276 / 310 → 288 / 386 / 305**, `/all` work over 408 frames **600 / 532 / 622 → 510 / 484 / 558 ms**, `/all` p95 **4.9 / 4.3 / 6.1 → 4.4 / 4.1 / 5.1** |
+| **Verdict** | **closed** — built and measured: C09 I74, T1.49, T3.85, `c09-solo-cluster` |
+
+**Remedy, sized.** I74 widened to every unit below U+0300 other than the
+carriage return, and the five whole-text walks stepping by cluster from the
+text's start with the same one-line arm the styled walks take — `soloAt` at
+the cursor, `containing` otherwise — so a paragraph of ASCII, Latin-1 or the
+alphabets never builds a segmenter iterator, and one holding a mark, a
+joiner, Hangul or CJK builds it once and asks it only at those clusters. The
+cursor is always on a boundary because every step is a cluster, so the rule
+is asked only where it holds. Byte-identical by construction; a new row asks
+the five walks for the segmenter's own clusters over a seeded corpus that
+holds a carriage return before a line feed, and T3.85 re-pins the `é` row at
+zero asks with a mark on its base taking its place. What it does not reach:
+`partsOf` and `between` in the rows arm; `plot3dArea`'s boxed sample arrays;
+`truncate`'s two cluster arrays and `compareByGrapheme`, which are not on
+the frame path in either profile.
+
+**Closed — built and measured.** C09 I74 widened to every unit below U+0300
+but the carriage return; `soloAt` decides it, and `graphemes`,
+`clusterEnds`, `placeableClusters`, `hardWrapCells` and `wrapCellsParts`
+step by cluster from the text's start with the styled walks' one-line arm.
+T1.49 asks the five for the segmenter's own clusters over two thousand
+seeded rows at every width — and found F1179 on the way, the wrap's cut
+after a space by code unit, which the row names and counts rather than
+hides. T3.85 re-pinned: a mark on its base asks two, the precomposed `é`
+none. `c09-solo-cluster`: control seen, six caught, none survived — the
+placeable mutation was first written as a function nothing called and
+survived as a no-op, recorded in T6.121. Gates green, goldens 458 with no
+mover, e2e green. (F1179's opening commit split this entry's last sentence
+with its heading; mended here.)
+
+| three runs a side, `make load-down` | before | after |
+|---|---|---|
+| forms sum | 260 / 247 / 289 ms | 371 / 205 / 320 ms — inside its spread, no reading |
+| `rows` span, forms | 323 / 276 / 310 ms | 298 / 321 / 266 ms |
+| `/all` work, 408 frames | 600 / 532 / 622 ms | 494 / 514 / 457 ms |
+| `/all` p95 | 4.9 / 4.3 / 6.1 ms | 4.4 / 4.3 / 3.7 ms |
+
+What remains: `partsOf` and `between` build arrays and `Set`s per style
+transition; `plot3dArea`'s boxed sample arrays; F1179's cut.
+
+## F1179 — the wrap breaks after a space by code unit, and a space that carries an extender is cut inside its cluster ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/text.ts` `breakPoint`: `line.lastIndexOf(" ")` and the cut at `at + 1`; `wrapCellsParts`'s own break-at-the-overflowing-space arm, which tests `segment === " "` and so is not the one that cuts |
+| **Reached for** | T1.49's corpus, written for F1178 to hold that every wrapped row begins on a segmenter boundary of its paragraph. The row `é‍👨 ‍👨́` at width 4 — a joiner after the space — wraps to `é‍👨` and `‍👨́` at start 5, on the F1177 build and the F1178 one alike: the segmenter's clusters are `é‍`, `👨`, ` ‍`, `👨́`, and the second row begins inside the third with a bare joiner. `breakPoint` finds the space by code unit and cuts after it, so any extender on a space — a joiner, a combining mark, a variation selector — begins the next row alone, which C04 I84 says a renderer never paints. The input is degenerate and the corpus reaches it in seeded rows; nothing in the block corpus does |
+| **Verdict** | **closed** — built: C09 §5, T3.10e, T1.49 without its exception, `c09-solo-cluster` |
+
+**Remedy, sized.** `breakPoint` cuts at the cluster boundary after the
+space — the end of the cluster the space begins — which the walk already
+knows, since it steps by cluster: a space followed by an extender is not a
+break point, or is one whose cut lands after the extender. Either keeps every
+row on a boundary; the second keeps the break. A row over the corpus with the
+exception removed, and the goldens, which hold no such input.
+
+**Closed — built.** The first: `breakPoint` asks `soloAt` of the space it
+found, so a space the next unit can extend is not a break point and the
+search continues towards the row's start — the overflow arm already asked
+the same, its test being that the cluster *is* the space. T3.10e names the
+joiner, a combining mark and the selector on both shapes, the later space
+breaking and the lone joined space cutting the token on a boundary; T1.49
+holds every row start on a segmenter boundary with no exception now.
+`c09-solo-cluster`: seven caught, none survived. Gates green, goldens 458
+with no mover, e2e green. Not timed: one predicate per break point found,
+and a break point is found once per full row.
+
+## F1180 — the rows arm builds the tokeniser's shapes to avoid the tokeniser: five arrays a sequence, a list a code, four `Set`s a transition ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/rows.ts`: `partsOf` (`split`, `slice`, `join`, `map`, and the `[sequence]` array), `applied` (a fresh list per code), `between` (three `Set`s, two `filter`s, `undone`'s reduction into fresh lists, a reversal, a spread and a fourth `Set`), `endOf` (two hashes and a `slice` before the `38`/`48` test) |
+| **Reached for** | the forms bench at ten repetitions and the `/all` profile at 408 frames on the F1179 build: `partsOf` 113.9 ms, `normaliseRow` 92.6, `between` 40.3, `endOf` 32.7 of 2,279 — the four largest frame-path functions after `cells`, twelve per cent of the work — and on `/all` `partsOf` 17.2, `normaliseRow` 10.3 of 549. A plot row carries a truecolour sequence a cell, and every one went through `partsOf`'s compound path. Sized with the parameters read in place by their `;` positions, the state reduced into two lists the row reuses, and the transition scanned linearly, three runs a side under `make load-down`: the `rows` span on forms **302 / 268 / 271 → 178 / 190 / 157 ms**, forms sum **327 / 205 / 230 → 231 / 245 / 282**, `/all` work over 408 frames **479 / 597 / 579 → 488 / 568 / 473 ms**, `/all` p95 **4.3 / 4.7 / 4.5 → 3.7 / 4.1 / 3.7**; the arm's self time on the forms profile 222 → 130 ms, of which `normaliseRow` 57 → 59, `partsOf` 81 → 0 with `applySequence`, `paramEnd` and `apply` at 11, 11 and 16, `between` 55 → under 11 |
+| **Verdict** | **closed** — built and measured: C09 I75, T1.50, `c09-rows-arm` |
+
+**Remedy, sized.** C09 I75: the arm reads a sequence's parameters in place —
+`38`/`48` with `5` and one more, or `2` and four more, taken as one part
+exactly where `splitCompoundSGRSequences` does — reduces each code into the
+live list in place, copies the live list over the shown one at a transition,
+and writes the transition from two linear scans, reducing the codes not
+carried over into a list made only when there is one; `endOf` answers the
+colour codes from their bytes. The bytes are I72's and T1.46 holds them
+against the tokeniser's serialiser; a new row counts `Set` constructions and
+`split` calls over a plot-shaped row and finds none.
+
+**Closed — built and measured.** C09 I75 as sized: `applySequence`, `apply`,
+`copyState`, `between` over two linear scans, `endOf` from the bytes. T1.50
+counts no `Set` and no `split` over eighty truecolour cells, the 256-colour,
+compound and empty-parameter rows, and two thousand seeded rows, with the
+tokeniser's own path as the counters' control; T1.46 and T2.143 hold every
+byte. `c09-rows-arm` re-anchored on the in-place forms and extended by the
+colour group applied as five parts, a shared end written twice and `38`
+closed with `49`: fourteen caught, none survived. SS23 fired on the three
+list truncations and they carry their `cells-ok`. Gates green, goldens 458
+with no mover, e2e green. The bench is the sizing's, taken on the tree's
+build before the marks — comments move no byte of `dist/`.
+
+| three runs a side, `make load-down` | before | after |
+|---|---|---|
+| `rows` span, forms | 302 / 268 / 271 ms | 178 / 190 / 157 ms |
+| forms sum | 327 / 205 / 230 ms | 231 / 245 / 282 ms — inside its spread |
+| `/all` work, 408 frames | 479 / 597 / 579 ms | 488 / 568 / 473 ms |
+| `/all` p95 | 4.3 / 4.7 / 4.5 ms | 3.7 / 4.1 / 3.7 ms |
+| the arm's self time, forms profile | 222 ms | 130 ms |
+
+What remains: `normaliseRow`'s own 58 ms is the byte scan and the string
+building; `plot3dArea`'s boxed sample arrays; the first triangulation of a
+mesh on a `/all` scroll, a 137 ms frame.
+
+## F1181 — the triangulation allocates six objects a face and three a face-vertex before it builds the triangle it keeps ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/surface3.ts` `geometryOf`: `faceN` as `idx.map` of `cross(sub, sub)` — three objects a face; `vertN` re-made per face-vertex — `vertN[k] = { x: acc.x + n.x, … }`, three objects a face; a `for … of` over each face's index triple, twice; `unit(faceN[f])` a fourth object a face; an `at` closure a face; `cullSign`'s `dot(cross(…))` an object a face. The kept geometry — a position, a normal and a vertex record per referenced vertex, a corner, a face normal and a triangle per face — is what the raster reads and stays |
+| **Reached for** | `probe-cold.mjs` on the F1180 build under `make load-down`: the bunny's first frame **67–104 ms** against a warm one at **13.5–14.5**, and `geometryOf` alone **37–53 ms and 42 MB** a triangulation over 69,451 faces; the teapot **8.6 ms and 16 MB**, suzanne **2.3 ms and 4 MB**. On the `/all` scroll the first render of each mesh figure triangulates it, `geometryOf` is 46.7 ms self and the largest frame is **137 ms**, against a p95 of 4.5 (F507's cold figure, re-taken). Sized on a dist copy with the face normals and the vertex sums in two `Float64Array` lanes, the scalar arithmetic in `cross`'s and `sub`'s order, the index triple read by position, the vertex normal made once when its record is, and `cullSign` in scalars: bit-identical geometry over the three meshes and a grid under both shadings, the bunny **37 → 15 ms warm, 51 → 33 cold, 42 → 27 MB**, the teapot **8.6 → 1.3 ms, 16 → 2.7 MB**, suzanne **2.3 → 1.1 ms**, the bunny's first frame **67 → 55 ms** |
+| **Verdict** | **closed** — built and measured: C12 I137, T1.149, `c12-geometry` |
+
+**Remedy, sized.** C12 I137: the builder accumulates in scalars and two
+lanes and allocates only what the geometry keeps. The face normal is
+`cross(sub(b, a), sub(c, a))` written out — the same six differences and six
+products in the same order — into a lane of three per face; the vertex sum is
+the lane's three values added per corner in face order, as the object form
+summed; `unit` over a lane's three is `unit` over the object, `hypot3` and
+the three divisions, answering the values unchanged when the length is
+zero; the corners and the triangles read each face's triple by position. A
+row builds the same meshes and grids through a reference written over the
+`Vec3` helpers and asks for bit equality and the same vertex sharing.
+
+**Closed — built and measured.** C12 I137 as sized, with the vertex normal
+made once when its record is, so an unreferenced vertex costs nothing.
+T1.149 holds every number by `Object.is` to the reference and the sharing of
+records by identity over the three meshes, six seeded grids and a face that
+names a vertex twice, in under a second; SF3's unit-averaging mutation,
+PR12's every-vertex set and T1.142's corner-per-face were re-anchored on the
+lanes and caught. `c12-geometry` gained three: a corner's sum skipped, the
+record made per corner, the zero length divided — ten caught, none survived;
+`c12-surface3d` twenty-one, `c12-span-corners` and `c12-vertex-once` three
+each. Gates green, goldens 458 with no mover, e2e green.
+
+| `probe-cold.mjs`, `make load-down` | before | after |
+|---|---|---|
+| bunny `geometryOf`, cold / warm | 48.3 / 32.5–37.5 ms | 38.9 / 14.6–15.2 ms |
+| bunny `geometryOf` heap | 42.0–42.7 MB | 28.4–30.5 MB |
+| bunny first frame / second / third | 110.7 / 19.0 / 15.4 ms | 89.4 / 22.0 / 14.5 ms |
+| teapot `geometryOf` | 3.0–10.6 ms, 13–16 MB | 1.2–1.5 ms, 2.7 MB |
+| suzanne `geometryOf` | 1.4–2.2 ms, 2.7–4.1 MB | 1.0–1.2 ms, 1.7–1.9 MB |
+| paired warm bunny, `probe-f6-pair` n=40 | A p50 17.7 ms | B p50 14.6, B−A median −2.6 ms, B faster in 37 of 40 |
+
+What remains: the bunny's kept geometry is 28 MB of records — a position, a
+record, a normal and a corner per vertex, a normal and a triangle per face —
+and the cold call's 39 ms is now mostly building them; `plot3dArea`'s boxed
+sample arrays; `normaliseRow`'s byte scan.
+
+## F1182 — `plot3dArea`'s boxed sample arrays and per-sample colour records, measured and left ★☆☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/scatter3.ts` `plot3dArea`: `ink`, `glyph` and `mark` as boxed arrays of `width × height` samples, `bits`, `frameBits` and `frameInkAt` over the cells, `inkRgb` beside them; the pass that builds a `{ kind: "rgb", hex }` record per pending sample (I132) |
+| **Reached for** | the inspector's allocation sampler over twenty bunny frames on the F1181 build: `plot3dArea` **21.2 MB of 66.5** sampled, 1.06 MB a frame; `plot3d.paint` / `plot3d.ink` per frame — suzanne 3,001 / 2,509, teapot 3,962 / 2,995, bunny 8,392 / 3,048 — against 1,760 cells at 80 × 22. So the records are 1.7× the cells and about 170 KB a frame; the three boxed arrays at eight bytes a slot are 740 KB, `inkRgb` 123 KB, the rest small. On the CPU profile `plot3dArea` is 63 ms self over forty frames, 1.6 ms a frame of 14.5, and the collector 2.3 ms a frame |
+| **Verdict** | **checked, not built** (2026-09-16) — the remedy's ceiling is under the bar |
+
+**Sized and declined.** Records built where a cell reads one rather than
+per painted sample would save at most 1,300 records a frame — 70 KB — and
+would move I132's count, which `plot3d.ink` reports and its row pins.
+`glyph` as an `Int16Array` and `mark` as indices into a per-render string
+table would save about 430 KB of the 3.3 MB a bunny frame allocates, some
+thirteen per cent of the allocation and, at the collector's 2.3 ms a frame,
+about 0.3 ms — two per cent of the frame, under F916's five. Recorded so the
+next reader of the heap sample does not size it again; the figure to beat is
+the frame's 14.5 ms, of which `drawTri` and `thinEdge` hold 6.4.
+
+## F1183 — four of five thin-triangle edge samples fail the depth test, and a triangle whose every reachable cell already holds a nearer depth is walked anyway ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/surface3.ts` `strokeThin` and `thinEdge`: a triangle under one cell of projected area (I95, F453) is stroked along its three edges, two to three samples an edge, each sample interpolating the depth, the normal and the view position, then asking `writeDepth`; nothing asks first whether the triangle can write at all |
+| **Reached for** | the CPU profile of forty bunny frames on the F1182 build (`out/prof-bunny5`): `thinEdge` **242 ms self of 1,498 — 16.2%**, the largest self time in the process, `drawTri` 118, `plot3dArea` 102; the frame 15.9 ms p50. A counting copy of `dist/` over forty frames: **30,909 triangles** reach the raster a frame and every one is sub-cell, **196,681 edge samples**, of which **8,128 pass the depth test — 4.1%**; **25,159 triangles — 81%** write nothing. A check over the cells the three edges' samples can reach, each cell asked whether it already holds a depth at or nearer than the triangle's nearest corner, marks **14,367 of them — 46% of the raster's triangles** — and over forty frames not one marked triangle would have written a sample. The teapot: 1,470 thin triangles, 873 writing nothing, 284 marked. On a copy of `dist/` that skips a marked triangle, paired in one process against the HEAD build: bunny **p50 15.6 → 14.3 ms, B−A −0.9 ms a round, faster in 33 of 40**; sixty rounds **−0.7 (40 of 60)** and with the sides swapped **−1.4 (50 of 60)**; the teapot **0.0**; **432 frames over three meshes, two shadings, three wire settings, four sizes and six cameras byte-identical** |
+| **Verdict** | **closed** — built and measured: C12 I138, T1.150, `c12-hidden-thin` |
+
+**Remedy, sized.** C12 I138: a sub-cell triangle is not walked when every
+cell its edge samples can reach already holds a depth at or nearer than its
+nearest corner. The samples' depth is `p.vz + (q.vz − p.vz)·t` for `t` in
+`[0, 1]`, which is at least the smaller endpoint less the subtraction's
+rounding — so the bound is the nearest corner less a relative margin of
+`1e-9`, taken through `Math.fround` as `writeDepth` takes the sample; the
+cells are the floor of the corners' coordinates widened by the same relative
+margin, because the interpolated coordinate lies within the endpoints up to
+the same rounding. A cell holding a depth at or under the bound refuses every
+sample the triangle could put in it, `writeDepth`'s test being strict; a
+triangle that writes nothing paints nothing and leaves the buffer as it was,
+so the frame after it is the frame without it. The check reads the nearest
+corner's own cell first, since most of the triangles it does not mark fail
+there. `plot3d.hidden` counts the triangles skipped, which is the observable
+the frame cannot show; a row holds the predicate against a restatement of the
+edge walk over a seeded corpus, and constructs the two rounding cases the
+margins exist for — a depth difference whose subtraction rounds below the
+smaller endpoint, and a coordinate difference whose sum lands one cell below
+the corner — where a check without the margin would skip a triangle that
+writes. The area path is left as it is: its samples' weights carry `fill`'s
+own `−eps` tolerance, its triangles are few, and 91% of its samples pass on
+the teapot.
+
+**Closed — built and measured.** C12 I138 as sized, with one correction
+made in the spec before the code: the coordinate margin is not for the
+interpolation — at `t = 1` the sum lands on or above the far endpoint's floor,
+by the rounding of a difference against a representable integer — but for
+the walk's normalised-and-back coordinate, `(p.x / width) · width`, which is
+`0.9999999999999999` for a corner at `1` on a 49-wide grid. `hiddenThin`
+reads the nearest corner's own cell first and enters the scan for the rest;
+the count travels as one `Int32Array` slot on the depth-buffer record and is
+reported as `plot3d.hidden`. T1.150 runs four hundred seeded sub-cell
+triangles through `drawTri` itself against buffers seeded near their depths —
+every marked triangle paints nothing and leaves the buffer as it was, the
+record counts it and nothing else, and the corpus marks some, leaves some
+and paints through some of those it leaves — then the two constructed cases,
+and the three meshes under a probe with `plot3d.paint` pinned to the figure
+the build before the check gave. `c12-hidden-thin`: five caught, none
+survived — both margins dropped, the scan ignored, the quick reject
+inverted, the count dropped — with the check removed as the control, which
+only the count arm sees. Gates green, goldens 458 with no mover, e2e green;
+432 frames over three meshes, two shadings, three wire settings, four sizes
+and six cameras byte-identical against the F1182 build.
+
+| `make load-down` | before (F1182 build) | after |
+|---|---|---|
+| bunny raster triangles / edge samples a frame | 30,909 / 196,681 | 17,388 walked / about 108,000 — 13,521 skipped |
+| bunny `plot3d.paint` | 8,163 | 8,163 |
+| paired warm bunny, `probe-f6-pair` n=60 | A p50 17.4 · 14.1 ms | B p50 15.8 · 12.6; B−A median −1.7 and −2.0 ms; B faster in 52 and 53 of 60 |
+| paired warm teapot | 3.9 ms | 3.9; −0.1 and −0.0 ms; 35 and 34 of 60 |
+| paired warm suzanne | 3.0 · 3.2 ms | 3.2 · 3.4; **+0.2 ms, B faster in 12 of 60** — 57 thin triangles a frame, the difference is not the check's; the cold probe below has it the other way |
+| `probe-cold.mjs` bunny first / second / third frame | 71.5 / 20.5 / 15.9 ms | 53.2 / 12.1 / 11.2 ms |
+| `probe-cold.mjs` teapot · suzanne third frame | 6.5 · 6.9 ms | 5.9 · 5.6 ms |
+
+What remains: the 17,388 bunny triangles still walked, of which some 11,600
+write nothing — occluded only cell by cell, or by depths between their
+nearest corner and their samples — which no whole-triangle bound reaches;
+`thinEdge`'s remaining iterations are the arithmetic the walk needs;
+`plot3dArea`'s boxed sample arrays (F1182); `normaliseRow`'s byte scan.
+
+## F1184 — the raster reads its vertices through three dependent object loads a corner, and the mesh is held as a quarter of a million objects ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/surface3.ts`: `Tri3` holds three `Vert` objects, each holding a `Vec3` position, a `Vec3` normal, a value and — since I130 — its screen record, a `MutableScreen` of nine doubles, under a frame stamp; `geometryOf` builds them all; `backfaceCulled`, `drawTri`, `screenOf`, `fill`, `strokeThin`, `hiddenThin` and `thinEdge` read them; `spanOverCorners` reads a `Corner` object per referenced vertex |
+| **Reached for** | the line ticks of forty bunny frames on the F1183 build (`out/prof-bunny6`, `make load-down`): of `drawTri`'s 75 self ticks, 23 sit on the third view-depth line — the first read of a corner's position object — and 30 on `screenOf`'s two record lines, `return w.s` and `w.rec = s`; the cull's centroid line holds 6 more. A micro-benchmark over the bunny's real geometry (`out/probe-soa.mjs`), the same arithmetic over the tree's objects and over packed `Float64Array`s, interleaved sixty rounds: the cull loop over 69,451 faces **0.93 → 0.55 ms**, the three-record touch a triangle over the 30,909 drawn **0.75 → 0.36 ms**. `probe-cold.mjs`: the bunny's first frame **53 ms**, of which `geometryOf` is **33 ms and 28.8 MB** building a `Vert` and two `Vec3` per vertex, a record per projected vertex, a `Corner` per referenced vertex, a normal and a triangle per face — some 260,000 objects for a mesh whose numbers fit in 6 MB of lanes; the `/all` bench's worst frame is that first render at **144 ms** |
+| **Verdict** | **closed** — built and measured: C12 I139, T1.151, `c12-lanes` |
+
+**Remedy, sized.** C12 I139: the geometry is lanes. `geometryOf` fills a
+position lane and a unit-normal lane of three doubles per raster vertex — the
+mesh's vertices under smooth shading, three per face under flat — a value
+array beside them, and an index lane of three per face; a triangle holds its
+face index and its geometry's lanes and no vertex object. The per-frame
+screen record is nine doubles in a lane slot per vertex under a stamp lane —
+I130's records and stamps, moved off the objects — with three spare slots
+the clip path writes its cut vertices into, so the fill and the thin stroke
+read every corner by index through one lane and the clip path is the same
+fill. The ramp span reads the position and value lanes. Every expression
+keeps its order: the numbers are the same doubles read from a different
+address, and the goldens are the gate. Sized from the two loops measured, a
+millisecond of the bunny's 12.6 warm — about 8% — plus what the fill and the
+stroke gain from contiguous corners; the heap loses the objects and gains
+the lanes, about 9 MB against 6; and the cold first frame loses the object
+building, which is most of `geometryOf`'s 33 ms. Not in this cut: `edges`
+stays an array of three booleans a face (2.8 MB on the bunny), `fn` a
+`Vec3` a face — both read by rows and runs by name, and each its own change.
+
+**Closed — built and measured.** C12 I139 as sized, with one correction
+made in the spec before the code: the slot is eight doubles, not nine — the
+value lives in the value list, not in the per-frame record. `Lanes` holds
+`pos`, `nrm`, `value`, `idx`, `screen`, `stamps` and three spare values; a
+`Tri3` is its face index, its lanes, its face normal, its edges, its series
+and its skin. `screenOf` reads a slot under the frame's stamp, treats the
+negation as a refusal and projects otherwise; the three booleans decide the
+direct path, so the separate view-depth block is gone; the clip path cuts
+into the spare slots through the same `toScreenAt` and the same `fill`;
+`backfaceCulled`, `spanOverCorners`, `hiddenThin` and the thin stroke read by
+index. T1.151 replaces its deferred row and holds the layout, every stamp
+against `project` after straddling frames over the cube, suzanne and the
+bunny, and `plot3d.project` to a count built from `backfaceCulled` and
+`project` over the same lanes — the distinct vertices of the non-culled faces
+plus two cuts a straddling face. T1.149 compares the lanes with the object
+reference under both shadings; the five rows that read vertex objects read
+the lanes through four exported readers, exempted with their reasons.
+`c12-lanes`: five caught, none survived; nine runs re-anchored on the lane
+reads, 67 caught. Gates green, goldens 458 with no mover, e2e green; 432
+frames byte-identical against the F1183 build; paint 8,163, hidden 13,521,
+project 16,539 on the bunny, unchanged.
+
+| `make load-down` | before (F1183 build) | after |
+|---|---|---|
+| paired warm bunny, `probe-f6-pair` n=60, both orders | A p50 13.6 · 17.6 ms | B p50 9.6 · 11.1; B−A median **−4.2 and −6.4 ms; B faster in 60 and 60 of 60** |
+| paired warm teapot | 3.5 · 3.5 ms | 3.3 · 3.4; −0.1 and −0.0 ms; 42 and 37 of 60 |
+| paired warm suzanne | 2.8 · 3.2 ms | 2.8 · 3.3; 0.0 and 0.0 ms; 30 and 28 of 60 |
+| `probe-cold.mjs` bunny first / second / third frame | 62.5 / 16.4 / 13.7 ms | 59.1 / 11.1 / 10.4 ms |
+| `probe-cold.mjs` bunny `geometryOf` cold / warm | 37.2 ms, 28.7 MB / 16.4 ms, 30.5 MB | 33.4 ms, 24.5 MB / 15.0 ms, 22.7 MB |
+| `probe-cold.mjs` teapot · suzanne third frame | 6.2 · 6.3 ms | 6.0 · 6.0 ms |
+
+Two numbers undercut the sizing and one exceeds it. The sizing said a
+millisecond of the bunny's warm frame, about 8%; the paired probes say four
+to six, about a third — more than the two loops measured account for, and
+the likely reason is that the vertex objects' hidden classes had gone
+polymorphic (`rec`, `s` and `stamp` were added to a `Vert` after
+construction, by I130), so every read the raster made on them was a
+megamorphic load and not the object read the micro-benchmark modelled. The
+sizing also said the cold first frame would lose most of `geometryOf`'s 33
+ms, since that was object building; it lost four, and the warm build one and
+a half. The builder's time is not the objects — it is the two normal lanes
+and the index compaction, which the lanes keep — and the heap it saves is 8
+MB on the warm build, not the 23 the count of objects suggested, because the
+`edges` arrays and the `fn` records were never in the count.
+
+What remains: `edges` as an array of three booleans a face and `fn` as a
+`Vec3` a face — 2.8 MB and about 3 MB on the bunny, each its own change;
+`plot3dArea`'s boxed sample arrays (F1182); `normaliseRow`'s byte scan;
+the builder's 15 ms warm on the bunny, now the largest cold cost of a mesh.
+
+## F1185 — the lane projection hands six doubles across a call and boxes every one: 1.6 MB of heap numbers a bunny frame, where the object form allocated none ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/surface3.ts` `toScreen(L, k, basis, grid)`: reads the vertex's three position and three normal doubles from the lanes and passes them to `toScreenAt(L, slot, px0, py0, pz0, nx0, ny0, nz0, basis, grid)`, which the clip path also calls with a cut vertex's components; `clipPath` keeps the cut's value in a `spareValue` list beside the lanes because the position and normal lanes have no spare slots |
+| **Reached for** | the inspector's allocation sampler with collected objects included (`out/probe-f9-heap.mjs`, 30 bunny renders under a moving camera, `make load-down`), on the F1184 build and on the F1183 build rebuilt from `cb082243` in a worktree. F1184: **`toScreen` 49.1 MB of 149.4 sampled — 32.9%, 1.6 MB a frame, the largest site**, ahead of `plot3dArea`'s 31.9 (F1182) and `mixedRows`' 15.2. F1183: `toScreen` **1.5 MB of 110.1** — the clip path's fresh records, and nothing per vertex. Arithmetic: 17,171 projections a frame (`plot3d.project`) × six doubles × 16 bytes = 1.65 MB — the sample to the decimal. The CPU profile of forty frames (`out/prof-bunny7`) has the garbage collector at 58.5 ms self, 1.5 ms a frame of a 10 ms frame, and 5 MB a frame of sampled allocation, so the projection's share is about a third of the collector |
+| **Verdict** | **closed** — built and measured: C12 I140, T1.152, `c12-lanes` |
+
+**What happened.** F1184 moved the vertex off an object and into lanes, and
+the projection with it: where `toScreen(w, …)` read `w.p.x` inside the
+function that used it, `toScreen(L, k, …)` reads `L.pos[q]` and hands the
+six doubles to `toScreenAt` so the clip path can project a cut vertex that
+has no lane slot through the same arithmetic. `toScreenAt` is a real call —
+the record write is eight typed-array stores after the projection, and V8
+does not inline it into the small `toScreen` — and a double crossing a real
+call is a heap number (I136, F1176: the shade's seven-in-one-out, 33.6 MB of
+a twenty-frame heap). The bytes did not move and the paired frame got 4–6 ms
+faster, so nothing watched the heap; the sampler with collected objects is
+the only instrument that sees garbage rather than survivors, and it was not
+run on the landing.
+
+**Remedy, sized.** C12 I140, an amendment to I139: every lane carries the
+three spare slots, not only the screen lane — position, normal and value
+sized `count + 3` — and `toScreenAt(L, slot, basis, grid)` reads the
+position and normal from the lanes at the slot, taking two integers and two
+records across the call and no double. The clip path writes a cut's
+position, normal and value into the spare slots and projects the slot as a
+vertex is projected; `spareValue` goes, and `valueAt` is the value lane.
+Every expression keeps its order — the same `dx = px − eye.x` on the same
+doubles read one frame later — so the goldens hold. Sized: the 1.6 MB a
+frame goes to zero, a third of the collector's 1.5 ms, about half a
+millisecond of the bunny's warm frame; the heap reading is the acceptance,
+the paired probe the check. Not in this cut: `thinEdge`'s 7.7 MB and
+`shadeAt`'s 6.6 over the same thirty frames — `writeDepth` and the painter
+take a depth and an intensity as doubles, `hypot3` takes three, at sites
+partly inlined — and `plot3dArea`'s 31.9 (F1182), each its own measurement.
+
+**Closed — built and measured.** C12 I140 as sized. Every lane carries the
+three spare slots; `toScreenAt(L, slot, basis, grid)` reads the six doubles
+at the slot itself; the clip path writes a cut's position, normal and value
+into the spare slots and projects the slot; `spareValue` is gone. T1.152
+holds the lane lengths, the two-kept and one-kept cuts by the clip's own
+interpolation, both value arms, each cut's screen slot to `project`, and
+sentinels surviving a frame with no cut. `c12-lanes` extended by three,
+eight of eight caught; the six-doubles mutation is the sampler's to see, as
+T6.116 records. Gates green, goldens 458 with no mover, e2e green; 432
+frames byte-identical against the F1184 build; paint, hidden and project
+counts unchanged.
+
+| `make load-down` | before (F1184 build) | after |
+|---|---|---|
+| allocation sample, 30 bunny renders | 149.4 MB · `toScreen` 49.1 MB, 32.9% | **97.0 MB · `toScreen` absent from the top twenty** |
+| `thinEdge` in the same sample | 7.7 MB | 4.0 MB — the cut records it held are gone too |
+| paired warm bunny, `probe-f6-pair` n=60, both orders | A p50 9.8 · 11.5 ms | B p50 9.5 · 11.4; B−A median −0.4 and −0.3 ms; B faster in 45 and 36 of 60 |
+| paired warm teapot · suzanne | 3.8 · 2.8 ms | 3.7 · 2.7; 0.0 and −0.0 ms |
+| `probe-cold.mjs` bunny first / second / third frame | 61.1 / 11.5 / 12.1 ms | 57.9 / 11.0 / 10.8 ms |
+
+As sized: a third of a millisecond to half, and a heap sample a third
+lighter. The largest site is now `plot3dArea`'s 32 MB (F1182's boxed
+sample arrays, measured and left at 0.3 ms) and `mixedRows`' 15 MB of row
+strings; `shadeAt`'s 6.6 MB is `hypot3` and `Math.pow` at a real call.
+
+What remains: the cull over face lanes (0.9 → 0.3 ms measured, `out/probe-cull.mjs`,
+and it retires `fn` and `edges` as objects); the thin path's 3.7 ms;
+`plot3dArea`'s arrays; `normaliseRow`'s byte scan.
+
+## F1186 — the cull reads three positions through the index lane and a normal object per face, 69,451 times a bunny frame; the same test over two face lanes runs in a third of the time ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/plot/surface3.ts` `backfaceCulled`: per face, three index-lane reads, nine position-lane reads at those indices — three dependent loads a corner into a 3.3 MB lane, in face order but not vertex order — and the face normal from `tri.fn`, a `Vec3` object a face; `geometryOf` builds that object from a face-normal sum lane it already holds |
+| **Reached for** | the line ticks of forty bunny frames on the F1184 build (`out/prof-bunny7`, `make load-down`): `drawTri` is the largest self time in the raster at 117.8 ms, and its ticks sit on the cull's centroid lines (662–670 in the build, 30 of 75 ticks in the function) and the first `screenOf`. A micro-benchmark over the bunny's real lanes (`out/probe-cull.mjs`, three runs, 60 timed rounds each): the cull as the tree has it **0.88–0.92 ms a frame**, the same arithmetic inlined over the index lane 0.78–0.81, and over a per-face centroid lane and a per-face normal lane, read in face order, **0.29–0.31 ms** — 30,747 kept faces on every arm. Teapot 0.06 → 0.02 |
+| **Verdict** | **closed** — built and measured: C12 I141, T1.153, `c12-lanes` |
+
+**A claim in F1184 corrected first.** F1184's remedy and its close say
+`edges` is *an array of three booleans a face, 2.8 MB on the bunny*, and
+list it as a cut to make. It is not: `edgeMask` fills a mesh's mask with one
+shared `[true, true, true]` — `new Array(faces).fill(triple)` is one array
+named 69,451 times — so a mesh's edges cost a pointer a face and nothing to
+retire. Only a height field, whose diagonal is not an edge, gets a fresh
+pair per cell, and no height field in the examples has more than a few
+hundred cells. The figure was carried from the object count without being
+measured; it is struck here rather than left to be built on.
+
+**Remedy, sized.** C12 I141: two face lanes on the geometry — the face
+centroid, three doubles a face computed once by the cull's own expression
+`(P[a] + P[b] + P[c]) / 3` over the position lane, and the unit face normal,
+three doubles a face from the sum lane the builder already has — and
+`backfaceCulled` reads six doubles in face order and the skin's sign.
+`Tri3.fn` goes; the rows that read a face's normal take it through
+`faceNormalOf(tri)`, exported for them as `cornersOf` is. The flat-shading
+arm of the builder reads the normal lane instead of the object. Same
+doubles: a centroid computed at build time is the same three divisions on
+the same three sums as one computed at cull time. Sized: 0.6 ms of the
+bunny's warm frame, about 6%; the heap trades 69,451 `Vec3` objects (about
+2.8 MB) for two lanes of 1.67 MB each, so about half a megabyte heavier and
+2.6 MB less garbage on a build. The paired probe is the check.
+
+**Closed — built and measured.** C12 I141 as sized. `Lanes` carries `cen`
+and `fnrm`, three doubles a face; `writeCentroid` fills the centroid by the
+cull's own expression once the face's corners are in the position lane;
+`geometryOf` writes `unit3` over the sum lane into `fnrm` and the flat arm
+reads it; `backfaceCulled` reads six doubles in face order; `Tri3.fn` is
+gone and `faceNormalOf` serves the rows. T1.153 holds both lanes to their
+expressions over 150,000 faces under both shadings, the flat vertex normal
+to its face's entry, the cull to the allocating form on ten thousand seeded
+triangles, and the bunny's 30,747 kept faces. `c12-lanes` extended by four,
+twelve of twelve caught; c12-geometry and c12-surface3d re-anchored, green.
+Gates green, goldens 458 with no mover, e2e green; 432 frames byte-identical
+against the F1185 build; counts unchanged.
+
+| `make load-down` | before (F1185 build) | after |
+|---|---|---|
+| paired warm bunny, `probe-f6-pair` n=60, both orders | A p50 10.7 · 10.4 ms | B p50 9.9 · 9.9; B−A median **−0.8 and −0.6 ms; B faster in 53 and 50 of 60** |
+| paired warm teapot · suzanne | 3.3 · 2.7 ms | 3.3 · 2.6; −0.1 and −0.1 ms; 39–46 of 60 |
+| `probe-cold.mjs` bunny `geometryOf` warm heap | 22.7 MB | **9.8 MB** |
+| `probe-cold.mjs` bunny `geometryOf` warm time | 14.7–16.0 ms | 16.5–17.7 ms |
+| `probe-cold.mjs` bunny second / third frame | 10.9 / 10.8 ms | 10.5 / 10.1 ms |
+| allocation sample, 30 bunny renders | 97.0 MB | 100.5 MB — the same sites, within the sampler's spread |
+
+Two figures against the sizing. The frame gained 0.6–0.8 ms where 0.6 was
+sized — the cull's whole measured saving, so the lane reads cost nothing the
+micro-benchmark did not see. The heap went the other way from the sizing and
+by far more: the sizing said *half a megabyte heavier*, trading 2.8 MB of
+`Vec3` objects for two 1.67 MB lanes; the warm build measures **22.7 → 9.8
+MB**. A `Vec3` a face was not 40 bytes — each of its three doubles is a heap
+number when the object is built from typed-array reads, so the record was
+nearer a hundred bytes and the 69,451 of them nearer 7 MB, and the `Tri3`
+records lost a field and a hidden-class transition with them. The count of
+objects was right and the size of one was a guess. The builder's warm time
+rose about 1.5 ms for the two extra lanes' writes, which the cold first frame
+pays once.
+
+What remains: the thin path's 3.7 ms (`thinEdge` and `hiddenThin`);
+`plot3dArea`'s boxed sample arrays (F1182, 31.6 MB of the sample);
+`shadeAt`'s 6.5 MB at `hypot3` and `Math.pow`; `normaliseRow`'s byte scan;
+the builder's 17 ms warm on the bunny.
+
+## F1187 — a fullscreen patch scroll step walks every line of the patch about thirty times: 5.3 ms at 5,000 lines, 103 ms at 50,000, and the cost has no bound ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/patch/window.ts` and `src/shell/patch-view.ts`: `rowsOf` builds one `Row` per screen row of the whole patch — `unitsOf` per hunk, `changedRuns` and `pairedRows` over sliced arrays in split layout — and `numberWidth` walks every line; `windowPatch` calls `clampOffset`, which calls `rowsOf` and `bottomOffset`, which calls `rowsOf` and then `build` — itself `rowsOf` and `numberWidth` — once per step of a binary search over every row a window may begin at; then `build` again for the window. `move` in the view calls `hunkHeaderRows` (`rowsOf`), `clampOffset` (the whole of the above) and `windowPatch` (all of it again) |
+| **Reached for** | `tools/bench/patch-window.mjs` on the F1186 build, `make load-down`: one `windowPatch` at 200×50 is **5.3 ms median at 5,000 lines (3,335 rows), 35.7 ms at 20,000, 102.9 ms at 50,000** — linear in the patch, not the window. Its CPU profile: `numberWidth` 24.9%, `unitsOf` 21.0%, the collector 20.7%, `rowsOf`'s row literals 15.1%, `build` 8.1%. By the call graph a `windowPatch` is 3 + ⌈log₂ starts⌉ walks of `rowsOf` — about 15 at 3,335 rows — and a view motion roughly twice that. The framework-wide profile (`out/prof-ev`) has the same four functions at the top of the scripted session's self time — `unitsOf` 35 ms, `numberWidth` 19 ms, `pairedRows` 12 ms over 211 frames of a 2,000-line patch — so the cost is paid in the transcript's inline window too, through `windowRows`, once a frame |
+| **Verdict** | **open** — measured, the remedy sized |
+
+**Why it has no bound.** Every function here is written as a pure function
+of the patch, so each derives the rows from scratch — and the rows are a
+property of the block and the width, not of the offset. A scroll step
+changes the offset alone. The design that made every function independent
+is what makes a keystroke cost the whole document; SS24 forbids module
+state in `patch/`, and correctly, so the derived form has to be handed in
+by a caller that owns it.
+
+**Remedy, sized.** C25 I22: a **window plan** — `windowPlan(patch, width)`
+returns the layout, the rows, the row indices a window may begin at, the
+hunk header rows and the pinned gutter width, derived once — and every
+window function is written over the plan: `build` walks from the offset
+until the budget is spent, so it is O(window); the bottom search is
+O(window · log rows); the clamp is a `snapDown` over the plan's rows. The
+patch-taking signatures stay and compute the plan themselves, byte-identical
+by construction, so a `windowPatch` becomes one walk instead of fifteen. C22
+I41 amended: the pushed view holds the plan beside its offset, keyed on the
+block's identity and the region's width — dropped when the entry is patched
+or the region resizes, reporting `absent`, `rev` and `width` misses through
+the profiler's probe — so a motion over an unchanged block walks nothing.
+Sized from the profile: the one-walk form about 12–15× on the bench; the
+planned view O(window) a keystroke at any size, which is the figure that
+matters — *it cannot be slow*. The inline `windowRows` takes the plan form
+too but no cache: a frame's window is one walk, which the height cache
+already pays for the measure.
+
+**Closed — built and measured.** C25 I22 and C22 I41 as sized.
+`windowPlan(patch, width)` returns the layout, the rows, the start rows, the
+header rows and the pinned gutter, frozen; `build`, the bottom search, the
+clamp, `windowRows` and `hunkHeaderRows` read it, and the patch-taking
+signatures take an optional plan and refuse one for another block or width
+rather than read it. The view holds the plan on its state beside the offset,
+keyed on the block's identity and the region's width, and reports `absent`,
+`rev` and `width` through the profiler's probe as `patch-view-plan`; C25
+T2.10 lists the probe as the view's fifth dependency, an instrument and not
+a seam. T1.24 holds the plan to the patch-taking functions over the corpus
+at both layouts and three heights — plan against no plan at every offset to
+two past the end, `windowRows` likewise, the start rows to the clamp's fixed
+points up to the ceiling, the refusal on both axes. T3.41 reads one `absent`
+on open, none over four motions, one `rev` on a patch, one `width` on a
+resize to the other layout with the window the other layout's, and every
+frame a window of the live block at the live width. `c25-window-plan` six of
+six, `c22-patch-view-plan` four of four. Gates green, goldens 458 with no
+mover, e2e green.
+
+| `make load-down`, 200×50 | before (F1186 build) | after |
+|---|---|---|
+| view motion, `out/probe-f1187-view.mjs`, 200 motions, 3 paired rounds — 5,000 lines | median 33.9 · 33.9 · 33.4 ms | **0.31 · 0.11 · 0.11 ms** (p95 ≤ 0.9) |
+| — 20,000 lines | 200 · 227 · 149 ms | **0.17 · 0.15 · 0.14 ms** (p95 ≤ 1.2) |
+| — 50,000 lines | 562 · 559 · 558 ms | **0.15 · 0.32 · 0.15 ms** (p95 ≤ 1.0) |
+| view `open`, one plan walk — 5,000 · 50,000 lines | 5–13 · 39–46 ms | 6–21 · 44–62 ms |
+| `tools/bench/patch-window.mjs` `windowPatch`, no plan — 5,000 · 20,000 · 50,000 | 5.3 · 35.7 · 102.9 ms | **0.37 · 4.7 · 10.5 ms** (14× · 7.6× · 9.8×) |
+| the same, over a held plan | — | **0.070 · 0.034 · 0.041 ms**; the plan derived once 0.31 · 5.5 · 14.8 ms |
+
+Three figures against the sizing. The keystroke path was worse than the
+finding's headline: the 5.3 ms was one `windowPatch`, and a motion calls
+`hunkHeaderRows`, `clampOffset` and `windowPatch` — about thirty walks, as
+the title said, and **34 ms at 5,000 lines**, not 5.3. The one-walk form
+was sized 12–15× and measures 14× at 5,000 lines and 8–10× above, where the
+plan's own walk — `unitsOf` over sliced arrays and `numberWidth` over every
+line — is the whole cost and the collector's share climbs with it. The view
+is O(window) at every size, as sized: a tenth to a third of a millisecond
+whether the patch is five thousand lines or fifty thousand, which is the
+figure that mattered.
+
+Two survivors on the first mutation run, both about the rows and not the
+code. The start-row arm compared the plan's starts to the clamp's fixed
+points *up to the ceiling*, and at ten and twenty-four rows the ceiling is
+offset 0 for every corpus patch — the arm was comparing one offset, and a
+plan listing every row as a start passed it. Three rows is the height that
+puts the ceiling near the end; the arm now runs at three, ten and
+twenty-four, and a control asserts the sweep saw interior rows at all. The
+gutter-from-the-slice mutation survived because the pin rows (C25 T3.20,
+T3.20b) live in `test/edge/patch.test.ts`, which the run did not execute;
+it does now. Neither indicts the code: both mutations were byte-visible to
+rows the tree already had, run from the wrong height or the wrong file.
+
+**What remains.** `open` and a patch of the entry pay one plan walk — 40–60
+ms at 50,000 lines, once, and the same walk the transcript's height cache
+pays for the block's measure. The plan's own walk is two passes,
+`numberWidth` over every line and `rowsOf` over every unit; one pass would
+carry the gutter out of the rows and take a quarter off `open`. The inline
+`windowRows` route derives a plan per call and has no holder — a frame's
+window is one walk, which the render cache keeps to a miss. None of the
+three is a keystroke.
+
+## F1188 — the runtime barrel imports the Mermaid renderer for every consumer: about a quarter of a cold import, for a builder no example calls ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/index.ts:369` re-exports `mermaidCode` from `src/presentation/mermaid.ts`, which statically imports `renderMermaidASCII` from `beautiful-mermaid` — an ESM-only package whose bundle pulls `elkjs`, 8.1 MB installed. So `import "@fmx/calcium"` resolves, reads and compiles the layout engine before `createTui` is called, for every consumer, whether or not a diagram is ever drawn. No example in the tree calls `mermaidCode`; its consumers are `test/contract/mermaid.test.ts` and, by the module-graph rule's own note, an app out of tree |
+| **Reached for** | the F1187 build copied to `/tmp/calc/dist-cur` so the bind mount is out of the figure (F1164's protocol), `make load-down`, six interleaved pairs: a plain import of `dist/index.js` **398–483 ms**, the same import with `beautiful-mermaid` already loaded **278–334 ms**, the paired difference **80–156 ms, median about 110**; `import("beautiful-mermaid")` alone 95–114 ms. Under the import trace the barrel loads 2,458 modules, two of them the renderer's and `elkjs`'s bundles. Per dependency, cold and alone: `ink` 262, `beautiful-mermaid` 127, `@xterm/headless` 38 (off the graph since C23 I71), `react` 7 |
+| **Verdict** | **open** — measured, the remedy sized |
+
+**Why it is on the graph.** `mermaidCode` is a synchronous builder — an app
+calls it inside an adapter and gets a `code` block — and a synchronous
+function cannot load an ESM-only module on demand: there is no CommonJS
+build to `require`, and a dynamic import is a promise. C23 I71 took the
+emulator off the graph because its route was already `async`; C09 I71 took
+the grammars off because highlight.js core has a registration seam. Neither
+shape is available here. What the tree does have is the entry-point form:
+`@fmx/calcium/testing`, `/fixtures` and `/profiling` exist so that a
+consumer pays for what it imports (C24 §2), and a diagram renderer that
+most sessions never reach is the same argument.
+
+**Remedy, sized.** C24 I36: a fifth entry, `@fmx/calcium/mermaid`, whose
+target is a one-line barrel over `presentation/mermaid.ts`; the runtime
+barrel exports `mermaidCode` no longer and imports nothing from
+`beautiful-mermaid` or `elkjs`. `mermaidCode` itself is untouched — the same
+function, the same bytes, on a different import line — so the contract rows
+hold as they are; the observable is the module graph under the import trace,
+T5.22's instrument (C23 I71), and not a duration. A consumer that draws
+diagrams imports the subpath and pays what it paid before, at the moment of
+its own choosing; a consumer that does not is about 110 ms faster to its
+first frame on a native filesystem and more on a bind mount, where F1164
+measured the loader's I/O multiplied ten times. The alternative — an
+`async mermaidCode` on the barrel behind a dynamic import — removes the same
+cost from the graph but changes the function's shape for a loading reason,
+and is recorded here rather than built. Sized: **−80 to −156 ms of a
+400–480 ms cold import**, the second-largest piece after `ink`'s own graph.
+
+**Closed — built and measured.** C24 I36 as sized. `src/mermaid.ts` is a
+one-line barrel over `presentation/mermaid.ts`, `package.json` names
+`./mermaid` beside `./profiling`, and `src/index.ts` re-exports `mermaidCode`
+no longer; the function is untouched and the four contract rows on it pass
+as they were. T5.6 reads the built package's graph under the import trace:
+nothing from `beautiful-mermaid` or `elkjs` after the runtime import, the
+renderer's bundle present after `dist/mermaid.js`'s, the rendering of a
+two-node flowchart equal to the contract corpus's byte for byte, and the
+exports map naming the entry. `c24-mermaid-entry` rebuilds `dist/` at each
+step and at its end and catches the export restored to the barrel, one of
+one. Gates green, goldens 458 with no mover, the full suite 6,256; e2e's one
+red was `T5.8`'s three-second exit bound at 3.4 s during the chain, green
+alone on the idle machine — a timing row, not this cut's.
+
+| `/tmp/calc`, off the bind mount | before (F1187 build) | after |
+|---|---|---|
+| modules loaded by `import "dist/index.js"` under the trace | 2,458 · 2 from the renderer's packages | **2,441 · 0** |
+| cold import, quiet machine, six pairs — the renderer's marginal cost (preloaded − plain) | 80–156 ms of 398–483, median about 110 | — |
+| cold import, paired A/B, `probe-import.mjs`, load average 2.2–2.9, sixteen pairs | A 563–1,372 ms | **B 443–950 ms; B faster in 15 of 16; paired median −220 ms in the second eight** |
+
+The two readings disagree by a factor of two and the difference is the
+load, not the cut: the quiet reading isolates the renderer's own import at
+a quarter of the total, and under a load average near three every import
+stretches with it, the renderer's included. The honest figure is the
+quiet one — about 110 ms of a 400–480 ms cold import — with the loaded
+pairs as the sign and the consistency: fifteen of sixteen.
+
+**What remains.** `ink`'s own graph is the largest piece left of a cold
+import (262 ms alone, cold) and it is the renderer; Node's compile cache
+(R01 R4.6) is what the launchers already do about it. A consumer that does
+draw diagrams now pays the renderer at its own import, statically — the
+async form, `import("@fmx/calcium/mermaid")` inside the adapter that needs
+it, is the consumer's to choose and costs nothing here. The examples call
+no `mermaidCode`; the docker example's notes describe the transform and
+name no import line.
+
+## F1189 — a spinner tick re-renders every block in its entry: 8.6 ms a tick beside a 2,000-line patch against 2.3 alone, 12% of a core idle, and the deck calls the miss `focus` ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/session.ts:1654`: `animated` — the spinner counter, present when anything in the entry animates — is folded into the slot string the render cache compares as its `focus` axis, so every tick is a miss on that axis, and `RenderCache.get` drops the parts on a `focus` miss (I101 keeps them for `range` alone). `renderEntryPieces` then renders the whole entry through the sequence render: the 2,000-line patch beside the `status` block, every 80 ms, for a glyph |
+| **Reached for** | `out/probe-anim.mjs` on the F1188 build over the bench's fakes, 120×40, three seconds of real time, `make load-down`: a `status` spinner alone — 21 frames, work p50 **2.34 ms**, 4.5% of a core; the same spinner beside a 2,000-line `patch` — 20 frames, work p50 **8.58 ms**, sum 205 ms, **11.9% of a core**; beside a 2,000-line `logs` — p50 3.94, p95 **34.3 ms**, 13.4% of a core; the patch alone — no frame after the greeting, 2.9% (the residue of start-up). The report's misses for the spinning runs: `render: {absent: 1, focus: 15}` — fifteen spinner ticks reported as **focus** misses on a screen where focus never moved |
+| **Verdict** | **open** — measured, the remedy sized |
+
+**Why it is the whole entry.** The slot key is right: a frame at another tick
+*is* a different frame, and I60 put the counter in the key so a spinner does
+not freeze on a cache hit (F227). What the key cannot say is *which block*
+the tick moves, and the cache's answer to any miss but the range is to drop
+everything it held and render the entry whole. I101 already built the other
+half — the parts, a per-block store the range miss assembles from, keyed on
+everything but the range — and the tick is exactly a range-shaped miss: the
+rows are the wrong rows for one block and the right rows for every other.
+And the deck's word for it is `focus`, because the compound slot string is
+what the cache compares under that name; C28 §3's own warning — *a cache at
+40% is healthy if the misses are `absent` on a scrolling transcript and
+broken if they are `focus` on a screen where nothing moved* — is met here by
+a reading that is wrong in the way it warns against.
+
+**Remedy, sized.** C22 I103: the tick is the slot's own axis, `tick`,
+compared after `focus` and before `range`, and a miss on it **keeps the
+parts** as a range miss does; the assembly takes every block from the parts
+except one whose subtree animates (`animationIntervalOf`, C22 I73's walk),
+which is rendered alone and never held — so a tick renders the `status` and
+assembles the patch's rows from what the last frame held, byte-identical by
+I101's identity (C09 I69, C14 I25; T4.89b's sweep). C28's `MissReason` gains
+`tick`, and the deck's six-by-eight heatmap is six-by-nine. The orbit, the
+cursor, the image frame and the series toggle stay in the compound slot —
+each names the block it moves and could take the same treatment, and each
+is recorded as what remains rather than cut here. Sized from the probe: a
+tick beside a 2,000-line patch from about 8.6 ms to about the spinner
+alone's 2.3, and the idle core share from 12% toward 5%; the `logs` case's
+34 ms p95 is the window's measure and is the same cut's to reduce.
+
+**Closed — built and measured.** C22 I103 as sized. The tick is the render
+slot's own axis, compared after `focus` and before the range, and its miss
+keeps the parts; `withoutAnimating` in the session withholds from the parts —
+on the read and on the hold — every block whose subtree animates, I73's walk
+per block, so a tick renders the `status` alone and assembles the patch from
+what the last frame held. `MissReason` has `tick`, the deck's caches card is
+six by nine, and the spinner is no longer a `focus` miss. T4.89e drives it at
+the cache and end to end under fake timers: the glyph turns, the kept block
+renders once more on the first tick — a whole render holds no parts and the
+assembly is what fills them — and no further time on the second; `tick` at
+least 2, `focus` 0. `c22-tick-axis` three of three, after its third mutation
+was cut to both halves of the filter: removing the read filter alone survived,
+because the hold filter alone keeps the spinner out of the parts and there is
+nothing stale to read — a mutation of one of two sufficient guards is a
+no-op, not a survivor. `c22-spinner`, `c22-range-parts`,
+`c22-series-visibility` and `c09-gif` re-anchored on the moved slot line and
+green. Gates: build, enforce, goldens 458 with no mover, e2e 134 green; the
+full suite's one red was RS14b's 30-second timeout in a file that took 221 s
+under a host load near three, green alone.
+
+| `out/probe-anim.mjs`, 120×40, 2,000 lines, 3 s, `make load-down` | before (F1188 build) | after |
+|---|---|---|
+| `patch` + `status`, first two rounds — work p50 | 6.98 · 6.46 ms | **3.94 · 3.62 ms** |
+| — core share | 12.2% · 10.0% | **8.0% · 7.1%** |
+| `patch` + `status`, six paired rounds at load 2–3 — work p50 | 6.34 · 3.87 · 9.60 · 9.34 · 8.83 · 9.34 | **3.49 · 7.49 · 5.70 · 4.67 · 5.18 · 5.95; B faster in 5 of 6** |
+| — CPU over 3 s | 349–372 ms (one 198) | **224–298 ms** |
+| `status` alone — work p50 | 1.14 · 1.74 ms | 1.30 · 0.98 ms (unchanged, the control) |
+| `logs` + `status` — work p50 | 3.42 · 1.42 ms | 1.84 · 4.54 ms — the noise exceeds the effect; no reading |
+
+**Against the sizing.** The sizing said a tick would fall to about the
+spinner alone's cost; it fell by about half and stopped near 3.6–5 ms, three
+times the spinner alone. The profile of the new build's run says why: after
+the module loader and the collector, the top Calcium self is `unitsOf` and
+`rowsOf` in `patch/window.js` and the text measure — **the entry is
+re-windowed and re-measured on every frame**, hit or miss, before the render
+cache is asked. `windowEntry` calls the patch's `window`, which derives a
+plan (C25 I22) over every line at every frame, and `renderEntryPieces`
+measures the sequence again for the C09 I1 check. None of that is the
+render's; all of it scales with the entry; and it is the same cost on a
+render-cache **hit**, which is the shape the framework profile's `compute`
+phase showed at 7% of a static frame and this probe shows at half a tick.
+
+**What remains.** The per-frame layout: `entryLayout` and `windowEntry`
+derive the pieces from the block and the width and the range, which are the
+render slot's own axes — a plan held beside the render slot, dropped on
+`rev`/`width`, would make a hit frame and a tick frame touch no line of the
+patch. That is the next finding, and it is the larger half of what this one
+measured. The orbit, the crosshair, the image frame and the series toggle
+stay in the compound slot as recorded above.
+
+## F1190 — a block the window slices is rendered again on every tick: 1.36 ms of a 1.58 ms tick frame beside a 2,000-line patch is thirty-seven lines that did not change ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/entry-layout.ts:377` `assemble`: a block the sequence window sliced — the first or last block of a run, cut to the window — is "rendered as before and held by nobody, because its rows are the range's" (I101's wording). True on a range miss, where the slice is new; on a **tick** miss (I103) the range did not move, the slice is the same slice, and it is rendered again for the spinner beside it. `src/presentation/patch/definition.ts:217` is the span that shows it: `patch.lines` runs on 22 of 26 frames of a still screen. |
+| **Reached for** | `out/probe-anim.mjs` on the F1189 build, 120×40, four seconds, `make load-down`, spans on: `patch` + `status` at 2,000 lines — work p50 **4.80 ms**, 9.9% of a core, `visible` p50 **1.584 ms** of which `patch.lines` **1.360 ms** on 22 frames; `status` alone — work p50 1.55, `visible` 0.242. `out/probe-slice.mjs` (this build, width 120, a 37-line slice, medians of forty): rendering the slice alone **0.83–0.84 ms** at 2,000 lines and 0.82–0.93 at 20,000 — the render is the slice's size and not the patch's. The paint row path the last profile also named — `exact` and `based` per row — is `paint` 0.042 ms and `based` 0.005 ms a frame at the span level, and is **checked and clear** on that reading. |
+| **Verdict** | **open** — measured, the remedy sized |
+
+**Why a tick renders it.** I101 held whole blocks and column-group children
+because their rows are the same rows at every range; a sliced block's rows
+are the range's, so holding them under the block's id alone would serve the
+last window's rows at the next. That reasoning is about the *range* miss.
+I103 made the tick a second miss that keeps the parts, and under it the range
+is unchanged — the slice the assembly rebuilds is byte for byte the one the
+last frame rendered, and nothing says so because the parts have no slot a
+slice can be held in. A scroll pays this render rightly; a tick pays it for
+nothing, 37 lines of intra-line span work (`unitsOf`, `sgr`, `fitStyled`,
+`normaliseRow` — the top Calcium self of F1189's residue profile) every 80 ms.
+
+**Remedy, sized.** C22 I104: the parts hold a sliced block's rows **under its
+id with the window they were rendered for** — the run-local `from` and `take`
+the piece carries, which is what the slice is a function of once the run's
+blocks and width are fixed, and those are the slot's own axes. A range or a
+tick miss that reaches the same window takes the held rows; a different
+window renders the slice once and **replaces** the hold, so the store is
+bounded at one slice per sliced block — at most two per run — and grows with
+nothing. The animating filter (`withoutAnimating`, I103) covers the slice
+reads and holds as it covers the parts. Byte-identical by construction: the
+same render at the same inputs. Sized from the probe: `visible` on a tick
+beside a 2,000-line patch from 1.58 ms toward the 0.22 that is not the render,
+and work p50 from 4.8 toward the spinner alone's 1.5; the scroll frame is
+unchanged, which is the control.
+
+**Closed — built and measured.** C22 I104 as sized. The parts are a `Held` —
+whole lines by key, and one slice per block id with the run-local window it
+was rendered for; `assemble` reads a sliced block at its window and holds
+what it renders, another window replaces the hold, and `withoutAnimating`
+covers the slice as it covers the parts. T4.89f drives it at the cache — a
+slice served at its own window alone, the old window gone after the new one
+is held — and end to end under fake timers: two ticks beside a forty-line
+dividing block render it once, to fill the parts, and no further time; a
+one-row scroll renders it once and lays the contiguous tail one row shorter.
+T4.89d amended from "never held" to "held under its window".
+`c22-slice-hold` three of three, `c22-range-parts` seven of seven after its
+SLICED-HELD mutation was re-anchored onto the window condition at the cache
+(the old one *is* the tree now), `c22-tick-axis` three of three. Gates:
+enforce, 6,258 tests, 458 goldens with no mover, 134 e2e.
+
+| `out/probe-anim.mjs`, 120×40, 2,000 lines, 4 s, spans on, `make load-down`, host load 2–4 | before (F1189 build) | after |
+|---|---|---|
+| `patch.lines` span — frames it ran on, of 25–26 | **21–22** | **2** (the first render and the first tick, which fills the parts) |
+| `patch.lines` span — sum over the run | 40 · 46 · 59 ms | **15 · 17 · 21 ms** |
+| work p50, seven interleaved pairs | 4.93 · 4.42 · 9.34 · 3.30 · 7.49 · 8.83 · 3.36 | 3.81 · 7.10 · 2.40 · 6.46 · 5.57 · 3.36 · 7.36 — B faster in 4 of 7 |
+| CPU over 4 s, median of seven | 287 ms | 326 ms |
+| `status` alone — work p50 | 3.49 | 1.74 (the control; the noise between two runs of one build) |
+
+**What the table says and what it does not.** The count is the finding's
+own observable and it moved exactly as sized: the slice is rendered twice a
+run instead of twenty-two times, and the span's sum fell by about the
+twenty renders it no longer pays. The wall and CPU figures do not resolve a
+1.3 ms effect at a host load of two to four — the same build's `visible`
+p50 read 0.89 ms in one round and 2.98 in another, and the `status`
+control's two readings differ by more than the effect — so they are
+recorded and not read (F936, F1189's rule: the noise is the load, and a
+magnitude at this load measures the machine). The structural half of what
+F1189 left — the re-windowing and the whole-block form, linear in the
+block — is F1191, and its 20,000-line frames are where the wall figure will
+move.
+
+## F1191 — the window seam derives the patch's plan and the registry's cap form on every frame: a tick beside a 20,000-line patch is 10 ms of `visible`, of which the thirty-seven rendered lines are 0.7 ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | Three sites, one call. `src/shell/entry-layout.ts:305` `windowEntry` → `registry.windowSequence` per frame, hit or miss. Inside it, `src/presentation/blocks/registry.ts:817` `#formContained` → `#form`, which for a block over the cap (`DEFAULT_MAX_BLOCK_ROWS` 2,000) measures the whole block through the definition — not the memo — and windows it to `[0, cap)` **on every call**, building a fresh capped block each frame; nothing holds a `Form`. Then `registry.ts:860` calls the kind's `window(block, w, from, to, measureChild)` — `src/presentation/patch/definition.ts:194` → `windowRows(block, width, from, to)` **with no plan**, so `windowPlan` (C25 I22) walks every line of the patch again; and `windowRows` itself, `src/presentation/patch/window.ts:329-345`, walks every row of the plan twice — once to collect the touched hunks, once to find each hunk's first body row — even when handed a plan. |
+| **Reached for** | `out/probe-anim.mjs`, F1189 build, 120×40, four seconds, `make load-down`: `patch` + `status` at **20,000** lines — work p50 **12.93 ms**, p95 39.4, **15.1% of a core** for one glyph, `visible` p50 **10.11 ms**, `patch.lines` **0.68 ms**; at 2,000 lines `visible` 1.58 with `patch.lines` 1.36 — so the part that is not the render is 0.22 ms at 2,000 and **9.4 ms at 20,000**, linear in the block and paid on the frame that changed nothing in it. `out/probe-slice.mjs`, width 120, 37-line slice, medians of forty: `windowPlan` 0.30 ms at 2,000 lines, **2.2 ms** at 20,000; `windowRows` with no plan 0.28–0.30 and **4.3–5.4**; with a plan 0.13 and **1.7–1.8** — the planned figure is still linear, which is the two walks; `registry.windowSequence([patch, status])` with no memo 1.45–1.69 and **15.6–16.5 ms**, the cap form's measure and window included. The render of the slice, 0.82–0.93 ms, is the same at both sizes. |
+| **Verdict** | **open** — measured, the remedy sized |
+
+**Why every frame pays it.** F1189 named this as the larger half — "the entry
+is re-windowed and re-measured on every frame, hit or miss, before the render
+cache is asked" — and sizing it splits it three ways. The measure is memoised
+(C22 I100) and is not the cost; the *window* is not, because the plan is a
+value C25 hands to whoever holds a block across many windows (I22's own
+words), and the transcript path never holds one — `window` is a pure seam with
+five arguments and no place to keep anything, so it derives the plan from the
+block each call. Above it, the registry's cap form is the same shape one level
+up: a form is a function of the block and the width, the registry resolves it
+per call, and for a block over the cap the resolution is a whole-block measure
+plus a whole-block window. And below it, `windowRows` was written before the
+plan existed and kept its two full walks when the plan arrived, so a planned
+window at 20,000 lines still costs 1.7 ms for 37 rows.
+
+**Remedy, sized.** Three cuts, one spec each, one seam. **C09**: the window
+seam takes the caller's scratch — `RenderScratch`, C12 I107's owner-keyed
+store, the shape `RenderContext.scratch` already hands renderers — as a sixth
+argument, `windowSequence` takes it beside the memo (I70's pattern), and the
+registry holds the cap form in it: owner the block, key the width; a block
+within the cap is unchanged. **C25**: `window` reads the plan from the scratch
+— owner the patch's `hunks` (the payload the plan is derived from, as C12
+keys on `faces`), key the width — and refuses one whose `patch` is not this
+block rather than read it; `windowRows` touches the window's rows and the
+hunks it reaches and no others, which is I22's own sentence for `build`,
+with the hunk body starts added to the plan. **C22**: the session hands
+`graph.scratch` to `windowEntry`. Sized from the probes: a tick or a hit
+frame beside a 20,000-line patch from about 10 ms of `visible` to about the
+slice's render plus a scratch read — under 1.5 ms, and under 0.2 with F1190
+— and a one-row scroll at that size from about 10 ms to about 1; at 2,000
+lines about 0.4 ms a frame. The measure memo (C22 I100) is the precedent
+for who owns the store, and SS24 is why it is not in `patch/` (I22, F1187).
+
+**A correction to the figures above, before the close.** The two
+`registry.windowSequence([patch, status])` and `measureSequence` readings in
+the table — 1.45–1.69 and 15.6–16.5 ms — were not the patch's. The probe's
+registry was `createBlockRegistry({ defaults: true })`, which does not
+register the `patch` kind (block-cap's kit registers it by hand), so the
+registry resolved the block to a `raw` fallback and the sequence figures
+were the fallback's; the direct `window.js` figures beside them were right,
+which is what made the column look corroborated. It surfaced when a later
+reading came back at 0.001 ms and a debug call showed an empty window.
+Re-taken with the kind registered, both builds: `windowSequence` with no
+memo **0.31–0.40 ms** at 2,000 lines and **6.4–6.8 ms** at 20,000 — the
+latter the cap form's whole-block measure and window, the finding's claim
+as stated; `measureSequence` 0.03–0.05 and 4.9–6.9 ms. The 20,000-line
+"memo + scratch" cell is a window past the capped block and says nothing.
+The in-session figures (`out/probe-anim.mjs`) never went through that
+registry and stand.
+
+**Closed — built and measured.** C09 I76, C25 I22 and C22 I100 as sized,
+with one ruling on the way: `render` holds no form, because the block it is
+handed on the transcript path is the frame's own slice — a new object every
+frame — and a slot held by it would be an absent miss a frame and a hit
+never (C09 I76 amended alone). The registry's call scope carries the scratch
+beside the memo; `#form` reads and holds a windowable block's `Form` with
+the block as owner and the width as key, and hands each kind's `window` the
+form's own bare block with the scratch as its sixth argument. C25's `window`
+holds its plan there — owner the hunks, refused for another block or width —
+and `windowRows` walks the window's rows only, the hunks' first body rows
+from the plan's `bodyStarts`. The session hands `graph.scratch` to
+`windowEntry`. T2.145 counts the definition's own calls and the identity of
+the block the seam hands over; T1.25 records every row index a planned
+window reads through a proxy and finds none outside it; T1.26 holds one plan
+per patch and width and refuses a twin sharing the hunks array; T4.89g reads
+the `scratch` hits on every frame after the first. Mutations:
+`c09-form-scratch` three of three after its sticky-scratch mutation was cut
+to both guards (the reset in `finally` and the assignment at the call's
+start each clear it alone — F1189's shape again); `c25-window-plan` nine of
+nine; `c22-measure-memo` seven of seven with the scratch-not-handed
+mutation added; `c14-cap`, `c22-footer-budget`, `p11-residue` re-anchored
+and green. Gates: enforce, 6,262 tests, 458 goldens with no mover, 134 e2e.
+
+| `out/probe-anim.mjs`, 120×40, 4 s, spans on, `make load-down`, host load 1.5–2.5, three interleaved pairs | before (F1190 build) | after |
+|---|---|---|
+| 20,000 lines, `patch` + `status` — `visible` p50 | 10.62 · 8.32 · 14.21 ms | **0.65 · 0.63 · 1.94 ms** |
+| — work p50 | 13.44 · 9.60 · 20.22 ms | **2.00 · 2.08 · 6.08 ms** |
+| — CPU over 4 s | 627 · 648 · 765 ms (16–19% of a core) | **250 · 169 · 325 ms (4–8%)** |
+| 2,000 lines — `visible` p50 | 1.26 · 2.27 · 2.34 ms | **0.68 · 0.40 · 1.30 ms** — B lower in 3 of 3 |
+| — work p50 | 2.40 · 4.29 · 4.54 | 2.59 · 1.39 · 5.18 |
+| `status` alone — work p50 | 1.17 | 2.66 (the control; the run-to-run noise) |
+| `out/probe-slice.mjs` — planned `windowRows`, 37 rows, 20,000 lines | 1.72–2.52 ms | **0.56–0.94 ms** |
+| — at 2,000 lines | 0.128 | **0.053** |
+| — `windowSequence` second call through memo and scratch, 2,000 lines | 0.356 ms | **0.060 ms** |
+
+**Against the sizing.** The sizing said a tick or a hit frame beside a
+20,000-line patch would fall from about 10 ms of `visible` to under 1.5, and
+it fell to 0.6–1.9; the core share from 15% toward a few per cent, and it
+fell from 16–19 to 4–8. The 2,000-line frame fell by about half in `visible`,
+as the plan's 0.25 ms and the form's measure predicted. What the planned
+window still costs at 20,000 lines — 0.56–0.94 ms for 37 rows — is
+`linesForRows` and the frozen block it builds, not a walk of the patch, and
+it is the scroll frame's to pay.
+
+**What remains.** The scroll frame at any size is now the slice's render
+(0.8–1.4 ms for 37 lines, C25's intra-line span work) plus the window; the
+tick frame beside a patch is the spinner's. The orbit, the crosshair, the
+image frame and the series toggle stay in the compound focus slot (F1189).
+The registry's `#measured` still measures a form again to commit its height
+(F942's second half), memoised across frames by C22 I100 and paid once per
+block within a call.
+
+## F1192 — Ink's one `throttle` loads es-toolkit's compat barrel: 1,319 of a cold start's 2,442 modules for one function, and a fifth of the import under the compile cache ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | Startup. `node_modules/ink/build/ink.js:3` — `import { throttle } from 'es-toolkit/compat';` — and es-toolkit 1.50's `dist/compat/index.mjs`, a barrel of 295 lines that imports every compat function it re-exports. The barrel's own `throttle` is `./function/throttle.mjs`, which imports `debounce` and nothing else. |
+| **Reached for** | `test/support/import-trace.mjs` over a cold import of `dist/index.js` (F1191 build), container-local copy, `make load-down`, load average 1.1–1.7: **2,442 modules, 1,319 of them under `es-toolkit/`** — more than half the graph, against 369 for `presentation/`, 232 for `data/`, 100 for `ink`, 42 for `react`, 18 for `highlight.js`. The barrel's marginal import, measured first in its own process: 64–91 ms cold, 46–72 ms under the compile cache, three readings each. A resolve hook that hands Ink `compat/function/throttle.mjs` in the barrel's place: **1,130 modules, 3 of them es-toolkit's.** Paired against the plain import, interleaved, six pairs a condition — no compile cache A 274 / 223 / 243 / 232 / 235 / 236 ms, B 246 / 188 / 208 / 189 / 212 / 214, B lighter six of six, paired median **−27 ms**; under the compile cache A 195 / 218 / 214 / 195 / 217 / 197, B 157 / 165 / 165 / 158 / 170 / 162, six of six, paired median **−44 ms of about 205, 21%**. |
+| **Verdict** | **open** — measured, the remedy sized |
+
+**Why it is Calcium's to fix and not the consumer's.** F1164 spent the
+startup list down to "the loader — about 250 ms container-local of which the
+CommonJS lexer is 60, the ESM compile 33 and format detection and package-
+scope reads most of the rest — the shape only bundling changes", and F1188
+left `ink`'s own graph as "the largest piece left of a cold import (262 ms
+alone, cold) and it is the renderer". Both read Ink's graph as Ink's. Counting
+it by package says otherwise: Ink is a hundred modules and the thirteen
+hundred behind it are a barrel loaded for one named import, which the
+`registerHooks` API Node 22.15 shipped (the same one `import-trace.mjs` is
+built on) can redirect before the loader reads a single one of them. A
+consumer cannot do this: C24 is what hides Ink from a consumer, and a launcher
+recipe that names Ink's import line and es-toolkit's file layout would be a
+recipe about two packages the consumer never chose. It goes beside the Mermaid
+entry (C24 I36): a subpath a launcher imports before the app, because a static
+import of the barrel hoists past anything in the same module — R01 R4.6's
+argument for the compile cache, verbatim.
+
+**Why a bare narrow specifier does not work, measured.** es-toolkit's export
+map has `"./compat/*": "./compat/*.mjs"` — package-root-relative, and the
+package ships `compat/*.d.mts` there and no `.mjs`, so
+`es-toolkit/compat/function/throttle` resolves to a file that does not exist
+(`ERR_MODULE_NOT_FOUND`, three of three). The form that holds resolves the
+barrel as Ink asked and rewrites the resolved URL's `compat/index.mjs` to
+`compat/function/throttle.mjs` — inside whichever copy of es-toolkit the
+loader chose — and keeps the barrel when that file is not on disk (measured:
+a wrong name falls back, 2,446 modules, no error).
+
+**What makes it exact rather than hopeful.** A `resolve` hook cannot see which
+names an import binds, so on its own it would link `debounce` against a file
+that exports `throttle` the day Ink imports two names — a `SyntaxError` at
+start for a startup optimisation. So the redirect is *armed* by a `load` hook
+that reads Ink's source as the loader hands it over and matches the import
+line byte for byte; any other text leaves the barrel in place. Both failure
+modes — line changed, file gone — land on today's behaviour.
+
+**Remedy, sized.** `@fmx/calcium/launch` (C24 §2's sixth entry, **C24 I37**),
+one export `prepareLaunch()` that registers the two hooks; the docker and
+plots launchers call it between `enableCompileCache()` and the app import
+(R01 **R4.7**, **R5.9**). T5.7 is the graph row: a child under
+`import-trace.mjs` that calls `prepareLaunch()` and imports `dist/index.js`
+lists under ten es-toolkit modules and none of the barrel's re-exports, while
+the same child without the call lists over a thousand — the fabricated
+violation run in the same row so the instrument is shown to see the barrel;
+and the child renders a block through Ink afterwards, because a redirect that
+links and does not run is the case a graph row cannot see. T1.12 holds the
+arming text against the exact line and against a two-name import. About 60
+lines of `src/launch.ts`, one line in each of two launchers, and a mutation
+run `c24-launch.mjs` whose control is a hook that never arms.
+
+**Not on the list.** The `minimal` example's launcher carries neither the
+compile cache nor this; it is the stranger's example (R4.4) and stays two
+lines. Ink importing `es-toolkit/compat/function/throttle` itself would make
+the hook a no-op, and that is a one-line change upstream — recorded here, not
+sent from here. Yoga's WebAssembly instantiation (22–38 ms) and React's 7–16
+are the renderer's floor and stay.
+
+**Closed — built and measured.** C24 I37, R01 R4.7 as sized: `src/launch.ts`
+(a `load` hook arming on Ink's exact import line, a `resolve` hook rewriting
+the resolved barrel URL to `compat/function/throttle.mjs` when the file is on
+disk), `exports["./launch"]`, one line in each of the docker and plots
+launchers, and `prepareLaunch` excused from MG25 with the reason no caller in
+`src/` can be early enough. T1.12 holds the predicate and the rewrite with
+its fallback arm; T5.7 runs the armed and the plain child under the import
+trace in one row and renders through Ink afterwards; both R4.7 rows count
+es-toolkit resolutions in the launcher's own process. Mutation run
+`c24-launch`: control caught, five of five caught — the loose predicate, the
+any-index rewrite, the check dropped, the check made on the wrong file, the
+redirect that resolves and never answers. Gates: enforce green, 6,263 tests,
+458 goldens with no mover, 135 e2e.
+
+| reading, F1191 build A against this build B, `make load-down`, load average 1.1–2.1 | A | B |
+|---|---|---|
+| modules on a cold import of `dist/index.js` (`import-trace.mjs`) · of them es-toolkit's | 2,442 · 1,319 | 1,130 · 3 |
+| cold import, container-local, no compile cache, eight interleaved pairs | 407 / 273 / 245 / 294 / 367 / 250 / 221 / 226 ms | 257 / 214 / 218 / 256 / 255 / 172 / 187 / 207 — **B lighter 8 of 8, paired median −43 ms of about 260** |
+| cold import, container-local, compile cache warm, eight pairs | 172 / 208 / 177 / 194 / 199 / 206 / 209 / 206 | 159 / 171 / 154 / 173 / 162 / 163 / 180 / 161 — **8 of 8, paired median −33 ms of about 200, 16%** |
+| `plots-tui` end to end to its no-TTY exit, on the bind mount, the shipped launcher against a copy with the call deleted, six pairs | 937 / 612 / 521 / 723 / 656 / 628 | 629 / 485 / 478 / 580 / 564 / 532 — **6 of 6, paired median −86 ms of about 640** |
+| es-toolkit resolutions in the launcher's process (R4.7's count) | 1,319 | 3 |
+
+**What the launcher figure says that the import figure cannot.** The
+end-to-end pair is the consumer's start — the compile cache on, the app's own
+modules and the far side's manifest included, on the filesystem this
+repository actually develops on — and the saving there is twice the quiet
+import's, because the barrel's thirteen hundred files are thirteen hundred
+stats and reads the mount multiplies (F1164's own finding about the loader).
+The frame is untouched: the module Ink receives is the object the barrel
+re-exported, and the golden tier says so at 458.
+
+**What remains.** Ink's own hundred modules, React's forty and Yoga's
+instantiation are the renderer's floor. Calcium's eight hundred files are the
+loader's per-module cost F1164 recorded, and bundling `dist/` stays the
+architecture-level lever it was, with its number. The `minimal` example's
+launcher carries neither this nor the compile cache and stays two lines by
+R4.4. A one-line change upstream — Ink importing the narrow path itself —
+would make the hook a no-op, and the hook is built to notice: the line would
+no longer match, and the barrel it fell back to would be the one Ink no
+longer imports.
+
+## F1193 — the loader is two thirds of a cold start and the loader's unit is the file: 820 of the 1,130 modules left are Calcium's own, and one chunk per entry is a third of the import and a quarter of the heap ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | The published shape. `tsc -p tsconfig.build.json` emits one file per source module into `dist/`, `exports` points every entry at one of them, and the loader resolves, reads, lexes, compiles and links each of the 820 on a consumer's first import — `presentation/` 369, `data/` 232, `shell/` 120, `interaction/` 65, `viewport/` 20, `terminal/` 15. |
+| **Reached for** | `node --cpu-prof` over the F1192 build's armed import, container-local: **207 of 310 sampled ms in `node:internal`** — the loader — against 8 for `presentation/`'s own evaluation, 4 for the colormaps, 4 for `highlight.js`; module evaluation is not the cost, module count is. esbuild 0.25 (already in the tree under `vite`) over the built `dist/`, six entries, `splitting`, `format: "esm"`, `packages: "external"`: nine files — `index.js` 812 KB, three shared chunks, an `emulator-*.js` chunk the dynamic import keeps separate, and four small entries — 2.1 MB against `dist/`'s 12; **347 ms to build**. Paired against the file tree, both armed by `prepareLaunch()`, interleaved: no compile cache A 225 / 233 / 231 / 184 / 190 / 226 ms, B 171 / 162 / 155 / 133 / 154 / 176 — **B lighter 6 of 6, paired median −56 ms of about 220**; compile cache warm A 176 / 234 / 191 / 181 / 167 / 165, B 110 / 155 / 124 / 120 / 119 / 121 — **6 of 6, paired median −57 ms of about 180, a third**. Heap after import **30 → 22 MB**, RSS 120 → 110, every pair. Modules under the trace, armed: 1,130 → about 295. |
+| **Verdict** | **open** — measured, the remedy sized; the day F1164 named has come |
+
+**Why now and not at F1164.** F1164 recorded bundling as "the architecture-
+level lever, with the number, for the day the rest is spent", and listed what
+it would cost: "it changes the published shape every deep import in `test/`
+and the examples rely on". Half of that premise is checked and false — no
+example deep-imports anything (`exports` has no `./dist/*` pattern, so a
+consumer *cannot*, which is A04 §1's seal), and `test/` imports `src/` or
+`dist/` files by relative path, which a bundle beside them does not move. The
+rest is now spent: the compile cache (R4.6), the quantisation table (C10
+I41), the emulator (C23 I71) and the grammars (C09 I71) off the graph, the
+Mermaid renderer its own entry (C24 I36), es-toolkit's barrel narrowed (C24
+I37). What is left is the per-file floor, and only the file count moves it.
+
+**What the bundle must keep, and how each is checked.**
+
+- *One instance of every module across every entry.* `testing` and `fixtures`
+  share the registry, the theme and the measurer with the runtime; a bundle
+  per entry without splitting would give a consumer's test two registries and
+  an `instanceof` that lies. `splitting: true` gives one chunk graph; a T5 row
+  imports two entries in one child and asserts a shared class is the same
+  object. The file tree in `dist/` is a second instance of everything and is
+  reached only by relative path from inside this repository — no `exports`
+  pattern leads to it — so nothing outside can mix the two.
+- *The same names.* Each bundled entry's `Object.keys` equals its file entry's
+  — the runtime, `testing`, `fixtures`, `profiling`, `mermaid`, `launch` — in
+  one T5 row; C24's surface rows keep running over `src/`.
+- *The emulator and the renderer stay off the runtime's graph.* esbuild keeps
+  a dynamic `import()` as its own chunk, measured above (`emulator-*.js`); the
+  Mermaid entry is a separate entry point and its renderer is `external`, so
+  T5.6 and T5.22's claims hold in bundle form and the row that says so runs
+  the same children through the bundle.
+- *Acyclic already.* MG1 and MG22 hold the graph acyclic across and within
+  layers, which is the property that makes a bundler's single-scope
+  evaluation order the loader's order; nothing in `src/` reads
+  `import.meta`, `__dirname` or `createRequire` (grepped, none).
+- *Frames stay named.* C28's sampled-stack card draws `url:line` from
+  `callFrame`; in a bundle that is `chunk-LBZ3RKGM.js:10038`. Enabling Node's
+  source-map support process-wide costs the start 15–60 ms in five pairs
+  (rejected — it would give back a third of the win to repair a card that is
+  drawn on request). The honest form is lazy: the fold resolves a frame
+  through the chunk's linked map when the card is folded — `node:module`'s
+  `SourceMap` over the sibling `.map`, **36 ms once**, and esbuild composes
+  tsc's maps so the answer is `src/presentation/blocks/registry.ts:1074`, the
+  name the deck already shows under vitest. A frame with no map beside it
+  keeps its URL.
+
+**Remedy, sized.** A04 §5's build is `tsc` then `tools/bundle.mjs` — esbuild,
+six entries from `dist/`, `splitting`, `packages: "external"`, `sourcemap:
+"linked"`, `sourcesContent: false`, into `dist/bundle/`; `exports` targets
+move there and every `types` stays on `dist/*.d.ts`; `esbuild` gains a
+Development row in `DEPENDENCIES.md` (SS31) pinned to the version `tsx`
+already brings. C24 §2 says what an entry resolves to and **I38** holds the
+four properties above; C28 **I65** holds the located frame; C23 I71 and C24
+I36 gain a sentence each that their claims are checked through the bundle
+too. Rows: C24 T5.8 (parity, one instance, module count under the armed
+trace below 400, the emulator chunk absent until a shell command), C28 T1.129
+(the locator over a synthetic chunk and map — resolved, map absent → URL
+kept, map malformed → URL kept) and T4.69 (a fold over the built bundle's
+chunk names `registry.ts`). About 60 lines of `tools/bundle.mjs`, 50 of
+`src/shell/profiling/locate.ts`, a parameter on `foldCpuProfile`, and a
+mutation run each for the bundle rows and the locator.
+
+**Not on the list.** Minification — the compile cache already holds the
+compiled form, and a minified stack is a card nobody can read. Bundling
+`ink` or `react` in — they are the consumer's to deduplicate, and `packages:
+"external"` is what keeps `prepareLaunch()`'s target at
+`node_modules/ink/build/ink.js`. Replacing `dist/`'s file tree — every tier-5
+child, probe and tool reads it by path, and it is what the bundle is built
+from.
+
+**Closed — built and measured.** A04 §5, C24 I38 and C28 I65 as sized:
+`tools/bundle.mjs` after `tsc` (six entries, `splitting`, `packages:
+"external"`, linked maps without sources, into `dist/bundle/`), the six
+`default` targets moved there with every `types` on the tree, `esbuild` 0.28.2
+in `DEPENDENCIES.md`'s Development table pinned to the copy `tsx` brings;
+`src/shell/profiling/locate.ts` and a locator parameter on `foldCpuProfile`,
+created once per inspector. T5.8 runs the bundled entries under the import
+trace — the count, the six parity lists, `b.live` through the runtime read by
+`liveParts` through `testing`, the emulator chunk after a shell command and
+not before, and the export map beside files that exist; T1.129 holds the
+locator over a synthetic map and T5.5 over the built chunk, naming
+`registry.ts` and the declaration's line. Mutation runs: `c24-bundle` control
+caught, four of four (the runtime pointed back at the tree, packages bundled
+in — R4.7's count reads zero es-toolkit resolutions — no maps, an entry
+dropped); `c28-locate` control caught, five of five. Gates: enforce green,
+6,264 root rows and every example suite, 458 goldens with no mover, 137 e2e.
+
+**Three rows encoded the old shape and none of them named it.** The seal's
+`packageRoot()`, the minimal example's README row and two C24 contract rows
+each derived a path from the runtime's resolved URL by one `../` or from the
+`default` target by a regex — correct for as long as the entry was
+`dist/index.js`, and wrong by one directory the moment it was not. Each now
+derives from what actually names the thing: the root is whatever sits above
+`dist/`, and an entry's source is beside its `types` target.
+
+| reading, F1192 build A (the tree) against this build B (the bundle), both armed by `prepareLaunch()`, `make load-down`, load average 3–5 as the suite drained | A | B |
+|---|---|---|
+| modules on a cold import under the trace | 1,133 | **302** |
+| cold import, container-local, no compile cache, eight interleaved pairs | 278 / 183 / 202 / 169 / 206 / 267 / 249 / 199 ms | 182 / 128 / 137 / 136 / 187 / 178 / 172 / 149 — **B lighter 8 of 8, paired median −60 ms of about 210** |
+| cold import, container-local, compile cache warm, eight pairs | 183 / 176 / 216 / 216 / 237 / 148 / 140 / 161 | 130 / 186 / 133 / 129 / 150 / 96 / 106 / 105 — **7 of 8, paired median −54 ms of about 180** |
+| heap used after the import · RSS | 30–31 MB · 113–125 | **21–23 MB · 101–111**, every pair |
+| `plots-tui` end to end to its no-TTY exit, on the bind mount, the shipped launcher against the same launcher with every `dist/bundle/` resolution redirected to the tree, six pairs | 618 / 537 / 603 / 548 / 557 / 526 | 385 / 418 / 393 / 362 / 364 / 387 — **6 of 6, paired median −183 ms of about 550, a third** |
+| the bundle's build | — | 347 ms after `tsc`; nine files, 2.1 MB against the tree's 12 |
+
+**What the end-to-end figure says.** The launcher's start on the filesystem
+this repository develops on is where the loader's per-file cost is largest,
+and it is where the bundle takes the most: a third of the whole start, against
+a quarter of a quiet container-local import. The frame is untouched — same
+code, same order, the golden tier at 458 — and the profiler's card names
+`src/presentation/blocks/registry.ts:1074` from a chunk frame, which is the
+name it showed before there was a chunk.
+
+**What remains.** Ink's hundred modules, React's forty and Yoga's
+instantiation are the renderer's floor; the compile cache (R4.6) and the
+narrowed barrel (C24 I37) are what the launchers do about them. The `minimal`
+example's launcher still carries neither R4.6 nor R4.7 by R4.4's rule. The
+next figure on a cold start is Node itself — about 40 ms before the first
+line of the launcher runs — and it is not Calcium's.
+
+## F1194 — a sixty-second orbit grows the live heap by half a megabyte a second, and every byte of it is the bench harness's: the session holds no frame it has painted ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | Session memory under sustained frames — the bunny in orbit through `tools/bench/plots.mjs`'s session over `fakeStdout`/`fakeStdin`, the F1193 build, `make load-down`. |
+| **Reached for** | A copy of the bench with the orbit's duration from the environment and a forced GC every three seconds, `process.memoryUsage()` read after each: **bunny, profiler on, 60 s — live heap 64.7 → 93.0 MB, 0.52 MB/s, 412 frames (about 70 KB a frame)**; profiler off, 45 s — 63.9 → 81.7, 0.46 MB/s; suzanne, 45 s — 55.1 → 69.3, 0.36 MB/s, 333 frames (about 49 KB a frame). Linear in every run, so not the profiler's and not the mesh's size. `--heap-prof` over a 30-second orbit, live at exit: 11.7 MB of strings allocated in `fitStyled` under `exact` under the transcript's paint — one frame's rows per frame, all still reachable — beside the fixed costs (13.0 MB module source text in the loader, 6.6 `parseObj`, 5.4 `geometryOf`, 4.0 the mesh's `deepFreeze`, 3.8 `unitCube`). The holder is `fakeStdout`: `write(chunk)` pushes every chunk onto an array the bench reads screens from, unbounded. **With that array emptied every three seconds, the same 45-second bunny orbit: 62.6 → 62.9 MB, 0.007 MB/s** — fourteen readings within 300 KB of each other. |
+| **Verdict** | **checked — clear.** The session retains nothing per frame; the render cache, the parts and the plan slots are one per entry and replace. The reading that said otherwise was the instrument's. |
+
+**What the instrument does to every other reading.** `fakeStdout.chunks` is
+how the bench reads the screen (`screenRows`), and it is also why every
+`ResourceSample.rss` a bench reports climbs for the length of the run: the
+subject's process is carrying the harness's transcript of itself. A bench
+figure for memory is the last sample minus the first, and here the whole of
+that difference was the harness. The arm that settles it is cheap and is now
+in the soak copy: drop the chunks and read again; a slope that survives is the
+subject's. Recorded rather than fixed in `fakes.mjs` — `screenRows` parses the
+chunk stream from the last full repaint and a cap would need to know where
+that is — so the rule is the reading's: **a memory figure taken over a fake
+that records is the recording's until the recording is emptied.**
+
+**What the fixed set says.** RSS sits at about 220 MB through a bunny orbit
+and does not move once the chunks are dropped; the heap's floor is the mesh
+(the parsed OBJ, the frozen geometry object graph, the typed geometry — about
+20 MB for 69k faces) and the loader's retained source text, which is Node's.
+No remedy is owed here; the number is the record for the next reading.
+
+## F1195 — three surfaces the pass had not measured — an image under kitty, a table of thousands of rows, a transcript of hundreds of entries — read beside a spinner, and none owes a remedy ★★☆☆☆
+
+| | |
+|---|---|
+| **Surface** | The tick frame beside three block shapes F1189–F1191 did not measure: `image` under `imageProtocol: "kitty"` (`TERM=xterm-kitty`), `table` at 2,000 and 20,000 rows, and a transcript of 300 one-block entries — each with a `status` spinner, through a session over fakes on the F1193 build (`out/probe-surfaces.mjs`, `make load-down`). |
+| **Reached for** | **Image**: the kitty APC carries the picture once — 18,158 bytes before the window, **0 during** four seconds of ticks; 48–63 writes of about 0.1 KB each; tick work p50 1.5–3.8 ms against 2.9 for the spinner alone, 3–5% of a core. **Table**: a spinner below 2,000 rows is off screen and the session correctly draws no tick at all — 0 writes, 1% of a core — so the only figure is the document's first frame: **40 ms at 2,000 rows, 265 ms at 20,000**; the profile is the wrap of every cell (`wrapCellsParts` 65 ms, `clusterCells` 53, `placeableClusters` 42, `placeable` 24, `wrapRuns` 17, `breakPoint` 15 over 80,000 cells) plus construction (`deepFreeze` 24, `validate.table` 17, `rebuild` 12). **Entries**: 300 submissions then a spinner — tick work **p50 0.31 ms**, p95 0.66, 3.0% of a core, 21 writes in four seconds; the render cache misses `range` 293 and `absent` 302 during the building and `tick` 21 after. |
+| **Verdict** | **checked — clear.** No per-frame cost on any of the three; the table's figure is a one-off proportional to the document, and it is the contract's. |
+
+**Why the table's first frame is what it is.** A row's height is its wrapped
+cells, and the table's height is the sum of its rows, so C09's measure has to
+wrap every row once before the viewport can place the block — O(rows) on the
+first frame and memoised after (C22 I100). Nothing in the profile is repeated
+or misplaced: it is 80,000 cells at about three microseconds each. A `ps`
+of two thousand containers pays 40 ms once; a table of twenty thousand rows is
+not a shape any example produces, and the row here is the number for the day
+one does.
+
+**What the image reading settles.** F1164's list had "images unmeasured", and
+the fear was a picture re-encoded or re-sent on every frame under a graphics
+protocol. It is not: `transmitFrame` sends a placement once and releases it
+when the frame no longer places it (C09 I66), and the per-tick cost beside a
+spinner is the placeholder rows.
+
+## F1196 — the stress bench: a transcript full of one thing, and transcripts full of many — twenty-seven cases read as frame rate, frame cost, input latency and live heap, and the baseline names five defects ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `tools/bench/stress.mjs`, against `dist/` through the public surface over `tools/bench/fakes.mjs`, on the F1195 build (`514fa151`, node 22.23.2, `make load-down`, 120×40). Pure cases — a transcript holding nothing but one kind: `spinners`, `steps`, `stream` (200 live parts at 16 ms), `text`, `code`, `logs`, `table`, `bigtable` (5 × 5,000 rows), `kv`, `patch`, `bigpatch` (5 × 4,000 lines), `notice`, `tip`, `pills`, `panel`, `progress`, `image` under kitty, `everyplot`, `everylive` (46 forms at 33 ms), `everymesh` (every `plot3d` rung at 33 ms), `plot:<form>`, `live:<form>`, `mesh:<rung>`, `livemesh:<rung>` — and mixed: `session` (a coding session of responses, code, patches, tables, logs, a spinner and a live plot at the tail) and `mixed` (round-robin of all six). Each loads `n` entries through the shell's own submit path, runs the animation for four seconds, then measures forty PageUp/PageDown keystrokes and twenty-six typed characters from the byte in to the first byte out, and reads the heap after a forced GC with the fake's record emptied (F1194). |
+| **Reached for** | The matrix, one process per case (`matrix`). **fps** is frames drawn per second under the framework's own cadence; **ms/frame** is the window's CPU per frame drawn; **headroom** is `1000 / ms/frame`; **work** is the profiler's per-frame work over every frame; **key** and **type** are keystroke latencies. |
+| **Verdict** | **Closed — built and measured.** The bench is the instrument; the baseline below is the record the findings that follow are cut against. |
+
+```
+case                n  load ms   fps  ms/frame  headroom  work p50   p95  max  key p50   p95  type p50  cpu %  heap MB  frames
+spinners          300      616   5.2       4.2       240       0.3   0.7    6      0.5   1.4       0.2      2     58.4    1018
+steps             300      623   5.2       7.0       142       0.3   0.8    5      0.8   1.8       0.4      4     58.5    1018
+stream            200      846  25.0      15.1        66       0.6   2.0    5      0.7   1.6       0.4     38     61.9     797
+text              200     1037   0.0         -      2174       0.5   3.0   20      1.6   3.1       0.3      2     64.6     697
+code              200      863   0.0         -      2577       0.4   2.6   15      1.1   6.1       0.3      3     81.7     697
+logs              200      450   0.0         -      3425       0.3   0.8    5      0.6   2.3       0.2      2     66.1     697
+table             100      173   0.0         -      3731       0.3   0.4    9      0.3   1.2       0.3      2     64.6     397
+bigtable            5      148   0.0         -      2632       0.4  19.7   76     19.0  21.0       0.3      2     65.7     112
+kv                300      632   0.0         -      3521       0.3   0.6    6      0.5   1.0       0.3      2     59.4     997
+patch             100      669   0.0         -      1316       0.8   4.0   19      3.3   5.8       0.7      2     74.1     397
+bigpatch            5      163   0.0         -       214       4.7   9.6   32      7.4  11.1       4.0      2     62.6     112
+notice            500      998   0.0         -      3731       0.3   0.5    5      0.5   2.0       0.3      2     59.9    1597
+tip               300      788   0.0         -      2525       0.4   0.8    6      0.9   2.6       0.4      2     60.0     997
+pills             300      650   0.0         -      3333       0.3   0.7    5      0.8   3.5       0.4      3     59.3     997
+panel             150      568   0.0         -      2525       0.4   1.6    5      0.5   0.9       0.3      2     60.6     547
+progress          300      752   0.0         -      2874       0.3   0.6    5      0.5   1.6       0.3      2     59.2     997
+image              60      451   0.0         -       906       1.1   3.0    7      0.0   0.4       0.0      2     55.8     277
+everyplot          47      237   0.0         -      2632       0.4   3.8   14      0.6   8.0       0.3      2     57.8     238
+everylive          47      309  25.0       8.3       120       1.2   8.1   18      1.2   6.8       0.4     21     60.4     338
+everymesh          16      345  24.2      10.3        98       4.5   9.9   59      2.4  12.3       0.3     25     71.9     242
+live:line          40      214  23.5      11.1        90       1.3   8.3   10      1.4   3.1       0.4     26     58.2     311
+live:heatmap       40      231  24.5       8.2       122       1.5   8.3   10      1.4   8.7       0.3     20     58.2     315
+live:bar           40      189  26.7       4.9       203       1.2   2.6    7      1.2   3.2       0.4     13     58.1     324
+livemesh:suzanne   12      177  24.0      10.3        97       4.7  11.4   30      0.4   8.3       0.3     25     57.2     229
+livemesh:bunny     12      642  17.5      30.2        33      11.4  23.8   84      0.5  22.6       0.3     53     65.0     203
+session            32      197   5.0       7.6       132       0.6   3.8   16      1.3   5.6       0.4      4     58.3     213
+mixed              60      366   0.0         -      1582       0.6   4.3   26      3.2   5.2       0.5      2     59.4     277
+```
+
+(`ms/frame` in this first matrix includes the profiler's 25 ms sampler; the bench now samples at 250 ms, and the first re-take is the next finding's.)
+
+**What the baseline says, in the order it will be cut.**
+
+1. **The ticker draws at half the rate the spec states, and the spec's own row recorded the half.** `spinners`, `steps` and `session` draw at **5.2 fps** where C22 I60a says the braille set's 80 ms *is observed at 100*; a suzanne orbit through `plots.mjs` draws **7 fps** ((56 − 28) frames over four seconds) where I73 says 30, against a 4 ms frame. T4.17j's comment measured *5 for the spinner alone, 15 with the orbit live* over 990 ms of fake clock and kept the ratio. The mechanism is in `#armSpinner`: the wake is armed from `#render` at the full interval **after** the paint, and the paint sits at the end of C03's window, so the period is *interval + window* — 80 + 100 and 33 + 33 — where the invariant's *floor* wording needs `max`. → opened next, as its own finding.
+2. **A refresh source's visibility gate rebuilds the visible range for every part on every sweep.** `stream` at 200 parts is 38% of a core with a 0.6 ms frame; the CPU profile puts `viewport.visible` at 335 ms of 6 s and its L4 wrapper (`stores.viewport.visible().entries.some(...)`, `construct.ts:1587`) at 250 more, with `sweepParts`, `armParts` and `currentPanel` behind them — twelve thousand full range computations a second for a yes/no answer that changes only when the viewport does. → opened as its own finding.
+3. **The ceiling is 30 fps by two constants, and the goal names 60.** Every live case sits at 24–27 fps: C03's `stream` window is 33 ms and `ORBIT_MS` names the same number. The frame costs 1–5 ms, so the headroom is there; the constants are the spec's and move only with it. → opened after 1 and 2, so the doubled frame rate is paid at the reduced cost.
+4. **A keystroke beside a big table or a big patch costs what the block costs, not what the key costs.** `bigtable` PageUp **19 ms** p50; `bigpatch` **7.4 ms** a page and **4.0 ms per typed character** — the prompt changes and the 4,000-line patch pays again. Candidates from the survey: the table sorts its whole row set on every `window` call, and the patch's `rowsOf` builds a `Row` per line per call for four callers. → to open on their own profiles.
+5. **A live plot's tick costs four to eight times its frame.** `live:line` is 11 ms of CPU a frame against 1.3 ms of frame work; the rest is the app's render, the patch's walks (`countId`, `rewrite`, `countBlocks`, `deepFreeze` — three to four full document walks per patch) and the viewport re-measuring the whole entry at patch rate rather than frame rate. → to open after the visibility gate's re-take separates the sweep from the patch.
+
+**The bunny stays where it is.** `livemesh:bunny` draws 17.5 fps at 53% of a core and 30 ms a frame; twelve bunnies at 120×40 keep two or three on screen, and the raster is the frame. F1155–F1188 took the allocation out of it; what is left is the arithmetic, and culling would move goldens. The goal's own concession covers it.
+
+**Two readings of the instrument itself.** A count argument passed as the empty string was read as `Number("") = 0` entries and the first profile measured a transcript of nothing (fixed: empty means the default). And the `ms/frame` column at the low frame rates is inflated by the profiler's own 25 ms sampler — the spinner case's 4.2 ms is mostly sampler — which is why the bench now samples at 250 ms and the first re-take is the honest column.
+
+## F1197 — the ticker's period is its interval plus C03's window, so a spinner draws at 5 fps where the spec states 10 and an orbit at 7 where it states 30 — and the spec's own row measured the half and kept it ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `#armSpinner` in `src/shell/session.ts`, which arms the next wake **out of `#render`** — after the paint — for the full interval (`ms` = the fastest of the spinner set's 80 ms, `ORBIT_MS` 33, the image frames' due). `#animate` then commits `spinner` or `stream`, and C03 holds the frame for its window (100 or 33 ms) before the paint that re-arms. The two waits are serial. |
+| **Reached for** | `tools/bench/stress.mjs spinners` and `steps` (F1196): **5.2 fps** drawn over four seconds, 300 entries. `tools/bench/plots.mjs orbit suzanne` under `ORBIT_MS=2000` and `6000`: 28 and 56 frames — **7 fps** over the difference, against a 4 ms frame (work p50 3.8). C22 I60a: *the braille default declares 80 ms and is observed at 100*; I73: *`commit("spinner")` draws at 10fps however fast the timer fires* and *a full-frame rewrite at 10fps instead of 30*. `test/integration/orbit-wiring.test.ts` T4.17j's comment: *Measured over 990 ms of the clock: 5 for the spinner alone, 15 with the orbit live* — the defect's own figures, kept as the ratio the row bounds. |
+| **Verdict** | **open.** The period is `interval + window` where I60a's *floor* needs `max(interval, window)`: 80 + 100 = 180 ms is 5.5 fps; 33 + 33 = 66 ms is 15 fps under fake timers and 7 measured, the paint's own cost and the settle adding to the chain. Every animated surface — spinner, steps, orbit, animated image — runs at roughly half its designed rate, and the goal names 60. |
+
+**Why the spec read as satisfied.** I60a says the window is a floor *under* the
+ticker, which is true of one wake: a tick at 80 ms is drawn no sooner than 100.
+It says nothing about where the *next* wake is armed from, and `#render` arms it
+from the paint — so the floor is laid end to end with the interval instead of
+beneath it. T4.17j measured 5 and 15, wrote both numbers into its comment, and
+asserted only that the second exceeds twice the first, which the defect
+satisfies exactly as the fix does. This is *ask where a settled claim is written
+down* with the record present and wrong: the sentence *observed at 100* was a
+derivation from C03's table, never a measurement, and the row beside it held the
+measurement that contradicted it.
+
+**Remedy, sized.** Arm the wake for the *stamp's* next due time rather than for
+the interval after the paint: `delay = max(0, min(tickAt + spinnerMs, motionAt +
+orbitMs, now + framesMs) − now)`, the stamps being the ones I74 already advances
+by whole intervals. A paint that lands at the end of the window then re-arms a
+wake that is already due, and the next frame follows one window later — the
+period becomes `max(interval, window)`: 100 ms for the braille spinner, 33 for
+the orbit, and the tick arithmetic (whole steps, remainder kept) is unchanged. A
+new invariant on C22 stating the period; T4.17j's comment corrected and a rate
+row added that fails on the shipped code; the fail-on-revert row is the shipped
+arming. One file in `src/`, no spec change outside C22, byte-identical frames —
+only their timing moves.
+
+**Closed — built and measured.** C22 I105 and C03 §3 as sized, and one half
+more than sized: `#armSpinner` arms for the stamps' due time less now, clamped
+at zero; and C03's `spinner` window is **80 ms**, the braille set's interval,
+because the first half alone left the period at exactly the 100 ms window over
+80 ms glyphs and T4.35 read nine glyphs of ten — the frames fell on ticks 1, 2,
+3, 5 of every five and two glyphs were never drawn. T4.17u asserts the rates as
+frames written outside the synchronised-update brackets (I103 keeps a
+bystander kind out of a tick's render, so the count T4.17j reads gives one for
+the spinner arm); T4.17j's comment carries 10 and 30 with the 5 and 15 it used
+to state. Mutation run `c22-ticker-period`: control caught, four of four (the
+arming from the paint, the stamps ignored, the spinner alone from now, the
+window back at 100 — the last through T4.35); `c22-spinner` five of five and
+`c22-camera` fifteen of fifteen unchanged. Gates: enforce green, 6,265 root
+rows, 458 goldens with no mover, 137 e2e.
+
+**The bench was measuring the fallback.** `plots.mjs` read 7 fps on the orbit
+because a fake terminal's `TERM` identifies nothing to C02, `synchronisedUpdate`
+resolves false, and the orbit takes the 100 ms tearing cap and commits `spinner`
+by I73's design. Both benches now pin the capability (`SYNC=0` measures the
+torn arm), and the before-figure below is taken the same way from the F1193
+build kept in `out/dist-B`.
+
+| reading, F1193 build B against this build A, both pinned, `make load-down`, 120×40 | B | A |
+|---|---|---|
+| `stress spinners` (300 entries), frames drawn per second over 4 s | 5.2 | **11.2** |
+| `stress steps` (300) | 5.2 | **11.5** |
+| `stress session` (32, a spinner and a live plot at the tail) | 5.0 | **9.7** |
+| `plots orbit suzanne`, frames over the 4 s between `ORBIT_MS=2000` and `6000` | 13.0 | **26.5** |
+| the same orbit, un-pinned (the 100 ms cap, both builds) | 7 | 10 |
+| CPU per frame drawn, spinners | 6.6 ms | 6.4 ms |
+
+The spinner's ceiling is now its own glyph interval — 12.5 a second, 11.2
+drawn under real timers — and the orbit's is C03's `stream` window plus the
+frame, 26 against a 4 ms frame. Every frame is byte-identical; the goldens say
+so.
+
+**What remains.** The orbit sits at 26 of a 30 ceiling because the window is
+armed after the paint and the paint is 4 ms; the goal names 60, and both
+constants (`stream` 33, `ORBIT_MS` 33) are C03's and C22's to move. The
+un-pinned arm stays capped at 100 ms by I73's tearing argument, which the
+goal's own concession on terminals without DECSET 2026 covers.
+
+## F1198 — a refresh source's visibility gate rebuilds the whole visible range for every part on every sweep: 200 live parts at 16 ms spend a tenth of a core answering yes or no ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | C23's refresh driver (`src/shell/refresh.ts`) asks `deps.visible(part.host)` per part per sweep — in `anyoneLooking`, the stale pass, `armParts`'s three gates and the readouts — and L4 answers it as `stores.viewport.visible().entries.some((e) => e.id === host.id)` (`src/shell/construct.ts:1587`). C14's `visible()` computes the range afresh on every call: a `locate` on the index, a walk over the on-screen entries, a frozen object per entry and one for the range. |
+| **Reached for** | `tools/bench/stress.mjs stream` (F1196): 200 live parts at 16 ms, 27 fps drawn at **41% of a core** with a 0.6 ms frame — 14.9 ms of CPU per frame drawn. `--cpu-prof` over the run: `visible` in `viewport.js` **335 ms** of 6,003 and its L4 wrapper **250 ms** more, with `sweepParts` 82, `currentPanel` 37 and `armParts` 35 behind them; `(garbage collector)` 179. Twelve thousand full range computations a second for an answer that changes only when the viewport does. |
+| **Verdict** | **open.** The range is a pure function of the viewport's state — the store's entries, the top row, the height, the live entry — and that state moves only through paths C14 already owns. Recomputing it per question is the cost; the question rate is the app's and will only rise at 60 fps. |
+
+**Remedy, sized.** `visible()` keeps the last range it answered and returns it
+until the viewport moves. Every movement — a scroll, a content change through
+`#afterContent`, a resize, a clear — ends in `#setTop`, I2's clamp, so the clamp
+is the memo's one invalidation point and no path can move the viewport past it.
+`stats` gains the memo's hits and misses beside the height cache's (C14 I27's
+rule: a cache that publishes its size publishes its rate). One invariant on
+C14, one unit row that reads the same reference back across two calls and a
+fresh one across each of the three axes, one fail-on-revert row for the
+invalidation moved off the clamp, and a mutation run. L4's wrapper is left as
+it is: `.some` over at most a screenful of entries is the cheap half. Frames
+are untouched; only the sweep's cost moves.
+
+**Closed — built and measured.** C14 I30 as sized. The drop is on the call and
+not on a changed row, and that clause earned its place in the mutation pass:
+the first run left *dropped only when the clamp moved the row* alive, because
+every step of T1.23 moved the top row — a scroll, an append while following a
+tail longer than the region, a shorter region. The step that reaches it is an
+append to a transcript that fits: the top row is 0 before and after and the rows
+under it are different, and a memo keyed on the row would serve the range
+without the new entry. T1.23 walks that step now and the spec row says so
+(C14 T1.23, T6.26). Second run of `c14-visible-memo`: control caught, three of
+three (the drop into the scroll methods, the drop on a changed row only, the
+counters swapped); `c14-cap` and `c14-windows` unchanged. Gates: enforce green,
+6,266 root rows, 458 goldens with no mover, e2e green — T5.6's idle-CPU bound
+went red once in the chain at 0.0054 against 0.005 and passed alone.
+
+| reading, F1197 build B against this build A, both pinned, `make load-down`, 120×40, paired rounds | B | A | rounds |
+|---|---|---|---|
+| `stress stream` (200 live parts at 16 ms), CPU per frame drawn | 14.1 ms | **8.0 ms** | 8, every pair lower |
+| the same, CPU share of one core | 36.5% | **21.9%** | 8, every pair lower |
+| the same, key latency p50 | 0.17 ms | **0.09 ms** | 8 |
+| `stress everylive` (47 live forms), CPU per frame | 9.7 ms | **6.4 ms** | 3, two of three lower |
+| `stress live:line` (40), CPU per frame | 9.4 ms | 8.1 ms | 3, within the spread |
+| `stress session` (32), CPU per frame | 7.4 ms | 6.9 ms | 8, paired differences straddling zero |
+| frames drawn per second, every case | unchanged | unchanged | the window sets it, not the sweep |
+| heap after `gc()`, every case | within 0.2 MB | | |
+
+The first three-round table read session at 5.2 → 8.3 ms and that is recorded
+here rather than dropped: five more paired rounds put the differences at +1.5,
+−0.8, +3.8, +0.1 and −3.3 ms on a case that draws forty animated frames in the
+window, which is the spread and not a cost. Stream is the case the finding was
+opened on and it is the one that moves in every pair.
+
+**What remains.** The sweep still asks per part per sweep and L4 still answers
+with `.some` over the range's entries; both are now cheap and neither is
+free. The frame rate did not move because the finding was never about the
+frame: 27 of a 30 ceiling in every row, which is the `stream` window's to move and
+the next finding's.
+
+## F1199 — the frame cadence is 30 a second by two constants written for a budget the goal has since doubled: `stream` at 33 ms and `ORBIT_MS` at 33 cap every live surface at 27 while the frame underneath costs 6 ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | C03's `stream` window (`src/terminal/frame-scheduler.ts` `WINDOWS`, 33 ms, *~30 frames/s ceiling, matching the A02 §7 budget*) and C22's `ORBIT_MS` (`src/shell/session.ts`, 33, *`stream`'s window*), which floors the orbit's and a GIF's wake where `synchronisedUpdate` holds. A02 §7's row reads *≤ 30 frames/s* for streaming and T5.1 asserts it from above at 30.4. |
+| **Reached for** | The goal names 60 and the F1196 matrix reads 27 on every live case: `stream` 25.4 and 25.7 fps, `live:line` 24.5, `everylive` 26.0, `livemesh:suzanne` 23.2, the suzanne orbit 26.5. A copy of this build with both constants at 16 (`out/dist-D`, `sed` on the built files, the bench's own refresh sources at 16 as well), two paired rounds each, `make load-down`, 120×40: |
+
+| case, sources at the cadence named | 33 ms window | 16 ms window | CPU share, 33 → 16 |
+|---|---|---|---|
+| `stream` (200 live parts, one-line render) | 25.4 · 25.7 fps | **46.2 · 49.5** | 31.0 → 27.9%, 29.0 → 27.7% |
+| `live:line` (40 live line plots) | 24.5 · 24.4 | **51.0 · 51.0** | 23.5 → 22.3%, 23.5 → 21.9% |
+| `everylive` (46 live 2-D forms) | 26.0 · 25.5 | **44.5 · 45.2** | 17.0 → 36.4%, 18.0 → 32.8% |
+| `livemesh:suzanne` (12 live meshes) | 23.2 · 22.0 | **39.7 · 41.0** | 27.2 → 44.0%, 29.7 → 41.3% |
+| `plots orbit suzanne`, frames over the 4 s between `ORBIT_MS=2000` and `6000` | 22.3 · 25.8 | **39.5 · 42.3** | work p50 4.8 → 3.7 ms |
+| `spinners` (300) | 11.7 · 11.7 | 11.5 · 11.2 | 3.5 → 6.3%, 4.1 → 5.7% |
+| `session` (mixed, a live plot at the tail) | 9.7 · 9.7 | 12.0 · 12.2 | 8.5 → 5.6%, 8.6 → 4.4% |
+
+The tree with its sources moved to 16 ms and the window left at 33 (`out/stress-A16.mjs`) draws 25 to 27 on every case — the source cadence is not the cap, the window is.
+
+| | |
+|---|---|
+| **Verdict** | **open.** Two of the three constants that set the rate are in the wrong place for the goal: C03's `stream` window and C22's `ORBIT_MS` say 30 because A02 §7 said 30 when they were written, and the frame they pace costs 0.5 to 6 ms. The third, `spinner` at 80, is the glyph interval and stays (F1197). Where the frame is cheap — a one-line render, a line plot — the 16 ms window draws twice the frames for the same CPU, because a frame's cost is the same whether it waits 16 or 33 for its turn and the sweep between frames is what the 33 was paying for. Where the frame is not cheap — every 2-D form at once, twelve meshes — the frames double and so does the CPU share, which is the price of drawing them and the next findings' business to lower. 60 is not reached at 16 either: 46 to 51 on the cheap cases, because the window is armed after the paint and the paint sits at the end of it (C22 I105's `#armSpinner`, T5.1's *window + frame cost + timer slop*). |
+
+**Remedy, sized.** C03 §3's `stream` row becomes **16 ms** with its reason
+rewritten — the ceiling is the display's, and *terminals benefit from fewer,
+larger writes* was the argument for 33 and is answered by DECSET 2026 where it
+holds and by I73's 100 ms cap where it does not; A02 §7's streaming budget
+becomes *≤ 60 frames/s*; C22's `ORBIT_MS` follows `stream` as I73 says it does.
+`resize` stays at 16 and is now equal to `stream` rather than shorter, so §8a A3
+and T3.16 restate their mechanism: a resize under a pending stream lands on the
+stream's own timer rather than re-arming it, and its 16 ms bound holds either
+way. Every row that carries the number is re-derived rather than substituted —
+T1.3, T1.4, T3.12, T6.13, C28 T4.3's window, T4.17u's sixty wakes, T4.17q's
+timeline, T5.1's ceiling at 62.5 with its CPU bound kept at a quarter of a core
+and measured before it is trusted. The walk rows in C22 §6i that were written
+against 33 keep their figures with the F1197 form of note. The bench's live
+sources move to 16 so the matrix measures the ceiling and not the source.
+Gates as always; goldens are cadence-blind and should not move.
+
+**Closed — built and measured.** C03 §3 and C22 I73/I105 as sized, plus one
+ruling the sizing did not see: with `stream` and `resize` both at 16 the two
+tie on strictness, and T1.24 read `stream` — the last reason committed — for a
+frame that was a repaint. C03 I16 now breaks an equal window for `resize`,
+because the frame it drives is a repaint (I7) and the reason handed down should
+say so; T6.18 names the flattening and `c03-resize-window` mutates it. Every
+row carrying the number was re-derived rather than substituted; two needed
+more than substitution — T6.2's five commits at 5 ms apart crossed a 16 ms
+window, and T4.17u over sixty 16 ms wakes read ten spinner frames where the
+eleventh landed on 960 exactly, so it runs sixty-two. Mutation runs:
+`c22-ticker-period` six of six with STREAM-33 and ORBIT-33 added, both caught
+by T4.17u's orbit bound; `c03-resize-window` six of six with TIE-FLAT added.
+Gates: enforce green, 6,266 root rows, 458 goldens with no mover, 137 e2e —
+T5.1 held at the 62.5 ceiling and 40/s floor on the first run.
+
+| reading, F1198 build B against this build A, both pinned, sources at 16 ms in both benches, `make load-down`, 120×40, three paired rounds | B | A | CPU share, B → A |
+|---|---|---|---|
+| `stress stream` (200 live parts), frames drawn per second | 26.5 | **51.8** | 24.6 → 24.4% |
+| `stress live:line` (40) | 25.0 | **48.5** | 21.6 → 25.2% |
+| `stress everylive` (46 forms) | 25.0 | **46.2** | 23.0 → 34.5% |
+| `stress livemesh:suzanne` (12 meshes) | 23.7 | **41.2** | 24.8 → 39.9% |
+| `plots orbit suzanne`, frames over the 4 s between `ORBIT_MS=2000` and `6000` | 24.8 · 26.0 · 24.5 | **43.0 · 41.8 · 41.8** | work p50 3.6 → 3.6 ms |
+| `stress session` (mixed) | 9.75 | 12.0 | 7.4 → 5.6% |
+| `stress spinners` (300) | 11.5 | 11.5 | 6.2 → 3.7% |
+| `stress text`, `bigpatch` — key and type latency p50/p95 | 0.04/0.13 · 0.07/0.18 ms | 0.03/0.11 · 0.06/0.19 ms | static, unchanged |
+| heap after `gc()`, the live cases | | **+0.7 to +1.6 MB** | more frames in the profiler's timeline over the same 4 s |
+| every case, frames | byte-identical | | 458 goldens, 0 movers |
+
+**What remains.** Sixty is the ceiling and 46 to 52 is the rate, because the
+window is armed after the paint and the paint sits at the end of it: at a 16 ms
+window a 5 ms frame is a 21 ms period. The path from here to 60 is the frame's
+cost, not the cadence — the per-patch path for live plots, the render of each
+2-D form, the mesh raster — which is where the next findings go. The heavy
+cases pay for their doubled frames in CPU share (every-live 23 → 34%, twelve
+meshes 25 → 40%) and that is the same frame cost seen from the other side. The
+spinner stays at its glyph interval by design (F1197), and the orbit without
+DECSET 2026 at I73's 100 ms cap. The heap rise is the timeline's, not the
+frame's, and reads as such in `misses`.
+
+## F1200 — the window is laid end to end with the frame: C03 dates the ceiling from the commit that follows a paint, so a continuous source draws at window + frame + slop and 60 is unreachable at any frame cost ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | C03 `commit` (`src/terminal/frame-scheduler.ts`): a coalesced commit from `idle` arms the window; the write consumes the timer; the next commit — which under a continuous source lands the moment the write returns — arms a fresh one. §3 calls the window a *throughput ceiling*, and what the code implements is a ceiling on the gap between a commit and its frame, not on the gap between frames. |
+| **Reached for** | After F1199 every live case sits at 46 to 53 of the 62.5 the 16 ms window allows (`stress stream` 53.7, `live:line` 51.7, `everylive` 47.8, `livemesh:suzanne` 41.5, the suzanne orbit 42). `PROFILE_JSON` over `stress stream`, the `stream` frames of the timeline: |
+
+| stream frames, 217 in the window | p10 | p50 | p90 |
+|---|---|---|---|
+| gap between consecutive frames | 17.39 ms | **18.34** | 19.47 |
+| `wait` — earliest unserved commit → frame start | 15.73 | 16.69 | 17.58 |
+| `work` | | 1.19 | 1.45 |
+| frame end → next earliest commit | 0.43 | 0.47 | 0.56 |
+
+18.34 = 16.69 + 1.19 + 0.47: the window, then the frame, then the half-millisecond until the source's next timer fires, and then the window again. Nothing lands during the write — the sources are timers, and a timer cannot fire inside a synchronous write — so the two waits are serial by construction and the rate is 1000 / (16 + frame + slop), which is 54 at a 1 ms frame and 47 at a 5 ms one. **A first hypothesis was measured and did not hold**: opening the next window at the write's start *for a commit deferred during the write* (T3.15's case) changed nothing — 50.7 against 49.5, 50.0 against 47.5 — because the commit does not arrive during the write; it arrives after.
+
+| | |
+|---|---|
+| **Verdict** | **open.** The ceiling §3 describes is a rate — *at most one frame per window* — and the ceiling the code implements is a latency — *at most one window between a commit and its frame*. They agree for a lone commit and disagree for a stream, where the second is stricter than the first by the frame's cost. The fix is clock-free, which is the constraint §3 names: a write opens the next window as it begins, so a commit that lands after the paint is served when that window closes rather than a full window after its own arrival. Frame latency for a lone commit is unchanged; for a commit inside an open slot it is shorter, never longer. |
+
+**Remedy, sized.** C03 gains a fourth state, `paced`: every write arms one
+timer for the shortest coalesced window (16 ms) as it begins, and leaves it
+standing. A coalesced commit that lands while it stands moves the machine to
+`pending` and arms nothing — the slot is already the shortest window, so I3's
+strictly-shorter rule never re-arms; an immediate commit cancels it and writes,
+as today; a slot nobody commits into fires once and lapses to `idle` without
+writing. I9 and I1 hold by cancelling the slot on a throwing render and on an
+unacquired write. One invariant (I17), a §5 row, two unit rows (frames 16 ms
+apart under a continuous source; an unused slot lapses without a write), one
+edge row (a spinner commit inside the slot is served at its close), T3.15 and
+T2.4 restated, T6.19 for the slot cancelled when nothing was deferred, two
+mutations in `c03-resize-window`. Fourteen assertions that read *no timer after
+a frame* become *one timer, the slot, which lapses and writes nothing* — each
+re-read rather than substituted, because half of them were asserting a
+cancellation and the slot is not what they were about. Expected: every live
+case at the source's rate — 58 to 60 where the frame is under 16 ms — and T5.6's
+idle CPU unchanged, since a slot fires once per burst and not per second.
+
+**Closed — built and measured.** C03 I17 as sized: the fourth state, the slot
+armed as the write begins, the lapse, the cancels on a refused or throwing
+write. Thirteen assertions of *no timer after a frame* were re-read one by one:
+eight were asserting a cancellation and now assert the cancelled window is gone
+and the slot stands, five were asserting silence and hold unchanged because a
+refused write opens no slot. **The mutation pass found the harness, not the
+scheduler.** T4.17u's orbit read 41 frames over sixty-two wakes, in a
+`011 011 …` pattern, and a trace of arms and fires against the injected clock
+showed why: `wake` advanced the clock sixteen milliseconds and then drained the
+fake's timers, so a zero-delay wake armed at the end of one drain fired at the
+start of the next with the clock already moved — the ticker read it as sixteen
+late, armed the next wake for a full window, and that wake tied with the slot's
+close, where the fake fires the earlier-armed timer first. A real wake armed
+after a paint is due strictly inside the slot, so no real clock produces the
+tie; the helper now drains the first millisecond before the clock moves and the
+row reads 61. Mutation run `c03-resize-window`: eight of eight, SLOT-CANCELLED
+and LAPSE-WRITES added, WINDOW-SLIDES re-anchored on the widened guard. Gates:
+enforce green, 6,267 root rows, 458 goldens with no mover, 137 e2e — T5.1 and
+T5.6 both green at the first run, the idle row unmoved by a slot that lapses
+once per burst.
+
+| reading, F1199 build B against this build A, both pinned, sources at 16 ms, `make load-down`, 120×40, three paired rounds | B | A | CPU share, B → A |
+|---|---|---|---|
+| `stress live:line` (40), frames drawn per second | 49.0 | **57.5** | 23.2 → 28.3% |
+| `stress everylive` (46 forms) | 46.2 | **55.7** | 29.7 → 32.4% |
+| `stress livemesh:suzanne` (12 meshes) | 41.1 | **55.8** | 39.7 → 55.7% |
+| `plots orbit suzanne`, frames over the 4 s between `ORBIT_MS=2000` and `6000` | 40.0 · 37.5 · 42.0 | **56.3 · 59.5 · 57.0** | work p50 3.5 → 3.3 ms |
+| `stress stream` (200 parts) | 52.2 | **55.0** | 27.2 → 31.8% |
+| `stress spinners` (300) | 11.5 | **12.5** | the glyph interval, reached |
+| `stress session` (mixed) | 12.25 | 14.5 | 5.6 → 8.1% |
+| CPU per frame drawn, every live case | | within ±0.7 ms | the frame's cost did not move |
+| heap after `gc()` | | +0.4 to +0.7 MB on the live cases | more frames in the timeline |
+| every frame | byte-identical | | 458 goldens, 0 movers |
+
+Every live case is now at the source's rate less the fake-timer slop of Node's
+16 ms `setTimeout`, which lands at 17 to 18 — 55 to 58 of the 60 the sources
+ask for. The CPU share rises with the frames drawn and the cost per frame is
+flat, which is the shape the finding predicted.
+
+**What remains.** The rate is the source's, and the frame's cost is now the
+whole of what the CPU share pays for: 5.8 ms for forty-six live forms, 9.8 for
+twelve meshes, 4.8 for forty line plots. That is where the next findings go —
+the L4 visibility wrapper still at the top of the stream profile, the per-form
+render, the raster. `stream` at 55 rather than 58 is two hundred timers at 16 ms
+landing late together; not the scheduler's.
+
+## F1201 — the visibility gate's L4 half walks the visible range once per part per sweep: at two hundred live parts it is the largest single line of the stream profile after F1198 took the C14 half ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | The `visible` dependency C22 hands C23's refresh driver (`src/shell/construct.ts`, the execution pipeline's deps): `host.kind === "view" || stores.viewport.visible().entries.some((e) => e.id === host.id)`. The driver asks it for every part on every sweep — `anyoneLooking`, the stale pass, `armParts`'s gates, the readouts (C23 I46). |
+| **Reached for** | `--cpu-prof` over `stress stream` (200 live parts at 16 ms, 6 s, after F1199): `visible shell/construct.js:1272` **324 ms** self time, the largest single entry after idle and the garbage collector — 4.4% of the process and about 14% of the non-idle time — with `armParts` 81, `currentPanel` 35 and `sweepParts` 26 behind it. F1198 memoised C14's range and left this half as *the cheap one*: a `.some` over a screenful. At two hundred parts a sweep it is two hundred walks of the same frozen array, twelve thousand a second. |
+| **Verdict** | **Closed — built and measured, and the frame did not move.** C14 I30 now returns the same object until the viewport moves, so the range's identity is a key: build the set of visible ids once per range object and answer membership from it. One slot, not a cache — the previous range is unreachable the moment the viewport moves, and a `WeakMap` would be a second copy of C14's own invalidation. The blind spot is stated up front: the wiring has no observable but cost, so the bench is what verifies it and the mutation run says so. |
+
+**Remedy, sized.** `VisibleIds` in `shell/visible-ids.ts` — `of(range)` returns
+the same `ReadonlySet` while the range object is the same and rebuilds it when it
+is not — owned by the composition root beside the other stores, and the wrapper
+answers `visibleIds.of(stores.viewport.visible()).has(host.id)`. One C22
+invariant, one unit row on identity and freshness, one fail-on-revert row, a
+mutation run with the control on the set's contents. Expected: the `visible`
+line gone from the top of the stream profile and its share moved to the sweep's
+own bookkeeping; no frame moves.
+
+**Closed — built and measured.** `VisibleIds` landed as a local of the composition
+root (C22 I106, commitment 77, T1.61, T6.121; `c22-visible-ids` 2/2 with the control
+firing), and the gate is a `has`. Gates: enforce green, 6270 unit-to-integration,
+458 goldens with no mover, 137 e2e. The stream profile's line did what the entry said
+— `visible shell/construct.js` **241 → 56 ms** over a 7.5 s profile — and the frame
+did not: three paired rounds at 120×40, medians, before → after —
+
+| case | fps | ms/frame | work sum (ms / 4 s) |
+|---|---|---|---|
+| stream | 56.5 → 56.7 | 5.7 → 5.9 | 787 → 809 |
+| everylive | 57.8 → 57.0 | 6.2 → 6.7 | 1120 → 1297 |
+| live:line | 57.2 → 57.5 | 5.4 → 5.6 | 954 → 1024 |
+| livemesh:suzanne | 56.2 → 57.0 | 10.1 → 9.8 | 1903 → 1744 |
+| session | 14.8 → 14.8 | 3.8 → 6.9 | 458 → 502 |
+
+Every difference sits inside the three-run spread, in both directions. **The
+diagnosis was wrong about what the line measured.** The walk's arithmetic was
+never done before the entry was opened: twelve thousand calls a second over a
+range of thirty entries is under a millisecond a second, two orders below the
+figure quoted. What the 241 ms was is visible in the after-profile — `sweepParts`,
+`armParts` and `currentPanel` gained about 90 ms between them once `visible`
+stopped absorbing it — so most of the line was attribution: V8 inlined the range
+memo and the closure's own entry into the wrapper's frame, and a sampled self-time
+column charged the callee for its callers. The remaining 56 ms is what the gate
+costs to be called at all. **The code stays** — it is smaller than what it replaced,
+tested, and the profile now reads truer — and the register carries the null result
+so nobody opens this line a third time. What remains is the frame's own cost per
+part, which is where the next cuts were already pointed.
+
+## F1202 — the exact-width guard's measurer leaves its one-pass scan at the first braille unit, and every plot row of every frame pays a strip and a second walk ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `displayCells` (`src/presentation/text.ts`), the measurer behind `fitStyled`, behind `exact` in `src/shell/frame-error.ts` — the guard that pads or truncates every transcript row to the frame's width before it is written. Its one-pass scan takes printable ASCII and SGR; anything else returns `cells(text.replace(sgrPattern(), ""))` — a stripped copy allocated and a second walk that asks `soloAt` of every unit. |
+| **Reached for** | `--cpu-prof` over `stress live:line` (40 line plots at 16 ms, 6 s), the tree under `writeFrame` rather than the self-time column, and the arithmetic first: `exact → fitStyled → displayCells` is **181 ms** of the write's 1037 ms over about 340 frames at 40 rows — some 13,600 rows, **13 µs a row**. A single scan of 120 code units with a four-pair binary search per unit is one to two microseconds, so the fall-through is ten microseconds a row and about **0.45 ms of a 3 ms write** in every case that draws braille or box rows: every live plot, every mesh, the orbit. The plot render itself is 202 ms of the same tree, so the guard's re-measure costs almost as much as drawing. |
+| **Verdict** | **Closed — built and measured.** `rowCells` in the same file already admits `CELL_PER_UNIT_RANGES` at `narrow` as one cell per unit — the fast set is a checked claim, T1.40 holds it against `cells` — and I74 rules a table unit is a cluster of its own unless an extender follows. The one-pass scan takes the same set at `narrow`. No next-unit test is needed there, and one would be a sentence that cannot be violated: any unit outside the scan's three kinds returns the whole stripped measure, so a unit followed by a mark or a selector is answered by `cells` exactly as before. Byte-identical by construction — a measure, not a render. |
+
+**Remedy, sized.** One arm in `displayCells`, one C09 invariant, one unit row
+asserting the scan equals the stripped measure over a corpus that reaches every
+arm — styled braille and box rows, a table unit before a selector, a mark and a
+joiner, a sextant pair, CJK, and every row at `wide` — a fail-on-revert row, and a
+mutation run whose control counts a table unit as two. Expected: the guard's line
+gone from the write's tree and the frame about 0.4 ms lighter on every plot case.
+
+**Closed — built and measured.** One arm in `displayCells` (C09 I77, commitment 66,
+T1.51, T6.123; `c09-styled-fast-set` 2/2 with the control firing; `quadratic-cursor`
+re-anchored past the arm and green). Gates: enforce, 6271 unit-to-integration, 458
+goldens with no mover, 137 e2e. **The measure itself, both builds in one process**,
+20,000 calls a row, medians of five interleaved rounds:
+
+| row | width | before | after |
+|---|---|---|---|
+| braille under a colour change every twenty cells | 120 | 6.34 µs | 0.99 µs |
+| box drawing between two dim rails | 118 | 6.20 µs | 0.78 µs |
+| styled ASCII | 120 | 0.49 µs | 0.49 µs |
+
+Equal widths on every row, and the ASCII path untouched. In the live-line profile
+the guard's line — `exact → fitStyled → displayCells` — fell **125 → 47 ms** over
+7.5 s. At forty rows a frame that is a little over 0.2 ms, about 4% of a 5 ms frame,
+which is under what three paired bench rounds can resolve: live:line's work sum
+987 → 852 ms and everylive's 1090 → 994 read as the cut, live:heatmap's 1000 →
+1071 and session's 360 → 430 read against it, and every one of the four sits
+inside its own side's spread. The entry's estimate of 0.45 ms a frame was twice
+the measured figure — the profile's 181 ms was taken under a heavier run than the
+paired one. **What remains** on this path is volume, not per-row cost: the panel's
+rows arm composes three hundred and sixty rows a frame at 1.4 µs each, and the
+plot renders themselves are 0.6 ms for forty plots. Neither has fat to take (F916),
+and the 2-D render path is recorded as checked and clear at this date. One small
+thing seen and not taken: `displayCells` allocates a sticky `RegExp` per call
+through `sgrAt()`, about 13,000 a second under live plots — below a microsecond
+each and not worth a finding until a profile names it.
+
+## F1203 — the card body's cleared copy lives one frame, so it is a new key every frame: every card whose body opens with a gapped block re-measures and re-forms on every frame, and the I100 memo and the I76 hold were never reached for it ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `src/shell/entry-layout.ts` `entryLayout` → `cardBody(blocks.slice(1))` → C04 `rebuild` → `deepFreeze`: a copy of the body's first block without its `gapBefore`, made on every call — and the layout is called twice a frame, by C14's measurer and by `visibleRows`. Downstream, everything keyed on block identity: C22 I100's measure memo, C09 I76's cap-form hold in the scratch, and through it C25 I22's plan. |
+| **Reached for** | `--cpu-prof` over `stress bigpatch` (five four-thousand-line patches, forty scroll keys and fifty-two typed): `windowEntry` **461 ms of a 713 ms write** over 112 frames — `windowSequence → #form → #resolveForm → patch window` 196 and `measureSequence → #measured → #form` 217 — **4.1 ms of a 6.4 ms frame** deriving the form of a block that did not change. The profiler's counters: `measure absent 748`, `scratch absent 215`, on a transcript nothing patched. In isolation the seam holds — a second identical `windowSequence` reads the form and the plan back in 0.15 ms against 9. In the session a preload on the scratch store saw **105 form sets, 105 distinct patch owners, 100 consecutive with the same `hunks` array**; a preload on `Object.freeze` named the caller: `deepFreeze ← rebuild ← block ← cardBody ← entryLayout`, from `measureEntry` under C14's `#sync` and from `visibleRows`. `stress stream` carries the same signature at `measure absent 22,351`. |
+| **Verdict** | **Closed — built and measured.** The copy was ruled into the layout by F821 — a live part is declared by object identity, so clearing the gap on the stored document lost the declaration — and C23 I57 wrote down the consequence as a property: *rebuilt from the current `doc.blocks` every frame*. That sentence is the defect. C22 I100's observable — *the first frame's misses and none after* — holds for T4.88's column group, whose body has no gap, and for no card that opens with a `table`, a `patch` or a `code` block under C24 §4's default gap. Two documents said the memo holds and one said the key moves every frame, and nothing read them together. |
+
+**Remedy, sized.** One `WeakMap` in the layout, keyed on the array the body is
+derived from — the document's `blocks` for the top card, the group's `children`
+for a nested one — holding the body `cardBody` derives. Sound for the reason the
+memo is: a blocks array is deep-frozen (C04 I1) and replaced with its document
+(C23 I34), so the same array is the same body, and F821's constraint is kept
+whole — the document's own objects are untouched and the driver never reads the
+layout. C22 I107 states it, C23 I57 loses its per-frame sentence, and the row is
+T4.88's shape over a card whose body opens with a gapped block: misses on the
+first frame and none after — which is the fabricated violation, because today's
+tree misses once a frame. Expected: the big-patch typing frame from about 6.4 ms
+to about 2.5, and every card-shaped case lighter by its first body block's
+measure and form.
+
+**Closed — built and measured.** `heldBody` in `entry-layout.ts` (C22 I107, commitment
+78, §6l.6 row H; C23 I57 amended; T1.62, T4.91, T6.122; `c22-card-body-hold` 2/2 with
+the control firing, `c22-indent` and `c23-running-card` still green). Gates: enforce,
+6273 unit-to-integration, 458 goldens with no mover, 137 e2e — T5.6, the sixty-second
+idle CPU row, went red in the chain at 0.0065 against 0.005 and passed alone, as it
+did in F1199's chain. Three paired rounds at 120×40, medians, before → after:
+
+| case | work sum (ms) | key p50 (ms) | type p50 (ms) | `measure` absent | `scratch` absent |
+|---|---|---|---|---|---|
+| bigpatch | **675 → 264** | 0.10 → 0.04 | 0.07 → 0.04 | 748 → 526 | **215 → 15** |
+| patch | 733 → 687 | 0.08 → 0.07 | 0.05 → 0.05 | 3032 → 2645 | 492 → 200 |
+| mixed | 594 → 529 | 0.11 → 0.10 | 0.05 → 0.05 | 2700 → 2281 | 300 → 92 |
+| stream | 730 → 655 · 54 → 57.4 fps | 0.07 → 0.08 | 0.03 → 0.04 | 21,675 → 16,717 | 0 → 0 |
+| session | 386 → 346 | 0.06 → 0.06 | 0.04 → 0.04 | 2160 → 2107 | 110 → 110 |
+| bigtable | 992 → 979 | 0.09 → 0.09 | 0.05 → 0.05 | 520 → 530 | 0 → 0 |
+| live:line | 866 → 868 | 0.05 → 0.06 | 0.05 → 0.04 | 5819 → 5783 | 0 → 0 |
+
+The big-patch write tree, one profile a side: `writeFrame` **677 → 256 ms** over 112
+frames — the entry's sizing of 6.4 → 2.5 ms a frame landed at 6.0 → 2.3. The cases
+whose first body block carries no gap — live plots under a caption, a table under the
+head — do not move, which is the shape the finding predicted. What remains in the
+big-patch frame is the window's own work and the render of the rows on screen; the
+`measure absent` residue in `stream` is the ticking notice replaced every 16 ms, a
+new block by design.
+
+## F1204 — the exact-width guard walks a short row cluster by cluster to copy it through unchanged, after it has already measured it ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `fitStyled` (`src/presentation/text.ts`), behind `exact` in `src/shell/frame-error.ts`. Its first line measures the row; a row at the width returns; every other row takes the walk — escape by escape, run by run, cluster by cluster, each piece appended to a fresh string — and a row *under* the width comes out of that walk as itself, byte for byte, with the shortfall in blanks. The walk cannot change a short row: nothing is cut, nothing dropped, every piece copied whole. |
+| **Reached for** | `--cpu-prof` over `stress session` and `stress mixed` (the coding-session and round-robin cases), the tree under `writeFrame`: `exact → fitStyled` **56 ms of a 386 ms write** in session and **69 of 494** in mixed, `fitStyled` self 26 and 21 with `displayCells` 25 and 46 beneath it. About 88 frames of 40 rows in session — some 3,500 rows — is **16 µs a row**, against about one for the measure that precedes it (F1202); a transcript of prose, code and patch rows is short rows almost entirely, so the walk runs on nearly every row of every frame to produce the string it was handed. |
+| **Verdict** | **Closed — built and measured.** The pad is the measure's: a row measuring under the width is returned as itself with `width − cells` blanks, and only a row over the width walks. Byte-identical because the walk's `used` is `displayCells`'s count — I63's claim, held by T1.39 and T3.78 — and the walk's output on the non-cut path is its input, so the two paths cannot differ; the goldens are the gate that says so over every frame. Arithmetic: about 0.5 ms of a 4.4 ms session frame and 0.6 of a mixed one. |
+
+**Remedy, sized.** One early return in `fitStyled`, one C09 invariant, a unit row
+asserting the padded answer's shape from outside — exactly `width` cells, the row
+as its prefix, the blanks as its suffix, no reset — over styled, plain, family,
+mark and control rows, and that the cut path is untouched; a fail-on-revert row;
+a mutation run whose control pads one short.
+
+**Closed — built and measured.** One early return in `fitStyled` (C09 I78, commitment
+67, T1.52, T6.124; `c09-fit-pad` 2/2 with the goldens in the loop; `quadratic-cursor`
+and `c09-solo-cluster` green). **The mutation pass found the rows before the code
+did**: FIT-REMAINDER — the cluster arm made quadratic — survived, because T3.77 and
+T3.84 fitted rows one cell *under* the width and under I78 that path times no walk
+at all; both rows moved to one cell over the width, and T3.85's segmenter count
+halved to what the measure alone asks. Gates: enforce, 6274 unit-to-integration,
+458 goldens with no mover, 137 e2e. Three paired rounds at 120×40, medians of work
+per run, before → after:
+
+| case | work sum (ms) | note |
+|---|---|---|
+| session | 412 → 332 | the coding-session case |
+| mixed | 499 → 461 | |
+| patch | 660 → 599 | |
+| code | 694 → 632 | |
+| logs | 329 → 288 | |
+| text | 655 → 897 · re-taken ×7: 578–674 → 573–805 | bimodal on both sides with the load phase; see below |
+| live:line | 823 → 880 | plot rows are at the width and take neither path |
+| spinners | 575 → 541 | |
+
+The session write tree, one profile a side: `exact → fitStyled` **58 → 22 ms** over 6 s.
+**The text case is flat, and its spread is the process's.** Its first three rounds
+read 655 → 897; re-taken seven more pairs, the after build sat at 554–590 in four
+and 805–897 in three, and every slow run was slow in its load phase too — 1,075 ms
+against 715–835 — with `work p50` rising in step: a whole-process slowdown on the
+host, not a frame that grew. Under `--cpu-prof` the after build is lighter on text
+as on every other case, 673 against 695, the guard's line 85 → 51. Recorded rather
+than averaged away, because a reading that only one side shows deserves its own
+line even when the profile clears it.
+
+## F1205 — a truncation builds every cluster of the line to keep its first hundred cells ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `truncateParts` and `truncate` (`src/presentation/text.ts`). Each measures the line, and a line over the width then has every grapheme cluster of the *whole* line built — `[...GRAPHEMES.segment(whole)].map((s) => s.segment)`, a record and a string per cluster — before a walk from the front spends the budget and stops. The clusters past the cut are built and dropped, so the cost is the line's and not the width's. `raw`'s render asks it for every line it draws (`kinds/simple.ts`), `code`'s for every row over the width, and the reverse arm (`from: "start"`) is the one caller that needs the whole line. |
+| **Reached for** | `--cpu-prof` over `stress text` at 120×40 — 200 markdown responses of eight paragraphs, forty PageUps: `truncateParts` self **134–153 ms** of a 697-frame run, all of it under `raw`'s render on the miss path; the profiler's `byKind.raw` 5,120 renders summing 191 ms, 37 µs each against a p50 of 10. The measurement that explains it: a markdown paragraph is one `raw` line — C04's markdown makes a paragraph a `raw` block, and `raw` never wraps — of 300 to 600 cells, and `truncateParts` on a 329-cell bench paragraph at width 118 costs **94 µs**, against 1.9 at a width that keeps it whole: 329 segment records for a 117-cell answer. About 0.4 ms of each of the 441 miss frames, and the same per over-width row in `code`. |
+| **Verdict** | **Closed — built and measured.** The head arm walks with the measurer's cursor and stops at the cut; the tail arm reads the whole line's boundaries from the same cursor. Byte-identical because the cursor's clusters are the segmenter's on every input (C09 I63, I74), which T1.53 holds against the iterator walk it replaces; the goldens are the gate that says so over every frame. |
+
+**Remedy, sized.** Walk the clusters in place with the measurer's cursor — `plainRun`,
+`soloAt`, `clusterAt`, the boundary every path of `cells` and `fitStyled` already reads
+(C09 I63, I74) — and stop at the cut, for `from: "end"`; the `"start"` arm keeps the tail
+and takes the whole line's boundaries from the same cursor, so one boundary source stands
+and the two arms cannot round differently at a CJK or ZWJ edge. Byte-identical because
+the cursor's clusters are the segmenter's on every input T1.40 and T1.51 sweep. One C09
+invariant, a unit corpus over both arms at widths over and under the line, a cost row, a
+fail-on-revert row, a mutation run whose control segments the whole line.
+
+**Closed — built and measured.** `keptWithin` in `text.ts` (C09 I79, commitment 68,
+T1.53, T3.90, T6.125; `c09-cut-walk` 3/3 with its control, `quadratic-cursor` and
+`c09-fit-pad` green). Gates: enforce, 6,616 unit-to-e2e, 458 goldens with no mover, 137
+e2e. **The baseline was rebuilt from the commit, not taken from a copy**: the copy on
+hand was checked against the I78 return and lacked it, so the F1204 close commit was
+built in a worktree into its own `dist/` and the bench pointed at that. Three paired
+rounds at 120×40, medians of work per run, before → after, with the Ink measurement
+agent's builds and profiles sharing the container through the first round:
+
+| case | work sum (ms) | note |
+|---|---|---|
+| text | 612 → 590 · rounds 907/563/612 → 485/590/674 | bimodal on both sides, as F1204 recorded; the spread is the process's |
+| code | 651 → 598 | `code`'s over-width rows take the same cut |
+| mixed | 524 → 424 | |
+| patch | 637 → 466 | |
+| session | 367 → 310 | |
+| logs | 227 → 226 | no line over the width; flat as expected |
+
+The profile is the reading the bench cannot give on text: over a 6 s run,
+`truncateParts` **134 → 24 ms** inclusive (131 → 18 under `raw`'s render, 3 → 6 under
+`code`'s), `keptWithin` 5 ms of the 24, and `renderSequenceToLines` 305 → 227 ms.
+Per paragraph the micro-bench's 94 µs is now the cursor's few. T1.53's corpus found
+one edge the spec row had over-stated: at the sweep's top width the answer is the
+line itself, not `width` cells, and the row was amended before the code landed.
+
+## F1206 — a live part's next poll is dated from the fetch it just finished, so a 16 ms cadence draws 55 frames a second ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `settleSource` (`src/shell/refresh.ts`): `src.dueAt = at + interval`, where `at` is the moment the fetch settled. The timer that woke the poll fired late by Node's granularity, the fetch took what it took, and the next deadline is set from the far end of both — so a part declared `every: 16` is polled every `16 + fetch + slop`, and the shortfall compounds rather than being recovered. C22 I105 already solved this shape for the spinner (*whole intervals from the stamp, never the interval counted from the paint*) and the poll was written the other way. |
+| **Reached for** | The goal names sixty frames a second and no live case reads it. `stress` at 120×40: `stream` **55.5** fps, `live:line` **55.3**, `everylive` **54.7** — each a 16 ms part with a 3.6 to 6.7 ms frame, so the cost of the frame is not what caps them. A preload logging every `setTimeout` window and its lateness (`out/log-pace.mjs`): the 16 ms window is armed **1,111 times in a `stream` run with a median lateness of 1.66 ms and a 90th of 4.95**, and it is `armParts` in the refresh driver — 16 + 1.66 + the promise hop is 18 ms, which is 55 fps to the frame. |
+| **Verdict** | **Closed — built and measured.** The deadline chains from the deadline the poll was woken for, and from the settle only when the settle is more than one declared interval past it. Three live cases up three to four frames a second, no case down, and the spinner exactly on its 12.50 design. |
+
+**The first remedy was built, measured and withdrawn, and the measurement is the finding.**
+The entry opened on C03's paced slot: the scheduler arms the next window when the last
+timer fires (C03 I17), so the lateness joins the period there too, and a probe of Node's
+timer alone confirmed the arithmetic — `setTimeout(16)` re-armed on firing paces at
+**52.9** fps against **59.96** for the same timer dated from the last deadline. C22 I108
+was specified, built as `pacedSchedule`, covered 4/4 by `c22-paced-schedule` with a
+control, and green through enforce, the suite and the goldens. Then it was measured:
+`stream` 55.5 → 54.7, `live:line` 55.3 → 55.0, `everylive` 54.7 → 57.2 — flat inside
+the spread — while `session` fell **14.7 → 12.7** fps and `spinners` moved off its 12.50
+design to 13.0. A second preload counting slots against cancels says why: of **706 paced
+slots armed in a `stream` run, 10 fired and 695 were cancelled** by an immediate commit
+before they closed. C03's slot is almost never what closes a frame under a live load, so
+pacing it moves nothing and its floor only widens the coalescing window. The invariant
+went back out (commit `747af079`) rather than stand on a measurement it did not have.
+**A correct mechanism at the wrong seam measures as nothing, and only the paired bench
+tells that from a fix** — the mutation pass, the goldens and the gates were all green on it.
+
+**Remedy, sized.** `settleSource` dates the next deadline from the last one — `dueAt +
+interval` — and from the settle only when the settle is more than an interval past it,
+which is the far side being slower than its own cadence and must not build a backlog.
+One C23 invariant, a contract row over a fast source, a slow one and a backoff, a
+fail-on-revert row, a mutation run whose control dates every poll from the settle.
+
+**Closed — built and measured.** `settleSource` (C23 I72, commitment 62, T2.48, T6.102;
+`c23-poll-deadline` 3/3 with its control). Gates: enforce, 6,277 unit-to-integration,
+458 goldens with no mover, 137 e2e — **and the e2e is the one that separates this remedy
+from the withdrawn one**: pacing C03's slot read the recording's tapped clock once per
+arm and broke replay parity (C28 T5.1c, T5.1d), where the poll's chain reads no clock of
+its own and the replay is untouched. Six paired rounds at 120×40 over two runs, medians
+of frames drawn per second, before → after:
+
+| case | fps | note |
+|---|---|---|
+| stream | 56.0 → 59.0 · and 55.0 → 58.9 in the first run | 200 live parts at `every: 16` |
+| live:line | 54.2 → 58.5 · 58.0 → 57.7 | the plot's rows are the frame's cost here, not the cadence |
+| everylive | 55.5 → 58.5 · 54.7 → 58.2 | every 2-D form once, live at 16 ms |
+| spinners | 12.49 → 12.50 | the 80 ms glyph cadence, exactly as designed |
+| session | 14.49 → 14.99 | no regression where the withdrawn remedy cost 2 fps |
+| mixed | flat | no live part, nothing to move |
+
+**The budget is met at the seam and not yet on the screen.** A02 §7 asks for sixty and
+the live cases now sit at 58 to 59, touching 60 in the best runs. What is left is C03's
+own slot — the window is armed when the last timer fires, so the frame's period is
+16 ms plus that timer's lateness — and the withdrawn C22 I108 says that is worth about
+nothing while 695 of every 706 slots are cancelled by an immediate commit first. The
+next frame a second has to come from the frame's cost, not from another timer.
+
+**Two rows stopped constraining their subject and this run found it.** `c22-ticker-period`
+came back 4 caught, **2 survived** — `WINDOW-100` (C03's spinner window at 100 ms against
+the 80 ms glyph interval, expecting T4.35) and `STREAM-33` (C03's stream window back at
+the 30 fps it shipped with, expecting T4.17u). Neither row's file declares a live source
+at all, so `settleSource` never runs in either and this change cannot have caused them:
+the run has rotted and the two bounds have gone slack. Recorded here and opened as its
+own entry rather than folded into this one.
+
+## F1207 — C03's window is dated from the timer that fired, so the frame rate sits a second under its budget and the fix only works once the poll is chained ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `armTimer`/`writeFrame` (`src/terminal/frame-scheduler.ts`): every write opens the next window as it begins (C03 I17) and the window is armed from that moment, so Node's timer granularity — a median of 0.80 to 1.16 ms measured on the slot itself — joins every period and is never recovered. C03 cannot correct it: it has no clock (C03 I11, A03 SS1) and the injected timer reports that it fired, never how long it had been running. The correction belongs in the composition root, where the clock is injected. |
+| **Reached for** | With F1206's poll chained, the live cases read `stream` 59.5–61.3, `live:line` 58.0–60.5, `everylive` 58.0–60.0 over five runs each at 120×40 — a second under A02 §7's sixty and, on `stream`, occasionally a second over it. The slot's own instrument (`out/log-pace4.mjs`) says the slot is now what closes the frame often enough to matter: **fired 237 of 1,222 arms in `stream`, 235 of 520 in `live:line`, 175 of 488 in `everylive`**, at a median lateness of 0.80, 0.93 and 1.16 ms. |
+| **Verdict** | **Closed** — C22 I108 amended and landed (`5fe8aa0e`, `490e22c9`). |
+
+**Closed.** The mechanism is the one withdrawn under F1206 and it needed two amendments,
+both forced by a red gate rather than by a second opinion.
+
+**Only a window of the same length chains.** A session runs several cadences at once —
+C03's 16 ms stream window, its 80 ms spinner window, the ticker's own interval — and an
+arm of one length dated from the deadline of another places a frame on a cadence it does
+not belong to. It reads as a halved rate, not as a phase error, which is why T4.35 and
+T4.8 named a spinner and not a chain.
+
+**A replay is not paced at all.** Taking the pacer's clock reads off the recording's
+positional channel (C28 I53) is not enough: how many times the schedule arms is itself a
+function of when timers fired, so a paced replay composes a different number of frames
+than the recording it is checked against and exhausts the recorded clock. T5.1, T5.1c and
+T5.1d all said so. A session built with `profile.replay` gets the ambient schedule its
+recording was driven by.
+
+**Three harness defects stood between the mechanism and its effect, and each read as the
+mechanism being wrong.** This is the same lesson as F1206's wrong seam, arriving from the
+instrument's side rather than the subject's.
+
+- `test/support/session.ts` injected `elapsed: () => 0` at both fixture sites — honest
+  about profiling being off, and it stills every consumer that dates an interval from that
+  clock. The pacer computed each delay against a present of zero while its deadline walked
+  forward, reaching 200 ms of `due` at time zero; an orbit drew ten frames a second where
+  fifty-nine were asserted. A fixture's honest default made four rows read as a broken
+  subject.
+- `wake` in `orbit-wiring.test.ts` advanced the injected clock by a whole span and the
+  timers by the rest; `ramps.test.ts` did the reverse. Either way the two sat up to a span
+  apart for the length of the drain, against that helper's own docstring saying they move
+  at the same speed. Both now step a millisecond at a time.
+- The floor was the suspect throughout and was innocent. With chaining disabled the whole
+  tier is green at any floor and the mechanism is worthless; with the floor removed the
+  live cases run at 62.5 fps, past A02 §7's ceiling. The chain carries both the value and
+  the failure.
+
+**Measured, and the loaded reading is the weaker one.** The five-run reading above —
+60.0 on all three live cases to a tenth — was taken on a quiet host. Re-taken tonight over
+**seven paired rounds at 120×40 with the host at load 9.66** (the VM, the window server
+and three desktop applications), the medians are `stream` 57.2 → 58.0, `live:line`
+56.2 → 59.7, `everylive` 55.7 → 59.5. Head beats base on every case's median and `work`
+p50 improves on all four cases including `mixed` (0.856 → 0.728 ms), but the per-round
+spread exceeds the difference on every case individually — base `stream` ranges 39.9 to
+61.0 — so **this run does not on its own demonstrate the budget**, and the 60.0 figure
+belongs to the quiet host. A sign test over seven paired rounds cannot reject zero at
+4/7, 4/7 and 5/7 wins.
+
+**Gates.** enforce, 6,283 tests, 458 goldens with no movers, tier 5, and both mutation
+runs green with their controls — five caught on the schedule, three on the poll. Tier 5's
+`T5.6` (sixty idle seconds under a 0.5% CPU bound) went red at 0.76% during the chain with
+the host at load 10.06 and green at load 2.77 when re-run alone; both loads are recorded
+here rather than the row being called noise, because its margin is about two.
+
+**The replay gate is not mutated.** Its fail-on-revert is `T5.1`, which tier 5 runs against
+`dist/` — a build the mutation harness does not do, so a mutation there would run against
+stale bytes and read as survived. T6.123 names the row.
+
+**This is F1206's withdrawn remedy, and the reason it now stands is the measurement and
+not a second opinion.** C22 I108 was specified, built, covered 4/4 with a control and
+green through every gate, then measured flat with `session` down 14.7 to 12.7 fps, and
+withdrawn (commit `747af079`). What was wrong was not the mechanism but the tree it was
+measured in: with the poll dating itself from each fetch, **695 of 706 slots were
+cancelled by an immediate commit before they closed**, so pacing them moved nothing while
+the 16.67 ms floor still widened every coalescing window. F1206 chained the poll, the
+slot began closing a fifth to a half of all frames, and the same code measures
+**60.0 fps on all three live cases, to a tenth, five runs each** — `stream` 60.0 60.0
+60.0 60.2 60.0, `live:line` 60.0 five times, `everylive` 60.0 four times and one 57.7 —
+with `session` 14.7 to 15.7 and the spinner on its 12.5 design. **Two defects that read
+as one**: either alone measures as noise, and only the pair removed shows the budget.
+
+**Remedy, sized.** C22 I108 as written and withdrawn: `pacedSchedule(sampleClock,
+schedule)` wrapping the ambient timer, chaining an arm made inside the last slot's own
+firing from that slot's deadline and dating every other arm from now, floored at
+`1000 / 60` so a 16 ms window does not draw 62.5. The clock is the untapped `sampleClock`
+(C28 I53), which is what keeps the replay positional — the first attempt read the tapped
+`elapsed` and broke C28 T5.1c and T5.1d. One C22 invariant, a unit row over the chain, a
+wiring row through the composed session, a fail-on-revert row, a mutation run whose
+control floors at twenty.
+
+## F1208 — the frame cadence is exactly sixty and the rate is not, because ten to thirty frames in fifteen hundred are eaten by garbage collection ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | The render path's allocation rate. Sampled with the inspector's heap profiler over a 20-second `live:line` run, with both collected-by-GC flags set so garbage is counted and not only what survived: **2,400 MB allocated in twenty seconds**, about 120 MB/s or **2 MB per frame**. `--trace-gc` over the same case shows pauses of 57.3, 24.7, 23.6, 12.8, 11.6 and 8.7 ms, and a scavenge clearing about 13 MB every 130 ms. |
+| **Reached for** | With C22 I108 landed (F1207) the cadence is correct and the shortfall is entirely stalls. Over 25 seconds a perfect sixty is 1,500 animation frames. Measured, with every inter-frame gap longer than 20 ms totalled and charged against the budget: `stream` loses **13.8** frames to 16 long gaps against a measured deficit of **14**; `live:line` loses **25.2** to 18 gaps against **30**; `everylive` loses **8.8** to 10 gaps against **10**. The longest gaps are 72.9, 119.9 and 50.8 ms, which is the major-GC pause and host scheduling, not a frame. |
+| **Verdict** | **Open.** |
+
+**This is what is left between 59.4 fps and 60.0, and it is not in the frame path.** F1207
+pinned the window at one sixtieth of a second and the period holds; what the rate loses is
+whole multi-frame pauses, and a pause of 120 ms is seven frames whatever the scheduler does.
+So the remaining work on the frame rate is **allocation**, and it is the same axis the
+standing goal names for memory.
+
+**Where the garbage is**, self-size, as a share of all allocation over the run:
+
+| share | site |
+|---|---|
+| 15.7% | `mergedRow` (`src/presentation/plot/definition.ts`) |
+| 10.8% | `normaliseRow` (`src/presentation/rows.ts`) |
+| 6.9% | `Array.prototype.push` growth |
+| 3.2% | `cells` (`src/presentation/text.ts`) |
+| 3.0% | `stripControl` (`src/data/text.ts`) |
+| 2.5% | `channel` (`src/terminal/escapes.ts`) |
+
+**One remedy was tried and measured as nothing, which is recorded here so it is not tried
+again.** `mergedRow` declares `const peers: { ref, ink }[] = []` **per cell** — about 110
+cells by 30 rows by 60 frames a second — and hoisting it to two parallel arrays reused down
+the row, cleared per cell, left the profile **byte-identical at 15.7% and 394 MB**. V8's
+escape analysis had already removed it: the array never leaves the function. The attribution
+is to the function's own frame and not to that line, so the real cost inside `mergedRow` is
+the span records, the `run += cell` string building and the per-layer cell arrays, none of
+which escape analysis can reach. See the sibling reading in F1152 and F1156 — a cache of a
+scalar-replaced record is an allocation, and the inverse holds too.
+
+**First cut landed: the normaliser confirms the row against itself** (commit below). The
+normal form of a row a renderer already wrote in diff form *is* that row, and on `live:line`
+that is **59,494 of 82,913 calls** — each building a second copy of a string it was going to
+return unchanged. `normaliseRow` now carries `op`, the count of code units the output has
+been confirmed to equal, and materialises `out` only when a piece arrives that the row does
+not carry at that position; every span it appends is a slice of the row itself, so *the
+positions agreeing* is the whole comparison, and only `between`'s built sequence needs its
+bytes checked. Measured: **10.8% to 9.5% of all allocation, 259 MB to 233 MB** over twenty
+seconds, against a figure that read 10.8, 10.7 and 10.8 on three prior runs. 458 goldens with
+no movers; `c09-rows-arm` catches 14 with none surviving, three of its anchors re-pointed at
+the sites that still carry their rules.
+
+**The cut is not a regression, and the scatter that prompted the doubt is the host.** Six clean
+runs after it read `stream` 42.65–58.28 and `live:line` 47.96–56.43 where the same commands had
+read 58–60 earlier, which is the shape of a change that traded rate for allocation. Checked
+paired against a tree built without the cut and differing in nothing else, five rounds of twenty
+seconds a side: `stream` **59.1 → 59.8**, `live:line` **59.4 → 59.4**, work p50 1.10 → 1.07 and
+2.21 → 2.14. **The baseline scatters the same way** — single runs of 50.7 and 51.1 on the side
+without the cut — so the spread is contention on both arms rather than anything the normaliser
+did. The first attempt at this check measured nothing: its baseline runner carried a second
+unrewritten relative import and every baseline row came back empty, which reads identically to a
+run that produced no frames.
+
+**And the ceiling is arithmetic, which is why this is a campaign and not a cut.** A pause
+longer than one frame costs frames that cannot be repaid: repaying them means drawing above
+sixty, which A02 §7 forbids. One 57 ms collection in a 25-second window caps the run at
+**59.86** before anything else goes wrong. Halving allocation halves how often a collection
+happens and does not shorten the tail that costs the frames, so **a literal sustained 60.0
+needs every pause gone rather than fewer of them**. The profile is flat — the largest site is
+16% and nothing else is above 10% — so no single cut reaches it.
+
+**Sized.** The instrument exists (`out/alloc.mjs`, a preload starting
+`HeapProfiler.startSampling` with `includeObjectsCollectedByMajorGC` and
+`...MinorGC`, walking the tree by self size) and so does the period reader
+(`out/period.mjs`, which totals every inter-frame gap over 20 ms and converts the excess to
+frames). **Acceptance is the frame accounting and not the fps figure**: gaps over 20 ms
+should fall, and the deficit from 1,500 should fall with them. The fps median is too noisy
+on a loaded host to be the gate — F1207's close carries that argument and the numbers behind
+it.
+
+## F1209 — the rows arm is proved against a live Ink render, so the pass that deletes Ink deletes its own oracle ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `elementOf` (`src/presentation/blocks/paint.ts:378`) is not only production code. **T2.143** and **T2.144** (`test/contract/rows-arm.test.ts`) and **T3.89** (`test/edge/rows.test.ts`) render each block both ways and assert the rows arm equals `throughInk(elementOf(...))` byte for byte, over the block corpus × seven widths × three capability sets, with `test/support/lifted.ts` supplying the lifting machinery. C09 I72's claim is *byte for byte the row Ink would have written*, and the only thing that knows what Ink would have written is Ink. |
+| **Reached for** | The layout pass deletes Ink. Reading step 5 against the suites: the three rows above lose their **reference implementation**, not a convenience. Nothing else in the tree can answer what Ink would have written, and the goldens cannot substitute — they hold frames the rows arm produced, which is the thing under test. |
+| **Verdict** | **Closed — captured and measured.** 1,904 files under `test/golden/ink-oracle`, one per block per width per capability arm, read by `test/support/ink-oracle.ts`. The recorder is the only thing left that calls Ink from those suites; when Ink goes the thunks go with it and the reads remain. |
+
+**And freezing the reference is not merely preservation — it strengthens the row, which is the
+part that reads as a nicety and is not.** T6.119 records two mutations that fail nothing and says
+why in its own text: *the cap's marker above the block's rows → T6.22, **not T2.143**, whose Ink
+side composes through the same registry and moves with the mutation*, and the floor padded one
+row short → T3.54 *for the same reason — `elementOf` lifts the padded rows, so both arms carry
+the shortfall.* **A live oracle that shares the registry with its subject moves when the subject
+moves.** A captured one does not, so both mutations begin to bite and
+`tools/mutate/runs/c09-rows-arm.mjs`'s expectations must be re-derived as part of the capture
+rather than after it.
+
+**The oracle surface is wider than the three suites, and the dispositions differ.** Reading every
+site that imports `ink` or calls `renderToString` under `test/`:
+
+| site | what Ink answers | disposition |
+|---|---|---|
+| `test/contract/rows-arm.test.ts` T2.143, T2.144 | the rows arm's reference | **capture** |
+| `test/edge/rows.test.ts` T3.89 | the declines and the over-tall body | **capture** |
+| `test/support/lifted.ts` | the lifting the two above run on | capture with them |
+| `test/support/ink.ts` → `test/contract/text-width.test.ts`, `test/revert/text-width.test.ts`, `test/unit/support-harness.test.ts` | Ink's own layout width, pinned against `cells()` (C09 I16, T2.16) | **retires** |
+| `test/unit/image-seam.test.ts`, `image-kitty.test.ts`, `image-placeholder.test.ts` | how Ink treats an APC byte and a placeholder's width | **decide per row** |
+
+**The width pair is the one that retires rather than needing a capture, and the reason is the
+whole argument for the pass.** `DEPENDENCIES.md`'s `ink` row says the duplication *cannot be
+deduplicated away* — *two implementations of one number* — and C09 I16 exists to pin them
+together. Delete Ink and there is no second implementation: the invariant becomes **vacuous
+rather than unproven**, which is A03 §2's class and must be written as a retirement with its
+reason, not left as a green row over an empty corpus.
+
+**Sized.** A generator on `tools/terminal-baseline.mjs`'s pattern, whose `expectedCount()`
+derives its total from `FORMS × CAPS × BASELINE_WIDTHS` so a literal cannot go stale
+(`tools/terminal-baseline.mjs:78`). One capture per block × width × capability set, committed as
+files rather than one blob, because a moved frame must be readable as a diff — a digest per entry
+would be smaller and would defeat the discipline the golden tier exists for. **Not** an edit to
+`DEFAULT_WIDTHS`: it is exported from `src/testing/index.ts:59` and shipped for consumer apps to
+sweep their own kinds, so narrow widths are a second constant beside it.
+
+---
+
+**Built, and the strengthening claim is now two failures rather than an argument.** The two
+mutations T6.119 recorded as failing T2.143 nothing were run by hand against the capture: the
+floor padded a row short gives **26 rows where the capture holds 27**, and the marker above the
+block gives **27 against 27 in the wrong order**, both on the sequence at width 24. The run's
+notes carry the measurement and `expect` stays on T3.54 and T6.22 — the rows that read the frame
+and name the position, rather than the one that merely notices. One mutation still fails nothing
+and stays written down: the floor's pad rows holding a space, which the normaliser trims to
+nothing, so no oracle however strict can reach it.
+
+**The capture can fail, shown three ways before it was trusted** — a byte changed in one file
+(T2.143 red at `notice at 60`), a file removed (`no captured Ink output for t2144-panel-p-empty`),
+and a file nothing asks for (T2.146 red, naming the ghost). The third is the one a subset check
+passes, and it is why the set comparison is an equality both ways: a block that stopped being
+rendered would otherwise make the run **quieter rather than red**.
+
+**The encoding's justification is measured rather than argued.** Rows are terminated, not joined,
+because `join("\n")` cannot tell `[]` from `[""]` — and the corpus holds both: `group-adv-empty`
+captures as 0 bytes and `code-adv-blank` as 1.
+
+**Two things the capture scheme found on its first run, neither of them what it was built for.**
+
+- **Twenty-two blocks were being rendered twice.** T2.143's corpus was
+  `[...Object.values(ONE_PER_KIND), ...CORPUS]`, and every one of `ONE_PER_KIND`'s twenty-two
+  entries is the **same object** as a `CORPUS` member — so a third of the sweep was duplicated
+  work and the arm tallies were taken over the doubled list. The key-collision assertion is what
+  caught it, at 61 blocks against 39 distinct keys, and it was written to stop one capture
+  standing for two blocks rather than to audit the corpus. The union is now taken by identity.
+- **The sweep never looked below 40.** `DEFAULT_WIDTHS` floors there. A rail pair and a gap cost
+  the same columns at 12 as at 200, so the *fraction* of the width the chrome takes is the axis
+  and the sweep sat at the comfortable end of it. `NARROW_WIDTHS` adds 2, 12, 24 and 32, held in
+  the suite rather than added to the exported constant — which is what the sizing above already
+  ruled and is now built that way.
+
+Gates: `enforce` clean, **6,281 tests**, **458 goldens with zero movers**, **137 e2e**, and
+`c09-rows-arm` at fourteen caught, none survived. Landed `94db84b9`, `51edd259`, `e5322add`,
+`6b35808d`.
+
+---
+
+## F1210 — the three geometry declines are unreachable from every block in the tree, so they are not what keeps Ink reachable ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `composeRow` (`src/presentation/rows.ts:479`) returns `null` when a piece would overlap the one before it; `placeRows` (`:495-510`) returns `null` when a child row is wider than its cell, and propagates `composeRow`'s. Each decline sends its container back to the element arm, which is Ink. The layout-pass brief reads them as *what keeps Ink reachable even when every child answered rows*, and schedules closing them **before** mosaic moves. |
+| **Reached for** | Counting them. Every decline site tallied to a file, then the whole suite and every golden frame: **6,281 tests, 318 repo rows, 458 goldens — four firings**, and all four are direct calls from two test rows with hand-made arguments. `test/edge/rows.test.ts` T3.89 makes three of them on purpose (`placeRows([{x:0,top:0,width:2,rows:["abc"]}],1)` and an overlapping pair); the fourth is `test/unit/rows.test.ts:183` passing `[{x:0,row:"abc"},{x:1,row:"|"}]`. **No block, at any of eleven widths, under any of three capability sets, has ever reached one.** |
+| **Verdict** | **Open.** |
+
+**The instrument was shown to respond before its zero was read.** T3.89 calls both declines
+directly, so the edge suite alone is the control: it produced `place-wide 3>2`,
+`compose-overlap x=2 cursor=3` and `place-compose-null` on the first run. A counter that reported
+four across the whole tree without first reporting three across one file would be the
+fabricated-violation class — a zero that means *the instrument is blind*, not *the path is cold*.
+
+**The first reading of the fourth firing was wrong, and the way it was wrong is the reason the
+context was widened.** `compose-overlap x=1 cursor=3` reads exactly like a panel: the panel
+composes its rails and body at `x = 0`, `1` and `1 + inner`, so a piece at 1 against a cursor of 3
+says a rail row measured three cells where a rail is one — a real defect, and interesting. Logging
+the pieces and the stack says it is `"abc"` and `"|"` from a unit row. **A decline's arguments are
+the only thing that identifies its caller**, and a site that logs only the arithmetic invites the
+reader to supply the caller from the shape of the numbers.
+
+**Why the premise was plausible and is still wrong.** The declines *are* the arm's only exits to
+Ink, and reading the code that is what they look like. What the code does not show is that both
+are screened upstream: the row group computes `fits = x - ROW_GUTTER <= width` and passes `null`
+without calling `placeRows` at all when the cells exceed the width, and a child's alignment offset
+is taken **within** its cell, so a conforming renderer cannot place a row past its allocation. The
+declines are defensive against a renderer that violates its width contract, and every shipped kind
+honours it.
+
+**What this changes about the pass, which is the part that matters.** Step 2 cannot be specified on
+its own. The declines become reachable at **step 3**, not before, because mosaic is the kind that
+places children absolutely and clips each — overlap and over-wide cells are mosaic's ordinary case
+rather than a contract violation. So a clipping rule written now would be written against no
+caller, verifiable only by the direct calls that are already the only things reaching it, and
+guessed rather than measured. **The behaviour must come from what Ink writes for a mosaic**, which
+is capturable exactly as long as Ink exists (F1209) — so step 2 folds into step 3 and the two land
+together.
+
+**And the brief's ordering argument inverts.** It scheduled the declines first *so that mosaic
+could move*; measured, mosaic is what gives them a caller, so moving mosaic is what makes them
+specifiable. A guard believed load-bearing because it is the only visible exit, in a path nothing
+takes — the same shape as C22 I108 paced at the wrong seam (F1206), where every gate was green and
+695 of 706 slots were cancelled before they fired.
+
+---
+
+## F1236 — `comparison`'s header names a column two cells to the right of where it sits ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `comparison`'s header row. The `b` column's values are prefixed with a verdict mark — `✓` or `✗` and a space — and the header label is not. |
+| **Reached for** | Held back from C09 I81's landing on purpose (F1233 §9): correcting it moves every capture at every width where the ladder moves twenty-one, and **a moved frame with two candidate causes is a bisect rather than a finding**. |
+| **Verdict** | **Real, and narrower than it was first written.** The header alone is wrong; the body is internally consistent. |
+
+**1 · Measured at four widths, and the first reading of it was half wrong.** The columns, by index
+rather than by eye:
+
+| width | header `run 5` | a verdict row's value | a row with no verdict | header `run 4` | the `a` values |
+|---|---|---|---|---|---|
+| 80 | **56** | 58 | 58 | 30 | 30 |
+| 60 | **42** | 44 | 44 | 22 | 22 |
+| 44 | **32** | 34 | 34 | 18 | 18 |
+| 32 | **24** | 26 | 26 | 14 | 14 |
+
+**The body is consistent with itself**: a row carrying a verdict and a row carrying none put their
+`b` value in the same column, because `markFor` pads to the reserved width for both. It was read as
+a body defect first — *the `errors` row's value sits further right* — and that reading came from
+counting spaces in a quoted frame rather than asking for the index. **The `a` column is correct at
+every width**, because nothing is prefixed to it, and that is what isolates the cause.
+
+**2 · The cause is one field.** `line()` builds the header and the body through the same function,
+and the header passes `reserve: 0` where the body passes `judgedRoom`. So the body reserves the
+verdict's two cells inside the `b` column and the header spends them on its label, which puts
+`run 5` on the mark rather than on the values it names.
+
+**3 · Why symmetry settles it rather than taste.** A header names a column; `run 4` sits exactly on
+the `a` values and `run 5` sits two cells left of the `b` values, so the block is already committed
+to the rule and keeps it on one column of two. The mark is not part of what `run 5` names: it is a
+verdict *about* the value, and a row with no verdict draws blanks there.
+
+**4 · Held back deliberately, and the reason expired when I81 landed.** The hold was not caution —
+it was that the shedding ladder was moving the same captures in the same landing, and two causes in
+one moved frame cannot be told apart. I81 is closed, its movers were named and read, so this
+landing's movers have exactly one candidate cause.
+
+**5 · The movers, named before the run and read after it.** Predicted: the sixteen snapshot entries
+holding `comparison-1`, the frozen Ink captures for that block at every width not already retired by
+I81, and any baseline frame carrying the header. Measured: **sixteen entries moved, one line each**,
+and diffing the whole snapshot file gives 32 changed lines of which **none** is anything but the
+`field … a … b` header. **Twenty-seven Ink captures retired**, widths 24 to 200 × three capability
+sets.
+
+**And the retirement register gained a reason per group**, because it had carried one string over
+every entry — right while there was one ruling, and a claim about a frame that nothing re-reads as
+soon as there were two: a shared reason would have cited C09 I81 over captures that ruling never
+touched.
+
+**6 · The baselines held, and the reason is two homonyms.** Across 2,440 terminal-baseline frames and
+the SVG set, **zero** contain a `comparison` block. The greps that suggested otherwise were the
+English word — `terminal-baseline.test.ts`'s own prose, *a comparison against a corpus* — and ten
+frames of a `plot3d` fixture named `surface-field`. That is F161's class twice in one prediction, and
+the cheap check is asking the frames rather than the filenames.
+
+**Closed** — landed at `ecb9630a`. The header passes `markFor(undefined, judgedRoom, ctx)` and
+`reserve: judgedRoom`: the same blank the body uses for a row with no verdict, rather than a second
+way to say two spaces. The header moves 56→58, 42→44, 32→34, 24→26 at 80/60/44/32, onto its values,
+and `run 4` is untouched. T3.95 asserts **both** columns over the 4-to-80 sweep, the body's agreement
+with itself, and the count of widths it reached — a filter excluding every width would satisfy every
+assertion above it. Mutation `c09-header` **4 caught / 0 survived**, control `judgedRoom` → 0; the
+first mutation is the shipped defect verbatim and the second is the same misalignment in the other
+direction, which a fix-shaped row would not catch. Gates: enforce at 24,823 references, 343 files /
+6,307 passed / 4 todo, golden 468/468, tier 5 24 files / 136 passed / 3 todo, anchors 0 known stale.
+Commits `3ca5e86c` (open), `701e6fe0` (spec, alone), `ecb9630a` (code).
+
+---
+
+## F1235 — §10 was refused by measuring a different component, and its own step order defeats its motivating case ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `LAYOUT_ENGINE.md` §10 — a float declared in the tree, attached to a box by id, anchored point-to-point, nudged into its window and clipped to its ancestor; four named layer positions; a frame ring. |
+| **Reached for** | Phase 4 of the layout-engine plan, which the first walk discharged as a refusal (C29 I19, §7d). |
+| **Verdict** | **The refusal answers about C15's layers and §10 step 2 names the engine's pass 5.** The mechanism is buildable, pure, and its design has two defects a build finds and a refusal cannot. |
+
+**1 · The conflation.** §10 step 2 reads *resolve `attachTo` to a **SOLVED box from pass 5***. Pass 5
+is this engine's positioning pass, which was built before the first walk ran. A4 refused attachment
+because the resolution *reads `ve.skipRows`, the viewport's scroll offset, which is neither the stack
+nor the region* — true, and about **C15's** `layout(stack, region)`. Inside `layout(box, width)` the
+resolution reads the solved tree the call has just produced and nothing else: pure by construction
+rather than by restraint. **A refusal that names a purity property checks which signature holds it.**
+
+**2 · And the rest of the refusal is *no consumer exists*.** A1, A7, A8 and A9 each refuse for want
+of a **member** — a layer name with nothing in it, an ancestor clip with no narrow layer, a ring with
+one tab. CLAUDE.md rules on exactly this: infrastructure has no consumers by definition, and the
+honest form is *nothing consumes it **and** nothing is queued to consume it*. §10's four cases — a
+tooltip, a hover card, an inline completion beside a token, a callout on a plot — are the queue, and
+not one of them is writable while the mechanism is absent.
+
+**3 · §10's step order is wrong, and the build is what shows it.** Step 4 nudges the float inside the
+**frame**; step 5 intersects it with the **attached ancestor's** clip. Two windows, applied in that
+order: a tooltip near the bottom of a scroll block is nudged to a row the frame allows and the
+ancestor does not, and is then clipped to nothing — **moved to the one place it cannot be drawn**.
+The nudge must target the window the float will be clipped to. Clip first, nudge second; the frame is
+the window only when `clipTo` is `"none"`. Every other step is right.
+
+**4 · The attach rect is the composited rect, and no fixture at offset zero can see it.** A float
+attached to row 9 of a list scrolled to row 3 belongs at screen row 6. Resolving against
+`SolvedBox.rect` gives row 9 and the tooltip detaches from the thing it points at — which is the
+whole of what a float is for. The engine already applies the offset in `collect`; the attachment must
+read the same number.
+
+**5 · `floating` and `sticky` are opposites wearing one sentence.** Both read as *this child is not
+laid out normally*: sticky **occupies flow space** and is excluded from an offset (I21), a float
+**takes no space** and is skipped by every sizing pass. A box declaring both asks for a child that
+occupies flow space and does not, and the engine says so rather than picking one.
+
+**6 · What survives from the first walk unchanged.** A2 and A3 are not refusals of the mechanism but
+constraints on it: a horizontal anchor is inert unless the thing anchored has a width of its own, so a
+float is sized by its own `FIT` and never by the frame. A6's asymmetry is C15's and stays C15's. The
+first walk is kept whole and none of its measurements are retracted.
+
+**7 · And the scope is the whole section, which is the ruling that governs the rest of this pass.**
+The first three grounds of the refusal — no integer for the free-position arm, no subject on the
+horizontal axis, `frameRing` in no file — are each **a statement that the thing is unbuilt**, which is
+the premise of the phase rather than an argument against it. The section also has shipping subjects
+the refusal never looked for: `promptUnderMenu` is C15's own prompt-anchored float, `kind: "peek"` is
+the element-anchored float governed by I21–I23, the completion menu and `find` both float over the
+transcript, and a chip's preview does it in the prompt. **Three refusals in a row is one process
+fault repeated, not three judgements**, and CLAUDE.md gains the rule that says so: a groundwork pass
+builds, *anything named in an approved plan is queued*, and a premise check is a check rather than a
+veto.
+
+**8 · Three defects in the build itself, and not one came from review.**
+
+- **A throw on the contradiction**, which is the fault C29 I16 names in as many words — *refused at
+  construction, never at layout* — and which **fired for nothing anyway**, because a float never
+  reaches `build` through its parent: `boxesOf` has taken it out and `solveFloat` strips the field.
+  The frame-read said `NOT REFUSED` where the check read as obviously correct. I16 gains back the
+  worked example it lost at F1234, because this contradiction **can** be constructed.
+- **T1.34's cache check was a proxy.** It grepped every engine source for `new Map`, and the claim
+  is about **state that survives a call** — a per-call index built and dropped inside `composeSited`
+  is not a cache. It went red on two of them while I20 was untouched. It now asserts module scope
+  and carries a fabricated violation, because an absence check that cannot fail is this suite's own
+  vacuity class.
+- **T1.44's three floats were declared in the order the layer sort produces**, so the sort was
+  unfalsifiable and removing it left the product byte-identical. The **mutation pass** is what said
+  so; declared in reverse, the row has something to assert.
+
+**Closed** — landed at `96e03810`. `Box.floating` with all three `attachTo` forms, `anchor` over nine
+points, `offset`, `clipTo`, and the nudge on **both** axes by the minimum shift, `x` first, resolved
+after pass 5 into a product beside the solved tree (§7f, I22); the frame ring, the frame stack and
+the per-frame layer stack as three types rather than one ladder (§7g, I23). **`composeSited` is one
+walk with two products** — the composited rect of every box is a by-product of drawing it, and a
+second traversal computing the same offsets is a second place for `clip.offset` to be applied
+differently, which is F1213's shape exactly.
+
+**The golden prediction was stated before the run and it is the strongest gate available here**: a
+float takes no space and `compose` draws none, so **zero frames move**, and a mover would have meant
+the float was in the flow. 468/468, nothing moved.
+
+Gates: enforce at 24,812 references, 343 files / 6,306 passed / 4 todo, golden 468/468 with zero
+movers named and none moved, tier 5 24 files / 136 passed / 3 todo, anchors 0 known stale and no run
+drifted, `c29-floats` **12 caught / 0 survived**, `c29-sticky` re-run after repointing 5 caught / 0
+survived. The second walk is `docs/notes/C29_LAYERS_WALK.md`; CLAUDE.md carries the groundwork rule;
+`FrameRing.tabs`, `FrameRing.at` and `FrameStack.frames` are in `UNCONSUMED_MEMBERS` with the queued
+consumer named. Commits `ccb056db` (open), `68282f38` and `902c0927` (spec, each alone), `96e03810`
+(code).
+
+---
+
+## F1234 — §14's refusal clause describes a different mechanism from §14's own definition ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `LAYOUT_ENGINE.md` §14, sticky. Two sentences: sticky is a child **excluded from its container's scroll offset** that **occupies flow space** — *it is not a float, it displaces its siblings* — and *a sticky child cannot be `GROW` on the scroll axis*, because *it would grow to fill the space it is excluded from, which is a loop*. |
+| **Reached for** | The field, and the refusal beside it, per the plan's phase 3. |
+| **Verdict** | **The definition is buildable and the refusal has no reachable input.** A child that occupies flow space is excluded from no space — only from an offset — so there is nothing for it to grow into. |
+
+**1 · Measured, because a loop is a claim about arithmetic.** A container clipping on `y` at a fixed
+height of 6, holding a one-row header and a `GROW` body:
+
+```
+GROW body inside a clipping container: measure=6
+scroll  x=0 y=0 w=3 h=6
+  header x=0 y=0 w=2 h=1
+  body   x=0 y=1 w=3 h=5
+```
+
+The body solves to 5 and does not diverge. The clip hands `POSITIVE_INFINITY` to the **distribution**
+— a clipping container does not impose its size on the axis it clips (C29 §7, I15) — while `GROW`
+still resolves against the inner box. So the refusal's premise is false about this engine whichever
+way the child is declared, and it would be a validation path nothing reaches.
+
+**2 · This is F1229's finding with the reason replaced.** C29 I16's worked example was *a sticky
+child that is `GROW` on the scroll axis*, and it was corrected off on the ground that **`sticky` is in
+no type** — true, and the weaker of the two reasons. The stronger one survives the field being built:
+the example names a contradiction this engine's sizing cannot express. **A refusal accumulates
+reasons, and the one that outlives the build is the one to keep.**
+
+**3 · The subject is real and it is a frame.** The same container with `offset.y = 3` draws
+
+```
+b2 b3 b4 b5 b6 b7
+```
+
+— the header is gone, because `collect` applies the offset to every child. That is what sticky is
+for, it is constructible today with no new type, and it is the answer to §7c's *the field would be an
+export nothing consumes*: the consumer argument was about surfaces, and the mechanism's subject is a
+frame the engine already draws wrongly.
+
+**4 · And the build needs a second rule §14 does not state.** A sticky child excluded from the offset
+still sits where flow put it, and its scrolling siblings land on the same rows — so one of them wins.
+Exclusion from the offset is half the mechanism; **order is the other half**, and a definition that
+names only the first draws a header under its own body.
+
+**5 · §4 named a painter, and this compositor is a cursor — so the first build of the second rule
+did nothing at all.** The sentence above read *its scrolling siblings are collected after it, so they
+paint over it*, and the remedy it implies is to collect the sticky child **last**. Built that way,
+`sticky: "top"` at `offset.y = 3` drew
+
+```
+b2 b3 b4 b5 b6 b7          no sticky
+b2 b3 b4 b5 b6 b7          sticky top — byte-identical
+```
+
+The field was read, the piece was emitted, and nothing moved. `placeRows` sorts pieces by `x` and
+`composeRow` walks a **cursor** — `const at = Math.max(piece.x, cursor)` (`rows.ts:477`) — so a piece
+that starts behind the cursor is **cut**, and the piece composited *later* at a column is the one
+that loses. The rule for this engine is **collected first**. Reversed, the same frames read
+
+```
+H0 b3 b4 b5 b6 b7          sticky top, offset 3
+b3 b4 b5 b6 b7 T0          sticky bottom, offset 3
+```
+
+**This is C23 §8a A4's class, second measured instance** — *an artefact can be correct about the
+interaction it found and wrong about a mechanism it assumed existed*. §4's interaction is real and
+was the walk's job; the verb it reached for was **paint**, which no layer under this engine performs.
+CLAUDE.md's remedy held exactly as written: the finding survived and only the remedy changed. And
+the instrument that caught it was the one that caught everything else in this pass — **reading the
+frame**. Every assertion about the solved tree agrees with itself either way, because a sticky
+child's `rect` is its flow rect whichever order it is collected in.
+
+**6 · And the mutation pass found a sixth thing, about the row rather than the code.** The guard
+keeping a sticky child out of the scrolling walk looked decorative: collected twice, the second
+piece is clipped away at every offset the fixture used, so the mutation survived. It is not
+decorative — a footer at `offset.y = 9` has its flow row back inside the window and blank, because
+the body ran out, and the duplicate has somewhere to land. **The fixture's offsets were the reason
+the cell could not be constructed**, which is the disposition F277 asks for before a row is
+rewritten. The harness also refused to start: the two rows passed `layout` a third argument it does
+not take, and `tsx` — the probe's runner all pass — never type-checks.
+
+**Closed** — §14 is `Box.sticky`, carried by `freeze` and read in `collect`, the one site that
+applies `clip.offset`; the refusal is corrected rather than built. T1.37 and T1.38 are the rows, both
+frame-reads, and T1.38 asserts the solved trees are equal on purpose. Mutation `c29-sticky` **5
+caught / 0 survived**. enforce 24,731 references · `make test` 343 files, 6,298 passed, 4 todo ·
+`make golden` **468/468 with nothing moved, predicted before the run** — `sticky` is optional and no
+existing tree declares it · `make e2e` 24 files, 136 passed, 3 todo · anchors 0 known stale, no run
+drifted. Commits `a37085be` (open), `70a143ec` and `aa23d21f` (spec, each alone), `030c21c3` (code).
+
+---
+
+## F1233 — four kinds shred where one step should shed, and neither the declared orders nor half the step's own rules survived being tested ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `comparison`, `keyValue`, `events` and `steps` — the four kinds C09 I81 names. Each degrades by truncating every part of its row at once, which is the mechanism for a single run too long for its box applied to a row of parts too narrow for all of them. |
+| **Reached for** | One shed step, shared. `status`'s `widthRung` and `plot`'s `layoutFor` are the shape of a narrow ladder and neither has a shed step; four private ones is how a repository comes to hold eight ladders (F1232, F1228). |
+| **Verdict** | **The step holds and the orders did not.** `shed.ts` is one implementation and the four kinds are on it; three of the four orders C09 I81 declared were overturned by reading a frame, and each overturning is recorded rather than applied quietly. |
+
+**1 · The step.** A part is `{ id, natural, min, tier, rank }`, higher rank more important. Shrink by
+**most slack first**, equal slack split by largest remainder; then shed the lowest rank whole and go
+again; the highest-ranked part never sheds. The tier decides what the minimum means — a **floor** for
+content, a **threshold** for decoration, which is *decoration never widens its container* said the
+other way — and `peer` is the third, a group given the tightest slack in it so equals narrow together.
+
+**2 · Three findings about the step, each from a frame and none from an assertion.**
+
+| what the frame showed | the reading |
+|---|---|
+| a row whose last part was two cells narrower than its plan | **the withholding is budgeted before the widths are settled.** A mark appended after takes its cells from the clamp, which takes them from whichever part is last — silently, and from the part the order protected |
+| `sta…` beside `⋯2`, a message three cells wide next to a mark saying it had gone | **a shed part is not drawn.** Defaulting a missing width to the part's floor put it back on the row; no number in the plan was wrong |
+| a timestamp cut at forty columns where the whole time fitted twice over | **the shrink order is derived and only the shed order is declared.** Taken from the rank it is right for `events` and wrong for `keyValue` — in one the important part is the elastic one, in the other it is not — and slack tells them apart with nothing declared |
+
+**3 · The orders, and this is the part that was declared wrongly.** Each row below is a claim C09 I81
+made, and the frame that answered it.
+
+| kind | what I81 declared | what the frame drew | what it is now |
+|---|---|---|---|
+| `events` | *the time and the tone never shed* | `22:13:20   ⋯2` at sixteen columns — a column of bare timestamps, which is not an event log | the **message** is the last part standing; the time still sheds after the type and never before it |
+| `comparison` | *never sheds the two values; sheds the field label first* | `run…  run 5` over `312…  289 …` at sixteen — two anonymous numbers, which is what a comparison is not | the marks go first, then `a`; the **field name** is the last part standing, and the values stay peers while both are drawn |
+| `steps` | *sheds the done steps from the ends, then the pending ones* | — | an order about a horizontal tape. This kind draws **one step per row**, and shedding an item is refused by I81 two paragraphs on. Its parts are the mark, the label and the detail |
+| `keyValue` | *never sheds the key; sheds the bar, then its detail* | | **kept**, and the only one of the four that was right |
+
+**4 · Two kind-level findings from the same read.** `events` capped its type column at a quarter of
+the row and `steps` its label at a half. Both caps **cut a label the ladder would have shed whole** —
+`schedul…` at thirty-two columns — which is the shredding this invariant removes, applied by the very
+kind that declares the part is drawn whole or not at all. Under the ladder the neighbouring part's
+floor is the guard the cap was, stated once where every floor is. And `keyValue`'s bar is declared
+**per row**: as a block-level part it reserved eleven cells on two rows that had no bar. It sheds
+inside the value column instead, where the row that owns it is in hand — and **the bar goes before
+the number**, where it read the other way round.
+
+**5 · The mark gives way to the last part standing.** At four columns `events` shed its type and its
+time, reserved three cells for `⋯2` and had one left for the message, so the frame was the withholding
+and nothing else — a row saying only that it cannot say anything. Where the reservation would take
+the whole row the row wins and the mark is clipped, which is the container's job.
+
+**6 · What the mutation pass found, and it is four more than the build did.** Every one is a claim
+that could not be violated — the vacuity class, arriving in a test, a tier, a member and a type.
+
+| the mutation | why it survived | what changed |
+|---|---|---|
+| the withholding is not budgeted for | T3.93's escape clause read *the row has no room for the mark*, which **any full-width row satisfies**. Unbudgeted, every mark vanishes from the frame — `clampSpans` cuts the **last** span, not the first — and the rows stayed full width | the discriminator is the count of parts still drawn: a row showing two and withholding a third had the room and spent it on the third part's cells |
+| decoration shrinks to its minimum | every kind declared `min` equal to the natural width, so the tier's rule was satisfied before it ran | `events` declares a smaller floor **on purpose**, and T3.93 asserts a decoration part is drawn whole or not at all — which is also what separates *shed* from *cut* for a probe reading a letter |
+| a shed part is drawn at its floor | `steps` read `shed` to decide whether to draw the detail, and the width beside it said the same thing — two spellings of *gone* | `shed` is unpublished and the width is the one answer; the mutation now puts the original defect back verbatim, a missing width defaulting to the declared minimum |
+| peers are not held in lockstep | the tier's one consumer hands its two columns **one** natural width between them, so their slack was equal before the lockstep ran; deleting the arm moved no frame at any width from 4 to 80 | the tier list is two, by a spec commit of its own. Equal columns are the kind's construction, stated where the widths are taken |
+
+**7 · And a fixture, which is where the `keyValue` reading came from.** The probe declared
+`bar: 0.61` where `Bar` is `{ value, max, format }`, so it drew a degenerate run with no number in
+it — and the frame then said, correctly about that block, that the bar duplicated a number the text
+already carried. T1.5c caught the inversion at the suite. **A fixture must be shown to respond to the
+thing under test before it is read from**, and this is the second instance of that rule reaching a
+*probe* rather than a test.
+
+**8 · The frozen Ink oracle learned to retire a capture.** Twenty-one captures draw kinds this ruling
+changed, and `ink-oracle.ts` could say only *never change a kind again* or *delete the capture* — the
+second being a gate that got quieter with nothing saying why. A retirement names its ruling, keeps the
+file as the record of what Ink drew, and is **driven**: the row asserts the bytes still differ, so a
+retirement that stopped changing anything fails as a stale exemption. Its first run caught three
+entries true of nothing, which is the list being a cross product where the movers are per block.
+
+**9 · Held back, named.** `comparison`'s header label never accounted for the verdict column and sits
+two cells left of what it names. Correcting it moves **every** capture at every width, where the
+ladder moves 21 — and a moved frame with two candidate causes is a bisect rather than a finding. Its
+own landing.
+
+**Closed** — landed at `e67e3f60`. Gates: enforce at 24,712 references, 343 files / 6,296 passed /
+4 todo, golden 468/468 with no mover named and none moved, tier 5 136 passed / 3 todo, anchors 0 known
+stale and no run drifted, `c09-shed` 10 caught / 0 survived.
+
+---
+
+## F1232 — three refusals rested on a rule that is now gone, and the sections are built as groundwork ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | C29 I18, I19 and I20 — §12's representations, §14's sticky, §10's floats and layers, §13's incremental cache. Each was refused on a measurement that **no consumer exists**, and each refusal cited CLAUDE.md's *never add an export nothing consumes*. |
+| **Reached for** | The owner's ruling: the sections are groundwork and are to be built. The rule is removed. |
+| **Verdict** | **The measurements stand and the conclusion does not.** Every *no subject* finding is still true of the tree at HEAD; what changed is that an absent consumer is no longer a reason to refuse a mechanism. |
+
+**1 · What the refusals got right, kept.** The measurements are not withdrawn and the build honours
+them:
+
+| the finding | what it measured | what the build does with it |
+|---|---|---|
+| §12's four ladders are four mechanisms | `widthRung` a struct of booleans, `layoutFor` a computed geometry, `table` a greedy loop, `image` a kind substitution | **none of the four is retrofitted.** The engine's chooser is new and lives beside them |
+| a declared `min` beside a form is a second record of one number | `art()` measures the form through `cells()` | **no `min` field.** `representations` is an ordered list and the minimum is the form's own fitted width |
+| the engine cannot see inside a leaf | `Leaf`'s own declaration: *the engine never looks inside one* | representations are **boxes**, not leaf forms, so the chooser stays outside the leaf |
+| `detail` is emitted at one site, full width | `table/definition.ts:475` | the float mechanism lands with **no** new `NavElement` emitter; F1216 still holds |
+| the memo already answers on §13's key | 421 absent misses over 97 frames, zero width misses | the engine's cache is **beside** it, keyed the same way, and holds what the memo does not — the solved rects |
+
+**2 · What was wrong, and it is a rule rather than a measurement.** *Never add an export nothing
+consumes* was written for F21's shape — `TableRow.actions` existed, the spec said C11 *surfaces its
+actions*, and no code read the field. **That is a claim of use with no reader, which is a different
+thing from a mechanism landed deliberately ahead of its first caller.** The rule does not distinguish
+them, and applied to a design document it converts *this is groundwork* into *this is refused*, which
+is what it did three times in this pass. Removed at `ad1ee1c4`; MG24 survives it and its note is
+corrected, because MG24 is about a **gap** across a seam and was never the same rule.
+
+**3 · The ordering, and why §12 is first.** Representations are the only one wholly inside the engine
+— they need no new C15 type, no new field on a block, and no cache. §14 follows, because sticky is a
+positioning rule over the same clip offset the engine already carries. §10 is third, because it is the
+only one that crosses a component. §13 is last, because a cache over the solved tree is only worth
+having once the tree has the shapes the other three add.
+
+**Open** — the ruling is taken and four landings are owed.
+
+---
+
+## F1231 — §13's cache is built, its dirty machine has no mutable tree to run on, and its opening premise is false ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `LAYOUT_ENGINE.md` §13 — *incremental layout*: a DIRTY/CLEAN marking pass, the rule that **a child whose natural size did not change cannot dirty its parent**, five numbered steps, and a cache *keyed on (box identity, available width) and nothing else*. The plan's phase 5 calls it *mostly a wiring exercise, because the cache is built and correct*. |
+| **Reached for** | The premise check F1226 is, run on the last section of the pass — and then `tools/bench/stress.mjs`, because three of the four claims are about how often something misses and none of them had a number. |
+| **Verdict** | **The prescribed cache is built, session-scoped, and keyed exactly as §13 asks. The dirty machine has nowhere to live. And §13's opening sentence — *the spec so far solves the whole tree every frame* — is false at HEAD.** |
+
+**1 · The cache §13 prescribes exists, one layer above the engine.** `construct.ts:830` opens a
+`WeakMap<Block, {width, rows}>` before the viewport and hands it down (C22 I100); `registry.ts`'s
+`#measureChild` reads it on every child ask and reports `hit` or `miss` with a reason. Its key is the
+block **object** and the width — *(box identity, available width) and nothing else*, which is §13's
+own sentence with `Block` where it wrote `box`. The engine holds no cache of its own:
+`src/presentation/layout/` contains no `Map`, no `WeakMap` and no memo in 864 lines.
+
+**2 · It holds across frames, measured.** `stress.mjs panel` at 120×40, 150 entries, a PageUp/PageDown
+sweep of forty:
+
+```
+misses: measure absent 421 · chrome absent 2/rev 83 · height absent 1/rev 1 · render absent 1
+        over 97 frames
+```
+
+**421 absent misses over 97 frames, against a corpus of roughly 750 measurable blocks** — so the count
+is a population and not a rate, and re-entering a window costs nothing. **Zero `width` misses**, which
+is the other half: nothing in a static run is ever re-measured at a second width. The same run at four
+seconds instead of one returns the identical line, so the misses are tied to frames and the frames to
+content.
+
+**3 · §13's opening premise is false.** *The spec so far solves the whole tree every frame. That is
+slower than what it replaces.* The engine's callers are `panel`, `scroll` and the two groups, each
+entered through `measure`, and every child ask inside the `Box` they build goes through the memo
+first. The engine is reached on a miss, and the miss rate is the figure above. The sentence describes
+a tree with no cache above it, and there has been one since C22 I100.
+
+**4 · The dirty machine has no mutable tree to run on, and its effect is already delivered.** §13's
+five steps — *mark the changed boxes dirty · solve each dirty box's natural size · if it equals the
+cached one, STOP · if it differs, dirty the parent and repeat* — presuppose boxes that are marked and
+re-solved in place. **Calcium's blocks are frozen and replaced on change**, so:
+
+| §13's step | what identity already does |
+|---|---|
+| *mark the changed boxes dirty* | a changed block **is** a new object, so the mark is the key |
+| *solve its natural size; if it equals the cached one, STOP* | an unchanged child is the same frozen object and the memo answers without solving |
+| *if it differs, dirty the parent and repeat* | a parent holding a changed child is itself rebuilt, so it is a new key, and one that is not is a hit |
+
+So the rule *a child whose natural size did not change cannot dirty its parent* is **satisfied by
+construction and slightly differently**: identity is stricter on one side — a block rebuilt with
+byte-identical content is a new key and misses, though its size did not change — and free on the
+other, because no marking pass has to run at all. The registry's own comment says the stricter half
+outright: *a rebuilt block is a new key and a settled entry's blocks are collected with it; nothing
+evicts and nothing subscribes.*
+
+**5 · The one property §13 does not have, now measured rather than read.** The plan recorded it off the
+type — *one slot per block holding the last width, not a map over widths, so alternating widths
+thrash* — and a claim read off a type is a claim. Asked at 80, then 60, then 80 again through one memo:
+
+```
+slot after 80:  { width: 80, rows: 4 }
+slot after 60:  { width: 60, rows: 4 }
+slot after 80:  { width: 80, rows: 4 }
+```
+
+The slot moves each time, so the third ask was a `width` miss and not a hit. **A resize sweep
+re-measures everything it touches twice; a stable terminal width never pays it** — which is the
+correct trade for a terminal and is the reason the counter above reads zero. It is stated so nobody
+measures it as a defect.
+
+**So phase 5 lands as a refusal with the mechanism recorded and its one measured limit stated.** The
+engine holds no cache, the memo is C22's, and §13's machine is an answer to mutability this tree does
+not have.
+
+**Closed** — landed as C29 I20 and §7e, with `docs/notes/C29_INCREMENTAL_WALK.md` the walk and T1.34
+the row. **No `src/` file changed**, as in F1230: the third record-only landing of the pass.
+
+**The walk's findings are all about what §13 leaves out rather than what it gets wrong**, and two are
+arguments for the built shape over the written one. **A3**: §13 says cache the *natural size*, and
+`#measured` stores the floored, capped figure — a cache of the natural size has the cap applied after
+each read, so the memo and the render path answer one question twice and agree only while both are
+right, which is MG24's shape in a cache. **A5**: §13 writes *(box identity, available width)* and
+never says that choosing the **object** as the key is what removes the eviction problem — the
+strongest argument for its own prescription is the one it does not make. And **S4** is the cell where
+a cache could be wrong and is not: a theme change leaves every memoised height valid, on a rule
+written a component away — appearance animates and geometry never does — which neither §13 nor C29
+states.
+
+**T1.34's own shape is the thing to keep.** A map over widths and a single slot **agree on every ask
+that does not revisit a width**, which is every ask a static run makes and every ask the 97-frame
+measurement above made. So the row is three asks — 80, 60, 80 — and the third is the whole of it;
+both arms were verified by fabricated violation, and the slot mutation is now permanent in
+`c22-measure-memo.mjs` as `SLOT-WRITE-ONCE`.
+
+Gates: `make test` 343 files · 6,292 passed / 6 todo; `make golden` 468/468 with no mover named and
+none moved; `make e2e` 24 files · 136 passed / 3 todo; `make enforce` at 24,656 references; anchors
+`0 known stale, and no run drifted`; `c22-measure-memo` 8 caught · 0 survived.
+
+---
+
+## F1230 — §10's one live float is full-width by construction, and two of its mechanisms are already built ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `LAYOUT_ENGINE.md` §10 — a float declared in the tree with `attachTo: {kind:"element"; id}`, anchor points, a nudge, `clipTo: "attachedAncestor"`, a **named** four-position layer stack, and a frame ring above a frame stack above layers. The plan's phase 4 keeps C15 the owner and `layout()` pure. |
+| **Reached for** | The premise check F1226 is, run on the section phase 4 is — and then one grep, because the claim that decides the section is a claim about how many producers a field has. |
+| **Verdict** | **Six claims: two built, one built at L4 where the design puts it inside C15, and three with no subject.** The one that decides the phase is the fourth — the field that selects a float's subject is emitted at exactly one site, whose span is the full width, so there is no *beside* to draw in. |
+
+**1 · The named stack is built, and the names it has are the measurement.** `sortLayers`
+(`place.ts:29`) partitions by `kind` — `view`, then `peek`, then `overlay`, stable within each —
+and there is no integer in `place.ts` or `overlay/types.ts` anywhere. §10's *Refused: a free
+integer z-index* is refused by construction rather than owed. Its four positions are not the
+tree's three: `base` is not a layer at all (it is the composited frame beneath the stack), `float`
+has no member, and **`debug` has no member either — the profiler's overlay is `kind: "view"`**
+(`profile-view.ts:275`), a full-region layer sorted *bottom*-most, which is the exact opposite of
+§10's *global, above every frame*. The name §10 does not have is `peek`, and it is the only one
+with a subject.
+
+**2 · The nudge is built, on both axes.** §10: *a float that would land outside the frame is
+NUDGED, not clipped: shift it along the axis that overflows until it fits, and only clip if it
+cannot fit at all.* `place.ts` step 7:
+
+```ts
+height = Math.max(0, Math.min(height, region.height));
+if (height < capped) truncated = true;
+top = Math.max(0, Math.min(top, region.height - height));
+left = Math.max(0, Math.min(left, Math.max(0, region.width - width)));
+```
+
+Shift first, clip only where the height cannot fit, and `truncated` carries the clip up to the
+owner rather than swallowing it. **Corrected in the landing, by the mutation pass**: this reads *both
+axes* above and it is one. Removing the `left` clamp outright leaves C15's unit and contract suites
+wholly green, and the reason is constructive rather than corpus-shaped — `resolveWidth` bounds the
+width by the region, an anchored layer takes `left = 0`, and a centred one takes a column already
+inside `[0, region.width - width]`, so **no input reaches it**. It is a guard; the width clamp is
+what bounds that axis. The sentence was a day old and read as a measurement because the code it
+describes is there. The code also states the rule-interaction §10 does not — *height
+first, because clamping the top against a height that still exceeds the region leaves the bottom
+edge outside it* (C15 I6).
+
+**3 · *No layer's position can be derived from a box in the layer beneath it* is false on the
+vertical axis, and where it is false it is built at L4 — which is where the plan wants it.**
+`construct.ts:1801`:
+
+```ts
+const within = chromeRowsOf(entry, width) + found.element.rows.from - ve.skipRows;
+```
+
+The peek's anchor is a solved box's row, resolved through the entry's chrome and the viewport's
+scroll offset and handed to C15 as a number. **`layout()` is pure because the caller did the
+resolution, not because the resolution does not happen** — so §10's *what the engine owes* step 2,
+*resolve `attachTo` to a SOLVED box from pass 5*, describes work that exists, one layer above the
+function it proposes to put it in. `attachTo: {kind:"element"; id}` is refused for the reason
+`placement.row` is a number.
+
+**4 · The horizontal axis has no subject, and one grep settles it.** §10's four motivating cases —
+a tooltip, a hover card, an inline completion beside a token, a callout on a plot — every one wants
+a **column**. The only float that attaches to an element is the peek, and a peek exists only where
+a `NavElement` declares `detail`. **`detail` is emitted at exactly one site in the tree**,
+`table/definition.ts:475`, on an element whose span is
+
+```ts
+cols: Object.freeze({ from: 0, to: w }),
+```
+
+the table's whole width. **There is no beside.** The two emitters whose `cols` is narrower than
+their block — mosaic cells (`containers.ts:635`) and chips (`simple.ts:565`) — declare no `detail`
+and raise no peek, and C26 F1216 forbids widening `NavElement`, which is where a per-row span would
+have to go.
+
+And the field's own doc reads *what the rendering could not show of this element, **shown beside
+it** as C15's peek*. That is prose naming a geometry its only producer cannot supply — C23 §8a
+A4's shape, **a ruling that names an operation the layer below does not have**, here a ruling that
+names a position a corpus of one cannot occupy. `construct.ts:1825` already wrote the true reading
+and never met the doc that contradicts it: *anchored below … the width is the region's*. Two
+statements about one layer in two files; the one with no instance is the design's.
+
+**5 · `clipTo: "attachedAncestor"` cannot be resolved where §10 puts it.** A float inside a
+`scroll` must be clipped by the scroll block — but the ancestor is a box in the solved tree, and
+C15's `layout(stack, region)` holds `Block[]` and a region and nothing else. Resolving it inside
+costs C15 I5's purity, which the plan's *do not* list protects; resolving it outside is claim 3
+again, and refused with it.
+
+**6 · Frames have no subject, and §10 authorises that outcome in its own words.** `frameRing` is in
+no file in `src/` or `test/`. The four `kind: "view"` producers — `patch-view.ts:170`,
+`surface.ts:184`, `document-view.ts:334`, `profile-view.ts:275` — are each one layer over one base,
+which **is** the frame stack with one member. The ring is the part with nothing in it, and
+`INTERACTION.md` §14's *there are no pushed views* is the ruling that keeps it so. §10: *if nothing
+else ever passes, the frame stack has exactly one member per tab and costs nothing — which is the
+correct outcome, not a wasted mechanism.* The section pre-authorised its own refusal and the
+measurement takes it up.
+
+**So phase 4 is a refusal with two mechanisms recorded as built.** The engine does not place
+layers: C15 does, the caller resolves the anchor, and the two halves §10 asks the engine to build —
+the named stack and the nudge — are in `place.ts` today under different names and with the
+interaction stated. What changes is the record, not the tree.
+
+**Closed** — landed as C29 I19 and §7d, with `docs/notes/C29_LAYERS_WALK.md` the walk and T1.32,
+T1.33 and T6.7 the rows. **No `src/` file changed**: what was owed was the record, and the landing's
+own findings are two.
+
+**The first is the correction above** — *both axes* written as though measured, and the mutation pass
+is what asked the sentence whether it could be violated, on a sentence a day old.
+
+**The second is the shape of T1.32, and it is walk A3 arriving as a test.** The refusal cannot be
+asserted on a placed result at all: a column added beside `row` would be inert for any layer that
+declares no width, so every number `place()` reports stays correct while the field sits there doing
+nothing. The row is therefore on the **type**, read by equality, and both halves were verified by
+fabricated violation before the gates — a `col?: number` on the arm fails the field set, and centring
+an anchored layer fails the placement. **A refusal whose violation is invisible to the mechanism can
+only be watched at the declaration.**
+
+And the unreachable clamp is declared in `c15-centred-width.mjs`'s `EXPECTED_SURVIVORS` rather than
+deleted or silently kept: removing it can fail nothing today, and the day a placement can produce a
+column of its own the mutation starts being caught and the pass fails as a **stale exemption**, which
+is the notice that the refusal has been lifted somewhere. A guard with a watch on its own
+unreachability.
+
+Gates: `make test` 343 files · 6,291 passed / 6 todo; `make golden` 468/468 with **no mover named and
+none moved**, which is the expected reading for a landing that changed no source; `make e2e` 24 files
+· 136 passed / 3 todo; `make enforce` at 24,628 references; anchors `0 known stale, and no run
+drifted`; `c15-centred-width` 10 caught · 1 survived · 1 expected.
+
+---
+
+## F1229 — an invariant whose worked example cannot be constructed ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | C29 I16 — *a contradictory declaration is refused at construction, never at layout* — whose example is **a `sticky` child that is `GROW` on the scroll axis**. |
+| **Reached for** | Phase 3's ruling on `LAYOUT_ENGINE.md` §14. Refusing `sticky` meant reading every citation of it, and I16 was the one that used it as its only instance. |
+| **Verdict** | **A03 §2's vacuity class, in a justification rather than in a rule.** The invariant's claim is sound and its example forbids nothing, because nothing can declare a `sticky` child at all. |
+
+**The invariant is right and its instance is imaginary.** *A throw mid-pass would abandon a
+half-solved tree and reach the frame as a fault rather than as a layout* — that is a real
+constraint, it is why `measure` is total (C09 I2), and it holds. What it lacked was anything a
+reader could construct to test it against: `sticky` is in no type, no validator and no block, so
+the sentence *this is refused at construction* has no subject to be refused.
+
+**Why review cannot reach it.** The example reads as the most careful part of the invariant — it
+names a specific contradiction and explains the mechanism of the loop it would create. A reader
+checks whether the sentence is *true*, and it is: a sticky child that grew into the space it is
+excluded from would loop. The question that reaches it is the mutation pass's — **can this be
+violated** — and F84's is the same one about a scope: *does this sentence constrain the decision it
+is attached to.* Here it constrains nothing, because the decision has no instances.
+
+**And it was written in the direction that makes it harmless.** An invariant with an imaginary
+example is not a false claim; it is a claim with an empty domain, which is exactly what passes a
+check indistinguishably from one that is satisfied. Four spec commits cited I16 and none of them
+could have noticed, because every one was about the *general* rule.
+
+**Corrected to a declaration that exists**: an `image` declaring both `width` and `aspect`, which
+C04 I62 refuses at construction with the reason *two ways to say one number*. And the boundary I16
+names is now stated rather than assumed — a `Box` is built by L1 from an already-validated block
+(`groupMeasureBox`, `panelMeasureBox`, `scrollMeasureBox`), so C04's validator is upstream of every
+field the engine reads. That sentence was the thing the `sticky` example was standing in for.
+
+**The class, and it is narrow but it has a home.** *An invariant is vacuous until its subject
+exists* is already a recorded rule about whole invariants. This is the same defect one level in:
+**the subject of the invariant existed and the subject of its example did not**, so the rule was
+live and the reason a reader would check it against was not. The cheap check is the one that found
+it — when a field is refused, read every citation of it, because a citation may be load-bearing for
+something other than the field.
+
+**Closed** — I16's example corrected, its boundary named, and `sticky` refused in C29 §7c.
+
+---
+
+## F1228 — §12's four cited consumers are the four that do not need it, and the four that do are not named ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `LAYOUT_ENGINE.md` §12 — *responsive representations*: `representations?: { min, box }[]`, the engine picks the widest that fits, per element, bottom-up, in pass 2. The plan's phase 3 says it **generalises four ladders that already exist** rather than inventing one. |
+| **Reached for** | The premise check F1226 is, run on the section the plan did apply it to — and then the frame-read, because the first table was of the wrong fixture and its numbers were almost right. |
+| **Verdict** | **§12's mechanism is sound and its evidence is inverted.** The four ladders it would generalise do not share its shape, two of its four worked examples have no subject in the tree, and the four kinds that genuinely shred at a narrow width are named nowhere in it. |
+
+**1 · Two of the four worked examples have no subject.** `sidebar` and `tabBar` are in no file in
+`src/` — the headline sentence, *a sidebar should not vanish at 60 columns, it should become a
+rail*, is about a block that does not exist. The **footer** example is the frame's chrome, whose
+height C22 I82 caps and whose content is the app's `ChromeFn`, not a block that could declare
+representations. F161's shape exactly: **a count of consumers is an argument only if the consumers
+share a shape**, and here two of them are not consumers at all.
+
+**2 · The four ladders that do exist are four different mechanisms.** §12 proposes a **list of
+discrete forms, chosen by width**. Measured, at HEAD:
+
+| the ladder | what it actually is |
+|---|---|
+| `status`'s `widthRung(width, frame)` | a **modified frame plus a tag fit** — it turns *features* off: border, then pad, then the tag. A struct of booleans resolved at a width, with no list anywhere |
+| `plot`'s `layoutFor(...)` | `Layout \| null` — a **computed geometry** carrying an *ordering of what loses width* (labels → furniture → curve). The rungs are a priority, not forms |
+| `table`'s shedding | a **greedy loop**: admit columns while `Σ min + gaps ≤ width`, stop at the first non-fit (`plan.ts:113`) |
+| `image` and the heatmap | a **substitution of kind** — they degrade *into a status box*. Not a representation of the same block |
+
+Going to each of the four, as F161's method requires: one already has the slot, two are functions of
+the width rather than lists, and the fourth is a different block. **So §12 must invent its
+mechanism rather than generalise; the plan's phase 3 sentence is false, and it is false in the
+direction that makes the work look smaller.**
+
+**3 · And the subject is real — it is just none of those four.** Twelve kinds rendered at 80, 40,
+24, 12 and 6 columns, read as frames:
+
+```
+comparison  w=12   "  field  b……"  /  "~ l…  3…  2…"
+keyValue    w=6    "f…  f…"        /  "s…  s…"
+events      w=12   "22:13:20  s…"
+steps       w=6    "✓ re…" / "⠋ fi…" / "◌ ad…"
+pills       w=6    "alpha" / "bravo" / "charl…" / "delta"
+```
+
+**`comparison` at twelve columns shreds every column at once**, which is the precise thing §12's
+own *sheds, never shreds* forbids. `keyValue` shreds both halves. `events` spends eight of twelve
+cells on a timestamp and loses the message entirely — the rung wants the timestamp shed first, and
+nothing sheds it. `steps` truncates the label to a stub and never sheds it in favour of the state
+marks, which is §12's *a rail — marks and counts, no labels* on a kind the design does not mention.
+
+**`pills` is the one that inverts the design outright.** §12 wants a tab bar to collapse to
+`⋯ n more`; `pills` **wraps to a row per chip** and at six columns shows four chips on four rows
+with one truncated. Nothing is silently lost, which is what dropping to `⋯ n more` would do — so
+the built mechanism is the better one and the design's spelling is what would regress it. That is
+F1226's first pattern again: *built, by the mechanism its own spelling forbids.*
+
+**4 · The correction this finding needs about itself, and it nearly shipped.** The first table was
+taken with **hand-written fixtures that five of the twelve kinds rejected** — `pills` takes `chips`
+and not `pills`, `steps` and `keyValue` take `label` and not `key`/`text`, `comparison` takes
+`field`/`a`/`b`. Every one rendered C09 I34's **contained failure notice**, and the notice narrows
+like any text. So the table read:
+
+```
+comparison   2r/51c   2r/38c   2r/24c   2r/12c   2r/6c      ← the failure notice
+comparison   2r/61c   2r/34c   2r/23c   2r/12c   2r/6c      ← the kind
+```
+
+**Three of the five columns agree to the cell and the other two are within three.** A measurement
+of the wrong subject was within noise of the right one, so no number in the table could have
+distinguished them — and the conclusion drawn from the wrong table would have been *every kind
+truncates cleanly and nothing sheds*, which is the opposite of what the frames say. **Only the
+frame-read separated them**, on its second run, and `test/support/README.md`'s rule is the one that
+should have come first: *a fixture must be shown to respond to the thing under test before it is
+asserted against.* The tell available in the numbers was one cell of one row — `status` measuring
+`NaN` — and it was a cast in the probe rather than a defect in the tree.
+
+**So phase 3's shape changes.** §12 is built for `comparison`, `keyValue`, `events` and `steps`,
+where the measurement says the shredding is; `status`, `plot`, `table` and `image` keep their
+ladders and the refusal is recorded rather than the four being retrofitted to a list they do not
+fit; `pills` is left alone with its reason written down.
+
+**Closed, and the disposition is three different things rather than one.**
+
+- **§12's engine-level `representations` is refused** (C29 I18, §7b). Three families want a
+  representation and the engine owns none: a leaf's forms are the definition's, because `Leaf` is
+  opaque to the engine by its own declaration; an authored alternative is `art()`'s, because a
+  variant is a different block and choosing one in pass 2 would mean rebuilding a subtree mid-solve;
+  and a container choosing a subtree has no subject in the tree.
+- **§14 is refused** (C29 §7c), its intent discharged by C25 I18 and by composition, and C29 I16's
+  worked example is corrected off it (F1229).
+- **§15 is built** and is C29 I10. Its lumpiness is a constraint on the tests, not on the code.
+- **The shredding is C09 I81**, which is new work this finding produced rather than §12's own. Four
+  kinds owe a ladder and it is scheduled after the plan's remaining phases, with T3.93 and T3.94
+  carrying the blocker.
+
+**The one figure to keep**: §12 names four consumers and has none, and the four kinds that shred are
+named nowhere in it. A design section can be right about the need and wrong about every instance it
+cites — and the instances are the part a reader checks, because the need is stated as a sentence and
+the instances are stated as facts.
+
+---
+
+## F1227 — the right margin is one row of forty-five frames, and three composers are exempt by invariants already written ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `APPEARANCE.md` §15 rule 8 — *content stops one column before the right edge* — 2b's one genuine item, confirmed unbuilt: `resizeViewport({ width: frame.size.columns, … })` hands the transcript the terminal. |
+| **Reached for** | `C04_CHILDGAP_WALK.md` A8's hazard before its ruling: *the transcript's rows, the prompt, the overlays and the rule are four composers at the frame's width, and a margin applied at three of four is a ragged edge nobody declared.* |
+| **Verdict** | **Three narrow, three are exempt, and every exemption is an invariant that already exists.** The raggedness A8 warned of is the case where the exemptions are chosen rather than cited; here they are cited, so the edge is declared. |
+
+**The measurement first, because it is the smaller number than the change.** Forty-five session
+goldens, the grid form with a column ruler. Rows reaching the frame's last column: **thirty in
+the chrome, three in the content — and the three are one row in three themes**, `/profile  open
+the profiler's deck; also \`snapshot\`, \`live\`, \`capture\`` at exactly eighty. So the rule's
+*visible* subject in the whole corpus is one line of help text, and everything else the change
+moves it moves by shifting a wrap point.
+
+**That cuts both ways and the ratio is the finding.** One touching row means nobody has been
+looking at a frame the rule would have improved; it also means the corpus cannot tell a correct
+margin from a wrong one, which is F1225's shape on the axis next door — *the gate had no padded
+block in it*. A margin landed against this corpus is landed against a blind gate, so the landing
+owes a frame whose content is wider than the region and a frame at the boundary.
+
+**The four composers, and who is exempt by what.**
+
+| composer | drawn at | by |
+|---|---|---|
+| the two prompt rules and the header's rule | the terminal's width | **C22 I81, I87** — *full width … never configurable*, three rules on every frame |
+| the header and footer rows | the terminal's width | **C22 I86** — *two clusters with the clock at the right edge* |
+| the transcript's blocks | **the region's width** | rule 8's subject; `C04_CHILDGAP_WALK.md` A8 |
+| the prompt's body | **the region's width** | rule 8's subject — a typed line is content |
+| an overlay's box | **the region's width** | A9's consequence: `place.ts` centres in `region.width` and clamps to it |
+
+**A rule crossing the gutter is not a ragged edge — it is what a margin looks like.** The
+distinction A8 could not make from a work list is between an exemption that is *argued* and one
+that is *left out*: a rule row spanning short of the edge would read as the defect, and I81 says
+so in the words *full width*, so the divider crossing the content's gutter is the declared shape.
+The clock is the same: I86 puts it at the right edge on purpose, and a margin applied to it would
+move a position an invariant fixes.
+
+**And the axis that made this findable is C14 I22, which already says it on the other axis.**
+*The height handed to `resize` is the transcript region's, not the terminal's* — with the reason
+that C14 holds no geometry above itself and cannot derive one from the other. The width is the
+same sentence: the region is narrower than the terminal by the margin, and only the composer
+knows by how much. So the spec edit is I22 gaining its second axis rather than a new invariant
+beside it, and the new one is C22's, because C22 owns the geometry.
+
+**Closed, and it produced two findings of its own.**
+
+**1 · `composite` was padding every composited row to `region.width`.** The rows handed to it are
+the painted frame — `size.rows` strings of `size.columns`, which its own doc comment says — and the
+region is a different question: *how far a box may reach*, in the coordinates C15 placed it in. One
+field was answering both, and it was **correct for exactly as long as the two numbers agreed**. No
+assertion anywhere could distinguish them, because there was nothing to distinguish; T1.12c, which
+asserts the composited row is still the frame's width, went red the moment the margin landed with
+nothing about layers having changed. **This is MG24's shape in a field name rather than in a
+justification**: a name for one quantity standing in for another, where every reader checking the
+line finds it true.
+
+**2 · the named movers said forty-five and two moved.** Both are the `window-wash` scene, in its
+styles and its bytes reading — the wash stops a column short and the base owns the last cell, which
+is rule 8 arriving — and the three rule rows and the clock are unmoved, which is the half that says
+the margin landed where §6l.9 put it and not on the frame. **Forty-three session frames did not
+move, and this finding's own measurement had already said why**: three content rows reached the last
+column across the whole corpus, so a frame that never touches the edge cannot see a margin.
+
+**The prediction was taken from the change's reach and the measurement from the corpus, and the
+corpus was right.** That is worth separating from being merely over-cautious: naming every frame a
+change *could* touch reads as the careful thing to do, and it is the reading that cannot be wrong —
+so it carries no information, and a mover list that cannot be wrong is not a gate. The one that can
+be wrong is the count of corpus members that carry the property, and it is the number that was
+already in hand.
+
+| | before the run | after |
+|---|---|---|
+| named as expected to move | 45 of 468 | — |
+| this finding's measured subject | 3 content rows, all one help line | — |
+| moved | — | **2 of 468**, one scene in two readings |
+
+**And the fixture the landing owed was written**: T3.42 renders a document exactly at the region's
+width and one cell wider, because a margin and an off-by-one are indistinguishable without both
+halves — a frame drawn at `size.columns` passes every containment assertion while overrunning the
+gutter by one cell.
+
+**Gates**: 343 files / 6,287 passed / 4 todo · golden 468/468, two regenerated with the reason in
+the file's header · `c22-frame-session` and `uncited-46` every mutation caught, the second carrying
+a new width mutation whose catcher is T4.11f rather than T6.124 — *a test that calls the mechanism
+misses the wiring* · tier 5 136 passed / 3 todo · enforce green at 24,559 references · anchors 0
+missing across 240 runs.
+
+---
+
+## F1226 — a design document's four surface rules, checked against the tree: three move ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `APPEARANCE.md` §5/§15 rules 5–8 and `LAYOUT_ENGINE.md:667`, as phase 2b's work list: `padding.l = 3` per nested level, root `padding.r = 1`, `childGap = 1` between entries, no leading or trailing blank row. |
+| **Reached for** | The plan's own instruction, applied to the section it was never applied to. It says *four of §21's nine lines are already true and must not be rebuilt* and runs that check for §21 — and §5 and §15 got a work list instead of a check. |
+| **Verdict** | **Three of four move, and 2b is two edits rather than five.** One is built by a better mechanism, one is falsified by a number, one is retired by 2a, and one is genuinely owed. |
+
+**1 · *A blank row between entries* is built, by the mechanism its own spelling forbids.** The
+design wants `childGap = 1` at the sequence level. `ENTRY_GAP = 1` and a blank *run* per entry
+have been there since C22 I85, and the comment beside them carries the argument the design is
+missing: *the entry's own, so C14 measures it through the wrapper and the frame draws it through
+the same layout — a composer adding spacing of its own is the C04 I25 shape one layer up*. A
+document's top level has no container for a `childGap` to sit on, so the design's spelling is not
+merely redundant, it is unavailable.
+
+**And the two are not the same rule, which is the part a work list cannot show.** A closing blank
+on *every* entry puts one after the last, above the rule; *between* entries would leave the last
+content row against it. C22 §6l.8 rows 18–19 rule the drawn behaviour correct, so the design's
+wording is the thing that is wrong — not the tree.
+
+**2 · *Exactly three columns* is four, and the four is derived.** `GUTTER_UNIT = BODY_INDENT =
+HOOK_INDENT + 2` — the hook's column, the mark and its trailing space — held to the body's indent
+by a row that draws both, *because two constants agreeing is not the claim*. `padding.l = 3` would
+move every nested frame and replace a derivation with a literal. **A number in a design document
+is a claim like any other**, and this one had a mechanism behind it that the document does not
+mention.
+
+**3 · *A block emits no leading or trailing blank row* was retired by 2a**, deliberately. A padded
+block emits exactly that. The rule was about *who owns vertical space*, written when the answer
+was the sequence, and its content survives as C09 I17's *a composer inserts no spacing of its
+own*. Rule 7 and rule 5's `padding` are one document contradicting itself — F1224's shape, one
+layer up: the clause that reads as forbidding the defect was the clause the change falsified.
+
+**4 · The right margin is owed, and it is not a block's `padding`.** Confirmed at the call site:
+`resizeViewport({ width: frame.size.columns, … })` — the full terminal width, unnarrowed. It lands
+on the **region** C14 hands down, because four composers draw at the frame's width (the
+transcript's rows, the prompt, the overlays, the rule) and a margin applied at three of four is a
+ragged edge nobody declared. A mosaic divides its cells *before* a child's padding is applied, so
+as a `padding.r` the dividers would read the unnarrowed number — the cell that would have been
+wrong the other way round.
+
+**And the one thing genuinely worth building is not on the list at all.** `ROW_GUTTER = 1` is read
+in three places — a row's widths, the admission loop that adds one per placed child, and the
+element walk's offsets. Three readers of one constant is what a field looks like before it has a
+name, and no surface can ask for a row group without a gutter: today's answer is a `raw` block
+hand-composed at three widths, which is C04 §3's `weights` deferral being paid for again at a
+different call site (CLAUDE.md's third instance, now a fourth).
+
+**The class, and it is the record rather than the code.** *Ask where a settled claim is written
+down* — pointed at a design document instead of at a finding. Four rules, each stated as a
+property to build, none measured against the tree since the tree acquired the mechanisms that
+answer them. The instrument's total is now **four claims disproved and four produced**, and this is
+the first time it has been run on a work list rather than on a belief.
+
+---
+
+**Addendum, and it corrects this finding's own count.** The section above says `ROW_GUTTER` has
+**three** readers. It has **four**: the width division (`measure.ts:121`), the admission loop
+(`:168`), the element walk in `containers.ts:1095`, and **the registry's own column cursor in
+`elementsIn`** — which is in a different file. Three of the four are in one place, and *a count of
+readers taken by reading one file is a count of that file*.
+
+**What found it is the row, not a re-read.** T3.92 asserts that the *element* moves when the gap
+widens. The widths and the admission loop were converted, every frame was byte-identical, the
+whole suite was green — and the focus ring stayed where the constant put it, because the fourth
+reader had not been told. No assertion about a width could see that, and no golden frame could
+either: an element is not drawn.
+
+**So the finding's own instrument was the thing it was about.** F1226 exists because a work list
+was carried without being checked against the tree, and its own count of readers was carried the
+same way — one grep, taken in the file the subject lives in, restated in a walk, a spec, a type
+comment and a commit message. **Five records of one unmeasured count** is F58's shape in miniature,
+inside the finding that names it.
+
+---
+
+## F1225 — the gate had no padded block in it, and the four things that came out of saying so ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | Phase 2a: `gapBefore` replaced by block-level `padding`, the registry applying it around every kind (C04 §3a, C09 I80). |
+| **Reached for** | 16 of 458 golden frames moved and all 16 were in one file. A change to the box model moving 3.5% of the corpus is either a very careful change or a corpus that cannot see it. |
+| **Verdict** | **The corpus.** 51 blocks in the shared corpus, **0 with padding**; the terminal baseline is one plot per frame, so its 2,440 frames are blind by construction. Three of the model's four claims shipped with no picture behind them and the fourth was watched by accident. |
+
+**The measurement first, because the 16 look like diligence.** They are all one case in
+`test/golden/patch.test.ts`, which renders each block **alone** — and a block drawn outside a
+sequence now draws its own leading row where `gapBefore` was inert there, because the row belonged
+to a composer that was not running. Every one of the 32 changed lines is that row plus the caption
+counting it. The frames that moved moved correctly; the finding is the frames that could not.
+
+**Four defects came out of the four subjects being given one**, and none was visible from a green
+run:
+
+**1 · The assembler loses a padded container's edges.** `entry-layout.ts` assembles a cached
+window over a column group by rendering each child alone and laying the rows end to end — which
+draws none of the *group's* own padding, where the fresh render draws it once around the whole. A
+re-pointed mutation survived; giving T4.89b's fixture a padded container turned the row **red with
+no mutation applied at all**, the assembly missing the top row and the 2-column inset on every
+line. Ruled the way the window seam already rules it: **a padded group is assembled whole**, one
+cache part, and no third place that knows the padding rule.
+
+**2 · `l` and `r` were code with a rule, a test and no picture.** `#padded` insets each row and
+narrows the width the kind is asked for, and **nothing in the tree declares either edge** — so
+both effects were unwatched. It takes two frames rather than one: `raw` truncates, so the inset
+shows and the narrowing does not, and a single case showing the inset reads as covering both.
+
+**3 · Sharing a predicate blinded the row that checks it** (F277's warning, met exactly). The
+floor's refusal and padding's became one `windowRefused`, called by both window callers *and* by
+the measurement harness's stand-in — which is right for the seam and fatal for T2.124, whose whole
+method is comparing the seam against the definition. Both sides consulted one function and agreed
+however wrong it was, and the mutation survived. The harness gained `windowDefinition`, the
+unguarded dispatch, and the row restates the rule in literal clauses as it already did for the
+floor and the cap. **A shared implementation is the right answer and it costs a row its
+independence; the row has to be told.**
+
+**4 · A mutation made vacuous by a layer below it.** PAD-SPACE writes the padding row as a single
+space, which was a real defect when `render-lines` pushed the row straight into its output past
+the arm's normalisation. The row is the registry's now and reaches a frame through `normaliseRow`,
+and **measured: `normaliseRow(" ")` is `""`**. The byte cannot survive to a frame, so no row can
+see it go. Recorded as an expected survivor rather than deleted — the obligation moved to the
+trim, which TRIM-DROPPED holds one line above, and deleting the row would leave no record that it
+moved.
+
+**And the corpus gap is the thing to fix, because 2b is worse.** Phase 2b puts `padding.l = 3` per
+nested level and `padding.r = 1` on the root — padded *containers*, which is defect 1's subject
+exactly. `test/golden/padding.test.ts` is the subject the gate was missing: six cases (alone,
+horizontal on a kind that truncates, horizontal on one that wraps, all four edges, a row group
+with one child padded, and a sequence) × 3 widths × 3 variants, with a column ruler so an inset is
+readable, and the arithmetic beside the picture. The fifth case is the control and the one that
+must **not** move: the row changed owner and not position, which is what the migration claims.
+
+**The class, and it is the one CLAUDE.md already names.** *A corpus chosen for a property may not
+have it* — T2.124's own comment had counted three instances of it in this component before padding
+made four, and each was found the same way: a mutation surviving for want of a fixture. Three
+instances is a rule and four is a habit, so the question belongs in the landing cycle rather than
+in the mutation report: **before moving a property, count the corpus members that carry it.** Zero
+is the answer that looks like green.
+
+---
+
+## F1224 — a fail-on-revert row whose defect can no longer be built, found by its own premise going red ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | C14 T6.16 — *summing `measure` instead of calling `measureSequence` → short by one row per gap*. It reverts a defect that phase 2a removed the possibility of. |
+| **Reached for** | It went red on its own fixture line, not on its viewport assertion: `measureSequence(gapped) === sumMeasure(gapped) + 1` is now false, because the two functions are the same fold. |
+| **Verdict** | **The invariants inverted and three rows and a harness comment did not follow.** C09 I17 and C14 I1 rewritten; T6.16, T2.9 and C09 T6.17 re-pointed at the defect the new rule makes possible. |
+
+**`measureSequence` is `Σ measure`, by construction rather than by agreement.** Phase 2a moved a
+block's spacing inside the block (C04 §3a, C09 I80), so `sequenceHeight` became a bare fold —
+`for (const block of blocks) total += measureChild(block, width)` — and there is no longer a
+document for which folding by hand gives a different number. C09 I17 still read *`gapBefore` is
+applied by the sequence, never by the block*, which is now false in both of its clauses, and C14
+I1 still carried *never `Σ measure(b, w)` — the two differ by one row per `gapBefore`*.
+
+**This is A03 §2's vacuity class arriving from the other side, and that is why it was findable.**
+The usual shape is a rule that never could be violated, which passes exactly like a rule that is
+satisfied and which only the mutation pass can interrogate. This is a rule that *was* violable and
+whose subject the change removed. A row like that does not go quietly green: the fixture asserting
+the disagreement is the first thing it runs, so it fails on its premise with nothing wrong in the
+subject. **The premise assertion is what made a silent emptying loud** — T6.16's own comment says
+*the fixture declares a gap so the two disagree*, and the line exists because a row that cannot
+distinguish the two functions is satisfied by either. It outlived its purpose usefully.
+
+**Three records and one of them is prose.** `test/support/viewport.ts`'s header states the same
+claim — *the defect T2.9 and T6.16 guard against is picking `Σ measure`, and a fake that returns a
+made-up number cannot tell the two apart* — and `sumMeasure` is exported for no other consumer.
+That is *ask where a settled claim is written down*, run in the ordinary direction: the claim had
+three homes, all of them true when written, and the change that falsified it touched none of them.
+
+**What survives, and it is the load-bearing half.** I17 is two sentences that read as one rule: *a
+block never counts its own spacing* — gone — and *a composer inserts none of its own*, which is
+what makes a document's height knowable from the document (C23 §2) and is untouched by where the
+spacing lives. The seam keeps its reason for the same kind of reason: `measureSequence` shares the
+memo and the containment (C09 I11, I26a), so a caller folding by hand gets the right number today
+and loses both the moment a kind's `measure` throws. **The claim narrowed rather than died**, and
+a rule rewritten to the half that still holds is stronger than one carrying a false clause that
+nothing can fail.
+
+**Where the defect went.** Spacing applied once, inside the block, makes a *second* application
+possible, and that is what a reader restoring the composer's arithmetic would write — so T6.16
+now reverts to reading `padding` at the sequence as well, which double-counts every padded block.
+T2.9 loses its evidence that the right function was called (the two no longer differ) and gains
+the frame: `measureSequence` against the rendered row count, which no summation satisfies by
+accident. `sumMeasure` stays, its comment corrected — it is no longer the wrong answer, it is the
+same answer, and a row asserting they agree is what keeps the fold honest.
+
+**And the walk did not have the cell** (`C04_PADDING_WALK.md` A9, A9a). Its classification table
+is indexed *where two sizing rules meet at rest*, and every other cell pairs two rules about a
+block; this one pairs a rule about a block with a rule about the container's arithmetic, which
+the index reads as out of scope. The index is right and its subject was drawn one layer too
+narrow — a walk over a property that moves between owners has to include the owner it is leaving.
+
+---
+
+## F1223 — a group whose children all measure zero measures one row and draws none, in both directions ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | C09 I1 — `measure(b, w)` equals the rendered row count — against a `group` holding nothing but an empty `group`. Measured **1**, rendered **0**, for `direction: "column"` and `"row"` alike. `panel` is unaffected: its border carries rows of its own. |
+| **Reached for** | A mutation that survived. C29 1.2 moved the column's height onto the engine, and removing the floor of one killed nothing — so the floor looked unreachable, because C04 I17 is usually read as *every measurer returns at least 1* without its one exception. **An empty container measures 0**, so a column holding one sums to zero and the floor is the only thing standing between that and a zero-row group. |
+| **Verdict** | **Pre-existing and fixed.** `measure` floors at one through `atLeastOne`; `render` floors at `block.minRows ?? 0` and at nothing else. Both arms of `render` take the same floor the measurer does. |
+
+**Two records of one height, disagreeing in exactly one case.** `groupHeight` is C09 I69's *one
+computation* and it is one — for `measure` and for `window`'s decline branch, which are the two the
+invariant names. **`render` was never in it.** It re-derives the height from the rows it produced and
+pads to `minRows`, which agrees with the measurer everywhere `minRows` is the binding constraint and
+everywhere a child draws something. The gap is the third clause, the floor of one, which `render`
+never had.
+
+**It could not be found by reading either arm.** `atLeastOne(groupRows(block, content))` is correct
+and `while (lines.length < (block.minRows ?? 0))` is correct; they are the same rule with one clause
+missing from one of them, and the clause is the one nobody thinks about because it reads as defensive.
+**The mutation is what asked whether it was defensive**, and the answer was no — CLAUDE.md's *a
+mutation that fails nothing is a finding about the tests*, arriving as a finding about a rule two
+files away from the one being mutated.
+
+**And the direction of the disagreement is the safe one, which is why nothing noticed.** Measuring
+one row and drawing none leaves a blank row in the frame; measuring none and drawing one wraps the
+line below it. A frame with a spare blank row looks like a layout choice, and the golden corpus holds
+no group whose children all measure zero — so 440 snapshot entries, 2,440 baseline frames and 6,277
+test rows all agree with a violated invariant, because none of them constructs the input.
+
+**And the repair turned a gate red on a harness defect the defect was holding green.** T4.1 — C14's
+drift test, *summed measured heights equal the rows drawn, at seven widths* — went to `measured 83,
+drew 84` at every width. Its `renderEntry` wrapped each entry's blocks in a **`column` group** and
+rendered that, while the sum it compared against was taken over the blocks themselves. A group is a
+block in its own right: it has a floor of one row. So the two quantities differed by exactly one for
+any entry whose blocks measured zero — and `adv-empty-group` in the corpus is one — **and the
+wrapper's own violation of C09 I1 cancelled it**. Fixing the group made the wrapper honest and the
+cancellation stopped.
+
+*A stand-in must make the reads the real one makes*: the viewport renders a **sequence**, so
+`renderEntry` renders a sequence now, through `renderSequenceToLines`. **T4.1 is the test the file's
+own header calls *the drift test and the reason the rest of the suite is worth having***, and it was
+green on two errors of opposite sign since the wrapper was written.
+
+**The residue**: `render` still derives its own height rather than being handed the measurer's, so
+the two remain two records with three clauses each rather than one record. Calling `groupHeight` from
+`render` would settle it and costs a second measurement of every child, which C09 I61 forbids
+(T1.33). The floor is duplicated in the same shape instead, and the row that now constructs the case
+is what watches them agreeing.
+
+## F1222 — `childOffset` had nothing to move, because the container had already shrunk the child to fit ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | C29 I15 — *clipping is per axis with a `childOffset`, and a clip never changes a measured height* — and §7's *`scroll` is `clip` plus a `childOffset`: the container clips and the child is placed at a negative offset. One mechanism for mosaic cells, scroll blocks and attached terminals.* |
+| **Reached for** | T1.15, constructing the mechanism rather than asserting a property of it: a two-row window over a five-row child with `offset.y = 2`, expecting rows 2 and 3. **The frame came back two blank rows.** |
+| **Verdict** | **Closed by a clause.** A container that clips on an axis does not impose its size on that axis: the surplus still distributes, and only the deficit is refused. I15 gains the sentence and `budgetOf` is where it lives. |
+
+**Pass 4 had already done the thing the clip exists to undo.** The window is `height: FIXED(2)` with one
+`FIT` child of five rows, so the height distribution saw a deficit of three and shrank the child to
+two — correctly, by every rule written down. What was then clipped was a child that already fitted,
+and the offset moved a two-row child two rows off the top of a two-row box. Every number in the
+solved tree was defensible and the frame was empty.
+
+**This is A03 §2's vacuity class arriving in a pass rather than in a rule.** `offset` was a published
+field, set by the caller, read by the composer, and carried all the way to a `Placed` — and there
+was no input at which it could change what was drawn, because the only boxes that clip are the ones
+whose children were made to fit first. A clause that forbids nothing reads exactly like a clause that
+is satisfied, and so does a mechanism that cannot act. **The engine's own I14 fix, found the same
+minute by the row above it, is the ordinary kind of defect by comparison**: `measure` returned 1 for
+a box solved to width 0, because a `rows` leaf's row count does not depend on its width and nothing
+in pass 3 asked. That one was a rule stated correctly and implemented wrongly. This one was a rule
+that was never stated.
+
+**And the two artefacts could not have reached it.** The classification table indexes cells where two
+sizing rules meet at rest, and *clip* is not a sizing rule; the sequence trace indexes pass
+boundaries, and this is a pass doing exactly what its own boundary says it does. What found it is the
+same instrument that found F1221 — **building the mechanism and giving it something to do** — which
+is the third time in one component that the finding came from the code rather than from a reading
+(F1220's two came from the walk, F1221 and this from the build).
+
+**The residue, stated**: *surplus still distributes* is a choice, not a derivation. A clipping
+container with slack is an ordinary container, which keeps a `clip` declared defensively from
+changing a frame that fits. A clipping container with a deficit is the scroll case and is the whole
+point. Nothing in the source distinguishes them, and if a caller ever wants a clip that also refuses
+the surplus, that is a second flag rather than a change to this one.
+
+## F1221 — the trace ruled `stretch` into pass 4 by assuming the cross axis is height, and on a column it is width ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | Writing pass 2, against C29 I9 — *stretch resolves in pass 4, overrides a child's `FIT` on the cross axis only, never overrides `FIXED`, and is a no-op against `GROW`*. The first three clauses hold on both axes. **The pass number holds on one.** |
+| **Reached for** | Constructing the case rather than reading the clause: a **column** container, `align.x: "stretch"`, one `FIT` child of wrapped prose. The cross axis of a column is **width**, and width is solved in pass 2. |
+| **Verdict** | **Closed by an amendment.** I9's pass number becomes the axis's own: stretch resolves where the cross axis is solved — pass 2 when that axis is width, pass 4 when it is height. The other three clauses are unchanged. |
+
+**It is D1 again, one rule over.** Solve the column at inner 60; the child is `FIT`, so pass 1 gives
+it its natural width, say 24. Pass 3 wraps its text at 24 and commits a height. Pass 4 then stretches
+it to 60 — and the rows re-wrap at 60, fewer of them, while the height standing in the tree is 24's.
+`measure` returns 24's height and `compose` emits 60's, which is **C09 I1 false by construction** in
+the engine whose selling point is that I1 holds by construction. The repair inside pass 4 would be a
+second re-fit, and C29 I11 says one suffices.
+
+**The walk had the row and the row carried an assumption.** S3 reads *`stretch` overrides a child's
+`FIT` on the cross axis — **after** heights exist, which is why §11 says pass 4*. That sentence is
+true of a **row** container, where the cross axis is height and stretch cannot be resolved before
+pass 3 has produced one. It is false of a column, and nothing in the row names a direction: the
+source's §11 is written from the mosaic row, the only stretch the corpus has, and the trace inherited
+its frame of reference. **A ruling can be correct about the interaction and wrong about which axis it
+is on** — the sibling of *an artefact can be correct about the interaction it found and wrong about a
+mechanism it assumed existed* (CLAUDE.md, C23 §8a A4), and it fails the same way: no index by rule
+interaction reaches it, because the flaw is not between two rules but in a word the prose left
+implicit.
+
+**Which is the walk's stated blind spot arriving from the direction it was stated for.** The table
+indexes pairs; this is `stretch` × the re-fit × `direction`, three rules, and the walk wrote that
+*three-rule interactions surface at the pass boundaries rather than at rest* (F1220). It did. What
+found it is the instrument neither artefact is: **writing the pass and having to name the axis**,
+which is the implementation falsifying the walk rather than review catching it — a reader checking
+I9 against S3 finds them agreeing, because both say pass 4.
+
+## F1220 — the engine's own selling point is violated twice by its pass ordering, found before a type existed ★★★★★
+
+| | |
+|---|---|
+| **Surface** | The scheduled hand walk of C29, both artefacts — a classification table over the cells where two sizing rules meet at rest, and a sequence trace over the five passes. Twelve cells ruled; the two defects are in the **document**, not in a cell, and both are the same invariant. |
+| **Reached for** | The trace's pass boundaries, asking what each pass consumes that the one before it produced. §18 is the whole argument for the engine — *`measure` stops after pass 4 and reads the root's height; C09 I1 then holds **by construction** rather than by discipline, which is the property the Yoga route was going to buy*. Both defects make it false. |
+| **Verdict** | **Closed by two rulings**, written into the walk and owed to C29's spec. `docs/notes/C29_LAYOUT_WALK.md`. |
+
+**D1 · `aspect` is resolved after the pass whose input it invalidates.** §15 resolves it *after both
+axes have a size, by shrinking the axis with slack*. §4's pass 3 is the re-fit, where *text re-wraps
+at its solved width, so heights are only knowable now*. So an aspect that shrinks the width **after**
+pass 4 leaves every height computed in pass 3 standing at the old width: a box of wrapped prose
+solved at 40 and aspect-shrunk to 31 carries 40's height, and §18 has `measure` return exactly that
+number. **C09 I1 violated by construction, in the engine that exists to make it hold by
+construction.** Ruled: aspect resolves on the **width** axis in pass 2 and on the height axis in
+pass 4, because §4's whole argument is that width precedes height and an aspect is a width
+constraint like any other. What §15 describes is the shape of a solver that does both axes at once,
+which §4 is explicitly not. The residue is stated rather than papered over: the implied height
+becomes a target pass 3 can exceed, and then A9 applies and aspect loses.
+
+**D2 · nothing says the representation choice is a pure function of the tree and the width.** §12
+picks the widest fitting form *per element, bottom-up, during pass 2*, and a representation **is a
+different `Box`** — so choosing one changes the tree that §18 says both halves build. `measure` at
+`w` and `render` at `w` must choose the same one or C09 I1 is false, and §12 and §18 together never
+say they must. Ruled: **the choice reads the child's own solved share and nothing else**, which puts
+it under §20 rule 7 with everything else — no focus, no state, and in particular **not** *what was
+chosen last frame*. That last one is the tempting one, because it would stop a form flickering as a
+width crosses a threshold and it would make the frame depend on its predecessor. **So the flicker is
+named and given a remedy that keeps purity**: hysteresis lives in the declared `min` values, never in
+the engine's memory.
+
+**Both are the pass structure disagreeing with itself, which is what a sequence trace is for and
+what the classification table could not reach.** Twelve table cells produced twelve rulings and no
+defects — they are cells where two rules overlap and the overlap resolves. The trace has seven rows
+and one of them found both. **Evidence for CLAUDE.md's *two artefact shapes catch different
+interactions*, from the side that usually goes unexamined**: C19 needed a table and had a trace;
+this needed a trace and the table was the obvious artefact, because a sizing model reads as a
+classification problem.
+
+**And the table's blind spot is stated with it.** It indexes **pairs**. A cell where three rules meet
+— `aspect` on a `stretch`ed child with a `PERCENT` cross axis — is in neither artefact, and D1 is the
+evidence that three-rule interactions surface at the pass boundaries rather than at rest.
+
+## F1219 — the distribution rule is two rules, and the reason written against changing it is false ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `LAYOUT_ENGINE.md` §5 asks for largest-remainder distribution with ties by declaration order, and the plan asserted it *agrees with today exactly when the shares are equal*. Settled before a type exists, because everything the engine computes is written against this rule. |
+| **Reached for** | Running both rules over every share vector the tree actually contains, at the gates' widths. **The assertion is false, and it was false because there are two rules.** `mosaicRects` is `divideShares` **plus `spread`** — leftover one cell each to the earliest non-fixed lines. `groupChildWidths` is `divideShares` **alone** — the leftover is **unspent**. So largest-remainder agrees with the mosaic on equal shares and differs from the group on *every* share vector whose budget does not divide, `[1, 1]` included. |
+| **Verdict** | **Closed by a ruling.** The leftover is a **declared policy**, not a property of the arithmetic: a group spends nothing, a mosaic tiles by largest remainder with ties by declaration order, one function serves both. C04 I42 amended. |
+
+**Measured, both rules over the vectors the tree holds** — every `flex` in `src/` and both examples,
+at 40, 60, 80, 120 and 200:
+
+| shares | today | largest remainder |
+|---|---|---|
+| `[1, 1]` at 80 | `[39, 39]`, one cell unspent | `[40, 39]` |
+| `[2, 1]` at 80 | `[52, 26]` | `[53, 26]` |
+| `[3, 2, 1]` at 40 | `[19, 12, 6]` | `[19, 13, 6]` |
+| `[8, 4, 2, 1]` at 40 | `[19, 9, 4, 2]` | `[20, 10, 5, 2]` |
+| `[1, {cells: 9}]` | unchanged at every width | unchanged |
+
+**`[1, 1]` is the row that matters, because it is the common case and the plan's claim exempted
+it.** Every unweighted row group resolves `flex ?? ones`, so *equal shares* is not a corner — it is
+what most of the corpus is.
+
+**The reason the spec gives for not spending the leftover is false against the rule being
+proposed.** I42 read *spending it would make `flex: [1, 1]` differ from no `flex`*. Both arms
+resolve `flex ?? ones` and take one path, so a rule that does not ask whether weights were written
+keeps them identical — measured, not argued. The clause is true of exactly one alternative: C11's
+**leftmost** rule, which spends the residual on the first child *when weights are present*, and
+that is the alternative it was written against. **A correct sentence justifying the wrong
+decision** (CLAUDE.md's MG24 case): it constrains a decision nobody is making now, and it is the
+first clause a reader meets.
+
+**What does rule is the second clause, which was already there.** *A table's residual exists to be
+absorbed and a group has no child that claims it.* A flex column claims the residual; no child of a
+group does, so distributing it picks a child on the arithmetic's behalf. Largest remainder makes
+that choice reproducible, not principled.
+
+**And the cost of changing it is the constraint that fixed the direction.** The corpus's row group
+is captured at eleven widths under three capability arms — thirty-three frozen files — and at every
+width whose budget is odd the second child moves one column right: at 40 the capture reads
+`left` + 16 spaces + `right`, and largest remainder makes it 17. **Those captures cannot be
+regenerated**: the recorder left with Ink (F1209), and the whole point of the corpus is that
+nothing in the tree can produce it again. So the choice was between a ruling and retiring
+unregenerable evidence to gain one cell of width.
+
+**One citation corrected on the way.** `spread`'s comment and the plan both say *T3.16 pins the row
+group's remainder where it is*. T3.16 asserts **equal weights against the unweighted path** and is
+invariant under every distribution rule — it cannot pin a remainder. The row that pins it is
+**T3.17**: `52 + 26 + 1 = 79`, *one cell of the eighty goes to nobody*. Same class as F1218's `I17`,
+one file over, found the same way: by going to read the row the citation names.
+
+## F1218 — four design documents and 596 references were outside the enforcement corpus, and the first run found a citation pointing at the wrong invariant ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | Adopting the layout bundle into `docs/design/layout/`. Committing it changed no counter in `make enforce` — dangling section citations stayed at 334 of 9507, across 175 targets — which is how it emerged that **`referenceFiles()` does not walk `docs/design`**: it walks `architecture`, `components`, `surfaces`, `behaviours`, `notes` and `reference-app`, and the directory holding four design documents was never in the list. |
+| **Reached for** | Adding the walk and reading what fired. **Nine SP3 violations, gated**, every one a bare invariant id with no owning spec: eight in the new bundle (`I1` throughout, meaning C09 I1) and **one pre-existing** — `AGENT_TUI_DESIGN.md:1141`'s *if it lives on focus it is I17's forbidden case*. |
+| **Verdict** | **Closed.** The directory is walked, the bundle's eight citations name C09, and the pre-existing one is corrected to **C09 I2** with the reason written beside it. |
+
+**The pre-existing citation resolves against the wrong invariant under either owner, which is the
+class the audit says cannot be automated — and a bare id is the half that can.** The sentence is
+about a height that depends on focus. **C09 I17** is `gapBefore`'s sequence rule; **C04 I17** is
+*every measurer returns at least 1 for a present block*. Neither forbids anything the sentence
+describes. What does is **C09 I2** — `measure` is pure and total, a function of `(block, width)` —
+and it is two invariants away from the number that was written. SP3 cannot tell a wrong citation
+from a right one; what it can tell is that nobody said *which spec*, and pointing it at an unwatched
+directory turned an unresolvable pointer into a resolvable wrong one, which is a reader's job from
+there.
+
+**The obvious fix for one half broke the other, and the counter is what said so.** Declaring
+`{ path: "docs/design/layout", spec: "C09" }` in `OWNERS` resolved all eight bare invariants at
+once — and made every bare `§13`, `§15` and `§19` in those documents, which are **their own
+section numbering**, resolve as `C09 §13` and report *C09 has no such section*. A misattributed
+citation reads as a defect in C09; an unattributed one reads as what it is. So the owner entry was
+reverted and the eight invariants were named in the prose instead, where a reader sees them:
+**0 dangling in the bundle, 23 correctly classed as naming no document.**
+
+**And the authority these documents defer to is not here either.** Their README says *when they
+disagree, the picture wins — it was measured and this was written*, naming
+`calcium-design-language.html` and `calcium-interaction-prototype.html`. **Neither is in the
+repository.** So the tie-break the rules rest on is unavailable, and a rule justified by *the
+drawing was measured* cannot be checked against the drawing. Written into the bundle's own README
+rather than left in a session, because it is the same shape as the finding above it one level
+down — and this time the record says where to look.
+
+## F1217 — the layout plan's last step lists seven properties, four are built, and the one that remains is forbidden as written ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | Step 6 of the layout pass: *now expressible as properties of the row composer rather than things each surface remembers* — padding, margin, gap at the sequence level, minimum width, alignment, a container as tall as its contents, a bounded body's hidden-row residue. |
+| **Reached for** | Each of the seven, against the tree, before writing any of them. **`APPEARANCE.md` — the document the step's whole justification rests on — was in no file in this repository**; `find` and a repo-wide grep returned nothing. **Corrected the next day: the document exists, outside the tree**, and is now committed at `docs/design/layout/APPEARANCE.md` with its six companions. The finding's mechanism is unchanged and the correction sharpens it — the claim was *unverifiable from here*, not *fabricated*, and the difference is exactly what F161 gets wrong in the other direction. |
+| **Verdict** | **Closed as a step, open as one entry.** Four of the seven are built, one is built at the wrong scope, and the remaining two are one subject — `padding` — which C04 already rules a **replacement** rather than an addition, so building it as a composer property is forbidden by a sentence written before the plan was. |
+
+| the property | where it is |
+|---|---|
+| gap at the sequence level | **Built.** `Gap.gapBefore`, and the height rule is at the sequence — `sequenceHeight` in `measure.ts:192` adds the row, never the block. |
+| alignment | **Built.** `Group.align?: readonly Valign[]`, read into `justifyContent` by `groupDefinition`, and T3.22 is the frame read roadmap 38 found it lacking. |
+| a container as tall as its contents | **Built.** A group is as tall as its tallest child — T3.22's own comment turns on it — and `height: "fill"`'s blocker expired when `ProducerContext.height` landed. |
+| a bounded body's hidden-row residue | **Built.** C04 I47 and I49; `containers.ts:244` decides the residue row from the content's total height, and a collapsed box is the residue row and nothing else. |
+| minimum width | **Built at the wrong scope.** `minWidth` is a table column's field (C11) and an adapter's measured ceiling. No block-level floor exists; `Floor` gives `minHeight` and says so. |
+| padding · margin | **Neither exists, and they are one subject.** |
+
+**The sentence that settles it was written before the plan and is not in the plan.** `types.ts:505`,
+on `Gap`: *if a general `padding` is ever added, this becomes its top edge — roadmap 38 asks for
+padding as a general property rather than `gapBefore` being the only spacing that exists, and a
+document with both would have two ways to say “a blank row above this block”, which every
+measurer, every container's child-width computation and every sequence would then have to agree
+about. **So the change is a replacement, not an addition.*** Roadmap 38's own status line agrees
+from the other side: *`padding` is the only one of the three still a separate step.*
+
+**So the rows arm did not make padding expressible, and padding was never blocked on the rows
+arm.** It is a change to C04's public vocabulary — one field removed, one added, every measurer
+and container and sequence agreeing about the replacement — which is the hard-to-reverse core,
+not a property of a composer. A pass scoped to *finish the rows arm and delete Ink* that ended by
+adding `padding` beside `gapBefore` would have landed exactly the document the ruling forbids.
+
+**And the deferral's note is where it should be, which is why this worked.** The `Gap` comment
+says outright: *the note is here rather than in the roadmap entry, because a condition written
+beside the deferral is the one nobody reads — three deferrals this project has recorded were
+satisfied elsewhere while their text stood unchanged. Whoever writes the second spacing field is
+reading this line.* That is the habit working as designed: the step said *build it*, the field's
+own doc comment said *replace, do not add*, and the only reason the two met is that the ruling was
+put where the writer would be standing.
+
+**What remains, stated as one entry rather than seven.** A block-level `padding` replacing
+`gapBefore`, with a block-level minimum width beside it if a surface needs one — a C04 change
+with its own walk, its own spec commit and its own migration of every `gapBefore` in the tree and
+in both examples. Not this pass's.
+
+## F1216 — a navigable element is one rectangle, and the checker's three predicates are the written specification of that ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | The layout plan's second register-only entry: whether `NavElement` should carry a fragmented shape now that the rows arm composes every container. **Recorded, type untouched** — nothing in the tree produces a fragmented element and there is no hyperlink kind, so widening it now would be a shape with no producer. |
+| **Reached for** | `src/testing/navigation-conformance.ts:177-215`, read as a specification rather than as a check. Its three predicates — containment, reading order, per-level disjointness — all take `{rows, cols}` as **one** rectangle, and two of them give **false failures** for a real wrapped run. |
+| **Verdict** | **Open, by choice.** When a fragmented element is needed the shape already exists two layers over: `CellSpan` (`src/interaction/editor/layout.ts:198`) and `selectionSpans`, per-row spans produced by the same wrap walk that drew the rows. |
+
+**What breaks, stated per predicate, because the reason is the specification.** A run that starts
+mid-row, fills the rows below it to both margins and ends mid-row has a bounding box spanning the
+full column range on every row it touches.
+
+- **Disjointness** compares bounding boxes, so an element sitting in the columns the run does
+  *not* occupy on its first or last row shares a cell with it and is reported. The failure is in
+  the predicate, not in the layout.
+- **Reading order** sorts by `(rows.from, cols.from)`, and the union's `cols.from` is the
+  leftmost column of any of its rows — `0` for anything that wraps. A run beginning at column 30
+  sorts ahead of an element at column 5 of the same row.
+- **Containment** passes, which is the tell: *inside the bounds* is satisfied by every wrong
+  answer, and it is the one predicate a union rectangle cannot fail.
+
+**The shape to copy, and why it is not a new design.** `selectionSpans` answers a list of
+`{row, from, to}` from the same wrap walk that produced `displayRows` and `cursorCell` — one
+walk, three readers, which is what keeps the spans and the rows from drifting. A navigable
+element wanting fragments wants exactly that, produced where the rows are produced rather than
+recovered from them afterwards.
+
+**Constructed rather than argued, because a finding whose evidence is a reading gets planned and
+never checked.** A run at rows `[0,3)` × cols `[0,20)` — the union of a fragment starting at
+column 30 of row 0 — beside a neighbour at row 0, columns `[5,15)`, listed in true reading order,
+run through `checkElements` with a stub registry: **eight failures over the sweep's four widths,
+`order` and `disjoint` at every one of them, and `containment` at none.** The ordering message
+reads *run is drawn above before and listed after it* about an element that is drawn below and to
+the right of it. The layout is correct and the checker says otherwise, four times.
+
+**Recorded rather than built, and the condition is written here so it can be grepped from the
+satisfier**: the day a kind draws a hyperlink, or any element whose text wraps and is navigable,
+this entry is the design. Until then `NavElement` has no producer that needs it, and a widened
+type would be a deferral with nothing watching it.
+
+## F1215 — the scroll-over-atomic-child disagreement is ruled, tested and exercised by nothing ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | The layout plan owed this as a register entry with no code. The disagreement itself is **settled**: C09 I59 names it in its own text, T3.76 pins `measure 3 / rendered 9`, T2.126 watches the fourteen unsliceable kinds by equality, and F855/F856 are closed. What is open is the **instrument**. |
+| **Reached for** | The corpus and the sweep, read directly. `test/support/blocks.ts`'s only over-full scroll is `adv-overfull-scroll`, whose two children are `raw` — and `raw` is not in T2.126's fourteen, so it **declares a window** and is sliced. Every over-full scroll the suite renders therefore takes the repaired path. `DEFAULT_WIDTHS` in `src/testing/measurement-conformance.ts` is `[40, 60, 80, 100, 120, 160, 200]`. |
+| **Verdict** | **Partly** — the width half is closed by F1209's oracle, which captured at 2, 8, 12, 20, 24 and 32 columns as well as 40 and above. The corpus half stands: no fixture puts an atomic child in a bounded container. |
+
+**The corpus's own comment says the shape of this and stops one kind short.** Beside
+`adv-overfull-scroll` it reads *two children rather than one, and the first is short: a sweep
+whose only over-tall case is also the only case is one where “slice the child” and “drop every
+child but the first” draw the same thing* — F855's lesson, applied. The next axis is the child's
+**kind**, and it was not applied there: one over-full scroll, both children windowed, so the
+branch that runs when `windowChild` answers `null` is reached by no fixture in the sweep.
+
+**Why it is a register entry and not a change.** Windowing five more kinds moves a watched
+equality list in the middle of a compositor pass, and T2.126 is held by equality precisely so
+that cannot happen quietly. The fixture is the cheap half — an over-full scroll with a `plot` or
+a `panel` child, which are atomic permanently and atomic-for-now respectively — and it belongs
+with whoever next opens I59, because a new adversarial fixture moves the oracle, the goldens and
+the terminal baseline together.
+
+**The width half is closed and worth recording as closed**, because the plan asserted both halves
+and only one survived contact: the oracle's corpus holds 172 captures at width 2 and 172 at 12,
+which is well below where container disagreements were said to grow and below anything
+`DEFAULT_WIDTHS` reaches.
+
+## F1214 — two mutation survivors are caught, exactly, by rows the run does not execute ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | The carried note that `c22-ticker-period` had rotted. Re-run: **4 caught, 2 survived** — `WINDOW-100` (C03's spinner window 80 → 100) and `STREAM-33` (its stream window 16 → 33), both constants in one frozen table in `src/terminal/frame-scheduler.ts`. |
+| **Reached for** | Not the tests the run names, but `grep` for the constants. `test/unit/frame-scheduler.test.ts` asserts **both, to the millisecond**: T1.3 `expect(clock.armed).toEqual([16])` and T1.7 `toEqual([80])`, the latter carrying F1197's own comment *“**80 and not 100**”*. The run's `CMD` is the two integration suites and nothing else. |
+| **Verdict** | **Open.** The survivors are a property of the run's scope, not of the tree. `CMD` widened to include the unit file and both `expect` rows re-pointed at T1.7 and T1.3; what stays open is T4.35, and the rule the harness does not have. |
+
+**The harness checks one direction of the anchor and the defect lives in the other.** *An
+`expect` row must name a test in a file the run's `CMD` executes* is written down, enforced, and
+was satisfied by both survivors: `WINDOW-100` named T4.35 in `spinner-wiring`, which the `CMD`
+runs. What nothing asks is whether the row named is **the nearest row that can see the
+mutation**. It was not. The exact witness — a row asserting the mutated integer itself — sat in
+a file the `CMD` omitted, and the run reported a survivor while a green assertion of `80` was one
+directory away.
+
+**So a survivor has a fourth disposition.** Three were known: the mutation indicts the test, the
+spec sentence, or itself (F897, F949, and *a mutation can indict its subject*). This one indicts
+**the run** — its scope, not its anchors. It reads identically to the first from the report, and
+the discriminator is cheap: grep the mutated text for an existing assertion before writing a new
+row.
+
+**T4.35 is the other half, and it is the repair-blind class again.** Its job was F1197's second
+half on screen — nine glyphs of ten under a window longer than the set's interval. The surplus
+sampling added to defeat aliasing, 150 ms × 30, also made it insensitive to a 25 % change in
+the window, so the row that was written against this mutation no longer fails it. **A repair
+took its predecessor's instrument with it** and the run kept pointing at the corpse, which is why
+the anchors sweep saw nothing: the anchor resolved, the row ran, and the row was empty of the
+thing it was named for.
+
+**Measuring which row the mutation was hiding from turned the second half over.** The run's own
+prose said the orbit commits `stream`, so its period is the longer of 16 and the window, and a
+33 ms window halves the count T4.17u bounds at 55 of 62 wakes. Probed by hand, three points:
+**58 frames at a 16 ms window, 57 at 33, 47 at 200.** A window acting as a floor would give about
+five at 200. So the row does not read the window at all — its rate is set by `ORBIT_MS`, the
+copy, and `ORBIT-33` is caught for that reason rather than by coincidence. The assertion's own
+message, *“the orbit draws at the stream window's 60fps, not at 30”*, names a mechanism the row
+cannot see. **This is F1206's shape again** — a correct mechanism at a seam that does not govern,
+measuring as nothing — and it arrived by asking why a survivor survived rather than by repairing
+it.
+
+**The residue, named because it is not traced.** At a 200 ms window the orbit still writes 47
+chunks in 992 ms of the clock. Either the window does not floor a `stream` commit on this path,
+or `framesSince` counts writes the window does not gate. Both are worth knowing and neither is
+measured; what is measured is that the bound of 55 sits just under the 62 wakes, so the row reads
+*the arm fired* far more nearly than *the scheduler emitted a frame*.
+
+**And the constant has a second copy, watched where the original is not.** `ORBIT_MS = 16` in
+`src/shell/session.ts` is C03's `stream` window written again by hand, deliberately not imported
+— *naming them here rather than importing C03's table keeps L4 out of a constant L0 tunes at
+construction; the reason is what binds them, and that is asserted.* The argument holds. What it
+produced is that `ORBIT-33`, which mutates the **copy**, is caught by the integration rows, and
+`STREAM-33`, which mutates the **original**, is not. A hand copy bound by a sentence acquires the
+coverage the sentence's consumer has, and the thing it was copied from keeps its own.
+
+## F1213 — a mosaic whose regions are not in column order lost two of its five cells, and every gate agreed ★★★★★
+
+| | |
+|---|---|
+| **Surface** | The plan owed a measured before and after on *the mosaic scroll frame*, with a stated ceiling of **~87 ms of 145**. That figure is in **no file** — not FINDINGS, not a spec, not a roadmap row — and no instrument could have produced it: `tools/bench/stress.mjs` has twenty-seven cases and none draws a mosaic, and no surface either example ships uses one. The ceiling was carried from the brief the plan replaced, which the plan itself had already corrected in three other places. |
+| **Reached for** | Writing the missing instrument. A worktree at `789e4007` — the last commit with mosaic on the element arm — installed, built, and rendered against the same document as HEAD, digest first. Six kinds agreed byte for byte; the seventh, a pinwheel `AAB/DEB/DCC`, did not, and reading the frame showed **the whole middle band blank**: cells D and E drawn by the old tree and drawn by nothing in the new one. |
+| **Verdict** | **Closed — read, diagnosed and fixed.** `placeRows` sorts each row's pieces by column; T2.147 holds the pinwheel, `PIECE-ORDER-DROPPED` mutates the sort away, and the two trees' digests are equal at every width. The instrument that found it, `tools/bench/mosaic.mjs`, is the other half — with a `mosaic` case in `stress.mjs` beside it — see the measurement below. |
+
+**`parseAreas` orders regions by first appearance and `composeRow` walks a cursor left to
+right.** `AAB/DEB/DCC` yields A, B, D, E, C, so B — at column 20 of 30 — reaches the composer
+before D at column 0 and E at column 10. A piece behind the cursor is cut to nothing and
+contributes nothing, so both cells vanished. `placeRows` now sorts each row's pieces by column,
+and the frames agree at every width.
+
+**A row group hands its cells in column order, which is why this survived every test the move
+had.** The composer was written for the row group and its contract — *pieces are in column
+order* — was satisfied by construction at the only call site that existed. Mosaic is the second
+caller and it satisfies nothing of the kind; the contract was in a comment and in nothing that
+could fail.
+
+**What had been carrying it is the decline this pass removed.** Until the element arm went, a
+piece behind the cursor made `composeRow` answer `null`, the mosaic fell through to Ink, and Ink
+drew the grid correctly. So F1210's measurement — *the declines fire zero times across 6,281
+tests and 458 goldens* — was true of the corpus and true of nothing else: this frame fires one,
+and firing it was the only reason it was right. **A decline can be load-bearing precisely where
+no test reaches it**, which is the inverse of the reading that made removing it look free.
+
+**Every gate agreed, and it is worth listing which.** Forty rows, the declared height. Five
+children measured once and rendered once. `make golden` 458 passed with **0 movers**. `make test`
+green over 6,265 rows. The terminal baseline's 2,440 frames unmoved. The corpus holds no grid
+whose later region begins left of an earlier one, so the whole apparatus was blind in exactly the
+same place — **a corpus chosen for coverage of kinds is not a corpus of shapes**, and every
+instrument in the repository reads it.
+
+**The instrument is the finding's other half.** The ceiling could not be checked because nothing
+measured a mosaic, and nothing measured a mosaic because no shipped surface has one. A figure
+about a frame no instrument draws cannot be confirmed or refuted; it can only be repeated. Having
+written the bench, the paired reading is below — and it is not the ~87 of 145 the plan carried,
+in either direction.
+
+**The measurement.** `tools/bench/mosaic.mjs`, the pinwheel above filled with five sixty-line
+`logs` children at a height of 40, rendered through the public testing entry against each tree's
+`dist/`, 200 frames a reading, three paired rounds, `make load-down` first. Host load averages
+3.5–3.8 throughout, which is a desktop under use rather than a quiet machine — so the **paired
+per-round difference** is the figure and the absolute numbers are not.
+
+| round | before (`789e4007`) | after | difference |
+|---|---|---|---|
+| 1 | 22.10 ms/frame | 1.48 | **−20.6 ms · ×14.9** |
+| 2 | 20.67 | 1.68 | −19.0 · ×12.3 |
+| 3 | 19.26 | 1.80 | −17.5 · ×10.7 |
+
+**Three of three in the same direction, and the digests are equal on both sides of every round**
+— the same 8,000 rows, byte for byte, which is the assertion that makes the timing mean anything.
+The plan's ceiling said *~87 ms of 145, and most of what it removes is the SGR round-trip rather
+than layout; if it lands under half of that, say so plainly.* It is not under half: a mosaic
+frame that cost about twenty milliseconds costs about one and a half. But the ceiling was a
+figure about a frame nothing measured, so what this refutes is the premise and not the estimate —
+the honest statement is that **the mosaic path was between ten and fifteen times its new cost,
+and nobody knew because nothing drew one.**
+
+## F1212 — deleting one dependency emptied six mechanisms in five components, and each was green the moment before ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | F1209's plan named what Ink's removal would touch: the element arm, `elementOf`, `inked`, three registry decorations, image's dead arm, and the `ink` and `react` rows in `DEPENDENCIES.md`. Every one of those landed. |
+| **Reached for** | The gates found six more, none in the plan, each two or more components away from anything the pass edited: `SpanName`'s `react` member (MG30, C28 I39); C09 commitment 13, a promise about two width implementations agreeing; `test/support/ink.ts` and T2.16's three consumers; `rowsOfAll`, the gate every container branched on, reduced to `rendered.map((r) => r)`; `@fmx/calcium/launch` — a public entry, one commitment, one invariant, three rows and two example bins — whose whole subject was Ink's import line; and R01 R4.6's `> 50`, a threshold over a module graph that had just shrunk to exactly 50. |
+| **Verdict** | **Open.** |
+
+**The shape is one fact stated six times: a rule can lose its subject somewhere else.** Each of
+the six is locally correct and locally unchanged — nobody edited `SpanName`, nobody edited the
+launcher, nobody touched the compile-cache row. What moved was a dependency two layers down, and
+every one of them read as satisfied the instant before it read as empty. That is A03 §2's vacuity
+class arriving by deletion rather than by drafting, and the reason it is worth a number is that
+the drafting form is the one the repository has instruments for.
+
+**The instruments that found them were not the ones aimed at Ink.** MG30 found the span member —
+a rule about union members nothing opens, written for C28 I39 and pointed at nothing in
+particular. SP9 found the commitment, by way of an invariant it could no longer place. `make test`
+found the launcher, through a count that went to zero, and the compile-cache row, through a
+threshold that had been a floor and became a ceiling. **Not one was found by reading the diff**,
+which is the argument for running the whole chain on a deletion rather than the suites the
+deletion names.
+
+**SP9 had no word for what had happened, which is the finding's own remedy.** An invariant whose
+subject is gone is neither *covered* nor *debt*, and those were the only two dispositions. Putting
+C09 I16 on `UNCITED_INVARIANTS` would have claimed a row was owed, on a list whose whole rule is
+that it may only shrink. A03 §7a now carries a third: **retired**, read from the listing and
+carrying a finding number, gated in both directions — a retired invariant leaves the coverage
+population, *and* a test row naming one is a violation, because a green row over an absent subject
+reads as coverage from every direction. The rule caught its own test on the first run: a comment
+in the row written for it spelled `C09 I16` and made the retired invariant *named by a test row*,
+which is F907's laundering class, found by the rule written against it.
+
+**The threshold is the one to keep in mind, because it fails in the direction that reads as a
+regression — and there are three of them.** `R4.6` asserted more than fifty compile-cache files as
+a guard against an empty cache, and the graph now produces exactly fifty (three runs, 2026-09-17,
+stable); the plots demo's copy of that row is the second; and C24 T5.8's *more than fifty modules
+on the bundled runtime's import* is the third, measuring **40**. None of the numbers drifted. The
+population did, and it shrank because the work succeeded. **A floor taken from the population it
+bounds inverts the moment that population is what is being reduced** — it was a guard against
+*nothing happened* and became a ratchet against a smaller graph. All three are refounded low
+enough to still refute the absence they were written for and low enough not to fail the next time
+the graph shrinks; in T5.8's case the *ceiling* was always the claim and the floor only ever said
+the trace saw something.
+
+**And the launcher is the largest of the six because it was the most load-bearing.** C24 I37 was
+a real invariant with a measured win behind it — 1,319 modules of a cold import's 2,442, 235 → 208
+ms without the compile cache and 205 → 162 with it, six of six interleaved pairs. All of that was
+about *Ink's* import line. The entry is removed rather than left registering loader hooks that can
+never arm, and the measurement is written into the retirement so it is not re-derived as an
+argument for adding something back.
+
+## F1211 — a child that answers a row wider than its cell breaks C09 I1 on one arm and overruns the frame on the other ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `composeRow` declines an overlap and `placeRows` a row wider than its cell, and until F1209 each decline sent its container to the element arm. F1210 measured the declines at **zero firings** across 6,281 tests and 458 goldens and ruled them cold. That ruling is about the corpus, and the corpus has no kind that answers a row wider than the width it was given. |
+| **Reached for** | Registering one — `wide`, which answers `"W".repeat(width + 4)` — and putting it in each container at a width of 20. **Neither arm is correct, and they are wrong in opposite directions.** A `panel` measures 3 and renders **4**; a `row` group measures 1 and renders **2** — both took `react`, the decline fell into Ink, and Yoga **wrapped** the over-wide row into a row nobody counted. A `column` group and a `scroll` stayed on the rows arm, kept their counts, and emitted a row of **24 cells at a width of 20**. |
+| **Verdict** | **Open.** |
+
+**The element arm's failure is the one C01 names as unrecoverable.** A wrapped line scrolls the
+alternate screen, and the application cannot see that it happened; C09 I1 exists to make the
+measure and the render agree precisely so a viewport's arithmetic stays true. So the decline is
+not a conservative fallback — it is the *worse* of the two answers, and it has been the answer for
+every container that declines since the arm was written.
+
+**The rows arm's failure is the same corruption one layer later.** A 24-cell row handed to a
+20-column terminal wraps at paint time rather than at layout time. The count is right, which is
+why nothing catches it: C09 I1 is a statement about rows, and every row-counting assertion passes.
+**A width disagreement has a safe direction** and neither arm takes it.
+
+**Why nothing found it.** The declines were read as cold because they are, and *cold* was inferred
+from a corpus rather than from the code — F1210's own measurement, correctly taken and then
+generalised one step too far. No shipped kind violates its width contract, so the only way to the
+case is to register a kind that does, which is a consumer's prerogative (I13) and not something
+the corpus can reach. This is the sibling of F1210 rather than a correction of it: that finding
+said *nothing reaches these declines*, which is true, and this one says *what they do when
+something does is worse than the thing they were guarding against*.
+
+**The clamp closed three rows' subjects as well as this one, and two of them had no other
+instrument.** Landing it, three mutations that had been caught went quiet — `CELL-EMPTY-DRAWN`,
+`the cell does not clip horizontally` and `aligned child rendered at the cell width`. None was a
+weak row: the clamp makes the *frame* correct whichever way each mutation goes, so what each one
+now moves is **work** and not bytes. A zero-wide cell composes to nothing whether or not it was
+rendered; a mosaic cell's row is already no wider than the width the child was rendered at; a
+child rendered at its cell rather than its content width is cut back to the same cells. **A repair
+takes its predecessor's instrument with it**, and the repair is the reason the rows read as weak.
+Each was given an instrument the clamp cannot satisfy — two render counts and, for the clip, the
+one construction that reaches it: a registered kind answering past its width, which is this
+finding's own subject.
+
+**The remedy is the clamp already ruled for two containers.** `mosaicRects` clamps a region and
+the row group clamps its first cell (I35, I73); the same cut, applied where a container composes a
+row, makes both failures impossible — the count stays right because a cut changes no row's
+existence, and the row fits because that is what a cut is. It also makes the composers **total**,
+which is what the pass deleting Ink needs: a decline with no element arm to fall into has nowhere
+to go, and the honest answer is not to have one.
+

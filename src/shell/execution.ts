@@ -34,7 +34,6 @@ import { createRefreshDriver } from "./refresh.js";
 import { DOCUMENT_VIEW_ID } from "./document-view.js";
 import type { ProducerContext } from "../data/adapters/types.js";
 import { overflowNotice, withOverflowNotice } from "../data/adapters/overflow.js";
-import { createEmulator } from "../data/emulator/emulator.js";
 import { BODY_INDENT } from "./entry-layout.js";
 import { isViewInvocation, jsonFlagFor } from "../data/manifest/index.js";
 import type { ValidationResult } from "../data/manifest/index.js";
@@ -190,6 +189,18 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // C28 §3c's view, for `/profile` (C23 I68) — the row is in
       // `FRAMEWORK_TOOLS`, so a handler missing here is what `seal()` refuses.
       profileView: deps.profileView,
+      // C23 I69's amended pair — `/profile snapshot` and `/profile live` read
+      // the same reader `LocalContext.profile` carries, and `null` where that
+      // is absent. **The reader, never the recorder**: the two verbs put a card
+      // in the transcript and a transcript part has no close, so a tier raise
+      // from here would pin the tier for the session and reset the ring doing
+      // it (C28 I50, I18). There is nothing to reach it with.
+      profileReport: () => deps.profile?.() ?? null,
+      // **The one operation, `null` where there is no profiler** (C28 I64).
+      // Required rather than optional for the same reason `profileReport` is:
+      // a wiring site that may omit a member is a wiring site that will, and
+      // the verb would then answer *no profiler* in a session that has one.
+      profileCapture: deps.profileCapture ?? null,
     }),
   )) {
     local.register(verb, handler);
@@ -668,6 +679,15 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     const { line } = settle;
 
     guard.take("shell", headOf(command));
+
+    /**
+     * **The emulator arrives here, not with the package** (C23 I71). The
+     * headless terminal is 35 ms of a cold start and no first frame draws
+     * one (F1164), so the route fetches it on its first run; the route is
+     * `async` already, and the block below is the same code one microtask
+     * later. T5.22 reads the startup graph to see the import stayed off it.
+     */
+    const { createEmulator } = await import("../data/emulator/emulator.js");
 
     /**
      * The body's inner width, handed down (C23 §3c, C22 I91's neighbour).

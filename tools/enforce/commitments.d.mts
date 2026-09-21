@@ -185,7 +185,13 @@ export declare function checkInvariantCoverage(
   testFiles: readonly string[],
   readFile?: (file: string) => string,
   exempt?: readonly string[],
-): { violations: Violation[]; uncited: number; declared: number };
+): { violations: Violation[]; uncited: number; retired: number; declared: number };
+
+/** Every invariant a spec lists as retired, each carrying a finding number. */
+export declare function retiredInvariantsOf(
+  file: string,
+  readFile?: (file: string) => string,
+): Set<string>;
 
 /** Files whose `§` references are deliberately unresolvable, each with why. */
 export declare const SECTION_EXCEPTIONS: Readonly<Record<string, string>>;

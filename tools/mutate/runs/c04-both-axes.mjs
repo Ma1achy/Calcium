@@ -51,8 +51,28 @@ const MUTATIONS = [
     // T6.88's other half — the floor dropped from the render while the measure keeps it.
     name: "minRows dropped from the render only",
     file: CONTAINERS,
-    from: "        ...(block.minRows === undefined ? {} : { minHeight: block.minRows }),",
-    to: "",
+    // **On both arms** (C09 I73): the column floor and the row height. It was
+    // three, with the element arm's `minHeight`; that arm is gone (F1209) and a
+    // floor left on either of the two remaining is a floor the frame keeps.
+    //
+    // **Re-anchored when the floor gained its other half** (F1223): both arms
+    // now floor a non-empty group at one row as well as at `minRows`, because
+    // the measurer always did and `render` never had. The mutation is the same
+    // one — `minRows` dropped from the render alone — written against the line
+    // that carries it now.
+    from: "        const floor = placed.length === 0 ? 0 : Math.max(1, block.minRows ?? 0); // cells-ok — a row count\n",
+    to: "        const floor = placed.length === 0 ? 0 : 1; // cells-ok — a row count\n",
+    also: [
+      {
+        file: CONTAINERS,
+        // **The `return` carries the disambiguation.** The two arms' floor
+        // lines are now the same text at different indentation, and the sweep
+        // matches on substring, so the six-space form is inside the eight-space
+        // one.
+        from: "      const floor = placed.length === 0 ? 0 : Math.max(1, block.minRows ?? 0); // cells-ok — a row count\n      return placeRows(blocks, Math.max(tallest, floor));\n",
+        to: "      const floor = placed.length === 0 ? 0 : 1; // cells-ok — a row count\n      return placeRows(blocks, Math.max(tallest, floor));\n",
+      },
+    ],
     expect: "T3.72",
   },
   {
@@ -83,8 +103,9 @@ const MUTATIONS = [
     // C04 I101 R2 — the child rendered at its cell rather than its content width.
     name: "aligned child rendered at the cell width",
     file: CONTAINERS,
-    from: "            ctx.renderChild(child, at.width),",
-    to: "            ctx.renderChild(child, widths[index] ?? 1),",
+    // Anchored on the one render both arms read (C09 I73).
+    from: "    const rendered = placed.map((child, index) => ctx.renderChild(child, (ats[index] as (typeof ats)[number]).width));",
+    to: "    const rendered = placed.map((child, index) => ctx.renderChild(child, widths[index] ?? 1));",
     expect: "T3.69",
   },
   {

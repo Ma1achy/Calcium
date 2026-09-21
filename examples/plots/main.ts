@@ -102,9 +102,10 @@ const tui = createTui({
      *
      * `/report`, not `/profile`: the framework ships `/profile` as its seventh
      * verb (C05 §3) and an app declaring the name cannot start (C05 I6). This
-     * one draws the same panes as a document in the transcript — the shape
-     * C23 I69 refuses for the framework's own verb, and a consumer drawing its
-     * own from `profilePane` is exactly what C24 I33 says the exports are for.
+     * one draws a card as a document in the transcript — the shape C23 I69
+     * refuses **unstamped** for the framework's own verb, whose `snapshot` and
+     * `live` verbs are the stamped and cadenced forms of it; a consumer drawing
+     * its own from `profileCard` is what C24 I33 says the exports are for.
      *
      * The builder is in `commands.ts` beside every other one, so the coverage
      * table can call the same code this handler does rather than a second copy

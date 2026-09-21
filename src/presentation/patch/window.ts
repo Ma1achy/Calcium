@@ -30,6 +30,7 @@ import type { Hunk, Patch } from "../../data/viewmodel/index.js";
 import { block, changedRuns } from "../../data/viewmodel/index.js";
 import { isCollapsed, layoutFor, pairedRows, patchHeight, type Layout } from "./height.js";
 import { numberWidth } from "./layout.js";
+import type { RenderScratch } from "../blocks/types.js";
 
 /**
  * The smallest thing a window may cut at.
@@ -40,7 +41,7 @@ import { numberWidth } from "./layout.js";
  * walk with every line its own unit, which is why this returns units rather
  * than branching at the call sites.
  */
-type Unit = Readonly<{ lineFrom: number; lineTo: number; rows: number }>;
+export type Unit = Readonly<{ lineFrom: number; lineTo: number; rows: number }>;
 
 /**
  * The units of one hunk — **grouped by `changedRuns` and not by a walk of this
@@ -89,7 +90,7 @@ function unitsOf(hunk: Hunk, layout: Layout): readonly Unit[] {
 }
 
 /** One entry per row of the full rendering, in order. */
-type Row =
+export type Row =
   | Readonly<{ kind: "path" }>
   | Readonly<{ kind: "marker"; hunk: number }>
   | Readonly<{ kind: "header"; hunk: number }>
@@ -119,6 +120,99 @@ function rowsOf(patch: Patch, layout: Layout): readonly Row[] {
 }
 
 /**
+ * **The window plan — everything a window needs that depends on the block and
+ * the width alone, derived once** (C25 I22).
+ *
+ * Every function below was a pure function of the patch and derived `rowsOf`
+ * from scratch, so one `windowPatch` was three walks plus a binary search of
+ * walks, and a view motion about twice that — linear in the patch when the
+ * offset was the only thing that changed (F1187). SS24 forbids a memo in this
+ * directory, rightly: the derived form is therefore a *value*, and the caller
+ * that has a block and a width across many windows holds it (C22 I41).
+ *
+ * The plan carries the block and the width it was derived from, and the
+ * functions that accept one refuse a plan for another block or width rather
+ * than read it — a stale plan over a new patch would slice the new lines by
+ * the old rows and show a diff the block does not hold, silently.
+ */
+export type WindowPlan = Readonly<{
+  patch: Patch;
+  width: number;
+  layout: Layout;
+  /** One record per row of the full rendering (`rowsOf`). */
+  rows: readonly Row[];
+  /** The rows a window may begin at — every row but a unit's interior ones. */
+  starts: readonly number[];
+  /** The row each hunk's header occupies. */
+  headers: readonly number[];
+  /** Each hunk's first body row, `-1` for a hunk with no body — what `windowRows` found by a second walk (F1191). */
+  bodyStarts: readonly number[];
+  /** The pinned gutter width (I21a). */
+  numberWidth: number;
+}>;
+
+export function windowPlan(patch: Patch, width: number): WindowPlan {
+  const layout = layoutFor(patch, width);
+  const rows = rowsOf(patch, layout);
+  const starts: number[] = [];
+  const headers: number[] = [];
+  const bodyStarts: number[] = patch.hunks.map(() => -1);
+  rows.forEach((row, i) => {
+    if (row.kind === "header") headers.push(i);
+    if (row.kind !== "body" || row.first) starts.push(i);
+    if (row.kind === "body" && bodyStarts[row.hunk] === -1) bodyStarts[row.hunk] = i;
+  });
+  return Object.freeze({
+    patch,
+    width,
+    layout,
+    rows: Object.freeze(rows),
+    starts: Object.freeze(starts),
+    headers: Object.freeze(headers),
+    bodyStarts: Object.freeze(bodyStarts),
+    numberWidth: numberWidth(patch),
+  });
+}
+
+/** The scratch key of a plan at `width` (I22): one slot per `hunks`, the width the condition. */
+const planKey = (width: number): string => `plan\u0000${String(width)}`;
+
+/**
+ * The plan for `patch` at `width` from the caller's scratch, or derived and
+ * held there (I22, F1191).
+ *
+ * **Owner the patch's `hunks`** — the payload the rows are derived from, as
+ * C12 keys on a surface's `faces` (C12 I107) — and **read back only for this
+ * very block at this very width**: a plan is refused rather than read for
+ * another block sharing the array or another width, because a stale plan
+ * slices the new lines by the old rows. The store is the caller's, which is
+ * what SS24 asks; with none, one walk as before.
+ */
+export function planFrom(scratch: RenderScratch | undefined, patch: Patch, width: number): WindowPlan {
+  if (scratch === undefined) return windowPlan(patch, width);
+  const held = scratch.get(patch.hunks, planKey(width));
+  if (isPlanFor(held, patch, width)) return held;
+  const plan = windowPlan(patch, width);
+  scratch.set(patch.hunks, planKey(width), plan);
+  return plan;
+}
+
+function isPlanFor(held: unknown, patch: Patch, width: number): held is WindowPlan {
+  if (typeof held !== "object" || held === null) return false;
+  const p = held as Partial<WindowPlan>;
+  return p.patch === patch && p.width === width && Array.isArray(p.rows);
+}
+
+/** The caller's plan when it has one for this block at this width, else one walk. */
+function planOf(patch: Patch, width: number, plan: WindowPlan | undefined): WindowPlan {
+  if (plan === undefined) return windowPlan(patch, width);
+  if (plan.patch !== patch || plan.width !== width) {
+    throw new Error("C25 I22 — a window plan for another block or width cannot be read");
+  }
+  return plan;
+}
+
+/**
  * The height of a patch — the full rendering's, or a window's.
  *
  * One function for both, deliberately. A separate `windowHeight` was written
@@ -141,13 +235,8 @@ export function totalRows(patch: Patch, width: number): number {
  * second cursor, and `G` leaves it pointing at the hunk the reader scrolled away
  * from.
  */
-export function hunkHeaderRows(patch: Patch, width: number): readonly number[] {
-  const layout = layoutFor(patch, width);
-  const out: number[] = [];
-  rowsOf(patch, layout).forEach((row, i) => {
-    if (row.kind === "header") out.push(i);
-  });
-  return Object.freeze(out);
+export function hunkHeaderRows(patch: Patch, width: number, plan?: WindowPlan): readonly number[] {
+  return planOf(patch, width, plan).headers;
 }
 
 /**
@@ -163,18 +252,16 @@ export function hunkHeaderRows(patch: Patch, width: number): readonly number[] {
  * Reaching the end is monotone in the offset, so this is a binary search over
  * the same builder rather than a second arithmetic that could disagree with it.
  */
-function bottomOffset(patch: Patch, width: number, height: number): number {
-  const rows = rowsOf(patch, layoutFor(patch, width));
-  if (rows.length === 0) return 0;  // cells-ok — a row count, not a width
+function bottomOffset(plan: WindowPlan, height: number): number {
   // Searched over the rows a window may *begin* at, so the answer is itself a
   // valid offset and needs no snapping afterwards.
-  const starts = rows.flatMap((r, i) => (r.kind === "body" && !r.first ? [] : [i]));
+  const starts = plan.starts;
   if (starts.length === 0) return 0;  // cells-ok — a row count, not a width
   let lo = 0;
   let hi = starts.length - 1;  // cells-ok — a row count, not a width
   while (lo < hi) {
     const mid = Math.floor((lo + hi) / 2);
-    if (build(patch, width, starts[mid] ?? 0, height).reachedEnd) hi = mid;
+    if (build(plan, starts[mid] ?? 0, height).reachedEnd) hi = mid;
     else lo = mid + 1;
   }
   return starts[lo] ?? 0;
@@ -200,12 +287,19 @@ function bottomOffset(patch: Patch, width: number, height: number): number {
  * That is what `less` does with a wrapped line, and it makes the builder's input
  * a precondition rather than something it repairs.
  */
-export function clampOffset(patch: Patch, width: number, height: number, offset: number): number {
+export function clampOffset(
+  patch: Patch,
+  width: number,
+  height: number,
+  offset: number,
+  plan?: WindowPlan,
+): number {
   if (!Number.isFinite(offset)) return 0;
   const wanted = Math.max(0, Math.trunc(offset));
   if (wanted === 0) return 0;
-  const rows = rowsOf(patch, layoutFor(patch, width));
-  const bottom = bottomOffset(patch, width, height);
+  const p = planOf(patch, width, plan);
+  const rows = p.rows;
+  const bottom = bottomOffset(p, height);
   // Snap first, then bound. Bounding first and snapping after can move the
   // ceiling *below* the offset that reaches the end, which puts the bottom of
   // the document out of reach again — the same defect this ceiling was written
@@ -252,9 +346,11 @@ export function windowRows(
   width: number,
   from: number,
   to: number,
+  plan?: WindowPlan,
 ): Readonly<{ block: Patch; skipRows: number; dropRows: number }> {
-  const layout = layoutFor(patch, width);
-  const rows = rowsOf(patch, layout);
+  const p = planOf(patch, width, plan);
+  const layout = p.layout;
+  const rows = p.rows;
   const lo = Math.max(0, Math.min(Math.trunc(from), rows.length));  // cells-ok — a row index, not a width
   const hi = Math.max(lo + 1, Math.min(Math.trunc(to), rows.length));  // cells-ok — a row index, not a width
 
@@ -268,8 +364,12 @@ export function windowRows(
   let headerIn = new Set<number>();
   let tail = false;
 
-  rows.forEach((row, i) => {
-    if (i < lo || i >= hi) return;
+  // **The window's rows and no others** (I22, F1191): a planned window at
+  // 20,000 lines was 1.7 ms for two walks of every row; the hunks' first body
+  // rows are the plan's `bodyStarts`, found once when the plan was derived.
+  for (let i = lo; i < hi; i += 1) {
+    const row = rows[i];
+    if (row === undefined) break;
     if (row.kind === "tail") tail = true;
     else if (row.kind === "marker") markerIn.add(row.hunk);
     else if (row.kind === "header") headerIn.add(row.hunk);
@@ -278,7 +378,7 @@ export function windowRows(
       if (cur === undefined) touched.set(row.hunk, { first: i, last: i });
       else cur.last = i;
     }
-  });
+  }
 
   // A hunk whose header is out of range still renders one, because nothing
   // suppresses it (I18) — so it is slack, exactly as the path header is.
@@ -286,11 +386,11 @@ export function windowRows(
   for (const h of hunkIds) if (!headerIn.has(h)) skipRows += 1;
 
   // Where each hunk's body rows begin in `rows`, so a row index becomes a body
-  // offset within the hunk.
-  const bodyStart = new Map<number, number>();
-  rows.forEach((row, i) => {
-    if (row.kind === "body" && !bodyStart.has(row.hunk)) bodyStart.set(row.hunk, i);
-  });
+  // offset within the hunk — the plan's, not a second walk's.
+  const bodyStart = (h: number, first: number): number => {
+    const start = p.bodyStarts[h] ?? -1;
+    return start < 0 ? first : start;
+  };
 
   const hunks: Hunk[] = [];
   for (const h of hunkIds) {
@@ -303,8 +403,8 @@ export function windowRows(
         : linesForRows(
             source,
             layout,
-            range.first - (bodyStart.get(h) ?? range.first),
-            range.last + 1 - (bodyStart.get(h) ?? range.first),
+            range.first - bodyStart(h, range.first),
+            range.last + 1 - bodyStart(h, range.first),
           );
     hunks.push({
       header: source.header,
@@ -326,7 +426,7 @@ export function windowRows(
     ...(patch.layout !== undefined ? { layout: patch.layout } : {}),
     // C25 I21a — the parent's gutter, read through `numberWidth` so a window of
     // a window passes the pin down (T3.20b).
-    numberWidth: numberWidth(patch),
+    numberWidth: p.numberWidth,
   } as Patch);
 
   // **No trailing slack** (C09 I26). A patch's slack is a path header and a hunk
@@ -388,8 +488,15 @@ function rowSlice(lines: Hunk["lines"], p: number, q: number): Hunk["lines"][num
   return out;
 }
 
-export function windowPatch(patch: Patch, width: number, offset: number, height: number): Patch {
-  return build(patch, width, clampOffset(patch, width, height, offset), height).patch;
+export function windowPatch(
+  patch: Patch,
+  width: number,
+  offset: number,
+  height: number,
+  plan?: WindowPlan,
+): Patch {
+  const p = planOf(patch, width, plan);
+  return build(p, clampOffset(patch, width, height, offset, p), height).patch;
 }
 
 
@@ -401,13 +508,12 @@ export function windowPatch(patch: Patch, width: number, offset: number, height:
  * is how two answers about the same window come to disagree.
  */
 function build(
-  patch: Patch,
-  width: number,
+  plan: WindowPlan,
   rawOffset: number,
   height: number,
 ): Readonly<{ patch: Patch; reachedEnd: boolean }> {
-  const layout = layoutFor(patch, width);
-  const rows = rowsOf(patch, layout);
+  const patch = plan.patch;
+  const rows = plan.rows;
   // A precondition, not a repair: `clampOffset` owns the snap (see above).
   const start = Math.max(0, Math.min(rawOffset, Math.max(0, rows.length - 1)));  // cells-ok — a row count, not a width
 
@@ -496,8 +602,9 @@ function build(
     //
     // Taken from `patch` and never from `hunks`, which is the whole point, and
     // read through `numberWidth` so a parent that is *itself* a window passes its
-    // pin down rather than re-deriving from a slice of a slice.
-    numberWidth: numberWidth(patch),
+    // pin down rather than re-deriving from a slice of a slice. Held on the
+    // plan (I22), which took it from `patch` once.
+    numberWidth: plan.numberWidth,
   } as Patch);
 
   return { patch: windowed, reachedEnd: consumed >= rows.length - 1 };  // cells-ok — a row count, not a width

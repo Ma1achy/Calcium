@@ -11,8 +11,7 @@
 // it: the first frame is correct in every arithmetic sense and describes a box
 // with nowhere to say what failed.
 import { describe, expect, it, vi } from "vitest";
-import { createElement } from "react";
-import { Text } from "ink";
+import { rows } from "../../src/presentation/blocks/paint.js";
 
 import { buildGraph, buildSession } from "../support/session.js";
 import { doc } from "../support/blocks.js";
@@ -59,14 +58,7 @@ const boom: BlockDefinition = {
 const overdraws: BlockDefinition = {
   kind: "overdraws" as never,
   measure: () => 1,
-  render: () =>
-    createElement(
-      "ink-box" as never,
-      { style: { flexDirection: "column" } },
-      createElement(Text, { key: "a" }, "OVER-1"),
-      createElement(Text, { key: "b" }, "OVER-2"),
-      createElement(Text, { key: "c" }, "OVER-3"),
-    ),
+  render: () => rows(["OVER-1", "OVER-2", "OVER-3"]),
 } as never;
 
 const SENTINEL = "SENTINEL-AFTER";

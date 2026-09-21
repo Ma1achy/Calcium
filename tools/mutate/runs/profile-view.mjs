@@ -19,12 +19,22 @@ import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
+// The deck's own two suites are in the corpus because the register and the kit
+// are now part of what this run mutates: a row expecting `T1.114` against a
+// command that does not run it reports a survivor for a reason that has nothing
+// to do with the mutation. **The comment is here rather than between the string
+// parts**: `anchors.mjs` collapses `" +` concatenation with a regex that allows
+// whitespace and not a comment, so a line break with a `//` in it hides every
+// path after it from the sweep.
 const CMD =
   "npx vitest run test/unit/profile-view.test.ts test/unit/profiler.test.ts " +
-  "test/integration/profiler.test.ts test/unit/local-profile.test.ts";
+  "test/integration/profiler.test.ts test/unit/local-profile.test.ts " +
+  "test/unit/profile-register.test.ts test/unit/profile-deck.test.ts";
 
 const VIEW = "src/shell/profile-view.ts";
-const PANES = "src/shell/profiling/panes.ts";
+const DECK = "src/shell/profiling/panes/index.ts";
+const REGISTER = "src/shell/profiling/panes/register.ts";
+const KIT = "src/shell/profiling/panes/kit.ts";
 const FRAMEWORK = "src/data/manifest/framework.ts";
 const HANDLERS = "src/shell/local/handlers.ts";
 
@@ -44,7 +54,7 @@ const results = runPass({
   run,
   control: {
     file: VIEW,
-    from: "        deps.overlays.push(layerFor(project(at.blocks, 0)));\n",
+    from: "        deps.overlays.push(layerFor(contentFor(report, at)));\n",
     to: "",
     why: "a view that pushes nothing fails twelve of the thirty rows outright; a run where this survives is not executing the view's suites at all",
   },
@@ -57,11 +67,11 @@ const results = runPass({
       file: VIEW,
       from:
         "    profiler.own(() => {\n" +
-        "      deps.overlays.update(PROFILE_VIEW_ID, { content: project(at.blocks, at.offset) });\n" +
+        "      deps.overlays.update(PROFILE_VIEW_ID, { content: contentFor(report, at) });\n" +
         "      deps.redraw(reason);\n" +
         "    });",
       to:
-        "    deps.overlays.update(PROFILE_VIEW_ID, { content: project(at.blocks, at.offset) });\n" +
+        "    deps.overlays.update(PROFILE_VIEW_ID, { content: contentFor(report, at) });\n" +
         "    deps.redraw(reason);",
       expect: "T1.92",
     },
@@ -138,7 +148,7 @@ const results = runPass({
       // terms rather than a stream's.
       name: "the tick is served as input",
       file: VIEW,
-      from: '      render(profiler, at, "stream");',
+      from: '      render(profiler, at, "stream", report);',
       to: '      render(profiler, at, "input");',
       expect: "T3.14",
     },
@@ -152,37 +162,40 @@ const results = runPass({
       expect: "T1.98",
     },
     {
-      // C28 I52, §9b B9 — the move reverted: the counters and cache tables drawn
-      // on the overview again, where no type bounds their rows. The largest
-      // report the type allows then measures 32 against the budget of 23, and
-      // T1.100's bound is what fails; the fixture with one reason would have
-      // read 23 and passed, which is why the row records every reason.
-      // Hand pass 2026-09-09: T1.100 alone, on the bound.
-      name: "the counters and cache tables come back to the overview",
-      file: PANES,
-      from:
-        "  const counters = counterEntries(r).length;\n" +
-        "  const caches = cacheNames(r).length;\n" +
-        "  if (counters > 0 || caches > 0) {",
-      to:
-        "  out.push(...countersTable(r), ...cacheTable(r));\n" +
-        "  const counters = counterEntries(r).length;\n" +
-        "  const caches = cacheNames(r).length;\n" +
-        "  if (counters > 0 || caches > 0) {",
-      expect: "T1.100",
+      // **The group boundary moved** — the plan's named control. The verdict
+      // joins group A, so the first section is empty, `/profile` opens on a
+      // section with no card, and the deck's contiguity — which is what gives
+      // the section gesture a section to name — is gone.
+      // Hand pass 2026-09-12: T1.114 first, then T1.101.
+      name: "the verdict card joins the app's group",
+      file: REGISTER,
+      from: '    id: "verdict",\n    group: "verdict",',
+      to: '    id: "verdict",\n    group: "app",',
+      expect: "T1.114",
     },
     {
-      // C28 I52 — the latency plot's area back to six rows, the two spare ones
-      // drawing nothing. Two rows more sits inside the slack the bound leaves
-      // (21 against 23), so the bound passes and the walked figures are what
-      // fail: the record beside the rule, which is why the row keeps both.
-      // Hand pass 2026-09-09: T1.100 and T1.98, the second because the page
-      // boundaries over the largest report moved with the plot.
-      name: "the latency plot is six area rows again",
-      file: PANES,
-      from: '        id: "ov-latency", form: "bar", height: 4, axes: true, orientation: "horizontal",',
-      to: '        id: "ov-latency", form: "bar", height: 6, axes: true, orientation: "horizontal",',
-      expect: "T1.100",
+      // **The per-frame index off by one** — a card resolved against the frame
+      // *after* the one its header names. Every figure is a real frame's and
+      // none is the frame the reader is being shown, which is F1128's defect
+      // with the address corrected and the resolution wrong.
+      // Hand pass 2026-09-12: T1.110.
+      name: "a per-frame card resolves the frame after the one it names",
+      file: KIT,
+      from: "  return r.worst.find((f) => f.seq === seq) ?? null;",
+      to: "  return r.worst[r.worst.findIndex((f) => f.seq === seq) + 1] ?? null;",
+      expect: "T1.110",
+    },
+    {
+      // **The footer qualifier detached from its figure** — the population
+      // clause gone, so a `dotplot` of a span's p50 and a `boxplot` of the same
+      // span's quartiles disagree with nothing on either card saying why
+      // (F1127). The figures are unchanged and every plot assertion passes.
+      // Hand pass 2026-09-12: T1.109.
+      name: "a card states no population",
+      file: DECK,
+      from: '  if (spec.site === "frame") parts.push(`frame-site spans${ctx.sep}${populationFooter(r, "ring")}`);',
+      to: '  if (false) parts.push(`frame-site spans${ctx.sep}${populationFooter(r, "ring")}`);',
+      expect: "T1.109",
     },
     {
       // C28 I52 — the header's gap back: a blank first row on every page of
@@ -202,13 +215,13 @@ const results = runPass({
       expect: "T1.98",
     },
     {
-      // C28 I51, C09 I49, F828 — `profilePane`'s ASCII default on a terminal that
+      // C28 I51, C09 I49, F828 — `profileCard`'s ASCII default on a terminal that
       // has capabilities of its own. Three rows on the hand pass, T4.9 through
       // the graph's resolved record.
-      name: "the pane takes profilePane's default caps",
+      name: "the card takes the deck's default caps",
       file: VIEW,
-      from: "      ...profilePane(profiler.report(), pane, deps.capabilities),",
-      to: "      ...profilePane(profiler.report(), pane),",
+      from: "    return profileDeck(report, at.section, at.index, { w: width, rows: height - 1 }, deps.capabilities);",
+      to: "    return profileDeck(report, at.section, at.index, { w: width, rows: height - 1 });",
       expect: "T1.96",
     },
     {
@@ -235,18 +248,18 @@ const results = runPass({
       // C23 I27, the other half — the row without its handler.
       name: "shippedHandlers drops the profile handler",
       file: HANDLERS,
-      from: "    profile: profileHandler(deps.profileView),\n",
+      from: "    profile: profileHandler(deps.profileView, deps.profileReport, deps.profileCapture),\n",
       to: "",
       expect: "T4.66",
     },
     {
-      // C23 T1.67 — the L0 copy of C28's `PANES` drifts by one member. C05 then
-      // rejects `/profile memory` before the handler sees it, and nothing else
-      // in the tree compares the two lists.
-      name: "the manifest's pane values lose a member",
+      // C23 T1.67 — the L0 copy of C28's `SECTIONS` drifts by one member. C05
+      // then rejects `/profile framework` before the handler sees it, and
+      // nothing else in the tree compares the two lists.
+      name: "the manifest's section values lose a member",
       file: FRAMEWORK,
-      from: '        values: Object.freeze(["overview", "frame", "distribution", "memory"]),',
-      to: '        values: Object.freeze(["overview", "frame", "distribution"]),',
+      from: '        values: Object.freeze(["verdict", "app", "framework", "snapshot", "live", "capture"]),',
+      to: '        values: Object.freeze(["verdict", "app", "snapshot", "live", "capture"]),',
       expect: "T1.67",
     },
   ],

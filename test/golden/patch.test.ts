@@ -19,6 +19,20 @@
 // Both unicode modes are axes because the collapse marker is C25 §3's deliberate
 // exception to C09's 1:1 substitution rule — `⋯` is one cell and `...` is three — so
 // the ASCII form is a genuinely different row rather than a glyph swap.
+//
+// **All sixteen of these moved in phase 2a, by one row each, and the reason is
+// that this harness draws every case alone** (C04 §3a, C09 I80). A block's
+// spacing is its own `padding` now rather than a row the sequence puts above it,
+// and `renderToLines(b, width)` is not a sequence — so a case built through a
+// builder that gaps by default drew no leading row before and draws one now. The
+// caption's measured and rendered counts move together, which is the half that
+// says the model is consistent; the row appearing at all is the half that says
+// the field changed owner.
+//
+// **They were the only sixteen of 458, and that was itself a finding.** The
+// shared block corpus has 51 blocks and none with padding, and the terminal
+// baseline is one plot per frame — so the gate saw this change here by accident
+// and nowhere on purpose. `padding.test.ts` is the subject the gate was missing.
 import { describe, expect, it } from "vitest";
 import { hunkOf, patchOf, THE_ILLUSTRATION } from "../support/blocks.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, MONO_CAPS, measurable } from "../support/render.js";

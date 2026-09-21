@@ -816,4 +816,10 @@ describe("C16 §5 — Ctrl-D, and the one thing C16 stores", () => {
     expect(body, "every arm is a location keyed by `at`").toMatch(/at:\s*"prompt"/u);
     expect(body).toMatch(/at:\s*"liveBlock"/u);
   });
+
+  // **The section gesture's row lives with the owners that answer it** — C16
+  // I33's claim is about all three, and this file has none of them. It is
+  // `T1.3v` in `session-keys.test.ts`, which holds the keymap and the ladder in
+  // one place. The id moved too: `T1.3q` was already this file's mouse-modality
+  // row above, and §9b row k cites it meaning that one.
 });

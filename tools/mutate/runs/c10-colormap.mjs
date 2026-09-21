@@ -1,34 +1,43 @@
-// Continuous colour, mutated — C10 I31, and the rows are the three rulings.
+// C10 I40 — the numeric colour path: `sampleRgb`, `shadeRgb` and the `toLinear`
+// table, consumed by `scatter3.ts`'s surface fill. Mutated.
 //
-// **Colour is the failure mode that renders best.** A map that replaces the
-// density glyph instead of joining it, one that keeps painting at 4-bit, one
-// whose stops are in the wrong order — every frame is a coloured matrix of the
-// right size, and only the *relationship* between the two channels is wrong.
-// That is why three rows below assert a difference between two renderings
-// rather than against one.
+// **The shape this run exists to catch is a table that is almost right.** The
+// LUT's claim is exactness over every eight-bit input, and a wrong entry — off by
+// one, built over the wrong domain — shifts a channel by one at some `t` and
+// nowhere else, which is a golden mover no assertion at a handful of points would
+// see. T1.42 sweeps every map × 1 024 t × 64 k against `shadeColour`, which is
+// **deliberately kept on `overChannels`' direct arithmetic** so the sweep compares
+// two implementations rather than the table to itself — the first draft routed
+// `shadeColour` through `shadeRgb`, and under that every mutation here survived.
+//
+// **Two mutations were checked and left out, each with its reason.** The fast
+// path's `k >= 1` shortcut removed is *byte-identical*: the sRGB round-trip at
+// `k = 1` is exact for all 256 channels (measured, 0 drifts), so the shortcut is
+// speed and not correctness and a run cannot see it. `fastMap` forced `undefined`
+// — the fast path never taken — is the c09-group-window control's shape: a
+// correct, slower answer that every byte and equality row accepts. Nothing here
+// asserts the fast path is *taken*; that is the bench's reading (F1150), and it
+// is the run's stated blind spot. And `colourBy: "value"` collapsed to depth on
+// the fast path was left out too: no mesh golden or fixture colours by value
+// (grepped), so it would survive vacuously — the row to add the day one does.
 import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
-
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const CMD = "npx vitest run test/contract/colormap.test.ts test/golden/plot.test.ts";
+const CMD = "npx vitest run test/unit/plot-colormaps.test.ts test/golden/plot-meshes.test.ts";
 const MAP = "src/presentation/theme/colormap.ts";
-// The heatmap left `definition.ts` for its own module, and the 24-bit arm
-// stopped being a ternary when the 256-entry tables landed. Both anchors
-// follow their subject.
-const HEAT = "src/presentation/plot/heatmap.ts";
-const DEF = "src/presentation/plot/definition.ts";
-const VAL = "src/data/viewmodel/validate.ts";
+const S3 = "src/presentation/plot/scatter3.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
+const BUFFER = 256 * 1024 * 1024;
 const run = () => {
   try {
-    return execSync(`${CMD} 2>&1`, { cwd: ROOT, encoding: "utf8", timeout: 180_000 });
+    return execSync(`${CMD} 2>&1`, { cwd: ROOT, encoding: "utf8", maxBuffer: BUFFER });
   } catch (e) {
-    const out = `${e.stdout ?? ""}${e.stderr ?? ""}`;
-    return e.code === "ETIMEDOUT" ? `${out}\nTIMED OUT after 180000ms` : out;
+    if (e.killed === true) return "the suite did not return — timed out";
+    return `${e.stdout ?? ""}${e.stderr ?? ""}`;
   }
 };
 
@@ -38,101 +47,82 @@ const results = runPass({
   run,
   control: {
     file: MAP,
-    from: "const CONTINUOUS_FLOOR = 8;",
-    to: "const CONTINUOUS_FLOOR = 999;",
-    why: "no depth ever gets a colour — if this survives, nothing reads the second channel and no row below is earned",
+    from: "  return [shadeChannel(r, kk), shadeChannel(g, kk), shadeChannel(b, kk)];",
+    to: "  return [r, g, b];",
+    why: "an unshaded shadeRgb differs from overChannels at every k < 1; a run where this survives is comparing the table to itself",
   },
   mutations: [
     {
-      // **THE RULING**, inverted: colour below 8-bit. C10 I26 says 0–15 are whatever
-      // the emulator's palette says, so this paints an *ordering* out of indices
-      // whose luminances are unknown — sixteen colours in an arbitrary sequence
-      // wearing viridis's name, on a frame that looks like a coloured heatmap.
-      name: "THE RULING: a map still paints below 8-bit, where there is no ordering",
+      // **The table over the wrong domain.** Entry `i` built from `(i + 1) / 255`
+      // shifts every channel; the sweep sees it because `shadeColour` computes
+      // `toLinear` directly.
+      name: "LUT-OFF-BY-ONE: LINEAR_LUT[i] is toLinear((i + 1) / 255)",
       file: MAP,
-      from: "const CONTINUOUS_FLOOR = 8;",
-      to: "const CONTINUOUS_FLOOR = 4;",
-      expect: "T2.31",
+      from: "const LINEAR_LUT: readonly number[] = Array.from({ length: 256 }, (_, i) => toLinear(i / 255));",
+      to: "const LINEAR_LUT: readonly number[] = Array.from({ length: 256 }, (_, i) => toLinear((i + 1) / 255));",
+      expect: "T1.42",
     },
     {
-      // 24-bit taking the cube entry. Every colour is still viridis-ish and every
-      // count agrees; what is lost is the resolution the depth was detected for.
-      name: "24-bit quantises to the cube it does not need",
+      // **The table bypassed.** Reading `toLinear(c)` — the channel as an int,
+      // not over 255 — is the shape a reader reaches for who forgot the domain;
+      // every channel above 0 saturates.
+      name: "LUT-BYPASSED-WRONG-DOMAIN: shadeRgb reads toLinear(c) instead of the table",
       file: MAP,
-      from: "  if (caps.colourDepth >= 24) {",
-      to: "  if (caps.colourDepth >= 999) {",
-      expect: "T2.31",
+      from: "  const v = toSrgb((LINEAR_LUT[c] ?? toLinear(c / 255)) * kk);",
+      to: "  const v = toSrgb(toLinear(c) * kk);",
+      expect: "T1.42",
     },
     {
-      // **The carrier replaced rather than joined.** The one thing F34 forbids:
-      // colour becomes the only channel and the frame is beautiful at 24-bit and
-      // empty at one bit.
-      name: "THE F34 FAILURE: colour replaces the density glyph rather than joining it",
-      file: HEAT,
-      // **The ruling inverted and the concern did not**, which is why this row
-      // is re-anchored rather than deleted. C12 I29 made colour the carrier above
-      // 8-bit deliberately — a foreground glyph occupies its cell whatever
-      // colour goes behind it, and the old arrangement rendered as speckle. So
-      // "colour replaces the glyph" is now the *shipped* behaviour at 24-bit.
-      //
-      // What F34 still forbids is colour being the carrier where there is no
-      // colour, and C12 I29's own ladder is what answers it: `colourAt` returns
-      // nothing below 8-bit (C10 I31) and the ramp takes back over. Blanking the
-      // cell unconditionally removes that fallback — beautiful at 24-bit, empty
-      // at one bit, exactly the frame this row has always described.
-      // Re-anchored when `layers` gave a field the option of not painting at
-      // all (C12 I51): the ramp fallback is now inside a `painted` arm, and the
-      // subject is unchanged — blanking the cell unconditionally still removes
-      // the one carrier that survives below 8-bit.
-      from: "    run += colour === undefined ? (painted ? glyphAt(x) : \" \") : \" \";",
-      to: "    run += \" \";",
-      expect: "T2.31",
-    },
-    {
-      // The window derived differently from `rampRow`'s, so cell `k` and reading
-      // `k` drift apart. Both are right-anchored today; anchoring one left is a
-      // matrix whose colours and glyphs describe different ticks.
-      name: "the colour window is left-anchored where the glyphs are right-anchored",
-      file: HEAT,
-      from: "  for (let x = 0; x < w; x += 1) out.push(x < pad ? null : start + (x - pad));",
-      to: "  for (let x = 0; x < w; x += 1) out.push(x >= count ? null : x);",
-      expect: "T2.31",
-    },
-    {
-      // An unknown name accepted. It paints nothing, which is exactly what a
-      // correct block paints at one bit — F172's collision, arriving on the
-      // surface built to avoid it.
-      name: "an unknown colormap name is accepted, and paints nothing",
-      file: VAL,
-      from: '    if (b["colormap"] !== undefined && !COLORMAP_SET.has(String(b["colormap"]))) {',
-      to: "    if (false) {",
-      expect: "T2.31",
-    },
-    {
-      // Sampling unclamped, so a value above the ceiling walks off the table and
-      // `mix` reads `undefined` — a colour computed from `NaN` channels.
-      name: "sampling does not clamp, so a value past the ceiling leaves the table",
+      // **No interpolation.** `sample` delegates to `sampleRgb`, so T1.42's
+      // `sample === rgbHex(sampleRgb)` is the same source on both sides and
+      // cannot see this; the mesh goldens at 24-bit can, because a smooth-shaded
+      // surface reads the map between entries.
+      name: "SAMPLE-NO-INTERPOLATION: frac is always 0",
       file: MAP,
-      // `sample`'s clamp, not `continuousColour`'s forty lines below — the
-      // non-finite guard above is what tells them apart (F1105's ambiguous class).
-      from: "  if (!Number.isFinite(t)) return rgbHex(data[0]!);\n  const clamped = t < 0 ? 0 : t > 1 ? 1 : t;",
-      to: "  if (!Number.isFinite(t)) return rgbHex(data[0]!);\n  const clamped = t;",
-      expect: "T2.31",
+      from: "  const frac = scaled - low;\n  const lo = data[low]!;\n  const hi = data[high]!;\n  return [",
+      to: "  const frac = 0;\n  const lo = data[low]!;\n  const hi = data[high]!;\n  return [",
+      expect: "24bit",
     },
     {
-      // **The table reversed.** Every frame is a viridis heatmap and every value
-      // reads as its opposite — high is dark, low is bright — which no count, no
-      // width and no glyph assertion can see.
-      name: "the map runs backwards, so high reads as low",
+      // **The green channel shaded into red's place** (C10 I42): a packed
+      // shade that unpacks the wrong bits agrees on grey and on nothing else.
+      name: "PACKED-CHANNEL-SWAPPED: shadePacked shades the green channel as red",
       file: MAP,
-      from: "  const scaled = clamped * (data.length - 1); // cells-ok — a data length",
-      to: "  const scaled = (1 - clamped) * (data.length - 1); // cells-ok — a data length",
-      expect: "T2.31",
+      from: "    (shadeChannel((packed >> 16) & 255, kk) << 16)\n    | (shadeChannel((packed >> 8) & 255, kk) << 8)",
+      to: "    (shadeChannel((packed >> 8) & 255, kk) << 16)\n    | (shadeChannel((packed >> 8) & 255, kk) << 8)",
+      expect: "T1.43",
+    },
+    {
+      // **Packed without rounding**: the shifts truncate what `sampleRgb`
+      // rounds, one off on every interpolated channel above `.5`.
+      name: "PACKED-NO-ROUNDING: samplePacked truncates the interpolated channels",
+      file: MAP,
+      from: "    (Math.round(lo[0] + (hi[0] - lo[0]) * frac) << 16)\n    | (Math.round(lo[1] + (hi[1] - lo[1]) * frac) << 8)\n    | Math.round(lo[2] + (hi[2] - lo[2]) * frac)",
+      to: "    ((lo[0] + (hi[0] - lo[0]) * frac) << 16)\n    | ((lo[1] + (hi[1] - lo[1]) * frac) << 8)\n    | (lo[2] + (hi[2] - lo[2]) * frac)",
+      expect: "T1.43",
+    },
+    {
+      // **The hex read back in `b, g, r` order.**
+      name: "PACKED-HEX-REVERSED: packedHex writes the channels blue first",
+      file: MAP,
+      from: "  return `#${hex2((packed >> 16) & 255)}${hex2((packed >> 8) & 255)}${hex2(packed & 255)}`;",
+      to: "  return `#${hex2(packed & 255)}${hex2((packed >> 8) & 255)}${hex2((packed >> 16) & 255)}`;",
+      expect: "T1.43",
+    },
+    {
+      // **The ramp not inverted on the fast path.** `colourOf` puts near at the
+      // top of the ramp (`1 − ramped(depth)`); a fast path that forgot the `1 −`
+      // colours the surface the other way while every count agrees. The anchor
+      // is unique to the fast path — the scalar `z` (C12 I129), where `colourOf`
+      // reads `reading.depth`.
+      name: "FASTPATH-RAMP-NOT-INVERTED: depth colours run far-to-near",
+      file: S3,
+      from: "          : 1 - ramped(z, span.nearD, span.farD);",
+      to: "          : ramped(z, span.nearD, span.farD);",
+      expect: "24bit",
     },
   ],
 });
 
 console.log(report(results));
-
-const unexpected = results.filter((r) => !r.killed);
-process.exit(unexpected.length > 0 ? 1 : 0);
+process.exit(results.some((r) => !r.killed) ? 1 : 0);

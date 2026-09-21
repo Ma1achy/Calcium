@@ -6,6 +6,14 @@
 import * as nodePty from "node-pty";
 import { spawn } from "node-pty";
 import { describe, expect, it } from "vitest";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { fileURLToPath } from "node:url";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+const execFileP = promisify(execFile);
 
 import { createEmulator } from "../../src/data/emulator/emulator.js";
 import * as fsSync from "node:fs";
@@ -258,3 +266,37 @@ describe("C23 — the shell route as a live screen, spec-first rows", () => {
     expect(kept, "and the last one before the press").toContain("tick 2");
   }, 30_000);
 });
+
+describe("C23 I71 — the emulator is loaded by the route, not by the import", () => {
+  it("T5.22 (I71): a child importing dist/index.js under the import trace loads nothing from @xterm/headless, and the same child after a shell command through the route lists the emulator", async () => {
+    // **The graph, not a duration.** `import-trace.mjs` lists every module the
+    // child resolves; the child prints the list once after the import and once
+    // after `echo tracer-ok` has drawn through the route. The second list is
+    // what makes the first an assertion rather than an absence: the emulator
+    // is reachable, and the route is what reaches it.
+    const here = new URL("../support/", import.meta.url);
+    const dir = mkdtempSync(join(tmpdir(), "startup-graph-"));
+    const out = join(dir, "trace.jsonl");
+    try {
+      await execFileP(process.execPath, [
+        "--import", fileURLToPath(new URL("import-trace.mjs", here)),
+        fileURLToPath(new URL("startup-graph-child.mjs", here)),
+        out,
+      ], { timeout: 60_000 });
+    } catch (e) {
+      rmSync(dir, { recursive: true, force: true });
+      throw e;
+    }
+    const lines = fsSync.readFileSync(out, "utf8").split("\n").filter((l) => l.startsWith("{"));
+    rmSync(dir, { recursive: true, force: true });
+    const first = JSON.parse(lines[0] ?? "{}") as { afterImport?: string[] };
+    const second = JSON.parse(lines[1] ?? "{}") as { afterShell?: string[]; seen?: boolean };
+    const xterm = (urls: readonly string[]): string[] => urls.filter((u) => u.includes("/@xterm/headless/"));
+    expect(first.afterImport?.length ?? 0, "the import loaded the package").toBeGreaterThan(100);
+    expect(first.afterImport?.some((u) => u.endsWith("/dist/index.js")), "the barrel is in the list").toBe(true);
+    expect(xterm(first.afterImport ?? []), "and nothing from the emulator's package is").toEqual([]);
+    expect(second.seen, "the shell command drew through the route").toBe(true);
+    expect(xterm(second.afterShell ?? []).length, "which loaded the emulator").toBeGreaterThan(0);
+  }, 90_000);
+});
+

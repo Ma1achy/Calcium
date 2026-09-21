@@ -4,7 +4,7 @@
  * **This is the whole per-element story, and it costs C09 nothing.** Every
  * interesting member of `Registry` is an arrow property assigned in the class
  * body — `measure`, `width`, `measureSequence`, `elementsOf`, `elementsIn`,
- * `windowSequence`, `renderSequence`, `windowChild`, `render` — so each is an
+ * `windowSequence`, `windowChild`, `render` — so each is an
  * *own property of the instance*, not a prototype method. Reassigning one from
  * out here replaces the property that the class's own `this.measure` and
  * `this.render` resolve through. `renderChild` is `this.render` exactly;
@@ -59,11 +59,16 @@ import type { Profiler } from "./types.js";
  * name it — the point of the exercise is that no edge is added.
  */
 type Block = { kind: string; id: string };
+/** C09 I70's caller-owned memo, named structurally for the reason `Block` is. */
+type Memo = {
+  get(block: Block): Readonly<{ width: number; rows: number }> | undefined;
+  set(block: Block, held: Readonly<{ width: number; rows: number }>): unknown;
+};
 
 export type ProbeableRegistry = {
-  measure: (block: Block, width: number) => number;
+  measure: (block: Block, width: number, memo?: Memo) => number;
   render: (block: Block, ctx: unknown) => unknown;
-  measureSequence: (blocks: readonly Block[], width: number) => number;
+  measureSequence: (blocks: readonly Block[], width: number, memo?: Memo) => number;
   /** The slot the registry hands to a definition's `measure` — see above. */
   probe: Probe;
 };
@@ -110,9 +115,9 @@ export function instrumentRegistry(registry: ProbeableRegistry, prof: Profiler):
   // *measured more than once per frame*, so the marker fired on eight rows of
   // nine and the two nodes genuinely measured twice sat one step above a floor
   // the table never stated (C28 I31, F1098).
-  const measured = (block: Block, width: number): number => {
+  const measured = (block: Block, width: number, memo?: Memo): number => {
     using _s = prof.element(block.kind, block.id, "measure");
-    return measure(block, width);
+    return measure(block, width, memo);
   };
 
   const rendered = (block: Block, ctx: unknown): unknown => {
@@ -120,15 +125,19 @@ export function instrumentRegistry(registry: ProbeableRegistry, prof: Profiler):
     return render(block, ctx);
   };
 
-  const sequenced = (blocks: readonly Block[], width: number): number => {
+  const sequenced = (blocks: readonly Block[], width: number, memo?: Memo): number => {
     using _s = prof.span("measure");
-    return measureSequence(blocks, width);
+    return measureSequence(blocks, width, memo);
   };
 
-  registry.measure = (block, width) => (prof.on ? measured(block, width) : measure(block, width));
+  // **The memo rides through every arm** (C09 I70, C22 I100): a wrapper that
+  // dropped it would leave the session's memo unread on exactly the profiled
+  // runs, and the `measure` misses the deck reports would be the wrapper's.
+  registry.measure = (block, width, memo) =>
+    prof.on ? measured(block, width, memo) : measure(block, width, memo);
   registry.render = (block, ctx) => (prof.on ? rendered(block, ctx) : render(block, ctx));
 
-  registry.measureSequence = (blocks, width) => {
+  registry.measureSequence = (blocks, width, memo) => {
     // **A count, because the count is the finding.** `measureSequence` runs
     // every frame whatever the cache holds — a fact no counter recorded before
     // this — and the per-block spans below it say nothing about how often the
@@ -142,6 +151,6 @@ export function instrumentRegistry(registry: ProbeableRegistry, prof: Profiler):
     // rounding error against the 203 element calls the same pass makes.
     prof.count("measure.sequences");
     prof.gauge("measure.sequence.blocks", blocks.length);
-    return prof.on ? sequenced(blocks, width) : measureSequence(blocks, width);
+    return prof.on ? sequenced(blocks, width, memo) : measureSequence(blocks, width, memo);
   };
 }

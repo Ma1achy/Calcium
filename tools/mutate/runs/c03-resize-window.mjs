@@ -15,6 +15,7 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const SUITE = [
   "test/unit/frame-scheduler.test.ts",
+  "test/unit/profiler-seams.test.ts",
   "test/contract/frame-scheduler.test.ts",
   "test/edge/frame-scheduler.test.ts",
   "test/revert/frame-scheduler.test.ts",
@@ -64,8 +65,8 @@ const results = runPass({
       // in the handler would have produced.
       name: "WINDOW-SLIDES: the deadline is re-armed by every resize",
       file: SCHED,
-      from: "if (state === \"pending\" && armed !== null && ms >= armed) return;",
-      to: "if (state === \"pending\" && armed !== null && ms > armed) return;",
+      from: "if (state !== \"idle\" && armed !== null && ms >= armed) {",
+      to: "if (state !== \"idle\" && armed !== null && ms > armed) {",
       expect: "T1.22",
     },
     {
@@ -98,6 +99,35 @@ const results = runPass({
         "height: stores.viewport.scroll.viewportHeight });\n" +
         "      pipeline.resized();\n      scheduler.commit(\"resize\");",
       expect: "T4.7",
+    },
+    {
+      // **The tie flattened** (C03 T6.18, F1199). `stream` and `resize` share
+      // 16 ms, so strictness by window alone hands a repaint the last reason
+      // committed, and T1.24 reads `stream`.
+      name: "TIE-FLAT: strictness is the window alone, and resize ties with stream",
+      file: SCHED,
+      from: '    return -windows[reason] + (reason === "resize" ? 0.5 : 0);',
+      to: "    return -windows[reason];",
+      expect: "T1.24",
+    },
+    {
+      // **The slot cancelled when nothing was deferred** — the tree before
+      // F1200 (C03 T6.19). The next commit arms its own window and the
+      // frames sit at 16, 33, 50 again.
+      name: "SLOT-CANCELLED: a write whose deferral is empty cancels the slot it opened",
+      file: SCHED,
+      from: "    if (first === null) return; // The slot the write opened stands (I17).",
+      to: '    if (first === null) {\n      cancelTimer();\n      state = "idle";\n      return;\n    }',
+      expect: "T1.26",
+    },
+    {
+      // **A lapsing slot writes.** The timer's paced arm removed: a slot with
+      // nothing in it renders a frame nobody committed.
+      name: "LAPSE-WRITES: the slot's timer runs the write whether or not anything is pending",
+      file: SCHED,
+      from: '      if (state === "paced") {\n        state = "idle";\n        return;\n      }\n      runWrite();',
+      to: "      runWrite();",
+      expect: "T1.27",
     },
   ],
 });

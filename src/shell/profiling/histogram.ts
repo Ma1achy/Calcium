@@ -64,24 +64,52 @@ export class Hist {
   snapshot(): Histogram {
     if (this.#n === 0) {
       return Object.freeze({
-        count: 0, min: 0, p50: 0, p95: 0, p99: 0, max: 0, sum: 0, mean: 0,
+        count: 0, min: 0, q1: 0, p50: 0, q3: 0, p95: 0, p99: 0, max: 0, sum: 0, mean: 0,
         error: HISTOGRAM_ERROR,
       });
     }
     const keys = [...this.#counts.keys()].sort((a, b) => a - b);
+    /**
+     * **The bucket's midpoint, not its lower edge** (C28 I10, F1140).
+     *
+     * `error` is published as *half a sub-bucket at the widest*, and an edge
+     * makes that claim false in one direction: the observation is somewhere in
+     * `[edge, edge + width)`, so an estimate at the edge is up to a **full**
+     * bucket low and never high. Measured on 1–100 ms, one observation each:
+     * `q1` read 24.576 against a true 25, which is 1.70% — outside the
+     * published 1.5625% and outside it downward every time.
+     *
+     * The midpoint makes the published bound exact rather than optimistic:
+     * within an octave the buckets are evenly spaced, so half a width is half a
+     * sub-bucket, which is what `HISTOGRAM_ERROR` says. Clamped into
+     * `[min, max]` because those two are the true observed values (above) and a
+     * top bucket's midpoint can sit past the largest thing ever measured.
+     */
+    const mid = (k: number): number =>
+      Math.min(this.#max, Math.max(this.#min, (valueOf(k) + valueOf(k + 1)) / 2));
     const at = (q: number): number => {
       const target = Math.max(1, Math.ceil(q * this.#n));
       let seen = 0;
       for (const k of keys) {
         seen += this.#counts.get(k) ?? 0;
-        if (seen >= target) return valueOf(k);
+        if (seen >= target) return mid(k);
       }
       return this.#max;
     };
     return Object.freeze({
       count: this.#n,
       min: this.#min,
+      // **The two the summary figures need, and the same call twice** (C28 I56).
+      // `Histogram` held five order statistics and every distribution form in
+      // C12 takes a `QuartileSummary` of `{min, q1, median, q3, max}` — the two
+      // sets overlap in three places and the missing pair is not derivable, so
+      // a consumer drawing a session-site span's shape had exactly two honest
+      // options: compute real quartiles from the ring, which holds nothing for
+      // that site, or put `p95` where `q3` belongs. `at` already answered `p50`,
+      // so this is no new state and one more pass over the same keys.
+      q1: at(0.25),
       p50: at(0.5),
+      q3: at(0.75),
       p95: at(0.95),
       p99: at(0.99),
       max: this.#max,

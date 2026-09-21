@@ -845,9 +845,37 @@ They target `global`, which is the first built-in use of that target and is what
 | Key | Action | | Key | Action |
 |---|---|---|---|---|
 | `n` | `viewNextHunk` | | `p` | `viewPrevHunk` |
+| `tab` | `viewNextSection` | | `⇧tab` | `viewPrevSection` |
 | `g` | `viewTop` | | `G` | `viewBottom` |
 | `pageup`, `↑` | `viewPageUp` | | `pagedown`, `↓` | `viewPageDown` |
 | `escape` | `viewPop` | | | |
+
+**`tab`/`⇧tab` are the coarse pair to `n`/`p`'s fine one, and the gesture is borrowed rather
+than invented** (I33, added 2026-09-12). `liveBlock` already binds the same two keys to
+`entryPrev`/`entryNext` — *the only two keys that change which entry focus is in* — so the
+meaning here is that sentence one target over: `n`/`p` move within the thing, `tab`/`⇧tab`
+move to the next thing. What *section* means is each owner's, exactly as *unit* already is:
+
+| owner | `n`/`p` — the unit | `tab`/`⇧tab` — the section |
+|---|---|---|
+| patch view | a hunk | a file |
+| document view | a block | a heading |
+| profile view | a card | a group |
+
+**What forced it was a deck that outgrew a single ladder.** C28 §3c ruled *nothing is added to
+the keymap, so `/help keys` is unchanged*, and that held while a view had four panes. The
+profiler's deck is roughly thirty cards in three groups, and thirty cards reachable only by
+repeating `n` is a vocabulary that technically covers the surface and nobody uses. The ruling
+is withdrawn rather than worked around, because the alternatives were worse in the way this
+repository names: a jump expressible only by closing the view and retyping the verb, or a deck
+cut to fit the gesture rather than the questions.
+
+**`tab` at a pushed view cannot collide with completion**, and the reason is structural rather
+than lucky: the prompt takes no keys while a view is top (§3), so `activeTarget` never answers
+`prompt` and `complete` is unreachable there. That makes this one key at **four** targets —
+`prompt` → `complete`, `overlay` → `menuNext`, `liveBlock` → `entryNext`, `pushedView` →
+`viewNextSection` — all resolved by the ladder, which is the mechanism already carrying the
+first three.
 
 **`n`/`p` are the diff-specific pair and the rest are conventions a view inherits** (C25 §3b). Letters are available here for the reason §6 already gives two blocks up: a pushed view has no prompt competing for them, which is why `g`/`G` were rejected for the transcript and are correct here.
 
@@ -872,7 +900,8 @@ The set is closed, and a `BlockKeymap` names members of it (I19, ruled 2026-09-0
 **`tab`/`⇧tab` move focus between entries** (C26 I21, §4g): the only two keys that change which
 entry focus is in, landing on the target entry's first element. `tab` was free at this target —
 the prompt's is `complete` and the overlay's is `menuNext`, one key at three targets resolved by
-the ladder — and `⇧tab`'s wire form is §2's `CSI Z`.
+the ladder, and `pushedView`'s `viewNextSection` makes it four — and `⇧tab`'s wire form is §2's
+`CSI Z`.
 
 **`←`/`→` are the horizontal pair** (I28, C22 I76, C12 §3s). The vertical pair steps elements
 and the horizontal one had no subject; the record said both *fell through to the prompt*, and
@@ -977,6 +1006,8 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I31** — **A pointer gesture reaches only states a key reaches, through the same calls** (§4a). A click on an element is `enterLiveBlock`/`focusRow` on that entry and address — the settled entry included; a click on the focused element in `navigate` is `rowActivate` and in `interact` is nothing; a drag **and a shift-click** are `extendRow` within the focused entry and nothing across entries; a wheel inside a `scroll`'s box moves that box's offset and elsewhere the transcript's; a click on chrome is `focusPrompt`; a release, a horizontal wheel, a second button and a `meta`- or `ctrl`-modified click do nothing and are unconsumed. Resolution is one `find` over the list the keyboard walks, after the entry's chrome rows are subtracted and a `scroll`'s offset is added, and the deepest level wins. `StoredFocus` therefore has no pointer-only value, and the table above is the whole of what the pointer can do.
 
 - **I32** — **A control string is consumed whole and emits nothing** (§2a, F1043). The five ECMA-48 introducers — DCS `ESC P`, SOS `ESC X`, OSC `ESC ]`, PM `ESC ^`, APC `ESC _` — run to `ST` (`ESC \`), and an OSC also to `BEL`; a stray `ESC` inside one ends it as malformed and decodes on its own; an incomplete one is *not yet decidable* and waits, bounded by a byte cap past which the **introducer** is discarded and decoding continues from the payload. It emits no event, exactly as the CSI arm emits none for a DECRQM reply: the arm makes a terminal's answer **harmless**, and making it **readable** is a reply channel C02 owns (C02 §8) and this component must not grow — a ruling that names an operation checks the operation exists, and there is no seam here to report a graphics error through. Without the arm the Meta arm claims the introducer and emits a bindable key — `Alt-_`, `Alt-P`, `Alt-]`, and `Ctrl-G` where the terminator is `BEL` — with the payload typed into the prompt between them: **164 events from eight real replies** captured from XTerm(398) and kitty 0.41.1, and the first of each is a keystroke a keymap can bind. The cap is the arm's own hazard rather than a defect it repairs: at HEAD the same bytes decode as keys at once and nothing wedges, and an unterminated CSI is bounded by `CSI_FINAL` where a control string is bounded by nothing.
+
+- **I33** — **A gesture bound at a shared target means the same thing at every owner of it, and an owner that cannot answer says so rather than doing nothing.** `pushedView` has one keymap row per key and three owners behind it (C22 §13a), so `viewNextSection` resolves to whichever view is up — and the failure mode is not a collision but a **silence**: an owner whose `sectionNext` returns without moving is indistinguishable from a view with one section, and a reader who learns the key does nothing here stops pressing it everywhere. So the member is required on the owner interface rather than optional, a view with one section answers `false` where a view at its last section also answers `false`, and the two are separated by what the header says rather than by the key's return. This is I24's claim about a *target* with no vocabulary, one level in: a target can have bindings and still have an owner with nothing behind them.
 
 **And a question outranks rungs 1 and 2, which is the one place newest-first is not enough on its own.** A local verb awaiting `ctx.ask` is `inFlight` for the whole time its question is on screen, so `⌃c` was taken by the cancel rung and the question never saw it — two rungs with a claim, and the older one higher. Ruling A's own argument decides it: `Esc` and `⌃c` collapse *because* declining and cancelling produce the same outcome, and when two paths produce the same outcome the one that leaves a record is the one to keep. Cancellation discards the entry; declining settles one saying nothing changed. **Found by a frame-read and reachable by nothing else** — the container was untouched and the layer was gone, which is everything a test asserts, and the frame showed that the submitted line had disappeared. The suite agreed throughout, because every harness reported `inFlight: null` and that is the one arrangement where both readings agree.
 
@@ -1107,6 +1138,10 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T3.12b** (I3): a wheel event with an overlay under the pointer → goes to the overlay; with none → goes to C14.
 - **T1.3o** (I31, §4a row j): `wheelLeft` over an entry's row is offered as a wheel — `viewport:wheel` in the stages, never `viewport:<entry>` — and consumed by nothing; the control is `button0` at the same row reaching the entry.
 - **T1.3p** (I31, §4a row i): an uncovered `wheelUp` inside the region is offered to the entry under it before `global`, and reaches `global` when the entry declines; with a layer covering the point it goes to the layer and nowhere else (T3.12b's half, kept).
+- **T1.3q** (I8, §4a row **k**): with a non-dismissable layer up, a click beside it, a wheel over the transcript and a click on the chrome are each **consumed and do nothing** — `["arming", "mouse", "modal"]` and no target reached; a click *on* the layer is the layer's, and a **dismissable** top layer is not modal, so the entry beneath is reachable. The mouse path's gate, which the keyboard path had and this one did not.
+- **T1.3v** (I33): `tab` and `⇧tab` resolve to `viewNextSection`/`viewPrevSection` at `pushedView` and to `entryNext`/`entryPrev` at `liveBlock` from the one keymap — the ladder separating them and not a second table, with `complete` at the prompt as the third reading that never meets either. And the gesture reaches **whichever owner is up and only that one**, asserted as the set of owners called rather than as the answer: an effect that asked every owner and took the first `true` would answer correctly for the profiler and wrongly for the other two. **The member is required rather than optional**, and what the row can assert about that is the consequence — a refusal is not retried at another owner. An owner with one section and an owner at its last section both answer `false`, the effect discards the verdict, and an optional member would add a third silence indistinguishable from both.
+
+  **The id moved, and the reason is worth the line**: this row was written as a second `T1.3q` while `T1.3q` was already C16's mouse-modality row in the tree, cited by §9b row **k** and declared in no §9 list. SP7 reads a spec's own declarations, so one declaration of a number used twice in the tree is exactly what it cannot see — and the citation at row **k** resolved to whichever a reader found first.
 - **T3.13**: a malformed escape sequence → discarded; the next valid key decodes normally.
 - **T3.14**: a multi-byte UTF-8 character split across two stdin chunks → one key event, correct codepoint.
 - **T3.15**: a handler that throws → contained; the event is treated as unconsumed and the session survives.

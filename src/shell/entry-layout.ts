@@ -17,13 +17,15 @@
  * (§6l.2 row 13), and a `step` header with no body hangs no hook (row 14).
  */
 
-import type { Block } from "../data/viewmodel/index.js";
+import type { Block, Group } from "../data/viewmodel/index.js";
 import { block as rebuild } from "../data/viewmodel/index.js";
 import { glyphFor } from "../presentation/blocks/index.js";
 import type { BlockRegistry, NavElement } from "../presentation/blocks/index.js";
+import type { RenderScratch } from "../presentation/blocks/types.js";
 import { paint as paintSpans, tone } from "../presentation/blocks/paint.js";
 import { glyphForMask, LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP } from "../presentation/plot/linedraw.js";
 import { renderSequenceToLines } from "../presentation/render-lines.js";
+import type { EntryParts } from "./render-cache.js";
 
 /**
  * The hook's column: the header's text column (C22 I84, §6l.6 row 16).
@@ -124,9 +126,35 @@ export function entryLayout(blocks: readonly Block[], width: number): readonly E
   }
   return [
     Object.freeze({ blocks: blocks.slice(0, 1), width, indent: 0, blank: false, gutter: NO_GUTTER }),
-    ...bodyRuns(cardBody(blocks.slice(1)), width, NO_GUTTER, 1),
+    ...bodyRuns(heldBody(blocks), width, NO_GUTTER, 1),
     gap,
   ];
+}
+
+/**
+ * The body derived from each blocks array, held for as long as the array is
+ * (I107, F1203).
+ *
+ * **A copy that lives one frame is a new key every frame.** `cardBody` clears
+ * the first block's gap by rebuilding it, and the layout is asked twice a frame
+ * — by C14's measurer and by the frame. Every store downstream keyed on block
+ * identity — the measure memo (I100), the cap-form hold (C09 I76), the patch's
+ * plan (C25 I22) — missed on every frame for every card opening with a gapped
+ * block: 4.1 ms of a 6.4 ms big-patch frame re-deriving a form that had not
+ * changed. Keyed on the array the body comes from — the document's `blocks`,
+ * a nested card's `children` — which is deep-frozen (C04 I1) and replaced with
+ * its document (C23 I34), so the same array is the same body. F821's
+ * constraint stands: the document's own objects are never copied over.
+ */
+const CARD_BODIES = new WeakMap<readonly Block[], readonly Block[]>();
+
+function heldBody(blocks: readonly Block[]): readonly Block[] {
+  let body = CARD_BODIES.get(blocks);
+  if (body === undefined) {
+    body = cardBody(blocks.slice(1));
+    CARD_BODIES.set(blocks, body);
+  }
+  return body;
 }
 
 /** A run under `gutter` columns, at the width those columns leave. */
@@ -188,13 +216,13 @@ function bodyRuns(
     // siblings, `├─` for every child but the last and `└─` for the last.
     const closes = b === last && b === tail;
     const cell: GutterCell = cards.length === 1 && runs.length === 0 ? "hook" : closes ? "elbow" : "branch"; // cells-ok — a card count
-    const [head, ...rest] = card.children;
+    const head = card.children[0];
     if (head !== undefined) runs.push(bodyRun([head], width, [...outer, { first: cell, rest: cell }]));
-    if (rest.length > 0) { // cells-ok — a block count
+    if (card.children.length > 1) { // cells-ok — a block count
       // The parent's line continues past a child's body and stops under the
       // last child (row 25): nothing below it to connect to.
       const through: GutterColumn = closes ? { first: "blank", rest: "blank" } : { first: "bar", rest: "bar" };
-      runs.push(...bodyRuns(cardBody(rest), width, [...outer, through], depth + 1));
+      runs.push(...bodyRuns(heldBody(card.children), width, [...outer, through], depth + 1));
     }
   }
   flush();
@@ -211,16 +239,25 @@ function bodyRuns(
  * part is declared by *object identity* (`builders/live.ts`'s `declarations`
  * keyed by the block), so clearing the gap by copying the block on the stored
  * document drops its declaration and it never ticks (F821). `entryLayout` is
- * rebuilt from the current `doc.blocks` on every frame and is read by the
- * measurer and the renderer but never by the identity-keyed driver, so the copy
- * lives one frame and the declaration on the original survives. Measure and
- * render agree because both reach the body through this one function (I83).
+ * read by the measurer and the renderer but never by the identity-keyed driver,
+ * so the copy is the layout's and the declaration on the original survives.
+ * **The copy is held per blocks array** (`heldBody`, I107, F1203): it lived one
+ * frame once, and a copy that lives one frame is a new key every frame to every
+ * identity-keyed store below. Measure and render agree because both reach the
+ * body through this one function (I83).
  */
 export function cardBody(blocks: readonly Block[]): readonly Block[] {
   const [first, ...rest] = blocks;
-  if (first === undefined || first.gapBefore !== true) return blocks;
-  const { gapBefore: _gap, ...cleared } = first;
-  return [rebuild(cleared as Block), ...rest];
+  const padding = first?.padding;
+  if (first === undefined || padding === undefined || (padding.t ?? 0) === 0) return blocks;
+  // **The top edge only** (C04 §3a). The hook goes on the body's first row, so
+  // a leading blank row would put the mark over nothing; the other three edges
+  // are the block's own shape and the card has no quarrel with them. Under
+  // `gapBefore` this dropped one boolean and could not tell the difference.
+  const { t: _dropped, ...edges } = padding;
+  const { padding: _was, ...bare } = first;
+  const kept = Object.keys(edges).length === 0 ? bare : { ...bare, padding: edges };
+  return [rebuild(kept as Block), ...rest];
 }
 
 /** The rows an entry's blocks take — C14's `measureSequence`, through the layout. */
@@ -293,6 +330,8 @@ export function windowEntry(
   from: number,
   to: number,
   registry: Pick<BlockRegistry, "windowSequence" | "measureSequence">,
+  /** The session's render scratch (C22 I100, F1191), through the window seam (C09 I76). */
+  scratch?: RenderScratch,
 ): readonly EntryPiece[] {
   const pieces: EntryPiece[] = [];
   let offset = 0;
@@ -306,7 +345,7 @@ export function windowEntry(
           run,
           windowed: run.blank
             ? { blocks: [], skipRows: 0 }
-            : registry.windowSequence(run.blocks, run.width, lo - offset, hi - offset),
+            : registry.windowSequence(run.blocks, run.width, lo - offset, hi - offset, undefined, scratch),
           localFrom: lo - offset,
           take: hi - lo,
         }),
@@ -318,6 +357,94 @@ export function windowEntry(
 }
 
 type RenderOptions = Parameters<typeof renderSequenceToLines>[3];
+
+
+
+// **`ownRows` is gone, and its absence is the change** (C09 I80). It stripped
+// the blank row the sequence form drew above a `gapBefore` block, so a cached
+// part held the block's rows and the assembler put the row back. A block's
+// padding is now inside its own rows: what is cached is what is drawn, and
+// there is nothing to strip or to re-add.
+
+/**
+ * The window's rows from the parts a range miss kept, rendering only what
+ * enters (C22 I101).
+ *
+ * **The identity this rests on is C09's, read from the other side**: a column
+ * group's rows are its children's laid end to end (C09 I69) and a sequence's
+ * are its blocks' (C14 I25), so a child rendered alone in a single-child group
+ * carrying its own `align`, and a top-level block rendered as a one-block
+ * sequence, lay the rows the full render would. A column group's children are
+ * taken from the parts or rendered alone and held; a top-level block the
+ * window kept whole — the same object as the run's — likewise; a block the
+ * window sliced is rendered as before and held **under its window** (C22
+ * I104) — the run-local first row and the rows taken, which the slice is a
+ * function of once the run's blocks and width are fixed — so a tick, whose
+ * range did not move, takes it back, and a scroll renders the new slice once
+ * and replaces it (F1190). `gapBefore` is a row here as it is there. T4.89b
+ * sweeps every position against the full render, byte for byte.
+ */
+function assemble(
+  registry: BlockRegistry,
+  piece: EntryPiece,
+  options: RenderOptions,
+  held: EntryParts,
+): readonly string[] {
+  const rows: string[] = [];
+  const width = piece.run.width;
+  const whole = new Set<Block>(piece.run.blocks);
+  const render = (blocks: readonly Block[]): readonly string[] =>
+    renderSequenceToLines(registry, blocks, width, options);
+  for (const block of piece.windowed.blocks) {
+    // **A padded column group is assembled whole, on the window seam's ground**
+    // (C09 I80, I33). Its children are rendered alone and their rows pushed end
+    // to end, which draws none of the *group's* own edges — the fresh render
+    // draws them once around the whole, so an assembled window over a padded
+    // group was short its top row and missing its inset on every line. Found by
+    // a mutation that survived because no fixture had a padded container; the
+    // fixture gained one and this branch went red without any mutation at all.
+    //
+    // Keeping it whole costs one cache part and is the same answer `windowChild`
+    // gives a padded block. Re-deriving the edges here would be the third place
+    // that knows the padding rule, which is what 2a exists to stop.
+    if (
+      block.kind === "group" &&
+      (block as Group).direction === "column" &&
+      (block as Group).minRows === undefined &&
+      block.padding === undefined
+    ) {
+      const group = block as Group;
+      group.children.forEach((child, i) => {
+        const align = group.align?.[i] ?? "left";
+        // The separator keeps a child's key apart from a top-level block's, which is its id alone.
+        const key = `${child.id}\u0000${align}`;
+        let lines = held.part(key);
+        if (lines === undefined) {
+          const alone: Group = { ...group, children: [child], align: [align] };
+          lines = render([alone]);
+          held.hold(key, lines);
+        }
+        rows.push(...lines);
+      });
+    } else if (whole.has(block)) {
+      let lines = held.part(block.id);
+      if (lines === undefined) {
+        lines = render([block]);
+        held.hold(block.id, lines);
+      }
+      rows.push(...lines);
+    } else {
+      const window = `${String(piece.localFrom)}\u0000${String(piece.take)}`;
+      let lines = held.slice(block.id, window);
+      if (lines === undefined) {
+        lines = render([block]);
+        held.holdSlice(block.id, window, lines);
+      }
+      rows.push(...lines);
+    }
+  }
+  return rows;
+}
 
 /**
  * One gutter cell's text, `GUTTER_UNIT` cells wide (I88, I89): `HOOK_INDENT`
@@ -363,6 +490,7 @@ export function renderEntryPieces(
   registry: BlockRegistry,
   pieces: readonly EntryPiece[],
   options: RenderOptions,
+  held?: EntryParts,
 ): Readonly<{ rows: readonly string[]; faults: readonly Readonly<{ drawn: number; expected: number }>[] }> {
   const rows: string[] = [];
   const faults: Readonly<{ drawn: number; expected: number }>[] = [];
@@ -373,7 +501,12 @@ export function renderEntryPieces(
       for (let i = 0; i < piece.take; i += 1) rows.push("");
       continue;
     }
-    const rendered = renderSequenceToLines(registry, piece.windowed.blocks, piece.run.width, options);
+    // **On a range miss, from the parts** (C22 I101); otherwise the sequence
+    // render, as every first frame is.
+    const rendered =
+      held === undefined
+        ? renderSequenceToLines(registry, piece.windowed.blocks, piece.run.width, options)
+        : assemble(registry, piece, options, held);
     const expected = registry.measureSequence(piece.windowed.blocks, piece.run.width);
     if (rendered.length !== expected) faults.push(Object.freeze({ drawn: rendered.length, expected }));
     const slice = rendered.slice(piece.windowed.skipRows, piece.windowed.skipRows + piece.take);

@@ -41,12 +41,16 @@ import { descendants } from "../data/viewmodel/index.js";
 import type { Block, Image, Plot } from "../data/viewmodel/index.js";
 import { entryLayout, renderEntryPieces, windowEntry } from "./entry-layout.js";
 import { animationIntervalOf } from "../presentation/blocks/index.js";
+import type { EntryParts } from "./render-cache.js";
+import type { EntryPiece } from "./entry-layout.js";
+import type { Group } from "../data/viewmodel/index.js";
 import { framesOf, placesAtProtocol } from "../presentation/blocks/kinds/image.js";
 import type { FocusState } from "../presentation/blocks/index.js";
+import type { RenderScratch } from "../presentation/blocks/types.js";
 import { contextAt } from "../interaction/completion/index.js";
 import { selectionSpans, type CellSpan } from "../interaction/editor/index.js";
 import { extentOf } from "../interaction/router/focus.js";
-import { PROMPT_GUTTER } from "./config.js";
+import { PROMPT_GUTTER, regionWidth } from "./config.js";
 import { cursorStyleFor, steadyWhileTyping } from "./cursor-style.js";
 import { createIdentityLoop } from "./identity.js";
 import {
@@ -245,13 +249,14 @@ const NOTHING_ANIMATES: Animated = Object.freeze({
  * The orbit's cadence, and it is C03's two windows rather than two new numbers
  * (C22 I73).
  *
- * 33 ms is `stream`'s window — *~30 frames/s, matching the A02 §7 budget* — and
- * 100 ms is `spinner`'s, which is what the rotation falls back to where
- * `synchronisedUpdate` is absent and a full-frame rewrite would tear. Naming
+ * 16 ms is `stream`'s window — *~60 frames/s, matching the A02 §7 budget*
+ * (F1199) — and 100 ms is the cap the rotation falls back to where `synchronisedUpdate` is
+ * absent and a full-frame rewrite would tear (it was `spinner`'s window until
+ * F1197 set that at the glyph interval; the tearing cap keeps its own number). Naming
  * them here rather than importing C03's table keeps L4 out of a constant L0
  * tunes at construction; the *reason* is what binds them, and that is asserted.
  */
-const ORBIT_MS = 33;
+const ORBIT_MS = 16;
 
 /**
  * The span a `null` profiler yields — one frozen object, so the `using` form
@@ -272,11 +277,12 @@ const ORBIT_MS_TORN = 100;
 /**
  * One revolution in twelve seconds, in radians per millisecond (C22 I74).
  *
- * **The number comes from the measurement rather than from taste.** At 30fps it
- * is one degree a frame, between the `pi/256` and `pi/64` steps measured at 22%
- * and 30% of a frame's cells changing; at the capped 10fps it is three degrees,
- * just past `pi/64`. Both read as motion rather than as a jump, which is the
- * property the figure has to have (F468).
+ * **The number comes from the measurement rather than from taste.** At 60fps it
+ * is half a degree a frame and at 30fps one, at and between the `pi/256` and
+ * `pi/64` steps measured at 22% and 30% of a frame's cells changing; at the
+ * capped 10fps it is three degrees, just past `pi/64`. Every rate reads as
+ * motion rather than as a jump, which is the property the figure has to have
+ * (F468).
  */
 const ORBIT_RATE = (2 * Math.PI) / 12_000;
 
@@ -1012,16 +1018,25 @@ class Session implements TuiInstance {
             // to. It partitions blocks and no run is measured here, which is why
             // this is affordable over every entry rather than the visible ones.
             graph.transcript.entries.flatMap((e) =>
-              entryLayout(e.doc.blocks, graph.lifecycle.size().columns)
+              entryLayout(e.doc.blocks, regionWidth(graph.lifecycle.size().columns))
                 .filter((run) => !run.blank)
                 .map((run) => ({ scope: e.id, blocks: run.blocks, width: run.width })),
             ),
             graph.capabilities,
             this.#sentImages,
-            // The frame's width, still — the fallback for a group declaring none,
+            // The **region's** width — the fallback for a group declaring none,
             // and the declared cell box is a render-time fact that was a
             // hardcoded `1` before F380.
-            graph.lifecycle.size().columns,
+            //
+            // **`regionWidth` rather than the region** (I109, §6l.9 row 7): the
+            // write seam runs after `composeFrame` has returned and holds no
+            // `Composed`, so the one implementation is reached for rather than
+            // the value. Spelling `columns - 1` here is what the helper exists
+            // to prevent — this seam and the layout above must read the number
+            // the blocks were measured at, and at 80 columns a card-nested
+            // picture declared 80 cells wide and addressed across 76 is what
+            // F1026 measured going wrong one width along.
+            regionWidth(graph.lifecycle.size().columns),
             graph.probe,
           )
         : "") + result.write;
@@ -1055,7 +1070,7 @@ class Session implements TuiInstance {
   /**
    * The third link, and the one recorded nowhere (F227).
    *
-   * C03 declares a `spinner` commit reason, tunes its 100 ms window and
+   * C03 declares a `spinner` commit reason, tunes its window (80 ms, F1197) and
    * specifies how it coalesces against `stream` — and nothing in the product
    * ever supplied one. **A missing producer makes every consumer downstream of
    * it look like a decision deferred rather than a chain broken**, which is why
@@ -1101,7 +1116,7 @@ class Session implements TuiInstance {
     //
     // C03's window, so a reserve coalesces with whatever else moved the
     // document. `stream` rather than `input`: this is content changing, not a
-    // key, and 33 ms is one frame at a rate a reader cannot see.
+    // key, and 16 ms is one frame at a rate a reader cannot see.
     if (raised) graph.scheduler.commit("stream");
   }
 
@@ -1132,9 +1147,7 @@ class Session implements TuiInstance {
       }
       framesMs = Math.max(floor, Number.isFinite(due) ? due : floor);
     }
-    const candidates = [spinnerMs, orbitMs, framesMs].filter((m): m is number => m !== null);
-    const ms = candidates.length === 0 ? null : Math.min(...candidates);
-    if (ms === null) {
+    if (spinnerMs === null && orbitMs === null && framesMs === null) {
       this.#tickAt = null;
       this.#motionAt = null;
       return;
@@ -1142,18 +1155,30 @@ class Session implements TuiInstance {
     const now = this.config.clock();
     this.#tickAt ??= now;
     this.#motionAt ??= now;
-    this.#spinner = this.config.schedule(() => void this.#animate(), ms);
+    // **Armed for when it is due, not for how long it waits** (I105, F1197).
+    // This runs out of `#render`, which sits at the end of C03's window, so a
+    // delay of the full interval from here laid the window and the interval
+    // end to end: 80 + 100 ms for the braille spinner, 33 + 33 for the orbit,
+    // every animation at half the rate I60a and I73 state. The stamps below are
+    // the ones `#animate` advances, so a wake already due fires at once and the
+    // next frame follows one window later — the period is the longer of the
+    // two, which is what *floor* meant.
+    let due = Number.POSITIVE_INFINITY;
+    if (spinnerMs !== null) due = Math.min(due, this.#tickAt + spinnerMs);
+    if (orbitMs !== null) due = Math.min(due, this.#motionAt + orbitMs);
+    if (framesMs !== null) due = Math.min(due, now + framesMs);
+    this.#spinner = this.config.schedule(() => void this.#animate(), Math.max(0, due - now));
   }
 
   /**
    * One wake: advance whatever is moving, then ask for a frame (I73, I74).
    *
    * **The reason is the frame rate and the interval is not.** `commit("spinner")`
-   * draws at 10fps however fast this fires, because C03's 100 ms window is a
-   * floor under the ticker (I60a) — so a live orbit commits `stream`, whose
+   * draws at its window's rate however fast this fires, because C03's window is
+   * a floor under the ticker (I60a, I105) — so a live orbit commits `stream`, whose
    * rationale in C03 §3 is a rate ceiling and says nothing about the source.
    * Everything else keeps `spinner`, and C03 §3's asymmetry is exactly this
-   * case: a stream commit under a pending spinner draws within its own 33 ms.
+   * case: a stream commit under a pending spinner draws within its own 16 ms.
    */
   #animate(): void {
     const graph = this.#graph;
@@ -1169,7 +1194,7 @@ class Session implements TuiInstance {
     //
     // **The frame index is the same arithmetic one store along** (I77): the
     // elapsed time goes into `Frames.advance`, which walks whole delays and
-    // keeps the remainder, so a GIF beside a 33 ms orbit shows each frame for
+    // keeps the remainder, so a GIF beside a 16 ms orbit shows each frame for
     // its own delay and not for one wake. One stamp serves both, read once.
     if (orbits.length > 0 || frames.length > 0) {
       const since = now - (this.#motionAt ?? now);
@@ -1197,13 +1222,21 @@ class Session implements TuiInstance {
   }
 
   #paintDeps(graph: Graph, frame: Composed): PaintDeps {
-    const width = frame.size.columns;
+    // **The region's width, and every dep below draws content** (I109, §6l.9
+    // rows 3–4). The transcript's rows, the prompt's rows, its cursor and its
+    // selection spans are all laid out at this; the paint pads them to
+    // `frame.size.columns`, which is where the rules and the chrome are drawn.
+    // One local, because a frame carrying two widths fails by a composer
+    // reading the wrong one and a second `frame.size.columns` here is that
+    // failure spelled harmlessly.
+    const width = frame.region.width;
     return {
       registry: graph.blocks,
       theme: graph.theme.current,
       capabilities: graph.capabilities,
       ...(graph.probe === undefined ? {} : { probe: graph.probe }),
       // **The layer host, and it is the one `/live` draws into** (C12 I107).
+      chrome: graph.chrome,
       scratch: graph.scratch,
       // C14 selected these at this width; the paint pads them and never
       // re-measures (C09 I1 — one implementation, or the two answers drift).
@@ -1415,7 +1448,11 @@ class Session implements TuiInstance {
       // **The footer's height, from the same measurer C14 uses** (C22 I82).
       // Before the graph exists nothing has a footer to measure; one row is the
       // guess `initialRegionHeight` makes and the first frame corrects it.
-      measureSequence: (blocks, width) => graph?.blocks.measureSequence(blocks, width) ?? 1,
+      // **And once per content** (C22 I102): the footer's blocks are rebuilt
+      // every frame, so the session's memo misses them by identity; the chrome
+      // cache keys on their structure and answers the height with the lines.
+      measureSequence: (blocks, width) =>
+        graph?.chrome.measure("footer", blocks, width, (b, w) => graph.blocks.measureSequence(b, w, graph.measures)) ?? 1,
     });
   }
 }
@@ -1532,7 +1569,19 @@ function visibleRows(
     // `entryLayout` the measurer wrapper in `construct.ts` calls, so the rows C14
     // counted are the rows drawn here. A document that is not a card is one run
     // at `width` and the blank.
-    const pieces = windowEntry(entryLayout(entry.doc.blocks, width), from, to, graph.blocks);
+    // **Through the session's memo** (C22 I100, C09 I70): the layout's runs
+    // were measured by C14 through the same `WeakMap` when it chose the range,
+    // so on a still document the window here reads every height back and
+    // measures nothing. Two closures per frame, against the ~850 measures per
+    // frame they replace on `/all` (F1160).
+    const memoised = {
+      measureSequence: (run: readonly Block[], w: number) => graph.blocks.measureSequence(run, w, graph.measures),
+      windowSequence: (run: readonly Block[], w: number, lo: number, hi: number, _memo?: unknown, scratch?: RenderScratch) =>
+        graph.blocks.windowSequence(run, w, lo, hi, graph.measures, scratch),
+    };
+    // **The scratch travels with the memo** (I100, F1191): the window seam holds
+    // the cap form (C09 I76) and the patch's plan (C25 I22) across frames.
+    const pieces = windowEntry(entryLayout(entry.doc.blocks, width), from, to, memoised, graph.scratch);
     const windowed = { blocks: pieces.flatMap((piece) => piece.windowed.blocks) };
 
     // The key carries the range, because the cached lines are now the *window's*
@@ -1636,9 +1685,18 @@ function visibleRows(
 
     const cadence = animationIntervalOf(windowed.blocks);
     if (cadence !== null && (fastest === null || cadence < fastest)) fastest = cadence;
-    const animated = cadence === null ? "" : `\u0000${String(tick)}`;
-    const slot = `${key}\u0000${range}\u0000${offsets}\u0000${orbitKey}\u0000${cursorKey}\u0000${framesKey}\u0000${seriesKey}${animated}`;
-    const held = graph.rendered.get(entry.id, entry.rev, width, slot, theme);
+    // **The tick is its own axis, not a suffix of the slot** (C22 I103, F1189).
+    // Folded into the slot every spinner tick was a `focus` miss, which drops
+    // the parts, and the entry rendered whole every 80 ms for one glyph.
+    const tickKey = cadence === null ? "" : String(tick);
+    // **The range is its own axis, beside the stable key** (C22 I101): a miss
+    // on it alone keeps the parts, and the render below assembles from them.
+    const slot = `${key}\u0000${offsets}\u0000${orbitKey}\u0000${cursorKey}\u0000${framesKey}\u0000${seriesKey}`;
+    const held = graph.rendered.get(entry.id, entry.rev, width, slot, theme, range, tickKey);
+    // **An animating block is never taken from the parts** (C22 I103): on a
+    // tick miss its held rows are the last tick's, and on a range miss the
+    // one small render it costs is the price of not asking which miss this was.
+    const parts = held === undefined ? withoutAnimating(graph.rendered.parts(entry.id), pieces) : undefined;
     // **Faults from here are this entry's** (I69). A `BlockFault` names a block
     // and ids are unique within a document and not across entries (C04 I14), so
     // neither half addresses anything on its own. A scope rather than a field,
@@ -1696,7 +1754,7 @@ function visibleRows(
           // the very same frame. The two caches disagree by construction and
           // both are right — the picture moved and the geometry did not.
           scratch: graph.scratch,
-        }),
+        }, parts),
           )
         : null;
     const lines = held ?? fresh?.rows ?? [];
@@ -1708,7 +1766,7 @@ function visibleRows(
             `and anything below the overflow in this entry is dropped`,
         );
       }
-      graph.rendered.set(entry.id, entry.rev, width, slot, theme, lines);
+      graph.rendered.set(entry.id, entry.rev, width, slot, theme, range, lines, tickKey);
     }
 
     // The pieces are already the window's rows (`windowEntry` took `[from, to)`),
@@ -1722,6 +1780,47 @@ function visibleRows(
       : { spinnerMs: fastest, orbits, frames },
   );
   return out;
+}
+
+/**
+ * The parts with every animating block withheld (C22 I103).
+ *
+ * The keys are `assemble`'s (C22 I101): a top-level block's id, or a column
+ * group's child's id and its `align` behind a NUL — so the block half is what
+ * is matched. `animationIntervalOf` over one block is I73's walk, containers
+ * included, which is what makes a `steps` inside a `panel` a block this
+ * withholds rather than one it serves stale.
+ */
+function withoutAnimating(parts: EntryParts | undefined, pieces: readonly EntryPiece[]): EntryParts | undefined {
+  if (parts === undefined) return undefined;
+  const animating = new Set<string>();
+  for (const piece of pieces) {
+    for (const block of piece.windowed.blocks) {
+      if (animationIntervalOf([block]) !== null) animating.add(block.id);
+      if (block.kind === "group" && (block as Group).direction === "column") {
+        for (const child of (block as Group).children) {
+          if (animationIntervalOf([child]) !== null) animating.add(child.id);
+        }
+      }
+    }
+  }
+  if (animating.size === 0) return parts;  // cells-ok — a block count, not a width
+  const blockOf = (key: string): string => {
+    const nul = key.indexOf("\u0000");
+    return nul < 0 ? key : key.slice(0, nul);
+  };
+  return Object.freeze({
+    part: (key) => (animating.has(blockOf(key)) ? undefined : parts.part(key)),
+    hold: (key, lines) => {
+      if (!animating.has(blockOf(key))) parts.hold(key, lines);
+    },
+    // **The slice too** (C22 I104): a sliced block that animates is rendered
+    // at every miss that opens the parts, as a whole one is.
+    slice: (id, window) => (animating.has(id) ? undefined : parts.slice(id, window)),
+    holdSlice: (id, window, lines) => {
+      if (!animating.has(id)) parts.holdSlice(id, window, lines);
+    },
+  });
 }
 
 /**

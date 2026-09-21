@@ -9,7 +9,7 @@
 SHELL := /usr/bin/env bash
 .SHELLFLAGS := -o pipefail -c
 
-.PHONY: install hooks check enforce catalogue instruments roadmap regime test golden e2e audit proof all clean
+.PHONY: install hooks quantised check enforce catalogue instruments roadmap regime test golden e2e audit proof all clean
 
 install:            ## npm ci, no install scripts, then the one named build (A04 §3)
 	git config core.hooksPath .githooks
@@ -37,6 +37,10 @@ install:            ## npm ci, no install scripts, then the one named build (A04
 
 hooks:              ## point git at .githooks — pre-commit runs `make enforce` (A04 §5)
 	git config core.hooksPath .githooks
+
+quantised:          ## C10 I41 — the shipped themes' quantisations, regenerated from dist/ (T3.73 holds it to the code)
+	npm run build
+	node tools/theme/quantised.mjs
 
 check:              ## type-check and lint, including the examples
 	npm run check

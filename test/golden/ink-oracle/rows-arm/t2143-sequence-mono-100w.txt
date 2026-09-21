@@ -1,0 +1,27 @@
+Nothing to do.
+
+12:00:01  info   listening on :8080
+12:00:02  [1mwarn [22m  slow query: 1.2s
+[2m-- [22m[1mDeployments[22m[2m ----------------------------------------------------------------------------[22m 3 active
+
+
+
+
+[2m+[22m[1m Summary [22m[2m-----------------------------------------------------------------------------------------+[22m
+[2m|[22mtwo lines                                                                                         [2m|[22m
+|of text                                                                                           |
+[2m+--------------------------------------------------------------------------------------------------+[22m
+12:00:00  info   line 1 of the capped logs
+12:00:01  info   line 2 of the capped logs
+12:00:02  info   line 3 of the capped logs
+12:00:03  info   line 4 of the capped logs
+12:00:04  info   line 5 of the capped logs
+12:00:05  info   line 6 of the capped logs
+[2m~ 6 of 30 rows[22m
+
+{"kind":"table","id":"table-1","columns":[{"key":"name","label":"Name","align":"left","priority":10~
+name: api
+replicas: 3
+
+left                                              right
+{"kind":"plot","id":"plot-1","form":"line","height":8,"series":[{"values":[1,4,2,8,5],"label":"rps"~

@@ -8,8 +8,8 @@ import { sourceOf } from "../support/source.js";
  * **A source-text assertion lives in a different file from its subject, and
  * nothing said where** (F1070).
  *
- * `test/support/source.ts` lets a row assert against another file's text. Five
- * suites use it over seven subjects, and **three of the seven name a file in
+ * `test/support/source.ts` lets a row assert against another file's text. Six
+ * suites use it over eight subjects, and **four of the eight name a file in
  * another component** — including a mutual crossing, where C10's suite asserts
  * about C12's source and C12's suite asserts about C10's.
  *
@@ -54,9 +54,10 @@ function testFiles(dir = TEST_ROOT, out: string[] = []): string[] {
 /**
  * Subject → the suites asserting about its text, derived from `sourceOf("…")`.
  *
- * **Three of these cross a component boundary** and are the reason the table
+ * **Four of these cross a component boundary** and are the reason the table
  * exists: `theme.test.ts` is C10's and reaches into C12's two renderers, and
- * `plot-svg-colour.test.ts` is C12's and reaches into C10's token table.
+ * `plot-svg-colour.test.ts` is C12's and reaches into C10's token table; and
+ * `layout-engine.test.ts` is C29's and reaches into C15's placement types.
  */
 const LITERAL_SUBJECTS: Readonly<Record<string, readonly string[]>> = Object.freeze({
   // C10's suite, asserting about C12's source. The crossing that went red.
@@ -64,6 +65,11 @@ const LITERAL_SUBJECTS: Readonly<Record<string, readonly string[]>> = Object.fre
   "src/presentation/plot/scatter3.ts": ["test/unit/theme.test.ts"],
   // C12's suite, asserting about C10's source. The same crossing, reversed.
   "src/presentation/theme/tokens-dark.ts": ["test/unit/plot-svg-colour.test.ts"],
+  // C29's suite, asserting about C15's source. T1.32 reads `Placement`'s
+  // anchored arm by equality, because the refusal it pins — no column field —
+  // is invisible to every placed result: a column beside `row` would be inert
+  // for any layer that declares no width (C29 §7d, F1230).
+  "src/viewport/overlay/types.ts": ["test/unit/layout-engine.test.ts"],
   // Inside one component.
   "src/presentation/plot/svg.ts": ["test/unit/plot-svg-path.test.ts"],
   // **This file's own control, and the index therefore indexes itself.** SR3

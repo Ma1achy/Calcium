@@ -27,7 +27,7 @@ export {
   SUBSTITUTIONS,
   type GlyphSet,
 } from "./glyphs.js";
-export { DEFAULT_MAX_BLOCK_ROWS, createBlockRegistry } from "./registry.js";
+export { DEFAULT_MAX_BLOCK_ROWS, createBlockRegistry, windowRefused } from "./registry.js";
 // C25 renders code inside a diff line and does not tokenise (C25 §4). The
 // tokeniser and its memo stay C09's; what crosses the seam is the token stream.
 export {
@@ -44,8 +44,10 @@ export type {
   BlockDefinition,
   BlockFault,
   BlockRegistry,
+  MeasureMemo,
   FocusState,
   NavElement,
   RenderContext,
+  Rendered,
   RenderContextInput,
 } from "./types.js";

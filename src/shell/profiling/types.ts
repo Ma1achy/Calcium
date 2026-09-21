@@ -14,6 +14,7 @@ import type { MissReason, Probe } from "../../data/viewmodel/probe.js";
 import type { CommitReason } from "../../terminal/frame-scheduler.js";
 import type { HeapSpace } from "./node.js";
 import type { LeakStat } from "./leaks.js";
+import type { SampledStacks } from "./stacks.js";
 import type { ElementOp, NodeStat, TreeNode } from "./tree.js";
 
 export type { CommitReason, ElementOp, HeapSpace, LeakStat, NodeStat, TreeNode, Probe };
@@ -38,7 +39,8 @@ export const TIER_RANK: Readonly<Record<Tier, number>> = Object.freeze({
  * **`body`, `prompt`, `composite` and `based` are `assemble`'s parts** (C28 §2).
  *
  * Added because `assemble` was **58 % of a frame's work with no breakdown** —
- * 358.2 ms of self time over 34 frames against `react`'s 151.9 ms, in the run
+ * 358.2 ms of self time over 34 frames against the element arm's 151.9 ms (the
+ * `react` span, gone with Ink — F1209), in the run
  * whose job was to rank what to fix. A span that large with nothing under it
  * names the file and not the work, and a ranking built on it has a hole where
  * its first entry should be (F936).
@@ -47,10 +49,10 @@ export const TIER_RANK: Readonly<Record<Tier, number>> = Object.freeze({
  * unchanged and only the breakdown improves.
  */
 export type SpanName =
-  | "frame" | "compose" | "measure" | "elements" | "paint" | "react" | "assemble" | "write"
+  | "frame" | "compose" | "measure" | "elements" | "paint" | "assemble" | "write"
   | "body" | "prompt" | "composite" | "based" | "transcript" | "visible"
   | "decode" | "route" | "handler" | "local" | "transport" | "adapt" | "stream" | "livefetch"
-  | "completion" | "overlays" | "chrome";
+  | "completion" | "overlays" | "chrome" | "rows";
 
 /**
  * What each phase is doing, in the terms the question gets asked in: *was the
@@ -123,7 +125,7 @@ export const SPAN_SITE: Readonly<Record<SpanName, SpanSite>> = Object.freeze({
   chrome: "frame",
   overlays: "frame",
   paint: "frame",
-  react: "frame",
+  rows: "frame",
   assemble: "frame",
   // `assemble`'s parts, so necessarily where `assemble` is.
   body: "frame",
@@ -155,7 +157,7 @@ export const PHASE_GROUP: Readonly<Record<SpanName, PhaseGroup>> = Object.freeze
   chrome: "compute",
   overlays: "compute",
   paint: "draw",
-  react: "draw",
+  rows: "draw",
   assemble: "draw",
   // **`draw`, with `assemble`, and that is the point.** They are its children,
   // so grouping them anywhere else would move cost between phases and make the
@@ -198,8 +200,32 @@ export const PHASE_GROUP: Readonly<Record<SpanName, PhaseGroup>> = Object.freeze
  * cannot be compared across runs (C28 I10).
  */
 export type Histogram = Readonly<{
-  count: number; min: number; p50: number; p95: number; p99: number;
-  max: number; sum: number; mean: number; error: number;
+  count: number;
+  min: number;
+  /**
+   * The quartiles, beside the percentiles rather than instead of them (C28 I56).
+   *
+   * **Every distribution form in C12 takes a `QuartileSummary`** of
+   * `{min, q1, median, q3, max}`, and this type held `min`, `p50`, `p95`, `p99`
+   * and `max` — the two sets overlap in three places and the missing pair is
+   * not derivable. So a consumer drawing a span's shape had two honest options:
+   * compute real quartiles from `timeline`'s per-frame samples, which exist
+   * only for **frame-site** spans (I41), or put `p95` where `q3` belongs. The
+   * alternative is the deferral that gets paid for at every call site, each
+   * figure working around the gap in its own way.
+   *
+   * `q3` and `p95` answer different questions and both stay: a summary that
+   * dropped either would be narrower than the one it replaced.
+   */
+  q1: number;
+  p50: number;
+  q3: number;
+  p95: number;
+  p99: number;
+  max: number;
+  sum: number;
+  mean: number;
+  error: number;
 }>;
 
 /**
@@ -327,6 +353,16 @@ export type CaptureResult = Readonly<{
    * what says why.
    */
   abandoned: boolean;
+  /**
+   * The sampled stacks, folded where the profile was produced (C28 I62).
+   *
+   * `null` for a `heap` or `alloc` capture, for an abandoned one, and for a
+   * `cpu` window in which nothing was sampled — the last of those a reading
+   * rather than a failure, and the reason it is not an empty tree: `nodes` is
+   * emitted whole whatever was sampled, so a tree of real function names at
+   * zero is *measured, and free*, which is the figure nobody doubts.
+   */
+  stacks: SampledStacks | null;
 }>;
 
 /**

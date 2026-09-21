@@ -175,11 +175,13 @@ export const settled = async (p?: { readonly inFlight: unknown }): Promise<void>
  */
 const refusingProfileView = (): ProfileView => ({
   open: () => "no profiler to show — this session was built without `TuiConfig.profile`",
-  switchPane: () => false,
+  nextCard: () => false,
+  sectionNext: () => false,
+  sectionPrev: () => false,
   move: () => false,
   pop: () => false,
   dispose: () => undefined,
-  get pane() {
+  get section() {
     return null;
   },
 });

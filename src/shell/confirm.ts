@@ -129,7 +129,7 @@ function choiceBlock(choices: readonly Choice[], selected: number): Block {
   return block({
     kind: "table",
     id: "confirm-choices",
-    gapBefore: true,
+    padding: { t: 1 },
     columns: [
       { key: "mark", label: "", align: "left", priority: 3, minWidth: 1, sortable: false },
       { key: "key", label: "", align: "left", priority: 2, minWidth: keyWidth(choices), sortable: false },

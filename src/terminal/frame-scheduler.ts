@@ -84,8 +84,18 @@ const WINDOWS: Readonly<Record<CommitReason, number>> = Object.freeze({
   // (F423). One frame instead of thirty, and the final size is the only one
   // anyone sees.
   resize: 16,
-  stream: 33,
-  spinner: 100,
+  // **16 ms, the A02 §7 budget at 60 frames/s** (F1199). The 33 it shipped with
+  // was argued from *fewer, larger writes*; DECSET 2026 makes a frame one
+  // write however often it comes, and C22 I73 caps the one surface that
+  // rewrites the whole screen where the capability is absent. The ceiling is
+  // the display's (§3).
+  stream: 16,
+  // **80 ms, the fastest shipped glyph interval, and not longer** (F1197). A
+  // window longer than the interval it floors skips glyphs in a fixed pattern:
+  // at 100 over C09's 80 ms braille set the frames landed on ticks 1, 2, 3, 5
+  // of every five and two glyphs of ten were never drawn. The window is the
+  // cadence's floor, not a second cadence (§3).
+  spinner: 80,
 });
 
 /**
@@ -123,8 +133,16 @@ export function createFrameScheduler(opts: FrameSchedulerOptions): FrameSchedule
   const { render, repaint, capabilities, lifecycle, write } = opts;
   const schedule = opts.schedule ?? defaultSchedule;
   const windows = resolveWindows(opts.windows);
+  /**
+   * The slot every write opens (I17): the shortest coalesced window, so no
+   * coalesced commit inside it is strictly shorter and I3 never re-arms.
+   */
+  const slot = Math.min(
+    ...(Object.keys(windows) as CommitReason[]).filter((r) => !IMMEDIATE.has(r)).map((r) => windows[r]),
+  );
 
-  let state: "idle" | "pending" | "writing" = "idle";
+  /** §5 — `paced` is the slot a write leaves standing, with nothing pending in it (I17). */
+  let state: "idle" | "paced" | "pending" | "writing" = "idle";
   let timer: Disposable | null = null;
   /** The window the outstanding timer was armed with — the ceiling in force. */
   let armed: number | null = null;
@@ -137,13 +155,17 @@ export function createFrameScheduler(opts: FrameSchedulerOptions): FrameSchedule
 
   /**
    * Higher is stricter. Immediate outranks every coalesced reason; among
-   * coalesced, the shorter window. Order *among* the immediate reasons is
-   * deliberately flat: `resize` sets contamination eagerly at commit time, so
-   * the only thing that could distinguish the three has already taken effect by
-   * the time a deferred reason is chosen (§3).
+   * coalesced, the shorter window, and at an equal window `resize` — the frame
+   * it drives is a repaint (I7) and the reason handed down says so (I16). The
+   * tie is reachable: `stream` and `resize` are both 16 ms since F1199. Order
+   * *among* the immediate reasons is deliberately flat: `resize` sets
+   * contamination eagerly at commit time, so the only thing that could
+   * distinguish the three has already taken effect by the time a deferred
+   * reason is chosen (§3).
    */
   function strictness(reason: CommitReason): number {
-    return IMMEDIATE.has(reason) ? Number.MAX_SAFE_INTEGER : -windows[reason];
+    if (IMMEDIATE.has(reason)) return Number.MAX_SAFE_INTEGER;
+    return -windows[reason] + (reason === "resize" ? 0.5 : 0);
   }
 
   function cancelTimer(): void {
@@ -158,6 +180,12 @@ export function createFrameScheduler(opts: FrameSchedulerOptions): FrameSchedule
     timer = schedule(() => {
       timer = null;
       armed = null;
+      // I17 — a slot nobody committed into lapses: nothing is written, and the
+      // next commit arms its own window as from idle (T1.27).
+      if (state === "paced") {
+        state = "idle";
+        return;
+      }
       runWrite();
     }, ms);
   }
@@ -177,27 +205,31 @@ export function createFrameScheduler(opts: FrameSchedulerOptions): FrameSchedule
     writeFrame();
 
     const first = takeDeferred();
-    if (first === null) return;
+    if (first === null) return; // The slot the write opened stands (I17).
     if (!IMMEDIATE.has(first)) {
-      // A fresh window from the end of the write (T3.15). No timer is
-      // outstanding here — every path into a write consumes it — so I3 holds.
+      // Served at the close of the slot the write opened (T3.15, I17) — a
+      // window from the start of the write, not its end. The slot is the one
+      // timer, so I3 holds; it is absent only when the write was refused or
+      // threw, and then the commit arms its own window.
       raise(first);
       state = "pending";
-      armTimer(windows[first]);
+      if (timer === null) armTimer(windows[first]);
       return;
     }
 
+    cancelTimer(); // I4 — the immediate write supersedes the slot.
     raise(first);
-    writeFrame(); // The one deferred write (T3.7, T3.21).
+    writeFrame(); // The one deferred write (T3.7, T3.21); it opens a new slot.
 
     const second = takeDeferred();
     if (second === null) return;
     raise(second);
     // Escalated, not dropped and not written inline. An immediate reason gets a
     // zero window, so it lands on the next turn rather than on this stack
-    // (T3.20).
+    // (T3.20); a coalesced one is served at the slot's close.
     state = "pending";
-    armTimer(IMMEDIATE.has(second) ? 0 : windows[second]);
+    if (IMMEDIATE.has(second)) armTimer(0);
+    else if (timer === null) armTimer(windows[second]);
   }
 
   /**
@@ -243,6 +275,12 @@ export function createFrameScheduler(opts: FrameSchedulerOptions): FrameSchedule
     }
 
     state = "writing";
+    // I17 — the write opens the next window as it begins, so a continuous
+    // source draws at the window's rate and not at window + frame. Armed here,
+    // before the render, because the timer is the only thing in C03 that knows
+    // sixteen milliseconds have passed (§3, F1200). No timer stands at this
+    // point: every path into a write consumed or cancelled it.
+    armTimer(slot);
     // I16 — consumed here, so the next frame starts from nothing rather than
     // inheriting this one's reason.
     const reason = driving ?? "input";
@@ -260,13 +298,16 @@ export function createFrameScheduler(opts: FrameSchedulerOptions): FrameSchedule
       } else {
         render(reason);
       }
+    } catch (e) {
+      cancelTimer(); // I9 — a throwing render leaves no timer standing (T3.3).
+      throw e;
     } finally {
       // In the `finally`, not the `try`. An unbalanced open marker leaves the
       // terminal in synchronised mode and frozen, so a throw during render
       // would present as a dead screen rather than as an error (I6, I9, T3.4,
       // T6.4).
       if (sync) write(SYNC_UPDATE.leave);
-      state = "idle";
+      state = timer === null ? "idle" : "paced";
     }
   }
 
@@ -298,7 +339,12 @@ export function createFrameScheduler(opts: FrameSchedulerOptions): FrameSchedule
     // and a continuous stream never renders at all (T1.4, T6.2); never
     // re-arming lets a 100 ms spinner hold a stream frame past its budget
     // (T3.12, T6.13).
-    if (state === "pending" && armed !== null && ms >= armed) return;
+    if (state !== "idle" && armed !== null && ms >= armed) {
+      // A commit inside a standing window — pending, or the slot a write left
+      // (I17) — is served when it closes and arms nothing (T1.26, T3.25).
+      state = "pending";
+      return;
+    }
 
     state = "pending";
     armTimer(ms);

@@ -16,6 +16,11 @@ const kit = (caps = FULL_CAPS): ReturnType<typeof measurable> =>
 
 const pair = (removed: string, added: string, language = ""): Patch =>
   b.patch({
+    // **No leading gap**, because this fixture is rendered alone and the rows
+    // below are read by index. `b.patch` gaps by default, and under C04 §3a
+    // that row is now the block's own rather than the sequence's — so a block
+    // drawn on its own draws it, where `gapBefore` was invisible there.
+    gapBefore: false,
     id: "e",
     path: "x",
     language,
@@ -65,7 +70,7 @@ describe("C25 I10 edge — the span stream against the line's other rules", () =
       { kind: "add", text: "a common c1", newNo: 3 },
       { kind: "context", text: "ctx", oldNo: 4, newNo: 4 },
     ];
-    const whole = b.patch({ id: "w", path: "x", language: "", hunks: [{ header: "@@", lines }] });
+    const whole = b.patch({ gapBefore: false, id: "w", path: "x", language: "", hunks: [{ header: "@@", lines }] });
     const k = kit();
     // Split at 120: rows are path, header, ctx, pair 0, pair 1, ctx. Cut inside the run.
     const win = windowRows(whole, 120, 4, 5);
@@ -103,7 +108,7 @@ describe("C25 I10 edge — the span stream against the line's other rules", () =
       { kind: "add", text: "a common c0", newNo: 2 },
       { kind: "context", text: "ctx", oldNo: 3, newNo: 3 },
     ];
-    const whole = b.patch({ id: "v", path: "x", language: "", hunks: [{ header: "@@", lines }] });
+    const whole = b.patch({ gapBefore: false, id: "v", path: "x", language: "", hunks: [{ header: "@@", lines }] });
     const k = kit();
     // Offset 2 is the first context line. The path header and the hunk header are
     // sticky and come out of the budget (I18), so four rows reach the removed line

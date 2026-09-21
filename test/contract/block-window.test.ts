@@ -214,6 +214,7 @@ const CORPUS: readonly Block[] = [
  */
 const DIVIDES: Readonly<Record<string, string>> = {
   code: "source lines are the units, and `text` travels whole with `lineRange` pinned — a slice is a different parse, not a narrower column (I25a, F426)",
+  group: "a `column` divides by whole children — the partial first and last child are kept whole and their off-window rows charged to skipRows/dropRows, with align re-indexed; a `row` and a `column` with minRows decline from inside the one member (C09 I69)",
   keyValue: "a row is a row, and `keyWidth` travels pinned, or a slice holding only short keys shifts every value sideways as the reader scrolls (I25a)",
   logs: "a line is a row and nothing is derived from lines outside the slice, so the window is exact and needs no pin — the kind F424's 0.65 ms was measured on",
   patch: "hunk lines are the units; the path and hunk headers the range misses are charged to `skipRows` (C25 I18) and the gutter travels pinned (C25 I21a)",
@@ -235,7 +236,6 @@ const DIVIDES: Readonly<Record<string, string>> = {
 const KEPT_WHOLE: Readonly<Record<string, string>> = {
   comparison: "`rows + 1`, so it divides in principle and does not — an unmeasured F424 candidate, kept named rather than kept quiet",
   events: "one row per event, `logs`' shape exactly, so it divides in principle and does not — an unmeasured F424 candidate",
-  group: "a container: the sum or the max of its children, and a tall child is bounded by the registry's row cap rather than by a window (C14 I24)",
   image: "one picture — `imageCells` derives the rows from the whole image at the width, so fewer rows is a different picture and not less of one",
   mosaic: "`height` exactly: a declared grid of absolutely positioned cells, and every cell bounds its own child (C04 I71, I35)",
   notice: "`ceil(cells(text) / w)` of one text — a handful of rows at any width, with no unit to divide into",
@@ -530,6 +530,101 @@ describe("C09 §2a — a block reduced to a valid smaller block", () => {
     for (const [kind, reason] of [...Object.entries(DIVIDES), ...Object.entries(KEPT_WHOLE)]) {
       expect(reason.length, `${kind} carries a reason`).toBeGreaterThan(20); // graphemes-ok
     }
+  });
+
+  // **Phase A — the column group's window** (C09 I69). Built by hand before the
+  // code (CLAUDE.md): three cases stepped row by row — a mid-child window, a
+  // gap-dropped window, and a kept-gap window — each balancing I26 and rendering
+  // the rows the whole group draws at those offsets.
+  const notice = (id: string, text: string): Block =>
+    ({ kind: "notice", id, tone: "muted", text }) as Block;
+  const col = (id: string, children: readonly Block[], extra: Record<string, unknown> = {}): Block =>
+    ({ kind: "group", id, direction: "column", children, ...extra }) as Block;
+  const gapped = (b: Block): Block => ({ ...(b as object), padding: { t: 1 } }) as Block;
+  const withId = (b: Block, id: string): Block => ({ ...(b as object), id }) as Block;
+
+  it("T2.138 (C09 I69, I26): the sweep over column groups with gaps, align and nested rows", () => {
+    const kit = measurable();
+    const corpus: Block[] = [
+      col("g-plain", [withId(logs(2), "p0"), withId(logs(3), "p1"), withId(logs(2), "p2")]),
+      col("g-gaps", [withId(logs(2), "q0"), gapped(withId(logs(3), "q1")), gapped(withId(logs(2), "q2"))]),
+      col("g-align", [notice("n0", "a"), notice("n1", "bb"), notice("n2", "ccc")], {
+        align: ["left", "centre", "right"],
+      }),
+      col("g-nested", [
+        withId(logs(2), "x0"),
+        { kind: "group", id: "g-row", direction: "row", children: [withId(logs(2), "xr0"), withId(logs(2), "xr1")] } as Block,
+        withId(logs(3), "x2"),
+      ]),
+      col("g-lead-gap", [gapped(withId(logs(2), "y0")), withId(logs(3), "y1")]),
+    ];
+    const report = checkMeasurement(kit, corpus);
+    expect(report.failures, formatReport(report)).toEqual([]);
+    expect(report.kindsCovered, "the column group is covered").toContain("group");
+  });
+
+  it("T2.139 (C09 I69): a window inside the first and last child keeps both whole", () => {
+    const kit = measurable();
+    // rows: c0 [0,2), gap 2, c1 [3,6), c2 [6,8) — height 8.
+    const g = col("g", [withId(logs(2), "a"), gapped(withId(logs(3), "b")), withId(logs(2), "c")]);
+    const out = kit.window(g, 40, 1, 5);
+    expect(out, "the column group divides").toBeDefined();
+    expect(out?.skipRows, "one row of the first child precedes `from`").toBe(1);
+    expect(out?.dropRows, "one row of the last kept child follows `to`").toBe(1);
+
+    const whole = kit.renderToLines(g, 40);
+    const windowed = kit.renderToLines(out!.block, 40);
+    const got = windowed.slice(out!.skipRows, windowed.length - out!.dropRows);
+    expect(got).toEqual(whole.slice(1, 5));
+  });
+
+  it("T2.140 (C09 I69, I26): a row group and a column with minRows decline", () => {
+    const kit = measurable();
+    const rowG = { kind: "group", id: "r", direction: "row", children: [withId(logs(3), "r0"), withId(logs(2), "r1")] } as Block;
+    const rout = kit.window(rowG, 40, 1, 2);
+    expect(rout?.block, "the row group is returned whole").toBe(rowG);
+    const rh = kit.measure(rout!.block, 40);
+    expect(rh - rout!.skipRows - rout!.dropRows, "I26 still balances").toBe(2 - 1);
+
+    const minG = col("m", [withId(logs(1), "m0"), withId(logs(1), "m1")], { minRows: 6 });
+    const mout = kit.window(minG, 40, 1, 4);
+    expect(mout?.block, "the minRows column is returned whole").toBe(minG);
+    const mh = kit.measure(mout!.block, 40);
+    expect(mh - mout!.skipRows - mout!.dropRows, "I26 balances over the padded height").toBe(4 - 1);
+  });
+
+  it("T2.141 (C09 I69): a right-aligned child windowed to its rows keeps its column", () => {
+    const kit = measurable();
+    // Three one-row notices of unequal width; the third is right-aligned, so a
+    // window that lost the align re-index would draw it left and move it.
+    const g = col("g", [notice("n0", "a"), notice("n1", "bb"), notice("n2", "ccc")], {
+      align: ["left", "left", "right"],
+    });
+    const out = kit.window(g, 40, 2, 3);
+    expect(out).toBeDefined();
+    const whole = kit.renderToLines(g, 40);
+    const windowed = kit.renderToLines(out!.block, 40);
+    const got = windowed.slice(out!.skipRows, windowed.length - out!.dropRows);
+    expect(got).toEqual(whole.slice(2, 3));
+  });
+
+  it("T2.142 (C09 I69, C14 I25): the gap boundary is kept on its row and dropped below it", () => {
+    const kit = measurable();
+    // c0 [0,2), gap 2, c1 [3,6) — height 6.
+    const g = col("g", [withId(logs(2), "gg0"), gapped(withId(logs(3), "gg1"))]);
+    const whole = kit.renderToLines(g, 40);
+
+    // Opening on the gap row keeps the gap and the child.
+    const onGap = kit.window(g, 40, 2, 6);
+    const wOn = kit.renderToLines(onGap!.block, 40);
+    expect(wOn.slice(onGap!.skipRows, wOn.length - onGap!.dropRows)).toEqual(whole.slice(2, 6));
+    expect(kit.measure(onGap!.block, 40) - onGap!.skipRows - onGap!.dropRows).toBe(6 - 2);
+
+    // Opening one row below drops the gap with the row above it.
+    const belowGap = kit.window(g, 40, 3, 6);
+    const wBelow = kit.renderToLines(belowGap!.block, 40);
+    expect(wBelow.slice(belowGap!.skipRows, wBelow.length - belowGap!.dropRows)).toEqual(whole.slice(3, 6));
+    expect(kit.measure(belowGap!.block, 40) - belowGap!.skipRows - belowGap!.dropRows).toBe(6 - 3);
   });
 });
 

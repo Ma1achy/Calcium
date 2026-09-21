@@ -21,7 +21,6 @@
  * the gutter survived at width 1 and every curve row rendered as a lone `…`.
  */
 import type { AmbiguousWidth } from "../text.js";
-import type { ReactElement } from "react";
 import { paint, rows, slot, tone, type Span } from "../blocks/paint.js";
 import { cells, fitStyled, rowCells, truncate } from "../text.js";
 import { SGR_RESET } from "../../terminal/escapes.js";
@@ -94,7 +93,7 @@ import { stripHeights } from "./strips.js";
 import type { Annotation, OHLC, QuartileSummary, Plot, PlotForm, Series } from "../../data/viewmodel/index.js";
 import { HAS_HIDEABLE_SERIES, NO_SPAN } from "../../data/viewmodel/index.js";
 import type { ColourRef, Style } from "../theme/index.js";
-import type { BlockDefinition, BlockKeyBinding, NavElement, RenderContext } from "../blocks/types.js";
+import type { BlockDefinition, BlockKeyBinding, NavElement, RenderContext, Rendered } from "../blocks/types.js";
 import type { MeasureFn } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
@@ -3386,7 +3385,7 @@ export function alignPad(block: Plot, frame: number, drawn: number): number {
   return 0; // cells-ok — a cell count
 }
 
-const render = (block: Plot, ctx: RenderContext): ReactElement => {
+const render = (block: Plot, ctx: RenderContext): Rendered => {
   const frame = Math.max(1, Math.floor(ctx.width));
   const drawn = drawnWidth(block, frame);
   const pad = alignPad(block, frame, drawn);

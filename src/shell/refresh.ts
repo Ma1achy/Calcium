@@ -688,7 +688,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     const existing = currentPanel(host, part);
     const base = livePanel(part.spec.id, titleOf(part), child);
     const panel: Block =
-      existing?.gapBefore === true ? ({ ...base, gapBefore: true } as Block) : base;
+      existing?.padding === undefined ? base : ({ ...base, padding: existing.padding } as Block);
     // **One boolean and one meaning on this arm** (§8h): C15 answers whether the
     // layer is still there, and a view that cannot take a well-formed block is a
     // state this seam cannot report — stated as the limit it is.
@@ -792,9 +792,45 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     return `${part.spec.title} ${glyphs(deps.capabilities).separator} ${String(secs)}s ago`;
   };
 
+  /**
+   * C23 I72 — the next deadline is one interval after the **last deadline**,
+   * and one interval after the settle only when the settle is more than an
+   * interval past it.
+   *
+   * **The cadence is the interval, not the interval plus the work** (F1206).
+   * This read `dueAt = at + interval`, where `at` is the moment the fetch
+   * settled — so the lateness of the wake that started it and the duration of
+   * the fetch itself both joined the period, every period, and neither was ever
+   * recovered. A part declared `every: 16` polled every 18 ms, and a screen of
+   * them drew 55 frames a second against A02 §7's sixty. C22 I105 had already
+   * ruled this for the spinner — the interval from the stamp, never from the
+   * paint — and the poll was written the other way round.
+   *
+   * **The clamp is the far side being slower than its own cadence**, and it is
+   * what keeps the chain from becoming a backlog: a 40 ms fetch on a 16 ms
+   * interval would otherwise fall three deadlines behind on the first poll and
+   * fire three overdue sweeps the moment it landed. Past one interval the
+   * source restarts from where it finished, which is the old behaviour exactly
+   * and the only behaviour available to a source that cannot keep up.
+   *
+   * **The bound is `intervalMs` and the step is the backoff, and the two must
+   * not be the same number.** The step is `backoffOf` (§7's one rule), so a
+   * failing source waits its doubled interval from the deadline it already had.
+   * The bound is the *declared* cadence, because a source woken a full interval
+   * late has not been keeping up — measured against a backoff that has already
+   * doubled it would be called current and retried early, half the doubled
+   * interval after the failure, on the first failure of every source declared
+   * before anything ticked. T1.32 reads exactly that.
+   */
   const settleSource = (src: Source, at: number): void => {
     const interval = backoffOf(src.intervalMs, src.failures);
-    src.dueAt = at + interval;
+    // `behind` is the whole test: a deadline in the past by less than an
+    // interval is the one this poll was woken for, and a stale or unset `dueAt`
+    // is further behind than that, so no separate *has it ever polled* flag is
+    // needed and a source declared at clock zero chains like every other.
+    const behind = at - src.dueAt;
+    const from = behind >= 0 && behind < src.intervalMs ? src.dueAt : at;
+    src.dueAt = from + interval;
     if (src.intervalMs === 0) src.done = true;
   };
 

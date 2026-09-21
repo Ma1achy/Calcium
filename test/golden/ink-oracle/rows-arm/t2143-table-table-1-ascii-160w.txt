@@ -1,0 +1,1 @@
+{"kind":"table","id":"table-1","columns":[{"key":"name","label":"Name","align":"left","priority":10,"minWidth":8,"sortable":true},{"key":"state","label":"State~

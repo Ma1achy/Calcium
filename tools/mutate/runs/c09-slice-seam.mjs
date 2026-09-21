@@ -61,10 +61,29 @@ const results = runPass({
       // The floor pads outside the definition, so a window over the definition's
       // rows is not a window over the block's (I33). `windowSequence` refuses a
       // floored block on the same line one function over.
+      //
+      // **Re-anchored when the two refusals became one predicate** (F1224). Both
+      // callers and the measurement harness asked the same question in three
+      // places, so it moved into `windowRefused`; the mutation follows it, and
+      // aims at the floor arm alone rather than at the whole guard, so this row
+      // still says what its name says.
       name: "a floored block is windowed",
       file: REGISTRY,
-      from: "    if (floorOf(block) > 0) return null;",
+      from: "  if (floorOf(block) > 0) return true;",
       to: "",
+      expect: "T2.124",
+    },
+    {
+      // **The other arm, and it is new with the padding** (C09 I80). A block's
+      // own padding is applied around the definition's rows on both axes — the
+      // vertical edges put rows outside anything `definition.window` can reach,
+      // and the horizontal ones mean the definition is asked at `w` and drawn at
+      // `w - l - r`, so the windowed rows would be measured against a wrapping
+      // the block never had. Dropping it lets a padded block be sliced.
+      name: "a padded block is windowed",
+      file: REGISTRY,
+      from: "  const pad = paddingOf(block);\n  return pad.t > 0 || pad.b > 0 || pad.l > 0 || pad.r > 0;",
+      to: "  return false;",
       expect: "T2.124",
     },
     {

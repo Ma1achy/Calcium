@@ -7,7 +7,6 @@
  * one of them and not the call.
  */
 import type { AmbiguousWidth } from "../../text.js";
-import type { ReactElement } from "react";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Glyph, Notice, Pills, Progress, Raw, Rule, Tip } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate, truncateParts, wrapCells } from "../../text.js";
@@ -17,7 +16,7 @@ import { NO_STYLE, rampStyle } from "../../theme/index.js";
 import { animateT, effectiveTick, extentT } from "../ramp.js";
 import { barStyle, glyphFor, glyphCells, glyphs } from "../glyphs.js";
 import { clampSpans, pad, paint, paintRuns, rows, selectionStyle, tone, type Span } from "../paint.js";
-import type { BlockDefinition, NavElement, RenderContext, Windowed } from "../types.js";
+import type { BlockDefinition, NavElement, RenderContext, Windowed, Rendered } from "../types.js";
 
 /** Chips in a `pills` row are separated by two spaces — one is too close to read. */
 const CHIP_GAP = 2;
@@ -44,13 +43,14 @@ function proseWidth(width: number, prefix: number): number {
  * *sibling* — the one relationship the mark exists to deny. Every assertion
  * passed with it wrong; only a frame-read says otherwise.
  *
- * **A gutter and not a field.** An `indent` on `Notice` is the second spacing
- * field `Gap`'s note has been waiting for — *whoever writes the second spacing
- * field is reading this line* — and roadmap 38 rules that change a
- * *replacement* of `gapBefore` rather than an addition beside it. So the
- * smaller change is the one that is not a public type at all: the depth belongs
- * to the mark, which already knows it is a mark, and the block schema learns
- * nothing.
+ * **A gutter and not a field, and the replacement has since landed.** An
+ * `indent` on `Notice` was the second spacing field `Gap`'s note was waiting
+ * for, and that note has now been answered the way it asked: `gapBefore` became
+ * `padding` (C04 §3a), a replacement rather than an addition. **The ruling here
+ * is unchanged and is worth restating now that a general `padding.l` exists**:
+ * the depth belongs to the mark, which already knows it is a mark, and a
+ * horizontal padding declared per notice would be a second author of the same
+ * gutter — the duplication R19 refused, one level down.
  *
  * **Two cells, because that is where the command's text starts.** The mark
  * belongs under the first cell of the line it is subordinate to, and
@@ -146,7 +146,7 @@ export const ruleDefinition: BlockDefinition<Rule> = {
 
   measure: () => 1,
 
-  render(block: Rule, ctx: RenderContext): ReactElement {
+  render(block: Rule, ctx: RenderContext): Rendered {
     const g = glyphs(ctx.capabilities);
     const width = normaliseWidth(ctx.width);
     // **The label before the clamp, which is the whole point of the gauge**
@@ -316,7 +316,7 @@ export const noticeDefinition: BlockDefinition<Notice> = {
 
   elements: noticeElements,
 
-  render(block: Notice, ctx: RenderContext): ReactElement {
+  render(block: Notice, ctx: RenderContext): Rendered {
     // **Focused: `accent` over the selection ground, the `pills` head's rule**
     // (C26 §7). `accent` is a legal notice tone, so `accent` alone would draw a
     // focused `info` notice as an unfocused `accent` one; the ground is the
@@ -387,7 +387,7 @@ export const tipDefinition: BlockDefinition<Tip> = {
   measure: (block: Tip, width: number): number =>
     atLeastOne(wrapCells(tipText(block), normaliseWidth(width)).length), // cells-ok
 
-  render(block: Tip, ctx: RenderContext): ReactElement {
+  render(block: Tip, ctx: RenderContext): Rendered {
     const style = tone("dim", ctx.theme, ctx.capabilities);
     const wrapped = wrapCells(tipText(block), normaliseWidth(ctx.width));
     // C28 I45 — the wrap is the cost and the rows are already here. `tipText`
@@ -405,7 +405,7 @@ export const progressDefinition: BlockDefinition<Progress> = {
 
   measure: () => 1,
 
-  render(block: Progress, ctx: RenderContext): ReactElement {
+  render(block: Progress, ctx: RenderContext): Rendered {
     const width = normaliseWidth(ctx.width);
     // **Resolved here, per render, and never stored on the block** — the same
     // rule `glyphs()` follows: a block names a style and the terminal decides
@@ -595,7 +595,7 @@ export const pillsDefinition: BlockDefinition<Pills> = {
 
   elements: pillsElements,
 
-  render(block: Pills, ctx: RenderContext): ReactElement {
+  render(block: Pills, ctx: RenderContext): Rendered {
     ctx.probe?.gauge("pills.chips", block.chips.length); // cells-ok — a count of items, not a display width
     const byLabel = new Map(block.chips.map((chip) => [stripControl(chip.label), chip]));
     // **Focus, and it read `ctx.focus` nowhere before this** (C11 I14, F764's
@@ -690,7 +690,7 @@ export const rawDefinition: BlockDefinition<Raw> = {
     });
   },
 
-  render(block: Raw, ctx: RenderContext): ReactElement {
+  render(block: Raw, ctx: RenderContext): Rendered {
     ctx.probe?.gauge("raw.lines", block.text.split("\n").length); // cells-ok — a count of items, not a display width
     const width = normaliseWidth(ctx.width);
     // The runs cut per line, as `rawLines` cuts the text — one `\n` rule for

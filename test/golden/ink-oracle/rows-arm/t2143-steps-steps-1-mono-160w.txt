@@ -1,0 +1,3 @@
+[1m+ [22mResolve
+[1m- [22mBuild    layer 3 of 7
+[2m. Push   [22m

@@ -195,12 +195,12 @@ describe("C25 fail-on-revert", () => {
     expect(kit().renderToLines(bare, 80).map(underlinedRuns)).toEqual([[], [], [], []]);
     // And the same pair through the builder is underlined — so the row above is
     // not passing because nothing underlines anything.
-    const built = b.patch({ id: "b", path: "x", language: "", hunks: [{ header: "@@", lines: [{ kind: "remove", text: "k: 1" }, { kind: "add", text: "k: 2" }] }] });
+    const built = b.patch({ gapBefore: false, id: "b", path: "x", language: "", hunks: [{ header: "@@", lines: [{ kind: "remove", text: "k: 1" }, { kind: "add", text: "k: 2" }] }] });
     expect(kit().renderToLines(built, 80).map(underlinedRuns)).toEqual([[], [], ["1"], ["2"]]);
   });
 
   it("T6.27 (C25 I10): letting the truncation marker inherit the last run's attributes → T3.17 fails at both rungs", () => {
-    const patch = b.patch({ id: "t", path: "x", language: "", layout: "unified", hunks: [{ header: "@@", lines: [
+    const patch = b.patch({ gapBefore: false, id: "t", path: "x", language: "", layout: "unified", hunks: [{ header: "@@", lines: [
       { kind: "remove", text: "alpha beta gamma", oldNo: 1 }, { kind: "add", text: "alpha bets gamma", newNo: 1 },
     ] }] });
     for (const caps of [FULL_CAPS, ASCII_CAPS]) {
@@ -216,7 +216,7 @@ describe("C25 fail-on-revert", () => {
   it("T6.28 (C25 I10): a second pairing in the builder — the nth remove against the n+1th add — → T2.7 fails", () => {
     // The signature of the drift: `a0` joins the underline on the left of row 0,
     // because `a0` against `a1` differs while `a0` against `a0` does not.
-    const patch = b.patch({ id: "d", path: "x", language: "", hunks: [{ header: "@@", lines: [
+    const patch = b.patch({ gapBefore: false, id: "d", path: "x", language: "", hunks: [{ header: "@@", lines: [
       { kind: "remove", text: "a0 common b0", oldNo: 1 }, { kind: "remove", text: "a1 common b1", oldNo: 2 },
       { kind: "add", text: "a0 common c0", newNo: 1 }, { kind: "add", text: "a1 common c1", newNo: 2 },
     ] }] });

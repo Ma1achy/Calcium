@@ -37,10 +37,14 @@ const ELEVEN = [
  */
 const ENTRIES: readonly string[] = (() => {
   const manifest = JSON.parse(readFileSync("package.json", "utf8")) as {
-    exports: Record<string, { default: string }>;
+    exports: Record<string, { types: string; default: string }>;
   };
+  // **From the `types` target, not the `default`.** Since A04 §5's bundle the
+  // default resolves into `dist/bundle/`, a chunk graph with no source file of
+  // its own; the declaration beside the tsc tree is what still names the entry
+  // module `src/` holds (F1193).
   return Object.values(manifest.exports).map((e) =>
-    e.default.replace(/^\.\/dist\//u, "src/").replace(/\.js$/u, ".ts"),
+    e.types.replace(/^\.\/dist\//u, "src/").replace(/\.d\.ts$/u, ".ts"),
   );
 })();
 

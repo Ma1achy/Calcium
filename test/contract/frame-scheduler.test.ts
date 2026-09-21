@@ -111,7 +111,7 @@ describe("C03 contract", () => {
     expect(new Set(reached)).toEqual(new Set(["acquired"]));
   });
 
-  it("T2.4 (I3): `pending` is true exactly while a timer is outstanding, for every reason", () => {
+  it("T2.4 (I3, I17): `pending` is true exactly while a commit awaits a timer, for every reason", () => {
     for (const reason of ALL_REASONS) {
       const { scheduler, clock } = harness();
       expect(scheduler.pending, `${reason}: before`).toBe(false);
@@ -120,10 +120,16 @@ describe("C03 contract", () => {
 
       const immediate = (IMMEDIATE_REASONS as readonly string[]).includes(reason);
       expect(scheduler.pending, `${reason}: after commit`).toBe(!immediate);
-      expect(clock.outstanding, `${reason}: timers`).toBe(immediate ? 0 : 1);
+      // One timer either way: the coalesced window, or the slot the immediate
+      // write left standing with nothing pending in it (I17).
+      expect(clock.outstanding, `${reason}: timers`).toBe(1);
 
       clock.advance(200);
       expect(scheduler.pending, `${reason}: after the window`).toBe(false);
+      // A second turn: the fake fires a timer armed during an advance on the
+      // next call, and the slot a coalesced frame opens is armed inside the
+      // first one. It lapses here and leaves nothing.
+      clock.advance(200);
       expect(clock.outstanding, `${reason}: timers after`).toBe(0);
     }
   });
@@ -225,7 +231,7 @@ describe("C03 §2 — time enters through one seam", () => {
       const h = harness();
       h.scheduler.commit("stream");
       h.scheduler.commit("stream");
-      h.clock.advance(33);
+      h.clock.advance(16);
       h.scheduler.commit("input");
       h.scheduler.flush();
 

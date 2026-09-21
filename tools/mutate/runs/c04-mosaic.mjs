@@ -22,7 +22,7 @@ const ROOT = process.cwd();
 const MOSAIC = "src/data/viewmodel/mosaic.ts";
 const CONTAINERS = "src/presentation/blocks/kinds/containers.ts";
 
-const FILES = "test/unit/mosaic.test.ts test/contract/blocks.test.ts test/contract/view-model.test.ts";
+const FILES = "test/unit/mosaic.test.ts test/contract/blocks.test.ts test/contract/view-model.test.ts test/contract/rows-arm.test.ts";
 
 const { read, write } = fsIo(ROOT);
 const run = () => {
@@ -56,31 +56,44 @@ const results = runPass({
       expect: "MG2",
     },
     {
-      // **The clamp the build found and the walk did not.** Every count still
-      // agrees; only the width moves, and only at the widths nobody looks at.
-      name: "the rects are not clamped to the region",
-      file: MOSAIC,
-      from: "      width: Math.max(0, Math.min(sum(colWidths, r.col, r.cols), width - left)), // cells-ok — a cell count",
-      to: "      width: sum(colWidths, r.col, r.cols), // cells-ok — a cell count",
+      // **The clamp the build found and the walk did not** — and 1.7 moved it
+      // out of the geometry into the paint (C29 §8a C9), so the line this row
+      // holds is `mosaicRoom`'s cut rather than `mosaicRects`'. The rule is the
+      // same rule: a region reaching past the grid is cut to the room the grid
+      // has. Every count still agrees; only the width moves, and only at the
+      // widths nobody looks at.
+      name: "the rects are not cut to the room the grid has",
+      file: CONTAINERS,
+      from: "  const w = Math.min(rect.width, width - rect.left); // cells-ok — a cell count",
+      to: "  const w = rect.width; // cells-ok — a cell count",
       expect: "MG7",
     },
     {
-      // **`flexShrink: 0`, which is the half that is easy to read as redundant**
-      // beside the clip. Without it the child is squashed before it can overflow
-      // and draws rows out of its own middle — `measure` unchanged.
-      name: "the cell's content may shrink",
+      // **The pair was `flexShrink: 0` and `overflow: "hidden"`** on the cell's
+      // Ink box — the squash and the clip, split so the run said which property
+      // each row held. Both are gone with the element arm (F1209) and the clip
+      // is geometric now: the cell's own `width` and `height` on the composed
+      // record (C09 I35). Nothing squashes a row, so the first half has no
+      // successor; the second is two, because the clip has two axes and a row
+      // that watched one said nothing about the other.
+      name: "the cell does not clip horizontally",
       file: CONTAINERS,
-      from: "            { flexShrink: 0, flexDirection: \"column\" as const },",
-      to: "            { flexDirection: \"column\" as const },",
-      expect: "MG5",
+      from: "        x: rect.left, top: rect.top, width: room.width, height: room.height,",
+      to: "        x: rect.left, top: rect.top, width: 1000, height: room.height,",
+      // **It survived against MG5, and the reason is the construction.** Every
+      // child is rendered at `rect.width`, so its rows are already no wider and
+      // there is nothing for the cut to take — unless the child answers past
+      // the width it was given, which no kind C09 ships does and a consumer's
+      // may (I13, F1211). T2.147 registers `wide` in a cell for exactly that.
+      expect: "T2.147",
     },
     {
-      // The other half of the pair, so the run says which one each row is
-      // holding rather than reporting a single joint property.
-      name: "the cell does not clip",
+      // The other axis, so the run says which one each row is holding rather
+      // than reporting a single joint property.
+      name: "the cell does not clip vertically",
       file: CONTAINERS,
-      from: "            overflow: \"hidden\" as const,\n            flexDirection: \"column\" as const,",
-      to: "            flexDirection: \"column\" as const,",
+      from: "        x: rect.left, top: rect.top, width: room.width, height: room.height,\n",
+      to: "        x: rect.left, top: rect.top, width: room.width,\n",
       expect: "MG6",
     },
     {

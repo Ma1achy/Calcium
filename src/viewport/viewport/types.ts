@@ -152,5 +152,7 @@ export interface Viewport {
     entryCount: number;
     hits: number;
     misses: HeightMisses;
+    /** The `visible()` memo's rate (I30). */
+    visibleMemo: Readonly<{ hits: number; misses: number }>;
   }>;
 }

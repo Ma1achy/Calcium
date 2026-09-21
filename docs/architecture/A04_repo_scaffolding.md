@@ -42,7 +42,7 @@ Separate rather than a monorepo because R01 §8's argument generalises: **a work
 
 **`docker-tui` resolved differently, and the argument above is why it could.** R01 §8 moved it to `Calcium/examples/docker/` on the finding that separation was never the goal — *building against the packaged artefact* was, and separation was one way to get it. Two mechanisms buy the same guarantee inside the workspace:
 
-- **The seal.** `"@fmx/calcium": "file:../.."` plus `"files": ["dist"]` and an `exports` map locked to three entry points, so `import "@fmx/calcium/src/…"` is a resolution error enforced by npm rather than by discipline.
+- **The seal.** `"@fmx/calcium": "file:../.."` plus `"files": ["dist"]` and an `exports` map locked to its entry points — six at C24 I37, every one resolving into `dist/bundle/` (§5, F1193) — so `import "@fmx/calcium/src/…"` is a resolution error enforced by npm rather than by discipline.
 - **The proof.** `make proof` packs the real tarball, installs it into a tree that has never seen this repository, and runs the app's suite against it — refusing to proceed if npm resolved a symlink instead.
 
 **The distinction that makes this safe is what a repository boundary was actually protecting.** It was never the file layout; it was the resolution path. A boundary enforced by `exports` fails the same way a boundary enforced by separation does — at install, not at review — and it fails on every developer's machine rather than only in CI.
@@ -53,11 +53,11 @@ Separate rather than a monorepo because R01 §8's argument generalises: **a work
 
 ## 2. Dependency posture
 
-**Calcium has six runtime dependencies: `react`, `ink`, `lowlight`, `highlight.js`, `beautiful-mermaid` and `@xterm/headless`.**
+**Calcium has five runtime dependencies: `react`, `ink`, `highlight.js`, `beautiful-mermaid` and `@xterm/headless`.** It had six: `lowlight` wrapped highlight.js's emitter seam in a hast tree and its package entry loaded every grammar highlight.js ships, so the wrapper went internal — sixty lines — and `lowlight` stayed as the devDependency C09 I71's reference row is checked against.
 
 It had two for most of the specification, and that was worth saying because **two was a property that fell out of the specs rather than a target we were defending.** Every other candidate had an internal alternative the specs made better: `Intl.Segmenter` over a grapheme splitter, C10's own arithmetic over a colour library, an injected `() => number` over a date library.
 
-`lowlight` is the first capability that genuinely cannot be internal, which is the bar DEPENDENCIES.md sets rather than a number. C10 defines a `syntax` palette and nothing produced the token spans it colours; a hand-written tokeniser for YAML would be wrong about anchors, multi-line scalars and flow mappings, and wrong quietly. The count moved because a spec needed something real, not because the discipline slipped — and the discipline is the justification, never the integer.
+`highlight.js`'s grammars are the first capability that genuinely cannot be internal, which is the bar DEPENDENCIES.md sets rather than a number. C10 defines a `syntax` palette and nothing produced the token spans it colours; a hand-written tokeniser for YAML would be wrong about anchors, multi-line scalars and flow mappings, and wrong quietly. The count moved because a spec needed something real, not because the discipline slipped — and the discipline is the justification, never the integer.
 
 Everything else is already in Node or is arithmetic the specs define, and that is what keeps the list this short:
 
@@ -215,6 +215,8 @@ Each declares its terminal as `xterm-256color` with a UTF-8 locale, and each als
 | `make all` | Everything above | — |
 | `make conformance` | `prism-tui` only — the boundary contract (A01 §6) | — |
 | `make record` | `prism-tui`, `docker-tui` — fixture recording and `--diff` | — |
+
+**The one named build has two halves, and the second is what a consumer imports** (F1193). `tsc -p tsconfig.build.json` emits one file per source module into `dist/` with its declarations and maps — the tree every tier-5 child, probe and tool reads by relative path, and the tree the bundle is built from. `tools/bundle.mjs` then runs esbuild over the six entries C24 §2 names, code-split into one chunk graph (`splitting`), every package external, ESM, unminified, with linked source maps and no embedded sources, into `dist/bundle/`; `exports` points every entry's `default` there and every `types` at `dist/*.d.ts`. The loader's unit is the file and it was two thirds of a cold import — 207 of 310 sampled ms over 1,130 modules, 820 of them ours — so one chunk per entry is a third of the import and a quarter of the heap after it, six of six pairs with and without the compile cache. What the bundle must keep is C24 I38's list: one instance of every module across every entry, the same names as the file entry, the emulator and the Mermaid renderer still off the runtime's graph, and a sampled frame still named (C28 I65). Minification is not done — the compile cache holds the compiled form, and a minified stack is a card nobody can read.
 
 **A `pre-commit` hook runs `make enforce` too, and running it three times is the point.** CI catches it, the pre-MR habit catches it, and the hook catches it before either — because the two gates above it are discipline and discipline is what fails on the commit where someone is concentrating on something else. That is not hypothetical here: a commit landed on a red `make enforce` during C16's build, because the only gate was an `&&` chain in a typed command and the chain ran past the failure.
 
@@ -425,6 +427,7 @@ The reference app bumping is the release gate. It lives in another repo precisel
 18. One skill — `implement-component`.
 19. One container per thing that needs a different machine, not one per repository. An example needing a far side gets its own; the framework's acquires nothing the framework does not have.
 20. The socket lives in one container, and no claim is made that it is read-only — a read-only bind of a unix socket is not a control (§4).
+21. The build is `tsc` then the bundle, and `exports` resolves into the bundle; the file tree stays for the tests and is what the bundle is built from (§5, C24 I38, F1193).
 
 ---
 

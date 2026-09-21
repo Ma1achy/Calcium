@@ -16,7 +16,9 @@
  */
 
 import { execFile } from "node:child_process";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { b, completeLocal } from "@fmx/calcium";
@@ -40,6 +42,32 @@ type LiveSpec = Readonly<{
 }>;
 
 describe("the plot demo", () => {
+  // **R4.7's row stood here**, spawning the launcher under a counting resolve
+  // hook and asserting between one and ten `es-toolkit/` resolutions. Retired
+  // with Ink (F1209): `prepareLaunch()` is deleted and es-toolkit is not in the
+  // tree, so the count is zero by construction.
+
+  it("R01 R4.6, by the same rule: spawned with a fresh TMPDIR and no NODE_COMPILE_CACHE, plots-tui leaves compile-cache files under it", async () => {
+    // The artefact rather than the source, as `docker-tui`'s row reads it:
+    // a fresh TMPDIR starts empty and the outside variable is removed, so the
+    // files can only be the launcher's own call.
+    const tmp = mkdtempSync(join(tmpdir(), "plots-tui-cc-"));
+    try {
+      const env: Record<string, string> = { ...(process.env as Record<string, string>), TMPDIR: tmp };
+      delete env["NODE_COMPILE_CACHE"];
+      const { stdout } = await run(here("../bin/plots-tui.js"), [], { env, timeout: 30_000 });
+      expect(stdout, "the launcher ran to the no-TTY branch").toContain("plots-tui");
+      const cache = join(tmp, "node-compile-cache");
+      expect(existsSync(cache), "the cache directory appeared under the fresh TMPDIR").toBe(true);
+      const files = readdirSync(cache, { recursive: true }).filter((f) => statSync(join(cache, String(f))).isFile());
+      // Refounded at twenty with `docker-tui`'s row and for its reason: the
+      // floor was taken from the graph it bounds, and the graph is what F1209
+      // shrank (F1212).
+      expect(files.length, "and it holds compiled modules").toBeGreaterThan(20);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  }, 40_000);
   it("the far side emits the five datasets", async () => {
     // A fixture must be shown to respond before it is asserted against.
     const { stdout } = await run(here("../bin/plots"), ["sample", "--json"]);
@@ -381,8 +409,8 @@ describe("every command composes a document the transcript would accept", () => 
     // does not configure a profiler sees. `ProfileReport` is reachable only
     // through `ctx.profile()`: there is no constructor on the public surface and
     // none in `@fmx/calcium/testing`, so the present arm needs a live session
-    // (F917). It is not uncovered — `profilePane` is exercised across every pane
-    // by the framework's own `test/unit/profiler.test.ts`; what this row adds is
+    // (F917). It is not uncovered — `profileCard` is exercised across every card
+    // by the framework's own `test/unit/profile-deck.test.ts`; what this row adds is
     // that the command composes a document the transcript accepts.
     // `FULL` is declared below and closed over rather than repeated: these
     // entries are thunks, so nothing here runs until an `it` does. The absent

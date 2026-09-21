@@ -18,7 +18,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { ProfileReport, TuiConfig } from "../../src/index.js";
-import type { Block, KeyValue } from "../../src/data/viewmodel/index.js";
+import type { Block } from "../../src/data/viewmodel/index.js";
 import type { CommitReason } from "../../src/terminal/frame-scheduler.js";
 import { defaultTheme } from "../../src/presentation/theme/index.js";
 import { resolveConfig, type Ambient } from "../../src/shell/config.js";
@@ -276,14 +276,14 @@ describe("C28 — profiler, tier 4 spec-first rows", () => {
     let t = 0;
     const p = createProfiler({ tier: "spans" }, { elapsed: () => t });
 
-    // Ten commits inside one 33 ms window, then the frame that serves them.
+    // Five commits inside one 16 ms window, then the frame that serves them.
     for (let i = 0; i < 5; i += 1) {
       t = i * 3;
       p.commit("stream", false);
     }
-    t = 33;
+    t = 16;
     p.beginFrame("stream");
-    t = 35;
+    t = 18;
     p.endFrame("frame");
 
     const report = p.report();
@@ -292,8 +292,8 @@ describe("C28 — profiler, tier 4 spec-first rows", () => {
     expect(report.frames, "five commits, one frame").toBe(1);
 
     // `wait` is dated from the **earliest unserved commit** (C28 I5), so it is
-    // the window and not the gap since the last one: 33 − 0, not 33 − 12.
-    expect(frame?.wait, "wait is the window, from the earliest unserved commit").toBe(33);
+    // the window and not the gap since the last one: 16 − 0, not 16 − 12.
+    expect(frame?.wait, "wait is the window, from the earliest unserved commit").toBe(16);
     expect(frame?.work, "and work is the composition alone").toBe(2);
     expect(frame?.work, "the two are not the same number").not.toBe(frame?.wait);
 
@@ -329,7 +329,7 @@ describe("C28 — profiler, tier 4 spec-first rows", () => {
     // A redraw in place — the path the timer and the keys share — is the view's
     // frame too. `open` brackets its own push; a row that stopped there passed
     // with the redraw's bracket removed (measured on T1.92's first form).
-    expect(graph.profileView.switchPane(1)).toBe(true);
+    expect(graph.profileView.nextCard(1)).toBe(true);
     const switched = profiler.report();
     expect(switched.frames).toBeGreaterThan(opened.frames);
     expect(switched.excluded.selfInflicted, "the redraw's frame is excluded too").toBeGreaterThan(
@@ -340,7 +340,7 @@ describe("C28 — profiler, tier 4 spec-first rows", () => {
     // **The control is a keystroke.** A byte through stdin raises a frame the
     // reader waited on — `deliver` commits `input` outside any bracket — and
     // `excluded.selfInflicted` does not move for it. `x` rather than `n`: `n`
-    // is the view's own pane switch and would be bracketed.
+    // is the view's own card switch and would be bracketed.
     stdin.emit("x");
     const typed = profiler.report();
     expect(typed.frames, "the key drew a frame").toBeGreaterThan(switched.frames);
@@ -368,36 +368,49 @@ describe("C28 — profiler, tier 4 spec-first rows", () => {
 
     stdin.emit("\x03");
     expect(graph.overlays.stack, "the stack is empty").toEqual([]);
-    expect(graph.profileView.pane, "the owner knows").toBeNull();
+    expect(graph.profileView.section, "the owner knows").toBeNull();
     expect(profiler.tier, "the tier is `counters` again").toBe("counters");
     profiler.dispose();
   });
 
-  it("T4.7 (C28 I50, C28 I51, with C16): `n` then `Esc` as bytes switch the pane and reach this owner's `pop`", async () => {
+  it("T4.7 (C28 I50, C28 I51, with C16): `n`, `tab` then `Esc` as bytes walk the deck and reach this owner's `pop`", async () => {
     const profiler = createProfiler({ tier: "counters" }, { elapsed: () => performance.now() });
     const { graph, stdin, clock } = await buildGraph({}, undefined, profiler);
     graph.lifecycle.acquire();
     expect(graph.profileView.open()).toBeNull();
-    expect(graph.profileView.pane).toBe("overview");
+    expect(graph.profileView.section).toBe("verdict");
 
-    // `n` — the keymap's `viewNextHunk`, which `keys.ts` routes to this owner
-    // while its pane is open; the layer's content is the next pane's.
+    // **`n` crosses the boundary here, which is the point of running it on the
+    // verdict.** That section holds one card, so the unit key leaves it — the
+    // groups are contiguous and `n` walks the deck (C28 §3c) — and the header
+    // has to name the section it arrived in rather than the one it left.
     stdin.emit("n");
-    expect(graph.profileView.pane).toBe("frame");
+    expect(graph.profileView.section).toBe("app");
     const header = viewContent(graph.overlays.stack)[0];
     expect(header?.kind).toBe("rule");
-    expect(header?.kind === "rule" ? header.meta : "").toBe("2/4");
+    expect(header?.kind === "rule" ? header.label : "").toContain("app");
+    expect(header?.kind === "rule" ? header.meta : "").toMatch(/^1\//u);
+
+    // **`tab` — the section gesture, through the same keymap** (C16 I33). It is
+    // the third owner of `pushedView` and the key is new to the target, so the
+    // row drives it as bytes rather than calling the member: a binding added to
+    // a job and not to the table is the defect F1090 names.
+    stdin.emit("\t");
+    expect(graph.profileView.section, "one group on").toBe("framework");
+    const after = viewContent(graph.overlays.stack)[0];
+    expect(after?.kind === "rule" ? after.label : "").toContain("framework");
+    expect(after?.kind === "rule" ? after.meta : "", "and back to that section's first card").toMatch(/^1\//u);
 
     // `Esc` — C16's 50 ms window, then `viewPop`, which asks this owner first.
     // A real wait, as `session-keys.test.ts` does: the harness injects a real
     // `schedule`, and the window is a constant rather than a race.
     stdin.emit("\u001b");
-    expect(graph.profileView.pane, "nothing before the window closes").toBe("frame");
+    expect(graph.profileView.section, "nothing before the window closes").toBe("framework");
     clock.advance(80);
     await new Promise((r) => setTimeout(r, 80));
 
     expect(graph.overlays.stack, "popped").toEqual([]);
-    expect(graph.profileView.pane).toBeNull();
+    expect(graph.profileView.section).toBeNull();
     expect(profiler.tier, "restored").toBe("counters");
     profiler.dispose();
   });
@@ -436,10 +449,14 @@ describe("C28 — profiler, tier 4 spec-first rows", () => {
   });
 
   it("T4.9 (C28 I51, C09 I49, with C22 I49): the view draws with `detection.capabilities`, after the overrides", async () => {
-    const excluded = (stack: readonly { id: string; content: readonly Block[] }[]): string | undefined =>
-      viewContent(stack)
-        .filter((x): x is KeyValue => x.kind === "keyValue" && x.id === "ov-regime")[0]
-        ?.rows.find((r) => r.label === "excluded")?.value;
+    // **The card's generated footer**, which is where the deck states its
+    // population and its exclusions and therefore where the separator the
+    // capabilities resolve to is joined in (C28 I57). The pane this replaces
+    // carried it in a `keyValue` row; the slot is the same one either way, and a
+    // view taking the deck's ASCII default would read `: ` on a unicode terminal
+    // with nothing else on screen different.
+    const footer = (stack: readonly { id: string; content: readonly Block[] }[]): string | undefined =>
+      viewContent(stack).find((x): x is Block & { footer?: string } => x.kind === "panel")?.footer;
 
     const ascii = await buildGraph(
       { capabilities: { unicode: "ascii" } },
@@ -448,7 +465,7 @@ describe("C28 — profiler, tier 4 spec-first rows", () => {
     );
     ascii.graph.lifecycle.acquire();
     expect(ascii.graph.profileView.open()).toBeNull();
-    expect(excluded(ascii.graph.overlays.stack), "the ASCII arm").toBe("0 self-inflicted : 0 fallback");
+    expect(footer(ascii.graph.overlays.stack), "the ASCII arm").toContain("frame-site spans : ");
     ascii.graph.profileView.pop();
 
     const unicode = await buildGraph(
@@ -458,8 +475,8 @@ describe("C28 — profiler, tier 4 spec-first rows", () => {
     );
     unicode.graph.lifecycle.acquire();
     expect(unicode.graph.profileView.open()).toBeNull();
-    expect(excluded(unicode.graph.overlays.stack), "the terminal's arm, never the default").toBe(
-      "0 self-inflicted · 0 fallback",
+    expect(footer(unicode.graph.overlays.stack), "the terminal's arm, never the default").toContain(
+      "frame-site spans · ",
     );
     unicode.graph.profileView.pop();
   });

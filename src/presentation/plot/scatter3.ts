@@ -13,7 +13,7 @@
  * tiers, and an absolute bucket gives the second one tier and no depth at all.
  */
 import type { AxisSpec3, Plot, Point3, Surface3, Tone } from "../../data/viewmodel/index.js";
-import type { RenderContext } from "../blocks/types.js";
+import type { RenderContext, RenderScratch } from "../blocks/types.js";
 import type { ColourValue, Style } from "../theme/types.js";
 import { assertPictureGlyph } from "../theme/picture.js";
 // **`HALF_BLOCK` is gone from this file and that is the finding, not the
@@ -38,30 +38,47 @@ import {
   type Axis3,
   type Seg3,
 } from "./axes3.js";
-import { continuousColour, shadeColour } from "../theme/colormap.js";
+import { continuousColour, packedHex, samplePacked, shadeColour, shadePacked } from "../theme/colormap.js";
 import { colormapFor } from "./heatmap.js";
 import { CELL_ASPECT } from "./aspect.js";
+
+/**
+ * The mark a surface sample carries between its write and its record (C12
+ * I132): one shared, frozen value, compared by identity, never a colour the
+ * compose could see — the pass that builds the records replaces every one
+ * before the frame draws. An empty hex, so a mark that escaped would be a
+ * visible fault rather than a plausible colour.
+ */
+const PENDING_INK: ColourValue = Object.freeze({ kind: "rgb", hex: "" }) as ColourValue;
 import {
-  densityGlyph,
+  densityGlyphOf,
+  densitySteps,
   drawTri,
   edgeIntensity,
   lightDirOf,
+  geometryOf,
+  spanOverCorners,
   surfacePoints,
-  trianglesOf,
+  type Geometry3,
+  type Lanes,
+  type Skin,
   type Tri3,
+  type RasterFrame,
 } from "./surface3.js";
 import { plotAreaRows } from "./height.js";
 import { seriesRefOf } from "./marks.js";
 import {
   AREA_ROWS,
   basisOf,
+  boundsOf,
   createDepth,
   equalDepth,
-  extentOf,
   project,
   sampleGrid,
   strokeSeg,
+  unionOf,
   unitOf,
+  UNIT_EXTENT,
   writeDepth,
   type Basis,
   type Depth,
@@ -197,6 +214,10 @@ type Scene = Readonly<{
   drawn: readonly Drawn[];
   strokes: readonly Stroke[];
   tris: readonly Tri3[];
+  /** Every surface's referenced vertices, once each, for the ramp span (C12 I127). */
+  lanes: readonly Lanes[];
+  /** This render's frame stamp over the surfaces' geometries (C12 I130). */
+  stamp: number;
   identities: readonly Identity[];
   basis: Basis;
   lo: Vec3;
@@ -220,11 +241,64 @@ type Scene = Readonly<{
  * their *values* go in the key and two structurally equal fresh arrays hit
  * rather than missing.
  */
-type HeldGeometry = Readonly<{ from: readonly unknown[]; tris: readonly Tri3[] }>;
+type HeldGeometry = Readonly<{ key: string; built: Geometry3 }>;
 
-/** Every object `trianglesOf` reads, in a fixed order, for the identity check. */
+/**
+ * A surface's one slot: its carriers, its own extent, and its geometry under the
+ * geometry's own key (C12 I126, §6o rows 10, 11, 13).
+ *
+ * **Two validity predicates in one slot, because a height field has one
+ * carrier.** The slot's key is the ranges and its `from` is the carriers — what
+ * the surface's own extent depends on. The geometry depends on the block's
+ * extent and the series as well, and the block's extent cannot be known until
+ * every carrier's own has answered, so the geometry's key is checked *inside*
+ * the value rather than at the store. A second slot for the extent would have
+ * to be owned by the same array `geometryFor` owns, and two writers on one
+ * slot with different keys thrash each other every frame with the store
+ * reporting a `rev` miss it cannot tell from a moved camera.
+ */
+type HeldSurface = Readonly<{
+  from: readonly unknown[];
+  own: Extent3 | undefined;
+  geometry: HeldGeometry | undefined;
+}>;
+
+/** A cloud's or a path's slot: its own extent, owned by its `points` (C12 I126). */
+type HeldPoints = Readonly<{ own: Extent3 | undefined }>;
+const POINTS_KEY = "extent";
+/**
+ * The render's frame stamp (C12 I130): one above every geometry's last, written
+ * back to each, so two surfaces in one block share one frame and a held
+ * geometry's records from the last camera are unreadable. A fresh geometry is
+ * at zero and any stamp above it is new to every vertex. No scratch write —
+ * the counter sits on the record the scratch already holds (§6o row 16).
+ */
+function advanceFrame(built: readonly Geometry3[]): number {
+  let stamp = 0;
+  for (const b of built) if (b.frame > stamp) stamp = b.frame;
+  stamp += 1;
+  for (const b of built) b.frame = stamp;
+  return stamp;
+}
+
+/** Every object `geometryOf` reads, in a fixed order, for the identity check. */
 const carriersOf = (sf: Surface3): readonly unknown[] =>
   [sf.vertices, sf.faces, sf.heights, sf.field];
+
+/** The slot's owner: a carrier and never the `Surface3` (C12 §6o row 2). */
+const ownerOf = (sf: Surface3): object => (sf.faces ?? sf.heights ?? sf.vertices ?? sf) as object;
+
+/**
+ * The slot's key: what a surface's *own* extent depends on besides its carriers
+ * (C12 I126, §6o row 10). A grid's points are laid across `xRange` and `yRange`,
+ * so a range moved is a different extent over the same `heights`; a mesh reads
+ * neither and the key is the same empty pair.
+ */
+function surfaceKey(sf: Surface3): string {
+  const r = (v: readonly [number, number] | undefined): string =>
+    v === undefined ? "" : `${String(v[0])},${String(v[1])}`;
+  return `${r(sf.xRange)}\u0000${r(sf.yRange)}`;
+}
 
 /**
  * Everything else it reads: the scalars, the ranges' values, the extent and the
@@ -257,9 +331,9 @@ function geometryKey(sf: Surface3, e: Extent3, series: number): string {
 }
 
 /**
- * `trianglesOf` through the caller's scratch (C12 I107, §6o, FINDINGS F469).
+ * `geometryOf` through the caller's scratch (C12 I107, §6o, FINDINGS F469).
  *
- * **None of `trianglesOf`'s three arguments is the camera**, so an orbit rebuilds
+ * **None of `geometryOf`'s three arguments is the camera**, so an orbit rebuilds
  * an identical answer every frame: measured at 69,451 faces, **194 ms of a
  * 319 ms frame**. F469 named this remedy — caller-owned scratch on
  * `RenderContext` — and recorded it rather than taking it, because C12 I11 makes
@@ -279,45 +353,102 @@ function geometryKey(sf: Surface3, e: Extent3, series: number): string {
  * cost is what it was; a cache whose absence changes a picture is not a cache,
  * and PR10's control asserts exactly that before it asserts anything else.
  */
-function trianglesFor(
+function geometryFor(
   sf: Surface3,
   extent: Extent3,
   series: number,
   ctx: RenderContext,
-): readonly Tri3[] {
+  held: HeldSurface | undefined,
+  own: Extent3 | undefined,
+): Geometry3 {
   const scratch = ctx.scratch;
-  if (scratch === undefined) return trianglesOf(sf, extent, series);
-  const owner = (sf.faces ?? sf.heights ?? sf.vertices ?? sf) as object;
-  const key = geometryKey(sf, extent, series);
-  const from = carriersOf(sf);
-  const held = scratch.get(owner, key) as HeldGeometry | undefined;
-  if (held !== undefined && held.from.length === from.length // cells-ok — a carrier count
-    && held.from.every((v, i) => v === from[i])) {
-    return held.tris;
+  if (scratch === undefined) {
+    ctx.probe?.count("plot3d.triangulate");
+    return geometryOf(sf, extent, series);
   }
-  const tris = trianglesOf(sf, extent, series);
-  scratch.set(owner, key, { from, tris } satisfies HeldGeometry);
-  return tris;
+  const key = geometryKey(sf, extent, series);
+  // **The geometry's own validity, checked inside a valid slot** (C12 I126,
+  // §6o row 10). `held` is undefined or its carriers matched; the block extent
+  // and the series are the rest of what the triangles depend on.
+  if (held?.geometry !== undefined && held.geometry.key === key) return held.geometry.built;
+  // **A rebuild inside a held slot is a hit at the store**, which counts slots;
+  // this is the count that sees it (C28 I30).
+  ctx.probe?.count("plot3d.triangulate");
+  const built = geometryOf(sf, extent, series);
+  // **One write per build, carrying the extent and the geometry together, after
+  // the build** (§6o rows 8, 13). The referenced vertices ride in the same
+  // record under the same key (row 15).
+  scratch.set(ownerOf(sf), surfaceKey(sf), { from: carriersOf(sf), own, geometry: { key, built } } satisfies HeldSurface);
+  return built;
+}
+
+/**
+ * A surface's slot if it holds this surface's carriers, else `undefined`
+ * (C12 I126). The owner and the key are the surface's own; `from` is the
+ * identity check, as I107 has it.
+ */
+function heldOf(sf: Surface3, scratch: RenderScratch): HeldSurface | undefined {
+  const held = scratch.get(ownerOf(sf), surfaceKey(sf)) as HeldSurface | undefined;
+  if (held === undefined) return undefined;
+  const from = carriersOf(sf);
+  return held.from.length === from.length && held.from.every((v, i) => v === from[i]) // cells-ok — a carrier count
+    ? held
+    : undefined;
+}
+
+/**
+ * A cloud's or a path's own extent, through the scratch when there is one
+ * (C12 I126, §6o row 12).
+ *
+ * **An empty carrier takes no slot.** Its answer is `undefined` — nothing to
+ * hold, and the union's identity — so the store is not consulted for it and
+ * PR11's *each carrier written once* counts the carriers that have a point.
+ */
+function pointsExtent(points: readonly Point3[], scratch: RenderScratch | undefined): Extent3 | undefined {
+  if (points.length === 0) return undefined; // cells-ok — a point count
+  if (scratch === undefined) return boundsOf(points);
+  const held = scratch.get(points, POINTS_KEY) as HeldPoints | undefined;
+  if (held !== undefined) return held.own;
+  const own = boundsOf(points);
+  scratch.set(points, POINTS_KEY, { own } satisfies HeldPoints);
+  return own;
 }
 
 function drawnOf(block: Plot, ctx: RenderContext, aspect: number): Scene {
   const clouds = block.points3 ?? [];
   const paths = block.lines3 ?? [];
   const skins = block.surfaces3 ?? [];
-  const all: Vec3[] = [];
-  for (const c of clouds) for (const p of c.points) all.push(p);
+  // **The extent is the union of every carrier's own, each held in the
+  // caller's scratch** (C12 I126, §6o rows 10–13). None of it is the camera,
+  // and building `all` from every point and walking it allocated two objects
+  // a point, every frame (F1153).
+  const scratch = ctx.scratch;
+  let acc: Extent3 | undefined;
+  for (const c of clouds) acc = unionOf(acc, pointsExtent(c.points, scratch));
   // **Both carriers, or the frame describes a different document** (C04 I78,
   // C12 §6g row 1). Taking the extent from the clouds alone leaves a
   // lines-only block normalising against `extentOf([])`'s unit cube: on
   // screen, inside the box, and drawn to the wrong scale — which no bounds
   // assertion and no ink comparison can see. That is T6.77.
-  for (const l of paths) for (const p of l.points) all.push(p);
+  for (const l of paths) acc = unionOf(acc, pointsExtent(l.points, scratch));
   // **And the fourth**, on the same rule (C04 I79, C12 §6h row 10). A surface
   // normalised against a cloud somewhere else has its relief flattened, and
   // that is the truth — the drawn geometry *is* the normalised one — but a
   // surface left out of the extent entirely draws against the unit cube.
-  for (const sf of skins) for (const p of surfacePoints(sf)) all.push(p);
-  const extent = extentOf(all);
+  //
+  // **A surface's own extent comes out of its slot when the slot holds its
+  // carriers, and is computed and kept in a local otherwise** — the write
+  // waits for the geometry (§6o row 13).
+  const helds: (HeldSurface | undefined)[] = [];
+  const owns: (Extent3 | undefined)[] = [];
+  for (const sf of skins) {
+    const held = scratch === undefined ? undefined : heldOf(sf, scratch);
+    const own = held !== undefined ? held.own : boundsOf(surfacePoints(sf));
+    helds.push(held);
+    owns.push(own);
+    acc = unionOf(acc, own);
+  }
+  const extent = acc ?? UNIT_EXTENT;
   // **The live camera wins and the block's is the fallback** (C04 I75, C12 I83).
   // `RenderContext` carries the one an orbit moves; the member says where the
   // view starts.
@@ -367,8 +498,21 @@ function drawnOf(block: Plot, ctx: RenderContext, aspect: number): Scene {
   // **Normals come from the normalised geometry** (C12 I94, §6h row 1), which is
   // why the triangles are built here with the extent in hand rather than by the
   // renderer with the surface alone.
-  const tris: Tri3[] = [];
-  for (const sf of skins) {
+  // **One surface's held array is the scene's; two concatenate** (C12 I126,
+  // §6o row 14). The copy is 69,451 pushes a bunny frame and there is no owner
+  // for a block-level slot that outlives the tick, so a multi-surface block pays
+  // it and the catalogue has none.
+  const built: Geometry3[] = [];
+  for (let k = 0; k < skins.length; k += 1) { // cells-ok — a surface index
+    built.push(geometryFor(skins[k] as Surface3, extent, si, ctx, helds[k], owns[k]));
+    si += 1; // cells-ok — a surface index
+  }
+  const stamp = advanceFrame(built);
+  let tris: readonly Tri3[];
+  if (built.length === 1) { // cells-ok — a surface count
+    tris = (built[0] as Geometry3).tris;
+  } else {
+    const out: Tri3[] = [];
     // **A loop and never `push(...built)`** (F508). A spread is an argument
     // list: 100,000 elements is fine and 125,000 throws `RangeError: Maximum
     // call stack size exceeded`, from an expression that reads as a
@@ -376,13 +520,18 @@ function drawnOf(block: Plot, ctx: RenderContext, aspect: number): Scene {
     // refuses, and the largest mesh in the tree is 69,451 faces — under half
     // the ceiling, which is why it never fired. `parseObj` fans quads, so a
     // 63k-quad model is over it.
-    for (const t of trianglesFor(sf, extent, si, ctx)) tris.push(t);
-    si += 1; // cells-ok — a surface index
+    for (const b of built) for (const t of b.tris) out.push(t);
+    tris = out;
   }
+  // **Each geometry's lanes, for the span** (C12 I127, I139).
+  const lanes: Lanes[] = [];
+  for (const b of built) lanes.push(b.lanes);
   return {
     drawn: out,
     strokes,
+    stamp,
     tris,
+    lanes,
     identities: [...clouds, ...paths, ...skins],
     basis,
     lo: extent.min,
@@ -796,38 +945,55 @@ export function plot3dArea(
   const scene = drawnOf(block, ctx, aspect);
   const drawn = scene.drawn;
 
+  // **Four bounds no closure captures** (C12 I135, F1175): these were written
+  // through a `reading` closure, and a double assigned to a captured variable
+  // is a heap number allocated per assignment — 22 MB of a twenty-frame bunny
+  // heap for the corners alone. The readings are the same `Math.min` and
+  // `Math.max` statements, written where the closure was called.
   let nearD = Infinity;
   let farD = -Infinity;
   let loV = Infinity;
   let hiV = -Infinity;
-  const reading = (depth: number, value: number | undefined): void => {
-    nearD = Math.min(nearD, depth);
-    farD = Math.max(farD, depth);
-    if (value !== undefined) {
-      loV = Math.min(loV, value);
-      hiV = Math.max(hiV, value);
+  for (const d of drawn) {
+    nearD = Math.min(nearD, d.depth);
+    farD = Math.max(farD, d.depth);
+    if (d.value !== undefined) {
+      loV = Math.min(loV, d.value);
+      hiV = Math.max(hiV, d.value);
     }
-  };
-  for (const d of drawn) reading(d.depth, d.value);
+  }
   // **The ramps span both carriers** (C04 I78). A path outside the cloud's
   // depth range would otherwise saturate at one end of the map, and the tier
   // and the ramp would be keyed to different sets — two answers to *how far is
   // far* in one figure.
   for (const st of scene.strokes) {
-    reading(st.a.depth, st.va);
-    reading(st.b.depth, st.vb);
-  }
-  // **And the surfaces**, or a landscape under a cloud saturates one end of the
-  // map and the depth cue keys to a set the picture does not hold (C04 I79).
-  // Projected here rather than threaded back from `drawTri`, because a culled
-  // vertex has no depth and the span must not be told otherwise.
-  for (const t of scene.tris) {
-    for (const w of [t.a, t.b, t.c]) {
-      const pr = project(scene.basis, w.p);
-      if (pr !== null) reading(pr.depth, w.v);
+    nearD = Math.min(nearD, st.a.depth);
+    farD = Math.max(farD, st.a.depth);
+    nearD = Math.min(nearD, st.b.depth);
+    farD = Math.max(farD, st.b.depth);
+    if (st.va !== undefined) {
+      loV = Math.min(loV, st.va);
+      hiV = Math.max(hiV, st.va);
+    }
+    if (st.vb !== undefined) {
+      loV = Math.min(loV, st.vb);
+      hiV = Math.max(hiV, st.vb);
     }
   }
-  const span = { nearD, farD, loV, hiV };
+  // **And the surfaces**, or a landscape under a cloud saturates one end of the
+  // map and the depth cue keys to a set the picture does not hold (C04 I79,
+  // C12 I127). Projected here rather than threaded back from `drawTri`, because
+  // a culled vertex has no depth and the span must not be told otherwise.
+  // **Once per referenced vertex and never per corner** (F1154): a bunny vertex
+  // sits on six faces, and a minimum over a multiset is the minimum over its
+  // support.
+  // **The depth alone** (C12 I131, F1169): `project`'s first dot, not its
+  // record — 35,947 of them a bunny frame — **in one function returning the
+  // span once** (I135), so the bounds stay in registers over the pass.
+  let span = { nearD, farD, loV, hiV };
+  for (let k = 0; k < scene.lanes.length; k += 1) { // cells-ok — a surface index
+    span = spanOverCorners(scene.basis, scene.lanes[k] as Lanes, span.nearD, span.farD, span.loV, span.hiV);
+  }
 
   const depth = createDepth(grid.width, grid.height);
   // **One colour per sample, and `null` is *not drawn*.** A sparse raster has
@@ -1110,53 +1276,125 @@ export function plot3dArea(
   // coincident edges. That is F452's ruling arriving where the coincidence is
   // structural rather than incidental.
   const lit = lightDirOf(block.light3, scene.basis);
-  for (const t of scene.tris) {
-    const wire = t.skin.wire;
-    drawTri(t, scene.basis, grid, depth, lit, span, (i, sm) => {
-      // **`wireframe: true` writes depth and paints nothing but the edges**
-      // (C12 I95, §6i row 11). The depth write already happened — `drawTri`
-      // calls it before this — so the face occludes what is behind it and the
-      // surface is a solid whose interior is not painted rather than a
-      // transparent cage. **The ink has to be cleared with it**, or a nearer
-      // carrier's colour survives at a sample it has just lost, which is I90's
-      // rule about the frame's write one carrier along. Hidden-line rather than
-      // see-through, because a committed frame cannot be orbited.
-      if (wire === true && !sm.edge) {
-        ink[i] = undefined;
-        mark[i] = undefined;
-        glyph[i] = -1;
-        return;
-      }
-      const base = colourOf(block, ctx, sm, scene.identities, span);
-      // **An edge under `"over"` is its own face at half the intensity**
-      // (§6i row 13): the only rule that cannot collapse into a fill whose own
-      // range is `0.1332 … 0.7871`, and it keeps the shading and the depth
-      // attenuation on the edge rather than pinning it to a constant.
-      const k = sm.edge ? edgeIntensity(sm.intensity, wire) : sm.intensity;
-      // **The shading scales the colour in linear light** (C12 I94, F455), and
-      // the intensity arrives already clamped, because the ratio that makes the
-      // field recoverable from hue holds over `[0, 1]` and nowhere else.
-      ink[i] = base === undefined ? undefined : shadeColour(base, k);
-      // **A wireframe edge is an outline and a fill is an area**, on the same
-      // surface and often in the same cell (C12 I103). `sm.edge` is the fill's
-      // own sample rather than a second stroke (I95), so the distinction costs
-      // nothing here and is what lets a cage draw in dots over a shaded face.
-      kind[i] = sm.edge ? OUTLINE : AREA;
-      // **The glyph arm's second channel** (§6h row 12): the colour carries the
-      // field and the mark carries the shading, which is F436's retracted claim
-      // holding on the arm that kept two carriers.
-      //
-      // **`sub` and not `!half`, and reading the frame is what said so** (C12
-      // I100, F489). This was `half ? undefined : …`, correct while *not half*
-      // meant *the glyph arm*. On the braille rung it wrote a density glyph at
-      // every surface sample, which `brailleRows` then read as a frame mark and
-      // withheld from the dot grid — measured, the bottom dot row of a shaded
-      // surface's cells was set **3 times against 76** for the rows above it,
-      // and the picture was a plausible stipple rather than an obvious fault.
-      mark[i] = sub ? undefined : densityGlyph(k, ctx.capabilities);
+  // **The colour map and its axis resolved once per render, not per sample**
+  // (C10 I40, F1150). `colourOf` looks the map up and branches on `colourBy`
+  // for every painted sample of a 30 720-sample grid, and on the 24-bit
+  // continuous arm it then builds a hex that `shadeColour` parses straight
+  // back. Both are constant across the plot, so they are read here and the
+  // fill holds the eight-bit channels between sample and shade. `fastMap` is
+  // `undefined` for a series colour, an eight-bit terminal or a plot with no
+  // map, and the fill falls back to `colourOf` + `shadeColour` unchanged.
+  const colourBy = block.colourBy ?? "depth";
+  const fastMap =
+    colourBy !== "series" && ctx.capabilities.colourDepth >= 24 ? colormapFor(block) : undefined;
+  // **One painter per render, not per triangle** (C12 I128, F1158): the only
+  // per-triangle input is `wire`, read through a binding the loop assigns;
+  // a closure per triangle was 69 451 allocations a bunny frame for one body.
+  let wire: Skin["wire"] = false;
+  // **The colour is one packed integer per sample until the last surface has
+  // drawn** (C12 I132, F1171): the painter writes `inkRgb[i]` and leaves
+  // `PENDING_INK` in `ink[i]`; the pass after the surfaces loop builds one
+  // record per sample still pending. A sample written by every thin edge of a
+  // bunny triangle before its face used to build a colour per write.
+  const inkRgb = new Int32Array(grid.width * grid.height); // cells-ok — a sample count
+  let paints = 0;
+  // The ladder's steps once per render (I132) — they were copied per write before.
+  const density = sub ? undefined : densitySteps(ctx.capabilities);
+  const painter = (i: number, z: number, v: number | undefined, si: number, intensity: number, edge: boolean): void => {
+    paints += 1;
+    // **`wireframe: true` writes depth and paints nothing but the edges**
+    // (C12 I95, §6i row 11). The depth write already happened — `drawTri`
+    // calls it before this — so the face occludes what is behind it and the
+    // surface is a solid whose interior is not painted rather than a
+    // transparent cage. **The ink has to be cleared with it**, or a nearer
+    // carrier's colour survives at a sample it has just lost, which is I90's
+    // rule about the frame's write one carrier along. Hidden-line rather than
+    // see-through, because a committed frame cannot be orbited.
+    if (wire === true && !edge) {
+      ink[i] = undefined;
+      mark[i] = undefined;
       glyph[i] = -1;
-    });
+      return;
+    }
+    // **An edge under `"over"` is its own face at half the intensity**
+    // (§6i row 13): the only rule that cannot collapse into a fill whose own
+    // range is `0.1332 … 0.7871`, and it keeps the shading and the depth
+    // attenuation on the edge rather than pinning it to a constant.
+    const k = edge ? edgeIntensity(intensity, wire) : intensity;
+    // **The shading scales the colour in linear light** (C12 I94, F455), and
+    // the intensity arrives already clamped, because the ratio that makes the
+    // field recoverable from hue holds over `[0, 1]` and nowhere else.
+    if (fastMap !== undefined) {
+      // **The numeric path** (C10 I40): the same ramp `colourOf` takes, the
+      // channels held as ints, one hex built at the end. Bit-identical to
+      // `shadeColour(continuousColour(map, t))` because `sample` is
+      // `rgbHex(sampleRgb(...))` and a hex round-trip of eight-bit ints is
+      // lossless; `k === 1` is `shadeColour`'s own unchanged-colour arm.
+      const tt =
+        colourBy === "value"
+          ? ramped(v ?? span.loV, span.loV, span.hiV)
+          : 1 - ramped(z, span.nearD, span.farD);
+      const p = samplePacked(fastMap, tt);
+      inkRgb[i] = k >= 1 ? p : shadePacked(p, k);
+      ink[i] = PENDING_INK;
+    } else {
+      // **The reading record is built on this arm alone** (C12 I129).
+      const base = colourOf(block, ctx, { depth: z, value: v, series: si }, scene.identities, span);
+      ink[i] = base === undefined ? undefined : shadeColour(base, k);
+    }
+    // **A wireframe edge is an outline and a fill is an area**, on the same
+    // surface and often in the same cell (C12 I103). `edge` is the fill's
+    // own sample rather than a second stroke (I95), so the distinction costs
+    // nothing here and is what lets a cage draw in dots over a shaded face.
+    kind[i] = edge ? OUTLINE : AREA;
+    // **The glyph arm's second channel** (§6h row 12): the colour carries the
+    // field and the mark carries the shading, which is F436's retracted claim
+    // holding on the arm that kept two carriers.
+    //
+    // **`sub` and not `!half`, and reading the frame is what said so** (C12
+    // I100, F489). This was `half ? undefined : …`, correct while *not half*
+    // meant *the glyph arm*. On the braille rung it wrote a density glyph at
+    // every surface sample, which `brailleRows` then read as a frame mark and
+    // withheld from the dot grid — measured, the bottom dot row of a shaded
+    // surface's cells was set **3 times against 76** for the rows above it,
+    // and the picture was a plausible stipple rather than an obvious fault.
+    mark[i] = density === undefined ? undefined : densityGlyphOf(density, k);
+    glyph[i] = -1;
+  };
+  // **One stamp per render, from the geometries' own counters** (C12 I130):
+  // the raster reads a vertex's projection back only under this stamp, so the
+  // last camera's records are unreadable.
+  const raster: RasterFrame = { stamp: scene.stamp, projected: 0 };
+  // **An index loop, not `for…of`** (C12 I133): the triangles are frozen (I107)
+  // and V8's unallocating iteration holds for a plain packed array, not a frozen
+  // one — the statement built a result object per triangle.
+  const tris = scene.tris;
+  for (let ti = 0; ti < tris.length; ti += 1) { // cells-ok — a triangle index
+    const t = tris[ti] as Tri3;
+    wire = t.skin.wire;
+    const clipped = drawTri(t, scene.basis, grid, depth, lit, span, painter, raster);
+    // **The clip path counted** (C12 I128): zero for a mesh in front of the camera.
+    if (clipped) ctx.probe?.count("plot3d.clip");
   }
+  // **The records, once per painted sample** (C12 I132): every sample the
+  // surfaces own and nothing since overwrote — the wireframe clear and a later
+  // carrier replace the mark as they replaced a record. Before the frame draws,
+  // so the frame's own ink lands over a record as it always did.
+  let records = 0;
+  for (let i = 0; i < ink.length; i += 1) { // cells-ok — a sample index
+    if (ink[i] === PENDING_INK) {
+      ink[i] = { kind: "rgb", hex: packedHex(inkRgb[i] as number) };
+      records += 1;
+    }
+  }
+  if (paints > 0) ctx.probe?.count("plot3d.paint", paints);
+  if (records > 0) ctx.probe?.count("plot3d.ink", records);
+  // **The sub-cell triangles skipped** (C12 I138): the observable, since a
+  // skipped triangle would have written nothing.
+  if ((depth.hidden[0] as number) > 0) ctx.probe?.count("plot3d.hidden", depth.hidden[0] as number);
+  // **The projections counted** (C12 I130): the distinct vertices among the
+  // drawn faces on a smooth mesh, three per drawn face on a flat one.
+  if (raster.projected > 0) ctx.probe?.count("plot3d.project", raster.projected);
 
   // **The frame goes in last, and it is a rule about ties rather than a reading
   // convenience** (C12 I90, F452). It used to draw first under a comment saying

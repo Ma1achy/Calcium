@@ -36,7 +36,7 @@ const EXPORT = "src/shell/profiling/export.ts";
 const ASYNC = "src/shell/profiling/async-probe.ts";
 const TYPES = "src/shell/profiling/types.ts";
 const CONSTRUCT = "src/shell/construct.ts";
-const BUDGET = "src/testing/profile.ts";
+const BUDGET = "src/shell/profiling/checks.ts";
 const SESSION = "src/shell/session.ts";
 const TREPLAY = "src/testing/replay.ts";
 const PAINT = "src/shell/paint.ts";
@@ -44,7 +44,10 @@ const RENDER_FRAME = "src/shell/render-frame.ts";
 const VIEWPORT = "src/viewport/viewport/viewport.ts";
 const LEAKS = "src/shell/profiling/leaks.ts";
 const SCRATCH = "src/shell/render-scratch.ts";
-const PANES = "src/shell/profiling/panes.ts";
+const DECK = "src/shell/profiling/panes/index.ts";
+const KIT = "src/shell/profiling/panes/kit.ts";
+const APP = "src/shell/profiling/panes/app.ts";
+const FW = "src/shell/profiling/panes/framework.ts";
 const RING = "src/shell/profiling/ring.ts";
 const LEAKSRC = "src/shell/profiling/leaks.ts";
 const CHROME = "src/shell/chrome.ts";
@@ -106,10 +109,14 @@ const results = runPass({
       // **The absence removed from the maximum** (C28 I13's second clause, F1005).
       // A zero maximum with no window behind it reads as *nothing was ever
       // delayed*, which is a claim about the loop the instrument cannot make.
-      name: "a maximum with no window behind it is drawn as a figure",
-      file: PANES,
-      from: "            ? \"— no window sampled yet\"\n            : `${ms(last.loopDelayMax)} ms`,",
-      to: "            ? `${ms(last.loopDelayMax)} ms`\n            : `${ms(last.loopDelayMax)} ms`,",
+      name: "a delay figure with no window behind it is qualified as a floor",
+      file: DECK,
+      // **Anchored on the predicate and the line under it**, which is the least
+      // context that makes it unique: the branch's own comment sits between the
+      // two arms, and an anchor reaching past it rots for a reason unrelated to
+      // the rule (the *anchor on what changes* rule).
+      from: "        windows === 0\n          ? `loop delay${ctx.sep}no window sampled yet`",
+      to: "        false\n          ? `loop delay${ctx.sep}no window sampled yet`",
       expect: "T3.3",
     },
     {
@@ -173,8 +180,8 @@ const results = runPass({
       // consulted by the row that says it is empty.
       name: "OFF-RECORDS: the disabled path takes the recording arm",
       file: SEAM,
-      from: "  registry.measure = (block, width) => (prof.on ? measured(block, width) : measure(block, width));",
-      to: "  registry.measure = (block, width) => measured(block, width);",
+      from: "  registry.measure = (block, width, memo) =>\n    prof.on ? measured(block, width, memo) : measure(block, width, memo);",
+      to: "  registry.measure = (block, width, memo) => measured(block, width, memo);",
       expect: "T1.44",
     },
     {
@@ -184,15 +191,15 @@ const results = runPass({
       // `spans` report, which is the only report anyone reads.
       name: "COUNTERS-DEAD: the sequence counters are gated on spanning",
       file: SEAM,
-      from: '    prof.count("measure.sequences");\n    prof.gauge("measure.sequence.blocks", blocks.length);\n    return prof.on ? sequenced(blocks, width) : measureSequence(blocks, width);',
-      to: "    return prof.on ? sequenced(blocks, width) : measureSequence(blocks, width);",
+      from: '    prof.count("measure.sequences");\n    prof.gauge("measure.sequence.blocks", blocks.length);\n    return prof.on ? sequenced(blocks, width, memo) : measureSequence(blocks, width, memo);',
+      to: "    return prof.on ? sequenced(blocks, width, memo) : measureSequence(blocks, width, memo);",
       expect: "T1.44",
       also: [
         {
           file: SEAM,
-          from: "  const sequenced = (blocks: readonly Block[], width: number): number => {",
+          from: "  const sequenced = (blocks: readonly Block[], width: number, memo?: Memo): number => {",
           to:
-            "  const sequenced = (blocks: readonly Block[], width: number): number => {\n"
+            "  const sequenced = (blocks: readonly Block[], width: number, memo?: Memo): number => {\n"
             + '    prof.count("measure.sequences");\n'
             + '    prof.gauge("measure.sequence.blocks", blocks.length);',
         },
@@ -216,8 +223,8 @@ const results = runPass({
       // separates them.
       name: "LABEL-SWAP: theme and focus report each other's reason",
       file: RCACHE,
-      from: '    if (slot.theme !== theme) return this.#miss(id, "theme", slot.lines);\n    if (slot.focus !== focus) return this.#miss(id, "focus", slot.lines);',
-      to: '    if (slot.theme !== theme) return this.#miss(id, "focus", slot.lines);\n    if (slot.focus !== focus) return this.#miss(id, "theme", slot.lines);',
+      from: '    if (slot.theme !== theme) return this.#miss(id, "theme", slot.lines, null);\n    if (slot.focus !== focus) return this.#miss(id, "focus", slot.lines, null);',
+      to: '    if (slot.theme !== theme) return this.#miss(id, "focus", slot.lines, null);\n    if (slot.focus !== focus) return this.#miss(id, "theme", slot.lines, null);',
       expect: "T1.55",
     },
     {
@@ -845,37 +852,41 @@ const results = runPass({
       // F895, and the axis it is about: the guard reads the tier where the
       // question is the data. Reverting it is what shipped, so this is the
       // mutation the defect itself was.
-      name: "OV-TIER-ONLY: the overview asks the tier whether there is data",
-      file: PANES,
-      from: "  } else if (lat.work.count === 0) {",
-      to: "  } else if (false) {",
+      name: "VITALS-NEVER-EMPTY: the vitals card draws over a ring with nothing in it",
+      file: APP,
+      from: "  if (r.samples.length === 0 && r.timeline.length === 0) {",
+      to: "  if (false) {",
       expect: "T1.16",
     },
     {
-      name: "ALWAYS-EMPTY: the overview takes the empty branch with data in the ring",
-      file: PANES,
+      name: "ALWAYS-EMPTY: the vitals card takes the empty branch with data in the ring",
+      file: APP,
       // The other direction, and the one T1.16's control exists for: a guard
       // widened until it refuses everything satisfies every assertion about
       // the empty case.
-      from: "  } else if (lat.work.count === 0) {",
-      to: "  } else if (true) {",
+      from: "  if (r.samples.length === 0 && r.timeline.length === 0) {",
+      to: "  if (true) {",
       expect: "T1.16c",
     },
     {
-      name: "DI-TIER-ONLY: the distribution asks the tier whether there is data",
-      file: PANES,
-      from: "  const out: Block[] = lat.work.count === 0",
-      to: "  const out: Block[] = false",
-      expect: "T1.16",
+      // **`spanning()` inverted** — the plan's named control. Every card that
+      // guards on the tier then answers the opposite question, so a report at
+      // `spans` is told it has no durations and a report at `counters` is drawn
+      // a figure over fields the recorder never filled.
+      name: "SPANNING-INVERTED: the tier test answers the opposite question",
+      file: KIT,
+      from: "  TIER_RANK[r.regime.tier] >= TIER_RANK.spans;",
+      to: "  TIER_RANK[r.regime.tier] < TIER_RANK.spans;",
+      expect: "T1.16b",
     },
     {
       // The third instance: the right branch printing the other axis's
       // sentence. Killed only by the row that reads the notice text — a row
       // asserting that a notice appears is green on this.
-      name: "FR-ONE-SENTENCE: the frame pane tells a reader on `spans` to raise the tier",
-      file: PANES,
-      from: '        spanning(r)\n          ? "no spans recorded — the tier is high enough and nothing has been measured yet"\n          : "no spans recorded — raise the tier to `spans`",',
-      to: '        "no spans recorded — raise the tier to `spans`",',
+      name: "ONE-SENTENCE: every card tells a reader on `spans` to raise the tier",
+      file: DECK,
+      from: "  if (!spanning(r)) {\n    parts.push(",
+      to: "  if (true) {\n    parts.push(",
       expect: "T1.16b",
     },
     {
@@ -964,19 +975,19 @@ const results = runPass({
     {
       // F900: the headline from the newest sample whatever its flag, so a
       // stopped clock is drawn as the present state.
-      name: "SUSPENDED-UNREAD: the memory pane headlines the newest sample, suspended or not",
-      file: PANES,
-      from: "  const last = running[running.length - 1];",
-      to: "  const last = r.samples[r.samples.length - 1];",
+      name: "SUSPENDED-UNREAD: the memory card headlines the newest sample, suspended or not",
+      file: KIT,
+      from: "  const running = r.samples.filter((s) => !s.suspended);",
+      to: "  const running = r.samples;",
       expect: "T3.10",
     },
     {
       // Its control: a caveat on every report is a caveat nobody reads, and it
       // passes every assertion about the suspended case.
       name: "CAVEAT-ALWAYS: every report says some samples were suspended",
-      file: PANES,
-      from: "        suspendedCount === 0",
-      to: "        false",
+      file: DECK,
+      from: "    const asleep = r.samples.filter((x) => x.suspended).length;\n    if (asleep > 0) {",
+      to: "    const asleep = r.samples.filter((x) => x.suspended).length;\n    if (true) {",
       expect: "T3.10",
     },
     {

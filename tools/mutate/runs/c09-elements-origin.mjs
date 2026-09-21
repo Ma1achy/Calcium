@@ -42,7 +42,7 @@ const results = runPass({
   control: {
     file: REG,
     // Two lines since C09 I61: every public member opens the call's memo through `#scoped`.
-    from: "  measure = (block: Block, width: number): number =>\n    this.#scoped(() => this.#measured(block, normaliseWidth(width)).rows);",
+    from: "  measure = (block: Block, width: number, memo?: MeasureMemo): number =>\n    this.#scoped(() => this.#measured(block, normaliseWidth(width)).rows, memo);",
     to: "  measure = (): number => 1;",
     why: "every kind's height collapsed to one row, which every offset in the lifted list depends on",
   },

@@ -19,11 +19,10 @@
  * expressed as lines, beside the registry that drives it. `src/testing/` keeps
  * the two conformance suites, which a consumer genuinely runs.
  */
-import { Box, Text, renderToString } from "ink";
-import { createElement } from "react";
-import { NO_SPAN } from "../data/viewmodel/index.js";
+import { NO_SPAN, normaliseWidth } from "../data/viewmodel/index.js";
 import type { Block } from "../data/viewmodel/index.js";
-import type { BlockRegistry, RenderContext, RenderContextInput } from "./blocks/index.js";
+import type { BlockRegistry, RenderContext, RenderContextInput, Rendered } from "./blocks/index.js";
+import { normaliseRow } from "./rows.js";
 import type { ResolvedTheme } from "./theme/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
 
@@ -31,9 +30,6 @@ import type { TerminalCapabilities } from "../terminal/capabilities.js";
  * Everything a render needs that is not the registry or the block. Defaulted
  * so a caller asserting about geometry does not have to assemble a theme.
  */
-/** One cell, below the block, so a blank final row still ends in a newline. */
-const SENTINEL = ".";
-
 export type RenderOptions = Readonly<{
   theme: ResolvedTheme;
   capabilities: TerminalCapabilities;
@@ -95,28 +91,28 @@ export function renderToLines(
     ...(options.probe === undefined ? {} : { probe: options.probe }),
   };
 
-  // Counted against a sentinel row rather than by splitting the output.
-  //
-  // Ink trims a blank row's trailing space, so an empty container — which
-  // occupies no rows — and an empty `notice` — which occupies one blank row, the
-  // case C04 I17 exists for — both paint the empty string. Splitting cannot tell
-  // them apart, and the harness would have to be wrong about one of them.
-  //
-  // A row appended below the block gives every real row a newline to its right,
-  // so the count is the number of newlines before the sentinel: zero for the
-  // container, one for the notice.
-  const painted = renderToString(
-    createElement(
-      Box,
-      { flexDirection: "column" },
-      registry.render(block, ctx),
-      createElement(Text, { key: "sentinel" }, SENTINEL),
-    ),
-    { columns: width },
-  );
+  const probe = options.probe;
+  let rendered: Rendered;
+  {
+    using _build = probe?.span("elements") ?? NO_SPAN;
+    rendered = registry.render(block, ctx);
+  }
+  return linesOf(rendered, probe);
+}
 
-  const lines = painted.split("\n");
-  return lines.slice(0, Math.max(0, lines.length - 1)); // cells-ok — rows, not columns
+/**
+ * A render's rows, each put into the form Ink's output layer wrote (C09 I72).
+ *
+ * **There is one arm.** This tested whether the answer was rows or an element
+ * and sent the second through Ink, and the probe opened `rows` for the one and
+ * `react` for the other so the deck could say what a document was made of. No
+ * kind answers an element since I73 reached `mosaic`, and `Rendered` narrowed
+ * to rows with Ink's removal (F1209); the `react` span is gone with it, which
+ * is why the deck's arm counts are now a statement about history.
+ */
+function linesOf(rendered: Rendered, probe: RenderContext["probe"]): readonly string[] {
+  using _rows = probe?.span("rows") ?? NO_SPAN;
+  return rendered.map(normaliseRow);
 }
 
 /**
@@ -150,31 +146,36 @@ export function renderSequenceToLines(
   };
 
   // **The two halves are timed apart, and this is the split that matters most**
-  // (C28 I31). Everything above `renderToString` is Calcium building an element
-  // tree — every block's `render`, every container's placement arithmetic.
-  // Everything inside it is React and Yoga: `createContainer`,
-  // `updateContainerSync`, `calculateLayout`, the string walk, then a full
-  // unmount and `yogaNode.free()`. Ink reuses nothing between calls, so that is
-  // a complete mount-and-teardown cycle per invocation and there is no reason to
-  // assume it is the cheap half. Merged into one span the question is
-  // unanswerable; split, the first frame answers it.
+  // (C28 I31). Everything in `elements` is Calcium building the answer — every
+  // block's `render`, every container's placement arithmetic. Everything in
+  // `react` is React and Yoga: `createContainer`, `updateContainerSync`,
+  // `calculateLayout`, the string walk, then a full unmount and
+  // `yogaNode.free()`. Ink reuses nothing between calls, so that is a complete
+  // mount-and-teardown cycle per invocation and there is no reason to assume it
+  // is the cheap half. Merged into one span the question is unanswerable;
+  // split, the first frame answers it — and answered, it was half the orbit
+  // frame (F1168), which is why the sequence is now composed **block by block**
+  // (C09 I72): a block answering rows is normalised into the frame's rows and
+  // pays nothing for Ink; a block answering an element takes the Ink path
+  // alone, in the same column box at the same width the registry's whole-
+  // sequence element arm gave it, so its rows are the rows the whole tree would
+  // have written — that arm is gone (F1209) and its bytes are a capture. A
+  // block's own padding row is one empty row, as the `Text` holding a space came
+  // out of Ink; the registry emits it now (C09 I80) and this composer does not.
   const probe = options.probe;
-  let element;
-  {
-    using _build = probe?.span("elements") ?? NO_SPAN;
-    element = createElement(
-      Box,
-      { flexDirection: "column" },
-      registry.renderSequence(blocks, ctx),
-      createElement(Text, { key: "sentinel" }, SENTINEL),
-    );
+  const w = normaliseWidth(width);
+  const out: string[] = [];
+  for (const block of blocks) {
+    // **No gap row here, and that is the point of 2a** (C09 I80). A block's
+    // spacing is its own padding and the registry applies it, so this composer
+    // adds nothing to the document's height — which is C04 I25's half that did
+    // not change.
+    let rendered: Rendered;
+    {
+      using _build = probe?.span("elements") ?? NO_SPAN;
+      rendered = registry.render(block, { ...ctx, width: w });
+    }
+    for (const line of linesOf(rendered, probe)) out.push(line);
   }
-  let painted: string;
-  {
-    using _react = probe?.span("react") ?? NO_SPAN;
-    painted = renderToString(element, { columns: width });
-  }
-
-  const lines = painted.split("\n");
-  return lines.slice(0, Math.max(0, lines.length - 1)); // cells-ok — rows, not columns
+  return out;
 }

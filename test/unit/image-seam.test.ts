@@ -3,16 +3,17 @@
  * (C09 I36, §4c).
  *
  * **These were the probes and they are kept because they are the reasons.** The
- * seam rests on three facts about this repository — Ink is not in the byte path,
+ * seam rests on three facts about this repository — the row path's sanitiser is
+ * not in the byte path (Ink was, until F1209 deleted it),
  * the diff baseline is `lines` rather than the write, and every frame reaches an
  * absolute address before any row content. A comment asserting those goes stale;
  * a row does not.
  */
 import { describe, expect, it } from "vitest";
 import { EventEmitter } from "node:events";
-import { Box, Text, renderToString } from "ink";
-import { createElement } from "react";
 import { createTerminalLifecycle } from "../../src/terminal/lifecycle.js";
+import { normaliseRow } from "../../src/presentation/rows.js";
+import { stripControl } from "../../src/presentation/text.js";
 import { FULL_CAPS } from "../support/render.js";
 import { buildSession } from "../support/session.js";
 
@@ -70,16 +71,21 @@ describe("kitty seam · probe 1 — the direct write", () => {
     expect(got, "a raw stream carries it, so the recorder is not the thing dropping bytes").toBe(APC);
   });
 
-  it("P1 arm C (the contrast): the same escape through an Ink `Text`", () => {
-    // **Re-measured rather than cited.** F249 established this; repeating it in
-    // *this* harness is what says the harness sees what F249 saw, and it is the
-    // arm a reader would skip as already known.
-    const drawn = renderToString(createElement(Box, null, createElement(Text, null, `${APC}xy`)), {
-      columns: 20,
-    });
-    console.log(`arm C  ink Text       in=${String(APC.length + 2)} out=${String(drawn.length)} hasAPC=${String(drawn.includes(`${ESC}_G`))}`);
-    expect(drawn, "Ink discards the APC and keeps the text").toBe("xy");
-    expect(drawn.includes(`${ESC}_G`), "so the two paths genuinely differ").toBe(false);
+  it("P1 arm C (the contrast): the same escape through the row path's sanitiser", () => {
+    // **This arm used to render the escape through an Ink `Text` and watch Ink
+    // discard it (F249).** Ink is gone, so the contrast it drew is gone with
+    // it — "Ink is not in the byte path" is now true by there being no Ink.
+    // The seam still needs a contrast, or arm A says only that a stream is a
+    // stream, and the tree still holds one: `normaliseRow` carries the escape
+    // whole and `stripControl` — what sanitises a block's text before it ever
+    // becomes a row — takes the introducer out and leaves the payload as
+    // printable rubbish. That is the path the image kind must not take, and it
+    // is measured here rather than cited.
+    expect(normaliseRow(`${APC}xy`), "the serialiser carries the escape whole").toBe(`${APC}xy`);
+    const sanitised = stripControl(`${APC}xy`);
+    expect(sanitised.includes(`${ESC}_G`), "the sanitiser does not: the introducer is gone").toBe(false);
+    expect(sanitised, "and what is left would be drawn as text").toBe("_Ga=T,f=100,i=7,U=1,c=2,r=1,q=2;AAAA\\xy");
+    console.log(`arm C  stripControl   in=${String(APC.length + 2)} out=${String(sanitised.length)} hasAPC=${String(sanitised.includes(`${ESC}_G`))}`);
   });
 });
 

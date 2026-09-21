@@ -218,9 +218,9 @@ switch (mode) {
     // colour at every depth above 1, a glyph that has an ASCII substitute, and
     // a rule whose fill character is Unicode.
     const blocks = [
-      { kind: "rule", id: "r", label: "capabilities", gapBefore: false },
-      { kind: "notice", id: "n1", tone: "error", glyph: "error", text: "a failure", gapBefore: false },
-      { kind: "notice", id: "n2", tone: "ok", glyph: "ok", text: "a success", gapBefore: false },
+      { kind: "rule", id: "r", label: "capabilities" },
+      { kind: "notice", id: "n1", tone: "error", glyph: "error", text: "a failure" },
+      { kind: "notice", id: "n2", tone: "ok", glyph: "ok", text: "a success" },
     ];
 
     const lines = renderSequenceToLines(registry, blocks, 60, {
@@ -645,7 +645,7 @@ switch (mode) {
       // its width, which is what makes the too-long line unambiguous.
       const lines = renderSequenceToLines(
         registry,
-        [{ kind: "rule", id: "r", label: "width hazard", gapBefore: false }],
+        [{ kind: "rule", id: "r", label: "width hazard" }],
         composedAt,
         { theme: loadedTheme.value.current, capabilities: detectCapabilities(process.env).capabilities },
       );

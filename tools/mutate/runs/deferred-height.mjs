@@ -72,8 +72,9 @@ const results = runPass({
       // element is short, so the entry is short and everything below it moves up.
       name: "the render does not pad to the floor",
       file: REG,
-      from: "    return createElement(Box, { flexDirection: \"column\", minHeight: floor }, element);",
-      to: "    return element;",
+      // Both arms at once (C09 I72): the early return before either pads.
+      from: "    const floor = floorOf(block);\n    if (floor === 0) return rendered;",
+      to: "    const floor = floorOf(block);\n    if (floor >= 0) return rendered;",
       expect: "T3.54",
     },
     {
@@ -83,8 +84,9 @@ const results = runPass({
       name: "a floored block is windowed anyway",
       file: REG,
       // Re-anchored 2026-09-04: `windowSequence` windows the capped form (C14 §4b).
-      from: "      const windowable = form === null || floorOf(block) > 0 ? undefined : form.definition.window;",
-      to: "      const windowable = form === null ? undefined : form.definition.window;",
+      // Re-anchored 2026-09-17 (F1224): the two refusals are one predicate.
+      from: "        form === null || windowRefused(block)",
+      to: "        form === null",
       expect: "T3.52",
     },
     {

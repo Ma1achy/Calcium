@@ -37,6 +37,7 @@ import { SGR_RESET, sgr, toTerminalDefault } from "../terminal/escapes.js";
 import { HEADER_ROWS, HEADER_RULE_ROWS, promptFor, PROMPT_GUTTER } from "./config.js";
 import { glyphs } from "../presentation/blocks/index.js";
 import { composite } from "./composite.js";
+import type { ChromeCache, ChromeRole } from "./chrome-cache.js";
 import { exact, FrameError } from "./frame-error.js";
 import { gutterMatchesPrompt, heightsSum, promptTop, type Composed } from "./frame.js";
 import type { Block } from "../data/viewmodel/index.js";
@@ -55,6 +56,8 @@ export type PaintDeps = Readonly<{
   registry: BlockRegistry;
   theme: ResolvedTheme;
   capabilities: TerminalCapabilities;
+  /** C22 I102 — the session's chrome cache; absent in a harness that paints once. */
+  chrome?: ChromeCache;
   /**
    * C28's seam (I30). Absent is not recording, and that is the usual case.
    */
@@ -182,16 +185,24 @@ function region(
   n: number,
   width: number,
   deps: PaintDeps,
+  role: ChromeRole,
 ): readonly string[] {
   if (n <= 0) return [];
+  const render = (b: readonly Block[], w: number): readonly string[] =>
+    renderSequenceToLines(deps.registry, b, w, {
+      theme: deps.theme,
+      capabilities: deps.capabilities,
+      ...(deps.probe === undefined ? {} : { probe: deps.probe }),
+    });
+  // **Once per content** (C22 I102): the chrome's blocks are rebuilt every
+  // frame and are the same document nearly every frame; the cache keys on
+  // the structure and hands the held lines back.
   const lines =
     blocks.length === 0
       ? []
-      : renderSequenceToLines(deps.registry, blocks, width, {
-          theme: deps.theme,
-          capabilities: deps.capabilities,
-          ...(deps.probe === undefined ? {} : { probe: deps.probe }),
-        });
+      : deps.chrome === undefined
+        ? render(blocks, width)
+        : deps.chrome.lines(role, blocks, width, deps.theme.name, render);
 
   const out: string[] = [];
   for (let i = 0; i < n; i += 1) out.push(exact(lines[i] ?? "", width));
@@ -625,7 +636,7 @@ export function paint(
   {
     using _body = deps.probe?.span("body") ?? NO_SPAN;
     rows = [
-      ...region(frame.header, HEADER_ROWS, width, deps),
+      ...region(frame.header, HEADER_ROWS, width, deps, "header"),
       // **The header's rule** (I87, §6l.7) — the same row the prompt's two are,
       // so the header and the region's first row do not read as one block.
       rule(width, deps),
@@ -640,7 +651,7 @@ export function paint(
       // **The composed height, not `1`** (I80, I82). `region()` truncates to it
       // and pads to it, so a footer taller than `MAX_FOOTER_ROWS` shows its top
       // (§6l.2 row 5) and one of zero rows takes nothing.
-      ...region(frame.footer, frame.footerRows, width, deps),
+      ...region(frame.footer, frame.footerRows, width, deps, "footer"),
     ];
   }
 
@@ -651,8 +662,12 @@ export function paint(
       registry: deps.registry,
       theme: deps.theme,
       capabilities: deps.capabilities,
+      ...(deps.chrome === undefined ? {} : { chrome: deps.chrome }),
       regionTop: frame.region.top,
       region: frame.overlayRegion,
+      // The frame's width, not the region's (I109): the rows come back padded
+      // to what the paint built them at.
+      columns: width,
       ...(deps.scratch === undefined ? {} : { scratch: deps.scratch }),
     });
   }

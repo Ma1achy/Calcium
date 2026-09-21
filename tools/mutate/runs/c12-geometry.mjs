@@ -26,7 +26,7 @@ import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const CMD = "npx vitest run test/unit/plot-geometry.test.ts";
+const CMD = "npx vitest run test/unit/plot-geometry.test.ts test/unit/plot-surface3d.test.ts";
 const SURFACE = "src/presentation/plot/surface3.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
@@ -49,22 +49,53 @@ const results = await runPass({
     // control has to be a thing the suite asserts rather than merely a change
     // to the subject.
     from:
-      "  const faceN = idx.map(([a, b, c]) =>\n" +
-      "    cross(sub(pts[b] as Vec3, pts[a] as Vec3), sub(pts[c] as Vec3, pts[a] as Vec3)));",
+      "    const nx = uy * vz - uz * vy;\n" +
+      "    const ny = uz * vx - ux * vz;\n" +
+      "    const nz = ux * vy - uy * vx;",
     to:
-      "  const faceN = idx.map(([a, b, c]) =>\n" +
-      "    cross(sub(pts[c] as Vec3, pts[a] as Vec3), sub(pts[b] as Vec3, pts[a] as Vec3)));",
+      "    const nx = vy * uz - vz * uy;\n" +
+      "    const ny = vz * ux - vx * uz;\n" +
+      "    const nz = vx * uy - vy * ux;",
     why: "GM1 asserts each coordinate plane's own normal to six places; a run where reversing the cross product survives cannot see a kill",
   },
   mutations: [
+    {
+      // **A corner's sum skipped** (I137): the third corner of every face
+      // no longer accumulates, and the smooth normals part from the reference
+      // on every mesh.
+      name: "LANE-CORNER-SKIPPED: the third corner does not accumulate its face normal",
+      file: SURFACE,
+      from: "      q = ic * 3;\n      vertN[q] = (vertN[q] as number) + ax;\n      vertN[q + 1] = (vertN[q + 1] as number) + ay;\n      vertN[q + 2] = (vertN[q + 2] as number) + az;",
+      to: "      q = ic * 3;",
+      expect: "T1.149",
+    },
+    {
+      // **The lane index made per corner** (I139, I130): smooth shading
+      // shares nothing, and the raster would project a vertex per face.
+      name: "RECORD-UNSHARED: a smooth vertex takes a lane index for every corner",
+      file: SURFACE,
+      from: "        let j = slotOf[k] as number;\n        if (j < 0) {",
+      to: "        let j = slotOf[k] as number;\n        if (j < 0 || !flat) {",
+      expect: "T1.149",
+    },
+    {
+      // **The zero normal normalised** (I137): `unit` answers the values
+      // unchanged at zero length; dividing gives `NaN`, and the flat grid's
+      // degenerate faces carry it.
+      name: "ZERO-DIVIDED: unit3 divides at zero length",
+      file: SURFACE,
+      from: "  return n === 0 ? { x, y, z } : { x: x / n, y: y / n, z: z / n };",
+      to: "  return { x: x / n, y: y / n, z: z / n };",
+      expect: "T1.149",
+    },
     {
       // **The cull's sign test loses its blind spot** (C12 I96, F473). `>= 0` culls
       // the zero-normal faces along with the back ones — the repair §6j
       // declines — and GM4 is the row that says the blind spot is real.
       name: "the cull drops a face whose normal is exactly zero",
       file: SURFACE,
-      from: "  return dot(tri.fn, sub(c, basis.eye)) * tri.skin.cull > 0;",
-      to: "  return dot(tri.fn, sub(c, basis.eye)) * tri.skin.cull >= 0;",
+      from: "  return (nx * (cx - e.x) + ny * (cy - e.y) + nz * (cz - e.z)) * tri.skin.cull > 0;",
+      to: "  return (nx * (cx - e.x) + ny * (cy - e.y) + nz * (cz - e.z)) * tri.skin.cull >= 0;",
       expect: "GM4",
     },
     {
@@ -73,8 +104,8 @@ const results = await runPass({
       // camera, so GM3's 2 / 4 / 6 collapses.
       name: "the cull tests the view direction rather than the eye",
       file: SURFACE,
-      from: "  return dot(tri.fn, sub(c, basis.eye)) * tri.skin.cull > 0;",
-      to: "  return dot(tri.fn, basis.forward) * tri.skin.cull > 0;",
+      from: "  return (nx * (cx - e.x) + ny * (cy - e.y) + nz * (cz - e.z)) * tri.skin.cull > 0;",
+      to: "  return (nx * basis.forward.x + ny * basis.forward.y + nz * basis.forward.z) * tri.skin.cull > 0;",
       expect: "GM3",
     },
     {
@@ -110,7 +141,7 @@ const results = await runPass({
       from: "export function backfaceCulled(tri: Tri3, basis: Basis): boolean {\n  if (tri.skin.cull === 0) return false;",
       to:
         "export function backfaceCulled(tri: Tri3, basis: Basis): boolean {\n" +
-        "  if (Math.hypot(tri.fn.x, tri.fn.y, tri.fn.z) < 1e-12) return true;\n" +
+        "  if (Math.hypot(faceNormalOf(tri).x, faceNormalOf(tri).y, faceNormalOf(tri).z) < 1e-12) return true;\n" +
         "  if (tri.skin.cull === 0) return false;",
       expect: "GM4",
     },
@@ -121,7 +152,7 @@ const results = await runPass({
       // draw nothing, and GM2 is the row that holds it.
       name: "a triangle under a sample of projected area draws nothing",
       file: SURFACE,
-      from: "  if (!(Math.abs(area) >= 1)) {\n    strokeThin(s, tri, e, grid, depth, light, span, paint);",
+      from: "  if (!(Math.abs(area) >= 1)) {\n    strokeThin(L, ia, ib, ic, tri, e, grid, depth, light, span, paint);",
       to: "  if (!(Math.abs(area) >= 1)) {",
       expect: "GM2",
     },

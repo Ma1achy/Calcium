@@ -1765,6 +1765,7 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
     checkFlex(b, e, at);
     checkAlign(b, e, at);
     checkMinRows(b, e, at);
+    checkChildGap(b, e, at);
   },
   raw: (b, e, at) => {
     requireString(b, "text", e, at);
@@ -2047,6 +2048,20 @@ function checkMinRows(b: Record<string, unknown>, e: string[], at: string): void
   if (minRows === undefined) return;
   if (typeof minRows !== "number" || !Number.isInteger(minRows) || minRows < 1) {
     e.push(`${at}: "minRows" is a whole number of rows above zero`);
+  }
+}
+
+/**
+ * The container's gap between children (C04 I121), on `minRows`' argument with
+ * the boundary one lower: a fraction of a cell names something the grid cannot
+ * draw, and **zero is a legitimate value here** where it is not for a floor —
+ * *no gutter at all* is the thing the field exists to make sayable (F1226).
+ */
+function checkChildGap(b: Record<string, unknown>, e: string[], at: string): void {
+  const gap = b["childGap"];
+  if (gap === undefined) return;
+  if (typeof gap !== "number" || !Number.isInteger(gap) || gap < 0) {
+    e.push(`${at}: "childGap" is a whole number of cells, zero or more`);
   }
 }
 

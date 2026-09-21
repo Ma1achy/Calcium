@@ -123,15 +123,17 @@ export { markdownBlocks } from "./markdown.js";
 
 export {
   BORDER_INSET,
+  childGapOf,
   ROW_GUTTER,
   atLeastOne,
   childWidths,
-  gapRows,
   placeable,
   sequenceHeight,
   groupChildWidths,
   insetWidth,
   normaliseWidth,
+  paddingOf,
+  contentWidth,
   ALIGN_ENTRIES,
   axesOf,
   groupPlacements,
@@ -143,8 +145,10 @@ export {
 
 export {
   divideShares,
+  largestRemainder,
   mosaicRects,
   parseAreas,
+  type Spend,
   MOSAIC_HOLE,
   type MosaicGrid,
   type MosaicParse,

@@ -612,3 +612,61 @@ describe("C09 §6b — the second caller, and the bound it applies", () => {
     ).not.toEqual([]);
   });
 });
+
+describe("C29 1.5 — what the content column declares", () => {
+  // **Both rows here are mutation survivors.** The ranges moved onto a C29 box
+  // and two of its fields could be deleted with 5,494 rows still green: the
+  // full width, and the absence of a `gapBefore` wrapper. Neither is exotic —
+  // they are the two ways a scroll differs from the panel and the column group
+  // whose builder sits beside it — and neither had a fixture that could see it.
+
+  it("T2.148 (C04 I49, C29 I9): a scroll insets nothing, so its children are measured at the full width", () => {
+    // **The width has to straddle a wrap or the two answers agree.** This
+    // notice is one row of 40 at width 40 and two rows at width 38, so
+    // measuring the children inside a border they do not have puts the content
+    // over a box of one and buys a residue row that the frame does not.
+    const text = `${"a".repeat(20)} ${"b".repeat(19)}`;
+    const child = wrapping("w", text);
+    expect(registry.measure(child, 40), "one row at the full width").toBe(1);
+    expect(registry.measure(child, 38), "two rows two columns narrower").toBe(2);
+
+    const box = scroll(1, [child]);
+    expect(scrollDefinition.measure?.(box, 40, measureChild), "the box, and no residue").toBe(1);
+    const lines = renderSequenceToLines(registry, [box], 40, { theme: DARK_THEME, capabilities: FULL_CAPS });
+    expect(lines.length, "and the frame agrees").toBe(1);
+  });
+
+  it("T2.149 (C04 §3a, C04 I25, C09 I80): a scroll is not a sequence, and a padded child still costs it the child's own row", () => {
+    // **The rule held and then 2a inverted half of it, which is the honest
+    // record.** C04 §3a still names the three sequences and a scroll is still
+    // none of them, so this container adds nothing of its own — that half is
+    // unchanged and is what `scrollMeasureBox` not reaching for
+    // `sequenceChildren` keeps true. What changed is the other half: the
+    // spacing is the *child's* padding now, inside what `measureChild` returns,
+    // so a padded child is taller wherever it sits, a scroll included. The row
+    // used to assert the two boxes were identical; they differ by exactly the
+    // child's own row, and no container decided that.
+    //
+    // **The box has to be over-full or the difference is invisible.** A
+    // scroll's own height is declared and `render` pads to the interior, so the
+    // content height is what carries it — read by the residue row and by the
+    // ranges the offset selects.
+    const plain = scroll(1, [flat("a"), flat("b")], "sp");
+    const padded = scroll(1, [flat("a"), { ...flat("b"), padding: { t: 1 } } as Block], "sg");
+    expect(
+      scrollDefinition.measure?.(padded, 40, measureChild),
+      "the declared height and a residue row, either way",
+    ).toBe(scrollDefinition.measure?.(plain, 40, measureChild));
+
+    const rows = (box: Scroll): readonly string[] =>
+      renderSequenceToLines(registry, [box], 40, { theme: DARK_THEME, capabilities: FULL_CAPS });
+    expect(rows(plain).at(-1), "one row hidden below").toContain("1 below");
+    expect(rows(padded).at(-1), "and two once the child carries its own row").toContain("2 below");
+
+    const ends = (box: Scroll): readonly number[] =>
+      (scrollDefinition.elements?.(box, 40, measureChild) ?? []).map((e) => e.rows.to); // cells-ok — row indices
+    expect(ends(padded), "the padded child ends one row lower").toEqual(
+      (ends(plain)[0] === undefined ? [] : [ends(plain)[0]!, ends(plain)[1]! + 1]),
+    );
+  });
+});

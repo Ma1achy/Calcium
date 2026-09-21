@@ -97,7 +97,7 @@ describe("per-kind input gauges", () => {
     const label = "x".repeat(4000);
     const g = gaugesOf(
       [
-        b.rule(label, undefined, { id: "r" }),
+        b.rule(label, undefined, { id: "r", gapBefore: false }),
         b.progress({ id: "p", label, current: 1, total: 2 }),
       ],
       80,
@@ -109,7 +109,7 @@ describe("per-kind input gauges", () => {
     expect(g["rule.label"]?.max, "the whole label stripControl walks").toBe(4000);
     expect(g["progress.label"]?.max, "and the same clamp on progress").toBe(4000);
     expect(
-      fullRegistry().measure(b.rule(label, undefined, { id: "r" }), 80),
+      fullRegistry().measure(b.rule(label, undefined, { id: "r", gapBefore: false }), 80),
       "while the row count is 1",
     ).toBe(1);
   });

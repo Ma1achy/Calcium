@@ -1545,10 +1545,11 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 // --- MG24 — a published interface member with no consumer -------------------
 //
 // **The interior half of "add no export nothing consumes".** CLAUDE.md carries
-// that rule for the public API's edge; this is the same rule one layer in, and
-// either alone reads as arbitrary. The edge rule stops the façade growing
-// surface nobody asked for. This one catches the opposite shape, which is not
-// an excess but a *gap*:
+// that rule for the public API's edge — now with the scope clause it was missing,
+// *and nothing is queued to consume*, because the unqualified form is circular in
+// a groundwork pass and made one refuse itself. **This rule needs no such clause
+// and the reason is that it was never the same rule.** The edge half is about
+// excess — a façade growing surface nobody asked for. This one is about a *gap*:
 //
 //   **a component complete on its own side of a seam, with nothing on the
 //   other.**
@@ -1627,6 +1628,67 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
+  // --- C29 §7g's frames, groundwork ahead of their first caller -------------
+  //
+  // **The queued consumer is named and the rule's honest form is what allows
+  // this.** `Never add an export nothing consumes` is a feature rule; in a
+  // groundwork pass it is circular, because infrastructure has no consumers by
+  // construction — that is what makes it groundwork. The scoped form is
+  // *nothing consumes it **and** nothing is queued to consume it*, and the
+  // layout-engine plan's phase 4 is the queue: §10's frame ring is `⌃⇥` across
+  // a main session and its subagents, which is C16's to wire and C22's to
+  // compose, and neither can be written while the shape is absent (CLAUDE.md,
+  // F1235).
+  //
+  // **Three members and one reason**, because a ring, a stack and a layer stack
+  // are three types on purpose: collapsing them is the error `INTERACTION.md`
+  // §2 corrected once, where nesting, modality and parallelism wore one ladder.
+  // Exempting them one at a time would let two of the three be quietly merged
+  // with the entry still reading as satisfied.
+  "FrameRing.tabs":
+    "C29 I23 — the ring of tabs, groundwork for the plan's phase 4: `⌃⇥` cycles a main "
+    + "session and its subagents, which C16 wires and C22 composes, and neither can be "
+    + "written while the shape is absent. Named in the plan, which is what `queued to "
+    + "consume` means (F1235)",
+  "FrameRing.at":
+    "C29 I23 — a position in a **cycle** and not a depth, which is the field that keeps a "
+    + "ring from being read as a stack: `esc` must pop a stack and must never leave a ring "
+    + "(F1235)",
+  "FrameStack.frames":
+    "C29 I23 — a view pushed over its base **within one tab**. `INTERACTION.md` §14 rules "
+    + "that there are no pushed views today, and that ruling is about usage rather than "
+    + "about the mechanism: having the shape does not undo it, it means the rule governs "
+    + "what may occupy it. If nothing else ever passes the test, a tab's stack has exactly "
+    + "one member and costs nothing, which §10 pre-authorises as the correct outcome "
+    + "rather than a wasted mechanism (F1235)",
+
+  // --- C28's fold over a shape it does not own -------------------------------
+  //
+  // The same argument `CellLike` carries below, on a smaller type: `CpuProfile`
+  // is not an interface this tree implements, it is the shape `Profiler.stop`
+  // hands back — V8's field names, written down so the fold can be driven by a
+  // literal in a tier-1 row rather than by a real capture. Every member is read
+  // by `foldCpuProfile` in the same file; MG24 asks whether a name appears
+  // *elsewhere in `src/`*, and for a wire format the answer is structurally no.
+  // `nodes` and `samples` pass only because other owners share those names,
+  // which is the rule's own stated limit rather than a difference in kind.
+  "CpuProfile.timeDeltas":
+    "C28 I62 — V8's own field name on the `.cpuprofile` shape, read by `foldCpuProfile` in "
+    + "`stacks.ts` and by nothing else because nothing else may parse a profile: the fold "
+    + "happens where `Profiler.stop` returns and a card is a pure function of a report. Its "
+    + "siblings `nodes` and `samples` are exempt by coincidence — other owners have members "
+    + "of those names — so this entry is the whole type's exemption wearing one member's name",
+
+  // --- C28's card register ---------------------------------------------------
+  "CardSpec.also":
+    "C28 §3c — the member exists so the **form register** can count a form a card "
+    + "draws conditionally: `the instrument` draws a `slope` where a replay baseline "
+    + "exists and nothing otherwise, and I59 compares the cards' forms to `PlotForm` by "
+    + "equality. Its consumer is therefore the gate, which lives in a test by "
+    + "construction — a register asserting its own totality inside `src/` is a gate that "
+    + "ships. F1132 is what the member is for: `bubble` was named in a card's note, "
+    + "correctly, and dispositioned nowhere, and a note is not something a gate can count",
+
   // --- C27's structural port, landing with the emulator ---------------------
   //
   // **Sixteen members at once, and the count is the argument rather than a
@@ -1768,8 +1830,11 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   // derived from — and \`basis.forward\`, to find where a segment crosses the near
   // plane. \`orthographic\` stayed: \`project\` picks the arm and a second reader of
   // that field would be a second place the projection is chosen, which is the
-  // reason the entry was written with rather than a date.
-  "Basis.orthographic": "project() picks the arm, and a second reader of this field would be a second place the projection is chosen",
+  // reason the entry was written with rather than a date. **And that reason
+  // was met on its own terms** (C12 I134, F1174): \`toScreen\` now restates
+  // \`project\`'s projection in scalars per vertex, so it is a second reader of
+  // the arm — held to the first to the bit by C12 T1.146, which is what makes a
+  // second place the projection is chosen tolerable. The entry left with it.
   // The tool-call card's streamed body (`AGENT_TUI_DESIGN.md` §9c). `toolCallDoc` reads
   // it into a follow scroll. **Its producer landed and does not fill it** (C23 I54,
   // 2026-09-05, Lane P): the shell's pending entry is a `toolCallDoc`, and its body is
@@ -1781,7 +1846,7 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
 
   // **`Skin` is `Basis`'s shape one carrier along**, and the same reading
   // applies: a record whose fields exist for one function, exported because
-  // `trianglesOf` returns it on every `Tri3`. `skin.wire` *is* read outside —
+  // `geometryOf` returns it on every `Tri3`. `skin.wire` *is* read outside —
   // `scatter3.ts` owns the paint policy, because it owns `ink`, `mark` and
   // `glyph` — and `skin.cull` is not, because the only question it answers is
   // asked inside `drawTri`.
@@ -1797,6 +1862,50 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "decided, which is what the signed volume exists to make single. The " +
     "composition layer reads `skin.wire` because it owns the paint policy, and " +
     "has no use for this: the cull moves neither the extent nor the depth span.",
+
+  // **`Lanes` is the geometry's storage, and two of its lanes have one
+  // reader by design** (C12 I139, F1184). The record is exported because
+  // `geometryOf` returns it and `scatter3.ts` holds it across frames (I107) and
+  // hands it to the span (`count`, `value`) and the raster (`idx`, `screen`,
+  // `stamps` — read where `drawTri` is called with a frame). The position and
+  // normal lanes are read by the cull, the projection and the fill, all in
+  // `surface3.ts`. A second reader of a position lane outside the raster would
+  // be a second projection, which I134 made single. The tests read them through
+  // `cornerAt` and `screenAt`, which are the readers the layout is held against.
+  // --- C25's window plan ------------------------------------------------------
+  //
+  // The plan is a value the view holds and the window functions read (C25 I22,
+  // C22 I41). Its row model — `Row` and `Unit` — is exported only because a
+  // published type cannot name a private one; the view reads `patch`, `width`
+  // and `headers`, and the start rows and unit bounds are read inside window.ts
+  // by the bottom search and the builder. A reader of them outside window.ts
+  // would be a second row arithmetic, which C25 I1 forbids. T1.24 reads them.
+  "WindowPlan.starts":
+    "C25 I22 — the rows a window may begin at, read by the bottom search inside window.ts " +
+    "and held to clampOffset by T1.24; a second reader would be a second row arithmetic (C25 I1)",
+  "WindowPlan.bodyStarts":
+    "C25 I22 — each hunk's first body row, read by windowRows inside window.ts so a planned window " +
+    "walks the window's rows only (F1191); held to a full scan by T1.25",
+  "Unit.lineFrom":
+    "C25 I19 — a unit's first line, read by the builder and windowRows inside window.ts; the " +
+    "type is published only because WindowPlan.rows names it (C25 I22)",
+  "Unit.lineTo":
+    "C25 I19 — a unit's end line, read by the builder and windowRows inside window.ts; the " +
+    "type is published only because WindowPlan.rows names it (C25 I22)",
+  "Lanes.pos":
+    "C12 I139 — the position lane: read by the cull, the projection and the span inside " +
+    "surface3.ts, and by T1.149 and T1.151 through cornerAt. A reader outside the raster " +
+    "would be a second projection (I134)",
+  "Lanes.nrm":
+    "C12 I139 — the unit-normal lane: read by the projection into the screen slot, and by " +
+    "T1.149 through cornerAt. The shade reads the slot, never the lane",
+  "Lanes.cen":
+    "C12 I141 — the face-centroid lane, the cull's own expression made once; read by " +
+    "backfaceCulled alone and by T1.153 against that expression. A second reader would be " +
+    "a second cull (Skin.cull's argument)",
+  "Lanes.fnrm":
+    "C12 I141 — the unit face-normal lane: read by the cull, by the builder's flat arm, and " +
+    "by the rows through faceNormalOf",
 
   // --- published ahead of the value that makes it readable ------------------
   //
@@ -3169,6 +3278,19 @@ export function checkExportedArguments(files, readFile = (f) => readFileSync(f, 
   // by holding the owner. Under-reports rather than over-reports, deliberately.
   const sources = new Map(files.map((f) => [f, strip(readFile(f))]));
   const reachable = new Set(published);
+  // **A type published under another name is published** (F1148). `published`
+  // keeps the *exported* half of `Region as CardRegion`, which is right for the
+  // surface and wrong for this comparison: a parameter is written in the
+  // declaring module's vocabulary, so the check asks after `Region` and the set
+  // holds `CardRegion`. The rule's message — *a consumer cannot supply the
+  // argument* — is then false, and it was silent only because the member scan
+  // below happened to pick the local name up off a nearby parameter list.
+  for (const m of src.matchAll(/export\s+type\s*\{([^}]*)\}\s*from/g)) {
+    for (const part of m[1].split(",")) {
+      const inner = part.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0]?.trim();
+      if (inner !== undefined && inner !== "") reachable.add(inner);
+    }
+  }
   for (const text of sources.values()) {
     for (const m of text.matchAll(/export\s+(?:type|interface)\s+(\w+)/g)) {
       if (!published.has(m[1])) continue;
@@ -3349,6 +3471,28 @@ export function checkExportedArguments(files, readFile = (f) => readFileSync(f, 
 
 /** Functions whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_FUNCTIONS = Object.freeze({
+  // **`shadeRgb` is the reference the packed form is held against** (C10 I42).
+  // The painter took `shadePacked` (C12 I132) and `shadeColour` deliberately
+  // stays on `overChannels`, so the tuple form has no caller in `src/` — and
+  // C10 T1.42 and T1.43 compare three implementations through it: the hex
+  // path against the tuple, the tuple against the packed integer. Deleting it
+  // would leave the packed form checked against the hex path alone, through
+  // a channel function it shares; wiring it back in is the allocation F1171
+  // measured. It goes the day the tuple form stops being the sweep's middle.
+  shadeRgb:
+    "C10 I40 · C10 I42 — the tuple form of the shade, consumed by T1.42 and T1.43 as the "
+    + "reference between the hex path and the packed integer, and by no caller in src/ since "
+    + "the painter took shadePacked (C12 I132, F1171)",
+  // **`profileCard` was here and is gone.** It was exempted for one commit —
+  // the deck landing ahead of the view that walks it, because reading
+  // thirty-seven frames is what found a form fed instants where it draws
+  // intervals (F1135), a treemap root with no value behind a green gate (F1134)
+  // and every `axes: true` card three rows past its region (F1133), none of them
+  // reachable through a view. Its reason said *MG25's equality arm fails the day
+  // `profile-view.ts` names it*, and on the commit that rewired the view it did,
+  // in the same run. A watched entry rather than a deferred one, and the
+  // difference is that nobody had to remember.
+
   // **`createSourceErrorSink` was here and is gone** — wired by `construct.ts`
   // on 2026-09-03 (C19 T3.6's *logged once* given a place to log to, drained by
   // C22 §8 step 3), and the equality arm removed the entry the day it was.
@@ -3401,6 +3545,36 @@ export const UNCONSUMED_FUNCTIONS = Object.freeze({
     "C12 — `definition.ts` computes `areaWidth` inline across a three-rung ladder with " +
     "`MIN_AREA`, and this helper states the simple case. Two expressions of one width, " +
     "and the helper is the one no renderer calls. C12's to reconcile",
+
+  // --- the lanes' readers, exported as the reference the layout is held against --
+  //
+  // **The lanes are numbers at an address, and the rows need a reader** (C12
+  // I139, F1184). `cornerAt`/`cornersOf` read a raster vertex back as the
+  // `{p, n, v}` record the object form held; `screenAt` reads a slot back as
+  // the eight-field record; `placeScreen` writes one so T1.150 can hand
+  // `hiddenThin` the records it computed by hand; `geometryFrom` lays given
+  // corners out as lanes so a row can build one triangle without a mesh. No
+  // renderer calls any of them — the raster reads the lanes by offset, which
+  // is the point of the change — and a reader that lived only in the tests
+  // would be a second statement of the layout rather than the first (the
+  // shadeRgb argument above). They go the day the lanes go.
+  // (`cornerAt` itself is not listed: the gate counts it consumed.)
+  cornersOf:
+    "C12 I139 — a triangle's three corners read back as {p, n, v} records through cornerAt; " +
+    "consumed by T1.149, T1.151 and the mesh rows, by no renderer: the raster reads the lanes " +
+    "by offset",
+  screenAt:
+    "C12 I139 — a screen slot read back as the eight-field record T1.146 and T1.151 hold to " +
+    "project; the fill reads the slot by offset",
+  placeScreen:
+    "C12 I139 — a screen slot written from a hand-computed record so T1.150 can ask " +
+    "hiddenThin about corners no camera produced; toScreenAt is the only writer in src/",
+  geometryFrom:
+    "C12 I139 — given corners laid out as lanes, one triangle without a mesh, for the rows " +
+    "that used to write a Tri3 literal; geometryOf is the builder every renderer takes",
+  faceNormalOf:
+    "C12 I141 — a face's unit normal read back from its lane for the rows that hold the cull " +
+    "and the builder against a reference; the cull reads the lane by offset",
 
   // --- a refusal that runs at test time by design --------------------------
   hasEmojiForm:

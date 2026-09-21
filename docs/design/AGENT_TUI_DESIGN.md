@@ -1139,7 +1139,10 @@ reads as three local decisions.* Building a `reasoning` kind would be the first 
 **Check before designing it**: whether `panel` can carry a collapsed state without changing
 `measure(block, width)`'s shape. A collapsed panel is *shorter*, which is a height that
 depends on state — and if that state lives on the block it is fine (a `rev` moves with it),
-but if it lives on focus it is I17's forbidden case. **The collapse is content, not focus, so
+but if it lives on focus it is **C09 I2**'s forbidden case (`measure` is a pure function of
+`(block, width)`). It read `I17` until `docs/design` joined the reference corpus and SP3 could
+see it: I17 is `gapBefore`'s sequence rule under C09 and *every measurer returns at least 1* under
+C04, and neither is about a height that depends on state. **The collapse is content, not focus, so
 it should be safe** — verify rather than assume.
 
 ### What step 0 changed about this section, and it is the weight rather than the ruling

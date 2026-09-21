@@ -952,13 +952,21 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     viewBottom: () => void onView("bottom", "bottom", "bottom"),
     viewPageUp: () => void onView("pageUp", "pageUp", "pageUp"),
     viewPageDown: () => void onView("pageDown", "pageDown", "pageDown"),
+    // **The section gesture, and it is one call to whichever owner is up**
+    // (C16 I33). `n`/`p` above move the view's own *unit*; these move its
+    // *section* — a file on a patch, a heading on a document, a group on the
+    // profiler's deck. The member is required on all three interfaces, so this
+    // needs no `undefined` arm and an owner that has one section answers
+    // `false` in its own words rather than by omission.
+    viewNextSection: () => void onSection(1),
+    viewPrevSection: () => void onSection(-1),
     // `Esc` is the view's own dismissal and deliberately not `dismiss`, which
     // pops whatever layer is on top: this one knows it is closing *its* view and
     // drops its offset with it (A01 D7).
     viewPop: () => {
       // **The profiler view first** (C28 §3c). Its `pop` restores the tier it
       // raised; sending its `Esc` to another owner would leave that tier up.
-      if (deps.profileView !== undefined && deps.profileView.pane !== null) {
+      if (deps.profileView !== undefined && deps.profileView.section !== null) {
         void deps.profileView.pop();
         return;
       }
@@ -1142,19 +1150,37 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
   const onView = (
     patch: PatchViewMotion,
     document: DocumentViewMotion,
-    // The profiler view's reading of the same key: a pane step for `n`/`p`,
+    // The profiler view's reading of the same key: a card step for `n`/`p`,
     // a window motion for the rest (C28 §3c).
     profile: ProfileViewMotion | 1 | -1,
   ): boolean => {
     const profileView = deps.profileView;
-    if (profileView !== undefined && profileView.pane !== null) {
+    if (profileView !== undefined && profileView.section !== null) {
       return typeof profile === "number"
-        ? profileView.switchPane(profile)
+        ? profileView.nextCard(profile)
         : profileView.move(profile);
     }
     return deps.documentView.openFor !== null
       ? deps.documentView.move(document)
       : deps.patchView.move(patch);
+  };
+
+  /**
+   * `tab`/`⇧tab` to whichever view is open (C16 I33).
+   *
+   * **The same ladder as `onView` and deliberately not a second one**: two
+   * copies of *which owner is up* is how they come to disagree, and the one
+   * above has already been wrong once (F944). One gesture, one resolution.
+   */
+  const onSection = (direction: 1 | -1): boolean => {
+    const profileView = deps.profileView;
+    const owner =
+      profileView !== undefined && profileView.section !== null
+        ? profileView
+        : deps.documentView.openFor !== null
+          ? deps.documentView
+          : deps.patchView;
+    return direction === 1 ? owner.sectionNext() : owner.sectionPrev();
   };
 
   /**

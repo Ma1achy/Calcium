@@ -30,6 +30,7 @@
 | C26 | Navigation | L3 | kit | [spec](components/C26_navigation.md) — **design only, unbuilt** |
 | C27 | Terminal emulator | L0 data | kit | [spec](components/C27_terminal_emulator.md) — **built; integration rows owed** (60 live rows across six tiers; `test/integration/emulator.test.ts` is 0 of 8) |
 | C28 | Profiler | L4 | kit | [spec](components/C28_profiler.md) — **spec'd, unbuilt** |
+| C29 | Layout engine | L1 | kit | [spec](components/C29_layout_engine.md) — the sizing core; `group` (both directions) and `panel` are on it |
 
 `kit + app` means the framework owns the mechanism and a consuming app supplies the
 content — the five extension hooks of A02 §6.

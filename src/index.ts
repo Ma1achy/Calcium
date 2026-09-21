@@ -322,7 +322,7 @@ export type {
 
 // `AnyBlockDefinition` is what `TuiConfig.blocks` takes — a definition of some
 // **one** kind, which is what an app writes (C04 I119, F405).
-export type { AnyBlockDefinition, BlockDefinition, RenderContext } from "./presentation/blocks/index.js";
+export type { AnyBlockDefinition, BlockDefinition, RenderContext, Rendered } from "./presentation/blocks/index.js";
 /**
  * C24 I22 — a `code` block accepts any language name, and until this existed
  * only two of them meant anything (C09 §4a, F93).
@@ -366,11 +366,13 @@ export type { LanguageFn } from "highlight.js";
  * from there, which is how a plot becomes an image inside a transcript.
  */
 export { plotToSvg, svgLayout, SVG_FONT_SIZE, type SvgLayout } from "./presentation/plot/svg.js";
-export { mermaidCode } from "./presentation/mermaid.js";
+// `mermaidCode` is `@fmx/calcium/mermaid` and not here (C24 I36): its renderer
+// is a quarter of a cold import, and no line of this barrel may load it (F1188).
 /**
  * A banner, from a sparse set of variants (roadmap 22).
  *
- * **Published for the same reason and by the same argument as `mermaidCode`.**
+ * **Published for the same reason and by the same argument as `mermaidCode`**
+ * (which sits on `@fmx/calcium/mermaid`, C24 I36).
  * Art is pre-composed text: nothing about it needs a renderer, so it is a
  * transform in front rather than a seventeenth kind in the vocabulary — which
  * is what keeps the freeze from having to carry it.
@@ -393,7 +395,7 @@ export type { TerminalCapabilities } from "./terminal/capabilities.js";
 /**
  * The two capability fields a glyph resolution reads (C24 I29, MG29).
  *
- * Published because `profilePane` takes one, and a consumer with no name for a
+ * Published because `profileCard` takes one, and a consumer with no name for a
  * parameter's type cannot supply it. A whole `TerminalCapabilities` satisfies
  * it, which is what the one caller inside the framework — C28 §3c's view, which
  * hands over `detection.capabilities` whole — does.
@@ -510,13 +512,19 @@ export { planColumns } from "./presentation/table/index.js";
  * draw it. An entry point shipping behaviour the runtime surface cannot reach
  * would be a second way in.
  *
- * `profilePane` is a pure function from a report to blocks, which is why it is
- * safe to publish: it composes the same builders an application already has.
- * The framework's own view (`/profile`, C28 §3c) draws with these three through
- * the same exports and nothing that opens it is published (C24 I33) —
- * `paneTitle` had no consumer anywhere until that view (F945).
+ * `profileCard` and `profileDeck` are pure functions from a report and a region
+ * to blocks, which is why they are safe to publish: they compose the same
+ * builders an application already has. The framework's own view (`/profile`,
+ * C28 §3c) draws with exactly these exports and nothing that opens it is
+ * published (C24 I33) — `paneTitle`, the surface these replace, had no consumer
+ * anywhere until that view (F945).
+ *
+ * **`CARDS` is published with them because a card's id is its address.** A
+ * consumer drawing its own deck needs the questions and the groups to build a
+ * menu from, and a hard-coded list of ids in an application is the register
+ * written a second time by someone who cannot see it change.
  */
-export { profilePane, paneTitle, PANES } from "./shell/profiling/panes.js";
+export { CARDS, SECTIONS, profileCard, profileDeck } from "./shell/profiling/panes/index.js";
 
 /**
  * **The exporters, and they run — which is not a contradiction of C24 I31.**
@@ -531,7 +539,7 @@ export { profilePane, paneTitle, PANES } from "./shell/profiling/panes.js";
  * appended to and read back with `jq`.
  */
 export { toNdjson, toTraceEvents } from "./shell/profiling/export.js";
-export type { PaneName } from "./shell/profiling/panes.js";
+export type { CardGroup, CardSpec, ProfileSection, Region as CardRegion } from "./shell/profiling/panes/index.js";
 export type {
   FrameRecord,
   Histogram as ProfileHistogram,

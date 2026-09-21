@@ -79,7 +79,7 @@ import { DEFAULT_WIDTHS, checkAsciiParity, checkMeasurement, formatReport } from
  *
  * **`rule` is in the last row because it was measured twice.** The first pass
  * put it in the checkable column — a regex reading the type ran past
- * `}> & Gap;` and attributed a neighbour's `tone` and `glyph` to it. `Rule` is
+ * `}> & Padded;` and attributed a neighbour's `tone` and `glyph` to it. `Rule` is
  * `{ kind, id, label }`; the compiler is what said so. Two of eleven kinds
  * carry a meaning-bearing field, not four.
  */

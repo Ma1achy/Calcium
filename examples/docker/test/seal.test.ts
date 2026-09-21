@@ -71,7 +71,11 @@ function resolveInNode(specifier: string): Resolution {
 function packageRoot(): string {
   const r = resolveInNode("@fmx/calcium");
   if (!r.ok) throw new Error(`@fmx/calcium does not resolve: ${r.message}`);
-  return fileURLToPath(new URL("../", r.url));
+  // The runtime resolves into `dist/` — `dist/bundle/index.js` since A04 §5's
+  // bundle (F1193) — and the package root is whatever sits above `dist/`.
+  const dist = r.url.indexOf("/dist/");
+  if (dist < 0) throw new Error(`@fmx/calcium resolved outside dist/: ${r.url}`);
+  return fileURLToPath(new URL(r.url.slice(0, dist + 1)));
 }
 
 /** The three C24 §2 entry points, and nothing else. */
@@ -107,7 +111,7 @@ describe("R2.3: the package surface is sealed by npm, not by discipline", () => 
     const r = resolveInNode("@fmx/calcium");
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.url).toContain("/dist/index.js");
+    expect(r.url, "the bundled runtime entry (A04 §5, C24 I38)").toContain("/dist/bundle/index.js");
     // The failure this rules out is a workspace link that shortcuts the exports
     // map: the app would type-check, run, and prove nothing about the package.
     expect(r.url).not.toContain("/src/");

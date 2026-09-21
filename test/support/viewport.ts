@@ -2,10 +2,18 @@
  * C14 fixtures.
  *
  * The measurer is C09's real `measureSequence` rather than a fake, deliberately:
- * the defect T2.9 and T6.16 guard against is picking `Σ measure` instead, and a
- * fake that returns a made-up number cannot tell the two apart. Where a test
- * genuinely wants controlled heights it uses `rowsDoc`, which produces documents
- * whose real measured height is known.
+ * a fake returning a made-up number cannot tell the seam from a hand-fold, and
+ * cannot tell either from the frame. Where a test genuinely wants controlled
+ * heights it uses `rowsDoc`, which produces documents whose real measured height
+ * is known.
+ *
+ * **The distinction this file was built around has dissolved** (F1224). The
+ * defect T2.9 and T6.16 were written against was picking `Σ measure` instead,
+ * which used to be short by one row per `gapBefore`. Padding lives inside the
+ * block now (C04 §3a, C09 I80), `sequenceHeight` is a bare fold, and the two are
+ * the same number by construction. What replaced the distinction is the frame:
+ * `renderedRows` below is the third answer, and it is the one no arithmetic
+ * satisfies by accident.
  */
 
 import { block } from "../../src/data/viewmodel/index.js";
@@ -35,15 +43,41 @@ const kit = measurable({
 export const measureSequence = (blocks: readonly Block[], width: number): number =>
   kit.registry.measureSequence(blocks, width);
 
-/** The wrong one, for the tests that must distinguish them. */
+/**
+ * The hand-fold — **no longer the wrong answer, and that is the point** (F1224).
+ * It agrees with `measureSequence` for every document, so a row asserting the
+ * two agree is what keeps the fold honest: it goes red the day a composer starts
+ * adding spacing of its own again (C09 I17).
+ */
 export const sumMeasure = (blocks: readonly Block[], width: number): number =>
   blocks.reduce((n, b) => n + kit.measure(b, width), 0);
 
+/**
+ * **The frame, which is the check the arithmetic lost.** Both numbers above are
+ * computed from the same per-block measures, so they cannot disagree and cannot
+ * catch a measure that is wrong in the same way twice. The rendered row count is
+ * arrived at by a different path — C09 I1's identity — and a spacing rule applied
+ * at the composer, or applied twice, shows up here and nowhere else.
+ */
+export const renderedRows = (blocks: readonly Block[], width: number): number =>
+  kit.renderSequence(blocks, width).length; // cells-ok — a row count
+
+/**
+ * An entry's rows — **the sequence renderer, not a `column` group round it**.
+ *
+ * **The wrapper was load-bearing and wrong** (F1223). A group is a block in its
+ * own right: it has a floor of one row, and it draws its children rather than
+ * being them. T4.1 sums the *blocks'* measured heights and compared them
+ * against the *wrapper's* rendered rows, and the two agreed everywhere except a
+ * block measuring zero — where the wrapper measured one, drew none, and the two
+ * errors cancelled. The day the group's render floor was repaired, T4.1 went
+ * red on a harness defect that had been holding it green.
+ *
+ * A stand-in must make the reads the real one makes: the viewport renders a
+ * sequence, so this renders a sequence.
+ */
 export const renderEntry = (blocks: readonly Block[], width: number): readonly string[] =>
-  kit.renderToLines(
-    block({ kind: "group", id: "seq", direction: "column", children: [...blocks] }),
-    width,
-  );
+  kit.renderSequence(blocks, width);
 
 /** `n` single-row blocks, so an entry's measured height is exactly `n`. */
 export function rowsDoc(n: number, id: string, gapAt = -1): ViewDocument {
@@ -54,7 +88,7 @@ export function rowsDoc(n: number, id: string, gapAt = -1): ViewDocument {
         kind: "raw",
         id: `${id}-${i}`,
         text: `${id} row ${i}`,
-        ...(i === gapAt ? { gapBefore: true } : {}),
+        ...(i === gapAt ? { padding: { t: 1 } } : {}),
       }),
     );
   }

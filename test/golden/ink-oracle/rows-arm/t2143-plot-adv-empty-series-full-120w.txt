@@ -1,0 +1,1 @@
+{"kind":"plot","id":"adv-empty-series","form":"line","height":4,"series":[],"emptyMessage":"No data."}

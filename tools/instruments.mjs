@@ -60,6 +60,7 @@ const COVERED = [
   ["tools/bench/pollers.mjs", null], // same fixture as frame.mjs — the shared guard
   ["tools/bench/patch-window.mjs", null], // same fixture — `gutter`
   ["tools/bench/liveness.mjs", null], // the guard itself, covered by its own rows
+  ["tools/bench/plots.mjs", null], // same liveness guard — drives the plots example headlessly
   ["tools/waitfor.mjs", ["npx", "vitest", "run", "test/unit/waitfor.test.ts"]],
   // **This target was red from the commit that landed these and nobody ran it**
   // (F905). Five files, 697 lines, inside a commit whose message is about

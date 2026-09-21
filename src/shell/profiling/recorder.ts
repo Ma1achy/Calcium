@@ -828,6 +828,10 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
             droppedBytes: 0,
             durationMs: elapsed() - startedAt,
             abandoned: true,
+            // **No tree, because no profile was ever produced** (C28 I62, I64).
+            // *Abandoned* and *no capture taken* are two different sentences
+            // and the card draws them as two.
+            stacks: null,
           }),
         );
       }

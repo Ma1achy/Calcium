@@ -12,6 +12,9 @@ expectations, which is the same reason C02 takes its `env` by injection.
 | `pty.ts` | `runInPty()`, `interactivePty()`, `control()`, `trackDecset()` for tier 5 |
 | `process.ts` | `groupMembers()`, `waitForGroupEmpty()`, `openDescriptorCount()`, `run()`, `collect()` and `scripts` — the real-process harness for C21. Nothing here is a fake: C21's value is in its interaction with the OS, and a test that mocks the process has moved to tier 3 without saying so |
 | `fixture.mjs` | The program tier 5 runs inside a PTY. Imports `dist/`, not `src/` |
+| `import-trace.mjs` | A `--import` hook listing every module the process resolves, on the main thread (`module.registerHooks`), read back through `globalThis.__importTrace()` — C23 T5.22's instrument for the startup graph |
+| `startup-graph-child.mjs` | The child T5.22 spawns under it: imports `dist/`, lists the graph, runs one shell command through the route over the bench's fakes, lists it again; two JSON lines appended to the file named by its argument |
+| `code-graph-child.mjs` | The child T5.6 spawns under `import-trace.mjs`: imports `dist/presentation/blocks/kinds/code.js`, lists the graph, registers a seventeenth grammar and lists it again — the row that reads what the code block loads (C09 I71). | C09 T5.6 |
 
 | `world.ts` | `fakeWorld()`, `worldResult()`, `steppableClock()` — a constant `WorldDriver` double for C08's resolver, which is not "the world" for I14's purposes |
 
