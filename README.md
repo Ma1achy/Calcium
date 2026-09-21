@@ -375,18 +375,111 @@ while building it.
 
 ![docker-tui: a six-beat screencast — the landing dashboard refreshing in place, the /ps table, drilling into a container where a CPU plot fills one sample at a time, a comparison of container against image, a unified config diff, and a streaming log tail](examples/docker/demo.gif)
 
-The same table at 120 columns and at 80 — `PORTS` dropped by declared priority,
-`USAGE` dropped from the dashboard, the pills wrapped, and the wordmark fallen
-back to ASCII, none of which the adapter asked for:
+The same table at 120 columns and at 80. `PORTS` is dropped by declared priority
+and `USAGE` leaves the dashboard above it, neither of which the adapter asked for:
 
-![docker-tui at 120 columns: a block-element wordmark, a dashboard with CPU, MEM and USAGE columns, and a /ps table including a PORTS column](docs/media/ps-120.gif)
+![docker-tui at 120 columns: the tail of the live dashboard showing CPU, MEM and USAGE columns per container, and below it a /ps table of five containers with NAME, IMAGE, STATUS and PORTS](docs/media/ps-120.gif)
 
-![docker-tui at 80 columns: an ASCII wordmark, the dashboard without its USAGE column, pills wrapped onto two lines, and the /ps table without PORTS](docs/media/ps-80.gif)
+![docker-tui at 80 columns: the same dashboard with the USAGE column gone, and the same /ps table reduced to NAME, IMAGE and STATUS](docs/media/ps-80.gif)
 
 [`examples/docker/`](examples/docker/README.md) has the recording, how to run it,
 and the ledger. [`docs/ROADMAP.md`](docs/ROADMAP.md) is what the ledger turned
 into: four pieces of framework work, each with a real consumer behind it.
 
+---
+
+## The second application: plots
+
+`plots-tui` is the other way round from `docker-tui`. That one is a real interface
+over a real daemon; this one exists because **every instrument in this repository
+compares bytes** — golden frames, the collision sweep, the terminal baseline — and
+not one of them can see a flicker, a jump, or a colour that reads badly on a real
+emulator. Until it existed, nothing had looked.
+
+Forty-eight forms, and the greeting draws six of them at once:
+
+![The plots gallery at 120 columns: a latency curve with its range labelled at 0, 25, 50 and 75; a grouped p50/p99 bar of layout and paint at four display widths; a per-core load matrix; a box-and-whisker distribution of measure, layout, paint and compose; a treemap of the frame budget nested into raster, fill, compose, blend, paint, measure and wrap; and a live queue-depth curve](docs/media/plot-gallery.gif)
+
+Each figure is captioned by **what it says** rather than by what it is called —
+*a curve · frame latency, ms*, *a distribution · stage timings, ms*. The form is
+the renderer's business; a producer names the shape of its data.
+
+`/live <form>` advances one of them in place. The transcript does not move under
+it, which is C25's whole subject — a block is patched where it sits rather than
+reprinted at the bottom:
+
+![The line form advancing live inside a bordered panel at 100 columns, the curve redrawing as new samples arrive while the entry above it stays put](docs/media/plot-live.gif)
+
+And `/compare <form>` draws the same block through both renderers at once:
+
+![The bar form side by side: on the left the terminal rendering in block elements with value labels above each bar, on the right the same figure rasterised from SVG and drawn in half-block characters, two colours to a cell](docs/media/plot-compare.gif)
+
+**The right pane is not a degraded left pane.** This terminal reports no graphics
+protocol, so the SVG is spent on half blocks — two colours a cell — and that is a
+decision the renderer took and can explain (C09 I36, I37), not a failure it fell
+into. On a terminal that answers Kitty or iTerm2 it is pixels instead, and nothing
+above the renderer changes.
+
+---
+
+## The layout engine
+
+Calcium owns its box model. Sizes fit, grow, shrink or are declared; a row of
+children is solved in five passes — fit width, grow and shrink width, re-fit
+height, grow and shrink height, then position — and `measure` stops after the
+fourth because it only ever wanted a number.
+
+`/mosaic` is the surface where the engine is the subject rather than the means. A
+layout is **named as a string**: one character a cell, `/` a row, `.` a hole.
+
+![Four named mosaic layouts at 120 columns: "AAB/AAB/CDB" drawing a wide panel beside a rail with two cells below it, and "AAB/DEB/DCC" drawing a pinwheel with an exact 24-cell first column, each grid filled with real plots](docs/media/plot-mosaic.gif)
+
+`".A./BBB/.C."` has holes in it, which a `group` has no way to say, and `"AB"`
+leaves `rows` unused — the degenerate case, which still holds. The engine is in
+[`src/presentation/layout/`](src/presentation/layout/) and
+[`docs/components/C29_layout_engine.md`](docs/components/C29_layout_engine.md) is
+the component spec, with
+[`docs/design/layout/LAYOUT_ENGINE.md`](docs/design/layout/LAYOUT_ENGINE.md) the
+design it was built to.
+
+---
+
+## The profiler measures the framework, with the framework
+
+C28 ships as the seventh verb every application gets for free. **Every figure it
+draws is a Calcium plot**, which is the honest test of the plot system and not a
+flourish: if the profiler is hard to read, the plots are hard to read.
+
+`/report verdict` answers the only question that matters first — does the frame
+budget hold, and if not, by how much:
+
+![The verdict card at 100 columns: four horizontal bands — bytes written per frame, median frame construction, p95 frame construction and streaming CPU — each drawn as a braille density run against a budget line, above a summary reading "verdict justified — median-frame", "marginal none" and the regime it was measured in](docs/media/profile-verdict.gif)
+
+*justified*, *marginal*, and the regime the reading was taken in — node version,
+CPU count, tier, elapsed. A number with no regime is not a measurement.
+
+`/report where-the-frame-went` breaks one frame into its sites, **self time and
+not total**, so the bars sum to the frame rather than to some multiple of it:
+
+![The where-the-frame-went card: seven stacked spans — visible, rows, transcript, body, write, prompt, chrome — each a bar starting where the last one ended, over a full-width "measured" bar, titled "app · where-the-frame-went · seq 3 · 19.1 ms"](docs/media/profile-frame.gif)
+
+`/report memory` is the heap over the session, sampled rather than snapshotted —
+a heap profile reports what *survived*, and what a leak looks like is a line that
+does not come back down:
+
+![The memory card: a stacked area of heap used, external and buffers over nine resource samples, axis labelled from 0 B to 76 MB](docs/media/profile-memory.gif)
+
+Thirty-eight cards in three groups — `verdict`, `app`, `framework`. `/profile`
+opens them as a pushed view rather than a transcript entry, and `n`/`p` walk the
+cards while `tab` walks the groups:
+
+![The /profile pushed view at 100 columns, walking four cards: the verdict card, then vitals, frame-cost and where-the-frame-went, the header reading "profiler · app" with a card counter on the right](docs/media/profile-view.gif)
+
+**A view that redrew on every frame would raise the frame that redraws it**, so
+every commit it makes is bracketed as the profiler's own and excluded from the
+figures (C28 I12, I49) — the header says how many self-inflicted frames were
+dropped. The cards are exported: `profileCard()` and `CARDS` let an application
+draw its own, which is what `plots-tui`'s `/report` does.
 ---
 
 ## The smallest complete example
