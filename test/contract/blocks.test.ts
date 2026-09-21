@@ -664,3 +664,21 @@ describe("C09 contract — the slice seam", () => {
     expect(kit.registry.windowChild(lines("plain", 6), 40, 2, 5), "and the seam takes it").not.toBeNull();
   });
 });
+
+/**
+ * C09 §the focus mark — owed at the spec commit (I83, R-SEL-006).
+ *
+ * **Both rows are about the unfocused frame**, which is the half a first draft
+ * gets wrong: a reservation that appears with focus renders identically to one
+ * that is always there on every focused frame, so a row asserting the mark is
+ * present proves nothing about the mechanism. The width with nothing drawn is
+ * the assertion.
+ */
+describe("C09 I83 — the focus mark's reserved column", () => {
+  it.todo(
+    "T2.148 (I83, R-SEL-006, C10 I47): a `step` notice reserves the focus column whatever the frame holds — the gutter is two cells wider unfocused than a notice that declares no element, `measure` is called with no focus in both and equals the rows rendered in both, and focused the column holds `\\u25b8`, `>` at the ASCII rung and `\\u25b8` at `colourDepth: 1` where the ground is gone — not deferred on a component: it lands with the resolver change in the code commit that follows this spec",
+  );
+  it.todo(
+    "T2.149 (I83, C11 I15): a notice declaring no element reserves nothing — asserted as an equality against the same notice with no glyph at all, because a reservation applied to every notice passes any row that measured only the ones that can hold focus — not deferred on a component: it lands with the same code commit",
+  );
+});
