@@ -666,19 +666,19 @@ describe("C09 contract — the slice seam", () => {
 });
 
 /**
- * C09 §the focus mark — owed at the spec commit (I83, R-SEL-006).
+ * C09 I83 — the focus ground, owed at the spec commit.
  *
- * **Both rows are about the unfocused frame**, which is the half a first draft
- * gets wrong: a reservation that appears with focus renders identically to one
- * that is always there on every focused frame, so a row asserting the mark is
- * present proves nothing about the mechanism. The width with nothing drawn is
- * the assertion.
+ * **Both rows are about what does *not* move.** The first form of I83 reserved
+ * a gutter column here; the frame refused it — a `step` head shifted two cells
+ * and the `\u23bf` body under it did not — and four fixtures put the mark in the
+ * gutter of the block that has addressable rows (C11 §5b). So a notice takes
+ * the ground and nothing else, and the assertion is the geometry.
  */
-describe("C09 I83 — the focus mark's reserved column", () => {
+describe("C09 I83 — a notice takes the focus ground and no column", () => {
   it.todo(
-    "T2.148 (I83, R-SEL-006, C10 I47): a `step` notice reserves the focus column whatever the frame holds — the gutter is two cells wider unfocused than a notice that declares no element, `measure` is called with no focus in both and equals the rows rendered in both, and focused the column holds `\\u25b8`, `>` at the ASCII rung and `\\u25b8` at `colourDepth: 1` where the ground is gone — not deferred on a component: it lands with the resolver change in the code commit that follows this spec",
+    "T2.148 (I83, R-SEL-006, C10 I47): a focused `step` notice is painted on `surface.focusGround` and its geometry does not move — the rendered rows are cell-for-cell the same width and the same gutter as unfocused, the `\u23bf` body lands in the same column in both, and `measure` is called with no focus in both and equals the rows rendered in both — not deferred on a component: it lands with the resolver change in the code commit that follows this spec",
   );
   it.todo(
-    "T2.149 (I83, C11 I15): a notice declaring no element reserves nothing — asserted as an equality against the same notice with no glyph at all, because a reservation applied to every notice passes any row that measured only the ones that can hold focus — not deferred on a component: it lands with the same code commit",
+    "T2.149 (I83, C10 I47): the focused notice keeps its own tone over the focus ground — a focused `info` notice is `info` and not `accent`, which the mechanism this replaces could not express, and at `colourDepth: 1` the ground is gone and the tone's mono class is what is left; asserted over three tones, because a row on one tone passes a mechanism that replaces every tone with a constant — not deferred on a component: it lands with the same code commit",
   );
 });

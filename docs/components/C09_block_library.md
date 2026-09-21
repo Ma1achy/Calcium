@@ -995,47 +995,51 @@ The ASCII half is `` ` ``, which is `tree(1)`'s rendering of the same hook in it
 
 **And the separator between a head's fields is a slot** (F828, I49). `toolCallHeader` joined verb, elapsed and outcome with a literal `·`, which is non-ASCII and Ambiguous — two cells at `wide`, and the contract row for the card asserted it at the ASCII arm. `status.ts` chose parentheses and the residue row chose a comma for exactly this reason, each with the reason written beside it; the head was composed after both. `GlyphSet.separator` is `·` / `:`, resolved by the composer, which takes capabilities. **The ASCII rung was `-` for one commit** (F834): read at the ASCII arm, a dispatched head was `* run_command(npm test) - -` — the separator and the turn spinner's first frame `-` are one character, and `|`, the frame two ticks later, is the other obvious rung. A separator's ASCII half must be absent from every set's ASCII frames, and the colon is the one that is; the frame said so where the cell count could not.
 
-#### The focus mark — a reserved column, because `measure` may not see focus
+#### The focus mark is not a notice's — a section that was wrong, and the measurement that says so
 
-R-SEL-006 gives focus a mark and selection the ground, and §4k of C10 is the walk that
-classifies the six compositions where the two meet. This is the half that lands here: **a
-notice standing in the focus ring reserves one gutter column for `▸`, always, and fills it
-on the frames where it holds focus.**
+**This section first ruled that a notice standing in the focus ring reserves a gutter column
+for `▸`.** It was built, and the implementation falsified it in one frame: a `step` head
+shifted two cells and the `⎿` body under it did not, so the hanging relationship between a
+call and its body broke (T1.48). The obvious correction — move the reservation out to the
+entry, where C22 could inset every row of it together — is wrong in the same direction, one
+level further out, and the fixtures say so.
 
-**Reserved unconditionally, and that is the whole of the design.** A width that appeared
-with focus would make `measure` disagree with what is rendered on exactly the frames a
-reader is looking at, and `measure` sees no focus by construction — C11 I17 refuses a
-*height* that follows focus for the same reason one level up, that it moves without `rev`
-moving and C14's cache cannot invalidate it. So the column is a third property of the
-token beside `GLYPH_INDENT` and `GLYPH_RAIL`: `declaresElement` reads `block.action` and
-`block.glyph`, both block data, so `prefixCells` can answer for it with no capability and
-no context. **A notice that declares no element reserves nothing**, because it can never
-hold focus and a blank column on a muted status line is furniture.
+**Four fixtures, measured by column, and they agree with each other.**
 
-**The design's own figures already carry the reservation**, which is what settles the two
-cells rather than one. Fixture 017 draws a focused entry as
+| fixture | row | col 0 | col 2 | col 4 | content |
+|---|---|---|---|---|---|
+| 044 | a table row, neither selected nor focused | — | — | `●` | 6 |
+| 044 | the row below it, **selected** | `▌` | — | `●` | 6 |
+| 044 | the row below **that**, selected **and** focused | `▌` | `▸` | `✗` | 6 |
+| 012 | a focused table row | — | `▸` | `●` | 6 |
+| 012 | a call-head **entry** in the same fixture | — | `●` | — | — |
+| 081 | a call head in a real transcript | `●` | — | — | — |
+| 081 | the table **inside** that entry, focused row | — | — | `▸` | 6 |
+| 003 | a transcript of unfocused heads | — | `●` | — | — |
 
-```
-  ▸ ● search("inQuote") · 1.2s · 3 files
-      ⎿ parse.ts:41    let inQuote = false;
-```
+**So the reservation belongs to the block with addressable rows, and every row of that block
+carries it.** Fixture 044 is the whole argument in three adjacent rows: two gutter columns,
+reserved on all three, spent on none, one and both, and the content edge never moves. A call
+head keeps its own left edge and reserves nothing — which is what stops the transcript going
+ragged, because the reservation is uniform *inside* a block and a block that reserves nothing
+has no rows to misalign against.
 
-— the head's `●` at column 4 and `⎿` at column 6, where this library puts them at 2 and 4.
-The whole gutter is shifted right by the mark and its space, and the child rows are shifted
-with it, which is what a reserved column means.
+**The one fixture that disagrees is the one this section was built on.** §017 draws
+`  ▸ ● search("inQuote")` — the only place a *head* carries the mark — and its own margins are
+inconsistent within itself: `Approve` at 3, `▌ selection` at 2, `▸ ●` at 2. One loose instance
+against four that agree is not a ruling, and *ask where a settled claim is written down* is the
+instrument that should have been pointed at it before the code was written rather than after.
 
-**What it costs, stated plainly**: every call head and every notice carrying an action moves
-two cells right, so **every golden frame holding one moves**. That is the visible price of
-giving focus a carrier that survives 1-bit and a reader who overrode their background, and
-it is the price fixture 017 argues for three ways.
+**And `▸` carries two meanings in the fixtures**, which is F161's shared-mark hazard with two
+real consumers rather than none: §003 line 6 draws `▸ thinking · 4s` with the triangle in the
+**head-glyph column**, where `●` sits on the lines around it — that is disclosure, not focus.
+The focus mark sits in a column of its own, to the left of the state glyph, and never in it.
+The collision is recorded here and ruled where the glyph table is (C09 §4, M4).
 
-**What it does not reach.** A **table** row has no such gutter, and C11 I15 refuses to
-synthesise one because either a synthesised column or a reserved gutter would move width
-arithmetic the S-series figures state. That refusal is not overturned here: the six
-compositions C10 §4k rules are call heads, patch lines and controls, none of them a table
-row, so the mark lands where a gutter already exists and C11's is left as its own change
-with its own frame-read. **The mark's ground half is unaffected** — a focused table row
-takes `focusGround` today and needs no column for it.
+**So this library reserves nothing, and C11 I15 is the invariant the design overturns** — the
+one this section's first draft said it did not. A notice takes the focus **ground** and no
+column; a row in an addressable block takes the ground, the mark, and the copy gutter beside
+it. See C11 §5 and C10 §4k.
 
 #### A rail — the one token property that changes what rows 1..n carry
 
@@ -2488,7 +2492,7 @@ the same overrun in smaller form.
   consistent with itself throughout — a row with a verdict and a row without put their value in the
   same column, because `markFor` pads to the reserved width for both (F1236, I81).
 
-- **I83** — *(R-SEL-006, C10 I47)* **A notice standing in the focus ring reserves one gutter column for the focus mark, always, and fills it only when it holds focus.** The reservation is a property of the token and the block's own data — `declaresElement`, which reads `action` and `glyph` — so `prefixCells` answers for it with no capability and no context, and **`measure` never sees focus**: a width that appeared with focus would disagree with what is rendered on exactly the frames a reader is looking at, which is C11 I17's argument about height one level up. A notice declaring no element reserves nothing, because it can never hold focus. The mark is `▸` and `>` at the ASCII rung, already in `GLYPH_TABLE` as `expand` and read by nothing before this. **Two cells, and the design's figures are what settle that**: fixture 017 draws a focused head's `●` at column 4 and its `⎿` child at 6 where this library puts them at 2 and 4, so the whole gutter shifts by the mark and its space and the children shift with it. **What it does not reach**: a table row has no gutter and C11 I15 still refuses to synthesise one, so the mark lands where a gutter exists and C11's is its own change — a focused table row takes `focusGround` and needs no column (→ I41, C10 §4k, C11 I15).
+- **I83** — *(R-SEL-006, C10 I47)* **A notice takes the focus ground and no column; the focus mark is not this library's.** A focused `notice` that stands in the focus ring (I47) is painted on `surface.focusGround` and keeps its own tone — *colour is declared, not inherited* — and nothing about its geometry moves, so `measure` still sees no focus and needs no capability. **The first form of this invariant reserved a gutter column here and was wrong**, measured rather than argued: the implementation shifted a `step` head two cells and left the `⎿` body under it where it was (T1.48), and four fixtures put the mark in the gutter of the **block with addressable rows** — §044's three adjacent rows reserve two columns and spend none, one and both with the content edge fixed, while §012, §081 and §003 all draw an unfocused call head at its own edge with nothing reserved. The mark's column is C11's (I15, §5). **What a focused notice keeps at 1-bit**: the ground answers `NO_STYLE` there, so the carrier is the tone's own mono class — which is why the tone is kept rather than replaced by `accent`, the mechanism this replaces (→ I47, C10 I47, C11 I15).
 ## 8. Commitments
 
 1. C09 owns the registry; C04 owns the schema and the measurement contract (I13).
@@ -2562,7 +2566,7 @@ the same overrun in smaller form.
 67. **A short row is padded, not walked** (I78, F1204). `fitStyled` measured every row and then walked every row under the width to emit the row it was handed — 16 µs against one — on nearly every row of every frame. The measure decides the pad now, and the walk is the cut path's alone.
 68. **A cut line is walked to the cut** (I79, F1205). `truncate` and `truncateParts` segmented the whole line — a record and a string per cluster — to keep its first hundred cells: 94 µs for a 329-cell markdown paragraph at width 118, on every `raw` line and every over-width `code` row of every miss frame. The cursor stops at the cut now, and the reverse arm reads the same boundaries.
 69. **A column's header names the cells the column holds** (I82). A reservation inside a column — `comparison`'s verdict mark, and any prefix a kind takes — is skipped by the label as well as by the value, because the mark is a verdict *about* a value rather than part of what the label names. The defect this closes was one field: `line()` builds `comparison`'s header and body through the same function, and the header passed `reserve: 0` (F1236).
-70. **Focus reserves its column and spends it only when focused** (I83, R-SEL-006). The tree told focus and selection apart by ink on one ground, which is why `▸` shipped in `GLYPH_TABLE` read by nothing; focus takes a ground of its own and a mark that survives 1-bit. The column is reserved whatever the frame holds, because a width that followed focus would put `measure` and the render in disagreement on exactly the frames a reader is looking at.
+70. **A notice takes the focus ground and not a column** (I83, R-SEL-006). The tree told focus and selection apart by ink on one ground, which is why `focusGround` shipped with a gate and no reader; focus takes a ground of its own here and the mark belongs to the block that has rows to point at. The first ruling put the column on the notice and the frame refused it — the head moved and its body did not — and four fixtures put it where C11 I15 said it could not go.
 
 ---
 
@@ -2799,8 +2803,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.147** (I73, I35, F1210): a mosaic whose children are taller than their regions draws each cut to its own region and not to the grid — the second cell's rows unaffected by the first's overflow; a region under one cell wide or one row tall draws nothing; **a mosaic declaring a height below one draws one blank row** — I14's floor over an empty composition, not a floor of mosaic's own, which is what the mutation pass established by surviving the removal of the second one. C04 I71 refuses that height at validation and says in the refusal what the renderer draws, so the case is reachable exactly for a document that skipped the gate, the same posture as an unregistered kind resolving to `raw` rather than throwing; and each equals the committed capture of the element path byte for byte. The over-tall child is the case the cut exists for, and a grid-wide cut passes a single-cell mosaic, so the corpus carries two cells of different heights.
 - **T2.146** (I72, I73, F1209): every capture T2.143 and T2.144 ask for is one the tree holds, and every capture the tree holds is one they ask for — the two sets compared by **equality, both ways**, over four hundred and more captures. A subset check passes a corpus that shrank: a block that stopped being rendered would stop being compared and the run would be quieter rather than red, which is the failure mode a captured oracle has and a live one cannot.
 - **T2.145** (I76, F1191): a registry over a counting windowable kind whose block exceeds the cap, `windowSequence` twice through one `RenderScratchStore` at one width — the kind's `measure` and `window` on the whole block called once, not twice, the block handed to `window` the same object both times, the profiler's `scratch` hit on the second; a third call at another width resolves again; `render` over the block touches the store not at all; a windowable block within the cap resolves once across two calls likewise; a kind with no `window` through the same store leaves it untouched. Not deferred on a component: the code commit replaces this row.
-- **T2.148** (I83, R-SEL-006, C10 I47): the focus column is reserved whatever the frame holds. A `step` notice is rendered **unfocused** and its gutter is asserted two cells wider than the same notice with `declaresElement` false — the reservation, measured where nothing is drawn, because a row asserting the mark's presence on a focused frame passes a mechanism that grew the width only when focus arrived. `measure` is called with no focus in both cases and equals the rows rendered in both, which is the identity the reservation exists to keep. Focused, the column holds `▸`; at the ASCII rung it holds `>`; at `colourDepth: 1` it holds `▸` and the ground is gone, which is the rung the mark was kept for.
-- **T2.149** (I83, C11 I15): a notice declaring no element reserves **nothing** — a muted status line is the same width focused or not, and it cannot be focused. Asserted as an equality against the same notice with no glyph at all, because a reservation applied to every notice would pass any row that only measured the ones that can hold focus.
+- **T2.148** (I83, R-SEL-006, C10 I47): a focused `step` notice is painted on `surface.focusGround` and **its geometry does not move** — the rendered rows are cell-for-cell the same width and the same gutter as the unfocused notice, the `⎿` body under it lands in the same column in both, and `measure` is called with no focus in both and equals the rows rendered in both. The geometry half is the assertion the first form of this invariant failed: it reserved a column here, the head moved two cells and the body did not.
+- **T2.149** (I83, C10 I47): the focused notice **keeps its own tone** over the focus ground — a focused `info` notice is `info` and not `accent`, which the mechanism this replaces could not express, and at `colourDepth: 1` the ground is gone and the tone's mono class is what is left. Asserted over three tones, because a row on one tone passes a mechanism that replaces every tone with a constant.
 
 ### Tier 3 — edge cases
 
@@ -2929,7 +2933,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 ### Tier 6 — fail-on-revert
 
 - **T6.85** (I39): `decodeImage` never dispatching to `decodeGif` → IF1 fails, every GIF refused as *not a PNG*; disposal never applied → **IF4** fails while IF2's disposal-1 fixtures all pass, which is why IF4 patches the byte; interlace read as progressive, the transparent index painted, or the KwKwK case dropped → **IF2** fails against `sharp`'s pages; the delay clamp removed → IF3; the renderer reading frame 0 regardless of the context → **IF6**'s green arm fails while every row count passes; a GIF sent under `f=100` → IF10; later frames not uploaded → IF9. `tools/mutate/runs/c09-gif.mjs`, with `canvas[d + 3] = 0` as its control.
-- **T6.126** (I83): making the reservation conditional on focus — the shape a first draft naturally takes — fails **T2.147** on the *unfocused* half, which is the half that matters: the focused frame is identical under both mechanisms, so a revert caught only by the focused row would not be caught at all.
+- **T6.126** (I83): putting the reservation back on the notice — the shape this invariant shipped in for one commit — fails **T2.148** on the body's column, which is the cell that moved; the head's own row is two cells wider and reads as deliberate, so a row asserting only the head would accept the defect.
 - **T6.1** (I1): a measurer that under-counts wrapped lines by one → T2.1 fails at the wrapping width.
 - **T6.75** (I33): the `max` removed from `registry.measure` → T3.53 fails, and T4.49's second frame draws the one-row figure again — which is the defect as it shipped.
 - **T6.76** (I33, I1): the padding removed from `registry.render` → T3.54 fails. `measure` returns the floor and the element draws its own height, which is an I1 violation created by the mechanism built to keep I1 whole.

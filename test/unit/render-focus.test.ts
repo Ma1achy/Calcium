@@ -581,3 +581,19 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
     expect(at(noticeAt(NOTICE, null, 1), "pull failed").attrs).not.toContain(7);
   });
 });
+
+/**
+ * C11 §5b — the two gutter columns, owed at the spec commit (I15, I14).
+ *
+ * **The content column is the assertion, not the mark.** A reservation that
+ * appeared with the fact renders identically in the focused frame; the only
+ * place the two mechanisms differ is the frame where nothing is drawn.
+ */
+describe("C11 §5b — the reserved gutter", () => {
+  it.todo(
+    "T2.11 (I15, I14, §5b): one table rendered four ways — nothing, focused, selected, focused and selected — puts its content column at the same integer in all four, and the marks differ where the edge does not — not deferred on a component: it lands with the reservation in the code commit that follows this spec",
+  );
+  it.todo(
+    "T2.12 (I14, C26 I16): the sentinel is distinguished by kind — `selected` absent paints the head on the focus ground, `selected` naming the head alone paints it on the selection ground and keeps `▸`, and the two are asserted different, which is the row the previous form of T1.23 had backwards — not deferred on a component: it lands with the same code commit",
+  );
+});

@@ -207,6 +207,49 @@ So the bar is drawn whenever **any** row declares `actions`, and its label row i
 
 ---
 
+### 5b. The two gutter columns — the reservation I15 refused, and the fixtures that overturn it
+
+**I15 says C11 neither synthesises a column nor reserves a gutter, because either would change
+width arithmetic the surfaces already state.** That is the invariant the design overturns, and
+it took two wrong rulings to find it: the mark was put on the notice (C09 I83's first form) and
+then proposed for the entry, and the fixtures refuse both.
+
+**Measured by column, across four fixtures.** §044 is the argument in three adjacent rows of one
+table:
+
+| row | col 0 | col 2 | col 4 | content |
+|---|---|---|---|---|
+| neither selected nor focused | — | — | `●` | 6 |
+| **selected** | `▌` | — | `●` | 6 |
+| selected **and** focused | `▌` | `▸` | `✗` | 6 |
+
+Two gutter columns, reserved on all three rows, spent on none, one and both, **and the content
+edge never moves**. §012 draws a focused table row with `▸` at 2 and a call-head entry with `●`
+at 2 in the same fixture; §081 draws a real transcript whose head sits at column 0 and whose
+table, inside that entry, puts its focused `▸` at 4 against values at 6 — the same offset,
+inside the table's own gutter; §003 draws a whole transcript of unfocused heads with nothing
+reserved.
+
+**So the reservation is the block's and not the entry's, and that is what keeps the left edge
+straight.** A call head keeps its own edge and reserves nothing, because it has no rows to
+misalign against; a table reserves both columns on every row, so nothing inside it moves when a
+row gains or loses a fact. **A width that followed focus would be the defect** — `measure` sees
+no focus by construction (I17 one axis over), so a column that appeared with the mark would put
+the measurer and the render in disagreement on exactly the frames a reader is looking at.
+
+**What I15 keeps.** Its reason was never *a gutter is wrong*; it was *the S-series figures state
+drop totals and a gutter moves them*. That is still true and is paid rather than dodged: the
+reservation is four cells, the S-series figures move by four, and the movers are named before
+the golden run rather than explained after it. What I15 continues to refuse is the thing it was
+written against — **a synthesised `role: "expand"` column**, which is a column of the *plan* and
+would take part in width distribution. These two are outside the plan entirely, as the detail
+indent is.
+
+**The mark is never in the state glyph's column**, and §003 is why the rule has to be stated:
+its line 6 draws `▸ thinking · 4s` with the triangle sitting where `●` sits on the lines around
+it. That is **disclosure**, not focus — one glyph with two meanings and two real consumers,
+which is F161's hazard arriving with the consumers it was missing. Focus's column is its own.
+
 ## 5a. The window (C09 §2a)
 
 **A table divides, and its units are not rows.** The header is one unit, each row *with its
@@ -265,8 +308,8 @@ derived, and a hand-built table setting either would assert something its own ro
 - **I11** — C11 owns no state. Sort order, expansion and focus all arrive as data.
 - **I12** — Column priority is declared by the surface, never inferred by C11. A table engine guessing which column matters would guess differently as data changed, and the drop order would stop being reviewable.
 - **I13** — Missing values sort last in both directions. Not first when ascending and last when descending — last either way, because a null is an absence of rank rather than the bottom of one, and a reader sorting to find the worst case should not find blanks.
-- **I14** — Focus is rendered by C11 and owned by C16. C11 holds no focus state; it draws what it is handed, which is what keeps I11 true for the one piece of state a table most looks like it should own. **The selection is the same rule with one more state**: a row named in `ctx.focus.selected` and not the head is painted `default` over the selection wash — reverse video at 1-bit — and the head stays `accent`; a one-element extent draws byte-identical to no selection, with no branch on the count; a block whose id no pair names paints nothing. Focus and selection change the **ground** and nothing else: no marker, no extra row, no width (§5). **The head's ground is `surface.focusGround` and the extent's is `surface.selection`** (R-SEL-006, C10 I47, §4k) — two grounds for two facts, where this invariant's first form gave both the selection wash and told them apart by ink alone. The mark R-SEL-006 gives focus lands in a gutter (C09 I83) and **not here**: I15 still refuses to synthesise a column or reserve one, because either moves width arithmetic the S-series figures state, and a focused row needs no column for a ground.
-- **I15** — The expand marker is drawn only into a column declaring `role: "expand"`, and `planColumns` never reads `role`. A table declaring no such column shows no marker; C11 neither synthesises a column nor reserves a gutter, because either would change width arithmetic the surfaces already state.
+- **I14** — Focus is rendered by C11 and owned by C16. C11 holds no focus state; it draws what it is handed, which is what keeps I11 true for the one piece of state a table most looks like it should own. **The selection is the same rule with one more state**: a row named in `ctx.focus.selected` and not the head is painted `default` over the selection wash — reverse video at 1-bit — and the head stays `accent`; a one-element extent draws byte-identical to no selection, with no branch on the count; a block whose id no pair names paints nothing. Focus and selection change the **ground** and nothing else: no marker, no extra row, no width (§5). **The head's ground is `surface.focusGround` and the extent's is `surface.selection`** (R-SEL-006, C10 I47, §4k) — two grounds for two facts, where this invariant's first form gave both the selection wash and told them apart by ink alone. The mark R-SEL-006 gives focus lands in this block's own reserved gutter (I15, §5b), beside the copy column `▌` carries, both reserved on every row whatever its state. **Selection wins the ground where both facts hold** and the head keeps `▸`, which is R-SEL-006 stated as one row rather than two. **The sentinel is distinguished by kind and never by size**: `ctx.focus.selected` **absent** is C26 I16's head-alone sentinel, and any **present** extent is a real selection, one element included — so a real single-row selection takes the selection ground, where a test on the extent's size would have painted it as focus and called that the sentinel.
+- **I15** — *(R-SEL-006, C10 I47, §5b)* The expand marker is drawn only into a column declaring `role: "expand"`, and `planColumns` never reads `role`. A table declaring no such column shows no marker, and **C11 never synthesises a column**, because a synthesised column is a column of the *plan* and would take part in width distribution the surfaces already state. **It does reserve two gutter columns, and that clause is new**: a copy column for `▌` and a focus column for `▸`, outside the plan as the detail indent is, **reserved on every row of the block whatever that row's state**. A width that followed focus would put `measure` and the render in disagreement on exactly the frames a reader is looking at, which is I17's argument one axis over. The reservation costs four cells and it is paid rather than dodged — the S-series drop totals move by four and the movers are named before the golden run. **The fixtures are what overturned the old clause**: §044 draws three adjacent rows reserving both columns and spending none, one and both with the content edge fixed, and §012, §081 and §003 all draw an unfocused call head at its own edge with nothing reserved — so the reservation is the block's, not the entry's (→ I14, C09 I83, C10 §4k).
 - **I16** — C11 registers through C09's public `register`; it is not privileged.
 - **I17** — The action bar's **presence** depends on the data and never on focus: a blank separator and a label row whenever any row declares `actions`, with the labels blank when nothing is focused. A height that varied with focus would move without `rev` moving, so C14's cache could not invalidate it — I9 broken in the one way measurement cannot catch, since `measure` never sees focus at all.
 - **I18** — The action bar's presence is `actionBar` when the block declares it and `rows.some(r => r.actions)` otherwise. **A window declares it and a producer does not**: the presence is derived from the rows, so a slice moves it in both directions — losing two rows the parent counted, or drawing a bar in the middle of a scrolled table. I17 is unchanged by this: the pin is computed from the parent's data at the moment the window is taken, so presence still never follows focus.
@@ -301,6 +344,7 @@ derived, and a hand-built table setting either would assert something its own ro
 19. **The header is padded at the same convention as the rows beneath it** (I21). Where a column begins is a property of the frame and not of a row, and the total is blind to it (→ FINDINGS F1019).
 20. **A ceiling applies to a column that can grow, and only to one** (I22). `maxWidth` without `flex` is accepted and inert; the rule is stated rather than enforced, and pinned so that reversing it is a decision (→ FINDINGS F1032, F50).
 21. **A bar or spark cell draws its glyph, inside the width the column planned, and the column spends the lead on every series it holds** (I23). C04 obliges the mark and this is where it is spent; the series takes what the mark leaves, the slot is blank on a row with no mark so the runs down a column stay one axis (C12 I20), and the mark is dropped only where it does not fit (→ C04 I6, C12 I25, FINDINGS F1104).
+22. **The block reserves two gutter columns and spends them per row** (I15, I14, R-SEL-006, §5b). I15 refused a reserved gutter on the grounds that it moves width arithmetic the surfaces state; the arithmetic moves by four cells and is paid, because the alternative the fixtures rule out is a width that follows focus. What I15 still refuses is a synthesised column of the *plan*. The copy column and the focus column sit outside the plan as the detail indent does, and they are reserved on every row so nothing inside the block moves when a row gains or loses a fact.
 
 ---
 
@@ -353,6 +397,9 @@ Six tiers. No state machine — C11 is pure over the block.
 
 - **T2.10** (I12): one dataset under **two declarations** drops in two different orders. This is the only shape that reaches the invariant: rows asserting *columns drop lowest-priority-first* pass identically whether the number came from the surface or from a heuristic over the data, because the data is the same in both worlds — and an engine inferring priority would give the same answer twice.
 - **T2.10b** (I12): nothing under `src/presentation/table/` **writes** a priority; every mention is a read of `column.priority`. The behavioural row is blind to a heuristic that happens to agree with the declaration on this corpus, and a guessing engine would guess differently as data changed, so the drop order would stop being reviewable.
+- **T2.11** (I15, I14, §5b): the two gutter columns are reserved on **every** row whatever its state. One table is rendered four ways — nothing, focused, selected, focused and selected — and the **content column is the same integer in all four**, which is the assertion; the marks differ and the edge does not. A reservation that appeared with the fact renders identically in the focused frame and differs only here, so a row asserting the mark's presence proves nothing about the mechanism.
+- **T2.12** (I14, C26 I16): the sentinel is distinguished by **kind**. `selected` absent paints the head on the focus ground; `selected` naming the head **alone** paints it on the selection ground and keeps `▸` — a real one-element selection, which R-SEL-006 requires and a test on the extent's size would have painted as focus. The two are asserted **different**, which is the row that the previous form of T1.23 had backwards.
+
 ### Tier 3 — edge cases
 
 - **T3.1**: zero columns → renders the empty message; does not throw.
@@ -398,6 +445,8 @@ Six tiers. No state machine — C11 is pure over the block.
 - **T5.4**: keyboard navigation through a 200-row table — focus moves, expands, collapses — with no drift between focus position and viewport.
 
 ### Tier 6 — fail-on-revert
+- **T6.19** (I15, §5b): dropping either gutter column fails **T2.11** on the content column, in all four frames at once — which is what distinguishes it from a revert that dropped only the mark and left the reservation.
+- **T6.20** (I14, C26 I16): testing the extent by size rather than by presence — `selected.size > 1` — fails **T2.12**: a one-element selection paints as focus and the sentinel is pinned in the test instead of in the type.
 
 - **T6.1** (I1): introducing horizontal scroll → T1.5's width invariant fails.
 - **T6.2** (I2): dropping a column without adding it to detail → T2.4 fails.
