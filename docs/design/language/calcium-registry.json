@@ -18647,6 +18647,34 @@
    "supersededBy": null,
    "legacyIds": [],
    "contentDigest": "f9bb25cf8cbcf1cc444d6204d785c07200c45e80c604c579d97b2aa2659181b6"
+  },
+  {
+   "id": "R-THM-003",
+   "title": "A high-contrast theme takes focus and selection as bands",
+   "text": "In a high-contrast theme, focus and selection are bands rather than grounds an ink is composed against: the band declares one colour and one ink, and everything drawn on the band takes that ink, so the theme's ratio holds by construction and no slot can fall through a list. Tone is spent on a banded row, so state moves to the glyph and the outcome word, which is the one-bit rung's carrier asked per cell rather than per terminal; the focus mark persists on the band. Four contrasts bind and the gate checks each as stated: every ink keeps the theme's declared ratio against its own band; the selection band keeps 3 : 1 against the page, because the ground is selection's only carrier; the focus band keeps 3 : 1 against the selection band, because the two can be adjacent; and the focus band keeps only 2 : 1 against the page, because the focus mark already carries focus at the declared ratio and the band need only read as an extent. It follows that the focus band is the one nearer the page and the selection band the one further from it, which is a consequence of the constraints rather than a choice.",
+   "status": "current",
+   "sectionKey": "current-contract",
+   "tags": [
+    "contract"
+   ],
+   "supersedes": [],
+   "supersededBy": null,
+   "legacyIds": [],
+   "contentDigest": "947f328a3748e1afc918007fa069e7bc40420a6c7f51e65403eafc12276e6fc2"
+  },
+  {
+   "id": "R-THM-004",
+   "title": "A floor's scope is every ground the theme paints text on",
+   "text": "A contrast floor is a claim about a pair, so its scope is every ground a theme paints text on and never a list of grounds somebody wrote down. The focus ground is one of them: a focused region washes its whole extent, bodies included, so a code body's palette lands there exactly as the meaning tones do and is held to the same floors there. Where a ground costs an ink its margin, the theme composes a nearer ink for that ground, keeping the hue and moving only in value by the least that clears; where the palette in question is lent rather than carried here, the composition is authored beside the values it replaces and this document stays normative for what it holds. Three palettes were authored against the page and measured against it alone, and each was found by widening the scope rather than by any failure, which is why the scope is stated as a rule and not left to the list.",
+   "status": "current",
+   "sectionKey": "current-contract",
+   "tags": [
+    "contract"
+   ],
+   "supersedes": [],
+   "supersededBy": null,
+   "legacyIds": [],
+   "contentDigest": "d9697b8022b51adebae7dd17d5e00dcc7cc7cbcbc94675fad1b85ed29cf4add3"
   }
  ],
  "sections": [
@@ -23355,10 +23383,11 @@
   },
   {
    "selector": "[data-theme=\"hcDark\"] .bg-selection",
-   "declarations": "background:#00405c",
+   "declarations": "background:#efc51c;color:#000000",
    "status": "current",
    "ruleIds": [
-    "R-THM-001"
+    "R-THM-001",
+    "R-THM-003"
    ]
   },
   {
@@ -23451,10 +23480,11 @@
   },
   {
    "selector": "[data-theme=\"hcDark\"] .bg-focusGround",
-   "declarations": "background:#2e2e2e",
+   "declarations": "background:#234f92;color:#ffffff",
    "status": "current",
    "ruleIds": [
-    "R-THM-001"
+    "R-THM-001",
+    "R-THM-003"
    ]
   },
   {
@@ -23611,10 +23641,11 @@
   },
   {
    "selector": "[data-theme=\"hcLight\"] .bg-selection",
-   "declarations": "background:#a8ccf0",
+   "declarations": "background:#46176d;color:#ffffff",
    "status": "current",
    "ruleIds": [
-    "R-THM-001"
+    "R-THM-001",
+    "R-THM-003"
    ]
   },
   {
@@ -23707,10 +23738,11 @@
   },
   {
    "selector": "[data-theme=\"hcLight\"] .bg-focusGround",
-   "declarations": "background:#c9c9c9",
+   "declarations": "background:#7face3;color:#000000",
    "status": "current",
    "ruleIds": [
-    "R-THM-001"
+    "R-THM-001",
+    "R-THM-003"
    ]
   },
   {
@@ -27756,14 +27788,6 @@
   {
    "selector": "[data-theme=\"mono\"] .bg-selection .c-dim,[data-theme=\"mono\"] .c-dim.bg-selection,\n[data-theme=\"mono\"] .bg-selection .c-muted,[data-theme=\"mono\"] .c-muted.bg-selection,\n[data-theme=\"mono\"] .bg-selection .c-meta,[data-theme=\"mono\"] .c-meta.bg-selection",
    "declarations": "color:#b8b8b8",
-   "status": "current",
-   "ruleIds": [
-    "R-THM-001"
-   ]
-  },
-  {
-   "selector": "[data-theme=\"hcDark\"] .bg-selection .c-dim,[data-theme=\"hcDark\"] .c-dim.bg-selection,\n[data-theme=\"hcDark\"] .bg-selection .c-muted,[data-theme=\"hcDark\"] .c-muted.bg-selection,\n[data-theme=\"hcDark\"] .bg-selection .c-ok,[data-theme=\"hcDark\"] .c-ok.bg-selection,\n[data-theme=\"hcDark\"] .bg-selection .c-warn,[data-theme=\"hcDark\"] .c-warn.bg-selection,\n[data-theme=\"hcDark\"] .bg-selection .c-error,[data-theme=\"hcDark\"] .c-error.bg-selection,\n[data-theme=\"hcDark\"] .bg-selection .c-info,[data-theme=\"hcDark\"] .c-info.bg-selection,\n[data-theme=\"hcDark\"] .bg-selection .c-accent,[data-theme=\"hcDark\"] .c-accent.bg-selection,\n[data-theme=\"hcDark\"] .bg-selection .c-meta,[data-theme=\"hcDark\"] .c-meta.bg-selection,\n[data-theme=\"hcDark\"] .bg-selection .c-identifier,[data-theme=\"hcDark\"] .c-identifier.bg-selection",
-   "declarations": "color:#fff",
    "status": "current",
    "ruleIds": [
     "R-THM-001"
