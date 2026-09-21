@@ -608,3 +608,20 @@ describe("C09 I34 — the height fits the message and the width does not", () =>
     }
   });
 });
+
+/**
+ * C09 §3a-ter — the three parts, and the state that is not a failure.
+ *
+ * Owed at the spec commit; the mechanism lands in the code commit that follows
+ * it. Each row names the blocker rather than the component, because no component
+ * is missing — `detail` and `state: "empty"` are fields this kind does not carry
+ * yet and both are written in the same change as these rows.
+ */
+describe("C09 §3a-ter — a status has three parts", () => {
+  it.todo(
+    "T3.96 (I84, §3a-ter): the three allocation clauses hold one at a time — a present detail reserves its row against a message that would take the whole interior, the message is served before the detail expands, and the detail takes the rows the message left; each constructed so the other two are satisfied either way, because a box where all three move together is one assertion wearing three labels — not deferred on a component: it lands with `Status.detail` in the code commit that follows this spec",
+  );
+  it.todo(
+    "T3.97 (I84): a detail that is present and empty reserves nothing — the clause says non-empty, and a block carrying `detail: \"\"` is a producer's shrug rather than a part — not deferred on a component: it lands with the same code commit",
+  );
+});

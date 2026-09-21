@@ -453,6 +453,86 @@ loading     no data yet, first fetch in flight. Not a failure at all
 
 **A call that fails or retries composes one of these under its head, and nothing composes a red line instead** (F827). The call grammar's states are RUNNING, WAITING, DONE, FAILED, RETRYING, DENIED and CANCELLED; the two that carry a body of their own carry this kind — the error rule, the mark, the message, at the block's committed height — and the head above it is kept, because *what ran* is the first thing a reader needs and the error is the second. The shell's composer is the one place a notice is written by hand — by literal or by builder call (A03 SS56, widened; C23), which is F406's class closed as a class rather than as twelve sites.
 
+#### 3a-ter. Three parts, a fourth state, and the cap moves onto the box
+
+**§096 says a status has three parts and each degrades its own way** — a **banner**, decoration
+either side of a label that never truncates; a **message**, prose, which *wraps, because losing
+the end loses the fact*; and a **detail**, code, which *truncates, and is bounded with a residue
+row, so it never costs more than a few rows*. The repo ships the first two and the frame. It has
+**no detail part at all**, and its cap is on the wrong one.
+
+**Where the cap actually is, measured before it is moved.** `MESSAGE_LINE_CAP` appears twice in
+`status.ts` and only one of them binds a frame: `statusRowsFor` takes
+`Math.min(MESSAGE_LINE_CAP, wrapped)` when it computes the rows a contained failure **asks for**,
+and `render` caps nothing — `forMessage` is the interior less the furniture, whatever that is. So
+the message is already uncapped *inside a box it has been granted*, and what the constant bounds
+is the **request**. That distinction is the whole of this ruling and it was not visible from the
+constant's name.
+
+**Which means F239's argument survives intact and simply moves.** It is not an argument about
+prose: it is that a bounded container draws an over-tall child **whole** (C04 §3c trace 1, T2.28b),
+so the worst over-draw has to be *a number*. Capping the message at four was one way to bound the
+box. **The quantity the argument is about is the box**, and the design assigns the two parts
+different behaviours — the message wraps, the detail truncates — which says *which part gives way
+when the box is full*, not that the box may be any size.
+
+**The figure, measured the way F239 measured its own** (`wrapCells` at the top rung's content
+width, `width − 4`):
+
+| | 120 | 80 | 60 | 40 |
+|---|---|---|---|---|
+| a typical failure — `plot failed to render: series 'loss' has 0 points after filtering` | 1 | 1 | 2 | 2 |
+| a path — `ENOENT: … open '/workspace/examples/docker/fixtures/containers-large.json'` | 1 | 2 | 3 | **4** |
+| a refusal in prose | 2 | 2 | 3 | **4** |
+| a three-frame stack **as one message**, which is what ships today | 3 | 4 | 6 | **9** |
+
+The last row is the one the split removes: under three parts a stack trace is **not** a message.
+The message is the sentence — `TypeError: Cannot read properties of undefined` — and the frames
+are the detail, where they truncate rather than reflow. So the worst message is **4** rows, the
+same figure F239 measured, reached by a path and by prose rather than by a trace; and the detail
+is bounded at **3**, which is §096's *never more than a few rows* given a number.
+
+- **`MESSAGE_LINE_CAP` is retired and `CONTENT_LINE_CAP = 7` replaces it**, on the box's content
+  rows rather than on the message: 4 + 3, both measured above. The message has no cap of its own
+  at any width — it wraps, and a nine-row trace pasted into a message gets seven rows and its own
+  truncation mark rather than four.
+- **`DETAIL_LINE_CAP = 3`**, and the detail's last kept row becomes a **residue row** when it was
+  cut — C04 I49's mechanism, not a second one.
+- **A present detail reserves one row.** A part that can vanish with no mark is the silent slice
+  this file already replaced once for the message (F230), and the detail is the part most likely
+  to be squeezed out, because the message is served first.
+
+**The allocation inside a granted interior**, after the tag and the activity line, in three
+clauses because each one is a separate thing to be wrong about:
+
+1. a present, non-empty detail **reserves one row**;
+2. the **message** wraps into what remains and truncates with its existing mark if it cannot fit;
+3. the **detail** expands into the rows the message did not take, up to `DETAIL_LINE_CAP`, its
+   last row a residue when it was cut.
+
+**With no detail the block is byte-identical to today**, which is what makes this additive rather
+than a rewrite: clause 1 reserves nothing, clause 2 gets the whole interior as `forMessage`
+already does, and clause 3 draws nothing. The only figure that moves for an existing block is the
+**requested** height, and it moves in one direction — up, and only for a message over four rows,
+which is the case the design says was losing the fact.
+
+**A fourth state, and the vertical half of it already ships.** §048 draws four block forms and the
+repo has three; §047 rules that an empty block *is a correct block about nothing, never an error*,
+and §096 draws it — *no banner, no ▲, no red, centred on BOTH axes, the one place that is right,
+because a block with nothing in it has slack on both.* `state: "empty"` joins the three.
+
+**The vertical centring is built and was built for a different reason**, which is worth stating
+because it is the one place this section adds no mechanism: `render` already centres *the whole
+group* in the interior — `slack`, `above` — and the comment above it says why (the tag pinned
+under the top border with the message floating was two figures rather than one, invisible until a
+twenty-row box was drawn). So an `empty` box inherits vertical centring from a ruling taken about
+a tall error box. **What is missing is the horizontal half**: every content row goes through
+`fit(text, textWidth)`, which is left-aligned, and §096's figure is centred on both. So `empty` is
+three differences from `error` — no banner, no mark, no error tone — and one addition, which is
+that its single row is centred in the content width.
+
+---
+
 **`error` read *the definition's renderer threw. A bug.* and that was narrower than the kind**
 (F406). `retrying`'s own line has always said *the far side failed*, so this was never scoped to
 renderer faults — and the narrow gloss is why the framework's own error documents were built out of
@@ -2493,6 +2573,8 @@ the same overrun in smaller form.
   same column, because `markFor` pads to the reserved width for both (F1236, I81).
 
 - **I83** — *(R-SEL-006, C10 I47)* **A notice takes the focus ground and no column; the focus mark is not this library's.** A focused `notice` that stands in the focus ring (I47) is painted on `surface.focusGround` and keeps its own tone — *colour is declared, not inherited* — and nothing about its geometry moves, so `measure` still sees no focus and needs no capability. **The first form of this invariant reserved a gutter column here and was wrong**, measured rather than argued: the implementation shifted a `step` head two cells and left the `⎿` body under it where it was (T1.48), and four fixtures put the mark in the gutter of the **block with addressable rows** — §044's three adjacent rows reserve two columns and spend none, one and both with the content edge fixed, while §012, §081 and §003 all draw an unfocused call head at its own edge with nothing reserved. The mark's column is C11's (I15, §5). **What a focused notice keeps at 1-bit**: the ground answers `NO_STYLE` there, so the carrier is the tone's own mono class — which is why the tone is kept rather than replaced by `accent`, the mechanism this replaces (→ I47, C10 I47, C11 I15).
+- **I84** — *(§096, §3a-ter, F239, F230)* **A status has three parts and the cap is on the box, not on the message.** The **banner** never truncates, the **message** wraps, and the **detail** truncates and is bounded with a residue row. `CONTENT_LINE_CAP = 7` bounds the rows a box **requests** — 4 for the worst measured message and 3 for the detail, both measured at the top rung's content width — and `DETAIL_LINE_CAP = 3` bounds the detail. Inside a granted interior the allocation is three clauses: a present, non-empty detail reserves **one row**; the message wraps into what remains and truncates with its existing mark; the detail expands into what the message did not take, its last row a residue when it was cut. **With no detail the block draws exactly what it drew before**, and the only figure that moves is the request, upward, for a message over four rows. F239's argument is unchanged and only its subject is: it was always about the box's over-draw inside a bounded container, and capping the message was one way to bound the box (→ I34, I31, C04 I49).
+- **I85** — *(§047, §048, §096)* **`empty` is a fourth status state, and it is not an error.** No banner, no mark, no error tone, and its content **centred on both axes**. The vertical half is inherited rather than added: `render` already centres the whole group in the interior, on a ruling taken about a tall error box, so what this invariant contributes is the **horizontal** centring — every other state's rows go through a left-aligned `fit` — and the three absences. A refusal states its reason; it is not an error and never red (→ I84, I31).
 ## 8. Commitments
 
 1. C09 owns the registry; C04 owns the schema and the measurement contract (I13).
@@ -2567,6 +2649,8 @@ the same overrun in smaller form.
 68. **A cut line is walked to the cut** (I79, F1205). `truncate` and `truncateParts` segmented the whole line — a record and a string per cluster — to keep its first hundred cells: 94 µs for a 329-cell markdown paragraph at width 118, on every `raw` line and every over-width `code` row of every miss frame. The cursor stops at the cut now, and the reverse arm reads the same boundaries.
 69. **A column's header names the cells the column holds** (I82). A reservation inside a column — `comparison`'s verdict mark, and any prefix a kind takes — is skipped by the label as well as by the value, because the mark is a verdict *about* a value rather than part of what the label names. The defect this closes was one field: `line()` builds `comparison`'s header and body through the same function, and the header passed `reserve: 0` (F1236).
 70. **A notice takes the focus ground and not a column** (I83, R-SEL-006). The tree told focus and selection apart by ink on one ground, which is why `focusGround` shipped with a gate and no reader; focus takes a ground of its own here and the mark belongs to the block that has rows to point at. The first ruling put the column on the notice and the frame refused it — the head moved and its body did not — and four fixtures put it where C11 I15 said it could not go.
+71. **The status cap was on the message and belongs to the box** (I84, §3a-ter, F239). `MESSAGE_LINE_CAP` bound the **request** and never the render, which is a distinction the constant's name hid: the message has always been uncapped inside a box it was granted. So the design's *the message wraps* costs one line, and what it buys is the part the repo did not have — a detail, which truncates into a residue row where prose would have lost the end. The figures are measured, not chosen: 4 is the worst message once a trace stops being one, and it is the same 4 F239 measured.
+72. **An empty block is a correct block about nothing** (I85, §047). It gets a state rather than a tone, because the thing that makes it not-an-error is the *absence* of the banner, the mark and the red — three absences no tone can express. Its vertical centring was already built for an unrelated reason, which is the whole of what this state costs on that axis and is why the ruling is one word about the horizontal one.
 
 ---
 
@@ -2805,6 +2889,10 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.145** (I76, F1191): a registry over a counting windowable kind whose block exceeds the cap, `windowSequence` twice through one `RenderScratchStore` at one width — the kind's `measure` and `window` on the whole block called once, not twice, the block handed to `window` the same object both times, the profiler's `scratch` hit on the second; a third call at another width resolves again; `render` over the block touches the store not at all; a windowable block within the cap resolves once across two calls likewise; a kind with no `window` through the same store leaves it untouched. Not deferred on a component: the code commit replaces this row.
 - **T2.148** (I83, R-SEL-006, C10 I47): a focused `step` notice is painted on `surface.focusGround` and **its geometry does not move** — the rendered rows are cell-for-cell the same width and the same gutter as the unfocused notice, the `⎿` body under it lands in the same column in both, and `measure` is called with no focus in both and equals the rows rendered in both. The geometry half is the assertion the first form of this invariant failed: it reserved a column here, the head moved two cells and the body did not.
 - **T2.149** (I83, C10 I47): the focused notice **keeps its own tone** over the focus ground — a focused `info` notice is `info` and not `accent`, which the mechanism this replaces could not express, and at `colourDepth: 1` the ground is gone and the tone's mono class is what is left. Asserted over three tones, because a row on one tone passes a mechanism that replaces every tone with a constant.
+- **T2.150** (I84, I1, §3a-ter): **the property, and it is the one that binds.** Over the message corpus × the detail corpus × seven widths × three states, `measure(block, width)` equals the rows `render` emits — asserted for `status` **specifically**, because this kind's `measure` is the declared height and every other kind's is computed, so the generic suite's agreement here says only that a number was echoed. The corpus includes a message longer than `CONTENT_LINE_CAP`, a detail longer than `DETAIL_LINE_CAP`, both at once, and a box one row shorter than the furniture needs.
+- **T2.151** (I84, C04 I49): a detail cut to the cap carries a **residue row** as its last row, and one that fits carries none — the asymmetry the message already draws (F230's mark is not appended to a row that fits). The residue names the count it dropped.
+- **T2.152** (I84, F239, §3a-ter): **the request moved and the render did not.** With no `detail`, a block's rendered rows are byte-identical to the same block before this change at every width and height in the corpus; the only quantity that differs is `statusRowsFor`, and it differs **only** for a message that wraps past four rows, and only upward. A row asserting the new part works says nothing about the part that already did.
+- **T2.153** (I85, §047, §096): an `empty` status draws **no banner, no mark and no error tone**, and its content row is centred on **both** axes — the horizontal offset equals `(textWidth − cells(text)) / 2` floored, and the rows above and below it differ by at most one. Asserted against `error` at the same height and width, so the three absences are a difference and not a description.
 
 ### Tier 3 — edge cases
 
@@ -2892,6 +2980,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T3.90** (I63, I79, F1205): a 400-cell CJK line — 200 clusters — truncated to 100 from the end asks the segmenter for **250** clusters through `containing` (200 for the measure, 49 kept and one refused at the boundary) and iterates **no** `Segments` (one iteration of 200 records before I79, and the same 200 asks); the same line kept from the tail asks **400** — the whole line's boundaries — and iterates none; a 400-cell ASCII line asks for none on either arm. Counted through `Segments.prototype.containing` and `Segments.prototype[Symbol.iterator]`, and not timed: the count *is* what I79 says, and a duration is a proxy for it.
 - **T3.91** (I73, F1209): T3.89's declines and over-tall body are compared against their own committed captures, and the set asked for equals the set on disk both ways.
 - **T3.93** (I81, F1228): the four kinds that owe a ladder — `comparison`, `keyValue`, `events`, `steps` — swept at every width from 4 to 80 against the shedding rule, **read as frames and not as row counts**. At each width every part still drawn is legible, meaning no part is reduced below its own declared minimum while another part is still at full width; the parts shed are shed **in the declared order**; and a withholding is stated rather than silent. The row that a truncating implementation passes is any row about the block's *height*, because shredding does not change it — which is why this asserts the row's content and why the defect shipped: measured at HEAD, `comparison` at twelve columns drew `  field  b……` over `~ l…  3…  2…`, four parts each cut to nothing at once.
+- **T3.96** (I84, §3a-ter): **the three allocation clauses, one row each.** A present detail reserves its row against a message that would otherwise take the whole interior; the message is served before the detail expands; and the detail takes the rows the message left. Each clause is constructed so that the other two are satisfied either way, because a box where all three move together is one assertion wearing three labels.
+- **T3.97** (I84): a detail that is present and **empty** reserves nothing — the clause says *non-empty*, and a block carrying `detail: ""` is a producer's shrug rather than a part.
 - **T3.95** (I82, F1236): a column's header and the cells it names start at the **same index**, asked
   of the frame by index rather than read from it. Over `comparison` at every width in the sweep, the
   `run 5` label and every `b` value begin at one column, and so do `run 4` and every `a` value —
@@ -2933,6 +3023,10 @@ Six tiers. Every cell of the §6 transition table is covered.
 ### Tier 6 — fail-on-revert
 
 - **T6.85** (I39): `decodeImage` never dispatching to `decodeGif` → IF1 fails, every GIF refused as *not a PNG*; disposal never applied → **IF4** fails while IF2's disposal-1 fixtures all pass, which is why IF4 patches the byte; interlace read as progressive, the transparent index painted, or the KwKwK case dropped → **IF2** fails against `sharp`'s pages; the delay clamp removed → IF3; the renderer reading frame 0 regardless of the context → **IF6**'s green arm fails while every row count passes; a GIF sent under `f=100` → IF10; later frames not uploaded → IF9. `tools/mutate/runs/c09-gif.mjs`, with `canvas[d + 3] = 0` as its control.
+- **T6.127** (I84): capping the message again — `Math.min(CONTENT_LINE_CAP, wrapped)` moved off the sum and back onto the message alone — fails **T2.150** on a block carrying both parts, where the box asks for fewer rows than it draws. It does **not** fail T2.152, which is the point of having both: that row is about the no-detail case and is green under this revert.
+- **T6.128** (I84): dropping the detail's reserved row fails **T3.96** clause 1 and nothing else, which is what says the three clauses are three.
+- **T6.129** (I84, C04 I49): emitting a cut detail without its residue row fails **T2.151** — the silent slice, one part along from where F230 closed it.
+- **T6.130** (I85): giving `empty` the error tone, or the banner, or the mark, each fails **T2.153** on its own, because the three absences are asserted separately; centring `empty` on one axis only fails it on the other.
 - **T6.126** (I83): putting the reservation back on the notice — the shape this invariant shipped in for one commit — fails **T2.148** on the body's column, which is the cell that moved; the head's own row is two cells wider and reads as deliberate, so a row asserting only the head would accept the defect.
 - **T6.1** (I1): a measurer that under-counts wrapped lines by one → T2.1 fails at the wrapping width.
 - **T6.75** (I33): the `max` removed from `registry.measure` → T3.53 fails, and T4.49's second frame draws the one-row figure again — which is the defect as it shipped.

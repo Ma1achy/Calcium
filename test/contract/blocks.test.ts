@@ -767,3 +767,27 @@ describe("C09 I83 — a notice takes the focus ground and no column", () => {
     expect(cellFor(mono, "ps · ok"), "the tone's mono class, focused or not").toEqual(cellFor(monoPlain, "ps · ok"));
   });
 });
+
+/**
+ * C09 I84 and I85 — the status parts and the empty state, owed at the spec
+ * commit (§3a-ter).
+ *
+ * **T2.150 is the row that binds**, and it is here rather than in the generic
+ * suite because `status`'s `measure` is the declared height where every other
+ * kind's is computed: T2.1's agreement for this kind says only that a number was
+ * echoed back, so the property needs a corpus of its own.
+ */
+describe("C09 §3a-ter — the status parts and the empty state", () => {
+  it.todo(
+    "T2.150 (I84, I1, §3a-ter): over the message corpus \u00d7 the detail corpus \u00d7 seven widths \u00d7 three states, measure equals the rows rendered, with a message longer than CONTENT_LINE_CAP, a detail longer than DETAIL_LINE_CAP, both at once, and a box one row shorter than the furniture needs — not deferred on a component: it lands with `Status.detail` in the code commit that follows this spec",
+  );
+  it.todo(
+    "T2.151 (I84, C04 I49): a detail cut to the cap carries a residue row as its last row and one that fits carries none, and the residue names the count it dropped — not deferred on a component: it lands with the same code commit",
+  );
+  it.todo(
+    "T2.152 (I84, F239, \u00a73a-ter): with no detail a block's rendered rows are byte-identical to the same block before this change, at every width and height in the corpus; the only quantity that differs is `statusRowsFor`, and only upward, and only for a message past four rows — not deferred on a component: it lands with the same code commit",
+  );
+  it.todo(
+    "T2.153 (I85, \u00a7047, \u00a7096): an `empty` status draws no banner, no mark and no error tone, and its content row is centred on both axes, asserted against `error` at the same height and width so the three absences are a difference and not a description — not deferred on a component: it lands with `state: \"empty\"` in the same code commit",
+  );
+});
