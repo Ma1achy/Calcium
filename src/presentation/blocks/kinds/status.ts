@@ -279,7 +279,55 @@ function tagRow(
  * make that divergence as large as an exception is long; at four lines the box
  * is at most seven rows and the worst over-draw is a number.
  */
-export const MESSAGE_LINE_CAP = 4;
+export const CONTENT_LINE_CAP = 7;
+
+/**
+ * The most rows a **detail** ever costs (C09 I84, §096).
+ *
+ * §096's *bounded with a residue row, so it never costs more than a few rows*
+ * given a number. Three, because the residue is one of them: a detail cut to the
+ * cap shows **two** of its lines and says how many it dropped, which is the
+ * smallest shape that is still a list.
+ */
+export const DETAIL_LINE_CAP = 3;
+
+/**
+ * The detail's rows: **truncated, never wrapped**, and bounded with a residue.
+ *
+ * **The opposite of `bodyOf`, on purpose.** Prose that overruns is joined and
+ * marked because losing the end loses the fact; code that overruns is *cut*,
+ * because a reflowed stack frame is a different string that reads like a real
+ * one. So each line is truncated to the width and the list is cut to the rows,
+ * and what the cut costs is stated rather than implied.
+ *
+ * **The residue is C04 I49's mechanism and not a second one** — `⋯ +N more` — so
+ * a reader who has learnt it in a container reads it here without being taught
+ * twice. It replaces the last kept row rather than being appended to it, because
+ * appending is how a bound becomes `cap + 1`.
+ *
+ * **A list that fits carries no residue**, the same asymmetry `bodyOf` draws: a
+ * mark claiming a truncation that did not happen sends a reader looking for text
+ * already on screen.
+ */
+function detailOf(
+  text: string,
+  textWidth: number,
+  forDetail: number,
+  caps: RenderContext["capabilities"],
+): readonly string[] {
+  if (forDetail === 0) return [];
+  const lines = stripControl(text).split("\n");
+  const cut = (line: string): string => truncate(line, textWidth, caps);
+  if (lines.length <= forDetail) return lines.map(cut); // cells-ok — a row count, not a width
+  const dropped = lines.length - (forDetail - 1); // cells-ok — a row count, not a width
+  // `⋯ +N more`, the same text `scroll` draws for a fold (C04 I49) — the glyph
+  // from the set so `ascii` substitutes it, and the words verbatim so a reader
+  // is not taught the mark twice.
+  return [
+    ...lines.slice(0, forDetail - 1).map(cut),
+    cut(`${glyphs(caps).residue} +${String(dropped)} more`),
+  ];
+}
 
 /**
  * The wrapped message, cut to the rows available, **with a mark when it is cut**.
@@ -324,6 +372,25 @@ function bodyOf(
   // no text lost and correctly no mark.
   kept.push(truncate(lines.slice(forMessage - 1).join(" "), textWidth, caps));
   return kept;
+}
+
+/**
+ * The rows a **present, non-empty** detail wants, bounded by its own cap.
+ *
+ * One function, so nothing can disagree about what a detail costs — the same
+ * argument `errorStatus` makes for the box's height one level up (C09 I34).
+ * Published because the **producer** needs it too: `framedStatus` sizes its box
+ * from C23's frame readings (F234, F235) and has to add the detail's rows to
+ * them, and a second `Math.min(3, …)` in L4 is the drift this file already
+ * refuses one level down.
+ */
+export function statusDetailRows(text: string | undefined): number {
+  if (text === undefined || text === "") return 0; // cells-ok — a row count
+  // **No width parameter, and that is the difference from the message.** A
+  // detail truncates rather than wrapping, so a narrower box costs it no rows —
+  // which is why `statusRowsFor`'s fixed-point argument does not apply here.
+  const lines = stripControl(text).split("\n").length; // cells-ok — a row count
+  return Math.min(DETAIL_LINE_CAP, lines); // cells-ok — a row count
 }
 
 /**
@@ -375,7 +442,14 @@ export function statusRowsFor(
   const line = activityLine(block, spinnerFrames(caps, block.spinner), 0);
 
   const wrapped = wrapCells(`${mark}${stripControl(block.message)}`, textWidth).length; // cells-ok — a row count
-  const rows = Math.min(MESSAGE_LINE_CAP, Math.max(1, wrapped)); // cells-ok — a row count
+  // **The message is served first and has no cap of its own** (I84). What is
+  // bounded is the box: `CONTENT_LINE_CAP` is F239's argument moved onto the
+  // quantity it was always about — a bounded container draws an over-tall child
+  // whole, so the worst over-draw must be a number — and the number is 4 for the
+  // worst measured message plus 3 for the detail.
+  const messageRows = Math.max(1, wrapped); // cells-ok — a row count
+  const detailRows = statusDetailRows(block.detail); // cells-ok — a row count
+  const rows = Math.min(CONTENT_LINE_CAP, messageRows + detailRows); // cells-ok — a row count
   const tagRows = rung.frame.tag && rung.tag !== "none" ? 1 : 0;
   const lineRows = line === "" ? 0 : 1;
   return rows + (rung.frame.border ? 2 : 0) + tagRows + lineRows; // cells-ok — a row count
@@ -414,7 +488,12 @@ export const statusDefinition: BlockDefinition<Status> = {
     // caught by looking at the image, because nothing asserts a tone per state
     // and the arithmetic is identical either way. §3a already says loading has
     // no error and therefore no rule and no tag; the tone follows the same fact.
-    const failed = block.state !== "loading";
+    // **`empty` is not a failure and neither is `loading`** (I85, §047). A
+    // refusal states its reason; it is not an error and never red. The three
+    // absences are here, at `tagRows` and at `mark` — separately, because a
+    // state that lost the tone and kept the banner would be a different wrong
+    // figure and T2.153 asserts each on its own.
+    const failed = block.state !== "loading" && block.state !== "empty";
     const ink = failed ? tone("error", ctx.theme, ctx.capabilities) : undefined;
     // **The tag's pair, both halves from `surfaces`** (C10 §4a). A ground taken
     // without its matched ink borrows a foreground nothing measured against it,
@@ -447,7 +526,11 @@ export const statusDefinition: BlockDefinition<Status> = {
     // width 9 the box drew four against a measured six, with every count in this
     // file agreeing the whole time.
     const interior = Math.max(1, height - (frame.border ? 2 : 0)); // cells-ok — a row count
-    const tagRows = frame.tag && tagFit !== "none" ? 1 : 0;
+    // **No banner on an empty block** (I85). The width ladder may afford one and
+    // the state declines it, which is why this is an `&&` here rather than a
+    // rung removed from `widthRung`: the ladder answers what the *box* can draw
+    // and the state answers what this box *should*.
+    const tagRows = frame.tag && tagFit !== "none" && block.state !== "empty" ? 1 : 0;
     // At one row the message wins: a countdown without its cause is a number
     // nobody can act on, and the cause without the countdown is still the fact.
     //
@@ -466,8 +549,25 @@ export const statusDefinition: BlockDefinition<Status> = {
     // is still waiting, and that lives entirely in the line that moves (F235).
     const lineWins = block.state === "loading";
     const lineRows = line !== "" && (interior - tagRows >= 2 || lineWins) ? 1 : 0;
-    const forMessage = Math.max(0, interior - tagRows - lineRows); // cells-ok — a row count
+    // **The allocation, in three clauses** (I84, §3a-ter). Each is a separate
+    // thing to be wrong about, which is why they are three statements and not
+    // one expression: T3.96 constructs a box for each where the other two are
+    // satisfied either way, and T6.128 takes clause 1 out on its own.
+    const content = Math.max(0, interior - tagRows - lineRows); // cells-ok — a row count
+    const wants = statusDetailRows(block.detail); // cells-ok — a row count
+    // 1 · a present, non-empty detail reserves one row, so it cannot vanish with
+    //     no mark — the silent slice this file already closed for the message
+    //     (F230), one part along.
+    const reserved = wants > 0 && content > 1 ? 1 : 0; // cells-ok — a row count
+    // 2 · the message wraps into what remains, and truncates with its own mark.
+    const forMessage = Math.max(0, content - reserved); // cells-ok — a row count
     const body = bodyOf(`${mark}${stripControl(block.message)}`, textWidth, forMessage, ctx.capabilities);
+    // 3 · the detail expands into the rows the message did not take.
+    const forDetail = Math.min(wants, Math.max(0, content - body.length)); // cells-ok — a row count
+    const detail =
+      block.detail === undefined || block.detail === ""
+        ? []
+        : detailOf(block.detail, textWidth, forDetail, ctx.capabilities);
 
     // **The whole group is centred, not the message inside the leftover.** The
     // two are the same picture at the full figure's six rows, which is why this
@@ -479,9 +579,23 @@ export const statusDefinition: BlockDefinition<Status> = {
     // The ladder's `pad` still decides the **horizontal** gutter; the vertical
     // padding it used to name is this slack, and computing it removes the case
     // where the two disagreed.
-    const group = tagRows + body.length + lineRows; // cells-ok — a row count
+    const group = tagRows + body.length + detail.length + lineRows; // cells-ok — a row count
     const slack = Math.max(0, interior - group); // cells-ok — a row count
     const above = Math.floor(slack / 2);
+
+    /**
+     * The horizontal half of I85, and the only cells it adds.
+     *
+     * Every other state's rows go through a left-aligned `fit`. `empty` is
+     * centred on **both** axes (§096) — the vertical half falling out of the
+     * group centring above, which was built for a tall error box and is why
+     * this is one function rather than a second layout.
+     */
+    const centred = (text: string): string => {
+      if (block.state !== "empty" || text === "") return text;
+      const slackCells = Math.max(0, textWidth - cells(text, ctx.capabilities.ambiguousWidth)); // cells-ok — a cell count
+      return `${" ".repeat(Math.floor(slackCells / 2))}${text}`; // cells-ok — a cell count
+    };
 
     /** Content rows are the error tone; the border and the blanks are not. */
     const span = (text: string, painted: boolean): readonly Span[] =>
@@ -515,7 +629,10 @@ export const statusDefinition: BlockDefinition<Status> = {
     if (tagRows === 1) {
       out.push(framed(tagRow(tagFit, textWidth, g.horizontal, tagInk, ink)));
     }
-    for (const row of body) out.push(boxed(row, true));
+    for (const row of body) out.push(boxed(centred(row), true));
+    // **The detail takes the default tone**, like the activity line: the message
+    // already said what went wrong and this is the evidence, not a second claim.
+    for (const row of detail) out.push(boxed(row, false));
     // **The activity line takes the default tone, not the error tone** — the
     // error already said what went wrong, and this says what is happening now.
     if (lineRows === 1) out.push(boxed(line, false));

@@ -80,8 +80,8 @@ const results = runPass({
       // row on nothing while its message is truncated.
       name: "a dropped tag row is left blank rather than given to the message",
       file: SRC,
-      from: '    const tagRows = frame.tag && tagFit !== "none" ? 1 : 0;',
-      to: "    const tagRows = frame.tag ? 1 : 0;",
+      from: '    const tagRows = frame.tag && tagFit !== "none" && block.state !== "empty" ? 1 : 0;',
+      to: '    const tagRows = frame.tag && block.state !== "empty" ? 1 : 0;',
       expect: "T3.41",
     },
     {
@@ -120,8 +120,8 @@ const results = runPass({
       // count and part company only in the contents.
       name: "the message floor puts it back and lets the clamp choose",
       file: SRC,
-      from: "    const forMessage = Math.max(0, interior - tagRows - lineRows); // cells-ok — a row count",
-      to: "    const forMessage = Math.max(1, interior - tagRows - lineRows); // cells-ok — a row count",
+      from: "    const content = Math.max(0, interior - tagRows - lineRows); // cells-ok — a row count",
+      to: "    const content = Math.max(1, interior - tagRows - lineRows); // cells-ok — a row count",
       expect: "T3.42c",
     },
     {

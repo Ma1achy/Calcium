@@ -23,6 +23,7 @@ import {
   visible,
 } from "../support/render.js";
 import { rowContaining, styleAt, styledScreenFrom } from "../support/styled-screen.js";
+import { CONTENT_LINE_CAP, statusRowsFor } from "../../src/presentation/blocks/kinds/status.js";
 import { focusStyle, tone } from "../../src/presentation/blocks/paint.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import { sgr } from "../../src/terminal/escapes.js";
@@ -778,16 +779,163 @@ describe("C09 I83 — a notice takes the focus ground and no column", () => {
  * echoed back, so the property needs a corpus of its own.
  */
 describe("C09 §3a-ter — the status parts and the empty state", () => {
-  it.todo(
-    "T2.150 (I84, I1, §3a-ter): over the message corpus \u00d7 the detail corpus \u00d7 seven widths \u00d7 three states, measure equals the rows rendered, with a message longer than CONTENT_LINE_CAP, a detail longer than DETAIL_LINE_CAP, both at once, and a box one row shorter than the furniture needs — not deferred on a component: it lands with `Status.detail` in the code commit that follows this spec",
-  );
-  it.todo(
-    "T2.151 (I84, C04 I49): a detail cut to the cap carries a residue row as its last row and one that fits carries none, and the residue names the count it dropped — not deferred on a component: it lands with the same code commit",
-  );
-  it.todo(
-    "T2.152 (I84, F239, \u00a73a-ter): with no detail a block's rendered rows are byte-identical to the same block before this change, at every width and height in the corpus; the only quantity that differs is `statusRowsFor`, and only upward, and only for a message past four rows — not deferred on a component: it lands with the same code commit",
-  );
-  it.todo(
-    "T2.153 (I85, \u00a7047, \u00a7096): an `empty` status draws no banner, no mark and no error tone, and its content row is centred on both axes, asserted against `error` at the same height and width so the three absences are a difference and not a description — not deferred on a component: it lands with `state: \"empty\"` in the same code commit",
-  );
+  const WIDTHS = [12, 20, 30, 40, 60, 80, 120];
+  const STATES = ["error", "retrying", "loading"] as const;
+  /** Nine rows of message, past `CONTENT_LINE_CAP` on purpose. */
+  const LONG = Array.from({ length: 9 }, (_u, i) => `message line ${String(i)} ${"y".repeat(28)}`).join(" ");
+  /** Six lines of detail, past `DETAIL_LINE_CAP` on purpose. */
+  const BIG = Array.from({ length: 6 }, (_u, i) => `at frame${String(i)} (src/some/file.ts:${String(100 + i)}:12)`).join("\n");
+  const MESSAGES = ["decode failed", "plot failed to render: series 'loss' has 0 points after filtering", LONG];
+  const DETAILS = [undefined, "", "at planColumns (plan.ts:118)", BIG];
+  const statusAt = (over: Record<string, unknown>): Block =>
+    block({ kind: "status", id: "s", state: "error", message: "decode failed", height: 4, ...over } as never) as Block;
+
+  it("T2.150 (C09 I84, C09 I1, §3a-ter): measure equals the rows rendered, over the message × detail × width × state × height corpus", () => {
+    // **Here rather than in T2.1, and the reason is this kind's `measure`.**
+    // Every other kind computes its height from the block; `status` returns the
+    // height the caller declared. So T2.1's agreement for `status` says only
+    // that a number was echoed back — it cannot see an allocation that draws
+    // more rows than it was granted, because the granted number is the answer.
+    // The corpus is what makes the row about the parts.
+    const disagreed: string[] = [];
+    let drawn = 0;
+    for (const caps of [FULL_CAPS, ASCII_CAPS]) {
+      const kit = measurable({ capabilities: caps });
+      for (const message of MESSAGES) {
+        for (const detail of DETAILS) {
+          for (const state of STATES) {
+            // 1 is below the furniture at every rung, which is the case the
+            // allocation has to survive rather than the case it is written for.
+            for (const height of [1, 2, 3, 5, 8, 12]) {
+              for (const width of WIDTHS) {
+                const b = statusAt({
+                  message,
+                  state,
+                  height,
+                  retryInMs: 8000,
+                  elapsedMs: 4000,
+                  ...(detail === undefined ? {} : { detail }),
+                });
+                const measured = kit.measure(b, width);
+                const rendered = kit.renderToLines(b, width).length;
+                drawn += 1;
+                if (measured !== rendered) {
+                  disagreed.push(`${state} h=${String(height)} w=${String(width)} d=${String(detail?.length ?? -1)}: ${String(measured)} vs ${String(rendered)}`);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    expect(disagreed, "measure equals the rows rendered").toEqual([]);
+    // The corpus is a corpus. A filter excluding every case satisfies the line
+    // above exactly (F855's class, and T3.95's own last clause).
+    expect(drawn, "and the corpus was walked").toBe(2 * 3 * 4 * 3 * 6 * 7);
+  });
+
+  it("T2.151 (C09 I84, C04 I49): a cut detail carries a residue row naming its count, and one that fits carries none", () => {
+    const kit = measurable({ capabilities: FULL_CAPS });
+    const lines = (over: Record<string, unknown>): string =>
+      kit.renderToLines(statusAt(over), 60).map(visible).join("\n");
+
+    // Six lines into a box with room for three: two shown, and the third says
+    // how many went. `⋯ +N more` is `scroll`'s text verbatim, so a reader who
+    // has met it in a container is not taught the mark twice.
+    const cut = lines({ height: 8, detail: BIG });
+    expect(cut, "two frames survive").toContain("at frame1");
+    expect(cut, "and the residue names the rest").toContain("⋯ +4 more");
+    expect(cut, "the dropped ones are gone").not.toContain("at frame5");
+    // **The count follows the room, which is what says it is computed.** One row
+    // less and one more frame goes, and the residue says so — a constant would
+    // read as correct on the row above and nowhere else.
+    expect(lines({ height: 6, detail: BIG }), "one row less, one more dropped").toContain("⋯ +5 more");
+
+    // **The asymmetry, which is the half that is easy to lose.** A detail that
+    // fits carries no mark — one claiming a truncation that did not happen sends
+    // a reader looking for text already on screen, which is worse than a silent
+    // cut because it is confidently wrong (the argument `bodyOf` already makes).
+    const fits = lines({ height: 6, detail: "at planColumns (plan.ts:118)\nat render (definition.ts:337)" });
+    expect(fits, "both lines are there").toContain("at render");
+    expect(fits, "and nothing claims otherwise").not.toContain("more");
+
+    // And the mark is capability-resolved, like every other one this file draws.
+    const ascii = measurable({ capabilities: ASCII_CAPS })
+      .renderToLines(statusAt({ height: 6, detail: BIG }), 60)
+      .map(visible)
+      .join("\n");
+    expect(ascii, "the ascii residue").toContain("~ +5 more");
+    expect(ascii).not.toContain("⋯");
+  });
+
+  it("T2.152 (C09 I84, F239, §3a-ter): with no detail the render is unchanged and only the request moves, upward", () => {
+    // **The row about the part that already worked.** A suite asserting the new
+    // part works says nothing about the old one, and this change's whole claim
+    // to being additive rests on the no-detail case being untouched.
+    const kit = measurable({ capabilities: FULL_CAPS });
+    for (const message of MESSAGES) {
+      for (const state of STATES) {
+        for (const height of [1, 2, 3, 5, 8, 12]) {
+          for (const width of WIDTHS) {
+            const bare = statusAt({ message, state, height, retryInMs: 8000, elapsedMs: 4000 });
+            const shrug = statusAt({ message, state, height, retryInMs: 8000, elapsedMs: 4000, detail: "" });
+            expect(
+              kit.renderToLines(shrug, width),
+              `${state} h=${String(height)} w=${String(width)}: an empty detail changes no cell`,
+            ).toEqual(kit.renderToLines(bare, width));
+          }
+        }
+      }
+    }
+
+    // **The request, and it moves in one direction.** The cap was 4 on the
+    // message and is 7 on the box, so a message that wrapped past four rows asks
+    // for more than it used to and nothing asks for less.
+    const asked = (message: string, width: number): number =>
+      statusRowsFor(statusAt({ message, height: 1 }) as never, width, FULL_CAPS);
+    expect(asked(LONG, 40), "a nine-row message used to be held to four").toBeGreaterThan(4);
+    expect(asked(LONG, 40), "and is held by the box's cap instead").toBeLessThanOrEqual(CONTENT_LINE_CAP + 3);
+    for (const width of WIDTHS) {
+      expect(asked("decode failed", width), `w=${String(width)}: a short message is unmoved`).toBeLessThanOrEqual(5);
+    }
+  });
+
+  it("T2.153 (C09 I85, §047, §096): an `empty` status has no banner, no mark and no error tone, and is centred on both axes", () => {
+    const kit = measurable({ capabilities: FULL_CAPS });
+    const at = (state: string) => kit.renderToLines(statusAt({ state, message: "No data.", height: 7 }), 40);
+    const empty = at("empty");
+    const error = at("error");
+    const seen = empty.map(visible);
+
+    // **Against `error` at the same height and width**, so each absence is a
+    // difference and not a description — a row asserting only that the frame
+    // lacks a banner passes on a box too narrow to draw one.
+    expect(error.map(visible).join("\n"), "the control draws all three").toMatch(/ERROR/u);
+    expect(seen.join("\n"), "no banner").not.toMatch(/ERROR/u);
+    expect(seen.join(""), "no mark").not.toContain("▲");
+    const tone24 = sgr(tone("error", DARK_THEME, FULL_CAPS));
+    expect(error.join(""), "the control is painted in the error tone").toContain(tone24);
+    expect(empty.join(""), "and this one is not").not.toContain(tone24);
+
+    // **Centred on both.** Horizontally, the ink sits at the floor of the slack;
+    // vertically, the rows above and below the content differ by at most one,
+    // which is the group centring this state inherits rather than adds.
+    const row = seen.findIndex((l) => l.includes("No data."));
+    expect(row, "the content is drawn").toBeGreaterThan(0);
+    const line = seen[row] ?? "";
+    // **The border is stripped before the slack is measured, and the first form
+    // of this was vacuous for exactly that reason.** A bordered row begins with
+    // `│`, which is not whitespace, so `trimStart` removed nothing and both
+    // margins came out at the same constant — the assertion held for a
+    // left-ranged row as readily as a centred one, and the mutation that ranges
+    // it left survived the pass. Containment is not correctness.
+    const inner = line.slice(2, line.length - 2);
+    const marginL = inner.length - inner.trimStart().length;
+    const marginR = inner.length - inner.trimEnd().length;
+    expect(marginL, "the ink is not against the left edge").toBeGreaterThan(0);
+    expect(Math.abs(marginL - marginR), "centred horizontally, odd cell to the right").toBeLessThanOrEqual(1);
+    const above = row - 1;
+    const below = seen.length - row - 2;
+    expect(Math.abs(above - below), "and vertically, odd row below").toBeLessThanOrEqual(1);
+  });
 });

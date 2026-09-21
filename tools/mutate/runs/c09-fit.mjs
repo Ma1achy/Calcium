@@ -41,8 +41,8 @@ const results = runPass({
   run,
   control: {
     file: STATUS,
-    from: "export const MESSAGE_LINE_CAP = 4;",
-    to: "export const MESSAGE_LINE_CAP = 0;",
+    from: "export const CONTENT_LINE_CAP = 7;",
+    to: "export const CONTENT_LINE_CAP = 0;",
     why: "no message row is ever asked for, so every fitted box collapses to its furniture",
   },
   mutations: [
@@ -60,11 +60,13 @@ const results = runPass({
     {
       // The cap gone, so a stack trace makes a box as tall as the exception is
       // long — and inside a bounded container that is an unbounded over-draw
-      // (F239).
-      name: "the message cap is removed",
+      // (F239). **The cap moved onto the box and the mutation followed it**
+      // (C09 I84, §3a-ter): what F239 forbids is an unbounded *box*, and the
+      // sum is where that is now expressed.
+      name: "the box cap is removed",
       file: STATUS,
-      from: "  const rows = Math.min(MESSAGE_LINE_CAP, Math.max(1, wrapped)); // cells-ok — a row count",
-      to: "  const rows = Math.max(1, wrapped); // cells-ok — a row count",
+      from: "  const rows = Math.min(CONTENT_LINE_CAP, messageRows + detailRows); // cells-ok — a row count",
+      to: "  const rows = messageRows + detailRows; // cells-ok — a row count",
       expect: "T3.63",
     },
     {

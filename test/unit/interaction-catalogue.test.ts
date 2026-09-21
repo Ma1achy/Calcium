@@ -162,7 +162,6 @@ describe("interaction-catalogue — the corpus renders", () => {
     // selection ground and the active chip does not.
     const c = capsNamed("24bit");
     const accent = params(tone("accent", theme, c));
-    const wash = params(selectionStyle(theme, c));
     const lines = frameFor(scene("pills-focus"), c);
     expect(cellOf(lines, "exited"), "the head: accent over the focus ground").toEqual({ fg: accent, bg: params(focusStyle(theme, c)), attrs: [] });
     expect(cellOf(lines, "running"), "the active chip: accent, no ground").toEqual({ fg: accent, bg: "", attrs: [] });
@@ -178,11 +177,9 @@ describe("interaction-catalogue — the corpus renders", () => {
     expect(cellOf(mono, "running").attrs).not.toContain(7);
   });
 
-  it("IC8 (C26 §7, C04 §3): the focused notice is accent over the ground and the plain notice beside it is untouched", () => {
+  it("IC8 (C26 §7, C04 §3, C09 I83): the focused notice keeps its own tone over the focus ground and the plain notice beside it is untouched", () => {
     const c = capsNamed("24bit");
-    const accent = params(tone("accent", theme, c));
     const info = params(tone("info", theme, c));
-    const wash = params(selectionStyle(theme, c));
     const lines = frameFor(scene("notice-action-focus"), c);
     // **Its own tone over the focus ground** (C09 I83): a notice keeps the tone
     // it declared, which the shared-ground mechanism could not express.

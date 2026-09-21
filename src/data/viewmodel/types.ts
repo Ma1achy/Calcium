@@ -3461,8 +3461,27 @@ export type Mosaic = Readonly<{
 export type Status = Readonly<{
   kind: "status";
   id: string;
-  state: "error" | "loading" | "retrying";
+  /**
+   * **`empty` is a correct block about nothing, never an error** (C09 I85,
+   * §047, §096). It draws no banner, no mark and no error tone, and its content
+   * is centred on both axes — the vertical half inherited from the group
+   * centring `render` already does, the horizontal half its own.
+   */
+  state: "error" | "loading" | "retrying" | "empty";
+  /** Prose. It **wraps**, because losing the end loses the fact (C09 I84, §096). */
   message: string;
+  /**
+   * Code. It **truncates**, and it is bounded with a residue row (C09 I84, §096).
+   *
+   * The part the box did not have. A stack trace belongs here rather than joined
+   * into `message`: as prose it reflows to nine rows at 40 columns and the cap
+   * ate it; here it keeps its own lines, is cut at `DETAIL_LINE_CAP`, and says
+   * how many it dropped.
+   *
+   * **Present and empty reserves nothing.** The clause is *non-empty*, because a
+   * `detail: ""` is a producer's shrug rather than a part.
+   */
+  detail?: string;
   /**
    * The rows the box occupies — required, on `plot`'s argument (C09 I31).
    *

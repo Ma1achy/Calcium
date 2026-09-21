@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import { block } from "../../src/data/viewmodel/index.js";
 import { spinnerFrames } from "../../src/presentation/blocks/index.js";
 import { ASCII_CAPS, FULL_CAPS, measurable } from "../support/render.js";
-import { MESSAGE_LINE_CAP, statusRowsFor } from "../../src/presentation/blocks/kinds/status.js";
+import { CONTENT_LINE_CAP, DETAIL_LINE_CAP, statusRowsFor } from "../../src/presentation/blocks/kinds/status.js";
 import { cells } from "../../src/presentation/text.js";
 
 const ESC = String.fromCharCode(27);
@@ -156,6 +156,19 @@ describe("C09 §3a — the box occupies what measure committed", () => {
         kit.renderToLines(status({ height: 6 }), width).length,
         `width ${String(width)} draws six rows`,
       ).toBe(6);
+      // **And no row is wider than the width, which is the half this row was
+      // missing.** The mutation it was written against — the width ladder not
+      // deciding whether the border is affordable — survived the pass for as
+      // long as this file has existed, because every assertion here is about the
+      // row *count* and the tag's shape, and what a five-cell border in a
+      // three-cell frame changes is the row's *cells*. The ladder's own frame
+      // read says so: *five cells of furniture in a three-cell frame*.
+      for (const row of kit.renderToLines(status({ height: 6 }), width)) {
+        expect(
+          cells(plain(row), "narrow"), // narrow-ok — FULL_CAPS is the default convention
+          `width ${String(width)}: no row outruns it — ${JSON.stringify(plain(row))}`,
+        ).toBeLessThanOrEqual(width);
+      }
     }
 
     const tagOf = (w: number): string => {
@@ -423,7 +436,13 @@ describe("C09 I34 — the height fits the message and the width does not", () =>
   // number, `measure` and `render` still agree on it, and the only thing that
   // says otherwise is the last line of the message being absent. That is the
   // class this component keeps producing (F235, and the width ladder before it).
-  const CAP = MESSAGE_LINE_CAP;
+  // **The cap moved onto the box and these rows followed it** (C09 I84,
+  // §3a-ter). They were written about `MESSAGE_LINE_CAP` and they are about the
+  // boundary rather than the figure: a message of exactly the cap carries no
+  // mark and one line more carries one. With no `detail` the box's content rows
+  // *are* the message's, so the boundary is `CONTENT_LINE_CAP` and the rows are
+  // unchanged in everything but the constant they read it from.
+  const CAP = CONTENT_LINE_CAP;
   const errStatus = (message: string, height: number): never =>
     block({ kind: "status", id: "s", state: "error", message, height } as never) as never;
 
@@ -618,10 +637,55 @@ describe("C09 I34 — the height fits the message and the width does not", () =>
  * yet and both are written in the same change as these rows.
  */
 describe("C09 §3a-ter — a status has three parts", () => {
-  it.todo(
-    "T3.96 (I84, §3a-ter): the three allocation clauses hold one at a time — a present detail reserves its row against a message that would take the whole interior, the message is served before the detail expands, and the detail takes the rows the message left; each constructed so the other two are satisfied either way, because a box where all three move together is one assertion wearing three labels — not deferred on a component: it lands with `Status.detail` in the code commit that follows this spec",
-  );
-  it.todo(
-    "T3.97 (I84): a detail that is present and empty reserves nothing — the clause says non-empty, and a block carrying `detail: \"\"` is a producer's shrug rather than a part — not deferred on a component: it lands with the same code commit",
-  );
+  const DETAIL = ["at planColumns (plan.ts:118)", "at render (definition.ts:337)", "at Registry.render (registry.ts:1047)", "at renderToLines (render-lines.ts:98)"].join("\n");
+  const rowsOf = (over: Over, width = 60): readonly string[] => draw(over, width);
+
+  it("T3.96 (C09 I84, §3a-ter): the three allocation clauses hold one at a time", () => {
+    // A message that would take the whole interior on its own, so clause 1 has
+    // something to take a row *from*.
+    const long = Array.from({ length: 12 }, (_u, i) => `message line ${String(i)} ${"y".repeat(30)}`).join(" ");
+
+    // **1 · a present detail reserves one row.** The same box, the same height,
+    // the same message: the only difference is the detail, and the message loses
+    // exactly one row to it. Without the reservation the message would take
+    // everything and the detail would draw nothing at all — which is the silent
+    // slice, one part along from where F230 closed it.
+    const without = rowsOf({ message: long, height: 6 });
+    const with_ = rowsOf({ message: long, height: 6, detail: DETAIL });
+    const body = (lines: readonly string[]): number => lines.filter((l) => l.includes("message line")).length;
+    expect(body(without), "no detail: the message has the interior").toBeGreaterThan(0);
+    expect(body(with_), "a detail costs the message exactly one row").toBe(body(without) - 1);
+    // **And at one row the detail is entirely residue** — `⋯ +4 more`, all four
+    // lines counted and none shown. That is the reservation doing its whole job:
+    // the part cannot vanish, and what it says when it has nowhere to stand is
+    // how much there was.
+    expect(with_.some((l) => l.includes("⋯ +4 more")), "the reserved row is the residue").toBe(true);
+
+    // **2 · the message is served before the detail expands.** A short message
+    // in a tall box: the detail may grow, and it grows to its own cap and not
+    // past it, while the message keeps every row it asked for.
+    const short = rowsOf({ message: "decode failed", height: 8, detail: DETAIL });
+    expect(short.filter((l) => l.includes("decode failed")), "the message is whole").toHaveLength(1);
+    const drawn = short.filter((l) => l.includes(" at ") || l.includes("more")).length;
+    expect(drawn, "the detail expands to its cap and stops").toBe(DETAIL_LINE_CAP);
+
+    // **3 · the detail takes the rows the message left**, and not more. Growing
+    // the message by two rows in the same box takes two rows off the detail —
+    // the clause that a reservation alone does not give you.
+    const medium = Array.from({ length: 3 }, (_u, i) => `line ${String(i)} ${"z".repeat(46)}`).join(" ");
+    const squeezed = rowsOf({ message: medium, height: 8, detail: DETAIL });
+    const detailRows = squeezed.filter((l) => l.includes(" at ") || l.includes("more")).length;
+    expect(detailRows, "the detail gets what is left").toBeLessThan(DETAIL_LINE_CAP);
+    expect(detailRows, "and still at least its reserved row").toBeGreaterThanOrEqual(1);
+  });
+
+  it("T3.97 (C09 I84): a detail that is present and empty reserves nothing", () => {
+    const long = Array.from({ length: 12 }, (_u, i) => `message line ${String(i)} ${"y".repeat(30)}`).join(" ");
+    const shrug = rowsOf({ message: long, height: 6, detail: "" });
+    const absent = rowsOf({ message: long, height: 6 });
+    // Byte-identical, because the clause says *non-empty*: a producer writing
+    // `detail: ""` has said nothing, and a row taken for nothing is a row of the
+    // message lost to a field's presence rather than to its content.
+    expect(shrug, "an empty detail is not a part").toEqual(absent);
+  });
 });

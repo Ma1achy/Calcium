@@ -4,13 +4,16 @@ exports[`C09 I34 — the contained failure, in a frame > dark-ascii capped at 30
 "frame 1 — committed
 [38;2;240;90;90m! plot failed to render: Type~[39m
 
-frame 2 — asked 7
+frame 2 — asked 10
 +----------------------------+
 | [38;2;240;90;90m---------[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;240;90;90m----------[39m |
 | [38;2;240;90;90m! plot failed to render:  [39m |
 | [38;2;240;90;90mTypeError: series.map is  [39m |
 | [38;2;240;90;90mnot a function            [39m |
-| [38;2;240;90;90m    at plotDefinition.ren~[39m |
+| [38;2;240;90;90m    at                    [39m |
+| [38;2;240;90;90mplotDefinition.render     [39m |
+| [38;2;240;90;90m(plot/definition.ts:1204:1[39m |
+| [38;2;240;90;90m8)     at BlockRegistry.r~[39m |
 +----------------------------+"
 `;
 
@@ -18,13 +21,16 @@ exports[`C09 I34 — the contained failure, in a frame > dark-ascii capped at 40
 "frame 1 — committed
 [38;2;240;90;90m! plot failed to render: TypeError: ser~[39m
 
-frame 2 — asked 7
+frame 2 — asked 10
 +--------------------------------------+
 | [38;2;240;90;90m--------------[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;240;90;90m---------------[39m |
 | [38;2;240;90;90m! plot failed to render: TypeError: [39m |
 | [38;2;240;90;90mseries.map is not a function        [39m |
 | [38;2;240;90;90m    at plotDefinition.render        [39m |
-| [38;2;240;90;90m(plot/definition.ts:1204:18)     at~[39m |
+| [38;2;240;90;90m(plot/definition.ts:1204:18)        [39m |
+| [38;2;240;90;90m    at BlockRegistry.render         [39m |
+| [38;2;240;90;90m(blocks/registry.ts:495:47)         [39m |
+| [38;2;240;90;90m    at renderSequence (render-lines~[39m |
 +--------------------------------------+"
 `;
 
@@ -32,13 +38,14 @@ exports[`C09 I34 — the contained failure, in a frame > dark-ascii capped at 80
 "frame 1 — committed
 [38;2;240;90;90m! plot failed to render: TypeError: series.map is not a function     at plotDef~[39m
 
-frame 2 — asked 7
+frame 2 — asked 8
 +------------------------------------------------------------------------------+
 | [38;2;240;90;90m----------------------------------[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;240;90;90m-----------------------------------[39m |
 | [38;2;240;90;90m! plot failed to render: TypeError: series.map is not a function            [39m |
 | [38;2;240;90;90m    at plotDefinition.render (plot/definition.ts:1204:18)                   [39m |
 | [38;2;240;90;90m    at BlockRegistry.render (blocks/registry.ts:495:47)                     [39m |
-| [38;2;240;90;90m    at renderSequence (render-lines.ts:88:20)     at visibleRows (shell/ses~[39m |
+| [38;2;240;90;90m    at renderSequence (render-lines.ts:88:20)                               [39m |
+| [38;2;240;90;90m    at visibleRows (shell/session.ts:912:9)                                 [39m |
 +------------------------------------------------------------------------------+"
 `;
 
@@ -119,13 +126,16 @@ exports[`C09 I34 — the contained failure, in a frame > dark-unicode capped at 
 "frame 1 — committed
 [38;2;240;90;90m▲ plot failed to render: Type…[39m
 
-frame 2 — asked 7
+frame 2 — asked 10
 ┌────────────────────────────┐
 │ [38;2;240;90;90m─────────[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;240;90;90m──────────[39m │
 │ [38;2;240;90;90m▲ plot failed to render:  [39m │
 │ [38;2;240;90;90mTypeError: series.map is  [39m │
 │ [38;2;240;90;90mnot a function            [39m │
-│ [38;2;240;90;90m    at plotDefinition.ren…[39m │
+│ [38;2;240;90;90m    at                    [39m │
+│ [38;2;240;90;90mplotDefinition.render     [39m │
+│ [38;2;240;90;90m(plot/definition.ts:1204:1[39m │
+│ [38;2;240;90;90m8)     at BlockRegistry.r…[39m │
 └────────────────────────────┘"
 `;
 
@@ -133,13 +143,16 @@ exports[`C09 I34 — the contained failure, in a frame > dark-unicode capped at 
 "frame 1 — committed
 [38;2;240;90;90m▲ plot failed to render: TypeError: ser…[39m
 
-frame 2 — asked 7
+frame 2 — asked 10
 ┌──────────────────────────────────────┐
 │ [38;2;240;90;90m──────────────[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;240;90;90m───────────────[39m │
 │ [38;2;240;90;90m▲ plot failed to render: TypeError: [39m │
 │ [38;2;240;90;90mseries.map is not a function        [39m │
 │ [38;2;240;90;90m    at plotDefinition.render        [39m │
-│ [38;2;240;90;90m(plot/definition.ts:1204:18)     at…[39m │
+│ [38;2;240;90;90m(plot/definition.ts:1204:18)        [39m │
+│ [38;2;240;90;90m    at BlockRegistry.render         [39m │
+│ [38;2;240;90;90m(blocks/registry.ts:495:47)         [39m │
+│ [38;2;240;90;90m    at renderSequence (render-lines…[39m │
 └──────────────────────────────────────┘"
 `;
 
@@ -147,13 +160,14 @@ exports[`C09 I34 — the contained failure, in a frame > dark-unicode capped at 
 "frame 1 — committed
 [38;2;240;90;90m▲ plot failed to render: TypeError: series.map is not a function     at plotDef…[39m
 
-frame 2 — asked 7
+frame 2 — asked 8
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │ [38;2;240;90;90m──────────────────────────────────[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;240;90;90m───────────────────────────────────[39m │
 │ [38;2;240;90;90m▲ plot failed to render: TypeError: series.map is not a function            [39m │
 │ [38;2;240;90;90m    at plotDefinition.render (plot/definition.ts:1204:18)                   [39m │
 │ [38;2;240;90;90m    at BlockRegistry.render (blocks/registry.ts:495:47)                     [39m │
-│ [38;2;240;90;90m    at renderSequence (render-lines.ts:88:20)     at visibleRows (shell/ses…[39m │
+│ [38;2;240;90;90m    at renderSequence (render-lines.ts:88:20)                               [39m │
+│ [38;2;240;90;90m    at visibleRows (shell/session.ts:912:9)                                 [39m │
 └──────────────────────────────────────────────────────────────────────────────┘"
 `;
 
@@ -234,13 +248,16 @@ exports[`C09 I34 — the contained failure, in a frame > light-unicode capped at
 "frame 1 — committed
 [38;2;194;31;16m▲ plot failed to render: Type…[39m
 
-frame 2 — asked 7
+frame 2 — asked 10
 ┌────────────────────────────┐
 │ [38;2;194;31;16m─────────[38;2;255;255;255m[48;2;168;31;18m ERROR [49m[38;2;194;31;16m──────────[39m │
 │ [38;2;194;31;16m▲ plot failed to render:  [39m │
 │ [38;2;194;31;16mTypeError: series.map is  [39m │
 │ [38;2;194;31;16mnot a function            [39m │
-│ [38;2;194;31;16m    at plotDefinition.ren…[39m │
+│ [38;2;194;31;16m    at                    [39m │
+│ [38;2;194;31;16mplotDefinition.render     [39m │
+│ [38;2;194;31;16m(plot/definition.ts:1204:1[39m │
+│ [38;2;194;31;16m8)     at BlockRegistry.r…[39m │
 └────────────────────────────┘"
 `;
 
@@ -248,13 +265,16 @@ exports[`C09 I34 — the contained failure, in a frame > light-unicode capped at
 "frame 1 — committed
 [38;2;194;31;16m▲ plot failed to render: TypeError: ser…[39m
 
-frame 2 — asked 7
+frame 2 — asked 10
 ┌──────────────────────────────────────┐
 │ [38;2;194;31;16m──────────────[38;2;255;255;255m[48;2;168;31;18m ERROR [49m[38;2;194;31;16m───────────────[39m │
 │ [38;2;194;31;16m▲ plot failed to render: TypeError: [39m │
 │ [38;2;194;31;16mseries.map is not a function        [39m │
 │ [38;2;194;31;16m    at plotDefinition.render        [39m │
-│ [38;2;194;31;16m(plot/definition.ts:1204:18)     at…[39m │
+│ [38;2;194;31;16m(plot/definition.ts:1204:18)        [39m │
+│ [38;2;194;31;16m    at BlockRegistry.render         [39m │
+│ [38;2;194;31;16m(blocks/registry.ts:495:47)         [39m │
+│ [38;2;194;31;16m    at renderSequence (render-lines…[39m │
 └──────────────────────────────────────┘"
 `;
 
@@ -262,13 +282,14 @@ exports[`C09 I34 — the contained failure, in a frame > light-unicode capped at
 "frame 1 — committed
 [38;2;194;31;16m▲ plot failed to render: TypeError: series.map is not a function     at plotDef…[39m
 
-frame 2 — asked 7
+frame 2 — asked 8
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │ [38;2;194;31;16m──────────────────────────────────[38;2;255;255;255m[48;2;168;31;18m ERROR [49m[38;2;194;31;16m───────────────────────────────────[39m │
 │ [38;2;194;31;16m▲ plot failed to render: TypeError: series.map is not a function            [39m │
 │ [38;2;194;31;16m    at plotDefinition.render (plot/definition.ts:1204:18)                   [39m │
 │ [38;2;194;31;16m    at BlockRegistry.render (blocks/registry.ts:495:47)                     [39m │
-│ [38;2;194;31;16m    at renderSequence (render-lines.ts:88:20)     at visibleRows (shell/ses…[39m │
+│ [38;2;194;31;16m    at renderSequence (render-lines.ts:88:20)                               [39m │
+│ [38;2;194;31;16m    at visibleRows (shell/session.ts:912:9)                                 [39m │
 └──────────────────────────────────────────────────────────────────────────────┘"
 `;
 

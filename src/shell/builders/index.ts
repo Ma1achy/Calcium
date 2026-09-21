@@ -42,6 +42,9 @@ import { samplesChildren, samplesLayout, type Sample, type SamplesOptions, sampl
 import { readFileSync } from "node:fs";
 import { digestOf, intralineLines, overlayFault, parseAreas } from "../../data/viewmodel/index.js";
 import { COLORMAPS } from "../../data/colormaps/index.js";
+// The detail's cap is C09's (C09 I84), asked rather than restated — a second
+// `Math.min(3, …)` here is the drift `statusDetailRows` exists to stop.
+import { statusDetailRows } from "../../presentation/blocks/index.js";
 import { parseStartDate } from "../../data/dates.js";
 import type {
   ImageOverlay,
@@ -1577,6 +1580,50 @@ function statusBlock(
 }
 
 /**
+ * `ErrorLike.details` as the detail part's lines, or `""` when there are none.
+ *
+ * **One `key: value` per line and no nesting**, because the part *truncates*: a
+ * cut has to take whole facts, and a pretty-printed object cut at three rows
+ * leaves a reader holding an open brace. A value that is itself structured is
+ * `JSON.stringify`d onto its own line and cut at the width like any other, which
+ * is honest about being evidence rather than a document.
+ */
+function detailFrom(err: ErrorLike): string {
+  const held = err.details;
+  if (held === undefined) return "";
+  return Object.entries(held)
+    .map(([key, value]) => `${key}: ${typeof value === "string" ? value : JSON.stringify(value)}`)
+    .join("\n");
+}
+
+/**
+ * The fourth state, and the one that is not a failure (C09 I85, §047).
+ *
+ * **A correct block about nothing, never an error.** No banner, no mark, no red,
+ * and the message centred on both axes. It takes a message rather than deriving
+ * one because *it says what it searched* is half of §047's figure — `No matches
+ * for "elementsIn" in src/.` is a better empty block than `No data.`, and only
+ * the caller knows what it looked for.
+ *
+ * **The height is the caller's on `plot`'s argument** (C09 I31), with a default
+ * of three: a border and the one row, which is §047's own picture.
+ */
+function statusEmpty(message: string, height = 3, opts?: BlockOpts, framed = false): Status {
+  return finish<Status>(
+    block({
+      kind: "status",
+      id: idOf(opts, "status"),
+      state: "empty",
+      message,
+      height,
+      ...(framed ? { framed } : {}),
+    }) as Status,
+    opts,
+    false,
+  );
+}
+
+/**
  * The same box, told whether something already frames it (C09 §3a, F406).
  *
  * **Not a parameter on `b.status`**, and MG27 holds the reason: whoever puts the
@@ -1608,12 +1655,26 @@ export function framedStatus(
   // **parameterised**, which is what it is — all three states are reachable from
   // the published surface, two through here and `loading` through the door below.
   const state = retryInMs === null ? "error" : "retrying";
+  // **The detail is relayed, which is the same distinction `state` draws above**
+  // (MG27, C24 I5). `ErrorLike.details` is the far side's structured payload —
+  // *what a `message` cannot carry*, its own docblock — and it has been declared
+  // and read by nothing since it was written. §096 gives it the part it was
+  // always the subject of: code, which truncates and is bounded with a residue
+  // row, where as prose it would have been joined onto the end of a sentence and
+  // then cut. One `key: value` per line, so a cut takes whole facts.
+  const detail = detailFrom(err);
   // **Framed heights are one row taller, and the row buys the tag** (F406, C09
   // I31). Free-standing the numbers are 1 and 2 — the rungs below the ladder's
   // first border — and inside `b.live`'s panel they read as a red line of text,
   // which is what a reader with two screenshots reported. Framed, two rows are
   // *tag and message* and three buy `retrying` its activity line.
-  const height = framed ? (retryInMs === null ? 2 : 3) : retryInMs === null ? 1 : 2;
+  // **The detail's rows are added rather than absorbed**, so every figure C23
+  // read from a frame is unchanged for the box as it ships today — an error with
+  // no `details` is the same two rows it has always been — and the box grows
+  // only when there is something to put in it. `statusDetailRows` is C09's, not
+  // a second cap here (C09 I84).
+  const height =
+    (framed ? (retryInMs === null ? 2 : 3) : retryInMs === null ? 1 : 2) + statusDetailRows(detail);
   return finish<Status>(
     block({
       kind: "status",
@@ -1622,6 +1683,7 @@ export function framedStatus(
       state,
       height,
       ...(framed ? { framed } : {}),
+      ...(detail === "" ? {} : { detail }),
       ...(retryInMs === null ? {} : { retryInMs, attempt }),
     }) as Status,
     opts,
@@ -1656,7 +1718,7 @@ function statusLoading(opts?: BlockOpts, framed = false): Status {
   );
 }
 
-const status = Object.assign(statusBlock, { loading: statusLoading });
+const status = Object.assign(statusBlock, { loading: statusLoading, empty: statusEmpty });
 
 // --- cells and actions ----------------------------------------------------
 

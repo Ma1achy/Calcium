@@ -53748,6 +53748,55 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1239 — a row asserting one axis of an over-draw reads as covering both ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `test/edge/status.test.ts` T3.40, against `tools/mutate/runs/c09-status.mjs`'s *the width ladder does not decide whether the border is affordable*. |
+| **Reached for** | The mutation pass on C09 §3a-ter's landing. The survivor was **not** caused by that work — measured at the previous commit in a worktree, the same one survives and the same seven are caught. |
+| **Verdict** | **Real, and it has been red since the file was written.** |
+
+**1 · A mutation that has never been killed.** `widthRung` decides the border and the padding
+against the width — `frame.border && width >= 3`, `border && width >= 5` — and the run removes both
+guards. Its own note records the frame read that produced them: *a bordered padded row at width 3
+was five cells of furniture in a three-cell frame.*
+
+T3.40 is the row it names, and T3.40 asserts, at ten widths, that the block draws **six rows**, and
+then that the tag is a rule at 13, bare at 11 and at 9, and absent at 8 and 3. Every one of those is
+true under the mutation. The furniture it removes changes **how wide a row is**, and nothing in the
+row looks at a row's width.
+
+**The tell is in the row's own first sentence**, which is why this is worth a number rather than a
+fix: *the row count is the half a width assertion does not reach on its own*. It is a correct
+observation about a **different** gap — a ladder choosing furniture without choosing rows — written
+at the moment that gap was closed, and it reads as though the row now covers the pair. **I1's
+over-draw has two axes**; the row closed one, said so, and the sentence saying so is what made the
+other one invisible. F84's shape — a correct sentence justifying the wrong scope — in a test rather
+than in a rule.
+
+**The remedy is one clause**: `cells(row) <= width` at every width already in the loop, which takes
+the mutation down.
+
+**2 · And the same pass produced the shape a second time, in a row written hours earlier.**
+T2.153's horizontal-centring assertion measured the margins with `trimStart`/`trimEnd` on a rendered
+row — and a bordered row begins with `│`, which is not whitespace. Both margins came out at the same
+constant, `|left − right| = 0` for every frame, and the mutation that ranges an empty block's text
+**left** survived. The assertion was about the border, not the ink.
+
+**Two instances, one sentence**: *an assertion positioned relative to the wrong landmark is
+satisfied by every arrangement of the thing it was watching.* T3.40's landmark is the row's count
+where the defect is in its cells; T2.153's is the frame's edge where the ink is inside it. Both read
+as precise, and both are — about something else. The instrument that found both is the mutation
+pass, and neither would ever have gone red on its own.
+
+**3 · Measured rather than assumed, which is the part worth keeping.** The survivor appeared on a
+landing that had touched the same file, and the cheap reading is *I broke it*. A worktree at the
+previous commit ran the same run: `caught 7 survived 1`, the identical member. Two minutes, and it
+is the difference between a finding and a bisect — F92's class in the other direction, where the
+work in hand is assumed to be the cause because it is the thing in view.
+
+---
+
 ## F1238 — an assertion on reserved cells is satisfied by a frame that never reserved them ★★★☆☆
 
 | | |
