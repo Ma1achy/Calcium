@@ -1,0 +1,1844 @@
+{
+ "CATEGORY_REFS": [
+  "categorical.c1",
+  "categorical.c2",
+  "categorical.c3",
+  "categorical.c4",
+  "categorical.c5",
+  "categorical.c6",
+  "categorical.c7",
+  "categorical.c8"
+ ],
+ "COLORMAPS": {
+  "Blues": {
+   "data": "sha256:8432680291249383",
+   "kind": "sequential",
+   "name": "Blues"
+  },
+  "Blues_r": {
+   "data": "sha256:43bd990c0d5a4ca2",
+   "kind": "sequential",
+   "name": "Blues_r"
+  },
+  "BrBG": {
+   "data": "sha256:4af116523ab00076",
+   "kind": "diverging",
+   "name": "BrBG"
+  },
+  "BrBG_r": {
+   "data": "sha256:a82303c317dac4b5",
+   "kind": "diverging",
+   "name": "BrBG_r"
+  },
+  "BuGn": {
+   "data": "sha256:ea3fc4da289e9254",
+   "kind": "sequential",
+   "name": "BuGn"
+  },
+  "BuGn_r": {
+   "data": "sha256:6a6ac1ad1645ecfe",
+   "kind": "sequential",
+   "name": "BuGn_r"
+  },
+  "BuPu": {
+   "data": "sha256:def54f3d2fbe9f5a",
+   "kind": "sequential",
+   "name": "BuPu"
+  },
+  "BuPu_r": {
+   "data": "sha256:f82bf01dff2df279",
+   "kind": "sequential",
+   "name": "BuPu_r"
+  },
+  "CMRmap": {
+   "data": "sha256:8da8a81082c5da82",
+   "kind": "sequential",
+   "name": "CMRmap"
+  },
+  "CMRmap_r": {
+   "data": "sha256:065fb1bbc857e511",
+   "kind": "sequential",
+   "name": "CMRmap_r"
+  },
+  "GnBu": {
+   "data": "sha256:138023d815a7286a",
+   "kind": "sequential",
+   "name": "GnBu"
+  },
+  "GnBu_r": {
+   "data": "sha256:0adc71812f136eb5",
+   "kind": "sequential",
+   "name": "GnBu_r"
+  },
+  "Greens": {
+   "data": "sha256:f86549141467d31d",
+   "kind": "sequential",
+   "name": "Greens"
+  },
+  "Greens_r": {
+   "data": "sha256:7b2a25f7df556a81",
+   "kind": "sequential",
+   "name": "Greens_r"
+  },
+  "Greys": {
+   "data": "sha256:1f17009ade9a3687",
+   "kind": "sequential",
+   "name": "Greys"
+  },
+  "Greys_r": {
+   "data": "sha256:a8416c29102ebbdc",
+   "kind": "sequential",
+   "name": "Greys_r"
+  },
+  "OrRd": {
+   "data": "sha256:85dd3361b015b824",
+   "kind": "sequential",
+   "name": "OrRd"
+  },
+  "OrRd_r": {
+   "data": "sha256:59bb7cf22d1a36cb",
+   "kind": "sequential",
+   "name": "OrRd_r"
+  },
+  "Oranges": {
+   "data": "sha256:fbb52eaecc9165da",
+   "kind": "sequential",
+   "name": "Oranges"
+  },
+  "Oranges_r": {
+   "data": "sha256:4905f64480dde231",
+   "kind": "sequential",
+   "name": "Oranges_r"
+  },
+  "PRGn": {
+   "data": "sha256:6894606b2f2c52bd",
+   "kind": "diverging",
+   "name": "PRGn"
+  },
+  "PRGn_r": {
+   "data": "sha256:ea5d06e16066719a",
+   "kind": "diverging",
+   "name": "PRGn_r"
+  },
+  "PiYG": {
+   "data": "sha256:a7763f2fe54a1e14",
+   "kind": "diverging",
+   "name": "PiYG"
+  },
+  "PiYG_r": {
+   "data": "sha256:5da663c2011fa924",
+   "kind": "diverging",
+   "name": "PiYG_r"
+  },
+  "PuBu": {
+   "data": "sha256:0979214706ff8688",
+   "kind": "sequential",
+   "name": "PuBu"
+  },
+  "PuBuGn": {
+   "data": "sha256:43b9a25000501c68",
+   "kind": "sequential",
+   "name": "PuBuGn"
+  },
+  "PuBuGn_r": {
+   "data": "sha256:b12b2ffe372d71a8",
+   "kind": "sequential",
+   "name": "PuBuGn_r"
+  },
+  "PuBu_r": {
+   "data": "sha256:30538b1eac5f7cae",
+   "kind": "sequential",
+   "name": "PuBu_r"
+  },
+  "PuOr": {
+   "data": "sha256:bba66798702db455",
+   "kind": "diverging",
+   "name": "PuOr"
+  },
+  "PuOr_r": {
+   "data": "sha256:bba3108d66debbb2",
+   "kind": "diverging",
+   "name": "PuOr_r"
+  },
+  "PuRd": {
+   "data": "sha256:5727b1b9651d9f76",
+   "kind": "sequential",
+   "name": "PuRd"
+  },
+  "PuRd_r": {
+   "data": "sha256:1d1fc3940fb6625d",
+   "kind": "sequential",
+   "name": "PuRd_r"
+  },
+  "Purples": {
+   "data": "sha256:13e50d9cd7f6cc65",
+   "kind": "sequential",
+   "name": "Purples"
+  },
+  "Purples_r": {
+   "data": "sha256:878d266cab1f0967",
+   "kind": "sequential",
+   "name": "Purples_r"
+  },
+  "RdBu": {
+   "data": "sha256:6cdffa787f460d28",
+   "kind": "diverging",
+   "name": "RdBu"
+  },
+  "RdBu_r": {
+   "data": "sha256:53f774b1524bfa8d",
+   "kind": "diverging",
+   "name": "RdBu_r"
+  },
+  "RdGy": {
+   "data": "sha256:1c647a04feea764f",
+   "kind": "diverging",
+   "name": "RdGy"
+  },
+  "RdGy_r": {
+   "data": "sha256:4556f862d6712c87",
+   "kind": "diverging",
+   "name": "RdGy_r"
+  },
+  "RdPu": {
+   "data": "sha256:7bcf673e9a355d35",
+   "kind": "sequential",
+   "name": "RdPu"
+  },
+  "RdPu_r": {
+   "data": "sha256:2ba74c47d665c0a1",
+   "kind": "sequential",
+   "name": "RdPu_r"
+  },
+  "RdYlBu": {
+   "data": "sha256:3f27b2efb63f91be",
+   "kind": "diverging",
+   "name": "RdYlBu"
+  },
+  "RdYlBu_r": {
+   "data": "sha256:bf6da7906502e461",
+   "kind": "diverging",
+   "name": "RdYlBu_r"
+  },
+  "RdYlGn": {
+   "data": "sha256:361a88c62f62865e",
+   "kind": "diverging",
+   "name": "RdYlGn"
+  },
+  "RdYlGn_r": {
+   "data": "sha256:f5cfd52491ebb59d",
+   "kind": "diverging",
+   "name": "RdYlGn_r"
+  },
+  "Reds": {
+   "data": "sha256:357e9ab4be474d08",
+   "kind": "sequential",
+   "name": "Reds"
+  },
+  "Reds_r": {
+   "data": "sha256:5ce1cfc2ad4747cc",
+   "kind": "sequential",
+   "name": "Reds_r"
+  },
+  "Spectral": {
+   "data": "sha256:4b7a65aaf5d53ac0",
+   "kind": "diverging",
+   "name": "Spectral"
+  },
+  "Spectral_r": {
+   "data": "sha256:c3de9086f649d1ac",
+   "kind": "diverging",
+   "name": "Spectral_r"
+  },
+  "Wistia": {
+   "data": "sha256:1006c99af30aa3ea",
+   "kind": "sequential",
+   "name": "Wistia"
+  },
+  "Wistia_r": {
+   "data": "sha256:4f9727e01ed33f26",
+   "kind": "sequential",
+   "name": "Wistia_r"
+  },
+  "YlGn": {
+   "data": "sha256:3edd0e764898a419",
+   "kind": "sequential",
+   "name": "YlGn"
+  },
+  "YlGnBu": {
+   "data": "sha256:109ab4024767b3c7",
+   "kind": "sequential",
+   "name": "YlGnBu"
+  },
+  "YlGnBu_r": {
+   "data": "sha256:abdcc1cf156f573d",
+   "kind": "sequential",
+   "name": "YlGnBu_r"
+  },
+  "YlGn_r": {
+   "data": "sha256:d51775807c6983c7",
+   "kind": "sequential",
+   "name": "YlGn_r"
+  },
+  "YlOrBr": {
+   "data": "sha256:8f4846ef6753aa84",
+   "kind": "sequential",
+   "name": "YlOrBr"
+  },
+  "YlOrBr_r": {
+   "data": "sha256:18174369be5507a2",
+   "kind": "sequential",
+   "name": "YlOrBr_r"
+  },
+  "YlOrRd": {
+   "data": "sha256:bb741f8c47fb7c3c",
+   "kind": "sequential",
+   "name": "YlOrRd"
+  },
+  "YlOrRd_r": {
+   "data": "sha256:2d27dc61eb9b9eb0",
+   "kind": "sequential",
+   "name": "YlOrRd_r"
+  },
+  "afmhot": {
+   "data": "sha256:3a91adbb74cce905",
+   "kind": "sequential",
+   "name": "afmhot"
+  },
+  "afmhot_r": {
+   "data": "sha256:a4e32c2b7a422e0b",
+   "kind": "sequential",
+   "name": "afmhot_r"
+  },
+  "autumn": {
+   "data": "sha256:ef514c2749f4330e",
+   "kind": "sequential",
+   "name": "autumn"
+  },
+  "autumn_r": {
+   "data": "sha256:ce96e97d22210859",
+   "kind": "sequential",
+   "name": "autumn_r"
+  },
+  "binary": {
+   "data": "sha256:cacf6535b985138b",
+   "kind": "sequential",
+   "name": "binary"
+  },
+  "binary_r": {
+   "data": "sha256:3c881ceefde62644",
+   "kind": "sequential",
+   "name": "binary_r"
+  },
+  "bone": {
+   "data": "sha256:1b39f6c3f70de08a",
+   "kind": "sequential",
+   "name": "bone"
+  },
+  "bone_r": {
+   "data": "sha256:7ec11da307100145",
+   "kind": "sequential",
+   "name": "bone_r"
+  },
+  "brg": {
+   "data": "sha256:455258c96354ea66",
+   "kind": "sequential",
+   "name": "brg"
+  },
+  "brg_r": {
+   "data": "sha256:69a9ae73900a8161",
+   "kind": "sequential",
+   "name": "brg_r"
+  },
+  "bwr": {
+   "data": "sha256:748714c7780741eb",
+   "kind": "diverging",
+   "name": "bwr"
+  },
+  "bwr_r": {
+   "data": "sha256:9a5cd73e6d93b31c",
+   "kind": "diverging",
+   "name": "bwr_r"
+  },
+  "cividis": {
+   "data": "sha256:54f6201aec0a4d84",
+   "kind": "sequential",
+   "name": "cividis"
+  },
+  "cividis_r": {
+   "data": "sha256:ea470bc42b8bcbdc",
+   "kind": "sequential",
+   "name": "cividis_r"
+  },
+  "cool": {
+   "data": "sha256:d0f01bc0da6d66f2",
+   "kind": "sequential",
+   "name": "cool"
+  },
+  "cool_r": {
+   "data": "sha256:5e8012059925f234",
+   "kind": "sequential",
+   "name": "cool_r"
+  },
+  "coolwarm": {
+   "data": "sha256:1e68e39c845ba1af",
+   "kind": "diverging",
+   "name": "coolwarm"
+  },
+  "coolwarm_r": {
+   "data": "sha256:dd05a16b4d3e8cb7",
+   "kind": "diverging",
+   "name": "coolwarm_r"
+  },
+  "copper": {
+   "data": "sha256:64f633be21ee1aa0",
+   "kind": "sequential",
+   "name": "copper"
+  },
+  "copper_r": {
+   "data": "sha256:5d7fea3c4d5651d7",
+   "kind": "sequential",
+   "name": "copper_r"
+  },
+  "cubehelix": {
+   "data": "sha256:cc12148501a96033",
+   "kind": "sequential",
+   "name": "cubehelix"
+  },
+  "cubehelix_r": {
+   "data": "sha256:0246608797e6cd98",
+   "kind": "sequential",
+   "name": "cubehelix_r"
+  },
+  "flag": {
+   "data": "sha256:1e08b30a8e0ef236",
+   "kind": "miscellaneous",
+   "name": "flag"
+  },
+  "flag_r": {
+   "data": "sha256:05f22bb230901357",
+   "kind": "miscellaneous",
+   "name": "flag_r"
+  },
+  "gist_earth": {
+   "data": "sha256:fe0d196326c1b4d2",
+   "kind": "sequential",
+   "name": "gist_earth"
+  },
+  "gist_earth_r": {
+   "data": "sha256:76764486701e4525",
+   "kind": "sequential",
+   "name": "gist_earth_r"
+  },
+  "gist_gray": {
+   "data": "sha256:3c881ceefde62644",
+   "kind": "sequential",
+   "name": "gist_gray"
+  },
+  "gist_gray_r": {
+   "data": "sha256:cacf6535b985138b",
+   "kind": "sequential",
+   "name": "gist_gray_r"
+  },
+  "gist_heat": {
+   "data": "sha256:88d3479a07787b43",
+   "kind": "sequential",
+   "name": "gist_heat"
+  },
+  "gist_heat_r": {
+   "data": "sha256:69356519920838fb",
+   "kind": "sequential",
+   "name": "gist_heat_r"
+  },
+  "gist_ncar": {
+   "data": "sha256:9a77d2212209ee2f",
+   "kind": "sequential",
+   "name": "gist_ncar"
+  },
+  "gist_ncar_r": {
+   "data": "sha256:5690bef1152710d1",
+   "kind": "sequential",
+   "name": "gist_ncar_r"
+  },
+  "gist_rainbow": {
+   "data": "sha256:5127322c6810ddb1",
+   "kind": "sequential",
+   "name": "gist_rainbow"
+  },
+  "gist_rainbow_r": {
+   "data": "sha256:69bd6eb950524009",
+   "kind": "sequential",
+   "name": "gist_rainbow_r"
+  },
+  "gist_stern": {
+   "data": "sha256:1c9054317c43009b",
+   "kind": "sequential",
+   "name": "gist_stern"
+  },
+  "gist_stern_r": {
+   "data": "sha256:7a5170b302562580",
+   "kind": "sequential",
+   "name": "gist_stern_r"
+  },
+  "gist_yarg": {
+   "data": "sha256:cacf6535b985138b",
+   "kind": "miscellaneous",
+   "name": "gist_yarg"
+  },
+  "gist_yarg_r": {
+   "data": "sha256:3c881ceefde62644",
+   "kind": "miscellaneous",
+   "name": "gist_yarg_r"
+  },
+  "gnuplot": {
+   "data": "sha256:ce9bbdff81801508",
+   "kind": "sequential",
+   "name": "gnuplot"
+  },
+  "gnuplot2": {
+   "data": "sha256:5cf34add2cecc7ca",
+   "kind": "sequential",
+   "name": "gnuplot2"
+  },
+  "gnuplot2_r": {
+   "data": "sha256:ed3e3d3232692846",
+   "kind": "sequential",
+   "name": "gnuplot2_r"
+  },
+  "gnuplot_r": {
+   "data": "sha256:3eab87a72dcc47fe",
+   "kind": "sequential",
+   "name": "gnuplot_r"
+  },
+  "gray": {
+   "data": "sha256:3c881ceefde62644",
+   "kind": "sequential",
+   "name": "gray"
+  },
+  "gray_r": {
+   "data": "sha256:cacf6535b985138b",
+   "kind": "sequential",
+   "name": "gray_r"
+  },
+  "hot": {
+   "data": "sha256:6003a8accab3760b",
+   "kind": "sequential",
+   "name": "hot"
+  },
+  "hot_r": {
+   "data": "sha256:5d920d7dcf3f0469",
+   "kind": "sequential",
+   "name": "hot_r"
+  },
+  "hsv": {
+   "data": "sha256:85a2222a8466ea2c",
+   "kind": "sequential",
+   "name": "hsv"
+  },
+  "hsv_r": {
+   "data": "sha256:7eb059ac06de7d1a",
+   "kind": "sequential",
+   "name": "hsv_r"
+  },
+  "inferno": {
+   "data": "sha256:7f27e9b6740c9521",
+   "kind": "sequential",
+   "name": "inferno"
+  },
+  "inferno_r": {
+   "data": "sha256:d1524cc337d3efd3",
+   "kind": "sequential",
+   "name": "inferno_r"
+  },
+  "jet": {
+   "data": "sha256:7d5ac54b1955aa20",
+   "kind": "sequential",
+   "name": "jet"
+  },
+  "jet_r": {
+   "data": "sha256:eb62c17e09a80256",
+   "kind": "sequential",
+   "name": "jet_r"
+  },
+  "magma": {
+   "data": "sha256:71373c7ed88ab40b",
+   "kind": "sequential",
+   "name": "magma"
+  },
+  "magma_r": {
+   "data": "sha256:f176fabbd1aa81d6",
+   "kind": "sequential",
+   "name": "magma_r"
+  },
+  "nipy_spectral": {
+   "data": "sha256:10e9bffe7c618a46",
+   "kind": "sequential",
+   "name": "nipy_spectral"
+  },
+  "nipy_spectral_r": {
+   "data": "sha256:0d18721e8c0648fd",
+   "kind": "sequential",
+   "name": "nipy_spectral_r"
+  },
+  "ocean": {
+   "data": "sha256:b4997505c39f52d4",
+   "kind": "sequential",
+   "name": "ocean"
+  },
+  "ocean_r": {
+   "data": "sha256:473cdb9964e12fd2",
+   "kind": "sequential",
+   "name": "ocean_r"
+  },
+  "pink": {
+   "data": "sha256:75a815cc7cfa0559",
+   "kind": "sequential",
+   "name": "pink"
+  },
+  "pink_r": {
+   "data": "sha256:56e8192fb66961b2",
+   "kind": "sequential",
+   "name": "pink_r"
+  },
+  "plasma": {
+   "data": "sha256:d32b6ab2dc8cec36",
+   "kind": "sequential",
+   "name": "plasma"
+  },
+  "plasma_r": {
+   "data": "sha256:f0dd3bb0c8bad3fd",
+   "kind": "sequential",
+   "name": "plasma_r"
+  },
+  "prism": {
+   "data": "sha256:19ba9a0c41877ac5",
+   "kind": "miscellaneous",
+   "name": "prism"
+  },
+  "prism_r": {
+   "data": "sha256:3f48b552235adca8",
+   "kind": "miscellaneous",
+   "name": "prism_r"
+  },
+  "rainbow": {
+   "data": "sha256:edcbae5f2b7ec284",
+   "kind": "sequential",
+   "name": "rainbow"
+  },
+  "rainbow_r": {
+   "data": "sha256:a385d15122a38bae",
+   "kind": "sequential",
+   "name": "rainbow_r"
+  },
+  "seismic": {
+   "data": "sha256:b3f2e409240e9c7a",
+   "kind": "diverging",
+   "name": "seismic"
+  },
+  "seismic_r": {
+   "data": "sha256:903ae54b03bb6192",
+   "kind": "diverging",
+   "name": "seismic_r"
+  },
+  "spring": {
+   "data": "sha256:b3cfd9f5499a7c0e",
+   "kind": "sequential",
+   "name": "spring"
+  },
+  "spring_r": {
+   "data": "sha256:756c85fa9fe7fc1b",
+   "kind": "sequential",
+   "name": "spring_r"
+  },
+  "summer": {
+   "data": "sha256:3642a54b60833313",
+   "kind": "sequential",
+   "name": "summer"
+  },
+  "summer_r": {
+   "data": "sha256:1778f1db6c08c716",
+   "kind": "sequential",
+   "name": "summer_r"
+  },
+  "terrain": {
+   "data": "sha256:3abae1aa02a92198",
+   "kind": "sequential",
+   "name": "terrain"
+  },
+  "terrain_r": {
+   "data": "sha256:dcc25fd0ae8e939f",
+   "kind": "sequential",
+   "name": "terrain_r"
+  },
+  "turbo": {
+   "data": "sha256:850dd8f7eff799da",
+   "kind": "sequential",
+   "name": "turbo"
+  },
+  "turbo_r": {
+   "data": "sha256:868ead96fe6fec23",
+   "kind": "sequential",
+   "name": "turbo_r"
+  },
+  "twilight": {
+   "data": "sha256:e641777088602e4b",
+   "kind": "cyclic",
+   "name": "twilight"
+  },
+  "twilight_r": {
+   "data": "sha256:8b8d6d99ab7214b5",
+   "kind": "cyclic",
+   "name": "twilight_r"
+  },
+  "twilight_shifted": {
+   "data": "sha256:f1058fa0471ea383",
+   "kind": "cyclic",
+   "name": "twilight_shifted"
+  },
+  "twilight_shifted_r": {
+   "data": "sha256:535cc2d2e8f734d9",
+   "kind": "cyclic",
+   "name": "twilight_shifted_r"
+  },
+  "viridis": {
+   "data": "sha256:92d6858ca0587ba7",
+   "kind": "sequential",
+   "name": "viridis"
+  },
+  "viridis_r": {
+   "data": "sha256:0e5edcc2332c0fbe",
+   "kind": "sequential",
+   "name": "viridis_r"
+  },
+  "winter": {
+   "data": "sha256:372ed15760835f51",
+   "kind": "sequential",
+   "name": "winter"
+  },
+  "winter_r": {
+   "data": "sha256:f3989e09b0fae497",
+   "kind": "sequential",
+   "name": "winter_r"
+  }
+ },
+ "DARK_FOUR_BIT": {
+  "categorical.c1": 3,
+  "categorical.c2": 6,
+  "categorical.c3": 2,
+  "categorical.c4": 11,
+  "categorical.c5": 12,
+  "categorical.c6": 1,
+  "categorical.c7": 5,
+  "categorical.c8": 7,
+  "surface.bg": 0,
+  "surface.bgDeep": 0,
+  "surface.bgElev": 0,
+  "surface.border": 8,
+  "surface.borderStrong": 7,
+  "surface.diffAdd": 2,
+  "surface.diffRemove": 1,
+  "surface.errorGround": 9,
+  "surface.errorInk": 0,
+  "syntax.comment": 8,
+  "syntax.function": 12,
+  "syntax.key": 9,
+  "syntax.keyword": 13,
+  "syntax.number": 3,
+  "syntax.operator": 14,
+  "syntax.punctuation": 7,
+  "syntax.string": 10,
+  "syntax.type": 11,
+  "tone.accent": 3,
+  "tone.default": 15,
+  "tone.dim": 7,
+  "tone.error": 9,
+  "tone.identifier": 6,
+  "tone.info": 14,
+  "tone.meta": 13,
+  "tone.muted": 8,
+  "tone.ok": 10,
+  "tone.warn": 11
+ },
+ "GLYPH_SUBSTITUTIONS": [
+  [
+   "✓",
+   "+"
+  ],
+  [
+   "▲",
+   "!"
+  ],
+  [
+   "✗",
+   "x"
+  ],
+  [
+   "ⓘ",
+   "i"
+  ],
+  [
+   "◌",
+   "."
+  ],
+  [
+   "◐",
+   "%"
+  ],
+  [
+   "●",
+   "*"
+  ],
+  [
+   "○",
+   "o"
+  ],
+  [
+   "⊘",
+   "/"
+  ],
+  [
+   "▸",
+   ">"
+  ],
+  [
+   "▾",
+   "v"
+  ],
+  [
+   "▌",
+   "|"
+  ],
+  [
+   "•",
+   "-"
+  ],
+  [
+   "⎸",
+   ">"
+  ],
+  [
+   "⁃",
+   "~"
+  ],
+  [
+   "⎿",
+   "`"
+  ],
+  [
+   "⏺︎",
+   "*"
+  ]
+ ],
+ "GLYPH_TOKENS": [
+  "ok",
+  "warn",
+  "error",
+  "info",
+  "pending",
+  "working",
+  "running",
+  "queued",
+  "cancelled",
+  "expand",
+  "collapse",
+  "live",
+  "bullet",
+  "quote",
+  "nested",
+  "continuation",
+  "step"
+ ],
+ "HIGH_CONTRAST_FOUR_BIT": {
+  "categorical.c1": 11,
+  "categorical.c2": 14,
+  "categorical.c3": 10,
+  "categorical.c4": 3,
+  "categorical.c5": 12,
+  "categorical.c6": 9,
+  "categorical.c7": 13,
+  "categorical.c8": 7,
+  "surface.bg": 0,
+  "surface.bgDeep": 0,
+  "surface.bgElev": 0,
+  "surface.border": 8,
+  "surface.borderStrong": 7,
+  "surface.diffAdd": 2,
+  "surface.diffRemove": 1,
+  "surface.errorGround": 9,
+  "surface.errorInk": 0,
+  "syntax.comment": 8,
+  "syntax.function": 12,
+  "syntax.key": 9,
+  "syntax.keyword": 13,
+  "syntax.number": 11,
+  "syntax.operator": 14,
+  "syntax.punctuation": 15,
+  "syntax.string": 10,
+  "syntax.type": 3,
+  "tone.accent": 13,
+  "tone.default": 15,
+  "tone.dim": 7,
+  "tone.error": 9,
+  "tone.identifier": 6,
+  "tone.info": 14,
+  "tone.meta": 5,
+  "tone.muted": 8,
+  "tone.ok": 10,
+  "tone.warn": 11
+ },
+ "LIGHT_FOUR_BIT": {
+  "categorical.c1": 3,
+  "categorical.c2": 6,
+  "categorical.c3": 2,
+  "categorical.c4": 5,
+  "categorical.c5": 4,
+  "categorical.c6": 1,
+  "categorical.c7": 13,
+  "categorical.c8": 8,
+  "surface.bg": 15,
+  "surface.bgDeep": 15,
+  "surface.bgElev": 15,
+  "surface.border": 7,
+  "surface.borderStrong": 8,
+  "surface.diffAdd": 2,
+  "surface.diffRemove": 1,
+  "surface.errorGround": 1,
+  "surface.errorInk": 15,
+  "syntax.comment": 8,
+  "syntax.function": 4,
+  "syntax.key": 1,
+  "syntax.keyword": 5,
+  "syntax.number": 3,
+  "syntax.operator": 6,
+  "syntax.punctuation": 0,
+  "syntax.string": 2,
+  "syntax.type": 3,
+  "tone.accent": 12,
+  "tone.default": 0,
+  "tone.dim": 8,
+  "tone.error": 1,
+  "tone.identifier": 6,
+  "tone.info": 4,
+  "tone.meta": 5,
+  "tone.muted": 8,
+  "tone.ok": 2,
+  "tone.warn": 3
+ },
+ "MUST_STAY_DISTINCT": [
+  "ok",
+  "warn",
+  "error",
+  "info",
+  "accent"
+ ],
+ "OKABE_ITO_CANONICAL": {
+  "black": "#000000",
+  "blue": "#0072b2",
+  "bluishGreen": "#009e73",
+  "orange": "#e69f00",
+  "reddishPurple": "#cc79a7",
+  "skyBlue": "#56b4e9",
+  "vermillion": "#d55e00",
+  "yellow": "#f0e442"
+ },
+ "REQUIRED_SLOTS": {
+  "categorical": [
+   "c1",
+   "c2",
+   "c3",
+   "c4",
+   "c5",
+   "c6",
+   "c7",
+   "c8"
+  ],
+  "syntax": [
+   "keyword",
+   "string",
+   "comment",
+   "number",
+   "key",
+   "type",
+   "function",
+   "operator",
+   "punctuation"
+  ],
+  "tone": [
+   "default",
+   "dim",
+   "muted",
+   "ok",
+   "warn",
+   "error",
+   "info",
+   "accent",
+   "meta",
+   "identifier"
+  ]
+ },
+ "SPINNER_SETS": {
+  "arc": {
+   "ascii": [
+    "-",
+    "\\",
+    "|",
+    "/"
+   ],
+   "frames": [
+    "◜",
+    "◠",
+    "◝",
+    "◞",
+    "◡",
+    "◟"
+   ],
+   "intervalMs": 130,
+   "narrowOnly": true
+  },
+  "arrow": {
+   "ascii": [
+    "-",
+    "\\",
+    "|",
+    "/"
+   ],
+   "frames": [
+    "←",
+    "↑",
+    "→",
+    "↓"
+   ],
+   "intervalMs": 200,
+   "narrowOnly": true
+  },
+  "balloon": {
+   "ascii": [
+    ".",
+    "o",
+    "O",
+    "@",
+    "*"
+   ],
+   "frames": [
+    ".",
+    "o",
+    "O",
+    "@",
+    "*"
+   ],
+   "intervalMs": 160
+  },
+  "binary4": {
+   "ascii": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9"
+   ],
+   "frames": [
+    "⠀",
+    "⠁",
+    "⠂",
+    "⠃",
+    "⠄",
+    "⠅",
+    "⠆",
+    "⠇",
+    "⠈",
+    "⠉",
+    "⠊",
+    "⠋",
+    "⠌",
+    "⠍",
+    "⠎",
+    "⠏"
+   ],
+   "intervalMs": 120
+  },
+  "bloom": {
+   "ascii": [
+    ".",
+    "o",
+    "O",
+    "@",
+    "*"
+   ],
+   "frames": [
+    "⋅",
+    "✧",
+    "✦",
+    "✢",
+    "✻",
+    "✾",
+    "❀",
+    "✿",
+    "❀",
+    "✾",
+    "✻",
+    "✢",
+    "✦",
+    "✧"
+   ],
+   "intervalMs": 95,
+   "narrowOnly": true
+  },
+  "bounce": {
+   "ascii": [
+    ".",
+    "o",
+    "O",
+    "@",
+    "*"
+   ],
+   "frames": [
+    "⠁",
+    "⠂",
+    "⠄",
+    "⠂"
+   ],
+   "intervalMs": 130
+  },
+  "boxBounce": {
+   "ascii": [
+    "-",
+    "\\",
+    "|",
+    "/"
+   ],
+   "frames": [
+    "▖",
+    "▘",
+    "▝",
+    "▗"
+   ],
+   "intervalMs": 140,
+   "narrowOnly": true
+  },
+  "boxBounce2": {
+   "ascii": [
+    "-",
+    "\\",
+    "|",
+    "/"
+   ],
+   "frames": [
+    "▌",
+    "▀",
+    "▐",
+    "▄"
+   ],
+   "intervalMs": 120,
+   "narrowOnly": true
+  },
+  "braille": {
+   "ascii": [
+    "-",
+    "\\",
+    "|",
+    "/"
+   ],
+   "frames": [
+    "⠋",
+    "⠙",
+    "⠹",
+    "⠸",
+    "⠼",
+    "⠴",
+    "⠦",
+    "⠧",
+    "⠇",
+    "⠏"
+   ],
+   "intervalMs": 80
+  },
+  "braille2": {
+   "ascii": [
+    "-",
+    "\\",
+    "|",
+    "/"
+   ],
+   "frames": [
+    "⣾",
+    "⣽",
+    "⣻",
+    "⢿",
+    "⡿",
+    "⣟",
+    "⣯",
+    "⣷"
+   ],
+   "intervalMs": 110
+  },
+  "circleHalves": {
+   "ascii": [
+    "-",
+    "\\",
+    "|",
+    "/"
+   ],
+   "frames": [
+    "◐",
+    "◓",
+    "◑",
+    "◒"
+   ],
+   "intervalMs": 120,
+   "narrowOnly": true
+  },
+  "circleQuarters": {
+   "ascii": [
+    "-",
+    "\\",
+    "|",
+    "/"
+   ],
+   "frames": [
+    "◴",
+    "◷",
+    "◶",
+    "◵"
+   ],
+   "intervalMs": 140,
+   "narrowOnly": true
+  },
+  "decimal": {
+   "ascii": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9"
+   ],
+   "frames": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9"
+   ],
+   "intervalMs": 140
+  },
+  "fullramp": {
+   "ascii": [
+    ".",
+    "o",
+    "O",
+    "@",
+    "*"
+   ],
+   "frames": [
+    "⋅",
+    "∘",
+    "◦",
+    "✧",
+    "✦",
+    "✢",
+    "✲",
+    "✵",
+    "✶",
+    "✷",
+    "✱",
+    "✺",
+    "✹",
+    "✸",
+    "✼",
+    "✻",
+    "❃",
+    "❁",
+    "✾",
+    "❀",
+    "✿",
+    "❂"
+   ],
+   "intervalMs": 130,
+   "narrowOnly": true
+  },
+  "grow": {
+   "ascii": [
+    ".",
+    "o",
+    "O",
+    "@",
+    "*"
+   ],
+   "frames": [
+    "✦",
+    "✢",
+    "✲",
+    "✶",
+    "✷",
+    "✹",
+    "✺",
+    "✹",
+    "✷",
+    "✶",
+    "✲",
+    "✢"
+   ],
+   "intervalMs": 90
+  },
+  "growHorizontal": {
+   "ascii": [
+    ".",
+    "o",
+    "O",
+    "@",
+    "*"
+   ],
+   "frames": [
+    "▏",
+    "▎",
+    "▍",
+    "▌",
+    "▋",
+    "▊",
+    "▉",
+    "▊",
+    "▋",
+    "▌",
+    "▍",
+    "▎"
+   ],
+   "intervalMs": 120,
+   "narrowOnly": true
+  },
+  "growVertical": {
+   "ascii": [
+    ".",
+    "o",
+    "O",
+    "@",
+    "*"
+   ],
+   "frames": [
+    "▁",
+    "▃",
+    "▄",
+    "▅",
+    "▆",
+    "▇",
+    "▆",
+    "▅",
+    "▄",
+    "▃"
+   ],
+   "intervalMs": 100,
+   "narrowOnly": true
+  },
+  "hex": {
+   "ascii": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "f"
+   ],
+   "frames": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "f"
+   ],
+   "intervalMs": 110
+  },
+  "line": {
+   "ascii": [
+    "-",
+    "\\",
+    "|",
+    "/"
+   ],
+   "frames": [
+    "-",
+    "\\",
+    "|",
+    "/"
+   ],
+   "intervalMs": 130
+  },
+  "noise": {
+   "ascii": [
+    ".",
+    "o",
+    "O",
+    "@",
+    "*"
+   ],
+   "frames": [
+    "▓",
+    "▒",
+    "░"
+   ],
+   "intervalMs": 100,
+   "narrowOnly": true
+  },
+  "orbit": {
+   "ascii": [
+    "-",
+    "\\",
+    "|",
+    "/"
+   ],
+   "frames": [
+    "⠁",
+    "⠈",
+    "⠐",
+    "⠠",
+    "⢀",
+    "⡀",
+    "⠄",
+    "⠂"
+   ],
+   "intervalMs": 90
+  },
+  "pipe": {
+   "ascii": [
+    "-",
+    "\\",
+    "|",
+    "/"
+   ],
+   "frames": [
+    "┤",
+    "┘",
+    "┴",
+    "└",
+    "├",
+    "┌",
+    "┬",
+    "┐"
+   ],
+   "intervalMs": 100,
+   "narrowOnly": true
+  },
+  "pulse": {
+   "ascii": [
+    ".",
+    "o",
+    "O",
+    "@",
+    "*"
+   ],
+   "frames": [
+    "✢",
+    "✲",
+    "✱",
+    "✻",
+    "✱",
+    "✲"
+   ],
+   "intervalMs": 120
+  },
+  "starfield": {
+   "ascii": [
+    ".",
+    "o",
+    "O",
+    "@",
+    "*"
+   ],
+   "frames": [
+    "✶",
+    "✷",
+    "✸",
+    "✹",
+    "✺",
+    "✹",
+    "✸",
+    "✷"
+   ],
+   "intervalMs": 110
+  },
+  "toggle": {
+   "ascii": [
+    "+",
+    "x"
+   ],
+   "frames": [
+    "⊶",
+    "⊷"
+   ],
+   "intervalMs": 400,
+   "narrowOnly": true
+  },
+  "triangle": {
+   "ascii": [
+    "-",
+    "\\",
+    "|",
+    "/"
+   ],
+   "frames": [
+    "◢",
+    "◣",
+    "◤",
+    "◥"
+   ],
+   "intervalMs": 120,
+   "narrowOnly": true
+  }
+ },
+ "SUBSTITUTIONS": [
+  [
+   "⋯",
+   "~"
+  ],
+  [
+   "·",
+   ":"
+  ],
+  [
+   "─",
+   "-"
+  ],
+  [
+   "│",
+   "|"
+  ],
+  [
+   "┊",
+   ":"
+  ],
+  [
+   "┄",
+   "-"
+  ],
+  [
+   "┌",
+   "+"
+  ],
+  [
+   "┐",
+   "+"
+  ],
+  [
+   "└",
+   "+"
+  ],
+  [
+   "┘",
+   "+"
+  ],
+  [
+   "┬",
+   "+"
+  ],
+  [
+   "┴",
+   "+"
+  ],
+  [
+   "╷",
+   "|"
+  ],
+  [
+   "╵",
+   "|"
+  ],
+  [
+   "╴",
+   "-"
+  ],
+  [
+   "╶",
+   "-"
+  ],
+  [
+   "▲",
+   "^"
+  ],
+  [
+   "▯",
+   "="
+  ],
+  [
+   "┃",
+   "#"
+  ],
+  [
+   "┿",
+   "+"
+  ],
+  [
+   "┼",
+   "+"
+  ],
+  [
+   "━",
+   "="
+  ],
+  [
+   "┃",
+   "H"
+  ],
+  [
+   "◆",
+   "x"
+  ],
+  [
+   "◈",
+   "X"
+  ],
+  [
+   "├",
+   "+"
+  ],
+  [
+   "┤",
+   "+"
+  ],
+  [
+   "┣",
+   "#"
+  ],
+  [
+   "✓",
+   "+"
+  ],
+  [
+   "✗",
+   "x"
+  ],
+  [
+   "●",
+   "*"
+  ],
+  [
+   "○",
+   "o"
+  ],
+  [
+   "◌",
+   "."
+  ],
+  [
+   "⊘",
+   "/"
+  ],
+  [
+   "▲",
+   "!"
+  ],
+  [
+   "▌",
+   "|"
+  ],
+  [
+   "↑",
+   "^"
+  ],
+  [
+   "↓",
+   "v"
+  ]
+ ],
+ "VISIONS": [
+  "normal",
+  "protan",
+  "deutan",
+  "tritan"
+ ],
+ "barStyles(ascii)": {
+  "ascii": {
+   "off": ".",
+   "on": "#"
+  },
+  "beads": {
+   "off": ".",
+   "on": "#"
+  },
+  "block": {
+   "off": ".",
+   "on": "#"
+  },
+  "braille": {
+   "off": ".",
+   "on": "#"
+  },
+  "halfblock": {
+   "off": ".",
+   "on": "#"
+  },
+  "posts": {
+   "off": ".",
+   "on": "#"
+  },
+  "rectangle": {
+   "off": ".",
+   "on": "#"
+  },
+  "slant": {
+   "off": ".",
+   "on": "#"
+  },
+  "squares": {
+   "off": ".",
+   "on": "#"
+  }
+ },
+ "barStyles(full)": {
+  "ascii": {
+   "off": ".",
+   "on": "#"
+  },
+  "beads": {
+   "narrowOnly": true,
+   "off": "◦",
+   "on": "•"
+  },
+  "block": {
+   "narrowOnly": true,
+   "off": "░",
+   "on": "█"
+  },
+  "braille": {
+   "off": " ",
+   "on": "⣿"
+  },
+  "halfblock": {
+   "narrowOnly": true,
+   "off": "░",
+   "on": "▐"
+  },
+  "posts": {
+   "narrowOnly": true,
+   "off": "▯",
+   "on": "▮"
+  },
+  "rectangle": {
+   "narrowOnly": true,
+   "off": "░",
+   "on": "▬"
+  },
+  "slant": {
+   "narrowOnly": true,
+   "off": "▱",
+   "on": "▰"
+  },
+  "squares": {
+   "narrowOnly": true,
+   "off": "□",
+   "on": "■"
+  }
+ },
+ "glyphs(ascii)": {
+  "bar": "|",
+  "blocked": "/",
+  "bottomLeft": "+",
+  "bottomRight": "+",
+  "calloutTee": "#",
+  "candleCross": "+",
+  "candleFilled": "#",
+  "candleHollow": "=",
+  "cross": "x",
+  "crossing": "+",
+  "cursorMark": "^",
+  "dashedHorizontal": "-",
+  "dashedVertical": ":",
+  "diamond": "x",
+  "diamondTee": "X",
+  "dotted": ".",
+  "filled": "*",
+  "heavyHorizontal": "=",
+  "heavyVertical": "H",
+  "hollow": "o",
+  "horizontal": "-",
+  "residue": "~",
+  "separator": ":",
+  "sortAsc": "^",
+  "sortDesc": "v",
+  "stubDown": "|",
+  "stubLeft": "-",
+  "stubRight": "-",
+  "stubUp": "|",
+  "teeDown": "+",
+  "teeLeft": "+",
+  "teeRight": "+",
+  "teeUp": "+",
+  "tick": "+",
+  "topLeft": "+",
+  "topRight": "+",
+  "vertical": "|",
+  "warning": "!"
+ },
+ "glyphs(full)": {
+  "bar": "▌",
+  "blocked": "⊘",
+  "bottomLeft": "└",
+  "bottomRight": "┘",
+  "calloutTee": "┣",
+  "candleCross": "┿",
+  "candleFilled": "┃",
+  "candleHollow": "▯",
+  "cross": "✗",
+  "crossing": "┼",
+  "cursorMark": "▲",
+  "dashedHorizontal": "┄",
+  "dashedVertical": "┊",
+  "diamond": "◆",
+  "diamondTee": "◈",
+  "dotted": "◌",
+  "filled": "●",
+  "heavyHorizontal": "━",
+  "heavyVertical": "┃",
+  "hollow": "○",
+  "horizontal": "─",
+  "residue": "⋯",
+  "separator": "·",
+  "sortAsc": "↑",
+  "sortDesc": "↓",
+  "stubDown": "╷",
+  "stubLeft": "╴",
+  "stubRight": "╶",
+  "stubUp": "╵",
+  "teeDown": "┬",
+  "teeLeft": "├",
+  "teeRight": "┤",
+  "teeUp": "┴",
+  "tick": "✓",
+  "topLeft": "┌",
+  "topRight": "┐",
+  "vertical": "│",
+  "warning": "▲"
+ }
+}

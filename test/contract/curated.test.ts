@@ -13,18 +13,24 @@
 // thing at risk here, and deliberateness is not a property of a value. So these
 // rows assert the value itself.
 //
-// **A digest, and a shape beside it.** The digest is what makes the pin total —
-// any different value fails, which is what *legal-but-different must fail*
-// means. It is also opaque, so each row carries its entry count and the entries
-// whose docblocks argue for them, written out. The digest says *something
-// moved*; the literals say *and here is what it was for*.
+// **The values are pinned in a file, and a failure prints the entries that
+// moved.** An earlier draft pinned each table by a digest, which is total — any
+// different value fails, which is what *legal-but-different must fail* means —
+// and opaque: a failure said *something moved* and nothing about what, so a
+// legitimate change could only be reviewed by reading two revisions of the
+// module side by side. `curated-pinned.json` is total in the same way and
+// reviewable as well, and a failing row names the entries and their old and new
+// values. `test/support/curated.ts` carries the list and the reasoning.
+//
+// **It is not a snapshot.** No `-u`, and no write path from here: re-taking the
+// pin is `npx tsx tools/curated/pin.ts --write`, an act with a diff to read
+// afterwards, not a keystroke that records whatever the code now does.
 //
 // **Driven, not an allow-list I keep by hand.** Every exported frozen table in
-// the curated modules must be named in `PINNED` or in `DERIVED` with a reason.
+// the curated modules must be named in `CURATED` or in `DERIVED` with a reason.
 // A table added and pinned by neither fails T2.40 — which is the failure mode
 // an allow-list has by construction, and the one `an exemption list must be
 // driven` was written for.
-import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -36,117 +42,33 @@ import {
   LIGHT_FOUR_BIT,
   MUST_STAY_DISTINCT,
 } from "../../src/presentation/theme/four-bit.js";
-import { OKABE_ITO_CANONICAL, VISIONS } from "../../src/presentation/theme/cvd.js";
-import { COLORMAPS } from "../../src/presentation/theme/colormap.js";
-import { CATEGORY_REFS } from "../../src/presentation/theme/categorical.js";
-import { REQUIRED_SLOTS } from "../../src/presentation/theme/contrast.js";
-import {
-  GLYPH_SUBSTITUTIONS,
-  GLYPH_TOKENS,
-  SPINNER_SETS,
-  SUBSTITUTIONS,
-  barStyle,
-  barStyleNames,
-  glyphs,
-} from "../../src/presentation/blocks/glyphs.js";
+import { glyphs } from "../../src/presentation/blocks/glyphs.js";
 import { defaultTheme } from "../../src/presentation/theme/index.js";
-
-/**
- * **Key order is not part of a table's identity, and its values are.** A
- * canonical form sorts keys and keeps arrays in order, so re-ordering a record's
- * declarations is free and changing one index is not — which is the line this
- * file wants, since a curated map's order is how it reads and its values are
- * what it promises.
- */
-const canon = (v: unknown): string => {
-  if (Array.isArray(v)) return `[${v.map(canon).join(",")}]`;
-  if (v !== null && typeof v === "object") {
-    return `{${Object.keys(v as object)
-      .sort()
-      .map((k) => `${JSON.stringify(k)}:${canon((v as Record<string, unknown>)[k])}`)
-      .join(",")}}`;
-  }
-  return JSON.stringify(v);
-};
-const digest = (v: unknown): string => createHash("sha256").update(canon(v)).digest("hex").slice(0, 16);
-const size = (v: unknown): number => (Array.isArray(v) ? v.length : Object.keys(v as object).length);
-
-const FULL = { unicode: "full", ambiguousWidth: "narrow" } as const;
-
-/** name → [the table, its digest, its entry count]. */
-const PINNED: readonly (readonly [string, unknown, string, number])[] = [
-  // C10 §3 — the three 4-bit maps. Sixteen indices whose *values* are the
-  // emulator's, so what is curated is which slot takes which index.
-  ["DARK_FOUR_BIT", DARK_FOUR_BIT, "10c76c5b8151425d", 36],
-  ["LIGHT_FOUR_BIT", LIGHT_FOUR_BIT, "a5fa703bf4622d52", 36],
-  ["HIGH_CONTRAST_FOUR_BIT", HIGH_CONTRAST_FOUR_BIT, "f2313581e78f13e9", 36],
-  ["MUST_STAY_DISTINCT", MUST_STAY_DISTINCT, "986f97e461ee9d63", 5],
-
-  // C10 §4j — the calibrating set. A *different* palette that also separates
-  // under all three dichromacies would pass `collisions() === []` exactly as
-  // this one does, which is why the control is pinned and not merely checked.
-  ["OKABE_ITO_CANONICAL", OKABE_ITO_CANONICAL, "53888dcda8a8f11f", 8],
-  ["VISIONS", VISIONS, "0ba27118ccb50985", 4],
-
-  // C10 §4h, §4j — the colormaps and the categorical refs.
-  ["COLORMAPS", COLORMAPS, "58331dfd4c1300a3", 142],
-  ["CATEGORY_REFS", CATEGORY_REFS, "8734f8b4ee8d8521", 8],
-  ["REQUIRED_SLOTS", REQUIRED_SLOTS, "3835a7b1f1ce3417", 3],
-
-  // C09 §4 — the alphabets. A spinner frame swapped for another one-cell glyph,
-  // or an ASCII fallback swapped for another ASCII character, passes every width
-  // and distinctness row this repository has.
-  ["SPINNER_SETS", SPINNER_SETS, "8eb8fcab0826b8e0", 26],
-  ["SUBSTITUTIONS", SUBSTITUTIONS, "71fcc16b8ef11716", 38],
-  ["GLYPH_SUBSTITUTIONS", GLYPH_SUBSTITUTIONS, "bd881d6a04811cde", 17],
-  ["GLYPH_TOKENS", GLYPH_TOKENS, "f2ffe9b608503d76", 17],
-
-  // `GLYPH_TABLE` and `BAR_STYLES` are module-private, so they are pinned
-  // through the projections that ship — which is the better subject anyway: what
-  // a caller receives, rather than the literal behind it.
-  ["glyphs(full)", glyphs(FULL), "6ed613b3044a283b", 38],
-  ["glyphs(ascii)", glyphs({ ...FULL, unicode: "ascii" }), "63a0e1d871278aa3", 38],
-  ["barStyles", Object.fromEntries(barStyleNames().map((n) => [n, barStyle(n)])), "4734f4464136cb64", 9],
-];
-
-/**
- * Exported frozen tables in the curated modules that are **derived** and need no
- * pin — each with the reason, because *derived* is a claim and an unstated one
- * reads as an omission.
- */
-const DERIVED: Readonly<Record<string, string>> = {
-  CUBE_LEVELS: "the xterm 256-colour cube's own six levels \u2014 the emulator's, not a choice",
-  NO_STYLE: "the empty Style; its emptiness is the claim and C09 T1.2 asserts it",
-  MARKER3_COLUMN: "C12's 3-D marker column, derived from the braille block's own encoding",
-  DARK: "the ink oracle's frozen palette \u2014 `test/support/ink-oracle.ts` pins it at 1 913 captures",
-  LIGHT: "a lender for the 4-bit rung; the shipped light theme is the registry's",
-  HIGH_CONTRAST: "the same, and T2.39a pins its 4-bit map by reference",
-};
+import { CURATED, DERIVED, MODULES, canonical, entryDiff } from "../support/curated.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const MODULES = [
-  "src/presentation/theme/four-bit.ts",
-  "src/presentation/theme/cvd.ts",
-  "src/presentation/theme/colormap.ts",
-  "src/presentation/theme/categorical.ts",
-  "src/presentation/theme/contrast.ts",
-  "src/presentation/theme/types.ts",
-  "src/presentation/theme/index.ts",
-  "src/presentation/theme/tokens-dark.ts",
-  "src/presentation/theme/tokens-light.ts",
-  "src/presentation/theme/tokens-high-contrast.ts",
-  "src/presentation/blocks/glyphs.ts",
-];
+const PINNED = JSON.parse(
+  readFileSync(resolve(here, "../support/curated-pinned.json"), "utf8"),
+) as Record<string, unknown>;
+const FULL = { unicode: "full", ambiguousWidth: "narrow" } as const;
 
 describe("C10 §2 / C09 §4 — the curated tables", () => {
   it("T2.39 (C10 I44, §2): every curated table is the value it was curated as", () => {
-    // **Both halves of each row.** The digest is the pin; the count is what a
-    // reader checks against the module, and it is what says *which way* a table
-    // moved when the digest fails — a dropped entry and an edited one read the
-    // same from a hash alone.
-    for (const [name, table, want, count] of PINNED) {
-      expect(size(table), `${name}: entry count`).toBe(count);
-      expect(digest(table), `${name}: the curated value — if this is deliberate, re-take it here and say why in the commit`).toBe(want);
+    // **Equality against the pinned file, table by table.** Compared per table
+    // rather than whole so the failure names the table first; `entryDiff` then
+    // names the entries inside it, with old and new beside each other. That
+    // list is the review: a legitimate change reads as a handful of slots, and
+    // a substitution reads as the one slot it touched.
+    const now = canonical();
+    expect(Object.keys(now).sort(), "the pinned set and the curated set are the same set").toEqual(
+      Object.keys(PINNED).sort(),
+    );
+    for (const name of Object.keys(now)) {
+      const moved = entryDiff(PINNED[name], now[name]);
+      expect(
+        moved,
+        `${name} moved. If that was meant, re-take the pin with \`npx tsx tools/curated/pin.ts --write\` and say why in the commit`,
+      ).toEqual([]);
     }
   });
 
@@ -180,7 +102,7 @@ describe("C10 §2 / C09 §4 — the curated tables", () => {
     // equality check over the module's own exports makes the addition
     // compulsory. A table added and named in neither set fails here, with the
     // name it was given.
-    const declared = new Set([...PINNED.map(([n]) => n), ...Object.keys(DERIVED)]);
+    const declared = new Set([...Object.keys(CURATED), ...Object.keys(DERIVED)]);
     const found: string[] = [];
     for (const rel of MODULES) {
       const src = readFileSync(resolve(here, "../..", rel), "utf8");
@@ -199,7 +121,7 @@ describe("C10 §2 / C09 §4 — the curated tables", () => {
     // **Both directions.** A name in `DERIVED` that no module exports any more
     // is an exemption outliving its subject — the shape a subset check lets
     // through, and the reason `compare-exemption-lists-by-equality` exists.
-    // `PINNED` needs no such row: every entry imports its table, so a retired
+    // `CURATED` needs no such row: every entry imports its table, so a retired
     // one fails to compile.
     const stale = Object.keys(DERIVED).filter((n) => !found.includes(n));
     expect(stale, "a derived-table exemption whose table is gone").toEqual([]);
@@ -217,15 +139,12 @@ describe("C10 §2 / C09 §4 — the curated tables", () => {
     // Pinned here because the alternative — a third set of narrow substitutes —
     // was considered and refused, and a future reader finding two identical sets
     // would otherwise reasonably assume a bug.
-    expect(digest(glyphs({ ...FULL, ambiguousWidth: "wide" })), "wide takes the ASCII set").toBe(
-      digest(glyphs({ ...FULL, unicode: "ascii" })),
-    );
-    expect(digest(glyphs(FULL)), "and neither is the full set").not.toBe(
-      digest(glyphs({ ...FULL, unicode: "ascii" })),
-    );
+    const ascii = glyphs({ ...FULL, unicode: "ascii" });
+    expect(glyphs({ ...FULL, ambiguousWidth: "wide" }), "wide takes the ASCII set").toEqual(ascii);
+    expect(glyphs(FULL), "and neither is the full set").not.toEqual(ascii);
 
-    // `DEFAULT_BAR_STYLE` resolves, which is what `DERIVED` claims of it.
-    expect(barStyleNames()).toContain("block");
-    expect(barStyle("block"), "the default resolves to a style").toBeDefined();
+    // And the ASCII rung is pinned, so this row is about *why* two sets agree
+    // rather than a second record of what they hold — T2.39 is that record.
+    expect(Object.keys(CURATED)).toContain("glyphs(ascii)");
   });
 });
