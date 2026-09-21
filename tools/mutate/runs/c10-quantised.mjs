@@ -63,10 +63,31 @@ const results = runPass({
     {
       // **An entry dropped from the generated file.** The theme it served is
       // back on the DP and nothing but the coverage half notices.
-      name: "ENTRY-DROPPED: the light spectrum palette is not in the table",
+      name: "ENTRY-DROPPED: no shipped set is in the table",
       file: TABLE,
-      from: "  // light.palettes.spectrum\n",
-      to: "  // light.palettes.spectrum — dropped\n  \"[]\": Object.freeze({}),\n  // was:\n  // ",
+      // **Anchored on the export, and it is the class at n = 41 rather than at
+      // n = 1.** This dropped one entry, anchored on that entry's comment — and
+      // the comment names which themes share the set, in the order the generator
+      // walks them, so it rewrites whenever a theme is added, renamed or
+      // reordered. It rotted twice in one sitting for reasons that have nothing
+      // to do with a dropped entry, which is `an anchor that names a constant is
+      // not an anchor` in a generated file: there is no stable text in here to
+      // point a single-entry drop at.
+      //
+      // So the mutation is the whole table instead. It is blunter — one missing
+      // entry is the subtle case and this is not it — and it is the same defect:
+      // every shipped theme back on the DP, every colour row still green, and
+      // only the coverage half of T3.73 noticing. What is lost is the *n*, and
+      // what is bought is an anchor made of hand-written text.
+      //
+      // **The first insertion tried here was worse than a rotting anchor**: a
+      // bogus `"[]"` entry beside the real ones, which T3.73 accepts, because
+      // the computation over an empty set is an empty set and the row compares
+      // each entry against its own computation. A mutation that survives is a
+      // finding about the tests — except when the instrument wrote it, and then
+      // it is a finding about the instrument.
+      from: 'export const QUANTISED: Readonly<Record<string, Readonly<Record<string, number>>>> = Object.freeze({\n',
+      to: 'export const QUANTISED: Readonly<Record<string, Readonly<Record<string, number>>>> = Object.freeze({});\nconst DROPPED_QUANTISED = Object.freeze({\n',
       expect: "T3.73",
     },
     {

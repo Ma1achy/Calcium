@@ -98,11 +98,47 @@ const FLOORS: Readonly<Record<string, number>> = Object.freeze({
    * ground with dark ink and needs no exception. Lightening the red to satisfy
    * this number would undo a decision rather than repair an oversight, and §4d
    * carries the figures that say which.
+   *
+   * **RETIRED — and the reasoning above was right about a constraint that no
+   * longer binds** (C10 I32, amended against the design registry, R-THM-001).
+   * The exception existed because ONE value had to be both legible on `bgElev`
+   * and dark enough to hold white, and the cube says no such value exists on a
+   * dark page. The registry does not ask one value to do both: `tone.error` and
+   * `surfaces.errorGround` are authored separately, so dark's tone moves from
+   * `#c62828` to `#f05a5a` — **2.83 against `bgElev` becomes 4.78** — while the
+   * ground keeps `#c62828` and keeps holding white at 5.62.
+   *
+   * **Measured over all ten shipped themes before this was removed**, because a
+   * floor deleted on one theme's evidence is a floor deleted on a guess: the
+   * tightest is `dark` on `bgElev` at **4.78** and every other theme has more
+   * room. `FLOORS` is now empty of tone exceptions and `DEFAULT_FLOOR` governs.
    */
-  error: 2.5,
 });
 
 export const DEFAULT_FLOOR = 4.5;
+
+/**
+ * **The ink a named surface actually takes for a colour reference.**
+ *
+ * A theme may compose a different value for a `(ground, ref)` pairing
+ * (`ThemeTokens.composed`, R-THM-001), and every floor is a claim about the pair
+ * that lands — so measuring the flat slot against a ground the theme composes
+ * away is asserting something the renderer never draws.
+ *
+ * **Exported because three checks in this file and four test rows all need it**,
+ * and the alternative is five copies of one lookup. That is the same argument
+ * `keyText` makes in `keymap.ts`: a second formatter is a second thing to drift —
+ * and it was measured here, in the direction the argument predicts. The three
+ * checks were patched one at a time because each was found only when the previous
+ * one went green, and the tests reimplement the ratio loop rather than call
+ * `validateTokens`, so they kept the birthday clause the src had already lost.
+ */
+export function inkOn(tokens: ThemeTokens, ref: string, surfaceName: string): string {
+  const composed = tokens.composed?.[`surface.${surfaceName}`]?.[ref];
+  if (composed !== undefined) return composed;
+  const [family, slot] = ref.split(".");
+  return (family === undefined || slot === undefined ? undefined : tokens.palettes[family]?.slots[slot]) ?? "";
+}
 
 export function floorFor(slot: string): number {
   return FLOORS[slot] ?? DEFAULT_FLOOR;
@@ -330,7 +366,10 @@ function validateDecorationText(tokens: ThemeTokens): readonly ThemeError[] {
   for (const [palette, slot, surfaceName, hex] of decorationTextPairs(tokens)) {
     const value = tokens.palettes[palette]?.slots[slot];
     if (value === undefined) continue;
-    const measured = ratio(value, hex);
+    // The same composition `validatePalette` honours, for the same reason: the
+    // ink this ground takes is the one that lands on it.
+    const ink = tokens.composed?.[`surface.${surfaceName}`]?.[`${palette}.${slot}`] ?? value;
+    const measured = ratio(ink, hex);
     // **Written as the positive form rather than as `>= DEFAULT_FLOOR` and
     // `continue`**, which is how `validateErrorTag` two functions up says the
     // same thing — and a second copy of that line makes *its* mutation anchor
@@ -359,16 +398,28 @@ function validateDiffSurfaces(tokens: ThemeTokens): readonly ThemeError[] {
     const value = tokens.palettes[palette]?.slots[slot];
     if (value === undefined) continue;
 
+    // The third and last site that must honour composition, and the one that was
+    // missed twice: the other two are `validatePalette` and `validateDecorationText`.
+    // **A floor lives wherever a pair is formed**, so a theme feature that changes
+    // which ink meets a ground has to reach every one of them or it silently holds
+    // a slot to a pairing that is never drawn.
+    const ink = tokens.composed?.[`surface.${surface}`]?.[`${palette}.${slot}`] ?? value;
+
     const floor = floorFor(slot);
-    const measured = ratio(value, hex);
+    const measured = ratio(ink, hex);
     if (measured >= floor) continue;
 
+    // **The remedy changed with composition and the sentence had to.** It read
+    // *the background moves rather than the slot*, which was the only answer when
+    // an ink was one value everywhere; a theme may now move the ink on this ground
+    // alone, and that is the cheaper of the two.
     errors.push({
       path: `palettes.${palette}.${slot}`,
       message:
-        `"${slot}" is ${measured.toFixed(2)} : 1 against ${surface} (${hex}), ` +
-        `below its floor of ${floor} : 1 — a background is a surface text ` +
-        `lands on, so the background moves rather than the slot`,
+        `"${slot}" is ${measured.toFixed(2)} : 1 against ${surface} (${hex})` +
+        `${ink === value ? "" : ` (composed as ${ink})`}, below its floor of ` +
+        `${floor} : 1 — a background is a surface text lands on, so the background ` +
+        `moves, or this theme composes a different ink for this ground`,
     });
   }
 
@@ -466,15 +517,68 @@ export function validateTokens(tokens: ThemeTokens): readonly ThemeError[] {
   const bgs = isHex(tokens.surfaces.bg) && isHex(tokens.surfaces.bgElev) ? textSurfaces(tokens) : [];
 
   for (const [paletteName, palette] of Object.entries(tokens.palettes)) {
-    errors.push(...validatePalette(paletteName, palette, bgs, tokens.surfaces.bg));
+    errors.push(...validatePalette(paletteName, palette, bgs, tokens.surfaces.bg, tokens.composed));
   }
 
   errors.push(...validateRequiredSlots(tokens));
   errors.push(...validateDiffSurfaces(tokens));
   errors.push(...validateErrorTag(tokens));
   errors.push(...validateDecorationText(tokens));
+  errors.push(...validateHighContrast(tokens));
   errors.push(...validateVariant(tokens));
 
+  return Object.freeze(errors);
+}
+
+/**
+ * **R-THM-002 — a theme that promises more than the floor is held to what it
+ * promised.**
+ *
+ * The high-contrast themes are named for a ratio and shipped without one. 7 : 1
+ * lived in a roadmap entry and in a single contract row, which is a claim about
+ * the tokens as they stood rather than a constraint on the ones that follow —
+ * and it went stale the way that shape always does: porting the themes to the
+ * registry left `hcLight` at 6.55 : 1 on `bgElev` for eight refs, below a
+ * promise nothing could read.
+ *
+ * **A separate function rather than a term inside `floorFor`, because it is a
+ * different kind of claim.** `FLOORS` is per slot and says what a *slot* needs;
+ * this is per theme and says what a *theme* undertakes, over every meaning ink
+ * it has and every surface it paints text on. Folding one into the other would
+ * make `floorFor(slot)` answer differently depending on a theme it is not given,
+ * and four call sites would have to start passing one.
+ *
+ * **The greater of the two, so a declared floor can only raise.** A theme
+ * declaring `2` would otherwise weaken `muted`'s own 2.5 — a promise that
+ * promises less is not a promise, and the shape A03 §2 calls vacuous.
+ *
+ * **Composition is honoured**, as everywhere else: a floor is a claim about the
+ * pair that lands, and `hcLight` keeps this promise precisely *by* composing
+ * four darker inks for its elevated ground rather than moving the ground.
+ */
+export function validateHighContrast(tokens: ThemeTokens): readonly ThemeError[] {
+  const promised = tokens.floor;
+  if (promised === undefined) return Object.freeze([]);
+  if (!isHex(tokens.surfaces.bg) || !isHex(tokens.surfaces.bgElev)) return Object.freeze([]);
+
+  const errors: ThemeError[] = [];
+  for (const [paletteName, palette] of Object.entries(tokens.palettes)) {
+    if (palette.carries !== "meaning") continue;
+    for (const slot of Object.keys(palette.slots)) {
+      const need = Math.max(promised, floorFor(slot));
+      for (const [surface, ground] of textSurfaces(tokens)) {
+        const ink = inkOn(tokens, `${paletteName}.${slot}`, surface);
+        if (!isHex(ink)) continue;
+        const measured = ratio(ink, ground);
+        if (measured < need) {
+          errors.push({
+            path: `palettes.${paletteName}.${slot}`,
+            message: `"${slot}" is ${measured.toFixed(2)} : 1 against ${surface} (${ground}), below the ${need} : 1 this theme declares — a theme named for a ratio keeps it on every surface it paints, or it composes an ink for that ground`,
+          });
+        }
+      }
+    }
+  }
   return Object.freeze(errors);
 }
 
@@ -518,6 +622,7 @@ function validatePalette(
   palette: PaletteSpec,
   bgs: readonly (readonly [string, string])[],
   bg: string,
+  composed: ThemeTokens["composed"],
 ): readonly ThemeError[] {
   const errors: ThemeError[] = [];
   const seen = new Map<string, string>();
@@ -559,12 +664,20 @@ function validatePalette(
 
     const floor = floorFor(slot);
     for (const [surfaceName, surface] of bgs) {
-      const measured = ratio(value, surface);
+      // **Measure the ink this ground actually takes, not the flat slot.** Where
+      // the theme composes a different value for `(ground, ref)` that value is
+      // what lands, and holding the flat one to a floor it is never drawn at is
+      // the containment-is-not-correctness shape: an assertion about a pairing
+      // the renderer does not produce. `nord.info` is the case — 4.64 : 1 on
+      // `bg`, 3.74 on `bgElev`, and `#95b5d5` on `bgElev`, which is 4.72.
+      const ink = composed?.[`surface.${surfaceName}`]?.[`${paletteName}.${slot}`] ?? value;
+      const measured = ratio(ink, surface);
       if (measured < floor) {
+        const via = ink === value ? "" : ` (composed as ${ink})`;
         errors.push({
           path,
           message:
-            `"${slot}" is ${measured.toFixed(2)} : 1 against ${surfaceName} (${surface}), ` +
+            `"${slot}" is ${measured.toFixed(2)} : 1 against ${surfaceName} (${surface})${via}, ` +
             `below its floor of ${floor} : 1`,
         });
       }

@@ -205,18 +205,37 @@ describe("C04 §3am.1 — `elide`", () => {
     expect(narrow.length, "shorter, and only in the marked run").toBeLessThan(wide.length);
   });
 
-  it("T2.117 (C04 I106, I109): RAMP_KEYS has six members; a seventh key and animate: sweep are refused by name; a ramped document round-trips through JSON", () => {
-    expect(RAMP_KEYS.size).toBe(6);
-    expect([...RAMP_KEYS].sort()).toEqual(["animate", "bands", "colormap", "fill", "from", "to"]);
-    expect(RAMP_ANIMATIONS).toEqual(["none", "shimmer", "wave", "breathe", "pulse", "heartbeat"]);
+  it("T2.117 (C04 I106, I109, R-MOT-012): RAMP_KEYS has seven members, the union is the registry's twenty-three and `none`, an eighth key is refused by name, and a ramped document round-trips through JSON", () => {
+    expect(RAMP_KEYS.size).toBe(7);
+    expect([...RAMP_KEYS].sort()).toEqual(["animate", "bands", "colormap", "fill", "from", "since", "to"]);
+
+    // **The union written out, not counted.** A count is satisfied by swapping
+    // one member for another, and this list is the design's — twenty-three
+    // effects and `none`, in the registry's gallery order so the two read down
+    // together. T2.117a is what holds it to the registry rather than to this
+    // literal; both are here because the literal is what a reader checks and the
+    // property is what catches a rename.
+    expect(RAMP_ANIMATIONS).toEqual([
+      "none",
+      "shimmer", "wave", "breathe", "pulse", "heartbeat",
+      "sweepbar", "glint", "tide", "flicker", "twinkle", "pendulum",
+      "converge", "marquee", "chase", "neon", "drift", "bookend", "scatter",
+      "sweep", "pop", "wipe", "typewriter", "ripple",
+    ]);
 
     const ramped = (ramp: unknown): unknown => ({ kind: "notice", id: "n", tone: "info", text: "abcdef", spans: [{ from: 0, to: 3, ramp }] });
-    const seventh = validateBlock(ramped({ fill: "palette", period: 200 }));
-    expect(seventh.ok).toBe(false);
-    if (!seventh.ok) expect(seventh.error.join(" ")).toMatch(/unknown member "period" — a ramp carries fill, from, to, colormap, bands, animate and nothing else/u);
+    const eighth = validateBlock(ramped({ fill: "palette", period: 200 }));
+    expect(eighth.ok).toBe(false);
+    if (!eighth.ok) expect(eighth.error.join(" ")).toMatch(/unknown member "period" — a ramp carries fill, from, to, colormap, bands, animate, since and nothing else/u);
+
+    // `sweep` used to be the refused name here, on C04 I109's *an event the render
+    // cannot time*. It ships; a name the design does not carry is what the
+    // refusal has to be shown against now.
     const sweep = validateBlock(ramped({ fill: "gradient", from: "default", to: "accent", animate: "sweep" }));
-    expect(sweep.ok).toBe(false);
-    if (!sweep.ok) expect(sweep.error.join(" ")).toMatch(/"animate" must be one of none, shimmer, wave, breathe, pulse, heartbeat.*C04 I109/u);
+    expect(sweep.ok, "a one-shot the registry declares is legal").toBe(true);
+    const invented = validateBlock(ramped({ fill: "gradient", from: "default", to: "accent", animate: "cascade" }));
+    expect(invented.ok).toBe(false);
+    if (!invented.ok) expect(invented.error.join(" ")).toMatch(/"animate" must be one of none, shimmer, wave.*C04 I109/u);
 
     // §5a — a ramp on every carrier and on the bar survives the round trip.
     const R: Ramp = { fill: "gradient", from: "default", to: "accent", animate: "wave" };

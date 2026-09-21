@@ -265,7 +265,14 @@ describe("C05 contract", () => {
     // `/theme high-contrast` a validation error for a theme the *session holds*,
     // with completion and usage going wrong in the same breath — and every
     // existing test asks for one of the two names such a literal already names.
-    const three = { ...defaultTheme, "high-contrast": defaultTheme["dark"]! };
+    // A literal, for the reason C10 T1.21 gives: the subject is that the enum
+    // takes the *session's* keys, and spreading the shipped set made the row
+    // assert its size too.
+    const three = {
+      dark: defaultTheme["dark"]!,
+      light: defaultTheme["light"]!,
+      "high-contrast": defaultTheme["dark"]!,
+    };
     const parsed = parseManifest(raw());
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;

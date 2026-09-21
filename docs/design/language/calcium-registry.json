@@ -18633,6 +18633,20 @@
    "supersededBy": null,
    "legacyIds": [],
    "contentDigest": "20deaab8a9dcf1cf8665aa2f52dbaff4148673bca86f368d7494eae25a3f3c4d"
+  },
+  {
+   "id": "R-THM-002",
+   "title": "A high-contrast theme keeps 7 : 1, and says so",
+   "text": "The two high-contrast themes hold every meaning ink to 7 : 1 against every surface they paint text on, not to the 4.5 : 1 every other theme meets. A theme that promises more than the common floor declares the floor it promises, because a promise no check can read is a label; hcDark and hcLight declare 7 and are held to it at load, on the same path and by the same code as every other floor. Where a ground costs an ink its margin, the theme composes a darker ink for that ground rather than moving the ground \u2014 an elevated surface a reader cannot tell from the page is the failure the theme exists to prevent.",
+   "status": "current",
+   "sectionKey": "current-contract",
+   "tags": [
+    "contract"
+   ],
+   "supersedes": [],
+   "supersededBy": null,
+   "legacyIds": [],
+   "contentDigest": "f9bb25cf8cbcf1cc444d6204d785c07200c45e80c604c579d97b2aa2659181b6"
   }
  ],
  "sections": [
@@ -23037,7 +23051,7 @@
   },
   {
    "selector": "[data-theme=\"mono\"] .c-accent",
-   "declarations": "color:#fff",
+   "declarations": "color:#f0f0f0",
    "status": "current",
    "ruleIds": [
     "R-THM-001"
@@ -27846,6 +27860,38 @@
   {
    "selector": "[data-theme=\"hcLight\"] .sw:focus-visible,[data-theme=\"hcLight\"] .term:focus-visible,\n[data-theme=\"light\"] .sw:focus-visible,[data-theme=\"light\"] .term:focus-visible,\n[data-theme=\"paper\"] .sw:focus-visible,[data-theme=\"paper\"] .term:focus-visible",
    "declarations": "outline-color:#005fcc",
+   "status": "current",
+   "ruleIds": [
+    "R-THM-001"
+   ]
+  },
+  {
+   "selector": "[data-theme=\"hcLight\"] .bg-bgElev .c-muted,[data-theme=\"hcLight\"] .c-muted.bg-bgElev",
+   "declarations": "color:#4d4d4d",
+   "status": "current",
+   "ruleIds": [
+    "R-THM-001"
+   ]
+  },
+  {
+   "selector": "[data-theme=\"hcLight\"] .bg-bgElev .c-ok,[data-theme=\"hcLight\"] .c-ok.bg-bgElev",
+   "declarations": "color:#005b00",
+   "status": "current",
+   "ruleIds": [
+    "R-THM-001"
+   ]
+  },
+  {
+   "selector": "[data-theme=\"hcLight\"] .bg-bgElev .c-error,[data-theme=\"hcLight\"] .c-error.bg-bgElev",
+   "declarations": "color:#a10000",
+   "status": "current",
+   "ruleIds": [
+    "R-THM-001"
+   ]
+  },
+  {
+   "selector": "[data-theme=\"hcLight\"] .bg-bgElev .c-identifier,[data-theme=\"hcLight\"] .c-identifier.bg-bgElev",
+   "declarations": "color:#00575b",
    "status": "current",
    "ruleIds": [
     "R-THM-001"

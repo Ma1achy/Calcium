@@ -357,19 +357,60 @@ export type RampFill = "gradient" | "step" | "palette";
 export const RAMP_FILLS: readonly RampFill[] = Object.freeze(["gradient", "step", "palette"]);
 
 /**
- * Five loops and `none` (I109). No one-shot — `sweep`, `ripple` — because the
- * render has no birth tick to time an event from; no position effect —
- * `typewriter`, `marquee` — because those change which clusters show and belong
- * beside `elide`, not inside a colour. Timing lives in the effect (C09 §5).
+ * **The registry's twenty-three animated ramps, and `none`** (I109, R-MOT-012).
+ *
+ * **This was five loops, and the sentence excluding the rest is superseded.** It
+ * read: *no one-shot — `sweep`, `ripple` — because the render has no birth tick
+ * to time an event from; no position effect — `typewriter`, `marquee` — because
+ * those change which clusters show*. Both halves are false in this tree. The
+ * clock is injected at `shell/session.ts` and handed down, so a one-shot that
+ * records the tick it began on is timeable by the render exactly as the
+ * spinner's stamp is — `Ramp.since` is that record. And none of these change
+ * which clusters show: every one is a value in `[0, 1]` that the fill is sampled
+ * at, so `typewriter` reveals by *brightening* toward `to` rather than by
+ * withholding a cluster. R-MOT-005 is the constraint that makes that true and it
+ * is the design's own: an animation may change a cell's colour, opacity or
+ * brightness, and nothing else.
+ *
+ * **Five of the twenty-three are one-shots** — `sweep pop wipe typewriter
+ * ripple` — and `RAMP_ONE_SHOTS` is the list. They read `Ramp.since` and hold
+ * their final frame once their duration is past, so `measure` is untouched and
+ * *appearance animates, geometry never does* still holds.
+ *
+ * Ordered as the registry gallery orders them, so a reader comparing the two
+ * lists reads down rather than searching.
  */
-export type RampAnimation = "none" | "shimmer" | "wave" | "breathe" | "pulse" | "heartbeat";
+export type RampAnimation =
+  | "none"
+  // periodic — the five the framework shipped
+  | "shimmer" | "wave" | "breathe" | "pulse" | "heartbeat"
+  // periodic — the thirteen the registry adds
+  | "sweepbar" | "glint" | "tide" | "flicker" | "twinkle" | "pendulum"
+  | "converge" | "marquee" | "chase" | "neon" | "drift" | "bookend" | "scatter"
+  // one-shot — timed from `Ramp.since`, holding the final frame after
+  | "sweep" | "pop" | "wipe" | "typewriter" | "ripple";
+
 export const RAMP_ANIMATIONS: readonly RampAnimation[] = Object.freeze([
   "none",
-  "shimmer",
-  "wave",
-  "breathe",
-  "pulse",
-  "heartbeat",
+  "shimmer", "wave", "breathe", "pulse", "heartbeat",
+  "sweepbar", "glint", "tide", "flicker", "twinkle", "pendulum",
+  "converge", "marquee", "chase", "neon", "drift", "bookend", "scatter",
+  "sweep", "pop", "wipe", "typewriter", "ripple",
+]);
+
+/**
+ * **The five that end** (I109). An animation whose meaning is an event rather
+ * than a state: §037 groups `sweep · pop · wipe` as *terminal* and gives
+ * `typewriter` and `ripple` the semantics *arrived* and *acknowledged*, which are
+ * things that happen once. `marquee` is **not** one of them — §037 says it
+ * *travels and wraps around*, which is periodic by its own description, and an
+ * earlier reading that put it here had it on the strength of the word *travels*.
+ *
+ * A one-shot reads `Ramp.since`: absent, it draws its first frame and stays
+ * there, which is the honest answer for a ramp nobody has started.
+ */
+export const RAMP_ONE_SHOTS: ReadonlySet<RampAnimation> = new Set<RampAnimation>([
+  "sweep", "pop", "wipe", "typewriter", "ripple",
 ]);
 
 /**
@@ -390,10 +431,26 @@ export type Ramp = Readonly<{
   colormap?: ColormapName;
   bands?: number;
   animate?: RampAnimation;
+
+  /**
+   * **The tick a one-shot began on** (I109) — meaningless for the eighteen
+   * periodic effects and ignored by them.
+   *
+   * A tick and not a millisecond, because that is the unit the render already
+   * counts in and `presentation/` may not read a clock. Whoever mints the block
+   * records the tick; the render computes `k − since` and clamps to the final
+   * frame once the effect's duration is past. That is the whole of what I109's
+   * *the render cannot time an event* was missing — not a clock, a stamp.
+   *
+   * Absent on a one-shot means *not started*: the effect draws its frame 0 and
+   * stays there rather than replaying on every render, which is the failure a
+   * one-shot without a stamp would otherwise have.
+   */
+  since?: number;
 }>;
 
 /** The members of a ramp, for a gate that cannot silently take a seventh (I106). */
-export const RAMP_KEYS: ReadonlySet<string> = new Set(["fill", "from", "to", "colormap", "bands", "animate"]);
+export const RAMP_KEYS: ReadonlySet<string> = new Set(["fill", "from", "to", "colormap", "bands", "animate", "since"]);
 
 // --- table ----------------------------------------------------------------
 

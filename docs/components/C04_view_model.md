@@ -2839,11 +2839,44 @@ member to put a ramp in, so that refusal is by type and not by gate. `rule`, `pa
 and plot series are deferred with symbols in design §7, admitted by a consumer appearing and
 never by symmetry — the same rule I88 applies to spans.
 
-**`animate` is a closed union of six, and timing is not a member** (I109). Five loops and
-`none`. A one-shot — `sweep`, `ripple` — is an event and needs a birth tick the render does
-not have (design Q8; the symbol is `RenderContext.since`); `typewriter` and `marquee` change
-which clusters show, a text-window mechanism that belongs beside `elide` and not inside a
-colour. No period and no easing: a caller choosing a period is two callers choosing
+**`animate` is a closed union of twenty-four, and timing is still not a member** (I109,
+R-MOT-012). Twenty-three effects and `none`: eighteen periodic and five one-shots.
+
+**The two exclusions this paragraph carried are both retired, and the second was wrong
+about the mechanism rather than about the cost.** It read: *a one-shot — `sweep`, `ripple`
+— is an event and needs a birth tick the render does not have (design Q8; the symbol is
+`RenderContext.since`); `typewriter` and `marquee` change which clusters show, a
+text-window mechanism that belongs beside `elide` and not inside a colour.*
+
+- **The birth tick exists and always did.** The clock is injected at `shell/session.ts` and
+  handed down, so a one-shot that records the tick it began on is timeable by the render
+  exactly as the spinner's stamp is. **The deferral named its own satisfier and named it in
+  the wrong place**: `RenderContext.since` is one value for a whole frame, and a document
+  may carry two one-shots begun at different moments — the stamp is a property of the
+  effect, so it is `Ramp.since`. A deferral that states its blocker as a symbol is the
+  right habit and it does not make the symbol right.
+- **None of them change which clusters show.** R-MOT-005 is the design's own constraint and
+  it settles this: an animation may change a cell's colour, opacity or brightness and
+  nothing else. `typewriter` reveals by *brightening* toward `to`, cell by cell; `marquee`
+  lights a sliding window. Both are values in `[0, 1]` that the fill is sampled at, so
+  `measure` never sees them and *appearance animates, geometry never does* is untouched.
+  A completed one-shot holds its final frame, so the finished document measures as the
+  unstarted one did.
+
+**`Ramp.since` is a tick and not a millisecond**, because that is the unit the render
+counts in and `presentation/` may not read a clock. Absent on a one-shot means *not
+started*: the effect draws its frame 0 and holds, which is why a one-shot does not replay
+on every render. On a periodic effect it is refused rather than ignored — a stamp nothing
+reads is a field that looks like it does something, which is the shape a reader trusts and
+a check cannot see.
+
+**`marquee` is periodic and an earlier reading had it as a one-shot.** §037 says it
+*travels and wraps around*, which is a loop by its own description; the design's own
+terminal group is `sweep · pop · wipe`, and `typewriter` and `ripple` join them on their
+semantics — *arrived* and *acknowledged*, things that happen once. The word *travels* is
+what carried the mistake.
+
+No period and no easing: a caller choosing a period is two callers choosing
 differently for one meaning, which is the drift the spinner sets already refused (C09 §4),
 and easing is a function, and a function is not serialisable. The static frame is `tick = 0`
 of the same evaluation (C09 §5), so a document with `animate` and one without measure and
@@ -3434,7 +3467,9 @@ split fails rather than passing on a message that reads as covering it.
 - **I106** — **`Ramp` is a closed data type: three fills whose backing arity the gate checks, six keys in `RAMP_KEYS`, no member that can hold a colour value, and `palette` names nothing.** `gradient` and `step` take exactly one of a slot pair or a `colormap`; `palette` takes neither and no `bands`; `bands` is `step`'s alone, an integer in `2..8`. The type is closed to `Tone` and `ColormapName`, so §3's *never embeds a colour* holds by construction. A palette ramp cycles the theme's categorical slots and no other (C10 I16, F837).
 - **I107** — **`TextSpan.ramp` is the ninth member and is appearance only: `measure` never reads it, it replaces the run's foreground colour and nothing else, it is refused beside `value`, and a colormap backing is refused on a span.** A slot pair is bounded by two colours whose floors C10 I26 proves; a sampled colour passes through no floor. The bar's ink reads by area (C10 I31), which is why the same backing is admitted there. The deferral's symbol is a floor-aware lift in `theme/contrast.ts`.
 - **I108** — **`Progress.ramp` is the one block-level carrier; `RAMP_EXTENT` is exhaustive over `BlockKind`, and a kind marked `none` has no member to carry a ramp.** The `on` cells take the ramp over the axis (→ C09), the `off` cells stay `muted`. Every other kind is a deferral with its symbol (`CALCIUM_INK_RAMPS_DESIGN.md` §7), admitted by a consumer appearing and never by symmetry.
-- **I109** — **`RampAnimation` is a closed union of five loops and `none`; period and easing are never members; absent is `none`, and the static frame is `tick = 0` of the same evaluation.** A one-shot is an event and needs a birth tick the render lacks; a position effect is a text window and not a colour. Timing lives in the effect (→ C09), as the spinner's lives in the set.
+- **I109** — *(amended — R-MOT-012, R-MOT-005)* **`RampAnimation` is a closed union of the registry's twenty-three effects and `none` — eighteen periodic and the five that end; period and easing are never members; absent is `none`, and the static frame is `tick = 0` of the same evaluation.** Timing lives in the effect (→ C09), as the spinner's lives in the set. **A one-shot reads `Ramp.since`**, the tick it began on, and holds its final frame once its duration is past — so `measure` is untouched and *appearance animates, geometry never does* still holds. `since` is refused on a periodic effect, because a stamp nothing reads is a field that looks like it does something. **Every effect is a value in `[0, 1]` the fill is sampled at** and none of them decides which clusters show, which is R-MOT-005 and is what retires the old *position effect* exclusion.
+
+  - **I109 (as first written)** — **`RampAnimation` is a closed union of five loops and `none`; period and easing are never members; absent is `none`, and the static frame is `tick = 0` of the same evaluation.** A one-shot is an event and needs a birth tick the render lacks; a position effect is a text window and not a colour. Timing lives in the effect (→ C09), as the spinner's lives in the set. *Both exclusions are false in this tree — the clock is injected and every effect is a colour — and the deferral named `RenderContext.since`, one value per frame, where a document may hold two one-shots begun at different moments.*
 - **I110** — **A `TerminalLine.text` carries no C0 or C1 control, and `validateDocument` refuses a document that breaks it, whatever the source.** The second of two gates — C27 I2 replaces controls at the cell walk — and the one that holds for a far-side envelope and a persisted row, neither of which passed through C27. The renderer does not strip, so this gate is what lets a terminal block carry colour at all: `raw`, which strips, cannot.
 - **I111** — **A `terminal`'s runs are maximal, non-overlapping, ordered, and within the text; a default-styled cell is in no run.** `TextSpan`'s offset convention (I83) and its bounds gate, with one addition: two adjacent runs with equal styles are refused, because merging is the producer's job and a snapshot that fails to merge measures the same and diffs differently on every frame.
 - **I112** — **`cursor`, when present, indexes a line that exists and a column within `cols`; and `measure` never reads it.** Appearance, never geometry — the cursor moves on every keystroke the child receives and a height that moved with it would reflow the transcript.

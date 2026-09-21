@@ -915,13 +915,13 @@ describe("C22 §2b — the completion sources", () => {
     const notices = JSON.stringify(graph.transcript.entries);
     expect(notices, "and the repair still says so").toContain("theme preference ignored");
     // **F215** — the set's own names, not the two literals that outlived C10 I27.
-    expect(notices).toContain("high-contrast");
+    expect(notices).toContain("hcDark");
   });
 
   it("T1.20f (I68): a polarity no theme in the set declares keeps the default, silently", async () => {
     // §6h.2 row 4. The set is the app author's, so a notice would be the
     // framework reporting on their choice to their user.
-    const noLight = { dark: defaultTheme["dark"]!, "high-contrast": defaultTheme["high-contrast"]! };
+    const noLight = { dark: defaultTheme["dark"]!, hcDark: defaultTheme["hcDark"]! };
     const { graph } = await build({
       fs: seeded().fs,
       theme: noLight,

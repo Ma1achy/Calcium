@@ -187,11 +187,33 @@ describe("C10 §4e — span attributes, tier 6", () => {
     expect(kit.renderToLines(ramped, 20)).not.toEqual(kit.renderToLines(plain, 20));
   });
 
-  it("T6.94 (C04 I109): widening RampAnimation with sweep → T2.117's refusal row admits an event the render cannot time", () => {
-    expect(RAMP_ANIMATIONS).not.toContain("sweep");
-    expect(refused(span({ fill: "palette", animate: "sweep" }))).toBe(true);
-    // The union is the record: six members, and the validator's set is built from it.
-    expect(RAMP_ANIMATIONS).toHaveLength(6);
+  it("T6.94 (C04 I109, R-MOT-012): narrowing RampAnimation back to six \u2192 a design effect is refused at the gate", () => {
+    // **This row inverted when I109 did.** It used to assert `sweep` is *not* in
+    // the union — *an event the render cannot time* — and the reason was false in
+    // this tree: the clock is injected and a one-shot that stamps its start is
+    // timeable. R-MOT-012 registers twenty-three effects and all twenty-three
+    // ship, so what has to be shown now is the opposite direction: narrowing the
+    // union refuses a ramp the design draws.
+    expect(RAMP_ANIMATIONS).toContain("sweep");
+    expect(refused(span({ fill: "palette", animate: "sweep" }))).toBe(false);
+
+    // **The union is the record**, and the validator's set is built from it — so
+    // a member removed from the union becomes a refusal at the gate with no
+    // other edit. Asserted as the count *and* as a construction, because a
+    // count alone is satisfied by swapping one member for another.
+    expect(RAMP_ANIMATIONS).toHaveLength(24);
+    expect(refused(span({ fill: "palette", animate: "cascade" as never })), "and a name the design does not carry is still refused").toBe(true);
+  });
+
+  it("T6.95a (C04 I109): dropping the `since` guard \u2192 a periodic ramp takes a stamp nothing reads", () => {
+    // **The revert is a field that looks like it does something.** `since` is a
+    // one-shot's start; on `shimmer` nothing reads it, so a caller who set it
+    // would watch a frame that never responds and have no error to go on. The
+    // guard is what turns that into a construction error at the call site.
+    expect(refused(span({ fill: "gradient", from: "default", to: "accent", animate: "shimmer", since: 3 } as never))).toBe(true);
+    expect(refused(span({ fill: "gradient", from: "default", to: "accent", animate: "sweep", since: 3 } as never))).toBe(false);
+    // And a stamp is a tick: a negative one is a start before the session.
+    expect(refused(span({ fill: "gradient", from: "default", to: "accent", animate: "sweep", since: -1 } as never))).toBe(true);
   });
 
   it("T6.95 (C04 I108): the progress arm dropping its checkRamp call → T1.29's bar half admits every refused ramp; a kind marked none has no member to carry a ramp", () => {

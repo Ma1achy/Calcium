@@ -12,6 +12,7 @@ import {
   type BlockRegistry,
 } from "../../src/presentation/blocks/index.js";
 import { defaultTheme, loadTheme, type ResolvedTheme } from "../../src/presentation/theme/index.js";
+import { DARK as DARK_TOKENS } from "../../src/presentation/theme/tokens-dark.js";
 import { renderSequenceToLines, renderToLines, type RenderOptions } from "../../src/presentation/render-lines.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
@@ -25,6 +26,57 @@ export function themeFor(variant: "dark" | "light"): ResolvedTheme {
 
 export const DARK_THEME = themeFor("dark");
 export const LIGHT_THEME = themeFor("light");
+
+/**
+ * **The tokens Ink drew against, frozen with the captures it produced.**
+ *
+ * `test/support/ink-oracle.ts` says every capture is final, *because the thing
+ * that produced them is not in the tree any more* — and the same sentence is true
+ * of the palette they were captured with. An oracle pinned to the SHIPPED theme
+ * measures the palette as well as the layout, so a token edit reads as a rows-arm
+ * defect: porting C10's themes to the design registry moved four tone values and
+ * turned **1 055 of 1 913 captures red**, none of them about the rows arm.
+ *
+ * **Retirement is the wrong instrument for it.** A retirement is a ruling that
+ * changes what a KIND draws, asserted by the bytes differing, and 1 055 of them
+ * is not a retirement — it is deleting the oracle and calling it a record.
+ *
+ * So the oracle keeps the palette it was captured with. What it pins is unchanged
+ * and is the whole of its purpose: **the rows arm agrees with Ink's layout for
+ * these tokens.** It could never have pinned the shipped palette, because Ink
+ * cannot be asked what it would draw for a colour it never saw.
+ *
+ * `tokens-dark.ts` is that palette. It is no longer the shipped `dark` — the
+ * registry's projection is — and it stays in the tree as this oracle's ground and
+ * as the lender of the palettes the registry does not carry.
+ */
+export const ORACLE_THEME: ResolvedTheme = (() => {
+  // **Resolved, not loaded, and that is the point of the block above.**
+  // `loadTheme` holds a set to the floors as they stand *today*, and this
+  // palette is history: `tone.error` is `#c62828`, which passed under C10 I32's
+  // retired 2.5 exception and is 3.10 against this ground under the 4.5 that
+  // replaced it. Validating it would fail a theme nobody ships and no longer
+  // could — and would fail it for being old rather than for being wrong.
+  //
+  // **What is lost by not calling `loadTheme`, and what replaces it.** The
+  // identity string is `name/variant` at serial 0 (`store.ts:40`), reproduced
+  // here; the row below asserts a *shipped* theme's resolution has exactly these
+  // three keys, so the day `ResolvedTheme` grows a fourth the oracle goes red
+  // rather than quietly resolving to a shape the renderer no longer accepts.
+  const theme: ResolvedTheme = Object.freeze({
+    name: `${DARK_TOKENS.name}/${DARK_TOKENS.variant}`,
+    variant: DARK_TOKENS.variant,
+    tokens: DARK_TOKENS,
+  });
+
+  const shipped = loadTheme(defaultTheme);
+  if (!shipped.ok) throw new Error(`the shipped set does not load: ${JSON.stringify(shipped.error)}`);
+  const want = Object.keys(shipped.value.current).sort().join(",");
+  const have = Object.keys(theme).sort().join(",");
+  if (want !== have) throw new Error(`the oracle's theme is shaped ${have}, a resolution is ${want}`);
+
+  return theme;
+})();
 
 /** A full-capability terminal: truecolour, Unicode, everything available. */
 export const FULL_CAPS: TerminalCapabilities = Object.freeze({

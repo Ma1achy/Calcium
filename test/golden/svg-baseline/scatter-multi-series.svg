@@ -4,21 +4,21 @@
 <line x1="89.6" y1="288" x2="486.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
 <line x1="486.4" y1="12.8" x2="486.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
 <line x1="89.6" y1="12.8" x2="486.4" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
-<text x="83.6" y="292" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">0</text>
-<text x="83.6" y="223.2" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">25</text>
-<text x="83.6" y="154.4" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">50</text>
-<text x="83.6" y="85.6" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">75</text>
-<text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">100</text>
-<text x="89.6" y="300" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">0</text>
-<text x="170.58" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">10</text>
-<text x="251.559" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">20</text>
-<text x="332.539" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">30</text>
-<text x="413.518" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">40</text>
-<text x="486.4" y="300" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">49</text>
+<text x="83.6" y="292" text-anchor="end" font-size="12" font-family="monospace" fill="#8c8c8c">0</text>
+<text x="83.6" y="223.2" text-anchor="end" font-size="12" font-family="monospace" fill="#8c8c8c">25</text>
+<text x="83.6" y="154.4" text-anchor="end" font-size="12" font-family="monospace" fill="#8c8c8c">50</text>
+<text x="83.6" y="85.6" text-anchor="end" font-size="12" font-family="monospace" fill="#8c8c8c">75</text>
+<text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#8c8c8c">100</text>
+<text x="89.6" y="300" text-anchor="start" font-size="12" font-family="monospace" fill="#8c8c8c">0</text>
+<text x="170.58" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#8c8c8c">10</text>
+<text x="251.559" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#8c8c8c">20</text>
+<text x="332.539" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#8c8c8c">30</text>
+<text x="413.518" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#8c8c8c">40</text>
+<text x="486.4" y="300" text-anchor="end" font-size="12" font-family="monospace" fill="#8c8c8c">49</text>
 <rect x="498.4" y="15.2" width="9.6" height="9.6" fill="#e69f00"/>
-<text x="512" y="24.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">setosa</text>
+<text x="512" y="24.8" text-anchor="start" font-size="12" font-family="monospace" fill="#8c8c8c">setosa</text>
 <rect x="498.4" y="34.4" width="9.6" height="9.6" fill="#56b4e9"/>
-<text x="512" y="44" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">virginica</text>
+<text x="512" y="44" text-anchor="start" font-size="12" font-family="monospace" fill="#8c8c8c">virginica</text>
 <circle cx="89.6" cy="150.4" r="3" fill="#e69f00"/>
 <circle cx="97.698" cy="136.663" r="3" fill="#e69f00"/>
 <circle cx="105.796" cy="123.063" r="3" fill="#e69f00"/>

@@ -112,7 +112,7 @@ export function paintRuns(runs: readonly Run[], style: Style, ctx: RunContext): 
     const tick = effectiveTick(ctx.tick, ctx.capabilities);
     clusters.forEach((cluster, i) => {
       const index = at + i;
-      const t = animateT(ramp.animate, extentT(index, of), tick, of, index);
+      const t = animateT(ramp.animate, extentT(index, of), tick, of, index, ramp.since);
       // A palette cycles identities, and on text the identity is the span
       // (C04 §3am.2): the ordinal, not the cluster — per cluster is confetti.
       const sampled = rampStyle(ramp, t, ramp.fill === "palette" ? ordinal : index, ctx.theme, ctx.capabilities);

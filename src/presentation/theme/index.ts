@@ -11,7 +11,7 @@
 
 export { CATEGORY_REFS, refOf } from "./categorical.js";
 export { mixHex, rampStyle, stepOf } from "./ramp.js";
-export { DEFAULT_FLOOR, decorationTextPairs, diffPairs, errorTagPairs, floorFor, isHex, luminance, ratio, selectionPairs, textSurfaces, validateTokens } from "./contrast.js";
+export { DEFAULT_FLOOR, decorationTextPairs, diffPairs, errorTagPairs, floorFor, inkOn, isHex, luminance, ratio, selectionPairs, textSurfaces, validateTokens } from "./contrast.js";
 export { DARK_FOUR_BIT, HIGH_CONTRAST_FOUR_BIT, LIGHT_FOUR_BIT, MUST_STAY_DISTINCT } from "./four-bit.js";
 export { assertPictureGlyph, isPictureGlyph } from "./picture.js";
 export { collisions, separation, OKABE_ITO_CANONICAL, SEPARATION_FLOOR, VISIONS, type Collision, type Vision } from "./cvd.js";
@@ -44,9 +44,7 @@ export {
   type ThemeTokens,
 } from "./types.js";
 
-import { DARK } from "./tokens-dark.js";
-import { HIGH_CONTRAST } from "./tokens-high-contrast.js";
-import { LIGHT } from "./tokens-light.js";
+import { REGISTRY_THEMES } from "./tokens.generated.js";
 import type { ThemeSet } from "./types.js";
 
 /**
@@ -55,11 +53,20 @@ import type { ThemeSet } from "./types.js";
  * reference app awkward for no gain; one that silently picked a theme would hide
  * a decision the app should own.
  */
-export const defaultTheme: ThemeSet = Object.freeze({
-  dark: DARK,
-  light: LIGHT,
-  // **The first consumer of the named set** (I27, roadmap 24). It is a third
-  // *theme* and not a third polarity — it declares `dark` like the first, and a
-  // set keyed by variant could not have held both.
-  "high-contrast": HIGH_CONTRAST,
-});
+/**
+ * **Ten, projected from the design registry** (C10 §2, R-THM-001), which is
+ * normative for these values. `tokens.generated.ts` is the projection and
+ * `make themes` rebuilds it; a hand edit there is a value the design does not hold.
+ *
+ * **`high-contrast` is now `hcDark`, and `hcLight` joins it.** The registry names
+ * the two polarities separately because a high-contrast theme is a promise about a
+ * ratio and a ratio is measured against a ground — one entry could only ever keep
+ * that promise on one of them. The repository's shipped `high-contrast` IS the
+ * registry's `hcDark` bar two diff surfaces, so this is a rename plus a sibling
+ * rather than a replacement.
+ *
+ * I27's point survives intact and is now carried by seven entries rather than one:
+ * these are *themes*, not polarities, and a set keyed by variant could hold at most
+ * two of them.
+ */
+export const defaultTheme: ThemeSet = REGISTRY_THEMES;

@@ -2,7 +2,7 @@
 
 
 
-[38;2;98;98;98m                          Waiting for the first epoch[39m
+[38;2;140;140;140m                          Waiting for the first epoch[39m
 
 
 

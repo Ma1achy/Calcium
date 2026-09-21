@@ -29,21 +29,42 @@ import { QUANTISED } from "../../src/presentation/theme/quantised.generated.js";
 import { caps, DEPTHS, store, SURFACES, TONES, withTone } from "../support/theme.js";
 
 /**
- * **T1.34's fixture: §4f.1's table, recomputed.** The twelve light slots that
- * fail against `bgDeep` — the whole reason the page moved rather than the check.
- * Held as a set with its figures so the row asserts *which* twelve, not *some*:
- * element zero is the degenerate one, and an arm collapsing onto it survives a
- * `.some()`.
+ * **T1.34's fixture: §4f.1's table, recomputed over the shipped ten.** The slots
+ * that fail against `bgDeep` — the whole reason the page moved rather than the
+ * check. Held as a set with its figures so the row asserts *which* slots, not
+ * *some*: element zero is the degenerate one, and an arm collapsing onto it
+ * survives a `.some()`.
+ *
+ * **At three themes this read as one theme in three and it is a polarity.** Of
+ * the ten, the two that fail are `light` and `paper` and both are light; the
+ * seven dark themes clear `bgDeep` because a dark theme's deep ground recesses
+ * *away* from its tones and a light theme's recesses *toward* them. The cell
+ * worth reading is `hcLight`, which is light and clears it anyway — polarity is
+ * the mechanism and headroom is what saves you from it, so a light theme with
+ * ordinary margins is the case, not an outlier.
+ *
+ * **`light`'s twelfth entry went when it came from the registry, and exactly one
+ * slot moved.** `tone.muted` was 2.44 against `bgDeep` and now clears its 2.5;
+ * every other `light` figure here is unchanged to the digit, which is the
+ * measurement saying the registry's `light` and the repository's agreed on all
+ * of it but the one slot. R-THM-001 is the authority for the value either way.
  */
-const LIGHT_FAILS_ON_BGDEEP: readonly (readonly [string, string, number])[] = [
-  ["tone", "muted", 2.44], ["tone", "ok", 4.29], ["tone", "warn", 4.30],
-  ["tone", "info", 4.29], ["tone", "accent", 4.30], ["tone", "identifier", 4.31],
-  ["categorical", "c4", 4.41], ["syntax", "string", 4.29], ["syntax", "comment", 2.89],
-  ["syntax", "number", 4.30], ["syntax", "function", 4.30], ["syntax", "operator", 4.29],
-];
-
+type Fails = readonly (readonly [string, string, number])[];
+const FAILS_ON_BGDEEP: Readonly<Record<string, Fails>> = {
+  light: [
+    ["tone", "ok", 4.29], ["tone", "warn", 4.30],
+    ["tone", "info", 4.29], ["tone", "accent", 4.30], ["tone", "identifier", 4.31],
+    ["categorical", "c4", 4.41], ["syntax", "string", 4.29], ["syntax", "comment", 2.89],
+    ["syntax", "number", 4.30], ["syntax", "function", 4.30], ["syntax", "operator", 4.29],
+  ],
+  paper: [
+    ["tone", "ok", 4.44], ["tone", "warn", 4.26], ["tone", "info", 4.45],
+    ["categorical", "c1", 4.45], ["categorical", "c2", 4.44], ["categorical", "c3", 4.26],
+    ["syntax", "string", 4.44], ["syntax", "number", 4.26], ["syntax", "function", 4.45],
+  ],
+};
 describe("C10 resolution", () => {
-  it("T1.34 (I34, §4f.1): every slot clears its floor on `bg`, and light fails twelve times on `bgDeep`", () => {
+  it("T1.34 (I34, §4f.1): every slot clears its floor on `bg`, and the two ordinary light themes fail on `bgDeep`", () => {
     // **Both halves, because either alone reads as the other's evidence.** The
     // first is why the page can be `bg`; the second is why widening the check to
     // `bgDeep` was the arm not taken, and it is a property of the *theme's*
@@ -66,16 +87,18 @@ describe("C10 resolution", () => {
           if (ratio(hex, tokens.surfaces.bgDeep) < floor) failed.push(`${family}.${slot}`);
         }
       }
-      // **The set, not its first member.** `dark` and `high-contrast` clear
-      // `bgDeep` too, which is exactly what makes the exclusion look harmless.
-      if (name === "light") {
-        expect(failed.sort()).toEqual(LIGHT_FAILS_ON_BGDEEP.map(([f, s]) => `${f}.${s}`).sort());
-        for (const [family, slot, figure] of LIGHT_FAILS_ON_BGDEEP) {
+      // **The set, not its first member.** Eight of the ten clear `bgDeep`, which
+      // is exactly what makes the exclusion look harmless — and what it hides is
+      // a polarity rather than a theme.
+      const expected = FAILS_ON_BGDEEP[name];
+      if (expected !== undefined) {
+        expect(failed.sort(), `${name}'s failing slots`).toEqual(expected.map(([f, sl]) => `${f}.${sl}`).sort());
+        for (const [family, slot, figure] of expected) {
           const hex = tokens.palettes[family]?.slots[slot] ?? "";
-          expect(ratio(hex, tokens.surfaces.bgDeep), `light ${family}.${slot} on bgDeep`).toBeCloseTo(figure, 1);
+          expect(ratio(hex, tokens.surfaces.bgDeep), `${name} ${family}.${slot} on bgDeep`).toBeCloseTo(figure, 1);
         }
       } else {
-        expect(failed, `${name} clears bgDeep too, which is why one theme in three hid this`).toEqual([]);
+        expect(failed, `${name} clears bgDeep too, which is why eight themes in ten hide this`).toEqual([]);
       }
     }
   });
@@ -163,28 +186,30 @@ describe("C10 resolution", () => {
     expect(resolveTone("ok", themes.current, caps(24)).colour).toEqual({ kind: "rgb", hex: "#3c793c" });
   });
 
-  it("T1.7 (I3, §4a): a theme whose error fails its 2.5 floor is rejected, naming error", () => {
-    // **The floor moved and this row moved with it, deliberately.** `error` is
-    // now the `status` tag's foreground *and* its ground (§4a), and those are
-    // held to opposite constraints — readable on the page, dark behind white
-    // text — so at 4.5 the two could share a hue and never a value. The slot
-    // sits at `muted`'s 2.5, and what still protects the word is
-    // `errorTagPairs`, which checks white on the ground at the full 4.5.
+  it("T1.7 (I3, §4a): a theme whose error fails the 4.5 floor is rejected, naming error", () => {
+    // **The exception is retired and this row moved back with it.** `error` held
+    // a floor of 2.5 because C10 I32 made the tag's foreground and its ground the
+    // *same* slot, and those are held to opposite constraints — readable on the
+    // page, dark behind white text — so one value had to serve both. R-THM-001
+    // splits them: `tone.error` is the ink and `surface.errorGround` is the
+    // ground, each held to 4.5 against what it actually sits on. Nothing needs
+    // the exception any more, and the tightest `tone.error` across the ten
+    // shipped themes is 4.78 (`dark` on `bgElev`), so nothing is close to it.
     //
     // **Both directions, because a floor that moved has to be shown to have
-    // moved.** `#c62828` is 2.97 against `bg` and 2.83 against `bgElev` — it
-    // failed at 4.5 and passes at 2.5, which is the whole of the change. The
-    // fabricated violation moved down with it, or this row would assert a check
-    // nothing can fail (A03 §2): `#3a2422` is 1.21 and still looks like a red
-    // someone might plausibly choose.
-    expect(loadTheme(withTone("error", "#c62828")).ok, "the shipped red passes at 2.5").toBe(true);
+    // moved.** `#ef5350` is 4.99 against `bg` and 4.56 against `bgElev` and
+    // passes; `#c62828` — the red the 2.5 exception was written for — is 3.10
+    // and 2.83 and now fails. That is the whole of the change, and the
+    // fabricated violation is a colour the repository actually shipped rather
+    // than one chosen to be obviously bad (A03 §2).
+    expect(loadTheme(withTone("error", "#ef5350")).ok, "a red clearing 4.5 loads").toBe(true);
 
-    const loaded = loadTheme(withTone("error", "#3a2422"));
+    const loaded = loadTheme(withTone("error", "#c62828"));
     expect(loaded.ok).toBe(false);
     if (!loaded.ok) {
       const text = loaded.error.map((e) => `${e.path}: ${e.message}`).join("\n");
       expect(text).toMatch(/error/);
-      expect(text).toMatch(/below its floor of 2\.5/);
+      expect(text).toMatch(/below its floor of 4\.5/);
     }
   });
 
@@ -460,8 +485,16 @@ describe("C10 resolution", () => {
     // **The case a variant-keyed store could not express.** `identity()` puts
     // the name first, so two dark themes differ — and the switch is by name,
     // which is what stops one of them being unreachable.
+    // **Three members written out, not the shipped set plus one.** The subject
+    // is the store's keying, and spreading `defaultTheme` made the row assert
+    // the shipped set's *size* as a side effect — which is C10 I27's other half
+    // and moved the day the set grew to ten. A literal cannot drift.
     const dark = defaultTheme["dark"]!;
-    const three = { ...defaultTheme, "high-contrast": { ...dark, name: "hc" } };
+    const three = {
+      dark,
+      light: defaultTheme["light"]!,
+      "high-contrast": { ...dark, name: "hc" },
+    };
 
     const loaded = loadTheme(three, "dark");
     expect(loaded.ok).toBe(true);

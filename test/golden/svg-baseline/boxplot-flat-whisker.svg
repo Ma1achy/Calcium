@@ -4,15 +4,15 @@
 <line x1="89.6" y1="288" x2="614.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
 <line x1="614.4" y1="12.8" x2="614.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
 <line x1="89.6" y1="12.8" x2="614.4" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
-<text x="89.6" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">0</text>
-<text x="352" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">5</text>
-<text x="614.4" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">10</text>
+<text x="89.6" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#8c8c8c">0</text>
+<text x="352" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#8c8c8c">5</text>
+<text x="614.4" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#8c8c8c">10</text>
 <clipPath id="isvgb-0"><rect x="0" y="46.667" width="83.6" height="24"/></clipPath>
-<text x="83.6" y="62.667" text-anchor="end" clip-path="url(#isvgb-0)" font-size="12" font-family="monospace" fill="#626262">capped</text>
+<text x="83.6" y="62.667" text-anchor="end" clip-path="url(#isvgb-0)" font-size="12" font-family="monospace" fill="#8c8c8c">capped</text>
 <clipPath id="isvgb-1"><rect x="0" y="138.4" width="83.6" height="24"/></clipPath>
-<text x="83.6" y="154.4" text-anchor="end" clip-path="url(#isvgb-1)" font-size="12" font-family="monospace" fill="#626262">floored</text>
+<text x="83.6" y="154.4" text-anchor="end" clip-path="url(#isvgb-1)" font-size="12" font-family="monospace" fill="#8c8c8c">floored</text>
 <clipPath id="isvgb-2"><rect x="0" y="230.133" width="83.6" height="24"/></clipPath>
-<text x="83.6" y="246.133" text-anchor="end" clip-path="url(#isvgb-2)" font-size="12" font-family="monospace" fill="#626262">both</text>
+<text x="83.6" y="246.133" text-anchor="end" clip-path="url(#isvgb-2)" font-size="12" font-family="monospace" fill="#8c8c8c">both</text>
 <path d="M142.08 58.667 L247.04 58.667" fill="none" stroke="#e69f00" stroke-width="2"/>
 <path d="M561.92 58.667 L561.92 58.667" fill="none" stroke="#e69f00" stroke-width="2"/>
 <rect x="141.58" y="44.907" width="1" height="27.52" fill="#e69f00"/>
@@ -31,5 +31,5 @@
 <rect x="456.46" y="228.373" width="1" height="27.52" fill="#3cbf9a"/>
 <rect x="247.04" y="214.613" width="209.92" height="55.04" fill="#3cbf9a" fill-opacity="0.35" stroke="#3cbf9a" stroke-width="1.5"/>
 <rect x="351" y="214.613" width="2" height="55.04" fill="#3cbf9a"/>
-<polygon points="352,239.733 354.4,242.133 352,244.533 349.6,242.133" fill="#3cbf9a" stroke="#626262" stroke-width="0.75"/>
+<polygon points="352,239.733 354.4,242.133 352,244.533 349.6,242.133" fill="#3cbf9a" stroke="#8c8c8c" stroke-width="0.75"/>
 </svg>

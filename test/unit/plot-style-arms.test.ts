@@ -26,7 +26,7 @@ const ceilingOf = (series: readonly { values: readonly (number | null)[] }[], ca
 
 import { rainColumns } from "../../src/presentation/plot/kde.js";
 import { quadrantGlyph } from "../../src/presentation/plot/linedraw.js";
-import { FULL_CAPS, MONO_UNICODE_CAPS, measurable } from "../support/render.js";
+import { DARK_THEME, FULL_CAPS, MONO_UNICODE_CAPS, measurable } from "../support/render.js";
 
 const kit = (caps = FULL_CAPS) => measurable({ definitions: [plotDefinition], capabilities: caps });
 const plain = (l: string): string => l.replace(/\x1b\[[0-9;]*m/gu, "");
@@ -293,7 +293,14 @@ describe("SA6 (C12 I43): a radar's line arm draws in the alphabet that connects"
     // frame's own three quadrants as foreign. Derived from the colour of the
     // fully collapsed render rather than named by position: any cell it draws
     // in a series slot is an artefact of the collapse.
-    const MUTED_SLOT = "98;98;98";
+    // **Derived from the theme, not copied from a frame.** This read
+    // `"98;98;98"` — the dark theme's `tone.muted` at the time, written as an
+    // SGR triple and acting as a classifier for *which cells are frame*. When
+    // the registry moved `muted` to `#8c8c8c` the constant stopped naming the
+    // frame and 239 cells read as corrupted, which is the row failing for a
+    // reason it is not about.
+    const mutedHex = DARK_THEME.tokens.palettes["tone"]?.slots["muted"] ?? "";
+    const MUTED_SLOT = [1, 3, 5].map((i) => String(parseInt(mutedHex.slice(i, i + 2), 16))).join(";");
     const corrupted = new Set<string>();
     hollowRaw(-1).forEach((l, r) => {
       let slot = "";

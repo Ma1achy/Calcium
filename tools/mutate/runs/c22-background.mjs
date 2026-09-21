@@ -31,7 +31,15 @@ const PAINT = "src/shell/paint.ts";
 const RESOLVE = "src/presentation/theme/resolve.ts";
 const HANDLERS = "src/shell/local/handlers.ts";
 const FRAMEWORK = "src/data/manifest/framework.ts";
-const LIGHT = "src/presentation/theme/tokens-light.ts";
+// **Re-pointed at `tokens.generated.ts` 2026-09-21, because the file this named
+// stopped being the subject.** `tokens-dark.ts`, `tokens-light.ts` and
+// `tokens-high-contrast.ts` were the shipped themes; since M2 the shipped set is
+// the registry's projection and those three are a frozen oracle and a lender of
+// palettes the registry does not carry. Mutating one changes nothing any row
+// measures — **the control went blind and the harness said so**, which is the
+// one failure mode a mutation report cannot show you, because an uncaught live
+// mutant and a blind harness produce the same clean page.
+const LIGHT = "src/presentation/theme/tokens.generated.ts";
 const ESCAPES = "src/terminal/escapes.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
@@ -170,8 +178,11 @@ const MUTATIONS = [
     // sets dark foregrounds and emits nothing behind them.
     name: "the light theme inherits again",
     file: LIGHT,
-    from: '  background: "surface",',
-    to: '  background: "terminal",',
+    // Scoped by the theme's own header, because `background: "surface"` is now
+    // four themes' answer and an unqualified anchor would mutate whichever came
+    // first in the file.
+    from: '    name: "Light",\n    variant: "light",\n    background: "surface",',
+    to: '    name: "Light",\n    variant: "light",\n    background: "terminal",',
     expect: "T1.17",
   },
 ];

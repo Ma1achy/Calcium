@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { patchDefinition } from "../../src/presentation/patch/index.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
-import { defaultTheme, diffPairs, floorFor, ratio } from "../../src/presentation/theme/index.js";
+import { defaultTheme, diffPairs, floorFor, inkOn, ratio} from "../../src/presentation/theme/index.js";
 import { hunkOf, patchOf, THE_ILLUSTRATION } from "../support/blocks.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, MONO_CAPS, measurable, visible } from "../support/render.js";
 import { underlinedRuns } from "../support/underline.js";
@@ -135,7 +135,13 @@ describe("C25 integration", () => {
     // joins this row rather than passing it by.
     for (const [variant, tokens] of Object.entries(defaultTheme)) {
       for (const [palette, slotName, surface, hex] of diffPairs(tokens)) {
-        const value = tokens.palettes[palette]?.slots[slotName] as string;
+        // **`inkOn`, not the flat slot** — R-THM-001 lets a theme compose a
+        // different ink for a given ground, and a floor is a claim about the
+        // pair that *lands*. Written the flat way this row went red on `nord`'s
+        // `syntax.keyword` at 4.31 while `loadTheme` passed, which is a test
+        // reimplementing a rule and keeping a clause the rule no longer has:
+        // nord composes `#be9ab7` on `diffAdd` and that is what the patch draws.
+        const value = inkOn(tokens, `${palette}.${slotName}`, surface);
         expect(ratio(value, hex), `${variant} ${palette}.${slotName} on ${surface}`).toBeGreaterThanOrEqual(
           floorFor(slotName),
         );

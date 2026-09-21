@@ -138,6 +138,45 @@ export type ThemeTokens = Readonly<{
   palettes: Readonly<Record<string, PaletteSpec>>;
   surfaces: Surfaces;
   fourBit: FourBitMap;
+
+  /**
+   * **Ink composed with the ground it lands on** — `surface.<name>` to
+   * `<palette>.<slot>` to the hex that pairing takes, overriding the flat slot
+   * (R-THM-001, *"including composed ink-on-surface values"*).
+   *
+   * **A flat tone cannot clear every ground, and measuring it against one it is
+   * never drawn on is measuring a pair the design does not compose.** `nord` is
+   * the case: its `info` is 4.64 : 1 against `bg` and 3.74 : 1 against `bgElev`,
+   * and the registry supplies `#95b5d5` for exactly that pairing, which measures
+   * 4.72. Four of its tones work this way, and 71 such pairings ship across nine
+   * themes. Without this the choice is a theme below its floor or a tone dulled
+   * on the ground where it was already fine.
+   *
+   * Optional, and absent means *no pairing differs* rather than *none was
+   * considered* — a theme whose flat slots clear every ground needs no entry.
+   */
+  composed?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+
+  /**
+   * **The ratio this theme promises, when it promises more than the common
+   * floor** (R-THM-002).
+   *
+   * `FLOORS` names the minimum *every* theme must clear, so before this field a
+   * theme that promised more had no way to declare it and no way to be held to
+   * it — which left `high-contrast` as a name and one contract row as the only
+   * thing standing between that name and nothing. The promise is the theme's, so
+   * this is where it goes: `hcDark` and `hcLight` declare `7`, every meaning ink
+   * of theirs is checked against every surface they paint text on at that
+   * number, and the check runs on the same path as every other floor.
+   *
+   * It raises floors and never lowers them. A value below a slot's own floor
+   * would be a theme promising less than the framework's minimum, which is not a
+   * promise, and `validateHighContrast` takes the greater of the two.
+   *
+   * Optional, and absent means *this theme promises the common floor* — which is
+   * what nine of the ten shipped themes do.
+   */
+  floor?: number;
 }>;
 
 /**

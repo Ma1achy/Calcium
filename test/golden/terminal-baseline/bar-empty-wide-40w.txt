@@ -1,7 +1,7 @@
 ── bar · empty · wide · 40w
 
 
-[38;2;98;98;98m                No data.[39m
+[38;2;140;140;140m                No data.[39m
 
 
 

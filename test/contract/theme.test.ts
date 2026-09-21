@@ -13,6 +13,7 @@ import {
   validateTokens,
   selectionPairs,
   floorFor,
+  inkOn,
   ratio,
   resolve,
   resolveBackground,
@@ -217,16 +218,24 @@ describe("C10 contract", () => {
     let checked = 0; // cells-ok — a pair count
     for (const [variant, tokens] of SHIPPED) {
       for (const [palette, slot, surface, hex] of decorationTextPairs(tokens)) {
-        const value = tokens.palettes[palette]?.slots[slot] ?? "";
-        const measured = ratio(value, hex);
+        // `inkOn`, not the flat slot: a theme may compose a different ink for this
+        // ground (R-THM-001), and a floor is a claim about the pair that lands.
+        const measured = ratio(inkOn(tokens, `${palette}.${slot}`, surface), hex);
         expect(measured, `${variant} ${palette}.${slot} on ${surface}`).toBeGreaterThanOrEqual(4.5);
         if (measured < tightest.measured) tightest = { pair: `${variant} ${palette}.${slot} on ${surface}`, measured };
         checked += 1; // cells-ok — a pair count
       }
     }
     expect(checked, "eight slots on two surfaces on every shipped theme").toBe(8 * 2 * SHIPPED.length);
-    expect(tightest.pair).toBe("light categorical.c4 on bgElev");
-    expect(tightest.measured).toBeCloseTo(4.74, 2);
+    // **The tightest pair moved theme and got very much tighter.** It was
+    // `light categorical.c4 on bgElev` at 4.74 — 5% of headroom, and the answer
+    // to *would anything notice if it stopped clearing*. Over the registry's ten
+    // it is `nord categorical.c4 on bgElev` at **4.5010**, which is 0.02% of
+    // headroom: the design cut this one to the floor rather than above it. It
+    // clears, and it is worth naming that it clears by a fifth of a thousandth,
+    // because the next figure recorded here will be the one that does not.
+    expect(tightest.pair).toBe("nord categorical.c4 on bgElev");
+    expect(tightest.measured).toBeCloseTo(4.5010, 3);
   });
 
   /**
@@ -421,10 +430,13 @@ describe("C10 contract", () => {
         if (palette.carries !== "meaning") continue;
 
         for (const [slot, value] of Object.entries(palette.slots)) {
-          for (const surface of [tokens.surfaces.bg, tokens.surfaces.bgElev]) {
+          // **By NAME as well as value**, because composition is keyed on the
+          // surface's name — `textSurfaces` yields both and the literal pair did not.
+          for (const [surfaceName, surface] of textSurfaces(tokens)) {
+            const ink = inkOn(tokens, `${name}.${slot}`, surfaceName);
             expect(
-              ratio(value, surface),
-              `${variant} ${name}.${slot} (${value}) against ${surface}`,
+              ratio(ink, surface),
+              `${variant} ${name}.${slot} (${value}${ink === value ? "" : ` composed ${ink}`}) against ${surface}`,
             ).toBeGreaterThanOrEqual(floorFor(slot));
           }
         }
@@ -489,9 +501,10 @@ describe("C10 contract", () => {
     // requirement, not a compromise on it.
     for (const [variant, tokens] of SHIPPED) {
       for (const slot of SYNTAX_SLOTS) {
-        const value = tokens.palettes["syntax"]!.slots[slot]!;
-        for (const surface of [tokens.surfaces.bg, tokens.surfaces.bgElev]) {
-          expect(ratio(value, surface), `${variant} syntax.${slot}`).toBeGreaterThanOrEqual(floorFor(slot));
+        for (const [surfaceName, surface] of textSurfaces(tokens)) {
+          const ink = inkOn(tokens, `syntax.${slot}`, surfaceName);
+          expect(ratio(ink, surface), `${variant} syntax.${slot} on ${surfaceName}`)
+            .toBeGreaterThanOrEqual(floorFor(slot));
         }
       }
     }
@@ -602,8 +615,7 @@ describe("C10 contract", () => {
     for (const [variant, tokens] of SHIPPED) {
       for (const [palette, slot, surface, hex] of diffPairs(tokens)) {
         checked += 1;
-        const value = tokens.palettes[palette]?.slots[slot];
-        const measured = ratio(value as string, hex);
+        const measured = ratio(inkOn(tokens, `${palette}.${slot}`, surface), hex);
         const floor = floorFor(slot);
         if (measured < floor) {
           failures.push(`${variant} ${palette}.${slot} on ${surface}: ${measured.toFixed(2)} < ${floor}`);
@@ -620,54 +632,90 @@ describe("C10 contract", () => {
     expect(failures, failures.join("\n")).toEqual([]);
   });
 
-  it("T2.24 (roadmap 24): high-contrast keeps its own promise, which the framework cannot", () => {
-    // **The promise is 7 : 1 and it is nowhere expressible.** `FLOORS` is a
-    // module constant naming the *minimum* every theme must clear, so a theme
-    // that promises more has no way to declare it and no way to be held to it —
-    // which makes this row the only thing standing between "high-contrast" and a
-    // name. Asserted here rather than in the tokens, because a value that meets
-    // a target and a value that was nudged past one are the same value.
-    const hc = defaultTheme["high-contrast"];
-    expect(hc, "the set holds it").toBeDefined();
-    if (hc === undefined) return;
-
+  it("T2.24 (I43, roadmap 24, R-THM-002): both high-contrast themes keep the floor they declare", () => {
+    // **The promise is 7 : 1 and it used to be nowhere expressible.** `FLOORS`
+    // is a module constant naming the *minimum* every theme must clear, so a
+    // theme that promised more had no way to declare it and no way to be held to
+    // it — which made this row the only thing standing between "high-contrast"
+    // and a name.
+    //
+    // **That is exactly how it went stale.** A claim asserted in one row against
+    // the tokens as they stood is not a constraint on the tokens that follow:
+    // porting the themes to the registry left `hcLight` at 6.55 : 1 on `bgElev`
+    // for eight refs, under a promise nothing could read. R-THM-002 registers
+    // the ratio in the design and `ThemeTokens.floor` makes it declarable, so
+    // `validateHighContrast` refuses it at load like every other floor.
+    //
+    // **So this row's subject moved and is sharper for it.** It no longer *is*
+    // the check — it asserts the themes declare the floor, that the declaration
+    // is what the check reads, and the three things a floor cannot say: that
+    // `muted` is still recessive, that the tones stay distinct, and where the
+    // claim stops.
+    const HC = ["hcDark", "hcLight"] as const;
     const PROMISE = 7;
-    const failures: string[] = [];
-    for (const [name, palette] of Object.entries(hc.palettes)) {
-      if (palette.carries !== "meaning") continue;
-      for (const [slot, value] of Object.entries(palette.slots)) {
-        for (const [surface, ground] of textSurfaces(hc)) {
-          const measured = ratio(value, ground);
-          if (measured < PROMISE) {
-            failures.push(`${name}.${slot} on ${surface}: ${measured.toFixed(2)} < ${PROMISE}`);
+
+    for (const name of HC) {
+      const hc = defaultTheme[name];
+      expect(hc, `the set holds ${name}`).toBeDefined();
+      if (hc === undefined) continue;
+
+      // **The declaration, not a literal in this file.** A row that carried its
+      // own 7 would agree with itself for ever — which is what the first
+      // version of this did.
+      expect(hc.floor, `${name} declares what it promises`).toBe(PROMISE);
+      expect(validateTokens(hc), `${name} keeps it`).toEqual([]);
+
+      // And the sweep, so the row says which pair is tightest rather than only
+      // that none failed. `hcLight` sits exactly on the floor, because it was
+      // composed to.
+      let tightest = { pair: "", measured: Number.POSITIVE_INFINITY };
+      for (const [palette, spec] of Object.entries(hc.palettes)) {
+        if (spec.carries !== "meaning") continue;
+        for (const slot of Object.keys(spec.slots)) {
+          for (const [surface, ground] of textSurfaces(hc)) {
+            const measured = ratio(inkOn(hc, `${palette}.${slot}`, surface), ground);
+            if (measured < tightest.measured) tightest = { pair: `${palette}.${slot} on ${surface}`, measured };
           }
         }
       }
+      expect(tightest.measured, `${name} tightest: ${tightest.pair}`).toBeGreaterThanOrEqual(PROMISE);
+
+      // **`muted` is the slot this theme exists to answer** — 2.14–2.42 on the
+      // light variant against every candidate wash, under its own 2.5 floor, and
+      // recorded during the selection work as a reason not to pair it. Named
+      // rather than left to the sweep above, because the sweep passing does not
+      // say which slot was in question.
+      const muted = hc.palettes["tone"]?.slots["muted"];
+      expect(ratio(muted!, hc.surfaces.bg), `${name} muted, the quietest slot here`)
+        .toBeGreaterThanOrEqual(PROMISE);
+
+      // And it is still recessive: quieter than `dim`, which is quieter than
+      // `default`. A promise that flattened the three would have bought the
+      // floor by losing what the tones are for — which is the risk the moment
+      // you start darkening inks to clear a ratio, and is why it is asserted on
+      // both themes rather than on the one that was darkened.
+      const tone = (slot: string): number => ratio(hc.palettes["tone"]!.slots[slot]!, hc.surfaces.bg);
+      expect(tone("muted"), `${name}: muted under dim`).toBeLessThan(tone("dim"));
+      expect(tone("dim"), `${name}: dim under default`).toBeLessThan(tone("default"));
+
+      // **And they stay ten**, on the ground they were composed for. Darkening
+      // four inks toward a floor is exactly the edit that converges a palette,
+      // and a ratio check cannot see two slots arriving at one colour.
+      const onElev = Object.keys(hc.palettes["tone"]!.slots)
+        .map((slot) => inkOn(hc, `tone.${slot}`, "bgElev"));
+      expect(new Set(onElev).size, `${name}: ten tones on bgElev, still ten colours`).toBe(onElev.length);
+
+      // **The rung where the claim stops.** At 4-bit the values are the
+      // emulator's, so contrast is unprovable and only distinctness survives —
+      // which is what the curated map promises instead (C10 I26).
+      const five = ["ok", "warn", "error", "info", "accent"].map((t) => hc.fourBit[`tone.${t}`]);
+      expect(new Set(five).size, `${name}: distinctness is what this depth can keep`).toBe(5);
     }
-    expect(failures, failures.join("\n")).toEqual([]);
 
-    // **`muted` is the slot this theme exists to answer** — 2.14–2.42 on the
-    // light variant against every candidate wash, under its own 2.5 floor, and
-    // recorded during the selection work as a reason not to pair it. Named
-    // rather than left to the sweep above, because the sweep passing does not
-    // say which slot was in question.
-    const muted = hc.palettes["tone"]?.slots["muted"];
-    expect(ratio(muted!, hc.surfaces.bg), "muted, the quietest slot here").toBeGreaterThanOrEqual(
-      PROMISE,
-    );
-
-    // And it is still recessive: quieter than `dim`, which is quieter than
-    // `default`. A promise that flattened the three would have bought the floor
-    // by losing what the tones are for.
-    const tone = (slot: string): number => ratio(hc.palettes["tone"]!.slots[slot]!, hc.surfaces.bg);
-    expect(tone("muted")).toBeLessThan(tone("dim"));
-    expect(tone("dim")).toBeLessThan(tone("default"));
-
-    // **The rung where the claim stops.** At 4-bit the values are the
-    // emulator's, so contrast is unprovable and only distinctness survives —
-    // which is what the curated map promises instead (C10 I26).
-    const five = ["ok", "warn", "error", "info", "accent"].map((t) => hc.fourBit[`tone.${t}`]);
-    expect(new Set(five).size, "distinctness is what this depth can keep").toBe(5);
+    // **And nothing else declares one**, so the field is not drifting into a
+    // second way of writing the ordinary floor.
+    const declaring = Object.entries(defaultTheme).filter(([, t]) => t.floor !== undefined).map(([n]) => n);
+    expect(declaring.sort(), "only the two themes named for a ratio declare one").toEqual([...HC].sort());
   });
 
   it("T2.14b (I22): the diff surfaces are paired with exactly those twelve slots", () => {
@@ -696,21 +744,45 @@ describe("C10 contract", () => {
     expect([...new Set(pairs.map(([, , surface]) => surface))].sort()).toEqual(["diffAdd", "diffRemove"]);
   });
 
-  it("T2.14e (C10 I32, §4d): the tag's ground IS `tone.error`, in every theme", () => {
-    // **Two hex literals that must agree is a pair waiting to drift**, and this
-    // one drifted four times in one sitting — hue 0 against hue 9, then a
-    // hue-matched ground that read brick, then a tone the loader refused, then a
-    // ground and a tone one lightness step apart. Every round was two numbers
-    // being tuned toward each other by eye.
+  it("T2.14e (C10 I32, §4d, R-THM-001): the tag's ground and the tone are two values, each held to its own pair", () => {
+    // **The equality is retired and this row is its inverse.** I32 made
+    // `surfaces.errorGround` take `tone.error`'s own value because two hex
+    // literals that must agree is a pair waiting to drift — and it drifted four
+    // times in one sitting before the equality settled it. What the equality
+    // cost was the floor: one value serving as ink on the page *and* as a ground
+    // behind white text cannot clear 4.5 in both directions, so `error` got a
+    // 2.5 exception and kept it.
     //
-    // They are one colour and this is what says so. The rule, the message and
-    // the tag's ground are the same value by assertion rather than by
-    // agreement, so a change to either has to be a change to both.
+    // R-THM-001 splits them, and the split is strictly better: `tone.error` is
+    // ink and clears 4.5 against the grounds it lands on, `surfaces.errorGround`
+    // is a ground and holds `errorInk` at 4.5, and the exception is retired
+    // across all ten themes with the tightest tone at 4.78 (`dark` on `bgElev`).
+    //
+    // **The drift hazard the equality answered is answered differently now.**
+    // Not by the two values being one, but by each being measured against what
+    // it actually sits on — `validateTokens` for the tone, `errorTagPairs` for
+    // the pair — so a change to either is caught by the check that owns it
+    // rather than by an assertion that they match.
+    let same = 0; // cells-ok — a theme count
     for (const [variant, tokens] of SHIPPED) {
-      expect(tokens.surfaces.errorGround, `${variant}: ground is the tone`).toBe(
-        tokens.palettes.tone?.slots["error"],
-      );
+      const tone = tokens.palettes.tone?.slots["error"];
+      const ground = tokens.surfaces.errorGround;
+      const ink = tokens.surfaces.errorInk;
+      expect(tone, `${variant}: a tone`).toBeDefined();
+      expect(ground, `${variant}: a ground`).toBeDefined();
+
+      // The ground holds its ink, which is the pair the tag draws.
+      expect(ratio(ink, ground), `${variant}: the tag's own pair`).toBeGreaterThanOrEqual(4.5);
+      if (tone === ground) same += 1; // cells-ok — a theme count
     }
+
+    // **Two themes still have them equal and it is not a leftover.** `hcDark`
+    // and `hcLight` are the high-contrast pair, where the tone is already loud
+    // enough to be a ground — so the equality survives where it is a
+    // consequence of the palette rather than a constraint on it, which is the
+    // whole of what changed. Asserted as a count so it cannot silently become
+    // ten again.
+    expect(same, "the equality is a consequence in two themes, not a rule in ten").toBe(2);
   });
 
   it("T2.14f (C10 I32, §4d): the tag's own check fires, and it reads both halves from `surfaces`", () => {
@@ -754,11 +826,24 @@ describe("C10 contract", () => {
     }
   });
 
-  it("T2.14c (C10 I22, §4a, §4b, §4d): ten surfaces, and the withdrawn strong pair is absent", () => {
+  it("T2.14c (C10 I22, §4a, §4b, §4d, R-THM-001): twenty-five surfaces, and the withdrawn strong pair is absent", () => {
     // The pair that was specified, measured and removed. Asserted absent rather
     // than merely unmentioned: a spec that measured something out and a token
     // file that quietly kept it is exactly the drift this suite exists to stop,
     // and an unused surface with no floor behind it is what someone reaches for.
+    //
+    // **Ten became twenty-five and the count is still the row's whole subject.**
+    // R-THM-001 assigns fifteen more, every one of which the design draws — the
+    // focus ground, the four selection-adjacent ground/ink pairs, the skip pair,
+    // the meter fill and the four mode grounds with their shared ink. A ground
+    // and its ink are both surfaces, which is the placement `errorInk` already
+    // had (§4d): an ink put in `tone` would be measured against `bg`, where a
+    // black ink for a red ground fails every floor for a pairing nothing draws.
+    //
+    // **`.bg-error` is not a twenty-sixth.** The registry carries it as a second
+    // name for `.bg-errorGround` with the same declaration in all ten themes,
+    // and `surface.error` beside `tone.error` is two colours reachable by one
+    // word. The generator drops the alias and asserts the two are equal first.
     for (const [variant, tokens] of SHIPPED) {
       const names = Object.keys(tokens.surfaces).sort();
       expect(names, variant).toEqual([
@@ -767,6 +852,10 @@ describe("C10 contract", () => {
         "bgElev",
         "border",
         "borderStrong",
+        // R-THM-001 — the chosen/pick/link triple: three grounds a reader can be
+        // pointed at, each with an ink of its own rather than borrowing one.
+        "chosen",
+        "chosenInk",
         "diffAdd",
         "diffRemove",
         // §4a — the error tag's pair. **Two entries, and they are one thing**:
@@ -775,9 +864,30 @@ describe("C10 contract", () => {
         // arrive alone. Sorted order puts the ground before the ink.
         "errorGround",
         "errorInk",
+        // R-THM-001 — the ground focus takes, which C10 §4c's *the shipped
+        // default paints nothing* had no room for. M3's precedence stack is what
+        // consumes it.
+        "focusGround",
+        "link",
+        "linkInk",
+        // R-THM-001 — the four mode grounds and the one ink they share. The ink
+        // is shared because the four grounds are chosen to hold it, which is a
+        // property of the set rather than of any one of them.
+        "mAccept",
+        "mAuto",
+        "mInk",
+        "mManual",
+        "mPlan",
+        // R-THM-001 — a fill rather than a ground: the part of a meter that is
+        // full, which carries no text and is paired with nothing.
+        "meterFill",
+        "pick",
+        "pickInk",
         // §4b — the selection wash. A text-bearing surface with a pairing of
         // its own (`selectionPairs`), not an eighth entry in the diff one.
         "selection",
+        "skipGround",
+        "skipInk",
       ]);
     }
   });
@@ -864,19 +974,60 @@ describe("C10 §4j — the categorical separation debt", () => {
    * directions: a new pair fails this row and a repaired one fails it too.
    */
   const DEBT: Readonly<Record<string, readonly string[]>> = {
-    light: [
+    "dark": [
+      "protan c2/c5 5.4", "deutan c1/c6 6.3", "deutan c2/c5 3.4", "tritan c1/c7 6.8",
+      "tritan c2/c3 1.5", "tritan c2/c5 6.5", "tritan c3/c5 5.1",
+    ],
+    "light": [
       "protan c1/c4 2.6", "deutan c1/c4 0.6", "deutan c1/c6 3.5", "deutan c4/c6 4.0",
       "tritan c1/c7 5.3", "tritan c2/c3 5.1", "tritan c6/c7 6.5",
     ],
-    dark: [
+    "hcDark": [
       "protan c2/c5 5.4", "deutan c1/c6 6.3", "deutan c2/c5 3.4", "tritan c1/c7 6.8",
       "tritan c2/c3 1.5", "tritan c2/c5 6.5", "tritan c3/c5 5.1",
     ],
-    "high-contrast": [
-      "protan c2/c5 5.4", "deutan c1/c6 6.3", "deutan c2/c5 3.4", "tritan c1/c7 6.8",
-      "tritan c2/c3 1.5", "tritan c2/c5 6.5", "tritan c3/c5 5.1",
+    "hcLight": [
+      "protan c1/c4 5.9", "protan c2/c3 5.4", "protan c3/c7 4.9", "deutan c1/c6 3.8",
+      "deutan c2/c3 2.5", "deutan c3/c7 6.2", "deutan c4/c5 4.4", "tritan c1/c5 6.8",
+      "tritan c2/c5 3.6",
+    ],
+    "ink": [
+      "protan c2/c3 6.2", "protan c3/c6 4.9", "deutan c1/c4 5.4", "deutan c2/c7 2.4",
+      "deutan c3/c6 2.3", "tritan c1/c5 3.1", "tritan c6/c7 2.2",
+    ],
+    "warm": [
+      "protan c1/c4 5.3", "protan c2/c3 5.4", "protan c2/c6 3.8", "protan c3/c6 3.5",
+      "protan c7/c8 4.5", "deutan c1/c4 1.9", "deutan c2/c6 6.9", "deutan c2/c7 2.4",
+      "deutan c3/c6 1.8", "tritan c1/c5 3.9", "tritan c3/c6 4.0", "tritan c4/c8 6.7",
+      "tritan c6/c7 6.4",
+    ],
+    "nord": [
+      "protan c1/c4 3.7", "protan c2/c3 6.4", "protan c2/c6 4.0", "protan c3/c6 6.4",
+      "protan c4/c8 5.8", "protan c5/c8 3.8", "deutan c2/c7 4.2", "deutan c3/c6 4.7",
+      "deutan c4/c8 3.4", "deutan c5/c8 4.1", "deutan c6/c7 5.5", "tritan c2/c8 2.0",
+      "tritan c6/c7 5.3",
+    ],
+    "viol": [
+      "protan c1/c4 4.7", "protan c4/c8 5.6", "deutan c1/c6 2.3", "deutan c2/c7 4.7",
+      "deutan c4/c5 2.8", "tritan c1/c2 3.9", "tritan c1/c5 5.5", "tritan c2/c5 5.5",
+      "tritan c3/c4 5.6", "tritan c4/c7 6.1",
+    ],
+    "mono": [
+      "normal c1/c2 4.5", "normal c1/c8 4.3", "normal c2/c3 6.1", "normal c2/c5 3.1",
+      "normal c3/c5 3.0", "normal c4/c8 4.0", "normal c6/c7 3.0", "protan c1/c2 4.5",
+      "protan c1/c8 4.3", "protan c2/c3 6.1", "protan c2/c5 3.1", "protan c3/c5 3.0",
+      "protan c4/c8 4.0", "protan c6/c7 3.0", "deutan c1/c2 4.5", "deutan c1/c8 4.3",
+      "deutan c2/c3 6.1", "deutan c2/c5 3.1", "deutan c3/c5 3.0", "deutan c4/c8 4.0",
+      "deutan c6/c7 3.0", "tritan c1/c2 4.5", "tritan c1/c8 4.3", "tritan c2/c3 6.1",
+      "tritan c2/c5 3.1", "tritan c3/c5 3.0", "tritan c4/c8 4.0", "tritan c6/c7 3.0",
+    ],
+    "paper": [
+      "deutan c1/c4 2.2", "deutan c1/c5 6.6", "deutan c3/c7 1.4", "deutan c4/c5 4.8",
+      "tritan c1/c5 1.7", "tritan c1/c6 5.4", "tritan c3/c4 3.1", "tritan c5/c6 5.6",
     ],
   };
+
+
 
   it("T2.38 (I39, §4j): every shipped theme's collisions are its debt list exactly", () => {
     // The variant set itself, by equality — a theme added with no entry would
@@ -891,11 +1042,32 @@ describe("C10 §4j — the categorical separation debt", () => {
         .toEqual(DEBT[variant]);
     }
 
-    // **`high-contrast` ships `dark`'s list and not a list of the same length.**
-    // The theme exists to maximise distinguishability and its palette is the
-    // dark theme's, so the two are asserted identical rather than separately
+    // **`hcDark` ships `dark`'s list and not a list of the same length.** The
+    // theme exists to maximise distinguishability and its categorical palette is
+    // the dark theme's, so the two are asserted identical rather than separately
     // correct — a divergence in either is a finding about a deliberate copy.
-    expect(DEBT["high-contrast"], "the same pairs, not merely as many").toEqual(DEBT["dark"]);
+    // `hcLight` is *not* in this pair and has a list of its own, which is the
+    // half the old three-theme set could not show: the high-contrast themes are
+    // two palettes, not one palette in two polarities.
+    expect(DEBT["hcDark"], "the same pairs, not merely as many").toEqual(DEBT["dark"]);
+    expect(DEBT["hcLight"], "and the light half is its own palette").not.toEqual(DEBT["dark"]);
+
+    // **`mono` collides in `normal` vision and that is the theme working.** It
+    // is the only entry here whose list carries `normal` rows, because its eight
+    // categorical slots are eight greys and ΔE2000 between two greys is a
+    // lightness difference — there is no hue left to separate them with. Seven
+    // pairs under the floor in ordinary vision is not debt a repair could clear;
+    // it is what a monochrome theme costs, and `classes` is where a monochrome
+    // theme carries meaning instead (I16). Named so the row is not read as
+    // eight themes with debt and one with a defect.
+    expect(
+      DEBT["mono"]!.filter((c) => c.startsWith("normal")).length,
+      "mono is the only theme that collides before any dichromacy",
+    ).toBe(7);
+    for (const [name, list] of Object.entries(DEBT)) {
+      if (name === "mono") continue;
+      expect(list.filter((c) => c.startsWith("normal")), `${name} separates in normal vision`).toEqual([]);
+    }
 
     // The control. Without it a floor of seven and a floor of seventy are the
     // same rule here: every shipped palette fails both.

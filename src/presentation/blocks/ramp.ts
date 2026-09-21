@@ -71,30 +71,109 @@ const PULSE_TICKS = 10;
 const HEARTBEAT: readonly number[] = Object.freeze([1, 0.5, 0, 1, 0.5, 0, 0, 0, 0, 0, 0, 0]);
 const SHIMMER_HALF_WIDTH = 1.5;
 
+/** §037's *seconds apart*: the band passes, then the extent rests for 60 ticks. */
+const GLINT_REST = 60;
+/** §037's *a slow swell*: two and a half times `breathe`, so the two do not read alike. */
+const TIDE_TICKS = 50;
+/** Two periods with no common factor, which is how *never repeating* is spelled in integers. */
+const DRIFT_A = 37;
+const DRIFT_B = 53;
+/** §037's *unsteady, irregular, **low***: the amplitude is the word `low`. */
+const FLICKER_CEILING = 0.35;
+/** §037's *a chase of three points*. */
+const CHASE_POINTS = 3;
+/** `flicker, settle, flicker, settle` — two bursts and two rests, in ticks. */
+const NEON: readonly number[] = Object.freeze([1, 0.2, 0.9, 0.1, 1, 1, 1, 1, 0.3, 1, 1, 1, 1, 1, 1, 1]);
+/** How long a one-shot runs before it holds its final frame, beyond the extent it crosses. */
+const POP_TICKS = 6;
+const RIPPLE_TICKS = 12;
+
+/**
+ * **A deterministic hash, because a frame must be reproducible.**
+ *
+ * Four of these effects are *irregular* by their own description — `flicker`,
+ * `twinkle`, `scatter`, and `neon`'s jitter — and an RNG would make every golden
+ * frame a different frame. So irregularity is a function of `(i, k)`: the same
+ * cell at the same tick is the same value on every machine and in every run,
+ * and it still has no pattern a reader can predict. This is the same trade
+ * `drift` makes with two incommensurable periods, one integer arithmetic and one
+ * trigonometric.
+ */
+function hash01(a: number, b: number): number {
+  let h = (Math.imul(a | 0, 0x27d4eb2d) ^ Math.imul(b | 0, 0x165667b1)) >>> 0;
+  h ^= h >>> 15;
+  h = Math.imul(h, 0x2545f491) >>> 0;
+  h ^= h >>> 13;
+  return (h >>> 0) / 0x100000000;
+}
+
+/** A triangular band of half-width `w` centred on `c`, at cell `i`: 1 at the centre, 0 outside. */
+function band(i: number, c: number, w: number): number {
+  return Math.max(0, 1 - Math.abs(i - c) / w);
+}
+
+/** How far the extent is into a one-shot, or `undefined` while it has not started. */
+function shotProgress(since: number | undefined, k: number, ticks: number): number | undefined {
+  if (since === undefined) return 0;
+  const elapsed = k - Math.floor(since);
+  if (elapsed <= 0) return 0;
+  return elapsed >= ticks ? undefined : elapsed / ticks;
+}
+
 /**
  * `t' = f(t, tick, n)` — the one term an effect adds before the fill is sampled
- * (I53). `tick = 0` is the static frame. Every effect is periodic, because the
- * render has no birth tick: a one-shot is an event and is not in the union
- * (C04 I109).
+ * (I53). `tick = 0` is the static frame.
+ *
+ * **Eighteen of the twenty-three arrived with the design registry**, and five of
+ * those are one-shots, which C04 I109 said could not exist here. They can: the
+ * render has no birth tick of its own, and it does not need one, because the
+ * block carries the tick it began on (`Ramp.since`). A one-shot with no stamp
+ * draws its first frame and stays there — not its last, because *unstarted* and
+ * *finished* are different facts and only one of them has happened.
  *
  * | effect | `t'` | period |
  * |---|---|---|
- * | `shimmer` | a band of half-width 1.5 cells whose centre moves one cell per tick; the ramp is the band's profile — `from` at rest, `to` at the peak | `n + 3` ticks |
+ * | `shimmer` | a band of half-width 1.5 whose centre moves one cell per tick; the ramp is the band's profile | `n + 3` ticks |
  * | `wave` | the ramp translates one cell per tick and wraps | `n` ticks |
  * | `breathe` | `½(1 + sin 2π·tick/20)`, constant across the extent | 20 ticks |
  * | `pulse` | two states, five ticks each | 10 ticks |
  * | `heartbeat` | two beats front-loaded, then rest | 12 ticks |
+ * | `sweepbar` | `shimmer`'s band with an exponential trail behind it — the leading edge is hard, the wake decays | `n + 3` ticks |
+ * | `glint` | one band pass, then 60 ticks of rest | `n + 3 + 60` |
+ * | `tide` | `breathe` given a position phase, so the swell travels | 50 ticks |
+ * | `flicker` | `hash(0, tick)` scaled to `[0, 0.35]`, constant across the extent | aperiodic |
+ * | `twinkle` | per cell, `hash(i, tick)` thresholded — independent points | aperiodic |
+ * | `pendulum` | a band whose centre is a triangle wave over the extent | `2(n − 1)` ticks |
+ * | `converge` | two bands, one from each edge, meeting at the centre | `⌈n/2⌉ + 3` |
+ * | `marquee` | a rectangular window of width `n/3` sliding and wrapping | `n` ticks |
+ * | `chase` | three narrow bands evenly spaced, all moving one cell per tick | `n` ticks |
+ * | `neon` | a sixteen-tick envelope: two bursts of jitter, then steady | 16 ticks |
+ * | `drift` | two sines at 37 and 53 ticks — no common period inside any session | ≈37·53 ticks |
+ * | `bookend` | `converge` reversed: the edges arrive first and the centre last | `⌈n/2⌉ + 3` |
+ * | `scatter` | each cell lights in a hashed order within one pass | `n + 3` ticks |
+ * | `sweep` | **one-shot** — a band crosses once; after, every cell at `to` | `n + 3` then held |
+ * | `pop` | **one-shot** — one flash, then rest | 6 ticks then held |
+ * | `wipe` | **one-shot** — a hard edge crosses once; after, every cell changed | `n` then held |
+ * | `typewriter` | **one-shot** — cells brighten one per tick, inline-start first | `n` then held |
+ * | `ripple` | **one-shot** — a ring expands from the centre, then rest | 12 ticks then held |
  */
-export function animateT(effect: RampAnimation | undefined, t: number, tick: number, n: number, i: number): number {
+export function animateT(
+  effect: RampAnimation | undefined,
+  t: number,
+  tick: number,
+  n: number,
+  i: number,
+  since?: number,
+): number {
   const k = Math.max(0, Math.floor(tick));
+  const span = Math.max(1, n);
   switch (effect) {
     case undefined:
     case "none":
       return t;
     case "shimmer": {
-      const period = Math.max(1, n) + 3;
-      const centre = (k % period) - SHIMMER_HALF_WIDTH;
-      return Math.max(0, 1 - Math.abs(i - centre) / SHIMMER_HALF_WIDTH);
+      const period = span + 3;
+      return band(i, (k % period) - SHIMMER_HALF_WIDTH, SHIMMER_HALF_WIDTH);
     }
     case "wave": {
       const shift = n <= 1 ? 0 : (k % n) / n;
@@ -107,6 +186,144 @@ export function animateT(effect: RampAnimation | undefined, t: number, tick: num
       return k % PULSE_TICKS < PULSE_TICKS / 2 ? 0 : 1;
     case "heartbeat":
       return HEARTBEAT[k % HEARTBEAT.length] ?? 0; // cells-ok — an envelope length
+
+    // --- the thirteen periodic effects the registry adds ---------------------
+    case "sweepbar": {
+      // A hard leading edge and a wake: ahead of the band nothing, behind it a
+      // decay. §035's *active progress* — the trail is what says the fill is
+      // being worked through rather than merely lit.
+      const period = span + 3;
+      const head = (k % period) - SHIMMER_HALF_WIDTH;
+      if (i > head) return 0;
+      return Math.max(0, 1 - (head - i) / (span / 2 + 1));
+    }
+    case "glint": {
+      // One pass, then the extent rests. The rest is the effect: §037 calls it
+      // *rare*, and a band that never stops is `shimmer`.
+      const pass = span + 3;
+      const phase = k % (pass + GLINT_REST);
+      if (phase >= pass) return 0;
+      return band(i, phase - SHIMMER_HALF_WIDTH, SHIMMER_HALF_WIDTH);
+    }
+    case "tide":
+      // `breathe` with a position term, so the swell has an end it starts from.
+      return 0.5 * (1 + Math.sin(2 * Math.PI * (k / TIDE_TICKS - t)));
+    case "flicker":
+      // Constant across the extent — an unstable *connection* is one fact about
+      // the whole run, not a property of each cell.
+      return hash01(0, k) * FLICKER_CEILING;
+    case "twinkle":
+      // Per cell and independent, which is the difference from `flicker`: many
+      // small things, each with its own state.
+      return hash01(i, Math.floor(k / 2)) > 0.8 ? 1 : 0;
+    case "pendulum": {
+      // A triangle wave, so it reverses at the ends rather than wrapping —
+      // *searching*, and a search that wrapped would be a scan.
+      const sweepSpan = Math.max(1, span - 1);
+      const phase = k % (2 * sweepSpan);
+      const centre = phase <= sweepSpan ? phase : 2 * sweepSpan - phase;
+      return band(i, centre, SHIMMER_HALF_WIDTH);
+    }
+    case "converge": {
+      // Both ends toward the middle. The distance travelled is half the extent,
+      // so the period is half `shimmer`'s — which is what *closing in* reads as.
+      const half = Math.ceil(span / 2);
+      const phase = k % (half + 3);
+      const from = phase - SHIMMER_HALF_WIDTH;
+      return Math.max(band(i, from, SHIMMER_HALF_WIDTH), band(i, span - 1 - from, SHIMMER_HALF_WIDTH));
+    }
+    case "marquee": {
+      // A window, not a band: `marquee` is content that does not fit, so what
+      // moves is a run rather than a highlight. It wraps, which is §037's own
+      // word and is why this is not a one-shot.
+      const width = Math.max(1, Math.round(span / 3));
+      const start = k % span;
+      const offset = (i - start + span) % span;
+      return offset < width ? 1 : 0;
+    }
+    case "chase": {
+      // Three points, evenly spaced, all moving together — *streaming*, where the
+      // spacing is what makes the direction readable at a glance.
+      const gap = span / CHASE_POINTS;
+      let best = 0;
+      for (let p = 0; p < CHASE_POINTS; p += 1) {
+        const centre = (k + p * gap) % span;
+        best = Math.max(best, band(i, centre, 1));
+        // The wrap seam: a point half off the end is half on the start.
+        best = Math.max(best, band(i, centre - span, 1));
+      }
+      return best;
+    }
+    case "neon":
+      // An envelope rather than a hash, because *flicker, settle* is a shape and
+      // not noise: the settling is the part that reads as connecting.
+      return NEON[k % NEON.length] ?? 1; // cells-ok — an envelope length
+    case "drift": {
+      // Two sines whose periods share no factor. It repeats after 37·53 = 1 961
+      // ticks, which at the spinner cadence is minutes — *never repeating* for
+      // any run that will see it, and honest about being periodic underneath.
+      const a = Math.sin((2 * Math.PI * k) / DRIFT_A);
+      const b = Math.sin((2 * Math.PI * k) / DRIFT_B + t * Math.PI);
+      return 0.5 * (1 + (a + b) / 2);
+    }
+    case "bookend": {
+      // `converge` run backwards: the edges land first. *Converging* is what the
+      // registry calls it, and the difference from `converge` is which end of
+      // the motion you are watching.
+      const half = Math.ceil(span / 2);
+      const period = half + 3;
+      const phase = period - 1 - (k % period);
+      const from = phase - SHIMMER_HALF_WIDTH;
+      return Math.max(band(i, from, SHIMMER_HALF_WIDTH), band(i, span - 1 - from, SHIMMER_HALF_WIDTH));
+    }
+    case "scatter": {
+      // Each cell has a place in a hashed order and lights when the pass reaches
+      // it — *one glyph at a time, irregular*. Hashed on `i` alone, so the order
+      // is stable within a pass rather than re-rolled every tick.
+      const period = span + 3;
+      const place = Math.floor(hash01(i, 0) * period);
+      return (k % period) === place ? 1 : 0;
+    }
+
+    // --- the five one-shots --------------------------------------------------
+    case "sweep": {
+      // A band crosses once. Finished, every cell sits at `to`: *done* is a state
+      // and the frame that shows it is the full one.
+      const p = shotProgress(since, k, span + 3);
+      if (p === undefined) return 1;
+      return band(i, p * (span + 3) - SHIMMER_HALF_WIDTH, SHIMMER_HALF_WIDTH);
+    }
+    case "pop": {
+      // One flash, then it settles — so the resting frame is 0 and not 1, which
+      // is the difference between *arrived once* and *done*.
+      const p = shotProgress(since, k, POP_TICKS);
+      if (p === undefined) return 0;
+      return 1 - p;
+    }
+    case "wipe": {
+      // A hard edge, not a band: *cleanly*. Behind it the new state, ahead of it
+      // the old, and afterwards the whole run is the new one.
+      const p = shotProgress(since, k, span);
+      if (p === undefined) return 1;
+      return i <= p * span ? 1 : 0;
+    }
+    case "typewriter": {
+      // Cells brighten one per tick from inline-start. It reveals by brightening
+      // and never by withholding a cluster, which is what keeps it inside
+      // R-MOT-005 and out of `measure`'s way.
+      const p = shotProgress(since, k, span);
+      if (p === undefined) return 1;
+      return i <= p * span ? 1 : 0;
+    }
+    case "ripple": {
+      // A ring leaving the centre, once. *Acknowledged* — it says a thing was
+      // received, and then there is nothing more to say, so it rests at 0.
+      const p = shotProgress(since, k, RIPPLE_TICKS);
+      if (p === undefined) return 0;
+      const centre = (span - 1) / 2;
+      const radius = p * (centre + 1);
+      return band(Math.abs(i - centre), radius, 1);
+    }
   }
 }
 

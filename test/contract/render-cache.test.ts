@@ -18,6 +18,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildGraph } from "../support/session.js";
+import { defaultTheme } from "../../src/presentation/theme/index.js";
 import { baselineOf } from "../../src/shell/cameras.js";
 import { CAMERA_DEFAULT } from "../../src/data/viewmodel/index.js";
 import type { InputEvent } from "../../src/interaction/router/types.js";
@@ -233,13 +234,23 @@ describe("C22 §6c — the cache's C13 arms", () => {
     let resized = 0;
     graph.lifecycle.onResize(() => { resized += 1; });
 
+    const opened = graph.theme.current.name;
     graph.theme.setTheme("light");
     resize({ columns: 120, rows: 40 });
 
     // **Both events asserted to have happened**, or the row is an identity
     // check across nothing — a `setTheme` that silently no-opped and a resize
     // the fake swallowed would leave it green and vacuous.
-    expect(graph.theme.current.name, "the theme moved").toBe("prism/light");
+    // **The identity it moved *to*, not a literal.** This read `"prism/light"`
+    // — the shipped light theme's `name` at the time, copied here and acting as
+    // a classifier, so porting the themes to the registry turned a cache row
+    // red for a reason the row is not about. What it needs is that the identity
+    // changed and that the new one is the light theme's, which is two facts the
+    // store can be asked for.
+    expect(graph.theme.current.name, "the theme moved").not.toBe(opened);
+    expect(graph.theme.current.name, "and it moved to the light theme").toBe(
+      `${defaultTheme["light"]!.name}/light`,
+    );
     expect(resized, "and the resize was delivered").toBeGreaterThan(0);
 
     expect(graph.capabilities, "the same record, not an equal one").toBe(before);

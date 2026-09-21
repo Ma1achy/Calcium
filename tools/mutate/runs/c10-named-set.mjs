@@ -26,7 +26,15 @@ const PARSE = "src/data/manifest/parse.ts";
 const CONSTRUCT = "src/shell/construct.ts";
 const HANDLERS = "src/shell/local/handlers.ts";
 const CONTRACT = "test/contract/theme.test.ts";
-const HC = "src/presentation/theme/tokens-high-contrast.ts";
+// **Re-pointed at `tokens.generated.ts` 2026-09-21, because the file this named
+// stopped being the subject.** `tokens-dark.ts`, `tokens-light.ts` and
+// `tokens-high-contrast.ts` were the shipped themes; since M2 the shipped set is
+// the registry's projection and those three are a frozen oracle and a lender of
+// palettes the registry does not carry. Mutating one changes nothing any row
+// measures — **the control went blind and the harness said so**, which is the
+// one failure mode a mutation report cannot show you, because an uncaught live
+// mutant and a blind harness produce the same clean page.
+const HC = "src/presentation/theme/tokens.generated.ts";
 const FOURBIT = "src/presentation/theme/four-bit.ts";
 const INDEX = "src/presentation/theme/index.ts";
 
@@ -156,8 +164,8 @@ const MUTATIONS = [
     // that would be the only thing between "high-contrast" and a name.
     name: "high-contrast's quietest slot meets the floor and not the promise",
     file: HC,
-    from: '        muted: "#9f9f9f",',
-    to: '        muted: "#767676",',
+    from: '          "muted": "#9f9f9f",',
+    to: '          "muted": "#767676",',
     expect: "T2.24",
   },
   {
@@ -166,8 +174,8 @@ const MUTATIONS = [
     // sweep alone cannot catch it and the ordering assertion is why it is there.
     name: "the recessive greys are flattened into the promise",
     file: HC,
-    from: '        muted: "#9f9f9f",',
-    to: '        muted: "#ffffff",',
+    from: '          "muted": "#9f9f9f",',
+    to: '          "muted": "#ffffff",',
     expect: "T2.24",
   },
   {
@@ -182,10 +190,18 @@ const MUTATIONS = [
   {
     // **The theme declared but not shipped**, which is entry 24's own residue
     // restored: a mechanism with no consumer.
+    //
+    // **Re-anchored onto the export rather than onto a literal in the set.** The
+    // set used to be written out in `index.ts` and the anchor named one of its
+    // lines; it is generated from the registry now, so the line is in a
+    // generated file where an anchor rots for reasons that have nothing to do
+    // with this defect. `defaultTheme`'s assignment is hand-written, is the one
+    // place the shipped set is decided, and narrowing it there is the same
+    // mechanism in the same words.
     name: "the set holds two themes again",
     file: INDEX,
-    from: '  "high-contrast": HIGH_CONTRAST,',
-    to: "",
+    from: "export const defaultTheme: ThemeSet = REGISTRY_THEMES;",
+    to: 'export const defaultTheme: ThemeSet = Object.freeze({ dark: REGISTRY_THEMES["dark"]!, light: REGISTRY_THEMES["light"]! });',
     expect: "T2.24",
   },
 ];

@@ -22,10 +22,12 @@ import {
   type KnownBlockKind,
   type DocumentStatus,
   type Glyph,
+  type RampAnimation,
   COLORMAP_NAMES,
   RAMP_ANIMATIONS,
   RAMP_FILLS,
   RAMP_KEYS,
+  RAMP_ONE_SHOTS,
   TONES,
   HAS_CALLOUT,
   HAS_HIDEABLE_SERIES,
@@ -1178,7 +1180,7 @@ function checkRamp(value: unknown, e: string[], where: string, onSpan: boolean):
   }
   for (const key of Object.keys(value)) {
     if (!RAMP_KEYS.has(key)) {
-      e.push(`${where}: unknown member "${key}" — a ramp carries fill, from, to, colormap, bands, animate and nothing else (C04 I106)`);
+      e.push(`${where}: unknown member "${key}" — a ramp carries fill, from, to, colormap, bands, animate, since and nothing else (C04 I106)`);
       return;
     }
   }
@@ -1244,8 +1246,25 @@ function checkRamp(value: unknown, e: string[], where: string, onSpan: boolean):
     }
   }
   if (animate !== undefined && (typeof animate !== "string" || !RAMP_ANIMATION_SET.has(animate))) {
-    e.push(`${where}: "animate" must be one of ${RAMP_ANIMATIONS.join(", ")} — a one-shot is an event the render cannot time (C04 I109)`);
+    e.push(`${where}: "animate" must be one of ${RAMP_ANIMATIONS.join(", ")} (C04 I109, R-MOT-012)`);
     return;
+  }
+
+  // **`since` belongs to a one-shot and to nothing else** (I109). On a periodic
+  // effect it is a stamp nothing reads — a field that looks like it does
+  // something and does not, which is the shape a reader trusts and a check
+  // cannot see. Refused rather than ignored, so the mistake arrives at the call
+  // site instead of at a frame that quietly never moves.
+  const since = value["since"];
+  if (since !== undefined) {
+    if (typeof since !== "number" || !Number.isFinite(since) || since < 0) {
+      e.push(`${where}: "since" is the tick a one-shot began on — a finite tick at or after zero (C04 I109)`);
+      return;
+    }
+    if (animate === undefined || !RAMP_ONE_SHOTS.has(animate as RampAnimation)) {
+      e.push(`${where}: "since" is a one-shot's stamp and "${String(animate ?? "none")}" is periodic — ${[...RAMP_ONE_SHOTS].join(", ")} read it (C04 I109)`);
+      return;
+    }
   }
 }
 
