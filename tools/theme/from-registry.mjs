@@ -144,6 +144,7 @@ function tokensFor(themeId) {
   const tone = {};
   const surfaces = {};
   const composed = {};
+  const bandInk = {};
   for (const rule of registry.themeRules) {
     if (SKIP_SELECTORS.test(rule.selector)) continue;
     // **Ink ON a ground** — `.bg-X .c-Y`, which the registry writes twice in one
@@ -182,6 +183,14 @@ function tokensFor(themeId) {
       const name = slot.slice(4);
       if (HUE.test(name)) hueGrounds[name] = norm(value);
       else surfaces[name] = norm(value);
+      // **A band declares its ground and its one ink together** (R-THM-003).
+      // Before this arm existed the `color:` on such a rule was read, found to be
+      // a `.bg-` selector, and dropped \u2014 a declaration with no reader, which is
+      // the shape that makes a promise unenforceable. A band's ink is total by
+      // construction: everything drawn on the band takes it, so no slot can fall
+      // through an enumeration, which is exactly how the nine-of-nineteen group
+      // this replaces came to break the ratio silently.
+      if (ground !== null && colour !== null && !HUE.test(name)) bandInk[name] = norm(colour[1]);
     }
   }
 
@@ -201,7 +210,7 @@ function tokensFor(themeId) {
     delete surfaces["error"];
   }
 
-  return { tone, surfaces, composed };
+  return { tone, surfaces, composed, bandInk };
 }
 
 /**
@@ -299,16 +308,52 @@ function solveDiffGrounds(themeId, tone, surfaces, composed) {
   }
   return out;
 }
-/** `surface.<ground>` -> `tone.<slot>` -> hex, omitted entirely when empty. */
-function composedBlock(composed) {
+/**
+ * `<band>` -> the one ink everything on that band takes (R-THM-003), omitted
+ * entirely when a theme declares no band.
+ *
+ * Separate from `composed` because it is a different claim. `composed` is a
+ * per-slot exception — *this ink, on this ground, is that value* — and its
+ * coverage is whatever was enumerated. A band ink is **total**: it is the ink for
+ * everything on the band, so a slot that nobody thought of is covered by
+ * construction rather than by having been listed.
+ */
+function bandInkBlock(bandInk) {
+  const names = Object.keys(bandInk).sort();
+  if (names.length === 0) return "";
+  const body = names.map((n) => `      ${JSON.stringify(n)}: ${lit(bandInk[n])},`).join("\n");
+  return `\n    bandInk: Object.freeze({\n${body}\n    }),`;
+}
+
+/**
+ * `surface.<ground>` -> `tone.<slot>` -> hex, merged with the lender's own
+ * compositions and omitted entirely when there are none of either.
+ *
+ * **Two authors, and the merge is per ground rather than per theme.** The registry
+ * carries ten meaning tones and six ink slots and no syntax palette at all, so a
+ * theme's `syntax` and `categorical` values are lent from a token file here — and
+ * a composition can only be authored where the value it replaces lives. The
+ * registry composes what it holds; the lender composes what it lends.
+ *
+ * A shallow spread would be wrong and silently so: both authors compose on
+ * `surface.focusGround`, so one ground's record would replace the other's whole
+ * record and drop every entry in it. The spread is therefore repeated **inside**
+ * each ground the registry touches, and the lender's remaining grounds come
+ * through the outer one.
+ *
+ * The registry is applied last, because it is normative where the two overlap.
+ */
+function composedBlock(composed, lender) {
   const grounds = Object.keys(composed).sort();
-  if (grounds.length === 0) return "";
+  if (grounds.length === 0 && lender === undefined) return "";
+  const lent = lender === undefined ? "" : `      ...(${lender}.composed ?? {}),\n`;
   const body = grounds.map((g) => {
+    const inherit = lender === undefined ? "" : `        ...(${lender}.composed?.[${JSON.stringify(g)}] ?? {}),\n`;
     const inks = Object.entries(composed[g]).sort(([a], [b]) => a.localeCompare(b))
       .map(([ref, hex]) => `        ${JSON.stringify(ref)}: ${lit(hex)},`).join("\n");
-    return `      ${JSON.stringify(g)}: Object.freeze({\n${inks}\n      }),`;
+    return `      ${JSON.stringify(g)}: Object.freeze({\n${inherit}${inks}\n      }),`;
   }).join("\n");
-  return `\n    composed: Object.freeze({\n${body}\n    }),`;
+  return `\n    composed: Object.freeze({\n${lent}${body}\n    }),`;
 }
 
 
@@ -392,7 +437,7 @@ ${slots(tone).replace(/^ {6}/gm, "          ")}
 ${derived(theme.id, tone, lender)}
       spectrum: lend(${lender}, "spectrum"),
     }),
-    fourBit: ${fourBitLender(theme.id, variant)}.fourBit,${composedBlock(solveDiffGrounds(theme.id, tone, surfaces, withDerived(theme.id, collected.get(theme.id).composed)))}
+    fourBit: ${fourBitLender(theme.id, variant)}.fourBit,${bandInkBlock(collected.get(theme.id).bandInk)}${composedBlock(solveDiffGrounds(theme.id, tone, surfaces, withDerived(theme.id, collected.get(theme.id).composed)), MEASURED.get(theme.id))}
   }),`;
 }).join("\n");
 

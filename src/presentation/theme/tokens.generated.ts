@@ -100,12 +100,15 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
     }),
     fourBit: DARK.fourBit,
     composed: Object.freeze({
+      ...(DARK.composed ?? {}),
       "surface.focusGround": Object.freeze({
+        ...(DARK.composed?.["surface.focusGround"] ?? {}),
         "tone.dim": "#9e9e9e",
         "tone.error": "#fa6464",
         "tone.muted": "#969696",
       }),
       "surface.selection": Object.freeze({
+        ...(DARK.composed?.["surface.selection"] ?? {}),
         "tone.dim": "#bdbdbd",
         "tone.error": "#ff9b91",
         "tone.meta": "#ddc1ee",
@@ -172,7 +175,9 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
     }),
     fourBit: LIGHT.fourBit,
     composed: Object.freeze({
+      ...(LIGHT.composed ?? {}),
       "surface.bgDeep": Object.freeze({
+        ...(LIGHT.composed?.["surface.bgDeep"] ?? {}),
         "tone.accent": "#1556e6",
         "tone.dim": "#5f626d",
         "tone.identifier": "#006c82",
@@ -182,9 +187,11 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
         "tone.warn": "#875900",
       }),
       "surface.bgElev": Object.freeze({
+        ...(LIGHT.composed?.["surface.bgElev"] ?? {}),
         "tone.muted": "#64656c",
       }),
       "surface.focusGround": Object.freeze({
+        ...(LIGHT.composed?.["surface.focusGround"] ?? {}),
         "tone.accent": "#1556e6",
         "tone.dim": "#5f626d",
         "tone.identifier": "#006c82",
@@ -194,6 +201,7 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
         "tone.warn": "#875900",
       }),
       "surface.selection": Object.freeze({
+        ...(LIGHT.composed?.["surface.selection"] ?? {}),
         "tone.accent": "#1747b8",
         "tone.dim": "#4e515b",
         "tone.error": "#a1190d",
@@ -214,7 +222,7 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
       "bg": "#000000",
       "bgElev": "#121212",
       "bgDeep": "#1c1c1c",
-      "selection": "#00405c",
+      "selection": "#efc51c",
       "meterFill": "#005f16",
       "border": "#767676",
       "borderStrong": "#a6a6a6",
@@ -226,7 +234,7 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
       "mPlan": "#2ea5fa",
       "mManual": "#9f9f9f",
       "skipGround": "#ff3b3b",
-      "focusGround": "#2e2e2e",
+      "focusGround": "#234f92",
       "errorInk": "#000000",
       "mInk": "#000000",
       "skipInk": "#000000",
@@ -265,10 +273,13 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
       spectrum: lend(DARK, "spectrum"),
     }),
     fourBit: HIGH_CONTRAST.fourBit,
+    bandInk: Object.freeze({
+      "focusGround": "#ffffff",
+      "selection": "#000000",
+    }),
     composed: Object.freeze({
-      "surface.selection": Object.freeze({
-        "tone.dim": "#ffffff",
-      }),
+      ...(HIGH_CONTRAST.composed ?? {}),
+
     }),
   }),
   "hcLight": Object.freeze({
@@ -280,7 +291,7 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
       "bg": "#ffffff",
       "bgElev": "#ebebeb",
       "bgDeep": "#dadada",
-      "selection": "#a8ccf0",
+      "selection": "#46176d",
       "meterFill": "#b5dbad",
       "border": "#000000",
       "borderStrong": "#000000",
@@ -292,7 +303,7 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
       "mPlan": "#003d8f",
       "mManual": "#3a3a3a",
       "skipGround": "#a80000",
-      "focusGround": "#c9c9c9",
+      "focusGround": "#7face3",
       "errorInk": "#ffffff",
       "mInk": "#ffffff",
       "skipInk": "#ffffff",
@@ -358,6 +369,10 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
       spectrum: lend(LIGHT, "spectrum"),
     }),
     fourBit: LIGHT.fourBit,
+    bandInk: Object.freeze({
+      "focusGround": "#000000",
+      "selection": "#ffffff",
+    }),
     composed: Object.freeze({
       "surface.bgElev": Object.freeze({
         "categorical.c2": "#005b00",

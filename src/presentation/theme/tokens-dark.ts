@@ -223,5 +223,27 @@ export const DARK: ThemeTokens = Object.freeze({
     }),
   }),
 
+  /**
+   * **The syntax palette, composed for the focus band** (R-THM-004).
+   *
+   * A focused region washes its whole extent, bodies included, so these slots land
+   * on `focusGround` exactly as the meaning tones do — and the registry has no
+   * syntax palette to compose them in, because the ten meaning tones and six ink
+   * slots are all it carries. The palette is lent from here, so the composition
+   * for it is authored here too: the registry stays normative for what it holds,
+   * and the lender answers for what it lends.
+   *
+   * Darkened or lightened along the RGB ray, which preserves the hue exactly, by
+   * the least that clears — the same move the registry makes for its own tones.
+   * The flat values are untouched, so nothing on `bg` or `bgElev` moves and the ink
+   * oracle's captures are unaffected.
+   */
+  composed: Object.freeze({
+    "surface.focusGround": Object.freeze({
+      "syntax.comment": "#707785", // 3.018 : 1, floor 3
+      "syntax.key": "#e2737c", // 4.512 : 1, floor 4.5
+    }),
+  }),
+
   fourBit: DARK_FOUR_BIT,
 });

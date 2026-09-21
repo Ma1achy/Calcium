@@ -199,5 +199,36 @@ export const LIGHT: ThemeTokens = Object.freeze({
     }),
   }),
 
+  /**
+   * **The syntax palette, composed for the focus band** (R-THM-004).
+   *
+   * A focused region washes its whole extent, bodies included, so these slots land
+   * on `focusGround` exactly as the meaning tones do — and the registry has no
+   * syntax palette to compose them in, because the ten meaning tones and six ink
+   * slots are all it carries. The palette is lent from here, so the composition
+   * for it is authored here too: the registry stays normative for what it holds,
+   * and the lender answers for what it lends.
+   *
+   * Darkened or lightened along the RGB ray, which preserves the hue exactly, by
+   * the least that clears — the same move the registry makes for its own tones.
+   * The flat values are untouched, so nothing on `bg` or `bgElev` moves and the ink
+   * oracle's captures are unaffected.
+   */
+  composed: Object.freeze({
+    "surface.focusGround": Object.freeze({
+      "syntax.string": "#387138", // 4.519 : 1, floor 4.5
+      "syntax.comment": "#7f8188", // 3.003 : 1, floor 3
+      "syntax.number": "#875c01", // 4.552 : 1, floor 4.5
+      "syntax.function": "#1d5ae1", // 4.500 : 1, floor 4.5
+      "syntax.operator": "#016b9a", // 4.539 : 1, floor 4.5
+      // Categorical is decoration and is painted as text — a legend entry, a table
+      // cell — so a focused region washes it like anything else (C10 §4g). Not
+      // `spectrum`: R-FOC-004 puts a plot's focus on its border or axes rather
+      // than painting its data, so a series colour never lands on this ground.
+      "categorical.c1": "#875d00", // 4.508 : 1
+      "categorical.c4": "#736400", // 4.564 : 1
+    }),
+  }),
+
   fourBit: LIGHT_FOUR_BIT,
 });

@@ -132,8 +132,12 @@ const results = runPass({
       // for a failure that cannot be seen. The exclusion is the invariant.
       name: "contrast is validated against bgDeep as well",
       file: CONTRAST,
-      from: '    ["bgElev", tokens.surfaces.bgElev],\n  ];',
-      to: '    ["bgElev", tokens.surfaces.bgElev],\n    ["bgDeep", tokens.surfaces.bgDeep],\n  ];',
+      // **Re-anchored: the old anchor reached the closing bracket** and rotted when
+      // `focusGround` joined the list (R-THM-004) — a change with nothing to do
+      // with this mutation. The anchor is now the one line the mutation inserts
+      // after, which is the least context that makes it unique.
+      from: '    ["bgElev", tokens.surfaces.bgElev],',
+      to: '    ["bgElev", tokens.surfaces.bgElev],\n    ["bgDeep", tokens.surfaces.bgDeep],',
       expect: "T2.4",
     },
     {

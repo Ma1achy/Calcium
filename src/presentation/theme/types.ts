@@ -52,6 +52,21 @@ export type Surfaces = Readonly<{
   diffAdd: string;
   diffRemove: string;
   /**
+   * The ground a focused region takes (R-STA-002, R-THM-004).
+   *
+   * **A text surface, and named here because it is one.** A focused region washes
+   * its whole extent — head and body — so every meaning ink lands on it, which
+   * puts it in `textSurfaces` and under every floor. It was absent from both for
+   * as long as it was read through an index, and that is the shape the floor-scope
+   * rule is about: seven inks short across two themes and sixteen of nineteen in
+   * each high-contrast theme, with nothing to report it.
+   *
+   * **Optional, and absent means *this theme paints no focus ground***, not that
+   * none was considered — focus still carries, on its mark, which is the carrier
+   * that survives to one bit anyway. All ten shipped themes declare one.
+   */
+  focusGround?: string;
+  /**
    * The selection wash (C17 §5b, roadmap entry 23).
    *
    * **A surface rather than a palette entry, and the entry said otherwise.**
@@ -177,6 +192,24 @@ export type ThemeTokens = Readonly<{
    * what nine of the ten shipped themes do.
    */
   floor?: number;
+
+  /**
+   * A band's one ink (R-THM-003): `<surface>` -> the ink everything drawn on that
+   * surface takes, whatever slot it names.
+   *
+   * **Total, where `composed` is enumerated**, and that difference is the whole
+   * reason this is a field rather than nineteen more entries in `composed`. A
+   * high-contrast theme promises a ratio on every surface it paints; composing
+   * ink by ink keeps the promise only for the slots somebody listed, and the
+   * measured failure was exactly that — `hcDark`'s selection carried a group of
+   * nine where the theme has nineteen meaning slots, and the ten it omitted fell
+   * through to flat inks below the promise with nothing to report it. A band ink
+   * cannot have that defect, because there is no list to be missing from.
+   *
+   * It costs the row its tone, paid for by moving state onto the glyph and the
+   * outcome word — the one-bit rung's carrier, asked per cell.
+   */
+  bandInk?: Readonly<Record<string, string>>;
 }>;
 
 /**

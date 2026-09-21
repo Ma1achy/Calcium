@@ -98,8 +98,12 @@ const results = runPass({
       // row that says so is the one asserting a leaning `bgDeep` still loads.
       name: "`bgDeep` joins the text surfaces",
       file: CONTRAST,
-      from: '    ["bgElev", tokens.surfaces.bgElev],\n  ];',
-      to: '    ["bgElev", tokens.surfaces.bgElev],\n    ["bgDeep", tokens.surfaces.bgDeep],\n  ];',
+      // **Re-anchored: the old anchor reached the closing bracket** and rotted when
+      // `focusGround` joined the list (R-THM-004) — a change with nothing to do
+      // with this mutation. The anchor is now the one line the mutation inserts
+      // after, which is the least context that makes it unique.
+      from: '    ["bgElev", tokens.surfaces.bgElev],',
+      to: '    ["bgElev", tokens.surfaces.bgElev],\n    ["bgDeep", tokens.surfaces.bgDeep],',
       expect: "T3.34",
     },
   ],

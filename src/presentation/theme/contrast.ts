@@ -117,6 +117,13 @@ const FLOORS: Readonly<Record<string, number>> = Object.freeze({
 
 export const DEFAULT_FLOOR = 4.5;
 
+/** A selection band against the page (R-THM-003) — the ground is its only carrier. */
+export const BAND_VS_PAGE = 3;
+/** A focus band against the page (R-THM-003) — relaxed, because the focus mark carries focus. */
+export const FOCUS_VS_PAGE = 2;
+/** The two bands against each other (R-THM-003) — they can be adjacent rows. */
+export const BAND_VS_BAND = 3;
+
 /**
  * **The ink a named surface actually takes for a colour reference.**
  *
@@ -134,6 +141,13 @@ export const DEFAULT_FLOOR = 4.5;
  * `validateTokens`, so they kept the birthday clause the src had already lost.
  */
 export function inkOn(tokens: ThemeTokens, ref: string, surfaceName: string): string {
+  // **A band answers for every ref, and it answers first** (R-THM-003). The band
+  // ink is the ink for everything drawn on that surface, so it outranks both a
+  // per-slot composition and the flat slot — a band whose ratio a later
+  // composition could undercut would be a promise held everywhere except where
+  // somebody was specific, which is the failure mode inverted rather than fixed.
+  const band = tokens.bandInk?.[surfaceName];
+  if (band !== undefined) return band;
   const composed = tokens.composed?.[`surface.${surfaceName}`]?.[ref];
   if (composed !== undefined) return composed;
   const [family, slot] = ref.split(".");
@@ -154,9 +168,22 @@ export function floorFor(slot: string): number {
  * happens to make that ground — the class, not the instance.
  */
 export function textSurfaces(tokens: ThemeTokens): readonly (readonly [string, string])[] {
+  const focus = tokens.surfaces["focusGround"];
   return [
     ["bg", tokens.surfaces.bg],
     ["bgElev", tokens.surfaces.bgElev],
+    // **The focus ground is a text surface, and leaving it out was the third
+    // instance of one class** (R-THM-004). A focused region washes its whole
+    // extent — head and body — so every meaning ink lands here, including a code
+    // body's. Measured when it was added: seven inks short across `dark` and
+    // `light`, and sixteen of nineteen in each high-contrast theme, none of it
+    // reported by anything, because a floor whose scope is a list is silent about
+    // whatever is not on the list. `nord`'s diff grounds and `hcLight`'s `bgElev`
+    // were the first two, found the same way — by widening the scope, never by a
+    // failure.
+    //
+    // `bgDeep` is still excluded and still for its own reason: no text lands on it.
+    ...(focus === undefined ? [] : [["focusGround", focus] as const]),
   ];
 }
 
@@ -368,7 +395,14 @@ function validateDecorationText(tokens: ThemeTokens): readonly ThemeError[] {
     if (value === undefined) continue;
     // The same composition `validatePalette` honours, for the same reason: the
     // ink this ground takes is the one that lands on it.
-    const ink = tokens.composed?.[`surface.${surfaceName}`]?.[`${palette}.${slot}`] ?? value;
+    //
+    // **Through `inkOn` rather than reading `composed` directly**, which is the
+    // fourth time that lookup has been written out and the second time a copy of
+    // it has been left behind by a change: a band (R-THM-003) answers for every
+    // ref on its surface and a direct read of `composed` cannot see one, so this
+    // check would have measured a flat categorical slot against a band the
+    // renderer never paints it on.
+    const ink = inkOn(tokens, `${palette}.${slot}`, surfaceName) || value;
     const measured = ratio(ink, hex);
     // **Written as the positive form rather than as `>= DEFAULT_FLOOR` and
     // `continue`**, which is how `validateErrorTag` two functions up says the
@@ -398,12 +432,17 @@ function validateDiffSurfaces(tokens: ThemeTokens): readonly ThemeError[] {
     const value = tokens.palettes[palette]?.slots[slot];
     if (value === undefined) continue;
 
-    // The third and last site that must honour composition, and the one that was
-    // missed twice: the other two are `validatePalette` and `validateDecorationText`.
     // **A floor lives wherever a pair is formed**, so a theme feature that changes
     // which ink meets a ground has to reach every one of them or it silently holds
-    // a slot to a pairing that is never drawn.
-    const ink = tokens.composed?.[`surface.${surface}`]?.[`${palette}.${slot}`] ?? value;
+    // a slot to a pairing that is never drawn. There are three such sites — this,
+    // `validatePalette` and `validateDecorationText` — and composition was missed
+    // at two of them when it landed, then bands were missed at all three, because
+    // each site had its own copy of the lookup.
+    //
+    // **So none of them has one now.** `inkOn` is the single answer to *what ink
+    // does this ground take*, and a fourth site added tomorrow gets every
+    // mechanism by calling it rather than by being remembered.
+    const ink = inkOn(tokens, `${palette}.${slot}`, surface) || value;
 
     const floor = floorFor(slot);
     const measured = ratio(ink, hex);
@@ -517,13 +556,14 @@ export function validateTokens(tokens: ThemeTokens): readonly ThemeError[] {
   const bgs = isHex(tokens.surfaces.bg) && isHex(tokens.surfaces.bgElev) ? textSurfaces(tokens) : [];
 
   for (const [paletteName, palette] of Object.entries(tokens.palettes)) {
-    errors.push(...validatePalette(paletteName, palette, bgs, tokens.surfaces.bg, tokens.composed));
+    errors.push(...validatePalette(paletteName, palette, bgs, tokens.surfaces.bg, tokens));
   }
 
   errors.push(...validateRequiredSlots(tokens));
   errors.push(...validateDiffSurfaces(tokens));
   errors.push(...validateErrorTag(tokens));
   errors.push(...validateDecorationText(tokens));
+  errors.push(...validateBands(tokens));
   errors.push(...validateHighContrast(tokens));
   errors.push(...validateVariant(tokens));
 
@@ -556,6 +596,85 @@ export function validateTokens(tokens: ThemeTokens): readonly ThemeError[] {
  * pair that lands, and `hcLight` keeps this promise precisely *by* composing
  * four darker inks for its elevated ground rather than moving the ground.
  */
+/**
+ * **The four contrasts a band declares, checked as stated** (R-THM-003).
+ *
+ * Not one rule with four consequences but four separate claims, because they bind
+ * for four different reasons and a reader meeting a failure needs the reason, not
+ * the number. The rule text carries them in the same order and the same words.
+ *
+ * **Why they are not all the same figure.** The ink keeps the theme's declared
+ * ratio because that is the promise. The selection band keeps 3 : 1 against the
+ * page because the ground is selection's *only* carrier — R-SEL-006 gives
+ * selection the ground and focus the mark, so a selection band that does not read
+ * is a fact with nothing carrying it. The focus band keeps only 2 : 1 against the
+ * page because the focus mark already carries focus at the declared ratio and the
+ * band need only read as an extent. And the two bands keep 3 : 1 from each other
+ * because they can be adjacent rows, which is the pair a reader actually compares.
+ *
+ * **It follows that the focus band is the one nearer the page** and selection the
+ * one further from it — a consequence of the constraints rather than a choice, and
+ * the reason `hcDark`'s selection is the bright band while `hcLight`'s is the dark
+ * one. Measured before the values were written: the previous grounds sat at
+ * 1.01 : 1 from each other in `hcLight`, separated by hue alone.
+ */
+export function validateBands(tokens: ThemeTokens): readonly ThemeError[] {
+  const bands = tokens.bandInk;
+  if (bands === undefined) return Object.freeze([]);
+  const bg = tokens.surfaces.bg;
+  if (!isHex(bg)) return Object.freeze([]);
+  const errors: ThemeError[] = [];
+  const promised = tokens.floor ?? DEFAULT_FLOOR;
+
+  const groundOf = (name: string): string | undefined => {
+    const v = name === "focusGround" ? tokens.surfaces.focusGround : tokens.surfaces.selection;
+    return v !== undefined && isHex(v) ? v : undefined;
+  };
+  const say = (path: string, got: number, need: number, what: string): void => {
+    errors.push({
+      path,
+      message:
+        `${got.toFixed(2)} : 1, below the ${need} : 1 a band declares — ${what}`,
+    });
+  };
+
+  for (const [name, ink] of Object.entries(bands)) {
+    const ground = groundOf(name);
+    if (ground === undefined || !isHex(ink)) continue;
+    const measured = ratio(ink, ground);
+    if (measured < promised) {
+      say(`bandInk.${name}`, measured, promised,
+        "a band's ink is the ink for everything on it, so this is the theme's promise for the whole band");
+    }
+  }
+
+  const focus = bands["focusGround"] === undefined ? undefined : groundOf("focusGround");
+  const selection = bands["selection"] === undefined ? undefined : groundOf("selection");
+
+  if (selection !== undefined) {
+    const measured = ratio(selection, bg);
+    if (measured < BAND_VS_PAGE) {
+      say("surfaces.selection", measured, BAND_VS_PAGE,
+        "the ground is selection's only carrier, so a selection band that does not read is a fact with nothing carrying it");
+    }
+  }
+  if (focus !== undefined) {
+    const measured = ratio(focus, bg);
+    if (measured < FOCUS_VS_PAGE) {
+      say("surfaces.focusGround", measured, FOCUS_VS_PAGE,
+        "the focus mark already carries focus, so the band need only read as an extent — but it must read as one");
+    }
+  }
+  if (focus !== undefined && selection !== undefined) {
+    const measured = ratio(focus, selection);
+    if (measured < BAND_VS_BAND) {
+      say("surfaces.focusGround", measured, BAND_VS_BAND,
+        "the two bands can be adjacent rows, and telling them apart by hue alone is the failure a high-contrast theme exists to prevent");
+    }
+  }
+  return Object.freeze(errors);
+}
+
 export function validateHighContrast(tokens: ThemeTokens): readonly ThemeError[] {
   const promised = tokens.floor;
   if (promised === undefined) return Object.freeze([]);
@@ -622,7 +741,14 @@ function validatePalette(
   palette: PaletteSpec,
   bgs: readonly (readonly [string, string])[],
   bg: string,
-  composed: ThemeTokens["composed"],
+  /**
+   * **The whole token set, where this took `composed` alone.** A floor is a claim
+   * about the ink a ground actually takes, and that answer now has more than one
+   * source — a band (R-THM-003) as well as a composition. Narrowing the parameter
+   * to the one mechanism that existed when it was written is what made bands
+   * invisible here; `inkOn` is the answer, and it needs the set.
+   */
+  tokens: ThemeTokens,
 ): readonly ThemeError[] {
   const errors: ThemeError[] = [];
   const seen = new Map<string, string>();
@@ -670,7 +796,7 @@ function validatePalette(
       // the containment-is-not-correctness shape: an assertion about a pairing
       // the renderer does not produce. `nord.info` is the case — 4.64 : 1 on
       // `bg`, 3.74 on `bgElev`, and `#95b5d5` on `bgElev`, which is 4.72.
-      const ink = composed?.[`surface.${surfaceName}`]?.[`${paletteName}.${slot}`] ?? value;
+      const ink = inkOn(tokens, `${paletteName}.${slot}`, surfaceName) || value;
       const measured = ratio(ink, surface);
       if (measured < floor) {
         const via = ink === value ? "" : ` (composed as ${ink})`;

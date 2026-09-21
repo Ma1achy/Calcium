@@ -23,6 +23,7 @@ import {
   OKABE_ITO_CANONICAL,
   type ColourRef,
 } from "../../src/presentation/theme/index.js";
+import { BAND_VS_BAND, BAND_VS_PAGE, FOCUS_VS_PAGE, validateBands } from "../../src/presentation/theme/contrast.js";
 import { OKABE_ITO } from "../../src/data/colormaps/qualitative/okabe-ito.js";
 import { plotToSvg } from "../../src/presentation/plot/svg.js";
 import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
@@ -213,6 +214,110 @@ describe("C10 contract", () => {
    * which slot was in question — and this one has 5% of headroom, which is the
    * answer to *would anything notice if it stopped clearing*.
    */
+  /**
+   * **T2.42 (C10 I45, R-THM-003) — each of the four, broken on its own.**
+   *
+   * A gate that passes on the shipped set has been read, not verified: every one
+   * of these four constraints holds today, so a sweep over the shipped themes
+   * agrees with a gate that checks none of them. Each row moves exactly one value
+   * and asserts that the failure names the *path* that has to move — which is what
+   * makes the message the reason rather than the number.
+   */
+  /**
+   * **T2.44 (C10 I46, R-THM-004) — the scope, asserted as a membership rather than
+   * as a sweep.**
+   *
+   * Every ratio row in this file passes over a narrower `textSurfaces`; that is
+   * how `focusGround` went unmeasured for as long as it did. So the surfaces are
+   * named, and the one palette deliberately outside the scope is named with them —
+   * an exclusion stated in a comment is an exclusion nothing checks.
+   */
+  it("T2.44 (I46, R-THM-004): the floor's scope is three named surfaces, and spectrum is outside it", () => {
+    for (const [variant, tokens] of SHIPPED) {
+      const names = textSurfaces(tokens).map(([n]) => n);
+      expect(names, `${variant}: every ground this theme paints text on`).toEqual(["bg", "bgElev", "focusGround"]);
+      // `bgDeep` is excluded because no text lands on it, and that exclusion has
+      // fired once already with the answer *the surface was wrong* (I34, §4f).
+      expect(names, `${variant}: bgDeep carries no text`).not.toContain("bgDeep");
+    }
+    // **`spectrum` is outside the scope, and the design is why** (R-FOC-004): a
+    // plot, picture or image takes focus on its border or axes rather than
+    // painting its data, so a series colour never meets the focus ground. Measured
+    // when the scope widened: 22 spectrum slots across four themes sit below 4.5
+    // on `focusGround`, and every one of them is a pairing nothing draws.
+    const pairs = decorationTextPairs(defaultTheme["light"]!);
+    expect([...new Set(pairs.map(([palette]) => palette))], "one decoration palette meets text").toEqual(["categorical"]);
+    expect(pairs.some(([, , surface]) => surface === "focusGround"), "and it meets the focus ground").toBe(true);
+  });
+
+  it("T2.42 (I45, R-THM-003): the four band contrasts each fire on their own", () => {
+    const hc = defaultTheme["hcDark"]!;
+    expect(validateBands(hc), "the shipped band clears every constraint").toEqual([]);
+    expect(hc.bandInk, "and it is a banded theme, so the gate is not vacuous").toBeDefined();
+
+    const withSurface = (name: "focusGround" | "selection", hex: string) => ({
+      ...hc,
+      surfaces: { ...hc.surfaces, [name]: hex },
+    });
+
+    // 1 — the ink on its own band. `#767676` on the focus band is far below 7.
+    const dullInk = { ...hc, bandInk: { ...hc.bandInk, focusGround: "#767676" } };
+    expect(validateBands(dullInk).map((e) => e.path)).toEqual(["bandInk.focusGround"]);
+
+    // 2 — the selection band against the page. Moved to a near-black, so it keeps
+    //     its ink's ratio and loses the page's: the one constraint fails alone.
+    const faintSelection = withSurface("selection", "#0a0a0a");
+    const sel = validateBands(faintSelection).filter((e) => e.path === "surfaces.selection");
+    expect(sel, "the selection band must read against the page").toHaveLength(1);
+    expect(sel[0]!.message).toContain("only carrier");
+
+    // 3 and 4 — the focus band's two constraints, and **they fail in opposite
+    //     directions**, which is why they are two constraints and not one. The
+    //     first draft of this row expected a single move to break both; it cannot.
+    //     Sliding the focus band onto the page moves it *away* from the selection
+    //     band, and sliding it onto selection moves it away from the page. The
+    //     band is pinned between them, and each end has its own reason.
+    const ontoPage = withSurface("focusGround", "#050505");
+    const pageSaid = validateBands(ontoPage).filter((e) => e.path === "surfaces.focusGround");
+    expect(pageSaid, "against the page, alone").toHaveLength(1);
+    expect(pageSaid[0]!.message).toContain("read as an extent");
+
+    const ontoSelection = withSurface("focusGround", "#e0c030");
+    const nearSaid = validateBands(ontoSelection).filter((e) => e.path === "surfaces.focusGround");
+    expect(nearSaid, "against the other band, alone").toHaveLength(1);
+    expect(nearSaid[0]!.message).toContain("adjacent rows");
+
+    // The figures are named rather than left to the constants, so a constant
+    // edited to make a failure go away fails here instead.
+    expect([BAND_VS_PAGE, FOCUS_VS_PAGE, BAND_VS_BAND]).toEqual([3, 2, 3]);
+  });
+
+  /**
+   * **T2.43 (C10 I45) — a band's ink is total, which is the whole of why it exists.**
+   */
+  it("T2.43 (I45, R-THM-003): every meaning ink on a band resolves to the band's ink", () => {
+    for (const id of ["hcDark", "hcLight"]) {
+      const t = defaultTheme[id]!;
+      for (const band of ["focusGround", "selection"] as const) {
+        const ink = t.bandInk?.[band];
+        expect(ink, `${id}.${band} declares a band ink`).toBeDefined();
+        let seen = 0; // cells-ok — a slot count
+        for (const [pn, p] of Object.entries(t.palettes)) {
+          if (p.carries !== "meaning") continue;
+          for (const slot of Object.keys(p.slots)) {
+            // **Including a slot the band never enumerated**, which is the property
+            // an enumeration cannot have: `hcDark`'s selection shipped a group of
+            // nine where the theme has nineteen, and the ten omitted fell through
+            // to flat inks below the promise with nothing to report it.
+            expect(inkOn(t, `${pn}.${slot}`, band), `${id} ${pn}.${slot} on ${band}`).toBe(ink);
+            seen += 1; // cells-ok — a slot count
+          }
+        }
+        expect(seen, `${id}.${band} covers every meaning slot`).toBe(19);
+      }
+    }
+  });
+
   it("T2.29a (I35, §4g): every decoration text pair clears the meaning floor, tightest named", () => {
     let tightest = { pair: "", measured: Number.POSITIVE_INFINITY };
     let checked = 0; // cells-ok — a pair count
@@ -226,7 +331,12 @@ describe("C10 contract", () => {
         checked += 1; // cells-ok — a pair count
       }
     }
-    expect(checked, "eight slots on two surfaces on every shipped theme").toBe(8 * 2 * SHIPPED.length);
+    // **Three surfaces, not two** (R-THM-004): `focusGround` joined `textSurfaces`
+    // when the floor's scope was stated as *every ground the theme paints text on*
+    // rather than as a list. The count is asserted because it is the half that
+    // notices a surface leaving the pairing — every ratio row would still pass
+    // over a narrower sweep.
+    expect(checked, "eight slots on three surfaces on every shipped theme").toBe(8 * 3 * SHIPPED.length);
     // **The tightest pair moved theme and got very much tighter.** It was
     // `light categorical.c4 on bgElev` at 4.74 — 5% of headroom, and the answer
     // to *would anything notice if it stopped clearing*. Over the registry's ten
