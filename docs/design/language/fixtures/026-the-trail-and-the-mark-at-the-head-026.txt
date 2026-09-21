@@ -1,0 +1,76 @@
+the trail is anchored to the POINT OF ARRIVAL, so it advances toward inline-end with
+the head. And the head carries the AGENT'S OWN MARK.
+
+● The parser tracks quotes with a single boolean, which is why ✦
+
+  the TRAIL   says what just arrived
+  the MARK    says more is coming
+              two facts, two carriers — and the trail stops saying the
+              second one the moment the stream pauses
+
+★ the mark is the agent's, so it lives WHEREVER THE AGENT IS ACTING
+
+  ✦  thinking   in the activity region while it reasons
+  ✦  running the suite   … and while a tool runs
+  ● … quotes with a boolean ✦   but AT THE HEAD while it writes
+
+  while text is streaming the work IS the text, so there is one bloom
+  on screen and it is wherever the agent currently is. Two — one
+  spinning above, one at the head — is two things claiming to be live.
+
+and when it stops, NOTHING replaces it
+
+● The parser tracks quotes with a single boolean, so a nested quote
+  flips it back instead of counting a level.
+
+──────────────────────────────────────────────────────────────────────────────
+❯ ▌
+  a settled reply has no cursor. The next thing wanting attention is
+  the prompt, and it has its own.
+
+five trails, and HOT EDGE is the default
+
+  hot edge  overshoots the ACCENT at the head, holds, then cools to
+            the body colour. The head reads even when the stream is
+            slow, and it cools to the ink rather than to a second tone
+  fade      the newest character IS the ground and emerges toward the
+            ink — only the text colour moves, so it survives anywhere
+  hue trail arrives in the accent and cools to the body tone. Needs the
+            mark LEAST, because the accent is already the agent's
+  ripple    a brightness wave propagating BACKWARDS from the head — the
+            only trail that is not monotonic
+  weight    bold, then ONE HARD STEP to normal. A terminal has bold or
+            it has not, so there is no settle. The only 1-bit survivor
+
+★ two things a terminal CANNOT do, and both were tried
+
+  a per-character FADE OVER TIME. There is no per-cell timeline — you
+  repaint, so an age-based fade means every character in the trail
+  repainted every frame. At a 100ms window that is ten repaints per
+  character; a 500-character reply is 5,000 cell writes a second.
+
+  a glyph RISING INTO its cell. There is no sub-cell position to
+  animate toward. A character is at a cell or it is not.
+
+  what IS affordable is a fixed band at the head: only the cells
+  entering and leaving it are repainted, so the cost is a function of
+  the BAND WIDTH and not of the reply length — about two repaints per
+  cell at a one-cell band, four at three.
+
+a run keeps its OWN ink as the trail's target
+
+● The counter is set here and read there.
+
+▾ thinking · 4s · 312 tok
+  The parser tracks quotes with a boolean, so a nested quote ✦
+
+  the reasoning is DIM, so its trail cools to dim — not to the body
+  colour. A trail whose target is fixed repaints every run to white,
+  which is a bug that looks like a styling choice.
+
+and chrome is never revealed
+
+  the ● mark and the ▾ thinking header appear WHOLE. The reveal is a
+  property of the STREAM; the trail is a property of a character's
+  position in it. A header has no position in the stream, so it exists
+  complete or not at all.

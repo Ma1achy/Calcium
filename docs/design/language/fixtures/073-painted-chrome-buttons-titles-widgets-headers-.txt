@@ -1,0 +1,53 @@
+the error tag is the only painted thing that means a STATUS. Everything
+below is painted because it is a SURFACE — a thing you act on or a thing
+that holds other things. Different job, no confusion.
+
+buttons — four states, and the ground is the affordance
+
+   Approve    Deny         resting
+   › Approve    Deny       focused — ⏎ activates
+   Approve    Deny         a destructive pair takes tone:
+   Approve    Deny         green to go, red to stop
+   Approve    Deny         disabled — a WELL, not a button
+  [ Approve ]  [ Deny ]       1-bit and ascii — brackets carry it
+
+titles — three treatments, and each says something different
+
+   workers ──────────────────────────────────────     painted — a NAMED region
+  ┌ containers ────────────────────────────────────┐   inset — the default, cheapest
+  containers  ──────────────────────────────────────       bare — a heading, not a container
+
+   running  3 ──────────────────────────────────────   a title that carries a STATE
+   degraded  1 ────────────────────────────────────  and a count beside it
+
+widgets — the ground is the track, the glyph is the value
+
+  learning rate        ●          3e-4
+                 ├──────●────────┤  3e-4    the glyph rung
+
+  mode            ✓ linear  log  log₂      segmented — the chosen
+                 ( ) linear  (●) log  ( ) log₂     segment is the painted one
+
+  live            ✓ on            a switch is ON when painted
+                  off ○            and a well when it is not
+
+  series          ✓ train   ✓ val   test   on / on / off
+
+a table header — the one place a full-width ground is right
+
+   uuid     family            status     metric   age
+  ▸ ● a3f9b21  digit-classifier  running    0.0372   23m
+    ✓ 7c2d4e1  decoder-zoom      succeeded  0.0089   41m
+  it is a SURFACE the rows sit under, not a status — and it makes the
+  column names stop competing with the data for the eye.
+
+what must never be painted
+
+  a status word          running  not  running
+  a permission posture   » auto   a posture is text
+  body text              anything you read at length
+  a whole block          a wash over content is a MODE, and there is none
+
+  the test: am I painting a THING (a button, a track, a header) or a
+  FACT about a thing (its status, its mode, its outcome)?
+  Things take a ground. Facts take a tone.

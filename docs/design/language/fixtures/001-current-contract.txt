@@ -1,0 +1,103 @@
+CURRENT CONTRACT · revision 0.9
+Generated from the registry. IDs are permanent; only CURRENT records are normative.
+Every repetition below is rendered from or cites one of these records. EXAMPLE sections cannot create a requirement.
+
+R-SPC-001   legacy SPEC-001 · The registry is the only normative source. Generated artifacts filter current records; stable IDs survive reordering and superseded records remain addressable. section
+R-COR-001   legacy CORE-001 · Keep one durable event record, one rendered window, and one model context. Eviction changes the window; compaction changes context; neither erases history. section
+R-COR-002   legacy CORE-002 · A render event may change drawing but never keyboard ownership. Question arrival is an ownership request, not an ordinary render event. section
+R-COR-003   legacy CORE-003 · Every actionable, status, and interaction distinction has two independent carriers and survives without colour. Dense data may shed colour-only detail only when a named readout preserves the meaning. section
+R-STA-001   legacy STATE-001 · Lifecycle, outcome, resolution, ownership, focus, pointer, selection, choice, disclosure, availability, freshness, and validity are orthogonal axes; no generic active flag is stored. section
+R-STA-002   legacy STATE-002 · A cell has one ground. Precedence is owner or armed, copy selection, focus, hover preview, semantic extent, then structural surface; displaced facts retain a mark, edge, or weight. section
+R-STA-003   legacy STATE-003 · Hover may preview but never owns input. Focus adds a persistent non-colour carrier so hover cannot be mistaken for focus. section
+R-OWN-001   legacy OWN-001 · Each ownership rung routes an action as handle, reject, pass, or global-intercept; exactly one declared owner or intercept acts. section
+R-OWN-002   legacy OWN-002 · Events carry the owner epoch in which they began and are never replayed against a new owner. An attached child explicitly handles control-C and escape. section
+R-OWN-003   legacy OWN-003 · Pointer press arms a stable id; release on the same id commits. Drag, owner change, identity loss, or release elsewhere cancels activation. section
+R-QST-001   legacy QST-001 · Answer form and placement are independent. Choice-only defaults to replace; text defaults to float above the held prompt. A question declares blocking and owner explicitly. section
+R-QST-002   legacy QST-002 · Inspection suspends a question and is not an answer. Every question resolves exactly once as answered, cancelled, or expired. section
+R-QST-003   legacy QST-003 · Editor code is shared; buffers, undo stacks, and histories are isolated by owner. section
+R-QST-004  Approval inspection is the third choice, labelled show full diff. It has no second key-only overflow route. section
+R-MOT-001   legacy MOT-001 · Motion is full, reduced, or off and is independent of colour depth and glyph set. section
+R-MOT-002   legacy MOT-002 · Work spinners use 80–200 ms frames; deliberate wait indicators may be slower. With motion off, a running call keeps a still mark and elapsed text carries liveness. section
+R-MOT-003   legacy MOT-003 · The HTML preview conservatively maps the operating-system reduced-motion request to off; the product reduced setting may retain essential work or wait motion. section
+R-MOT-004   legacy MOT-004 · Meaningful text remains contrast-safe in every frame; deep fades belong only to a decorative duplicate or mark, never the sole semantic carrier. section
+R-MOT-005  A specimen animation may change only the glyph in a cell or that cell’s colour, opacity, or brightness. Transform, translate, scale, rotate, and layout motion are forbidden. Per-character stagger is retained. Glyph-swap frames resolve through a one-cell capability rung; ambiguous Unicode falls back to registered one-cell ASCII frames. section
+R-PRG-001   legacy PROG-001 · A meter declares quantity, granularity, and liveness independently. section
+R-TXT-001   legacy TEXT-001 · Storage offsets, grapheme indexes, token indexes, and display cells are distinct. Editing and public spans never split a grapheme; serialization keeps source offsets. section
+R-GLY-001   legacy GLYPH-001 · Every semantic glyph declares a collision-free ASCII fallback, width by capability, and reservedCells equal to its widest representation. The renderer pads the selected representation to that reservation. section
+R-CAP-001   legacy CAP-001 · Capabilities form a vector, not a ladder. Every action has a base-terminal route; enhanced protocols improve bindings but never create the only route. section
+R-ACC-001   legacy A11Y-001 · Every component exposes semantics and announcement policy. Linear semantic events are append-only and non-animated; only the active input editor mutates in place. section
+R-TRU-001   legacy TRUST-001 · Only the renderer emits terminal controls. User, model, tool, path, URL, and log content is escaped; a PTY interprets controls only inside its emulator boundary. section
+R-THM-001  Theme CSS is generated from current token records, including composed ink-on-surface values and preview controls. section
+R-PRI-001  The primitive index is generated from registered primitives and cites the current rules governing each primitive. section
+R-TAB-001  Every registered component declares entry, carriers, actions, escape, motion-off form, one-bit form, and residue; state tables are generated from those records. section
+R-PER-001  Permission postures and standing grants are explicit, inspectable, and revocable. A grant names the exact command it grants. section
+R-STR-001  A call has one head and one gutter, with at most one bounded body when output exists. section
+R-STR-002  At transcript level, one blank row separates sibling entries; spacing inside a body belongs to that block. section
+R-STR-003  Every nested level costs three columns, and nesting is limited by width while the deepest child still clears its own minimum width. section
+R-STR-004  Content stops one column before the inline-end edge. section
+R-COL-001  Framework status red means failure and override red means unsafe override; red is never the only carrier. Syntax, removal, and identity retain their declared roles. section
+R-COL-002  The tone budget is regional: an entry has three tones, while code, plots, and patches carry their own adjacent palettes. section
+R-COL-003  A ground is for an extent; a tone is for a mark. Things take a ground and facts about things take a tone. section
+R-COL-004  An actionable, status, or interaction ground is never the only carrier; dense data owes a readout. section
+R-COL-005  Focus intensifies by shape: an unpainted run or box inverts, a frame takes its border or axes, a control washes, and a painted identity chip bolds and marks. section
+R-MOT-006  Motion says that state is changing or something is live. Semantic animation says what is happening, never merely look here. section
+R-MOT-007  A call’s shape does not depend on its duration. section
+R-MOT-008  The bloom family belongs to the agent and nothing else uses it. section
+R-INT-001  Interaction uses visible scopes, not hidden modes. section
+R-INT-002  No single-key command exists in any scope where typing is possible. section
+R-INT-003  Scrolling is not a scope and never moves focus. section
+R-INT-004  Focus pulls the viewport by the minimum displacement required to reveal it. section
+R-INT-005  An inside-bearing continuous control cannot commit its domain value from outside; declared readouts may preview and direct-action controls have no inside state. section
+R-INT-006  Every consumed state-changing pointer gesture lands on a state a key can reach. section
+R-INT-007  Escape takes the current host owner’s declared safe path at most one rung; in an attached PTY it belongs to the child. section
+R-INT-008  Nothing moves the reader without asking. Rejected commands explain; passive untargeted pointer events may remain silent. section
+R-HON-001  A dash is not a zero. section
+R-HON-002  A stale reading says when it was taken. section
+R-HON-003  A bounded window says what it dropped. section
+R-HON-004  A refusal states its reason and is never red. section
+R-HON-005  A number carries its unit. section
+R-HON-006  Copy takes the source, never the rendering. section
+R-HON-007  The event record, visible window, and model context never masquerade as one. section
+R-DEG-001  Every distinction survives to one-bit rendering. section
+R-DEG-002  A capability makes things better, never possible. section
+R-DEG-003  Width is checked on a simultaneously rendered set, not on an isolated glyph. section
+R-INT-009  Every handled input produces immediate visible feedback; a rejected command explains why it was rejected. section
+R-INT-010  Every state-changing interaction exposes the safe exit, cancellation, or undo route appropriate to its scope. section
+R-KEY-002  A repeating action declares its delay and repeat rate; text entry and destructive actions do not inherit navigation repeat. section
+R-MOT-009  A ping-pong alphabet traverses 0 → N → 1 so neither endpoint is emitted twice at the cycle seam. section
+R-MOT-010  A spinner’s ASCII fallback preserves the shape of its motion, not merely the visual resemblance of one frame. section
+R-MOT-011  Spinner sets that reuse a frame alphabet also reuse its interval; a semantic family has one cadence. section
+R-NTF-001  A watched run that completes while it is not visible emits the declared completion notification without moving the reader. section
+R-COL-006  A metric declares whether higher, lower, or neutral movement is desirable before trend colour is assigned. section
+R-EVT-001  High-rate pointer samples coalesce inside their declared window without changing the armed target or replaying against a new owner epoch. section
+R-HON-008  A displayed configuration value names the layer or source that supplied it. section
+R-FOC-001  An unpainted box takes whole-shape inversion or lift when focused. section
+R-FOC-002  A continuous control applies its focus wash to label, track, and value as one control. section
+R-FOC-003  A checkbox or radio treats its label and mark as one focus shape. section
+R-FOC-004  A picture, plot, or image takes focus on its border or axes rather than painting its data. section
+R-FOC-005  Focus geometry follows the component and never assumes one interactive element per row. section
+R-PTR-001  Focus-first pointer activation is resolved from state, not from a timing heuristic. section
+R-PTR-002  Remembered focus stores stable identity and re-resolves it when the view returns. section
+R-PTR-003  Hover may update a declared preview or readout but never becomes focus or commits a value. section
+R-PTR-004  A legend item is an actionable control whose click toggles the same series state reachable by keyboard. section
+R-PTR-005  Pointer press arms a stable identity; release commits only when that same identity is still armed. section
+R-PTR-006  A context-click with no declared keyboard-equivalent action has no state-changing effect. section
+R-REF-001  The default terminal profile does not require leader keys or multi-key command sequences. section
+R-REF-002  The application does not capture chords reserved by the terminal, operating system, or assistive technology. section
+R-REF-003  A binding is not exposed when the same chord works only intermittently under indistinguishable visible state. section
+R-TBL-001  Text aligns to inline-start and numeric values align to inline-end. section
+R-TBL-002  Comparable decimal numbers align on their decimal separator, not merely their final character. section
+R-TBL-003  A missing numeric value renders as an unknown dash, never as zero or an unlabeled blank. section
+R-TBL-004  Thousands are grouped and the unit travels with the displayed numeric value. section
+R-TBL-005  A constrained table truncates from the tail and only in the column that must yield. section
+R-TBL-006  Sort state and sort action belong to the column header, which is exposed as a control. section
+R-KEY-003  Arrow keys move, enter confirms, escape backs out, tab moves focus, and shift plus an arrow extends selection unless the current owner explicitly captures the action. section
+R-KEY-004  The active owner and its primary action, safe exit, and help route remain visible or reachable at every responsive rung. section
+R-PRI-002  Every primitive record names the canonical sections that define or exercise it; the generated primitive index renders those links beside its definition. section
+R-PRG-002  A bar alphabet declares where it belongs. Determinate work uses a bar only when a total is known; indeterminate work uses a spinner, discrete steps use posts, sub-cell progress uses braille, and ASCII is the universal fallback rung. section
+R-MOT-012  Every ramp declares its meaning, semantic use, direction, and attention group. Progress and streaming travel inline-start to inline-end unless an explicitly named exception declares another direction. section
+R-KEY-005  Question-mark help emits the generated keymap as a durable, copyable transcript entry with the current scope first and the remaining bindings grouped by scope; docs/KEYS.md is generated from the same binding source. section
+R-KEY-006  The keymap records deliberate departures and platform conventions alongside resolved bindings so a later edit cannot recover an incompatible shortcut by accident. section
+R-GLY-002  Every registered glyph and delimiter is measured in both Unicode and ASCII forms in the composed browser grid; each form must fit reservedCells and leave the following column at the same coordinate. section
+R-KEY-007  The keymap and question-mark help are generated from one resolved action and binding registry. Footer hints in retained specimens are examples, not binding projections. section
+R-REG-002  Normative authority belongs only to explicit current core or atomic rule records. Generic section content is retained as immutable content-addressed EXAMPLE block records; sections cite the current rules that govern them. Raw section HTML is never a normative source. section

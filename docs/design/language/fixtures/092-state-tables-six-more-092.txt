@@ -1,0 +1,77 @@
+six more, and the last two are the ones that had no table anywhere
+
+ A TABLE
+  entry        a call or command returned rows
+  carriers     a painted header · ▾ on the sorted column · the residue row
+  actions      ↑↓ rows · ⇥ to a header, ⏎ sorts · ⌃⇧C copies VALUES
+  esc          out to the transcript, remembering the row
+  motion off   unchanged
+  1-bit        the header is inverse; ▾ survives; the focused row inverts
+  residue      the window, its count, AND its sort — the order is not the
+               document’s, so the residue says so
+
+ A PATCH
+  entry        the model edited a file
+  carriers     the path rule · a COLOURED stat · −/+ markers · the gutter
+  actions      ⏎ enters · ⌃⇧C copies a UNIFIED DIFF, not the painted rows
+  esc          out to the transcript
+  motion off   unchanged
+  1-bit        the markers alone. Grounds gone, gutter tone gone, text plain
+  residue      the hunks and the stat. ↺ revert while the turn is recent
+
+ A PLOT
+  entry        a command or a tool produced a series
+  carriers     the figure · its AXES · a legend · a readout when cursored
+  actions      ⏎ enters · ←→ crosshair or camera · 1–9 toggle a series · hover
+               moves the readout and NEVER the focus
+  esc          out; the camera and the cursor keep their positions
+  motion off   a live plot stops repainting on tick; it still patches on data
+  1-bit        braille survives; the series are told apart by the legend’s
+               marks, never by colour
+  residue      the figure, the final camera, the cursor where you left it
+
+ AN ATTACHED PTY — the CHILD captures ownership over a block
+  entry        ⏎ on a terminal block, deliberately
+  carriers     the border goes heavy · the head says !! attached · the footer
+               names the child and the reserved host escape
+  actions      keys go to the child, including ⌃C and esc, except host.detach
+  esc          goes to the CHILD. ⌃] is the base-terminal host escape;
+               ⌥esc also detaches when the protocol distinguishes it
+  motion off   unchanged
+  1-bit        the heavy border is the carrier; the !! survives
+  residue      the block, scrollable, no longer captured
+
+ A SUBAGENT TAB
+  entry        the model fans out
+  carriers     a painted name chip · its hue on all four rules · the footer row
+  actions      ⌃⇥ switches · ⌘1–9 jumps · its prompt is LIVE
+  esc          its own three scopes. esc never leaves the tab — ⌃⇥ does
+  motion off   its walk stops; its elapsed count carries liveness
+  1-bit        the NAME carries identity; the hue is gone
+  residue      its transcript stays. The parent records what came back
+
+ A PASTE CHIP
+  entry        a paste longer than a few lines, or an @ mention
+  carriers     the chip · its size BEFORE you attach · a warn past a threshold
+  actions      ⏎ opens it to edit · ⌥⌫ drops it · it travels with the message
+  esc          closes the edit view, keeping the chip
+  motion off   unchanged
+  1-bit        the brackets carry it: [#1 json · 47L]
+  residue      part of the sent message, and the transcript shows the chip
+
+★ three more blank cells, and each was a real hole
+
+  A TABLE’S RESIDUE had to say its SORT. The rows are not in the
+  document’s order once you sort them, and a reader who scrolled past
+  the header has no way to know.
+
+  A PLOT’S 1-BIT form could not use colour to separate series, and
+  nothing said what did. The LEGEND’S MARKS do — which means a plot
+  with more series than marks is a plot that cannot degrade, and that
+  is a real limit the plot arm should enforce.
+
+  AN ATTACHED PTY’S ESC belongs to the CHILD. It alone sends esc outside
+  Calcium; other captured owners handle it on the host, while passive rows
+  may declare no-op or not-applicable. The PTY therefore needs its own
+  chord and the footer has to say it. Without the table, that cell was
+  simply never asked.

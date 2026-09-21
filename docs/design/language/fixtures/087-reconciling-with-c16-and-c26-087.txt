@@ -1,0 +1,75 @@
+C16 and C26 were written before this pass. Where they disagree with it,
+here is which wins and why.
+
+the specs are the authority on MECHANISM. This document is the authority
+on SHAPE. A binding is a shape; the store it writes is a mechanism.
+
+what changed, and every one is a binding rather than a behaviour
+
+  newline          ⌥⏎  →  ⇧⏎      what people type, and the
+                                   protocol makes it detectable
+  copy             y     →  ⌃⇧C     a letter types a letter
+  bottom           G     →  ⌘↓       it was never a mode
+  find             ⌃r    →  ⌃⇧F     find, as everywhere else
+  scroll           ⇞ ⇟   →  ⌥↑↓     ⇞ ⇟ are not on a laptop
+  move by entry    n p   →  ↑↓       they were always arrows
+  leave the prompt —     →  ⇧⇥      shift-tab moves focus back
+  switch agent     —     →  ⌃⇥      agents are tabs
+
+  none of these changes what the key DOES — the action, the store
+  and the frame are the specs'. Only the chord moved.
+
+what this pass ADDS that the specs have no row for
+
+  focusGround         a lightness ground for the cursor. C10 has
+                      selection and no focus surface
+  keyboardProtocol    C02's tenth capability field. It is
+                      UNCONSIDERED there, not deferred
+  per-binding repeat  DAS and ARR as a decision, which needs the
+                      protocol's release events to exist at all
+  the scope footer    the last line naming the live keys
+
+★ and one RULE needed refining, because the legend caught it
+
+  I wrote NO SINGLE-LETTER COMMANDS ON CONTENT. But the gesture
+  table has 1–9 toggling a plot's series, which is exactly that.
+
+  the rule's REASON was: while an editor owns input, ordinary text keys
+  keep typing there without a focus check. The rule bites wherever typing
+  is possible; non-typing owners may declare single-key actions.
+
+  corrected: NO SINGLE-KEY COMMANDS IN ANY SCOPE WHERE TYPING IS
+  POSSIBLE. Inside a block nothing is typed, so 1–9 on a legend and
+  r to reset a camera are legal and good.
+
+  which is the shape of correction this whole exercise keeps
+  producing: the rule was right and its statement was too wide.
+
+what the specs got right and this document IMPORTED unchanged
+
+  click again is a state test, not a timing one
+  focus memory, resolved by id, falling forward
+  hover may preview inline targets or move a plot readout; never moves focus
+  or commits domain/action state
+  press arms; release commits only to the same stable identity
+  right-click has no key equal, so it has no effect
+  a click on a non-element row is unconsumed
+  a selection cannot straddle two entries
+  the wheel acts on the box under the POINTER, not the focused one
+
+  all eight are better than anything I would have arrived at, and
+  six of them are answers to questions I had not thought to ask.
+
+what to do when they conflict during the build
+
+  1  a CHORD conflict — this document wins, and the spec's row is
+     updated rather than exempted
+  2  a MECHANISM conflict — the spec wins, and this document is
+     wrong about how something works
+  3  a RULE conflict — neither wins automatically. Find the rule's
+     reason and check whether it reaches the case, as the legend
+     did above
+
+  and the third is the common one, which is why a rule in this
+  document without its reason beside it is a rule that will be
+  applied somewhere it does not belong.

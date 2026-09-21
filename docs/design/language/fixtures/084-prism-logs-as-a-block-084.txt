@@ -1,0 +1,29 @@
+logs are a BLOCK — it was already a scroll container and needed no frame
+
+ ❯ /logs a3f9b21 --follow
+
+● logs a3f9b21 · 1,204 lines · ● following
+  ⎿ 14:23:01.882  INFO   [trainer] epoch 17 started
+    14:23:02.104  INFO   [dataloader] batch 41/256         ╽
+    14:23:02.339  DEBUG  [memory] gpu_mem=52GiB/80GiB      ┃
+    14:23:02.551  WARN   [dataloader] slow batch (87ms)    ┃
+    14:23:02.774  INFO   [trainer] step 2417 · loss=0.0372 ╿
+    14:23:03.001  ERROR  [checkpoint] write failed, retrying
+    1,204 lines · at 1,198 · 2 warnings · 1 error   l level  ⌃s pause
+
+ ❯ what was the checkpoint error?
+
+● It failed writing to the shared volume and retried once.
+
+and THAT is the point: the logs are still on screen while you ask
+about them. A pushed view would have taken them away at exactly the
+moment you wanted to refer to them.
+
+  the level column is a TONE, never a ground — a wall of painted
+  labels would make the messages the quietest thing on screen.
+
+  following means the tail pulls the block. Page up inside it once
+  and it stops; the head says ● paused; returning to the bottom
+  resumes it — which is Scroll.follow, not a new mechanism.
+
+  and the count answers what a bar cannot: 1,204 lines, at 1,198.

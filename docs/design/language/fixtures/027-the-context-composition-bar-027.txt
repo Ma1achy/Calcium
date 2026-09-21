@@ -1,0 +1,10 @@
+a percentage says 78% full. It does not reveal which sources consume it.
+
+  ctx ███████████████████████░░░░░░░  78%   ⏎ breakdown
+      systoolsturns└────file─────┘
+
+  ▐ system prompt    ▐ tool schemas
+  ▐ conversation     ▐ tool results and pasted content
+
+a single read_file that swallowed the window is visible at a glance
+instead of an unexplained jump from 30% to 78%.

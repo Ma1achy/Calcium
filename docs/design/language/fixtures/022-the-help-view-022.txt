@@ -1,0 +1,55 @@
+● keys · 39 bindings
+Help is an ENTRY in scrollback: copyable, filterable, and scrolled past like any other durable event.
+
+ prompt
+  key ⇧⏎     newline
+  key ⌃⇧V    paste
+  key ⌥⌫     drop the last queued message
+
+ global
+  key ⏎      confirm · send · activate · open
+  key esc    out one owner rung · cancel · clear
+  key ⇥      move focus forward; complete in the prompt
+  key ⇧⇥     move focus backward
+  key ↑      move up within the focused thing · focused
+  key ↓      move down within the focused thing · focused
+  key ←      move left within the focused thing · focused
+  key →      move right within the focused thing · focused
+  key ⇧↑     extend selection up · selectable
+  key ⇧↓     extend selection down · selectable
+  key ⇧←     extend selection left · selectable
+  key ⇧→     extend selection right · selectable
+  key ⌃⇧C    copy source; ⌘C where passed through
+  key ⌃C     interrupt · running
+  key F1     emit the resolved keymap
+  key ?      emit the resolved keymap · non-typing
+  cmd /help  base-terminal help route · typing
+  key ⌃⇥     switch to next agent
+  key ⌃⇧⇥    switch to previous agent
+  key ⌘1     jump to agent 1
+  key ⌘2     jump to agent 2
+  key ⌘3     jump to agent 3
+  key ⌘4     jump to agent 4
+  key ⌘5     jump to agent 5
+  key ⌘6     jump to agent 6
+  key ⌘7     jump to agent 7
+  key ⌘8     jump to agent 8
+  key ⌘9     jump to agent 9
+  key ⌥p     cycle permission posture
+  key ⌥⇧C    hand the mouse to the terminal
+  key ⌥⇧V    enter Calcium copy mode
+
+ transcript
+  key ⌥↑     scroll one page up
+  key ⌥↓     scroll one page down
+  key ⌘↑     go to top
+  key ⌘↓     go to bottom
+  key ⌥v     toggle per-token values
+
+The active scope is rendered first; this specimen resolves prompt as the current scope, then preserves registry order for the remaining scopes.
+Bindings are grouped by scope because that is how ownership shapes the keymap.
+The help view is generated from the binding registry, so a new binding cannot be absent from help.
+docs/KEYS.md and the help entry come from the same source; a hand-written keymap drifts.
+[R-KEY-005]
+
+Keymap and ? help are generated from R-KEY-007; retained footer specimens remain examples.

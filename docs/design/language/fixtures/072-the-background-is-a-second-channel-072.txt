@@ -1,0 +1,60 @@
+a background is for an EXTENT. a foreground is for a MARK.
+something with length or area takes a ground; a symbol or a label does not.
+
+1 · a changed line — and the ground runs to the BLOCK'S EDGE, not the text's
+     41 - let inQuote = false;
+     41 + let depth = 0;
+     47 - if (ch === '"') inQuote = !inQuote;
+     47 + if (ch === '"') depth += (ch === q) ? (esc ? 0 : 1) : 0;
+     52   return tokens;
+    the LINE changed, so the line is painted. A ground stopping at the
+    last character says a word changed, which is a different claim.
+
+2 · a word-level change inside an unchanged line — now the ground is short
+     63   const rows = measureSequence(blocks, width);
+     63   const rows = measureWindow(blocks, width);
+    the extent IS the claim — and this needs spans, which is why it is
+    the substrate arc's subject rather than a rendering choice.
+
+3 · a TAG with extent — and the error tag is the only one in the system
+     ERROR          a failure, and only a failure
+    » auto          a posture — TEXT, never a ground
+    so a posture can never be mistaken for an error, whatever its hue
+
+4 · a context bar — the segments are grounds, so the composition is legible
+    ctx                                 78%   ⏎ breakdown
+        └sys─┘└tool┘└─turns──┘└file┘
+    one read_file swallowed about 23% and it is visible, not an unexplained jump
+
+5 · a selection — a run the terminal cannot tell you the bounds of
+    explain this error and compare with the previous run
+
+6 · a focused row — a wash plus a persistent mark
+      a3f9b21  digit-classifier  running    0.0372   23m
+    ▸ 7c2d4e1  decoder-zoom      succeeded  0.0089   41m
+      2e8a04c  graphsage         failed     —        1h
+
+7 · a value's magnitude in a table cell — the ground IS the number
+    gpu-01  ░░▒▒▒▒▓▓██▓▓▒▒░░   71%
+    gpu-02  ░░░░▒▒▒▒▒▒░░░░░░   34%
+    a sparkline says the shape. A painted cell says the LEVEL, and both
+    fit in a column a number would need eight of.
+
+8 · a half-block image — two full colours per cell, the one place a ground
+    doubles the resolution rather than decorating it
+    ▀▀▀▀▀▀▀▀   fg = the top pixel, bg = the bottom; metadata is the nonvisual equivalent
+
+9 · a well — structural, never semantic. bgDeep says CONTENT INSIDE
+     loss
+     4.0┤⢀⡠⠔⠒⠉⠉⠑⠒⠢⢄
+     0.0┼──────────────────────────────────────────
+
+the two rules
+
+  structural grounds and semantic grounds never mix. A panel takes bgElev;
+  it never takes diffAdd. A well is bgDeep; a selection is not.
+
+  and a ground is NEVER the only carrier for actionable/status state — surfaces vanish at 1-bit:
+     41 - let inQuote = false;     the +/− carries it
+    ▸ 7c2d4e1  decoder-zoom        the ▸ carries it
+    » auto                        the » and the bold carry it

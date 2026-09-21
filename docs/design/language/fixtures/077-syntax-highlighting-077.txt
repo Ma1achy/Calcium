@@ -1,0 +1,42 @@
+the syntax palette — six slots, and they are TONES rather than a second
+set of colours
+
+  keyword     meta        const, if, return, function
+  string      ok          a literal, and it reads as data
+  number      warn        including a boolean — a value, not a name
+  identifier  identifier  a name you or the code chose
+  comment     muted       furniture, and it recedes
+  everything  default     punctuation, operators, whitespace
+
+  export function parse(src: string): Token[] {
+    const out = [];            // the accumulator
+    let depth = 0;
+    if (ch === '"') depth += depth > 0 ? -1 : 1;
+
+six slots because six is what a reader can hold. Twenty-slot themes
+exist and nobody can name what the twentieth means — they are chosen
+for coverage, not for reading.
+
+★ and it borrows the SAME tones the rest of the system uses
+
+  which means a theme has one palette rather than two, and a reader
+  who has learnt that identifier tone means A NAME learns nothing
+  new when they look at code.
+
+  it also means a syntax colour can never contradict a status one:
+  there is no separate red for an error in code, because errors are
+  not a syntax category.
+
+where it applies, and where it does not
+
+  a code block          yes
+  a patch, ALL THREE kinds yes — removed lines too
+  a tool's arguments    yes — they are code
+  the prompt            only a leading /command, and only the verb
+  agent prose           no — it is prose, and inline ` ` is a span
+
+degradation
+
+  8-bit · 4-bit  the same six, quantised
+  1-bit          keywords BOLD, comments faint, the rest plain —
+                 which is the weight ladder each tone already carries

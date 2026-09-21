@@ -1,0 +1,39 @@
+★ the coalescing window is also the INPUT LATENCY FLOOR, and that is a
+problem the framework created for itself
+
+  C03 coalesces commits into one frame per 100ms window. That is what
+  makes a streaming turn affordable — and it means a keystroke can
+  wait up to 100ms to appear.
+
+  100ms is the number at which a person stops believing they caused
+  the thing. So typing at the window's rate feels like a bad ssh
+  connection on a local machine.
+
+so input does not go through the window
+
+  a keystroke that only changes the PROMPT   draw now
+  a keystroke that moves FOCUS               draw now
+  a keystroke that changes the DOCUMENT      the window
+  a stream patch                             the window
+  a tick                                     the window
+
+  the split is not urgency, it is CAUSATION: a reader pressed a key
+  and is waiting to see it. Everything else arrived on its own and
+  nobody is watching for it at 16ms.
+
+  and the cost is bounded, because a person types at ten a second
+  and a stream arrives at ninety. Exempting input exempts the SMALL
+  population.
+
+three framework budgets, plus an unbounded turn
+
+  echo        ≤ 16ms    slower and typing feels laggy
+  a key that  ≤ 50ms    slower and the arrows feel sticky
+  moves focus
+  a frame     ≤ 16ms    slower and a stream stutters
+  a turn      no budget it takes what it takes, and the
+                        elapsed counter is the honest answer
+
+  only the first three are the framework's. Confusing them with the
+  fourth is how a tool ends up feeling slow while every number in
+  it is green.

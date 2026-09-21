@@ -1,0 +1,26 @@
+Every reusable set carries its own interval; the caller never picks one.
+20 named reusable sets are shown here; the composite agent walk makes 21.
+
+  ✦  braille           80ms   ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏
+  ✦  bounce           130ms   ⠁⠂⠄⠂
+  ✦  orbit             90ms   ⠁⠈⠐⠠⢀⡀⠄⠂
+  ✦  grow             120ms   ✦✢✲✶✷✹✺✹✷✶✲✢
+  ✦  bloom            120ms   ⋅✧✦✢✻✾❀✿❀✾✻✢✦✧
+  ✦  starfield        120ms   ✶✷✸✹✺✹✸✷
+  ✦  fullramp         120ms   ⋅∘◦✧✦✢✲✵✶✷✱✺✹✸✼✻❃❁✾❀✿❂✿❀✾❁❃✻✼✸✹✺✱✷✶✵✲✢✦✧◦∘
+  ✦  hex              110ms   0123456789abcdef
+  ✦  toggle           400ms   ⊶⊷
+  ✦  circleQuarters   140ms   ◴◷◶◵
+  ✦  boxBounce        140ms   ▖▘▝▗
+  ✦  growVertical     100ms   ▁▃▄▅▆▇▆▅▄▃
+  ✦  growHorizontal   120ms   ▏▎▍▌▋▊▉▊▋▌▍▎
+  ✦  noise            100ms   ▓▒░
+  ✦  boxBounce2       120ms   ▌▀▐▄
+  ✦  triangle         120ms   ◢◣◤◥
+  ✦  circleHalves     120ms   ◐◓◑◒
+  ✦  pipe             100ms   ┤┘┴└├┌┬┐
+  ✦  arrow            200ms   ←↑→↓
+  ✦  pulse            120ms   ✢✲✱✻✱✲
+
+A real terminal resolves each registered set against measured cell widths. The browser specimen defaults to rich Unicode; ASCII is an explicit degradation preview, not a global browser-font guess.
+The generated fallback table separately demonstrates the ASCII degradation rung; ?glyphs=auto is an optional per-set browser diagnostic.

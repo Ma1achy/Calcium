@@ -1,0 +1,20 @@
+████  default     body text, the reading
+████  dim         secondary text
+████  muted       furniture, units
+████  ok          a good outcome
+████  warn        approaching a limit
+████  error       over a limit, a failure
+████  info        a neutral notice
+████  accent      focused / current interaction emphasis
+████  meta        a kind, a type
+████  identifier  a name you can type
+
+        bg            the ground
+        bgElev        a panel, a button
+        bgDeep        a well: a plot, a chip
+        border        ordinary chrome
+        borderStrong  a focused container
+▌       selection     a selected run · underline, range edge or ▌ also carries it
+        meterFill     a quantitative extent; its label carries the value
+        match         a search hit, with underline; never copy selection
+        dataA–D       categorical data palette, paired with labels or a data view

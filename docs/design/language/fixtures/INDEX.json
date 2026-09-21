@@ -1,0 +1,1571 @@
+[
+ {
+  "file": "001-current-contract.txt",
+  "section": 1,
+  "id": "current-contract",
+  "title": "Current contract — the rules implementations targetcurrent · R-SPC-001 · example R-EXA-001",
+  "cols": 355,
+  "rows": 103,
+  "sha": "5f4ad2eab35339d1",
+  "ruleIds": [
+   "R-SPC-001",
+   "R-EXA-001"
+  ]
+ },
+ {
+  "file": "002-the-primitives-and-where-each-is-defined-002.txt",
+  "section": 2,
+  "id": "the-primitives-and-where-each-is-defined-002",
+  "title": "The primitives, and where each is definedcurrent · R-PRI-001 R-PRI-002 · example R-EXA-002",
+  "cols": 183,
+  "rows": 67,
+  "sha": "8e6d270ccd050309",
+  "ruleIds": [
+   "R-PRI-001",
+   "R-PRI-002",
+   "R-EXA-002"
+  ]
+ },
+ {
+  "file": "003-the-agent-at-work-five-regions-activity-presen.txt",
+  "section": 3,
+  "id": "the-agent-at-work-five-regions-activity-present-003",
+  "title": "The agent at work — five regions, activity presentcurrent · R-STR-001 R-STR-002 R-MOT-008 · retained example blocks generated from registry · example R-EXA-003",
+  "cols": 78,
+  "rows": 41,
+  "sha": "117c31ecdb5e2c31",
+  "ruleIds": [
+   "R-STR-001",
+   "R-STR-002",
+   "R-MOT-008",
+   "R-EXA-003"
+  ]
+ },
+ {
+  "file": "004-idle-the-activity-region-and-its-rule-are-gone.txt",
+  "section": 4,
+  "id": "idle-the-activity-region-and-its-rule-are-gone-004",
+  "title": "Idle — the activity region and its rule are gonecurrent · R-STR-001 R-MOT-007 · retained example blocks generated from registry · example R-EXA-004",
+  "cols": 78,
+  "rows": 17,
+  "sha": "f70c6862bea89ae3",
+  "ruleIds": [
+   "R-STR-001",
+   "R-MOT-007",
+   "R-EXA-004"
+  ]
+ },
+ {
+  "file": "005-cancelled-the-spinner-stops-the-region-stays-0.txt",
+  "section": 5,
+  "id": "cancelled-the-spinner-stops-the-region-stays-005",
+  "title": "Cancelled — the spinner stops, the region stayscurrent · R-STR-001 R-MOT-002 · retained example blocks generated from registry · example R-EXA-005",
+  "cols": 78,
+  "rows": 24,
+  "sha": "6dca22d23c8f6f7e",
+  "ruleIds": [
+   "R-STR-001",
+   "R-MOT-002",
+   "R-EXA-005"
+  ]
+ },
+ {
+  "file": "006-the-mark-vocabulary-twelve-canonical-glyphs-00.txt",
+  "section": 6,
+  "id": "the-mark-vocabulary-twelve-canonical-glyphs-006",
+  "title": "The mark vocabulary — twelve canonical glyphscurrent · R-GLY-001 R-GLY-002 · example R-EXA-006",
+  "cols": 170,
+  "rows": 23,
+  "sha": "82281f6df12691e8",
+  "ruleIds": [
+   "R-GLY-001",
+   "R-GLY-002",
+   "R-EXA-006"
+  ]
+ },
+ {
+  "file": "007-subagents-007.txt",
+  "section": 7,
+  "id": "subagents-007",
+  "title": "Subagentscurrent · R-COR-001 R-STR-001 · retained example blocks generated from registry · example R-EXA-007",
+  "cols": 78,
+  "rows": 137,
+  "sha": "3d5181c47e4ae2fd",
+  "ruleIds": [
+   "R-COR-001",
+   "R-STR-001",
+   "R-EXA-007"
+  ]
+ },
+ {
+  "file": "008-a-message-you-sent-008.txt",
+  "section": 8,
+  "id": "a-message-you-sent-008",
+  "title": "A message you sentcurrent · R-STR-001 R-STR-002 · retained example blocks generated from registry · example R-EXA-008",
+  "cols": 72,
+  "rows": 29,
+  "sha": "4305b79a88b05237",
+  "ruleIds": [
+   "R-STR-001",
+   "R-STR-002",
+   "R-EXA-008"
+  ]
+ },
+ {
+  "file": "009-the-queue-009.txt",
+  "section": 9,
+  "id": "the-queue-009",
+  "title": "The queuecurrent · R-COR-001 R-STA-001 · retained example blocks generated from registry · example R-EXA-009",
+  "cols": 78,
+  "rows": 56,
+  "sha": "d5f249b08f2d94d4",
+  "ruleIds": [
+   "R-COR-001",
+   "R-STA-001",
+   "R-EXA-009"
+  ]
+ },
+ {
+  "file": "010-startup-and-resume-010.txt",
+  "section": 10,
+  "id": "startup-and-resume-010",
+  "title": "Startup and resumecurrent · R-COR-001 R-HON-003 · retained example blocks generated from registry · example R-EXA-010",
+  "cols": 78,
+  "rows": 31,
+  "sha": "0d144f06f3a1fb08",
+  "ruleIds": [
+   "R-COR-001",
+   "R-HON-003",
+   "R-EXA-010"
+  ]
+ },
+ {
+  "file": "011-mentions-011.txt",
+  "section": 11,
+  "id": "mentions-011",
+  "title": "@ mentionscurrent · R-TXT-001 R-COL-003 · retained example blocks generated from registry · example R-EXA-011",
+  "cols": 78,
+  "rows": 21,
+  "sha": "b2b0271eba22afd9",
+  "ruleIds": [
+   "R-TXT-001",
+   "R-COL-003",
+   "R-EXA-011"
+  ]
+ },
+ {
+  "file": "012-multi-line-and-transient-feedback-012.txt",
+  "section": 12,
+  "id": "multi-line-and-transient-feedback-012",
+  "title": "Multi-line and transient feedbackcurrent · R-STR-002 R-HON-004 · retained example blocks generated from registry · example R-EXA-012",
+  "cols": 74,
+  "rows": 24,
+  "sha": "991a6c4802993965",
+  "ruleIds": [
+   "R-STR-002",
+   "R-HON-004",
+   "R-EXA-012"
+  ]
+ },
+ {
+  "file": "013-review-what-auto-wrote-013.txt",
+  "section": 13,
+  "id": "review-what-auto-wrote-013",
+  "title": "Review what auto wrotecurrent · R-OWN-001 R-HON-004 · retained example blocks generated from registry · example R-EXA-013",
+  "cols": 67,
+  "rows": 24,
+  "sha": "a192eb90c9e9a12d",
+  "ruleIds": [
+   "R-OWN-001",
+   "R-HON-004",
+   "R-EXA-013"
+  ]
+ },
+ {
+  "file": "014-when-you-are-away-014.txt",
+  "section": 14,
+  "id": "when-you-are-away-014",
+  "title": "When you are awaycurrent · R-NTF-001 R-COR-001 · retained example blocks generated from registry · example R-EXA-014",
+  "cols": 71,
+  "rows": 18,
+  "sha": "772959b7ea691c4e",
+  "ruleIds": [
+   "R-NTF-001",
+   "R-COR-001",
+   "R-EXA-014"
+  ]
+ },
+ {
+  "file": "015-interaction-four-principles-015.txt",
+  "section": 15,
+  "id": "interaction-four-principles-015",
+  "title": "Interaction — four principlescurrent · R-KEY-003 R-INT-001 R-INT-002 R-KEY-004 · retained example blocks generated from registry · example R-EXA-015",
+  "cols": 79,
+  "rows": 36,
+  "sha": "450379641f240266",
+  "ruleIds": [
+   "R-KEY-003",
+   "R-INT-001",
+   "R-INT-002",
+   "R-KEY-004",
+   "R-EXA-015"
+  ]
+ },
+ {
+  "file": "016-scopes-016.txt",
+  "section": 16,
+  "id": "scopes-016",
+  "title": "Scopescurrent · R-INT-001 R-OWN-001 · retained example blocks generated from registry · example R-EXA-016",
+  "cols": 74,
+  "rows": 49,
+  "sha": "3b4c8a22d1715e87",
+  "ruleIds": [
+   "R-INT-001",
+   "R-OWN-001",
+   "R-EXA-016"
+  ]
+ },
+ {
+  "file": "017-focus-the-focus-treatment-follows-the-shape-01.txt",
+  "section": 17,
+  "id": "focus-the-focus-treatment-follows-the-shape-017",
+  "title": "Focus — the focus treatment follows the shapecurrent · R-COL-005 R-STA-003 · retained example blocks generated from registry · example R-EXA-017",
+  "cols": 84,
+  "rows": 81,
+  "sha": "c32683c55dfcdd72",
+  "ruleIds": [
+   "R-COL-005",
+   "R-STA-003",
+   "R-EXA-017"
+  ]
+ },
+ {
+  "file": "018-focus-on-things-that-are-not-rows-018.txt",
+  "section": 18,
+  "id": "focus-on-things-that-are-not-rows-018",
+  "title": "Focus on things that are not rowscurrent · R-FOC-001 R-FOC-002 R-FOC-003 R-FOC-004 R-FOC-005 · retained example blocks generated from registry · example R-EXA-018",
+  "cols": 91,
+  "rows": 67,
+  "sha": "1b93a5bd663c115c",
+  "ruleIds": [
+   "R-FOC-001",
+   "R-FOC-002",
+   "R-FOC-003",
+   "R-FOC-004",
+   "R-FOC-005",
+   "R-EXA-018"
+  ]
+ },
+ {
+  "file": "019-the-keys-019.txt",
+  "section": 19,
+  "id": "the-keys-019",
+  "title": "The keyscurrent · R-KEY-007 R-KEY-006 · example R-EXA-019",
+  "cols": 140,
+  "rows": 69,
+  "sha": "fbeaa224e3cb2ebc",
+  "ruleIds": [
+   "R-KEY-007",
+   "R-KEY-006",
+   "R-EXA-019"
+  ]
+ },
+ {
+  "file": "020-key-repeat-das-and-arr-020.txt",
+  "section": 20,
+  "id": "key-repeat-das-and-arr-020",
+  "title": "Key repeat — DAS and ARRcurrent · R-KEY-002 R-CAP-001 · retained example blocks generated from registry · example R-EXA-020",
+  "cols": 70,
+  "rows": 43,
+  "sha": "3841ee3078ebc622",
+  "ruleIds": [
+   "R-KEY-002",
+   "R-CAP-001",
+   "R-EXA-020"
+  ]
+ },
+ {
+  "file": "021-the-scrollbar-021.txt",
+  "section": 21,
+  "id": "the-scrollbar-021",
+  "title": "The scrollbarcurrent · R-INT-003 R-INT-004 R-HON-003 · retained example blocks generated from registry · example R-EXA-021",
+  "cols": 72,
+  "rows": 88,
+  "sha": "219e3d9a533db6d9",
+  "ruleIds": [
+   "R-INT-003",
+   "R-INT-004",
+   "R-HON-003",
+   "R-EXA-021"
+  ]
+ },
+ {
+  "file": "022-the-help-view-022.txt",
+  "section": 22,
+  "id": "the-help-view-022",
+  "title": "The help viewcurrent · R-KEY-007 R-KEY-005 · example R-EXA-022",
+  "cols": 143,
+  "rows": 55,
+  "sha": "0612e819b9a6c4d7",
+  "ruleIds": [
+   "R-KEY-007",
+   "R-KEY-005",
+   "R-EXA-022"
+  ]
+ },
+ {
+  "file": "023-at-40-columns-023.txt",
+  "section": 23,
+  "id": "at-40-columns-023",
+  "title": "At 40 columnscurrent · R-STR-003 R-STR-004 R-CAP-001 · retained example blocks generated from registry · example R-EXA-023",
+  "cols": 66,
+  "rows": 29,
+  "sha": "7fe1c2ccde50c242",
+  "ruleIds": [
+   "R-STR-003",
+   "R-STR-004",
+   "R-CAP-001",
+   "R-EXA-023"
+  ]
+ },
+ {
+  "file": "024-reasoning-024.txt",
+  "section": 24,
+  "id": "reasoning-024",
+  "title": "Reasoningcurrent · R-MOT-006 R-MOT-004 · retained example blocks generated from registry · example R-EXA-024",
+  "cols": 71,
+  "rows": 9,
+  "sha": "786a0e79602c1bab",
+  "ruleIds": [
+   "R-MOT-006",
+   "R-MOT-004",
+   "R-EXA-024"
+  ]
+ },
+ {
+  "file": "026-the-trail-and-the-mark-at-the-head-026.txt",
+  "section": 26,
+  "id": "the-trail-and-the-mark-at-the-head-026",
+  "title": "The trail, and the mark at the headcurrent · R-MOT-004 R-COR-003 · retained example blocks generated from registry · example R-EXA-026",
+  "cols": 84,
+  "rows": 76,
+  "sha": "6334895423000052",
+  "ruleIds": [
+   "R-MOT-004",
+   "R-COR-003",
+   "R-EXA-026"
+  ]
+ },
+ {
+  "file": "027-the-context-composition-bar-027.txt",
+  "section": 27,
+  "id": "the-context-composition-bar-027",
+  "title": "The context composition barcurrent · R-PRG-001 R-COL-003 R-COL-004 · retained example blocks generated from registry · example R-EXA-027",
+  "cols": 72,
+  "rows": 10,
+  "sha": "86b6d74e13ee3ade",
+  "ruleIds": [
+   "R-PRG-001",
+   "R-COL-003",
+   "R-COL-004",
+   "R-EXA-027"
+  ]
+ },
+ {
+  "file": "028-approval-replaces-the-prompt-028.txt",
+  "section": 28,
+  "id": "approval-replaces-the-prompt-028",
+  "title": "Approval replaces the promptcurrent · R-QST-001 R-QST-004 R-PER-001 · retained example blocks generated from registry · example R-EXA-028",
+  "cols": 78,
+  "rows": 18,
+  "sha": "14d2320353d87415",
+  "ruleIds": [
+   "R-QST-001",
+   "R-QST-004",
+   "R-PER-001",
+   "R-EXA-028"
+  ]
+ },
+ {
+  "file": "029-completion-expands-it-029.txt",
+  "section": 29,
+  "id": "completion-expands-it-029",
+  "title": "Completion expands itcurrent · R-QST-001 R-STR-001 · retained example blocks generated from registry · example R-EXA-029",
+  "cols": 78,
+  "rows": 16,
+  "sha": "99a257a2b2b854e9",
+  "ruleIds": [
+   "R-QST-001",
+   "R-STR-001",
+   "R-EXA-029"
+  ]
+ },
+ {
+  "file": "030-the-dot-the-cursor-the-running-state-030.txt",
+  "section": 30,
+  "id": "the-dot-the-cursor-the-running-state-030",
+  "title": "The dot, the cursor, the running statecurrent · R-MOT-002 R-MOT-007 · retained example blocks generated from registry · example R-EXA-030",
+  "cols": 76,
+  "rows": 44,
+  "sha": "16ca3c46e182bc47",
+  "ruleIds": [
+   "R-MOT-002",
+   "R-MOT-007",
+   "R-EXA-030"
+  ]
+ },
+ {
+  "file": "031-spinners-every-reusable-set-at-its-own-interva.txt",
+  "section": 31,
+  "id": "spinners-every-reusable-set-at-its-own-interval-031",
+  "title": "Spinners — every reusable set, at its own intervalcurrent · R-MOT-002 R-MOT-005 · example R-EXA-031",
+  "cols": 196,
+  "rows": 26,
+  "sha": "98a040aead3fabaf",
+  "ruleIds": [
+   "R-MOT-002",
+   "R-MOT-005",
+   "R-EXA-031"
+  ]
+ },
+ {
+  "file": "032-the-four-spinner-rules-032.txt",
+  "section": 32,
+  "id": "the-four-spinner-rules-032",
+  "title": "The four spinner rulescurrent · R-MOT-005 R-MOT-002 R-MOT-009 R-MOT-010 · retained example blocks generated from registry · example R-EXA-032",
+  "cols": 166,
+  "rows": 69,
+  "sha": "cad007f43a182be0",
+  "ruleIds": [
+   "R-MOT-005",
+   "R-MOT-002",
+   "R-MOT-009",
+   "R-MOT-010",
+   "R-EXA-032"
+  ]
+ },
+ {
+  "file": "033-progress-bars-nine-alphabets-and-where-each-be.txt",
+  "section": 33,
+  "id": "progress-bars-nine-alphabets-and-where-each-belongs-033",
+  "title": "Progress bars — nine alphabets, and where each belongscurrent · R-PRG-001 R-PRG-002 · example R-EXA-033",
+  "cols": 93,
+  "rows": 22,
+  "sha": "fa364eb3efcb1204",
+  "ruleIds": [
+   "R-PRG-001",
+   "R-PRG-002",
+   "R-EXA-033"
+  ]
+ },
+ {
+  "file": "034-active-progress-bars-034.txt",
+  "section": 34,
+  "id": "active-progress-bars-034",
+  "title": "Active progress barscurrent · R-PRG-001 R-MOT-002 · retained example blocks generated from registry · example R-EXA-034",
+  "cols": 84,
+  "rows": 17,
+  "sha": "243bd42f69a7e2df",
+  "ruleIds": [
+   "R-PRG-001",
+   "R-MOT-002",
+   "R-EXA-034"
+  ]
+ },
+ {
+  "file": "035-meter-semantics-quantity-granularity-and-liven.txt",
+  "section": 35,
+  "id": "meter-semantics-quantity-granularity-and-liveness-035",
+  "title": "Meter semantics — quantity, granularity and livenesscurrent · R-PRG-001 · retained example blocks generated from registry · example R-EXA-035",
+  "cols": 75,
+  "rows": 37,
+  "sha": "0f7b4e09dc5a1bc2",
+  "ruleIds": [
+   "R-PRG-001",
+   "R-EXA-035"
+  ]
+ },
+ {
+  "file": "036-the-operation-and-budget-presets-036.txt",
+  "section": 36,
+  "id": "the-operation-and-budget-presets-036",
+  "title": "The operation and budget presetscurrent · R-PRG-001 · retained example blocks generated from registry · example R-EXA-036",
+  "cols": 84,
+  "rows": 94,
+  "sha": "e8c214265cc05680",
+  "ruleIds": [
+   "R-PRG-001",
+   "R-EXA-036"
+  ]
+ },
+ {
+  "file": "037-ink-ramps-every-effect-037.txt",
+  "section": 37,
+  "id": "ink-ramps-every-effect-037",
+  "title": "Ink ramps — every effectcurrent · R-MOT-005 R-MOT-012 · example R-EXA-037",
+  "cols": 122,
+  "rows": 54,
+  "sha": "58c18a2e8b9bae32",
+  "ruleIds": [
+   "R-MOT-005",
+   "R-MOT-012",
+   "R-EXA-037"
+  ]
+ },
+ {
+  "file": "038-the-agents-mark-and-the-verbs-ramp-038.txt",
+  "section": 38,
+  "id": "the-agents-mark-and-the-verbs-ramp-038",
+  "title": "The agent’s mark, and the verb’s rampcurrent · R-MOT-006 R-MOT-008 · retained example blocks generated from registry · example R-EXA-038",
+  "cols": 81,
+  "rows": 68,
+  "sha": "cc4a308ed92e34e7",
+  "ruleIds": [
+   "R-MOT-006",
+   "R-MOT-008",
+   "R-EXA-038"
+  ]
+ },
+ {
+  "file": "039-one-interval-one-family-039.txt",
+  "section": 39,
+  "id": "one-interval-one-family-039",
+  "title": "One interval, one familycurrent · R-MOT-011 R-MOT-005 · retained example blocks generated from registry · example R-EXA-039",
+  "cols": 78,
+  "rows": 42,
+  "sha": "0ea4622dd75872a4",
+  "ruleIds": [
+   "R-MOT-011",
+   "R-MOT-005",
+   "R-EXA-039"
+  ]
+ },
+ {
+  "file": "041-the-spinner-is-chosen-by-the-verb-041.txt",
+  "section": 41,
+  "id": "the-spinner-is-chosen-by-the-verb-041",
+  "title": "The spinner is chosen by the verbcurrent · R-MOT-006 R-MOT-002 · retained example blocks generated from registry · example R-EXA-041",
+  "cols": 73,
+  "rows": 18,
+  "sha": "6750b680867977d6",
+  "ruleIds": [
+   "R-MOT-006",
+   "R-MOT-002",
+   "R-EXA-041"
+  ]
+ },
+ {
+  "file": "042-widgets-042.txt",
+  "section": 42,
+  "id": "widgets-042",
+  "title": "Widgetscurrent · R-STA-001 R-STA-002 R-COL-005 · retained example blocks generated from registry · example R-EXA-042",
+  "cols": 56,
+  "rows": 13,
+  "sha": "a9141f81ae3b307d",
+  "ruleIds": [
+   "R-STA-001",
+   "R-STA-002",
+   "R-COL-005",
+   "R-EXA-042"
+  ]
+ },
+ {
+  "file": "043-spans-the-substrate-four-things-wait-on-043.txt",
+  "section": 43,
+  "id": "spans-the-substrate-four-things-wait-on-043",
+  "title": "Spans — the substrate four things wait oncurrent · R-TXT-001 R-PRI-001 · retained example blocks generated from registry · example R-EXA-043",
+  "cols": 78,
+  "rows": 19,
+  "sha": "0b09e18ed82301c1",
+  "ruleIds": [
+   "R-TXT-001",
+   "R-PRI-001",
+   "R-EXA-043"
+  ]
+ },
+ {
+  "file": "044-selection-two-kinds-one-clipboard-044.txt",
+  "section": 44,
+  "id": "selection-two-kinds-one-clipboard-044",
+  "title": "Selection — two kinds, one clipboardcurrent · R-STA-001 R-HON-006 · retained example blocks generated from registry · example R-EXA-044",
+  "cols": 83,
+  "rows": 19,
+  "sha": "e6fadfdbb6eb0e0f",
+  "ruleIds": [
+   "R-STA-001",
+   "R-HON-006",
+   "R-EXA-044"
+  ]
+ },
+ {
+  "file": "045-the-live-terminal-block-045.txt",
+  "section": 45,
+  "id": "the-live-terminal-block-045",
+  "title": "The live terminal blockcurrent · R-TRU-001 R-OWN-002 R-INT-007 · retained example blocks generated from registry · example R-EXA-045",
+  "cols": 71,
+  "rows": 20,
+  "sha": "c131a0688dff5bfc",
+  "ruleIds": [
+   "R-TRU-001",
+   "R-OWN-002",
+   "R-INT-007",
+   "R-EXA-045"
+  ]
+ },
+ {
+  "file": "046-history-search-and-ghost-text-046.txt",
+  "section": 46,
+  "id": "history-search-and-ghost-text-046",
+  "title": "History, search and ghost textcurrent · R-COR-001 R-HON-003 R-TXT-001 · retained example blocks generated from registry · example R-EXA-046",
+  "cols": 78,
+  "rows": 37,
+  "sha": "270ab2c69b138da9",
+  "ruleIds": [
+   "R-COR-001",
+   "R-HON-003",
+   "R-TXT-001",
+   "R-EXA-046"
+  ]
+ },
+ {
+  "file": "047-edges-empty-too-small-stale-interrupted-refuse.txt",
+  "section": 47,
+  "id": "edges-empty-too-small-stale-interrupted-refused-047",
+  "title": "Edges — empty, too small, stale, interrupted, refusedcurrent · R-HON-001 R-HON-002 R-HON-003 R-HON-004 · retained example blocks generated from registry · example R-EXA-047",
+  "cols": 69,
+  "rows": 31,
+  "sha": "63f1525a74ea9d22",
+  "ruleIds": [
+   "R-HON-001",
+   "R-HON-002",
+   "R-HON-003",
+   "R-HON-004",
+   "R-EXA-047"
+  ]
+ },
+ {
+  "file": "048-block-states-048.txt",
+  "section": 48,
+  "id": "block-states-048",
+  "title": "Block statescurrent · R-STA-001 R-STR-001 · retained example blocks generated from registry · example R-EXA-048",
+  "cols": 53,
+  "rows": 30,
+  "sha": "146b2c3e3adee3fe",
+  "ruleIds": [
+   "R-STA-001",
+   "R-STR-001",
+   "R-EXA-048"
+  ]
+ },
+ {
+  "file": "049-blocks-049.txt",
+  "section": 49,
+  "id": "blocks-049",
+  "title": "Blockscurrent · R-STR-001 R-STR-002 R-STR-003 · retained example blocks generated from registry · example R-EXA-049",
+  "cols": 57,
+  "rows": 28,
+  "sha": "2f508a0609803340",
+  "ruleIds": [
+   "R-STR-001",
+   "R-STR-002",
+   "R-STR-003",
+   "R-EXA-049"
+  ]
+ },
+ {
+  "file": "050-the-tool-result-gallery-050.txt",
+  "section": 50,
+  "id": "the-tool-result-gallery-050",
+  "title": "The tool-result gallerycurrent · R-STR-001 R-HON-004 · retained example blocks generated from registry · example R-EXA-050",
+  "cols": 74,
+  "rows": 28,
+  "sha": "d1088b0403174800",
+  "ruleIds": [
+   "R-STR-001",
+   "R-HON-004",
+   "R-EXA-050"
+  ]
+ },
+ {
+  "file": "051-approval-overflow-inspection-is-not-an-answer-.txt",
+  "section": 51,
+  "id": "approval-overflow-inspection-is-not-an-answer-051",
+  "title": "Approval overflow — inspection is not an answercurrent · R-QST-002 R-QST-004 · retained example blocks generated from registry · example R-EXA-051",
+  "cols": 78,
+  "rows": 30,
+  "sha": "17d92622fd94de52",
+  "ruleIds": [
+   "R-QST-002",
+   "R-QST-004",
+   "R-EXA-051"
+  ]
+ },
+ {
+  "file": "052-a-question-that-wants-a-sentence-052.txt",
+  "section": 52,
+  "id": "a-question-that-wants-a-sentence-052",
+  "title": "A question that wants a sentencecurrent · R-QST-001 R-QST-003 · retained example blocks generated from registry · example R-EXA-052",
+  "cols": 78,
+  "rows": 53,
+  "sha": "9e92c616f0d15565",
+  "ruleIds": [
+   "R-QST-001",
+   "R-QST-003",
+   "R-EXA-052"
+  ]
+ },
+ {
+  "file": "053-the-mouse-053.txt",
+  "section": 53,
+  "id": "the-mouse-053",
+  "title": "The mousecurrent · R-OWN-003 R-INT-006 R-INT-008 · retained example blocks generated from registry · example R-EXA-053",
+  "cols": 78,
+  "rows": 46,
+  "sha": "cd4cb1ea648119b2",
+  "ruleIds": [
+   "R-OWN-003",
+   "R-INT-006",
+   "R-INT-008",
+   "R-EXA-053"
+  ]
+ },
+ {
+  "file": "054-links-054.txt",
+  "section": 54,
+  "id": "links-054",
+  "title": "Linkscurrent · R-INT-005 R-INT-006 · retained example blocks generated from registry · example R-EXA-054",
+  "cols": 78,
+  "rows": 67,
+  "sha": "b8521836b9bb10af",
+  "ruleIds": [
+   "R-INT-005",
+   "R-INT-006",
+   "R-EXA-054"
+  ]
+ },
+ {
+  "file": "055-a-links-states-055.txt",
+  "section": 55,
+  "id": "a-links-states-055",
+  "title": "A link’s statescurrent · R-STA-001 R-STA-003 · retained example blocks generated from registry · example R-EXA-055",
+  "cols": 98,
+  "rows": 62,
+  "sha": "d4ba44e558d40184",
+  "ruleIds": [
+   "R-STA-001",
+   "R-STA-003",
+   "R-EXA-055"
+  ]
+ },
+ {
+  "file": "056-six-pointer-rulings-056.txt",
+  "section": 56,
+  "id": "six-pointer-rulings-056",
+  "title": "Six pointer rulingscurrent · R-PTR-001 R-PTR-002 R-PTR-003 R-PTR-004 R-PTR-005 R-PTR-006 · retained example blocks generated from registry · example R-EXA-056",
+  "cols": 83,
+  "rows": 73,
+  "sha": "c81d84031ad724d6",
+  "ruleIds": [
+   "R-PTR-001",
+   "R-PTR-002",
+   "R-PTR-003",
+   "R-PTR-004",
+   "R-PTR-005",
+   "R-PTR-006",
+   "R-EXA-056"
+  ]
+ },
+ {
+  "file": "057-c-four-outcomes-across-five-contexts-057.txt",
+  "section": 57,
+  "id": "c-four-outcomes-across-five-contexts-057",
+  "title": "⌃C — four outcomes across five contextscurrent · R-OWN-001 R-OWN-002 R-INT-007 · retained example blocks generated from registry · example R-EXA-057",
+  "cols": 71,
+  "rows": 26,
+  "sha": "3512ac7cf047c9a0",
+  "ruleIds": [
+   "R-OWN-001",
+   "R-OWN-002",
+   "R-INT-007",
+   "R-EXA-057"
+  ]
+ },
+ {
+  "file": "058-what-copy-takes-058.txt",
+  "section": 58,
+  "id": "what-copy-takes-058",
+  "title": "What copy takescurrent · R-HON-006 R-TXT-001 · retained example blocks generated from registry · example R-EXA-058",
+  "cols": 67,
+  "rows": 25,
+  "sha": "ca86915166c7b2ec",
+  "ruleIds": [
+   "R-HON-006",
+   "R-TXT-001",
+   "R-EXA-058"
+  ]
+ },
+ {
+  "file": "059-find-059.txt",
+  "section": 59,
+  "id": "find-059",
+  "title": "Findcurrent · R-TXT-001 R-INT-004 · retained example blocks generated from registry · example R-EXA-059",
+  "cols": 83,
+  "rows": 25,
+  "sha": "3b3aa2049853340c",
+  "ruleIds": [
+   "R-TXT-001",
+   "R-INT-004",
+   "R-EXA-059"
+  ]
+ },
+ {
+  "file": "060-resize-060.txt",
+  "section": 60,
+  "id": "resize-060",
+  "title": "Resizecurrent · R-STR-003 R-HON-003 · retained example blocks generated from registry · example R-EXA-060",
+  "cols": 69,
+  "rows": 33,
+  "sha": "0f5f65187da034e5",
+  "ruleIds": [
+   "R-STR-003",
+   "R-HON-003",
+   "R-EXA-060"
+  ]
+ },
+ {
+  "file": "061-eight-cases-that-are-not-edge-cases-061.txt",
+  "section": 61,
+  "id": "eight-cases-that-are-not-edge-cases-061",
+  "title": "Eight cases that are not edge casescurrent · R-OWN-001 R-OWN-002 R-OWN-003 R-QST-001 R-TXT-001 R-COR-001 · retained example blocks generated from registry · example R-EXA-061",
+  "cols": 86,
+  "rows": 90,
+  "sha": "9d4354624d1318ac",
+  "ruleIds": [
+   "R-OWN-001",
+   "R-OWN-002",
+   "R-OWN-003",
+   "R-QST-001",
+   "R-TXT-001",
+   "R-COR-001",
+   "R-EXA-061"
+  ]
+ },
+ {
+  "file": "062-latency-and-the-window-that-causes-it-062.txt",
+  "section": 62,
+  "id": "latency-and-the-window-that-causes-it-062",
+  "title": "Latency — and the window that causes itcurrent · R-HON-005 R-HON-003 R-COR-001 · retained example blocks generated from registry · example R-EXA-062",
+  "cols": 70,
+  "rows": 39,
+  "sha": "58c21c8d606d7567",
+  "ruleIds": [
+   "R-HON-005",
+   "R-HON-003",
+   "R-COR-001",
+   "R-EXA-062"
+  ]
+ },
+ {
+  "file": "063-three-refusals-and-what-stays-rebindable-063.txt",
+  "section": 63,
+  "id": "three-refusals-and-what-stays-rebindable-063",
+  "title": "Three refusals, and what stays rebindablecurrent · R-REF-001 R-REF-002 R-REF-003 · retained example blocks generated from registry · example R-EXA-063",
+  "cols": 78,
+  "rows": 52,
+  "sha": "aaf63af58058e093",
+  "ruleIds": [
+   "R-REF-001",
+   "R-REF-002",
+   "R-REF-003",
+   "R-EXA-063"
+  ]
+ },
+ {
+  "file": "064-undo-064.txt",
+  "section": 64,
+  "id": "undo-064",
+  "title": "Undocurrent · R-QST-003 R-HON-007 · retained example blocks generated from registry · example R-EXA-064",
+  "cols": 67,
+  "rows": 22,
+  "sha": "fa09fec12f6b35fb",
+  "ruleIds": [
+   "R-QST-003",
+   "R-HON-007",
+   "R-EXA-064"
+  ]
+ },
+ {
+  "file": "065-compaction-which-turns-go-065.txt",
+  "section": 65,
+  "id": "compaction-which-turns-go-065",
+  "title": "Compaction — which turns gocurrent · R-COR-001 R-HON-007 · retained example blocks generated from registry · example R-EXA-065",
+  "cols": 77,
+  "rows": 23,
+  "sha": "34b9bb77941920da",
+  "ruleIds": [
+   "R-COR-001",
+   "R-HON-007",
+   "R-EXA-065"
+  ]
+ },
+ {
+  "file": "066-tool-failures-against-model-failures-066.txt",
+  "section": 66,
+  "id": "tool-failures-against-model-failures-066",
+  "title": "Tool failures against model failurescurrent · R-COL-001 R-HON-004 · retained example blocks generated from registry · example R-EXA-066",
+  "cols": 77,
+  "rows": 26,
+  "sha": "8a99ecff6e7a3433",
+  "ruleIds": [
+   "R-COL-001",
+   "R-HON-004",
+   "R-EXA-066"
+  ]
+ },
+ {
+  "file": "067-scrolled-back-while-a-turn-runs-067.txt",
+  "section": 67,
+  "id": "scrolled-back-while-a-turn-runs-067",
+  "title": "Scrolled back while a turn runscurrent · R-COR-001 R-INT-008 · retained example blocks generated from registry · example R-EXA-067",
+  "cols": 78,
+  "rows": 101,
+  "sha": "f0816b508e2af5e2",
+  "ruleIds": [
+   "R-COR-001",
+   "R-INT-008",
+   "R-EXA-067"
+  ]
+ },
+ {
+  "file": "068-degradation-one-exchange-three-rungs-068.txt",
+  "section": 68,
+  "id": "degradation-one-exchange-three-rungs-068",
+  "title": "Degradation — one exchange, three rungscurrent · R-DEG-001 R-DEG-002 R-DEG-003 · retained example blocks generated from registry · example R-EXA-068",
+  "cols": 80,
+  "rows": 28,
+  "sha": "1ffb8a44650d97ce",
+  "ruleIds": [
+   "R-DEG-001",
+   "R-DEG-002",
+   "R-DEG-003",
+   "R-EXA-068"
+  ]
+ },
+ {
+  "file": "069-the-labelled-rule-069.txt",
+  "section": 69,
+  "id": "the-labelled-rule-069",
+  "title": "The labelled rulecurrent · R-COL-003 R-COR-003 · retained example blocks generated from registry · example R-EXA-069",
+  "cols": 78,
+  "rows": 32,
+  "sha": "062ebb5761ccd870",
+  "ruleIds": [
+   "R-COL-003",
+   "R-COR-003",
+   "R-EXA-069"
+  ]
+ },
+ {
+  "file": "070-colour-tinting-the-chrome-070.txt",
+  "section": 70,
+  "id": "colour-tinting-the-chrome-070",
+  "title": "/colour — tinting the chromecurrent · R-COL-001 R-COL-002 R-COL-003 · retained example blocks generated from registry · example R-EXA-070",
+  "cols": 87,
+  "rows": 107,
+  "sha": "4767434b1590b8cf",
+  "ruleIds": [
+   "R-COL-001",
+   "R-COL-002",
+   "R-COL-003",
+   "R-EXA-070"
+  ]
+ },
+ {
+  "file": "071-the-five-permission-postures-071.txt",
+  "section": 71,
+  "id": "the-five-permission-postures-071",
+  "title": "The five permission posturescurrent · R-PER-001 R-COL-001 · retained example blocks generated from registry · example R-EXA-071",
+  "cols": 84,
+  "rows": 46,
+  "sha": "8e98cecc4dbef920",
+  "ruleIds": [
+   "R-PER-001",
+   "R-COL-001",
+   "R-EXA-071"
+  ]
+ },
+ {
+  "file": "072-the-background-is-a-second-channel-072.txt",
+  "section": 72,
+  "id": "the-background-is-a-second-channel-072",
+  "title": "The background is a second channelcurrent · R-COL-003 R-COL-004 R-STA-002 · retained example blocks generated from registry · example R-EXA-072",
+  "cols": 96,
+  "rows": 60,
+  "sha": "efb12ebb73ed5293",
+  "ruleIds": [
+   "R-COL-003",
+   "R-COL-004",
+   "R-STA-002",
+   "R-EXA-072"
+  ]
+ },
+ {
+  "file": "073-painted-chrome-buttons-titles-widgets-headers-.txt",
+  "section": 73,
+  "id": "painted-chrome-buttons-titles-widgets-headers-073",
+  "title": "Painted chrome — buttons, titles, widgets, headerscurrent · R-COL-003 R-COL-005 · retained example blocks generated from registry · example R-EXA-073",
+  "cols": 92,
+  "rows": 53,
+  "sha": "03e0413923faa2b2",
+  "ruleIds": [
+   "R-COL-003",
+   "R-COL-005",
+   "R-EXA-073"
+  ]
+ },
+ {
+  "file": "074-weight-and-why-it-is-not-free-074.txt",
+  "section": 74,
+  "id": "weight-and-why-it-is-not-free-074",
+  "title": "Weight, and why it is not freecurrent · R-COR-003 R-COL-002 · retained example blocks generated from registry · example R-EXA-074",
+  "cols": 76,
+  "rows": 27,
+  "sha": "a8f52d5110ec7391",
+  "ruleIds": [
+   "R-COR-003",
+   "R-COL-002",
+   "R-EXA-074"
+  ]
+ },
+ {
+  "file": "075-config-and-where-a-value-came-from-075.txt",
+  "section": 75,
+  "id": "config-and-where-a-value-came-from-075",
+  "title": "/config — and where a value came fromcurrent · R-HON-008 R-PER-001 · retained example blocks generated from registry · example R-EXA-075",
+  "cols": 82,
+  "rows": 32,
+  "sha": "57e7b81279d209dd",
+  "ruleIds": [
+   "R-HON-008",
+   "R-PER-001",
+   "R-EXA-075"
+  ]
+ },
+ {
+  "file": "076-per-token-values-076.txt",
+  "section": 76,
+  "id": "per-token-values-076",
+  "title": "Per-token valuescurrent · R-TXT-001 R-COL-002 · retained example blocks generated from registry · example R-EXA-076",
+  "cols": 70,
+  "rows": 28,
+  "sha": "e872c75e4f655bf7",
+  "ruleIds": [
+   "R-TXT-001",
+   "R-COL-002",
+   "R-EXA-076"
+  ]
+ },
+ {
+  "file": "077-syntax-highlighting-077.txt",
+  "section": 77,
+  "id": "syntax-highlighting-077",
+  "title": "Syntax highlightingcurrent · R-COL-001 R-COL-002 · retained example blocks generated from registry · example R-EXA-077",
+  "cols": 71,
+  "rows": 42,
+  "sha": "8cdcf79d978f2d5e",
+  "ruleIds": [
+   "R-COL-001",
+   "R-COL-002",
+   "R-EXA-077"
+  ]
+ },
+ {
+  "file": "078-tables-078.txt",
+  "section": 78,
+  "id": "tables-078",
+  "title": "Tablescurrent · R-TBL-001 R-TBL-002 R-TBL-003 R-TBL-004 R-TBL-005 R-TBL-006 · retained example blocks generated from registry · example R-EXA-078",
+  "cols": 79,
+  "rows": 40,
+  "sha": "eb90ab87acaca5e0",
+  "ruleIds": [
+   "R-TBL-001",
+   "R-TBL-002",
+   "R-TBL-003",
+   "R-TBL-004",
+   "R-TBL-005",
+   "R-TBL-006",
+   "R-EXA-078"
+  ]
+ },
+ {
+  "file": "079-tones-and-surfaces-079.txt",
+  "section": 79,
+  "id": "tones-and-surfaces-079",
+  "title": "Tones and surfacescurrent · R-COL-002 R-COL-003 R-COL-004 · retained example blocks generated from registry · example R-EXA-079",
+  "cols": 81,
+  "rows": 20,
+  "sha": "08e1b2b24f219bcb",
+  "ruleIds": [
+   "R-COL-002",
+   "R-COL-003",
+   "R-COL-004",
+   "R-EXA-079"
+  ]
+ },
+ {
+  "file": "080-prism-the-rework-in-one-sentence-080.txt",
+  "section": 80,
+  "id": "prism-the-rework-in-one-sentence-080",
+  "title": "Prism — the rework in one sentencecurrent · R-STR-001 R-PRG-001 · retained example blocks generated from registry · example R-EXA-080",
+  "cols": 72,
+  "rows": 39,
+  "sha": "73c92ed813df271f",
+  "ruleIds": [
+   "R-STR-001",
+   "R-PRG-001",
+   "R-EXA-080"
+  ]
+ },
+ {
+  "file": "081-prism-ps-081.txt",
+  "section": 81,
+  "id": "prism-ps-081",
+  "title": "Prism — /pscurrent · R-STA-001 R-HON-002 · retained example blocks generated from registry · example R-EXA-081",
+  "cols": 78,
+  "rows": 31,
+  "sha": "8d9a67f3e9fe55ff",
+  "ruleIds": [
+   "R-STA-001",
+   "R-HON-002",
+   "R-EXA-081"
+  ]
+ },
+ {
+  "file": "082-no-pushed-views-082.txt",
+  "section": 82,
+  "id": "no-pushed-views-082",
+  "title": "No pushed viewscurrent · R-INT-001 R-INT-008 · retained example blocks generated from registry · example R-EXA-082",
+  "cols": 82,
+  "rows": 62,
+  "sha": "b4812892f3317cf5",
+  "ruleIds": [
+   "R-INT-001",
+   "R-INT-008",
+   "R-EXA-082"
+  ]
+ },
+ {
+  "file": "083-prism-submit-083.txt",
+  "section": 83,
+  "id": "prism-submit-083",
+  "title": "Prism — submitcurrent · R-QST-001 R-PER-001 · retained example blocks generated from registry · example R-EXA-083",
+  "cols": 82,
+  "rows": 25,
+  "sha": "ad9b83058007217c",
+  "ruleIds": [
+   "R-QST-001",
+   "R-PER-001",
+   "R-EXA-083"
+  ]
+ },
+ {
+  "file": "084-prism-logs-as-a-block-084.txt",
+  "section": 84,
+  "id": "prism-logs-as-a-block-084",
+  "title": "Prism — logs, as a blockcurrent · R-COR-001 R-HON-003 · retained example blocks generated from registry · example R-EXA-084",
+  "cols": 72,
+  "rows": 29,
+  "sha": "caefe102db71a147",
+  "ruleIds": [
+   "R-COR-001",
+   "R-HON-003",
+   "R-EXA-084"
+  ]
+ },
+ {
+  "file": "085-prism-the-six-hour-run-085.txt",
+  "section": 85,
+  "id": "prism-the-six-hour-run-085",
+  "title": "Prism — the six-hour runcurrent · R-PRG-001 R-MOT-002 R-NTF-001 · retained example blocks generated from registry · example R-EXA-085",
+  "cols": 79,
+  "rows": 61,
+  "sha": "4ae5fed8d8e65cae",
+  "ruleIds": [
+   "R-PRG-001",
+   "R-MOT-002",
+   "R-NTF-001",
+   "R-EXA-085"
+  ]
+ },
+ {
+  "file": "086-prism-which-plots-it-actually-needs-086.txt",
+  "section": 86,
+  "id": "prism-which-plots-it-actually-needs-086",
+  "title": "Prism — which plots it actually needscurrent · R-PRG-001 R-COL-004 · retained example blocks generated from registry · example R-EXA-086",
+  "cols": 91,
+  "rows": 36,
+  "sha": "a99027e1bccb422a",
+  "ruleIds": [
+   "R-PRG-001",
+   "R-COL-004",
+   "R-EXA-086"
+  ]
+ },
+ {
+  "file": "087-reconciling-with-c16-and-c26-087.txt",
+  "section": 87,
+  "id": "reconciling-with-c16-and-c26-087",
+  "title": "Reconciling with C16 and C26current · R-QST-001 R-COR-001 · retained example blocks generated from registry · example R-EXA-087",
+  "cols": 76,
+  "rows": 75,
+  "sha": "b11ec5dc6302fb30",
+  "ruleIds": [
+   "R-QST-001",
+   "R-COR-001",
+   "R-EXA-087"
+  ]
+ },
+ {
+  "file": "088-four-major-things-this-document-owed-088.txt",
+  "section": 88,
+  "id": "four-major-things-this-document-owed-088",
+  "title": "Four major things this document owedcurrent · R-MOT-001 R-PER-001 R-NTF-001 R-COL-006 · retained example blocks generated from registry · example R-EXA-088",
+  "cols": 73,
+  "rows": 55,
+  "sha": "dd3a9b49ac23f8e8",
+  "ruleIds": [
+   "R-MOT-001",
+   "R-PER-001",
+   "R-NTF-001",
+   "R-COL-006",
+   "R-EXA-088"
+  ]
+ },
+ {
+  "file": "089-one-hierarchy-and-what-sits-beside-it-089.txt",
+  "section": 89,
+  "id": "one-hierarchy-and-what-sits-beside-it-089",
+  "title": "One hierarchy, and what sits beside itcurrent · R-OWN-001 R-STA-001 · retained example blocks generated from registry · example R-EXA-089",
+  "cols": 82,
+  "rows": 80,
+  "sha": "4be223e1c894efc0",
+  "ruleIds": [
+   "R-OWN-001",
+   "R-STA-001",
+   "R-EXA-089"
+  ]
+ },
+ {
+  "file": "090-semantic-names-against-visual-aliases-090.txt",
+  "section": 90,
+  "id": "semantic-names-against-visual-aliases-090",
+  "title": "Semantic names against visual aliasescurrent · R-COL-001 R-COL-003 · retained example blocks generated from registry · example R-EXA-090",
+  "cols": 99,
+  "rows": 80,
+  "sha": "f2d04ce64709a0b2",
+  "ruleIds": [
+   "R-COL-001",
+   "R-COL-003",
+   "R-EXA-090"
+  ]
+ },
+ {
+  "file": "091-state-tables-seven-core-facts-per-component-09.txt",
+  "section": 91,
+  "id": "state-tables-seven-core-facts-per-component-091",
+  "title": "State tables — seven core facts per componentcurrent · R-TAB-001 · example R-EXA-091",
+  "cols": 88,
+  "rows": 102,
+  "sha": "0a687169815845d6",
+  "ruleIds": [
+   "R-TAB-001",
+   "R-EXA-091"
+  ]
+ },
+ {
+  "file": "092-state-tables-six-more-092.txt",
+  "section": 92,
+  "id": "state-tables-six-more-092",
+  "title": "State tables — six morecurrent · R-TAB-001 · example R-EXA-092",
+  "cols": 79,
+  "rows": 77,
+  "sha": "e74e7996b8663a77",
+  "ruleIds": [
+   "R-TAB-001",
+   "R-EXA-092"
+  ]
+ },
+ {
+  "file": "093-three-major-rules-it-broke-in-its-own-examples.txt",
+  "section": 93,
+  "id": "three-major-rules-it-broke-in-its-own-examples-093",
+  "title": "Three major rules it broke in its own examplescurrent · R-GLY-001 R-MOT-002 R-EVT-001 · retained example blocks generated from registry · example R-EXA-093",
+  "cols": 78,
+  "rows": 65,
+  "sha": "150aca51c294874e",
+  "ruleIds": [
+   "R-GLY-001",
+   "R-MOT-002",
+   "R-EVT-001",
+   "R-EXA-093"
+  ]
+ },
+ {
+  "file": "094-three-tiers-content-representation-decoration-.txt",
+  "section": 94,
+  "id": "three-tiers-content-representation-decoration-094",
+  "title": "Three tiers — content, representation, decorationcurrent · R-DEG-001 R-DEG-002 R-COR-003 · retained example blocks generated from registry · example R-EXA-094",
+  "cols": 80,
+  "rows": 50,
+  "sha": "106777352f1314b4",
+  "ruleIds": [
+   "R-DEG-001",
+   "R-DEG-002",
+   "R-COR-003",
+   "R-EXA-094"
+  ]
+ },
+ {
+  "file": "095-a-tape-where-a-row-of-peers-would-shed-095.txt",
+  "section": 95,
+  "id": "a-tape-where-a-row-of-peers-would-shed-095",
+  "title": "A tape, where a row of peers would shedcurrent · R-HON-003 R-STR-003 · retained example blocks generated from registry · example R-EXA-095",
+  "cols": 70,
+  "rows": 27,
+  "sha": "6ae68dbc7f4028bc",
+  "ruleIds": [
+   "R-HON-003",
+   "R-STR-003",
+   "R-EXA-095"
+  ]
+ },
+ {
+  "file": "096-a-status-has-three-parts-and-a-frame-is-separa.txt",
+  "section": 96,
+  "id": "a-status-has-three-parts-and-a-frame-is-separate-096",
+  "title": "A status has three parts, and a frame is separatecurrent · R-PRI-001 R-COR-003 · retained example blocks generated from registry · example R-EXA-096",
+  "cols": 81,
+  "rows": 37,
+  "sha": "b9b9967c4e0338d5",
+  "ruleIds": [
+   "R-PRI-001",
+   "R-COR-003",
+   "R-EXA-096"
+  ]
+ },
+ {
+  "file": "097-a-transient-panel-floats-between-two-rules-097.txt",
+  "section": 97,
+  "id": "a-transient-panel-floats-between-two-rules-097",
+  "title": "A transient panel floats, between two rulescurrent · R-QST-001 R-OWN-001 · retained example blocks generated from registry · example R-EXA-097",
+  "cols": 78,
+  "rows": 49,
+  "sha": "12ec8882999dc8f3",
+  "ruleIds": [
+   "R-QST-001",
+   "R-OWN-001",
+   "R-EXA-097"
+  ]
+ },
+ {
+  "file": "098-input-ownership-what-was-in-flight-098.txt",
+  "section": 98,
+  "id": "input-ownership-what-was-in-flight-098",
+  "title": "Input ownership — what was in flightcurrent · R-OWN-002 R-QST-003 · retained example blocks generated from registry · example R-EXA-098",
+  "cols": 89,
+  "rows": 63,
+  "sha": "bbee7d29fa98160c",
+  "ruleIds": [
+   "R-OWN-002",
+   "R-QST-003",
+   "R-EXA-098"
+  ]
+ },
+ {
+  "file": "099-wrapping-truncation-and-the-atomic-chip-099.txt",
+  "section": 99,
+  "id": "wrapping-truncation-and-the-atomic-chip-099",
+  "title": "Wrapping, truncation and the atomic chipcurrent · R-TXT-001 R-STR-003 R-STR-004 · retained example blocks generated from registry · example R-EXA-099",
+  "cols": 81,
+  "rows": 59,
+  "sha": "3ac8cf7f0043ccfa",
+  "ruleIds": [
+   "R-TXT-001",
+   "R-STR-003",
+   "R-STR-004",
+   "R-EXA-099"
+  ]
+ },
+ {
+  "file": "100-resize-a-table-that-cannot-shed-and-two-column.txt",
+  "section": 100,
+  "id": "resize-a-table-that-cannot-shed-and-two-columns-100",
+  "title": "Resize, a table that cannot shed, and two columnscurrent · R-STR-003 R-TXT-001 R-HON-003 · retained example blocks generated from registry · example R-EXA-100",
+  "cols": 71,
+  "rows": 35,
+  "sha": "a45a246d2d3632f9",
+  "ruleIds": [
+   "R-STR-003",
+   "R-TXT-001",
+   "R-HON-003",
+   "R-EXA-100"
+  ]
+ },
+ {
+  "file": "101-replace-or-float-and-where-a-chip-previews-101.txt",
+  "section": 101,
+  "id": "replace-or-float-and-where-a-chip-previews-101",
+  "title": "Replace or float, and where a chip previewscurrent · R-QST-001 R-STA-003 · retained example blocks generated from registry · example R-EXA-101",
+  "cols": 78,
+  "rows": 51,
+  "sha": "fb2c77f2360e54ca",
+  "ruleIds": [
+   "R-QST-001",
+   "R-STA-003",
+   "R-EXA-101"
+  ]
+ },
+ {
+  "file": "102-view-state-is-not-liveness-and-a-models-one-sh.txt",
+  "section": 102,
+  "id": "view-state-is-not-liveness-and-a-models-one-shape-102",
+  "title": "View state is not liveness, and a model’s one shapecurrent · R-MOT-007 R-STA-001 · retained example blocks generated from registry · example R-EXA-102",
+  "cols": 80,
+  "rows": 62,
+  "sha": "d937d13bf7c43393",
+  "ruleIds": [
+   "R-MOT-007",
+   "R-STA-001",
+   "R-EXA-102"
+  ]
+ },
+ {
+  "file": "103-the-ownership-ladder-who-owns-the-keyboard-103.txt",
+  "section": 103,
+  "id": "the-ownership-ladder-who-owns-the-keyboard-103",
+  "title": "The ownership ladder — who owns the keyboardcurrent · R-OWN-001 R-OWN-002 R-INT-007 · retained example blocks generated from registry · example R-EXA-103",
+  "cols": 83,
+  "rows": 60,
+  "sha": "46ffb82fb314b4e3",
+  "ruleIds": [
+   "R-OWN-001",
+   "R-OWN-002",
+   "R-INT-007",
+   "R-EXA-103"
+  ]
+ },
+ {
+  "file": "104-focus-survives-a-drop-and-s-five-jobs-104.txt",
+  "section": 104,
+  "id": "focus-survives-a-drop-and-s-five-jobs-104",
+  "title": "Focus survives a drop, and ←→’s five jobscurrent · R-STA-003 R-INT-004 R-KEY-007 · retained example blocks generated from registry · example R-EXA-104",
+  "cols": 72,
+  "rows": 52,
+  "sha": "84fdd2ec8f1aada2",
+  "ruleIds": [
+   "R-STA-003",
+   "R-INT-004",
+   "R-KEY-007",
+   "R-EXA-104"
+  ]
+ },
+ {
+  "file": "105-five-primitives-the-harness-never-needed-105.txt",
+  "section": 105,
+  "id": "five-primitives-the-harness-never-needed-105",
+  "title": "Five primitives the harness never neededcurrent · R-PRI-001 · retained example blocks generated from registry · example R-EXA-105",
+  "cols": 78,
+  "rows": 65,
+  "sha": "a10dc8ad9f2457ef",
+  "ruleIds": [
+   "R-PRI-001",
+   "R-EXA-105"
+  ]
+ },
+ {
+  "file": "106-where-two-rules-meet-six-composition-cases-106.txt",
+  "section": 106,
+  "id": "where-two-rules-meet-six-composition-cases-106",
+  "title": "Where two rules meet — six composition casescurrent · R-STA-002 R-OWN-001 R-QST-002 R-COR-001 · retained example blocks generated from registry · example R-EXA-106",
+  "cols": 77,
+  "rows": 88,
+  "sha": "9a9779261182dcd8",
+  "ruleIds": [
+   "R-STA-002",
+   "R-OWN-001",
+   "R-QST-002",
+   "R-COR-001",
+   "R-EXA-106"
+  ]
+ },
+ {
+  "file": "107-the-semantic-tree-linear-rendering-and-termina.txt",
+  "section": 107,
+  "id": "the-semantic-tree-linear-rendering-and-terminal-boundary-107",
+  "title": "The semantic tree, linear rendering and terminal boundarycurrent · R-ACC-001 R-TRU-001 · retained example blocks generated from registry · example R-EXA-107",
+  "cols": 80,
+  "rows": 69,
+  "sha": "e4e005a253f44a40",
+  "ruleIds": [
+   "R-ACC-001",
+   "R-TRU-001",
+   "R-EXA-107"
+  ]
+ },
+ {
+  "file": "108-capability-vectors-resolve-actions-108.txt",
+  "section": 108,
+  "id": "capability-vectors-resolve-actions-108",
+  "title": "Capability vectors resolve actionscurrent · R-CAP-001 R-KEY-007 · retained example blocks generated from registry · example R-EXA-108",
+  "cols": 80,
+  "rows": 46,
+  "sha": "95e2ce3e68248054",
+  "ruleIds": [
+   "R-CAP-001",
+   "R-KEY-007",
+   "R-EXA-108"
+  ]
+ },
+ {
+  "file": "109-responsive-space-and-international-text-109.txt",
+  "section": 109,
+  "id": "responsive-space-and-international-text-109",
+  "title": "Responsive space and international textcurrent · R-TXT-001 R-CAP-001 R-STR-003 · retained example blocks generated from registry · example R-EXA-109",
+  "cols": 86,
+  "rows": 28,
+  "sha": "1fabce1c8b260d3d",
+  "ruleIds": [
+   "R-TXT-001",
+   "R-CAP-001",
+   "R-STR-003",
+   "R-EXA-109"
+  ]
+ },
+ {
+  "file": "110-three-records-a-state-product-and-the-extensio.txt",
+  "section": 110,
+  "id": "three-records-a-state-product-and-the-extension-door-110",
+  "title": "Three records, a state product and the extension doorcurrent · R-COR-001 R-STA-001 · retained example blocks generated from registry · example R-EXA-110",
+  "cols": 81,
+  "rows": 60,
+  "sha": "4bdcebe31fa8cbcd",
+  "ruleIds": [
+   "R-COR-001",
+   "R-STA-001",
+   "R-EXA-110"
+  ]
+ },
+ {
+  "file": "111-the-rules-condensed-111.txt",
+  "section": 111,
+  "id": "the-rules-condensed-111",
+  "title": "The rules, condensedcurrent · R-SPC-001 · example R-EXA-111",
+  "cols": 351,
+  "rows": 50,
+  "sha": "2410db62c76791fd",
+  "ruleIds": [
+   "R-SPC-001",
+   "R-EXA-111"
+  ]
+ }
+]

@@ -1,0 +1,17 @@
+  calcium   ✦ qwen3-coder-next   effort high        localhost:8000   22:13
+
+ ❯ refactor the parser to handle nested quotes
+
+  ● Done. The parser tracks depth now and the suite passes.
+    ⎿ 118 passed, 2 todo · exit 0
+
+
+
+──────────────────────────────────────────────────────────────────────────────
+  ❯ ▌
+──────────────────────────────────────────────────────────────────────────────
+  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13
+  ███████████████░░░░░░░░░  62%  31k/50k   step ████░░░░░░ 4/10   28 tok/s
+  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m
+
+nothing is reserved — the region and its rule are gone

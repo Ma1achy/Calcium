@@ -1,0 +1,24 @@
+a cancelled call is not a special shape — the result-summary slot carries it
+
+  ● edit(src/interaction/parser/parse.ts) · 2.1s · cancelled
+    ⎿ 1 of 2 hunks applied
+    ── src/interaction/parser/parse.ts +1 −1 ────────────────────────────────
+    ⋯ 40 unchanged lines
+    @@ -41,1 +41,1 @@
+       41 - let inQuote = false;
+       41 + let depth = 0;
+    ⋯ 143 unchanged lines
+    ⎿ ▲ stopped before the second hunk · ↺ revert   ⏎ resume
+
+and the activity region STAYS, stopped — an empty region says nothing happened
+  ● updating the tests  12s · 1.4k tok  ·  stopped
+  ⎿ todo  3/5  ·  ◻ update the tests  ·  2 left
+
+the ✻ became ● — MOTION STOPPING is the signal, and it needs no colour
+  ✦ running     →     ● stopped   the mark stops AND goes muted
+
+four states, one shape — only the result-summary slot and the motion differ
+  ● edit(parse.ts) · ✦            running
+  ● edit(parse.ts) · 2.1s · +4 −1   done
+  ● edit(parse.ts) · 2.1s · cancelled  cancelled — muted
+  ● edit(parse.ts) · 2.1s · failed     failed — error

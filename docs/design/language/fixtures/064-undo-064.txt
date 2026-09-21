@@ -1,0 +1,22 @@
+undo is a transcript entry, because an invisible undo is one you do
+twice
+
+● edit(parse.ts) · 0.3s · +2 −2
+
+● reverted · parse.ts · +2 −2 undone   ↺ redo
+  ⎿ the file is back to what it was before the edit above
+
+it is muted, because nothing went wrong and nothing is pending — it
+is a fact about history, and history is what the transcript IS.
+
+what can be undone, and what cannot
+
+  an edit the agent made    yes — the patch is the record
+  a whole turn's edits      yes — the review row's ↺ revert all
+  a command it ran          NO. rm does not come back, and offering
+                            an undo that cannot work is worse than
+                            having none
+  your own message          only while it is queued — ⌥⌫
+
+  so the affordance appears where it is TRUE and nowhere else. A
+  greyed-out undo teaches people to stop looking for it.

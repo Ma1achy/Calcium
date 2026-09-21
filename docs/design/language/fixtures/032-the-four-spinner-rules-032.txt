@@ -1,0 +1,69 @@
+four rules the sets obey, and every one is asserted rather than commented
+
+1 · EVERY FRAME IS ONE CELL [R-MOT-005]
+  by cells() and by the terminal. A two-cell frame shifts everything
+  after it by one column on that tick — the whole line jitters, not
+  the spinner.
+
+  two ways a character fails: it is East Asian AMBIGUOUS (one cell
+  or two, by setting), or it has an EMOJI PRESENTATION (one cell or
+  two, by font). Registration measures every frame in the resolved
+  terminal profile. If any primary frame is not exactly one cell, the
+  WHOLE set takes its semantic ASCII fallback — never frame by frame.
+
+SEMANTIC ASCII FALLBACKS · GENERATED FROM THE SPINNER REGISTRY [R-MOT-005]
+  sample  primary           motion           fitted trajectory                   interval · resolved length
+✦  agent           composite bloom  fullramp(. o O @ O o) + grow(. o O @ O o) + bloom(. o O @ O o) + starfield(. + * @ * +) + pulse(. o O @ O o) 120ms · 82 frames
+✦  braille         rotation         | / - \                             80ms · 10 frames
+✦  bounce          vertical bounce  _ - ^ -                            130ms ·  4 frames
+✦  orbit           orbit            | / - \                             90ms ·  8 frames
+✦  grow            growth           . o O @ O o                        120ms · 12 frames
+✦  bloom           bloom            . o O @ O o                        120ms · 14 frames
+✦  starfield       twinkle          . + * @ * +                        120ms ·  8 frames
+✦  fullramp        intensity ramp   . o O @ O o                        120ms · 42 frames
+✦  hex             count            0 1 2 3 4 5 6 7 8 9 a b c d e f    110ms · 16 frames
+✦  toggle          alternation      < >                                400ms ·  2 frames
+✦  circleQuarters  rotation         | / - \                            140ms ·  4 frames
+✦  boxBounce       orbit            | / - \                            140ms ·  4 frames
+✦  growVertical    growth           . o O @ O o                        100ms · 10 frames
+✦  growHorizontal  growth           . o O @ O o                        120ms · 12 frames
+✦  noise           dissolve         # * .                              100ms ·  3 frames
+✦  boxBounce2      rotation         | / - \                            120ms ·  4 frames
+✦  triangle        rotation         v < ^ >                            120ms ·  4 frames
+✦  circleHalves    rotation         | / - \                            120ms ·  4 frames
+✦  pipe            rotation         | / - \                            100ms ·  8 frames
+✦  arrow           rotation         < ^ > v                            200ms ·  4 frames
+✦  pulse           pulse            . o O @ O o                        120ms ·  6 frames
+Each base pattern is fitted once across the primary trajectory; composite sets concatenate named source trajectories. The same resolved frames generate the ASCII CSS.
+
+2 · WORK FRAMES ARE 80–200 ms. Deliberate WAIT sets may be slower. [R-MOT-002]
+  ✦  braille      80ms ·  10 frames
+  ✦  pulse       120ms ·   6 frames
+  ✦  fullramp    120ms ·  42 frames   ← same rate, more variety
+  ✦  the walk    120ms ·  82 frames   ← the whole family
+
+  Every WORK set is 80–200ms, from braille at 80 to arrow at 200.
+  toggle at 400ms is a WAIT set: its slowness says nobody is busy.
+  The semantic class, not one universal band, decides whether it reads alive.
+  CYCLE LENGTH decides VARIETY, not liveness: 4-frame sets repeat every
+  0.48–0.8s and a 42-frame one does not repeat for five seconds.
+
+  an earlier pass said frames × interval must land in 800–1600ms. That made
+  long alphabets look stuck. The band was wrong, not the catalogue:
+  frame interval carries liveness; cycle length carries variety.
+
+  the agent's walk is the one exception, and it is deliberate: it is
+  not saying a step is in progress, it is saying the agent is alive.
+  A ten-second cycle never looks like a loop, which is the point.
+
+3 · A PING-PONG LOOPS 0 → N → 1, NEVER 0 → N → 0 [R-MOT-009]
+  ▁▃▄▅▆▇▆▅▄▃     correct — the endpoints appear once per cycle
+  ▁▃▄▅▆▇▆▅▄▃▁    wrong — ▁ held for two ticks, and it stutters
+
+4 · THE ASCII PAIR IS MATCHED BY SHAPE OF MOTION, NOT BY LOOKS [R-MOT-010]
+  ⠧⠳⠹⠼⠞⠏  →  | / - \\        both rotate
+  ▏▎▍▌▋▊▉  →  . o O @      both grow
+  ◐◓◑◒     →  | / - \\        both turn
+
+  a set whose ascii pair does not MOVE the same way is a different
+  animation at a lower rung, not the same one degraded.

@@ -1,0 +1,67 @@
+THE PRIMITIVE INDEX · generated from 32 current records [R-PRI-001]
+A primitive has one general name, one definition, canonical section links, and current rule citations. [R-PRI-002]
+
+  GUTTER        A reserved inline-start column saying whose row this is.  [R-PRI-001 R-PRI-002]
+                defined in §5 The mark vocabulary — twelve canonical glyphs · §90 State tables — seven core facts per component
+  MARK          A reserved slot drawn from the canonical glyph registry; its component declares the semantic role.  [R-PRI-001 R-PRI-002]
+                defined in §5 The mark vocabulary — twelve canonical glyphs · §92 Three major rules it broke in its own examples
+  CHIP          A painted label standing for an object; atomic in a wrap.  [R-PRI-001 R-PRI-002]
+                defined in §6 Subagents · §10 @ mentions · §54 A link’s states · §91 State tables — six more
+  RULE          A boundary. Labelled, it announces and never truncates.  [R-PRI-001 R-PRI-002]
+                defined in §68 The labelled rule · §69 /colour — tinting the chrome · §96 A transient panel floats, between two rules
+  WASH          Focus as a mark plus a ground; the target follows the shape.  [R-PRI-001 R-PRI-002]
+                defined in §16 Focus — the focus treatment follows the shape · §17 Focus on things that are not rows · §71 The background is a second channel
+  LADDER        Representations of one thing, selected by available width and height.  [R-PRI-001 R-PRI-002]
+                defined in §22 At 40 columns · §93 Three tiers — content, representation, decoration
+  TAPE          A window over a list, sliding by the minimum required to hold the current item.  [R-PRI-001 R-PRI-002]
+                defined in §94 A tape, where a row of peers would shed · §6 Subagents
+  RESIDUE       A row saying what was not shown and how to reach it.  [R-PRI-001 R-PRI-002]
+                defined in §90 State tables — seven core facts per component · §77 Tables
+  STATUS        Banner plus message plus detail, in any container.  [R-PRI-001 R-PRI-002]
+                defined in §95 A status has three parts, and a frame is separate · §47 Block states · §65 Tool failures against model failures
+  BAR           A meter whose quantity, granularity, and liveness are independent.  [R-PRI-001 R-PRI-002]
+                defined in §32 Progress bars — nine alphabets, and where each belongs · §34 Meter semantics — quantity, granularity and liveness · §35 The operation and budget presets
+  SPINNER       Liveness or deliberate waiting, never progress; declares work or wait.  [R-PRI-001 R-PRI-002]
+                defined in §30 Spinners — every reusable set, at its own interval · §31 The four spinner rules · §38 One interval, one family
+  RAMP          A static or animated cell-tone transformation; decoration with a declared meaning.  [R-PRI-001 R-PRI-002]
+                defined in §36 Ink ramps — every effect · §37 The agent’s mark, and the verb’s ramp
+  SCROLLBAR     The thumb is the bar; the track is a divot.  [R-PRI-001 R-PRI-002]
+                defined in §20 The scrollbar
+  SPAN          The text substrate; one cell holds one ground.  [R-PRI-001 R-PRI-002]
+                defined in §42 Spans — the substrate four things wait on · §75 Per-token values
+  WIDGET        The mark says chosen and the wash says focused.  [R-PRI-001 R-PRI-002]
+                defined in §41 Widgets · §17 Focus on things that are not rows · §72 Painted chrome — buttons, titles, widgets, headers
+  TABLE         Sheds columns, then stops being a table.  [R-PRI-001 R-PRI-002]
+                defined in §77 Tables · §91 State tables — six more
+  LINK          Content that acts; active uses a persistent non-colour carrier.  [R-PRI-001 R-PRI-002]
+                defined in §53 Links · §54 A link’s states
+  BLOCK         A bounded body with a frame owned by its container.  [R-PRI-001 R-PRI-002]
+                defined in §48 Blocks · §47 Block states · §49 The tool-result gallery · §95 A status has three parts, and a frame is separate
+  CALL          A unit of work with a result-summary slot; command output is its body.  [R-PRI-001 R-PRI-002]
+                defined in §2 The agent at work — five regions, activity present · §79 Prism — the rework in one sentence · §90 State tables — seven core facts per component
+  ENTRY         One durable event in history; the rendered window is only its view.  [R-PRI-001 R-PRI-002]
+                defined in §7 A message you sent · §90 State tables — seven core facts per component · §106 The semantic tree, linear rendering and terminal boundary
+  QUESTION      A pending decision with one owner, one safe resolution, and one residue.  [R-PRI-001 R-PRI-002]
+                defined in §27 Approval replaces the prompt · §51 A question that wants a sentence · §95 A status has three parts, and a frame is separate
+  OWNER         The one rung routing keyboard actions at this instant.  [R-PRI-001 R-PRI-002]
+                defined in §97 Input ownership — what was in flight · §102 The ownership ladder — who owns the keyboard
+  INSIDE        Component rendering of ownership.active when a component has an interior; focus is independent.  [R-PRI-001 R-PRI-002]
+                defined in §16 Focus — the focus treatment follows the shape · §17 Focus on things that are not rows · §102 The ownership ladder — who owns the keyboard
+  SELECTION     A source range to copy; search hits and diagnostics are separate states.  [R-PRI-001 R-PRI-002]
+                defined in §43 Selection — two kinds, one clipboard · §57 What copy takes
+  PANEL         Floats above the prompt between two rules; dismissable.  [R-PRI-001 R-PRI-002]
+                defined in §96 A transient panel floats, between two rules
+  PEEK          Anchored beside an element and takes no keys.  [R-PRI-001 R-PRI-002]
+                defined in §96 A transient panel floats, between two rules
+  OVERLAY       Modal and owns input; not dismissable.  [R-PRI-001 R-PRI-002]
+                defined in §96 A transient panel floats, between two rules
+  PALETTE       An overlay whose rows are filtered actions.  [R-PRI-001 R-PRI-002]
+                defined in §96 A transient panel floats, between two rules · §104 Five primitives the harness never needed
+  TOAST         Transient status, never an owner.  [R-PRI-001 R-PRI-002]
+                defined in §104 Five primitives the harness never needed
+  FORM          A labelled set of editable fields with one submit action.  [R-PRI-001 R-PRI-002]
+                defined in §104 Five primitives the harness never needed
+  SPLIT         Two persistent peer regions with explicit focus transfer.  [R-PRI-001 R-PRI-002]
+                defined in §104 Five primitives the harness never needed
+  TREE          A disclosure hierarchy whose selection and focus remain distinct.  [R-PRI-001 R-PRI-002]
+                defined in §104 Five primitives the harness never needed

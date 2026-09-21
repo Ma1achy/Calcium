@@ -1,0 +1,28 @@
+the same exchange at three rungs
+
+24-bit
+  ● I'll check the parser first.
+  ● read_file(parse.ts) · 0.2s · 184 lines
+    ⎿ let inQuote = false;
+  ▸ thinking · 4s
+
+1-bit — tone becomes weight, and the marks are unchanged
+  ● I'll check the parser first.
+  ● read_file(parse.ts) · 0.2s · 184 lines
+    ⎿ let inQuote = false;
+  ▸ thinking · 4s
+
+ascii — every glyph takes its role-for-role fallback; layout remeasures the rung
+  * I'll check the parser first.
+  * read_file(parse.ts) · 0.2s · 184 lines
+    `- let inQuote = false;
+  > thinking - 4s
+
+ascii and colourDepth are INDEPENDENT axes — an ASCII terminal with 24-bit
+colour is common, and it gets full colour with substituted glyphs.
+
+what has nowhere to go at 1-bit, stated rather than discovered
+  syntax highlighting  weight only — keywords bold, the rest plain
+  the context bar      one plain fill, no segments
+  every ink ramp       the motion stops
+  the agent's mark     unchanged — it was never a colour

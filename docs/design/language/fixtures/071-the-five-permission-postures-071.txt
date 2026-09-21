@@ -1,0 +1,46 @@
+five postures, five symbols — and NOT ONE of them is painted
+
+  ❯ manual           grey    every call comes back to you — the prompt's own chevron
+  ? accept-edits    purple  edits go; it still asks about commands
+  ❙❙ plan          blue    nothing is written
+  » auto             yellow  nothing asks — fast forward
+  !! skip             red     no permission check at all
+
+why none of them is painted, and it is the whole answer to the error problem
+
+  THE ERROR TAG IS THE ONLY PAINTED LABEL THAT MEANS A STATUS.
+    ────────  ERROR  ────────
+  so a posture drawn in text can never be mistaken for one, however red
+  it is. The distinction is the CHANNEL, not the hue — which is stronger
+  than any amount of picking different reds.
+
+  and skip does not flash. It is not asking for your attention every
+  second — it is telling you what is true, once.
+
+the footer, in each posture
+
+  ❯ manual   ✦ qwen3-coder-next   effort high       localhost:8000
+  ? accept-edits ✦ qwen3-coder-next   effort high       localhost:8000
+  ❙❙ plan     ✦ qwen3-coder-next   effort high       localhost:8000
+  » auto     ✦ qwen3-coder-next   effort high       localhost:8000
+  !! skip     ✦ qwen3-coder-next   effort high       no permission checks
+
+  skip earns its loudness with a CLAUSE, not a colour — the thing it
+  adds is the sentence at the end of the line.
+
+the symbols, every one measured before it was picked
+
+  ❯    U+276F   narrow, no emoji form    the prompt's own mark
+  ?    U+003F   ascii                   it still asks
+  ❙❙   U+2759   narrow, no emoji form    ⏸ U+23F8 IS an emoji — the ⏺ trap again
+  »    U+00BB   narrow                   fast forward
+  !!   U+0021   ascii                   the only ASCII symbol, for the only
+                                        posture that is a warning to YOU
+
+  ‼ U+203C is an emoji and ⚡ is wide AND an emoji. Two plain
+  exclamation marks need no table at all.
+
+  ascii    > manual   ? accept   || plan   >> auto   !! skip
+
+and every one survives to 1-bit, where no tone is left
+  ❯ manual   ? accept-edits   ❙❙ plan   » auto   !! skip

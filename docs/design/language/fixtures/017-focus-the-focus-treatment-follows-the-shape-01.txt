@@ -1,0 +1,81 @@
+FOCUS = A PERSISTENT INDICATOR PLUS THE SHAPE'S FOCUS TREATMENT.
+An unpainted run or box inverts; a frame takes its border or axes; a control washes.
+A painted identity chip preserves its hue, bolds and takes a focus mark.
+
+  a button        no tone      →  the accent
+  a link          identifier   →  cyan, and the underline stays
+  a paste chip    meta         →  purple
+  a destructive   error        →  the error ground
+  a chosen answer ok           →  the ok ground
+  an agent chip   its own hue  →  already painted; focus bolds + marks it
+
+colour is declared, not inherited: a button inside an orange region can
+declare tone: "info" and invert to blue. The element owns its colour;
+an unpainted run or box inverts it. A painted identity chip preserves its
+hue; other shapes keep the same channel differently.
+
+AND WHAT IT PAINTS DEPENDS ON THE SHAPE — an element is not always a row.
+
+  A RUN      text with no frame      the RUN inverts
+  A BOX      a button, a chip, a     an unpainted BOX inverts;
+             choice, a full-width row painted identity bolds + mark
+  A FRAME    a plot, an image, a     its BORDER — or its AXES when
+             panel, a terminal       it has none. Inside untouched
+  A CONTROL  a slider, a toggle, a   a WASH over ALL of it — label,
+             checkbox, a radio       track and value
+
+three presentations that compose, with independent mechanisms
+
+  at rest    nothing, or the element's own resting ground
+  focused    INVERT (unpainted run/box) · PRESERVE+BOLD+MARK (painted identity chip)
+             the BORDER (frame) · a WASH (control)
+  focused+insideHEAVY — the same light/heavy pair the plot border and the
+             scrollbar already use
+
+an unpainted BOX — one row or less, so it paints whole
+
+   Approve         at rest — bgElev is the affordance
+   › Approve       focused — active ground plus the persistent edge
+   ✓ Approve       chosen — ok. A result, not a cursor
+   Approve         disabled — a WELL, and ⇥ skips it
+  [ Approve ]      1-bit — brackets and bold
+
+a REGION — more than one row, so the entry washes and the row paints
+
+  ▸ ● search("inQuote") · 1.2s · 3 files
+      ⎿ parse.ts:41    let inQuote = false;
+        tokens.ts:88   if (inQuote) continue;
+  transcript scope — you have the BLOCK
+
+  ▸ ● search("inQuote") · 1.2s · 3 files
+      ⎿ parse.ts:41    let inQuote = false;
+        tokens.ts:88   if (inQuote) continue;
+  block scope — the entry settles back and the ROW paints
+
+four grounds, four jobs
+
+          bgElev       what you are INSIDE
+          focusGround  a REGION you are on
+          the accent   the ITEM you are on
+  ▌       selection    what will be COPIED
+
+so focus and selection can both be true and both read
+
+        parse.ts:41    let inQuote = false;
+  ▌     parse.ts:47    if (ch === q) inQuote = !inQuote;
+  ▌   ▸ tokens.ts:88   if (inQuote) continue;
+  ⇧↑ selected two rows and the cursor is on the second — ▌ says what
+  would be copied; ▸ and the accent say where a key would act.
+
+the ▸ stays, and it is not redundant
+
+  ▸  survives to 1-bit, where focused is INVERSE and no ground exists
+  ▸  survives a terminal whose background the reader overrode
+  ▸  and it POINTS — in a four-row entry it says which row is the head
+
+REMEMBERED FOCUS — visible while another owner is active
+
+   ▸ 7c2d4e1  decoder-zoom    succeeded  0.0089    focused
+   ▸ 7c2d4e1  decoder-zoom    succeeded  0.0089    remembered
+  focus memory means a row is remembered. A row that shows NOTHING while
+  you are away is a row you are surprised to land on.

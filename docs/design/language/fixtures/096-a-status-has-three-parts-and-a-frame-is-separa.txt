@@ -1,0 +1,37 @@
+A STATUS HAS THREE PARTS, and each degrades its own way
+
+  the BANNER   decoration either side of a label that NEVER truncates
+  the MESSAGE  prose — it WRAPS, because losing the end loses the fact
+  the DETAIL   code — it TRUNCATES, and it is BOUNDED with a residue
+               row, so it never costs more than a few rows
+
+★ and a STATUS is content. A FRAME is the container’s. They COMPOSE.
+
+  the same status, three containers, and neither knows about the other
+
+  ┌ val loss ──────────────────────────────────── ┐
+  │ ────────────── ERROR ────────────── │
+  │ ✗ plot failed to render                        │
+  └──────────────────────────────────────────────┘   framed — a plot HAS a border
+
+  ● read_image(loss-curve.png) · failed
+    ⎿ ────────── ERROR ──────────
+      ✗ decode failed: truncated PNG    the GUTTER is the
+                                        containment
+
+  ────────────── ERROR ──────────────
+  ✗ context exhausted at 50,000 tokens
+  ✦ retrying in 8s · attempt 2       bare — the prompt rules
+                                        are the containment
+
+  one status() function, three containers, nine combinations. Baking
+  the frame into the error needed a second function for every
+  unframed case, which is how a duplicate gets written.
+
+and EMPTY is not an error, so the layout says so
+
+  ┌──────────────────────────────┐      no banner, no ▲, no red
+  │           No data.            │      centred on BOTH axes — the
+  └──────────────────────────────┘      one place that is right,
+                                         because a block with nothing
+                                         in it has slack on both

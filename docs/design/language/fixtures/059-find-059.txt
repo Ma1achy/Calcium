@@ -1,0 +1,25 @@
+⌃⇧F searches the transcript. It is a PROMPT SUBSTATE, not a scope
+
+──────────────────────────────────────────────────────────────────────────────
+ ⌕ inQuote        3 of 14    ⏎ next   ⇧⏎ prev   esc close
+──────────────────────────────────────────────────────────────────────────────
+❯ ▌
+──────────────────────────────────────────────────────────────────────────────
+⏎ next   ⇧⏎ previous   ⌃⇧C copy the match   esc close
+
+it expands the prompt like everything else, and the transcript below
+shows every match at once:
+
+  ● The depth counter replaces inQuote here.
+  ● search("inQuote") · 3 files   ← the current one
+    ⎿ parse.ts:41  let inQuote = false;
+
+  EVERY match takes the distinct match ground plus underline. The CURRENT one takes
+  the focus ground, edge and bold — separate from copy selection — and they answer
+  two questions: where are they all, and which one am I on.
+
+  ⏎ moves to the next and SCROLLS TO IT — the focus-pulls-the-
+  viewport rule, reused rather than a second way of moving.
+
+  and esc leaves the highlighting behind for a moment before it
+  fades — you closed the search, not the answer.

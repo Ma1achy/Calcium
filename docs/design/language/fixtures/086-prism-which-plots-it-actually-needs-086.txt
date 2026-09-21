@@ -1,0 +1,36 @@
+the survey lists forty forms. A run needs FOUR; five including sweeps.
+
+  a metric over steps    line          the one everybody opens
+  progress               bar           block — progress · continuous · active
+  a metric in a row      sparkline     inside a table cell
+  runs compared          dumbbell      two points, the gap is the answer
+
+  and one more the moment there is a sweep:
+  is a gap real          forest        an interval and a pooled row
+
+what Prism is the consumer FOR, and does not need
+
+  treemap · sankey · chord · radar · waffle · icicle · gantt
+  spectrogram · violin · ridgeline · contour · plot3d
+
+  each has a consumer somewhere — the profiler wants six of them — but
+  not here. Prism was the app the ML plot package was justified BY, so
+  it is the app that gets to say which dozen, and a chart it does not
+  need is a chart nobody needed.
+
+  ▲ which is worth writing down rather than leaving implied: forty
+  forms shipped; four per run — five including sweeps — are load-bearing
+  for the consumer they were built for. That is a finding about the survey, not a complaint
+  about the forms.
+
+the ML blocks that ARE load-bearing, and none needs a new plot form
+
+  cost         GPU-hours and money, per run and per sweep — the
+               number management asks about and nobody surfaces
+  lineage      which dataset produced the checkpoint this model
+               was fine-tuned from. Nobody can answer it at 3am
+  throughput   samples/s with an ETA, which is a progress bar
+               that has learnt to divide
+
+  two of the three already reduce to a progress bar and a table. They are unbuilt
+  because they are unglamorous, not because they are hard.

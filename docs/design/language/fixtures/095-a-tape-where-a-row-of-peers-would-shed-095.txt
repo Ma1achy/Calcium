@@ -1,0 +1,27 @@
+A ROW OF PEERS SHEDS MEMBERS. A LIST YOU NAVIGATE SLIDES A WINDOW.
+
+shedding loses the hidden ones. A TAPE keeps them all and moves the
+window to hold the current — like a browser’s tab strip.
+
+  ⋯ › main    seams  2:53 ✓   arm  3:46 ✓   count  ✦ 4:02    ⌃⇥
+  ⋯   main    seams  ✓   arm  ✓  › count  ✦  2»      ⌃⇥
+  ⋯   main   «2  count  ✦ › probe  ✓  1»     ⌃⇥
+
+  «2 and 1» say how many are off each end — NOTHING IS LOST, only
+  offscreen. And the window moves ONLY when the current leaves it,
+  which is what makes it read as a tape rather than a cursor dragging
+  the row along.
+
+two rules make the shedding honest
+
+  1  an ALL-OR-NOTHING group goes before any single member. Every
+     elapsed TIME goes before one agent does, because knowing an agent
+     EXISTS beats knowing how long it has run. Without this the ladder
+     is not monotonic — it drops a whole agent to keep a clock.
+
+  2  the window moves by the MINIMUM that brings the current back into
+     view — the same sentence as FOCUS PULLS THE VIEWPORT, BY THE
+     MINIMUM, one axis over.
+
+  ★ and moving the window COSTS a «n, which SHRINKS it — so one move
+  can push the current straight back out. It settles to a fixed point.

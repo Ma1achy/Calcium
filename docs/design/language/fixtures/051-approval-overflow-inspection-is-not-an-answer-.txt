@@ -1,0 +1,30 @@
+an INSPECTION action belongs to the question but is not one of its answers
+
+a 200-line patch does not fit above a prompt, and the payload is REPLACED
+rather than marked — so without inspection a reader approves a change
+they cannot see.
+
+──────────────────────────────────────────────────────────────────────────────
+ ⟩ Apply this change?   src/parser/parse.ts  +214 −88
+
+ ── src/parser/parse.ts +214 −88 ────────────────────────────────────────────
+ @@ -41,88 +41,214 @@
+    41 - let inQuote = false;
+    41 + let depth = 0;
+    47 - if (ch === q) inQuote = !inQuote;
+ +211 more lines
+
+  › no    yes    show full diff
+──────────────────────────────────────────────────────────────────────────────
+←→ move     ⏎ answer   — esc resolves to NO
+
+four inherited rules, none of them decided here
+
+  the SAFE answer opens current   no is first and focused
+  esc resolves to it              dismissing is answering no
+  placement is a parameter        anchored for an ordinary tool,
+                                  centred for a destructive one
+  inspection suspends identity    esc returns to the same unresolved question
+
+  and the layer is not dismissable, because an owner is awaiting an
+  answer — a silent pop hangs the verb forever.

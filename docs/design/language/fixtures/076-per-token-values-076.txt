@@ -1,0 +1,28 @@
+per-token values over the model's own output — the case that extends
+the shared run/span mechanism with numeric values
+
+  The parser tracks quotes with a boolean.
+  low  ░▒▓█  high                       per-token probability
+
+the unit is a TOKEN IN WRAPPED PROSE — not a row, not a cell. So table
+cannot hold it, a span carries appearance and not a value, and every
+plot form is axis-based.
+
+three things it needs
+
+  a per-token VALUE        driving a ground, or a mark beneath
+  tokens survive wrapping  a token near a line end wraps whole
+  selection by token       ⇧←→ extends by token, not by grapheme
+
+and it is the SAME mechanism spans needed — inline emphasis wanted a
+STYLED run and this wants a VALUED one. The symbol is reserved.
+
+where it earns its place in an agent surface
+
+  the model hedged here    a low-confidence run is visible, not buried
+  which tokens cost        an expensive rewrite has a shape
+  what came from the tool  quoted context against generated text
+
+  ▲ and it is off by default. A wall of shaded prose is harder to
+  read than prose, and the value is a diagnostic rather than a
+  reading — ⌥v toggles it on the entry under the cursor.

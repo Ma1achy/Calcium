@@ -1,0 +1,88 @@
+one column, one box-drawing family, and twice the resolution it looks
+
+  ● pytest tests/unit · 4.2s · 1,204 passed
+    ⎿ ============== test session starts =========
+      collected 1204 items                            ╽
+      tests/unit/plot.py ........................   ┃
+      tests/unit/table.py ...................... ┃
+      tests/unit/patch.py ......................     ╿
+      +1,136 more
+
+  │   the track      light vertical
+  ┃   the thumb      HEAVY vertical — the same shape, more weight
+  ╽   starts mid-row  light up, heavy down
+  ╿   ends mid-row    heavy up, light down
+
+a block on a hairline is two different things in one column. A light
+line and a heavy line are one thing at two weights — which is what a
+track and a thumb ARE.
+
+★ and ╽ ╿ give HALF-ROW precision, with the track running through them
+
+  scroll   0 of 28   ┃ ┃ ┃ ╿ │ │ │ │ │ │ │ │
+  scroll   5 of 28   │ ╽ ┃ ┃ ┃ │ │ │ │ │ │ │
+  scroll  14 of 28   │ │ │ │ ┃ ┃ ┃ ╿ │ │ │ │
+  scroll  28 of 28   │ │ │ │ │ │ │ │ ╽ ┃ ┃ ┃
+
+  a twelve-row gutter has TWENTY-FOUR positions. Without it a bar over
+  a long document moves in visible jumps and sits still through half
+  a page of scrolling — which reads as broken rather than coarse.
+
+  it is the same trick the plot renderer takes for a half-block — the
+  cell is the unit the terminal gives you, and the glyph is how you
+  get underneath it.
+
+the thumb takes the ACCENT when its container has focus
+
+  ││╽┃┃╿││    muted    scrolling under a focused prompt
+  ││╽┃┃╿││    accent   you are IN it — the arrows move here
+  the same rule the focused-container border takes, and it costs no
+  extra column.
+
+★ FOCUS PULLS THE VIEWPORT. Scrolling never moves focus.
+
+  the two directions are not symmetric, and treating them as if they
+  were is the commonest scrolling bug in a TUI:
+
+  move focus past the edge   the view follows, by the MINIMUM
+  scroll away from focus     focus STAYS, and it is still there
+                             when you come back
+
+  one row past the edge scrolls ONE ROW, not half a screen — re-
+  centring on every step makes the text jump under a reader who is
+  trying to follow it.
+
+where a bar appears
+
+  the transcript      whenever it overflows
+  a scroll block      inside its own bounds, not the frame's
+  another agent's tab its own; the other tab's is not drawn
+  an overlay          only if it overflows — usually it does not
+  nothing fits        NOTHING. A bar that cannot move is decoration
+
+  two bars is legal when they are two documents. Two bars for one
+  document is a layout error.
+
+and a count, where the count is the question
+
+  ┌ logs ────────────────────────────────────────┐
+  │ 14:23:02.774  INFO   [trainer] step 2417 │
+  │ 14:23:03.001  WARN   [loader] slow batch │╽
+  │ 14:23:03.194  INFO   [trainer] step 2418 │┃
+  └ 1,204 lines · at 842  ───────────────────┘
+
+  a bar says WHERE. A count says HOW FAR, and a log of 1,204 lines is
+  a place where the second question is the one being asked.
+
+degradation — and the whole set degrades together
+
+  24-bit · 8-bit · 1-bit   │ ┃ ╽ ╿   unchanged — it was never a colour
+  ascii                   | #         no half-rows; the track is | and
+                                      the thumb is #
+  ambiguousWidth: wide    | #         │ and ┃ are Ambiguous, ╽ and ╿ are
+                                      Narrow — a set of mixed widths
+                                      cannot ship, so it takes ascii
+
+  that last row is why the width check runs on a SET and not on a
+  glyph: four characters that are each fine can still be unusable
+  together.

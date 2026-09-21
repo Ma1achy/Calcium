@@ -1,0 +1,31 @@
+/ps, with every rule this document has landed on it
+
+  calcium   ✦ qwen3-coder-next   effort high        localhost:8000   22:41
+──────────────────────────────────────────────────────────────────────────────
+
+ ❯ /ps --mine --since 24h
+
+● ps · 0.3s · 4 of 11
+  ⎿  uuid     family            status      metric ▾   age  owner
+    ▸ a3f9b21  digit-classifier  running     0.0372    23m  malachy
+      7c2d4e1  decoder-zoom      succeeded   0.0089    41m  malachy
+      2e8a04c  graphsage         failed           —   1h12m  priya
+      f410d99  flow-predictor    queued            —      3m  malachy
+      +7 more · sorted by metric
+
+──────────────────────────────────────────────────────────────────────────────
+❯ ▌
+──────────────────────────────────────────────────────────────────────────────
+↑↓ rows   ⏎ open the run   ⌃⇧C copy the values   esc back
+
+nine rules doing their job at once
+
+  the message is washed          it is yours
+  the result summary is a number 4 of 11, not “ok”
+  the header is painted          a surface the rows sit under
+  ▾ marks the sort              and the residue row repeats it
+  metrics align on the point     0.0372 over 0.0089
+  — for a run with no metric     never 0, never blank
+  the focused row is a wash      plus ▸, which survives 1-bit
+  status is a TONE, not a ground it is a fact, not a thing
+  the footer names this scope    and changes when you leave

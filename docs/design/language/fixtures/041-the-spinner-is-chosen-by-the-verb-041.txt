@@ -1,0 +1,18 @@
+the spinner is chosen by what is happening, not at random
+
+  ✦  thinking          the agent's walk  not a verb — see above
+  ✦  reading a file    braille          the neutral default
+  ✦  writing           growHorizontal   something is filling up
+  ✦  searching         orbit            sweeping a space
+  ✦  compiling         noise            churning
+  ✦  network           bounce           a packet, out and back
+  ✦  uploading         growVertical     rising
+  ✦  waiting on you    toggle           two states, slow — nobody is busy
+  ✦  waiting on a lock circleQuarters   blocked WORK, still retrying
+  ✦  running tests     triangle         stepping through
+
+and the ramp under it varies with the verb too — shimmer for work,
+scatter for thinking, chase for a stream, breathe when it is your turn.
+
+chosen deterministically from a small declared family per verb, so calls
+may vary without changing meaning. Never random across the whole table.

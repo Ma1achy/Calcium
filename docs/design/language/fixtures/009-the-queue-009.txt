@@ -1,0 +1,56 @@
+messages typed while a turn runs are QUEUED — yours, and not sent yet
+
+  calcium   ✦ qwen3-coder-next   effort high        localhost:8000   22:19
+──────────────────────────────────────────────────────────────────────────────
+
+ ❯ refactor the parser to handle nested quotes
+
+● I'll look at the current implementation first.
+
+  ✦  editing parse.ts  41s · 3.2k tok
+  ⎿ todo  4/5  ·  ◻ run the suite
+
+─────────────────────────────── 2 queued ─────────────────────────────────────
+ ❯ also add a test for escaped quotes
+ ❯ then run the full suite
+──────────────────────────────────────────────────────────────────────────────
+❯ ▌
+──────────────────────────────────────────────────────────────────────────────
+⏎ send   ⌥↑ edit the last   ⌥⌫ drop the last   ⌥⏎ send all now
+
+three things carry the state, and each does one job
+
+  the WASH      says these are yours — unchanged from a sent message
+  the TONE      dim, not default — they have not happened yet
+  the DIVIDER   says how many, and where the sent transcript ends
+
+the divider is the state-carrier, so the messages keep their shape —
+which is what makes the transition legible when one sends:
+
+─────────────────────────────── 2 queued ─────────────────────────────────────
+ ❯ also add a test for escaped quotes
+ ❯ then run the full suite
+
+  ↓ the turn ends, the first one sends
+
+ ❯ also add a test for escaped quotes
+
+● Adding one now.
+
+─────────────────────────────── 1 queued ─────────────────────────────────────
+ ❯ then run the full suite
+
+it moves ABOVE the divider and goes to full tone. Nothing is redrawn
+in a different shape — it crossed a line and brightened.
+
+where the queue lives
+
+  always directly above the prompt's top rule, and it SCROLLS with
+  the transcript — it is not chrome, it is the end of the document
+
+  so scrolling up moves it out of view, which is correct: it is not
+  urgent and the footer already carries what is running
+
+and the empty case has no divider at all
+  zero queued draws nothing. A rule saying 0 queued is chrome
+  spending a row to say nothing is happening.

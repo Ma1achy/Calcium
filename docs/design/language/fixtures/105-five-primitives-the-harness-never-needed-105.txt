@@ -1,0 +1,65 @@
+FIVE PRIMITIVES THE HARNESS NEVER NEEDED
+
+a general app wants these and the agent surface does not, so they were
+missing rather than refused. Each is built from what already exists.
+
+a TREE — the twisty is CONTENT, the guides are DECORATION
+
+  ▾ src
+  │  ▾ interaction
+  │  │  ▸ parser
+  │  │    frame.ts                      4.1 kB
+  │  ▸ data
+    package.json                        1.2 kB
+
+  so at narrow widths the GUIDES go first and the names never do — and
+  depth is capped by §93’s floor rule, not by a constant.
+
+a FORM — the label is Fixed, the field Grows, the hint is decoration
+
+   name        prism-serve
+   port        80▌
+               ✗ ports below 1024 need root
+   replicas    3
+               0 stops the service
+
+  › save    cancel
+  an ERROR REPLACES THE HINT rather than joining it — two lines under
+  one field is two things competing to be read. And it uses the same ✗
+  and the same tone as every other failure, so a form error is not a new
+  visual idea.
+
+a SPLIT — the divider is a CONTROL
+
+  src/              │ export function layout(b, w, h) {
+    interaction/    │   b = chooseRep(b, w);
+    data/           ┃   solveW(b, w);
+  README.md         │   return b;
+
+  drag it, or ⌥←→ from either side — the SCROLLBAR’s rule on the other
+  axis. The focused pane takes the accent ON the divider, so which side
+  owns the arrows is visible without a label.
+
+a COMMAND PALETTE — and it is a PANEL whose list is a LADDER
+
+──────────────────────────────────────────────────────────────────────────────
+  ❯ open▌        3 of 61
+   › open file         ⌘O
+     toggle sidebar    ⌃B
+     run build         ⌘⇧B
+     +58 more
+──────────────────────────────────────────────────────────────────────────────
+  nothing new: a PANEL (§96), a LADDER, and a RESIDUE. The framework
+  already had every part — what it lacked was the name.
+
+a TOAST — and the rule that keeps it honest
+
+   ✓ saved to disk  3s
+
+  transient, and it takes NO KEYS. ★ WHAT A TOAST ANNOUNCES IS ALSO IN
+  THE RECORD — a toast is a courtesy, never the only place something was
+  said, which is the same argument §13 makes about notifications not
+  being durable completion facts.
+
+  §11 already refused a FLOATING toast and was right: this one lives
+  where the action was, and it is in the transcript too.

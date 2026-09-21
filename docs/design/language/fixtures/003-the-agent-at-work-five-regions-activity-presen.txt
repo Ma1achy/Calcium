@@ -1,0 +1,41 @@
+  calcium   ✦ qwen3-coder-next   effort high        localhost:8000   22:13
+──────────────────────────────────────────────────────────────────────────────
+
+ ❯ refactor the parser to handle nested quotes
+
+  ▸ thinking · 4s · 312 tok
+
+  ● I'll look at the current implementation first.
+
+  ● read_file(src/interaction/parser/parse.ts)
+    ⎿ 184 lines · 6.2 KB
+
+  ● The parser handles quotes with a single boolean. Nested quotes need
+    a depth counter instead:
+
+  ● edit(src/interaction/parser/parse.ts)
+    ⎿
+    ── src/interaction/parser/parse.ts +2 −2 ────────────────────────────────
+    ⋯ 39 unchanged lines
+    @@ -40,4 +40,4 @@
+       40     const out = [];
+       41 -   let inQuote = false;
+       41 +   let depth = 0;
+       46       if (esc) { esc = false; continue; }
+       47 -     if (ch === '"') inQuote = !inQuote;
+       47 +     if (ch === '"') depth += (ch === q) ? (esc ? 0 : 1) : 0;
+       48       out.push(ch);
+    ⋯ 136 unchanged lines
+  ✦ updating the tests                       12s · 1.4k tok
+  ⎿ todo  3/5
+    ◼ read the current implementation
+    ◼ find where quotes are tracked
+    ◼ add a depth counter
+    ✦ update the tests
+    ◻ run the suite
+──────────────────────────────────────────────────────────────────────────────
+  ❯ ▌
+──────────────────────────────────────────────────────────────────────────────
+  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13
+  ████████████████░░░░░░░░░░  62%  31k/50k   step ████░░░░░░ 4/10   28 tok/s
+  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m

@@ -1,0 +1,62 @@
+a link is an INLINE BUTTON, and it takes a button's states
+
+  at rest    see parse.ts:41 for the walk
+             identifier tone and an underline — so you know it is a
+             link BEFORE you click, which is what makes a plain click safe
+
+  hovered    see  parse.ts:41  for the walk
+  focused    see  parse.ts:41  for the walk
+             same active ground; only focus keeps the persistent edge
+
+  1-bit      see parse.ts:41 for the walk   the underline and bold
+  ascii      see <parse.ts:41> for the walk  angle brackets
+
+★ HOVER AND FOCUS SHARE AN ACTIVE TREATMENT, BUT FOCUS ADDS A MARK
+
+  both mean THIS IS A LINK THAT CAN ACTIVATE, so both receive the link
+  ground. Keyboard focus also keeps the persistent focus mark or edge;
+  hover never receives it. The actual key target therefore stays visible.
+
+  and hover still does NOT move focus. The paint follows the pointer;
+  the ▸ and the entry's wash stay where keyboard focus is. Two things can
+  be lit at once, but only one carries the focus indicator.
+
+★ and this CORRECTS the rule from the section above
+
+  the shape rule says a RUN inverts to its own tone, and a link
+  has one — identifier — so it inverts to cyan, not the accent.
+  And the underline stays, because it is what says LINK.
+
+  it cannot. A two-step lightness shift over ELEVEN CHARACTERS inside
+  a paragraph is not a signal — the wash works because it covers a
+  ROW, and the reason does not reach an inline extent.
+
+  see parse.ts:41 — washed inline, and nearly invisible
+  see  parse.ts:41  — painted, and unmistakable
+
+  so the rule gains its third clause:
+
+  an unpainted RUN or BOX inverts
+  a FRAME takes its border or axes
+  a CONTROL washes, and a REGION washes
+  a painted IDENTITY CHIP preserves hue, bolds and takes a mark
+
+why the link's OWN hue rather than the accent
+
+  the accent would make a hovered link look like a selected menu
+  item. Keeping the identifier hue means a painted link is still
+  recognisably a LINK — the colour did not change, the ground did.
+
+  and the ink flips by CONTRAST against that hue, which is the same
+  calculation the ten chrome hues and the choice ground use. Nobody
+  maintains a per-theme ink table.
+
+what else is an inline target
+
+  a paste chip     [#1 json · 47L]  →   [#1 json · 47L]
+  an agent chip     › count            →  already painted; focus BOLDS + MARKS it
+  a legend entry   ● train            →  the swatch and label together
+  an inline button  Approve           →  bgElev → focusGround, as before
+
+  an identity chip is already painted, so focus adds weight, mark and edge rather than a new hue —
+  which is the same one-step-further move a button makes.

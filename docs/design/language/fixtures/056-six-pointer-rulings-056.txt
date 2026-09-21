@@ -1,0 +1,73 @@
+six rulings the gesture table settles, and none of them is obvious
+
+1 · FOCUS-FIRST ACTIVATION IS A STATE TEST, NOT A TIMING ONE [R-PTR-001]
+  there is no double-click speed. On a FOCUS-FIRST target the first click
+  focuses; a click on the ALREADY-FOCUSED element activates it — whether
+  that is 200ms later or a minute. Direct-action controls activate on
+  their first committed release and have no focus-first precondition.
+
+  so a slow double-click works, a shaky hand works, and there is no
+  number to tune. The framework reads no clock for this, which is
+  also why it cannot have a timing test even if it wanted one.
+
+2 · FOCUS IS REMEMBERED, AND RESTORING IS A RE-RESOLUTION [R-PTR-002]
+  leave a table on row 14, come back, and you are on row 14. There
+  is no click-to-jump-back in a terminal, so re-entering at row 1
+  every time is punishing rather than merely untidy.
+
+  but the element may be GONE — the transcript evicts, a block is
+  replaced whole, and the element list is a function of width. So
+  it resolves by id and FALLS FORWARD to the nearest survivor,
+  which is the scroll anchor's shape reused rather than a second
+  mechanism.
+
+3 · HOVER MAY PREVIEW; A PLOT MAY MOVE ITS READOUT [R-PTR-003]
+  ┌──────────────────────────────────────┐
+  │ 4.0┤⣀⠡⠤⠒│⠉⠑⠒⠢⡄
+  │ 0.0┼──────────┬──────────────────
+  │       step 41  ·  loss 0.0372
+  └──────────────────────────────────────┘
+
+  the readout follows the pointer and FOCUS DOES NOT MOVE. It passes
+  the every-gesture-has-a-key rule because ←→ set the same store —
+  this is the readout half of that pair without the focus half.
+
+  leaving the area LEAVES THE CURSOR WHERE IT WAS. A readout that
+  vanished with the pointer would have no keyboard equal.
+
+  and it is consumed only when the INDEX changes — a motion inside
+  one sample's columns is a no-op and no frame, which is what makes
+  tracking every motion affordable at all.
+
+  links, buttons and chips may preview their focus treatment. Other
+  surfaces do nothing. Hover never moves focus, activates, or commits domain/action
+  state; a component may update its declared preview or readout state.
+
+4 · CLICKING A LEGEND ENTRY TOGGLES THAT SERIES [R-PTR-004]
+  ● train   ● val   ○ test        click a swatch or its label
+  the key equal is ↓ then 1–9. A legend hit TOGGLES on its first committed
+  click even when the plot was unfocused, and may also focus the plot; the
+  plot background remains focus-first. A legend entry is a control, so
+  it does its own thing rather than the generic one.
+
+5 · PRESS ARMS; RELEASE COMMITS BY IDENTITY [R-PTR-005]
+  the press records the target's stable id and ownership generation.
+  release activates only over that same live id. A drag, owner change,
+  replacement or release elsewhere cancels it, so a drag never ends in a click.
+
+6 · RIGHT-CLICK HAS NO KEY EQUAL, SO IT HAS NO EFFECT [R-PTR-006]
+  recorded rather than absorbed: a right-click needs a keyboard
+  equal BEFORE it can have a behaviour, and there is no ⇧↓-shaped
+  state for it to reach.
+
+  same for ⌘ and ⌃ clicks — which is also what leaves ⌘click to the
+  terminal, where a reader already expects it.
+
+and the one the table refuses
+
+  a click on a row that is NO element — chrome, a gap, blank space
+  beside a short block — does nothing and is unconsumed.
+
+  “no element” is a state the keys never produce and the frame never
+  highlights, so a click that stored it would change state INVISIBLY.
+  A row with nothing focusable is not entered.

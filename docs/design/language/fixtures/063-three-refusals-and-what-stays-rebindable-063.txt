@@ -1,0 +1,52 @@
+three things refused, and each is refused for the same reason
+
+1 · NO LEADER KEYS, NO TWO-KEY SEQUENCES [R-REF-001]
+  no ⌃x ⌃s, no g g, no space-then-f. A sequence is a MODE you are
+  in for 400ms without being told — and the way you discover you
+  were in it is that the next key did something else.
+
+  every binding is one chord. The footer shows the highest-ranked live
+  actions that fit; help shows all. A sequence cannot be shown; it can only be
+  remembered.
+
+2 · NO CHORDS THE PLATFORM ALREADY OWNS [R-REF-002]
+  ⌥←→ is word movement. ⌘←→ is line ends. ⌘C is the terminal's
+  copy. ⌃↑ is Mission Control. Taking one wins an argument with the
+  reader's own machine, and the machine wins.
+
+3 · NO KEY THAT ONLY WORKS SOMETIMES [R-REF-003]
+  if ⏎ means open in the transcript, it opens in EVERY scope that
+  has something to open, and it is absent from the footer where it
+  does not. A key that silently does nothing in one place is worse
+  than a key that does not exist.
+
+and what is deliberately left rebindable
+
+  every chord is rebindable. Confirm, safe exit, focus movement and
+  interrupt are structural ACTIONS, so each must keep one reachable
+  binding or named-command path after conflict resolution.
+
+  ❯ /keys posture ⌥p
+──────────────────────────────────────────────────────────────────────────────
+──────────────────────────────────────────────────────────────────────────────
+ ⟩ ⌥p is already cycle posture. Replace it?
+  › no    replace it    pick another chord
+──────────────────────────────────────────────────────────────────────────────
+←→ move     ⏎ answer   — a conflict is a QUESTION like any other
+  › no    replace it    pick another chord
+──────────────────────────────────────────────────────────────────────────────
+←→ move     ⏎ answer   — a conflict is a QUESTION like any other
+
+  a conflict is answered before it is written, not discovered when
+  the old binding stops working.
+
+prompt undo is the editor's, not the agent's
+
+  ⌘Z        undo in the line editor — your typing only
+  ⌘⇧Z       redo
+  ↺ on an entry  revert what the AGENT did — a different thing,
+                in a different place, with a different key
+
+  sharing one undo between the two would mean ⌘Z sometimes touches
+  your files, which is the kind of surprise nobody recovers trust
+  from.

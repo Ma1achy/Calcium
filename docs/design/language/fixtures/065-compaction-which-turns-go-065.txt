@@ -1,0 +1,23 @@
+the context fills, and a harness can say WHICH TURNS GO — a statusline cannot
+
+  ctx ██████████████████████████████░░  94%   ⏎ breakdown
+
+  ▲ the next turn drops 3 turns
+    turn 4   read_file(construct.ts)      8.1k tok
+    turn 5   search("elementsIn")         2.2k tok
+    turn 6   your question about spans    0.4k tok
+    ⏎ summarise instead   p pin a turn   esc let it drop
+
+you are at 94% is a WARNING. These three turns drop when you send this
+is a DECISION — and only a harness holds the turns to say it.
+
+after compaction the transcript says so, in place
+
+  ✦ compacting   ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱  3 of 5 turns
+
+  ● 3 turns compacted · 10.7k → 0.9k tok · ⏎ read the summary
+  ⎿ read construct.ts, searched for elementsIn, discussed the span
+    prerequisite. No edits were made.
+
+  it is an ENTRY, not a gap — because a conversation that silently
+  forgets is one you cannot reason about.

@@ -1,0 +1,42 @@
+★ ONE INTERVAL for the whole family; the four named sets are subsets of
+FULLRAMP’S ALPHABET.
+
+  ✦   pulse      ✢✲✱✻✱✲                        6 × 120ms =  720ms
+  ✦   starfield  ✶✷✸✹✺✹✸✷                      8 × 120ms =  960ms
+  ✦   grow       ✦✢✲✶✷✹✺✹✷✶✲✢                 12 × 120ms = 1440ms
+  ✦   bloom      ⋅✧✦✢✻✾❀✿❀✾✻✢✦✧               14 × 120ms = 1680ms
+  ✦   fullramp   ⋅∘◦✧✦✢✲✵✶✷✱✺✹✸✼✻❃❁✾❀✿❂…     42 × 120ms = 5040ms
+  ✦   the walk   all five, concatenated            82 × 120ms = 9840ms
+
+Across the five constituent sets, ✶ appears in THREE, ✢ in FOUR, and ⋅ in TWO.
+The composite walk repeats those memberships.
+If the five constituent sets used different intervals, the SAME GLYPH
+would move at different speeds by set — that would read as inconsistent.
+
+  at one interval they differ only in AMPLITUDE and CYCLE LENGTH, which
+  is what actually distinguishes them: pulse barely opens, fullramp goes
+  from a dot to a full flower.
+
+which is a rule, not a one-off
+
+  SETS THAT SHARE GLYPHS SHARE AN INTERVAL.
+
+  the bloom family shares an alphabet, so it shares 120ms. braille,
+  orbit, the box family and the rest are separate alphabets with their
+  own frame counts, and they keep their own.
+
+  ✦  braille   80ms      a different alphabet entirely
+  ✦  toggle   400ms      two states, slow, and deliberately so
+  ✦  triangle 120ms      four corners
+
+and NOTHING varies its rate at runtime
+
+  no rung, no heuristic, no mapping from throughput to speed. A rate
+  that varies is a rate no golden frame can hold, and the two things it
+  would convey are already said better elsewhere:
+
+  how long have I waited   the elapsed counter, and the thinking tone
+  how much work is running the step count and the token rate
+
+  the mark's job is to say THE MODEL IS ALIVE. That is one bit, and it
+  does not need a dial.

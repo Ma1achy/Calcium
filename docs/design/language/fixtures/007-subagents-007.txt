@@ -1,0 +1,137 @@
+every subagent gets a NAME and an identity HUE. In colour-capable rendering,
+that hue is painted behind the name wherever it appears.
+
+   seams     arm     count         assigned in order, from the ten chrome hues
+
+  the HUE is the harness's, by index — deterministic, so a frame
+  renders the same twice and a golden can hold it.
+
+  the NAME is the model's — one word for what it was asked, falling
+  back to the index. seams reads better than agent 1 and costs
+  nothing.
+
+  past ten they cycle, and the name is what disambiguates — which
+  is also what happens at 1-bit, where no ground survives.
+
+three surfaces, and the chip is on all three
+
+1 · the transcript: one entry, and it is small
+
+● 3 agents · 8m 12s · 3 of 3
+  ├─ ●  seams   explore the unwired seams     2m 53s · 4 findings
+  ├─ ●  arm     explore the plot-arm repairs  3m 46s · 3 corrections
+  └─ ●  count   verify the refusal count     8m 12s · 1 disproved
+
+what it was asked and what came back. No context bars, no nested
+calls — four stacked bars in one transcript is four readings competing
+for a glance that only wanted one.
+
+2 · the footer: which are LIVE, and only while they are
+
+  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13
+  ████████░░░░░░░░░░░░░░░░░░░░  30%  15k/50k   step ██████░░░░ 6/10   28 tok/s
+  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3   ⋯ 3 agents   malachy
+  ⋯ › main    seams  2:53 ✓   arm  3:46 ✓   count  ✦ 4:02    ⌃⇥ switch
+
+one row, present only while something runs, and gone with them. It is
+the SAME ROW in every frame — › marks the one you are in, and main is
+its first entry.
+
+  it lives in the footer because that is where LIVE things live —
+  the same row as the context bar, and for the same reason: you
+  glance without leaving what you are reading.
+
+3 · opening one: a full frame, tinted with that agent's hue
+
+   calcium/count   verify the refusal count    ✦ qwen3-coder-next  22:19
+  ────────────────────────────────────────────────────────────────────────────
+
+ ❯ count the refusals three ways and compare
+
+  ● I'll grep the prose, the register and the roadmap separately.
+
+  ● search("refus") · 1.2s · 1,204 matches
+    ⎿ +1,204 more · ⏎ expand
+
+  ✦  cross-checking the register  4m 02s · 46k tok
+  ────────────────────────────────────────────────────── calcium/count ─
+  ❯ ▌
+  ────────────────────────────────────────────────────────────────────────────
+  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13
+  ██████████████████████░░  92%  46k/50k   step █████████░ 18/20   28 tok/s
+  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m
+  ⋯   main    seams  2:53 ✓   arm  3:46 ✓ › count  ✦ 4:02    ⌃⇥ switch
+
+all four rules take the agent's hue, and the prompt's label carries
+the PATH — calcium/count — which is exactly what /colour does, applied
+automatically.
+
+  one chip, one hue — two grounds would read as two identities, and
+  there is one agent here. The path says where you came from; the
+  colour says which of them you are in.
+
+  and the footer is the SAME LINES as the parent's, with this agent's
+  numbers in them. A subagent view that dropped to one line would be
+  a different product one keypress away.
+
+  and everything that REPRESENTS THE AGENT takes its hue — the walking
+  mark, the ramp on its activity text, its own affordance keys. The
+  theme accent is main's identity; a child overrides it with its own.
+
+  what does NOT change is everything else: a succeeded call is still
+  green, a failure still red, a user message still washed. The hue
+  says WHO, and the tones still say WHAT.
+
+  including the agent row — with › on the one you are in, and MAIN
+  as its first entry. So switching is one list rather than a back
+  key and a separate open key, and sibling to sibling needs no trip
+  through the parent.
+
+  so the frame tells you where you are before you read a word, in
+  your peripheral vision, from any scroll position.
+
+  the PARENT keeps the default chrome, so coming back is a change
+  you see rather than one you have to check for:
+
+  ───────────────────────────────────────────────────────────────── calcium ─
+  ❯ ▌
+  ────────────────────────────────────────────────────────────────────────────
+  » auto   ███████░░░░░░░░░░░░░░░░░  30%  15k/50k      ⋯ 3 agents
+
+  and a manual /colour inside a subagent is refused — the hue is the
+  agent's identity, not a preference, and two agents wearing the same
+  colour is the one thing this is for preventing.
+
+  it is a full transcript otherwise: its own entries, its own prompt,
+  its own context bar, its own posture. This child at 92% is visible
+  exactly where someone would look for it — and the prompt is LIVE,
+  so you can redirect it mid-run or just watch.
+
+★ a question surfaces in the frame YOU ARE LOOKING AT
+
+there is one of you and three of them. A child hitting a permission
+gate cannot wait for you to open it — so it comes to wherever you are,
+wearing its chip.
+
+──────────────────────────────────────────────────────────────────────────────
+ ⟩  calcium/count  asks:
+
+ run rg --stats -uu 'refus' across the tree?
+ -uu searches ignored files. 41,208 candidates.
+
+  › no    yes    always allow rg --stats -uu here    open count
+──────────────────────────────────────────────────────────────────────────────
+←→ move     ⏎ answer   — esc resolves to NO, and the child is told
+
+  the fourth choice opens that child, because the honest answer to
+  half of these is I need to see what it is doing.
+
+  and the others keep running — the footer reads 2 done · 1 waiting
+  rather than stalling with no explanation.
+
+the rules that survive from the fan-out
+
+  children never reorder      started order, whatever order they finish
+  the duration is wall clock  14m51 of work in 8m12 — they do not add up
+  a failure is the CHILD's     the parent says how many, not whose message
+  two levels, never three     a subagent's subagent is that view's problem

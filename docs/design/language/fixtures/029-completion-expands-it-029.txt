@@ -1,0 +1,16 @@
+  calcium   ✦ qwen3-coder-next   effort high        localhost:8000   22:15
+──────────────────────────────────────────────────────────────────────────────
+
+● pytest tests/unit · 4.2s · 47 passed
+
+
+
+──────────────────────────────────────────────────────────────────────────────
+ › /profile    the profiler's overlay
+   /profile snap     emit a stamped card
+   /profile clear    reset the ring
+ 3 of 14   ↑↓ move   ⏎ run   esc close
+──────────────────────────────────────────────────────────────────────────────
+❯ /profile▌
+──────────────────────────────────────────────────────────────────────────────
+⏎ run   ↹ accept   ↑↓ move   esc close

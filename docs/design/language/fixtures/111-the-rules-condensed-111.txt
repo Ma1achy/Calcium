@@ -1,0 +1,50 @@
+Generated from CURRENT registry records only. This is a projection, never a paraphrased second source.
+
+STRUCTURE
+  Keep one durable event record, one rendered window, and one model context. Eviction changes the window; compaction changes context; neither erases history.  [R-COR-001]
+  A call has one head and one gutter, with at most one bounded body when output exists.  [R-STR-001]
+  At transcript level, one blank row separates sibling entries; spacing inside a body belongs to that block.  [R-STR-002]
+  Every nested level costs three columns, and nesting is limited by width while the deepest child still clears its own minimum width.  [R-STR-003]
+  Content stops one column before the inline-end edge.  [R-STR-004]
+
+COLOUR
+  Framework status red means failure and override red means unsafe override; red is never the only carrier. Syntax, removal, and identity retain their declared roles.  [R-COL-001]
+  The tone budget is regional: an entry has three tones, while code, plots, and patches carry their own adjacent palettes.  [R-COL-002]
+  A ground is for an extent; a tone is for a mark. Things take a ground and facts about things take a tone.  [R-COL-003]
+  An actionable, status, or interaction ground is never the only carrier; dense data owes a readout.  [R-COL-004]
+  Focus intensifies by shape: an unpainted run or box inverts, a frame takes its border or axes, a control washes, and a painted identity chip bolds and marks.  [R-COL-005]
+
+MOTION
+  A specimen animation may change only the glyph in a cell or that cell’s colour, opacity, or brightness. Transform, translate, scale, rotate, and layout motion are forbidden. Per-character stagger is retained. Glyph-swap frames resolve through a one-cell capability rung; ambiguous Unicode falls back to registered one-cell ASCII frames.  [R-MOT-005]
+  Motion says that state is changing or something is live. Semantic animation says what is happening, never merely look here.  [R-MOT-006]
+  A call’s shape does not depend on its duration.  [R-MOT-007]
+  The bloom family belongs to the agent and nothing else uses it.  [R-MOT-008]
+
+INTERACTION
+  Interaction uses visible scopes, not hidden modes.  [R-INT-001]
+  No single-key command exists in any scope where typing is possible.  [R-INT-002]
+  Scrolling is not a scope and never moves focus.  [R-INT-003]
+  Focus pulls the viewport by the minimum displacement required to reveal it.  [R-INT-004]
+  An inside-bearing continuous control cannot commit its domain value from outside; declared readouts may preview and direct-action controls have no inside state.  [R-INT-005]
+  Every consumed state-changing pointer gesture lands on a state a key can reach.  [R-INT-006]
+  Escape takes the current host owner’s declared safe path at most one rung; in an attached PTY it belongs to the child.  [R-INT-007]
+  Nothing moves the reader without asking. Rejected commands explain; passive untargeted pointer events may remain silent.  [R-INT-008]
+
+HONESTY
+  A dash is not a zero.  [R-HON-001]
+  A stale reading says when it was taken.  [R-HON-002]
+  A bounded window says what it dropped.  [R-HON-003]
+  A refusal states its reason and is never red.  [R-HON-004]
+  A number carries its unit.  [R-HON-005]
+  Copy takes the source, never the rendering.  [R-HON-006]
+  The event record, visible window, and model context never masquerade as one.  [R-HON-007]
+
+DEGRADATION
+  Every actionable, status, and interaction distinction has two independent carriers and survives without colour. Dense data may shed colour-only detail only when a named readout preserves the meaning.  [R-COR-003]
+  Every semantic glyph declares a collision-free ASCII fallback, width by capability, and reservedCells equal to its widest representation. The renderer pads the selected representation to that reservation.  [R-GLY-001]
+  Capabilities form a vector, not a ladder. Every action has a base-terminal route; enhanced protocols improve bindings but never create the only route.  [R-CAP-001]
+  Every component exposes semantics and announcement policy. Linear semantic events are append-only and non-animated; only the active input editor mutates in place.  [R-ACC-001]
+  Only the renderer emits terminal controls. User, model, tool, path, URL, and log content is escaped; a PTY interprets controls only inside its emulator boundary.  [R-TRU-001]
+  Every distinction survives to one-bit rendering.  [R-DEG-001]
+  A capability makes things better, never possible.  [R-DEG-002]
+  Width is checked on a simultaneously rendered set, not on an isolated glyph.  [R-DEG-003]

@@ -1,0 +1,9 @@
+  ▸ thinking · 4s · 312 tok                    collapsed — the default
+
+  ▾ thinking · 4s · 312 tok
+    │ The parser tracks quotes with a boolean, so a nested quote
+    │ flips it back and the run ends early. A depth counter fixes
+    │ that, but I should check whether escaping is handled first.
+
+90 stream parts against text's 22 — the collapsed header is the primary
+surface, not the degenerate case.

@@ -1,0 +1,19 @@
+two selections, one clipboard — and they are different objects
+
+the PROMPT's is a character range over the buffer
+  ❯ explain this error and compare with the previous run
+
+the TRANSCRIPT's is a SET OF ELEMENTS, and copy asks each what it IS
+    ● a3f9b21  digit-classifier  running   0.0372
+▌   ● 7c2d4e1  decoder-zoom    succeeded 0.0089
+▌ ▸ ✗ 2e8a04c  graphsage       failed    —
+  underline carries a selected range; ▌ carries selected elements; ▸ carries focus.
+  ⌃⇧C copies the selected source objects — something a raw terminal cannot offer.
+
+a plot copies its data. A code block copies its source, not its highlighting.
+A chip copies its content, not its label. A terminal copies the emulator's text.
+
+copy mode — when the terminal's own selection is wanted instead
+  ⌥⇧C native     mouse tracking off · the terminal owns the mouse
+  and the frame stops painting, because a native selection over a
+  repainting screen silently comes to cover different text.

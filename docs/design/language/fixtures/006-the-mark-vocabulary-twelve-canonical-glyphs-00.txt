@@ -1,0 +1,23 @@
+TWELVE CANONICAL GLYPHS · generated from one registry [R-GLY-001]
+ASCII fallbacks are collision-checked as a co-rendered set. reservedCells is the widest rung.
+
+ glyph  ascii role                        u/a   reservedCells
+  ●  o     work-unit / state dot       1/1   1
+  ⎿  `-    result branch               1/2   2
+  ▲  ^     attention                   1/1   1
+  ✓  +     success                     1/1   1
+  ❯  $     reader position             1/1   1
+  ▸  >     focus                       1/1   1
+  ▾  v     expanded disclosure         1/1   1
+  ⟩  ?     question                    1/1   1
+  ›  *     current item                1/1   1
+  ⋯  ...   omitted content             1/3   3
+  ○  @     unchosen choice             1/1   1
+  ✗  x     failure                     1/1   1
+
+supporting registered marks — inventory-checked, not part of the canonical twelve
+  ▰  #     segmented meter fill        1/1   1
+  —  -     rule segment                1/1   1
+
+tape delimiters   « → [    » → ]
+The renderer pads a narrow representation inside its reservation; following columns do not move. Browser measurement verifies both forms in the composed grid. [R-GLY-002]

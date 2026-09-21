@@ -1,0 +1,55 @@
+four major things this document owed, and now says
+
+1 · MOTION: FULL / REDUCED / OFF — independent of colour depth
+  the design is kinetic, and there was no way to turn it down. mouse: off
+  already exists; motion joins it as an independent preference because
+  a 1-bit display may animate and a 24-bit display may be still.
+
+  ● updating the tests   12s · 1.4k tok      the mark is STILL
+  ● pytest · 4.2s · 47 passed          no spinner, no ramp
+
+  the elapsed counter carries liveness, which this document already
+  calls the honest answer. The mark's job is one bit and a static
+  mark still carries it.
+
+2 · /permissions — a standing grant is a one-way door without it
+   what                      where                 granted
+   edits                     ~/code/calcium        22:14
+   rg --stats -uu            the count agent       22:41
+   npm test                  ~/code/calcium        3d ago
+  ↑↓ move   ⌥⌫ revoke   ⌃⇧C copy
+
+  always allow is a decision, and a decision you cannot see is one
+  you cannot revoke — the same argument /config's source column makes.
+
+3 · A WATCHED RUN ENDING EARNS THE BELL
+  the notification ladder fires on TURN end. A six-hour run finishing
+  is not a turn — and a watch drops itself when the run ends, so being
+  away meant it vanished from the footer with no trace.
+
+  ⟩ a question is waiting         always
+  ● a WATCHED RUN ended           always — new
+  ● a watched run FAILED          always — new
+  ● a turn ended                 if it ran over ~30s
+  ● a tool call ended            never — the turn has not
+
+4 · A METRIC'S DIRECTION DRIVES ITS TREND TONE
+  val loss   █▇▆▅▄▃▃▂▂▁  0.0372   ↓ from 0.41    lower is better
+  accuracy   ▁▂▃▄▅▆▆▇██  0.941    ↑ from 0.62    higher is better
+  val loss   ▁▂▄▅▆▇▇███  0.410   ↑ from 0.04    … and this is BAD
+
+  a trend that always paints DOWN as ok misleads on half of every ML
+  metric. The METRIC declares its polarity and the arrow takes ok or
+  error from it — otherwise the colour is decorative, which this
+  document argues against everywhere else.
+
+and two smaller ones
+
+  FIND says what it cannot reach: 3 of 14 · loaded turns only
+  the transcript evicts at a cap, so a count over the loaded window is
+  a bounded window — and a bounded window says what it dropped.
+
+  A SUBAGENT'S HUE SKIPS THE PARENT'S. Hues are assigned by index, but
+  a reader can pin main to any of them with /colour. The assignment
+  excludes whatever main currently holds, however it got it — two
+  agents in one colour is the thing the hue exists to prevent.

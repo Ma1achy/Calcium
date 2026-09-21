@@ -1,0 +1,31 @@
+first run — and the empty transcript is the only place to say anything
+
+  calcium   ✦ qwen3-coder-next   effort high        localhost:8000   22:01
+──────────────────────────────────────────────────────────────────────────────
+
+  calcium  v1.0.0
+  qwen3-coder-next at localhost:8000  ·  ~/code/calcium  ·  ⎇ feat/c26
+
+  ❯ describe what you want, or / for commands
+  ? accept-edits — edits go, commands ask. ⌥p changes that.
+
+
+──────────────────────────────────────────────────────────────────────────────
+❯ ▌
+──────────────────────────────────────────────────────────────────────────────
+⏎ run   ⇥ complete   ?  keys   /  commands
+
+three facts and two affordances. No logo, no tips carousel — the one
+thing worth saying on an empty screen is what the posture is, because
+it is the only setting that can surprise you later.
+
+resuming — the transcript is not empty, so the notice is an entry
+
+  ● resumed · 14 turns · 2h ago · 31k tok restored
+  ⎿ last: edited parse.ts, ran the suite, 2 failing
+
+ ❯ what was failing again?
+
+it settles like any other entry, so scrolling past it is normal — and
+it says what it RESTORED, because a context you cannot see is one you
+cannot reason about.

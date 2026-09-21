@@ -1,0 +1,49 @@
+THREE scopes, and they NEST. Three other categories are not scopes at all.
+
+  PROMPT      typing. The default, and where you return to
+  TRANSCRIPT  an entry is focused
+  BLOCK       inside one — a table's rows, a widget's value, a camera
+
+  ⇧⇥   OUT of the prompt, into the transcript — what shift-tab does
+       in every form on the web
+  ⇥    forward through the ring, and back to the prompt
+  esc  RESOLVE THE INNERMOST TEMPORARY STATE, safely. Its order:
+       1  a question is open      take its declared safe path
+       2  a substate is open      close find, completion, history search
+       3  the prompt has text     clear the line
+       4  otherwise              out one rung: block → transcript → prompt
+  an attached PTY is capture, not an ordinary substate: esc belongs to the
+  child and the displayed host.detach action leaves it.
+
+  “out one scope” was only the fourth case. The one-line version was
+  true of the common path and wrong about the other three.
+
+★ and the three categories that are NOT rungs on this ladder
+
+  A BLOCKING OWNER is MODALa question may raise one; it takes input
+                           until resolved. OVERLAY describes how a
+                           layer paints, not what kind of owner it is
+  A TAB is PARALLEL        a subagent — its own prompt, its own
+                           context, its own three scopes. ⌃⇥ moves
+                           SIDEWAYS, not up
+  FIND and COMPLETION are  the prompt, relabelled. They expand it
+  PROMPT SUBSTATES         and ⏎ targets something else
+
+  an earlier pass listed five scopes including a pushed VIEW. Pushed
+  views were then removed and the list was not. Worse, it was hiding a
+  modelling error: NESTING, MODALITY and PARALLELISM are three
+  relationships, and they were wearing one ladder.
+
+scrolling is not a scope
+
+  ⌥↑ ⌥↓, the wheel and the trackpad scroll WITHOUT moving focus.
+  The prompt keeps it and you keep typing — the single biggest thing
+  terminal apps get wrong.
+
+the footer's last line is the current scope's keys
+
+  prompt      ⏎ send   ⇧⏎ newline   ⇥ complete   ⇧⇥ transcript
+  transcript  ↑↓ move   ⏎ open   ⌥⇧V copy   esc back
+  block       ↑↓ rows   ⇧↑↓ select   ⏎ activate   esc back
+  question    its declared actions and safe resolution
+  a tab       its own three, because it is a whole frame

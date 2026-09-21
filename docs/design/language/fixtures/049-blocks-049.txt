@@ -1,0 +1,28 @@
+plot
+  loss
+  4.0┤⢀⡠⠔⠒⠉⠉⠑⠒⠢⢄
+     │⠊         ⠈⠢⡀
+  2.0┤             ⠈⠑⠢⢄⣀
+  0.0┼─────────────────⠉⠒⠤⠤⣀⣀⣀──────
+     0        25        50        75       100
+  ● train   ● val
+
+table
+  uuid     family            status      metric   age
+  ▸ ● a3f9b21  digit-classifier  running     0.0372   23m
+    ✓ 7c2d4e1  decoder-zoom      succeeded   0.0089   41m
+    ✗ b81c003  vae-latent        failed      —        2h
+  +8 more
+
+image · paste chip · buttons · links
+  ┌────────────────────────┐
+  │⣿⣿⣷⣤⣄⡀  ⢀⣠⣤⣶⣿⣿⣿⣿⣷⣤⣀ │
+  │⣿⣿⣿⣿⣿⣿⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿│
+  └────────────────────────┘
+  sample-047.png · 512×384 · dithered
+
+  ❯ explain [#1 json · 47L] and [#2 nginx.conf · 44L]
+
+   › Approve    Deny  [ Approve ]  ascii
+
+  see construct.ts:1263 · focused construct.ts:1263

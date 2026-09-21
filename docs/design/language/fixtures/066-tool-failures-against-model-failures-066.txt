@@ -1,0 +1,26 @@
+a tool failed and the MODEL failed are different facts, and the shapes differ
+
+a TOOL failure is a result — it hangs under its own call and the turn goes on
+  ● read_file(missing.ts) · 0.1s · failed
+    ⎿ ✗ ENOENT: no such file
+  ● I'll check the directory listing instead.     ← the turn continues
+
+a MODEL failure ends the turn, and it is the status block
+  ● The parser tracks quotes with a boolean, so a nes
+
+  ──────────  ERROR  ──────────
+  ✗ context exhausted at 50,000 tokens
+
+  ✦ retrying in 8s · attempt 2        ← and it retries, visibly
+
+four model failures, four answers
+
+  rate limited      retry with backoff, and SAY the wait
+  context exhausted offer compaction — it is actionable
+  refused           not an error. The model answered
+  transport died    the status block, and the partial reply STAYS
+
+  a refusal is the model's answer and gets no error treatment:
+  ● I won't do that — here is why, and what I can do instead.
+
+  conflating the two teaches a reader to ignore red.

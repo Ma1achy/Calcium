@@ -9,7 +9,7 @@
 SHELL := /usr/bin/env bash
 .SHELLFLAGS := -o pipefail -c
 
-.PHONY: install hooks quantised check enforce catalogue instruments roadmap regime test golden e2e audit proof all clean
+.PHONY: install hooks quantised check design design-check enforce catalogue instruments roadmap regime test golden e2e audit proof all clean
 
 install:            ## npm ci, no install scripts, then the one named build (A04 §3)
 	git config core.hooksPath .githooks
@@ -71,7 +71,36 @@ check:              ## type-check and lint, including the examples
 	  cd "$$(dirname $$d)" && npm run check && cd - >/dev/null; \
 	done
 
-enforce:            ## A03 — module graph, source scans, supply chain
+# **The design language's own consistency, and it is a PREREQUISITE of `enforce`.**
+# `docs/design/language/calcium-registry.json` is the normative source for appearance,
+# interaction and keyboard navigation; the HTML beside it is a projection. A commit that
+# moves one and not the other leaves the two disagreeing, and `check-calcium.mjs`
+# rebuilds the HTML in memory and compares — so a stale projection is a red gate rather
+# than a thing a reader notices later.
+#
+# **The two scripts cover each other and NEITHER IS SUFFICIENT ALONE** — measured here by
+# forging R-STA-002 twice. `lint-immutable.mjs` compares a rule's *stored* `contentDigest`
+# against the released baseline, so editing the text and leaving the digest alone passes it:
+# it reports `content … intact` having checked a recorded field, not the content. What
+# catches that is `check-calcium.mjs`, which RECOMPUTES the digest and fails on
+# `immutable rule content drifted`. Invert it — move the text and the digest together, a
+# consistent forgery — and the recompute agrees while `lint-immutable` fails on
+# `released digest changed`, because the baseline is outside the file being edited.
+# So: the checker holds the registry to itself, the lint holds it to the release, and a
+# run of one is not a run of the other.
+#
+# **Beside `enforce` rather than inside `npm run enforce`**, because A03 is the module
+# graph and the source scans and this is neither — it is the design's own record checking
+# itself. The pre-commit hook runs `make enforce`, so the dependency is what makes the
+# rule *regenerate the HTML in the same commit* enforced instead of remembered.
+design-check:       ## the registry ↔ HTML projection, and released-rule immutability
+	node docs/design/language/check-calcium.mjs
+	node docs/design/language/lint-immutable.mjs
+
+design:             ## regenerate the HTML and KEYS.md from the registry
+	node docs/design/language/build-calcium.mjs
+
+enforce: design-check  ## A03 — module graph, source scans, supply chain
 	npm run enforce
 
 # **A gate that reads a generated artefact has to generate it** — the `check`

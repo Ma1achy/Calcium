@@ -1,0 +1,37 @@
+reverse search expands the prompt too — same surface, different content
+
+  calcium   ✦ qwen3-coder-next   effort high        localhost:8000   22:17
+──────────────────────────────────────────────────────────────────────────────
+
+● pytest tests/unit · 4.2s · 47 passed
+
+
+──────────────────────────────────────────────────────────────────────────────
+ ⌥r reverse search      3 of 214
+ › /promote a3f9b21 --open-mr
+   /diff a3f9b21 7c2d4e1
+   /ps --owner=malachy --since=a3f9b21
+──────────────────────────────────────────────────────────────────────────────
+❯ a3f9b21▌
+──────────────────────────────────────────────────────────────────────────────
+⌥r older   ⌥s newer   ⏎ accept   esc cancel
+
+the matched run is accent inside each result — a list that does not show
+WHY a row matched is a list a reader cannot trust.
+
+ghost text is inline, in the prompt, and it is muted — not a popup
+
+  ❯ /profile▌          ⇥ accepts the muted part
+  ❯ /profile snap▌      it narrows as you type
+  ❯ /profile snap▌       and vanishes when it is exact
+
+three layouts across four uses, and a reader learns each layout once
+  completion   the prompt stays, the panel grows above it
+  search       the prompt stays, the panel grows above it
+  choice question the prompt is replaced — there is nothing to type
+  text question   the question floats; its isolated editor remains visible
+
+REPLACEMENT IS THE DEFAULT FOR CHOICE-ONLY QUESTIONS, whoever asks;
+exceptions declare placement explicitly.
+A question needing text floats above the same editor implementation and
+blocks it for that answer. There is no inline yes/no in transcript content.

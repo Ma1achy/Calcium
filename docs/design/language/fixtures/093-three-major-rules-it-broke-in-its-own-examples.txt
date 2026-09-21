@@ -1,0 +1,65 @@
+three major rules this document broke in its own examples, measured
+
+1 · THE MARK SET WAS NEVER WIDTH-CHECKED
+  the spinner rules ban East Asian AMBIGUOUS glyphs and say the check
+  runs on a SET, not a glyph. The mark vocabulary was never measured:
+
+  ●  U+25CF   Ambiguous      ⎿  U+23BF   Narrow
+  ▲  U+25B2   Ambiguous      ⟩  U+27E9   Narrow
+  ○  U+25CB   Ambiguous      ❯  U+276F   Narrow
+  ⋯  U+22EF   Ambiguous      ▸  U+25B8   Narrow
+  ▾  U+25BE   Narrow         ✓  U+2713   Narrow
+  ✗  U+2717   Narrow         ›  U+203A   Narrow
+
+  FOUR AMBIGUOUS, EIGHT NARROW — a mixed set, which is exactly the
+  condition that sent the scrollbar to its ascii rung. At
+  ambiguousWidth: wide the gutter is two cells for some marks and one
+  for others, and every measured height is wrong.
+
+  so the mark set takes an ascii rung too, whole:
+  ● ⎿ ⟩ ▲ ❯ ▸ ▾ ○ ✓ ✗ › ⋯   →   o `- ? ^ $ > v @ + x * ...
+
+2 · THE 800–1600 ms BAND WAS WRONG, NOT THE TABLE
+  measured against the catalogue: 8 of 21 sets passed. noise is 300ms,
+  triangle 480, bloom 1680, hex 1760. The rule was unshippable.
+
+  the property that actually decides whether a thing reads as alive is
+  the INTERVAL: every shipped WORK set is 80–200ms; deliberate WAIT sets may
+  be slower. Cycle length decides
+  VARIETY instead — 4-frame sets repeat every 0.48–0.8s, while a 42-frame
+  one does not repeat for five seconds.
+
+3 · ORBIT'S 16 ms ARR AGAINST THE 100 ms WINDOW
+  key repeat claims 60fps for a camera. But a camera change is a
+  DOCUMENT change and a document change takes the window — so the
+  stated rate was about six times the real one.
+
+  the fix is the exemption's own test: the split is CAUSATION. A held
+  arrow is a keypress and the reader is watching for it at 16ms, so
+  ORBIT JOINS THE DRAW-NOW SET — alongside echo and focus.
+
+  draws now   a keystroke that changes the prompt
+              a keystroke that moves focus
+              a keystroke that drives a CAMERA or a SLIDER
+  the window  a stream patch, a tick, an arriving entry
+
+and four smaller ones, fixed rather than argued
+
+  the running dot   ONE position: white, still, spinner beside it.
+                    Four sections disagreed
+  bottom            ⌘↓ everywhere. ⌃↓ is gone
+  copy mode         ⌥⇧C. It was sharing ⌃⇧C with copy, and a
+                    terminal cannot tell the case apart
+  the app's name    calcium, in the header, the label and the path
+
+★ and the hue order was assigned SPECTRALLY, which is a CVD hazard
+
+  agents 1–5 were red, orange, yellow, lime, green — five identities a
+  deuteranope cannot separate. The order is now by PERCEPTUAL
+  SEPARATION, and the name carries the rest exactly as the 1-bit
+  argument already says it must:
+
+   blue   orange   cyan   pink   lime   violet   yellow   green   red   purple
+
+  the first four are separable under every common deficiency, which
+  is where a session with three subagents lands.

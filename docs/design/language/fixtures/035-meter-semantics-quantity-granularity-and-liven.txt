@@ -1,0 +1,37 @@
+the alphabets remain; the semantics are three independent axes
+
+  quantity     capacity · progress · count
+  granularity  continuous · segmented
+  liveness     still · active · stalled
+
+BUDGET and OPERATION are named PRESETS, not the only possible types.
+Alphabet follows granularity; motion follows liveness. A six-hour training
+run is progress · continuous · active, without pretending it is a capacity.
+
+  ███████████████░░░░░░░░░   capacity · continuous · still
+  ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱   progress · segmented · active
+
+a capacity is a STATE you glance at. It persists rather than completing,
+and it is read in the corner of the eye:
+  ctx   ███████████████████████░░░░░░░  78%  39k/50k
+  disk  ██████████████████░░░░░░  74%
+
+the OPERATION preset starts and ends, and has a spinner beside it. Segments
+are visibly separate only when the work has countable units:
+  ✦ stepping    ▮▮▮▮▯▯▯▯▯▯  4 of 10
+  ✦ compacting  ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱  3 of 5 turns
+  ✦ indexing    ▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱  412 of 1,847 files
+  ✦ uploading   ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱  84 of 100 MB
+
+quantity plus liveness say whether a bar can finish. The alphabet says
+only whether its measurement is continuous or segmented.
+
+and both degrade, differently
+
+  continuous ██████████░░░░░░   →   ##########------   ascii
+  segmented  ▰▰▰▰▰▱▱▱      →   [#][#][#][.][.] ascii
+             the ASCII rung preserves granularity. A spinner or text status
+             independently carries active or stalled liveness.
+
+  ▰ and ▱ are narrowOnly, so at ambiguousWidth: "wide" they take the
+  ascii pair too — measured, not assumed.

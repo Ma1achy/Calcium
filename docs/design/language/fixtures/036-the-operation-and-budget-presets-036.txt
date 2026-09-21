@@ -1,0 +1,94 @@
+OPERATION presets active progress; BUDGET presets still capacity.
+
+  ✦ Compacting conversation…  (5m 38s · ↓ 8.0k tokens)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱  77%
+
+the head names what is HAPPENING, not a tool — a gerund, because an
+operation is a process rather than a call. pytest is a name; compacting
+is a thing in progress.
+
+  the spinner    it is running, and it is the verb's own set
+  the elapsed    how long so far
+  the DELTA      ↓ 8.0k tokens — what it has ACHIEVED so far, which
+                 a percentage cannot say
+  the bar        how far through, on its own row
+
+  the parentheses group the two as an aside, so the eye reads the
+  VERB first and the numbers second.
+
+★ and the shimmer is the second thing that separates the two alphabets
+
+  OPERATION preset — progress · segmented · active
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱  77%
+
+  BUDGET preset — capacity · continuous · still
+    █████████████████████████░░░░░░░░░░░░░░░  62%  31k/50k
+
+  the glyph already said it — ▰▱ against █░ — and the motion says it
+  again in a channel that survives when the alphabet collapses. At
+  ascii both are ##.., and only one of them is still moving.
+
+  which is the rule this document keeps arriving at: a distinction
+  worth making is worth making twice, in two channels.
+
+the fill shimmers, the remainder does not
+
+  the empty half has not happened yet, so nothing in it is moving.
+  A shimmer across the whole bar would say the whole bar is active,
+  which is the one thing a progress bar must not say.
+
+three ramps that work on a fill, and what each reads as
+
+  shimmer   ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱  77%   steady work
+  chase     ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱  77%   a band travelling
+  sweepbar  ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱  77%   one pass, then a gap
+
+  and the two that do NOT: pulse reads as a problem, breathe reads
+  as waiting. Neither is what a bar that is filling means.
+
+the same shape for every operation
+
+  ✦ Compacting conversation…     (5m 38s · ↓ 8.0k tokens)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱  77%
+
+  ✦ Indexing the repository…     (12s · 4,102 of 9,318 files)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱  44%
+
+  ✦ Uploading the checkpoint…    (1m 04s · 2.1 of 4.8 GiB)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱  44%
+
+  ✦ Running the suite…           (31s · 892 of 1,204 tests)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱  74%
+
+  the DELTA is in the operation's own units — tokens, files, bytes,
+  tests. A percentage is the same word for all four, and the unit is
+  what tells you whether 44% is nearly done or nowhere near.
+
+when it ends, the motion stops and it settles as an entry
+
+  ✦ Compacting conversation…     (5m 38s · ↓ 8.0k tokens)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱  77%
+  ↓ it finishes
+  ● compacted · 6m 12s · 41k → 12k tokens · 18 turns summarised
+
+  the bar is GONE. It said how far through, and there is no through
+  left — a 100% bar on a finished thing is a row spent on nothing.
+
+  and the result summary is the delta FINISHED: 41k → 12k, not “done”.
+
+cancelled, and interrupted
+
+  ● compacting · 2m 10s · cancelled   nothing was summarised
+  ● compacting · 2m 10s · failed
+  ⎿ ✗ the summariser returned no content
+  muted for cancelled, error for failed — and in both the bar goes,
+  because a stopped bar is a claim about progress that is not being
+  made any more.
+
+degradation
+
+  24-bit · 8-bit  ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱  77%  as drawn
+  4-bit          ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱  77%   the shimmer stops
+  1-bit          ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱  77%   fill bold, empty faint
+  ascii          ##############....  77% · live   the word remains when motion stops
+                                and the spinner is a second liveness carrier

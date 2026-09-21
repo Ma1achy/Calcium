@@ -1,0 +1,62 @@
+★ THERE ARE NO PUSHED VIEWS. Correcting an earlier pass.
+
+a pushed view takes the screen, you do something, you come back — and
+the transcript has a HOLE where that work was. The record is the
+product here, and a surface that steps outside it is a surface whose
+output you cannot scroll back to.
+
+three surfaces, and a push is not one of them
+
+  THE TRANSCRIPT  everything that HAPPENED. It is the record, and
+                  work belongs in it
+  A QUESTION      an ownership request. It resolves once and never
+                  holds work; panel / peek / overlay describe its layer
+  A TAB           a PARALLEL document with its own prompt and its
+                  own context. ⌃⇥, like a browser
+
+what each thing I had pushed becomes instead
+
+  a run's detail    →  EXPANDS IN PLACE. ⏎ on the row, and the
+                       detail unfolds under it
+  logs              →  A BLOCK with follow. It was already a
+                       scroll container; it needed no frame
+  the help view     →  AN ENTRY. ? emits the keymap, and it is in
+                       your scrollback, copyable, scrolled past
+  an attached PTY   →  A CAPTURED CHILD OWNER over its block. The border says your
+                       keys go to the child; the transcript stays
+  a subagent        →  A TAB, which it already was — ⌃⇥ is what
+                       tabs use, and a tab is not a push
+
+  the subagent is the only one that LOOKS like a push and is not: it
+  is a second conversation with its own context window and its own
+  prompt. You SWITCH to it and it is still there when you switch
+  back. Nothing was hidden and nothing was lost.
+
+the test, when something wants a frame of its own
+
+  does it have its own PROMPT and its own CONTEXT?
+    yes — it is a tab
+    no  — it is a block, or an entry, or a question
+
+  everything I pushed answered NO, which is how I know the earlier
+  pass was wrong rather than merely different.
+
+and what an expanded entry looks like — which is most of the answer
+
+● ps · 0.3s · 2 of 11
+  ⎿  uuid     family            status      metric   age
+    ▸ ▾ a3f9b21  digit-classifier  running     0.0372   23m
+        node   gpu-04.fmx.internal · 2×A100 · 16GiB
+        mr     !1248  auto-merged
+        ██████████░░░░░░░░░░░░░░  43%  ep 17/40  ~18m
+        ≡ logs  ⚡ events  ⊘ cancel  { } json
+      7c2d4e1  decoder-zoom      succeeded   0.0089   41m
+      +9 more
+
+▸ keeps focus while ▾ independently says expanded. The detail sits on bgElev — the
+inside ground, which is the same one block scope already uses — and
+the rows below carry on underneath.
+
+  you can see the run you opened AND the one you were comparing it
+  to. A pushed view could not show you both, which is the whole
+  reason this is better.

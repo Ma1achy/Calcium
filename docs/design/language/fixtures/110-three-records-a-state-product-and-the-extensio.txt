@@ -1,0 +1,60 @@
+THE EVENT RECORD, VISIBLE WINDOW AND MODEL CONTEXT ARE THREE THINGS.
+
+  EVENT RECORD    durable semantic facts in order
+  VISIBLE WINDOW  the current projection of those facts
+  MODEL CONTEXT   the compiled input for the next turn
+
+the record stores stable id, sequence, source, parent, content reference and
+state transitions — never cursor-addressed frames. Streaming writes start,
+patch and settle events, not forty nearly identical pictures.
+
+the visible window may fold, filter, bound, shed or evict. EVERY CONTENT OR
+EVENT OMISSION LEAVES A RESIDUE with range, count, reason and retrieval action.
+Pure decoration is not an event and may shed without residue. Rehydrating
+old rows changes the window and nothing else.
+
+model context may include an event, exclude it, or replace a range with a
+summary. Each item points to event ids; a summary names and can open its range.
+COMPACTION CHANGES CONTEXT, NOT THE RECORD.
+SCROLLBACK EVICTION CHANGES THE WINDOW, NOT CONTEXT.
+RESIZE CHANGES REPRESENTATION, NOT EITHER HISTORY.
+
+state is a product; a component declares only the axes it uses
+
+  lifecycle     pending · live · blocked · settled
+  outcome       none · succeeded · failed · cancelled
+  resolution    open · answered · cancelled · expired
+  ownership     none · available · active · captured
+  focus         absent · remembered · focused
+  pointer       away · hover · armed · dragging
+  selection     none · selected · mixed
+  choice        unchosen · chosen
+  disclosure    leaf · collapsed · expanded
+  availability  enabled · readonly · disabled
+  freshness     fresh · stale · unknown
+  validity      unchecked · valid · invalid
+
+FOCUSED IS NOT SELECTED OR CHOSEN. HOVER DOES NOT ACTIVATE.
+RUNNING IS NOT FRESH. REMEMBERED FOCUS DOES NOT OWN THE KEYBOARD.
+
+every component keeps the seven-fact component table in §§90–91 and also declares
+semantics, announcement, state axes and composition. An extension adds:
+
+  type / version      stable namespaced identity
+  consumer            the real surface that needs it
+  ownership           actions handled, rejected, passed or intercepted
+  copy                source form and named alternatives
+  responsive ladder   width and height rungs, identity preserved
+  capabilities        enhancement, fallback and linear form
+  trust boundary      untrusted fields and parser
+  registries          tokens, glyphs, actions and bindings added
+  conformance         themes · 1-bit · ASCII · motion off · linear ·
+                      narrow · short · locale · hostile content
+
+registration is additive and collision-checked. A new token has a semantic
+name; a glyph has width and ASCII rung; an action has owner and base-terminal
+route, plus a command fallback unless capture forbids it; a state has composition
+cases. Experimental components may exist
+without a consumer, but enter core only after one real surface exercises them.
+
+THE EXTENSION DOOR IS WIDE OPEN, BUT SHAPED.

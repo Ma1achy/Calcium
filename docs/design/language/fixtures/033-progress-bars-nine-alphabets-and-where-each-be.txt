@@ -1,0 +1,22 @@
+The same 62% in nine registered alphabets [R-PRG-001]
+filled = floor(clamp(value ÷ total, 0, 1) × width + 0.5); empty = width − filled.
+
+  ███████████████░░░░░░░░░   block       62%
+  ▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐░░░░░░░░░   halfblock   62%
+  ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬░░░░░░░░░   rectangle   62%
+  •••••••••••••••◦◦◦◦◦◦◦◦◦   beads       62%
+  ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯   posts       62%
+  ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱   slant       62%
+  ■■■■■■■■■■■■■■■□□□□□□□□□   squares     62%
+  ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿            braille     62%
+  ###############---------   ascii       62%
+
+AND WHERE EACH BELONGS [R-PRG-002]
+  ███████████████░░░░░░░░░  determinate work — a total is known
+  ✦ 12s                 indeterminate — a spinner, never a bar
+  ▮▮▮▮▮▯▯▯               discrete steps — five of eight
+  ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿        sub-cell — eight positions per column
+  ###############---------  ASCII, and the only rung that survives everywhere
+
+The remaining registered alphabets are alternate textures, not additional progress semantics.
+Alphabet follows granularity; quantity and liveness remain independent.

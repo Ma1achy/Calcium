@@ -1,0 +1,29 @@
+a message you sent is washed one step off the ground — full width,
+so the transcript reads as alternating turns without a single rule.
+
+ ❯ refactor the parser to handle nested quotes
+
+● I'll look at the current implementation first.
+
+● read_file(parse.ts) · 0.2s · 184 lines
+
+ ❯ and check the escaping path too
+
+● Good catch — a backslash before a quote should not change depth.
+
+bgElev is ONE STEP AWAY FROM THE GROUND in both directions — lighter on
+a dark theme, darker on a light one — so the same token works everywhere
+and nobody maintains two.
+
+and it runs to the block's edge, because the whole message is yours —
+the same claim a changed diff line makes.
+
+a command you ran is a message too
+
+ ❯ /colour blue
+
+● chrome set to blue for ~/code/calcium
+
+which is why it is a WASH and not a mark: a mark would have to differ
+between a sentence and a command, and they are the same thing — you,
+saying something.

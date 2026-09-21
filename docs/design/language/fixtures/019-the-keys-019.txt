@@ -1,0 +1,69 @@
+RESOLVED DEFAULT-TERMINAL KEYMAP · 39 bindings
+The universal set gives one purpose to each key and does not depend on what has focus; the active owner resolves that purpose.
+Actions are primary. Chords are the resolved profile. A named command route is the intended contract; only 1 of 39 bindings carry one today.
+
+ global
+  key ⏎      confirm · send · activate · open
+  key esc    out one owner rung · cancel · clear
+  key ⇥      move focus forward; complete in the prompt
+  key ⇧⇥     move focus backward
+  key ↑      move up within the focused thing · focused
+  key ↓      move down within the focused thing · focused
+  key ←      move left within the focused thing · focused
+  key →      move right within the focused thing · focused
+  key ⇧↑     extend selection up · selectable
+  key ⇧↓     extend selection down · selectable
+  key ⇧←     extend selection left · selectable
+  key ⇧→     extend selection right · selectable
+  key ⌃⇧C    copy source; ⌘C where passed through
+  key ⌃C     interrupt · running
+  key F1     emit the resolved keymap
+  key ?      emit the resolved keymap · non-typing
+  cmd /help  base-terminal help route · typing
+  key ⌃⇥     switch to next agent
+  key ⌃⇧⇥    switch to previous agent
+  key ⌘1     jump to agent 1
+  key ⌘2     jump to agent 2
+  key ⌘3     jump to agent 3
+  key ⌘4     jump to agent 4
+  key ⌘5     jump to agent 5
+  key ⌘6     jump to agent 6
+  key ⌘7     jump to agent 7
+  key ⌘8     jump to agent 8
+  key ⌘9     jump to agent 9
+  key ⌥p     cycle permission posture
+  key ⌥⇧C    hand the mouse to the terminal
+  key ⌥⇧V    enter Calcium copy mode
+
+ prompt
+  key ⇧⏎     newline
+  key ⌃⇧V    paste
+  key ⌥⌫     drop the last queued message
+
+ transcript
+  key ⌥↑     scroll one page up
+  key ⌥↓     scroll one page down
+  key ⌘↑     go to top
+  key ⌘↓     go to bottom
+  key ⌥v     toggle per-token values
+
+WHAT CHANGED DELIBERATELY, AND WHY
+  ⌥⏎ for newline        → ⇧⏎      it is what people type and the protocol makes it detectable
+  y to copy             → ⌃⇧C     a letter types a letter
+  ⌘↓ as a pushed view   → ⌘↓ or scrollbottom is a location, not a mode
+  n / p to move         → ↑↓      movement already belongs to arrows
+  ⌃r for search         → ⌃⇧F     find follows the platform convention
+  ⏎ to expand           → ⏎       kept because enter already means open
+
+PLATFORM CONVENTIONS THAT STAY OWNED
+  ⌥← and ⌥→ remain word-left and word-right in text fields; agent switching uses ⌃⇥ because agents are tabs.
+  ⌃C remains interrupt. Copy uses ⌃⇧C, leaving the terminal convention intact.
+
+CHORDS THAT ARE GENUINELY OURS
+  ⌃⇥ and ⌃⇧⇥ switch agents because agents are tabs.
+  ⌘1–9 jumps directly to an agent, matching browser tabs.
+  ⌥↑ and ⌥↓ scroll a page; ⌘↑ and ⌘↓ move to the ends.
+  ⌥p cycles the posture because that setting can surprise; ⌥v reveals per-token values; ⌥⌫ drops the last queued message.
+[R-KEY-006]
+
+Keymap and ? help are generated from R-KEY-007; retained footer specimens remain examples.

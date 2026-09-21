@@ -1,0 +1,40 @@
+six rules for a table, and five of them are about NUMBERS
+
+   name             status      metric   rows      age
+   parse.ts         edited      0.0372    184      2m
+   tokens.ts        edited      0.0089       88     41m
+   parser.test.ts   unchanged        —    1,204      1h
+   lexer.ts         failed           —      120       —
+
+1 · numbers INLINE-END-ALIGN, text INLINE-START-ALIGNS [R-TBL-001]
+    (right and left, respectively, in this English preview)
+  so digits line up by place value and you can compare a column by
+  its SHAPE without reading it.
+
+2 · a number aligns on its DECIMAL POINT, not its last character [R-TBL-002]
+  0.0372 over 0.0089 over — : the points are in one column, which is
+  the only alignment that makes 1,204 and 88 comparable at a glance.
+
+3 · a missing number is —, never 0 and never blank [R-TBL-003]
+  0 is a measurement. Blank is a rendering failure. A dash is the
+  only one that says NOT APPLICABLE, and it is the same rule the
+  whole system takes about absent against zeroed.
+
+4 · thousands are grouped, units travel with the value [R-TBL-004]
+  1,204 and 184 · 2m and 41m · 4.2s and 0.02s. A units row in the
+  header is a row you have to look back at.
+
+5 · a column truncates from the TAIL, and only the column that must [R-TBL-005]
+  the widest text column gives up its width first; a number column
+  never truncates, because half a number is a different number.
+
+6 · sorting is a column header, and it is a control [R-TBL-006]
+   name             status      metric  ▾   rows      age
+  ▾ sorted descending · ▴ ascending · nothing means unsorted
+  click a header, or ⇥ to it and ⏎. The keyboard equal is the
+  header being IN the focus ring, not a separate sort key.
+
+  and a sorted table says so in its residue row, because a reader
+  who scrolled past the header needs to know the order is not the
+  document's:
+  +8 more · sorted by metric

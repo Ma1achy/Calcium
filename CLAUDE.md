@@ -471,6 +471,13 @@ it says what to read first, what is authoritative here, and where to start.
 Each component has a spec with numbered **commitments** and **invariants**.
 Implement to the spec, and cite invariant numbers in tests: `T3.7 (I5): …`.
 
+**For appearance, interaction and keyboard navigation the spec is not the top of the
+chain — [`docs/design/language/`](docs/design/language/) is.** Its registry is normative,
+including on mechanism; where a C-spec, an invariant or an A03 row says the design cannot
+be done, the spec is amended to agree and the code follows. An existing rule is not a
+reason not to build something. The carve-outs are in `AUTHORITY.md` and they are the three
+that bind anyway: the measurement invariant, A02's layering, and `make enforce`.
+
 **If the spec is wrong, change the spec first.** A spec and an implementation that
 disagree is worse than either being wrong on its own — and an agent that silently
 diverges leaves 56 documents describing something that no longer exists.

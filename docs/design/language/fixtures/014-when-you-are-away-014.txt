@@ -1,0 +1,18 @@
+a four-minute turn means you left. Something has to reach you.
+
+  the terminal bell    ␇ on turn end, if the window is unfocused
+  OSC 9 / OSC 777     a system notification where the terminal has it
+  the title            OSC 2 — • calcium · done, so a tab strip says it
+
+three rungs, detected not assumed — and every one is opt-in, because
+a tool that beeps at you unasked is a tool people mute forever.
+
+what earns a notification
+
+  ⟩ a question is waiting         always — the turn is BLOCKED
+  ● a turn ended                 if it ran over ~30s
+  ● the model failed             always
+  ● a tool call ended            never — the turn has not
+
+and when you come back, the transcript says what you missed
+  ● 3 entries settled while you were away   ⌘↓ to the bottom

@@ -1,0 +1,24 @@
+in » auto and ? accept-edits, files change without you seeing them.
+That is the point of the mode and it is also its one real hazard.
+
+so the turn ends with what it did to the tree
+
+● done · 4m 12s · 3 files · +124 −18
+  ⎿ src/interaction/parser/parse.ts    +18 −4
+    src/interaction/parser/tokens.ts   +94 −2
+    test/unit/parser.test.ts           +12 −12
+    ⏎ review   d full diff   ↺ revert all
+
+one row per file, the stat coloured, and the edits revertible.
+
+▲ BUT AUTO ALSO RUNS COMMANDS, AND A COMMAND DOES NOT COME BACK.
+  the revert row covers edits. rm does not have one.
+
+  so auto is NOT the default. ? accept-edits is: edits go, commands
+  ask. It is the posture whose whole guarantee the revert row can
+  actually keep.
+which is what makes the EDIT HALF of auto reckless.
+
+and a file the agent touched TWICE is one row, not two
+  the reader cares what the tree looks like now, not how it got
+  there — the transcript above already has that.

@@ -1,0 +1,101 @@
+the activity line is the RUNNING ENTRY'S HEAD, so it lives in the
+transcript and it scrolls. It is not chrome.
+
+  calcium   ✦ qwen3-coder-next   effort high        localhost:8000   22:18
+──────────────────────────────────────────────────────────────────────────────
+ ❯ what does elementsIn actually walk?
+
+  ● It walks the entry's blocks depth-first, and only a kind that
+    declares elements contributes any.
+
+  ✦  editing parse.ts  41s · 3.2k tok
+  ⎿ todo  4/5  ·  ◻ run the suite
+
+   ↓ 3 new messages ⏎
+──────────────────────────────────────────────────────────────────────────────
+  ❯ ▌
+──────────────────────────────────────────────────────────────────────────────
+  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13
+  ███████████████████░░░░░  78%  39k/50k   step ███████░░░ 7/10   28 tok/s
+  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m
+
+★ the activity line SCROLLS — it is part of the transcript
+
+  it is the head of the entry being written. An entry that floated
+  free of the record while it was running and then dropped into it
+  when it settled would be two objects wearing one shape.
+
+  so scrolling up CAN take it off screen, and that is correct: you
+  went to read something else.
+
+what stays visible instead, and it is enough
+
+  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13
+  ███████████████████░░░░░  78%  39k/50k   step ███████░░░ 7/10   28 tok/s
+  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m
+  the STEP count says how far through, the CONTEXT bar says how full,
+  the TOKEN rate says it is still producing. Three live numbers, in
+  the one place this document already puts live state.
+
+  a fourth copy of what the agent is doing, pinned above the prompt,
+  would be the activity line said twice — and the second one could not
+  be scrolled to, copied, or expanded.
+
+★ the notice sits DIRECTLY ABOVE THE PROMPT, and it is a BUTTON
+
+  it is not chrome and not a status line. It is the thing you would
+  reach for, so it sits where your hand already is — one row above the
+  prompt.
+
+  AT REST it is bgElev, like every other button. It is not active and
+  nothing is waiting on it, so it does not wear the accent — that is
+  reserved for the thing you are ON.
+
+  and the ⏎ is INSIDE the button, because it is the button's own key
+  rather than a hint about the frame. A key printed beside a control is
+  a caption; a key printed on it is a label.
+
+  clicking it does the same thing, because every consumed gesture lands on a
+  state a key reaches.
+
+★ and it counts MESSAGES, not rows
+
+   ↓ 3 new messages ⏎    a reader knows what a message is
+   ↓ 214 rows below      nobody has ever wanted this number
+
+  a row is a rendering fact — it changes with the width, with a table's
+  columns, with whether a block is expanded. 214 rows is 3 messages at
+  one width and 340 at another, and the reader has not missed any more
+  of the conversation for being in a narrow terminal.
+
+  and a MESSAGE is what they are counting when they ask what they
+  missed — so that is the number the chrome owes them.
+
+what counts as one
+
+  a settled entry     yes — a reply, a call, a patch, an agent fan-out
+  the running entry   NO. It has not arrived yet, and it is visible
+                      in the activity region anyway
+  a patch to a block  NO. The entry was already counted
+  your own message    NO. You just sent it
+
+  so the count is entries that SETTLED while you were scrolled away —
+  which is exactly the set you would have to scroll back to read.
+
+the three states it takes
+
+   ↓ 3 new messages ⏎       at rest
+   ↓ 1 new message ⏎        singular, because 1 messages is sloppy
+   ↓ 3 new messages ⏎       hovered — preview, no focus carrier
+   › ↓ 3 new messages ⏎     focused — mark and edge persist
+                          scrolled up, nothing new — NOTHING is drawn
+
+  scrolled up with nothing new needs no notice. A button that says
+  nothing happened is a row spent on nothing, and ⌘↓ is already there.
+
+a new entry does NOT move a scrolled-up reader — the anchor holds, and the
+button is how they know something arrived.
+
+  which is the whole arrangement: the TRANSCRIPT is the record and it
+  all scrolls, the FOOTER is live state and it never moves, and the
+  BUTTON is the one thing that bridges them.

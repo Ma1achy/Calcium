@@ -1,0 +1,36 @@
+four principles, and the third is the one that decides the rest
+
+1 · USE THE KEYS PEOPLE ALREADY KNOW [R-KEY-003]
+  arrows move. ⏎ confirms. esc backs out. ⇥ moves focus. ⇧+arrow
+  selects. ⌃⇧C copies. Every GUI on earth agrees, and a terminal
+  app disagreeing with all of them is a terminal app people avoid.
+
+2 · SCOPES, NOT MODES [R-INT-001]
+  a mode is something you ENTER and forget you are in. A scope is
+  WHERE FOCUS IS, and focus is drawn. It shows the candidate navigation
+  keyset. OWNERSHIP separately decides which scope may handle an event;
+  being focused does not by itself make a scope the keyboard owner.
+
+3 · NO SINGLE-KEY COMMANDS WHERE TYPING IS POSSIBLE [R-INT-002]
+  y to copy, ⌘↓ to the bottom, n and p to move — three traditions,
+  none of them shared, all of them invisible. A letter key types a
+  letter; in any owner that accepts text it never does something.
+
+  this is the expensive one and it is worth it: it means you can
+  type wherever text is accepted, without checking what has focus.
+
+  the prompt is protected by the rule. This resolved profile also keeps
+  letters out of the TRANSCRIPT by convention and PROXIMITY: the
+  transcript is one esc from the prompt and a reader moves between
+  them constantly, so a letter there is a letter they will type by
+  accident. A captured block is somewhere you went deliberately.
+
+  so: inside a
+  block, 1–9 toggling a plot's series and r resetting a camera are
+  legal. In the transcript they are not.
+
+4 · NOTHING HIDDEN [R-KEY-004]
+  at ordinary rungs the footer shows OWNER, primary action, safe exit and HELP.
+  Constrained rungs retain owner plus the highest-ranked reachable safe action;
+  the full resolved set remains reachable through help or its named command.
+  A binding nobody can discover is a binding that does not exist.

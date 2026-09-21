@@ -1,0 +1,25 @@
+a submit is a call with steps; its choice-only question replaces the prompt
+
+ ❯ /submit fmx_models.jobs.training:job
+
+● submit · ✦ 4s
+  ⎿ ✓ clean working tree              HEAD a3f9b21
+    ✓ tier-1 rules                    22 rules · 0 errors
+    ✦ generating manifest              jobs/a3f9b21.yaml
+    ○ open merge request
+
+
+──────────────────────────────────────────────────────────────────────────────
+ ⟩ Open a merge request against main?
+ jobs/a3f9b21.yaml  +34 −0  ·  CODEOWNERS auto-merges it
+
+  › no    open it    show the manifest
+──────────────────────────────────────────────────────────────────────────────
+←→ move     ⏎ answer   — esc resolves to NO
+
+the safe answer is initially focused and esc resolves to it. The inspection action
+is not an answer: it suspends this question, opens the bounded source,
+and returns to the same unresolved identity on esc. It resolves once.
+
+  which is the approval design, unchanged, applied to a surface that
+  used to ask in its own bespoke way.

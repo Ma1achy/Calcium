@@ -1,0 +1,68 @@
+two vocabularies, and the split is the whole design
+
+  THE AGENT'S MARK   the bloom family, walked continuously
+                     it means the agent is ALIVE and nothing more,
+                     so varying it carries no claim
+
+  A TOOL'S SPINNER   chosen by the verb
+                     it means THIS PARTICULAR THING is happening,
+                     so it stays inside the verb's declared family every time
+
+  randomise what carries no information. Determine what does.
+
+the agent's mark — four named subsets plus fullramp, one continuous walk
+
+  ✦  updating the tests
+
+  grow       ✦✢✲✶✷✹✺✹✷✶✲✢
+  bloom      ⋅✧✦✢✻✾❀✿❀✾✻✢✦✧
+  starfield  ✶✷✸✹✺✹✸✷
+  pulse      ✢✲✱✻✱✲
+             82 frames, 9.8s, and it does not repeat for ten seconds
+
+  fullramp leads because it begins at a DOT — the walk opens small
+  and blooms, rather than arriving mid-flower.
+
+  it DRIFTS between families rather than picking one — which looks
+  varied and is still a pure function of the tick.
+
+  a RANDOM spinner cannot be golden-framed. Every frame in this
+  repository is byte-compared, so a random choice would make the one
+  thing on screen that moves the one thing no test can check.
+
+  and the bloom family is RESERVED — fullramp, grow, bloom, starfield
+  and pulse mean THE MODEL IS WORKING — its turn, or compacting its own
+
+  history. A tool never blooms.
+  which is still checkable: a bloom set on a TOOL is a defect a grep finds.
+
+the ramp is chosen by the verb, because it describes the action
+
+  ✦ searching the tree              wave      sweeping across
+  ✦ writing parse.ts               chase     directional, laid down
+  ✦  working out the depth rule    scatter   arriving out of order
+  ✦ running the suite              tide      repeated passes across the suite
+  ✦ compiling the crate            shimmer   steady work
+  ✦ waiting on the registry        drift     out of our hands
+  ✦ uploading the image            marquee   travelling, wraps
+  ✦ waiting for your answer        breathe   waiting on YOU, not the machine
+  ✦ retrying · attempt 2          pulse     something failed
+  ●  committed a3f9b21               sweep     one pass, then it ends
+
+  ten verbs, ten ramps, and each one's motion is an argument about
+  the work: a search sweeps, a write advances, a thought arrives out
+  of order, a wait on YOU breathes where a wait on the NETWORK drifts.
+
+  so a reader who is not looking directly at the line still knows
+  roughly what is happening — which is the whole point of motion in
+  a surface that is mostly still.
+
+and what does NOT get a semantic ramp
+
+  a settled call        ● pytest · 4.2s · 47 passed
+  state-bearing chrome  ▾ thinking · 4s · 312 tok
+  the reader's own text ❯ refactor the parser
+  a finished todo       ◼ read the current implementation
+  below 8-bit colour  interpolation stops; discrete glyph motion remains
+  motion reduced      ambient/nonessential ramps stop
+  motion off          all animation stops; state stays in mark, label and elapsed

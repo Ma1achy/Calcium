@@ -1,0 +1,20 @@
+a PTY inside a block — bounded, scrolling, attachable
+
+● pytest tests/ · ✦ 12s
+  ⎿ ============== test session starts ==============
+    collected 1204 items
+    tests/unit/plot.py ........................      [ 12%]
+    tests/unit/table.py ..........F............    [ 31%]
+    +1,157 more · ⏎ attach   ⌃c cancel
+
+attached — a MODE of the block, and the child owns the keyboard
+┌ !! attached  pytest · ⌃c goes to the child ────────────────────────┐
+│ tests/unit/table.py::test_window FAILED                         │
+│ (Pdb) ▌                                                 │
+└ ⌃] host escape · ⌥esc enhanced detach · ⌃c interrupts child ─────┘
+
+the border appears ONLY when attached — the one moment ordinary keys go
+to a child process rather than to Calcium.
+
+on detach, what changed while you were away
+  ● 2 entries settled while attached · pytest · 1,203 passed 1 failed

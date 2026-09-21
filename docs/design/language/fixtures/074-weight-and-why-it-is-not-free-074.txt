@@ -1,0 +1,27 @@
+bold works, and it is SGR 1 — as old and as universal as colour itself
+
+  ␛[1m  bold        bold text            universal
+  ␛[2m  dim         dim text             widely supported, sometimes ignored
+  ␛[3m  italic      italic text          common, not universal
+  ␛[4m  underline   underlined text      universal
+  ␛[7m  inverse      inverse text        universal, and it is 1-bit's ground
+
+but weight is NOT a free axis here — it is already bound to tone
+
+  ok · warn · error · accent · identifier  emphasised → bold at 1-bit
+  default · info · meta        normal         → plain
+  dim · muted                deemphasised   → faint at 1-bit
+
+  syntax roles resolve first: syntax.keyword → bold; every other syntax
+  slot → plain. Generic ok, warn and meta aliases do not override syntax.
+
+  so at 1-bit, where every colour is gone, the TONE STILL READS —
+  because it was never only a colour:
+
+  24-bit   ● a3f9b21  succeeded      ● b81c003  failed
+  1-bit    ● a3f9b21  succeeded      ✗ b81c003  failed
+           the mark separates them where the weight cannot
+
+which is why bold is not available as decoration
+  bolding a muted label contradicts its own tone — the theme says
+  deemphasised and the render says look here.

@@ -1,0 +1,29 @@
+at 40 columns the drill survives; the composition does not
+
+  calcium      ✦ qwen3     22:13
+  ──────────────────────────────────────
+
+   ❯ refactor the parser
+
+  ● read_file(parse.ts)
+    ⎿ 184 lines
+
+  ✦ editing   41s · 3.2k
+  ⎿ 4/5  ·  ◻ run the suite
+  ──────────────────────────────────────
+  ❯ ▌
+  ──────────────────────────────────────
+  » auto  ███████░░░░░  ctx 62% · step 4/10
+
+what goes, in order
+
+  1  the label on the rule      least load-bearing thing on screen
+  2  the endpoint and effort    they do not change
+  3  the path and branch row    the footer drops to two lines
+  4  the argument in a head     truncated from the tail
+  5  the context bar segments   one plain fill
+
+what NEVER goes
+
+  the posture, the marks, the outcome, and ⏎ run — because losing
+  any of them makes the frame wrong rather than smaller.

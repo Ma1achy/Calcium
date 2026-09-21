@@ -1,0 +1,67 @@
+a link is ATOMIC, like a button — so one click opens it
+
+  ● The depth counter is set in parse.ts:41 and read in
+    tokens.ts:88. The spec is docs/components/C17.md.
+
+  underlined and in the identifier tone, so you know it is a link
+  BEFORE you click — which is what makes a plain click safe.
+
+  focused: parse.ts:41   — identifier hue, bold, link ground and focus edge
+  is on the entry as usual
+
+★ plain click opens. Not ⌘click.
+
+  a terminal needs ⌘click because it CANNOT TELL a link from text —
+  it is guessing at a URL with a regex. This app knows exactly where
+  its links are, so it does not have that excuse.
+
+  and ⌘click stays the TERMINAL's gesture, which is the other half
+  of the reason: taking it would be fighting the emulator for a
+  chord it will fire anyway.
+
+  clicking the SENTENCE around a link focuses the entry, as any text
+  does. Clicking the LINK opens it. That is how every browser has
+  always worked and nobody has had to learn it.
+
+the keyboard equal
+
+  ⇥       links are in the focus ring, so tab reaches them
+  ⏎       opens the focused one
+  ⌃⇧C     copies the TARGET, not the label — the same
+          copies-the-source rule everything else takes
+
+four kinds, and what OPEN means for each
+
+  parse.ts:41              an entry showing the file, at the line
+  https://…               the platform opener — and it ASKS first
+  ↑ the call above         scroll to it and focus it
+   count                  switch to that agent
+
+  a URL asks because it leaves the machine — and a model that wrote
+  the link is not the reader who is about to follow it:
+
+──────────────────────────────────────────────────────────────────────────────
+ ⟩ Open this link?
+ https://docs.internal.fmx.io/runbooks/parser
+
+  › no    open    copy it instead
+──────────────────────────────────────────────────────────────────────────────
+←→ move     ⏎ answer   esc cancels
+
+what is NOT a link
+
+  anything that RUNS something
+  a link opens, reveals or navigates. It never executes — and the
+  moment one does, every plain click in the transcript becomes a
+  thing a reader has to think about.
+
+  so re-running a call is ⏎ on the CALL, which is a focused element
+  with a visible action — not an underlined word in a sentence.
+
+degradation
+
+  24-bit · 8-bit · 4-bit  identifier tone and an underline
+  1-bit                 the underline alone — which is why it is
+                        there rather than colour alone
+  no underline support  angle brackets: <parse.ts:41>
+  no mouse              ⇥ and ⏎, unchanged

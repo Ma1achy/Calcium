@@ -1,0 +1,13 @@
+declarative binding — a knob drives a field, no app code
+
+  learning rate  ├──────●────────┤  3e-4
+  scale          ( ) linear  (●) log
+  series         ✓ train  ✓ val  ✗ test
+  bins           [ − ]  12  [ + ]
+  live           [● on ]
+  colormap       [ viridis        ▾ ]
+
+camera — two coupled values want one control
+  ┌──────────┐
+  │     ✛    │   azimuth × elevation
+  └──────────┘

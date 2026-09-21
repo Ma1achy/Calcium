@@ -1,0 +1,63 @@
+THE LADDER SAYS WHO OWNS THE KEYBOARD NOW. It says nothing about an
+event already IN FLIGHT when ownership changed — and that is where the
+harm is.
+
+you are typing. A child raises a choice-only question and holds the prompt. Your ⏎
+arrives. Turning an intended SUBMIT into a permission DENIAL is wrong,
+even when the safe choice is the one initially focused.
+
+★ EVENTS ASSIGNED TO ONE OWNER MUST NOT BE REPLAYED AGAINST ANOTHER.
+  A newly presented question requires a FRESH, DELIBERATE activation.
+  EVERY OWNER TRANSITION INCREMENTS AN OWNERSHIP GENERATION.
+
+  presses, repeats, releases and pending activations retain the generation
+  where they began. A later owner can never receive them.
+
+  with key-release reporting, wait for the held key to lift. WITHOUT it the
+  question enters ACTIVATION-GUARDED state: the first ambiguous keyboard
+  activation before a neutral/key-up boundary is refused, naming why. A fresh
+  pointer press belongs to the new owner epoch and keeps ordinary one-click semantics.
+
+four moments, and the draft survives all of them
+
+  ❯ refactor the parser to handle nested quotes▌
+
+  ⟩  seams  may I write to package.json?
+  approve    › deny    reply…
+  the draft is HELD — buffer, caret, chips and undo
+
+  ▲ ⏎ refused · this question arrived after you pressed.
+    Press again to answer.
+
+  ❯ refactor the parser to handle nested quotes▌
+    answered · and the draft came back exactly as it was
+
+★ REUSING THE EDITOR IS NOT REUSING ITS STATE
+
+  ONE line-editor implementation is right. SAME HISTORY is too broad.
+  A normal prompt, a commit-message answer, a paste-chip editor and
+  each subagent’s prompt need separate buffers and appropriately
+  scoped histories and undo stacks — otherwise a question overwrites a
+  half-written instruction, undo crosses between unrelated editors, or
+  A SENSITIVE ANSWER APPEARS IN ORDINARY PROMPT HISTORY.
+
+★ AN INSPECTION CHOICE IS NOT AN ANSWER
+
+  ⟩  seams  may I run rg --stats -uu here?
+  › deny    approve once    show full diff    always allow rg --stats -uu here
+
+the third choice is an INSPECTION, not an answer; there is no second key-only path
+
+  it SUSPENDS the question, keeps its identity, and esc inside it
+  leaves the INSPECTION — not the request. EVERY QUESTION RESOLVES
+  EXACTLY ONCE, cancellation and expiry included.
+
+  ★ and the grant NAMES WHAT IT GRANTS: the -uu was the entire
+    reason for asking, so “always allow rg here” would grant a looser
+    thing than the one that was reviewed.
+
+and in a SAFETY question, the SAFE choice is initially FOCUSED
+
+  an earlier pass drew approval with approve initially focused. If the
+  first ambiguous keyboard activation begun before a question arrived were honoured, that
+  single cell would be the difference between a denial and a write.
