@@ -53748,6 +53748,82 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1238 — an assertion on reserved cells is satisfied by a frame that never reserved them ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `test/unit/render-focus.test.ts` T2.11, against `tools/mutate/runs/c11-focus-gutter.mjs`'s *a detail child forgets the gutter*. |
+| **Reached for** | The mutation pass on C11 §5b's landing. It survived the run's first two forms of the row. |
+| **Verdict** | **Real, and general.** Two blank mechanisms abut, and a slice cannot tell which one it is holding. |
+
+**1 · What survived, twice.** C11 §5b reserves `GUTTER_CELLS` on every emitted row, and a detail
+child's rows go out on their own path: `parts.push(`​`${blank}${fitRow(pad + line, inner)}`​`)`.
+Dropping `${blank}` leaves the parent rows reserved and hangs the detail two cells left of the row
+it belongs to — geometry that measures correctly and is wrong.
+
+**The first row that should have caught it was T2.3**, the generic measurement suite at seven
+widths flat and expanded. It cannot: the measurement invariant is `measure(block, width) == rows
+rendered`, a statement about **rows**, and this defect moves a **column**. Nothing about the
+invariant is weak; it is simply not about this axis, and a landing that leans on it for geometry
+is leaning on a count.
+
+**The second was an assertion written for exactly this mutation**, and it is the finding:
+
+```
+expect(line.slice(0, GUTTER_CELLS)).toBe("  ")
+```
+
+The detail's own indent — `pad`, the inset inside the gutter — is **also spaces**. So with the
+reservation dropped, the first two cells are still two spaces, from the neighbour instead of from
+the gutter, and the assertion passes on a frame that never reserved anything. It is not a weak
+assertion about the wrong thing; it is a precise assertion about a quantity that two different
+mechanisms produce identically.
+
+**2 · The tell, and the remedy.** *An assertion on blank cells is an assertion about an absence,
+and an absence has no provenance.* Where a reservation abuts any other blank — an indent, a pad, a
+rail's empty rung — asserting the reserved cells are blank cannot distinguish the two, and nothing
+in the frame can. **What has provenance is the position of the ink**: the detail's text starts
+strictly right of the row it belongs to, and that integer moves the instant the reservation goes.
+
+The same sentence covers the sibling in F1237 from the other side: there, the quantity was compared
+across states and the defect moved every state together; here, the quantity is compared against a
+constant two different sources can supply. Both are assertions that are true of the defect.
+
+---
+
+## F1237 — a set compared across states is blind to a change that moves every state ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `test/unit/render-focus.test.ts` T2.11, against `tools/mutate/runs/c11-focus-gutter.mjs`'s *the header sits outside the reservation*. |
+| **Reached for** | The same pass. Caught **elsewhere**, which is how it surfaced: the row written for it was not the row that killed it. |
+| **Verdict** | **Real.** A comment saying a subject is in the set is not an assertion that it is. |
+
+**1 · The row, and what it actually asserted.** T2.11's subject is that the focus gutter is
+reserved on every row whatever its state, and its instrument is one table rendered four ways —
+nothing, focused, selected, focused and selected — with the content column asserted equal across
+all four. That is the right instrument for the mechanism it was written against: a gutter that
+*appeared with the fact* renders the focused frame identically and differs only where nothing is
+drawn.
+
+The header was put in the set deliberately, with a comment saying why — the reservation is the
+block's and not the body's, so the columns beneath a header stay one axis (C09 I82's rule from the
+other side). **And the set is compared across states.** Emitting the header outside `emit` moves it
+in all four frames **together**, so every cross-state comparison still agrees and the row passes.
+The comment named a property the assertions could not reach.
+
+**2 · The shape, which is what makes it worth a number.** An index chosen to separate two
+mechanisms is chosen for the axis they differ on; a second subject added to the same index inherits
+that axis whether or not its own defect lives there. The header's defect is **structural** — two
+things that must share a column — and the index is **by state**, so the row was a classification
+table asked to answer a question about rest, using rows drawn for a sequence. That is A03's
+artefact-shape ruling arriving inside a single test.
+
+**The remedy is one line and it is not a widening**: the header's edge against the body's, taken
+**inside each frame**. Six mutations, six caught, once both this and F1238 were paid.
+
+---
+
 ## F1236 — `comparison`'s header names a column two cells to the right of where it sits ★★★☆☆
 
 | | |
