@@ -19,6 +19,7 @@
 // already covers expanded rows, details and a sort — the three things that move
 // every offset beneath them.
 import { describe, expect, it } from "vitest";
+import { GUTTER_CELLS } from "../support/table-gutter.js";
 
 import { checkElements, formatElementReport } from "../../src/testing/navigation-conformance.js";
 import { fullRegistry } from "../../src/testing/expect-document.js";
@@ -392,10 +393,19 @@ describe("C26 §5 — the lifted list, in both axes (C09 §2)", () => {
     expect(at(found, "a", "r1")).toEqual({ rows: [1, 2], cols: [0, 39] });
     expect(at(found, "b", "r1"), "lifted by the first's share plus the gutter").toEqual({ rows: [1, 2], cols: [40, 79] });
 
-    // Read from the frame: the second header begins at the column the element does.
+    // Read from the frame: the second header begins where the element does, plus
+    // the block's own reserved gutter (C11 I15, §5b) — the element covers the
+    // whole row, gutter included, and the ink starts after it.
+    //
+    // **Searched from past the first occurrence and not from index 1.** The
+    // first table's `Name` used to sit at 0, so `indexOf(…, 1)` skipped it by
+    // accident of the layout; with a gutter it sits at 2 and the same call finds
+    // it again. An offset that means *the second one* has to be derived from the
+    // first one's position, not from a constant that happened to work.
     const frame = plain(k.renderToLines(g, 80));
-    expect(frame[0]?.indexOf("Name", 1), "the second `Name` on the header row").toBe(40);
-    expect(frame[1]?.indexOf("row 1", 1), "and the second `row 1` beneath it").toBe(40);
+    const second = (line: string, text: string): number => line.indexOf(text, line.indexOf(text) + 1);
+    expect(second(frame[0] ?? "", "Name"), "the second `Name` on the header row").toBe(40 + GUTTER_CELLS);
+    expect(second(frame[1] ?? "", "row 1"), "and the second `row 1` beneath it").toBe(40 + GUTTER_CELLS);
   });
 
   it("T2.30 (C26 I4, I5, I6): containment, disjointness and stability hold of the lifted list across blocks; order within each — and a fabricated old walk fails disjointness", () => {
@@ -471,10 +481,10 @@ describe("C26 §5 — the lifted list, in both axes (C09 §2)", () => {
     const inPanel = k.registry.elementsIn([p], 40);
     expect(at(inPanel, "a", "r1")).toEqual({ rows: [2, 3], cols: [1, 39] });
     const frame = plain(k.renderToLines(p, 40));
-    expect(frame[2]?.indexOf("row 1"), "the frame draws it there").toBe(1);
+    expect(frame[2]?.indexOf("row 1"), "the frame draws it there").toBe(1 + GUTTER_CELLS);
     // The second child begins where the first's measured rows end.
     expect(at(inPanel, "b", "r1").rows, "after a's three rows").toEqual([5, 6]);
-    expect(frame[5]?.indexOf("row 1"), "the frame's second `row 1`").toBe(1);
+    expect(frame[5]?.indexOf("row 1"), "the frame's second `row 1`").toBe(1 + GUTTER_CELLS);
 
     // Below three columns the rails are dropped and the child is at column 0.
     expect(at(k.registry.elementsIn([panel([a])], 2), "a", "r1")).toEqual({ rows: [2, 3], cols: [0, 1] });

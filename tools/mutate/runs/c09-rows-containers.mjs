@@ -116,8 +116,12 @@ const results = runPass({
     {
       name: "DETAIL-INSET-DROPPED: an expanded row's detail is not padded left",
       file: T,
-      from: "          parts.push(line === \"\" ? \"\" : fitRow(pad + line, width));\n",
-      to: "          parts.push(line === \"\" ? \"\" : fitRow(line, width));\n",
+      // **Re-anchored**: the line gained the block's reserved focus gutter
+      // (C11 I15, §5b) and its width became `inner`. The mutation is unchanged —
+      // it drops the detail's own left pad — and is anchored on `pad + line`,
+      // which is what it removes, plus the least context that makes it unique.
+      from: "fitRow(pad + line, inner)",
+      to: "fitRow(line, inner)",
       expect: "T2.144",
     },
     {

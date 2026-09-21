@@ -322,8 +322,10 @@ describe("C04 e2e — the drift tests", () => {
       // is on the screen and not by a row count.
       expect(
         // The older entry is a card (C23 I55), its rows four cells in under the
-        // hook and then the bar (C22 I83, I84, I88).
-        before.filter((r) => /^(  ⎿ |  │ |    )?\d{7}\b/.test(r)).length,
+        // hook and then the bar (C22 I83, I84, I88) — and then C11 §5b's
+        // reserved gutter, which is blank on an unfocused row and is why this
+        // matcher takes a run of spaces rather than a fixed inset.
+        before.filter((r) => /^(  ⎿ |  │ |    )? *\d{7}\b/.test(r)).length,
         "detached inside the older entry",
       ).toBeGreaterThan(5);
       expect(before.join("\n"), "and not at the live stream").not.toContain("tail ");

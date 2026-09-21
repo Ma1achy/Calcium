@@ -213,6 +213,26 @@ export function withBackground(style: Style | undefined, surface: Style): Style 
  * Painted **over `tone.default`** and nothing else — the one ink C10 §4b has
  * measured against this ground (`SELECTION_SLOTS`).
  */
+/**
+ * The focus ground (C10 I47, C09 I83, R-SEL-006).
+ *
+ * **A ground of its own, and that is the whole change.** Focus and selection
+ * were told apart by *ink over one ground* — `accent` for the head, `default`
+ * for the extent, both over `surface.selection` — where R-SEL-006 tells them
+ * apart by two grounds and a mark. `focusGround` had shipped as a token with a
+ * contrast gate and no reader for exactly as long as that was true.
+ *
+ * **No 1-bit rung here, and that is deliberate.** `selectionStyle` falls to
+ * `inverse` because the ground is selection's only carrier; focus has `▸`
+ * (C09 I83), which survives to 1-bit and survives a reader who overrode their
+ * background. A second inverse rung would make a focused row and a selected one
+ * the same frame, which is the defect this function exists to end. So where
+ * there is no colour this answers `NO_STYLE` and the mark carries focus alone.
+ */
+export function focusStyle(theme: ResolvedTheme, caps: TerminalCapabilities): Style {
+  return resolveBackground("surface.focusGround", theme, caps);
+}
+
 export function selectionStyle(theme: ResolvedTheme, caps: TerminalCapabilities): Style {
   const bg = background("surface.selection", theme, caps);
   return bg.background === undefined ? { inverse: true } : bg;

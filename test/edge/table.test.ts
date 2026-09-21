@@ -1,5 +1,6 @@
 // C11 tier 3 — the widths and the contents nobody designs for.
 import { describe, expect, it } from "vitest";
+import { atContent, body } from "../support/table-gutter.js";
 import { planColumns, tableDefinition } from "../../src/presentation/table/index.js";
 import { psColumns, psTable } from "../support/blocks.js";
 import { ASCII_CAPS, FULL_CAPS, measurable, visible } from "../support/render.js";
@@ -93,9 +94,11 @@ describe("C11 tier 3 — edges", () => {
     // Eight double-width glyphs are 16 cells and do not fit a 12-cell column, so
     // the cell truncates — and the row is still exactly the width it was planned
     // at, which is the property `.length` would break.
-    const lines = r.renderToLines(block, 24);
-    for (const width of widthsOf(lines)) expect(width).toBeLessThanOrEqual(24);
-    expect(cells(visible(lines[1] ?? ""))).toBe(22);
+    // **Rendered two cells wider and read past the gutter** (C11 I15, §5b), so
+    // the columns get the 24 this row is about.
+    const lines = r.renderToLines(block, atContent(24));
+    for (const width of widthsOf(lines)) expect(width).toBeLessThanOrEqual(atContent(24));
+    expect(cells(body(visible(lines[1] ?? "")))).toBe(22);
   });
 
   it("T3.6: a ZWJ emoji counts as one cluster and truncation never splits it", () => {
@@ -247,7 +250,9 @@ describe("C11 tier 3 — edges", () => {
     // The rendered rows are the table's width, not the terminal's — which is what
     // "renders narrower than the terminal" means, and it is C07's fallback shape.
     const block: Table = { kind: "table", id: "t", columns, rows: [{ id: "r1", cells: { a: { text: "x" }, b: { text: "y" } } }] };
-    expect(cells(visible(r.renderToLines(block, 120)[1] ?? ""))).toBe(12);
+    // **The gutter is part of the block's answer** (C11 I15): it is drawn on
+    // every row, so a width that left it out would be narrower than the frame.
+    expect(cells(visible(r.renderToLines(block, 120)[1] ?? ""))).toBe(atContent(12));
   });
 
   it("T3.16: 10,000 rows plan sub-millisecond and measure linearly", () => {
@@ -320,6 +325,8 @@ describe("C11 tier 3 — edges", () => {
       { id: "r1", cells: { name: { text: "alpha" }, dt: { text: "12" }, rate: { text: "20" }, note: { text: "ok" } } },
       { id: "r2", cells: { name: { text: "beta" }, dt: { text: "13" }, rate: { text: "21" }, note: { text: "no" } } },
     ];
+    // The columns are planned at `WIDTH`; the block is rendered two cells wider
+    // and read past the reserved gutter (C11 I15, §5b).
     const WIDTH = 44;
 
     /**
@@ -368,7 +375,7 @@ describe("C11 tier 3 — edges", () => {
           definitions: [tableDefinition],
           capabilities: { ...FULL_CAPS, ambiguousWidth: amb },
         });
-        const lines = reg.renderToLines(block, WIDTH).map(visible);
+        const lines = reg.renderToLines(block, atContent(WIDTH)).map((l) => body(visible(l)));
         expect(lines.length, `${arm} at ${amb}: header and two rows`).toBe(3); // cells-ok
 
         // **As one set, not a row at a time.** A header compared against the

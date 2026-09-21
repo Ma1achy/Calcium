@@ -116,10 +116,14 @@ const MUTATIONS = [
     expect: "T1.26",
   },
   {
+    // **Re-anchored** (C10 I47, R-SEL-006): the head chip takes `focusGround`,
+    // or the wash where it is also selected. The mutation is unchanged — the head
+    // loses its ground and is `accent` alone — and it is anchored on the ground
+    // chooser, which is what it removes.
     name: "the head chip loses the ground",
     file: SIMPLE,
-    from: '              ? { ...tone("accent", ctx.theme, ctx.capabilities), ...selectionStyle(ctx.theme, ctx.capabilities) }',
-    to: '              ? tone("accent", ctx.theme, ctx.capabilities)',
+    from: '                  ...(selected.has(id) ? selectionStyle : focusStyle)(ctx.theme, ctx.capabilities),\n',
+    to: "",
     expect: "T1.24",
   },
 ];

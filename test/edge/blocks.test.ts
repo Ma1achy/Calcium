@@ -1,5 +1,6 @@
 // C09 tier 3 — the edges, where every arithmetic mistake shows.
 import { describe, expect, it } from "vitest";
+import { GUTTER_CELLS } from "../support/table-gutter.js";
 import { block, placeable, validateBlock } from "../../src/data/viewmodel/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
@@ -554,16 +555,21 @@ describe("C09 §2c width — the answers (I42–I44)", () => {
     const rows = [{ id: "r1", cells: { name: { text: "row 1" } } }];
     expect(w(block({ kind: "table", id: "tf", columns: [{ ...column, flex: true }], rows }), 40), "an uncapped flex column takes the residual").toBe(40);
     const capped = block({ kind: "table", id: "tc", columns: [{ ...column, flex: true, maxWidth: 12 }], rows });
-    expect(w(capped, 40), "a capped flex column stops short, and the plan says where").toBe(12);
+    // **Plus the reserved gutter** (C11 I15, §5b): the block draws it on every
+    // row, so a width answer that left it out would be narrower than the frame.
+    expect(w(capped, 40), "a capped flex column stops short, and the plan says where").toBe(12 + GUTTER_CELLS);
     expect(w(block({ kind: "table", id: "ta", columns: [column], rows, actionBar: true }), 40), "an action bar").toBe(40);
     expect(w(block({ kind: "table", id: "te", columns: [column], rows: [] }), 40), "no rows").toBe(40);
     const fixed = block({ kind: "table", id: "tn", columns: [column, { ...column, key: "size", label: "Size" }], rows: [
       { id: "r1", cells: { name: { text: "row 1" }, size: { text: "12" } } },
     ] });
-    const plan = planColumns(fixed.columns, 40);
+    // **Planned inside the reserved gutter** (C11 I15, §5b), which is the plan
+    // the block itself makes; the width answer is that plan plus the gutter it
+    // draws on every row.
+    const plan = planColumns(fixed.columns, 40 - GUTTER_CELLS);
     const planned = plan.visible.reduce((t, c) => t + c.width, 0) + plan.gap * (plan.visible.length - 1);
-    expect(w(fixed, 40), "the planned columns and gaps").toBe(planned);
-    expect(planned).toBeLessThan(40);
+    expect(w(fixed, 40), "the planned columns and gaps").toBe(planned + GUTTER_CELLS);
+    expect(planned + GUTTER_CELLS).toBeLessThan(40);
   });
 
   it("T3.69 (C09 I44): containers answer only when their layout does not depend on the width", () => {

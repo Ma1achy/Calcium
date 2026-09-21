@@ -18,9 +18,9 @@ import { describe, expect, it } from "vitest";
 import { buildSession } from "../support/session.js";
 import { fakeStdin, capabilities } from "../support/fake-terminal.js";
 import { rowContaining, styleAt, styledScreenFrom, textOf, type CellStyle } from "../support/styled-screen.js";
-import { measurable } from "../support/render.js";
+import { measurable, visible } from "../support/render.js";
 import type { FocusState } from "../../src/presentation/blocks/index.js";
-import { selectionStyle, tone } from "../../src/presentation/blocks/paint.js";
+import { focusStyle, selectionStyle, tone } from "../../src/presentation/blocks/paint.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
@@ -28,6 +28,7 @@ import { defaultTheme, loadTheme } from "../../src/presentation/theme/index.js";
 import { block, mosaicRects, parseAreas } from "../../src/data/viewmodel/index.js";
 import { sgr } from "../../src/terminal/escapes.js";
 import { focusKey } from "../../src/shell/render-cache.js";
+import { GUTTER_CELLS } from "../support/table-gutter.js";
 
 /** The wire forms (C16 I17, keymap.ts: `⇧↓` is `CSI 1;2B`). */
 const DOWN = "\u001b[B";
@@ -119,7 +120,13 @@ describe("C11 I14 — the selection is painted, read from a session's screen", (
     const accent = params(tone("accent", theme, caps));
     const plain = params(tone("default", theme, caps));
     const wash = params(selectionStyle(theme, caps));
+    // **Focus has a ground of its own now** (C10 I47, R-SEL-006): the head was
+    // `accent` over *nothing* and is `accent` over `focusGround`, so the two
+    // facts are two grounds rather than one ground told apart by ink.
+    const focusBg = params(focusStyle(theme, caps));
     expect(wash, "the wash is a background at 8-bit").toMatch(/^48;/u);
+    expect(focusBg, "and so is the focus ground").toMatch(/^48;/u);
+    expect(focusBg, "and they are different grounds").not.toBe(wash);
 
     // **The control**: no focus, nothing washed, nothing accented.
     for (const name of ["alpha", "bravo", "charlie", "delta"]) {
@@ -128,7 +135,7 @@ describe("C11 I14 — the selection is painted, read from a session's screen", (
 
     await s.type(DOWN); // the card's head is the first element (C09 I47)
     await s.type(DOWN);
-    expect(s.toneOf("alpha"), "↓ ↓ focuses alpha").toEqual({ fg: accent, bg: "", attrs: [] });
+    expect(s.toneOf("alpha"), "↓ ↓ focuses alpha").toEqual({ fg: accent, bg: focusBg, attrs: [] });
 
     await s.type(SHIFT_DOWN);
     await s.type(SHIFT_DOWN);
@@ -136,7 +143,11 @@ describe("C11 I14 — the selection is painted, read from a session's screen", (
     // every count; the assertion names each row and its tone.
     expect(s.toneOf("alpha"), "alpha is selected: default ink over the wash").toEqual({ fg: plain, bg: wash, attrs: [] });
     expect(s.toneOf("bravo"), "bravo is selected").toEqual({ fg: plain, bg: wash, attrs: [] });
-    expect(s.toneOf("charlie"), "charlie is the head: accent, no wash").toEqual({ fg: accent, bg: "", attrs: [] });
+    // **The head inside the extent takes the selection ground and keeps `accent`**
+    // (R-SEL-006). It was `accent` over nothing, which is the old mechanism: one
+    // ground, two facts, told apart by ink. Selection owns the ground where both
+    // hold, and the mark in the reserved column is what says *here*.
+    expect(s.toneOf("charlie"), "charlie is the head: accent over the wash").toEqual({ fg: accent, bg: wash, attrs: [] });
     expect(s.toneOf("delta"), "delta is outside the extent").toEqual({ fg: plain, bg: "", attrs: [] });
     // And the wash runs across the row, gap included — *selected*, not
     // *highlighted* (C22 §6e's distinction): the state column of a selected row
@@ -144,11 +155,13 @@ describe("C11 I14 — the selection is painted, read from a session's screen", (
     const alphaRow = rowContaining(s.screen(), "alpha");
     expect(styleAt(alphaRow!, "running"), "alpha's state cell: default over the wash").toEqual({ fg: plain, bg: wash, attrs: [] });
     const charlieRow = rowContaining(s.screen(), "charlie");
-    expect(styleAt(charlieRow!, "running"), "charlie's state cell takes the head's accent").toEqual({ fg: accent, bg: "", attrs: [] });
+    expect(styleAt(charlieRow!, "running"), "charlie's state cell takes the head's accent over the wash").toEqual({ fg: accent, bg: wash, attrs: [] });
 
     // **An unshifted motion collapses** (C26 I16): `↓` to delta, nothing washed.
     await s.type(DOWN);
-    expect(s.toneOf("delta")).toEqual({ fg: accent, bg: "", attrs: [] });
+    // The extent collapses to the head alone, which is `selected` **absent**
+    // (C26 I16's sentinel) — so the ground is focus's, not selection's.
+    expect(s.toneOf("delta")).toEqual({ fg: accent, bg: focusBg, attrs: [] });
     for (const name of ["alpha", "bravo", "charlie"]) {
       expect(s.toneOf(name), `${name} after the collapse`).toEqual({ fg: plain, bg: "", attrs: [] });
     }
@@ -175,7 +188,12 @@ describe("C11 I14 — the selection is painted, read from a session's screen", (
     expect(s.toneOf("alpha"), "alpha washed by ⌃a").toEqual({ fg: plain, bg: wash, attrs: [] });
     expect(s.toneOf("bravo"), "bravo washed by ⌃a").toEqual({ fg: plain, bg: wash, attrs: [] });
     expect(s.toneOf("charlie"), "charlie washed by ⌃a").toEqual({ fg: plain, bg: wash, attrs: [] });
-    expect(s.toneOf("delta").bg, "the head is not washed").toBe("");
+    // **The head inside the extent takes the selection ground** (R-SEL-006:
+    // *focused and selected takes selectionGround and keeps the focus mark*).
+    // It was unwashed, which was the old mechanism telling the two apart by ink
+    // on one ground; `⌃a` selects every row including this one, so the ground is
+    // selection's and `▸` is what still says the head is here.
+    expect(s.toneOf("delta").bg, "the head is washed too, and keeps its mark").toBe(wash);
   });
 });
 
@@ -198,6 +216,7 @@ describe("C11 I14 — the renderer, handed the extent directly", () => {
     const accent = params(tone("accent", theme, caps));
     const plain = params(tone("default", theme, caps));
     const wash = params(selectionStyle(theme, caps));
+    const focusBg = params(focusStyle(theme, caps));
     const ok = params(tone("ok", theme, caps));
 
     const none = render(null);
@@ -212,7 +231,10 @@ describe("C11 I14 — the renderer, handed the extent directly", () => {
     // rest and `default` over the wash. M7 — keeping span tones on a selected
     // row — survived until this line existed.
     expect(cellOf(three, "exited"), "the span inside a selected row").toEqual({ fg: plain, bg: wash, attrs: [] });
-    expect(cellOf(three, "charlie")).toEqual({ fg: accent, bg: "", attrs: [] });
+    // **The head is inside the extent, so selection owns its ground too**
+    // (R-SEL-006). `accent` is what is left of focus in the ink, and `▸` in the
+    // reserved column is what is left of it in the gutter.
+    expect(cellOf(three, "charlie")).toEqual({ fg: accent, bg: wash, attrs: [] });
     expect(cellOf(three, "delta")).toEqual({ fg: plain, bg: "", attrs: [] });
     // The header row above `alpha` is not washed either.
     expect(cellOf(three, "Name").bg).toBe("");
@@ -225,19 +247,48 @@ describe("C11 I14 — the renderer, handed the extent directly", () => {
     // **And a selection whose head is in a sibling still names rows here.**
     const straddling = render({ blockId: "x", rowId: "chip-0", selected: [pair("t", "d"), pair("x", "chip-0")] });
     expect(cellOf(straddling, "delta"), "delta washed although the head is elsewhere").toEqual({ fg: plain, bg: wash, attrs: [] });
-    expect(cellOf(straddling, "charlie").bg).toBe("");
+    expect(cellOf(straddling, "charlie").bg, "and charlie holds no focus here").toBe("");
 
-    // **The sentinel, measured**: the head alone is byte-identical to absent.
+    // **The sentinel is a kind, not a size** (C26 I16, C11 I14, T2.12). `selected`
+    // **absent** is the head alone; a `selected` naming the head is a *real*
+    // one-element selection and takes the selection ground, which R-SEL-006
+    // requires. The previous form of this row asserted the two were
+    // byte-identical, which pinned the sentinel in the test by its **size** —
+    // and a size test paints a real single-row selection as focus.
+    const sentinel = render({ blockId: "t", rowId: "c" });
+    expect(cellOf(sentinel, "charlie"), "absent: the head takes the focus ground").toEqual({ fg: accent, bg: focusBg, attrs: [] });
     const headAlone = render({ blockId: "t", rowId: "c", selected: [pair("t", "c")] });
-    expect(headAlone).toEqual(render({ blockId: "t", rowId: "c" }));
+    expect(cellOf(headAlone, "charlie"), "present, one element: a real selection").toEqual({ fg: accent, bg: wash, attrs: [] });
+    expect(headAlone, "so the two are not the same frame").not.toEqual(sentinel);
+    // **And the producer never emits the second form**, which is what keeps the
+    // sentinel free at the seam rather than in this renderer: `focusFor` returns
+    // the head alone with `selected` absent (C26 §5c).
   });
 
-  it("T1.23 (C11 I14, C10 §4b): at 1-bit the wash is reverse video, on the selected rows and not the head", () => {
+  it("T1.23 (C11 I14, C10 §4b, R-SEL-006): at 1-bit the selection is reverse video and the focus mark persists", () => {
     const three = render({ blockId: "t", rowId: "c", selected: [pair("t", "a"), pair("t", "b"), pair("t", "c")] }, 1);
     expect(cellOf(three, "alpha").attrs, "alpha: inverse").toContain(7);
     expect(cellOf(three, "bravo").attrs, "bravo: inverse").toContain(7);
-    expect(cellOf(three, "charlie").attrs, "the head is bold (accent's mono class), not inverse").not.toContain(7);
+    // **The head is inverse too, and `▸` is what tells it from its neighbours**
+    // (R-SEL-006: *at 1-bit the selection becomes reverse video while the focus
+    // mark persists, so neither fact rests on colour alone*). This row read *the
+    // head is bold, not inverse* — true of the mechanism where one ground served
+    // both facts, and the reason focus had no carrier once the ground was gone.
+    expect(cellOf(three, "charlie").attrs, "the head is inside the extent, so it inverts").toContain(7);
     expect(cellOf(three, "delta").attrs).not.toContain(7);
+    const lineWith = (lines: readonly string[], name: string): string =>
+      visible(lines.find((l) => visible(l).includes(name)) ?? "");
+    expect(lineWith(three, "charlie"), "and the mark is in the reserved column").toContain("▸ ");
+    for (const other of ["alpha", "bravo", "delta"]) {
+      expect(lineWith(three, other), `${other} carries no mark`).not.toContain("▸");
+    }
+    // **A focused row outside any extent has the mark and nothing else at 1-bit**,
+    // because `focusGround` answers `NO_STYLE` without colour and the mark is the
+    // whole carrier — which is why `focusStyle` has no inverse rung: a second one
+    // would draw a focused row and a selected one as the same frame.
+    const alone = render({ blockId: "t", rowId: "c" }, 1);
+    expect(cellOf(alone, "charlie").attrs, "no ground survives 1-bit").not.toContain(7);
+    expect(lineWith(alone, "charlie")).toContain("▸ ");
     // The whole row, gap included — the state cell of a selected row is inverse too.
     const alphaRow = rowContaining(styled(three), "alpha")!;
     expect(styleAt(alphaRow, "running")!.attrs).toContain(7);
@@ -249,6 +300,7 @@ describe("C11 I14 — the renderer, handed the extent directly", () => {
     const muted = params(tone("muted", theme, caps));
     const plain = params(tone("default", theme, caps));
     const wash = params(selectionStyle(theme, caps));
+    const focusBg = params(focusStyle(theme, caps));
     const pills = block({
       kind: "pills",
       id: "p",
@@ -267,24 +319,32 @@ describe("C11 I14 — the renderer, handed the extent directly", () => {
     // down — so a head in `accent` alone was the F769 frame: `running` and
     // `exited` in one colour. The ground is a channel no chip datum uses.
     const focused = paint({ blockId: "p", rowId: "chip-1" });
-    expect(cellOf(focused, "exited"), "the head chip is accent over the ground").toEqual({ fg: accent, bg: wash, attrs: [] });
+    expect(cellOf(focused, "exited"), "the head chip is accent over the FOCUS ground").toEqual({ fg: accent, bg: focusBg, attrs: [] });
     expect(cellOf(focused, "all"), "its neighbour is not").toEqual({ fg: muted, bg: "", attrs: [] });
     const withActive = block({ kind: "pills", id: "p", chips: [{ label: "all" }, { label: "exited" }, { label: "dead", active: true }] } as never);
     const activeFrame = renderToLines(registry, withActive, 60, { theme, capabilities: caps, focus: { blockId: "p", rowId: "chip-1" } });
     expect(cellOf(activeFrame, "dead"), "an active chip is accent with no ground — the datum").toEqual({ fg: accent, bg: "", attrs: [] });
-    expect(cellOf(activeFrame, "exited"), "and the head beside it differs by the ground alone").toEqual({ fg: accent, bg: wash, attrs: [] });
+    expect(cellOf(activeFrame, "exited"), "and the head beside it differs by the ground alone").toEqual({ fg: accent, bg: focusBg, attrs: [] });
     expect(cellOf(activeFrame, "dead")).not.toEqual(cellOf(activeFrame, "exited"));
 
     const selected = paint({ blockId: "p", rowId: "chip-2", selected: [pair("p", "chip-0"), pair("p", "chip-1"), pair("p", "chip-2")] });
     expect(cellOf(selected, "all"), "chip-0 washed").toEqual({ fg: plain, bg: wash, attrs: [] });
     expect(cellOf(selected, "exited"), "chip-1 washed").toEqual({ fg: plain, bg: wash, attrs: [] });
     expect(cellOf(selected, "dead"), "chip-2 is the head: accent ink over the same ground").toEqual({ fg: accent, bg: wash, attrs: [] });
-    // At 1-bit the ground is reverse video and the head is bold as well.
-    const mono = renderToLines(registry, pills, 60, { theme, capabilities: capabilities({ colourDepth: 1 }), focus: { blockId: "p", rowId: "chip-1" } });
+    // **At 1-bit a focused chip is bold and NOT inverse** (C10 I47, R-SEL-006).
+    // `focusStyle` answers `NO_STYLE` without colour and has no inverse rung on
+    // purpose: inverse is selection's, and a second one would draw a focused chip
+    // and a selected chip as the same frame. `accent`'s mono class is the weight
+    // that is left. A *selected* chip still inverts, which is the row below.
+    const monoFocus = capabilities({ colourDepth: 1 });
+    const mono = renderToLines(registry, pills, 60, { theme, capabilities: monoFocus, focus: { blockId: "p", rowId: "chip-1" } });
     const monoCells = styledScreenFrom([mono.join("\r\n")], { columns: 60, rows: mono.length });
     const monoHead = styleAt(rowContaining(monoCells, "exited")!, "exited")!;
-    expect(monoHead.attrs, "1-bit head: bold and inverse").toEqual(expect.arrayContaining([1, 7]));
+    expect(monoHead.attrs, "1-bit head: bold, and not inverse").toEqual([1]);
     expect(styleAt(rowContaining(monoCells, "all")!, "all")!.attrs).not.toContain(7);
+    const monoSel = renderToLines(registry, pills, 60, { theme, capabilities: monoFocus, focus: { blockId: "p", rowId: "chip-2", selected: [pair("p", "chip-1"), pair("p", "chip-2")] } });
+    const selCells = styledScreenFrom([monoSel.join("\r\n")], { columns: 60, rows: monoSel.length });
+    expect(styleAt(rowContaining(selCells, "exited")!, "exited")!.attrs, "a selected chip inverts").toContain(7);
 
     // Another block's focus leaves every chip in its own tone.
     expect(paint({ blockId: "t", rowId: "chip-1", selected: [pair("t", "chip-0"), pair("t", "chip-1")] })).toEqual(none);
@@ -543,11 +603,10 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
   const noticeAt = (b: typeof NOTICE, focus: FocusState | null, depth: 24 | 1 = 24) =>
     renderToLines(registry, b, 40, { theme, capabilities: capabilities({ colourDepth: depth }), focus });
 
-  it("T1.29 (C26 §7, C04 §3): a focused notice with an action goes accent over the selection ground — glyph and text; one without an action declares nothing and cannot move", () => {
+  it("T1.29 (C26 §7, C04 §3, C09 I83): a focused notice keeps its own tone over the focus ground — glyph and text; one without an action declares nothing and cannot move", () => {
     const caps = capabilities({ colourDepth: 24 });
-    const accent = params(tone("accent", theme, caps));
     const error = params(tone("error", theme, caps));
-    const wash = params(selectionStyle(theme, caps));
+    const focusBg = params(focusStyle(theme, caps));
     const none = noticeAt(NOTICE, null);
     const focused = noticeAt(NOTICE, { blockId: "n", rowId: "n" });
     expect(focused.map((l) => l.replace(SGR, ""))).toEqual(none.map((l) => l.replace(SGR, "")));
@@ -559,8 +618,13 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
       return s;
     };
     expect(at(none, "pull failed"), "unfocused: the tone, no ground").toEqual({ fg: error, bg: "", attrs: [] });
-    expect(at(focused, "pull failed"), "focused: accent over the ground, the tone dropped").toEqual({ fg: accent, bg: wash, attrs: [] });
-    expect(at(focused, "✗"), "the glyph keeps its character and takes the same paint").toEqual({ fg: accent, bg: wash, attrs: [] });
+    // **The notice keeps its own tone over the FOCUS ground** (C09 I83, C10 I47).
+    // It was `accent` over the *selection* ground, which dropped the tone so a
+    // focused `info` notice would not read as an unfocused `accent` one — a
+    // workaround for focus and selection sharing a ground. They no longer do, so
+    // the tone stays the notice's: *colour is declared, not inherited* (§017).
+    expect(at(focused, "pull failed"), "focused: its own tone over the focus ground").toEqual({ fg: error, bg: focusBg, attrs: [] });
+    expect(at(focused, "✗"), "the glyph keeps its character and takes the same paint").toEqual({ fg: error, bg: focusBg, attrs: [] });
     expect(at(none, "✗").fg).toBe(error);
 
     // **The element, as a count** (C09): one with an action, none without.
@@ -575,25 +639,130 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
     expect(noticeAt(NOTICE, { blockId: "q", rowId: "q" })).toEqual(none);
     expect(noticeAt(NOTICE, { blockId: "n", rowId: null })).toEqual(none);
 
-    // 1-bit: bold and reverse video, the pills head's carrier (C10 §4b).
+    // **1-bit: no ground, and no inverse** (C09 I83, C10 I47). `focusGround`
+    // answers `NO_STYLE` without colour and `focusStyle` has no inverse rung —
+    // inverse is selection's, and a notice is not selectable. What is left is the
+    // notice's own tone at its mono class, which is `error`'s: the frame says
+    // *this went wrong* and says nothing false about focus.
     const mono = noticeAt(NOTICE, { blockId: "n", rowId: "n" }, 1);
-    expect(at(mono, "pull failed").attrs).toEqual(expect.arrayContaining([1, 7]));
-    expect(at(noticeAt(NOTICE, null, 1), "pull failed").attrs).not.toContain(7);
+    expect(at(mono, "pull failed").attrs, "no inverse at 1-bit").not.toContain(7);
+    expect(at(mono, "pull failed")).toEqual(at(noticeAt(NOTICE, null, 1), "pull failed"));
   });
 });
 
 /**
- * C11 §5b — the reserved focus column, owed at the spec commit (I15, I14).
+ * C11 §5b — the reserved focus column, and the sentinel's kind.
  *
  * **The content column is the assertion, not the mark.** A reservation that
  * appeared with the fact renders identically in the focused frame; the only
  * place the two mechanisms differ is the frame where nothing is drawn.
  */
 describe("C11 §5b — the reserved gutter", () => {
-  it.todo(
-    "T2.11 (I15, I14, §5b): one table rendered four ways — nothing, focused, selected, focused and selected — puts its content column at the same integer in all four, and the marks differ where the edge does not — not deferred on a component: it lands with the reservation in the code commit that follows this spec",
-  );
-  it.todo(
-    "T2.12 (I14, C26 I16): the sentinel is distinguished by kind — `selected` absent paints the head on the focus ground, `selected` naming the head alone paints it on the selection ground and keeps `▸`, and the two are asserted different, which is the row the previous form of T1.23 had backwards — not deferred on a component: it lands with the same code commit",
-  );
+  const registry = measurable({ definitions: [tableDefinition] }).registry;
+  const caps24 = capabilities({ colourDepth: 24 });
+  const styled = (lines: readonly string[]) =>
+    styledScreenFrom([lines.join("\r\n")], { columns: 60, rows: lines.length });
+  const scene = (focus: FocusState | null): readonly string[] =>
+    renderToLines(registry, TABLE as never, 60, { theme, capabilities: caps24, focus });
+  const lineWith = (lines: readonly string[], name: string): string =>
+    visible(lines.find((l) => visible(l).includes(name)) ?? "");
+  const contentAt = (lines: readonly string[], name: string): number => lineWith(lines, name).indexOf(name);
+  const pairOf = (blockId: string, rowId: string) => ({ blockId, rowId });
+
+  it("T2.11 (C11 I15, C11 I14, C11 §5b): the focus gutter is reserved on every row, whatever its state", () => {
+    const frames = {
+      nothing: scene(null),
+      focused: scene({ blockId: "t", rowId: "c" }),
+      selected: scene({ blockId: "t", rowId: "a", selected: [pairOf("t", "a"), pairOf("t", "c")] }),
+      both: scene({ blockId: "t", rowId: "c", selected: [pairOf("t", "a"), pairOf("t", "c")] }),
+    };
+    // **The column the ink begins at, in all four frames, header included.** This
+    // is the whole row: a gutter that appeared with focus would give three of
+    // these one number and one another, and every assertion about the *mark*
+    // would still pass in all four. The header is in the set because the
+    // reservation is the block's and not the body's — the columns beneath it
+    // have to stay one axis (C09 I82's rule from the other side).
+    const cols = Object.fromEntries(
+      Object.entries(frames).map(([k, f]) => [k, [contentAt(f, "charlie"), contentAt(f, "Name")]]),
+    );
+    const first = cols["nothing"];
+    for (const [name, got] of Object.entries(cols)) {
+      expect(got, `${name}: the content edge does not move`).toEqual(first);
+    }
+    expect(first?.[0] ?? 0, "and it is past the reserved column").toBeGreaterThanOrEqual(GUTTER_CELLS);
+
+    // **Header against body, in each frame on its own.** The set above is
+    // compared *across* frames, and a header that left the reservation moves in
+    // all four together — so the cross-frame comparison is blind to it and a
+    // comment saying the header is in the set is not an assertion that it is
+    // (measured: the mutation was caught elsewhere, not here). The columns
+    // beneath a header have to stay one axis, which is C09 I82's rule from the
+    // other side.
+    for (const [name, f] of Object.entries(frames)) {
+      expect(contentAt(f, "Name"), `${name}: the header sits on the body's axis`).toBe(contentAt(f, "charlie"));
+    }
+
+    // **And the rows a detail draws**, which are emitted on their own path and
+    // so can forget the gutter while every parent row keeps it — geometry that
+    // measures correctly and is wrong. Narrow enough that a column is dropped,
+    // which is what gives the row a detail at all.
+    const CHILD = { kind: "code", id: "kid", language: "text", text: "what was lost\nand a second row" };
+    const expanded = {
+      ...TABLE,
+      rows: ROWS.map((r) => (r.id === "c" ? { ...r, expanded: true, detail: [CHILD] } : r)),
+    };
+    const detail = renderToLines(registry, expanded as never, 60, {
+      theme,
+      capabilities: caps24,
+      focus: { blockId: "t", rowId: "c" },
+    }).map(visible);
+    const kids = detail.filter((l) => l.includes("what was lost") || l.includes("and a second row"));
+    expect(kids, "the frame draws the detail's rows").toHaveLength(2);
+    // **The column, not the cells.** A detail row's own indent is spaces too, so
+    // slicing the reserved cells off and finding them blank is satisfied by a
+    // frame that never reserved them — the mutation dropping `blank` from this
+    // path survived exactly that assertion. What moves is where the text starts:
+    // inside the gutter, so strictly right of the row the detail belongs to.
+    const bodyEdge = contentAt(detail, "charlie");
+    for (const line of kids) {
+      const ink = line.length - line.trimStart().length;
+      expect(ink, `a detail row is inset inside the gutter: ${JSON.stringify(line)}`).toBeGreaterThan(bodyEdge);
+      expect(line.length, "and no row outruns the width").toBeLessThanOrEqual(60);
+    }
+
+    // The marks differ where the edge does not.
+    const marked = (lines: readonly string[], name: string): boolean => lineWith(lines, name).startsWith("\u25b8");
+    expect(marked(frames.nothing, "charlie"), "nothing focused").toBe(false);
+    expect(marked(frames.focused, "charlie"), "focused").toBe(true);
+    expect(marked(frames.selected, "charlie"), "selected but not the head").toBe(false);
+    expect(marked(frames.both, "charlie"), "focused and selected keeps the mark").toBe(true);
+  });
+
+  it("T2.12 (C11 I14, C26 I16): the sentinel is a kind, not a size", () => {
+    const cellAt = (lines: readonly string[], name: string) => {
+      const row = rowContaining(styled(lines), name);
+      const c = row === null ? null : styleAt(row, name);
+      if (c === null) throw new Error(`no cell holds ${name}`);
+      return c;
+    };
+    const wash = params(selectionStyle(theme, caps24));
+    const focusBg = params(focusStyle(theme, caps24));
+
+    // `selected` **absent** is the head alone — C26 I16's sentinel — so the head
+    // takes the focus ground.
+    const sentinel = scene({ blockId: "t", rowId: "c" });
+    expect(cellAt(sentinel, "charlie").bg, "absent: focus owns the ground").toBe(focusBg);
+    // `selected` **present** naming only the head is a *real* one-element
+    // selection, and R-SEL-006 gives selection the ground. A test on the extent's
+    // **size** paints this as focus and calls that the sentinel, which is what
+    // the previous form of T1.23 pinned — in the test rather than in the type.
+    const one = scene({ blockId: "t", rowId: "c", selected: [pairOf("t", "c")] });
+    expect(cellAt(one, "charlie").bg, "present, one element: selection owns it").toBe(wash);
+    expect(one, "so the two are not one frame").not.toEqual(sentinel);
+    // And the mark is on the head in both, which is what keeps focus readable
+    // once selection has taken the ground.
+    for (const [name, f] of [["absent", sentinel], ["one element", one]] as const) {
+      expect(lineWith(f, "charlie"), `${name}: the mark`).toContain("\u25b8 ");
+    }
+  });
 });

@@ -5,6 +5,7 @@
 // holds the comparison against what the spec *states*; this file holds the
 // properties that must hold whatever a surface declares.
 import { describe, expect, it } from "vitest";
+import { atContent, body } from "../support/table-gutter.js";
 import { COLUMN_GAP, planColumns, tableDefinition, tableElements } from "../../src/presentation/table/index.js";
 
 /**
@@ -391,8 +392,11 @@ describe("C11 tier 1 — planColumns", () => {
     ];
     const rows = [{ id: "r1", cells: { key: { text: "ui.show_banner" } } }];
 
+    // **Rendered two cells wider and read past the gutter** (C11 I15, §5b): the
+    // block reserves a column for `▸` on every row, and this row is about the
+    // column's own 12 cells.
     const draw = (from: "start" | "end"): string =>
-      visible(registry.renderToLines({ kind: "table", id: "t", columns: columns(from), rows }, 12)[1] ?? "");
+      body(visible(registry.renderToLines({ kind: "table", id: "t", columns: columns(from), rows }, atContent(12))[1] ?? ""));
 
     // 14 characters into 12 cells: 11 kept plus a one-cell marker, from whichever
     // end the column declared.
@@ -403,9 +407,9 @@ describe("C11 tier 1 — planColumns", () => {
     // The default is `end`, so a column that says nothing renders as it did before
     // the field existed.
     const silent = columns("end").map(({ truncateFrom: _t, ...rest }) => rest);
-    expect(visible(registry.renderToLines({ kind: "table", id: "t", columns: silent, rows }, 12)[1] ?? "")).toBe(
-      draw("end"),
-    );
+    expect(
+      body(visible(registry.renderToLines({ kind: "table", id: "t", columns: silent, rows }, atContent(12))[1] ?? "")),
+    ).toBe(draw("end"));
   });
 
   it("the gap is two cells, and it is the plan's own number", () => {
@@ -449,7 +453,7 @@ describe("C11 tier 1 — planColumns", () => {
   /** The cell alone, with the header dropped and the styling stripped. */
   const drawn = (block: Table, caps: TerminalCapabilities, trim = true): string => {
     const kit = measurable({ definitions: [tableDefinition], capabilities: caps });
-    const line = kit.renderToLines(block, 40)[1];
+    const line = body(kit.renderToLines(block, atContent(40))[1] ?? ""); // the gutter is C11 I15's, not this row's
     expect(line, "the table drew a row").toBeDefined();
     return trim ? visible(line ?? "").trimEnd() : visible(line ?? "");
   };
@@ -503,7 +507,7 @@ describe("C11 tier 1 — planColumns", () => {
           { id: "cool", cells: { cpu: { text: "", bar: { value: 45.2, max: 100, format: "percent" } } } },
         ],
       };
-      return kit.renderToLines(block, 40).slice(1).map((l) => visible(l));
+      return kit.renderToLines(block, atContent(40)).slice(1).map((l) => body(visible(l)));
     };
 
     const [hot, cool] = both(true);

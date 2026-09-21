@@ -13,7 +13,19 @@ import { SCAN_BUDGET_MS } from "../support/budget.js";
 
 import { checkAsciiParity, checkMeasurement, formatReport, uncoveredKinds } from "../../src/testing/measurement-conformance.js";
 import { ADVERSARIAL, CORPUS, ONE_PER_KIND } from "../support/blocks.js";
-import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable, visible } from "../support/render.js";
+import {
+  ASCII_CAPS,
+  DARK_THEME,
+  FULL_CAPS,
+  LIGHT_THEME,
+  MONO_UNICODE_CAPS,
+  measurable,
+  visible,
+} from "../support/render.js";
+import { rowContaining, styleAt, styledScreenFrom } from "../support/styled-screen.js";
+import { focusStyle, tone } from "../../src/presentation/blocks/paint.js";
+import { block } from "../../src/data/viewmodel/index.js";
+import { sgr } from "../../src/terminal/escapes.js";
 import { cells, hasEmojiForm, TEXT_PRESENTATION } from "../../src/presentation/text.js";
 import { SPINNER_SETS } from "../../src/presentation/blocks/glyphs.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
@@ -675,10 +687,83 @@ describe("C09 contract — the slice seam", () => {
  * the ground and nothing else, and the assertion is the geometry.
  */
 describe("C09 I83 — a notice takes the focus ground and no column", () => {
-  it.todo(
-    "T2.148 (I83, R-SEL-006, C10 I47): a focused `step` notice is painted on `surface.focusGround` and its geometry does not move — the rendered rows are cell-for-cell the same width and the same gutter as unfocused, the `\u23bf` body lands in the same column in both, and `measure` is called with no focus in both and equals the rows rendered in both — not deferred on a component: it lands with the resolver change in the code commit that follows this spec",
-  );
-  it.todo(
-    "T2.149 (I83, C10 I47): the focused notice keeps its own tone over the focus ground — a focused `info` notice is `info` and not `accent`, which the mechanism this replaces could not express, and at `colourDepth: 1` the ground is gone and the tone's mono class is what is left; asserted over three tones, because a row on one tone passes a mechanism that replaces every tone with a constant — not deferred on a component: it lands with the same code commit",
-  );
+  const HEAD = block({ kind: "notice", id: "h", tone: "default", glyph: "step", text: "ps · ok" } as never);
+  const BODY = block({ kind: "notice", id: "b", tone: "muted", glyph: "continuation", text: "one row" } as never);
+  const WIDTH = 40;
+  const kitAt = (focus: RenderContext["focus"], caps = FULL_CAPS) =>
+    measurable({ theme: DARK_THEME, capabilities: caps, ...(focus === null ? {} : { focus }) });
+  const params = (style: ReturnType<typeof tone>): string =>
+    sgr(style).replace(/^\u001b\[/u, "").replace(/m$/u, "");
+  const cellFor = (lines: readonly string[], text: string) => {
+    const row = rowContaining(styledScreenFrom([lines.join("\r\n")], { columns: WIDTH, rows: lines.length }), text);
+    const cell = row === null ? null : styleAt(row, text);
+    if (cell === null) throw new Error(`no cell holds ${text}`);
+    return cell;
+  };
+
+  it("T2.148 (I83, R-SEL-006, C10 I47): a focused `step` notice takes the focus ground and its geometry does not move", () => {
+    const none = kitAt(null);
+    const lit = kitAt({ blockId: "h", rowId: "h" });
+    const plain = none.renderSequence([HEAD, BODY], WIDTH);
+    const focused = lit.renderSequence([HEAD, BODY], WIDTH);
+
+    // **The instrument responds before it is trusted**: the two frames are not
+    // the same bytes, so a row asserting they agree on text is asserting
+    // something (`test/support/README.md`).
+    expect(focused, "the ground is painted, so the bytes differ").not.toEqual(plain);
+    // **Cell for cell, and that is the whole of I83's first form being wrong.**
+    // The reservation shipped here for one commit; the head moved two cells and
+    // the `⎿` body under it did not.
+    expect(focused.map(visible), "the text does not move").toEqual(plain.map(visible));
+    const bodyColumn = (lines: readonly string[]): number => {
+      const line = lines.map(visible).find((l) => l.includes("one row"));
+      if (line === undefined) throw new Error("no ⎿ body in the frame");
+      return line.indexOf("\u23bf");
+    };
+    expect(bodyColumn(focused), "the ⎿ lands in the same column").toBe(bodyColumn(plain));
+    expect(bodyColumn(plain), "and that column is the gutter's, not zero").toBe(2);
+
+    // **The measurement invariant, in both frames** — `measure` never sees a
+    // focus, so a ground that changed the height would be invisible to it.
+    for (const [name, kit, frame] of [
+      ["unfocused", none, plain],
+      ["focused", lit, focused],
+    ] as const) {
+      const measured = kit.measure(HEAD, WIDTH) + kit.measure(BODY, WIDTH);
+      expect(frame.length, `${name}: measure equals the rows rendered`).toBe(measured);
+    }
+
+    // The ground is on the head and nowhere else.
+    expect(cellFor(focused, "ps · ok").bg, "the head takes focusGround").toBe(
+      params(focusStyle(DARK_THEME, FULL_CAPS)),
+    );
+    expect(cellFor(focused, "one row").bg, "the body keeps the page").toBe("");
+    expect(cellFor(plain, "ps · ok").bg, "and unfocused there is no ground").toBe("");
+  });
+
+  it("T2.149 (I83, C10 I47): the focused notice keeps its own tone over the focus ground, on every tone", () => {
+    const ground = params(focusStyle(DARK_THEME, FULL_CAPS));
+    // **Three tones, because one passes a mechanism that paints a constant.**
+    // The form this replaces put `accent` on the selection ground, which could
+    // not tell a focused `info` notice from an unfocused `accent` one.
+    for (const name of ["info", "error", "warn"] as const) {
+      const notice = block({ kind: "notice", id: "h", tone: name, glyph: "step", text: `on ${name}` } as never);
+      const lines = kitAt({ blockId: "h", rowId: "h" }).renderSequence([notice], WIDTH);
+      expect(cellFor(lines, `on ${name}`), `${name}: its own tone over the focus ground`).toEqual({
+        fg: params(tone(name, DARK_THEME, FULL_CAPS)),
+        bg: ground,
+        attrs: [],
+      });
+    }
+
+    // **At one bit the ground is gone and the tone's mono class is what is
+    // left.** `focusStyle` has no inverse rung — inverse is selection's only
+    // carrier — so what survives here is the notice's own ink, and `▸` is what
+    // says *focus* (R-SEL-006). A second inverse rung would make a focused row
+    // and a selected one one frame.
+    const mono = kitAt({ blockId: "h", rowId: "h" }, MONO_UNICODE_CAPS).renderSequence([HEAD], WIDTH);
+    const monoPlain = kitAt(null, MONO_UNICODE_CAPS).renderSequence([HEAD], WIDTH);
+    expect(cellFor(mono, "ps · ok").attrs, "no inverse at 1-bit").not.toContain(7);
+    expect(cellFor(mono, "ps · ok"), "the tone's mono class, focused or not").toEqual(cellFor(monoPlain, "ps · ok"));
+  });
 });

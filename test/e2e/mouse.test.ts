@@ -17,6 +17,7 @@
 import { describe, expect, it } from "vitest";
 
 import { interactivePty } from "../support/pty.js";
+import { GUTTER_CELLS } from "../support/table-gutter.js";
 import { createDecoder } from "../../src/interaction/router/decode.js";
 import { MOUSE, MOUSE_ANY } from "../../src/terminal/escapes.js";
 import {
@@ -91,17 +92,34 @@ describe("C16 e2e — the mouse through a PTY (I31, §4a)", () => {
         await beat(200);
         const after = pty.styledFrame;
 
-        // **Which row, not that one.** The target's pen changed; the other three
-        // did not; and no stripped text moved anywhere on the screen — focus is a
-        // tone and nothing else (C11 I14).
+        // **Which row, not that one.** The target's pen changed and the other
+        // three did not.
         expect(after[b1], "the clicked row carries a new tone").not.toBe(before[b1]);
         for (const other of [a1, a2, b2]) {
           expect(after[other], `row ${String(other)} is untouched`).toBe(before[other]);
         }
+        // **And a mark, which is not a move** (C11 §5b, R-SEL-006, R-STA-003).
+        // Focus keeps a carrier that is not colour, so the click writes `▸` as
+        // well as a ground. The earlier form of this row asserted the stripped
+        // frame byte-identical — true of focus-as-a-tone, false of the design —
+        // and it could not have told a mark landing in its reserved column from
+        // one shoving the row two cells right, which is the defect C09 I83's
+        // first form shipped. So the gutter and the content are asserted apart.
+        //
         // **Row 0 is chrome and carries a clock**, repainted on the click's frame;
         // whole-frame equality included it and T5.6 died once under a wheel
         // mutation that cannot touch a click (2026-09-05). The region is the subject.
-        expect(pty.frame.slice(1), "the stripped region is unchanged — a highlight, not a move").toEqual(text.slice(1));
+        const moved = pty.frame.slice(1).flatMap((l, i) => (l === text[i + 1] ? [] : [i + 1]));
+        expect(moved, "the only row whose text changed at all is the one clicked").toEqual([b1]);
+        // The table sits under an entry's rail, so its gutter is not the screen's
+        // column 0; the content edge is what locates it, and the content edge is
+        // what must not move.
+        const edge = (line: string): number => line.indexOf("7c2d4e1");
+        const at = edge(text[b1] ?? "");
+        expect(at, "the target's content edge is found").toBeGreaterThan(GUTTER_CELLS);
+        expect(edge(pty.frame[b1] ?? ""), "and it does not move under the mark").toBe(at);
+        expect(pty.frame[b1]?.slice(at - GUTTER_CELLS, at), "the reserved column carries ▸").toBe("▸ ");
+        expect(text[b1]?.slice(at - GUTTER_CELLS, at), "where before it was blank").toBe("  ");
       } finally {
         pty.kill();
       }

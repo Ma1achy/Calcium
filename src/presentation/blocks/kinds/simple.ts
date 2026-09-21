@@ -15,7 +15,7 @@ import { runLines, runsOf, runsText, sliceRuns, wrapRuns } from "../../runs.js";
 import { NO_STYLE, rampStyle } from "../../theme/index.js";
 import { animateT, effectiveTick, extentT } from "../ramp.js";
 import { barStyle, glyphFor, glyphCells, glyphs } from "../glyphs.js";
-import { clampSpans, pad, paint, paintRuns, rows, selectionStyle, tone, type Span } from "../paint.js";
+import { clampSpans, focusStyle, pad, paint, paintRuns, rows, selectionStyle, tone, type Span } from "../paint.js";
 import type { BlockDefinition, NavElement, RenderContext, Windowed, Rendered } from "../types.js";
 
 /** Chips in a `pills` row are separated by two spaces — one is too close to read. */
@@ -317,18 +317,23 @@ export const noticeDefinition: BlockDefinition<Notice> = {
   elements: noticeElements,
 
   render(block: Notice, ctx: RenderContext): Rendered {
-    // **Focused: `accent` over the selection ground, the `pills` head's rule**
-    // (C26 §7). `accent` is a legal notice tone, so `accent` alone would draw a
-    // focused `info` notice as an unfocused `accent` one; the ground is the
-    // channel no notice datum uses. The tone is dropped under focus as a table
-    // row drops its cell tones (C11 I14) and the glyph keeps its character. The
+    // **Focused: the notice's own tone over the FOCUS ground** (C09 I83, C10
+    // I47, R-SEL-006). This was `accent` over the *selection* ground, which
+    // dropped the notice's tone to avoid drawing a focused `info` notice as an
+    // unfocused `accent` one — a workaround for focus and selection sharing one
+    // ground. They no longer do: `focusGround` is focus's own channel, so the
+    // tone stays the notice's, which is the design's *colour is declared, not
+    // inherited* (§017). **The geometry does not move** — no column is reserved
+    // here, because a notice has no rows to point at and the mark belongs to the
+    // block that does (C11 I15, §5b), and a reservation here shifted a head two
+    // cells while leaving its `⎿` body behind (T1.48). The
     // id tested is the one the session writes — the element's, which is the
     // block's (`noticeElements`, `focusFor`) — and only a notice that declares
     // an element (an action, or a `GLYPH_ELEMENT` token — I47) can reach this arm.
     const focused =
       declaresElement(block) && ctx.focus !== null && ctx.focus.blockId === block.id && ctx.focus.rowId === block.id;
     const style = focused
-      ? { ...tone("accent", ctx.theme, ctx.capabilities), ...selectionStyle(ctx.theme, ctx.capabilities) }
+      ? { ...tone(block.tone, ctx.theme, ctx.capabilities), ...focusStyle(ctx.theme, ctx.capabilities) }
       : tone(block.tone, ctx.theme, ctx.capabilities);
     const prefix = prefixCells(block.glyph);
     const wrapped = noticeRows(block, ctx.width, ctx.capabilities);
@@ -627,9 +632,17 @@ export const pillsDefinition: BlockDefinition<Pills> = {
           // chip datum uses. A selected chip is `default` over the same ground,
           // so head and extent differ by ink; at 1-bit both are reverse video
           // and the head is bold.
+          // **Selection wins the ground where both facts hold** (R-SEL-006,
+          // C10 I47): a head inside a real extent takes the wash and keeps
+          // `accent` as the ink. `has` and never a size — `selected` absent is
+          // C26 I16's head-alone sentinel, and any present extent is a real
+          // selection, one element included (C11 I14).
           const style =
             id === head
-              ? { ...tone("accent", ctx.theme, ctx.capabilities), ...selectionStyle(ctx.theme, ctx.capabilities) }
+              ? {
+                  ...tone("accent", ctx.theme, ctx.capabilities),
+                  ...(selected.has(id) ? selectionStyle : focusStyle)(ctx.theme, ctx.capabilities),
+                }
               : selected.has(id)
                 ? { ...tone("default", ctx.theme, ctx.capabilities), ...selectionStyle(ctx.theme, ctx.capabilities) }
                 : tone(name, ctx.theme, ctx.capabilities);

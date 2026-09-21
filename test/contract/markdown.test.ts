@@ -6,6 +6,7 @@
 // paragraph. So the shapes are checked once and the frame is read for the three
 // constructs whose target was a decision rather than a correspondence.
 import { describe, expect, it } from "vitest";
+import { body } from "../support/table-gutter.js";
 
 import { block, markdownBlocks, validateBlock } from "../../src/data/viewmodel/index.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
@@ -187,7 +188,9 @@ describe("roadmap 11 — the named subset, as blocks", () => {
     expect(kinds(markdownBlocks("| h |\n| x |")), "no delimiter, no table — T2.43's arm at one column").toEqual(["raw"]);
 
     // The frame: a one-column table draws its header and its row, nothing else.
-    expect(frame(markdownBlocks("| h |\n|---|\n| x |"), FULL_CAPS, 12)).toEqual(["h", "x"]);
+    // The rows carry the table's reserved focus gutter (C11 I15, §5b); this row
+    // is about the table having one column, not about where its ink starts.
+    expect(frame(markdownBlocks("| h |\n|---|\n| x |"), FULL_CAPS, 12).map(body)).toEqual(["h", "x"]);
   });
 
   it("T2.45 (the frame): a list item draws the glyph slot, and it degrades", () => {
