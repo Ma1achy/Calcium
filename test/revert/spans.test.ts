@@ -205,6 +205,41 @@ describe("C10 §4e — span attributes, tier 6", () => {
     expect(refused(span({ fill: "palette", animate: "cascade" as never })), "and a name the design does not carry is still refused").toBe(true);
   });
 
+  it("T6.94a (C04 I109): one stamp per frame rather than one per ramp \u2192 nothing fails but this row", () => {
+    // **Measured, not argued: making this revert fails this row and nothing
+    // else — T2.117g included.** That row calls `animateT` directly, so it is
+    // handed two stamps by construction and answers twice however `paint.ts`
+    // reads them. What it cannot see is whether the renderer passes each ramp
+    // *its own* stamp or one number off the render context for the whole frame,
+    // and the two are indistinguishable in any frame holding a single one-shot,
+    // which is every frame the rest of this suite draws.
+    //
+    // So this row puts two one-shots in **one document** and goes through the
+    // public render. Under the revert — a single `RenderContext.since` — the
+    // two spans would be handed the same elapsed time and the mixed document
+    // would render exactly as the uniform one does.
+    const text = "aaaaaaaaaa          bbbbbbbbbb";
+    const shot = (since: number): Ramp => ({ fill: "gradient", from: "default", to: "accent", animate: "sweep", since });
+    const pair = (a: number, b: number): Block =>
+      block({ kind: "notice", id: "n", tone: "info", text,
+        spans: [{ from: 0, to: 10, ramp: shot(a) }, { from: 20, to: 30, ramp: shot(b) }] });
+
+    const at = (tick: number, b: Block): readonly string[] =>
+      measurable({ theme: DARK_THEME, capabilities: FULL_CAPS, tick }).renderToLines(b, 40);
+
+    // Stamped four ticks apart, the two spans are four ticks apart.
+    expect(at(4, pair(0, 4)), "two stamps in one frame do not collapse").not.toEqual(at(4, pair(0, 0)));
+
+    // And the elapsed time is measured from each ramp's own stamp, not from the
+    // frame: shifting both stamps and the tick together is the same picture.
+    expect(at(8, pair(4, 4)), "the whole frame slid four ticks and nothing moved").toEqual(at(4, pair(0, 0)));
+
+    // The geometry is untouched either way — appearance animates, geometry
+    // never does — which is the carve-out that binds whatever the stamp says.
+    const kit = measurable({ theme: DARK_THEME, capabilities: FULL_CAPS });
+    for (const w of [40, 20, 12]) expect(kit.measure(pair(0, 4), w), `at ${String(w)}`).toBe(kit.measure(pair(0, 0), w));
+  });
+
   it("T6.95a (C04 I109): dropping the `since` guard \u2192 a periodic ramp takes a stamp nothing reads", () => {
     // **The revert is a field that looks like it does something.** `since` is a
     // one-shot's start; on `shimmer` nothing reads it, so a caller who set it

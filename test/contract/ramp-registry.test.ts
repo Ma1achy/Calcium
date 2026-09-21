@@ -204,6 +204,44 @@ describe("C04 §3am — the ink ramps are the registry's", () => {
     expect(late[0]!, "and reaches the ends").toBeGreaterThan(late[n / 2]!);
   });
 
+  it("T2.117g (C04 I109): two one-shots in one frame time independently", () => {
+    // **The half the deferral got wrong, asserted rather than argued.** §3am
+    // named the missing symbol as `RenderContext.since` — one value for a whole
+    // frame — and a frame-wide stamp makes every one-shot in a document start at
+    // the same moment. That is not a smaller version of the right mechanism; it
+    // is a different one, and it is wrong for the first document that carries
+    // two, which is the ordinary case: a call settles, then a second settles
+    // four ticks later, and both draw a `sweep`.
+    //
+    // The stamp is on the effect, so this is a construction and not a claim: two
+    // ramps, two stamps, one tick, and the frames differ. Nothing in `src/`
+    // holds a frame-wide stamp, and the assertion below is what would fail if
+    // one were introduced and read in preference.
+    const n = 10;
+    const frame = (since: number, k: number): number[] =>
+      Array.from({ length: n }, (_v, i) => animateT("sweep", i / (n - 1), k, n, i, since));
+
+    const early = frame(0, 6);
+    const late = frame(4, 6);
+    expect(late, "started four ticks apart, they are four ticks apart").not.toEqual(early);
+    expect(late, "and the later one is where the earlier one was").toEqual(frame(0, 2));
+
+    // And they converge only by both finishing, which is the one moment a
+    // frame-wide stamp would also produce — so the row asserts the difference at
+    // a tick where both are still running, not merely somewhere.
+    expect(early.some((v) => v > 0 && v < 1) || late.some((v) => v > 0 && v < 1), "both still running").toBe(true);
+    expect(frame(0, 500), "and at rest they agree").toEqual(frame(4, 500));
+
+    // **All five, because `sweep` could be the only one wired.** A stamp read by
+    // one arm of a switch and ignored by the other four is exactly the shape a
+    // single-effect row cannot see.
+    for (const effect of RAMP_ONE_SHOTS) {
+      const a = Array.from({ length: n }, (_v, i) => animateT(effect, i / (n - 1), 6, n, i, 0));
+      const b = Array.from({ length: n }, (_v, i) => animateT(effect, i / (n - 1), 6, n, i, 4));
+      expect(b, `${effect}: its stamp moves its frame`).not.toEqual(a);
+    }
+  });
+
   it("T2.117f (C04 I109): the same cell at the same tick is the same value, on every run", () => {
     // **The four irregular effects use a hash and not an RNG**, and this is the
     // row that says why it matters: a golden frame has to be the same frame
