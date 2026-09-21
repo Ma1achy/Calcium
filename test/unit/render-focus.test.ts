@@ -583,7 +583,7 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
 });
 
 /**
- * C11 §5b — the two gutter columns, owed at the spec commit (I15, I14).
+ * C11 §5b — the reserved focus column, owed at the spec commit (I15, I14).
  *
  * **The content column is the assertion, not the mark.** A reservation that
  * appeared with the fact renders identically in the focused frame; the only
