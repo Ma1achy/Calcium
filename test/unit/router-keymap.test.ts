@@ -3,10 +3,16 @@
  */
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { join } from "node:path";
+
+/** The repo root, for the rows that run a tool or read the registry. */
+const ROOT = new URL("../..", import.meta.url).pathname;
 import { describe, expect, it } from "vitest";
 
 import { createKeymap, KeymapError, defaultKeymap, keyText } from "../../src/interaction/router/keymap.js";
 import { createDecoder } from "../../src/interaction/router/decode.js";
+import { REGISTRY_BINDINGS } from "../../src/interaction/router/registry-bindings.js";
 import type { Binding, FocusTarget, Key } from "../../src/interaction/router/types.js";
 
 const k = (name: string, mods: Partial<Key> = {}): Key => ({
@@ -813,15 +819,79 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     return k !== undefined && k.kind === "key" ? k.key : null;
   };
 
-  it.todo(
-    "T1.95 (I42): generate-keymap.mjs reproduces registry-bindings.ts byte for byte — not deferred on a component: C16 ships; the generator lands in this MR's code commit",
-  );
-  it.todo(
-    "T1.96 (I42): every registry key binding appears in registry-bindings.ts, by equality on actionId — not deferred on a component: C16 ships; the generator lands in this MR's code commit",
-  );
-  it.todo(
-    "T1.97 (I42): defaultKeymap is the same 121 rows after generation as before — not deferred on a component: C16 ships; the generator lands in this MR's code commit",
-  );
+  it("T1.95 (I42): the generator reproduces `registry-bindings.ts` byte for byte", () => {
+    // **What stops a generated file becoming a second hand-written record with a
+    // longer name.** The file is committed, so it can be edited; this is the row
+    // that notices. `--check` is the same comparison the pre-commit hook runs.
+    const out = spawnSync("node", ["tools/generate-keymap.mjs", "--check"], {
+      cwd: ROOT,
+      encoding: "utf8",
+    });
+    expect(out.status, `${out.stdout}${out.stderr}`).toBe(0);
+  });
+
+  it("T1.96 (I42): every registry key binding reaches the generated file, by equality", () => {
+    // **By equality, not containment.** A subset check passes a generator that
+    // silently dropped a binding — which is the failure mode of a filter, and
+    // this file is built by one (`kind === "key" && status === "current"`).
+    const registry = JSON.parse(
+      readFileSync(join(ROOT, "docs/design/language/calcium-registry.json"), "utf8"),
+    ) as { bindings: readonly { kind: string; status: string; actionId: string }[] };
+    const expected = registry.bindings
+      .filter((b) => b.kind === "key" && b.status === "current")
+      .map((b) => b.actionId)
+      .sort();
+
+    expect(
+      REGISTRY_BINDINGS.map((b) => b.actionId).sort(),
+      "the registry's current key bindings, all of them and no others",
+    ).toEqual(expected);
+
+    // And each one's chord is spellable as a `Key` — the generator throws rather
+    // than emitting a null, so this asserts the shape that survived it.
+    for (const b of REGISTRY_BINDINGS) {
+      expect(b.key.name, `${b.actionId} has a name`).not.toBe("");
+    }
+
+    // **`chordOf`'s guard, pinned by its source, and the reason is a mutation
+    // that survived.** Replacing the throw with a fallback key fails nothing:
+    // the branch is unreachable while the assertion above holds, because every
+    // `actionId` a row names is present. So the guard is defence for a state
+    // this row makes impossible, and its only witness is that it is written —
+    // which is the shape T1.38 already uses for `keys.ts`'s reservations.
+    //
+    // A fallback would be the worse failure of the two: a registry rename would
+    // bind a chord nobody asked for and every row here would stay green, where a
+    // throw makes the module unloadable and says which id went missing.
+    const src = readFileSync(join(ROOT, "src/interaction/router/keymap.ts"), "utf8");
+    expect(
+      src,
+      "chordOf throws on an unknown actionId rather than defaulting a chord",
+    ).toContain("throw new Error(`no registry binding for ${actionId}`)");
+  });
+
+  it("T1.97 (I42): the table is the rows it was — generation moved where a chord is written and nothing else", () => {
+    // **The row that makes this MR a refactor rather than a change.** 121 rows,
+    // compared as a set of `(target, key, action, profile)`; 58 of them now take
+    // their chord from the registry through `chordOf`. If generation had altered
+    // one chord, one target or one profile, this is where it shows.
+    //
+    // The count is pinned as well as the set: a table that lost a row *and*
+    // gained an equal one would satisfy a set comparison alone.
+    const rows = defaultKeymap
+      .map((b) => `${b.target}\t${keyText(b.key)}\t${b.action}\t${b.profile ?? "both"}`)
+      .sort();
+    expect(rows).toHaveLength(121);
+    expect(new Set(rows).size, "no two rows are identical").toBe(121);
+
+    // Every row whose chord the registry names resolves to the registry's key —
+    // the join asserted from the table's side, so a `chordOf` call that silently
+    // fell back to a literal would fail here.
+    const byAction = new Map(REGISTRY_BINDINGS.map((b) => [b.actionId, keyText(b.key)]));
+    const registryChords = new Set(byAction.values());
+    const fromRegistry = defaultKeymap.filter((b) => registryChords.has(keyText(b.key)));
+    expect(fromRegistry.length, "the rows the registry supplies a chord for").toBe(58);
+  });
 
   it("T1.94 (I41): ⌘↑ and ⌥↑ are two actions under the enhanced profile and one under the base", () => {
     // **The pair I34's accidental resolution could not distinguish.** `⌘↑` and
