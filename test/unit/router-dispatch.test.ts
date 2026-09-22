@@ -1054,3 +1054,24 @@ describe("C16 §3a — the global-intercept table and the child rung (M5)", () =
     expect(detach.router.lastStages, "⌥esc is the host's").not.toContain("child:esc-to-child");
   });
 });
+
+describe("C16 §7 and §4a — arming, epochs and pointer commit, owed at the spec commit (M7)", () => {
+  it.todo(
+    "T1.98 (C16 I43, I44, §7): a dispatch that raises a rung leaves the router armed and the epoch one higher, read from the router and not from a handler; T1.98b, with nothing armed, an activation is handled and the epoch does not move — not deferred on a component: the ladder, the epoch counter and the arm all land in router.ts in this MR",
+  );
+  it.todo(
+    "T1.99 (C16 I44, §7): armed, the next activation answers reject and the arm clears, so the one after it is handled; T1.99b, a non-activation key is handled and clears the arm; T1.99c, a dispatch that lowers the rung moves the epoch and does not arm — not deferred on a component: §4a W8's row, which one field cannot pass",
+  );
+  it.todo(
+    "T1.100 (C16 I45, §4a): a press on the focused element commits nothing and arms (entry, blockId, elementId, epoch), and the release over that identity commits once; the control is the same release with no press before it — not deferred on a component: pointerEffect and the router's arm land together",
+  );
+  it.todo(
+    "T1.101 (C16 I45, I46, §4a): a release with nothing armed is unconsumed; a release over a different identity cancels and does nothing; T1.101b, press, drag off, drag back, release on the armed identity commits nothing, because only a press arms — not deferred on a component",
+  );
+  it.todo(
+    "T1.102 (C16 I45, §4a): the armed identity is compared by ids and not by cell — the same cell with a changed elementId does not commit, and a changed cell with the same ids does not either — not deferred on a component",
+  );
+  it.todo(
+    "T3.20 (C16 I44, §7): armed, OWNER_ARM_MS elapses on the injected clock and the next activation is handled; the control is the same activation one millisecond early, refused — not deferred on a component",
+  );
+});
