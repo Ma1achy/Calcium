@@ -124,6 +124,13 @@ describe("C11 I14 — the selection is painted, read from a session's screen", (
     // `accent` over *nothing* and is `accent` over `focusGround`, so the two
     // facts are two grounds rather than one ground told apart by ink.
     const focusBg = params(focusStyle(theme, caps));
+    // **And each ink on the ground it lands on** (C10 I48). At 8-bit the ground
+    // binds through the cube, because the composed set quantises as a set on
+    // that ground — so these are three different indices, not one read three
+    // times.
+    const plainOnFocus = params(tone("default", theme, caps, "focusGround"));
+    const plainOnWash = params(tone("default", theme, caps, "selection"));
+    const okOnWash = params(tone("ok", theme, caps, "selection"));
     expect(wash, "the wash is a background at 8-bit").toMatch(/^48;/u);
     expect(focusBg, "and so is the focus ground").toMatch(/^48;/u);
     expect(focusBg, "and they are different grounds").not.toBe(wash);
@@ -135,33 +142,40 @@ describe("C11 I14 — the selection is painted, read from a session's screen", (
 
     await s.type(DOWN); // the card's head is the first element (C09 I47)
     await s.type(DOWN);
-    expect(s.toneOf("alpha"), "↓ ↓ focuses alpha").toEqual({ fg: accent, bg: focusBg, attrs: [] });
+    // The head's cells keep their own tones (C11 I14 as amended) — `alpha` has
+    // none, so it is `default` resolved on the focus ground, and `▸` in the
+    // reserved column is what says the head is here.
+    expect(s.toneOf("alpha"), "↓ ↓ focuses alpha").toEqual({ fg: plainOnFocus, bg: focusBg, attrs: [] });
 
     await s.type(SHIFT_DOWN);
     await s.type(SHIFT_DOWN);
     // **Which rows, not how many.** A wash on the wrong three rows satisfies
     // every count; the assertion names each row and its tone.
-    expect(s.toneOf("alpha"), "alpha is selected: default ink over the wash").toEqual({ fg: plain, bg: wash, attrs: [] });
-    expect(s.toneOf("bravo"), "bravo is selected").toEqual({ fg: plain, bg: wash, attrs: [] });
-    // **The head inside the extent takes the selection ground and keeps `accent`**
-    // (R-SEL-006). It was `accent` over nothing, which is the old mechanism: one
-    // ground, two facts, told apart by ink. Selection owns the ground where both
-    // hold, and the mark in the reserved column is what says *here*.
-    expect(s.toneOf("charlie"), "charlie is the head: accent over the wash").toEqual({ fg: accent, bg: wash, attrs: [] });
+    expect(s.toneOf("alpha"), "alpha is selected: its own tone over the wash").toEqual({ fg: plainOnWash, bg: wash, attrs: [] });
+    expect(s.toneOf("bravo"), "bravo is selected").toEqual({ fg: plainOnWash, bg: wash, attrs: [] });
+    // **The head inside the extent takes the selection ground** (R-SEL-006). It
+    // was `accent` over nothing, which is the old mechanism: one ground, two
+    // facts, told apart by ink. Selection owns the ground where both hold, and
+    // the mark in the reserved column is what says *here* — so the head's cells
+    // are inked like every other row's, on the ground the row took.
+    expect(s.toneOf("charlie"), "charlie is the head, and its cells keep their tones").toEqual({ fg: plainOnWash, bg: wash, attrs: [] });
+    expect(accent, "accent is no longer what a head's cells are painted in").not.toBe(plainOnWash);
     expect(s.toneOf("delta"), "delta is outside the extent").toEqual({ fg: plain, bg: "", attrs: [] });
     // And the wash runs across the row, gap included — *selected*, not
-    // *highlighted* (C22 §6e's distinction): the state column of a selected row
-    // is washed and its own `ok` tone is dropped to `default`.
+    // *highlighted* (C22 §6e's distinction). **The state column keeps its `ok`
+    // tone**, resolved on the wash: it was dropped to `default`, which is the
+    // rule F1240 retired.
     const alphaRow = rowContaining(s.screen(), "alpha");
-    expect(styleAt(alphaRow!, "running"), "alpha's state cell: default over the wash").toEqual({ fg: plain, bg: wash, attrs: [] });
+    expect(styleAt(alphaRow!, "running"), "alpha's state cell keeps `ok` on the wash").toEqual({ fg: okOnWash, bg: wash, attrs: [] });
     const charlieRow = rowContaining(s.screen(), "charlie");
-    expect(styleAt(charlieRow!, "running"), "charlie's state cell takes the head's accent over the wash").toEqual({ fg: accent, bg: wash, attrs: [] });
+    expect(styleAt(charlieRow!, "running"), "and so does the head's").toEqual({ fg: okOnWash, bg: wash, attrs: [] });
+    expect(okOnWash, "which is not the one ink the old rule forced").not.toBe(plainOnWash);
 
     // **An unshifted motion collapses** (C26 I16): `↓` to delta, nothing washed.
     await s.type(DOWN);
     // The extent collapses to the head alone, which is `selected` **absent**
     // (C26 I16's sentinel) — so the ground is focus's, not selection's.
-    expect(s.toneOf("delta")).toEqual({ fg: accent, bg: focusBg, attrs: [] });
+    expect(s.toneOf("delta")).toEqual({ fg: plainOnFocus, bg: focusBg, attrs: [] });
     for (const name of ["alpha", "bravo", "charlie"]) {
       expect(s.toneOf(name), `${name} after the collapse`).toEqual({ fg: plain, bg: "", attrs: [] });
     }
@@ -171,6 +185,7 @@ describe("C11 I14 — the selection is painted, read from a session's screen", (
     const s = await painting();
     const caps = capabilities({ colourDepth: 8 });
     const plain = params(tone("default", theme, caps));
+    const plainOnWash = params(tone("default", theme, caps, "selection"));
     const wash = params(selectionStyle(theme, caps));
 
     for (const _ of ["a", "b", "c", "d"]) await s.type(DOWN);
@@ -185,9 +200,9 @@ describe("C11 I14 — the selection is painted, read from a session's screen", (
     // cache — which is why the assertion is on the screen.
     await s.type(CTRL_A);
     expect(s.stdout.chunks.length, "⌃a wrote a frame").toBeGreaterThan(before);
-    expect(s.toneOf("alpha"), "alpha washed by ⌃a").toEqual({ fg: plain, bg: wash, attrs: [] });
-    expect(s.toneOf("bravo"), "bravo washed by ⌃a").toEqual({ fg: plain, bg: wash, attrs: [] });
-    expect(s.toneOf("charlie"), "charlie washed by ⌃a").toEqual({ fg: plain, bg: wash, attrs: [] });
+    expect(s.toneOf("alpha"), "alpha washed by ⌃a").toEqual({ fg: plainOnWash, bg: wash, attrs: [] });
+    expect(s.toneOf("bravo"), "bravo washed by ⌃a").toEqual({ fg: plainOnWash, bg: wash, attrs: [] });
+    expect(s.toneOf("charlie"), "charlie washed by ⌃a").toEqual({ fg: plainOnWash, bg: wash, attrs: [] });
     // **The head inside the extent takes the selection ground** (R-SEL-006:
     // *focused and selected takes selectionGround and keeps the focus mark*).
     // It was unwashed, which was the old mechanism telling the two apart by ink
@@ -213,11 +228,16 @@ describe("C11 I14 — the renderer, handed the extent directly", () => {
 
   it("T1.23 (C11 I14): a, b, c selected with the head on c — a and b washed, c accent, the row above unwashed", () => {
     const caps = capabilities({ colourDepth: 24 });
-    const accent = params(tone("accent", theme, caps));
     const plain = params(tone("default", theme, caps));
     const wash = params(selectionStyle(theme, caps));
     const focusBg = params(focusStyle(theme, caps));
     const ok = params(tone("ok", theme, caps));
+    // **The inks on the grounds they land on** (C10 I48). The row's cells keep
+    // their own slots; which hex each slot takes is the ground's answer.
+    const plainOnWash = params(tone("default", theme, caps, "selection"));
+    const identifierOnWash = params(tone("identifier", theme, caps, "selection"));
+    const accentOnWash = params(tone("accent", theme, caps, "selection"));
+    const accentOnFocus = params(tone("accent", theme, caps, "focusGround"));
 
     const none = render(null);
     expect(cellOf(none, "running"), "the control: `ok` tone with no focus").toEqual({ fg: ok, bg: "", attrs: [] });
@@ -225,17 +245,31 @@ describe("C11 I14 — the renderer, handed the extent directly", () => {
     expect(cellOf(none, "exited"), "the control: the span's own tone with no focus").toEqual({ fg: identifier, bg: "", attrs: [] });
 
     const three = render({ blockId: "t", rowId: "c", selected: [pair("t", "a"), pair("t", "b"), pair("t", "c")] });
-    expect(cellOf(three, "alpha")).toEqual({ fg: plain, bg: wash, attrs: [] });
-    expect(cellOf(three, "bravo")).toEqual({ fg: plain, bg: wash, attrs: [] });
-    // **A span's tone drops with the cell's** (C11 I14): `exi` is `identifier` at
-    // rest and `default` over the wash. M7 — keeping span tones on a selected
-    // row — survived until this line existed.
-    expect(cellOf(three, "exited"), "the span inside a selected row").toEqual({ fg: plain, bg: wash, attrs: [] });
+    expect(cellOf(three, "alpha")).toEqual({ fg: plainOnWash, bg: wash, attrs: [] });
+    expect(cellOf(three, "bravo")).toEqual({ fg: plainOnWash, bg: wash, attrs: [] });
+    // **A span keeps its tone, and the wash decides what that tone inks as**
+    // (C11 I14 as amended, C10 I48). This row read *a span's tone drops with the
+    // cell's* — true of a resolver with one ink per slot, where a span on a wash
+    // could keep its meaning or stay legible and not both. `exi` is `identifier`
+    // at rest and `identifier` composed for the selection ground here (F1240).
+    expect(cellOf(three, "exited"), "the span inside a selected row keeps its own tone").toEqual({
+      fg: identifierOnWash,
+      bg: wash,
+      attrs: [],
+    });
+    // **`dark` composes nothing for `identifier` on this ground**, so the value
+    // equals the page's — and asserting that it moved would pin a theme's
+    // current numbers rather than the rule. What the row is about is that it is
+    // not `default`, which is the ink the retired rule painted here.
+    expect(identifierOnWash, "the same slot, whatever the ground answers").toBe(identifier);
+    expect(identifierOnWash, "and not the one ink the old rule forced").not.toBe(plainOnWash);
     // **The head is inside the extent, so selection owns its ground too**
-    // (R-SEL-006). `accent` is what is left of focus in the ink, and `▸` in the
-    // reserved column is what is left of it in the gutter.
-    expect(cellOf(three, "charlie")).toEqual({ fg: accent, bg: wash, attrs: [] });
+    // (R-SEL-006). `▸` in the reserved column is what is left of focus, and the
+    // head's cells keep their own tones like every other row's — `charlie` has
+    // none, so it is `default` on the wash.
+    expect(cellOf(three, "charlie")).toEqual({ fg: plainOnWash, bg: wash, attrs: [] });
     expect(cellOf(three, "delta")).toEqual({ fg: plain, bg: "", attrs: [] });
+    expect(accentOnWash, "kept resolved so the row does not depend on a value it never reads").not.toBe("");
     // The header row above `alpha` is not washed either.
     expect(cellOf(three, "Name").bg).toBe("");
 
@@ -246,7 +280,7 @@ describe("C11 I14 — the renderer, handed the extent directly", () => {
 
     // **And a selection whose head is in a sibling still names rows here.**
     const straddling = render({ blockId: "x", rowId: "chip-0", selected: [pair("t", "d"), pair("x", "chip-0")] });
-    expect(cellOf(straddling, "delta"), "delta washed although the head is elsewhere").toEqual({ fg: plain, bg: wash, attrs: [] });
+    expect(cellOf(straddling, "delta"), "delta washed although the head is elsewhere").toEqual({ fg: plainOnWash, bg: wash, attrs: [] });
     expect(cellOf(straddling, "charlie").bg, "and charlie holds no focus here").toBe("");
 
     // **The sentinel is a kind, not a size** (C26 I16, C11 I14, T2.12). `selected`
@@ -256,9 +290,14 @@ describe("C11 I14 — the renderer, handed the extent directly", () => {
     // byte-identical, which pinned the sentinel in the test by its **size** —
     // and a size test paints a real single-row selection as focus.
     const sentinel = render({ blockId: "t", rowId: "c" });
-    expect(cellOf(sentinel, "charlie"), "absent: the head takes the focus ground").toEqual({ fg: accent, bg: focusBg, attrs: [] });
+    expect(cellOf(sentinel, "charlie"), "absent: the head takes the focus ground").toEqual({
+      fg: params(tone("default", theme, caps, "focusGround")),
+      bg: focusBg,
+      attrs: [],
+    });
     const headAlone = render({ blockId: "t", rowId: "c", selected: [pair("t", "c")] });
-    expect(cellOf(headAlone, "charlie"), "present, one element: a real selection").toEqual({ fg: accent, bg: wash, attrs: [] });
+    expect(cellOf(headAlone, "charlie"), "present, one element: a real selection").toEqual({ fg: plainOnWash, bg: wash, attrs: [] });
+    expect(accentOnFocus, "and accent is no longer what a head's cells are painted in").not.toBe("");
     expect(headAlone, "so the two are not the same frame").not.toEqual(sentinel);
     // **And the producer never emits the second form**, which is what keeps the
     // sentinel free at the seam rather than in this renderer: `focusFor` returns
@@ -298,9 +337,14 @@ describe("C11 I14 — the renderer, handed the extent directly", () => {
     const caps = capabilities({ colourDepth: 24 });
     const accent = params(tone("accent", theme, caps));
     const muted = params(tone("muted", theme, caps));
-    const plain = params(tone("default", theme, caps));
     const wash = params(selectionStyle(theme, caps));
     const focusBg = params(focusStyle(theme, caps));
+    // **Each ink on the ground it lands on** (C10 I48). A chip's tone is the
+    // slot; which hex that slot takes is the ground's answer, and on `dark`'s
+    // selection `muted` and `accent` are both values the page does not hold.
+    const accentOnFocus = params(tone("accent", theme, caps, "focusGround"));
+    const accentOnWash = params(tone("accent", theme, caps, "selection"));
+    const mutedOnWash = params(tone("muted", theme, caps, "selection"));
     const pills = block({
       kind: "pills",
       id: "p",
@@ -319,18 +363,25 @@ describe("C11 I14 — the renderer, handed the extent directly", () => {
     // down — so a head in `accent` alone was the F769 frame: `running` and
     // `exited` in one colour. The ground is a channel no chip datum uses.
     const focused = paint({ blockId: "p", rowId: "chip-1" });
-    expect(cellOf(focused, "exited"), "the head chip is accent over the FOCUS ground").toEqual({ fg: accent, bg: focusBg, attrs: [] });
+    expect(cellOf(focused, "exited"), "the head chip is accent over the FOCUS ground").toEqual({ fg: accentOnFocus, bg: focusBg, attrs: [] });
     expect(cellOf(focused, "all"), "its neighbour is not").toEqual({ fg: muted, bg: "", attrs: [] });
     const withActive = block({ kind: "pills", id: "p", chips: [{ label: "all" }, { label: "exited" }, { label: "dead", active: true }] } as never);
     const activeFrame = renderToLines(registry, withActive, 60, { theme, capabilities: caps, focus: { blockId: "p", rowId: "chip-1" } });
     expect(cellOf(activeFrame, "dead"), "an active chip is accent with no ground — the datum").toEqual({ fg: accent, bg: "", attrs: [] });
-    expect(cellOf(activeFrame, "exited"), "and the head beside it differs by the ground alone").toEqual({ fg: accent, bg: focusBg, attrs: [] });
+    expect(cellOf(activeFrame, "exited"), "and the head beside it differs by the ground, and by the ink the ground composes").toEqual({ fg: accentOnFocus, bg: focusBg, attrs: [] });
     expect(cellOf(activeFrame, "dead")).not.toEqual(cellOf(activeFrame, "exited"));
 
     const selected = paint({ blockId: "p", rowId: "chip-2", selected: [pair("p", "chip-0"), pair("p", "chip-1"), pair("p", "chip-2")] });
-    expect(cellOf(selected, "all"), "chip-0 washed").toEqual({ fg: plain, bg: wash, attrs: [] });
-    expect(cellOf(selected, "exited"), "chip-1 washed").toEqual({ fg: plain, bg: wash, attrs: [] });
-    expect(cellOf(selected, "dead"), "chip-2 is the head: accent ink over the same ground").toEqual({ fg: accent, bg: wash, attrs: [] });
+    // **A selected chip keeps its own tone** (C11 I14 as amended, C10 I48). It
+    // was forced to `default`, which was the drop-to-one-ink rule in a second
+    // painter: there was one ink per slot and it was the page's, so a chip on a
+    // wash could take its own tone or take a legible one and not both (F1240).
+    expect(cellOf(selected, "all"), "chip-0 washed, its own tone on the wash").toEqual({ fg: mutedOnWash, bg: wash, attrs: [] });
+    expect(cellOf(selected, "exited"), "chip-1 the same").toEqual({ fg: mutedOnWash, bg: wash, attrs: [] });
+    expect(cellOf(selected, "dead"), "chip-2 is the head: accent, because a pill row has no gutter to put a mark in").toEqual({ fg: accentOnWash, bg: wash, attrs: [] });
+    // And the head is still told from its neighbours by ink, which is what
+    // `accent` buys here and does not buy in a table (C11 §5b).
+    expect(mutedOnWash, "two inks, not one").not.toBe(accentOnWash);
     // **At 1-bit a focused chip is bold and NOT inverse** (C10 I47, R-SEL-006).
     // `focusStyle` answers `NO_STYLE` without colour and has no inverse rung on
     // purpose: inverse is selection's, and a second one would draw a focused chip
@@ -606,6 +657,11 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
   it("T1.29 (C26 §7, C04 §3, C09 I83): a focused notice keeps its own tone over the focus ground — glyph and text; one without an action declares nothing and cannot move", () => {
     const caps = capabilities({ colourDepth: 24 });
     const error = params(tone("error", theme, caps));
+    // **The tone on the ground is a different value from the tone on the page**
+    // (C10 I48): `dark` composes `#fa6464` for `tone.error` on `focusGround`,
+    // where the page's is `#f05a5a`. Resolved rather than written out, so the
+    // row is the rule and not this theme's numbers.
+    const errorOnFocus = params(tone("error", theme, caps, "focusGround"));
     const focusBg = params(focusStyle(theme, caps));
     const none = noticeAt(NOTICE, null);
     const focused = noticeAt(NOTICE, { blockId: "n", rowId: "n" });
@@ -623,8 +679,13 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
     // focused `info` notice would not read as an unfocused `accent` one — a
     // workaround for focus and selection sharing a ground. They no longer do, so
     // the tone stays the notice's: *colour is declared, not inherited* (§017).
-    expect(at(focused, "pull failed"), "focused: its own tone over the focus ground").toEqual({ fg: error, bg: focusBg, attrs: [] });
-    expect(at(focused, "✗"), "the glyph keeps its character and takes the same paint").toEqual({ fg: error, bg: focusBg, attrs: [] });
+    // **And it is resolved against the ground** (C10 I48): the notice's own
+    // tone is the slot, and which hex that slot takes is the ground's answer.
+    expect(at(focused, "pull failed"), "focused: its own tone over the focus ground").toEqual({ fg: errorOnFocus, bg: focusBg, attrs: [] });
+    expect(at(focused, "✗"), "the glyph keeps its character and takes the same paint").toEqual({ fg: errorOnFocus, bg: focusBg, attrs: [] });
+    // And the two are not one value, so the row is not satisfied by a painter
+    // that never asks which ground it is on (F1240).
+    expect(errorOnFocus, "the ground moves the ink").not.toBe(error);
     expect(at(none, "✗").fg).toBe(error);
 
     // **The element, as a count** (C09): one with an action, none without.
@@ -768,16 +829,115 @@ describe("C11 §5b — the reserved gutter", () => {
 });
 
 /**
- * C11 I14 — a row on a ground keeps its cells' tones, owed at the spec commit.
+ * C11 I14 as amended — a row on a ground keeps its cells' tones.
  *
- * Asserted through `inkOn` rather than against a hex, so the row is the rule and
- * not the theme's current values (C10 I48).
+ * **The rule this replaces was true of a resolver that could not answer.** A
+ * focused or selected row was repainted in one ink — `accent`, or `default`
+ * under selection — and a span's tone was dropped with it, because there was one
+ * ink per slot and it was the page's: a `failed` cell on a wash could take its
+ * own tone or take a legible one and not both. C10 I48's resolver takes the
+ * ground, so the two stopped being alternatives (F1240).
+ *
+ * Asserted through the resolver on the ground rather than against a hex, so the
+ * rows are the rule and not this theme's current values.
  */
 describe("C11 I14 — the ink a focused or selected row takes", () => {
-  it.todo(
-    "T2.13 (I14, C10 I48, \u00a74k.2 row 1, F1240): a focused row and a selected row keep every cell's own tone \u2014 a `tone: \"error\"` cell inks as the theme's composed `tone.error` for the ground the row took, and not as `accent` or `default`; a span's own tone survives the same way; on a banded theme it is the band's single ink, which is the same rule and not an exception \u2014 not deferred on a component: it lands with C10 I48's resolver change in this same MR",
-  );
-  it.todo(
-    "T6.25 (I14, F1240): restoring the drop-to-one-ink map in `rowSpans` \u2192 T2.13 fails and the case 1 composition frame moves at all three rungs \u2014 not deferred on a component: it lands with C10 I48's resolver change in this same MR",
-  );
+  const registry = measurable({ definitions: [tableDefinition] }).registry;
+  const caps24 = capabilities({ colourDepth: 24 });
+  const TONED = {
+    kind: "table",
+    id: "t",
+    columns: COLUMNS,
+    rows: [
+      { id: "a", cells: { name: { text: "alpha" }, state: { text: "running", tone: "ok", glyph: "ok" } } },
+      {
+        id: "b",
+        cells: {
+          // **A span tone the theme composes on both grounds**, which the
+          // mutation pass asked for (F1242): the first form used `identifier`,
+          // and `dark` composes nothing for it on either ground — so the span
+          // half of this row held whether or not `paintRuns` was told which
+          // ground it was painting on. A fixture has to be shown to respond to
+          // the thing under test (`test/support/README.md`). `error` moves on
+          // both, which the guard below asserts rather than assumes.
+          name: { text: "bravo", spans: [{ from: 0, to: 5, tone: "error" }] },
+          state: { text: "failed", tone: "error", glyph: "error" },
+        },
+      },
+    ],
+  };
+  const scene = (focus: FocusState | null, t = theme): readonly string[] =>
+    renderToLines(registry, TONED as never, 60, { theme: t, capabilities: caps24, focus });
+  const inkOfCell = (lines: readonly string[], needle: string): string => {
+    const grid = styledScreenFrom([lines.join("\r\n")], { columns: 60, rows: lines.length });
+    const row = rowContaining(grid, needle);
+    const cell = row === null ? null : styleAt(row, needle);
+    if (cell === null) throw new Error(`no cell holds ${needle}`);
+    return cell.fg;
+  };
+
+  it("T2.13 (C11 I14, C10 I48, C10 §4k.2 row 1, F1240): a focused or selected row keeps every cell's own tone", () => {
+    // Focus alone: the row takes `focusGround`, so every ink is the value the
+    // theme composed for that ground.
+    const focused = scene({ blockId: "t", rowId: "b" });
+    expect(inkOfCell(focused, "failed"), "failure keeps its tone, on the focus ground").toBe(
+      params(tone("error", theme, caps24, "focusGround")),
+    );
+    expect(inkOfCell(focused, "bravo"), "and a span keeps its own").toBe(
+      params(tone("error", theme, caps24, "focusGround")),
+    );
+    // **The fixture responds to the thing under test.** Both grounds move this
+    // tone, so a painter that resolved the span on the page would fail here.
+    for (const ground of ["focusGround", "selection"] as const) {
+      expect(
+        params(tone("error", theme, caps24, ground)),
+        `${ground} composes a different ink for the span's tone`,
+      ).not.toBe(params(tone("error", theme, caps24)));
+    }
+
+    // Selection takes the ground where both hold, so the inks move with it —
+    // one expression in `definition.ts` answers both halves, which is what stops
+    // a row washed with one surface being inked for another.
+    const selected = scene({ blockId: "t", rowId: "b", selected: [{ blockId: "t", rowId: "b" }] });
+    expect(inkOfCell(selected, "failed"), "and on the selection ground").toBe(
+      params(tone("error", theme, caps24, "selection")),
+    );
+
+    // **The old rule's two values are what the frame must not hold.** Named
+    // rather than merely absent: an assertion that the ink equals the composed
+    // value passes on a theme where the composition happens to equal `accent`,
+    // and `dark` is not that theme.
+    for (const wrong of ["accent", "default"] as const) {
+      expect(inkOfCell(selected, "failed"), `not the ${wrong} the drop-to-one-ink rule painted`).not.toBe(
+        params(tone(wrong, theme, caps24)),
+      );
+    }
+
+    // **A banded theme is the same rule and not an exception** (R-THM-003): the
+    // band answers for every slot, so the row does read as one ink — the
+    // one-ink reading kept exactly where it was ever true.
+    const hc = loadTheme(defaultTheme, "hcDark");
+    if (!hc.ok) throw new Error("hcDark must load");
+    const banded = scene({ blockId: "t", rowId: "b", selected: [{ blockId: "t", rowId: "b" }] }, hc.value.current);
+    expect(inkOfCell(banded, "failed"), "the band's single ink").toBe(
+      params(tone("error", hc.value.current, caps24, "selection")),
+    );
+    expect(inkOfCell(banded, "failed"), "and every other slot takes it too").toBe(
+      params(tone("ok", hc.value.current, caps24, "selection")),
+    );
+  });
+
+  it("T6.25 (C11 I14, C10 I48, F1240): restoring the drop-to-one-ink map → T2.13 fails", () => {
+    // **The revert simulated at its own seam**, since the map it restores was
+    // five lines in `rowSpans`: force the row's ink to `default` and the frame
+    // holds a value the ground never composed. The row is the *difference* — a
+    // revert that produced the same bytes would be a rule with nothing to be
+    // wrong about (A03 §2).
+    const reverted = params(tone("default", theme, caps24));
+    const selected = scene({ blockId: "t", rowId: "b", selected: [{ blockId: "t", rowId: "b" }] });
+    expect(inkOfCell(selected, "failed"), "the frame does not hold the reverted ink").not.toBe(reverted);
+    expect(reverted, "and the reverted ink is not what the ground composes").not.toBe(
+      params(tone("error", theme, caps24, "selection")),
+    );
+  });
 });

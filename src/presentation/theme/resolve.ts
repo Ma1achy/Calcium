@@ -17,7 +17,7 @@
 
 import type { Tone } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
-import { floorFor, isHex, ratio } from "./contrast.js";
+import { floorFor, inkOn, isHex, ratio } from "./contrast.js";
 import { cubeHexOf, quantiseSet } from "./quantise.js";
 import {
   NO_STYLE,
@@ -98,24 +98,61 @@ function styleOf(colour: ColourValue | undefined): Style {
  * `Style`, and an unknown ref yields the empty one rather than a throw — a
  * missing slot must not be the thing that takes a session down mid-render.
  */
-export function resolve(ref: ColourRef, theme: ResolvedTheme, caps: Caps): Style {
-  const key = `${ref}|${theme.name}|${caps.colourDepth}`;
+export function resolve(ref: ColourRef, theme: ResolvedTheme, caps: Caps, on?: string): Style {
+  const key = `${ref}|${theme.name}|${caps.colourDepth}|${on ?? ""}`;
   const held = styles.get(key);
   if (held !== undefined) return held;
 
-  const computed = compute(ref, theme, caps.colourDepth);
+  const computed = compute(ref, theme, caps.colourDepth, on);
   styles.set(key, computed);
   return computed;
 }
 
-function compute(ref: ColourRef, theme: ResolvedTheme, depth: Depth): Style {
+/**
+ * The composed slot set for one palette on one ground (I48).
+ *
+ * **A set, because quantisation is a property of a set** (§3). Composing slot by
+ * slot and quantising each on its own would let two inks the theme separated on
+ * a band land on one cube entry, which is the failure §3 is written about
+ * arriving on a surface instead of on the page.
+ *
+ * A band answers for every slot, so on a banded ground every entry is the band's
+ * one ink — and the set collapses to one value on purpose. That is R-THM-003
+ * and not a degenerate case.
+ */
+function composedSlots(
+  theme: ResolvedTheme,
+  paletteName: string,
+  slots: Readonly<Record<string, string>>,
+  on: string,
+): Readonly<Record<string, string>> {
+  const out: Record<string, string> = {};
+  for (const name of Object.keys(slots)) {
+    const composed = inkOn(theme.tokens, `${paletteName}.${name}`, on);
+    out[name] = composed === "" ? (slots[name] as string) : composed;
+  }
+  return out;
+}
+
+function compute(ref: ColourRef, theme: ResolvedTheme, depth: Depth, on?: string): Style {
   const [paletteName, slot] = split(ref);
 
+  // **A surface is not composed on another surface.** A ground is the thing a
+  // composition is *against*; asking which ink `surface.selection` takes on the
+  // focus band is a question no theme answers and none should be asked to.
   if (paletteName === "surface") return surface(ref, slot, theme, depth);
 
   const palette: PaletteSpec | undefined = theme.tokens.palettes[paletteName];
-  const hex = palette?.slots[slot];
-  if (palette === undefined || hex === undefined) return NO_STYLE;
+  const flat = palette?.slots[slot];
+  if (palette === undefined || flat === undefined) return NO_STYLE;
+
+  // **The composition step is `inkOn` and not a second copy of the rule** (I48):
+  // the band first (R-THM-003), then the theme's `(ground, ref)` value
+  // (R-THM-001), then the flat slot. `inkOn` answers `""` for a ref it cannot
+  // place, which is the flat slot's cue rather than an error — `resolve` is
+  // total (I1) and a missing composition is not a missing slot.
+  const composed = on === undefined ? flat : inkOn(theme.tokens, ref, on);
+  const hex = composed === "" ? flat : composed;
 
   if (depth === 1) {
     // A decoration palette has no meaning to preserve, so it collapses to the
@@ -127,12 +164,21 @@ function compute(ref: ColourRef, theme: ResolvedTheme, depth: Depth): Style {
 
   if (depth === 24) return styleOf({ kind: "rgb", hex });
 
+  // **Below 24-bit the ground is inert, and it is a limit rather than an
+  // omission** (I48). The curated 4-bit map is sixteen entries the theme
+  // authored per ref and composed no second time, so there is no composed index
+  // to serve; at 1-bit no colour is emitted at all (I2), so there is no ink for
+  // a ground to change. A floor is a 24-bit claim and both rungs already depart
+  // from the hexes wholesale.
   if (depth === 4) {
     const index = theme.tokens.fourBit[ref];
     return index === undefined ? NO_STYLE : styleOf({ kind: "ansi16", index });
   }
 
-  const index = quantisedFor(theme, paletteName, palette.slots)[slot];
+  // 8-bit carries the theme's own values, so the ground binds — over the
+  // composed **set**, keyed by the ground so the page's picks stay the page's.
+  const set = on === undefined ? palette.slots : composedSlots(theme, paletteName, palette.slots, on);
+  const index = quantisedFor(theme, on === undefined ? paletteName : `${paletteName}@${on}`, set)[slot];
   return index === undefined ? NO_STYLE : styleOf({ kind: "ansi256", index });
 }
 
@@ -241,8 +287,8 @@ export function validatePaintedFloors(tokens: ThemeTokens): readonly ThemeError[
 }
 
 /** The ergonomic form. `tone` is the overwhelmingly common case (§2). */
-export function resolveTone(tone: Tone, theme: ResolvedTheme, caps: Caps): Style {
-  return resolve(`tone.${tone}`, theme, caps);
+export function resolveTone(tone: Tone, theme: ResolvedTheme, caps: Caps, on?: string): Style {
+  return resolve(`tone.${tone}`, theme, caps, on);
 }
 
 /**

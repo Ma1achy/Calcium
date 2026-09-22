@@ -750,12 +750,22 @@ describe("C09 I83 — a notice takes the focus ground and no column", () => {
     for (const name of ["info", "error", "warn"] as const) {
       const notice = block({ kind: "notice", id: "h", tone: name, glyph: "step", text: `on ${name}` } as never);
       const lines = kitAt({ blockId: "h", rowId: "h" }).renderSequence([notice], WIDTH);
+      // **The slot is the notice's; the hex is the ground's answer** (C10 I48).
+      // `dark` composes a nearer `error` for `focusGround`, so a row asserting
+      // the flat slot here would be asserting a value the painter does not emit
+      // — which is F1240's own shape, in a test rather than in a gate.
       expect(cellFor(lines, `on ${name}`), `${name}: its own tone over the focus ground`).toEqual({
-        fg: params(tone(name, DARK_THEME, FULL_CAPS)),
+        fg: params(tone(name, DARK_THEME, FULL_CAPS, "focusGround")),
         bg: ground,
         attrs: [],
       });
     }
+    // And at least one of the three is a value the page does not hold, so the
+    // loop is not satisfied by a resolver that ignores its fourth argument.
+    expect(
+      params(tone("error", DARK_THEME, FULL_CAPS, "focusGround")),
+      "the ground moves at least one of them",
+    ).not.toBe(params(tone("error", DARK_THEME, FULL_CAPS)));
 
     // **At one bit the ground is gone and the tone's mono class is what is
     // left.** `focusStyle` has no inverse rung — inverse is selection's only

@@ -1274,7 +1274,48 @@ describe("C10 §4k — focus, selection and the facts that contest a ground", ()
  * a third record would be a third thing to drift.
  */
 describe("C10 I48 — the ink a slot takes on the ground it lands on", () => {
-  it.todo(
-    "T2.49 (I48, R-THM-001, R-THM-003, F1240): the painter's ink and the gate's ink are one value \u2014 `resolve(ref, theme, caps, ground).colour.hex` equals `inkOn(tokens, ref, ground)` over every meaning slot \u00d7 every ground the theme paints text on \u00d7 all ten themes at 24-bit, with the pair count asserted so a slot or a ground leaving the sweep is a red row rather than a smaller silent one \u2014 not deferred on a component: it lands with I48's resolver change in this same MR",
-  );
+  /**
+   * **An equality between two functions, and not a table of hexes.** The defect
+   * this closes was two records of one rule disagreeing (F1240), so a third
+   * record would be a third thing to drift. The pair count is asserted with it
+   * for the reason T2.14c's count is: a ground or a slot leaving the sweep is
+   * otherwise a smaller green run.
+   */
+  it("T2.49 (I48, R-THM-001, R-THM-003, F1240): the painter's ink and the gate's ink are one value", () => {
+    const grounds = ["selection", "focusGround"] as const;
+    const wrong: string[] = [];
+    let pairs = 0;
+    let composed = 0;
+    for (const name of Object.keys(defaultTheme)) {
+      const theme = store(name).current;
+      const tokens = theme.tokens;
+      for (const ground of grounds) {
+        for (const family of ["tone", "syntax"] as const) {
+          const palette = tokens.palettes[family];
+          if (palette === undefined) continue;
+          for (const slotName of Object.keys(palette.slots)) {
+            const ref = `${family}.${slotName}` as ColourRef;
+            const want = inkOn(tokens, ref, ground);
+            const got = resolve(ref, theme, caps(24), ground).colour;
+            pairs += 1;
+            if (want !== palette.slots[slotName]) composed += 1;
+            const hex = got !== undefined && got.kind === "rgb" ? got.hex : "(none)";
+            if (hex !== want) wrong.push(`${name} ${ground} ${ref}: painter ${hex}, gate ${want}`);
+          }
+        }
+      }
+    }
+    expect(wrong, "the painter emits the ink the gate measures").toEqual([]);
+    // Ten themes × two grounds × nineteen meaning slots.
+    expect(pairs, "the sweep's own size").toBe(380);
+    // **And the sweep is not vacuous**, which is the half a pass cannot report:
+    // an equality that held because nothing composes is A03 §2's vacuity class
+    // wearing this row's name. **166 of the 380 pairs move**, pinned rather than
+    // bounded — 72 of them are the two banded themes, where every slot takes the
+    // band's single ink, and the other 94 are per-slot compositions across
+    // `dark`, `light`, `ink`, `warm`, `nord`, `viol`, `mono` and `paper`. A
+    // theme that stops composing for a ground is what this catches, and a bound
+    // would let the last one go quietly.
+    expect(composed, "pairs where the ground moves the ink").toBe(166);
+  });
 });

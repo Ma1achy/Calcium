@@ -51,6 +51,20 @@ export type RunContext = Readonly<{
   colormap?: ColormapName;
   /** C03's spinner counter, for a ramp that moves (C09 I53); absent is the static frame. */
   tick?: number;
+  /**
+   * **The ground these runs are painted on** (C10 I48) — a surface name, absent
+   * being the page. A run's tone resolves *against* it, so a `tone.error` cell
+   * inside a selection takes the ink the theme composed for that ground and the
+   * high-contrast bands take their single ink.
+   *
+   * **Carried on the context rather than asked per call**, because it is a fact
+   * about the region and not about the run: a painter that washes an extent
+   * says so once, and every run inside it inherits the answer. The thing this
+   * cannot catch is a painter that washes and forgets to say — which is why the
+   * row that watches it is the composition frame, reporting each run's ink
+   * beside the ground it stands on (F1240).
+   */
+  on?: string | undefined;
 }>;
 
 /**
@@ -69,7 +83,7 @@ export type RunContext = Readonly<{
  * arm is a total function's and not a branch anything reaches.
  */
 export function runStyle(run: Run, style: Style, ctx: RunContext): Style {
-  const base = run.tone === undefined ? style : resolveTone(run.tone, ctx.theme, ctx.capabilities);
+  const base = run.tone === undefined ? style : resolveTone(run.tone, ctx.theme, ctx.capabilities, ctx.on);
   const merged = withSpan(base, run.attrs);
   if (run.value === undefined || ctx.colormap === undefined) return merged;
   const map = COLORMAPS[ctx.colormap];
@@ -146,13 +160,19 @@ function sameValue(a: ColourValue | undefined, b: ColourValue | undefined): bool
   return a.kind === "rgb" ? a.hex === (b as { hex: string }).hex : a.index === (b as { index: number }).index;
 }
 
-/** A tone, resolved. The only way a renderer obtains a style (I4). */
+/**
+ * A tone, resolved. The only way a renderer obtains a style (I4).
+ *
+ * `on` names the ground the run lands on (C10 I48); absent is the page, which
+ * is every call site that paints on nothing in particular.
+ */
 export function tone(
   name: Tone,
   theme: ResolvedTheme,
   caps: TerminalCapabilities,
+  on?: string,
 ): Style {
-  return resolveTone(name, theme, caps);
+  return resolveTone(name, theme, caps, on);
 }
 
 /**
@@ -163,8 +183,9 @@ export function slot(
   ref: ColourRef,
   theme: ResolvedTheme,
   caps: TerminalCapabilities,
+  on?: string,
 ): Style {
-  return resolve(ref, theme, caps);
+  return resolve(ref, theme, caps, on);
 }
 
 /**

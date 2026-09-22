@@ -53748,6 +53748,105 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1243 — a mutation reaches only as far as its run's command ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `tools/mutate/runs/spans.mjs`, and the anchor sweep that passed it. |
+| **Reached for** | A mutation in `src/presentation/table/cells.ts`, expecting C11 T2.13. |
+| **Verdict** | **Real, and the report said the wrong word.** |
+
+C11 I14's amendment retired the mutation *a focused table row keeps a span's tone* — the painter no
+longer drops it, so the condition the mutation flipped is gone. A replacement was written in its place
+in `spans.mjs`: *a table row's runs are painted on the page rather than on its ground*, expecting
+C11 T2.13, the row that watches exactly that seam.
+
+**It survived.** Every instrument said the run was healthy: the anchor applied, the sweep reported
+`anchors missed 0`, and the suite came back green. What none of them says is that `spans.mjs`'s command
+is five named files — `spans`, `text`, and their tiers — and **not one of them loads a table**. The
+mutation was compiled, the suite that could not see it passed, and the report printed `SURVIVED`, which
+in this harness is a claim about the tests.
+
+**The class, and it is the one the anchor sweep was built for the other half of.** The sweep answers
+*does this anchor still match the source*, which is textual reach. There is no instrument for *can the
+command this run issues execute the row this mutation expects* — and the two failures read identically
+from outside: a survivor is a survivor whether the test is weak or absent. F277 is the habit that
+catches it (*ask why the mutation cannot reach the test before rewriting the test*), and it caught this
+one; what is missing is the gate. A run's `expect` names a row and its command names files, and nothing
+compares the two.
+
+**The remedy taken is the small one**: the mutation moved to `c11-focus-gutter.mjs`, whose command
+names `render-focus` and the three table tiers, and it is caught there. **The gate is owed** — for
+each mutation, the row named in `expect` must be collectable by the run's own command — and it is
+checkable, because `anchors.mjs` already parses both halves: it reads 651 test paths and 2,161
+expectations and never crosses them.
+
+---
+
+## F1242 — a fixture whose tone the theme composes nothing for makes its assertion vacuous ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | C11 T2.13's fixture, `test/unit/render-focus.test.ts`. |
+| **Reached for** | *A span keeps its own tone, resolved against the ground the row took* (C10 I48). |
+| **Verdict** | **Real, and the mutation pass is what said so.** |
+
+The row's fixture carried a span toned `identifier`, inherited from the file's older table. `dark`
+composes a different ink for **five** slots on `focusGround` and **three** on `selection`, and
+`identifier` is in neither set — so the value the span resolves to is the page's value whether or not
+the painter was ever told which ground it was standing on. The assertion compared two expressions that
+are equal for a reason unrelated to the rule.
+
+**It passed against the defect it was written for**, which is the vacuity class A03 §2 names, arriving
+through a fixture rather than through a rule. And it is `test/support/README.md`'s standing rule read
+one level finer: a fixture must be shown to respond to the thing under test — and *responds* here is
+not *has a tone*, it is *has a tone this theme moves on this ground*.
+
+**The remedy is the fixture plus the guard.** The span's tone is `error`, which `dark` composes on
+both grounds, and the row asserts that fact about the theme before asserting anything about the frame:
+if a later token edit stopped composing it, the guard goes red rather than the row going quiet.
+
+---
+
+## F1241 — a reader that tests a parameter list as a set invents the defect it reports ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `test/golden/compositions.test.ts`'s SGR reader. Found by landing F1240 and reading the frame it moved. |
+| **Reached for** | The report names which ground each run took and which ink it was painted in, so a reader that misnames either is the only thing standing between a frame and a wrong ruling. |
+| **Verdict** | **Real, in the instrument, and the frame it indicted was correct.** |
+
+**What it said.** After `resolve` gained the ground, the case 1 report read
+`selection/-:"bravo         ✗ failed  "` — one run, no ink, for a row whose two cells are painted in
+two different colours. Read as a frame that would be *the selection drops every tone*, which is the
+defect F1240 had just closed, arriving in the report on the day it was fixed.
+
+**The bytes say otherwise.** `\u001b[38;2;212;212;212m\u001b[48;2;38;64;87mbravo` …
+`\u001b[38;2;255;155;145m✗ failed`. Both cells carry a foreground; the second is the composed
+`#ff9b91`. The painter was right.
+
+**The cause is one line, and it reads as careful.** The reader asked
+`params.includes("38")` to decide whether a sequence opened a foreground. `dark`'s selection ground is
+`48;2;38;64;87` — blue 87, green 64, **red 38** — so every run standing on that ground was read as
+opening a foreground, resolved against a table of tones, matched nothing, and reported `-`. With the
+ink stuck at `-` for the whole row, no run boundary ever fired and the two cells merged into one.
+
+**The class.** A parameter list is a **sequence with per-parameter arity** — `38` and `48` consume
+five parameters in truecolour and three in 256-colour — and a membership test over it is reading a
+grammar as a bag. It is the same shape as this file's earlier entry on the same reader: SGR is
+cumulative and the first form read each sequence as a stamp. Twice now, one reader, both times a
+protocol property the reader declined to model.
+
+**And the remedy already existed.** `test/support/styled-screen.ts`'s `applySgr` is this walk, written
+first, correct, and used by a dozen rows in `test/unit`. The reader in the golden directory was written
+beside it and did not consult it — which is *who else already solved this* not asked, in a file whose
+whole subject is reading a frame honestly. The reader now walks parameters with their arity, and names
+**every** attribute rather than the first, because at 1-bit the attributes are the carriers: the
+selected row is `inverse` and the failed cell is `inverse+bold` inside it, and a label reporting
+`inverse` alone says the two cells are drawn the same way.
+
+---
+
 ## F1240 — the contrast gate checks an ink the painter never emits ★★★★★
 
 | | |
@@ -53809,9 +53908,31 @@ reaches it is *does anything downstream consume what was checked* — which no g
 
 **The remedy is one MR and both halves must land in it**: `resolve` gains the surface a run is painted
 on, `inkOn` becomes its composition step, and C11 I14's drop-to-one-ink rule is retired in the same
-change. Every golden with colour moves. It is **not** M3's, and it is not recorded as divergent: §4k.4
-carries it with its MR, and C10 §4k's own golden frames carry the defect in their snapshot text so the
-frame is not read as the ruling being met.
+change. Every golden with colour moves.
+
+**Closed, as C10 I48 and commitment 38.** What it cost and what it found:
+
+- **The ladder is unchanged and the limit is a row rather than a sentence.** The ground binds at
+  24-bit and at 8-bit, where the composed inks quantise **as a set on that ground** — rank order and
+  distinctness are properties of a set and a per-slot neighbour can see neither. At 4-bit and 1-bit it
+  is inert, because a curated sixteen-entry map is authored per ref and composed no second time and at
+  1-bit no colour is emitted at all. T3.75 asserts both halves, the inert one as an equality.
+- **The seam is `RunContext.on`, and one expression answers both halves.** `definition.ts` picks the
+  ground the row takes and the ground its inks resolve against in one place, because two expressions
+  is how the gate and the painter stopped agreeing in the first place.
+- **The goldens that moved were named before the run and are the eight that moved**: `table.test.ts`,
+  dark and light × four widths, on `focusGround`, one row each. The focused row's cells drop `accent`
+  for their own tones; its expand marker moves `#8a8a8a → #9e9e9e`, which is `dim` composed for that
+  ground. Nothing else in the corpus renders a focused or selected row.
+- **T6.106 is paired with C11 T2.13 on purpose.** T2.49 measures `resolve` against `inkOn` and stays
+  green whether or not any painter asks the question, which is this finding's own shape. A
+  fail-on-revert that named only the resolver would be the gate again.
+- **And drawing it found a defect in the instrument** (→ F1241). The composition frames' SGR reader
+  tested `params.includes("38")` for a foreground opener, and `dark`'s selection ground is
+  `48;2;38;64;87` — red 38. The reader called a background a foreground, failed to name the colour it
+  had invented, and reported the selected row as carrying no ink at all. The frame was correct
+  throughout. A parameter list is a **sequence with per-parameter arity**, not a set, and
+  `test/support/styled-screen.ts`'s `applySgr` is the same walk, written first and never consulted.
 
 ---
 

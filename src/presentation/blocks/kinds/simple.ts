@@ -332,8 +332,11 @@ export const noticeDefinition: BlockDefinition<Notice> = {
     // an element (an action, or a `GLYPH_ELEMENT` token — I47) can reach this arm.
     const focused =
       declaresElement(block) && ctx.focus !== null && ctx.focus.blockId === block.id && ctx.focus.rowId === block.id;
+    // **The ink is resolved against the ground it lands on** (C10 I48): a
+    // focused notice keeps its own tone and takes the value the theme composed
+    // for `focusGround`, which on a banded theme is the band's single ink.
     const style = focused
-      ? { ...tone(block.tone, ctx.theme, ctx.capabilities), ...focusStyle(ctx.theme, ctx.capabilities) }
+      ? { ...tone(block.tone, ctx.theme, ctx.capabilities, "focusGround"), ...focusStyle(ctx.theme, ctx.capabilities) }
       : tone(block.tone, ctx.theme, ctx.capabilities);
     const prefix = prefixCells(block.glyph);
     const wrapped = noticeRows(block, ctx.width, ctx.capabilities);
@@ -637,14 +640,23 @@ export const pillsDefinition: BlockDefinition<Pills> = {
           // `accent` as the ink. `has` and never a size — `selected` absent is
           // C26 I16's head-alone sentinel, and any present extent is a real
           // selection, one element included (C11 I14).
+          // **The ground is named once and the ink resolves against it**
+          // (C10 I48, F1240). `accent` stays the head's ink here and is not
+          // C11 I14's drop-to-one-ink rule wearing the same shape: a pill row
+          // has no reserved gutter, so accent **is** focus's carrier rather
+          // than a tone spent to say *selected*. What changes is that a
+          // selected pill keeps its own tone instead of being forced to
+          // `default`, and every one of these inks is now the value the theme
+          // composed for the ground underneath it.
+          const on = id === head && !selected.has(id) ? "focusGround" : selected.has(id) ? "selection" : undefined;
           const style =
             id === head
               ? {
-                  ...tone("accent", ctx.theme, ctx.capabilities),
+                  ...tone("accent", ctx.theme, ctx.capabilities, on),
                   ...(selected.has(id) ? selectionStyle : focusStyle)(ctx.theme, ctx.capabilities),
                 }
               : selected.has(id)
-                ? { ...tone("default", ctx.theme, ctx.capabilities), ...selectionStyle(ctx.theme, ctx.capabilities) }
+                ? { ...tone(name, ctx.theme, ctx.capabilities, on), ...selectionStyle(ctx.theme, ctx.capabilities) }
                 : tone(name, ctx.theme, ctx.capabilities);
           spans.push({ text, style });
         }

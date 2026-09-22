@@ -37,6 +37,7 @@ import { fsIo, report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const TABLE = "src/presentation/table/definition.ts";
+const CELLS = "src/presentation/table/cells.ts";
 
 // `render-focus` carries T2.11 and T2.12; C11's contract suite carries T2.3, the
 // generic measurement suite at seven widths flat and expanded, so a gutter that
@@ -101,18 +102,43 @@ const results = runPass({
       // is what makes it a rule tested against one case.
       name: "the sentinel is told by the extent's size",
       file: TABLE,
-      from: "isSelected || (isHead && selected.has(row.id)) ? wash",
-      to: "isSelected || (isHead && selected.size > 1) ? wash",
+      from: "const on = isSelected || (isHead && selected.has(row.id))",
+      to: "const on = isSelected || (isHead && selected.size > 1)",
       expect: "T2.12",
     },
     {
       // Focus and selection share the ground again, which is the mechanism the
       // tree had before the design: one ground and ink to tell the two apart.
+      //
+      // **Re-anchored on `on` rather than on the ground** (C10 I48): one
+      // expression now answers both which ground the row takes and which ground
+      // its inks resolve against, so the mutation moves both together — which is
+      // the property the single expression exists to hold.
       name: "focus takes the selection ground",
       file: TABLE,
-      from: "? wash : isHead ? focusGround : null;",
-      to: "? wash : isHead ? wash : null;",
+      from: "        : isHead\n          ? \"focusGround\"",
+      to: "        : isHead\n          ? \"selection\"",
       expect: "T2.12",
+    },
+    {
+      // **The ground reaches the ink, or it does not** (C10 I48, F1240). The row
+      // keeps its own tones and each of them is resolved against the surface
+      // underneath; a painter that washes an extent and does not say so paints
+      // the page's ink on a band, which is the value the contrast gate already
+      // measures as wrong there.
+      //
+      // **It lives here and not in `spans`, and that is the finding** (F1243).
+      // It was written there, in place of the span-drop mutation C11 I14's
+      // amendment retired, and it survived — `spans.mjs`'s command names five
+      // files and none of them is a table's, so the mutation applied cleanly,
+      // the suite it ran was green for the reason it is always green, and the
+      // report said *survived*. A mutation reaches only as far as its run's
+      // command, and the anchor sweep checks the text rather than the reach.
+      name: "a table row's runs are painted on the page rather than on its ground",
+      file: CELLS,
+      from: "    spans.push(...paintRuns(pieces, style, { ...ctx, on: options.on }));",
+      to: "    spans.push(...paintRuns(pieces, style, ctx));",
+      expect: "T2.13",
     },
     {
       // **The measurement invariant, from the caller's side.** `detailHeight`

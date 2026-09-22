@@ -190,8 +190,13 @@ export function rowSpans(
   ctx: RenderContext,
   options: Readonly<{
     expandable: boolean;
-    focused: boolean;
-    selected?: boolean;
+    /**
+     * **The ground this row is painted on** (C10 I48, I14) — a surface name,
+     * absent being the page. One value, chosen by the caller that also picks
+     * the wash, because *which ground did this row take* is one question and
+     * two answers to it is how the ink and the ground stopped agreeing (F1240).
+     */
+    on?: string | undefined;
     /** The columns reserving a glyph slot (I23), from `markedSeriesColumns`. */
     marked: ReadonlySet<string>;
   }>,
@@ -221,7 +226,7 @@ export function rowSpans(
       // that is in a different component (I21).
       spans.push({
         text: fitAt(marker, planned.width, ctx),
-        style: tone("dim", ctx.theme, ctx.capabilities),
+        style: tone("dim", ctx.theme, ctx.capabilities, options.on),
       });
       return;
     }
@@ -240,7 +245,7 @@ export function rowSpans(
     // recent samples — the ones it was shown for.
     if (cell?.spark !== undefined) {
       const { lead, room } = seriesLead(cell, options.marked.has(planned.key), planned.width, ctx);
-      const style = tone(cell.tone ?? "accent", ctx.theme, ctx.capabilities);
+      const style = tone(cell.tone ?? "accent", ctx.theme, ctx.capabilities, options.on);
       // The mark is its own run for the reason the text path gives: a span's
       // offsets stay offsets into the series rather than into a spliced string.
       if (lead !== "") spans.push({ text: lead, style });
@@ -257,28 +262,22 @@ export function rowSpans(
     // decides nothing.
     if (cell?.bar !== undefined) {
       const { lead, room } = seriesLead(cell, options.marked.has(planned.key), planned.width, ctx);
-      const style = tone(cell.tone ?? "accent", ctx.theme, ctx.capabilities);
+      const style = tone(cell.tone ?? "accent", ctx.theme, ctx.capabilities, options.on);
       if (lead !== "") spans.push({ text: lead, style });
       spans.push({ text: valueBar(cell.bar, room, ctx.capabilities), style });
       return;
     }
 
-    const spanned = cell === undefined ? [] : runsOf(cell.text, cell.spans);
-    // **A focused row drops a span's tone as it drops the cell's** (I14, C09
-    // §5): focus replaces `cell.tone` with `accent` below, and a span's `tone`
-    // is the same claim at a finer grain — a row that kept it would read as two
-    // things on the one occasion it must read as one. Attributes and a value
-    // are not claims about the foreground and survive.
-    // A selected row drops them the same way (I14): its ink is `default`, the
-    // one slot C10 §4b measured over the wash, and a span's own tone would be
-    // a second claim on the one occasion the row must read as one thing.
-    const textRuns = options.focused || options.selected === true
-      ? spanned.map((run) => {
-          if (run.tone === undefined) return run;
-          const { tone: _focusTakesIt, ...rest } = run;
-          return rest;
-        })
-      : spanned;
+    // **A run keeps its own tone, and the ground decides what that tone inks
+    // as** (I14 as amended, C10 I48). The first form of this dropped a span's
+    // tone on a focused or selected row, arguing that a row which kept it would
+    // read as two things on the one occasion it must read as one. That was true
+    // of a resolver with one ink per slot: there was the page's value or a
+    // legible one and not both. The resolver takes the ground now, so a span's
+    // tone resolves *against* the wash — the band's single ink where the theme
+    // declares a band, which is the one-ink reading kept exactly where it was
+    // ever true, and the theme's composed value where it does not (F1240).
+    const textRuns = cell === undefined ? [] : runsOf(cell.text, cell.spans);
     const text = runsText(textRuns);
     const glyph = cell?.glyph === undefined ? "" : glyphFor(cell.glyph, ctx.capabilities);
 
@@ -299,19 +298,17 @@ export function rowSpans(
     const body = lead + text;
     const bodyRuns = lead === "" ? textRuns : [{ text: lead }, ...textRuns];
 
-    // **Focus is rendered, never owned** (I14). It changes the tone and nothing
-    // else — no marker, no extra row, no width. `measure` receives no focus at
-    // all (C04 §5), so a focused row that occupied a different number of cells
-    // or rows would be I9 broken by whichever row the user happened to be on.
+    // **Focus is rendered, never owned** (I14). It changes the ground and the
+    // mark and no geometry — no extra row, no width. `measure` receives no
+    // focus at all (C04 §5), so a focused row that occupied a different number
+    // of cells or rows would be I9 broken by whichever row the user happened to
+    // be on.
     //
-    // **Selected is the same rule, one more state** (I14): `default` ink, and
-    // the caller lays the wash over the whole row. `focused` wins where both
-    // hold — the head is painted as the head.
-    const style = options.focused
-      ? tone("accent", ctx.theme, ctx.capabilities)
-      : options.selected === true
-        ? tone("default", ctx.theme, ctx.capabilities)
-        : tone(cell?.tone ?? "default", ctx.theme, ctx.capabilities);
+    // **The cell keeps its own tone whatever the row's state**, and `on` is
+    // what makes that legible: the ink is resolved against the ground the
+    // caller laid, so §4k.2 row 1's third clause holds — failure keeps its
+    // glyph, its word and its tone, on the ground selection took.
+    const style = tone(cell?.tone ?? "default", ctx.theme, ctx.capabilities, options.on);
 
     // The end a cell truncates from is the surface's (C04 I30) — a path keeps its
     // filename, a config key its leaf, an image its tag. C11 reads the field and
@@ -332,7 +329,7 @@ export function rowSpans(
       { text: column?.align === "right" ? "" : " ".repeat(short) },
     ];
 
-    spans.push(...paintRuns(pieces, style, ctx));
+    spans.push(...paintRuns(pieces, style, { ...ctx, on: options.on }));
   });
 
   return spans;

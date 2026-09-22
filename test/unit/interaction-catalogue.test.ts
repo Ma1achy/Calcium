@@ -63,21 +63,26 @@ describe("interaction-catalogue — the corpus renders", () => {
   it("IC2 (C11 I14): the selection scene at 24-bit washes a and b, accents c, leaves d — the same frame the session draws", () => {
     const c = capsNamed("24bit");
     const accent = params(tone("accent", theme, c));
-    const plain = params(tone("default", theme, c));
     const wash = params(selectionStyle(theme, c));
     const focusBg = params(focusStyle(theme, c));
+    // Each ink on the ground it lands on (C10 I48): a row keeps its cells' own
+    // tones and the ground decides what each of them inks as.
+    const plainOnWash = params(tone("default", theme, c, "selection"));
+    const plainOnFocus = params(tone("default", theme, c, "focusGround"));
     const lines = frameFor(scene("table-selection"), c);
-    expect(cellOf(lines, "alpha")).toEqual({ fg: plain, bg: wash, attrs: [] });
-    expect(cellOf(lines, "bravo")).toEqual({ fg: plain, bg: wash, attrs: [] });
+    expect(cellOf(lines, "alpha")).toEqual({ fg: plainOnWash, bg: wash, attrs: [] });
+    expect(cellOf(lines, "bravo")).toEqual({ fg: plainOnWash, bg: wash, attrs: [] });
     // **The head is inside the extent, so selection owns its ground** (R-SEL-006,
-    // C10 I47) and `accent` plus `▸` are what focus keeps.
-    expect(cellOf(lines, "charlie")).toEqual({ fg: accent, bg: wash, attrs: [] });
+    // C10 I47) and `▸` in the reserved column is what focus keeps. Its cells are
+    // inked like every other row's, on the ground the row took (C11 I14, F1240).
+    expect(cellOf(lines, "charlie")).toEqual({ fg: plainOnWash, bg: wash, attrs: [] });
+    expect(accent, "and not accent, which the retired rule painted here").not.toBe(plainOnWash);
     expect(cellOf(lines, "delta").bg).toBe("");
     // **The frame responds to the thing under test**: the focus scene, same
     // table, washes nothing and puts `bravo` on the focus ground — a *different*
     // ground, which is the whole of this change.
     const focus = frameFor(scene("table-focus"), c);
-    expect(cellOf(focus, "bravo")).toEqual({ fg: accent, bg: focusBg, attrs: [] });
+    expect(cellOf(focus, "bravo")).toEqual({ fg: plainOnFocus, bg: focusBg, attrs: [] });
     expect(focusBg, "and the two grounds are not one").not.toBe(wash);
     for (const name of ["alpha", "charlie", "delta"]) expect(cellOf(focus, name).bg, `${name} unwashed`).toBe("");
   });
@@ -183,8 +188,11 @@ describe("interaction-catalogue — the corpus renders", () => {
     const lines = frameFor(scene("notice-action-focus"), c);
     // **Its own tone over the focus ground** (C09 I83): a notice keeps the tone
     // it declared, which the shared-ground mechanism could not express.
-    expect(cellOf(lines, "image pull failed"), "the button, focused").toEqual({ fg: params(tone("error", theme, c)), bg: params(focusStyle(theme, c)), attrs: [] });
-    expect(cellOf(lines, "✗"), "its glyph too").toEqual({ fg: params(tone("error", theme, c)), bg: params(focusStyle(theme, c)), attrs: [] });
+    // The slot is the notice's and the hex is the ground's answer (C10 I48).
+    const errorOnFocus = params(tone("error", theme, c, "focusGround"));
+    expect(cellOf(lines, "image pull failed"), "the button, focused").toEqual({ fg: errorOnFocus, bg: params(focusStyle(theme, c)), attrs: [] });
+    expect(cellOf(lines, "✗"), "its glyph too").toEqual({ fg: errorOnFocus, bg: params(focusStyle(theme, c)), attrs: [] });
+    expect(errorOnFocus, "the ground moves the ink").not.toBe(params(tone("error", theme, c)));
     expect(cellOf(lines, "no containers"), "the plain notice: its tone, no ground").toEqual({ fg: info, bg: "", attrs: [] });
     const mono = frameFor(scene("notice-action-focus"), capsNamed("1bit"));
     // **No ground and no inverse at 1-bit** (C09 I83): the notice keeps its own

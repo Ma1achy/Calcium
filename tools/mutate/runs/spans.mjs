@@ -18,7 +18,6 @@ const PAINT = "src/presentation/blocks/paint.ts";
 const VALIDATE = "src/data/viewmodel/validate.ts";
 const SIMPLE = "src/presentation/blocks/kinds/simple.ts";
 const TEXT = "src/presentation/text.ts";
-const CELLS = "src/presentation/table/cells.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -105,7 +104,7 @@ const MUTATIONS = [
     // row still passes, because the attributes still spread.
     name: "a span's tone is ignored and the block's style painted",
     file: PAINT,
-    from: "  const base = run.tone === undefined ? style : resolveTone(run.tone, ctx.theme, ctx.capabilities);",
+    from: "  const base = run.tone === undefined ? style : resolveTone(run.tone, ctx.theme, ctx.capabilities, ctx.on);",
     to: "  const base = style;",
     expect: "T2.35",
   },
@@ -115,8 +114,8 @@ const MUTATIONS = [
     // the one place the two readings differ (C10 T6.85).
     name: "a span's tone composes with the block's instead of replacing it",
     file: PAINT,
-    from: "  const base = run.tone === undefined ? style : resolveTone(run.tone, ctx.theme, ctx.capabilities);",
-    to: "  const base = run.tone === undefined ? style : { ...style, ...resolveTone(run.tone, ctx.theme, ctx.capabilities) };",
+    from: "  const base = run.tone === undefined ? style : resolveTone(run.tone, ctx.theme, ctx.capabilities, ctx.on);",
+    to: "  const base = run.tone === undefined ? style : { ...style, ...resolveTone(run.tone, ctx.theme, ctx.capabilities, ctx.on) };",
     expect: "T2.26",
   },
   {
@@ -145,19 +144,6 @@ const MUTATIONS = [
     file: SIMPLE,
     from: "  measure: (block: Notice, width: number): number => atLeastOne(noticeRows(block, width).length), // cells-ok",
     to: "  measure: (block: Notice, width: number): number => atLeastOne(wrapCells(stripControl(block.text), proseWidth(width, prefixCells(block.glyph))).length), // cells-ok",
-    expect: "T3.66",
-  },
-  {
-    // A focused row keeps its span tones: a `38` inside the accent run.
-    //
-    // **Re-anchored when the selection joined the condition** (C11 I14, arc3
-    // Lane A): the line gained `|| options.selected === true`, and the mutation
-    // is unchanged — the whole condition to `false`. C11 T1.23 is the row that
-    // sees the selected half; this one stays on the focused half.
-    name: "a focused table row keeps a span's tone",
-    file: CELLS,
-    from: "    const textRuns = options.focused || options.selected === true\n      ? spanned.map((run) => {",
-    to: "    const textRuns = false\n      ? spanned.map((run) => {",
     expect: "T3.66",
   },
   {

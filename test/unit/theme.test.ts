@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { fires, sourceOf } from "../support/source.js";
 import {
   assertPictureGlyph,
+  cacheSize,
   clearResolutionCache,
   defaultTheme,
   isPictureGlyph,
@@ -821,18 +822,67 @@ describe("C10 I41 — the shipped quantisations", () => {
 });
 
 /**
- * C10 I48 — the ladder under a ground, owed at the spec commit.
+ * C10 I48 — the ground down the degradation ladder.
  *
- * Two rows because the ground does two different things down the ladder: it is
- * in the key at every rung that has a value, and it is **inert** at the two
- * rungs that carry no hex of the theme's own. A limit stated in prose is a
- * limit nothing measures.
+ * Two rows, because the ground does two different things going down: it is in
+ * the key at every rung that carries a value of the theme's own, and it is
+ * **inert** at the two rungs that carry none. A limit stated in prose is a limit
+ * nothing measures.
  */
 describe("C10 I48 — the ground down the degradation ladder", () => {
-  it.todo(
-    "T3.74 (I48, I11): the ground is in the cache key \u2014 one ref on the page and on a composing ground yields two styles with the cache warm, in either order, and `cacheSize` grows by two; a key without the ground serves the first answer to the second caller and the value it serves is a legal one \u2014 not deferred on a component: it lands with I48's resolver change in this same MR",
-  );
-  it.todo(
-    "T3.75 (I48, \u00a73): at 8-bit a composed set quantises as a set on its ground, rank order preserved within it and a moved slot picking a different cube entry from the page's; at 4-bit and 1-bit the answer with a ground is identical to the answer without one \u2014 not deferred on a component: it lands with I48's resolver change in this same MR",
-  );
+  /**
+   * **The value a stale key would serve is a legal one**, which is why this is a
+   * row and not a review note: `#f05a5a` on a selection ground is a colour the
+   * terminal draws without complaint, and nothing downstream can tell it from
+   * the composed `#ff9b91`.
+   */
+  it("T3.74 (I48, I11): the ground is in the cache key", () => {
+    const theme = store("dark").current;
+    clearResolutionCache();
+    const before = cacheSize();
+
+    const page = resolve("tone.error", theme, caps(24));
+    const band = resolve("tone.error", theme, caps(24), "selection");
+    expect(cacheSize() - before, "two keys, not one").toBe(2);
+    expect(page.colour, "the page's ink").toEqual({ kind: "rgb", hex: "#f05a5a" });
+    expect(band.colour, "the ink the theme composed for the selection ground").toEqual({
+      kind: "rgb",
+      hex: "#ff9b91",
+    });
+
+    // Warm, and in the other order — a key that dropped the ground would serve
+    // whichever was asked for first to both callers.
+    expect(resolve("tone.error", theme, caps(24), "selection")).toEqual(band);
+    expect(resolve("tone.error", theme, caps(24))).toEqual(page);
+  });
+
+  it("T3.75 (I48, §3): the ground binds where the theme's own values do, and is inert below", () => {
+    const theme = store("nord").current;
+
+    // 8-bit: the composed set quantises as a set on its ground, so a slot the
+    // ground moves picks a different cube entry from the page's. `nord` moves
+    // twenty-one slots on the selection ground, which is why it is the subject.
+    const pageEight = resolve("tone.error", theme, caps(8));
+    const bandEight = resolve("tone.error", theme, caps(8), "selection");
+    expect(bandEight.colour, "the ground reaches the cube").not.toEqual(pageEight.colour);
+
+    // And the set keeps its rank: three tones the theme separates stay three
+    // distinct entries on the ground, which a per-slot neighbour cannot promise.
+    const onGround = (["error", "ok", "info"] as const).map(
+      (t) => (resolve(`tone.${t}`, theme, caps(8), "selection").colour as { index: number }).index,
+    );
+    expect(new Set(onGround).size, "three tones, three cube entries").toBe(3);
+
+    // 4-bit and 1-bit carry no hex of the theme's own, so the ground is inert —
+    // asserted as an equality, so the limit I48 states is a row and not a
+    // sentence.
+    for (const depth of [4, 1] as const) {
+      for (const t of TONES) {
+        expect(
+          resolve(`tone.${t}`, theme, caps(depth), "selection"),
+          `${t} at ${String(depth)}-bit is the answer with no ground`,
+        ).toEqual(resolve(`tone.${t}`, theme, caps(depth)));
+      }
+    }
+  });
 });

@@ -43,8 +43,8 @@ const results = runPass({
   run,
   control: {
     file: FILE,
-    from: "      const { lead, room } = seriesLead(cell, options.marked.has(planned.key), planned.width, ctx);\n      const style = tone(cell.tone ?? \"accent\", ctx.theme, ctx.capabilities);\n      if (lead !== \"\") spans.push({ text: lead, style });\n      spans.push({ text: valueBar(cell.bar, room, ctx.capabilities), style });",
-    to: "      const style = tone(cell.tone ?? \"accent\", ctx.theme, ctx.capabilities);\n      spans.push({ text: valueBar(cell.bar, planned.width, ctx.capabilities), style });",
+    from: "      const { lead, room } = seriesLead(cell, options.marked.has(planned.key), planned.width, ctx);\n      const style = tone(cell.tone ?? \"accent\", ctx.theme, ctx.capabilities, options.on);\n      if (lead !== \"\") spans.push({ text: lead, style });\n      spans.push({ text: valueBar(cell.bar, room, ctx.capabilities), style });",
+    to: "      const style = tone(cell.tone ?? \"accent\", ctx.theme, ctx.capabilities, options.on);\n      spans.push({ text: valueBar(cell.bar, planned.width, ctx.capabilities), style });",
     why: "the shipped behaviour restored — T1.26 fails on the mark and all ten golden frames move back; a run that cannot see the absence cannot see the invariant that ends it",
   },
   mutations: [
@@ -77,8 +77,8 @@ const results = runPass({
       // which is the split that names it.
       name: "the lead is spent per cell rather than per column",
       file: FILE,
-      from: "      const { lead, room } = seriesLead(cell, options.marked.has(planned.key), planned.width, ctx);\n      const style = tone(cell.tone ?? \"accent\", ctx.theme, ctx.capabilities);\n      if (lead !== \"\") spans.push({ text: lead, style });\n      spans.push({ text: valueBar(cell.bar, room, ctx.capabilities), style });",
-      to: "      const { lead, room } = seriesLead(cell, cell.glyph !== undefined, planned.width, ctx);\n      const style = tone(cell.tone ?? \"accent\", ctx.theme, ctx.capabilities);\n      if (lead !== \"\") spans.push({ text: lead, style });\n      spans.push({ text: valueBar(cell.bar, room, ctx.capabilities), style });",
+      from: "      const { lead, room } = seriesLead(cell, options.marked.has(planned.key), planned.width, ctx);\n      const style = tone(cell.tone ?? \"accent\", ctx.theme, ctx.capabilities, options.on);\n      if (lead !== \"\") spans.push({ text: lead, style });\n      spans.push({ text: valueBar(cell.bar, room, ctx.capabilities), style });",
+      to: "      const { lead, room } = seriesLead(cell, cell.glyph !== undefined, planned.width, ctx);\n      const style = tone(cell.tone ?? \"accent\", ctx.theme, ctx.capabilities, options.on);\n      if (lead !== \"\") spans.push({ text: lead, style });\n      spans.push({ text: valueBar(cell.bar, room, ctx.capabilities), style });",
       expect: "T1.28",
     },
   ],

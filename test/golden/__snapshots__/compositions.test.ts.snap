@@ -8,23 +8,23 @@ exports[`C10 §4k — the compositions, as frames > case 1 — focused + selecte
     charlie       ✓ running 
 
 -- which fact took the ground, run by run
-  page/-:"  Name          State     "
+  dim/-:"Name        " dim/-:"State     "
   page/-:"  alpha         " bold/-:"✓ running "
-  bold/-:"▸ " inverse/-:"bravo         " bold/-:"✗ failed  "
+  bold/-:"▸ " inverse/-:"bravo         " inverse+bold/-:"✗ failed  "
   page/-:"  charlie       " bold/-:"✓ running "
 
 -- the ruling (C10 §4k.2 row 1)
   selection takes the ground · focus keeps its mark · failure keeps its glyph, its word and its tone
 
--- what the frame does NOT meet, recorded here because a snapshot records and does not check
-  the TONE. A focused or selected row is repainted in one ink — accent, or default when
-  selection alone holds it — so \`failed\` keeps ✗ and the word and loses the error tone.
-  The two halves of the remedy are one change and neither works alone: C11 I14's drop-to-one-ink
-  rule, and a painter that resolves a tone against the surface it lands on. \`inkOn\` is that
-  resolver, it carries the per-theme overrides and both high-contrast bands, and it is called
-  only from \`contrast.ts\` — 74 of 100 tone x surface pairs are an ink the gate checks and the
-  painter never emits. Dropping I14 without the second half would paint the flat ink on the
-  selection ground, which is the value the gate already measures as wrong there."
+-- and what drawing it found, kept because the record is the point (F1240)
+  This frame reported two of row 1's three clauses for as long as it existed. A focused or
+  selected row was repainted in ONE ink — accent, or default under selection — so \`failed\` kept
+  ✗ and the word and lost the error tone. The two halves of the remedy were one change and
+  neither worked alone: C11 I14's drop-to-one-ink rule, and a painter that resolves a tone
+  against the surface it lands on. \`inkOn\` was that resolver and was called only from
+  \`contrast.ts\` — 74 of 100 tone x surface pairs were an ink the gate checked and the painter
+  never emitted. C10 I48 gives \`resolve\` the ground, \`inkOn\` is its composition step, and the
+  ink beside each ground above is the value C10 T2.49 measures the gate against."
 `;
 
 exports[`C10 §4k — the compositions, as frames > case 1 — focused + selected + failed, at 24-bit 1`] = `
@@ -37,21 +37,21 @@ exports[`C10 §4k — the compositions, as frames > case 1 — focused + selecte
 -- which fact took the ground, run by run
   page/muted:"Name        " page/muted:"State     "
   page/default:"alpha       " page/ok:"✓ running "
-  page/accent:"▸ " selection/-:"bravo         " selection/accent:"✗ failed  "
+  page/accent:"▸ " selection/default:"bravo       " selection/error:"✗ failed  "
   page/default:"charlie     " page/ok:"✓ running "
 
 -- the ruling (C10 §4k.2 row 1)
   selection takes the ground · focus keeps its mark · failure keeps its glyph, its word and its tone
 
--- what the frame does NOT meet, recorded here because a snapshot records and does not check
-  the TONE. A focused or selected row is repainted in one ink — accent, or default when
-  selection alone holds it — so \`failed\` keeps ✗ and the word and loses the error tone.
-  The two halves of the remedy are one change and neither works alone: C11 I14's drop-to-one-ink
-  rule, and a painter that resolves a tone against the surface it lands on. \`inkOn\` is that
-  resolver, it carries the per-theme overrides and both high-contrast bands, and it is called
-  only from \`contrast.ts\` — 74 of 100 tone x surface pairs are an ink the gate checks and the
-  painter never emits. Dropping I14 without the second half would paint the flat ink on the
-  selection ground, which is the value the gate already measures as wrong there."
+-- and what drawing it found, kept because the record is the point (F1240)
+  This frame reported two of row 1's three clauses for as long as it existed. A focused or
+  selected row was repainted in ONE ink — accent, or default under selection — so \`failed\` kept
+  ✗ and the word and lost the error tone. The two halves of the remedy were one change and
+  neither worked alone: C11 I14's drop-to-one-ink rule, and a painter that resolves a tone
+  against the surface it lands on. \`inkOn\` was that resolver and was called only from
+  \`contrast.ts\` — 74 of 100 tone x surface pairs were an ink the gate checked and the painter
+  never emitted. C10 I48 gives \`resolve\` the ground, \`inkOn\` is its composition step, and the
+  ink beside each ground above is the value C10 T2.49 measures the gate against."
 `;
 
 exports[`C10 §4k — the compositions, as frames > case 1 — focused + selected + failed, at ascii 1`] = `
@@ -64,21 +64,21 @@ exports[`C10 §4k — the compositions, as frames > case 1 — focused + selecte
 -- which fact took the ground, run by run
   page/muted:"Name        " page/muted:"State     "
   page/default:"alpha       " page/ok:"+ running "
-  page/accent:"> " selection/-:"bravo         " selection/accent:"x failed  "
+  page/accent:"> " selection/default:"bravo       " selection/error:"x failed  "
   page/default:"charlie     " page/ok:"+ running "
 
 -- the ruling (C10 §4k.2 row 1)
   selection takes the ground · focus keeps its mark · failure keeps its glyph, its word and its tone
 
--- what the frame does NOT meet, recorded here because a snapshot records and does not check
-  the TONE. A focused or selected row is repainted in one ink — accent, or default when
-  selection alone holds it — so \`failed\` keeps ✗ and the word and loses the error tone.
-  The two halves of the remedy are one change and neither works alone: C11 I14's drop-to-one-ink
-  rule, and a painter that resolves a tone against the surface it lands on. \`inkOn\` is that
-  resolver, it carries the per-theme overrides and both high-contrast bands, and it is called
-  only from \`contrast.ts\` — 74 of 100 tone x surface pairs are an ink the gate checks and the
-  painter never emits. Dropping I14 without the second half would paint the flat ink on the
-  selection ground, which is the value the gate already measures as wrong there."
+-- and what drawing it found, kept because the record is the point (F1240)
+  This frame reported two of row 1's three clauses for as long as it existed. A focused or
+  selected row was repainted in ONE ink — accent, or default under selection — so \`failed\` kept
+  ✗ and the word and lost the error tone. The two halves of the remedy were one change and
+  neither worked alone: C11 I14's drop-to-one-ink rule, and a painter that resolves a tone
+  against the surface it lands on. \`inkOn\` was that resolver and was called only from
+  \`contrast.ts\` — 74 of 100 tone x surface pairs were an ink the gate checked and the painter
+  never emitted. C10 I48 gives \`resolve\` the ground, \`inkOn\` is its composition step, and the
+  ink beside each ground above is the value C10 T2.49 measures the gate against."
 `;
 
 exports[`C10 §4k — the compositions, as frames > case 4 — focus over a heatmap, at 1-bit 1`] = `
@@ -90,18 +90,18 @@ exports[`C10 §4k — the compositions, as frames > case 4 — focus over a heat
   1 ⠄⠔⠖⠶⠷⠿⡿⣿ 16
 
 -- at rest, run by run
-  page/-:"  one ┤⠄⠄⠄⠄⠄⠄⠄⠄⠄⠔⠔⠔⠔⠔⠔⠔⠔⠷⠷⠷⠷⠷⠷⠷⠷⣿⣿⣿⣿⣿⣿⣿⣿"
-  page/-:"  two ┤⣿⣿⣿⣿⣿⣿⣿⣿⣿⠷⠷⠷⠷⠷⠷⠷⠷⠔⠔⠔⠔⠔⠔⠔⠔⠄⠄⠄⠄⠄⠄⠄⠄"
-  page/-:"three ┤⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷"
+  dim/-:"  one ┤" page/-:"⠄⠄⠄⠄⠄⠄⠄⠄⠄⠔⠔⠔⠔⠔⠔⠔⠔⠷⠷⠷⠷⠷⠷⠷⠷⣿⣿⣿⣿⣿⣿⣿⣿"
+  dim/-:"  two ┤" page/-:"⣿⣿⣿⣿⣿⣿⣿⣿⣿⠷⠷⠷⠷⠷⠷⠷⠷⠔⠔⠔⠔⠔⠔⠔⠔⠄⠄⠄⠄⠄⠄⠄⠄"
+  dim/-:"three ┤" page/-:"⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷"
   (blank)
-  page/-:"1 ⠄⠔⠖⠶⠷⠿⡿⣿ 16"
+  dim/-:"1 ⠄⠔⠖⠶⠷⠿⡿⣿ 16"
 
 -- focused, run by run
-  page/-:"  one ┤⠄⠄⠄⠄⠄⠄⠄⠄⠄⠔⠔⠔⠔⠔⠔⠔⠔⠷⠷⠷⠷⠷⠷⠷⠷⣿⣿⣿⣿⣿⣿⣿⣿"
-  page/-:"  two ┤⣿⣿⣿⣿⣿⣿⣿⣿⣿⠷⠷⠷⠷⠷⠷⠷⠷⠔⠔⠔⠔⠔⠔⠔⠔⠄⠄⠄⠄⠄⠄⠄⠄"
-  page/-:"three ┤⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷"
+  dim/-:"  one ┤" page/-:"⠄⠄⠄⠄⠄⠄⠄⠄⠄⠔⠔⠔⠔⠔⠔⠔⠔⠷⠷⠷⠷⠷⠷⠷⠷⣿⣿⣿⣿⣿⣿⣿⣿"
+  dim/-:"  two ┤" page/-:"⣿⣿⣿⣿⣿⣿⣿⣿⣿⠷⠷⠷⠷⠷⠷⠷⠷⠔⠔⠔⠔⠔⠔⠔⠔⠄⠄⠄⠄⠄⠄⠄⠄"
+  dim/-:"three ┤" page/-:"⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷"
   (blank)
-  page/-:"1 ⠄⠔⠖⠶⠷⠿⡿⣿ 16"
+  dim/-:"1 ⠄⠔⠖⠶⠷⠿⡿⣿ 16"
 
 -- the ruling (C10 §4k.2 row 4, R-FOC-004)
   nothing is contested · the border and the axes take the focus · the data keeps its reading"
@@ -157,11 +157,4 @@ exports[`C10 §4k — the compositions, as frames > case 4 — focus over a heat
 
 -- the ruling (C10 §4k.2 row 4, R-FOC-004)
   nothing is contested · the border and the axes take the focus · the data keeps its reading"
-`;
-
-exports[`C10 §4k — the compositions, as frames > the four compositions with no subject name the change that would give them one 1`] = `
-"2 · hover beside focus     no producer — mouse mode 1002 sends no motion, so the fact cannot arise (M7)
-3 · selection over a diff  both facts ship; \`patch\` declares no elements and reads ctx.focus nowhere (M9)
-5 · disabled + error       \`disabled\` is an availability fact and no block carries the field (M4)
-6 · stale + running        \`stale\` is a freshness fact and no block carries the field (M4)"
 `;

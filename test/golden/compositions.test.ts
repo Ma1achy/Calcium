@@ -54,39 +54,94 @@ const GROUNDS = [
 /** The tones a run could be inked in, so the report names one rather than a hex. */
 const TONES = ["error", "ok", "warn", "accent", "default", "dim", "muted", "info", "meta", "identifier"] as const;
 
-/** The token name of a run's ink, or `-` when nothing set one. */
-function inkOf(seq: string, caps: TerminalCapabilities): string {
-  const params = SGR_RE.exec(seq)?.[1] ?? "";
-  if (params === "") return "-";
+/**
+ * The SGR channels a sequence leaves standing, walked parameter by parameter.
+ *
+ * **A `48` carries its own `38`, and the first two forms of this file did not
+ * know it.** `48;2;38;64;87` is the selection ground in `dark` — blue 87, green
+ * 64, **red 38** — and a reader testing `params.includes("38")` calls that a
+ * foreground opener, then fails to name the colour it just invented and reports
+ * `-`. The frame was correct at the time and the report said the selected row
+ * had no ink at all. A parameter list is a sequence with per-parameter arity,
+ * not a set, and reading it as a set is how a instrument invents a defect
+ * (`applySgr` in `test/support/styled-screen.ts` is the same walk, written
+ * first).
+ */
+function channels(
+  params: string,
+  cur: Readonly<{ fg: string; bg: string; attrs: readonly string[] }>,
+): Readonly<{ fg: string; bg: string; attrs: readonly string[] }> {
+  let { fg, bg } = cur;
+  let attrs = [...cur.attrs];
+  const held = params === "" ? ["0"] : params.split(";");
+  for (let i = 0; i < held.length; i += 1) {
+    const p = held[i] as string;
+    if (p === "0") {
+      fg = "";
+      bg = "";
+      attrs = [];
+    } else if (p === "38" || p === "48") {
+      const take = held[i + 1] === "2" ? 5 : held[i + 1] === "5" ? 3 : 1;
+      const value = held.slice(i, i + take).join(";");
+      if (p === "38") fg = value;
+      else bg = value;
+      i += take - 1;
+    } else if (p === "39") fg = "";
+    else if (p === "49") bg = "";
+    else if (p === "22") attrs = attrs.filter((a) => a !== "1" && a !== "2");
+    else if (p === "27") attrs = attrs.filter((a) => a !== "7");
+    else if (["1", "2", "3", "4", "7"].includes(p) && !attrs.includes(p)) attrs.push(p);
+  }
+  return { fg, bg, attrs };
+}
+
+/** The SGR parameters a style resolves to, without the CSI and the `m`. */
+function paramsOf(style: Parameters<typeof sgr>[0]): string {
+  return sgr(style).replace(/^\u001b\[/u, "").replace(/m$/u, "");
+}
+
+/**
+ * The token name of the ground a run is painted on, or `page` for none.
+ */
+function groundOf(bg: string, attrs: readonly string[], caps: TerminalCapabilities): string {
+  if (bg !== "") {
+    for (const name of GROUNDS) {
+      const want = paramsOf(background(name, DARK_THEME, caps));
+      if (want !== "" && want === bg) return name.replace("surface.", "");
+    }
+  }
+  // **At 1-bit the attributes are the carriers, so all of them are named.** A
+  // ground resolves to `NO_STYLE` there and an attribute is the honest answer,
+  // but naming only the first of them hides the second: the selected row is
+  // `inverse` for its whole extent and the failed cell is `bold` inside it, and
+  // a label reporting `inverse` alone says the two cells are drawn the same
+  // way. They are not, and at that rung the weight is the whole difference.
+  const named = ["7", "1", "2", "3", "4"]
+    .filter((a) => attrs.includes(a))
+    .map((a) => ({ "7": "inverse", "1": "bold", "2": "dim", "3": "italic", "4": "underline" })[a]);
+  return named.length === 0 ? "page" : named.join("+");
+}
+
+/**
+ * The token name of a run's ink, or `-` when nothing set one.
+ *
+ * **Asked on the ground the run is standing on** (C10 I48). A tone resolves
+ * *against* the surface under it, so `tone.error` is `#f05a5a` on the page and
+ * `#ff9b91` on `dark`'s selection — and a reader that only ever asks about the
+ * page cannot name the second. That is the whole reason the report is worth
+ * having: it is the one place the two values are visible side by side.
+ */
+function inkOf(fg: string, ground: string, caps: TerminalCapabilities): string {
+  if (fg === "") return "-";
+  const on = ground === "page" || ground === "inverse" || ground === "bold" ? undefined : ground;
   for (const name of TONES) {
-    const want = sgr(tone(name, DARK_THEME, caps))
-      .replace(/^\u001b\[/u, "")
-      .replace(/m$/u, "");
-    if (want !== "" && params.includes(want)) return name;
+    if (paramsOf(tone(name, DARK_THEME, caps, on)) === fg) return name;
   }
   return "-";
 }
 
-/** The token name of the ground a run is painted on, or `page` for none. */
-function groundOf(seq: string, caps: TerminalCapabilities): string {
-  const params = SGR_RE.exec(seq)?.[1] ?? "";
-  if (params === "") return "page";
-  const held = params.split(";");
-  for (const name of GROUNDS) {
-    const want = sgr(background(name, DARK_THEME, caps))
-      .replace(/^\u001b\[/u, "")
-      .replace(/m$/u, "");
-    if (want !== "" && params.includes(want)) return name.replace("surface.", "");
-  }
-  // At 1-bit a ground resolves to `NO_STYLE` or to an attribute; naming the
-  // attribute is the honest answer there, because there is no surface to name.
-  if (held.includes("7")) return "inverse";
-  if (held.includes("1")) return "bold";
-  return "page";
-}
-
 /**
- * Every run of a row as `ground:text`, so the report is one line per row.
+ * Every run of a row as `ground/ink:text`, so the report is one line per row.
  *
  * **SGR is cumulative and the first form of this read it as a stamp.** A
  * background opened by `48;2;r;g;b` stays open until `49` or `0`, and a bare
@@ -98,29 +153,22 @@ function groundOf(seq: string, caps: TerminalCapabilities): string {
  */
 function runsOf(line: string, caps: TerminalCapabilities): string {
   const out: string[] = [];
-  let ground = "page";
-  let ink = "-";
+  let style = { fg: "", bg: "", attrs: [] as readonly string[] };
+  let label = "page/-";
   let text = "";
   const close = (): void => {
-    if (text.trim() !== "") out.push(`${ground}/${ink}:${JSON.stringify(text)}`);
+    if (text.trim() !== "") out.push(`${label}:${JSON.stringify(text)}`);
     text = "";
   };
   for (const part of line.split(SPLIT_RE)) {
     if (part === "") continue;
     if (part.startsWith("\u001b[")) {
-      const held = (SGR_RE.exec(part)?.[1] ?? "").split(";");
-      const zero = held.includes("0") || held.join("") === "";
-      const clearsGround = held.includes("49") || zero;
-      const opensGround = held.includes("48") || held.includes("7") || held.includes("1");
-      const clearsInk = held.includes("39") || zero;
-      const opensInk = held.includes("38");
-      if (!clearsGround && !opensGround && !clearsInk && !opensInk) continue;
-      const nextGround = clearsGround ? "page" : opensGround ? groundOf(part, caps) : ground;
-      const nextInk = opensInk ? inkOf(part, caps) : clearsInk ? "-" : ink;
-      if (nextGround !== ground || nextInk !== ink) {
+      style = channels(SGR_RE.exec(part)?.[1] ?? "", style);
+      const ground = groundOf(style.bg, style.attrs, caps);
+      const next = `${ground}/${inkOf(style.fg, ground, caps)}`;
+      if (next !== label) {
         close();
-        ground = nextGround;
-        ink = nextInk;
+        label = next;
       }
       continue;
     }
@@ -191,15 +239,15 @@ describe("C10 §4k — the compositions, as frames", () => {
           "-- the ruling (C10 §4k.2 row 1)",
           "  selection takes the ground · focus keeps its mark · failure keeps its glyph, its word and its tone",
           "",
-          "-- what the frame does NOT meet, recorded here because a snapshot records and does not check",
-          "  the TONE. A focused or selected row is repainted in one ink — accent, or default when",
-          "  selection alone holds it — so `failed` keeps ✗ and the word and loses the error tone.",
-          "  The two halves of the remedy are one change and neither works alone: C11 I14's drop-to-one-ink",
-          "  rule, and a painter that resolves a tone against the surface it lands on. `inkOn` is that",
-          "  resolver, it carries the per-theme overrides and both high-contrast bands, and it is called",
-          "  only from `contrast.ts` — 74 of 100 tone x surface pairs are an ink the gate checks and the",
-          "  painter never emits. Dropping I14 without the second half would paint the flat ink on the",
-          "  selection ground, which is the value the gate already measures as wrong there.",
+          "-- and what drawing it found, kept because the record is the point (F1240)",
+          "  This frame reported two of row 1's three clauses for as long as it existed. A focused or",
+          "  selected row was repainted in ONE ink \u2014 accent, or default under selection \u2014 so `failed` kept",
+          "  \u2717 and the word and lost the error tone. The two halves of the remedy were one change and",
+          "  neither worked alone: C11 I14's drop-to-one-ink rule, and a painter that resolves a tone",
+          "  against the surface it lands on. `inkOn` was that resolver and was called only from",
+          "  `contrast.ts` \u2014 74 of 100 tone x surface pairs were an ink the gate checked and the painter",
+          "  never emitted. C10 I48 gives `resolve` the ground, `inkOn` is its composition step, and the",
+          "  ink beside each ground above is the value C10 T2.49 measures the gate against.",
         ].join("\n"),
       ).toMatchSnapshot();
     });
@@ -251,6 +299,15 @@ describe("C10 §4k — the compositions, as frames", () => {
       "6 · stale + running        `stale` is a freshness fact and no block carries the field (M4)",
     ];
     expect(owed, "four, and the classification rules all six").toHaveLength(4);
-    expect(owed.join("\n")).toMatchSnapshot();
+    // **Two constructible \u00d7 three rungs is the six tests above**, asserted as
+    // arithmetic against the same numbers so the file cannot quietly hold five.
+    // The question this answers is *do all six compositions exist at all three
+    // rungs* \u2014 they do not, and the four that do not are at **no** rung rather
+    // than at one: they have no subject a producer can construct, not a missing
+    // capability. What watches the conditions is C10 T2.48, which asserts each
+    // absence against the tree and goes red the day one acquires a subject; this
+    // row watches the **count**, so a blocker lifting without a frame being drawn
+    // is a failure here rather than a silence.
+    expect((6 - owed.length) * RUNGS.length, "the frames this file draws").toBe(6);
   });
 });

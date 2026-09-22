@@ -12,6 +12,8 @@ import {
   resolveTone,
   validateTokens,
 } from "../../src/presentation/theme/index.js";
+import { inkOn } from "../../src/presentation/theme/contrast.js";
+import { runStyle } from "../../src/presentation/blocks/paint.js";
 import { SCANS } from "../../tools/enforce/source-scans.mjs";
 import { caps, store, SURFACES, SYNTAX_SLOTS, TONES, withTone } from "../support/theme.js";
 
@@ -392,13 +394,38 @@ describe("C10 fail-on-revert", () => {
 });
 
 /**
- * C10 T6.106 — the seam, owed at the spec commit.
+ * C10 T6.106 — the seam a resolver row cannot see.
  *
- * **The pairing is the row.** T2.49 measures the resolver and cannot see a
- * painter that never asks it the question, which is the shape of F1240 itself.
+ * **The pairing is the row.** T2.49 measures `resolve` against `inkOn` and is
+ * green whether or not any painter ever passes a ground, which is the shape of
+ * F1240 itself: a gate that checks an ink nobody emits. So the fail-on-revert
+ * names the row on the other side of the seam, and asserts the difference the
+ * revert makes rather than the revert's own absence.
  */
 describe("C10 I48 — the ground carried from the painter into the resolver", () => {
-  it.todo(
-    "T6.106 (I48, F1240): dropping the `on` argument from `runStyle`'s `resolveTone` call \u2192 T2.49 still passes and C11 T2.13 fails \u2014 not deferred on a component: it lands with I48's resolver change in this same MR",
-  );
+  it("T6.106 (I48, F1240): dropping `on` from `runStyle`'s resolver call → T2.49 still passes and C11 T2.13 fails", () => {
+    const theme = store("dark").current;
+    const run = { text: "failed", tone: "error" } as const;
+    const base = resolveTone("default", theme, caps(24));
+
+    // The tree as it stands: the ground reaches the resolver.
+    const onGround = runStyle(run, base, { theme, capabilities: caps(24) as never, on: "selection" });
+    // The revert: the same call with the argument dropped.
+    const reverted = runStyle(run, base, { theme, capabilities: caps(24) as never });
+
+    expect(onGround.colour, "the ink the theme composed for the ground").toEqual({
+      kind: "rgb",
+      hex: inkOn(theme.tokens, "tone.error", "selection"),
+    });
+    expect(reverted.colour, "and the revert paints the page's ink on the wash").toEqual({
+      kind: "rgb",
+      hex: theme.tokens.palettes["tone"]!.slots["error"]!,
+    });
+    expect(reverted.colour, "which is a different value, so the revert is visible").not.toEqual(onGround.colour);
+
+    // **And T2.49's subject is untouched by the revert**, which is the half that
+    // makes the pairing necessary rather than tidy: `resolve` answers correctly
+    // for both grounds whether or not anything asks it.
+    expect(resolve("tone.error", theme, caps(24), "selection").colour).toEqual(onGround.colour);
+  });
 });

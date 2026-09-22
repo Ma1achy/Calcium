@@ -369,29 +369,27 @@ export const tableDefinition: BlockDefinition<Table> = {
     for (const row of sortedRows(block)) {
       const expandable = isExpandable(row, plan);
       const isHead = focused !== null && focused === row.id;
-      // **The head is never washed by the extent** — it keeps `accent`, which
-      // is what makes it distinguishable inside its own extent (I14).
+      // **The head is told from the extent by its own ground**, not by ink
+      // inside a shared one (I14 as amended, R-SEL-006).
       const isSelected = !isHead && selected.has(row.id);
-      // **Selection wins the ground over focus where both hold** (R-SEL-006):
-      // a head inside a real extent takes the wash and keeps `accent` as the
-      // focus carrier. **`size > 1` and not `has`**, because a one-element
-      // extent *is* no selection — C26 I16's sentinel, measured on the render
-      // side (T1.23): with `has`, a hand-built `selected: [head]` would take the
-      // wash where an absent `selected` takes the focus ground, and the two
-      // would stop drawing byte-identically.
-      const spans = rowSpans(block, row, plan, ctx, {
-        expandable,
-        focused: isHead,
-        selected: isSelected,
-        marked,
-      });
-
+      // **One expression, and it answers both halves** (C10 I48, F1240): which
+      // ground the row takes, and which ground its inks resolve against. Two
+      // expressions is how the gate and the painter stopped agreeing — a row
+      // washed with one surface and inked for another is exactly the value the
+      // contrast gate measures as wrong.
+      //
       // **Selection wins the ground where both hold** (R-SEL-006), and the head
       // keeps `▸`. **`has` and never a size**: `selected` *absent* is C26 I16's
       // head-alone sentinel and any *present* extent is a real selection, one
       // element included — a test on the size paints a real single-row selection
       // as focus and calls that the sentinel (I14, T2.12).
-      const ground = isSelected || (isHead && selected.has(row.id)) ? wash : isHead ? focusGround : null;
+      const on = isSelected || (isHead && selected.has(row.id))
+        ? "selection"
+        : isHead
+          ? "focusGround"
+          : undefined;
+      const spans = rowSpans(block, row, plan, ctx, { expandable, on, marked });
+      const ground = on === "selection" ? wash : on === "focusGround" ? focusGround : null;
       emit(ground === null ? spans : grounded(spans, ground), isHead);
 
       if (row.expanded !== true) continue;
