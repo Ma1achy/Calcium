@@ -989,22 +989,47 @@ here: `heavyHorizontal` is `━`/`=` and `horizontal` is `─`/`-`, resolved thr
 
 ## 4. Capability fallbacks
 
-Every substitution occupies **the same slot at every rung**, and every slot is one
-column bar one. This is the constraint that keeps measurement honest under degradation.
+**A mark in a fixed column occupies the same slot at every rung.** A fixed column is a
+gutter, a row's lead, a frame's edge — anywhere following content aligns to the column, so
+a mark that changed width between rungs would move that alignment when the terminal
+changed alphabet. Every `Glyph` and almost every `GlyphSet` rôle is one cell at every rung
+and holds this trivially. This is the constraint that keeps measurement honest under
+degradation.
 
-**It read *1:1 by column count* until M4, and the design is what changed it.** One cell
-against one cell was a way of guaranteeing that no column moves when the alphabet does;
-it was never the property itself. The registry declares `ellipsis` with `ascii: "..."`
-and `reservedCells: 3` (R-GLY-001, §096), so the residue mark is a **three-cell slot**
-and the 1:1 form would refuse the design's own character. An invariant that blocks the
-design is amended rather than cited: `residueLead(caps)` pads either rendering to the
-three cells, `RESIDUE_CELLS` names the number, and T2.5 asserts the width is identical
-at all three rungs — narrow Unicode, wide, ASCII — which is what the old form bought.
+**It read *1:1 by column count* until M4, and it was amended twice.** One cell against one
+cell was a way of guaranteeing that no column moves when the alphabet does; it was never
+the property itself, and it refused the design's own `...` for `ellipsis`
+(`reservedCells: 3`, R-GLY-003, §096). An invariant that blocks the design is amended
+rather than cited.
 
-**The in-row shed mark is not that slot.** `⋯N` takes the bare character, because it is
-not a column: `shedRow` measures it against the room left and drops it when reserving it
-would clip the row it announces (I81). There is nothing beside it to keep still, and
-padding would put three cells between the mark and its own count.
+**The first amendment then over-reached, and the scope is the correction.** It padded the
+residue lead into a three-cell slot at every rung, which is `reservedCells` applied to a
+mark that is in no column. **A residue lead is followed only by its own count** — `⋯ 5 more`
+in Unicode, `... 5 more` in ASCII (§095, R-BLK-867) — so nothing aligns to it and the
+padding buys two cells of gap the design does not draw. It cost more than gap: the pie
+chart's legend column is sized by its widest row, so the padding took two cells off the
+figure beside it, which the terminal baseline records. `reservedCells` is the width of the
+widest rendering, not a column to pad every rendering into.
+
+**And the registry says it, which is where it had to be said.** R-GLY-001's text read
+*the renderer pads the selected representation to that reservation*, flatly — so the design
+contradicted its own fixtures, which draw `⋯ 5 more`. A released rule's text is sealed by
+the baseline anchor and cannot be edited, so the narrowing landed as **R-GLY-003**, which
+supersedes it and carries the whole rule with the reservation clause bound to fixed columns.
+That needed the builder's supersession check amended as well: it read *a successor must be
+current*, which forbade chains outright, and a chain was the only move available once
+R-GLY-001's own links were sealed by three history rules pointing at it. It now walks to the
+**terminus** — one current rule at the end, every link resolving and reciprocal, no cycle —
+with a fabricated violation for each of those four ways to fail.
+
+`FREE_WIDTH_SLOTS` in `glyphs.ts` declares the exception, and T2.5 keeps it honest from
+both ends: every rôle outside the set is one width at all three rungs — narrow Unicode,
+wide, ASCII — and every rôle **inside** it must genuinely vary, so a dead entry fails
+rather than quietly weakening the rule for everything it names.
+
+**The in-row shed mark reaches the same place from the other end.** `⋯N` takes the bare
+character because `shedRow` measures it against the room left and drops it when reserving
+it would clip the row it announces (I81). There is nothing beside it to keep still.
 
 | Unicode | ASCII | Cells |
 |---|---|---|
@@ -1029,7 +1054,7 @@ C09 owns both renderings of every glyph a block can name (C04 §5). A block name
 | `running` | `●` | `*` | Running, steady state |
 | `queued` | `○` | `o` | Accepted, not yet running |
 | `cancelled` | `⊘` | `/` | Stopped by request |
-| `expand` | `▹` | `:` | A collapsed row — U+25B9, **hollow**. It was `▸`/`>`, which is `focus`'s mark and `quote`'s ASCII: one slot serving two facts, which is the collision §4's fixture note recorded and this row is the ruling (R-GLY-001, M4). **The rule is fill, not direction** — filled is focus, hollow is disclosure — so the two are told apart by the same property at every rung rather than by which way a triangle points, and direction is left to say *collapsed* against *expanded*. ASCII cannot carry fill, so there the three marks are three characters and nothing systematic; `(` is what the no-collision scan left free. `:` was the first pick and was **withdrawn**: the registry's own check sees only the registry, and `:` is `GlyphSet.separator` and `dashedVertical` — one row shows a lead mark and a field separator at once, which is the case the domain model refuses (F1246, SS59) |
+| `expand` | `▹` | `:` | A collapsed row — U+25B9, **hollow**. It was `▸`/`>`, which is `focus`'s mark and `quote`'s ASCII: one slot serving two facts, which is the collision §4's fixture note recorded and this row is the ruling (R-GLY-003, M4). **The rule is fill, not direction** — filled is focus, hollow is disclosure — so the two are told apart by the same property at every rung rather than by which way a triangle points, and direction is left to say *collapsed* against *expanded*. ASCII cannot carry fill, so there the three marks are three characters and nothing systematic; `(` is what the no-collision scan left free. `:` was the first pick and was **withdrawn**: the registry's own check sees only the registry, and `:` is `GlyphSet.separator` and `dashedVertical` — one row shows a lead mark and a field separator at once, which is the case the domain model refuses (F1246, SS59) |
 | `collapse` | `▿` | `v` | An expanded row — U+25BF, hollow, for the reason above. It was `▾`, which the design also spends on **sort descending** (`▾ sorted descending · ▴ ascending`) and on a select's caret: moving disclosure off it leaves that pair whole and gives this axis a mark of its own |
 | `focus` | `▸` | `>` | The focus mark, in the gutter C11 I15 reserves — **a slot of its own, and that is what is new**. It was drawn with `expand`'s, which is why the two could not be told apart. Its ASCII half is `>`, which `quote` also takes — **and that is a clash rather than an exemption.** The earlier wording here said I5 is about cell count and not uniqueness (F824) and that M4's rule ranges over the state set; SS59 ranges over the *domains*, both of these are `row-lead`, and it reports the pair. `>` is the design's for focus, so `quote`'s rail is what moves; the ruling is M4 acceptance |
 | `bullet` | `•` | `-` | A list marker with no status meaning |
@@ -2347,7 +2372,7 @@ with one caller when it needed two.
 |---|---|
 | `registry.measure` | **7** rows — `height + 1`, exactly as C04 I47 and C04 I49 say |
 | the paint | **32** rows |
-| the residue row | `⋯   25 above, 0 below` — the mark in its three-cell slot (I5) |
+| the residue row | `⋯ 25 above, 0 below` — the mark at its natural width; no column aligns to it (I5) |
 | the first row drawn | line 0 — a follow box, opened at its head |
 
 `render` filters `childRanges` by overlap and then renders each survivor **whole**. With several
@@ -2424,7 +2449,7 @@ the same overrun in smaller form.
 - **I2** — `measure` is pure and total (C04 §5). No I/O, no clock, no throw on any input. **A `minHeight` floor does not weaken this and cannot, because no definition sees it**: the registry applies it (I33), so `definition.measure` is a function of `(block, width)` exactly as before, and a kind cannot consult a floor even by accident.
 - **I3** — No renderer reads the environment. Capabilities and theme arrive through `ctx`.
 - **I4** — No renderer emits a colour directly; all styling comes from `resolve` against a declared palette slot.
-- **I5** — Every capability substitution occupies the same slot at every capability rung, and every slot is one cell bar `residue`, which the design declares at three (`reservedCells: 3`, R-GLY-001) and which `residueLead` pads both renderings to. **Amended from *1:1 by cell count* in M4**: the 1:1 form was one way of guaranteeing that no column moves when the alphabet changes, and it refused the design's own `...`. §4 carries the reasoning and the exception's own exception — the in-row shed mark takes the bare character.
+- **I5** — **Every capability substitution in a fixed column occupies the same slot at every capability rung, and every such slot is one cell.** A fixed column is one following content aligns to — a gutter, a row's lead, a frame's edge. `FREE_WIDTH_SLOTS` declares the rôles that are not, with `residue` its only member: a residue lead is followed only by its own count, so it takes its natural width at each rung — `⋯ 5 more`, `... 5 more` (§095, R-BLK-867). **Amended twice in M4**: from *1:1 by cell count*, which refused the design's own `...`, and then narrowed from *every substitution* to *every fixed-column substitution*, which is what `reservedCells` was always a rule about. T2.5 asserts both directions — fixed-column rôles identical across rungs, free-width rôles genuinely varying. §4 carries the reasoning and the in-row shed mark, which reaches the same answer from the other end.
 - **I6** — `cells()` is the single width implementation; no kind computes width independently. **Its Ambiguous set is `East_Asian_Width=Ambiguous` derived from the property with the file's version named, plus a listed deviation for the blocks the framework draws geometry from** — a hand-recalled table is a claim about terminals nobody measured, and the one it replaced under-counted 138,132 code points at `ambiguousWidth: "wide"` (§5, C02 I9).
 - **I7** — Container kinds measure children only through the injected `measureChild`. No kind imports the registry.
 - **I8** — `measure` never reads `ctx.tick`. Animation changes appearance, never geometry.
@@ -2468,7 +2493,7 @@ the same overrun in smaller form.
 - **I42** — **A kind may declare `width(block, w)`, the columns its content occupies at `w`, and one that does not fills.** The answer is in `[1, normaliseWidth(w)]` and pure in `(block, width)` as `measure` is (I2); the registry clamps a definition's answer into the range and reports the excursion. Absent is the second answer, not a missing one: a `rule`, a `progress`, a `plot`, an `image`, a `scroll` and a `mosaic` are their width, and the registry answers `normaliseWidth(w)` for them (§2c, → C04 I101).
 - **I43** — **A block is the same height at its content width**: `measure(b, width(b, w)) === measure(b, w)` for every block and width. This is what lets a container render a child at `width(child, cell)` inside a cell measured at `cell` without the row moving, and every declaring kind keeps it by construction — a `notice` answers its longest wrapped row, so no row re-wraps (§2c).
 - **I44** — **The kinds that answer are named, with the case in which each fills.** `notice`, `raw`, `pills`, `keyValue` (no bar), `code`, `table` (rows present, no action bar, no expanded row — its plan, flex columns included), `group` (a `row` whose shares are all `{cells}` sums them and the gutters; a `column` whose children are all `left` takes the widest), `panel` (its widest child plus the border, or its title or footer plus their furniture). A `keyValue` with a bar fills because the bar absorbs the residual; a weighted `row` and a `column` with an aligned child fill because their layout depends on the width — rendered at their own sum they would be a different layout (§2c). Every other kind declares no member. The list is the record a reader checks against the registry, and a kind added to one and not the other is the SP-class disagreement between spec and tree (§2c).
-- **I45** — **Every non-ASCII base of an emoji variation sequence drawn by a glyph table or a spinner set is followed by U+FE0E, the text presentation selector; a bare base is refused.** The ASCII range is excluded by construction and with its reason: `#`, `*` and the digits are keycap bases that no terminal draws as emoji without their `U+20E3`, and the alphabet the tables degrade to cannot be the alphabet the rule refuses (F832). The set is derived from `emoji-variation-sequences.txt` with its Unicode version named, held in `text.ts` beside the Ambiguous and Wide tables, and consulted by a test-time refusal only — `cells()` never counts presentation, because terminals disagree about it and a width that guesses is worse than one that is wrong the same way everywhere. `⏺` U+23FA is in the set and `⬤` U+2B24 is not, which is the whole of F823; that the remedy is the selector rather than a refusal is the whole of F854 (§4).
+- **I45** — **Every non-ASCII base of an emoji variation sequence drawn by a glyph table or a spinner set is followed by U+FE0E, the text presentation selector; a bare base is refused.** The ASCII range is excluded by construction and with its reason: `#`, `*` and the digits are keycap bases that no terminal draws as emoji without their `U+20E3`, and the alphabet the tables degrade to cannot be the alphabet the rule refuses (F832). The set is derived from `emoji-variation-sequences.txt` with its Unicode version named, held in `text.ts` beside the Ambiguous and Wide tables, and consulted by a test-time refusal only — `cells()` never counts presentation, because terminals disagree about it and a width that guesses is worse than one that is wrong the same way everywhere. `⏺` U+23FA is in the set and `⬤` U+2B24 is not, which is the whole of F823; that the remedy is the selector rather than a refusal is the whole of F854 (§4). **M4 retired the slot that character sat in**, so the rule now guards a set with no shipped member on that base — which is the right disposition and not a reason to drop it: the refusal is about the table, not about one token, and the day a spinner set takes an emoji base it is what catches it. The head mark is no longer a character at all: a call head carries a `state` and the renderer resolves it to `running`'s `●` where tone carries, and to the state's own mark — `queued ○`, `running ●`, `ok ✓`, `error ✗`, `cancelled ⊘` — at 1 bit and in ASCII, which is what makes R-COR-003 hold without colour (C04 §Glyph, R-BLK-125, §030).
 - **I46** — **A `notice` carrying `step` measures one row and is fitted, not wrapped, and the run marked `elide` shortens first.** The fitter truncates the elide run from its end through `truncate` until the row fits, and only then the row; verb, duration and outcome are never shortened while any of the argument remains. A property of the token, as the indent and the rail are (I41), so the kind's wrap policy and `measure`'s signature are unchanged (§3, C04 I85).
 - **I47** — **A `notice` whose glyph is in `GLYPH_ELEMENT` declares one block-level element whether or not it carries an `action`.** `activate` is the block's `action` when present and absent otherwise; `copy` is the text unless the consumer overrides it. `step` is the one member: a call's head is the line a reader acts on, and the gate that keeps a muted status line out of the focus ring is right for every other token (F831; → C26 §5).
 - **I48** — **A member of the `Glyph` vocabulary measured Ambiguous resolves to its ASCII half at `ambiguousWidth: "wide"`, so I5 holds under both conventions.** `glyphFor` takes both fields; `glyphCells` still needs no capability because the two renderings of a slot are one cell at either arm. Eleven members moved on the day the tier landed — the ten F825 measured and `ⓘ`, which F832 put in `info`'s slot — and six Neutral ones did not (§4).
@@ -2577,11 +2602,11 @@ the same overrun in smaller form.
   type and its time, reserved three cells for `⋯2` and had one left for the
   message, so the frame was the withholding and nothing else. The mark is the
   `residue` slot (C09 I22, C04 I49) — `⋯` against `...` since M4 — and never a
-  literal. **The bare character, not `residueLead`'s three-cell slot**: the row
-  lead is a column and keeps still across rungs, and this mark is not — it is
-  measured against the room left and dropped when reserving it would clip the
-  row it announces, so padding would put three cells between the mark and its
-  own count and spend the room the ladder is fighting for.
+  literal. **The bare character**, as every residue mark takes since the slot
+  rule was narrowed to fixed columns (I5): this one is measured against the room
+  left and dropped when reserving it would clip the row it announces, so there is
+  nothing beside it to keep still and padding would only spend the room the
+  ladder is fighting for.
 
   **Dropping an item is refused**: a kind that shed a row would change its element ids and orphan a
   C26 focus, so an item that cannot be drawn is counted in a withholding rather than removed. **A

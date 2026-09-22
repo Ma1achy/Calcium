@@ -433,7 +433,7 @@
       "id": "R-GLY-001",
       "title": "Glyph registry and reserved cells",
       "text": "Every semantic glyph declares a collision-free ASCII fallback, width by capability, and reservedCells equal to its widest representation. The renderer pads the selected representation to that reservation.",
-      "status": "current",
+      "status": "superseded",
       "sectionKey": "current-contract",
       "tags": [
         "contract"
@@ -443,12 +443,29 @@
         "R-HIS-007",
         "R-SEC-093"
       ],
-      "supersededBy": null,
+      "supersededBy": "R-GLY-003",
       "condensedGroup": "DEGRADATION",
       "legacyIds": [
         "GLYPH-001"
       ],
       "contentDigest": "0a3edc0c66ac0550a5eefdbaedfc7b6986c2d76112e04656a98e0faead4eff00"
+    },
+    {
+      "id": "R-GLY-003",
+      "title": "Glyph registry and reserved cells, which bind in fixed columns",
+      "text": "Every semantic glyph declares a collision-free ASCII fallback, width by capability, and reservedCells equal to its widest representation. Reserved cells BIND where the glyph sits in a fixed column - a gutter, a row lead, a frame edge, anywhere following content aligns to the column - and there the renderer pads the selected representation to the reservation, so changing capability rung moves no column. Where a mark stands in no column, reservedCells records the width of the widest rendering and nothing more, and the mark is drawn at its natural width at each rung. A residue lead is that case: it is followed only by its own count, so it reads as the ellipsis, a space and the count at every rung, and padding it would buy a gap the design does not draw and take the cells from whatever stands beside it.",
+      "status": "current",
+      "sectionKey": "current-contract",
+      "tags": [
+        "contract"
+      ],
+      "supersedes": [
+        "R-GLY-001"
+      ],
+      "supersededBy": null,
+      "condensedGroup": "DEGRADATION",
+      "legacyIds": [],
+      "contentDigest": "9a46840195ac5b90072411c869ffc4ce729e53d8b0f71cb68176bf91746563a8"
     },
     {
       "id": "R-CAP-001",
@@ -19014,7 +19031,7 @@
       "status": "example",
       "renderer": "glyphs",
       "ruleIds": [
-        "R-GLY-001",
+        "R-GLY-003",
         "R-GLY-002"
       ]
     },
@@ -21318,7 +21335,7 @@
       "status": "example",
       "renderer": null,
       "ruleIds": [
-        "R-GLY-001",
+        "R-GLY-003",
         "R-MOT-002",
         "R-EVT-001"
       ],
@@ -28162,7 +28179,7 @@
       "accessibleName": "work-unit / state dot",
       "status": "current",
       "ruleIds": [
-        "R-GLY-001"
+        "R-GLY-003"
       ],
       "canonical": true,
       "widthClass": "ambiguous",
@@ -28186,7 +28203,7 @@
       "accessibleName": "result branch",
       "status": "current",
       "ruleIds": [
-        "R-GLY-001"
+        "R-GLY-003"
       ],
       "canonical": true,
       "widthClass": "narrow"
@@ -28208,7 +28225,7 @@
       "accessibleName": "attention",
       "status": "current",
       "ruleIds": [
-        "R-GLY-001"
+        "R-GLY-003"
       ],
       "canonical": true,
       "widthClass": "ambiguous",
@@ -28231,7 +28248,7 @@
       "accessibleName": "segmented meter fill",
       "status": "current",
       "ruleIds": [
-        "R-GLY-001"
+        "R-GLY-003"
       ],
       "canonical": false,
       "widthClass": "ambiguous"
@@ -28253,7 +28270,7 @@
       "accessibleName": "success",
       "status": "current",
       "ruleIds": [
-        "R-GLY-001"
+        "R-GLY-003"
       ],
       "canonical": true,
       "widthClass": "narrow"
@@ -28275,7 +28292,7 @@
       "accessibleName": "reader position",
       "status": "current",
       "ruleIds": [
-        "R-GLY-001"
+        "R-GLY-003"
       ],
       "canonical": true,
       "widthClass": "narrow"
@@ -28297,7 +28314,7 @@
       "accessibleName": "focus",
       "status": "current",
       "ruleIds": [
-        "R-GLY-001"
+        "R-GLY-003"
       ],
       "canonical": true,
       "widthClass": "ambiguous"
@@ -28319,7 +28336,7 @@
       "accessibleName": "collapsed disclosure",
       "status": "current",
       "ruleIds": [
-        "R-GLY-001"
+        "R-GLY-003"
       ],
       "canonical": true,
       "widthClass": "ambiguous"
@@ -28341,7 +28358,7 @@
       "accessibleName": "expanded disclosure",
       "status": "current",
       "ruleIds": [
-        "R-GLY-001"
+        "R-GLY-003"
       ],
       "canonical": true,
       "widthClass": "ambiguous"
@@ -28363,7 +28380,7 @@
       "accessibleName": "question",
       "status": "current",
       "ruleIds": [
-        "R-GLY-001"
+        "R-GLY-003"
       ],
       "canonical": true,
       "widthClass": "narrow"
@@ -28386,7 +28403,7 @@
       "accessibleName": "current item",
       "status": "current",
       "ruleIds": [
-        "R-GLY-001"
+        "R-GLY-003"
       ],
       "canonical": true,
       "widthClass": "narrow",
@@ -28409,7 +28426,7 @@
       "accessibleName": "sorted descending",
       "status": "current",
       "ruleIds": [
-        "R-GLY-001"
+        "R-GLY-003"
       ],
       "canonical": true,
       "widthClass": "ambiguous"
@@ -28431,7 +28448,7 @@
       "accessibleName": "sorted ascending",
       "status": "current",
       "ruleIds": [
-        "R-GLY-001"
+        "R-GLY-003"
       ],
       "canonical": true,
       "widthClass": "ambiguous"
@@ -28453,7 +28470,7 @@
       "accessibleName": "rule segment",
       "status": "current",
       "ruleIds": [
-        "R-GLY-001"
+        "R-GLY-003"
       ],
       "canonical": false,
       "widthClass": "ambiguous",
@@ -28476,7 +28493,7 @@
       "accessibleName": "omitted content",
       "status": "current",
       "ruleIds": [
-        "R-GLY-001"
+        "R-GLY-003"
       ],
       "canonical": true,
       "widthClass": "ambiguous"
@@ -28494,7 +28511,7 @@
       "reservedCells": 1,
       "status": "current",
       "ruleIds": [
-        "R-GLY-001"
+        "R-GLY-003"
       ],
       "canonical": true,
       "widthClass": "ambiguous",
@@ -28515,7 +28532,7 @@
       "reservedCells": 1,
       "status": "current",
       "ruleIds": [
-        "R-GLY-001"
+        "R-GLY-003"
       ],
       "canonical": true,
       "widthClass": "narrow",
@@ -28533,7 +28550,7 @@
       "reservedCells": 1,
       "status": "current",
       "ruleIds": [
-        "R-GLY-001"
+        "R-GLY-003"
       ],
       "widthClass": "narrow",
       "collisionDomains": [
@@ -28548,7 +28565,7 @@
       "reservedCells": 1,
       "status": "current",
       "ruleIds": [
-        "R-GLY-001"
+        "R-GLY-003"
       ],
       "widthClass": "narrow",
       "collisionDomains": [
@@ -33000,7 +33017,7 @@
     "glyphs": {
       "collection": "glyphs",
       "ruleIds": [
-        "R-GLY-001"
+        "R-GLY-003"
       ],
       "where": {
         "canonical": true
@@ -33251,7 +33268,7 @@
         "widthClass": "ambiguous"
       },
       "ruleIds": [
-        "R-GLY-001"
+        "R-GLY-003"
       ]
     },
     "canonicalNarrowGlyphs": {
@@ -33261,7 +33278,7 @@
         "widthClass": "narrow"
       },
       "ruleIds": [
-        "R-GLY-001"
+        "R-GLY-003"
       ]
     },
     "legacyCycleBandPasses": {
@@ -33351,7 +33368,7 @@
     "glyphWidthFailureModes": {
       "collection": "catalogues.glyphWidthFailureModes",
       "ruleIds": [
-        "R-GLY-001"
+        "R-GLY-003"
       ]
     },
     "fillRamps": {

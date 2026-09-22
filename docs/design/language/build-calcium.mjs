@@ -123,20 +123,48 @@ export function validateRuleRecords(ruleList) {
   for (const rule of ruleList) {
     if (rule.status === 'superseded') {
       if (!rule.supersededBy) throw new Error(`${rule.id} is superseded without a successor`);
-      const successor = rules.get(rule.supersededBy);
-      if (!successor || successor.status !== 'current') throw new Error(`${rule.id} has invalid successor ${rule.supersededBy}`);
-      if (!successor.supersedes?.includes(rule.id)) throw new Error(`${rule.id} / ${successor.id} supersession is not reciprocal`);
+      // **A successor may itself be superseded.** The check read `successor.status
+      // !== 'current'`, which forbade chains outright — and a chain is the only
+      // move left once a rule's own links are sealed: a released rule's
+      // supersededBy cannot be redirected (lint-immutable), so a rule that
+      // narrows a narrowing has nowhere to attach but the end of the line. What
+      // must hold is not the first link's status but the **terminus**: follow the
+      // chain and it ends in exactly one current rule.
+      //
+      // The walk does all four things at once, because each is a way the chain
+      // can fail to have one terminus — a link that resolves to nothing, a link
+      // the target does not acknowledge, a link that returns to a rule already
+      // walked, and an end that is not current.
+      const walked = new Set([rule.id]);
+      let cursor = rule;
+      while (cursor.supersededBy) {
+        const next = rules.get(cursor.supersededBy);
+        if (!next) throw new Error(`${cursor.id} has invalid successor ${cursor.supersededBy}`);
+        if (!next.supersedes?.includes(cursor.id)) throw new Error(`${cursor.id} / ${next.id} supersession is not reciprocal`);
+        if (walked.has(next.id)) throw new Error(`supersession cycle at ${next.id}`);
+        walked.add(next.id);
+        cursor = next;
+      }
+      if (cursor.status !== 'current') {
+        throw new Error(`${rule.id}'s supersession chain ends at ${cursor.id}, which is ${cursor.status} and has no successor`);
+      }
     }
     for (const oldId of rule.supersedes ?? []) {
       const old = rules.get(oldId);
       if (!old || old.supersededBy !== rule.id) throw new Error(`${rule.id} has asymmetric supersedes link to ${oldId}`);
     }
+    // **And the cycle walk stays for the rules the chain check does not start
+    // from.** A `current` or `example` rule carrying a `supersededBy` is not
+    // superseded, so the branch above never sees it; without this it could point
+    // into a loop and nothing would say so. Null-safe, because a dangling link
+    // here is a dangling link and not a TypeError.
     const seen = new Set([rule.id]);
     let cursor = rule;
-    while (cursor.supersededBy) {
+    while (cursor?.supersededBy) {
       if (seen.has(cursor.supersededBy)) throw new Error(`supersession cycle at ${cursor.supersededBy}`);
       seen.add(cursor.supersededBy);
       cursor = rules.get(cursor.supersededBy);
+      if (!cursor) throw new Error(`dangling supersededBy link from ${rule.id}`);
     }
   }
   return rules;
