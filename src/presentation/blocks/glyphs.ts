@@ -311,6 +311,17 @@ const ASCII: GlyphSet = Object.freeze({
 export const RESIDUE_CELLS = 3;
 
 /**
+ * The cells one spinner frame occupies, at every set and every rung.
+ *
+ * **A constant, and the constant is what a capability-free measurer needs.**
+ * `measure` receives width and no capability record (C04 §5), so a reservation
+ * for an animating mark can only be correct if every frame of every set is the
+ * same width — which T2.75 and T2.70 assert over the whole catalogue rather
+ * than leaving it to whoever adds the next set.
+ */
+export const SPINNER_CELLS = 1;
+
+/**
  * The residue mark, padded to its slot — the one place either rendering enters
  * a frame.
  *
@@ -964,7 +975,6 @@ const GLYPH_TABLE: Readonly<Record<Glyph, readonly [unicode: string, ascii: stri
     // and reserved its width with `glyphCells("expand")`, so a change to the
     // disclosure mark would have moved the focus gutter. Two facts, two slots.
     focus: ["▸", ">"],
-    live: ["▌", "|"],
     bullet: ["•", "-"],
     // **`⎸` U+23B8 is `East_Asian_Width=Neutral` — one cell under both
     // conventions** — where `▌`, `│`, `┃`, `▎`, `▏`, `┆`, `┊` and `╎` are all
@@ -974,8 +984,12 @@ const GLYPH_TABLE: Readonly<Record<Glyph, readonly [unicode: string, ascii: stri
     // first slot picked *because* of that measurement. Not `live`'s `▌` for
     // F161's reason as well: a shared mark acquires a consumer that cannot take
     // it, and a live gutter and a quotation are two rôles in one position.
-    // The ASCII half is plain text's own quotation mark.
-    quote: ["⎸", ">"],
+    // **The ASCII half is `|` since M4, and it was `>`.** Both are plain text's
+    // own quotation marks; `>` is also the design's focus mark, and the two
+    // shared a row's lead — SS64's first real finding. `|` is what every
+    // box-drawing vertical already degrades to, and it was held by `live`,
+    // which M4 retires (C04 I39).
+    quote: ["⎸", "|"],
     // **`⁃` U+2043 is Neutral too**, where the bullets a reader reaches for —
     // `◦`, `‣`, `▪` — are Ambiguous. The ASCII half is `~`, the mark C04 §5
     // already gives a bounded region, and deliberately not `-`: that is
@@ -1036,7 +1050,6 @@ export const GLYPH_DOMAINS: Readonly<Record<Glyph, readonly string[]>> = {
   expand: ["row-lead"],
   collapse: ["row-lead"],
   focus: ["row-lead"],
-  live: ["row-lead"],
   bullet: ["row-lead"],
   quote: ["row-lead"],
   nested: ["row-lead"],

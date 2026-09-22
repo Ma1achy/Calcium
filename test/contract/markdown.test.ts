@@ -347,8 +347,12 @@ describe("roadmap 11 — the named subset, as blocks", () => {
     // Ambiguous and draws two cells where the terminal says wide.
     expect(cells("⎸", "narrow")).toBe(1);
     expect(cells("⎸", "wide"), "Neutral — one cell under both conventions").toBe(1);
-    expect(cells("▌", "wide"), "which is why `live`'s mark could not be reused").toBe(2);
-    expect(frame([quote], ASCII_CAPS, 24)[0]?.startsWith("> ")).toBe(true);
+    expect(cells("▌", "wide"), "which is why the design's own rail could not be reused").toBe(2);
+    // **The ASCII half is `|` since M4, and it was `>`.** Both are plain text's
+    // own quote bars; `>` is also the design's focus mark (R-GLY-001) and the
+    // two shared a row's lead, which is SS64's first real finding. `|` was held
+    // by `Glyph.live`, retired in the same change (C04 I39).
+    expect(frame([quote], ASCII_CAPS, 24)[0]?.startsWith("| ")).toBe(true);
 
     // **A blockquote's body is prose, out by name.** One notice has one glyph,
     // so a heading inside a quote is the characters it is written with.

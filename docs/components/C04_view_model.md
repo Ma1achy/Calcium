@@ -806,7 +806,7 @@ The constraint is indirection, not scarcity. Three things depend on it and none 
 type Glyph =
   | "ok" | "warn" | "error" | "info"
   | "pending" | "working" | "running" | "queued" | "cancelled"
-  | "expand" | "collapse" | "live" | "bullet"
+  | "expand" | "collapse" | "focus" | "bullet"
   | "quote" | "nested"      // §3an — a rail, and the mark past the depth cap
   | "continuation"
   | "step";                 // a call's head — C09 §4, `⬤` U+2B24 over `*`

@@ -53799,6 +53799,43 @@ fabricated finding costs the next reader the same twenty minutes.
 
 ---
 
+## F1250 — a token retired for one fact was measured to carry only one ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `Glyph.live` and its mark `▌`. |
+| **Reached for** | Every `▌` a frame in `src/` can reach. |
+| **Verdict** | **Real, and the condition on retiring it was written for a fact the repository never had.** |
+
+Retiring `live` was conditioned on both of `▌`'s facts keeping a named, asserted
+replacement: *this block is still updating*, and *my keys go here*.
+
+**Measured, the repository's `▌` carried one.** `Panel.live` is the only producer —
+`livePanel` in `shell/refresh.ts`, drawn at exactly one site in `kinds/containers.ts` —
+and it means *this region refreshes*. The ownership reading is the **design's** `▌`
+(§017, R-BLK-129: the selection rail, and the caret in the mode line), and nothing in
+`src/` paints it.
+
+A sweep of `src/` for the character returns four lines and not one is an ownership mark:
+`GlyphSet.bar` (the plot's box fill — a figure, where position carries the meaning), two
+**spinner frames** (a liveness carrier, not a mark that stands still), and a trailing
+comment on a range bound in `cells()`'s own table.
+
+**The point is not that the condition was wrong — it is that a fact with no carrier cannot
+be lost.** T1.4g2 asserts the four producers by name rather than counting them, so the row
+fails the day a fifth appears, which is when the ownership replacement — the footer's owner
+line (R-KEY-004, M5) plus `▸` when focused — actually has to exist. A count would have said
+*no new producer*; the list says *what the old ones were for*, which is what the next
+reader needs.
+
+**And the replacement for the fact that did exist is the design's own.** The design carries
+no static live mark: liveness is the spinner (§030). So the panel title takes a spinner
+frame, `measure` still never sees the tick — every frame of every set is one cell at both
+alphabets, which is what lets the reservation be a constant — and retiring the token freed
+`|` for `Glyph.quote`'s rail, which `focus` had pushed off `>`.
+
+---
+
 ## F1249 — a widened gate's first run was 76% wrong about its own subject ★★★★★
 
 | | |

@@ -784,9 +784,6 @@
   "info": [
    "row-lead"
   ],
-  "live": [
-   "row-lead"
-  ],
   "nested": [
    "row-lead"
   ],
@@ -989,16 +986,12 @@
    ">"
   ],
   [
-   "▌",
-   "|"
-  ],
-  [
    "•",
    "-"
   ],
   [
    "⎸",
-   ">"
+   "|"
   ],
   [
    "⁃",
@@ -1026,7 +1019,6 @@
   "expand",
   "collapse",
   "focus",
-  "live",
   "bullet",
   "quote",
   "nested",

@@ -25,7 +25,7 @@ import type { Block, Group, MeasureFn, Mosaic, MosaicRect, Panel, Scroll, WidthF
 import { axesOf, groupPlacements, mosaicRects, parseAreas } from "../../../data/viewmodel/index.js";
 import type { NavElement } from "../types.js";
 import { cells, sliceCells, stripControl, truncate } from "../../text.js";
-import { glyphCells, glyphFor, glyphs, residueLead } from "../glyphs.js";
+import { SPINNER_CELLS, glyphs, residueLead, spinnerFrames } from "../glyphs.js";
 import { clampSpans, paint, rows, tone } from "../paint.js";
 import { composeRow, fitRow, placeRows, type Placed } from "../../rows.js";
 import { layout, measure as solveHeight, type Box, type Size } from "../../layout/index.js";
@@ -76,7 +76,12 @@ export const panelDefinition: BlockDefinition<Panel> = {
     const rail = (text: string | undefined, live: boolean): number => {
       const shown = stripControl(text ?? "");
       if (shown === "") return 0;
-      return cells(shown) + (live ? glyphCells("live") + 1 : 0) + 5; // narrow-ok — `width` is pure in (block, width) as `measure` is (C09 I42), and narrow is the measurer's convention
+      // **One cell for the spinner frame and one for its space** — a constant
+      // rather than a lookup, and that is what makes `measure` capability-free
+      // here: every frame of every set is one cell at both alphabets (T2.75,
+      // T2.70), so the reservation cannot depend on which set is resolved. It
+      // read `glyphCells("live") + 1` while a static rail held the slot.
+      return cells(shown) + (live ? SPINNER_CELLS + 1 : 0) + 5; // narrow-ok — `width` is pure in (block, width) as `measure` is (C09 I42), and narrow is the measurer's convention
     };
     return Math.max(
       1,
@@ -104,13 +109,22 @@ export const panelDefinition: BlockDefinition<Panel> = {
       return shown === "" ? "" : ` ${shown} `;
     };
 
-    // **The `live` slot, reachable at last** (C04 I39, F18). It rides in the
-    // title's own text, so the fill arithmetic below is untouched and a panel is
-    // still children + 2 — and it comes through `glyphFor`, so it is `|` under
-    // ASCII rather than a `▌` an app wrote into its title and could not degrade.
+    // **A live region is marked by a spinner frame, not by a static rail**
+    // (C04 I39, F18, R-GLY-001). It was `Glyph.live`'s `▌`, and M4 retires that
+    // token for two reasons that are both the design's: the design carries no
+    // static live mark — liveness is the spinner (§030) — and `▌` is the
+    // design's selection rail and caret (§017), so a repository token stood on
+    // a design character for a fact the design draws another way. Retiring it
+    // also freed `|` for `Glyph.quote`'s rail, which `focus` had pushed off `>`.
+    //
+    // **The frame rides in the title's own text**, so the fill arithmetic below
+    // is untouched and a panel is still children + 2. Every frame of every set
+    // is one cell at both alphabets (T2.75, T2.70), so the title does not
+    // change width as it animates and `measure` never sees the tick (I8).
+    const frames = spinnerFrames(ctx.capabilities);
     const titlePart = railPart(
       block.live === true
-        ? `${glyphFor("live", ctx.capabilities)} ${stripControl(block.title)}`.trimEnd()
+        ? `${frames[ctx.tick % frames.length] ?? g.dotted} ${stripControl(block.title)}`.trimEnd() // cells-ok — a frame index
         : block.title,
     );
     const fill = Math.max(0, inner - cells(titlePart, ctx.capabilities.ambiguousWidth));

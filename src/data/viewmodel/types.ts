@@ -208,7 +208,6 @@ export type Glyph =
    * *you are here* — and a shared slot cannot.
    */
   | "focus"
-  | "live"
   | "bullet"
   /**
    * A quotation's gutter — **a rail rather than a mark** (C04 I95, C09 I41).

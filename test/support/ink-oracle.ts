@@ -59,6 +59,8 @@ const LADDER =
   "C09 I81 (F1233): the kind's narrow ladder replaced a cut taken from every part at once";
 const HEADER =
   "C09 I82 (F1236): the header reserves the verdict's cells, so its label names the column its values are in";
+const LIVE_SPINNER =
+  "C04 I39 / R-GLY-001 (M4): a live region is marked by a spinner frame, where Ink drew `Glyph.live`'s static `▌` — a token the design has no slot for, on a character the design spends on the selection rail";
 const RESIDUE_SLOT =
   "R-GLY-001 (M4): the residue mark is a declared three-cell slot at every rung — `...` by the design, `⋯` padded to match — where Ink drew a one-cell `~`";
 
@@ -96,6 +98,10 @@ const RETIRED: ReadonlyMap<string, string> = new Map(
       ["t2144-scroll-sc-off", [12, 24, 32, 40, 60, 80, 100, 120, 160, 200], RESIDUE_SLOT],
       ["t2144-scroll-sc-residue", [2], RESIDUE_SLOT, ["ascii", "mono"]],
       ["t2144-scroll-sc-off", [2], RESIDUE_SLOT, ["ascii", "mono"]],
+      // The one panel that declares `live`. Width 2 is absent for a different
+      // reason than the scrolls': at two columns the title is gone entirely, so
+      // there is no mark to change.
+      ["t2144-panel-p-live", [12, 24, 32, 40, 60, 80, 100, 120, 160, 200], LIVE_SPINNER],
     ] as const
   ).flatMap(([key, widths, why, only]) =>
     widths.flatMap((width) =>

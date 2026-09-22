@@ -1,5 +1,5 @@
 // C09 tier 1 — the registry's state machine, and each kind's documented height.
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { createLowlight } from "lowlight";
 import type { LanguageFn } from "highlight.js";
@@ -28,6 +28,8 @@ import type { Block, Group, MeasureFn, Probe } from "../../src/data/viewmodel/in
 import { groupDefinition } from "../../src/presentation/blocks/kinds/containers.js";
 import {
   createBlockRegistry,
+  GLYPH_TOKENS,
+  spinnerFrames,
   DEFAULT_DEFINITIONS,
   DEFAULT_LANGUAGES,
   registerGrammar,
@@ -911,17 +913,92 @@ describe("C09 §6 — kinds", () => {
         children: [block({ kind: "rule", id: live ? "r" : "s", label: "x" })],
       });
 
+    // **The mark is a spinner frame since M4, and it was `▌`.** `Glyph.live` is
+    // retired: the design carries no static live mark — liveness is the spinner
+    // (§030) — and `▌` is the design's selection rail and caret (§017), so a
+    // repository token stood on a design character for a fact drawn another way.
+    // The fact survives the mark, which is what this row is now for.
     const kit = measurable();
-    expect(visible(kit.renderToLines(of(true), 40)[0] ?? "")).toContain("▌ containers");
-    expect(visible(kit.renderToLines(of(false), 40)[0] ?? "")).not.toContain("▌");
+    const frames = spinnerFrames(FULL_CAPS);
+    const titleAt = (t: number, caps = FULL_CAPS): string =>
+      visible(measurable({ capabilities: caps, tick: t }).renderToLines(of(true), 40)[0] ?? "");
 
-    // The whole argument for a slot rather than a character in the title.
+    expect(titleAt(0)).toContain(`${frames[0]!} containers`);
+    expect(visible(kit.renderToLines(of(false), 40)[0] ?? ""), "a static panel takes no mark").not.toContain(
+      ` containers`.trimStart() === "" ? "x" : `${frames[0]!} `,
+    );
+
+    // **It advances**, which is the half a static rail could not carry: the
+    // fact is *this region refreshes*, and a mark that never moves says a
+    // region exists rather than that it is working.
+    const seen = new Set(frames.map((_, t) => titleAt(t)));
+    expect(seen.size, "the title moves with the tick").toBeGreaterThan(1);
+
+    // The whole argument for a slot rather than a character in the title: it
+    // degrades, where a `▌` an app wrote into its own title could not.
     const ascii = measurable({ capabilities: ASCII_CAPS });
-    expect(visible(ascii.renderToLines(of(true), 40)[0] ?? "")).toContain("| containers");
+    const asciiFrames = spinnerFrames(ASCII_CAPS);
+    expect(visible(ascii.renderToLines(of(true), 40)[0] ?? "")).toContain(`${asciiFrames[0]!} containers`);
 
-    // It rides in a border drawn either way, so the panel is children + 2 still.
+    // **Geometry does not animate** (I8): it rides in a border drawn either
+    // way, so the panel is children + 2 still, and every frame is one cell, so
+    // the row is the same width at every tick.
     expect(kit.measure(of(true), 40)).toBe(kit.measure(of(false), 40));
-    expect(visible(kit.renderToLines(of(true), 40)[0] ?? "")).toHaveLength(40);
+    for (const t of frames.keys()) expect(titleAt(t), `tick ${String(t)}`).toHaveLength(40);
+  });
+
+  /** Every `.ts` under `src/`, for the producer sweep below. */
+  const srcFiles = (dir: string, out: string[] = []): string[] => {
+    for (const entry of readdirSync(dir)) {
+      const path = `${dir}/${entry}`;
+      if (statSync(path).isDirectory()) srcFiles(path, out);
+      else if (/\.ts$/u.test(entry) && !/\.d\.ts$/u.test(entry)) out.push(path);
+    }
+    return out;
+  };
+
+  it("T1.4g2 (C04 I39, R-GLY-001): retiring `live` loses no fact — `▌` had one consumer and it was this one", () => {
+    // **The condition on retiring the token was that both its facts keep a
+    // named, asserted replacement.** Measured, the repository's `▌` carried
+    // **one**: *this region refreshes* (`Panel.live`, `livePanel` in
+    // `shell/refresh.ts`, drawn at exactly one site), which T1.4g above now
+    // asserts as a spinner.
+    //
+    // The other reading of `▌` — *my keys go here* — is the **design's**
+    // (§017, R-BLK-129: the selection rail, and the caret in the mode line),
+    // and nothing in `src/` paints it. A fact with no carrier cannot be lost by
+    // retiring a mark, and this row is what makes that a measurement rather
+    // than a claim: it fails the day a second producer appears, which is when
+    // the replacement — the footer's owner line (R-KEY-004, M5) plus `▸` when
+    // focused — has to exist.
+    const src = srcFiles("src");
+    const producers: string[] = [];
+    for (const file of src) {
+      const text = readFileSync(file, "utf8");
+      for (const [i, line] of text.split("\n").entries()) {
+        if (!line.includes("\u258c")) continue;
+        // A mention in prose is not a producer; a string literal is.
+        if (/^\s*(\*|\/\/|\/\*)/u.test(line)) continue;
+        producers.push(`${file}:${String(i + 1)} ${line.trim().replace(/\s+/gu, " ")}`);
+      }
+    }
+    // **Four, and not one of them is an ownership mark.** Named rather than
+    // counted, because a count says *no new producer* and a list says *what the
+    // old ones were for* — and the second is what the next reader needs when
+    // R-KEY-004's owner line lands.
+    expect(producers, "every `▌` a frame can reach, and what each is for").toEqual([
+      // The plot's box fill — a figure, where position carries the meaning.
+      'src/presentation/blocks/glyphs.ts:238 bar: "▌",',
+      // Two spinner sets: `▌` as one *frame* of an animation, which is a
+      // liveness carrier and not a mark that stands still and means something.
+      'src/presentation/blocks/glyphs.ts:598 frames: Object.freeze(["▏", "▎", "▍", "▌", "▋", "▊", "▉", "▊", "▋", "▌", "▍", "▎"]),',
+      'src/presentation/blocks/glyphs.ts:610 frames: Object.freeze(["▌", "▀", "▐", "▄"]),',
+      // A trailing comment on a range bound in `cells()`'s own table.
+      "src/presentation/text.ts:1651 0x25a0, 0x25ff, // geometric shapes — ▌ ● ○ ▸ ▾",
+    ]);
+
+    // And the token is gone from the vocabulary, both halves.
+    expect(GLYPH_TOKENS as readonly string[]).not.toContain("live");
   });
 
   it("T1.4h (C04 I40): a comparison names its columns, and says nothing when it has nothing to say", () => {

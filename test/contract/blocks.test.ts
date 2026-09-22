@@ -528,7 +528,7 @@ describe("C09 §4 — the call grammar's glyph rows", () => {
     // T2.5b asserted the rule at `narrow` alone, and ten of seventeen members
     // broke it at `wide` while it was green (F825). The two named sets are
     // compared by equality so a member moving between them fails the row.
-    const AMBIGUOUS = new Set(["warn", "info", "pending", "working", "running", "queued", "cancelled", "expand", "collapse", "focus", "live", "bullet"]);
+    const AMBIGUOUS = new Set(["warn", "info", "pending", "working", "running", "queued", "cancelled", "expand", "collapse", "focus", "bullet"]);
     const NEUTRAL = new Set(["ok", "error", "quote", "nested", "continuation", "step"]);
     expect(new Set([...AMBIGUOUS, ...NEUTRAL])).toEqual(new Set(GLYPH_TOKENS));
     const tiered: string[] = [];
