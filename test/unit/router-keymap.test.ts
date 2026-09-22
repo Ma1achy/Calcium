@@ -689,3 +689,11 @@ describe("C16 I17 — the rule, over the half a table walk cannot reach", () => 
     expect(offenders, "a key nothing can press").toEqual([]);
   });
 });
+
+describe("C16 §6a — two profiles, and the registry's authority over the table (M6)", () => {
+  it.todo("T1.34 (I34): `⌘↑` and `↑` are different keys, and only the Kitty arm sets `super` — not deferred on a component: the same round’s code commit replaces this row");
+  it.todo("T1.35 (I35): a profile is a condition, both live in one table, and `resolve` refuses the wrong one — not deferred on a component: the same round’s code commit replaces this row");
+  it.todo("T1.36 (I36): every action has a `default-terminal` route — not deferred on a component: the same round’s code commit replaces this row");
+  it.todo("T1.37 (I37): every current registry binding resolves, is handled elsewhere by a named site, or is a declared capture — not deferred on a component: the same round’s code commit replaces this row");
+  it.todo("T1.38 (I38): every reserved chord carries an explicit no-op executor — not deferred on a component: the same round’s code commit replaces this row");
+});

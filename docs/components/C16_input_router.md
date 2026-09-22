@@ -954,15 +954,19 @@ yank is the readline convention worth keeping.
 | Key | Action | | Key | Action |
 |---|---|---|---|---|
 | `backspace`, `⌃h` | `backspace` | | `delete` | `delete` |
-| `⌃w`, `⌥⌫` | `killWordLeft` | | `⌥d` | `killWordRight` |
+| `⌃w` | `killWordLeft` | | `⌥d` | `killWordRight` |
 | `⌃u` | `killToStart` | | `⌃k` | `killToEnd` |
 | `⌃y` | `yank` | | `⌃a`, `home` | `home` |
 | `⌃e`, `end` | `end` | | `⌥b`, `⌃←` | `wordLeft` |
 | `⌥f`, `⌃→` | `wordRight` | | `←` | `left` |
 | `⌃z` | `undo` | | `⌥z` | `redo` |
 
-`⌃w` and `⌥⌫` are both word-delete-left, in different traditions; they are
-distinct wire forms and no other binding wants either, so both are bound. **`→`
+`⌃w` and `⌥⌫` were both word-delete-left, in different traditions. **`⌥⌫` is
+now `queue.drop`** (M6, `binding.037`): the registry gives it to the queue, and
+*no other binding wants either* was the premise that made binding both free —
+one does now. `⌃w` keeps the verb, so nothing C17 exposes becomes unreachable;
+what is lost is the second tradition's spelling of it, which is the cost of the
+design owning the chord and is recorded rather than argued away. **`→`
 is deliberately absent**: it is already `acceptGhostOrForward`, which falls
 through to a character-right move when there is no ghost, so binding it again
 would be the duplicate `(target, key)` construction error below.
@@ -1062,6 +1066,117 @@ forms are already pressed through the decoder for the prompt's rows.
 
 ---
 
+## 6a. Two profiles, and the registry's authority over this table — M6
+
+`docs/design/language/` declares 39 actions and 39 bindings and is normative for
+every chord it names (`AUTHORITY.md`). This table holds 85 rows over ~65 actions,
+so the registry is not a replacement for it: **the registry says what the design
+has ruled, and this table must agree with it wherever it speaks.** The rows it
+does not speak to — word motion, kill and yank, the plot camera, the pushed
+view's paging — stay exactly as they are.
+
+### The measurement that shaped this section
+
+Every current registry binding was resolved against the live keymap before any
+of it was written. Of 39: one is a command (`/help`), 26 resolved to nothing, and
+of the 12 that resolved, **two resolved by accident** — `⌘↑` and `⌘↓` matched
+`rowUp` and `rowDown` because `Key` had no `super` field, so `⌘↑` and `↑` were
+one key. That is the first finding and it is why `Key` gains `super` rather than
+because a profile table wanted a column: **a modifier the type cannot hold is a
+modifier the keymap cannot refuse.**
+
+### `Key.super`, and why only the enhanced profile reads it
+
+`Key` gains `super?: boolean`, and `BlockKeymap` and `SurfaceKeyChord` gain the
+same optional field — additive, no break. `kittyModifiersOf` sets it; the legacy
+arm keeps folding bit 8 into `meta`, deliberately, because on a terminal with no
+protocol `⌘a` genuinely arrives as `Alt-a` and a decoder that guessed otherwise
+would make one wire form two bindings. That is the reason the field is safe to
+add: it can only ever be `true` where the protocol distinguished it.
+
+### The two profiles
+
+| | |
+|---|---|
+| `default-terminal` | every action has a route an xterm without the Kitty protocol can deliver |
+| `enhanced-terminal` | the registry's chord, resolved when `capabilities.keyboardProtocol === "kitty"` |
+
+**Both are in the table and both resolve; the profile is a condition, not a
+second keymap.** A binding carries `profile?`, absent meaning *both*, and
+`resolve` refuses a binding whose profile the terminal is not in. Two bindings
+for one `(target, key)` remains a construction error, so a base route and an
+enhanced route may not collide after canonicalisation — which is the gate.
+
+Eight actions need a second route, because `⌘` never reaches the application and
+`⇧⏎`, `⌃⇧C`, `⌃⇧V` and `⌃⇥` are byte-identical to their unshifted forms:
+
+| Action | Enhanced | Base | Deliverable as |
+|---|---|---|---|
+| `copy` | `⌃⇧C` | `⌥w` | `ESC w` |
+| `paste` | `⌃⇧V` | `⌃y` | `0x19` |
+| `agent.next` | `⌃⇥` | `⌥.` | `ESC .` |
+| `agent.previous` | `⌃⇧⇥` | `⌥,` | `ESC ,` |
+| `agent.1`…`agent.9` | `⌘1`…`⌘9` | `⌥1`…`⌥9` | `ESC 1`…`ESC 9` |
+| `transcript.top` | `⌘↑` | `⌃home` | `CSI 1;5H` |
+| `transcript.bottom` | `⌘↓` | `⌃end` | `CSI 1;5F` |
+
+Six of the eight base routes are chords this table already binds to the same
+meaning, which is the argument for them over anything more inventive. `⌥`-based
+routes need the terminal to send Option as Meta, which is not a new assumption:
+every existing `m+` row has always required it. `docs/KEYS.md` carries the note.
+
+### Where the design's chord and this table disagreed, and how each resolved
+
+**Four apparent conflicts, and R-KEY-003 settles three of them without a change.**
+The rule reads *arrow keys move, enter confirms, escape backs out, tab moves
+focus … **unless the current owner explicitly captures the action***. So `⇥`
+completing at the prompt, `↑`/`↓` walking history there, and `→` accepting a
+ghost are the rule's own exception, already implemented. They are recorded as
+**declared captures** rather than as divergences, and the gate takes a capture
+only with the owner named.
+
+**Two were real, and the design supplied both replacements itself** — nothing new
+is invented and no question is owed:
+
+- **`⌥v`** was `enterCopyMode` at `prompt` and `liveBlock`; the registry gives it
+  to `values.toggle`. Copy mode's chords are the design's own `⌥⇧C` (native
+  handoff) and `⌥⇧V` (semantic), so `enterCopyMode` moves to `⌥⇧C` and `⌥v` is
+  free. M10 finishes the rename.
+- **`⌥⌫`** was `killWordLeft`; the registry gives it to `queue.drop`. `⌃w` keeps
+  the verb, so no editor operation becomes unreachable — see §6's table.
+
+### Fourteen actions registered with a chord and no effect
+
+`agent.1`…`agent.9`, `agent.next`, `agent.previous`, `posture.cycle`,
+`values.toggle` and `queue.drop`. **They are bound and they do nothing**, which
+is deliberate and is the opposite of the vacuity §6 spends four paragraphs on:
+the closed-set argument makes an action with no executor uncompilable, so these
+carry an executor that is explicitly a no-op with the reason on it. The chord is
+reserved, `docs/KEYS.md` lists it with its condition, and the day the feature
+lands it does not have to negotiate a key with anything.
+
+Without this they are worse than absent: an application would bind `⌥p` to
+something of its own, and `posture.cycle` would arrive needing a chord that is
+taken. A reserved name is every consumer's namespace.
+
+### The gate
+
+`R-KEY-005` and `R-KEY-007`: one resolved registry, one rendering.
+
+1. **Every current registry binding resolves**, to its action, at its scope, in
+   at least one profile — or is declared, in a table with the site named, as
+   handled outside the keymap (`⏎`, `esc` and `⌃C` are the router's rungs and
+   C22's submit) or as an owner capture under R-KEY-003.
+2. **Every action has a `default-terminal` route.** An action reachable only on a
+   terminal with the protocol is an action most readers cannot reach.
+3. **No two routes collide after canonicalisation**, within a profile.
+4. **`?` and `F1` emit the keymap as a durable transcript entry** — R-KEY-005:
+   *the current scope first, the remaining bindings grouped by scope.* Durable
+   because a reader who needs the map needs it while doing something else, and a
+   layer that closes on the next key is not a reference.
+5. `docs/KEYS.md` is generated from the same source, with `Route`, `Profile` and
+   `Condition` columns, and `npx tsx tools/keymap-table.mjs --check` gates it.
+
 ## 7. State machine
 
 Two small machines, both with an injected clock.
@@ -1148,6 +1263,11 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I32** — **A control string is consumed whole and emits nothing** (§2a, F1043). The five ECMA-48 introducers — DCS `ESC P`, SOS `ESC X`, OSC `ESC ]`, PM `ESC ^`, APC `ESC _` — run to `ST` (`ESC \`), and an OSC also to `BEL`; a stray `ESC` inside one ends it as malformed and decodes on its own; an incomplete one is *not yet decidable* and waits, bounded by a byte cap past which the **introducer** is discarded and decoding continues from the payload. It emits no event, exactly as the CSI arm emits none for a DECRQM reply: the arm makes a terminal's answer **harmless**, and making it **readable** is a reply channel C02 owns (C02 §8) and this component must not grow — a ruling that names an operation checks the operation exists, and there is no seam here to report a graphics error through. Without the arm the Meta arm claims the introducer and emits a bindable key — `Alt-_`, `Alt-P`, `Alt-]`, and `Ctrl-G` where the terminator is `BEL` — with the payload typed into the prompt between them: **164 events from eight real replies** captured from XTerm(398) and kitty 0.41.1, and the first of each is a keystroke a keymap can bind. The cap is the arm's own hazard rather than a defect it repairs: at HEAD the same bytes decode as keys at once and nothing wedges, and an unterminated CSI is bounded by `CSI_FINAL` where a control string is bounded by nothing.
 
 - **I33** — **A gesture bound at a shared target means the same thing at every owner of it, and an owner that cannot answer says so rather than doing nothing.** `pushedView` has one keymap row per key and three owners behind it (C22 §13a), so `viewNextSection` resolves to whichever view is up — and the failure mode is not a collision but a **silence**: an owner whose `sectionNext` returns without moving is indistinguishable from a view with one section, and a reader who learns the key does nothing here stops pressing it everywhere. So the member is required on the owner interface rather than optional, a view with one section answers `false` where a view at its last section also answers `false`, and the two are separated by what the header says rather than by the key's return. This is I24's claim about a *target* with no vocabulary, one level in: a target can have bindings and still have an owner with nothing behind them.
+- **I34** — **A modifier the `Key` type cannot hold is a modifier the keymap cannot refuse** (§6a, M6). `Key.super` exists because `⌘↑` and `↑` were one key: two registry bindings resolved against the live table by accident, and the measurement that found it is the one that shaped §6a. Only the Kitty arm of the decoder sets it; the legacy arm keeps folding bit 8 into `meta`, because on a terminal with no protocol `⌘a` genuinely *is* `Alt-a` and a decoder that guessed otherwise would make one wire form two bindings.
+- **I35** — **A profile is a condition on a binding, not a second keymap** (§6a, R-CAP-001). Both profiles live in `defaultKeymap`; `resolve` refuses a binding whose profile the terminal is not in, and two bindings for one `(target, key)` remains a construction error **within a profile**. Two keymaps would be two things to keep in step and `/help` would render one of them — the drift §6 spends its opening paragraph forbidding, reintroduced by the axis rather than by an edit.
+- **I36** — **Every action has a `default-terminal` route.** An action reachable only where `keyboardProtocol === "kitty"` is an action most readers cannot reach, and the registry's chord is the enhanced route wherever `⌘`, `⇧⏎`, `⌃⇧`-letters or `⌃⇥` make it undeliverable — those four are byte-identical to their unmodified forms on a legacy terminal, so the base route is not a convenience.
+- **I37** — **A registry binding is answered, and a capture is declared with its owner** (§6a, R-KEY-003, R-KEY-007). Every `current` binding in `docs/design/language/` resolves to its action at its scope in some profile, or appears in a table naming the site that handles it outside the keymap, or is an owner capture under R-KEY-003's *unless the current owner explicitly captures the action*. The third arm is the one that needs the owner named: without it, *the design says `⇥` moves focus and the tree completes* and *the design says `⇥` moves focus and nobody noticed* read identically.
+- **I38** — **A reserved chord carries an explicit no-op, never no executor** (§6a). The fourteen agent, posture, queue and values actions are bound and do nothing. §6's closed-set argument makes an action with no executor uncompilable, so the alternative to a declared no-op is leaving the chord unbound — and an unbound chord is one an application takes, so the feature arrives needing a key that is gone. A reserved name is every consumer's namespace.
 
 **And a question outranks rungs 1 and 2, which is the one place newest-first is not enough on its own.** A local verb awaiting `ctx.ask` is `inFlight` for the whole time its question is on screen, so `⌃c` was taken by the cancel rung and the question never saw it — two rungs with a claim, and the older one higher. Ruling A's own argument decides it: `Esc` and `⌃c` collapse *because* declining and cancelling produce the same outcome, and when two paths produce the same outcome the one that leaves a record is the one to keep. Cancellation discards the entry; declining settles one saying nothing changed. **Found by a frame-read and reachable by nothing else** — the container was untouched and the layer was gone, which is everything a test asserts, and the frame showed that the submitted line had disappeared. The suite agreed throughout, because every harness reported `inFlight: null` and that is the one arrangement where both readings agree.
 
