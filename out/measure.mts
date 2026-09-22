@@ -1,0 +1,10 @@
+import { defaultKeymap } from "/workspace/src/interaction/router/keymap.js";
+const rows = defaultKeymap;
+console.log("defaultKeymap rows:", rows.length);
+const byTarget: Record<string, number> = {};
+for (const b of rows) byTarget[b.target] = (byTarget[b.target] ?? 0) + 1;
+console.log("by target:", JSON.stringify(byTarget));
+const actions = new Set(rows.map((b) => b.action));
+console.log("distinct actions:", actions.size);
+const profiled = rows.filter((b) => b.profile !== undefined).length;
+console.log("rows declaring a profile:", profiled);

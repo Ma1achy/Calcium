@@ -813,6 +813,16 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     return k !== undefined && k.kind === "key" ? k.key : null;
   };
 
+  it.todo(
+    "T1.95 (I42): generate-keymap.mjs reproduces registry-bindings.ts byte for byte — not deferred on a component: C16 ships; the generator lands in this MR's code commit",
+  );
+  it.todo(
+    "T1.96 (I42): every registry key binding appears in registry-bindings.ts, by equality on actionId — not deferred on a component: C16 ships; the generator lands in this MR's code commit",
+  );
+  it.todo(
+    "T1.97 (I42): defaultKeymap is the same 121 rows after generation as before — not deferred on a component: C16 ships; the generator lands in this MR's code commit",
+  );
+
   it("T1.94 (I41): ⌘↑ and ⌥↑ are two actions under the enhanced profile and one under the base", () => {
     // **The pair I34's accidental resolution could not distinguish.** `⌘↑` and
     // `↑` were one key because `Key` had no `super`; `⌘↑` and `⌥↑` were one key

@@ -1193,6 +1193,57 @@ meaning, which is the argument for them over anything more inventive. `⌥`-base
 routes need the terminal to send Option as Meta, which is not a new assumption:
 every existing `m+` row has always required it. `docs/KEYS.md` carries the note.
 
+### §6b — the chord is the registry's, the owner's verb is the tree's
+
+**What landed in M6 was a hand-written table beside a gate that checked it, and that is
+two records of one fact.** The chord for `⌥↑` was written in `calcium-registry.json` and
+again in `defaultKeymap`, and a rule compared them. A gate over two records is better
+than nothing and worse than one record: it catches drift after it happens, and it makes
+the second copy look deliberate.
+
+**So the chords are generated.** `tools/generate-keymap.mjs` reads the registry and emits
+`src/interaction/router/registry-bindings.ts`, which is not hand-edited. It carries what
+the registry knows: `actionId`, the chord parsed into a `Key`, `scope`, `profile` and
+`when`.
+
+**What it cannot carry, measured rather than assumed.** Of the 38 `kind: "key"` bindings,
+**25 correspond to exactly one row** of the table and generate outright. **Twelve fan out
+to two, three or four rows, and nine of those fan out to different *actions*:**
+
+| registry binding | chord | the tree's rows |
+|---|---|---|
+| `escape` | `esc` | `dismiss` · `viewPop` · `exitCopyMode` · `focusPrompt` |
+| `focus.next` | `⇥` | `complete` · `menuNext` · `viewNextSection` · `entryNext` |
+| `focus.previous` | `⇧⇥` | `viewPrevSection` · `entryPrev` · `focusTranscript` |
+| `move.up` | `↑` | `menuPrev` · `historyPrev` · `viewPageUp` · `rowUp` |
+| `move.down` | `↓` | `menuNext` · `historyNext` · `viewPageDown` · `rowDown` |
+| `move.left` | `←` | `left` · `cursorLeft` |
+| `move.right` | `→` | `acceptGhostOrForward` · `cursorRight` |
+| `confirm` | `⏎` | `menuAccept` · `rowActivate` |
+| `newline` | `⇧⏎` | `insertNewline` · `rerunEntry` |
+
+**So *look the handler up by actionId* has no answer for nine of them**, and that is not
+a defect in the tree. It is R-KEY-003 — *arrow keys move, enter confirms, escape backs
+out, tab moves focus … **unless the current owner explicitly captures the action*** —
+and the registry's `when: "focused"` is the design saying *the owner decides*, in as
+many words. `escape` is not a handler. It is a verb four owners spell differently, and
+a registry that named one of them would be wrong about the other three.
+
+**The split that makes it one record.** The chord is the registry's and appears nowhere
+else. **Which verb an owner spells for a shared action is the tree's**, as
+`OWNER_ACTIONS`, keyed by `(actionId, target)` — a fact the registry does not hold and
+should not. Neither record repeats the other, which is what *two records* meant and this
+does not.
+
+**The remainder, and it is the larger half.** 121 rows, of which **the chords of about
+two-thirds appear nowhere in the registry** — the editor's motions (`⌃w`, `⌃u`, `⌥d`),
+the table's (`{`, `}`), reverse search, the kill ring. Those rows stay written in the
+tree because there is nothing to generate them from; the registry is normative *where it
+speaks*, which is I37, and it does not speak about `killWordLeft`. Generating the whole
+table from the registry would delete them, which is the measurement the first draft of
+this section reported as *the registry cannot generate the keymap* — true of the whole
+table and false of the part the registry owns.
+
 ### Where the design's chord and this table disagreed, and how each resolved
 
 **Four apparent conflicts, and R-KEY-003 settles three of them without a change.**
@@ -1343,6 +1394,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I39** — **A reserved route's owner-applicability is total** (§3, R-OWN-001). `INTERCEPTS[id]` is `Record<OwnerRung, Verdict>` and names every rung, because an absent row means *the ladder decides* and the ladder is precisely what a reserved route is reserved against. The partial version shipped the defect it was built to stop: `page-scroll` declared `copy` and idle, the `question` rung fell through, and a confirm's answer handler swallowed `⌥↑`. Totality is not tidiness — it is what makes a seventh rung a decision rather than an inherited default, and TypeScript is what enforces it.
 - **I40** — **`page-scroll` is `⌥↑`/`⌥↓` alone, and it scrolls the transcript whatever is focused** (§3, §103, R-BLK-112, binding.031/.032). The design reserves two chords and gives them `scope: "transcript"`; R-BLK-112 says what the scope buys — *⌥↑ ⌥↓, the wheel and the trackpad scroll WITHOUT moving focus. The prompt keeps it and you keep typing.* So the verdict routes to the transcript **before the ladder and without consulting it**, at every rung but `copy`: a question, a substate layer and a captured child are all stepped over, and so is a focused `scroll` box. The chord does not ask where you are, which is the whole of its reservation. **`PgUp`/`PgDn` are not in this table** — they appear in no binding and no rule in the registry, they are the repo's own keys, they behave like the arrows, and the ladder gives them to the viewport you are inside. Holding both on one route forced *the active viewport* to mean the focused box for one key and the transcript for the other, which is one verdict saying two things.
 - **I41** — **Bit 8 is Meta without a protocol and Super with one** (§6, R-CAP-001). `modifiersOf` takes `keyboardProtocol`: under `"kitty"` bit 8 sets `super`, otherwise it joins `meta` as before. The arm an escape sequence arrived on is not the question — `CSI 1;9A` is legal in both encodings and means different things in each, and only the negotiated protocol says which. Reading it by arm made `⌘↑` and `⌥↑` one key on a terminal that distinguishes them, and then the collision was recorded as *there is no wire form for the chord*, which is a decoder's limit written down as a fact about terminals. `⌘↑`/`⌘↓` are `transcript.top`/`transcript.bottom`'s enhanced routes, restored.
+- **I42** — **A chord the registry names is written once, and it is written there** (§6b, R-KEY-007). `registry-bindings.ts` is generated by `tools/generate-keymap.mjs` from `calcium-registry.json` and is not hand-edited; `defaultKeymap` builds its registry-owned rows from it. The hand-written table plus a sync gate that M6 landed was two records of one fact, and a gate over two records catches drift after it happens while making the copy look deliberate. **What the registry cannot supply is not copied but joined**: nine of its bindings are one verb four owners spell differently — `escape` is `dismiss`, `viewPop`, `exitCopyMode`, `focusPrompt` — which is R-KEY-003's *unless the current owner explicitly captures the action*, and `when: "focused"` is the design saying so. That mapping is `OWNER_ACTIONS`, keyed by `(actionId, target)`, and it is the tree's because the registry does not hold it. Rows whose chord the registry never names stay written in the tree: it is normative where it speaks (I37), and it does not speak about `killWordLeft`.
 
 **And a question outranks rungs 1 and 2, which is the one place newest-first is not enough on its own.** A local verb awaiting `ctx.ask` is `inFlight` for the whole time its question is on screen, so `⌃c` was taken by the cancel rung and the question never saw it — two rungs with a claim, and the older one higher. Ruling A's own argument decides it: `Esc` and `⌃c` collapse *because* declining and cancelling produce the same outcome, and when two paths produce the same outcome the one that leaves a record is the one to keep. Cancellation discards the entry; declining settles one saying nothing changed. **Found by a frame-read and reachable by nothing else** — the container was untouched and the layer was gone, which is everything a test asserts, and the frame showed that the submitted line had disappeared. The suite agreed throughout, because every harness reported `inFlight: null` and that is the one arrangement where both readings agree.
 
@@ -1400,6 +1452,9 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.92** (I40): `PgUp` produces **no intercept stage at any rung** — the absence the split rests on, asserted directly rather than implied by the rows that drive `⌥↑`. A table that reserved it again would pass every other row in §3a. It is not carved out of I8, because nothing in the design reserves it: the carve-out is exactly two chords wide.
 - **T1.93** (I41): `CSI 1;9A` decodes as `{name: "up", super: true}` when `keyboardProtocol` is `"kitty"` and as `{name: "up", meta: true}` when it is not — in `router-decode.test.ts`, with `modifiersOf`, so `c16-modifiers.mjs`'s mutation run reaches it — **the same bytes, twice, through two decoders**, which is the only shape that asserts the protocol is the condition. The control is `CSI 1;3A`, which is `meta` under both and is what makes this a test of bit 8 rather than of the parameter.
 - **T1.94** (I41): under the enhanced profile `⌘↑` and `⌥↑` resolve to **different actions** — `transcript.top` and `scrollPageUp` — and under the base profile `⌘↑`'s bytes resolve to `scrollPageUp`, because there they *are* `⌥↑`. The pair that the accidental resolution I34 was written about could not distinguish.
+- **T1.95** (I42): `tools/generate-keymap.mjs` run against the registry reproduces `registry-bindings.ts` **byte for byte**. The generated file is in the tree and this is what stops it being a second hand-written record with a longer name.
+- **T1.96** (I42): every `kind: "key"` binding in the registry appears in `registry-bindings.ts`, **by equality on the set of `actionId`s** — so a binding added to the registry and not regenerated fails, which a subset check would not.
+- **T1.97** (I42): `defaultKeymap` after the change is **the same 121 rows** it held before, compared as a sorted set of `(target, keyText, action, profile)`. The generation is a change of where the chords are written and of nothing else, and this is the row that says so.
 - **T1.31** (I8): coverage is read from the box. A layer that is **not** a view but whose `Placed` spans the region also skips step 3, and a view whose box has been clamped smaller does not. Hand-built `Placed`, because the property is geometric and a kind test would pass the first case and fail the second.
 - **T1.32** (I24): every member of the `FocusTarget` union has at least one row in `defaultKeymap`. Derived from the union, not from a list written beside it — a coverage set built from the test's own table covers nothing.
 - **T1.33** (I24): at `pushedView`, `n`, `p`, `g`, `G`, `pageup`, `pagedown` and `escape` each resolve to their action, and `escape` resolves to `viewPop` rather than to `dismiss`.
