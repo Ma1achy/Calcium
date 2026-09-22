@@ -1107,7 +1107,7 @@ second keymap.** A binding carries `profile?`, absent meaning *both*, and
 for one `(target, key)` remains a construction error, so a base route and an
 enhanced route may not collide after canonicalisation — which is the gate.
 
-Eight actions need a second route, because `⌘` never reaches the application and
+Six actions take a second route, because `⌘` never reaches the application and
 `⇧⏎`, `⌃⇧C`, `⌃⇧V` and `⌃⇥` are byte-identical to their unshifted forms:
 
 | Action | Enhanced | Base | Deliverable as |
@@ -1117,10 +1117,21 @@ Eight actions need a second route, because `⌘` never reaches the application a
 | `agent.next` | `⌃⇥` | `⌥.` | `ESC .` |
 | `agent.previous` | `⌃⇧⇥` | `⌥,` | `ESC ,` |
 | `agent.1`…`agent.9` | `⌘1`…`⌘9` | `⌥1`…`⌥9` | `ESC 1`…`ESC 9` |
-| `transcript.top` | `⌘↑` | `⌃home` | `CSI 1;5H` |
-| `transcript.bottom` | `⌘↓` | `⌃end` | `CSI 1;5F` |
+| `transcript.top` | **none** | `⌃home` | `CSI 1;5H` |
+| `transcript.bottom` | **none** | `⌃end` | `CSI 1;5F` |
 
-Six of the eight base routes are chords this table already binds to the same
+**`⌘↑` and `⌘↓` have no enhanced route, and that is a measurement** (I17). Pressed
+through this tree's decoder: `⌘↑` arrives as `CSI 1;9A`, whose modifier bit 8 the
+legacy arm folds into `meta` — so it is `⌥↑`, already `scrollPageUp`. Only the
+**csi-u** arm reads bit 8 as `super`, and the csi-u spelling of an arrow names it
+by a functional code this decoder maps to the empty string. So there is no wire
+form for the distinct chord at all, and §6's own ruling applies: *widening the
+decoder to reach one binding is how a table comes to name keys nothing sends*, so
+the candidate is dropped rather than met. The digits are the contrast — `CSI 49;9u`
+**does** name `1` and does carry `super`, which is why `⌘1`…`⌘9` are in the table
+and the arrows are not.
+
+Six of the base routes are chords this table already binds to the same
 meaning, which is the argument for them over anything more inventive. `⌥`-based
 routes need the terminal to send Option as Meta, which is not a new assumption:
 every existing `m+` row has always required it. `docs/KEYS.md` carries the note.
@@ -1145,10 +1156,14 @@ is invented and no question is owed:
 - **`⌥⌫`** was `killWordLeft`; the registry gives it to `queue.drop`. `⌃w` keeps
   the verb, so no editor operation becomes unreachable — see §6's table.
 
-### Fourteen actions registered with a chord and no effect
+### Fifteen actions registered with a chord and no effect
 
 `agent.1`…`agent.9`, `agent.next`, `agent.previous`, `posture.cycle`,
-`values.toggle` and `queue.drop`. **They are bound and they do nothing**, which
+`values.toggle`, `queue.drop` — and **`selection.semantic`**, whose chord `⌥⇧V`
+the design owns and whose mode M10 builds. Reserving it is the only answer that
+is not a divergence: the alternative is a `current` registry binding that
+resolves to nothing, declared as owed to a later MR with nothing watching it.
+**They are bound and they do nothing**, which
 is deliberate and is the opposite of the vacuity §6 spends four paragraphs on:
 the closed-set argument makes an action with no executor uncompilable, so these
 carry an executor that is explicitly a no-op with the reason on it. The chord is
