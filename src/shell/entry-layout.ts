@@ -90,14 +90,14 @@ function runRows(
   return run.blank ? ENTRY_GAP : measureSequence(run.blocks, run.width);
 }
 
-/** Whether a document begins as a card — a `step` notice at block 0 (C23 I54). */
+/** Whether a document begins as a card — a call head at block 0 (C23 I54). */
 export function isCard(blocks: readonly Block[]): boolean {
   const head = blocks[0];
-  return head !== undefined && head.kind === "notice" && head.glyph === "step";
+  return head !== undefined && head.kind === "notice" && head.state !== undefined;
 }
 
 /**
- * A nested card (C22 I89): a `group` column whose first block is a `step`
+ * A nested card (C22 I89): a `group` column whose first block is a call head
  * notice. The composer builds one per child call (C23 I62); the layout reads the
  * shape and never a flag, so a producer cannot declare a card it did not draw.
  */

@@ -24,7 +24,7 @@ import { ASCII_CAPS, FULL_CAPS, measurable } from "../support/render.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { createViewport } from "../../src/viewport/viewport/index.js";
 import { measureSequence } from "../support/viewport.js";
-import { RESIDUE_CELLS, SUBSTITUTIONS, residueLead } from "../../src/presentation/blocks/index.js";
+import { FREE_WIDTH_SLOTS, SUBSTITUTIONS, glyphs } from "../../src/presentation/blocks/index.js";
 import { cells } from "../../src/presentation/text.js";
 import { checkAsciiParity, formatReport } from "../../src/testing/measurement-conformance.js";
 
@@ -343,19 +343,19 @@ describe("C04 fail-on-revert", () => {
     // both unicode modes. A fallback wider than its slot would pass every test
     // run in a UTF-8 locale.
     //
-    // **`residue` is the one slot wider than a cell** — the design declares
-    // `ellipsis` at `reservedCells: 3` (R-GLY-001) and `residueLead` pads both
-    // renderings to it, so parity holds through a slot rather than through a
-    // character (T2.5, amended).
+    // **`residue` is the one rôle whose two renderings differ in width** — it
+    // is a free-width slot, because a residue lead is followed only by its own
+    // count and no column aligns to it (T2.5, `FREE_WIDTH_SLOTS`). Parity for
+    // every other rôle still holds through the character.
     for (const [unicode, ascii] of SUBSTITUTIONS) {
       if (unicode === "\u22ef") continue;
       expect(cells(ascii), `${unicode} → ${ascii}`).toBe(cells(unicode));
     }
-    for (const caps of [FULL_CAPS, ASCII_CAPS]) {
-      expect(cells(residueLead(caps), caps.ambiguousWidth), "the residue slot is the same at both arms").toBe(
-        RESIDUE_CELLS,
-      );
-    }
+    expect(FREE_WIDTH_SLOTS.has("residue"), "and the exception is declared, not assumed").toBe(true);
+    expect(
+      [cells(glyphs(FULL_CAPS).residue), cells(glyphs(ASCII_CAPS).residue)],
+      "the two renderings genuinely differ, which is what makes the exemption live",
+    ).toEqual([1, 3]);
 
     const report = checkAsciiParity(
       measurable(),

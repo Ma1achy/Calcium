@@ -1567,7 +1567,7 @@ export function checkMarkDomains(
     violations.push({
       rule: "SS64", file: "src/presentation/blocks/glyphs.ts", line: 1,
       message: "no mark was read out of `glyphs.ts` — an empty parse compares the registry with itself and passes, which is the vacuity this rule exists to refuse (F1246)",
-      spec: "R-GLY-001",
+      spec: "R-GLY-003",
     });
     return violations;
   }
@@ -1575,7 +1575,7 @@ export function checkMarkDomains(
     violations.push({
       rule: "SS64", file: "src/presentation/blocks/glyphs.ts", line: 1,
       message: `${who} paints an ASCII mark and declares no domain — a mark with no region is one this rule cannot rule on, which is an exemption rather than an answer`,
-      spec: "R-GLY-001",
+      spec: "R-GLY-003",
     });
   }
   for (let i = 0; i < marks.length; i += 1) {
@@ -1594,8 +1594,8 @@ export function checkMarkDomains(
         rule: "SS64",
         file: "src/presentation/blocks/glyphs.ts",
         line: 1,
-        message: `${a.who} and ${b.who} both paint ${JSON.stringify(a.ascii)} in ${shared.join(", ")} — one character, two marks, on a row a reader reads at once (R-GLY-001)`,
-        spec: "R-GLY-001",
+        message: `${a.who} and ${b.who} both paint ${JSON.stringify(a.ascii)} in ${shared.join(", ")} — one character, two marks, on a row a reader reads at once (R-GLY-003)`,
+        spec: "R-GLY-003",
       });
     }
   }
@@ -1625,7 +1625,7 @@ export function parseRangeTable(textSource, name) {
  * restatement of `widthByCapability`. That field is the width in the composed
  * browser grid and the builder gates `reservedCells` on it; this one is whether
  * the character is Ambiguous, which is what sends a **set** to its ASCII rung
- * (R-GLY-001). Deriving it away would delete the fact rather than un-drift it.
+ * (R-GLY-003). Deriving it away would delete the fact rather than un-drift it.
  *
  * The ranges come from `text.ts`'s own tables, so there is one authority and not
  * a second copy to fall behind (C09 I48, F1246).

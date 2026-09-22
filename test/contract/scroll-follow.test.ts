@@ -77,11 +77,11 @@ describe("shell/tail — one comparison, written once", () => {
 describe("C04 I97 — the field says *start following*", () => {
   it("T2.37 (C04 I97, §3c T6): a follow box nobody touched opens at its tail, and the residue is above", () => {
     const following = lines([box(rows(5), { follow: true })], 40);
-    expect(following).toEqual(["r4", "r5", "⋯   3 above, 0 below"]);
+    expect(following).toEqual(["r4", "r5", "⋯ 3 above, 0 below"]);
 
     // The control: without the field the same box opens at its head.
     const plain = lines([box(rows(5))], 40);
-    expect(plain).toEqual(["r1", "r2", "⋯   0 above, 3 below"]);
+    expect(plain).toEqual(["r1", "r2", "⋯ 0 above, 3 below"]);
   });
 
   it("T2.38 (C04 I97, §3c T1): live output does not move the rows above the box, and nothing is written", () => {
@@ -92,7 +92,7 @@ describe("C04 I97 — the field says *start following*", () => {
     expect(first.indexOf("before"), "the row above the box").toBe(0);
     expect(second.indexOf("before"), "is where it was").toBe(0);
     expect(second.length, "and the frame is the same height").toBe(first.length);
-    expect(second.slice(1), "while the box shows the new tail").toEqual(["r7", "r8", "⋯   6 above, 0 below"]);
+    expect(second.slice(1), "while the box shows the new tail").toEqual(["r7", "r8", "⋯ 6 above, 0 below"]);
     // `measure` never saw `follow`: the box is `height` (+ residue) either way.
     expect(scrollDefinition.measure(box(rows(5), { follow: true }), 40, measureChild)).toBe(3);
     expect(scrollDefinition.measure(box(rows(8), { follow: true }), 40, measureChild)).toBe(3);
@@ -115,22 +115,22 @@ describe("C04 I97 — the field says *start following*", () => {
     // the tail the field implies, not at the `0` an absent entry reads as.
     store.nudge("e", "s", -1, { ceiling: ceiling(five), follow: true });
     expect(store.get("e", "s")).toBe(2);
-    expect(lines([five], 40, store.forEntry("e"))).toEqual(["r3", "r4", "⋯   2 above, 1 below"]);
+    expect(lines([five], 40, store.forEntry("e"))).toEqual(["r3", "r4", "⋯ 2 above, 1 below"]);
 
     // A child arrives. The reader is reading, and the window does not move.
     const six = box(rows(6), { follow: true });
-    expect(lines([six], 40, store.forEntry("e"))).toEqual(["r3", "r4", "⋯   2 above, 2 below"]);
+    expect(lines([six], 40, store.forEntry("e"))).toEqual(["r3", "r4", "⋯ 2 above, 2 below"]);
 
     // ⇟ past the end lands at the bottom, so the box follows again — derived
     // from where it ended up (C14 I5), and written as `TAIL`.
     store.nudge("e", "s", 5, { ceiling: ceiling(six), follow: true });
     expect(store.get("e", "s")).toBe(TAIL);
-    expect(lines([six], 40, store.forEntry("e"))).toEqual(["r5", "r6", "⋯   4 above, 0 below"]);
+    expect(lines([six], 40, store.forEntry("e"))).toEqual(["r5", "r6", "⋯ 4 above, 0 below"]);
 
     // And the next child arrives with **nothing written**: the clamp at read
     // is the follow.
     const seven = box(rows(7), { follow: true });
-    expect(lines([seven], 40, store.forEntry("e"))).toEqual(["r6", "r7", "⋯   5 above, 0 below"]);
+    expect(lines([seven], 40, store.forEntry("e"))).toEqual(["r6", "r7", "⋯ 5 above, 0 below"]);
     expect(store.get("e", "s")).toBe(TAIL);
     // §3c T8, recorded: the key carries it as a non-zero.
     expect(store.key("e")).toBe("s=Infinity");
@@ -158,15 +158,15 @@ describe("C04 I97 — the field says *start following*", () => {
 });
 
 describe("C04 I98 — the collapsed form is the residue row and nothing else", () => {
-  it("T2.42 (C04 I98, I104, §3c S1 S2): collapsed, the box measures 1 and draws *⋯   +N more* at every width", () => {
+  it("T2.42 (C04 I98, I104, §3c S1 S2): collapsed, the box measures 1 and draws *⋯ +N more* at every width", () => {
     const folded = box(rows(5), { follow: true, collapsed: true });
     for (const width of [80, 40]) {
       expect(scrollDefinition.measure(folded, width, measureChild)).toBe(1);
-      expect(lines([folded], width)).toEqual(["⋯   +5 more"]);
+      expect(lines([folded], width)).toEqual(["⋯ +5 more"]);
     }
     expect(lines([folded], 40, undefined, ASCII_CAPS)).toEqual(["... +5 more"]);
     // S2: a held offset does not move a fold — the residue is the fold's statement.
-    expect(lines([folded], 40, { s: 3 })).toEqual(["⋯   +5 more"]);
+    expect(lines([folded], 40, { s: 3 })).toEqual(["⋯ +5 more"]);
     // **And the state in which the forced zero is observable** (F968): a held
     // offset inside a multi-row child the slice cannot cut. With an interior of
     // 0 the window keeps whatever straddles the offset, and a child with no
@@ -178,11 +178,11 @@ describe("C04 I98 — the collapsed form is the residue row and nothing else", (
       follow: true,
       collapsed: true,
     });
-    expect(lines([tall], 40, { s: 1 })).toEqual(["⋯   +5 more"]);
+    expect(lines([tall], 40, { s: 1 })).toEqual(["⋯ +5 more"]);
     // Expanded again it is an ordinary follow box.
     const open = box(rows(5), { follow: true, collapsed: false });
     expect(scrollDefinition.measure(open, 40, measureChild)).toBe(3);
-    expect(lines([open], 40)).toEqual(["r4", "r5", "⋯   3 above, 0 below"]);
+    expect(lines([open], 40)).toEqual(["r4", "r5", "⋯ 3 above, 0 below"]);
   });
 
   it("T2.43 (C04 I98, §3c S3): every element of a declared fold carries the toggle; an undeclared one carries none", () => {

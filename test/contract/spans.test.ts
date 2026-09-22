@@ -194,12 +194,12 @@ describe("C04 §3am.1 — `elide`", () => {
 
     // **On a fitted token the marked run gives way first** (C09 I46): the run
     // ends in the marker and the runs outside it are byte-identical.
-    const head = block({ kind: "notice", id: "h", tone: "info", glyph: "step", text: TEXT, spans: [ARG] });
+    const head = block({ kind: "notice", id: "h", tone: "info", glyph: "running", state: "running", text: TEXT, spans: [ARG] });
     const wide = rows(head, 80)[0] ?? "";
     const narrow = rows(head, 40)[0] ?? "";
-    expect(wide).toBe(`⏺︎ ${TEXT}`);
+    expect(wide).toBe(`● ${TEXT}`);
     expect(rows(head, 40)).toHaveLength(1);
-    expect(narrow.startsWith("⏺︎ verb(")).toBe(true);
+    expect(narrow.startsWith("● verb(")).toBe(true);
     expect(narrow.endsWith(") · 4s · 12 rows")).toBe(true);
     expect(narrow).toContain("…) · 4s · 12 rows");
     expect(narrow.length, "shorter, and only in the marked run").toBeLessThan(wide.length);

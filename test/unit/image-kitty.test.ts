@@ -438,7 +438,7 @@ describe("C22 §6j.4 — the seam takes the layout's width (I98)", () => {
   // assertion below would have been made against `""`, and the first draft was.
   const wideData = rgbPng64(2000, 100, () => [10, 20, 30]);
   const wide = { ...block, data: wideData, digest: digestOf(wideData), height: 8 } as Image;
-  const card = [{ kind: "notice", glyph: "step", text: "run" }, wide] as readonly Block[];
+  const card = [{ kind: "notice", glyph: "running", state: "running", text: "run" }, wide] as readonly Block[];
 
   const groupsFor = (width: number): { scope?: string; blocks: readonly Block[]; width?: number }[] =>
     entryLayout(card, width)

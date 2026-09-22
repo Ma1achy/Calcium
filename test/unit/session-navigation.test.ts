@@ -161,7 +161,7 @@ describe("C26 §4g — the frame side of the ceiling", () => {
       expect(focus, "a focus was drawn").not.toBeNull();
       expect(focus, "a focus was drawn").not.toBe("never rendered");
       if (focus === null || focus === "never rendered") return;
-      expect(focus.blockId, "a `step` head").toMatch(/^step-/u);
+      expect(focus.blockId, "a call head").toMatch(/^call-/u);
       expect(focus.rowId, "a block-level element").toBe(focus.blockId);
     };
     await s.type(DOWN);

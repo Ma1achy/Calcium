@@ -1425,7 +1425,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     // was the command row and silence. The figure is I53's readout, registered
     // below with this header's id; below one second `elapsed()` draws nothing,
     // so the card is bare at dispatch and gains `· 1s` on the first wake.
-    const call = { name: verb, args: result.argv.slice(1).join(" "), id: blockId("step") };
+    const call = { name: verb, args: result.argv.slice(1).join(" "), id: blockId("call") };
     // **Composed by `documents.ts`, with the capabilities** (C23 I61, F828): the
     // separator is a slot and the duration slot is the spinner's while the call
     // runs (I58) — `tick` is the readout's, so the frame moves at I53's cadence.

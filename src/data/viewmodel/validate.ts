@@ -94,7 +94,7 @@ const GLYPH_MEMBERS = {
   working: true, running: true, queued: true, cancelled: true,
   expand: true, collapse: true, focus: true, bullet: true,
   quote: true, nested: true,
-  continuation: true, step: true,
+  continuation: true,
 } satisfies Record<Glyph, true>;
 
 const GLYPHS: ReadonlySet<Glyph> = new Set(Object.keys(GLYPH_MEMBERS) as Glyph[]);

@@ -85,7 +85,7 @@ describe("C23 I18 — refused, and the notice names the command", () => {
     await settle();
     const entry = graph.transcript.entries.find((e) => e.id === settled);
     // Past the card's header (C23 I55): the refusal is the body.
-    const notice = entry?.doc.blocks.find((b) => b.kind === "notice" && b.glyph !== "step");
+    const notice = entry?.doc.blocks.find((b) => b.kind === "notice" && b.state === undefined);
     expect(notice, "patched into the source entry, never appended (C23 I18)").toBeDefined();
     expect(notice?.kind === "notice" && notice.text).toMatch(/is from a frozen entry/);
     // **The recorded command, so the reader has the thing that is not stale.**

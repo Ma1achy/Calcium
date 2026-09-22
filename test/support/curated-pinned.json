@@ -1,4 +1,11 @@
 {
+ "CALL_STATE_GLYPH": {
+  "cancelled": "cancelled",
+  "failed": "error",
+  "queued": "queued",
+  "running": "running",
+  "succeeded": "ok"
+ },
  "CATEGORY_REFS": [
   "categorical.c1",
   "categorical.c2",
@@ -802,9 +809,6 @@
   "running": [
    "row-lead"
   ],
-  "step": [
-   "row-lead"
-  ],
   "warn": [
    "row-lead"
   ],
@@ -1000,10 +1004,6 @@
   [
    "⎿",
    "`"
-  ],
-  [
-   "⏺︎",
-   "*"
   ]
  ],
  "GLYPH_TOKENS": [
@@ -1022,8 +1022,7 @@
   "bullet",
   "quote",
   "nested",
-  "continuation",
-  "step"
+  "continuation"
  ],
  "HIGH_CONTRAST_FOUR_BIT": {
   "categorical.c1": 11,

@@ -14,7 +14,7 @@
  * oversight.
  */
 
-import type { Action, Block, Cell, ColormapName, ErrorLike, Glyph, HeadingLevel, KeyValue, Tone, TextSpan } from "../../data/viewmodel/index.js";
+import type { Action, Block, CallState, Cell, ColormapName, ErrorLike, Glyph, HeadingLevel, KeyValue, Tone, TextSpan } from "../../data/viewmodel/index.js";
 import type { ProducerContext } from "../../data/adapters/types.js";
 
 /**
@@ -92,6 +92,16 @@ export type NoticeOpts = ValuedTextOpts &
   Readonly<{
     /** The notice's one button — `fill` for a retry, `open` for a log (C04 §3). */
     action?: Action;
+    /**
+     * The lifecycle state of the call this notice heads (C04 I59, C09 I45).
+     *
+     * **Present is what makes a notice a call head** — one committed row, an
+     * element in the focus ring, and a mark that resolves at render rather than
+     * here. An author composing their own call grammar states it for the same
+     * reason `callHead` does: the character is a question about the terminal and
+     * a producer has never seen one.
+     */
+    state?: CallState;
   }>;
 
 /**

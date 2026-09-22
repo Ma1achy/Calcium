@@ -14,7 +14,7 @@ import type { Run } from "../../runs.js";
 import { runLines, runsOf, runsText, sliceRuns, wrapRuns } from "../../runs.js";
 import { NO_STYLE, rampStyle } from "../../theme/index.js";
 import { animateT, effectiveTick, extentT } from "../ramp.js";
-import { barStyle, glyphFor, glyphCells, glyphs } from "../glyphs.js";
+import { barStyle, glyphFor, glyphCells, glyphs, headMark } from "../glyphs.js";
 import { clampSpans, focusStyle, pad, paint, paintRuns, rows, selectionStyle, tone, type Span } from "../paint.js";
 import type { BlockDefinition, NavElement, RenderContext, Windowed, Rendered } from "../types.js";
 
@@ -91,27 +91,32 @@ const GLYPH_INDENT: ReadonlyMap<Glyph, number> = new Map<Glyph, number>([
 const GLYPH_RAIL: ReadonlySet<Glyph> = new Set<Glyph>(["quote"]);
 
 /**
- * The tokens whose notice is one block-level element with or without an
- * `action` (C09 I47, F831). A call's head is the line a reader acts on — `⏎`
+ * Whether this notice is a call's head — one block-level element with or
+ * without an `action` (C09 I47, F831). A call's head is the line a reader acts on — `⏎`
  * folds its body, `y` copies its invocation — and `noticeElements`' gate,
- * *no action, no element*, is right for every other token: a muted status line
- * is not a place to stand. One member, and a property of the token as the
- * indent and the rail are.
+ * *no action, no element*, is right for every other notice: a muted status line
+ * is not a place to stand.
+ *
+ * **The test is the call state, not the glyph token.** It used to be
+ * `glyph === "step"`, and that slot is gone: above the monochrome rung the head
+ * mark is `running`'s `●` for every state, which a muted `running` notice could
+ * also hold, and at 1 bit it is five different tokens. A predicate over the
+ * character would have answered differently at different capabilities, which is
+ * a focus ring that changes shape when the terminal does. `state` is on the
+ * block, is capability-free, and is present on exactly the notices that are
+ * call heads.
+ *
+ * It is also **one committed row, fitted rather than wrapped** (C09 I46), for
+ * the same reason and by the same test: a head that wraps is two heads to a
+ * reader skimming the gutter, so the run its spans mark `elide` gives way
+ * first, from its end, and the whole row last. `measure` answers 1 without a
+ * capability; the fitting happens where the capabilities are, in `render`.
  */
-const GLYPH_ELEMENT: ReadonlySet<Glyph> = new Set<Glyph>(["step"]);
+const isCallHead = (block: Notice): boolean => block.state !== undefined;
 
-/**
- * The tokens whose notice is **one committed row, fitted rather than wrapped**
- * (C09 I46). A head that wraps is two heads to a reader skimming the gutter, so
- * the run its spans mark `elide` gives way first, from its end, and the whole
- * row last. `measure` answers 1 without a capability; the fitting happens where
- * the capabilities are, in `render`. The kind's wrap policy is untouched.
- */
-const GLYPH_ONE_ROW: ReadonlySet<Glyph> = new Set<Glyph>(["step"]);
-
-/** Whether a notice stands in the focus ring (I47): an action, or a token in `GLYPH_ELEMENT`. */
+/** Whether a notice stands in the focus ring (I47): an action, or a call state. */
 function declaresElement(block: Notice): boolean {
-  return block.action !== undefined || (block.glyph !== undefined && GLYPH_ELEMENT.has(block.glyph));
+  return block.action !== undefined || isCallHead(block);
 }
 
 /**
@@ -237,7 +242,7 @@ function noticeRows(
 ): readonly (readonly Run[])[] {
   const runs = runsOf(block.text, block.spans);
   const budget = proseWidth(width, prefixCells(block.glyph));
-  if (block.glyph !== undefined && GLYPH_ONE_ROW.has(block.glyph)) {
+  if (isCallHead(block)) {
     // One row by construction (I46). Without capabilities — the measurer's
     // call — the runs are returned unfitted: a row count of one is the whole of
     // what `measure` needs, and the marker's width is a capability's to say.
@@ -283,7 +288,7 @@ function fitRuns(runs: readonly Run[], budget: number, caps: RenderContext["capa
  * The rows are `noticeRows`' own, so the element is where the block is drawn.
  */
 function noticeElements(block: Notice, width: number): readonly NavElement[] {
-  // **Or its token is in `GLYPH_ELEMENT`** (I47): a call's head stands in the
+  // **Or it is a call head** (I47): a call's head stands in the
   // ring whether or not the composer gave it a fold to toggle; `activate` is
   // the action when there is one and absent otherwise.
   if (!declaresElement(block)) return Object.freeze([]);
@@ -329,7 +334,7 @@ export const noticeDefinition: BlockDefinition<Notice> = {
     // cells while leaving its `⎿` body behind (T1.48). The
     // id tested is the one the session writes — the element's, which is the
     // block's (`noticeElements`, `focusFor`) — and only a notice that declares
-    // an element (an action, or a `GLYPH_ELEMENT` token — I47) can reach this arm.
+    // an element (an action, or a call state — I47) can reach this arm.
     const focused =
       declaresElement(block) && ctx.focus !== null && ctx.focus.blockId === block.id && ctx.focus.rowId === block.id;
     // **The ink is resolved against the ground it lands on** (C10 I48): a
@@ -366,7 +371,14 @@ export const noticeDefinition: BlockDefinition<Notice> = {
           {
             text:
               (index === 0 || rail) && block.glyph !== undefined
-                ? glyphLead(block.glyph, ctx.capabilities)
+                ? glyphLead(
+                    // **The head mark is resolved here and nowhere else** (I45):
+                    // the block carries the call's state and the character is a
+                    // function of whether tone can carry it. Geometry is
+                    // untouched — every candidate is one cell with no indent.
+                    block.state !== undefined ? headMark(block.state, ctx.capabilities) : block.glyph,
+                    ctx.capabilities,
+                  )
                 : " ".repeat(prefix),
             style,
           },

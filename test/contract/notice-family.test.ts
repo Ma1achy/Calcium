@@ -59,7 +59,7 @@ const runLocal = async (line: string): Promise<readonly string[]> => {
   // **Without the card's header** (C23 I55): a local verb settles as a card
   // since 2026-09-05, and block 0 is the shell's `⬤ verb` — the family's bytes
   // are the handler's, under it.
-  return frame(lastBlocks(h).filter((blk, i) => !(i === 0 && blk.kind === "notice" && blk.glyph === "step")));
+  return frame(lastBlocks(h).filter((blk, i) => !(i === 0 && blk.kind === "notice" && blk.state !== undefined)));
 };
 
 /** Captured at 73882a4f — the literal's frame. */

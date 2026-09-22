@@ -13,7 +13,7 @@ import { cells, graphemes, truncate } from "../../text.js";
 import { degradeColour } from "../../theme/colormap.js";
 import { NO_STYLE } from "../../theme/index.js";
 import type { Style } from "../../theme/types.js";
-import { residueLead } from "../glyphs.js";
+import { glyphs } from "../glyphs.js";
 import { paint, rows, tone, type Span } from "../paint.js";
 import type { BlockDefinition, RenderContext, Windowed, Rendered } from "../types.js";
 
@@ -25,7 +25,7 @@ import type { BlockDefinition, RenderContext, Windowed, Rendered } from "../type
  * *scroll to see* read as one family, and both flatten together at ASCII.
  */
 const markerText = (dropped: number, caps: RenderContext["capabilities"]): string =>
-  `${residueLead(caps)} ${dropped.toLocaleString("en-GB")} lines dropped at the cap`;
+  `${glyphs(caps).residue} ${dropped.toLocaleString("en-GB")} lines dropped at the cap`;
 
 /** A run's style, with the child's colours brought down C10's ladder (C10 I38). */
 function styleOf(

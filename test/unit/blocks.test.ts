@@ -957,7 +957,7 @@ describe("C09 §6 — kinds", () => {
     return out;
   };
 
-  it("T1.4g2 (C04 I39, R-GLY-001): retiring `live` loses no fact — `▌` had one consumer and it was this one", () => {
+  it("T1.4g2 (C04 I39, R-GLY-003): retiring `live` loses no fact — `▌` had one consumer and it was this one", () => {
     // **The condition on retiring the token was that both its facts keep a
     // named, asserted replacement.** Measured, the repository's `▌` carried
     // **one**: *this region refreshes* (`Panel.live`, `livePanel` in
@@ -979,7 +979,13 @@ describe("C09 §6 — kinds", () => {
         if (!line.includes("\u258c")) continue;
         // A mention in prose is not a producer; a string literal is.
         if (/^\s*(\*|\/\/|\/\*)/u.test(line)) continue;
-        producers.push(`${file}:${String(i + 1)} ${line.trim().replace(/\s+/gu, " ")}`);
+        // **The line number is deliberately not in the key** (the anchor
+        // lesson): it moves whenever anything above it is edited, so a row
+        // keyed on it goes red for reasons that have nothing to do with `▌`.
+        // The file and the line's own text locate it just as well and only
+        // move when the producer does.
+        void i;
+        producers.push(`${file} ${line.trim().replace(/\s+/gu, " ")}`);
       }
     }
     // **Four, and not one of them is an ownership mark.** Named rather than
@@ -988,13 +994,13 @@ describe("C09 §6 — kinds", () => {
     // R-KEY-004's owner line lands.
     expect(producers, "every `▌` a frame can reach, and what each is for").toEqual([
       // The plot's box fill — a figure, where position carries the meaning.
-      'src/presentation/blocks/glyphs.ts:238 bar: "▌",',
+      'src/presentation/blocks/glyphs.ts bar: "▌",',
       // Two spinner sets: `▌` as one *frame* of an animation, which is a
       // liveness carrier and not a mark that stands still and means something.
-      'src/presentation/blocks/glyphs.ts:598 frames: Object.freeze(["▏", "▎", "▍", "▌", "▋", "▊", "▉", "▊", "▋", "▌", "▍", "▎"]),',
-      'src/presentation/blocks/glyphs.ts:610 frames: Object.freeze(["▌", "▀", "▐", "▄"]),',
+      'src/presentation/blocks/glyphs.ts frames: Object.freeze(["▏", "▎", "▍", "▌", "▋", "▊", "▉", "▊", "▋", "▌", "▍", "▎"]),',
+      'src/presentation/blocks/glyphs.ts frames: Object.freeze(["▌", "▀", "▐", "▄"]),',
       // A trailing comment on a range bound in `cells()`'s own table.
-      "src/presentation/text.ts:1651 0x25a0, 0x25ff, // geometric shapes — ▌ ● ○ ▸ ▾",
+      "src/presentation/text.ts 0x25a0, 0x25ff, // geometric shapes — ▌ ● ○ ▸ ▾",
     ]);
 
     // And the token is gone from the vocabulary, both halves.

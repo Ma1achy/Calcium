@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { block } from "../../src/data/viewmodel/index.js";
 import { cells, truncate, wrapCells } from "../../src/presentation/text.js";
-import { RESIDUE_CELLS, glyphs, residueLead } from "../../src/presentation/blocks/index.js";
+import { FREE_WIDTH_SLOTS, glyphs } from "../../src/presentation/blocks/index.js";
 import { sgr } from "../../src/terminal/escapes.js";
 import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
 import { checkSourceScans } from "../../tools/enforce/source-scans.mjs";
@@ -50,7 +50,7 @@ describe("C09 tier 6", () => {
     // It read *changing the ASCII ellipsis to `...` → T2.5 and T3.4 fail*, on
     // the rule that every substitution is 1:1 by cell count. The design
     // declares `ellipsis` with `ascii: "..."` and `reservedCells: 3`
-    // (R-GLY-001, §096), so the character the row forbade is the character the
+    // (R-GLY-003, §096), so the character the row forbade is the character the
     // framework now draws — and an invariant that blocks the design is amended
     // rather than cited.
     //
@@ -70,16 +70,16 @@ describe("C09 tier 6", () => {
     expect(cells(truncate(line, 20, ASCII))).toBe(20);
     expect(truncate(line, 20, ASCII).endsWith("~")).toBe(true);
 
-    // **The revert, and the thing that makes it a revert**: drawing the mark
-    // without its padding gives three different widths at three rungs, which is
-    // the column movement T2.5 now asserts against directly.
+    // **The revert, and the thing that makes it a revert**: the residue mark
+    // is three different widths at three rungs, which is exactly why it is
+    // declared a free-width slot rather than padded into a column. Dropping it
+    // from `FREE_WIDTH_SLOTS` makes T2.5's fixed-column loop see it and fail.
     const rungs = [
       { unicode: "full", ambiguousWidth: "narrow" },
       { unicode: "full", ambiguousWidth: "wide" },
       { unicode: "ascii", ambiguousWidth: "narrow" },
     ] as const;
-    const padded = rungs.map((caps) => cells(residueLead(caps), caps.ambiguousWidth));
-    expect(new Set(padded), "the shipped lead is one width at every rung").toEqual(new Set([RESIDUE_CELLS]));
+    expect(FREE_WIDTH_SLOTS.has("residue"), "the exemption is declared").toBe(true);
 
     const unpadded = rungs.map((caps) => cells(glyphs(caps).residue, caps.ambiguousWidth));
     expect(

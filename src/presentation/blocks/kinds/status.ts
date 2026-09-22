@@ -16,7 +16,7 @@
 import { normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Status } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate, wrapCells } from "../../text.js";
-import { glyphs, residueLead, spinnerFrames } from "../glyphs.js";
+import { glyphs, spinnerFrames } from "../glyphs.js";
 import { background, fit, paint, rows, slot as surface, tone, withBackground, type Span } from "../paint.js";
 import type { BlockDefinition, RenderContext, Rendered } from "../types.js";
 import type { Style } from "../../theme/index.js";
@@ -325,7 +325,7 @@ function detailOf(
   // is not taught the mark twice.
   return [
     ...lines.slice(0, forDetail - 1).map(cut),
-    cut(`${residueLead(caps)} +${String(dropped)} more`),
+    cut(`${glyphs(caps).residue} +${String(dropped)} more`),
   ];
 }
 

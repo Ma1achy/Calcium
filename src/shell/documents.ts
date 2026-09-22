@@ -22,6 +22,7 @@ import type { ToolDef } from "../data/manifest/index.js";
 import type {
   LocalDocument,
   Block,
+  CallState,
   DocumentMeta,
   DocumentStatus,
   ErrorLike,
@@ -274,6 +275,12 @@ export type ToolCallSpec = Readonly<{
    * the spinner a settled call no longer has.
    */
   settled?: boolean;
+  /**
+   * The lifecycle state, stated rather than derived (C23 I59). Only `queued`
+   * and `cancelled` need it: a header cannot tell *not started* from *running*,
+   * and a cancelled call has an outcome like any other settlement.
+   */
+  state?: CallState;
   /** Awaiting a decision (C23 I60): the duration slot reads `⠋ waiting`, and no figure. */
   waiting?: boolean;
   /**
@@ -350,6 +357,28 @@ export function toolCallHeader(call: ToolCallSpec, caps: Caps, tick = 0): string
 }
 
 /**
+ * The call's lifecycle state (C23 I59).
+ *
+ * **Derived where it is not stated**, from the two facts the composer already
+ * reads for the spinner: a call with an outcome or an explicit `settled` has
+ * finished, and a failure word in the outcome says how. `queued` and
+ * `cancelled` cannot be inferred from a header — nothing in `ToolCallSpec`
+ * distinguishes *not started* from *started a moment ago* — so a caller that
+ * knows states them.
+ */
+function callState(call: ToolCallSpec): CallState {
+  if (call.state !== undefined) return call.state;
+  const settled = call.settled === true || (call.outcome !== undefined && call.outcome !== "");
+  if (!settled) return "running";
+  // **`cancelled` is its own state and not a kind of failure**, which is the
+  // whole reason the design keeps `⊘` apart from `✗`: a call that was stopped
+  // says nothing about whether it would have worked. `FAILURE_WORDS` counts it
+  // against a parent's rollup (C23 I62) and that is a different question.
+  if (call.outcome === "cancelled") return "cancelled";
+  return call.outcome !== undefined && FAILURE_WORDS.has(call.outcome) ? "failed" : "succeeded";
+}
+
+/**
  * The head block (C09 I46, I47): a `step` notice carrying the header, its
  * argument marked `elide` so the fitter shortens it before the verb, duration or
  * outcome, and the call's id so a readout can replace it in place (C23 I54).
@@ -358,7 +387,21 @@ export function callHead(call: ToolCallSpec, caps: Caps, tick = 0, foldTarget?: 
   const text = toolCallHeader(call, caps, tick);
   const from = call.name.length + 1; // cells-ok — a code-unit offset into the text
   const spans = call.args === "" ? [] : [{ from, to: from + call.args.length, elide: true }]; // cells-ok — code-unit offsets
-  const base = { kind: "notice" as const, id: call.id ?? blockId("step"), tone: "info" as const, glyph: "step" as const, text };
+  // **The head carries a state, not a character** (C09 I45, C23 I59): which
+  // mark it draws is a question about the terminal, and a producer has never
+  // seen one. `glyph` is the answer for the rung where tone carries — one `●`
+  // for every state, §030's collapse — and the renderer substitutes the state's
+  // own mark where it does not. Both are one cell with no indent, so `measure`
+  // reads `glyph` alone and is right at every rung.
+  const state = callState(call);
+  const base = {
+    kind: "notice" as const,
+    id: call.id ?? blockId("call"),
+    tone: "info" as const,
+    glyph: "running" as const,
+    state,
+    text,
+  };
   const marked = spans.length === 0 ? base : { ...base, spans }; // cells-ok — a span count
   // **`⏎` on the head folds the body** (C09 I47, C26 §5): the action is the
   // block's `expand` aimed at the body's scroll, when there is one. Re-run

@@ -1423,7 +1423,7 @@ describe("C23 tier 3 — edges", () => {
     const ok = harness();
     ok.pipeline.submit("echo hi");
     await settled(ok.pipeline);
-    expect(ok.transcript.entries[0]?.doc.blocks.filter((b) => b.kind === "notice" && b.glyph !== "step")).toHaveLength(0); // C23 I54: block 0 is the card's header
+    expect(ok.transcript.entries[0]?.doc.blocks.filter((b) => b.kind === "notice" && b.state === undefined)).toHaveLength(0); // C23 I54: block 0 is the card's header
   });
 
   it("T3.20a (C07 I22): a stream that overflowed carries the notice when it settles", async () => {
@@ -1445,7 +1445,7 @@ describe("C23 tier 3 — edges", () => {
     const doc = h.transcript.entries[0]?.doc;
     expect(h.transcript.entries[0]?.streaming, "settled").toBe(false);
     // C23 I54 — the card's `step` header is a notice too, and it is block 0, not the row's subject.
-    const notices = (doc?.blocks ?? []).filter((b) => b.kind === "notice" && b.glyph !== "step");
+    const notices = (doc?.blocks ?? []).filter((b) => b.kind === "notice" && b.state === undefined);
     expect(notices, "one notice, after the streamed block").toHaveLength(1);
     expect(doc?.blocks.at(-1)?.kind).toBe("notice");
     expect(notices[0]).toMatchObject({ tone: "warn", glyph: "warn" });
@@ -1462,7 +1462,7 @@ describe("C23 tier 3 — edges", () => {
     });
     ok.pipeline.submit("/tail");
     await settled(ok.pipeline);
-    expect(ok.transcript.entries[0]?.doc.blocks.filter((b) => b.kind === "notice" && b.glyph !== "step")).toHaveLength(0); // C23 I54: block 0 is the card's header
+    expect(ok.transcript.entries[0]?.doc.blocks.filter((b) => b.kind === "notice" && b.state === undefined)).toHaveLength(0); // C23 I54: block 0 is the card's header
   });
 
   it("T3.16 (I5): a shell route holds the guard exactly as an app verb does", async () => {

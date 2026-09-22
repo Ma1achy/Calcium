@@ -14,7 +14,7 @@
  * `ascii` is for terminals that cannot draw beyond it at all — a terminal that
  * has box drawing and no astral planes still gets `┌` and `✓`.
  */
-import type { Glyph, Marker3 } from "../../data/viewmodel/types.js";
+import type { CallState, Glyph, Marker3 } from "../../data/viewmodel/types.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { cells } from "../text.js";
 
@@ -247,13 +247,20 @@ const UNICODE: GlyphSet = Object.freeze({
 });
 
 const ASCII: GlyphSet = Object.freeze({
-  // **`...` and not `~`, and the slot is three cells at every rung** (R-GLY-001,
-  // §096). The registry declares `ellipsis` with `reservedCells: 3` and
-  // `ascii: 3`, and the design is the source of truth on the character. `~` was
-  // chosen by T2.5's 1:1-by-cell-count rule — three dots against one `⋯` — and
-  // that rule is amended rather than dodged: what it protected was *no column
-  // moves when the rung changes*, which a declared slot keeps and a 1:1
-  // character was only ever one way of getting.
+  // **`...` and not `~`** (R-GLY-003, §096, §095). The registry declares
+  // `ellipsis` with `reservedCells: 3`, and the design is the source of truth on
+  // the character. `~` was chosen by T2.5's 1:1-by-cell-count rule — three dots
+  // against one `⋯` — and that rule was amended rather than dodged: what it
+  // protected was *no column moves when the rung changes*, and a 1:1 character
+  // was only ever one way of getting it.
+  //
+  // **It is not padded to that reservation**, because this mark stands in no
+  // column: `reservedCells` records the widest rendering, and R-GLY-003 binds
+  // the padding to fixed columns only. A residue lead is followed by its own
+  // count and nothing else, so it reads `⋯ 5 more` and `... 5 more` and the
+  // two cells a slot would have spent go to whatever is beside it —
+  // measurably, the pie chart's figure, whose legend column is sized by its
+  // widest row. `FREE_WIDTH_SLOTS` is where that is declared.
   residue: "...",
   // `:` and not `-` (F834): `-` is `TURN_ASCII`'s first frame, and a dispatched
   // head read `verb - -`. The rung is a character no set's ASCII frames use.
@@ -300,17 +307,6 @@ const ASCII: GlyphSet = Object.freeze({
 });
 
 /**
- * The cells the residue mark's slot occupies, at every rung (C04 I49, R-GLY-001).
- *
- * **Three, because the widest rendering is three and a slot that changed width
- * between rungs would move the column beside it.** `⋯` is one cell narrow and
- * two wide; `...` is three. The mark is drawn left-aligned in the slot and the
- * rest is padding, so the row's arithmetic is the same number whichever
- * alphabet the terminal takes.
- */
-export const RESIDUE_CELLS = 3;
-
-/**
  * The cells one spinner frame occupies, at every set and every rung.
  *
  * **A constant, and the constant is what a capability-free measurer needs.**
@@ -322,24 +318,71 @@ export const RESIDUE_CELLS = 3;
 export const SPINNER_CELLS = 1;
 
 /**
- * The residue mark, padded to its slot — the one place either rendering enters
- * a frame.
+ * The `GlyphSet` rôles whose two renderings need **not** be the same width.
  *
- * A function rather than a constant because the padding depends on which
- * rendering was resolved, and `cells()` is what decides. `glyphs()` hands back
- * the ASCII set wholesale at `ambiguousWidth: "wide"` (C02 I9), so the Unicode
- * `⋯` is only ever measured narrow.
+ * **The fixed-column rule and its exception, stated together.** A mark in a
+ * fixed column — a gutter, a row's lead, a frame's edge — must be the same
+ * width at every capability rung, because content beside it aligns to that
+ * column and a mark that changed width would move the alignment when the
+ * terminal changed alphabet. That is what C09 I5 protects and what every
+ * `Glyph` and almost every `GlyphSet` rôle holds.
  *
- * **Not the in-row shed mark**, which is `⋯N` and takes the bare character.
- * That mark is not a column: `shedRow` measures it against the room left and
- * drops it when reserving it would clip the row it is announcing (C09 I81), so
- * there is nothing beside it to keep still. Padding it would put three cells
- * between the mark and its own count and spend the room the ladder is fighting
- * for. Two consumers of one character, and only one of them is a slot.
+ * **A residue lead is not a fixed column.** It is followed only by its own
+ * count — `⋯ 5 more`, `... 5 more` — so nothing aligns to it and the padding
+ * buys nothing but two cells of gap the design does not draw (§095,
+ * R-BLK-867). The registry's `reservedCells: 3` is the width of the widest
+ * rendering, not a column to pad every rendering into.
+ *
+ * The in-row shed mark `⋯N` is the same argument reached from the other end:
+ * `shedRow` measures it against the room left and drops it when reserving it
+ * would clip the row it announces, so there is nothing beside it to keep still.
  */
-export function residueLead(caps: GlyphCaps): string {
-  const mark = glyphs(caps).residue;
-  return mark + " ".repeat(Math.max(0, RESIDUE_CELLS - cells(mark, caps.ambiguousWidth)));
+export const FREE_WIDTH_SLOTS: ReadonlySet<keyof GlyphSet> = new Set<keyof GlyphSet>(["residue"]);
+
+/**
+ * The glyph each call state draws **when shape has to carry it** (C09 I45,
+ * R-BLK-125, §030).
+ *
+ * Above the monochrome rung the design draws one `●` for every state and lets
+ * **tone** say which — so the head mark is a constant and the state is a
+ * colour. At 1 bit, and in ASCII, tone is gone and the only carrier left is
+ * the shape, so each state takes its own mark. Both halves of R-COR-003 are
+ * then the glyph and the outcome word, neither of which is a colour.
+ */
+export const CALL_STATE_GLYPH: Readonly<Record<CallState, Glyph>> = Object.freeze({
+  queued: "queued",
+  running: "running",
+  succeeded: "ok",
+  failed: "error",
+  cancelled: "cancelled",
+});
+
+/**
+ * Whether tone can carry a fact at these capabilities.
+ *
+ * **Asked at render, never at production.** A producer composing a call head
+ * has never seen a capability record — `callHead` runs in `shell/documents.ts`
+ * — and focus and theme move per frame without the document being re-produced.
+ * So the block carries a *state* and the renderer resolves it here.
+ *
+ * ASCII counts as no tone for this purpose even on a colour terminal: the
+ * ASCII rung is a whole alphabet stepping down together, and a `*` head with
+ * five meanings distinguished only by colour is the collapse §030 accepts
+ * because it has `●` to fall back on, which ASCII does not.
+ */
+export function toneCarries(caps: GlyphCaps & Pick<TerminalCapabilities, "colourDepth">): boolean {
+  return caps.colourDepth > 1 && caps.unicode !== "ascii";
+}
+
+/**
+ * The head mark a call in `state` draws at these capabilities (C09 I45).
+ *
+ * Every candidate is one cell with indent 0, which is what lets `measure` stay
+ * capability-free while the character moves: `GLYPH_INDENT` holds one entry and
+ * it is not one of these, so resolving by capability moves no geometry.
+ */
+export function headMark(state: CallState, caps: Parameters<typeof toneCarries>[0]): Glyph {
+  return toneCarries(caps) ? "running" : CALL_STATE_GLYPH[state];
 }
 
 /** The pairs, for the test that asserts each is 1:1 (T2.5). */
@@ -1004,17 +1047,6 @@ const GLYPH_TABLE: Readonly<Record<Glyph, readonly [unicode: string, ascii: stri
     // survivors is the better answer the day someone measures one, and this is
     // one. The ASCII half is `tree(1)`'s rendering of the same hook.
     continuation: ["⎿", "`"],
-    // **`⏺` U+23FA BLACK CIRCLE FOR RECORD, followed by U+FE0E** (C09 I45,
-    // F854). The base has an emoji presentation form, which is why it left this
-    // slot under F823 — and refusing the character was the wrong remedy. The
-    // selector says *draw the preceding character as text*, `cells()` counts it
-    // zero (measured, not assumed), and the mark is one cell by every table.
-    //
-    // It is the character the slot means: Miscellaneous Technical, beside ⏵
-    // PLAY and ⏸ PAUSE, and a call in progress is a recording. `⬤` U+2B24, which
-    // held the slot between F823 and this, is a circle of the right size and
-    // nothing else.
-    step: ["\u23fa\ufe0e", "*"],
   });
 
 /**
@@ -1054,7 +1086,6 @@ export const GLYPH_DOMAINS: Readonly<Record<Glyph, readonly string[]>> = {
   quote: ["row-lead"],
   nested: ["row-lead"],
   continuation: ["row-lead"],
-  step: ["row-lead"],
 };
 
 /**

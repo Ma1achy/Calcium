@@ -42,9 +42,8 @@ import {
   GLYPH_TOKENS,
   glyphCells,
   glyphFor,
-  RESIDUE_CELLS,
+  FREE_WIDTH_SLOTS,
   glyphs,
-  residueLead,
 } from "../../src/presentation/blocks/index.js";
 import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
 import { checkSourceScans } from "../../tools/enforce/source-scans.mjs";
@@ -162,31 +161,34 @@ describe("C09 contract — measurement", () => {
   });
 
   it("T2.5 (I5): every substitution in §4 occupies the same slot at every rung", () => {
-    // **Amended from *1:1 by cell count*, and the amendment is what the rule was
-    // always for.** One cell against one cell was a way of guaranteeing that no
-    // column moves when the alphabet changes; it was never the property itself.
-    // The design declares `ellipsis` with `reservedCells: 3` and `ascii: "..."`
-    // (R-GLY-001, §096), so the residue mark is a three-cell **slot** and the
-    // 1:1 form would refuse it — which is a rule blocking the design, and the
-    // rule is what changes.
+    // **Amended twice, and the second amendment narrowed the first.** One cell
+    // against one cell was a way of guaranteeing that no column moves when the
+    // alphabet changes; it was never the property itself. The design declares
+    // `ellipsis` with `reservedCells: 3` and `ascii: "..."` (R-GLY-003, §096),
+    // so the 1:1 form would refuse it — a rule blocking the design, and the rule
+    // is what changed.
     //
-    // Every other member is still one cell at both renderings; `residue` is the
-    // one slot that is wider, it is declared, and `residueLead` is the only
-    // place either rendering enters a frame.
-    const SLOTS: Readonly<Record<string, number>> = { residue: RESIDUE_CELLS };
+    // The first amendment then over-reached: it padded the residue lead into a
+    // three-cell slot at every rung. **`reservedCells` at every rung is a rule
+    // about marks in FIXED COLUMNS** — a gutter, a row's lead, a frame's edge —
+    // where content beside the mark aligns to the column and a mark that
+    // changed width would move the alignment. A residue lead is followed only
+    // by its own count (`⋯ 5 more`, `... 5 more`, §095 / R-BLK-867), so nothing
+    // aligns to it and padding buys two cells of gap the design does not draw.
+    // `FREE_WIDTH_SLOTS` is where the exception is declared, and this row is
+    // what keeps the declaration honest.
     const uni = glyphs({ unicode: "full", ambiguousWidth: "narrow" });
     const asc = glyphs({ unicode: "ascii", ambiguousWidth: "narrow" });
     for (const name of Object.keys(uni) as (keyof typeof uni)[]) {
       const unicode = uni[name];
       const ascii = asc[name];
-      const slot = SLOTS[name] ?? 1;
-      expect(cells(ascii), `${unicode} → ${ascii} fits its ${String(slot)}-cell slot`).toBeLessThanOrEqual(slot);
-      expect(cells(unicode, "narrow"), `${unicode} fits its slot narrow`).toBeLessThanOrEqual(slot);
-      if (slot === 1) expect(cells(ascii), `${unicode} → ${ascii}`).toBe(cells(unicode));
+      if (FREE_WIDTH_SLOTS.has(name)) continue;
+      expect(cells(ascii), `${unicode} → ${ascii}`).toBe(cells(unicode));
+      expect(cells(unicode, "narrow"), `${unicode} is one cell narrow`).toBe(1);
     }
 
-    // **The property the 1:1 rule protected, asserted directly**: the residue
-    // lead is the same number of cells at every rung, so the column beside it
+    // **The property the 1:1 rule protected, asserted directly**: a fixed-column
+    // mark is the same number of cells at every rung, so the column beside it
     // does not move when the terminal changes alphabet. `glyphs()` hands back
     // the ASCII set wholesale at `wide` (C02 I9), so the three rungs are narrow
     // Unicode, wide, and ASCII.
@@ -195,14 +197,21 @@ describe("C09 contract — measurement", () => {
       { unicode: "full", ambiguousWidth: "wide" },
       { unicode: "ascii", ambiguousWidth: "narrow" },
     ] as const;
-    const widths = rungs.map((caps) => cells(residueLead(caps), caps.ambiguousWidth));
-    expect(new Set(widths), `the residue slot is one width at every rung — ${widths.join(", ")}`).toEqual(
-      new Set([RESIDUE_CELLS]),
-    );
-    // And the control: the marks themselves are *not* all the same width, which
-    // is why the slot has to be a slot rather than a character.
-    const marks = rungs.map((caps) => cells(glyphs(caps).residue, caps.ambiguousWidth));
-    expect(new Set(marks).size, `the marks differ — ${marks.join(", ")}`).toBeGreaterThan(1);
+    for (const name of Object.keys(uni) as (keyof typeof uni)[]) {
+      if (FREE_WIDTH_SLOTS.has(name)) continue;
+      const widths = rungs.map((caps) => cells(glyphs(caps)[name], caps.ambiguousWidth));
+      expect(new Set(widths).size, `${name} is one width at every rung — ${widths.join(", ")}`).toBe(1);
+    }
+
+    // **And the exemption is driven, not decorative** (the rule an allow-list
+    // needs to survive): every member of `FREE_WIDTH_SLOTS` must actually vary
+    // across the rungs. A member that stopped varying would be a dead entry
+    // weakening the rule for everything it names, and this is what fails the day
+    // one appears.
+    for (const name of FREE_WIDTH_SLOTS) {
+      const widths = rungs.map((caps) => cells(glyphs(caps)[name], caps.ambiguousWidth));
+      expect(new Set(widths).size, `${name} is exempt because it varies — ${widths.join(", ")}`).toBeGreaterThan(1);
+    }
   });
 
   it("T2.5b (I5, C04 §5): every `Glyph` is 1:1 by cell count, in both renderings", () => {
@@ -521,7 +530,7 @@ describe("C09 §4 — the call grammar's glyph rows", () => {
     }
     expect(bare, "a bare base is still a violation — the remedy is the selector, not the exemption").toEqual(["\u23fa"]);
     expect(hasEmojiForm(0x2a), "* is a keycap base in the Unicode file and excluded by construction (F832)").toBe(false);
-    expect(glyphFor("step", ASCII_CAPS), "so the ASCII rung is still *").toBe("*");
+    expect(glyphFor("running", ASCII_CAPS), "so the ASCII rung is still *").toBe("*");
   });
 
   it("T2.115 (C09 I48): every `Glyph` is 1:1 by cell count at BOTH conventions, through `glyphFor`", () => {
@@ -529,7 +538,7 @@ describe("C09 §4 — the call grammar's glyph rows", () => {
     // broke it at `wide` while it was green (F825). The two named sets are
     // compared by equality so a member moving between them fails the row.
     const AMBIGUOUS = new Set(["warn", "info", "pending", "working", "running", "queued", "cancelled", "expand", "collapse", "focus", "bullet"]);
-    const NEUTRAL = new Set(["ok", "error", "quote", "nested", "continuation", "step"]);
+    const NEUTRAL = new Set(["ok", "error", "quote", "nested", "continuation"]);
     expect(new Set([...AMBIGUOUS, ...NEUTRAL])).toEqual(new Set(GLYPH_TOKENS));
     const tiered: string[] = [];
     const steady: string[] = [];
@@ -726,7 +735,7 @@ describe("C09 contract — the slice seam", () => {
  * the ground and nothing else, and the assertion is the geometry.
  */
 describe("C09 I83 — a notice takes the focus ground and no column", () => {
-  const HEAD = block({ kind: "notice", id: "h", tone: "default", glyph: "step", text: "ps · ok" } as never);
+  const HEAD = block({ kind: "notice", id: "h", tone: "default", glyph: "running", state: "running", text: "ps · ok" } as never);
   const BODY = block({ kind: "notice", id: "b", tone: "muted", glyph: "continuation", text: "one row" } as never);
   const WIDTH = 40;
   const kitAt = (focus: RenderContext["focus"], caps = FULL_CAPS) =>
@@ -786,7 +795,7 @@ describe("C09 I83 — a notice takes the focus ground and no column", () => {
     // The form this replaces put `accent` on the selection ground, which could
     // not tell a focused `info` notice from an unfocused `accent` one.
     for (const name of ["info", "error", "warn"] as const) {
-      const notice = block({ kind: "notice", id: "h", tone: name, glyph: "step", text: `on ${name}` } as never);
+      const notice = block({ kind: "notice", id: "h", tone: name, glyph: "running", state: "running", text: `on ${name}` } as never);
       const lines = kitAt({ blockId: "h", rowId: "h" }).renderSequence([notice], WIDTH);
       // **The slot is the notice's; the hex is the ground's answer** (C10 I48).
       // `dark` composes a nearer `error` for `focusGround`, so a row asserting
@@ -888,16 +897,16 @@ describe("C09 §3a-ter — the status parts and the empty state", () => {
       kit.renderToLines(statusAt(over), 60).map(visible).join("\n");
 
     // Six lines into a box with room for three: two shown, and the third says
-    // how many went. `⋯   +N more` is `scroll`'s text verbatim, so a reader who
+    // how many went. `⋯ +N more` is `scroll`'s text verbatim, so a reader who
     // has met it in a container is not taught the mark twice.
     const cut = lines({ height: 8, detail: BIG });
     expect(cut, "two frames survive").toContain("at frame1");
-    expect(cut, "and the residue names the rest").toContain("⋯   +4 more");
+    expect(cut, "and the residue names the rest").toContain("⋯ +4 more");
     expect(cut, "the dropped ones are gone").not.toContain("at frame5");
     // **The count follows the room, which is what says it is computed.** One row
     // less and one more frame goes, and the residue says so — a constant would
     // read as correct on the row above and nowhere else.
-    expect(lines({ height: 6, detail: BIG }), "one row less, one more dropped").toContain("⋯   +5 more");
+    expect(lines({ height: 6, detail: BIG }), "one row less, one more dropped").toContain("⋯ +5 more");
 
     // **The asymmetry, which is the half that is easy to lose.** A detail that
     // fits carries no mark — one claiming a truncation that did not happen sends

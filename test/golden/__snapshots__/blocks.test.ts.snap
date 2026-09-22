@@ -347,7 +347,7 @@ D             C
 ── scroll · measured 3 · rendered 3
 one
 two
-[38;2;138;138;138m⋯   0 above, 1 below[39m
+[38;2;138;138;138m⋯ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                right
 ── raw · measured 2 · rendered 2
@@ -418,7 +418,7 @@ D                   C
 ── scroll · measured 3 · rendered 3
 one
 two
-[38;2;138;138;138m⋯   0 above, 1 below[39m
+[38;2;138;138;138m⋯ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                          right
 ── raw · measured 2 · rendered 2
@@ -489,7 +489,7 @@ D                          C
 ── scroll · measured 3 · rendered 3
 one
 two
-[38;2;138;138;138m⋯   0 above, 1 below[39m
+[38;2;138;138;138m⋯ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                                    right
 ── raw · measured 2 · rendered 2
@@ -560,7 +560,7 @@ D                                       C
 ── scroll · measured 3 · rendered 3
 one
 two
-[38;2;138;138;138m⋯   0 above, 1 below[39m
+[38;2;138;138;138m⋯ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                                                        right
 ── raw · measured 2 · rendered 2
@@ -915,7 +915,7 @@ D             C
 ── scroll · measured 3 · rendered 3
 one
 two
-[38;2;105;108;119m⋯   0 above, 1 below[39m
+[38;2;105;108;119m⋯ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                right
 ── raw · measured 2 · rendered 2
@@ -986,7 +986,7 @@ D                   C
 ── scroll · measured 3 · rendered 3
 one
 two
-[38;2;105;108;119m⋯   0 above, 1 below[39m
+[38;2;105;108;119m⋯ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                          right
 ── raw · measured 2 · rendered 2
@@ -1057,7 +1057,7 @@ D                          C
 ── scroll · measured 3 · rendered 3
 one
 two
-[38;2;105;108;119m⋯   0 above, 1 below[39m
+[38;2;105;108;119m⋯ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                                    right
 ── raw · measured 2 · rendered 2
@@ -1128,7 +1128,7 @@ D                                       C
 ── scroll · measured 3 · rendered 3
 one
 two
-[38;2;105;108;119m⋯   0 above, 1 below[39m
+[38;2;105;108;119m⋯ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                                                        right
 ── raw · measured 2 · rendered 2

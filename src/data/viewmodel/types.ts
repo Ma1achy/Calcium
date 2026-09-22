@@ -249,14 +249,7 @@ export type Glyph =
    * different submission's entry. C09 §4 names the two blocks in the position
    * and the two that look as though they are.
    */
-  | "continuation"
-  /**
-   * A step in a sequence of work — a tool call's header (C09 §4,
-   * `AGENT_TUI_DESIGN.md` §9c). A *position in a sequence* and not a state, so
-   * it does not change as the step runs or settles; `running` is the state.
-   * `⏺` U+23FA is written with U+FE0E after it — the base has an emoji presentation form and the selector says to draw it as text, which `cells()` counts as zero cells (C09 I45, F823, F854).
-   */
-  | "step";
+  | "continuation";
 
 /** The tones that oblige a glyph (I6, D29). */
 export const GLYPH_REQUIRED_TONES: ReadonlySet<Tone> = new Set<Tone>(["error", "warn"]);
@@ -665,7 +658,35 @@ export type Notice = Readonly<{
    * Absent, the notice declares nothing and is what it always was.
    */
   action?: Action;
+  /**
+   * The lifecycle state of the call this notice heads (C23 I59, R-GLY-003).
+   *
+   * **Present, the renderer resolves the head mark from it and `glyph` is the
+   * mark above one bit.** This is the seam M4's head-mark rung needs and the
+   * reason a producer cannot choose the character: above 1-bit the design draws
+   * one `●` for every state and lets **tone** say which (§030, R-BLK-125); at
+   * one bit and in ASCII tone is gone, so the **shape** has to carry it. Which
+   * rung applies is a property of the terminal reading the frame, not of the
+   * document, and `callHead` runs in a producer that has never seen one.
+   *
+   * **It moves no geometry**, which is what makes it safe: every glyph it can
+   * resolve to is one cell with no indent, so `measure` still receives no
+   * capability and `prefixCells` still reads `glyph` alone (C09 I5, I8).
+   *
+   * It replaced `Glyph.step`, a slot holding one character — `⏺` — for a
+   * position whose whole point is that it changes.
+   */
+  state?: CallState;
 }> & Padded & Floor;
+
+/**
+ * What a call head can be, in the order a call passes through them.
+ *
+ * Named here rather than derived from `Glyph` because these are **states**, and
+ * the glyphs are how a capability rung happens to draw them — the mapping is
+ * the renderer's and changes with the rung.
+ */
+export type CallState = "queued" | "running" | "succeeded" | "failed" | "cancelled";
 
 export type KeyValue = Readonly<{
   kind: "keyValue";

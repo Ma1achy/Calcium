@@ -54,8 +54,9 @@ const results = runPass({
       name: "THE DEFECT: the validator's vocabulary is a Set literal again, and the token is missing from it",
       file: VALIDATE,
       // Re-anchored 2026-09-05: `step` joined the row (C09 §4), applied by hand
-      // and T3.18 died.
-      from: "  continuation: true, step: true,\n} satisfies Record<Glyph, true>;",
+      // and T3.18 died. Re-anchored again 2026-09-22: `step` left it, the head
+      // mark having become a resolution rather than a slot (C09 I45).
+      from: "  continuation: true,\n} satisfies Record<Glyph, true>;",
       to: "} as Record<string, true>;",
       expect: "T3.18",
     },

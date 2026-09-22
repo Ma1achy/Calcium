@@ -26,8 +26,7 @@ export {
   GLYPH_SET_DOMAINS,
   GLYPH_SUBSTITUTIONS,
   GLYPH_TOKENS,
-  RESIDUE_CELLS,
-  residueLead,
+  FREE_WIDTH_SLOTS,
   SUBSTITUTIONS,
   type GlyphSet,
 } from "./glyphs.js";

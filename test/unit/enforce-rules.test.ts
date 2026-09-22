@@ -21,8 +21,12 @@
 // about. The fabricated violation catches the first, the scope check the
 // second, the existence check the third; no one of them catches the others,
 // which is why all three are here (A03 §2, commitment 14).
-import { existsSync, globSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, globSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
+import { spawnSync } from "node:child_process";
 import { PLOT_UNIONS } from "../../src/data/viewmodel/validate.js";
+import { validateRuleRecords, type RuleRecord } from "../../docs/design/language/build-calcium.mjs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -762,10 +766,10 @@ const scanIds = SCANS.map((s) => s.id);
 // SS63 and SS64 read the design registry and `glyphs.ts` rather than a file
 // corpus, so neither fits a `SCANS` row: SS63 compares a recorded `widthClass`
 // against `cells()`'s own tables, and SS64 compares marks across three
-// structures inside a domain closure. SS64 is computed beside the gate and
-// **reported** until M4 rules the three characters it still finds, at which
-// point it joins the violation list — a gate red on its first run is a gate
-// somebody switches off.
+// structures inside a domain closure. **SS64 is a gate as of M4's close** — it
+// reported for exactly as long as it was red, because a gate red on its first
+// run is a gate somebody switches off, and the three characters it found were
+// ruled rather than exempted.
 const STANDALONE_SCANS = ["SS47", "SS52", "SS53", "SS54", "SS57", "SS63", "SS64"];
 
 const implemented = [
@@ -3470,5 +3474,148 @@ describe("make check — the lint corpus is the repository's own sources (F1079)
     ]) {
       expect(await linter.isPathIgnored(path), `${path} is a source and must be linted`).toBe(false);
     }
+  });
+});
+
+// --- the design registry's supersession chain ------------------------------
+
+/**
+ * **A supersession chain is legal; a chain with no single current terminus is
+ * not.** The checker read `successor.status !== 'current'`, which forbade chains
+ * outright — and a chain is the only move available once a rule's own links are
+ * sealed. A released rule's `supersededBy` cannot be redirected
+ * (`lint-immutable.mjs`), so a rule narrowing a rule that already narrowed
+ * something has nowhere to attach but the end of the line.
+ *
+ * Four ways a chain fails to have one terminus, one row each, because each is a
+ * different edit and a single fabrication would leave three arms untested.
+ */
+describe("the design registry — supersession chains", () => {
+  // The module's own record type, not a second copy of it here — a transcription
+  // is the drift `.d.mts` files exist to stop, one level in.
+  type Rule = RuleRecord & { sectionKey: string; supersedes: string[]; supersededBy: string | null };
+  const load = (): Rule[] =>
+    (JSON.parse(readFileSync("docs/design/language/calcium-registry.json", "utf8")) as { rules: Rule[] }).rules;
+
+  const validate = (rules: Rule[]): void => {
+    validateRuleRecords(rules);
+  };
+
+  /** A rule with a digest the checker will accept, so a row fails on its own subject. */
+  const digestOf = (r: Pick<Rule, "title" | "text" | "sectionKey">): string =>
+    createHash("sha256").update(JSON.stringify([r.title, r.text, r.sectionKey ?? null])).digest("hex");
+
+  const linked = (id: string, status: string, supersedes: string[], supersededBy: string | null): Rule => {
+    const base = { title: `fabricated ${id}`, text: `fabricated normative text for ${id}`, sectionKey: "current-contract" };
+    return { id, ...base, status, supersedes, supersededBy, contentDigest: digestOf(base) };
+  };
+
+  it("A03-DSN1 passes: a three-link chain ending in one current rule is legal", () => {
+    // The arm the amendment opens, asserted before the four refusals — a row
+    // that only fabricates failures cannot tell a fixed checker from a checker
+    // that refuses everything.
+    const rules = [
+      ...load(),
+      linked("R-ZZZ-001", "superseded", [], "R-ZZZ-002"),
+      linked("R-ZZZ-002", "superseded", ["R-ZZZ-001"], "R-ZZZ-003"),
+      linked("R-ZZZ-003", "current", ["R-ZZZ-002"], null),
+    ];
+    expect(() => { validate(rules); }, "a chain with one current terminus is legal").not.toThrow();
+  });
+
+  it("A03-DSN1 fires: a chain that closes on itself is a cycle", () => {
+    const rules = [
+      ...load(),
+      linked("R-ZZZ-001", "superseded", ["R-ZZZ-002"], "R-ZZZ-002"),
+      linked("R-ZZZ-002", "superseded", ["R-ZZZ-001"], "R-ZZZ-001"),
+    ];
+    expect(() => { validate(rules); }).toThrow(/supersession cycle at R-ZZZ-00[12]/u);
+  });
+
+  it("A03-DSN1 fires: a chain ending in a superseded rule with no successor has no terminus", () => {
+    // **The arm the old check bought by accident**, and the one worth keeping:
+    // requiring the *first* successor to be current made this impossible to
+    // express, so relaxing it without this row would drop the property rather
+    // than widen it.
+    const rules = [
+      ...load(),
+      linked("R-ZZZ-001", "superseded", [], "R-ZZZ-002"),
+      linked("R-ZZZ-002", "superseded", ["R-ZZZ-001"], null),
+    ];
+    // **Two refusals are correct here and iteration order picks which speaks**:
+    // walking from `001` the chain ends at `002`, and `002` on its own turn is
+    // superseded with no successor. The row anchors on what both say rather
+    // than on whichever the loop reaches first, which is an ordering detail.
+    expect(() => { validate(rules); }).toThrow(/R-ZZZ-002.*(no successor|without a successor)/u);
+  });
+
+  it("A03-DSN1 fires: a chain ending in a superseded rule whose successor is itself dead", () => {
+    // The same property one link further out, where a per-link status check
+    // would pass and only the walk to the end can fail: every link resolves and
+    // is reciprocal, and the terminus is `example` rather than `current`.
+    const rules = [
+      ...load(),
+      linked("R-ZZZ-001", "superseded", [], "R-ZZZ-002"),
+      linked("R-ZZZ-002", "superseded", ["R-ZZZ-001"], "R-ZZZ-003"),
+      linked("R-ZZZ-003", "example", ["R-ZZZ-002"], null),
+    ];
+    expect(() => { validate(rules); }).toThrow(/chain ends at R-ZZZ-003, which is example/u);
+  });
+
+  it("A03-DSN1 fires: a link to a rule that does not exist", () => {
+    const rules = [...load(), linked("R-ZZZ-001", "superseded", [], "R-ZZZ-404")];
+    expect(() => { validate(rules); }).toThrow(/R-ZZZ-001 has invalid successor R-ZZZ-404/u);
+  });
+
+  it("A03-DSN1 fires: a released rule's supersession link cannot be redirected", () => {
+    // **The control the chain amendment most needed and the checker cannot
+    // carry.** Relaxing `validateRuleRecords` widened what a *legal* chain looks
+    // like; what stops a chain being rearranged after release is a different
+    // gate in a different file — `lint-immutable.mjs`, comparing against the
+    // sealed baseline — and a row that only fabricated against the checker would
+    // have left the guard the amendment leans on unasserted. R-GLY-001 could be
+    // superseded precisely because its own `supersededBy` was empty; the three
+    // history rules pointing *at* it have theirs set, and this is what keeps
+    // them pointing there.
+    //
+    // The shipped script is run as it ships, against a fabricated copy of the
+    // directory: it has no exports and resolves both files beside itself, so a
+    // copy is the only way to hand it a different registry without editing it.
+    const dir = mkdtempSync(join(tmpdir(), "calcium-immutable-"));
+    const from = "docs/design/language";
+    copyFileSync(`${from}/lint-immutable.mjs`, join(dir, "lint-immutable.mjs"));
+    copyFileSync(`${from}/released-baseline.json`, join(dir, "released-baseline.json"));
+    const reg = JSON.parse(readFileSync(`${from}/calcium-registry.json`, "utf8")) as {
+      rules: { id: string; supersededBy: string | null }[];
+    };
+
+    // The unedited pair passes, or the row below is about the copy rather than
+    // about the redirect.
+    writeFileSync(join(dir, "calcium-registry.json"), JSON.stringify(reg));
+    const clean = spawnSync("node", [join(dir, "lint-immutable.mjs")], { encoding: "utf8" });
+    expect(clean.status, clean.stdout + clean.stderr).toBe(0);
+
+    // **The fabrication**: a released history rule re-aimed past the rule it was
+    // sealed against, at the rule that now supersedes it — which is exactly the
+    // rearrangement that would have been the easy way out of this problem.
+    const hist = reg.rules.find((r) => r.id === "R-HIS-006");
+    expect(hist?.supersededBy, "the sealed link the fabrication redirects").toBe("R-GLY-001");
+    if (hist !== undefined) hist.supersededBy = "R-GLY-003";
+    writeFileSync(join(dir, "calcium-registry.json"), JSON.stringify(reg));
+
+    const fired = spawnSync("node", [join(dir, "lint-immutable.mjs")], { encoding: "utf8" });
+    expect(fired.status, "a redirected released link is refused").toBe(1);
+    expect(fired.stderr + fired.stdout).toMatch(/R-HIS-006: supersededBy REDIRECTED R-GLY-001 → R-GLY-003/u);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("A03-DSN1 fires: a link the target does not acknowledge", () => {
+    const rules = [
+      ...load(),
+      linked("R-ZZZ-001", "superseded", [], "R-ZZZ-002"),
+      linked("R-ZZZ-002", "current", [], null),
+    ];
+    expect(() => { validate(rules); }).toThrow(/supersession is not reciprocal/u);
   });
 });

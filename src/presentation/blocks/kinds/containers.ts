@@ -25,7 +25,7 @@ import type { Block, Group, MeasureFn, Mosaic, MosaicRect, Panel, Scroll, WidthF
 import { axesOf, groupPlacements, mosaicRects, parseAreas } from "../../../data/viewmodel/index.js";
 import type { NavElement } from "../types.js";
 import { cells, sliceCells, stripControl, truncate } from "../../text.js";
-import { SPINNER_CELLS, glyphs, residueLead, spinnerFrames } from "../glyphs.js";
+import { SPINNER_CELLS, glyphs, spinnerFrames } from "../glyphs.js";
 import { clampSpans, paint, rows, tone } from "../paint.js";
 import { composeRow, fitRow, placeRows, type Placed } from "../../rows.js";
 import { layout, measure as solveHeight, type Box, type Size } from "../../layout/index.js";
@@ -110,7 +110,7 @@ export const panelDefinition: BlockDefinition<Panel> = {
     };
 
     // **A live region is marked by a spinner frame, not by a static rail**
-    // (C04 I39, F18, R-GLY-001). It was `Glyph.live`'s `▌`, and M4 retires that
+    // (C04 I39, F18, R-GLY-003). It was `Glyph.live`'s `▌`, and M4 retires that
     // token for two reasons that are both the design's: the design carries no
     // static live mark — liveness is the spinner (§030) — and `▌` is the
     // design's selection rail and caret (§017), so a repository token stood on
@@ -499,8 +499,8 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
       // the affordance is `activate`, and the footer shows its label (C16 I19).
       const text =
         interior === 0
-          ? `${residueLead(ctx.capabilities)} +${String(content)} more`
-          : `${residueLead(ctx.capabilities)} ${String(above)} above, ${String(below)} below`;
+          ? `${glyphs(ctx.capabilities).residue} +${String(content)} more`
+          : `${glyphs(ctx.capabilities).residue} ${String(above)} above, ${String(below)} below`;
       residueRow = paint(clampSpans([{ text: truncate(text, width, ctx.capabilities), style: dim }], width, ctx.capabilities));
     }
 

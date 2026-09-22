@@ -16,6 +16,7 @@ export type {
   AdapterMeta,
   LocalDocument,
   ProducedMeta,
+  CallState,
   Glyph,
   HeadingLevel,
   Action,

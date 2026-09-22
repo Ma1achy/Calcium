@@ -60,9 +60,12 @@ const LADDER =
 const HEADER =
   "C09 I82 (F1236): the header reserves the verdict's cells, so its label names the column its values are in";
 const LIVE_SPINNER =
-  "C04 I39 / R-GLY-001 (M4): a live region is marked by a spinner frame, where Ink drew `Glyph.live`'s static `▌` — a token the design has no slot for, on a character the design spends on the selection rail";
-const RESIDUE_SLOT =
-  "R-GLY-001 (M4): the residue mark is a declared three-cell slot at every rung — `...` by the design, `⋯` padded to match — where Ink drew a one-cell `~`";
+  "C04 I39 / R-GLY-003 (M4): a live region is marked by a spinner frame, where Ink drew `Glyph.live`'s static `▌` — a token the design has no slot for, on a character the design spends on the selection rail";
+const RESIDUE_ASCII =
+  "R-GLY-003 / §095 (M4): the residue mark's ASCII half is the design's `...` where Ink drew a one-cell `~` — and only the ASCII half, because `⋯` is both what Ink drew and what the design draws";
+
+/** Every width the two sweeps render at, so a rung-wide ruling is not a hand-copied list. */
+const ALL_WIDTHS = [2, 12, 24, 32, 40, 60, 80, 100, 120, 160, 200] as const;
 
 const RETIRED: ReadonlyMap<string, string> = new Map(
   (
@@ -81,23 +84,26 @@ const RETIRED: ReadonlyMap<string, string> = new Map(
       // shed it. Named before the run and read after — 27 entries, and the diff
       // is one row of each.
       ["t2143-comparison-comparison-1", [24, 32, 40, 60, 80, 100, 120, 160, 200], HEADER],
-      // **The two blocks that draw a residue row, and every width bar one.**
-      // Named from a measured sweep and read after: 64 captures, both `scroll`
-      // kinds, three capability sets — and `full` at two columns is **not** in
-      // it, because at two cells the padded `⋯` truncates to exactly what the
-      // bare one did. An exemption list that is driven is what makes that
-      // absence worth stating rather than rounding up to a cross product.
-      ["t2143-scroll-scroll-1", [12, 24, 32, 40, 60, 80, 100, 120, 160, 200], RESIDUE_SLOT],
-      ["t2143-scroll-adv-overfull-scroll", [12, 24, 32, 40, 60, 80, 100, 120, 160, 200], RESIDUE_SLOT],
-      ["t2143-scroll-scroll-1", [2], RESIDUE_SLOT, ["ascii", "mono"]],
-      ["t2143-scroll-adv-overfull-scroll", [2], RESIDUE_SLOT, ["ascii", "mono"]],
-      // T2.144's container corpus draws the same row from two more scrolls, and
-      // the width-2 asymmetry repeats exactly — which is the measurement
+      // **The four blocks that draw a residue row, at the two rungs that take
+      // the ASCII set.** Named from a measured sweep and read after: 88
+      // captures, every width, `ascii` and `mono` only.
+      //
+      // **The `full` arm is deliberately absent, and its absence is the
+      // measurement that corrected an earlier ruling.** A first pass padded the
+      // mark into a three-cell slot at every rung, which moved the Unicode arm
+      // too and put 128 captures on this list. `reservedCells` at every rung is
+      // a rule about marks in **fixed columns**, where following content aligns
+      // to the column; a residue lead is followed only by its own count, so
+      // nothing aligns to it. With the padding gone the Unicode arm draws `⋯`
+      // exactly as Ink did, agrees again, and comes off the list — which is
+      // this list working as a driven exemption rather than as a note.
+      ["t2143-scroll-scroll-1", ALL_WIDTHS, RESIDUE_ASCII, ["ascii", "mono"]],
+      ["t2143-scroll-adv-overfull-scroll", ALL_WIDTHS, RESIDUE_ASCII, ["ascii", "mono"]],
+      // T2.144's container corpus draws the same row from two more scrolls, at
+      // the same two rungs and the same eleven widths — the measurement
       // agreeing with itself across two independent sweeps.
-      ["t2144-scroll-sc-residue", [12, 24, 32, 40, 60, 80, 100, 120, 160, 200], RESIDUE_SLOT],
-      ["t2144-scroll-sc-off", [12, 24, 32, 40, 60, 80, 100, 120, 160, 200], RESIDUE_SLOT],
-      ["t2144-scroll-sc-residue", [2], RESIDUE_SLOT, ["ascii", "mono"]],
-      ["t2144-scroll-sc-off", [2], RESIDUE_SLOT, ["ascii", "mono"]],
+      ["t2144-scroll-sc-residue", ALL_WIDTHS, RESIDUE_ASCII, ["ascii", "mono"]],
+      ["t2144-scroll-sc-off", ALL_WIDTHS, RESIDUE_ASCII, ["ascii", "mono"]],
       // The one panel that declares `live`. Width 2 is absent for a different
       // reason than the scrolls': at two columns the title is gone entirely, so
       // there is no mark to change.

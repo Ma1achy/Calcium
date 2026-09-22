@@ -40,6 +40,7 @@ import {
   barStyle,
   barStyleNames,
   glyphs,
+  CALL_STATE_GLYPH,
 } from "../../src/presentation/blocks/glyphs.js";
 
 const FULL = { unicode: "full", ambiguousWidth: "narrow" } as const;
@@ -100,6 +101,14 @@ export const CURATED: Readonly<Record<string, unknown>> = {
   // report. A moved domain is a ruling and reads like a typo.
   GLYPH_DOMAINS,
   GLYPH_SET_DOMAINS,
+
+  // **C09 I45 — which mark each call state takes when shape has to carry it.**
+  // Five rulings, and every one is a choice: `succeeded → ok ✓` rather than a
+  // filled circle, `failed → error ✗`, `cancelled → ⊘`. Swapping any two passes
+  // every width, distinctness and domain row in the repository, because all
+  // five marks are one cell and already distinct — which is exactly the class a
+  // pin exists for.
+  CALL_STATE_GLYPH,
 
   "glyphs(full)": glyphs(FULL),
   "glyphs(ascii)": glyphs({ ...FULL, unicode: "ascii" }),

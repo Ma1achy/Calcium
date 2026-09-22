@@ -208,6 +208,10 @@ function noticeOf(tone: Tone, text: string, glyph?: Glyph, opts?: NoticeOpts): N
       // The one button (C04 §3, arc 6 §5) — written only when supplied, so a
       // notice without one is byte-identical to what this built before.
       ...(opts?.action === undefined ? {} : { action: opts.action }),
+      // **The call state, and it is what makes the notice a head** (C09 I45):
+      // present, the renderer resolves the mark by capability and the row joins
+      // the focus ring; absent, the notice is an ordinary line.
+      ...(opts?.state === undefined ? {} : { state: opts.state }),
     } as Notice,
     opts,
     false,

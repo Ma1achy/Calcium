@@ -349,7 +349,7 @@ describe("roadmap 11 — the named subset, as blocks", () => {
     expect(cells("⎸", "wide"), "Neutral — one cell under both conventions").toBe(1);
     expect(cells("▌", "wide"), "which is why the design's own rail could not be reused").toBe(2);
     // **The ASCII half is `|` since M4, and it was `>`.** Both are plain text's
-    // own quote bars; `>` is also the design's focus mark (R-GLY-001) and the
+    // own quote bars; `>` is also the design's focus mark (R-GLY-003) and the
     // two shared a row's lead, which is SS64's first real finding. `|` was held
     // by `Glyph.live`, retired in the same change (C04 I39).
     expect(frame([quote], ASCII_CAPS, 24)[0]?.startsWith("| ")).toBe(true);

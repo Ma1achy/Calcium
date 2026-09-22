@@ -176,6 +176,15 @@ const violations = [
   // that still read as current; an exemption nothing exercises cannot be told
   // from one that has expired.
   ...checkAllowLists(files),
+  // **SS64 — a gate as of M4's close** (R-GLY-003, R-GLY-002). It reported
+  // rather than gated for exactly as long as it was red: three ASCII characters
+  // carried two marks each inside one row, all three predating this work, and a
+  // gate that is red on its first run is a gate somebody switches off. The
+  // three were ruled — `attention` took `!`, `quote` took `|` when `live`
+  // retired, `current` moved to the chooser row, and the head mark became a
+  // resolution rather than a slot — and with the list empty the rule takes the
+  // place it was always going to.
+  ...checkMarkDomains(),
   // SS54 — the refusal register. A refusal whose premise is *X does not exist*
   // names X, and this asserts it still does not; judgements are counted below.
   ...checkRefusals(),
@@ -274,9 +283,6 @@ const exactness = nameExactnessSignal(files);
 // lie: a collision only ever clears, so this list under-reports and cannot
 // over-report. A03 §9.
 const surface = publicSurfaceUseSignal(files, examples);
-// SS64's list, computed beside the gate and printed as a signal (R-GLY-001).
-const markDomains = checkMarkDomains();
-
 if (violations.length === 0) {
   console.log(
     `${GREEN}✓${RESET} enforce · ${files.length} files · ${specs.length} specs · ` +
@@ -310,14 +316,6 @@ if (violations.length === 0) {
       // SS54's judgements. A register that holds only gated rows is one nobody
       // put a taste refusal into; one that holds mostly judgements is a list of
       // opinions with a rule's name. The number is what a reader watches.
-      // **SS64, reported and not gated — for now.** It lands red: three ASCII
-      // characters carry two marks each inside one row, and all three predate
-      // this work. A gate that is red on its first run is a gate somebody
-      // switches off, so the rule reports its list until M4 rules the three and
-      // then becomes a gate (the promotion is M4 acceptance, not a follow-up).
-      `  ${DIM}mark domains · ${String(markDomains.length)} ASCII marks share a character ` +
-      `inside one domain — ${[...new Set(markDomains.map((v) => /paint "(.*?)"/u.exec(v.message)?.[1] ?? "?"))].join(" ")} ` +
-      `(SS64, R-GLY-001, reported not gated until M4 closes)${RESET}\n` +
       `  ${DIM}refusal register · ${String(unverifiableRefusals().length)} of ` +
       `${String(REFUSAL_COUNT)} refusals rest on a judgement and are not gated; ` +
       `the rest resolve against the tree (SS54, reported not gated)${RESET}` +

@@ -388,7 +388,7 @@ exports[`golden frames — a composed session, not a block > SF1 · transcript �
 06                                                                                 
 07                                                                                 
 08 ❯ /help                                                                         
-09 ⏺︎ help                                                                         
+09 ● help                                                                          
 10   ⎿                                                                             
 11   │                                                                             
 12   │ /help     list the verbs; \`/help keys\` lists the key bindings               
@@ -417,7 +417,7 @@ exports[`golden frames — a composed session, not a block > SF1 · transcript �
 06                                                                                 
 07                                                                                 
 08 ❯ /help                                                                         
-09 ⏺︎ help                                                                         
+09 ● help                                                                          
 10   ⎿                                                                             
 11   │                                                                             
 12   │ /help     list the verbs; \`/help keys\` lists the key bindings               
@@ -446,7 +446,7 @@ exports[`golden frames — a composed session, not a block > SF1 · transcript �
 06                                                                                 
 07                                                                                 
 08 ❯ /help                                                                         
-09 ⏺︎ help                                                                         
+09 ● help                                                                          
 10   ⎿                                                                             
 11   │                                                                             
 12   │ /help     list the verbs; \`/help keys\` lists the key bindings               
@@ -475,7 +475,7 @@ exports[`golden frames — a composed session, not a block > SF1 · transcript �
 06                                                                                 
 07                                                                                 
 08 ❯ /help                                                                         
-09 ⏺︎ help                                                                         
+09 ● help                                                                          
 10   ⎿                                                                             
 11   │                                                                             
 12   │ /help     list the verbs; \`/help keys\` lists the key bindings               
@@ -504,7 +504,7 @@ exports[`golden frames — a composed session, not a block > SF1 · transcript �
 06                                                                                 
 07                                                                                 
 08 ❯ /help                                                                         
-09 ⏺︎ help                                                                         
+09 ● help                                                                          
 10   ⎿                                                                             
 11   │                                                                             
 12   │ /help     list the verbs; \`/help keys\` lists the key bindings               
@@ -533,7 +533,7 @@ exports[`golden frames — a composed session, not a block > SF1 · transcript �
 06                                                                                 
 07                                                                                 
 08 ❯ /help                                                                         
-09 ⏺︎ help                                                                         
+09 ● help                                                                          
 10   ⎿                                                                             
 11   │                                                                             
 12   │ /help     list the verbs; \`/help keys\` lists the key bindings               
@@ -562,7 +562,7 @@ exports[`golden frames — a composed session, not a block > SF1 · transcript �
 06                                                                                 
 07                                                                                 
 08 ❯ /help                                                                         
-09 ⏺︎ help                                                                         
+09 ● help                                                                          
 10   ⎿                                                                             
 11   │                                                                             
 12   │ /help     list the verbs; \`/help keys\` lists the key bindings               
@@ -591,7 +591,7 @@ exports[`golden frames — a composed session, not a block > SF1 · transcript �
 06                                                                                 
 07                                                                                 
 08 ❯ /help                                                                         
-09 ⏺︎ help                                                                         
+09 ● help                                                                          
 10   ⎿                                                                             
 11   │                                                                             
 12   │ /help     list the verbs; \`/help keys\` lists the key bindings               
@@ -620,7 +620,7 @@ exports[`golden frames — a composed session, not a block > SF1 · transcript �
 06                                                                                 
 07                                                                                 
 08 ❯ /help                                                                         
-09 ⏺︎ help                                                                         
+09 ● help                                                                          
 10   ⎿                                                                             
 11   │                                                                             
 12   │ /help     list the verbs; \`/help keys\` lists the key bindings               
@@ -649,7 +649,7 @@ exports[`golden frames — a composed session, not a block > SF1 · transcript �
 06                                                                                 
 07                                                                                 
 08 ❯ /help                                                                         
-09 ⏺︎ help                                                                         
+09 ● help                                                                          
 10   ⎿                                                                             
 11   │                                                                             
 12   │ /help     list the verbs; \`/help keys\` lists the key bindings               
@@ -1207,7 +1207,7 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 ................................................................................
 ................................................................................
 ................................................................................
-CCCCCCC.........................................................................
+CCCCCC..........................................................................
 ..B.............................................................................
 ..B.............................................................................
 ..B.BBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...............
@@ -1238,7 +1238,7 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-DDDDDDDBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+DDDDDDBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBCBCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBB
@@ -1271,7 +1271,7 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-DDDDDDDBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+DDDDDDBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBCBCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBB
@@ -1304,7 +1304,7 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 ................................................................................
 ................................................................................
 ................................................................................
-CCCCCCC.........................................................................
+CCCCCC..........................................................................
 ..B.............................................................................
 ..B.............................................................................
 ..B.BBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...............
@@ -1336,7 +1336,7 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-DDDDDDDBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+DDDDDDBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBCBCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBB
@@ -1368,7 +1368,7 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 ................................................................................
 ................................................................................
 ................................................................................
-CCCCCCC.........................................................................
+CCCCCC..........................................................................
 ..B.............................................................................
 ..B.............................................................................
 ..B.BBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...............
@@ -1400,7 +1400,7 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 ................................................................................
 ................................................................................
 ................................................................................
-CCCCCCC.........................................................................
+CCCCCC..........................................................................
 ..B.............................................................................
 ..B.............................................................................
 ..B.BBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...............
@@ -1432,7 +1432,7 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-DDDDDDDBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+DDDDDDBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBCBCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBB
@@ -1465,7 +1465,7 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 ................................................................................
 ................................................................................
 ................................................................................
-CCCCCCC.........................................................................
+CCCCCC..........................................................................
 ..B.............................................................................
 ..B.............................................................................
 ..B.BBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...............
@@ -1496,7 +1496,7 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 ................................................................................
 ................................................................................
 ................................................................................
-CCCCCCC.........................................................................
+CCCCCC..........................................................................
 ..B.............................................................................
 ..B.............................................................................
 ..B.BBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...............
@@ -2910,7 +2910,7 @@ ESC[0m
 ESC[9;1H
 ESC[0m
 ESC[38;5;74m
-«⏺︎ help»
+«● help»
 ESC[39m
 «» +74sp
 ESC[10;1H
@@ -3056,7 +3056,7 @@ ESC[9;1H
 ESC[0m
 ESC[48;5;16m
 ESC[38;5;75m
-«⏺︎ help»
+«● help»
 ESC[39m
 «» +74sp
 ESC[0m
@@ -3233,7 +3233,7 @@ ESC[9;1H
 ESC[0m
 ESC[48;5;231m
 ESC[38;5;53m
-«⏺︎ help»
+«● help»
 ESC[39m
 «» +74sp
 ESC[0m
@@ -3407,7 +3407,7 @@ ESC[0m
 ESC[9;1H
 ESC[0m
 ESC[38;5;147m
-«⏺︎ help»
+«● help»
 ESC[39m
 «» +74sp
 ESC[10;1H
@@ -3553,7 +3553,7 @@ ESC[9;1H
 ESC[0m
 ESC[48;5;231m
 ESC[38;5;24m
-«⏺︎ help»
+«● help»
 ESC[39m
 «» +74sp
 ESC[0m
@@ -3727,7 +3727,7 @@ ESC[0m
 ESC[9;1H
 ESC[0m
 ESC[38;5;248m
-«⏺︎ help»
+«● help»
 ESC[39m
 «» +74sp
 ESC[10;1H
@@ -3870,7 +3870,7 @@ ESC[0m
 ESC[9;1H
 ESC[0m
 ESC[38;5;67m
-«⏺︎ help»
+«● help»
 ESC[39m
 «» +74sp
 ESC[10;1H
@@ -4016,7 +4016,7 @@ ESC[9;1H
 ESC[0m
 ESC[48;5;255m
 ESC[38;5;31m
-«⏺︎ help»
+«● help»
 ESC[39m
 «» +74sp
 ESC[0m
@@ -4190,7 +4190,7 @@ ESC[0m
 ESC[9;1H
 ESC[0m
 ESC[38;5;110m
-«⏺︎ help»
+«● help»
 ESC[39m
 «» +74sp
 ESC[10;1H
@@ -4333,7 +4333,7 @@ ESC[0m
 ESC[9;1H
 ESC[0m
 ESC[38;5;110m
-«⏺︎ help»
+«● help»
 ESC[39m
 «» +74sp
 ESC[10;1H

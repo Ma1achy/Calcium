@@ -327,7 +327,7 @@ describe("C22 §6l — the frame's default look", () => {
   });
 
   it("T1.41 (C22 I83, §6l.2 rows 11, 13, 14): entryLayout renders a card's header at the width and its body at width − 2 under the hook; other documents lay out whole", () => {
-    const step = block({ kind: "notice", id: "h", tone: "info", glyph: "step", text: "ps(--all) · 0.4s · ok" });
+    const step = block({ kind: "notice", id: "h", tone: "info", glyph: "running", state: "running", text: "ps(--all) · 0.4s · ok" });
     const body = block({ kind: "notice", id: "b", tone: "muted", text: "the body row" });
     const other = block({ kind: "notice", id: "o", tone: "muted", text: "another" });
     const options = { theme: DARK_THEME, capabilities: FULL_CAPS };
@@ -364,7 +364,7 @@ describe("C22 §6l — the frame's default look", () => {
   });
 
   it("T1.44 (C22 I84, §6l.6 row 16): the card's hook and C09's continuation mark are one column — compared as two rendered forms, not two constants", () => {
-    const step = block({ kind: "notice", id: "h", tone: "info", glyph: "step", text: "ps · ok" });
+    const step = block({ kind: "notice", id: "h", tone: "info", glyph: "running", state: "running", text: "ps · ok" });
     const body = block({ kind: "notice", id: "b", tone: "muted", text: "the body row" });
     const queued = block({ kind: "notice", id: "q", tone: "muted", glyph: "continuation", text: "queued behind /logs" });
     const options = { theme: DARK_THEME, capabilities: FULL_CAPS };
@@ -428,7 +428,7 @@ describe("C22 §6l — the frame's default look", () => {
   });
 
   it("T1.42 (C22 I83, §6l.2 row 12): a body that wraps once more at width − 2 is measured and rendered with the same extra row", () => {
-    const step = block({ kind: "notice", id: "h", tone: "info", glyph: "step", text: "ps" });
+    const step = block({ kind: "notice", id: "h", tone: "info", glyph: "running", state: "running", text: "ps" });
     // 39 cells of prose: one row at 40, two at 36.
     const body = block({ kind: "notice", id: "b", tone: "muted", text: "a".repeat(39) });
     const options = { theme: DARK_THEME, capabilities: FULL_CAPS };
@@ -496,7 +496,7 @@ describe("C22 §6l — the frame's default look", () => {
 
 describe("C22 §6l.8 — the gutter carries the call", () => {
   const WIDE_CAPS = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
-  const head = (id: string, text: string): Block => block({ kind: "notice", id, tone: "info", glyph: "step", text });
+  const head = (id: string, text: string): Block => block({ kind: "notice", id, tone: "info", glyph: "running", state: "running", text });
   const body = (id: string, text: string): Block => block({ kind: "notice", id, tone: "muted", text });
   const card = (id: string, text: string, ...rest: Block[]): Block =>
     block({ kind: "group", id: `g-${id}`, direction: "column", children: [head(id, text), ...rest] });
@@ -525,7 +525,7 @@ describe("C22 §6l.8 — the gutter carries the call", () => {
     expect(measureEntry(REGISTRY.measureSequence, blocks, 40)).toBe(1 + 3 + ENTRY_GAP);
     // A one-row body draws the hook and no bar.
     const one = draw([head("h", "ps · ok"), body("b", "one row")], 40);
-    expect(one).toEqual(["⏺︎ ps · ok", "  ⎿ one row", ""]);
+    expect(one).toEqual(["● ps · ok", "  ⎿ one row", ""]);
   });
 
   it("T1.49 (C22 I89, §6l.8 rows 23–25): three nested cards draw branch, branch, elbow; the bar runs past a child's body and stops under the last; one child keeps the hook; depth 3 is text; ASCII is +-", () => {
@@ -536,11 +536,11 @@ describe("C22 §6l.8 — the gutter carries the call", () => {
       card("c3", "third · 3s · exit 1", body("c3b", "third body")),
     ];
     expect(draw(three, 60)).toEqual([
-      "⏺︎ parent · 8s · 2 of 3",
-      "  ├─⏺︎ first · 2s · 41 matches",
+      "● parent · 8s · 2 of 3",
+      "  ├─● first · 2s · 41 matches",
       "  │   ⎿ first body",
-      "  ├─⏺︎ second · 1s · exit 0",
-      "  └─⏺︎ third · 3s · exit 1",
+      "  ├─● second · 1s · exit 0",
+      "  └─● third · 3s · exit 1",
       "      ⎿ third body",
       "",
     ]);
@@ -559,8 +559,8 @@ describe("C22 §6l.8 — the gutter carries the call", () => {
     ]);
     // One child: the hook alone, and its body one unit further in.
     expect(draw([head("p", "parent"), card("c", "only child", body("cb", "its body"))], 60)).toEqual([
-      "⏺︎ parent",
-      "  ⎿ ⏺︎ only child",
+      "● parent",
+      "  ⎿ ● only child",
       "      ⎿ its body",
       "",
     ]);
@@ -569,14 +569,14 @@ describe("C22 §6l.8 — the gutter carries the call", () => {
     // third gutter column.
     const deep = [head("p", "parent"), card("c", "child", card("gc", "grandchild", body("gcb", "deep body")))];
     const rows = draw(deep, 60);
-    expect(rows[1]).toBe("  ⎿ ⏺︎ child");
-    expect(rows[2]?.startsWith("      ⎿ ⏺︎ grandchild"), "the grandchild's head is the child's body text").toBe(true);
+    expect(rows[1]).toBe("  ⎿ ● child");
+    expect(rows[2]?.startsWith("      ⎿ ● grandchild"), "the grandchild's head is the child's body text").toBe(true);
     expect(entryLayout(deep, 60).every((run) => run.gutter.length <= 2), "two gutter columns at most").toBe(true);
     // Plain body before and after a nested card: the hook, then a **branch** —
     // the elbow closes the body, not the child list (C22 I89), so a child followed
     // by text takes `├─` and the bar runs past it.
     const mixed = [head("p", "parent"), body("a", "before"), card("c", "child"), body("z", "after")];
-    expect(draw(mixed, 60)).toEqual(["⏺︎ parent", "  ⎿ before", "  ├─⏺︎ child", "  │ after", ""]);
+    expect(draw(mixed, 60)).toEqual(["● parent", "  ⎿ before", "  ├─● child", "  │ after", ""]);
   });
 
   it("T1.50 (C22 I90, §6l.8 row 26): with a command the head element copies the invocation and body elements copy their own text", () => {
