@@ -836,7 +836,20 @@ const out_unreached = [];
  * CLAUDE.md names, and the thing that gets a rule exempted and then unread.
  */
 const runReach = new Map();
+const reachableCache = new Map();
 function reachableIn(src) {
+  // **Cached on the run's own source, before anything is read.** `reachableIn`
+  // is asked once per *anchor* and the cache below keys on the test paths, so
+  // every question re-derived those paths and re-read every test file the run
+  // names just to ask whether the corpus scans — 2441 calls where there are 247
+  // runs. The answer is a function of the source text and nothing else.
+  const cached = reachableCache.get(src);
+  if (cached !== undefined) return cached;
+  const answer = reachableUncached(src);
+  reachableCache.set(src, answer);
+  return answer;
+}
+function reachableUncached(src) {
   const paths = testPathsOf(src);
   // **A bare directory in the command is an unknown reach, not an empty one.**
   // `vitest run … test/golden` runs every file under it, and `testPathsOf` keeps

@@ -239,38 +239,43 @@ export const CORPUS_BUDGET_MS = 60_000;
  * taxonomy `DOCUMENT_BUDGET_MS` below is contrasted against. What this removes
  * is a row whose verdict is a function of how much else the suite is doing.
  *
- * **Re-measured when the reach check landed** (F1243), because the ratio above
+ * **Re-measured twice when the reach check landed** (F1243), because the ratio
  * stopped being true and a justification the next person checks and cannot
  * reproduce is one they delete:
  *
- * | | |
+ * | the sweep alone | |
  * |---|---|
- * | the sweep alone, before the reach walk | **12.6 s** |
- * | the sweep alone, with it, uncached | **29.3 s** |
- * | the sweep alone, imports and path resolution cached once each | **19.7 s** |
- * | MA4 alone | **27.4 s** |
- * | MA4 inside a green `make test` | **69.0 s** |
- * | MS3, same run | **66.4 s** |
+ * | before the reach walk | **12.6 s** |
+ * | with it, nothing cached | **29.3 s** |
+ * | imports and path resolution each read once | 19.7 s |
+ * | `reachableIn` cached on the run's own source | **9.2 s** |
  *
- * **The sweep now walks the import graph**, so it reads every module a test file
- * can reach rather than only the runs directory, and that is a 1.56× cost after
- * the caches and a 2.33× cost before them. Both rows timed out at 122 s against
- * this budget on the run that landed it.
+ * | loaded, inside a green `make test` | |
+ * |---|---|
+ * | MA4 and MS3 before, each spawning the sweep | **69.0 s** · **66.4 s** |
+ * | MA4 after, MS3 no longer spawning | **24.3 s** · — |
  *
- * **So the old ratio is retired rather than restored.** 120 s was a little under
- * 5× a 25.1 s loaded measurement; against 69.0 s it is **1.74×**, which is the
- * figure this file's own opening calls not a margin. Raising it to keep 5× would
- * mean 345 s and would give up *a hang still surfaces inside two minutes* — a
- * claim that was true of a 25 s operation and is not available for a 69 s one.
- * **240 s is 3.5× the loaded measurement**, keeps a hang inside four minutes,
- * and is stated as the trade rather than as a derivation.
+ * **The sweep now walks the import graph** — every module a test file can reach,
+ * not only the runs directory — and it is *faster than it was without it*. The
+ * walk cost 2.33× until `reachableIn` was cached: it is asked once per **anchor**
+ * and re-read every test file the run names each time, 2441 calls where there
+ * are 247 runs, and that repetition predated the walk. Both rows timed out at
+ * 122 s against a 120 s budget on the run that landed the check.
  *
- * **The duplication is what would buy the ratio back, and it is still not fixed
- * here**: MA4 and MS3 each pay the full sweep — 69.0 + 66.4 s of wall time for
- * two assertions about one output. Worth one child process and a shared fixture,
- * in its own change.
+ * **And the duplication is fixed rather than recorded**, which is what pays for
+ * the ratio: MS3's cross-check — *the total its reader takes off `anchors.mjs`
+ * is the total `anchors.mjs` prints* — moved into MA4, where that output already
+ * is. Vitest isolates per file, so nothing in-process can be shared between two
+ * of them; the assertion moved to the output rather than the output to the
+ * assertion. MS3 keeps the half that is its own, the debt-list reader driven on
+ * a fabricated source, and needs no budget at all.
+ *
+ * **120 s is 4.9× the loaded measurement** — the ratio `SCAN_BUDGET_MS` takes
+ * over its worst row, and the one this constant was first set on — and a hang
+ * still surfaces inside two minutes. The constant is unchanged; what changed is
+ * that it is true again.
  */
-export const SWEEP_BUDGET_MS = 240_000;
+export const SWEEP_BUDGET_MS = 120_000;
 
 /**
  * For C06 T5.1 — a real binary emitting a large document, spawned, parsed,

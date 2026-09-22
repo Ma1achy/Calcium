@@ -17,10 +17,13 @@
 //         resolving again fails, so a dead excuse cannot outlive its reason.
 import { execFileSync } from "node:child_process";
 import { SWEEP_BUDGET_MS } from "../support/budget.js";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
+import { ANCHORS, knownStale } from "../../tools/mutate/sweep.mjs";
 
 const DIR = mkdtempSync(join(tmpdir(), "mutate-anchors-"));
 
@@ -605,5 +608,24 @@ const MUTATIONS = [
     // the argument for keeping the number in a comment with its date and out of
     // the pattern.
     expect(r.out, "every run in the tree was parsed").toMatch(/· \d{2,} parsed ·/u);
+
+    // **MS3's cross-check, moved here because the output is here** — *the total
+    // `sweep.mjs`' reader takes off `anchors.mjs` is the total `anchors.mjs`
+    // prints*, one computed from the source text and one from the runs. It used
+    // to spawn the sweep a second time for that one number: 69.0 s and 66.4 s
+    // inside one `make test`, two assertions about one output, and the
+    // duplication was what forced this row's budget up.
+    const list = (knownStale as (src: string) => Readonly<Record<string, number>>)(
+      readFileSync(ANCHORS as string, "utf8"),
+    );
+    const total = Object.values(list).reduce((a, b) => a + b, 0);
+    const stale = /(\d+) known stale, and no run drifted/u.exec(r.out);
+    expect(stale, "the sweep's summary line").not.toBeNull();
+    expect(Number(stale![1]), "the list's total and the sweep's own count").toBe(total);
+    // **Both sides are 0 while the debt list is empty**, and that is carried
+    // rather than hidden: this compares two readings of the same fact and the
+    // fact is currently *nothing owed*. What keeps the reader honest meanwhile
+    // is MS3's fabricated list, which drives both arms whatever the tree holds
+    // — the same division F1119 forced on MA3.
   });
 });

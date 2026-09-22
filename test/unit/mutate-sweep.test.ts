@@ -13,7 +13,6 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { SWEEP_BUDGET_MS } from "../support/budget.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
@@ -65,8 +64,16 @@ describe("MS2: shards partition the plan", () => {
 });
 
 describe("MS3: the debt list the sweep tolerates is the one `anchors.mjs` enforces", () => {
-  // The same sweep MA4 runs, paid a second time (F1088).
-  it("every entry names a run that exists, and the total is the total the anchors sweep prints", { timeout: SWEEP_BUDGET_MS }, () => {
+  // **The sweep is no longer run here, and that is the point of the change.**
+  // This row and MA4 each spawned `anchors.mjs` over the whole tree — 69.0 s and
+  // 66.4 s inside one `make test`, for two assertions about one output — and the
+  // duplication was what forced `SWEEP_BUDGET_MS` up. Vitest isolates per file,
+  // so nothing in-process can be shared between them; the cross-check moved to
+  // where the output already is, which is MA4, and the claim it makes is about
+  // **the anchors sweep's own summary line** rather than about this planner. The
+  // half that is this file's own — the debt list reader, driven on a fabricated
+  // source — stays, and it needs no sweep and no budget.
+  it("every entry names a run that exists", () => {
     const list = stale(readFileSync(ANCHORS as string, "utf8"));
     const runs = new Set(discover());
 
@@ -91,14 +98,10 @@ describe("MS3: the debt list the sweep tolerates is the one `anchors.mjs` enforc
     expect(runs.has("no-such-run.mjs"), "and an entry naming nothing is not").toBe(false);
 
     for (const run of Object.keys(list)) expect(runs.has(run), run).toBe(true);
-    const total = Object.values(list).reduce((a, b) => a + b, 0);
-    // The cross-check: the sweep's own summary line carries the same number,
-    // computed from the runs and not from the list.
-    const r = spawnSync("node", [ANCHORS as string], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
-    expect(r.status, r.stdout).toBe(0);
-    const m = /(\d+) known stale, and no run drifted/u.exec(r.stdout);
-    expect(m, "the anchors sweep's summary line").not.toBeNull();
-    expect(Number(m![1])).toBe(total);
+
+    // **The cross-check lives in MA4** — *the total this reader takes off
+    // `anchors.mjs` is the total `anchors.mjs` prints* — because that row
+    // already holds the sweep's output and a second spawn buys nothing.
   });
 
   it("a source with no list is refused rather than read as an empty one", () => {
