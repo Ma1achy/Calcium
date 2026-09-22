@@ -50,6 +50,8 @@ function harness(over: Partial<RouterDeps> = {}, start = 1_000) {
   const calls: string[] = [];
   const layer = { top: null as Placed["layer"] | null, placed: [] as Placed[] };
   const deps: RouterDeps = {
+    keyReleasesReported: () => false,
+    overlayWouldResolve: () => null,
     overlayAnswerCallback: () => null,
     overlayTop: () => layer.top,
     overlayRegion: () => ({ width: 80, height: 24 }),
@@ -1055,23 +1057,176 @@ describe("C16 §3a — the global-intercept table and the child rung (M5)", () =
   });
 });
 
-describe("C16 §7 and §4a — arming, epochs and pointer commit, owed at the spec commit (M7)", () => {
-  it.todo(
-    "T1.98 (C16 I43, I44, §7): a dispatch that raises a rung leaves the router armed and the epoch one higher, read from the router and not from a handler; T1.98b, with nothing armed, an activation is handled and the epoch does not move — not deferred on a component: the ladder, the epoch counter and the arm all land in router.ts in this MR",
-  );
-  it.todo(
-    "T1.99 (C16 I44, §7): armed, the next activation answers reject and the arm clears, so the one after it is handled; T1.99b, a non-activation key is handled and clears the arm; T1.99c, a dispatch that lowers the rung moves the epoch and does not arm — not deferred on a component: §4a W8's row, which one field cannot pass",
-  );
-  it.todo(
-    "T1.100 (C16 I45, §4a): a press on the focused element commits nothing and arms (entry, blockId, elementId, epoch), and the release over that identity commits once; the control is the same release with no press before it — not deferred on a component: pointerEffect and the router's arm land together",
-  );
-  it.todo(
-    "T1.101 (C16 I45, I46, §4a): a release with nothing armed is unconsumed; a release over a different identity cancels and does nothing; T1.101b, press, drag off, drag back, release on the armed identity commits nothing, because only a press arms — not deferred on a component",
-  );
-  it.todo(
-    "T1.102 (C16 I45, §4a): the armed identity is compared by ids and not by cell — the same cell with a changed elementId does not commit, and a changed cell with the same ids does not either — not deferred on a component",
-  );
-  it.todo(
-    "T3.20 (C16 I44, §7): armed, OWNER_ARM_MS elapses on the injected clock and the next activation is handled; the control is the same activation one millisecond early, refused — not deferred on a component",
-  );
+describe("C16 §7 and §4a — the epoch, the question guard and pointer commit (M7)", () => {
+  /** A question: a non-dismissable top layer with an answer callback and a vocabulary. */
+  const withQuestion = (opts: Partial<RouterDeps> = {}) => {
+    const q = { open: false };
+    const h = harness({
+      overlayTop: () => (q.open ? { kind: "overlay" as const, id: "confirm", dismissable: false } : null),
+      overlayAnswerCallback: () => (q.open ? (): boolean => true : null),
+      // `y` and `⏎` resolve; an arrow moves the selection and `x` does nothing.
+      // The vocabulary is the question's, which is the whole reason the router
+      // asks rather than deciding (C16 I25, I44).
+      overlayWouldResolve: () =>
+        q.open
+          ? (e: InputEvent): boolean =>
+              e.kind === "key" && (e.key.name === "y" || e.key.name === "enter")
+          : null,
+      ...opts,
+    });
+    return { ...h, q };
+  };
+
+  it("T1.98 (I43, I44, R-BLK-786): a question arriving guards the router and moves the epoch", () => {
+    const { router, q } = withQuestion();
+    const epoch0 = router.ownerEpoch;
+    expect(router.ownerArmed, "nothing is guarded before one arrives").toBe(false);
+
+    q.open = true;
+    expect(router.ownerEpoch, "every owner transition increments the generation").toBe(epoch0 + 1);
+    expect(router.ownerArmed).toBe(true);
+  });
+
+  it("T1.98b (I43, I44): unguarded, an activation is handled and the epoch does not move", () => {
+    // **The control, and without it T1.98 is a restatement of *nothing
+    // happened*.** A router that guarded everything, or nothing, passes one of
+    // the two rows; only the pair pins the guard to a question arriving.
+    const { router, q } = withQuestion();
+    q.open = true;
+    const epoch = router.ownerEpoch;
+    router.dispatch(key("x")); // a neutral key ends the guard
+    expect(router.ownerArmed).toBe(false);
+    expect(router.dispatch(key("y")), "the question takes it").toBe(true);
+    expect(router.lastStages).not.toContain("question-guard");
+    expect(router.ownerEpoch, "no owner changed, so the generation did not move").toBe(epoch);
+  });
+
+  it("T1.99 (I44, R-BLK-788): with no release reporting the first activation is refused and the guard ends", () => {
+    const { router, q } = withQuestion();
+    q.open = true;
+
+    expect(router.dispatch(key("y")), "refused, and consumed — never dropped").toBe(true);
+    expect(router.lastStages).toEqual(["arming", "question-guard", "reject"]);
+
+    expect(router.dispatch(key("y")), "the second is the reader's own").toBe(true);
+    expect(router.lastStages).not.toContain("question-guard");
+  });
+
+  it("T1.99b (I44): a neutral key is handled and ends the guard", () => {
+    // An arrow under a question that has just arrived is how a reader reads what
+    // arrived. Guarding it would close the failure I40 opened on the scroll side.
+    const { router, q } = withQuestion();
+    q.open = true;
+
+    expect(router.dispatch(key("down")), "neutral: the question's, unrefused").toBe(true);
+    expect(router.lastStages).not.toContain("question-guard");
+    expect(router.ownerArmed).toBe(false);
+    expect(router.dispatch(key("y"))).toBe(true);
+    expect(router.lastStages).not.toContain("question-guard");
+  });
+
+  it("T1.99c (I43, I44, §4a W8): a rung change that is not a question arriving guards nothing", () => {
+    // Trace 19, and the row a single field cannot pass: the epoch moves on every
+    // transition and the guard is a question's alone, so the keystroke after a
+    // question closes is the reader typing and is not refused.
+    const { router, q } = withQuestion();
+    q.open = true;
+    router.dispatch(key("y")); // spend the guard on the arrival
+    const epoch = router.ownerEpoch;
+
+    q.open = false;
+    expect(router.ownerEpoch, "the fall moves the generation too").toBe(epoch + 1);
+    expect(router.ownerArmed, "and guards nothing").toBe(false);
+  });
+
+  it("T1.99d, T1.99e (I44, R-BLK-788): with releases reported the guard waits for the key to lift", () => {
+    const { router, q } = withQuestion({ keyReleasesReported: () => true });
+    // **The key is held first, and that is what the guard is for.** With
+    // releases reported the router knows whether anything is down when the
+    // question arrives; with nothing down there is nothing to wait for, which
+    // T1.99f is the control for.
+    router.dispatch(key("y"));
+    q.open = true;
+
+    // **All three refused, not just the first.** *Wait for the held key to lift*
+    // is an instruction only a terminal that says when it lifted can be given,
+    // and this one does.
+    for (const n of [1, 2, 3]) {
+      expect(router.dispatch(key("y")), `refused ${String(n)}`).toBe(true);
+      expect(router.lastStages, `refused ${String(n)}`).toContain("question-guard");
+    }
+
+    router.dispatch({ kind: "key", event: "release", key: { name: "y", ctrl: false, meta: false, shift: false, sequence: "y" } });
+    expect(router.ownerArmed, "the key lifted").toBe(false);
+    expect(router.dispatch(key("y"))).toBe(true);
+    expect(router.lastStages).not.toContain("question-guard");
+  });
+
+  it("T3.20 (I44, §4a W9): the guard reads no clock", () => {
+    // **The assertion a 500 ms window fails**, and it fails in both directions:
+    // it would let this one through and it would refuse the one in T1.99b.
+    const { router, q, advance } = withQuestion({ keyReleasesReported: () => true });
+    router.dispatch(key("y"));
+    q.open = true;
+    advance(3_600_000);
+    expect(router.dispatch(key("y")), "an hour later, still held, still refused").toBe(true);
+    expect(router.lastStages).toContain("question-guard");
+  });
+
+  it("T1.99f (I44, R-BLK-788): with releases reported and nothing held, a question guards nothing", () => {
+    // *Wait for the held key to lift* presupposes a held key. This is the
+    // control that makes T1.99d an assertion about a **held** key rather than
+    // about questions in general, and it is the row that keeps the precise arm
+    // from collapsing into the conservative one.
+    const { router, q } = withQuestion({ keyReleasesReported: () => true });
+    router.dispatch(key("x"));
+    router.dispatch({ kind: "key", event: "release", key: { name: "x", ctrl: false, meta: false, shift: false, sequence: "x" } });
+    q.open = true;
+    expect(router.ownerArmed, "nothing was down when it arrived").toBe(false);
+    expect(router.dispatch(key("y"))).toBe(true);
+    expect(router.lastStages).not.toContain("question-guard");
+  });
+
+  it("T1.100, T1.101 (I45, I46, R-OWN-003): press arms, release commits, and nothing else does", () => {
+    const { router } = harness();
+    const epoch = router.ownerEpoch;
+
+    // The control first: a release with nothing armed commits nothing.
+    expect(router.commitPointer("a"), "no press, no commit").toBe(false);
+
+    router.armPointer("a");
+    expect(router.commitPointer("b"), "a release elsewhere cancels").toBe(false);
+    expect(router.commitPointer("a"), "and the cancel was not a miss — the arm is gone").toBe(false);
+
+    router.armPointer("a");
+    expect(router.commitPointer("a"), "the armed identity, same epoch").toBe(true);
+    expect(router.commitPointer("a"), "and once only — the release spent it").toBe(false);
+    expect(router.ownerEpoch, "arming and committing move no owner").toBe(epoch);
+  });
+
+  it("T1.101b (I46): a drag cancels the arm, and coming back does not restore it", () => {
+    // Where the arm parts company with a selection: a selection is resolved
+    // afresh on every motion and survives an excursion (§4a trace 4); an
+    // activation is a commitment a drag revokes (trace 15).
+    const { router } = harness();
+    router.armPointer("a");
+    router.dispatch({ ...(click(1, 1) as Extract<InputEvent, { kind: "mouse" }>), motion: true });
+    expect(router.commitPointer("a"), "the drag took it back").toBe(false);
+  });
+
+  it("T1.102 (I45, R-OWN-002): an arm does not survive the owner it was armed under", () => {
+    // Trace 16: the element is still there and still under the pointer, and the
+    // owner it was armed under is gone. The epoch is what carries that.
+    const { router, q } = withQuestion();
+    router.armPointer("a");
+    q.open = true;
+    expect(router.commitPointer("a")).toBe(false);
+  });
+
+  it("T1.102b (I46): resetFocus cancels the arm", () => {
+    const { router } = harness();
+    router.armPointer("a");
+    router.resetFocus();
+    expect(router.commitPointer("a")).toBe(false);
+  });
 });

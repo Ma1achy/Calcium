@@ -66,8 +66,8 @@ const results = runPass({
     {
       name: "the click-again branch dropped — a row can be reached and never acted on",
       file: "src/shell/construct.ts",
-      from: "      return at.mode === \"interact\" ? null : keys.table.rowActivate;\n",
-      to: "      return at.mode === \"interact\" ? null : () => focus.focusRow(hit.id, address);\n",
+      from: "      return armActivation(armId(hit.id, address.blockId, address.elementId), keys.table.rowActivate);\n",
+      to: "      return () => focus.focusRow(hit.id, address);\n",
       expect: "T4.64",
     },
     {
@@ -94,6 +94,38 @@ const results = runPass({
       from: "    return stores.viewport.entryAtRow(regionRow - blankRowsAbove(viewportHeight, totalRows));\n",
       to: "    return stores.viewport.entryAtRow(regionRow + 0 * blankRowsAbove(viewportHeight, totalRows));\n",
       expect: "T4.62c",
+    },
+    // **M7's three rulings, each mutated against the row that claims it**
+    // (C16 I45, T6.34, T6.35). The arm is where a correct-looking revert is
+    // cheapest: every one below leaves a click that focuses and activates and
+    // looks right in any session where nothing moves.
+    {
+      name: "the release commits on position — the identity is the cell again",
+      file: "src/shell/construct.ts",
+      from: "      return router.commitPointer(armId(over.id, stillUnder.blockId, stillUnder.element.id))\n",
+      to: "      return router.commitPointer(armId(over.id, String(e.row), String(e.col)))\n",
+      expect: "T4.64",
+    },
+    {
+      name: "the press arms whatever it lands on — focus-first deleted",
+      file: "src/shell/construct.ts",
+      from: "    const land = at.at === \"prompt\" ? () => focus.enterLiveBlock(hit.id, address) : () => focus.focusRow(hit.id, address);\n",
+      to: "    const land = armActivation(armId(hit.id, address.blockId, address.elementId), at.at === \"prompt\" ? () => focus.enterLiveBlock(hit.id, address) : () => focus.focusRow(hit.id, address));\n",
+      expect: "T4.62",
+    },
+    {
+// **Killed by T1.101b and not by T4.65, which is a fact about T4.65.**
+      // The session's drag row extends a *selection*, and a selection never
+      // arms — so there is no arm in that row for a drag to fail to cancel, and
+      // it would pass with the cancellation deleted. The unit row is where the
+      // press lands on the focused element, which is the only gesture that arms.
+      // Recorded rather than re-anchored: the expectation names the row that
+      // actually sees it.
+      name: "a drag no longer cancels the arm — a gesture taken back still commits",
+      file: "src/interaction/router/router.ts",
+      from: "    if (e.press) pointerArm = null;\n",
+      to: "    if (e.press && !e.motion) pointerArm = null;\n",
+      expect: "T1.101b",
     },
   ],
 });

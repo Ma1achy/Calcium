@@ -1643,6 +1643,30 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
+  // --- C16 I43's epoch, the observable of a counter nothing else reads -------
+  //
+  // **Published so the invariant can be asserted, and consumed by no other
+  // component because there is nothing for one to do with it.** The epoch is the
+  // router's own machinery: it stamps a pointer arm and kills it across an owner
+  // transition, and both halves are inside `router.ts`. What it is *for* is
+  // R-OWN-002 — *events carry the owner epoch in which they began and are never
+  // replayed against a new owner* — and that is a claim about a number, so an
+  // invariant written against a number nobody can read is one no row can
+  // construct. T1.98 and T1.99c both assert it moves, and T1.99c is the row that
+  // separates a transition from a raise; neither is expressible through a proxy,
+  // because every proxy is exactly the behaviour the epoch is supposed to cause.
+  //
+  // **Not the same case as `ownerArmed`**, which sits beside it and *is*
+  // consumed — the chrome reads it for the owner line's guarded mark (C22 §6).
+  // The pair is the tell that this entry is about one member and not about the
+  // seam: if the epoch ever acquires a reader in `src/`, this entry is itself a
+  // violation.
+  "InputRouter.ownerEpoch":
+    "C16 I43 — the ownership generation. Internal to `router.ts` by construction: it stamps "
+    + "a pointer arm and kills it across an owner transition, and both ends are in that file. "
+    + "It is published so T1.98 and T1.99c can assert R-OWN-002's counter directly rather than "
+    + "through the behaviour the counter exists to cause, which is the only proxy available and "
+    + "is passed by a router with no counter at all.",
   // --- C29 §7g's frames, groundwork ahead of their first caller -------------
   //
   // **The queued consumer is named and the rule's honest form is what allows

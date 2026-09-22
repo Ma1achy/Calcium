@@ -1447,7 +1447,16 @@ export async function constructGraph(
       // A thunk: `entryAtRegionRow` is declared below, with the other pointer
       // helpers, and the router is built here. Called at dispatch, never now.
       deps: {
-        ...routerDeps(stores, runner, scheduler, deps.frame, () => pipeline, confirm, (row) => entryAtRegionRow(row)),
+        ...routerDeps(
+          stores,
+          runner,
+          scheduler,
+          deps.frame,
+          () => pipeline,
+          confirm,
+          (row) => entryAtRegionRow(row),
+          () => detection.capabilities.keyboardProtocol === "kitty",
+        ),
         // C28 I39 — the `handler` span. Spread in here rather than threaded
         // through `routerDeps`, whose seven parameters are all C16's own and
         // none of which the profiler belongs among.
@@ -2413,8 +2422,69 @@ export async function constructGraph(
    * does with that. `null` is *no effect and unconsumed*, so the router drops
    * the event rather than passing it lower (C16 I5).
    */
+  /**
+   * What the armed press will do when its release commits it (C16 I45, M7).
+   *
+   * **Held here rather than recomputed at the release**, and the difference is
+   * not tidiness: `rowActivate` and the legend's toggle are chosen by asking
+   * whether the element is the focused one and whether the column is a legend
+   * entry, and focus can move between the press and the release without the
+   * owner changing. Recomputing would then resolve the release as a *first*
+   * click and move focus where the reader asked for an activation. The router
+   * holds the identity and the epoch, which is the part that decides whether the
+   * gesture is still live; this holds what the gesture was.
+   */
+  let armedActivation: (() => void) | null = null;
+
+  /**
+   * Arm `effect` on `id`, as an effect rather than as a side effect of resolving
+   * one (C16 I45).
+   *
+   * `pointerEffect` **resolves** a gesture and its caller **runs** it, and the
+   * two are separated so that an unconsumed gesture leaves nothing behind. Arming
+   * while resolving would arm on presses the router went on to drop.
+   */
+  const armActivation = (id: string, effect: () => void): (() => void) =>
+    () => {
+      router.armPointer(id);
+      armedActivation = effect;
+    };
+
+  /** `(entry, blockId, elementId)` — the identity R-PTR-005 calls stable, and never a cell. */
+  const armId = (entryId: string, blockId: string, elementId: string): string =>
+    `${entryId}\u0000${blockId}\u0000${elementId}`;
+
   const pointerEffect = (e: InputEvent): (() => void) | null => {
-    if (e.kind !== "mouse" || !e.press) return null;
+    if (e.kind !== "mouse") return null;
+    // **The release is where an activation lands** (C16 I45, §4a's release row,
+    // R-OWN-003, R-PTR-005). The row used to read *nothing, and it is unconsumed
+    // — a release that also acted would be a second click*, which is true of a
+    // release acting on its own and not of one committing half a gesture. The
+    // press armed; this is the other half, and the reader had until here to take
+    // it back.
+    if (!e.press) {
+      if (e.button === "none") return null;
+      const armed = armedActivation;
+      armedActivation = null;
+      if (armed === null) return null;
+      const over = entryAtRegionRow(e.row - deps.frame.region().top);
+      if (over === null) {
+        router.commitPointer("");
+        return null;
+      }
+      const stillUnder = elementAt(over, e.col);
+      if (stillUnder === null) {
+        router.commitPointer("");
+        return null;
+      }
+      return router.commitPointer(armId(over.id, stillUnder.blockId, stillUnder.element.id))
+        ? armed
+        : null;
+    }
+    // **A press that arms nothing still ends whatever the last one armed.** The
+    // router drops its half on every press (I46's second cancellation); this is
+    // the other half of the same fact, kept in step here rather than inferred.
+    if (e.button !== "none") armedActivation = null;
     // **A hover aims and does nothing else** (§4a's hover row; C01 I21). Mode
     // 1003's motion with no button held: the crosshair follows the pointer and
     // focus stays where the keys left it — the readout half of `←`/`→` without
@@ -2483,7 +2553,14 @@ export async function constructGraph(
           scheduler.commit("input");
         }
       : series !== null
-        ? (): void => toggleSeriesIn(hit.id, under.block as Plot, series)
+        // **The legend's toggle is an activation and waits for the release**
+        // (C16 I45, §4a's legend row). The press below still carries the focus
+        // call, so the plot is focused in the press's frame and the swatch goes
+        // hollow in the release's: one gesture, one effect, each half drawn in
+        // the half of the gesture that caused it.
+        ? armActivation(armId(hit.id, under.block.id, under.element.id), (): void =>
+            toggleSeriesIn(hit.id, under.block as Plot, series),
+          )
         : null;
 
     if (e.motion || e.shift) {
@@ -2501,11 +2578,16 @@ export async function constructGraph(
     }
     if (onFocused) {
       // **A plot's second click moves the crosshair** (§4a row m): its element
-      // carries no `activate`, so there is no `⏎` for the click to be.
+      // carries no `activate`, so there is no `⏎` for the click to be — and a
+      // crosshair is a readout, which R-PTR-003 says never commits a value, so
+      // it stays on the press where the hover it equals is.
       if (aim !== null) return aim;
-      // Click again is `⏎` — a state test, not a timer (C16 I9). In `interact`
-      // the block owns its keys (C26 I14) and the framework fires nothing.
-      return at.mode === "interact" ? null : keys.table.rowActivate;
+      // **Click again is still a state test and not a timer** (C16 I9); what the
+      // arm adds is not a clock but an identity. In `interact` the block owns its
+      // keys (C26 I14) and the framework fires nothing, so there is nothing to
+      // arm either.
+      if (at.mode === "interact") return null;
+      return armActivation(armId(hit.id, address.blockId, address.elementId), keys.table.rowActivate);
     }
     // A click is a way in exactly as `↓` is, so from the prompt it takes the
     // same call; from a row it is a move, and `focusRow` collapses a selection
@@ -3035,6 +3117,7 @@ function routerDeps(
   pipeline: () => Pipeline | null,
   confirm: ConfirmHost,
   entryAtRegionRow: RouterDeps["entryAtRow"],
+  keyReleasesReported: () => boolean,
 ): RouterDeps {
   const top = (): Readonly<{ kind: "overlay" | "view"; id: string; dismissable: boolean }> | null => {
     const layer = stores.overlays.top;
@@ -3046,6 +3129,7 @@ function routerDeps(
   return {
     overlayTop: top,
     overlayAnswerCallback: confirm.answerHandler,
+    overlayWouldResolve: confirm.resolvesHandler,
     overlayRegion: frame.overlayRegion,
     // A peek is not hit-tested (C15 I21): a click on it reaches the row beneath.
     placed: () => stores.overlays.layout(frame.overlayRegion()).filter(takesInput),
@@ -3075,6 +3159,11 @@ function routerDeps(
     // reference here would be the null one.
     liveStreams: () => pipeline()?.liveStreams ?? 0,
     cancelNewestStream: () => pipeline()?.cancelNewestStream() ?? false,
+    // **C02's field, read through the one accessor §6a reads** (C16 I44,
+    // R-BLK-788). Which of the guard's two boundaries applies is a fact about
+    // the terminal, and sourcing it anywhere else would let *this terminal has
+    // the protocol* and *this terminal sends releases* drift apart.
+    keyReleasesReported,
     // C23's, not `runner.killAll`: killing the child leaves the entry streaming
     // forever, and C23 I10 settles it `partial` with its output retained.
     cancel: () => void pipeline()?.cancel(),

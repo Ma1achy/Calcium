@@ -168,6 +168,7 @@ describe("the S-series' illustrated heights", () => {
       measureSequence: MEASURE,
       session: () => S01_SESSION,
       owner: () => null,
+      ownerArmed: () => false,
     capabilities: () => null,
       now: () => 1_700_000_000_000,
       size: () => ({ columns: width, rows: rows + RULE_ROWS + HEADER_RULE_ROWS }),

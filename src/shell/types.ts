@@ -100,6 +100,23 @@ export type ChromeContext = Readonly<{
    */
   owner: OwnerRung | null;
   /**
+   * Is that owner newly raised and still refusing its first activation
+   * (C16 I44, C22 §6, R-OWN-002, R-INT-008)?
+   *
+   * **The refusal's explanation, and the reason it is a field rather than a
+   * notice.** A rung that has just been raised refuses one activation, so a key
+   * already in flight cannot answer a question that arrived under it — and
+   * R-INT-008 says a rejected command explains. The owner line already answers
+   * *who has your keys*; *and not yet* is the same question one moment earlier.
+   * The mark is drawn while the arm is live and gone after the refusal, so the
+   * refused key **changes the frame**, which is the difference between a key
+   * refused and a key swallowed and the only part a frame-read can see.
+   *
+   * Optional on the same terms as `owner`: `compose` runs before the session
+   * graph exists, and absent is *no arm*.
+   */
+  ownerArmed?: boolean;
+  /**
    * C02's resolved record, because **the chrome draws marks and a mark needs a
    * rung** (A03 SS47, C09 I22). The owner line's chords are `⏎ ⇧ ⇥ ⌃] ←→ ↑↓`,
    * none of which an ASCII terminal can render, and a framework string carrying

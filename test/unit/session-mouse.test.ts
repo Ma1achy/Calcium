@@ -61,6 +61,23 @@ const mouse = (row: number, col = 0, over: Partial<Mouse> = {}): InputEvent => (
   ...over,
 });
 
+/**
+ * A whole click — press then release at the same cell (C16 I45, §4a's release
+ * row, M7).
+ *
+ * **The gesture is two events and it always was; the table used to act on the
+ * first.** Since the design reserved the release — *press arms a stable
+ * identity; release commits only when that same identity is still armed* — a
+ * row that dispatches a press alone asserts half a gesture, so the helper is
+ * what keeps the rows reading as clicks. Returns whether either half was
+ * consumed, which is what a single dispatch used to answer.
+ */
+const click = (router: { dispatch(e: InputEvent): boolean }, row: number, col = 0): boolean => {
+  const a = router.dispatch(mouse(row, col));
+  const b = router.dispatch(mouse(row, col, { press: false }));
+  return a || b;
+};
+
 const META = {
   verb: "rows",
   adapter: "passthrough",
@@ -242,13 +259,18 @@ describe("C16 §4a — a click lands where the keys would", () => {
     const a1 = term(2);
 
     // Live entry, row `a2`: focus, then activate — the `fill` lands in the prompt.
-    graph.router.dispatch(mouse(a2, 2));
+    click(graph.router, a2, 2);
     expect(graph.focus.current).toEqual(AT(live, "a2", "t2"));
-    expect(graph.editor.text).toBe("");
+    expect(graph.editor.text, "the first click focuses and its release commits nothing").toBe("");
+    // **The press arms and the release commits** (C16 I45, M7). The control is
+    // the press on its own, which must leave the prompt empty — without it the
+    // row is equally passed by a table that still acts on the press.
     graph.router.dispatch(mouse(a2, 2));
-    expect(graph.editor.text, "the second click is ⏎").toBe("pick 2");
+    expect(graph.editor.text, "the press arms and does not act").toBe("");
+    graph.router.dispatch(mouse(a2, 2, { press: false }));
+    expect(graph.editor.text, "the second click is ⏎, on its release").toBe("pick 2");
     // A third click is the same state test: it fills again, as `⏎ ⏎` does.
-    graph.router.dispatch(mouse(a2, 2));
+    click(graph.router, a2, 2);
     expect(graph.editor.text).toBe("pick 2");
     expect(graph.focus.current, "activation does not move focus").toEqual(AT(live, "a2", "t2"));
 
@@ -257,9 +279,9 @@ describe("C16 §4a — a click lands where the keys would", () => {
     const revBefore = (id: string): number => graph.transcript.entries.find((e) => e.id === id)?.rev ?? -1;
     const settledRev = revBefore(settled);
     const liveRev = revBefore(live);
-    graph.router.dispatch(mouse(a1, 2));
+    click(graph.router, a1, 2);
     expect(graph.focus.current).toEqual(AT(settled, "a1", "t1"));
-    graph.router.dispatch(mouse(a1, 2));
+    click(graph.router, a1, 2);
     expect(graph.editor.text, "the frozen entry's fill did not run").toBe("");
     expect(revBefore(settled), "the refusal was patched into the settled entry").toBeGreaterThan(settledRev);
     expect(revBefore(live), "and not into the live one").toBe(liveRev);
@@ -499,7 +521,16 @@ const lastFocus = (
 };
 
 /** SGR 1006, as the terminal sends it: 1-based column and row. */
-const sgrClick = (row0: number, col0: number): string => `[<0;${String(col0 + 1)};${String(row0 + 1)}M`;
+/**
+ * A whole click on the wire — press then release at the same cell (C16 I45, M7).
+ *
+ * **Two reports, because that is what a click is and what the design now reads.**
+ * `…M` is the press and `…m` the release (I30), and since the release commits
+ * an activation the press armed, a byte string carrying only the press is half a
+ * gesture. Every row here says *click*, so the helper sends one.
+ */
+const sgrClick = (row0: number, col0: number): string =>
+  `[<0;${String(col0 + 1)};${String(row0 + 1)}M[<0;${String(col0 + 1)};${String(row0 + 1)}m`;
 
 describe("C16 §4a — the frame side", () => {
   it("T4.62c (C16 I31): the click's highlight is on the settled entry's second row, read from the painted frame", async () => {
@@ -996,12 +1027,12 @@ describe("C16 §4a — the legend clicks (C12 I117, C22 I78)", () => {
     const settled = graph.transcript.append(doc("/plot", [TWO()]) as never);
     const live = graph.transcript.append(doc("/plot", [TWO()]) as never);
     // Entry 1: command line at row 0, block rows 1–8; the legend's rows are the area's.
-    expect(graph.router.dispatch(mouse(term(1 + row), col))).toBe(true);
+    expect(click(graph.router, term(1 + row), col)).toBe(true);
     expect(graph.seriesVisibility.get(settled, "p", 1), "series 2 of the settled plot hidden").toBe(true);
     expect(graph.seriesVisibility.forEntry(live), "nothing written for the live entry").toEqual({});
     expect(graph.focus.current, "and the click focused the settled plot, as any click does").toEqual(AT(settled, "p", "p"));
     // Again on the same cell — the plot is focused, so this is row m's shape: a toggle, not `⏎`.
-    graph.router.dispatch(mouse(term(1 + row), col));
+    click(graph.router, term(1 + row), col);
     expect(graph.seriesVisibility.get(settled, "p", 1)).toBe(false);
     // A hover over the legend is nothing (the hover row): no sample, no toggle.
     expect(graph.router.dispatch(hover(term(1 + row), col))).toBe(false);

@@ -15,10 +15,17 @@ import { NO_SPAN } from "../../data/viewmodel/index.js";
 import type { Probe } from "../../data/viewmodel/index.js";
 import { activeTarget, type FocusInputs, type FocusStore } from "./focus.js";
 import type { Keymap } from "./keymap.js";
-import { RUNG_OF, type FocusTarget, type InputEvent, type OwnerRung, type Verdict } from "./types.js";
+import {
+  RUNG_OF,
+  type FocusTarget,
+  type InputEvent,
+  type OwnerRung,
+  type Verdict,
+} from "./types.js";
 import { interceptOf, interceptVerdict } from "./intercepts.js";
 
 const EXIT_ARM_MS = 500;
+
 
 export type Placed = Readonly<{
   layer: Readonly<{ id: string; kind: "overlay" | "view"; dismissable: boolean }>;
@@ -123,6 +130,34 @@ export type RouterDeps = Readonly<{
    */
   liveStreams: () => number;
   cancelNewestStream: () => boolean;
+  /**
+   * Does this terminal report key releases (C02 `keyboardProtocol`, C16 I44)?
+   *
+   * **The one thing that decides which of R-BLK-788's two boundaries applies.**
+   * *Wait for the held key to lift* is only an instruction a terminal that says
+   * when it lifted can be given; on one that does not, the guard has to end on
+   * the refusal or it would swallow the reader's deliberate second press with
+   * nothing able to tell it from the held first one.
+   *
+   * A pull like every other, and the same field §6a reads to choose a profile —
+   * so the two answers cannot drift apart into *this terminal has the protocol*
+   * and *this terminal sends releases*.
+   */
+  keyReleasesReported: () => boolean;
+  /**
+   * Would the top question **resolve** on this key, or `null` when none is open
+   * (C16 I44, R-BLK-788)?
+   *
+   * **The guard's predicate, and it is a pull because C16 must not know the
+   * answer** (I25). *The first ambiguous activation is refused* needs a way to
+   * tell a key that would answer the question from one that would move its
+   * selection or do nothing, and the only honest way to ask is to ask the
+   * question — the alternative is calling the answer handler, which answers it.
+   * A separate pull rather than a widened `overlayAnswerCallback`, because one
+   * settles and one does not, and a single function that sometimes settles is
+   * the shape no caller can use safely.
+   */
+  overlayWouldResolve: () => ((e: InputEvent) => boolean) | null;
 }>;
 
 /**
@@ -163,6 +198,33 @@ export interface InputRouter {
    * `target` is — a second copy is a second thing to keep in step.
    */
   readonly rung: OwnerRung | null;
+  /**
+   * The owner epoch, shared by the keyboard and the pointer (C16 I43,
+   * R-OWN-002). It moves on every owner change, and nothing armed in one epoch
+   * may be committed in another.
+   */
+  readonly ownerEpoch: number;
+  /**
+   * Is the current owner newly raised and still refusing its first activation
+   * (C16 I44)? Read by the footer's owner line, which is where the refusal
+   * explains itself (C22 §6, R-INT-008).
+   */
+  readonly ownerArmed: boolean;
+  /**
+   * Arm a pointer activation on a stable identity (C16 I45, R-OWN-003).
+   *
+   * The identity is the caller's to compose and is `(entry, blockId, elementId)`
+   * in the gesture table — never a cell, because a live block re-renders under a
+   * held button and a release comparing positions activates whatever slid under
+   * the pointer.
+   */
+  armPointer(id: string): void;
+  /**
+   * Commit the arm if `id` is still the armed identity in the epoch it was armed
+   * in (C16 I45). Clears the arm either way: a release ends it whatever became
+   * of it.
+   */
+  commitPointer(id: string): boolean;
   /** Which stages the last dispatch consulted, in order. Diagnostics and T2.x. */
   readonly lastStages: readonly string[];
 }
@@ -173,10 +235,55 @@ const isCtrlC = (e: InputEvent): boolean =>
 export function createRouter(
   opts: Readonly<{ focus: FocusStore; keymap: Keymap; now: () => number; deps: RouterDeps }>,
 ): InputRouter {
-  const { focus, now, deps } = opts;
+  const { focus, keymap, now, deps } = opts;
   const handlers = new Map<FocusTarget, Handler[]>();
   let armedAt: number | null = null;
   let stages: string[] = [];
+
+  /**
+   * M7's two fields, and they are two because one cannot hold both facts
+   * (C16 I43, I44, §4a W8).
+   *
+   * `ownerEpoch` moves on **every** owner change — a raise, a fall, and a move
+   * to or from no rung alike — because R-OWN-002's first clause is *events carry
+   * the owner epoch in which they began and are never replayed against a new
+   * owner*, and a question closing is an owner change like any other.
+   * `guarded` is set only when a **question** arrives, because R-BLK-786's
+   * clause is *a newly presented question requires a fresh, deliberate
+   * activation*. Folding them into one field refuses the first keystroke after
+   * every question the reader has just answered — which is exactly when they are
+   * typing deliberately, and is a defect no row asserting a *state* can see.
+   *
+   * **There is no clock here and an earlier draft gave it one** (§4a W9).
+   * R-BLK-788 makes the boundary an event — *with key-release reporting, wait
+   * for the held key to lift; without it the first ambiguous activation before a
+   * neutral/key-up boundary is refused* — and a held key is precisely the thing
+   * that produces no event for a timer to be right about.
+   *
+   * **`lastRung` starts at `null`, and a lazy seed was wrong** (I43). An
+   * `undefined` seed taken on the first `syncOwner` swallows the first
+   * transition it ever sees — which is the arrival of the session's first
+   * question, the one the guard most has to catch. Seeding eagerly at
+   * construction is the other wrong answer: the deps are pulls and `inFlight`
+   * reads a `pipeline` that is still in its temporal dead zone, so asking costs
+   * a `ReferenceError` rather than a walk. `null` needs neither, because a
+   * router is built with nothing raised — there is no stack yet to raise from.
+   */
+  let ownerEpoch = 0;
+  let lastRung: OwnerRung | null = null;
+  let guarded = false;
+  let pointerArm: Readonly<{ id: string; epoch: number }> | null = null;
+  /**
+   * Which keys are physically down, where the terminal says so (C16 I44).
+   *
+   * **Empty and meaningless without release reporting**, which is the whole
+   * reason R-BLK-788 splits its rule in two. *Wait for the held key to lift*
+   * presupposes a held key, and a terminal that reports releases is one that can
+   * say whether there is one — so where there is not, a question guards nothing
+   * and the reader's first press answers it. Where the terminal is silent about
+   * releases this stays empty and the conservative arm applies.
+   */
+  const held = new Set<string>();
 
   function register(
     target: FocusTarget,
@@ -473,13 +580,161 @@ export function createRouter(
     return "scope";
   }
 
+  /**
+   * Bring the epoch and the owner arm up to date (C16 I43, §4a W7).
+   *
+   * **Written at the bottom of a dispatch and read at the top**, because the
+   * raise is usually caused by the key being dispatched: a handler pushes a
+   * layer, and the rung is different on the way out than it was on the way in.
+   * A machine comparing the rung only before dispatch never arms for the case
+   * that matters, and every row asserting a state still passes.
+   *
+   * Idempotent, so `commitPointer` may call it first to make sure the epoch it
+   * compares against is the current one — an owner raised by output or a timer
+   * has had no dispatch of its own in which to move it.
+   */
+  function syncOwner(): void {
+    const rung = rungNow();
+    if (rung === lastRung) return;
+    const questionArrived = rung === "question" && lastRung !== "question";
+    lastRung = rung;
+    // R-BLK-786: *every owner transition increments an ownership generation*.
+    ownerEpoch += 1;
+    // R-BLK-786 again, and it is narrower than the transition: *a newly
+    // presented QUESTION requires a fresh, deliberate activation*. No other rung
+    // acts on one keystroke the way an answer does, so no other rung guards.
+    //
+    // **And narrower still where the terminal reports releases**: there the
+    // guard is for a key that was already down when the question arrived, and
+    // with nothing down there is nothing to wait for and nothing to refuse.
+    if (questionArrived) guarded = !deps.keyReleasesReported() || held.size > 0;
+  }
+
+  /**
+   * Is this event an activation the raised owner would act on (C16 I44)?
+   *
+   * **Narrower than *a key the owner handles*, and the narrowing is the rule.**
+   * Refusing every key after a raise refuses the arrow that would let the reader
+   * read what arrived; refusing none lets a held key answer a question that
+   * appeared under it. For a raised question every key its answer callback would
+   * consume is an answer — the callback is the question's whole vocabulary and
+   * C16 does not know what a key means to it (I25) — and elsewhere it is the
+   * chord bound to `rowActivate`, asked of the keymap rather than spelled here.
+   */
+  function isActivation(e: InputEvent): boolean {
+    if (e.kind !== "key") return false;
+    // **Ambiguous is *would resolve*, not *would be consumed*** (R-BLK-788).
+    // An unbound key at an open question is consumed and does nothing, and an
+    // arrow moves the selection — neither is an activation, and refusing them
+    // would stop a reader looking at what arrived. Only the question knows which
+    // of its keys answer it (I25), so the predicate is its own.
+    const resolves = deps.overlayWouldResolve();
+    if (resolves !== null) return resolves(e);
+    return keymap.resolve(activeTarget(inputs()), e.key)?.action === "rowActivate";
+  }
+
+  /**
+   * The question's activation guard, read at the top of a dispatch — `true`
+   * means *refuse this one* (C16 I44, R-BLK-788).
+   *
+   * **The pointer is never guarded** (R-BLK-788's last clause): a fresh press
+   * belongs to the new epoch and keeps ordinary one-click semantics, and it could
+   * not be the in-flight event the guard exists to catch — a button already down
+   * when the question arrived produces a release and never a press.
+   *
+   * **Two boundaries, and which one applies is the terminal's answer.** Where key
+   * releases are reported, the guard waits for the held key to lift, so every
+   * activation before the key-up is refused. Where they are not, nothing can tell
+   * the deliberate second press from the held first one, so the guard ends on the
+   * refusal rather than outliving a keystroke it cannot see the end of. A neutral
+   * key — one the question would not take as an answer — ends it either way.
+   */
+  function takeGuard(e: InputEvent): boolean {
+    if (!guarded || e.kind !== "key") return false;
+    if (e.event === "release") {
+      // The held key lifted. `held` was updated before this ran, so an empty set
+      // is *nothing is down any more* and the guard has what it was waiting for.
+      if (held.size === 0) guarded = false;
+      return false;
+    }
+    if (!isActivation(e)) {
+      guarded = false;
+      return false;
+    }
+    if (!deps.keyReleasesReported()) guarded = false;
+    return true;
+  }
+
+  /**
+   * Three of I46's five cancellations, observed before dispatch.
+   *
+   * A drag and a second press both arrive as `press: true` — a motion report has
+   * `press: true, motion: true` (I30) — so one line answers for both, and the
+   * press that *arms* clears first and is re-armed by the effect during dispatch.
+   * A hover is not a gesture and clears nothing, for §4a row t's reason.
+   */
+  function cancelArmOnPress(e: InputEvent): void {
+    if (e.kind !== "mouse" || e.button === "none") return;
+    if (e.press) pointerArm = null;
+  }
+
   function dispatch(e: InputEvent): boolean {
+    // **Read at the top as well as written at the bottom** (§4a W7). The bottom
+    // call catches a raise the dispatch itself caused — a handler pushing a
+    // layer. This one catches a raise nothing dispatched: `ctx.ask` is called
+    // from a verb, so the question exists before the next keystroke arrives, and
+    // that keystroke is precisely the one the guard exists to refuse. A machine
+    // with only the bottom call lets it through and guards the one after it.
+    // **`syncOwner` first, and the order is the rule** (I44). A question raised
+    // out of band is observed here, and the condition is what was held *when it
+    // arrived* — which is what was down before this event, not including it. A
+    // key genuinely held across the arrival is already in the set, because a
+    // held key repeats and its first press was an earlier dispatch; a key
+    // pressed deliberately after it is not, and answers. Counting this event
+    // first collapses the two and guards every question on every terminal,
+    // which is the conservative arm arriving where the design asked for the
+    // precise one.
+    syncOwner();
+    if (e.kind === "key") {
+      if (e.event === "release") held.delete(e.key.name);
+      else held.add(e.key.name);
+    }
+    cancelArmOnPress(e);
+    try {
+      return dispatchInner(e);
+    } finally {
+      syncOwner();
+      // **A release ends the arm whatever became of it** (I46). The commit is
+      // attempted during dispatch by the gesture table; a release over chrome,
+      // over a layer or outside the region never reaches it, and an arm that
+      // outlived one would be committed by the *next* release somewhere else.
+      if (e.kind === "mouse" && !e.press && e.button !== "none") pointerArm = null;
+    }
+  }
+
+  function dispatchInner(e: InputEvent): boolean {
     stages = [];
 
     stages.push("arming");
     const arming = observeArming(e);
     if (arming === "raise") {
       deps.raiseExitConfirm();
+      return true;
+    }
+
+    // **A newly presented question refuses an activation already in flight, and
+    // names why** (I44, R-BLK-786, R-BLK-788, R-INT-008). Below the exit arm,
+    // because the exit arm must still see a refused key as input — a `⌃c` that
+    // was refused is a `⌃c` that happened, and leaving it armed would raise the
+    // confirm on a keystroke the reader never got an answer to.
+    //
+    // `reject` and not a dropped key: R-INT-008 says a rejected command
+    // explains, and the explanation is the footer's owner line losing its armed
+    // mark on this very keystroke — so the frame changes, which is the whole
+    // difference between refused and swallowed.
+    if (takeGuard(e)) {
+      stages.push("question-guard");
+      stages.push("reject");
       return true;
     }
 
@@ -689,7 +944,35 @@ export function createRouter(
     get rung() {
       return rungNow();
     },
-    resetFocus: () => focus.reset(),
+    get ownerEpoch() {
+      syncOwner();
+      return ownerEpoch;
+    },
+    get ownerArmed() {
+      syncOwner();
+      return guarded;
+    },
+    armPointer(id: string) {
+      syncOwner();
+      pointerArm = Object.freeze({ id, epoch: ownerEpoch });
+    },
+    commitPointer(id: string) {
+      // **The epoch is brought current first, and that is what catches trace 16**
+      // (I45, I46, R-OWN-002). An owner raised by output or by a timer between
+      // the press and the release has had no dispatch of its own in which to
+      // move the counter, so comparing against a stale one would commit an
+      // activation armed under an owner that is gone.
+      syncOwner();
+      const armed = pointerArm;
+      pointerArm = null;
+      return armed !== null && armed.id === id && armed.epoch === ownerEpoch;
+    },
+    resetFocus: () => {
+      // I46's fifth cancellation. A reset is L4 saying the reader is somewhere
+      // else now, which is the one cancel no event carries.
+      pointerArm = null;
+      focus.reset();
+    },
     get target() {
       return activeTarget(inputs());
     },

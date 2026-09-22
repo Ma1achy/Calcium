@@ -1431,6 +1431,7 @@ class Session implements TuiInstance {
       // §103's ladder, read from the router rather than re-derived: the owner
       // line and the dispatch that honours it must not be able to disagree.
       owner: () => this.#graph?.router.rung ?? null,
+      ownerArmed: () => this.#graph?.router.ownerArmed ?? false,
       // A03 SS47 — the owner line draws chords, so the chrome resolves them.
       capabilities: () => graph?.capabilities ?? null,
       // C24 I32 — read per frame from the recorder rather than kept here. A

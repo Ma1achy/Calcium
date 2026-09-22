@@ -58,6 +58,7 @@ function frameAt(rows: number, chrome: Chrome, wanted = 1, columns = 80, session
     chrome,
     session: () => session,
     owner: () => null,
+      ownerArmed: () => false,
     capabilities: () => null,
     now: () => NOW,
     size: () => ({ columns, rows }),

@@ -102,6 +102,8 @@ export type ComposeDeps = Readonly<{
    * had reached the end of that argument for.
    */
   owner: () => OwnerRung | null;
+  /** C16 I44 — whether that owner is still refusing its first activation. */
+  ownerArmed: () => boolean;
   /** C02's resolved record, for the chrome's marks (A03 SS47). `null` before
    * the session graph exists, which is also when there is no owner. */
   capabilities: () => TerminalCapabilities | null;
@@ -154,6 +156,7 @@ export function compose(deps: ComposeDeps): Composed {
     now,
     columns: size.columns,
     owner: deps.owner(),
+    ownerArmed: deps.ownerArmed(),
     // Spread rather than assigned, so `exactOptionalPropertyTypes` sees the
     // member as absent rather than present-and-undefined: a chrome doing
     // `"lastFrame" in ctx` gets the same answer as one doing `!== undefined`.

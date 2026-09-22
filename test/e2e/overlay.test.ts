@@ -33,6 +33,8 @@ const escape = (): InputEvent => ({
 function routerDeps(overlays: OverlayManager): RouterDeps {
   return {
     overlayRegion: () => ({ width: 80, height: 24 }),
+    keyReleasesReported: () => false,
+    overlayWouldResolve: () => null,
     overlayAnswerCallback: () => null,
     overlayTop: () => {
       const top = overlays.top;

@@ -83,6 +83,15 @@ export interface ConfirmHost {
    * answered by the menu.
    */
   answerHandler(): ((e: InputEvent) => boolean) | null;
+  /**
+   * Would this key **resolve** the open question (C16 I44, R-BLK-788)?
+   *
+   * The activation guard's predicate, and it is here rather than in C16 for
+   * I25's reason: what a key means to a question is the question's business.
+   * `null` when no question is on top. Pure — it settles nothing, which is the
+   * whole point of asking before answering.
+   */
+  resolvesHandler(): ((e: InputEvent) => boolean) | null;
   /** Whether a question is open — C22 refuses a submission while one is. */
   readonly open: boolean;
 }
@@ -241,8 +250,24 @@ function placementOf(
   return { placement: { kind: "anchored", row: at.row, rows: at.rows, prefer: "above" } };
 }
 
+/**
+ * What one key means to an open question — written once and read twice
+ * (C16 I44, R-BLK-788).
+ *
+ * **The second reader is the activation guard, and it must not answer to ask.**
+ * A newly presented question refuses an *ambiguous activation* — a key that
+ * would resolve it — and lets a neutral one through, so something has to say
+ * which a key is without settling it. C16 cannot: what a key means to a question
+ * is the question's business (I25), and a router holding half of that rule would
+ * hold it two layers from the other half. So the classification is one function
+ * here, and `handler` and the predicate both read it rather than each carrying a
+ * copy of the same four cases.
+ */
+type Meaning = "resolve" | "move" | "none";
+
 export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
   let handler: ((e: InputEvent) => boolean) | null = null;
+  let meaning: ((e: InputEvent) => Meaning) | null = null;
 
   return {
     get open() {
@@ -254,6 +279,12 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
       // second record of "is the question on top" is one that can disagree with
       // C15's stack, and C16 asks this on every keystroke.
       return deps.overlays.top?.id === CONFIRM_LAYER_ID ? handler : null;
+    },
+
+    resolvesHandler() {
+      const classify = meaning;
+      if (classify === null || deps.overlays.top?.id !== CONFIRM_LAYER_ID) return null;
+      return (e: InputEvent): boolean => classify(e) === "resolve";
     },
 
     ask(opts) {
@@ -298,6 +329,7 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
       return new Promise<string>((resolve) => {
         const settle = (key: string): boolean => {
           handler = null;
+          meaning = null;
           disposable[Symbol.dispose]();
           deps.invalidate();
           resolve(key);
@@ -310,41 +342,48 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
           return true;
         };
 
+        // Both escapes resolve with the default (C23 I36). They are classified
+        // here rather than special-cased in C16 because what they mean is the
+        // question's business, and a router that knew it would hold half of a
+        // rule whose other half lives two layers away (C16 I25).
+        //
+        // Accelerators are checked last so a choice keyed `c` cannot shadow
+        // `⌃c`. Bare only: `⌥y` is not `y`.
+        const classify = (e: InputEvent): Meaning => {
+          if (e.kind !== "key") return "none";
+          const { name, ctrl } = e.key;
+          if (name === "escape" || (ctrl && name === "c")) return "resolve";
+          if (name === "return" || name === "enter") return "resolve";
+          if (name === "up" || name === "left") return "move";
+          if (name === "down" || name === "right" || name === "tab") return "move";
+          if (!ctrl && !e.key.meta && opts.choices.some((c) => c.key === name)) return "resolve";
+          return "none";
+        };
+        meaning = classify;
+
         handler = (e) => {
           if (e.kind !== "key") return false;
           const { name, ctrl } = e.key;
-
-          // Both escapes resolve with the default (C23 I36). They are routed
-          // here rather than special-cased in C16 because what they mean is the
-          // question's business, and a router that knew it would hold half of a
-          // rule whose other half lives two layers away (C16 I25).
-          if (name === "escape" || (ctrl && name === "c")) {
-            return settle(defaultChoice(opts.choices).key);
+          switch (classify(e)) {
+            case "resolve":
+              if (name === "escape" || (ctrl && name === "c")) {
+                return settle(defaultChoice(opts.choices).key);
+              }
+              if (name === "return" || name === "enter") {
+                return settle(opts.choices[selected()]!.key);
+              }
+              return settle(name);
+            case "move":
+              if (name === "up" || name === "left") selection.prev();
+              else selection.next();
+              return redraw();
+            default:
+              // **Consumed, and nothing happens.** An unbound key at an open
+              // question must not fall through — C16 I8 blocks the surface
+              // beneath, and returning false here would send the key back up the
+              // ladder to the rung that consumes `⌃c` into silence.
+              return true;
           }
-          if (name === "return" || name === "enter") {
-            return settle(opts.choices[selected()]!.key);
-          }
-          if (name === "up" || name === "left") {
-            selection.prev();
-            return redraw();
-          }
-          if (name === "down" || name === "right" || name === "tab") {
-            selection.next();
-            return redraw();
-          }
-
-          // Accelerators, and they are checked last so a choice keyed `c` cannot
-          // shadow `⌃c`. Bare only: `⌥y` is not `y`.
-          if (!ctrl && !e.key.meta) {
-            const hit = opts.choices.find((c) => c.key === name);
-            if (hit !== undefined) return settle(hit.key);
-          }
-
-          // **Consumed, and nothing happens.** An unbound key at an open
-          // question must not fall through — C16 I8 blocks the surface beneath,
-          // and returning false here would send the key back up the ladder to
-          // the rung that consumes `⌃c` into silence.
-          return true;
         };
 
         deps.invalidate();

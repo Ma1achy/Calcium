@@ -44,6 +44,8 @@ function wire(editor: LineEditor): {
   const keymap = createKeymap(defaultKeymap);
   const focus = createFocusStore();
   const deps: RouterDeps = {
+    keyReleasesReported: () => false,
+    overlayWouldResolve: () => null,
     overlayAnswerCallback: () => null,
     overlayTop: () => null,
     overlayRegion: () => ({ width: 80, height: 24 }),

@@ -40,6 +40,7 @@ const frameAt = (columns: number): Composed =>
     chrome: CHROME,
     session: () => SESSION,
     owner: () => null,
+      ownerArmed: () => false,
     capabilities: () => null,
     now: () => 0,
     size: () => ({ columns, rows: 24 }),

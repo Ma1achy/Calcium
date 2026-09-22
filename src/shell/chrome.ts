@@ -242,7 +242,26 @@ export function shedToWidth(
   return kept;
 }
 
-export function ownerLine(rung: OwnerRung | null, caps: TerminalCapabilities): readonly Chip[] {
+export function ownerLine(
+  rung: OwnerRung | null,
+  caps: TerminalCapabilities,
+  armed = false,
+): readonly Chip[] {
+  const chips = ownerChips(rung, caps);
+  // **The armed mark, and it is a chip rather than a decoration** (C16 I44,
+  // C22 §6, R-INT-008). A newly raised owner refuses one activation so a key
+  // already in flight cannot answer a question that arrived under it, and a
+  // rejected command has to explain. This is the explanation: it is drawn while
+  // the arm is live and gone after the refusal, so the refused key changes the
+  // frame — which is the whole difference between refused and swallowed.
+  //
+  // `ownerLine(null)` stays the empty line. No owner raised is no row, and an
+  // arm with no owner is not a state the router can reach.
+  if (!armed || chips.length === 0) return chips;
+  return [...chips, { label: "ready in a moment", tone: "muted" }];
+}
+
+function ownerChips(rung: OwnerRung | null, caps: TerminalCapabilities): readonly Chip[] {
   switch (rung) {
     case "child":
       return [
@@ -332,7 +351,11 @@ const footer = (ctx: ChromeContext): readonly Block[] => [
         block<Block>({
           kind: "pills",
           id: "chrome.owner",
-          chips: shedToWidth(ownerLine(ctx.owner, ctx.capabilities), ctx.columns, ctx.capabilities),
+          chips: shedToWidth(
+            ownerLine(ctx.owner, ctx.capabilities, ctx.ownerArmed === true),
+            ctx.columns,
+            ctx.capabilities,
+          ),
         }),
       ]),
 ];

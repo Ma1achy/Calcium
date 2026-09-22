@@ -71,8 +71,13 @@ const MUTATIONS = [
     // plot — so the crosshair stays where the first click put it.
     name: "a click on the focused plot is ⏎ rather than the crosshair",
     file: CONSTRUCT,
-    from: "      if (aim !== null) return aim;\n      // Click again is `⏎`",
-    to: "      // Click again is `⏎`",
+    // **Re-anchored after M7 split the press from the release.** The anchor
+    // reached into the comment below it, which the same commit rewrote — an
+    // anchor that ends at a line boundary rots for reasons unrelated to its
+    // subject. It now names the branch itself plus the least context that makes
+    // it unique.
+    from: "      if (aim !== null) return aim;\n      // **Click again is still a state test",
+    to: "      // **Click again is still a state test",
     expect: "T4.71",
   },
   {
