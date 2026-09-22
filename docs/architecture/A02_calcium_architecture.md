@@ -150,8 +150,25 @@ All three implementations are fully substitutable in every test that does not co
 
 ```typescript
 type FocusTarget =
-  | "overlay" | "copyMode" | "pushedView" | "prompt" | "liveBlock" | "global";
+  | "child" | "overlay" | "copyMode" | "pushedView"
+  | "interaction" | "prompt" | "liveBlock" | "global";
 ```
+
+**Amended in M5, and the row was stale before the design touched it.** It listed six
+targets where the union had seven: `interaction` had shipped with C26 and was never
+written here, so a seam document describing the focus priority was describing a priority
+the tree had not held for some time. `child` is the eighth, and it is the design's —
+§103's ownership ladder reads `child · copy · question · substate · inside · scope`, with
+an attached PTY above every host rung because those keys are not the host's to route.
+
+**The eight targets are not the six rungs, and conflating them is a defect this seam
+should not invite.** A *target* is where a handler is registered; a *rung* is who owns the
+keyboard. `prompt` and `liveBlock` are two positions of the one `scope` owner — §103's
+SCOPE is *prompt · transcript*, one owner, and `stored.at` is the position inside it — so
+the mapping is many-to-one and `global` is not a rung at all. `RUNG_OF` in
+`src/interaction/router/types.ts` is that mapping, and it is total over the union less
+`global`. **`global-intercept` is read before the ladder** and is not a target: three
+reserved routes (`interrupt`, `page-scroll`, the wheel) that no rung may claim.
 
 Array order **is** the priority. Focus is derived on every dispatch from what is on screen, plus exactly one stored bit (`prompt` vs `liveBlock`) owned by C16 and reset on every transcript append. C16 §3 owns the resolution rules.
 

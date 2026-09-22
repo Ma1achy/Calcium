@@ -1957,7 +1957,13 @@ correct while disagreeing.
 - **E. The default footer has one row.** `makeDefaultChrome`'s footer returns one row — a `group`
   of two muted `pills` clusters since §6l.6 J: `/help` and `stopping` while the snapshot says so at
   the left, the session's `cwd` with the home directory as `~` at the right — every one a field
-  `SessionSnapshot` already carries, so the footer adds no writer. Verbs and facts, never key names — a key named in chrome is C16 I19's second keymap.
+  `SessionSnapshot` already carries, so the footer adds no writer.
+
+**Amended in M5 (R-KEY-004, R-OWN-001, §103).** This read *verbs and facts, never key names — a key named in chrome is C16 I19's second keymap*, and it was right about the hazard and wrong about the remedy. The hazard is a framework footer of **bindings**, which is wrong the moment an app rebinds one; R-KEY-007 says the same from the design's side — *footer hints in retained specimens are examples, not binding projections*. But the conclusion closed a rung rather than the hazard, and §103 requires the rung: *EVERY OWNER SAYS SO, in the footer’s last line. AN OWNER YOU CANNOT SEE IS AN OWNER YOU WILL FIGHT.*
+
+So the footer carries a **second row, last**, naming the owner and its routes — and the distinction that keeps I19 intact is that an *owner* is Calcium’s own. A question, copy mode, an attached child and a block’s interior are rungs the framework raises; they are not actions an application rebinds, so naming their exits is not a second keymap. The `scope` rung’s line is the one made of ordinary editing verbs, and it is the one an application replaces by supplying its own chrome (I82).
+
+**How much each rung shows is §103’s split and is not uniform**: *every rung retains owner plus its highest-ranked reachable safe action; **ordinary** rungs also show primary action, safe exit and help.* A question is not an ordinary rung — its actions are its own and the shell does not hold them — so its line is the owner and the safe path. `ownerLine(null)` is the empty line: no owner raised is no row, not an empty one.
   An app that wants no footer returns `[]` and gets none.
 - **F. The rows above are not configuration.** No `TuiConfig` field turns a rule off or fixes
   the footer's height. The one thing an app decides is what its footer returns.

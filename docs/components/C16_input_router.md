@@ -268,15 +268,45 @@ The fix is one check, not four: the buffering branch moves out of `decodeCsi` in
 
 ```typescript
 type FocusTarget =
-  | "overlay" | "copyMode" | "pushedView" | "prompt" | "liveBlock" | "global";
+  | "child" | "overlay" | "copyMode" | "pushedView"
+  | "interaction" | "prompt" | "liveBlock" | "global";
 
 function activeTarget(deps: Readonly<{
-  overlayTop: Layer | null;
-  copyMode:   boolean;
-  liveEntry:  TranscriptEntry | null;
-  promptFocused: boolean;
+  overlayTop:    Layer | null;
+  copyMode:      boolean;
+  attachedChild: boolean;
+  liveEntry:     TranscriptEntry | null;
+  stored:        StoredFocus;
 }>): FocusTarget;
+
+/** Who owns the keyboard (§103). Many targets, one owner. */
+type OwnerRung = "child" | "copy" | "question" | "substate" | "inside" | "scope";
+type Verdict   = "handle" | "reject" | "pass" | "global-intercept";
 ```
+
+**Amended in M5 — `child` joins the union, and targets stop pretending to be rungs**
+(§103, R-OWN-001). §103’s ladder is six owners, highest first: `child · copy · question ·
+substate · inside · scope`. The union is eight *targets*, which is where a handler is
+registered, and `RUNG_OF` maps one onto the other. The mapping is many-to-one and that is
+the finding: **`prompt` and `liveBlock` are two positions of the one `scope` owner** —
+§103’s SCOPE is *prompt · transcript*, and `stored.at` is the position within it. Merging
+their handler lists would run the live block’s handler while focus sat at the prompt, and
+in the reverse of the ladder’s order, because `installLadder` registers `liveBlock` first.
+`global` maps to no rung: it is the keymap left when nothing owns the keyboard.
+
+**And `global-intercept` is read *before* the ladder**, not as its top rung. §103 names
+three reserved routes — `interrupt` (⌃C), `page-scroll` (⌥↑/⌥↓, and the legacy
+`pageup`/`pagedown`) and **the wheel**, which is a mouse event and is the one a table gets
+written without. They carry an explicit owner-applicability table (`intercepts.ts`) and no
+rung may claim one. A `reject` there still runs the owning rung first and consumes the
+event: rejecting is a decision the owner announces, not a hole the event falls through.
+
+**A *question* is an overlay awaiting an answer, and §5 already drew that line.**
+`activeTarget` answers `overlay` for any top layer, where §103’s QUESTION rung is *choice
+or text · resolves exactly once by answer · safe exit*. So the intercept table reads its
+rung through `overlayAnswerCallback() !== null`; without it a non-dismissable layer nobody
+is waiting on rejects an interrupt, and a verb in flight never gets cancelled — ruled
+behaviour overturned by a rung name being one word coarser than the rule.
 
 Resolution order, first match wins:
 
@@ -346,18 +376,128 @@ Everything else is derived from something visible. The precise claim is therefor
 
 ---
 
+## 3a. The ownership ladder, walked — M5
+
+The design has one ladder where this component has four special cases, and §103 says
+so in its own opening: *"§15 listed SCOPES and never said what a scope competes with,
+so a question, copy mode, an attached PTY and a block's interior were four separate
+special cases."* That is a true description of `FOCUS_ORDER` plus the Ctrl-C rungs plus
+`modal-blocked` plus `routeMouse`. Walked before the code, per the rule that has found
+something on every component it has been run against.
+
+**Both artefact shapes, because the ladder has both kinds of interaction.** Which rung
+claims an action is structural — two rungs both holding a claim, at rest. Whether an
+owner *changes* is event-mediated — something arrived in between. Taking only the trace
+would have missed W3; taking only the table would have missed W1.
+
+### The rungs, design against tree
+
+| design (§103) | raised by | tree today | where it lives |
+|---|---|---|---|
+| the **CHILD** | an attached PTY | — | `route === "shell"` inside `dispatch`'s Ctrl-C branch; not a focus target, so only `⌃c` reaches it |
+| **COPY MODE** | `⌥⇧V` froze the screen | — | unbuilt; M10's semantic mode |
+| — | — | `copyMode` | native handoff (`⌥⇧C`), which §103 does not rank because the terminal owns the keyboard, not us |
+| a **QUESTION** | choice or text | `overlay` | `FOCUS_ORDER[0]`, plus a second claim in the Ctrl-C branch |
+| a **SUBSTATE** | find · completion · history search | `pushedView` | `FOCUS_ORDER[2]`; also C24's `openSurface`, re-homed to `child` in M9 |
+| the **INSIDE** | a camera · a cursor | `interaction` | `FOCUS_ORDER[3]` |
+| the **SCOPE** | prompt · transcript | `prompt`, `liveBlock` | `FOCUS_ORDER[4]` and `[5]` — **two rungs, not one** |
+| *(below the ladder)* | — | `global` | `FOCUS_ORDER[6]`, read last and skipped under a modal |
+| **GLOBAL-INTERCEPT** | the registry's table | — | one hand-rolled instance (`⌃c`), read *before* the ladder, with no table |
+
+### The classification table — structural, at rest
+
+Rows where two rungs could both claim one action. A row governed by one rung restates
+that rung and finds nothing.
+
+| the state | the action | which rung claims it | and the other |
+|---|---|---|---|
+| a blocking question is open, focus held at the prompt | an ordinary letter | `question` **rejects** (§103) | today: `overlay`'s handler declines, then `modal-blocked` drops it silently — **W2** |
+| a blocking question is open | `⌃c` | `question` (the older rung is higher — §5's ruling A) | the cancel rungs; already ruled and already right |
+| the prompt holds focus, a block is live | `↓` | `scope` | `prompt` and `liveBlock` are two rungs here and one in the design — **W3** |
+| an attached child is running | `esc` | the **child** (R-OWN-002: *an attached child explicitly handles control-C and escape*) | today nothing: `esc` never reaches a child, because the child is not a target — **W5** |
+| copy mode is frozen | page-scroll | copy mode **rejects** (the owner-applicability table) | today the intercept table does not exist — **W4** |
+| any rung | a handler that consumed nothing | `pass` | today `false` means *pass* **and** *reject*, indistinguishably — **W6** |
+
+### The sequence trace — event-mediated
+
+| # | the sequence | what the design says | what the tree does |
+|---|---|---|---|
+| A1 | focus stored in the transcript, no live entry; a command is submitted and a live entry appears | R-COR-002: *a render event may change drawing but never keyboard ownership* | the owner moves `global` → `liveBlock` — **W1**, measured |
+| A2 | a question arrives while the prompt holds focus | an ownership **request**; the rung rises | the same code path as A1: `activeTarget` reads `overlayTop` on the way past. Right answer, and by the mechanism A1 gets wrong |
+| A3 | a key is pressed, the owner changes, the key is delivered | R-OWN-002: events carry the epoch they began in and are never replayed against a new owner | no epoch exists; M7's subject |
+| A4 | a question resolves | *resolves exactly once, by answer · safe exit* | already true |
+
+### What the walk found
+
+- **W1 · A content arrival moves the owner.** `activeTarget`'s last two rows are
+  `if (deps.stored.at === "prompt") return "prompt"; if (deps.liveEntry !== null) return
+  "liveBlock";` — so with focus stored in the transcript in navigate mode and no live
+  entry the owner is `global`, and a live entry *arriving* makes it `liveBlock`.
+  Constructed rather than argued: the two calls differ on that one input alone. This is
+  R-COR-002's prohibition exactly, and it is invisible to every existing row because
+  each asserts the owner for a state rather than across an arrival.
+
+- **W2 · A blocking question drops keys silently.** `modal-blocked` returns `false` with
+  no feedback, which R-HON-004 and R-INT-009 both refuse: *a refusal states its reason*,
+  *a rejected command explains why*. The design's word is REJECT, and the tree has no way
+  to say it — which is W6 from the other end.
+
+- **W3 · Merging `prompt` and `liveBlock` would invert the Ctrl-C ladder.** The design's
+  SCOPE is one rung over *prompt · transcript*; the tree has two, and `FOCUS_ORDER` ranks
+  `prompt` above `liveBlock`. But `installLadder` registers `liveBlock` first
+  (`router.ts:266`) and `prompt` second (`:271`), so a merge onto one target makes their
+  order *registration* order — the reverse. **The ladder's order and the registration
+  order agree today only because the target is what separates them.** A merge that reads
+  as a rename is a reordering, and nothing in the file says so. This is the row the
+  table found and the trace could not: no event is involved.
+
+- **W4 · The intercept table does not exist, and one intercept already does.** `⌃c` is
+  read before the ladder by name, which is exactly a global-intercept — so the mechanism
+  is present as a special case and absent as a mechanism. §103 requires an
+  owner-applicability table (*interrupt · page-scroll · the wheel*) and that an app may
+  register one *only with an owner, fallback and collision test*.
+
+- **W5 · The child handles `⌃c` and cannot see `esc`.** R-OWN-002 names both. The tree
+  reaches the child only from inside the Ctrl-C branch, because a child is not a focus
+  target and has nothing to register on.
+
+- **W6 · `boolean` cannot express four verdicts.** `handle` is `true`; `pass` and
+  `reject` are both `false`; `global-intercept` has no representation at all. A refusal
+  and a decline being the same byte is why W2 is possible to write without noticing.
+
+**Six, and five of them are about a mechanism rather than a value** — which is the
+argument for walking the ladder before renaming it. A rename of `FOCUS_ORDER`'s members
+would have left every one of these in place and read as the MR being done.
+
+---
+
 ## 4. Dispatch
 
-Handlers register against a target and return whether they consumed the event.
+Handlers register against a target and return a **verdict** (W6).
 
 ```typescript
+type Handler = (e: InputEvent) => boolean | Verdict;
+
 interface InputRouter {
-  register(target: FocusTarget, handler: (e: InputEvent) => boolean): Disposable;
+  register(target: FocusTarget, handler: Handler): Disposable;
   dispatch(e: InputEvent): boolean;
   resetFocus(): void;                 // L4 calls this on append (§3, I2)
   readonly target: FocusTarget;
+  readonly rung: OwnerRung | null;    // §103, for the footer’s owner line
 }
 ```
+
+**Amended in M5 (R-OWN-001, R-HON-004).** `boolean` has three meanings to carry and two
+values: `true` is `handle`, and `false` was *pass* and *consume without acting* at once —
+so a rung that deliberately declined was indistinguishable from one that was not asked, and
+a refusal that states no reason is the thing R-INT-009 forbids. The four verdicts are
+`handle · reject · pass · global-intercept`. `boolean` is still accepted and coerced
+(`true → handle`, `false → pass`), because every existing handler means exactly that; a
+handler that wants to consume without acting now says `reject` and can be seen doing it.
+
+`rung` is derived, never stored, for the reason `target` is — a second copy is a second
+thing to keep in step — and it is exposed because the footer’s owner line must read it
+(R-KEY-004, C22 §6l.4 E).
 
 ```
 0  the exit-arming machine observes    → always, before anything (§7)

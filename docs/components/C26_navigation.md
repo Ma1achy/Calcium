@@ -1089,7 +1089,12 @@ notice here.
 - **I1** — The scope stack is at most four deep, and a level exists only where §5's
   declaration reports an element at it.
 - **I2** — Interaction mode is a focus target, so C16 §5's ladder derives from `FOCUS_ORDER`
-  and holds no order of its own (§2). **And it is reachable in the live entry only** (§4g row d): the
+  and holds no order of its own (§2). **Amended in M5**: `FOCUS_ORDER` is the *target*
+  order and §103's ladder is the *owner* order, and the invariant is about the first. The
+  targets map onto six rungs through `RUNG_OF` (C16 §3), many-to-one — `prompt` and
+  `liveBlock` are two positions of one `scope` owner — so the ladder still holds no order
+  of its own, it holds a **projection** of this one. The shape the invariant forbids is
+  unchanged: a second list beside `FOCUS_ORDER` that dispatch consults. **And it is reachable in the live entry only** (§4g row d): the
   stored location names an entry, and `activeTarget` answers `interaction` when that entry is
   the live one — A01 D4 withdraws a block's keys on freeze, so a settled entry has nothing to
   interact with.
