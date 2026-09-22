@@ -18,6 +18,7 @@
  */
 
 import type {
+  DecodeCapabilities,
   Decoder,
   DecoderOptions,
   InputEvent,
@@ -163,14 +164,35 @@ const CSI_TILDE_KEYS: Readonly<Record<string, string>> = Object.freeze({
  * as Alt (bit 2) and one sending it as Meta (bit 8) are describing the same
  * keystroke, and splitting them here would put the terminal's configuration into
  * the keymap.
+ *
+ * **Bit 8 is Meta without a protocol and Super with one** (C16 I41, I34 amended).
+ * That sentence above is true of a terminal that reported nothing — `⌘` does not
+ * reach the application there, so a bit-8 arrow genuinely *is* `⌥↑`. It is false
+ * of a terminal that answered `CSI > 3 u`: kitty's encoding defines bit 8 as
+ * Super, and folding it to `meta` there discards what the terminal took the
+ * trouble to say. `CSI 1;9A` is legal in both encodings and means a different
+ * chord in each, so **the arm an escape sequence arrived on cannot be the
+ * condition** — only the negotiated protocol can, and reading it by arm made
+ * `⌘↑` and `⌥↑` one key on a terminal that distinguishes them.
+ *
+ * The control that keeps this honest is `CSI 1;3A`: bit 2, `meta` under both.
  */
-function modifiersOf(param: string | undefined): Pick<Key, "ctrl" | "meta" | "shift"> {
+function modifiersOf(
+  param: string | undefined,
+  protocol: DecodeCapabilities["keyboardProtocol"],
+): Pick<Key, "ctrl" | "meta" | "shift" | "super"> {
   const encoded = param?.split(":", 1)[0];
   const bits = encoded === undefined ? 0 : Math.max(0, Number(encoded) - 1);
+  const eight = (bits & 8) !== 0;
+  const isSuper = eight && protocol === "kitty";
   return {
     shift: (bits & 1) !== 0,
-    meta: (bits & 2) !== 0 || (bits & 8) !== 0,
+    meta: (bits & 2) !== 0 || (eight && !isSuper),
     ctrl: (bits & 4) !== 0,
+    // Absent rather than false, as the csi-u arm emits it — a `super: false` on
+    // every key would make `keyText` and the collision check see a field that is
+    // there for the two chords that use it and nowhere else (I34).
+    ...(isSuper ? { super: true } : {}),
   };
 }
 
@@ -525,7 +547,7 @@ export function createDecoder(options: DecoderOptions): Decoder {
     if (body.startsWith("<")) return mouse(body, final, consumed, out);
 
     const params = body.split(";");
-    const mods = modifiersOf(params[1]);
+    const mods = modifiersOf(params[1], capabilities.keyboardProtocol);
 
     // The two forms a terminal uses to report a key it cannot express as a
     // bare byte — which is every modified Enter, Tab and Space, and therefore

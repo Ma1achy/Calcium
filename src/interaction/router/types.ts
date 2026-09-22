@@ -564,12 +564,20 @@ export type BlockKeymap = readonly Readonly<{
  * What the decoder needs to know about the terminal, as data.
  *
  * A subset of C02's record rather than the record itself: the decoder branches
- * on exactly these two, and taking the whole thing would let a later edit reach
- * for a third without anyone noticing it had grown a dependency.
+ * on exactly these, and taking the whole thing would let a later edit reach for
+ * another without anyone noticing it had grown a dependency.
+ *
+ * **It grew to three, which is the mechanism working rather than failing**
+ * (C16 I41). `keyboardProtocol` is here because `modifiersOf` needs it: bit 8 of
+ * an `CSI 1;m X` modifier is Meta in xterm's encoding and Super in kitty's, the
+ * byte is identical, and only the negotiated protocol says which chord arrived.
+ * The point of the subset is that a third field is a visible decision, and this
+ * is one — declared, not reached for.
  */
 export type DecodeCapabilities = Readonly<{
   bracketedPaste: boolean;
   mouse: boolean;
+  keyboardProtocol: "none" | "kitty";
 }>;
 
 export type DecoderOptions = Readonly<{

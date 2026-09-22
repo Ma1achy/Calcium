@@ -503,15 +503,29 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   { target: "global", key: { name: "up", meta: true }, action: "scrollPageUp" },
   { target: "global", key: { name: "down", meta: true }, action: "scrollPageDown" },
 
-  // **`transcript.top` / `transcript.bottom` keep their base routes only, and
-  // that is a measurement rather than a preference** (§6a, I17). `⌘↑` reaches
-  // this decoder as `CSI 1;9A`, which the legacy arm folds to `{name: "up",
-  // meta: true}` — the same key as `⌥↑`, already `scrollPageUp` above. The
-  // csi-u spelling that *would* carry `super` names the arrow by a functional
-  // code the decoder maps to the empty string, so there is no wire form for the
-  // distinct chord at all. §6's own ruling applies: widening the decoder to
-  // reach one binding is how a table comes to name keys nothing sends, so the
-  // candidate is dropped rather than met. `⌃home` and `⌃end` are the routes.
+  // **`transcript.top` / `transcript.bottom`, restored** (§6a, I41). The earlier
+  // note here said `⌘↑` has no wire form, having measured that `CSI 1;9A` folds
+  // to `{name: "up", meta: true}` — the same key as `⌥↑`. That was the decoder's
+  // limit reported as the terminal's: `⌘↑` is `CSI 1;9A` and `⌥↑` is `CSI 1;3A`,
+  // and those are different bytes. Bit 8 is Meta in xterm's encoding and Super in
+  // kitty's, so `modifiersOf` now reads it by the negotiated protocol and the two
+  // chords stop being one key on a terminal that distinguishes them.
+  //
+  // Enhanced only: without the protocol, bit 8 *is* Meta and the fold is correct,
+  // so these rows would collide with `⌥↑` exactly as the old note said. `⌃home`
+  // and `⌃end` remain the `default-terminal` routes, which is I36.
+  {
+    target: "global",
+    key: { name: "up", super: true },
+    action: "scrollTop",
+    profile: "enhanced-terminal",
+  },
+  {
+    target: "global",
+    key: { name: "down", super: true },
+    action: "scrollBottom",
+    profile: "enhanced-terminal",
+  },
 
   // `copy` / `paste`. The base routes are `⌥w` → `copySelection` and `⌃y` →
   // `yank`, both already bound at `prompt`; these are the enhanced spellings.

@@ -312,7 +312,7 @@ describe("C16 §2 / C01 I21 — the mouse modes, answered by two emulators (F808
         // **The decoder, on this emulator's own rest byte** (C16 I30): `35` is
         // no button. Two emulators now write the byte the arm was built for.
         const rest = /\x1b\[<35;\d+;\d+M/u.exec(only1003.a)?.[0] ?? "";
-        const d = createDecoder({ capabilities: { bracketedPaste: true, mouse: true }, now: () => 0 });
+        const d = createDecoder({ capabilities: { bracketedPaste: true, mouse: true, keyboardProtocol: "none" }, now: () => 0 });
         const ev = d.push(new TextEncoder().encode(rest))[0];
         expect(ev?.kind === "mouse" ? ev.button : ev?.kind, `${program}: the rest decodes as \`button: "none"\``).toBe("none");
 
@@ -398,7 +398,7 @@ describe("C16 §2 / C01 I21 — the mouse modes, answered by two emulators (F808
 
       // **And the decoder on those bytes** — the four names in the array's
       // order, from the emulator's own report rather than a hand-built string.
-      const d = createDecoder({ capabilities: { bracketedPaste: true, mouse: true }, now: () => 0 });
+      const d = createDecoder({ capabilities: { bracketedPaste: true, mouse: true, keyboardProtocol: "none" }, now: () => 0 });
       const names = ["64", "65", "66", "67"].map((cb) => {
         const [ev] = d.push(new TextEncoder().encode(`\u001b[<${cb};1;1M`));
         return ev?.kind === "mouse" ? ev.button : ev?.kind;

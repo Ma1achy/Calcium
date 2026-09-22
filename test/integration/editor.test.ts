@@ -28,7 +28,7 @@ const enc = new TextEncoder();
 function plainTerminal(): ReturnType<typeof createDecoder> {
   let t = 0;
   return createDecoder({
-    capabilities: { bracketedPaste: true, mouse: false },
+    capabilities: { bracketedPaste: true, mouse: false, keyboardProtocol: "none" },
     now: () => (t += 1000),
   });
 }

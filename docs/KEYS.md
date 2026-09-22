@@ -51,6 +51,7 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `down` † | both |  | menuNext |  | viewPageDown |  | historyNext | rowDown |  |
 | `m+down` | both |  |  |  |  |  |  |  | scrollPageDown |
 | `s+down` | both |  |  |  |  |  |  | extendRowDown |  |
+| `u+down` | enhanced-terminal |  |  |  |  |  |  |  | scrollBottom |
 | `c+e` | both |  |  |  |  |  | end |  |  |
 | `c+end` | both |  |  |  |  |  |  |  | scrollBottom |
 | `end` | both |  |  |  |  |  | end |  |  |
@@ -91,6 +92,7 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `c+u` | both |  |  |  |  |  | killToStart |  |  |
 | `m+up` | both |  |  |  |  |  |  |  | scrollPageUp |
 | `s+up` | both |  |  |  |  |  |  | extendRowUp |  |
+| `u+up` | enhanced-terminal |  |  |  |  |  |  |  | scrollTop |
 | `up` † | both |  | menuPrev |  | viewPageUp |  | historyPrev | rowUp |  |
 | `cs+v` | enhanced-terminal |  |  |  |  |  | yank |  |  |
 | `m+v` † | both |  |  |  |  |  | valuesToggle | valuesToggle |  |
@@ -103,4 +105,4 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `{` | both |  |  |  |  |  |  | tiltDown |  |
 | `}` | both |  |  |  |  |  |  | tiltUp |  |
 
-119 bindings · 91 keys · 17 resolved by the ladder (†).
+121 bindings · 93 keys · 17 resolved by the ladder (†).

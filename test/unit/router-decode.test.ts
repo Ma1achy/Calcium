@@ -14,7 +14,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { createDecoder, ESC_DISAMBIGUATION_MS } from "../../src/interaction/router/decode.js";
-import type { Decoder, InputEvent } from "../../src/interaction/router/types.js";
+import type { DecodeCapabilities, Decoder, InputEvent, Key } from "../../src/interaction/router/types.js";
 
 const enc = new TextEncoder();
 
@@ -25,11 +25,15 @@ function clock(start = 1_000) {
 }
 
 function decoder(
-  over: Partial<{ bracketedPaste: boolean; mouse: boolean }> = {},
+  over: Partial<DecodeCapabilities> = {},
   c = clock(),
 ): { d: Decoder; c: ReturnType<typeof clock> } {
   const d = createDecoder({
-    capabilities: { bracketedPaste: true, mouse: true, ...over },
+    // **`keyboardProtocol: "none"` is the default and it is load-bearing**
+    // (C16 I41): bit 8 of a `CSI 1;m X` modifier is Meta here and Super under
+    // `"kitty"`, so a harness that did not state it would be asserting one of
+    // two answers without saying which.
+    capabilities: { bracketedPaste: true, mouse: true, keyboardProtocol: "none", ...over },
     now: c.now,
   });
   return { d, c };
@@ -200,8 +204,44 @@ describe("C16 §2 — key decoding", () => {
     // xterm's `formatOtherKeys=1` sends the same bytes with no protocol pushed,
     // and the decoder has no way to know which encoder sent them. So the arm is
     // not gated, and a terminal that sends `CSI u` unasked still produces the key.
-    const { d } = decoder({ bracketedPaste: false, mouse: false });
+    const { d } = decoder({ bracketedPaste: false, mouse: false, keyboardProtocol: "none" });
     expect(names(feed(d, "\x1b[13;2u"))).toEqual(["enter"]);
+  });
+
+  it("T1.93 (I41): CSI 1;9A is super under the kitty protocol and meta without it — the same bytes, twice", () => {
+    // **The same bytes through two decoders is the only shape that asserts the
+    // protocol is the condition.** Feeding one decoder and checking for `super`
+    // is equally passed by a decoder that sets `super` on bit 8 always, which is
+    // the reading I34 was right to refuse for a terminal that reported nothing.
+    const firstKey = (bytes: string, protocol: "none" | "kitty"): Key => {
+      const { d } = decoder({ keyboardProtocol: protocol });
+      const first = feed(d, bytes)[0];
+      if (first === undefined || first.kind !== "key") throw new Error(`no key from ${bytes}`);
+      return first.key;
+    };
+
+    const superUp = firstKey("\u001b[1;9A", "kitty");
+    expect(superUp.name).toBe("up");
+    expect(superUp.super, "⌘↑ under the protocol is Super").toBe(true);
+    expect(superUp.meta, "and not Meta — the fold is what made them one key").toBe(false);
+
+    const metaUp = firstKey("\u001b[1;9A", "none");
+    expect(metaUp.name).toBe("up");
+    expect(metaUp.meta, "the same bytes with no protocol are Meta, and that is correct").toBe(true);
+    expect(
+      metaUp.super,
+      "⌘ did not reach the application, so there is no Super to report",
+    ).toBeUndefined();
+
+    // **The control, and it is what makes this about bit 8 rather than about the
+    // parameter.** `CSI 1;3A` is bit 2 — Alt — and is `meta` under both, so a
+    // decoder that had simply started reporting `super` for every modified arrow
+    // fails here.
+    for (const protocol of ["none", "kitty"] as const) {
+      const altUp = firstKey("\u001b[1;3A", protocol);
+      expect(altUp.meta, `⌥↑ is Meta under ${protocol}`).toBe(true);
+      expect(altUp.super, `⌥↑ is never Super (${protocol})`).toBeUndefined();
+    }
   });
 
   it("T1.3e (C16 §2, I17): xterm's Meta bit is read, so 1;10D and 1;16D are different keys", () => {

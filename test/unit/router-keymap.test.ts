@@ -451,6 +451,13 @@ describe("§6 — the default table (C17 I12)", () => {
       "global c+tab": ["\u001b[9;5u"],
       "global cs+tab": ["\u001b[9;6u"],
       "global m+1": ["\u001b1"],
+      // **`⌘↑`/`⌘↓`, and they are the rows I41 is about** (§6a). `CSI 1;9A` is
+      // the xterm-shaped arrow with modifier bit 8 — the *same bytes* a terminal
+      // with no protocol sends for `⌥↑`. What makes it a distinct chord is the
+      // negotiated protocol, which is why the decoder below is built at the
+      // binding's own profile rather than at one fixed setting.
+      "global u+up": ["\u001b[1;9A"],
+      "global u+down": ["\u001b[1;9B"],
       "global u+1": ["\u001b[49;9u"],
       "global m+2": ["\u001b2"],
       "global u+2": ["\u001b[50;9u"],
@@ -559,8 +566,18 @@ describe("§6 — the default table (C17 I12)", () => {
         // means "escape" is the byte that begins every other sequence here.
         // Everything else answers on `push` and is unaffected by the advance.
         let t = 1_000;
+        // **The decoder is built at the binding's own profile** (I41). A single
+        // protocol setting cannot answer this row: bit 8 is Meta without a
+        // protocol and Super with one, so `CSI 1;9A` is `⌥↑` on one terminal and
+        // `⌘↑` on another, and a fixed `"none"` reported the enhanced chord as
+        // having no wire form — which is how the byte came to be recorded as
+        // unsendable in the first place.
         const decoder = createDecoder({
-          capabilities: { bracketedPaste: true, mouse: true },
+          capabilities: {
+            bracketedPaste: true,
+            mouse: true,
+            keyboardProtocol: b.profile === "enhanced-terminal" ? "kitty" : "none",
+          },
           now: () => t,
         });
         const pushed = decoder.push(enc.encode(seq));
@@ -703,7 +720,7 @@ describe("C16 I17 — the rule, over the half a table walk cannot reach", () => 
     for (const seq of corpus) {
       let t = 1_000;
       const decoder = createDecoder({
-        capabilities: { bracketedPaste: true, mouse: true },
+        capabilities: { bracketedPaste: true, mouse: true, keyboardProtocol: "none" },
         now: () => t,
       });
       const pushed = decoder.push(enc.encode(seq));
@@ -788,7 +805,7 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
   const enc = new TextEncoder();
   const press = (seq: string): Key | null => {
     const d = createDecoder({
-      capabilities: { bracketedPaste: true, mouse: true } as never,
+      capabilities: { bracketedPaste: true, mouse: true, keyboardProtocol: "none" } as never,
       now: () => 0,
     });
     const evs = [...d.push(enc.encode(seq)), ...d.poll()];
@@ -796,12 +813,36 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     return k !== undefined && k.kind === "key" ? k.key : null;
   };
 
-  it.todo(
-    "T1.93 (I41): CSI 1;9A decodes as super under the kitty protocol and as meta without it — not deferred on a component: C16 ships; modifiersOf takes the protocol in this MR's code commit",
-  );
-  it.todo(
-    "T1.94 (I41): ⌘↑ and ⌥↑ resolve to different actions under the enhanced profile — not deferred on a component: C16 ships; the enhanced routes are restored in this MR's code commit",
-  );
+  it("T1.94 (I41): ⌘↑ and ⌥↑ are two actions under the enhanced profile and one under the base", () => {
+    // **The pair I34's accidental resolution could not distinguish.** `⌘↑` and
+    // `↑` were one key because `Key` had no `super`; `⌘↑` and `⌥↑` were one key
+    // because the decoder folded bit 8. This asserts the outcome rather than
+    // either mechanism: the bytes reach two different actions.
+    const resolve = (bytes: string, protocol: "none" | "kitty"): string | undefined => {
+      const d = createDecoder({
+        capabilities: { bracketedPaste: true, mouse: true, keyboardProtocol: protocol },
+        now: () => 0,
+      });
+      const first = d.push(new TextEncoder().encode(bytes))[0];
+      if (first === undefined || first.kind !== "key") return undefined;
+      const km = createKeymap(
+        defaultKeymap,
+        protocol === "kitty" ? "enhanced-terminal" : "default-terminal",
+      );
+      return km.resolve("global", first.key)?.action;
+    };
+
+    expect(resolve("\u001b[1;9A", "kitty"), "⌘↑ is transcript.top").toBe("scrollTop");
+    expect(resolve("\u001b[1;9B", "kitty"), "⌘↓ is transcript.bottom").toBe("scrollBottom");
+    expect(resolve("\u001b[1;3A", "kitty"), "⌥↑ is still the page").toBe("scrollPageUp");
+    expect(resolve("\u001b[1;3B", "kitty"), "⌥↓ is still the page").toBe("scrollPageDown");
+
+    // **Under the base profile the old note is right and stays right.** Without
+    // the protocol bit 8 *is* Meta, so `⌘↑`'s bytes are `⌥↑`'s and land on the
+    // page — which is why the restored rows are `enhanced-terminal` only.
+    expect(resolve("\u001b[1;9A", "none"), "no protocol: ⌘↑ genuinely is ⌥↑").toBe("scrollPageUp");
+    expect(resolve("\u001b[1;9B", "none"), "and ⌘↓ is ⌥↓").toBe("scrollPageDown");
+  });
 
   it("T1.34 (I34): `⌘1` and `⌥1` are different keys, and only the csi-u arm sets `super`", () => {
     // **The measurement §6a is built on, as a row.** Two registry bindings
@@ -856,6 +897,12 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
       "agentNext c+tab",
       "agentPrevious cs+tab",
       "copySelection cs+c",
+      // **`transcript.top`/`transcript.bottom`, enhanced only** (I41). Without
+      // the protocol bit 8 is Meta, so these bytes *are* `⌥↑`/`⌥↓` and the rows
+      // would collide with `scrollPageUp`/`scrollPageDown`. The profile is what
+      // keeps them apart, which is this row's whole subject.
+      "scrollBottom u+down",
+      "scrollTop u+up",
       "yank cs+v",
     ]);
 
