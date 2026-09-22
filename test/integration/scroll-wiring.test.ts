@@ -76,6 +76,10 @@ const handlers: NonNullable<TuiConfig["localHandlers"]> = {
 const PAGE_DOWN = "\u001b[6~";
 const PAGE_UP = "\u001b[5~";
 const DOWN = "\u001b[B";
+// **`⌥↑`/`⌥↓`, the design's `page.up`/`page.down`** (binding.031/.032). `CSI 1;3A`
+// is the xterm form: parameter 3 is alt, which `modifiersOf` folds into `meta`.
+const META_UP = "\u001b[1;3A";
+const META_DOWN = "\u001b[1;3B";
 
 describe("C04 I48 — the offset reaches the frame", () => {
   it("T4.41 (C04 I48, C22 I58): read, page, read, page back, read", async () => {
@@ -171,6 +175,79 @@ describe("C04 I48 — the offset reaches the frame", () => {
 
     expect(second, "paging reached a block inside the panel").not.toBe(first);
     expect(third, "and coming back is the frame we left").toBe(first);
+    await session.tui.stop("exit");
+  });
+
+  /**
+   * **The row the reserved/unreserved split exists for** (C16 I40, R-BLK-112,
+   * binding.031/.032).
+   *
+   * The two keys page two different things from the same focus, and that is the
+   * whole content. `⌥↑` carries `scope: "transcript"` in the registry and
+   * R-BLK-112 says why — *scroll WITHOUT moving focus; the prompt keeps it and
+   * you keep typing* — so it never asks where focus is. `PgUp` is in no binding
+   * and no rule, so it is the repo's own key and goes to the viewport you are
+   * inside, which here is the box.
+   *
+   * **Neither half alone is a measurement.** Reserve both keys and the first
+   * assertion still passes; reserve neither and the second does. An earlier draft
+   * held both on the reserved route and had to make *the active viewport* mean
+   * the box for one key and the transcript for the other — one verdict saying two
+   * things. Putting `pageup` back into `interceptOf` fails this row, T4.41, T4.59,
+   * T1.30 and T1.92.
+   *
+   * **Stated blind spot, found by a mutation that survived.** Routing `⌥↑`
+   * through the ladder instead of straight to the transcript — the compromise
+   * this replaced — fails *nothing here*, because no block keymap binds `⌥↑`, so
+   * `run("liveBlock", ⌥↑)` declines and the event reaches `global` either way.
+   * The `⌥↑` half is therefore a **characterisation** of the pair from one focus
+   * and not a gate on the route; what gates the route is T1.40, where a question
+   * *would* consume it. The day a block binds `⌥↑` this row becomes the gate it
+   * reads as, and that is the day it would otherwise have gone quietly wrong.
+   */
+  it("T4.74 (C16 I40, C04 I48): with a scroll box focused, ⌥↑ scrolls the transcript and PgUp pages the box", async () => {
+    const stdin = fakeStdin();
+    const session = await buildSession({
+      manifest: MANIFEST,
+      localHandlers: handlers,
+      stdin: stdin as unknown as NodeJS.ReadStream,
+    });
+    const type = async (bytes: string): Promise<void> => {
+      stdin.emit(bytes);
+      for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    };
+    const rows = (): string => session.screen().rows.join("\n");
+
+    // Enough transcript above the box that the transcript has somewhere to go.
+    for (let i = 0; i < 6; i += 1) await type("/wrapped\r");
+    await type(DOWN);
+    await type(DOWN);
+
+    const start = rows();
+    expect(start, "the box is on screen and at its top").toContain("ALPHA");
+
+    // **`PgUp` pages the box.** The ladder's answer: the viewport you are inside.
+    await type(PAGE_DOWN);
+    const afterBox = rows();
+    expect(afterBox, "PgUp's sibling reached the box").not.toBe(start);
+    await type(PAGE_UP);
+    expect(rows(), "and back").toBe(start);
+
+    // **`⌥↑` scrolls the transcript, from the same focus.** The box does not
+    // move — asserted on the box's own first row, because a whole-frame compare
+    // cannot tell *the transcript moved* from *the box moved* when both change
+    // the frame.
+    const boxRow = (f: string): string =>
+      f.split("\n").find((r) => r.includes("ALPHA")) ?? "";
+    const boxBefore = boxRow(start);
+    await type(META_UP);
+    const afterTranscript = rows();
+
+    expect(afterTranscript, "the transcript moved").not.toBe(start);
+    expect(boxRow(afterTranscript), "and the box did not").toBe(boxBefore);
+
+    await type(META_DOWN);
+    expect(rows(), "and back again").toBe(start);
     await session.tui.stop("exit");
   });
 

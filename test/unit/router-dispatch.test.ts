@@ -261,9 +261,14 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
     // question; *the question is still open* by one that dropped the key on the
     // floor; *unanswered* by one that popped the layer. The defect this replaces
     // satisfied the second and the third.
-    const answered: string[] = [];
+    // The question's own answer callback, recording every event it is *offered*
+    // and declining all of them. Empty is the assertion: the callback was never
+    // reached, which is stronger than it having declined.
+    const offered: string[] = [];
     const { router, calls, layer } = harness({
-      overlayAnswerCallback: () => (a: string) => void answered.push(a),
+      overlayAnswerCallback: () => (e: InputEvent) => (
+        offered.push(e.kind === "key" ? e.key.name : "mouse"), false
+      ),
     });
     layer.top = { id: "confirm", kind: "overlay", dismissable: false };
     router.register("global", () => (calls.push("scroll"), true));
@@ -271,7 +276,7 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
 
     expect(router.dispatch(key("up", { meta: true })), "consumed").toBe(true);
     expect(calls, "the viewport scrolled and the question's handler never ran").toEqual(["scroll"]);
-    expect(answered, "nothing was answered").toEqual([]);
+    expect(offered, "the question was never even offered the key").toEqual([]);
     expect(layer.top?.id, "the question is still open").toBe("confirm");
     // **The question's rung is never reached** — the stage names the viewport
     // the ladder resolved, and `prompt` is the transcript's. A stages read is the
@@ -279,7 +284,7 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
     expect(router.lastStages).toEqual([
       "arming",
       "intercept:page-scroll:question:handle",
-      "intercept:scroll:prompt",
+      "intercept:scroll:transcript",
     ]);
 
     // **The control, and it is the reason this is not a test of "⌥↑ is special".**
@@ -326,8 +331,11 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
     // so the row distinguishes *the layer is not modal* from *this route is
     // unclaimable* — which one boolean over one key could not.
     const { router, calls, layer } = harness();
-    const reserved = key("pageup");
-    const ordinary = key("t", { ctrl: true });
+    // **The reserved key is `⌥↑`, not `PgUp`** (I40). `PgUp` is in no binding
+    // and no rule in the registry; it is the repo's own key and I8 still holds
+    // every bit of it, which is what makes it the control here.
+    const reserved = key("up", { meta: true });
+    const ordinary = key("pageup");
     router.register("global", (e) => (
       calls.push(e.kind === "key" ? e.key.name : "mouse"), true
     ));
@@ -339,7 +347,7 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
     layer.placed = [box("menu", { top: 4, left: 10, height: 6, width: 30 })];
     expect(router.dispatch(reserved)).toBe(true);
     expect(router.dispatch(ordinary)).toBe(true);
-    expect(calls).toEqual(["pageup", "t"]);
+    expect(calls).toEqual(["up", "pageup"]);
 
     calls.length = 0;
     layer.top = { id: "dash", kind: "view", dismissable: true };
@@ -347,11 +355,11 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
 
     // The reserved route reaches the viewport scroller, ahead of the ladder.
     expect(router.dispatch(reserved), "consumed").toBe(true);
-    expect(calls, "a reader under a full-region layer can still page").toEqual(["pageup"]);
+    expect(calls, "a reader under a full-region layer can still page").toEqual(["up"]);
     expect(router.lastStages).toEqual([
       "arming",
       "intercept:page-scroll:substate:handle",
-      "intercept:scroll:prompt",
+      "intercept:scroll:transcript",
     ]);
 
     // **Consumed, not dropped** (M5, §103, R-OWN-001): a blocking layer REJECTS
@@ -980,9 +988,9 @@ describe("C16 §3a — the global-intercept table and the child rung (M5)", () =
       ["interrupt", ctrlC],
       ["page-scroll", key("up", { meta: true })],
       ["page-scroll", key("down", { meta: true })],
-      ["page-scroll", key("pageup")],
       ["wheel", click(3, 0, "wheelUp")],
     ];
+
 
     // **Every rung, including the two that reject.** A rejection is delivery: the
     // intercept decided, which is the thing being asserted, and a rung that could
@@ -1004,6 +1012,24 @@ describe("C16 §3a — the global-intercept table and the child rung (M5)", () =
       }
     }
   });
+
+  it("T1.92 (I40): PgUp is the ladder's at every rung, and produces no intercept stage", () => {
+    // **`PgUp` is not a reserved route and its absence is asserted** (I40). It
+    // occurs in no binding and no rule in the registry, so it is the repo's own
+    // key and belongs to the ladder — to the `scroll` box you are inside, else
+    // the transcript. Dropping it from the list above without this line would
+    // leave the split resting on nothing: a table that reserved it again would
+    // pass every row here.
+    for (const rung of OWNER_RUNGS) {
+      const { router } = atRung(rung);
+      router.dispatch(key("pageup"));
+      expect(
+        router.lastStages.find((st) => st.startsWith("intercept:")),
+        `PgUp is the ladder's at the ${rung} rung — stages were ${router.lastStages.join(",")}`,
+      ).toBeUndefined();
+    }
+  });
+
 
   it("T1.33 (R-OWN-002, §103): a bare esc reaches the child; only ⌥esc detaches", () => {
     // **The row that decides whether a full-screen program in a child is usable.**

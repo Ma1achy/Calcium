@@ -70,7 +70,14 @@ export const INTERCEPTS: Readonly<Record<InterceptId, OwnerApplicability>> = Obj
     idle: "reject",
     why: "a child owns its own signal; a question and a frozen screen are resolved by their own exits, not by cancelling something else",
   },
-  /** §103: *COPY MODE rejects while frozen; otherwise the active viewport handles without moving focus.* */
+  /**
+   * §103: *COPY MODE rejects while frozen; otherwise the active viewport handles
+   * without moving focus* — and the design says which viewport that is.
+   * `binding.031`/`.032` give `page.up`/`page.down` `scope: "transcript"`, so
+   * `⌥↑` scrolls the **transcript** whatever is focused, including when a
+   * `scroll` box has focus. That is R-BLK-112's whole point: the chord is the one
+   * that never moves focus and never asks where it is.
+   */
   "page-scroll": {
     // **`otherwise` is every other rung, the child included** (C16 I40). A
     // captured child owns its keys; it does not own the transcript scrolled
@@ -125,17 +132,23 @@ export function interceptVerdict(id: InterceptId, rung: OwnerRung | null): Verdi
  * the wheel* — and a table that carried only `⌃c` would have been the special
  * case it replaced, with two more rows of documentation.
  *
- * `⌥↑`/`⌥↓` are the design's `page.up`/`page.down` (binding.031, binding.032).
- * `pageup`/`pagedown` are kept beside them because the tree binds those today and
- * M6 is where the keymap becomes the registry's; an intercept that recognised
- * only the design's chord would go quiet for one MR on the route people use.
+ * **`⌥↑`/`⌥↓` alone, and `PgUp`/`PgDn` were wrongly here** (I40). The design
+ * reserves two chords: `binding.031` and `binding.032`, `page.up`/`page.down`,
+ * `scope: "transcript"`, and R-BLK-112 says what the scope buys — *⌥↑ ⌥↓, the
+ * wheel and the trackpad scroll WITHOUT moving focus. The prompt keeps it and
+ * you keep typing.* `PgUp`/`PgDn` are **in no binding and in no rule**: measured,
+ * the string does not occur anywhere in `calcium-registry.json`. They are the
+ * repo's own keys, they behave like the arrows, and they belong to whichever
+ * viewport you are inside — which is the ladder's answer, not a reserved one.
+ *
+ * Keeping them here made one route out of two different things and forced I40
+ * into a compromise: *the active viewport* had to mean the focused box for
+ * `PgUp` and the transcript for `⌥↑`, and one verdict cannot say both.
  */
 export function interceptOf(e: InputEvent): InterceptId | null {
   if (e.kind === "mouse") return e.button.startsWith("wheel") ? "wheel" : null;
   if (e.kind !== "key") return null;
   const { key } = e;
   if (key.ctrl && key.name === "c") return "interrupt";
-  const paging = key.name === "pageup" || key.name === "pagedown";
-  const metaArrow = key.meta && (key.name === "up" || key.name === "down");
-  return paging || metaArrow ? "page-scroll" : null;
+  return key.meta && (key.name === "up" || key.name === "down") ? "page-scroll" : null;
 }

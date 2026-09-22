@@ -540,28 +540,25 @@ export function createRouter(
           stages.push("intercept:wheel");
           return e.kind === "mouse" ? routeMouse(e) : false;
         }
-        // **"The active viewport" is not always the transcript, and routing
-        // straight to `global` said it was.** A focused `scroll` box is a
-        // viewport, and the tree resolves *which* one through the ladder —
-        // `liveBlock` and `interaction` page the box, `prompt` pages the
-        // transcript through `global`. Skipping the ladder outright broke three
-        // rows that page inside a panel, which is the measurement that corrected
-        // this: unclaimable means **no rung may take it for something else**, not
-        // that no rung may perform it.
+        // **The transcript, whatever is focused** (I40, R-BLK-112,
+        // binding.031/.032). `⌥↑` carries `scope: "transcript"` in the registry,
+        // and R-BLK-112 says what that buys: *scroll WITHOUT moving focus — the
+        // prompt keeps it and you keep typing*. So this does not ask which
+        // viewport is active; asking would make the chord mean one thing at the
+        // prompt and another inside a `scroll` box, which is the ambiguity the
+        // reservation removes.
         //
-        // So the ladder runs, over the rungs that are viewports. The three that
-        // are not — a question, a substate layer, a captured child — are the ones
-        // whose handlers would consume the key for something other than
-        // scrolling, and they are exactly what the reserved route is reserved
-        // against. `copy` never arrives here; it is the one `reject`.
-        const viewport = activeTarget({
-          ...inputs(),
-          overlayTop: null,
-          attachedChild: false,
-          copyMode: false,
-        });
-        stages.push(`intercept:scroll:${viewport}`);
-        return run(viewport, e) || run("global", e);
+        // **`PgUp`/`PgDn` used to arrive here and no longer do.** They are in no
+        // binding and no rule in the registry — they are the repo's keys, they
+        // behave like the arrows, and the ladder gives them to the box you are
+        // inside. One route cannot be both, and trying made I40 say *the active
+        // viewport* while meaning two different viewports.
+        //
+        // The transcript's scroller is `global`: all four paging routes register
+        // there, and a focused box's paging is on `liveBlock`/`interaction`,
+        // which is exactly the rung this steps over.
+        stages.push("intercept:scroll:transcript");
+        return run("global", e);
       }
     }
 
