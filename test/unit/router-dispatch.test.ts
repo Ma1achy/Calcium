@@ -237,6 +237,16 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
     expect(calls, "copy mode is untouched and no layer popped").toEqual([]);
   });
 
+  it.todo(
+    "T1.39 (I39): INTERCEPTS is total over OWNER_RUNGS, by equality — not deferred on a component: C16 ships; the table is made total in this MR's code commit",
+  );
+  it.todo(
+    "T1.40 (I40): ⌥↑ with a question open scrolls the transcript and the question stays open and unanswered — not deferred on a component: C16 ships; the handle route lands in this MR's code commit",
+  );
+  it.todo(
+    "T1.40b (I40): ⌥↑ in copy mode is rejected and the frozen screen does not move — not deferred on a component: C16 ships; the handle route lands in this MR's code commit",
+  );
+
   it("T1.30 (I8): a full-region layer blocks step 3; a one-row dismissable overlay does not", () => {
     // **The defect this clause closes, and its control.** `PgUp` over a pushed
     // view fell through to `global` and scrolled the transcript underneath the
