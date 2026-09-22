@@ -1153,19 +1153,40 @@ Six actions take a second route, because `⌘` never reaches the application and
 | `agent.next` | `⌃⇥` | `⌥.` | `ESC .` |
 | `agent.previous` | `⌃⇧⇥` | `⌥,` | `ESC ,` |
 | `agent.1`…`agent.9` | `⌘1`…`⌘9` | `⌥1`…`⌥9` | `ESC 1`…`ESC 9` |
-| `transcript.top` | **none** | `⌃home` | `CSI 1;5H` |
-| `transcript.bottom` | **none** | `⌃end` | `CSI 1;5F` |
+| `transcript.top` | `⌘↑` | `⌃home` | `CSI 1;9A` enhanced · `CSI 1;5H` base |
+| `transcript.bottom` | `⌘↓` | `⌃end` | `CSI 1;9B` enhanced · `CSI 1;5F` base |
 
-**`⌘↑` and `⌘↓` have no enhanced route, and that is a measurement** (I17). Pressed
-through this tree's decoder: `⌘↑` arrives as `CSI 1;9A`, whose modifier bit 8 the
-legacy arm folds into `meta` — so it is `⌥↑`, already `scrollPageUp`. Only the
-**csi-u** arm reads bit 8 as `super`, and the csi-u spelling of an arrow names it
-by a functional code this decoder maps to the empty string. So there is no wire
-form for the distinct chord at all, and §6's own ruling applies: *widening the
-decoder to reach one binding is how a table comes to name keys nothing sends*, so
-the candidate is dropped rather than met. The digits are the contrast — `CSI 49;9u`
-**does** name `1` and does carry `super`, which is why `⌘1`…`⌘9` are in the table
-and the arrows are not.
+**`⌘↑` and `⌘↓` have their enhanced routes, and the measurement that denied them was
+about the decoder rather than about the wire** (I17, I41). Pressed through this tree:
+`⌘↑` arrives as `CSI 1;9A` and `⌥↑` as `CSI 1;3A`. **Those are different bytes.** The
+earlier ruling read them as one chord because the legacy arm folds bit 8 into `meta`
+unconditionally, and then concluded from its own decoder that the wire form did not
+exist — which is the decoder's limit stated as the terminal's.
+
+**The fold is right about a terminal that reported nothing and wrong about one that
+reported the protocol.** I34's reason — *on a terminal with no protocol `⌘a` genuinely
+is `Alt-a`, and a decoder that guessed otherwise would make one wire form two bindings*
+— is a statement about the **absence** of a protocol. Once `keyboardProtocol` is
+`"kitty"` the terminal has said which encoding it is using, and in that encoding bit 8
+is Super. Folding it to `meta` there discards something the terminal took the trouble to
+say, which is the same defect the csi-u arm was fixed for, one arm over.
+
+So `modifiersOf` takes the protocol. Under `"kitty"` bit 8 is `super`; under anything
+else it stays `meta`, unchanged and for the unchanged reason. **The design's routes are
+restored rather than dropped**: the registry binds `transcript.top`/`transcript.bottom`
+to `⌘↑`/`⌘↓`, and the design outranks a spec on mechanism — §6's *widening the decoder
+to reach one binding is how a table comes to name keys nothing sends* does not apply,
+because nothing is being widened to reach a binding. A byte the terminal already sends
+is being read as what the terminal says it means.
+
+| | the old reading | the measurement |
+|---|---|---|
+| `⌥↑` | `CSI 1;3A` → `meta` | unchanged |
+| `⌘↑`, no protocol | `CSI 1;9A` → `meta` | unchanged, and correct — `⌘` did not reach the application, so this is Meta |
+| `⌘↑`, kitty protocol | `CSI 1;9A` → `meta`, colliding with `⌥↑` | `CSI 1;9A` → `super`, the chord the registry binds |
+
+The base routes stand as they are: `⌃home`/`⌃end` remain `transcript.top`/`transcript.bottom`'s
+`default-terminal` route, because I36 holds and a reader without the protocol still needs one.
 
 Six of the base routes are chords this table already binds to the same
 meaning, which is the argument for them over anything more inventive. `⌥`-based
@@ -1314,13 +1335,14 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I32** — **A control string is consumed whole and emits nothing** (§2a, F1043). The five ECMA-48 introducers — DCS `ESC P`, SOS `ESC X`, OSC `ESC ]`, PM `ESC ^`, APC `ESC _` — run to `ST` (`ESC \`), and an OSC also to `BEL`; a stray `ESC` inside one ends it as malformed and decodes on its own; an incomplete one is *not yet decidable* and waits, bounded by a byte cap past which the **introducer** is discarded and decoding continues from the payload. It emits no event, exactly as the CSI arm emits none for a DECRQM reply: the arm makes a terminal's answer **harmless**, and making it **readable** is a reply channel C02 owns (C02 §8) and this component must not grow — a ruling that names an operation checks the operation exists, and there is no seam here to report a graphics error through. Without the arm the Meta arm claims the introducer and emits a bindable key — `Alt-_`, `Alt-P`, `Alt-]`, and `Ctrl-G` where the terminator is `BEL` — with the payload typed into the prompt between them: **164 events from eight real replies** captured from XTerm(398) and kitty 0.41.1, and the first of each is a keystroke a keymap can bind. The cap is the arm's own hazard rather than a defect it repairs: at HEAD the same bytes decode as keys at once and nothing wedges, and an unterminated CSI is bounded by `CSI_FINAL` where a control string is bounded by nothing.
 
 - **I33** — **A gesture bound at a shared target means the same thing at every owner of it, and an owner that cannot answer says so rather than doing nothing.** `pushedView` has one keymap row per key and three owners behind it (C22 §13a), so `viewNextSection` resolves to whichever view is up — and the failure mode is not a collision but a **silence**: an owner whose `sectionNext` returns without moving is indistinguishable from a view with one section, and a reader who learns the key does nothing here stops pressing it everywhere. So the member is required on the owner interface rather than optional, a view with one section answers `false` where a view at its last section also answers `false`, and the two are separated by what the header says rather than by the key's return. This is I24's claim about a *target* with no vocabulary, one level in: a target can have bindings and still have an owner with nothing behind them.
-- **I34** — **A modifier the `Key` type cannot hold is a modifier the keymap cannot refuse** (§6a, M6). `Key.super` exists because `⌘↑` and `↑` were one key: two registry bindings resolved against the live table by accident, and the measurement that found it is the one that shaped §6a. Only the Kitty arm of the decoder sets it; the legacy arm keeps folding bit 8 into `meta`, because on a terminal with no protocol `⌘a` genuinely *is* `Alt-a` and a decoder that guessed otherwise would make one wire form two bindings.
+- **I34** — **A modifier the `Key` type cannot hold is a modifier the keymap cannot refuse** (§6a, M6). `Key.super` exists because `⌘↑` and `↑` were one key: two registry bindings resolved against the live table by accident, and the measurement that found it is the one that shaped §6a. **Amended (I41): bit 8 is read by protocol, not by arm.** The original clause said only the csi-u arm sets `super` and the legacy arm folds bit 8 into `meta` always — true of a terminal that reported no protocol, where `⌘a` genuinely *is* `Alt-a`, and false of one that reported Kitty, where bit 8 is Super by that encoding's own definition. The condition was the protocol all along and the arm was standing in for it.
 - **I35** — **A profile is a condition on a binding, not a second keymap** (§6a, R-CAP-001). Both profiles live in `defaultKeymap`; `resolve` refuses a binding whose profile the terminal is not in, and two bindings for one `(target, key)` remains a construction error **within a profile**. Two keymaps would be two things to keep in step and `/help` would render one of them — the drift §6 spends its opening paragraph forbidding, reintroduced by the axis rather than by an edit.
 - **I36** — **Every action has a `default-terminal` route.** An action reachable only where `keyboardProtocol === "kitty"` is an action most readers cannot reach, and the registry's chord is the enhanced route wherever `⌘`, `⇧⏎`, `⌃⇧`-letters or `⌃⇥` make it undeliverable — those four are byte-identical to their unmodified forms on a legacy terminal, so the base route is not a convenience.
 - **I37** — **A registry binding is answered, and a capture is declared with its owner** (§6a, R-KEY-003, R-KEY-007). Every `current` binding in `docs/design/language/` resolves to its action at its scope in some profile, or appears in a table naming the site that handles it outside the keymap, or is an owner capture under R-KEY-003's *unless the current owner explicitly captures the action*. The third arm is the one that needs the owner named: without it, *the design says `⇥` moves focus and the tree completes* and *the design says `⇥` moves focus and nobody noticed* read identically.
 - **I38** — **A reserved chord carries an explicit no-op, never no executor** (§6a). The fourteen agent, posture, queue and values actions are bound and do nothing. §6's closed-set argument makes an action with no executor uncompilable, so the alternative to a declared no-op is leaving the chord unbound — and an unbound chord is one an application takes, so the feature arrives needing a key that is gone. A reserved name is every consumer's namespace.
 - **I39** — **A reserved route's owner-applicability is total** (§3, R-OWN-001). `INTERCEPTS[id]` is `Record<OwnerRung, Verdict>` and names every rung, because an absent row means *the ladder decides* and the ladder is precisely what a reserved route is reserved against. The partial version shipped the defect it was built to stop: `page-scroll` declared `copy` and idle, the `question` rung fell through, and a confirm's answer handler swallowed `⌥↑`. Totality is not tidiness — it is what makes a seventh rung a decision rather than an inherited default, and TypeScript is what enforces it.
 - **I40** — **`page-scroll` is `⌥↑`/`⌥↓` alone, and it scrolls the transcript whatever is focused** (§3, §103, R-BLK-112, binding.031/.032). The design reserves two chords and gives them `scope: "transcript"`; R-BLK-112 says what the scope buys — *⌥↑ ⌥↓, the wheel and the trackpad scroll WITHOUT moving focus. The prompt keeps it and you keep typing.* So the verdict routes to the transcript **before the ladder and without consulting it**, at every rung but `copy`: a question, a substate layer and a captured child are all stepped over, and so is a focused `scroll` box. The chord does not ask where you are, which is the whole of its reservation. **`PgUp`/`PgDn` are not in this table** — they appear in no binding and no rule in the registry, they are the repo's own keys, they behave like the arrows, and the ladder gives them to the viewport you are inside. Holding both on one route forced *the active viewport* to mean the focused box for one key and the transcript for the other, which is one verdict saying two things.
+- **I41** — **Bit 8 is Meta without a protocol and Super with one** (§6, R-CAP-001). `modifiersOf` takes `keyboardProtocol`: under `"kitty"` bit 8 sets `super`, otherwise it joins `meta` as before. The arm an escape sequence arrived on is not the question — `CSI 1;9A` is legal in both encodings and means different things in each, and only the negotiated protocol says which. Reading it by arm made `⌘↑` and `⌥↑` one key on a terminal that distinguishes them, and then the collision was recorded as *there is no wire form for the chord*, which is a decoder's limit written down as a fact about terminals. `⌘↑`/`⌘↓` are `transcript.top`/`transcript.bottom`'s enhanced routes, restored.
 
 **And a question outranks rungs 1 and 2, which is the one place newest-first is not enough on its own.** A local verb awaiting `ctx.ask` is `inFlight` for the whole time its question is on screen, so `⌃c` was taken by the cancel rung and the question never saw it — two rungs with a claim, and the older one higher. Ruling A's own argument decides it: `Esc` and `⌃c` collapse *because* declining and cancelling produce the same outcome, and when two paths produce the same outcome the one that leaves a record is the one to keep. Cancellation discards the entry; declining settles one saying nothing changed. **Found by a frame-read and reachable by nothing else** — the container was untouched and the layer was gone, which is everything a test asserts, and the frame showed that the submitted line had disappeared. The suite agreed throughout, because every harness reported `inFlight: null` and that is the one arrangement where both readings agree.
 
@@ -1376,6 +1398,8 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.40b** (I40): `⌥↑` in **copy mode** is `reject` — the frozen screen does not move, and the event is consumed rather than falling to the ladder.
 - **T4.74** (I40, C04 I48): **with a `scroll` box focused, `⌥↑` scrolls the transcript and the box does not move; `PgUp` pages the box.** The pair, not either half: the first alone is passed by a router that reserved both keys, the second by one that reserved neither. This is the row the split exists for, and it is the one an implementation holding both on the reserved route cannot pass — it is why *the active viewport* could not be one answer. `⌥↑`'s stage is `intercept:scroll:transcript` and `PgUp` has no intercept stage at all, which is the mechanism behind the two outcomes.
 - **T1.92** (I40): `PgUp` produces **no intercept stage at any rung** — the absence the split rests on, asserted directly rather than implied by the rows that drive `⌥↑`. A table that reserved it again would pass every other row in §3a. It is not carved out of I8, because nothing in the design reserves it: the carve-out is exactly two chords wide.
+- **T1.93** (I41): `CSI 1;9A` decodes as `{name: "up", super: true}` when `keyboardProtocol` is `"kitty"` and as `{name: "up", meta: true}` when it is not — **the same bytes, twice, through two decoders**, which is the only shape that asserts the protocol is the condition. The control is `CSI 1;3A`, which is `meta` under both and is what makes this a test of bit 8 rather than of the parameter.
+- **T1.94** (I41): under the enhanced profile `⌘↑` and `⌥↑` resolve to **different actions** — `transcript.top` and `scrollPageUp` — and under the base profile `⌘↑`'s bytes resolve to `scrollPageUp`, because there they *are* `⌥↑`. The pair that the accidental resolution I34 was written about could not distinguish.
 - **T1.31** (I8): coverage is read from the box. A layer that is **not** a view but whose `Placed` spans the region also skips step 3, and a view whose box has been clamped smaller does not. Hand-built `Placed`, because the property is geometric and a kind test would pass the first case and fail the second.
 - **T1.32** (I24): every member of the `FocusTarget` union has at least one row in `defaultKeymap`. Derived from the union, not from a list written beside it — a coverage set built from the test's own table covers nothing.
 - **T1.33** (I24): at `pushedView`, `n`, `p`, `g`, `G`, `pageup`, `pagedown` and `escape` each resolve to their action, and `escape` resolves to `viewPop` rather than to `dismiss`.

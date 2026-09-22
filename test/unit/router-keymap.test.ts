@@ -796,6 +796,13 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     return k !== undefined && k.kind === "key" ? k.key : null;
   };
 
+  it.todo(
+    "T1.93 (I41): CSI 1;9A decodes as super under the kitty protocol and as meta without it — not deferred on a component: C16 ships; modifiersOf takes the protocol in this MR's code commit",
+  );
+  it.todo(
+    "T1.94 (I41): ⌘↑ and ⌥↑ resolve to different actions under the enhanced profile — not deferred on a component: C16 ships; the enhanced routes are restored in this MR's code commit",
+  );
+
   it("T1.34 (I34): `⌘1` and `⌥1` are different keys, and only the csi-u arm sets `super`", () => {
     // **The measurement §6a is built on, as a row.** Two registry bindings
     // resolved against the live keymap by accident because `Key` had no `super`:
