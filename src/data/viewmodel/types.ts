@@ -197,6 +197,17 @@ export type Glyph =
   | "cancelled"
   | "expand"
   | "collapse"
+  /**
+   * The mark in the focus gutter C11 I15 reserves (§017, R-BLK-131).
+   *
+   * **Its own token because it was `expand`'s.** `definition.ts` painted focus
+   * with `glyphFor("expand")` and sized the gutter with `glyphCells("expand")`,
+   * so the collapsed-disclosure mark and the focus mark were one character by
+   * accident of who needed a right-pointing triangle first. The design draws
+   * them apart — `▹` hollow for *there is more behind this*, `▸` filled for
+   * *you are here* — and a shared slot cannot.
+   */
+  | "focus"
   | "live"
   | "bullet"
   /**

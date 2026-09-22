@@ -655,11 +655,11 @@ describe("C09 §3a-ter — a status has three parts", () => {
     const body = (lines: readonly string[]): number => lines.filter((l) => l.includes("message line")).length;
     expect(body(without), "no detail: the message has the interior").toBeGreaterThan(0);
     expect(body(with_), "a detail costs the message exactly one row").toBe(body(without) - 1);
-    // **And at one row the detail is entirely residue** — `⋯ +4 more`, all four
+    // **And at one row the detail is entirely residue** — `⋯   +4 more`, all four
     // lines counted and none shown. That is the reservation doing its whole job:
     // the part cannot vanish, and what it says when it has nowhere to stand is
     // how much there was.
-    expect(with_.some((l) => l.includes("⋯ +4 more")), "the reserved row is the residue").toBe(true);
+    expect(with_.some((l) => l.includes("⋯   +4 more")), "the reserved row is the residue").toBe(true);
 
     // **2 · the message is served before the detail expands.** A short message
     // in a tall box: the detail may grow, and it grows to its own cap and not

@@ -759,6 +759,186 @@
   "tone.ok": 10,
   "tone.warn": 11
  },
+ "GLYPH_DOMAINS": {
+  "bullet": [
+   "row-lead"
+  ],
+  "cancelled": [
+   "row-lead"
+  ],
+  "collapse": [
+   "row-lead"
+  ],
+  "continuation": [
+   "row-lead"
+  ],
+  "error": [
+   "row-lead"
+  ],
+  "expand": [
+   "row-lead"
+  ],
+  "focus": [
+   "row-lead"
+  ],
+  "info": [
+   "row-lead"
+  ],
+  "live": [
+   "row-lead"
+  ],
+  "nested": [
+   "row-lead"
+  ],
+  "ok": [
+   "row-lead"
+  ],
+  "pending": [
+   "row-lead"
+  ],
+  "queued": [
+   "row-lead"
+  ],
+  "quote": [
+   "row-lead"
+  ],
+  "running": [
+   "row-lead"
+  ],
+  "step": [
+   "row-lead"
+  ],
+  "warn": [
+   "row-lead"
+  ],
+  "working": [
+   "row-lead"
+  ]
+ },
+ "GLYPH_SET_DOMAINS": {
+  "bar": [
+   "plot"
+  ],
+  "blocked": [
+   "row-lead",
+   "plot"
+  ],
+  "bottomLeft": [
+   "border"
+  ],
+  "bottomRight": [
+   "border"
+  ],
+  "calloutTee": [
+   "border"
+  ],
+  "candleCross": [
+   "plot"
+  ],
+  "candleFilled": [
+   "plot"
+  ],
+  "candleHollow": [
+   "plot"
+  ],
+  "cross": [
+   "row-lead",
+   "plot"
+  ],
+  "crossing": [
+   "border"
+  ],
+  "cursorMark": [
+   "plot"
+  ],
+  "dashedHorizontal": [
+   "border"
+  ],
+  "dashedVertical": [
+   "border"
+  ],
+  "diamond": [
+   "plot"
+  ],
+  "diamondTee": [
+   "plot"
+  ],
+  "dotted": [
+   "row-lead",
+   "plot"
+  ],
+  "filled": [
+   "row-lead",
+   "plot"
+  ],
+  "heavyHorizontal": [
+   "border"
+  ],
+  "heavyVertical": [
+   "border"
+  ],
+  "hollow": [
+   "row-lead",
+   "plot"
+  ],
+  "horizontal": [
+   "border"
+  ],
+  "residue": [
+   "row-lead",
+   "inline"
+  ],
+  "separator": [
+   "inline"
+  ],
+  "sortAsc": [
+   "table-header"
+  ],
+  "sortDesc": [
+   "table-header"
+  ],
+  "stubDown": [
+   "border"
+  ],
+  "stubLeft": [
+   "border"
+  ],
+  "stubRight": [
+   "border"
+  ],
+  "stubUp": [
+   "border"
+  ],
+  "teeDown": [
+   "border"
+  ],
+  "teeLeft": [
+   "border"
+  ],
+  "teeRight": [
+   "border"
+  ],
+  "teeUp": [
+   "border"
+  ],
+  "tick": [
+   "row-lead",
+   "plot"
+  ],
+  "topLeft": [
+   "border"
+  ],
+  "topRight": [
+   "border"
+  ],
+  "vertical": [
+   "border"
+  ],
+  "warning": [
+   "row-lead",
+   "plot"
+  ]
+ },
  "GLYPH_SUBSTITUTIONS": [
   [
    "✓",
@@ -797,12 +977,16 @@
    "/"
   ],
   [
-   "▸",
-   ">"
+   "▹",
+   "("
   ],
   [
-   "▾",
+   "▿",
    "v"
+  ],
+  [
+   "▸",
+   ">"
   ],
   [
    "▌",
@@ -841,6 +1025,7 @@
   "cancelled",
   "expand",
   "collapse",
+  "focus",
   "live",
   "bullet",
   "quote",
@@ -1521,7 +1706,7 @@
  "SUBSTITUTIONS": [
   [
    "⋯",
-   "~"
+   "..."
   ],
   [
    "·",
@@ -1664,11 +1849,11 @@
    "|"
   ],
   [
-   "↑",
+   "▴",
    "^"
   ],
   [
-   "↓",
+   "▾",
    "v"
   ]
  ],
@@ -1783,7 +1968,7 @@
   "heavyVertical": "H",
   "hollow": "o",
   "horizontal": "-",
-  "residue": "~",
+  "residue": "...",
   "separator": ":",
   "sortAsc": "^",
   "sortDesc": "v",
@@ -1825,8 +2010,8 @@
   "horizontal": "─",
   "residue": "⋯",
   "separator": "·",
-  "sortAsc": "↑",
-  "sortDesc": "↓",
+  "sortAsc": "▴",
+  "sortDesc": "▾",
   "stubDown": "╷",
   "stubLeft": "╴",
   "stubRight": "╶",

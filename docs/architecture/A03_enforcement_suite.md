@@ -390,6 +390,8 @@ Two shapes, because there are two ways to write one: a `"--flagname"` literal is
 | SS55 | A binding filtering on the kitty keyboard protocol's `event` type — `event: "press"`, `"repeat"` or `"release"` — with no `// none-fallback: <action>` on the same line naming what fires under `keyboardProtocol: "none"`. **Vacuous on landing and says so**: `Binding.key` has no `event` member and no row names one, so the rule has nothing to be wrong about until the first release binding arrives; its fabricated violation is a binding on `event: "release"` alone. *Stated blind spots*: the fallback is named, not resolved; a filter spelled otherwise passes; one file | `src/interaction/router/keymap.ts` | C02 I12 · C16 §2 |
 | SS51 | One of the four encoding vocabularies named by `RAMP_VOCABULARIES` — `RAMP_UNICODE`, `RAMP_ASCII`, `RAMP_BRAILLE`, `RAMP_DENSITY` | `src/` outside `src/presentation/plot/ramp.ts` | C12 §3c · C12 I21 |
 | SS57 | **A glyph with an emoji presentation form** — a non-ASCII code point inside a string literal that is a base of an emoji variation sequence, against `text.ts`'s `EMOJI_VARIATION_BASES` (derived from `emoji-variation-sequences.txt` 17.0.0), comments blanked. Found eleven on its first run — `⏺` U+23FA, `ℹ` U+2139, the `arrow` spinner's four diagonals, `▪ ▫ ◼ ◻` in two bar styles, a `⚠` in the fixtures report (F823, F832, F833); no allow-list | `src/` | C09 I45, T2.112 |
+| SS63 | **A glyph's recorded width class is the one `cells()` measures** — every `widthClass` on `calcium-registry.json`'s glyphs and delimiters against `text.ts`'s own `AMBIGUOUS_RANGES` and `DRAWN_AS_GEOMETRY`, which is the pair `cells()` consults. Found four on its first run: `focus ▸` and `disclosure ▾` recorded `narrow` and measuring 1 cell narrow / 2 wide, `meter-fill ▰` and `rule —` carrying no class at all (F1246); no allow-list | `docs/design/language/calcium-registry.json` | C09 I48, R-GLY-001 |
+| SS64 | **A mark is unique inside the domains it appears in, across every structure that paints one.** Three structures draw ASCII marks — the registry's `glyphs`/`delimiters`, `GLYPH_TABLE` and `GlyphSet` — and the registry's own check sees the first, which is how `:` was chosen for collapsed disclosure and passed while being `GlyphSet.separator` and `dashedVertical` (F1246). Domains come from the registry's `collisionDomains` table with containment, so two marks clash when their domain **closures** intersect: `row-lead` and `inline` are inside `content-row`, which fails a lead mark against a field separator, while the sort pair on a table header may take `v` beside disclosure's. Fires on a shared ASCII half with a **different** Unicode half — two records of one mark (`GLYPH_TABLE.ok` and `GlyphSet.tick`, both `✓`) are not two marks. `border` and `plot` are **figure** domains and exempt: ASCII has no box drawing, every corner and tee *is* `+`, and position carries the meaning — the first run said so 45 times of 59. Two controls: an empty parse of `glyphs.ts` is a violation rather than a pass, and a mark with no domain is reported rather than exempted | `docs/design/language/calcium-registry.json`, `src/presentation/blocks/glyphs.ts`; no allow-list | C09 I48, R-GLY-001, R-GLY-002 |
 | SS56 | **A hand-composed notice** — `kind: "notice"` as an object-literal value — anywhere the L4 family (`documents.ts`'s `noticeDoc`, `builders/`' `b.notice`) is meant to be called instead. Sixteen files carried the literal at landing and every one was allowed **by name with its reason in the rule's comment**: two are the family, two are the kind's declaration and definition (`viewmodel/types.ts`, `blocks/kinds/simple.ts`), eight are below L4 where the family is unreachable (A02 — four adapters, markdown, the cap marker, the history layer, `art.ts`), and **four were L4 surfaces that owed a migration** — fourteen sites, allowed so that SS53 would retire each entry when its last literal went. **It did** (2026-09-05, F777): every site calls `b.notice`, SS53 failed four times with the entries still present, the entries left, and `test/contract/notice-family.test.ts` holds the frames the literals drew and asserts the family draws the same bytes. Twelve entries remain. *Stated blind spots*: a notice built through a helper the rule does not know, the kind held in a constant, or a spread from elsewhere all pass; it is per line and cannot tell a composition from an object-literal type guard; it does not say which member of the family a site should call | `src/`, allowing by name — the family `src/shell/documents.ts` and `src/shell/builders/`; the kind `src/data/viewmodel/types.ts` and `src/presentation/blocks/kinds/simple.ts`; below L4 `src/data/adapters/fallback.ts`, `src/data/adapters/mapping.ts`, `src/data/adapters/overflow.ts`, `src/data/adapters/registry.ts`, `src/data/viewmodel/markdown.ts`, `src/viewport/transcript/cap.ts`, `src/interaction/history/layers.ts`, `src/presentation/art.ts` | C22 T2.40 · C24 I5 · C23 I61 |
 | SS36 | A string literal assigned to a `colour` field | `src/` | C10 I24, T2.19 |
 | SS37 | An Ink `color=` or `backgroundColor=` prop | `src/presentation/` | C09 I15, T2.17 |
@@ -993,6 +995,78 @@ Seven deferrals in the tree took the marker when the rule landed, and two of the
 **Its first run found eleven, not the two the walk named** (F833): the `arrow` spinner's diagonals `↖ ↗ ↘ ↙`, the `beads` and `squares` bar styles' `▪ ▫ ◼ ◻`, and a `⚠` in the fixtures provenance report — three families, in a spinner table T2.71 had scanned with a list from memory, a bar table whose docstring measured width and not presentation, and a module two layers below the glyph vocabulary. A scope of *the tables in `glyphs.ts`*, which this section first proposed, would have found seven of the eleven.
 
 **Stated blind spot**: the scan reads literals in the source, so a mark that reaches a frame as *text at runtime* — a far side's string, a fixture's payload, a producer's label — is outside it, as it is outside every glyph rule; C09 §4's *anything outside the vocabulary is text* is the line and SS47 is the rule on the other side of it.
+
+### SS63 — a glyph's recorded width class is the one `cells()` measures
+
+**The field this gates had no reader, which is why it drifted.** `widthClass` is a record of a
+measurement and nothing consults it — not `build-calcium.mjs`, not `src/`, not the suite — so it
+disagreed with the tree for as long as it took someone to mirror it. `focus ▸` and `disclosure ▾`
+were recorded `narrow` and both measure 1 cell at `ambiguousWidth: "narrow"` and 2 at `"wide"`;
+`meter-fill ▰` and `rule —` carried no class at all while measuring the same way. The values came
+from a design block that supplies the measurement it says was never taken — `R-BLK-742`'s *FOUR
+AMBIGUOUS, EIGHT NARROW*, which is six and six (F1246).
+
+**Kept rather than derived, and the distinction is not a restatement.** `widthByCapability` is the
+width in the composed browser grid and the builder gates `reservedCells` on it; `widthClass` is
+whether the character is Ambiguous, which is what sends a **set** to its ASCII rung (R-GLY-001).
+Deriving one away would delete the fact rather than un-drift it, so the field stays and this rule
+is what makes it true.
+
+**One authority, read rather than restated.** The ranges are parsed out of `text.ts` by
+`parseRangeTable`, the same shape `parseEmojiBases` already uses — and **both** tables, because
+`cells()` is `inRanges(cp, AMBIGUOUS_RANGES) || inRanges(cp, DRAWN_AS_GEOMETRY)` and a check
+reading only the first would call every geometric shape Narrow and pass a registry that says so.
+
+**Its fabricated violation is the state it was found in**: setting `focus`'s class back to
+`narrow` and deleting `choice-open`'s fails on both lines, naming the measured value; an empty
+parse of either table fails the rule's own control, because an empty table calls every character
+Narrow and passes every record.
+
+### SS64 — a mark is unique inside the domains it appears in
+
+**Three structures paint ASCII marks and the registry's own check sees one of them.**
+The registry's `glyphs` and `delimiters`, `GLYPH_TABLE` in `src/presentation/blocks/glyphs.ts`,
+and `ASCII: GlyphSet` in the same file. `:` was chosen for collapsed disclosure, passed the
+registry's collision check, and is `GlyphSet.separator` and `GlyphSet.dashedVertical` — a lead
+mark and a field separator on one row (F1246). A check phrased over a third of its subject is
+green for a reason that has nothing to do with the tree.
+
+**Uniqueness is a property of a region, not of the alphabet.** The ASCII half is one character
+out of about ninety printable ones and three structures draw from it; free across all three,
+measured, was twelve. A global rule spends that alphabet on pairs a reader never meets — the
+sort marks live on a table's header row and disclosure in a content row's lead, so both take
+`v`. Domains are declared on `calcium-registry.json`'s `collisionDomains` table, which carries
+**containment**: `row-lead` and `inline` are inside `content-row`, so their closures intersect
+and a `:` in both is a clash. That containment is the whole mechanism, and it is data rather
+than a clause in the checker.
+
+**A figure domain is not a mark domain.** `border` and `plot` carry `figure: true`, and a pair
+sharing only figure domains is not a clash. ASCII has no box drawing: every corner, tee and
+crossing collapses to `+` and every edge to `-`, and a reader tells them apart by where they
+sit in the figure. The rule's first run over the real tree returned **59 findings of which 45
+were this**, which is the measurement that bought the axis.
+
+**What fires:** a shared ASCII half with a **different** Unicode half whose domain closures
+intersect. Two records of one mark are not two marks — `GLYPH_TABLE.ok` and `GlyphSet.tick` are
+both `✓` / `+` under two names, and a rule that read them as a collision would report the
+tables agreeing.
+
+**Two controls, both of them about the rule going quiet rather than about the tree.** An empty
+parse of `glyphs.ts` compares the registry with itself and passes, so zero marks read out of
+that file *is* the violation; and a mark carrying no domain is **reported**, never exempted,
+because a record with no region is one this rule cannot rule on. A registry record may decline
+its ASCII half only with `asciiResolution` — the monochrome rung, where the head mark is a set
+rather than a character — and the builder refuses a deferral that does not name the rung that
+resolves it.
+
+*Stated blind spots.* It reads the two `glyphs.ts` tables as **text**, by the shape of an object
+literal, so a member written any other way is invisible — which is why the empty-parse control
+is the first thing it checks. It knows nothing of *position within* a domain: two marks in
+`row-lead` are a clash even if one only ever appears in a panel title and the other only in a
+transcript gutter, which is a coarseness the domain table can be refined to answer and has not
+been. And it compares the declared domains, not the drawn ones: a mark painted somewhere its
+record does not name is a defect no scan here reaches.
+
 
 ### SS56, widened — the builder call is the composition
 

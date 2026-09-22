@@ -287,7 +287,7 @@ describe("C11 tier 3 — edges", () => {
     };
     const line = visible(r.renderToLines(block, 40)[1] ?? "");
     expect(line).toContain("yes");
-    expect(line).not.toContain("▸");
+    expect(line).not.toContain("▹");
   });
 
   /**

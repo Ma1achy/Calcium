@@ -28,7 +28,7 @@
 import type { Series } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { BRAILLE_DOTS, createGrid, drawLine, foldBraille, foldSolid, setDot, type Grid } from "./raster.js";
-import { glyphs } from "../blocks/glyphs.js";
+import { glyphs, residueLead } from "../blocks/glyphs.js";
 import { pad, padStart } from "../blocks/paint.js";
 import { cells, rowCells, truncate, type AmbiguousWidth } from "../text.js";
 import { write } from "./chargrid.js";
@@ -293,7 +293,7 @@ export function segmentLegend(
   // shares is six cells wide, and `⋯ 5 more` is eight: the first overflowing
   // pie read `⋯ 5 m…`, and the arm-disagreement reader took the `m` for a
   // segment's name. Bounded by the budget the entries were bounded by.
-  const more = dropped > 0 ? `${glyphs(caps).residue} ${String(dropped)} more` : "";
+  const more = dropped > 0 ? `${residueLead(caps)} ${String(dropped)} more` : "";
   const width = Math.min(
     budget,
     Math.max(swatchW + 1 + labelW + (valueW > 0 ? valueW + 1 : 0), cells(more, ambiguous)),
@@ -548,7 +548,7 @@ export function pieAsciiRows(
     ];
   }
   if (dropped > 0) {
-    lines[top + shown] = [{ text: truncate(`${glyphs(caps).residue} ${String(dropped)} more`, w, caps), index: -1 }];
+    lines[top + shown] = [{ text: truncate(`${residueLead(caps)} ${String(dropped)} more`, w, caps), index: -1 }];
   }
   return lines;
 }

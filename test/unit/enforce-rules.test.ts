@@ -47,6 +47,8 @@ import {
   checkAllowLists,
   checkControlBytes,
   checkEmojiBases,
+  checkGlyphWidthClass,
+  checkMarkDomains,
   checkMarks,
   checkSourceScans,
   parseEmojiBases,
@@ -757,7 +759,14 @@ const scanIds = SCANS.map((s) => s.id);
  * list: a rule invisible to `implemented` is a rule the fabrication check does not
  * demand a violation for, which is A03 §2 arriving in the mechanism against it.
  */
-const STANDALONE_SCANS = ["SS47", "SS52", "SS53", "SS54", "SS57"];
+// SS63 and SS64 read the design registry and `glyphs.ts` rather than a file
+// corpus, so neither fits a `SCANS` row: SS63 compares a recorded `widthClass`
+// against `cells()`'s own tables, and SS64 compares marks across three
+// structures inside a domain closure. SS64 is computed beside the gate and
+// **reported** until M4 rules the three characters it still finds, at which
+// point it joins the violation list — a gate red on its first run is a gate
+// somebody switches off.
+const STANDALONE_SCANS = ["SS47", "SS52", "SS53", "SS54", "SS57", "SS63", "SS64"];
 
 const implemented = [
   ...scanIds,
@@ -859,6 +868,13 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       // would be commitment 14 satisfied by assertion, so the next test reads
       // that file and looks for them.
       ...SPEC_RULES,
+      // SS63 and SS64 read the design registry — a JSON document — against
+      // `text.ts`'s own range tables and against `glyphs.ts`'s two mark tables.
+      // The one-file `FABRICATED` shape holds a `src/` file's text and has
+      // nowhere to put a second and a third document, so both drive their own
+      // sources through the readers their signatures take. Their rows are below.
+      "SS63",
+      "SS64",
     ]);
     expect([...implemented].sort()).toEqual([...covered].sort());
   });
@@ -1518,6 +1534,84 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       s.cleared + s.candidates.length + s.testOnly,
       "every member lands in exactly one bucket",
     ).toBe(s.members);
+  });
+
+  it("SS63 fires: a recorded width class that disagrees with what `cells()` measures", () => {
+    // **The fabrication is the defect that shipped** (F1246): `focus ▸` and
+    // `disclosure ▾` were recorded `narrow` and measure one cell narrow, two
+    // wide. The values came from a design block that stated a measurement it
+    // said had never been taken, and nothing read `widthClass`, so a snapshot
+    // with no reader drifted for as long as it existed.
+    const text = readFileSync("src/presentation/text.ts", "utf8");
+    const wrong = JSON.stringify({
+      glyphs: [{ id: "focus", unicode: "▸", ascii: ">", widthClass: "narrow" }],
+      delimiters: [],
+    });
+    const fired = checkGlyphWidthClass(wrong, text);
+    expect(fired.length, "the mismatch fires").toBeGreaterThan(0);
+    expect(fired[0]?.rule).toBe("SS63");
+    expect(fired[0]?.message).toContain("focus");
+
+    // **The same record, corrected** — the remedy's own control, so the row is
+    // about the class and not about the word `narrow` appearing anywhere.
+    const right = JSON.stringify({
+      glyphs: [{ id: "focus", unicode: "▸", ascii: ">", widthClass: "ambiguous" }],
+      delimiters: [],
+    });
+    expect(checkGlyphWidthClass(right, text)).toEqual([]);
+
+    // **The vacuity control**: an empty parse of `text.ts` classifies every
+    // character as narrow and agrees with a registry that says so, which is a
+    // rule with nothing to be wrong about (A03 §2).
+    const blind = checkGlyphWidthClass(right, "export const NOTHING = 0;\n");
+    expect(blind.length, "an empty range table is the violation, not a pass").toBeGreaterThan(0);
+
+    // And the real pair, which must be green.
+    expect(checkGlyphWidthClass()).toEqual([]);
+  });
+
+  it("SS64 fires: `:` for collapsed disclosure against the separator it shares a row with", () => {
+    // **The fabrication is the character that was very nearly chosen** (F1246).
+    // `:` passed the registry's own collision check because that check sees the
+    // registry alone; `:` is `GlyphSet.separator` and `GlyphSet.dashedVertical`,
+    // and a call head shows a lead mark and a field separator on one row. This
+    // is the case the domain model exists to fail.
+    const glyphSource = readFileSync("src/presentation/blocks/glyphs.ts", "utf8");
+    const real = JSON.parse(readFileSync("docs/design/language/calcium-registry.json", "utf8")) as {
+      glyphs: { id: string; ascii?: string }[];
+    };
+    const withColon = JSON.parse(JSON.stringify(real)) as typeof real;
+    const collapsed = withColon.glyphs.find((g) => g.id === "disclosure-collapsed");
+    expect(collapsed, "the record the fabrication edits exists").toBeDefined();
+    if (collapsed !== undefined) collapsed.ascii = ":";
+
+    const fired = checkMarkDomains(JSON.stringify(withColon), glyphSource);
+    const colon = fired.filter((v) => v.message.includes('":"'));
+    expect(colon.length, "`:` against the separator is a clash").toBeGreaterThan(0);
+    expect(colon.some((v) => v.message.includes("separator"))).toBe(true);
+    expect(colon.every((v) => v.rule === "SS64")).toBe(true);
+
+    // **The remedy's control**: `(` in the same slot draws no `:` finding, so the
+    // row is about the character and not about the record being touched at all.
+    expect(
+      checkMarkDomains().filter((v) => v.message.includes('":"')),
+      "the shipped `(` is clear",
+    ).toEqual([]);
+
+    // **The vacuity control, and it is the one this rule most needs.** With no
+    // marks read out of `glyphs.ts` the scan compares the registry with itself
+    // and passes — so an empty parse *is* the violation.
+    const blind = checkMarkDomains(undefined, "export const NOTHING = 0;\n");
+    expect(blind.length, "an empty parse is refused").toBe(1);
+    expect(blind[0]?.message).toContain("no mark was read");
+
+    // **A figure domain is not a mark domain**, and the control is the tree's own
+    // border family: every ASCII corner and tee is `+` and every edge `-`, which
+    // is the fallback working. 45 of the rule's first 59 findings were this.
+    expect(
+      checkMarkDomains().filter((v) => v.message.includes("border")),
+      "box drawing collapsing to `+` is not a collision",
+    ).toEqual([]);
   });
 
   it("SS57 fires: the shipped head mark, the info glyph, and not the keycap bases", () => {

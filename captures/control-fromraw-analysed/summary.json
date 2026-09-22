@@ -1,0 +1,211 @@
+{
+  "command": "node tools/spinner.js pulse --ms 100",
+  "exitCode": null,
+  "frameCount": 20,
+  "region": {
+    "row": 2,
+    "col": 6,
+    "width": 1,
+    "height": 1
+  },
+  "sgrHistogram": {
+    "dim": 120,
+    "reset": 192,
+    "16-fg": 72
+  },
+  "unparsedSgr": [],
+  "perFrame": [
+    {
+      "index": 0,
+      "tMs": 241,
+      "distinctColours": 0,
+      "dualChannelCells": 0,
+      "meanRunLength": 0,
+      "runLengths": []
+    },
+    {
+      "index": 1,
+      "tMs": 357,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 1,
+      "runLengths": [
+        1
+      ]
+    },
+    {
+      "index": 2,
+      "tMs": 442,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 1,
+      "runLengths": [
+        1
+      ]
+    },
+    {
+      "index": 3,
+      "tMs": 443,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 1,
+      "runLengths": [
+        1
+      ]
+    },
+    {
+      "index": 4,
+      "tMs": 544,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 1,
+      "runLengths": [
+        1
+      ]
+    },
+    {
+      "index": 5,
+      "tMs": 544,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 1,
+      "runLengths": [
+        1
+      ]
+    },
+    {
+      "index": 6,
+      "tMs": 645,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 1,
+      "runLengths": [
+        1
+      ]
+    },
+    {
+      "index": 7,
+      "tMs": 646,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 1,
+      "runLengths": [
+        1
+      ]
+    },
+    {
+      "index": 8,
+      "tMs": 746,
+      "distinctColours": 0,
+      "dualChannelCells": 0,
+      "meanRunLength": 0,
+      "runLengths": []
+    },
+    {
+      "index": 9,
+      "tMs": 746,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 1,
+      "runLengths": [
+        1
+      ]
+    },
+    {
+      "index": 10,
+      "tMs": 847,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 1,
+      "runLengths": [
+        1
+      ]
+    },
+    {
+      "index": 11,
+      "tMs": 847,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 1,
+      "runLengths": [
+        1
+      ]
+    },
+    {
+      "index": 12,
+      "tMs": 948,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 1,
+      "runLengths": [
+        1
+      ]
+    },
+    {
+      "index": 13,
+      "tMs": 948,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 1,
+      "runLengths": [
+        1
+      ]
+    },
+    {
+      "index": 14,
+      "tMs": 1049,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 1,
+      "runLengths": [
+        1
+      ]
+    },
+    {
+      "index": 15,
+      "tMs": 1049,
+      "distinctColours": 0,
+      "dualChannelCells": 0,
+      "meanRunLength": 0,
+      "runLengths": []
+    },
+    {
+      "index": 16,
+      "tMs": 1149,
+      "distinctColours": 0,
+      "dualChannelCells": 0,
+      "meanRunLength": 0,
+      "runLengths": []
+    },
+    {
+      "index": 17,
+      "tMs": 1150,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 1,
+      "runLengths": [
+        1
+      ]
+    },
+    {
+      "index": 18,
+      "tMs": 1250,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 1,
+      "runLengths": [
+        1
+      ]
+    },
+    {
+      "index": 19,
+      "tMs": 1250,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 1,
+      "runLengths": [
+        1
+      ]
+    }
+  ]
+}

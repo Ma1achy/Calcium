@@ -132,7 +132,7 @@ function unitsOf(block: Table, width: number, measureChild: MeasureFn): readonly
  * is the copied-constant shape that drifts the first time the glyph changes
  * width, and C09 §4's 1:1 rule is exactly what a literal would stop honouring.
  */
-export const GUTTER_CELLS = glyphCells("expand") + 1;
+export const GUTTER_CELLS = glyphCells("focus") + 1;
 
 /** The width the plan and every clamp see — never `ctx.width` (I15). */
 function bodyWidth(width: number): number {
@@ -337,7 +337,7 @@ export const tableDefinition: BlockDefinition<Table> = {
     const blank = " ".repeat(GUTTER_CELLS); // cells-ok — the reserved gutter
     const lead = (marked: boolean): readonly Span[] =>
       marked
-        ? [{ text: `${glyphFor("expand", ctx.capabilities)} `, style: tone("accent", ctx.theme, ctx.capabilities) }]
+        ? [{ text: `${glyphFor("focus", ctx.capabilities)} `, style: tone("accent", ctx.theme, ctx.capabilities) }]
         : [{ text: blank }];
     /** One exit, so no emitted row can forget the gutter (I15). */
     const emit = (spans: readonly Span[], marked = false): void => {

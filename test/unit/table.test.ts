@@ -277,11 +277,12 @@ describe("C11 tier 1 — planColumns", () => {
     const opened = psTable({ rows: 2, expanded: [1] });
 
     // At 80, three columns drop, so every row is expandable (I2) and the marker is
-    // drawn. `▸` collapsed, `▾` open.
+    // drawn. `▹` collapsed, `▿` open — hollow, because the filled `▸` is the
+    // focus mark and disclosure stopped borrowing it (§024, R-BLK-928).
     const first = registry.renderToLines(collapsed, 80)[1] ?? "";
     const openedFirst = registry.renderToLines(opened, 80)[1] ?? "";
-    expect(first).toContain("▸");
-    expect(openedFirst).toContain("▾");
+    expect(first).toContain("▹");
+    expect(openedFirst).toContain("▿");
 
     // The same table with the role removed: no marker anywhere, and the column
     // renders its own cell text instead.
@@ -294,7 +295,7 @@ describe("C11 tier 1 — planColumns", () => {
       rows: collapsed.rows.map((r) => ({ ...r, cells: { ...r.cells, expand: { text: "#" } } })),
     };
     const rolelessFirst = registry.renderToLines(roleless, 80)[1] ?? "";
-    expect(rolelessFirst).not.toContain("▸");
+    expect(rolelessFirst).not.toContain("▹");
     expect(rolelessFirst).toContain("#");
   });
 
@@ -380,7 +381,7 @@ describe("C11 tier 1 — planColumns", () => {
     // and a marker that did nothing when pressed would be worse than none.
     const plan = planColumns(psColumns(), 160);
     expect(plan.dropped).toEqual([]);
-    expect(registry.renderToLines(psTable({ rows: 2 }), 160)[1] ?? "").not.toContain("▸");
+    expect(registry.renderToLines(psTable({ rows: 2 }), 160)[1] ?? "").not.toContain("▹");
   });
 
   it("T1.18 (C04 I30): a column truncates from the end it declares", () => {
@@ -393,7 +394,7 @@ describe("C11 tier 1 — planColumns", () => {
     const rows = [{ id: "r1", cells: { key: { text: "ui.show_banner" } } }];
 
     // **Rendered two cells wider and read past the gutter** (C11 I15, §5b): the
-    // block reserves a column for `▸` on every row, and this row is about the
+    // block reserves a column for `▹` on every row, and this row is about the
     // column's own 12 cells.
     const draw = (from: "start" | "end"): string =>
       body(visible(registry.renderToLines({ kind: "table", id: "t", columns: columns(from), rows }, atContent(12))[1] ?? ""));

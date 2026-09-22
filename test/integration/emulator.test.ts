@@ -1,8 +1,8 @@
 // C27 — terminal emulator (docs/components/C27_terminal_emulator.md §9), tier 4.
 //
 // **Every figure here was measured before it was written.** The deferrals these
-// replace named a residue row reading `⋯ N above` and a count of 34; the frame
-// says `⋯ 35 above, 0 below`, and the glyph and its colour both move with the
+// replace named a residue row reading `⋯   N above` and a count of 34; the frame
+// says `⋯   35 above, 0 below`, and the glyph and its colour both move with the
 // arm. A deferred row's text is never executed, so its numbers drift for as long
 // as the deferral lasts (F923) — these are read off the renderer.
 import { describe, expect, it } from "vitest";
@@ -73,7 +73,7 @@ describe("C27 terminal emulator — tier 4", () => {
     // The cursor's own row is the sixth — an inverse cell on the line the child
     // stopped on, which is content and counts against the box.
     expect(rows[5], "the cursor is drawn, and it is one of the six").toContain("\u001b[7m");
-    expect(strip(rows[6] ?? ""), "and the residue counts both directions").toBe("⋯ 36 above, 0 below");
+    expect(strip(rows[6] ?? ""), "and the residue counts both directions").toBe("⋯   36 above, 0 below");
   });
 
   it("T4.2 (with C09): the same document degrades by the ladder and by nothing else", async () => {
@@ -130,7 +130,7 @@ describe("C04 · C09 · C10 — the terminal block in a scroll, spec-first rows"
     expect(rows, "six rows and the residue").toHaveLength(7);
     // 40 writes leave 41 lines — the last is the empty one the cursor sits on —
     // so six shown leaves 35. The deferral said 34, from a count that never ran.
-    expect(strip(rows[6] ?? ""), "the residue's own count").toBe("⋯ 35 above, 0 below");
+    expect(strip(rows[6] ?? ""), "the residue's own count").toBe("⋯   35 above, 0 below");
 
     // **Two counts, asserted separately**, because one number cannot say which
     // mechanism produced it: `dropped` is the emulator's cap and the residue is
@@ -139,7 +139,7 @@ describe("C04 · C09 · C10 — the terminal block in a scroll, spec-first rows"
     const capped = b.terminal(40, [{ text: "a" }, { text: "bb" }], { dropped: 12 });
     const withCap = render(inScroll(capped), FULL_CAPS);
     expect(strip(withCap[0] ?? ""), "the marker is content row 0, above the first kept line").toBe(
-      "⋯ 12 lines dropped at the cap",
+      "⋯   12 lines dropped at the cap",
     );
     expect(strip(withCap[1] ?? ""), "and the kept lines follow it").toBe("a");
     expect(withCap, "three content rows fit in a box of six, so there is no residue").toHaveLength(6);
@@ -181,7 +181,7 @@ describe("C09 · C10 — the terminal block at the arms, spec-first rows", () =>
     // `unicode` rather than with `colourDepth` — the two are separate rungs and
     // a fixture that changes both cannot say which.
     expect(strip(render(doc, MONO_UNICODE_CAPS)[6] ?? ""), "unicode keeps the ellipsis").toContain("⋯");
-    expect(strip(render(doc, ASCII_CAPS)[6] ?? ""), "ascii takes the tilde").toContain("~");
+    expect(strip(render(doc, ASCII_CAPS)[6] ?? ""), "ascii takes the three dots the design declares").toContain("...");
   });
 
   it("T4.37 (C10 I38, with C04, C09): the arms differ by the ladder alone, and the document does not move", async () => {

@@ -92,7 +92,7 @@ const STATUSES: ReadonlySet<string> = new Set<DocumentStatus>([
 const GLYPH_MEMBERS = {
   ok: true, warn: true, error: true, info: true, pending: true,
   working: true, running: true, queued: true, cancelled: true,
-  expand: true, collapse: true, live: true, bullet: true,
+  expand: true, collapse: true, focus: true, live: true, bullet: true,
   quote: true, nested: true,
   continuation: true, step: true,
 } satisfies Record<Glyph, true>;

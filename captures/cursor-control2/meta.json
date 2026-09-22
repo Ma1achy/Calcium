@@ -1,0 +1,5 @@
+{
+  "command": "node tools/capture-foreign.cursor-control.mjs",
+  "cols": 40,
+  "rows": 15
+}

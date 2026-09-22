@@ -1460,6 +1460,215 @@ export function checkMarks(files, readFile = (f) => readFileSync(f, "utf8"), exe
  * and a mark built by `String.fromCodePoint` or held in a variable passes, as
  * it does SS47.
  */
+/**
+ * A `readonly number[]` range table, read out of `text.ts` rather than restated.
+ *
+ * **One reader for both tables, because `cells()` consults both** (C09 I48).
+ * `isAmbiguous` is `inRanges(cp, AMBIGUOUS_RANGES) || inRanges(cp, DRAWN_AS_GEOMETRY)`,
+ * so a check that read only the first would call every geometric shape Narrow
+ * and pass a registry that says so.
+ */
+/**
+ * A `Record<string, readonly string[]>` of domains, read out of `glyphs.ts`.
+ *
+ * Shape: `token: ["row-lead"],` — one line per token, beside the table it
+ * classifies, so a new glyph that forgets its domain is a parse gap the scan
+ * reports rather than a mark it silently exempts.
+ */
+export function parseDomainTable(source, name) {
+  const start = source.indexOf(`export const ${name}`);
+  if (start < 0) return {};
+  const end = source.indexOf("\n};", start);
+  const out = {};
+  for (const m of source.slice(start, end).matchAll(/^ {2}(\w+): \[([^\]]*)\],/gmu)) {
+    out[m[1]] = [...m[2].matchAll(/"([^"]+)"/gu)].map((d) => d[1]);
+  }
+  return out;
+}
+
+/** One `Record<string, string>` of ASCII halves, read out of a frozen object literal. */
+function parseAsciiPairs(source, opener, pattern) {
+  const start = source.indexOf(opener);
+  if (start < 0) return {};
+  const body = source.slice(start, source.indexOf("\n});", start));
+  const out = {};
+  for (const m of body.matchAll(pattern)) out[m[1]] = JSON.parse(`"${m[m.length - 1]}"`);
+  return out;
+}
+
+/**
+ * **SS64 — a mark is unique inside the domains it appears in, across every
+ * structure that paints one.**
+ *
+ * Three structures paint ASCII marks and the registry's own check sees one of
+ * them. That is how `:` was chosen for collapsed disclosure and passed: it is
+ * `GlyphSet.separator` (F834), so a lead mark and a field separator would be the
+ * same character on one row, and the gate that said *green* had never been shown
+ * the set it was ruling on (F1246).
+ *
+ * **Domains rather than a global alphabet, because the alphabet ran out.** With
+ * every mark compared against every other, twelve printable characters remained
+ * for four unregistered roles — so uniqueness was costing more than it bought in
+ * places no reader can confuse. A domain is a screen region: `row-lead` and
+ * `inline` are both inside `content-row`, because a row shows its lead and its
+ * separators together; `table-header` is a different row, which is what lets the
+ * sort pair take `v` and `^` while disclosure keeps `v` in the lead.
+ *
+ * **Two records of one mark are not a clash.** The registry and `GLYPH_TABLE`
+ * mirror each other on purpose — `disclosure ▿ v` is in both — so the rule fires
+ * on a shared ASCII half with a **different** Unicode half, which is the case a
+ * reader cannot tell apart at the ASCII rung and can at every other.
+ */
+export function checkMarkDomains(
+  registrySource = readFileSync("docs/design/language/calcium-registry.json", "utf8"),
+  glyphSource = readFileSync("src/presentation/blocks/glyphs.ts", "utf8"),
+) {
+  const violations = [];
+  const registry = JSON.parse(registrySource);
+  const contains = registry.collisionDomains ?? {};
+  const closure = (domains) => {
+    const out = new Set(domains ?? []);
+    for (const [name, record] of Object.entries(contains)) {
+      for (const inner of record.contains ?? []) if (out.has(inner)) out.add(name);
+    }
+    return out;
+  };
+  const marks = [];
+  let deferred = 0;
+  for (const g of [...registry.glyphs, ...registry.delimiters]) {
+    // **A state-resolved ASCII half holds no character** (the monochrome rung),
+    // so there is nothing to compare — counted, never silently dropped.
+    if (g.asciiResolution !== undefined) { deferred += 1; continue; }
+    marks.push({ who: `registry:${g.id}`, ascii: g.ascii, unicode: g.unicode, domains: g.collisionDomains ?? [] });
+  }
+  const tableDomains = parseDomainTable(glyphSource, "GLYPH_DOMAINS");
+  const setDomains = parseDomainTable(glyphSource, "GLYPH_SET_DOMAINS");
+  const table = parseAsciiPairs(glyphSource, "const GLYPH_TABLE",
+    /^ {4}(\w+): \["((?:[^"\\]|\\.)*)", "((?:[^"\\]|\\.)*)"\],/gmu);
+  const tableUnicode = parseAsciiPairs(glyphSource, "const GLYPH_TABLE",
+    /^ {4}(\w+): \["((?:[^"\\]|\\.)*)", "(?:[^"\\]|\\.)*"\],/gmu);
+  const set = parseAsciiPairs(glyphSource, "const ASCII: GlyphSet", /^ {2}(\w+): "((?:[^"\\]|\\.)*)",/gmu);
+  // **The Unicode half, read rather than stubbed.** A placeholder here made every
+  // `GlyphSet` member differ from every other and from `GLYPH_TABLE`, so `ok ✓`
+  // and `tick ✓` — one character under two names — read as a clash on `+`. The
+  // rule fires on *different* marks sharing a character; two records of one mark
+  // are not two marks.
+  const setUnicode = parseAsciiPairs(glyphSource, "const UNICODE: GlyphSet", /^ {2}(\w+): "((?:[^"\\]|\\.)*)",/gmu);
+  const unclassified = [];
+  for (const [token, ascii] of Object.entries(table)) {
+    if (tableDomains[token] === undefined) { unclassified.push(`GLYPH_TABLE:${token}`); continue; }
+    marks.push({ who: `GLYPH_TABLE:${token}`, ascii, unicode: tableUnicode[token], domains: tableDomains[token] });
+  }
+  for (const [token, ascii] of Object.entries(set)) {
+    if (setDomains[token] === undefined) { unclassified.push(`GlyphSet:${token}`); continue; }
+    marks.push({ who: `GlyphSet:${token}`, ascii, unicode: setUnicode[token] ?? `\u0000${token}`, domains: setDomains[token] });
+  }
+  if (marks.length <= registry.glyphs.length + registry.delimiters.length - deferred) {
+    violations.push({
+      rule: "SS64", file: "src/presentation/blocks/glyphs.ts", line: 1,
+      message: "no mark was read out of `glyphs.ts` — an empty parse compares the registry with itself and passes, which is the vacuity this rule exists to refuse (F1246)",
+      spec: "R-GLY-001",
+    });
+    return violations;
+  }
+  for (const who of unclassified) {
+    violations.push({
+      rule: "SS64", file: "src/presentation/blocks/glyphs.ts", line: 1,
+      message: `${who} paints an ASCII mark and declares no domain — a mark with no region is one this rule cannot rule on, which is an exemption rather than an answer`,
+      spec: "R-GLY-001",
+    });
+  }
+  for (let i = 0; i < marks.length; i += 1) {
+    for (let j = i + 1; j < marks.length; j += 1) {
+      const a = marks[i], b = marks[j];
+      if (a.ascii !== b.ascii || a.unicode === b.unicode) continue;
+      const shared = [...closure(a.domains)].filter((d) => closure(b.domains).has(d));
+      if (shared.length === 0) continue;
+      // **A figure domain is not a mark domain.** Inside a frame or a plot the
+      // character is not the signal — its place in the figure is. ASCII has no
+      // box drawing, so every corner, tee and crossing *is* `+` and every edge
+      // `-`; demanding uniqueness there refuses the fallback rather than a
+      // defect, and the rule's first run said so 45 times out of 59.
+      if (shared.every((d) => contains[d]?.figure === true)) continue;
+      violations.push({
+        rule: "SS64",
+        file: "src/presentation/blocks/glyphs.ts",
+        line: 1,
+        message: `${a.who} and ${b.who} both paint ${JSON.stringify(a.ascii)} in ${shared.join(", ")} — one character, two marks, on a row a reader reads at once (R-GLY-001)`,
+        spec: "R-GLY-001",
+      });
+    }
+  }
+  return violations;
+}
+
+export function parseRangeTable(textSource, name) {
+  const start = textSource.indexOf(`const ${name}: readonly number[] = [`);
+  if (start < 0) return [];
+  const end = textSource.indexOf("\n];", start);
+  return [...textSource.slice(start, end).matchAll(/0x([0-9a-f]+)/gu)].map((m) => Number.parseInt(m[1], 16));
+}
+
+/**
+ * **SS63 — a glyph's recorded width class is the one `cells()` measures.**
+ *
+ * `widthClass` is a record of a measurement and **nothing reads it** — not the
+ * builder, not `src/`, not the suite — which is exactly why it could disagree
+ * with the tree for as long as it did. `focus` and `disclosure` were recorded
+ * `narrow` and are Ambiguous; `meter-fill` and `rule` carried no class at all
+ * while measuring 1 cell narrow and 2 wide. Those values came from a design
+ * block that stated the measurement it said had never been taken (F1246), and a
+ * scalar snapshot with no reader is *a snapshot records, it does not check* with
+ * nothing in the frame to notice.
+ *
+ * **The field is kept rather than derived**, and the reason is that it is not a
+ * restatement of `widthByCapability`. That field is the width in the composed
+ * browser grid and the builder gates `reservedCells` on it; this one is whether
+ * the character is Ambiguous, which is what sends a **set** to its ASCII rung
+ * (R-GLY-001). Deriving it away would delete the fact rather than un-drift it.
+ *
+ * The ranges come from `text.ts`'s own tables, so there is one authority and not
+ * a second copy to fall behind (C09 I48, F1246).
+ */
+export function checkGlyphWidthClass(
+  registrySource = readFileSync("docs/design/language/calcium-registry.json", "utf8"),
+  textSource = readFileSync("src/presentation/text.ts", "utf8"),
+) {
+  const violations = [];
+  const ambiguous = parseRangeTable(textSource, "AMBIGUOUS_RANGES");
+  const geometry = parseRangeTable(textSource, "DRAWN_AS_GEOMETRY");
+  const at = (file, needle) => {
+    const i = file.indexOf(needle);
+    return i < 0 ? 1 : file.slice(0, i).split("\n").length;
+  };
+  if (ambiguous.length === 0 || geometry.length === 0) {
+    violations.push({
+      rule: "SS63", file: "src/presentation/text.ts", line: 1,
+      message: "the width tables parsed to nothing — an empty table calls every character Narrow and passes every registry record, which is the vacuity this rule exists to refuse (C09 I48)",
+      spec: "C09 I48",
+    });
+    return violations;
+  }
+  const inRanges = (cp, table) => {
+    for (let i = 0; i < table.length; i += 2) if (cp >= table[i] && cp <= table[i + 1]) return true;
+    return false;
+  };
+  const registry = JSON.parse(registrySource);
+  for (const glyph of [...registry.glyphs, ...registry.delimiters]) {
+    const cp = glyph.unicode.codePointAt(0);
+    const measured = inRanges(cp, ambiguous) || inRanges(cp, geometry) ? "ambiguous" : "narrow";
+    if (glyph.widthClass === measured) continue;
+    violations.push({
+      rule: "SS63",
+      file: "docs/design/language/calcium-registry.json",
+      line: at(registrySource, `"${glyph.id}"`),
+      message: `${glyph.id} records widthClass ${JSON.stringify(glyph.widthClass ?? null)} and ${glyph.unicode} (U+${cp.toString(16).toUpperCase().padStart(4, "0")}) measures ${measured} — a recorded measurement nothing reads is one that drifts (F1246)`,
+      spec: "C09 I48",
+    });
+  }
+  return violations;
+}
+
 export function parseEmojiBases(textSource) {
   const start = textSource.indexOf("const EMOJI_VARIATION_BASES: readonly number[] = [");
   if (start < 0) return [];

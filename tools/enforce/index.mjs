@@ -16,7 +16,7 @@ import {
   nameExactnessSignal,
   publicSurfaceUseSignal,
 } from "./module-graph.mjs";
-import { checkSourceScans, checkMarks, checkControlBytes, checkAllowLists, checkEmojiBases } from "./source-scans.mjs";
+import { checkSourceScans, checkMarks, checkControlBytes, checkAllowLists, checkEmojiBases, checkGlyphWidthClass, checkMarkDomains } from "./source-scans.mjs";
 import { checkDependencies, checkPhantomImports } from "./dependencies.mjs";
 import { checkWorkflows } from "./workflows.mjs";
 import { checkRefusals, REFUSALS, unverifiableRefusals } from "./refusals.mjs";
@@ -195,6 +195,7 @@ const violations = [
   // reason SS47 is: the subject is a literal's contents against a table parsed
   // out of `text.ts`, not a line against a regex.
   ...checkEmojiBases(files),
+  ...checkGlyphWidthClass(),
   ...checkDependencies(),
   ...checkPhantomImports(files),
   // SS62 — the workflows against their record. Its own function rather than a
@@ -273,6 +274,8 @@ const exactness = nameExactnessSignal(files);
 // lie: a collision only ever clears, so this list under-reports and cannot
 // over-report. A03 §9.
 const surface = publicSurfaceUseSignal(files, examples);
+// SS64's list, computed beside the gate and printed as a signal (R-GLY-001).
+const markDomains = checkMarkDomains();
 
 if (violations.length === 0) {
   console.log(
@@ -307,6 +310,14 @@ if (violations.length === 0) {
       // SS54's judgements. A register that holds only gated rows is one nobody
       // put a taste refusal into; one that holds mostly judgements is a list of
       // opinions with a rule's name. The number is what a reader watches.
+      // **SS64, reported and not gated — for now.** It lands red: three ASCII
+      // characters carry two marks each inside one row, and all three predate
+      // this work. A gate that is red on its first run is a gate somebody
+      // switches off, so the rule reports its list until M4 rules the three and
+      // then becomes a gate (the promotion is M4 acceptance, not a follow-up).
+      `  ${DIM}mark domains · ${String(markDomains.length)} ASCII marks share a character ` +
+      `inside one domain — ${[...new Set(markDomains.map((v) => /paint "(.*?)"/u.exec(v.message)?.[1] ?? "?"))].join(" ")} ` +
+      `(SS64, R-GLY-001, reported not gated until M4 closes)${RESET}\n` +
       `  ${DIM}refusal register · ${String(unverifiableRefusals().length)} of ` +
       `${String(REFUSAL_COUNT)} refusals rest on a judgement and are not gated; ` +
       `the rest resolve against the tree (SS54, reported not gated)${RESET}` +

@@ -22,8 +22,12 @@ export {
   spinnerIntervalMs,
   spinnerSetNames,
   barStyleNames,
+  GLYPH_DOMAINS,
+  GLYPH_SET_DOMAINS,
   GLYPH_SUBSTITUTIONS,
   GLYPH_TOKENS,
+  RESIDUE_CELLS,
+  residueLead,
   SUBSTITUTIONS,
   type GlyphSet,
 } from "./glyphs.js";

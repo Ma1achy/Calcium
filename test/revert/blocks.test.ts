@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { block } from "../../src/data/viewmodel/index.js";
 import { cells, truncate, wrapCells } from "../../src/presentation/text.js";
-import { SUBSTITUTIONS } from "../../src/presentation/blocks/index.js";
+import { RESIDUE_CELLS, glyphs, residueLead } from "../../src/presentation/blocks/index.js";
 import { sgr } from "../../src/terminal/escapes.js";
 import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
 import { checkSourceScans } from "../../tools/enforce/source-scans.mjs";
@@ -45,21 +45,47 @@ describe("C09 tier 6", () => {
     expect(kit.measure(notice, 30), "97 cells over 28 columns is four rows").toBe(4);
   });
 
-  it("T6.2 (I5): changing the ASCII ellipsis to `...` → T2.5 and T3.4 fail", () => {
-    // The classic. `…` is one column and `...` is three, so a three-cell marker
-    // shifts every truncation point — for users with a non-UTF-8 locale, and
-    // nobody else, which is why it survives review.
+  it("T6.2 (I5): drawing the residue mark unpadded → T2.5 fails", () => {
+    // **This row used to say the opposite, and the design is why it changed.**
+    // It read *changing the ASCII ellipsis to `...` → T2.5 and T3.4 fail*, on
+    // the rule that every substitution is 1:1 by cell count. The design
+    // declares `ellipsis` with `ascii: "..."` and `reservedCells: 3`
+    // (R-GLY-001, §096), so the character the row forbade is the character the
+    // framework now draws — and an invariant that blocks the design is amended
+    // rather than cited.
+    //
+    // **What the old row protected survives, and it is the only part that was
+    // ever load-bearing**: a marker whose width changes with the alphabet
+    // shifts every truncation point behind it, for readers in a non-UTF-8
+    // locale and nobody else, which is why it survives review. A declared slot
+    // keeps that; a 1:1 character was one way of getting it.
     expect(cells("…")).toBe(1);
     expect(cells("~")).toBe(1);
     expect(cells("...")).toBe(3);
 
+    // The truncation marker is a different slot and is untouched — `~` is C04
+    // §5's, not `residue`'s, and the two were only ever the same character by
+    // coincidence of both being one cell.
     const line = "y".repeat(80);
     expect(cells(truncate(line, 20, ASCII))).toBe(20);
     expect(truncate(line, 20, ASCII).endsWith("~")).toBe(true);
 
-    for (const [unicode, ascii] of SUBSTITUTIONS) {
-      expect(cells(ascii), `${unicode} → ${ascii}`).toBe(cells(unicode));
-    }
+    // **The revert, and the thing that makes it a revert**: drawing the mark
+    // without its padding gives three different widths at three rungs, which is
+    // the column movement T2.5 now asserts against directly.
+    const rungs = [
+      { unicode: "full", ambiguousWidth: "narrow" },
+      { unicode: "full", ambiguousWidth: "wide" },
+      { unicode: "ascii", ambiguousWidth: "narrow" },
+    ] as const;
+    const padded = rungs.map((caps) => cells(residueLead(caps), caps.ambiguousWidth));
+    expect(new Set(padded), "the shipped lead is one width at every rung").toEqual(new Set([RESIDUE_CELLS]));
+
+    const unpadded = rungs.map((caps) => cells(glyphs(caps).residue, caps.ambiguousWidth));
+    expect(
+      new Set(unpadded).size,
+      `the revert — the bare mark is ${unpadded.join(", ")} cells, so the column moves with the alphabet`,
+    ).toBeGreaterThan(1);
   });
 
   it("T6.3 (I6): using `.length` for display width → T2.9 fails, and CJK misaligns", () => {

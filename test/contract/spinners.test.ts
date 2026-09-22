@@ -7,7 +7,7 @@
 // both arms.
 import { describe, expect, it } from "vitest";
 
-import { glyphs, spinnerFrames, spinnerIntervalMs } from "../../src/presentation/blocks/index.js";
+import { RESIDUE_CELLS, glyphs, spinnerFrames, spinnerIntervalMs } from "../../src/presentation/blocks/index.js";
 // **The table itself is not on the barrel**, and MG24 is why: its members have
 // no reader in `src/` — the two functions are the seam. Imported from the module
 // so the rows can walk every set rather than a list they keep themselves, which
@@ -163,10 +163,17 @@ describe("roadmap 51 — the spinner sets", () => {
     expect(glyphs(WIDE_CAPS).bar, "wide falls to the ASCII set").toBe(glyphs(ASCII_CAPS).bar);
     expect(glyphs(WIDE_CAPS)).toEqual(glyphs(ASCII_CAPS));
 
-    // And every glyph the wide arm hands back is one cell measured as wide,
-    // which is the property the fall exists for.
-    for (const value of Object.values(glyphs(WIDE_CAPS))) {
-      expect(cells(value, "wide"), `${value} on a wide terminal`).toBeLessThanOrEqual(1);
+    // And every glyph the wide arm hands back fits its slot measured as wide,
+    // which is the property the fall exists for. Every slot is one cell bar
+    // `residue`, which the design declares at three (`reservedCells: 3`,
+    // R-GLY-001) and which `residueLead` pads to the same three at every rung —
+    // so the column beside it does not move, which is what the one-cell form
+    // was protecting (T2.5).
+    const wide = glyphs(WIDE_CAPS);
+    for (const [name, value] of Object.entries(wide)) {
+      const slot = name === "residue" ? RESIDUE_CELLS : 1;
+      expect(cells(value, "wide"), `${value} on a wide terminal`).toBeLessThanOrEqual(slot);
     }
+    expect(cells(wide.residue, "wide"), "and the residue mark fills its slot exactly").toBe(RESIDUE_CELLS);
   });
 });

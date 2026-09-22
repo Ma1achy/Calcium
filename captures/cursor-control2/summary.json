@@ -1,0 +1,35 @@
+{
+  "command": "node tools/capture-foreign.cursor-control.mjs",
+  "exitCode": 0,
+  "frameCount": 2,
+  "region": {
+    "row": 0,
+    "col": 0,
+    "width": 40,
+    "height": 15
+  },
+  "sgrHistogram": {},
+  "unparsedSgr": [],
+  "strippedCsi": {},
+  "perFrame": [
+    {
+      "index": 0,
+      "tMs": 15,
+      "distinctColours": 0,
+      "dualChannelCells": 0,
+      "meanRunLength": 0,
+      "runLengths": []
+    },
+    {
+      "index": 1,
+      "tMs": 15,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 9.5,
+      "runLengths": [
+        14,
+        5
+      ]
+    }
+  ]
+}

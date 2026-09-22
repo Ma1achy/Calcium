@@ -195,13 +195,22 @@ describe("C09 I72 — the two arms agree", () => {
     for (const b of withPlacement) {
       for (const width of widths) {
         for (const [capsName, capabilities] of capsFor(b)) {
-          const expected = oracle.frozen(oracleName(`t2144-${keyOf(b)}`, capsName, width));
+          const oracleKey = oracleName(`t2144-${keyOf(b)}`, capsName, width);
+          const expected = oracle.frozen(oracleKey);
           const { probe, names } = recording();
           const got = renderToLines(r, b, width, {
             theme: ORACLE_THEME, capabilities, probe, scrollOffsets,
             ...(b.id === "img-place" ? { placementScope: "e1" } : {}),
           } as never);
-          expect(got, `${b.id} at ${String(width)}`).toEqual(expected);
+          // **A retired capture is asserted to differ, never skipped** (F1233),
+          // exactly as T2.143 does — this arm had no such branch, so a ruling
+          // that changed a container's frame had nowhere to be recorded.
+          const ruling144 = oracle.retired(oracleKey);
+          if (ruling144 !== null) {
+            expect(got, `${oracleKey} is retired by ${ruling144}, and still matches`).not.toEqual(expected);
+          } else {
+            expect(got, `${b.id} at ${String(width)}`).toEqual(expected);
+          }
           expect(names.filter((n) => n === "rows"), `${b.id} at ${String(width)} took the rows arm`).toHaveLength(1);
           compared += 1;
         }

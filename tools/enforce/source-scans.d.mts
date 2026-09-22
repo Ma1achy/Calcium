@@ -101,3 +101,24 @@ export declare function checkMarks(
   readFile?: (file: string) => string,
   exemptions?: Readonly<Record<string, string>>,
 ): (Violation & { line: number })[];
+
+/** SS63 — the hex ranges of a named table in `text.ts`, parsed out of its source (C09 I48). */
+export declare function parseRangeTable(textSource: string, name: string): number[];
+
+/** SS63 — a glyph's recorded `widthClass` against what `cells()` measures (C09 I48, R-GLY-001). */
+export declare function checkGlyphWidthClass(
+  registrySource?: string,
+  textSource?: string,
+): Violation[];
+
+/** SS64 — a domain table in `glyphs.ts`, read as `token: ["domain", …],` lines (R-GLY-001). */
+export declare function parseDomainTable(source: string, name: string): Record<string, string[]>;
+
+/**
+ * SS64 — a mark unique inside the domains it appears in, across the registry,
+ * `GLYPH_TABLE` and `GlyphSet` (R-GLY-001, R-GLY-002).
+ */
+export declare function checkMarkDomains(
+  registrySource?: string,
+  glyphSource?: string,
+): Violation[];

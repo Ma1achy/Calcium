@@ -237,13 +237,24 @@ const UNICODE: GlyphSet = Object.freeze({
   warning: "▲",
   bar: "▌",
 
-  sortAsc: "↑",
-  sortDesc: "↓",
+  // **`▴` and `▾`, not `↑`/`↓`** — the design's sort marks (§078, §081,
+  // R-BLK-626/637/639). Both are Ambiguous, exactly as the arrows were, so the
+  // set's wholesale collapse to ASCII at `wide` is unchanged; the ASCII halves
+  // `^` and `v` are what they always were.
+  sortAsc: "▴",
+  sortDesc: "▾",
 
 });
 
 const ASCII: GlyphSet = Object.freeze({
-  residue: "~",
+  // **`...` and not `~`, and the slot is three cells at every rung** (R-GLY-001,
+  // §096). The registry declares `ellipsis` with `reservedCells: 3` and
+  // `ascii: 3`, and the design is the source of truth on the character. `~` was
+  // chosen by T2.5's 1:1-by-cell-count rule — three dots against one `⋯` — and
+  // that rule is amended rather than dodged: what it protected was *no column
+  // moves when the rung changes*, which a declared slot keeps and a 1:1
+  // character was only ever one way of getting.
+  residue: "...",
   // `:` and not `-` (F834): `-` is `TURN_ASCII`'s first frame, and a dispatched
   // head read `verb - -`. The rung is a character no set's ASCII frames use.
   separator: ":",
@@ -287,6 +298,38 @@ const ASCII: GlyphSet = Object.freeze({
   sortDesc: "v",
 
 });
+
+/**
+ * The cells the residue mark's slot occupies, at every rung (C04 I49, R-GLY-001).
+ *
+ * **Three, because the widest rendering is three and a slot that changed width
+ * between rungs would move the column beside it.** `⋯` is one cell narrow and
+ * two wide; `...` is three. The mark is drawn left-aligned in the slot and the
+ * rest is padding, so the row's arithmetic is the same number whichever
+ * alphabet the terminal takes.
+ */
+export const RESIDUE_CELLS = 3;
+
+/**
+ * The residue mark, padded to its slot — the one place either rendering enters
+ * a frame.
+ *
+ * A function rather than a constant because the padding depends on which
+ * rendering was resolved, and `cells()` is what decides. `glyphs()` hands back
+ * the ASCII set wholesale at `ambiguousWidth: "wide"` (C02 I9), so the Unicode
+ * `⋯` is only ever measured narrow.
+ *
+ * **Not the in-row shed mark**, which is `⋯N` and takes the bare character.
+ * That mark is not a column: `shedRow` measures it against the room left and
+ * drops it when reserving it would clip the row it is announcing (C09 I81), so
+ * there is nothing beside it to keep still. Padding it would put three cells
+ * between the mark and its own count and spend the room the ladder is fighting
+ * for. Two consumers of one character, and only one of them is a slot.
+ */
+export function residueLead(caps: GlyphCaps): string {
+  const mark = glyphs(caps).residue;
+  return mark + " ".repeat(Math.max(0, RESIDUE_CELLS - cells(mark, caps.ambiguousWidth)));
+}
 
 /** The pairs, for the test that asserts each is 1:1 (T2.5). */
 export const SUBSTITUTIONS: readonly (readonly [string, string])[] = Object.freeze(
@@ -904,8 +947,23 @@ const GLYPH_TABLE: Readonly<Record<Glyph, readonly [unicode: string, ascii: stri
     running: ["●", "*"],
     queued: ["○", "o"],
     cancelled: ["⊘", "/"],
-    expand: ["▸", ">"],
-    collapse: ["▾", "v"],
+    // **`▹` U+25B9 HOLLOW, and the ASCII half is `(`** — a collapsed row
+    // (§024, R-BLK-928). Hollow says *there is something behind this*; the
+    // filled `▸` is focus and keeps its own token below, so the two facts no
+    // longer share one slot. `:` was the first ASCII pick and was withdrawn:
+    // it is `GlyphSet.separator` and `dashedVertical`, which the registry's
+    // own collision check could not see (F1246, SS59).
+    expand: ["▹", "("],
+    // **`▿` U+25BF, hollow, and the ASCII half stays `v`** — an expanded row.
+    // `v` is also `sort-desc`'s ASCII, and that is not a collision: sort marks
+    // live in the table header and disclosure in a row's lead, which the
+    // domain table keeps apart.
+    collapse: ["▿", "v"],
+    // **The focus mark, in the gutter C11 I15 reserves** (§017, R-BLK-131).
+    // It had no token: `definition.ts` painted focus with `glyphFor("expand")`
+    // and reserved its width with `glyphCells("expand")`, so a change to the
+    // disclosure mark would have moved the focus gutter. Two facts, two slots.
+    focus: ["▸", ">"],
     live: ["▌", "|"],
     bullet: ["•", "-"],
     // **`⎸` U+23B8 is `East_Asian_Width=Neutral` — one cell under both
@@ -944,6 +1002,104 @@ const GLYPH_TABLE: Readonly<Record<Glyph, readonly [unicode: string, ascii: stri
     // nothing else.
     step: ["\u23fa\ufe0e", "*"],
   });
+
+/**
+ * The screen regions each `Glyph` can appear in — what a collision means (SS59).
+ *
+ * **Uniqueness is a property of a region, not of the alphabet.** The ASCII half
+ * is one character out of about ninety printable ones, and three structures draw
+ * from it — this table, `GlyphSet` below, and the design registry. Requiring
+ * every mark in the tree to differ from every other spends the alphabet on pairs
+ * a reader never meets: the sort marks live on a table's header row and
+ * disclosure in a content row's lead, so both may take `v`. What the model
+ * refuses is the pair that shares a row — `row-lead` and `inline` are both
+ * inside `content-row`, which is why a lead mark and a field separator may not
+ * take the same character (F1246).
+ *
+ * **Every member is `row-lead`, and that is what this table is.** `GLYPH_TABLE`
+ * is the vocabulary a *block* names, and a block's glyph is drawn in the gutter
+ * — the first row's lead cell, or every row's for a rail. The table exists all
+ * the same: an assignment that falls out of one sentence today is still the
+ * assignment, and a member added in some other position has somewhere to say so
+ * rather than being covered by a default nobody wrote down.
+ */
+export const GLYPH_DOMAINS: Readonly<Record<Glyph, readonly string[]>> = {
+  ok: ["row-lead"],
+  warn: ["row-lead"],
+  error: ["row-lead"],
+  info: ["row-lead"],
+  pending: ["row-lead"],
+  working: ["row-lead"],
+  running: ["row-lead"],
+  queued: ["row-lead"],
+  cancelled: ["row-lead"],
+  expand: ["row-lead"],
+  collapse: ["row-lead"],
+  focus: ["row-lead"],
+  live: ["row-lead"],
+  bullet: ["row-lead"],
+  quote: ["row-lead"],
+  nested: ["row-lead"],
+  continuation: ["row-lead"],
+  step: ["row-lead"],
+};
+
+/**
+ * The same, for the set C09 draws from on its own account.
+ *
+ * **Unlike `GLYPH_DOMAINS` this one is not one sentence**, because `GlyphSet`'s
+ * rôles are spread across the screen: a frame's own rows, a plot's drawing
+ * region, a table's header, and — for the status group — a block's lead. The
+ * status group is `row-lead` *and* `plot`: `g.warning` leads a status block
+ * (`kinds/status.ts`) while `g.hollow`, `g.filled` and `g.dotted` are points and
+ * outliers inside a plot (`plot/roles.ts`, `plot/glyph-row.ts`).
+ */
+export const GLYPH_SET_DOMAINS: Readonly<Record<keyof GlyphSet, readonly string[]>> = {
+  // The residue mark is a whole row in a container and an in-row shed mark in a
+  // table cell (`kinds/containers.ts`, `shed.ts`) — both, and both inside a row.
+  residue: ["row-lead", "inline"],
+  separator: ["inline"],
+
+  horizontal: ["border"],
+  vertical: ["border"],
+  dashedVertical: ["border"],
+  dashedHorizontal: ["border"],
+  topLeft: ["border"],
+  topRight: ["border"],
+  bottomLeft: ["border"],
+  bottomRight: ["border"],
+  teeDown: ["border"],
+  teeUp: ["border"],
+  teeLeft: ["border"],
+  teeRight: ["border"],
+  stubDown: ["border"],
+  stubUp: ["border"],
+  stubLeft: ["border"],
+  stubRight: ["border"],
+  crossing: ["border"],
+  heavyHorizontal: ["border"],
+  heavyVertical: ["border"],
+  calloutTee: ["border"],
+
+  cursorMark: ["plot"],
+  candleHollow: ["plot"],
+  candleFilled: ["plot"],
+  candleCross: ["plot"],
+  diamond: ["plot"],
+  diamondTee: ["plot"],
+  bar: ["plot"],
+
+  tick: ["row-lead", "plot"],
+  cross: ["row-lead", "plot"],
+  filled: ["row-lead", "plot"],
+  hollow: ["row-lead", "plot"],
+  dotted: ["row-lead", "plot"],
+  blocked: ["row-lead", "plot"],
+  warning: ["row-lead", "plot"],
+
+  sortAsc: ["table-header"],
+  sortDesc: ["table-header"],
+};
 
 /** The pairs, for the test that asserts each is 1:1 by cell count (I5). */
 export const GLYPH_SUBSTITUTIONS: readonly (readonly [string, string])[] = Object.freeze(

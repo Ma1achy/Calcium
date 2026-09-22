@@ -31,6 +31,8 @@ import { COLORMAPS } from "../../src/presentation/theme/colormap.js";
 import { CATEGORY_REFS } from "../../src/presentation/theme/categorical.js";
 import { REQUIRED_SLOTS } from "../../src/presentation/theme/contrast.js";
 import {
+  GLYPH_DOMAINS,
+  GLYPH_SET_DOMAINS,
   GLYPH_SUBSTITUTIONS,
   GLYPH_TOKENS,
   SPINNER_SETS,
@@ -92,6 +94,12 @@ export const CURATED: Readonly<Record<string, unknown>> = {
   SUBSTITUTIONS,
   GLYPH_SUBSTITUTIONS,
   GLYPH_TOKENS,
+  // **The domain assignments are curated and not derived**, and pinning them by
+  // value is the point: SS64 compares marks *within* a domain, so a token moved
+  // from `row-lead` to `plot` would silently retire a clash the rule exists to
+  // report. A moved domain is a ruling and reads like a typo.
+  GLYPH_DOMAINS,
+  GLYPH_SET_DOMAINS,
 
   "glyphs(full)": glyphs(FULL),
   "glyphs(ascii)": glyphs({ ...FULL, unicode: "ascii" }),

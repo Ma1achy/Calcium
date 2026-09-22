@@ -1,0 +1,59 @@
+{
+  "command": "node tools/spinner.js pulse --ms 100",
+  "exitCode": 0,
+  "frameCount": 4,
+  "region": {
+    "row": 2,
+    "col": 6,
+    "width": 1,
+    "height": 1
+  },
+  "sgrHistogram": {
+    "dim": 140,
+    "reset": 224,
+    "16-fg": 84
+  },
+  "unparsedSgr": [],
+  "strippedCsi": {
+    "l": 1,
+    "\\x1b": 477
+  },
+  "perFrame": [
+    {
+      "index": 0,
+      "tMs": 17,
+      "distinctColours": 0,
+      "dualChannelCells": 0,
+      "meanRunLength": 0,
+      "runLengths": []
+    },
+    {
+      "index": 1,
+      "tMs": 126,
+      "distinctColours": 0,
+      "dualChannelCells": 0,
+      "meanRunLength": 0,
+      "runLengths": []
+    },
+    {
+      "index": 2,
+      "tMs": 132,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 1,
+      "runLengths": [
+        1
+      ]
+    },
+    {
+      "index": 3,
+      "tMs": 225,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 1,
+      "runLengths": [
+        1
+      ]
+    }
+  ]
+}

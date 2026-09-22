@@ -517,7 +517,7 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
       expect(d.was.fg).toBe(dim);
       expect(d.now.fg).toBe(accent);
     }
-    expect(diff.map((d) => d.ch).join("").trim(), "the whole residue text and nothing beside it").toBe("⋯ 2 above, 1 below");
+    expect(diff.map((d) => d.ch).join("").trim(), "the whole residue text and nothing beside it").toBe("⋯   2 above, 1 below");
 
     // **The consequence, said rather than absorbed**: three children in a
     // three-row box have no residue row, so focus paints nothing there.

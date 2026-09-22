@@ -1,0 +1,5 @@
+{
+  "command": "claude write a haiku about compilers, then write a second one about garbage collection, then a third about race conditions",
+  "cols": 120,
+  "rows": 40
+}

@@ -140,7 +140,7 @@ describe("C11 tier 2 — planColumns as an interface", () => {
       expect(lines.filter((line) => line.includes(key)).length).toBeGreaterThanOrEqual(3); // cells-ok
     }
     // And the marker says so: every row is expandable, so every row draws one.
-    expect(r.renderToLines(psTable({ rows: 3 }), 80).slice(1).every((l) => l.includes("▸"))).toBe(true);
+    expect(r.renderToLines(psTable({ rows: 3 }), 80).slice(1).every((l) => l.includes("▹"))).toBe(true);
   });
 
   it("T2.5 (I16): `table` is registered through the public register, with no built-in fallback", () => {

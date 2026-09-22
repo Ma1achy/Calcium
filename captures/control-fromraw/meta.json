@@ -1,0 +1,5 @@
+{
+  "command": "node tools/spinner.js pulse --ms 100",
+  "cols": 80,
+  "rows": 24
+}

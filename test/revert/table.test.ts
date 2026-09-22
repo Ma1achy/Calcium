@@ -58,7 +58,7 @@ describe("C11 tier 6", () => {
     expect(frame).toContain("malachy@fmx.io");
 
     // And the marker: a row with no detail is still expandable, so it still says so.
-    expect(visible(r.renderToLines(psTable({ rows: 1 }), 60)[1] ?? "")).toContain("▸");
+    expect(visible(r.renderToLines(psTable({ rows: 1 }), 60)[1] ?? "")).toContain("▹");
   });
 
   it("T6.3 (I4): reordering columns by priority for display → T1.3 fails", () => {

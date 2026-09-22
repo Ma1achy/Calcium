@@ -1,0 +1,225 @@
+[?25l[2J[H[2J[2m  pulse · 100ms/frame · 6 frames · space next · ↑↓ speed · q quit[0m
+
+      [36m✢[0m
+
+  [2m[0m✢[2m ✲ ✱ ✻ ✱ ✲[0m
+
+  [32m✓[0m [2mevery frame one cell, no emoji form[0m
+
+  [2m❯[0m refactor the parser to handle nested quotes
+
+  [36m✢[0m [2mthinking · 4s[0m
+
+  [36m✢[0m edit(src/interaction/parser/parse.ts)
+    [2m⎿ ┌ parse.ts ──────────────────[0m
+    [2m  │[0m [31m41 - let inQuote = false;[0m
+    [2m  │[0m [32m41 + let depth = 0;[0m
+    [2m  └────────────────────────────[0m[H[2J[2m  pulse · 100ms/frame · 6 frames · space next · ↑↓ speed · q quit[0m
+
+      [36m✲[0m
+
+  [2m✢ [0m✲[2m ✱ ✻ ✱ ✲[0m
+
+  [32m✓[0m [2mevery frame one cell, no emoji form[0m
+
+  [2m❯[0m refactor the parser to handle nested quotes
+
+  [36m✲[0m [2mthinking · 4s[0m
+
+  [36m✲[0m edit(src/interaction/parser/parse.ts)
+    [2m⎿ ┌ parse.ts ──────────────────[0m
+    [2m  │[0m [31m41 - let inQuote = false;[0m
+    [2m  │[0m [32m41 + let depth = 0;[0m
+    [2m  └────────────────────────────[0m[H[2J[2m  pulse · 100ms/frame · 6 frames · space next · ↑↓ speed · q quit[0m
+
+      [36m✱[0m
+
+  [2m✢ ✲ [0m✱[2m ✻ ✱ ✲[0m
+
+  [32m✓[0m [2mevery frame one cell, no emoji form[0m
+
+  [2m❯[0m refactor the parser to handle nested quotes
+
+  [36m✱[0m [2mthinking · 4s[0m
+
+  [36m✱[0m edit(src/interaction/parser/parse.ts)
+    [2m⎿ ┌ parse.ts ──────────────────[0m
+    [2m  │[0m [31m41 - let inQuote = false;[0m
+    [2m  │[0m [32m41 + let depth = 0;[0m
+    [2m  └────────────────────────────[0m[H[2J[2m  pulse · 100ms/frame · 6 frames · space next · ↑↓ speed · q quit[0m
+
+      [36m✻[0m
+
+  [2m✢ ✲ ✱ [0m✻[2m ✱ ✲[0m
+
+  [32m✓[0m [2mevery frame one cell, no emoji form[0m
+
+  [2m❯[0m refactor the parser to handle nested quotes
+
+  [36m✻[0m [2mthinking · 4s[0m
+
+  [36m✻[0m edit(src/interaction/parser/parse.ts)
+    [2m⎿ ┌ parse.ts ──────────────────[0m
+    [2m  │[0m [31m41 - let inQuote = false;[0m
+    [2m  │[0m [32m41 + let depth = 0;[0m
+    [2m  └────────────────────────────[0m[H[2J[2m  pulse · 100ms/frame · 6 frames · space next · ↑↓ speed · q quit[0m
+
+      [36m✱[0m
+
+  [2m✢ ✲ ✱ ✻ [0m✱[2m ✲[0m
+
+  [32m✓[0m [2mevery frame one cell, no emoji form[0m
+
+  [2m❯[0m refactor the parser to handle nested quotes
+
+  [36m✱[0m [2mthinking · 4s[0m
+
+  [36m✱[0m edit(src/interaction/parser/parse.ts)
+    [2m⎿ ┌ parse.ts ──────────────────[0m
+    [2m  │[0m [31m41 - let inQuote = false;[0m
+    [2m  │[0m [32m41 + let depth = 0;[0m
+    [2m  └────────────────────────────[0m[H[2J[2m  pulse · 100ms/frame · 6 frames · space next · ↑↓ speed · q quit[0m
+
+      [36m✲[0m
+
+  [2m✢ ✲ ✱ ✻ ✱ [0m✲[2m[0m
+
+  [32m✓[0m [2mevery frame one cell, no emoji form[0m
+
+  [2m❯[0m refactor the parser to handle nested quotes
+
+  [36m✲[0m [2mthinking · 4s[0m
+
+  [36m✲[0m edit(src/interaction/parser/parse.ts)
+    [2m⎿ ┌ parse.ts ──────────────────[0m
+    [2m  │[0m [31m41 - let inQuote = false;[0m
+    [2m  │[0m [32m41 + let depth = 0;[0m
+    [2m  └────────────────────────────[0m[H[2J[2m  pulse · 100ms/frame · 6 frames · space next · ↑↓ speed · q quit[0m
+
+      [36m✢[0m
+
+  [2m[0m✢[2m ✲ ✱ ✻ ✱ ✲[0m
+
+  [32m✓[0m [2mevery frame one cell, no emoji form[0m
+
+  [2m❯[0m refactor the parser to handle nested quotes
+
+  [36m✢[0m [2mthinking · 4s[0m
+
+  [36m✢[0m edit(src/interaction/parser/parse.ts)
+    [2m⎿ ┌ parse.ts ──────────────────[0m
+    [2m  │[0m [31m41 - let inQuote = false;[0m
+    [2m  │[0m [32m41 + let depth = 0;[0m
+    [2m  └────────────────────────────[0m[H[2J[2m  pulse · 100ms/frame · 6 frames · space next · ↑↓ speed · q quit[0m
+
+      [36m✲[0m
+
+  [2m✢ [0m✲[2m ✱ ✻ ✱ ✲[0m
+
+  [32m✓[0m [2mevery frame one cell, no emoji form[0m
+
+  [2m❯[0m refactor the parser to handle nested quotes
+
+  [36m✲[0m [2mthinking · 4s[0m
+
+  [36m✲[0m edit(src/interaction/parser/parse.ts)
+    [2m⎿ ┌ parse.ts ──────────────────[0m
+    [2m  │[0m [31m41 - let inQuote = false;[0m
+    [2m  │[0m [32m41 + let depth = 0;[0m
+    [2m  └────────────────────────────[0m[H[2J[2m  pulse · 100ms/frame · 6 frames · space next · ↑↓ speed · q quit[0m
+
+      [36m✱[0m
+
+  [2m✢ ✲ [0m✱[2m ✻ ✱ ✲[0m
+
+  [32m✓[0m [2mevery frame one cell, no emoji form[0m
+
+  [2m❯[0m refactor the parser to handle nested quotes
+
+  [36m✱[0m [2mthinking · 4s[0m
+
+  [36m✱[0m edit(src/interaction/parser/parse.ts)
+    [2m⎿ ┌ parse.ts ──────────────────[0m
+    [2m  │[0m [31m41 - let inQuote = false;[0m
+    [2m  │[0m [32m41 + let depth = 0;[0m
+    [2m  └────────────────────────────[0m[H[2J[2m  pulse · 100ms/frame · 6 frames · space next · ↑↓ speed · q quit[0m
+
+      [36m✻[0m
+
+  [2m✢ ✲ ✱ [0m✻[2m ✱ ✲[0m
+
+  [32m✓[0m [2mevery frame one cell, no emoji form[0m
+
+  [2m❯[0m refactor the parser to handle nested quotes
+
+  [36m✻[0m [2mthinking · 4s[0m
+
+  [36m✻[0m edit(src/interaction/parser/parse.ts)
+    [2m⎿ ┌ parse.ts ──────────────────[0m
+    [2m  │[0m [31m41 - let inQuote = false;[0m
+    [2m  │[0m [32m41 + let depth = 0;[0m
+    [2m  └────────────────────────────[0m[H[2J[2m  pulse · 100ms/frame · 6 frames · space next · ↑↓ speed · q quit[0m
+
+      [36m✱[0m
+
+  [2m✢ ✲ ✱ ✻ [0m✱[2m ✲[0m
+
+  [32m✓[0m [2mevery frame one cell, no emoji form[0m
+
+  [2m❯[0m refactor the parser to handle nested quotes
+
+  [36m✱[0m [2mthinking · 4s[0m
+
+  [36m✱[0m edit(src/interaction/parser/parse.ts)
+    [2m⎿ ┌ parse.ts ──────────────────[0m
+    [2m  │[0m [31m41 - let inQuote = false;[0m
+    [2m  │[0m [32m41 + let depth = 0;[0m
+    [2m  └────────────────────────────[0m[H[2J[2m  pulse · 100ms/frame · 6 frames · space next · ↑↓ speed · q quit[0m
+
+      [36m✲[0m
+
+  [2m✢ ✲ ✱ ✻ ✱ [0m✲[2m[0m
+
+  [32m✓[0m [2mevery frame one cell, no emoji form[0m
+
+  [2m❯[0m refactor the parser to handle nested quotes
+
+  [36m✲[0m [2mthinking · 4s[0m
+
+  [36m✲[0m edit(src/interaction/parser/parse.ts)
+    [2m⎿ ┌ parse.ts ──────────────────[0m
+    [2m  │[0m [31m41 - let inQuote = false;[0m
+    [2m  │[0m [32m41 + let depth = 0;[0m
+    [2m  └────────────────────────────[0m[H[2J[2m  pulse · 100ms/frame · 6 frames · space next · ↑↓ speed · q quit[0m
+
+      [36m✢[0m
+
+  [2m[0m✢[2m ✲ ✱ ✻ ✱ ✲[0m
+
+  [32m✓[0m [2mevery frame one cell, no emoji form[0m
+
+  [2m❯[0m refactor the parser to handle nested quotes
+
+  [36m✢[0m [2mthinking · 4s[0m
+
+  [36m✢[0m edit(src/interaction/parser/parse.ts)
+    [2m⎿ ┌ parse.ts ──────────────────[0m
+    [2m  │[0m [31m41 - let inQuote = false;[0m
+    [2m  │[0m [32m41 + let depth = 0;[0m
+    [2m  └────────────────────────────[0m[H[2J[2m  pulse · 100ms/frame · 6 frames · space next · ↑↓ speed · q quit[0m
+
+      [36m✲[0m
+
+  [2m✢ [0m✲[2m ✱ ✻ ✱ ✲[0m
+
+  [32m✓[0m [2mevery frame one cell, no emoji form[0m
+
+  [2m❯[0m refactor the parser to handle nested quotes
+
+  [36m✲[0m [2mthinking · 4s[0m
+
+  [36m✲[0m edit(src/interaction/parser/parse.ts)
+    [2m⎿ ┌ parse.ts ──────────────────[0m
+    [2m  │[0m [31m41 - let inQuote = false;[0m
+    [2m  │[0m [32m41 + let depth = 0;[0m
+    [2m  └────────────────────────────[0m

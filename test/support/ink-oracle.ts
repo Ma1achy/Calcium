@@ -59,6 +59,8 @@ const LADDER =
   "C09 I81 (F1233): the kind's narrow ladder replaced a cut taken from every part at once";
 const HEADER =
   "C09 I82 (F1236): the header reserves the verdict's cells, so its label names the column its values are in";
+const RESIDUE_SLOT =
+  "R-GLY-001 (M4): the residue mark is a declared three-cell slot at every rung — `...` by the design, `⋯` padded to match — where Ink drew a one-cell `~`";
 
 const RETIRED: ReadonlyMap<string, string> = new Map(
   (
@@ -68,19 +70,38 @@ const RETIRED: ReadonlyMap<string, string> = new Map(
       // arrived, and a shared reason would have said `C09 I81` over captures
       // that ruling never touched — a claim about a frame that nothing would re-read
       // (F1236).
-      ["keyValue-kv-1", [2, 12], LADDER],
-      ["events-events-1", [2, 12, 24], LADDER],
-      ["comparison-comparison-1", [2, 12], LADDER],
+      ["t2143-keyValue-kv-1", [2, 12], LADDER],
+      ["t2143-events-events-1", [2, 12, 24], LADDER],
+      ["t2143-comparison-comparison-1", [2, 12], LADDER],
       // **Every width the ladder did not already take**, which is what makes
       // this list a measurement rather than a guess: the header moves wherever
       // the `b` column is drawn at all, and below 24 the ladder had already
       // shed it. Named before the run and read after — 27 entries, and the diff
       // is one row of each.
-      ["comparison-comparison-1", [24, 32, 40, 60, 80, 100, 120, 160, 200], HEADER],
+      ["t2143-comparison-comparison-1", [24, 32, 40, 60, 80, 100, 120, 160, 200], HEADER],
+      // **The two blocks that draw a residue row, and every width bar one.**
+      // Named from a measured sweep and read after: 64 captures, both `scroll`
+      // kinds, three capability sets — and `full` at two columns is **not** in
+      // it, because at two cells the padded `⋯` truncates to exactly what the
+      // bare one did. An exemption list that is driven is what makes that
+      // absence worth stating rather than rounding up to a cross product.
+      ["t2143-scroll-scroll-1", [12, 24, 32, 40, 60, 80, 100, 120, 160, 200], RESIDUE_SLOT],
+      ["t2143-scroll-adv-overfull-scroll", [12, 24, 32, 40, 60, 80, 100, 120, 160, 200], RESIDUE_SLOT],
+      ["t2143-scroll-scroll-1", [2], RESIDUE_SLOT, ["ascii", "mono"]],
+      ["t2143-scroll-adv-overfull-scroll", [2], RESIDUE_SLOT, ["ascii", "mono"]],
+      // T2.144's container corpus draws the same row from two more scrolls, and
+      // the width-2 asymmetry repeats exactly — which is the measurement
+      // agreeing with itself across two independent sweeps.
+      ["t2144-scroll-sc-residue", [12, 24, 32, 40, 60, 80, 100, 120, 160, 200], RESIDUE_SLOT],
+      ["t2144-scroll-sc-off", [12, 24, 32, 40, 60, 80, 100, 120, 160, 200], RESIDUE_SLOT],
+      ["t2144-scroll-sc-residue", [2], RESIDUE_SLOT, ["ascii", "mono"]],
+      ["t2144-scroll-sc-off", [2], RESIDUE_SLOT, ["ascii", "mono"]],
     ] as const
-  ).flatMap(([key, widths, why]) =>
+  ).flatMap(([key, widths, why, only]) =>
     widths.flatMap((width) =>
-      ["full", "ascii", "mono"].map((caps) => [oracleName(`t2143-${key}`, caps, width), why] as const),
+      (only ?? ["full", "ascii", "mono"]).map(
+        (caps) => [oracleName(key, caps, width), why] as const,
+      ),
     ),
   ),
 );

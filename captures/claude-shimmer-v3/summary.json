@@ -1,0 +1,446 @@
+{
+  "command": "claude what is 2+2? answer in one word.",
+  "exitCode": null,
+  "frameCount": 40,
+  "region": {
+    "row": 0,
+    "col": 0,
+    "width": 120,
+    "height": 40
+  },
+  "sgrHistogram": {
+    "24bit-fg": 401,
+    "24bit-bg": 31,
+    "default-bg": 13,
+    "default-fg": 58,
+    "bold": 1,
+    "normal-intensity": 4,
+    "dim": 3,
+    "16-fg": 13,
+    "unknown-4": 1,
+    "unknown-24": 1
+  },
+  "unparsedSgr": [
+    4,
+    24
+  ],
+  "strippedCsi": {
+    "r": 3,
+    "h": 64,
+    "\\x1b": 692,
+    "l": 72,
+    "q": 2,
+    "c": 2,
+    "m": 5,
+    "u": 5,
+    "\\x07": 10,
+    "B": 95,
+    "G": 88,
+    "C": 55,
+    "K": 8,
+    "n": 1,
+    "\\x0f": 2
+  },
+  "perFrame": [
+    {
+      "index": 0,
+      "tMs": 247,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 2,
+      "runLengths": [
+        2
+      ]
+    },
+    {
+      "index": 1,
+      "tMs": 930,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 14,
+      "runLengths": [
+        14
+      ]
+    },
+    {
+      "index": 2,
+      "tMs": 1064,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 3,
+      "tMs": 1117,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 4,
+      "tMs": 1492,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 5,
+      "tMs": 1662,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 6,
+      "tMs": 1716,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 7,
+      "tMs": 1833,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 8,
+      "tMs": 1959,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 9,
+      "tMs": 2025,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 10,
+      "tMs": 2163,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 11,
+      "tMs": 2204,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 12,
+      "tMs": 2501,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 13,
+      "tMs": 2722,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 14,
+      "tMs": 2841,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 15,
+      "tMs": 2960,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 16,
+      "tMs": 3060,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 17,
+      "tMs": 3288,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 18,
+      "tMs": 3304,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 19,
+      "tMs": 3509,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 20,
+      "tMs": 3729,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 21,
+      "tMs": 3848,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 22,
+      "tMs": 3946,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 23,
+      "tMs": 4067,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 24,
+      "tMs": 4285,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 25,
+      "tMs": 4301,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 26,
+      "tMs": 4524,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 27,
+      "tMs": 4746,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 28,
+      "tMs": 4847,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 29,
+      "tMs": 4907,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 30,
+      "tMs": 5128,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 31,
+      "tMs": 5213,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 32,
+      "tMs": 5557,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 33,
+      "tMs": 6290,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 34,
+      "tMs": 7292,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 35,
+      "tMs": 8294,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 36,
+      "tMs": 9294,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 37,
+      "tMs": 10302,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 38,
+      "tMs": 10940,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    },
+    {
+      "index": 39,
+      "tMs": 11295,
+      "distinctColours": 1,
+      "dualChannelCells": 0,
+      "meanRunLength": 120,
+      "runLengths": [
+        120
+      ]
+    }
+  ]
+}

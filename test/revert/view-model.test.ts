@@ -24,7 +24,7 @@ import { ASCII_CAPS, FULL_CAPS, measurable } from "../support/render.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { createViewport } from "../../src/viewport/viewport/index.js";
 import { measureSequence } from "../support/viewport.js";
-import { SUBSTITUTIONS } from "../../src/presentation/blocks/index.js";
+import { RESIDUE_CELLS, SUBSTITUTIONS, residueLead } from "../../src/presentation/blocks/index.js";
 import { cells } from "../../src/presentation/text.js";
 import { checkAsciiParity, formatReport } from "../../src/testing/measurement-conformance.js";
 
@@ -338,11 +338,23 @@ describe("C04 fail-on-revert", () => {
   });
 
   it("T6.3: an ASCII fallback glyph of a different width → T2.6 fails", () => {
-    // The 1:1 rule made checkable: every substitution is one cell on both
-    // sides, so a fixture's measured height is identical in both unicode
-    // modes. A two-cell fallback would pass every test run in a UTF-8 locale.
+    // The slot rule made checkable: every substitution fits the slot it
+    // declares on both sides, so a fixture's measured height is identical in
+    // both unicode modes. A fallback wider than its slot would pass every test
+    // run in a UTF-8 locale.
+    //
+    // **`residue` is the one slot wider than a cell** — the design declares
+    // `ellipsis` at `reservedCells: 3` (R-GLY-001) and `residueLead` pads both
+    // renderings to it, so parity holds through a slot rather than through a
+    // character (T2.5, amended).
     for (const [unicode, ascii] of SUBSTITUTIONS) {
+      if (unicode === "\u22ef") continue;
       expect(cells(ascii), `${unicode} → ${ascii}`).toBe(cells(unicode));
+    }
+    for (const caps of [FULL_CAPS, ASCII_CAPS]) {
+      expect(cells(residueLead(caps), caps.ambiguousWidth), "the residue slot is the same at both arms").toBe(
+        RESIDUE_CELLS,
+      );
     }
 
     const report = checkAsciiParity(

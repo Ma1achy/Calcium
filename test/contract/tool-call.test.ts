@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { block, validateDocument } from "../../src/data/viewmodel/index.js";
 import { cardBody, entryLayout } from "../../src/shell/entry-layout.js";
 import type { Action, Block, TextSpan } from "../../src/data/viewmodel/index.js";
-import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
+import { createBlockRegistry, residueLead } from "../../src/presentation/blocks/index.js";
 import { GLYPH_TOKENS, glyphCells, glyphFor } from "../../src/presentation/blocks/glyphs.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import { toolCallDoc, toolCallHeader } from "../../src/shell/documents.js";
@@ -150,7 +150,9 @@ describe("§9c — the header, the body, and the row the body already has", () =
       const folded = toolCallDoc("run_command", { name: "run_command", args: "npm test", output: out(392), height: 3, collapsed: true }, META, caps).blocks;
       const mark = ascii ? "*" : "⏺︎";
       const hook = ascii ? "`" : "⎿";
-      const more = ascii ? "~" : "⋯";
+      // The residue lead, padded to its three-cell slot at either rung
+      // (R-GLY-001, T2.5): `...` by the design, `⋯` padded to match.
+      const more = residueLead(ascii ? ASCII_CAPS : FULL_CAPS);
       const sep = ascii ? ":" : "·";
       const spin = spinnerFrames(caps)[0] ?? "";
 

@@ -194,7 +194,7 @@ describe("C04 §3c — the frame, read", () => {
     expect(frame(block), "two children and the residue, and nothing else at all").toEqual([
       "a",
       "b",
-      "⋯ 0 above, 2 below",
+      "⋯   0 above, 2 below",
     ]);
   });
 
@@ -213,7 +213,7 @@ describe("C04 §3c — the frame, read", () => {
     expect(frame(block, 40, { s: 99 }), "the last two children, not nothing").toEqual([
       "c",
       "d",
-      "⋯ 2 above, 0 below",
+      "⋯   2 above, 0 below",
     ]);
   });
 
@@ -504,17 +504,17 @@ describe("C04 §3c — the residue row's two texts", () => {
     renderSequenceToLines(registry, [block], width, { theme: DARK_THEME, capabilities: caps, focus: null, scrollOffsets })
       .map((line) => line.replace(/\u001b\[[0-9;]*m/gu, "").trimEnd());
 
-  it("T2.113 (C04 I104): a collapsed box reads `⋯ +N more`, an open box paged to its middle reads `⋯ N above, M below`, and neither names a key", () => {
+  it("T2.113 (C04 I104): a collapsed box reads `⋯   +N more`, an open box paged to its middle reads `⋯   N above, M below`, and neither names a key", () => {
     const children = Array.from({ length: 392 }, (_u, i) => flat(`c${String(i)}`));
     const folded = { ...scroll(5, children), collapsed: true } as Scroll;
     for (const width of [80, 20]) {
-      expect(render(folded, width)).toEqual(["⋯ +392 more"]);
-      expect(render(folded, width, ASCII_CAPS)).toEqual(["~ +392 more"]);
+      expect(render(folded, width)).toEqual(["⋯   +392 more"]);
+      expect(render(folded, width, ASCII_CAPS)).toEqual(["... +392 more"]);
     }
     const open = scroll(5, children);
     const paged = render(open, 80, FULL_CAPS, { s: 200 });
     expect(paged).toHaveLength(6);
-    const m = /^⋯ (\d+) above, (\d+) below$/u.exec(paged[5] ?? "");
+    const m = /^⋯   (\d+) above, (\d+) below$/u.exec(paged[5] ?? "");
     expect(m, "the open box states both directions").not.toBeNull();
     expect(Number(m?.[1]) + Number(m?.[2]) + 5, "N + M + interior is the content").toBe(392);
     for (const row of [...render(folded, 80), ...paged]) {
@@ -560,7 +560,7 @@ describe("C09 §6b — the second caller, and the bound it applies", () => {
       "build step 28 of 30",
       "build step 29 of 30",
     ]);
-    expect(drawn[6], "and the residue counts the window that was applied").toBe("⋯ 24 above, 0 below");
+    expect(drawn[6], "and the residue counts the window that was applied").toBe("⋯   24 above, 0 below");
   });
 
   it("T3.76 (C09 I59, §6b): an atomic child taller than the box still over-draws — the recorded limit, with its number", () => {

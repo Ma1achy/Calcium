@@ -147,7 +147,7 @@ describe("interaction-catalogue — the corpus renders", () => {
     }
     expect(moved.length).toBeGreaterThan(0);
     expect(new Set(moved.map((m) => m.row)), "the residue row and no other").toEqual(new Set([3]));
-    expect(moved.map((m) => m.ch).join("").trim()).toBe("⋯ 2 above, 1 below");
+    expect(moved.map((m) => m.ch).join("").trim()).toBe("⋯   2 above, 1 below");
     for (const m of moved) {
       expect(m.was).toBe(dim);
       expect(m.now).toBe(accent);

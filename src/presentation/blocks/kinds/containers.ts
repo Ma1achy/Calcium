@@ -25,7 +25,7 @@ import type { Block, Group, MeasureFn, Mosaic, MosaicRect, Panel, Scroll, WidthF
 import { axesOf, groupPlacements, mosaicRects, parseAreas } from "../../../data/viewmodel/index.js";
 import type { NavElement } from "../types.js";
 import { cells, sliceCells, stripControl, truncate } from "../../text.js";
-import { glyphCells, glyphFor, glyphs } from "../glyphs.js";
+import { glyphCells, glyphFor, glyphs, residueLead } from "../glyphs.js";
 import { clampSpans, paint, rows, tone } from "../paint.js";
 import { composeRow, fitRow, placeRows, type Placed } from "../../rows.js";
 import { layout, measure as solveHeight, type Box, type Size } from "../../layout/index.js";
@@ -437,7 +437,6 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
     const interior = interiorOf(block);
     const content = contentHeight(block, width, ctx.measureChild);
     const offset = offsetOf(block, ctx, content);
-    const g = glyphs(ctx.capabilities);
 
     const ranges = childRanges(block, width, ctx.measureChild);
     const shown = ranges.filter((r) => r.to > offset && r.from < offset + interior);
@@ -486,8 +485,8 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
       // the affordance is `activate`, and the footer shows its label (C16 I19).
       const text =
         interior === 0
-          ? `${g.residue} +${String(content)} more`
-          : `${g.residue} ${String(above)} above, ${String(below)} below`;
+          ? `${residueLead(ctx.capabilities)} +${String(content)} more`
+          : `${residueLead(ctx.capabilities)} ${String(above)} above, ${String(below)} below`;
       residueRow = paint(clampSpans([{ text: truncate(text, width, ctx.capabilities), style: dim }], width, ctx.capabilities));
     }
 
