@@ -1230,3 +1230,15 @@ describe("C16 §7 and §4a — the epoch, the question guard and pointer commit 
     expect(router.commitPointer("a")).toBe(false);
   });
 });
+
+describe("C16 §4a — the dismissing click and the scroll order, owed at the spec commit (M8)", () => {
+  it.todo(
+    "T1.103 (C16 I47, R-BLK-854, R-BLK-855): a press beside a panel closes it and reaches no target; T1.103b, a press on it is the panel's, and a press beside a blocking layer closes nothing and does nothing — not deferred on a component: the panel kind and the two fields land in the same MR",
+  );
+  it.todo(
+    "T1.104 (C16 I48, C15 I23, R-BLK-779): a wheel over a placed panel is the panel's and the transcript does not move; the control is the same wheel one row outside it — not deferred on a component",
+  );
+  it.todo(
+    "T1.105 (C16 I48, R-SEL-012): a scroll inside a scroll takes the wheel at the depth the pointer is in, both counters asserted after each step — not deferred on a component",
+  );
+});

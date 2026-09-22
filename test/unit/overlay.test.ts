@@ -296,3 +296,21 @@ describe("C15 §2b — approval is a layer, owed at the spec commit", () => {
     "T1.27 (C15 I24, §2b): approvalPrompt's options through the confirm host produce an overlay whose blocks are the invocation notice, the warn consequence when supplied and none when not, and the host's 3-column choice table with always allow as an ordinary row; activeTarget answers overlay; deny pops it and the entry reads denied — not deferred on a component: approvalPrompt lands with C4 of the call grammar",
   );
 });
+
+describe("C15 §2c — blocking and dismissal are two fields, owed at the spec commit (M8)", () => {
+  it.todo(
+    "T1.29 (C15 I26, R-QST-001, R-BLK-822): blocking and dismissal are read from the layer and nowhere else — a fill-placed non-blocking layer is not modal and a one-row blocking layer is, and the typed reply's blocking-and-floating is the combination that proves them independent — not deferred on a component: the fields and C16's step 3 land together in this MR",
+  );
+  it.todo(
+    "T1.30 (C15 I3, I26): pop() removes an escape layer, leaves an answer layer and leaves a focus layer — three values, three answers, in one stack — not deferred on a component",
+  );
+  it.todo(
+    "T1.31 (C15 I27, R-BLK-779): push and update refuse a centred panel, a fill panel, a blocking panel and a panel whose dismissal is not escape; the control is the anchored non-blocking escape one — not deferred on a component",
+  );
+  it.todo(
+    "T1.32 (C15 I28, R-BLK-873): pushing a blocking layer dismisses every escape layer first, each with its own change carrying its id, before the push returns; the control is a non-blocking push, which leaves them — not deferred on a component",
+  );
+  it.todo(
+    "T1.33 (C15 I23, R-BLK-779): a stack pushed in every order sorts view · peek · panel · overlay bottom-first, asserted as the whole sequence of ids — not deferred on a component",
+  );
+});
