@@ -819,3 +819,20 @@ describe("C10 I41 — the shipped quantisations", () => {
     expect(quantisedHex({ ...light, surfaces: perturbed } as never, "bg"), "read through quantisedHex").toBe(cubeHexOf(fresh["bg"]!));
   });
 });
+
+/**
+ * C10 I48 — the ladder under a ground, owed at the spec commit.
+ *
+ * Two rows because the ground does two different things down the ladder: it is
+ * in the key at every rung that has a value, and it is **inert** at the two
+ * rungs that carry no hex of the theme's own. A limit stated in prose is a
+ * limit nothing measures.
+ */
+describe("C10 I48 — the ground down the degradation ladder", () => {
+  it.todo(
+    "T3.74 (I48, I11): the ground is in the cache key \u2014 one ref on the page and on a composing ground yields two styles with the cache warm, in either order, and `cacheSize` grows by two; a key without the ground serves the first answer to the second caller and the value it serves is a legal one \u2014 not deferred on a component: it lands with I48's resolver change in this same MR",
+  );
+  it.todo(
+    "T3.75 (I48, \u00a73): at 8-bit a composed set quantises as a set on its ground, rank order preserved within it and a moved slot picking a different cube entry from the page's; at 4-bit and 1-bit the answer with a ground is identical to the answer without one \u2014 not deferred on a component: it lands with I48's resolver change in this same MR",
+  );
+});

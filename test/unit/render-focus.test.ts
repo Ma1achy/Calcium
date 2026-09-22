@@ -766,3 +766,18 @@ describe("C11 §5b — the reserved gutter", () => {
     }
   });
 });
+
+/**
+ * C11 I14 — a row on a ground keeps its cells' tones, owed at the spec commit.
+ *
+ * Asserted through `inkOn` rather than against a hex, so the row is the rule and
+ * not the theme's current values (C10 I48).
+ */
+describe("C11 I14 — the ink a focused or selected row takes", () => {
+  it.todo(
+    "T2.13 (I14, C10 I48, \u00a74k.2 row 1, F1240): a focused row and a selected row keep every cell's own tone \u2014 a `tone: \"error\"` cell inks as the theme's composed `tone.error` for the ground the row took, and not as `accent` or `default`; a span's own tone survives the same way; on a banded theme it is the band's single ink, which is the same rule and not an exception \u2014 not deferred on a component: it lands with C10 I48's resolver change in this same MR",
+  );
+  it.todo(
+    "T6.25 (I14, F1240): restoring the drop-to-one-ink map in `rowSpans` \u2192 T2.13 fails and the case 1 composition frame moves at all three rungs \u2014 not deferred on a component: it lands with C10 I48's resolver change in this same MR",
+  );
+});

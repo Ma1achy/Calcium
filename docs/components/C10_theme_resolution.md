@@ -1117,21 +1117,23 @@ does not apply. A table of four would have read as *the list always decides*.
   elements and reads `ctx.focus` nowhere**, so no patch row can be focused or selected. The
   ground is not missing; the **addressability** is. That is a C25 change and not a C10 one, and
   it is the only one of the three whose remedy does not begin with a new field.
-- **Row 1's third clause is not met, and the frame is what said so** (F1240). *Failure keeps its
-  glyph, its word and its tone* — the frame keeps two. A focused or selected row is repainted in
-  **one ink**, `accent` under focus and `default` under selection alone, which is C11 I14's shipped
-  rule. **And retiring I14 on its own would be wrong**, which is why this is one change and not two:
-  the flat `tone.error` is `#f05a5a` and the theme already says the ink on the selection ground is
-  `#ff9b91`. That answer comes from `inkOn`, which carries the per-theme overrides and both
-  high-contrast bands — **and `inkOn` is called from `contrast.ts` and nowhere else.** `resolve`
-  takes `(ref, theme, caps)` and has no surface parameter, so the painter cannot ask the question:
-  74 of 100 tone × surface pairs across five themes are an ink the gate checks and the painter never
-  emits, and R-THM-003's *one ink per band at ≥ 7:1* is verified against values the terminal never
-  receives. The remedy is `resolve` gaining the surface, `inkOn` becoming its composition step, and
-  I14 retiring in the same commit; every golden with colour moves. It belongs with **M11**, whose
-  subject is the contrast gate, and the composition snapshots carry it in their own text so the frame
-  is not read as the ruling being met. **The third instance of this session's shape** — `focusGround`
-  with a gate and no reader, `▸` with no reader at all — and the largest of the three.
+- **Row 1's third clause was not met, and the frame is what said so — and it is met now** (F1240, I48).
+  *Failure keeps its glyph, its word and its tone* — the frame kept two. A focused or selected row was
+  repainted in **one ink**, `accent` under focus and `default` under selection alone, which was C11 I14's
+  shipped rule. **And retiring I14 on its own would have been wrong**, which is why it landed as one change
+  and not two: the flat `tone.error` is `#f05a5a` and the theme already says the ink on the selection ground
+  is `#ff9b91`. That answer comes from `inkOn`, which carries the per-theme compositions and both
+  high-contrast bands — **and `inkOn` was called from `contrast.ts` and nowhere else.** `resolve` took
+  `(ref, theme, caps)` and had no ground to ask about, so the painter could not put the question:
+  74 of 100 tone × surface pairs across the five composing themes were an ink the gate checked and the
+  painter never emitted, and R-THM-003's *one ink per band at ≥ 7 : 1* was verified against values the
+  terminal never received. **The remedy is I48 and it is built**: `resolve` gains the ground, `inkOn`
+  becomes its composition step, C11 I14 retires its drop-to-one-ink clause, and the composition frames
+  report each run's ink beside the ground it stands on — so the row that would have gone quiet is the row
+  that reads the two values back. It was written as M11's, whose subject is the contrast gate, and it is
+  **not a gate gap**: the band promise is true in the validator and was false on screen, so the high-contrast
+  bands painted the wrong inks in every frame they drew. **The third instance of this session's shape** —
+  `focusGround` with a gate and no reader, `▸` with no reader at all — and the largest of the three.
 - **So the classification above is the ruling for all six, and the golden frames land for the
   compositions a producer can construct** — focused+selected+failed and focus over a heatmap
   today, the other four with the change that gives each a subject. A frame that fakes the state
@@ -1334,7 +1336,7 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 - **I8** — Surfaces follow the same degradation ladder as tones, and vanish entirely at 1-bit.
 - **I9** — No tone resolves to the variant's own `bg`.
 - **I10** — Switching is atomic; no render observes a partially applied theme.
-- **I11** — The memo cache is keyed on `(tone, themeName, colourDepth)` and cleared on every switch and override.
+- **I11** — The memo cache is keyed on `(ref, themeName, colourDepth, ground)` and cleared on every switch and override. **The ground is in the key because it is in the answer** (I48): one ref resolves to one ink per ground, so a key without it serves the page's ink to a caller that asked about the selection band — the defect I48 exists to end, arriving one layer down and invisible because the value returned is a legal one.
 - **I12** — C10 reads no environment; capabilities are injected (C02 I5).
 - **I13** — `ThemeTokens` is authored in 24-bit hex only; no token file contains an ANSI index or a terminal-specific value. The curated 4-bit map is not token data and lives in its own module (§2), which is SS19's single named exception.
 - **I14** — A block names a palette slot and never embeds a colour value.
@@ -1411,6 +1413,8 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
   **A separate function rather than a term inside `floorFor`, because it is a different kind of claim.** `FLOORS` is per slot and says what a *slot* needs; this is per theme and says what a *theme* undertakes, over every meaning ink it has and every surface it paints text on. Folding one into the other would make `floorFor(slot)` answer differently depending on a theme it is not given, and four call sites would have to start passing one.
 
   **The remedy the rule names is composition, not a lighter ground.** `hcLight` clears 7 : 1 by composing four darker inks for `bgElev` — `muted #525252→#4d4d4d`, `ok #005c00→#005b00`, `error #a80000→#a10000`, `identifier #00595e→#00575b`, each darkened along its own RGB ray so the hue is unchanged and only the value moves, by the least that clears. The alternative was one declaration — `bgElev` from `#ebebeb` to `#f5f5f5` — and it would have shrunk the elevation step against `#ffffff` from 9% lightness to 4%, on the theme whose point is that surfaces are tellable apart. **An elevated surface a reader cannot tell from the page is the failure the theme exists to prevent**, so the ground is what does not move. Four and not eight because `syntax.comment` `key` `operator` `string` derive from those four tones and inherit their composition. Asserted afterwards, because darkening four inks toward a floor is the edit that converges a palette: ten distinct tones on `bgElev`, closest pair 58 units apart in RGB, `muted` still recessive at 7.09 against `default`'s 17.62, and the tightest meaning pair in the theme exactly **7.00** (T2.24, T6.22).
+- **I48** — *(R-THM-001, R-THM-003, R-THM-004)* **The resolver takes the ground a run lands on, and `inkOn` is its composition step.** `resolve(ref, theme, caps, on?)` and `resolveTone(tone, theme, caps, on?)` answer *what ink does this slot take on that ground*; `on` absent is the page, which is every existing call site unchanged. **The composition is one function and it is the gate's own** — the band first (R-THM-003), then the theme's `(ground, ref)` composition (R-THM-001), then the flat slot — so the painter and `validateTokens` read one answer rather than two implementations of one rule. **This is what makes every floor in this component a claim about a drawn frame.** Before it, `inkOn` was called from `contrast.ts` and nowhere else and `resolve` had no ground to ask about, so **74 of 100 tone × surface pairs across the five themes that compose were an ink the gate checked and the painter never emitted** — R-THM-003's *one ink per band* verified against values the terminal never received, which is A03 §2's vacuity class wearing a passing gate (F1240). **The ladder is unchanged, and the ground binds on the two rungs that carry the theme's own values**: at 24-bit the composed hex is the hex; at 8-bit the composed inks are quantised **as a set on that ground**, per `(theme, palette, ground)`, because rank order and distinctness are properties of a set and a per-slot neighbour can see neither (§3). **At 4-bit and 1-bit the ground is inert, and that is a limit rather than an omission**: 4-bit is a curated sixteen-entry map the theme authored per ref and composed no second time, and at 1-bit no colour is emitted at all (I2), so there is no ink for a ground to change — a floor is a 24-bit claim and those two rungs already depart from the hexes wholesale. **What it does not reach, stated because an unrecorded limit reads as strength**: a ground reaches the resolver only where a painter passes it, so a renderer that washes a region and forgets to say so paints the page's ink on it. The seam is `RunContext.on` and the row that watches it is the composition frame, which reports each run's ink **beside the ground it stands on** rather than asserting one in isolation.
+
 
 ## 8. Commitments
 
@@ -1451,6 +1455,7 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 35. **The shipped set's quantisations are generated, shipped and checked** (I41). `tools/theme/quantised.mjs` writes `src/presentation/theme/quantised.generated.ts` from `dist/`; the resolver reads it before it computes; T3.73 holds the two in step.
 36. **A theme's promise is a field, not a name** (I43, R-THM-002). The high-contrast themes were named for a ratio and shipped without one; `floor` makes the ratio declarable, `validateHighContrast` refuses a theme that breaks it, and the remedy when a ground costs an ink its margin is a composed ink for that ground rather than a lighter ground.
 37. **Focus is a ground of its own, and `▸` is what survives when it is not** (I47, §4k, R-STA-004). The tree told focus and selection apart by *ink on one ground* where the design tells them apart by *two grounds and a mark*, which is why `focusGround` shipped with a gate and no reader and why `▸` ships in `GLYPH_TABLE` read by nothing. Six compositions are classified rather than discovered one at a time, availability joins the precedence because *disabled + error* was a composition the list could not rank, and the four facts with no subject in this tree are named so a frame is not drawn for a state no producer can construct.
+38. **An ink is resolved against the ground it lands on, and the gate and the painter share the resolution** (I48, R-THM-003, F1240). The composition frames drew row 1 of §4k.2 and its third clause was false: a focused or selected row was repainted in one ink, so `failed` kept its glyph and its word and lost its tone — and retiring that rule alone would have painted the flat ink on a band, which is the value the gate already measures as wrong there. Both halves are one change: `resolve` gains the ground, `inkOn` becomes its composition step, and C11 I14's drop-to-one-ink rule retires in the same commit.
 
 ---
 
@@ -1545,6 +1550,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.46** (I47, R-STA-003) — `it.todo`: **hover and focus never share a carrier at any rung.** Over the three rungs, the set of carriers hover holds and the set focus holds are disjoint: focus has `▸` at every rung and hover never does, and at 1-bit — where hover's ground is gone — hover holds **bold** and focus does not. Asserted as a disjointness over sets rather than two separate rows, because two rows each naming one carrier agree while the two facts render identically.
 - **T2.47** (I47, R-STA-004) — `it.todo`: **where availability meets validity the well takes the ground**, and the error keeps its mark and its word. The row asserts the displaced fact still has **two** carriers, which is R-COR-003's floor and the whole reason the rank is affordable; a row asserting only which ground won would pass a ruling that left validity with nothing.
 - **T2.48** (I47, §4k.1) — **the four facts with no subject are asserted to have none.** `surface.diffAdd` and `diffRemove` are read by no file in `src`; no block declares a `disabled`, `stale` or hover field. It is a **negative** row and it is the one that expires: the day any of them acquires a painter it goes red, and the entry it sends the reader to is §4k.4's list rather than a comment nobody watches. Without it, the three undrawn golden frames are a gap with no watcher, which is the disagreement-row shape F855 records — except that this row watches the **condition** and not the remedy, so it fires when the condition is met rather than staying green while the gap widens.
+- **T2.49** (I48, R-THM-001, R-THM-003, F1240): **the painter's ink and the gate's ink are one value**, over every meaning slot × every ground the theme paints text on × all ten themes at 24-bit — `resolve(ref, theme, caps, ground).colour.hex` equals `inkOn(tokens, ref, ground)`. Asserted as an equality between the two functions rather than against a table of hexes, because a table is a third record and the defect was two records disagreeing. The count of pairs is asserted with it, so a ground or a slot leaving the sweep is a red row rather than a smaller silent one.
+
 ### Tier 3 — edge cases
 
 - **T3.1**: an override naming an unknown tone → ignored, no throw.
@@ -1562,6 +1569,9 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T3.11** (I33): `unicode: "ascii"` with an italic span still paints SGR `3` — the attribute is not on the glyph axis — and the painted row's `cells()` equals the plain row's.
 - **T3.72** (I38): at 1-bit, a run with a colour and all six attributes paints every attribute and no colour; a run with a colour alone paints nothing and is not emitted.
 - **T3.73** (I41): every entry of the shipped table equals `quantiseSet` computed fresh over the entry's own set, and every shipped theme's surfaces and each of its palettes has an entry — so `quantisedHex` and the 8-bit resolver never run the DP for a shipped theme, and a theme edited without a regeneration is red. The negative half: a set the table does not hold computes, and computes the same answer as the table would have.
+
+- **T3.74** (I48, I11): the ground is in the cache key. The same ref resolved on the page and on a composing ground yields two different styles with the cache warm, in either order, and `cacheSize` grows by two — a key without the ground would serve the first answer to the second caller, and the value it served would be a legal one.
+- **T3.75** (I48, §3): **the ground binds where the theme's own values do and is inert below.** At 8-bit a composed set quantises as a set on its ground — rank order preserved within it, and a slot the ground moves picks a different cube entry from the page's. At 4-bit and at 1-bit the answer with a ground is **identical** to the answer without one, asserted as an equality so the limit I48 states is a row rather than a sentence.
 
 ### Tier 4 — integration
 
@@ -1581,6 +1591,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T5.2**: a real session under `TERM=xterm` (16 colours) → readable, distinct, no truecolour escapes emitted.
 - **T5.3**: a real session under `TERM=dumb` → no colour escapes at all, statuses still distinguishable.
 - **T5.4**: `/theme` toggled fifty times mid-session → no flicker, no half-themed frame, no memory growth. **The control counts the frames the row examined, never the frames the scheduler produced** (F1004): how many frames fifty submissions coalesce into is C03's window and the machine's load, and a floor under it is contention wearing this row's name.
+
 
 ### Tier 6 — fail-on-revert
 
@@ -1637,6 +1648,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.105** (I47, R-STA-004) — `it.todo`: dropping the availability rung so validity outranks it fails **T2.47** on the ground, with the mark and the word still asserted present — which is what distinguishes this revert from one that deleted the carriers instead.
 
 ---
+
+- **T6.106** (I48, F1240): dropping the `on` argument from `runStyle`'s `resolveTone` call — the one line that carries a ground from the painter into the resolver — → **T2.49 still passes** and C11 T2.13 fails. The pairing is the row: T2.49 measures the resolver and cannot see a painter that never asks, which is the shape of F1240 itself, so the fail-on-revert names the row that sits on the other side of the seam.
 
 ## 10. Out of scope
 

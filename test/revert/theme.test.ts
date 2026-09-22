@@ -390,3 +390,15 @@ describe("C10 fail-on-revert", () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * C10 T6.106 — the seam, owed at the spec commit.
+ *
+ * **The pairing is the row.** T2.49 measures the resolver and cannot see a
+ * painter that never asks it the question, which is the shape of F1240 itself.
+ */
+describe("C10 I48 — the ground carried from the painter into the resolver", () => {
+  it.todo(
+    "T6.106 (I48, F1240): dropping the `on` argument from `runStyle`'s `resolveTone` call \u2192 T2.49 still passes and C11 T2.13 fails \u2014 not deferred on a component: it lands with I48's resolver change in this same MR",
+  );
+});

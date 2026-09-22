@@ -1265,3 +1265,16 @@ describe("C10 §4k — focus, selection and the facts that contest a ground", ()
     expect(declared, "no block carries an availability, freshness or hover field").toEqual([]);
   });
 });
+
+/**
+ * C10 I48 — the resolver takes the ground, owed at the spec commit.
+ *
+ * **The row is an equality between two functions and not a table of hexes**,
+ * because the defect it closes was two records of one rule disagreeing (F1240):
+ * a third record would be a third thing to drift.
+ */
+describe("C10 I48 — the ink a slot takes on the ground it lands on", () => {
+  it.todo(
+    "T2.49 (I48, R-THM-001, R-THM-003, F1240): the painter's ink and the gate's ink are one value \u2014 `resolve(ref, theme, caps, ground).colour.hex` equals `inkOn(tokens, ref, ground)` over every meaning slot \u00d7 every ground the theme paints text on \u00d7 all ten themes at 24-bit, with the pair count asserted so a slot or a ground leaving the sweep is a red row rather than a smaller silent one \u2014 not deferred on a component: it lands with I48's resolver change in this same MR",
+  );
+});
