@@ -53748,6 +53748,57 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1246 — the block saying the marks were never width-checked was wrong about two of them ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `R-BLK-742` (§093), and `widthClass` on four registry glyph records. |
+| **Reached for** | Registering `▹` and `▿` *with the same handling `▸` and `▾` already have*. |
+| **Verdict** | **Real, and the instruction to mirror is what surfaced it.** |
+
+`R-BLK-742` is the design's own self-criticism — *THE MARK SET WAS NEVER WIDTH-CHECKED* — and it
+carries the measurement it says was missing:
+
+```
+  ●  U+25CF   Ambiguous      ⎿  U+23BF   Narrow
+  ▲  U+25B2   Ambiguous      ⟩  U+27E9   Narrow
+  ○  U+25CB   Ambiguous      ❯  U+276F   Narrow
+  ⋯  U+22EF   Ambiguous      ▸  U+25B8   Narrow
+  ▾  U+25BE   Narrow         ✓  U+2713   Narrow
+  ✗  U+2717   Narrow         ›  U+203A   Narrow
+
+  FOUR AMBIGUOUS, EIGHT NARROW
+```
+
+**Two rows are wrong.** Measured with `cells()`, which is the repository's derived
+`EastAsianWidth-17.0.0` table: `▸` U+25B8 is **1 narrow / 2 wide** and `▾` U+25BE is **1 / 2**.
+Both are Ambiguous. The count is **six and six**, not four and eight — and the block's own
+argument is that *a mixed set* is the hazard, so being wrong here **understates its own case**.
+
+**The wrong values were copied into the registry**, where `focus` and `disclosure` carried
+`widthClass: "narrow"`, and `meter-fill ▰` and `rule —` carried no class at all while measuring
+1/2. Corrected, with the two new marks registered as `ambiguous`: all fifteen glyph records now
+agree with `cells()`, nine ambiguous against six narrow.
+
+**Nothing reads `widthClass`**, which is why it could be wrong for as long as it was — grepped
+across `docs/design/language/*.mjs`, `src/`, `test/` and `tools/`, zero readers. The builder
+gates on `widthByCapability` and `reservedCells` instead, and those were right. So this is a
+record that disagrees with a measurement in a field no gate consults: the shape *a snapshot
+records, it does not check* takes when the snapshot is a scalar rather than a frame.
+
+**`R-BLK-742` is not rewritten, and that is a question rather than an omission.** It is a
+historical account of a defect, so correcting its numbers may destroy the record it exists to
+keep; and it now also lists `▾`, which is no longer a registered mark. Raised rather than ruled,
+because the design contradicting a measurement is the one case the brief says to stop on.
+
+**What the same measurement pass cleared.** `«` U+00AB and `»` U+00BB — the tape delimiters —
+measure 1/1, and my first reading called that a gap in the repository's ambiguous table. It is
+not: the table is every `; A` row of `EastAsianWidth-17.0.0.txt` sorted and merged, and U+00AB
+is not one of them. The table is right and the recollection was wrong, recorded here because a
+fabricated finding costs the next reader the same twenty minutes.
+
+---
+
 ## F1245 — the anchor reader required a line break, so four live edits were invisible ★★★★☆
 
 | | |

@@ -1014,8 +1014,9 @@ C09 owns both renderings of every glyph a block can name (C04 §5). A block name
 | `running` | `●` | `*` | Running, steady state |
 | `queued` | `○` | `o` | Accepted, not yet running |
 | `cancelled` | `⊘` | `/` | Stopped by request |
-| `expand` | `▸` | `>` | A collapsed row |
-| `collapse` | `▾` | `v` | An expanded row |
+| `expand` | `▹` | `:` | A collapsed row — U+25B9, **hollow**. It was `▸`/`>`, which is `focus`'s mark and `quote`'s ASCII: one slot serving two facts, which is the collision §4's fixture note recorded and this row is the ruling (R-GLY-001, M4). **The rule is fill, not direction** — filled is focus, hollow is disclosure — so the two are told apart by the same property at every rung rather than by which way a triangle points, and direction is left to say *collapsed* against *expanded*. ASCII cannot carry fill, so there the three marks are three characters and nothing systematic; `:` is what the no-collision scan left free, `+` being `ok`'s and `>` being `focus`'s |
+| `collapse` | `▿` | `v` | An expanded row — U+25BF, hollow, for the reason above. It was `▾`, which the design also spends on **sort descending** (`▾ sorted descending · ▴ ascending`) and on a select's caret: moving disclosure off it leaves that pair whole and gives this axis a mark of its own |
+| `focus` | `▸` | `>` | The focus mark, in the gutter C11 I15 reserves — **a slot of its own, and that is what is new**. It was drawn with `expand`'s, which is why the two could not be told apart. Its ASCII half is shared with `quote`, as `expand`'s was: I5 is about cell count and not uniqueness (F824), and the uniqueness rule M4 builds ranges over the **state** set, which neither of these is |
 | `live` | `▌` | `\|` | The live-state gutter (D6) |
 | `bullet` | `•` | `-` | A list marker with no status meaning |
 | `quote` | `⎸` | `>` | A quotation's gutter — a **rail**, drawn on every row (C04 I95) |
@@ -1110,11 +1111,21 @@ inconsistent within itself: `Approve` at 3, `▌ selection` at 2, `▸ ●` at 2
 against four that agree is not a ruling, and *ask where a settled claim is written down* is the
 instrument that should have been pointed at it before the code was written rather than after.
 
-**And `▸` carries two meanings in the fixtures**, which is F161's shared-mark hazard with two
+**And `▸` carried two meanings in the fixtures**, which is F161's shared-mark hazard with two
 real consumers rather than none: §003 line 6 draws `▸ thinking · 4s` with the triangle in the
 **head-glyph column**, where `●` sits on the lines around it — that is disclosure, not focus.
 The focus mark sits in a column of its own, to the left of the state glyph, and never in it.
-The collision is recorded here and ruled where the glyph table is (C09 §4, M4).
+
+**Ruled in M4, and the deferral this paragraph carried is discharged.** The registry reserves
+`▸` for focus, so focus keeps it and **disclosure moves**: `▹` collapsed, `▿` expanded, both
+hollow. Fill is the carrier — filled is focus, hollow is disclosure — which makes the
+distinction systematic rather than a tie-break between two triangles that differ by direction
+alone, and it survives 1-bit, where all three are shapes and no tone is doing any work.
+Eleven specimen blocks move with it, each superseded through the builder's content-addressed
+block path rather than edited, so the old draw stays addressable: §003, §024, §068 ×2 and §105
+for the collapsed mark, §024, §026 ×2, §038, §082 ×2 for the expanded one. What does **not**
+move is `▾` where it means *sort descending* (§078, §081) or a select's caret (§042) — three
+facts shared one mark, and disclosure is the one that leaves.
 
 **So this library reserves nothing, and C11 I15 is the invariant the design overturns** — the
 one this section's first draft said it did not. A notice takes the focus **ground** and no
