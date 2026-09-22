@@ -162,7 +162,23 @@ describe("C22 §3 step 11 — the effect table", () => {
 
     expect(defaultKeymap.length, "the table is not empty, so this is not vacuous").toBeGreaterThan(0);
 
+    const base = defaultKeymap.filter((b) => b.profile !== "enhanced-terminal");
+    // **The enhanced routes are skipped, and the skip is checked rather than
+    // asserted** (C16 I35, I36, M6). This graph is a default-terminal session,
+    // so a route that resolves only under the Kitty protocol reaches no handler
+    // here — correctly. What the walk would lose is the *action*, and it loses
+    // nothing: I36 requires every action to have a base route, so each skipped
+    // row's effect is still exercised by the row that carries it. Asserted,
+    // because a skip nobody checks is a hole shaped like a decision.
     for (const b of defaultKeymap) {
+      if (b.profile !== "enhanced-terminal") continue;
+      expect(
+        base.some((r) => r.action === b.action),
+        `${b.action} is skipped here and covered by its default-terminal route`,
+      ).toBe(true);
+    }
+
+    for (const b of base) {
       if (b.target === "overlay") openOverlay(graph);
       // `liveBlock` needs both halves of what `activeTarget` reads: a live
       // entry in C13 and focus stored there (C16 §3).
@@ -261,6 +277,8 @@ describe("C22 §3 step 11 — the effect table", () => {
     }) as typeof real;
 
     const effects = createKeyEffects({
+      submit: () => undefined,
+      focusTranscript: () => undefined,
       editor: spy,
       // The third owner of `pushedView`, as the root wires it (C28 §3c).
       profileView: graph.profileView,

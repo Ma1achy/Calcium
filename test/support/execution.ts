@@ -394,7 +394,8 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
       };
     },
     openUrl: () => Promise.resolve(),
-    bindings: () => [{ keys: "c+c", does: "global: cancel" }],
+    bindings: () => [{ keys: "c+c", does: "cancel", target: "global" }],
+    currentScope: () => "prompt",
     // **Added because a row called it and the cast below could not** (C22 I66).
     // `/theme`'s handler writes this, so T4.4 failed the moment it existed —
     // which is the README's *anything added to `PipelineDeps` will be silently

@@ -14,7 +14,7 @@
  * apart, and identity is what makes that checkable.
  */
 
-import type { Binding, BlockKeymap, BuiltinBinding, FocusTarget, Key, KeyAction } from "./types.js";
+import type { Binding, BlockKeymap, BuiltinBinding, FocusTarget, Key, KeyAction, KeyProfile } from "./types.js";
 
 export class KeymapError extends Error {
   override readonly name = "KeymapError";
@@ -42,7 +42,12 @@ export function keyText(key: Binding["key"]): string {
   const mods =
     (key.ctrl === true ? "c" : "") +
     (key.meta === true ? "m" : "") +
-    (key.shift === true ? "s" : "");
+    (key.shift === true ? "s" : "") +
+    // **`u` for sUper**, because `c`, `m` and `s` are taken and this spelling is
+    // read by `slot` as well as printed by help — a letter that collided would
+    // make two different chords one slot, which is the defect `super` exists to
+    // stop rather than one to introduce alongside it (C16 I34).
+    (key.super === true ? "u" : "");
   return mods === "" ? key.name : `${mods}+${key.name}`;
 }
 
@@ -186,10 +191,14 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   { target: "prompt", key: { name: "h", ctrl: true }, action: "backspace" },
   { target: "prompt", key: { name: "delete" }, action: "delete" },
 
-  // Both traditions for word-delete-left, because they are distinct wire forms
-  // and no other binding wants either.
+  // **`⌃w` is now the only word-delete-left.** The comment here read *both
+  // traditions, because they are distinct wire forms and no other binding wants
+  // either* — and in M6 one does; see the row below.
   { target: "prompt", key: { name: "w", ctrl: true }, action: "killWordLeft" },
-  { target: "prompt", key: { name: "backspace", meta: true }, action: "killWordLeft" },
+  // **`⌥⌫` left `killWordLeft` in M6** — the registry gives it to `queue.drop`
+  // (§6a). `⌃w` keeps the verb, so nothing C17 exposes becomes unreachable;
+  // what is lost is the second tradition's spelling of it.
+  { target: "prompt", key: { name: "backspace", meta: true }, action: "queueDrop" },
   { target: "prompt", key: { name: "d", meta: true }, action: "killWordRight" },
   { target: "prompt", key: { name: "u", ctrl: true }, action: "killToStart" },
   { target: "prompt", key: { name: "k", ctrl: true }, action: "killToEnd" },
@@ -348,8 +357,21 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // live entry and focus away from the prompt, so a `global` row would resolve
   // almost nowhere. Not `interaction`: a block's declared keys are an open set
   // (C26 I14) and a framework binding there shadows one — C16 §5a row A4.
-  { target: "prompt", key: { name: "v", meta: true }, action: "enterCopyMode" },
-  { target: "liveBlock", key: { name: "v", meta: true }, action: "enterCopyMode" },
+  // **`⌥⇧C` is `{name: "C", meta: true}` and not `meta+shift+c`** (I17): `ESC C`
+  // names the character it carries, and the decoder sets no shift bit for a
+  // capital. Pressed through the real decoder before being written down, which
+  // is what T2.13b refused the first spelling on.
+  //
+  // **`⌥v` left `enterCopyMode` in M6, and the design supplied the replacement
+  // itself** (§6a): the registry gives `⌥v` to `values.toggle` and copy mode its
+  // own two chords — `⌥⇧C` native handoff, `⌥⇧V` semantic. So nothing is
+  // invented and no chord is chosen here. M10 finishes the rename.
+  { target: "prompt", key: { name: "C", meta: true }, action: "enterCopyMode" },
+  { target: "liveBlock", key: { name: "C", meta: true }, action: "enterCopyMode" },
+  { target: "prompt", key: { name: "v", meta: true }, action: "valuesToggle" },
+  { target: "liveBlock", key: { name: "v", meta: true }, action: "valuesToggle" },
+  { target: "prompt", key: { name: "V", meta: true }, action: "enterSemanticSelection" },
+  { target: "liveBlock", key: { name: "V", meta: true }, action: "enterSemanticSelection" },
   // The target's own dismissal, as `viewPop` is the view's (C16 §5c). `⌃c` stays
   // the ladder's; both exist for `pushedView` too, and I24 defends the pair.
   { target: "copyMode", key: { name: "escape" }, action: "exitCopyMode" },
@@ -455,6 +477,141 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // everywhere and the shift form is better where it exists.
   { target: "liveBlock", key: { name: "enter", shift: true }, action: "rerunEntry" },
   { target: "liveBlock", key: { name: "enter", meta: true }, action: "rerunEntry" },
+
+  // --- §6a, M6: the design's routes ------------------------------------------
+  //
+  // **Both profiles are in this table, because a profile is a condition and not
+  // a second keymap** (I35). `resolve` refuses a binding the terminal is not in,
+  // and the duplicate check runs within a profile — so `⌥w` and `⌃⇧C` may both
+  // be `copy` without the two ever meeting.
+  //
+  // `⌘`, `⇧⏎`, `⌃⇧`-letters and `⌃⇥` are byte-identical to their unmodified
+  // forms on a terminal without the Kitty protocol, so each of those actions
+  // needs a base route too (I36). Six of the eight base routes are chords this
+  // table already binds to the same meaning, which is the argument for them.
+
+  // Help — a durable transcript entry, not a layer (R-KEY-005).
+  { target: "global", key: { name: "f1" }, action: "helpKeymap" },
+  { target: "liveBlock", key: { name: "?" }, action: "helpKeymap" },
+
+  // `focus.previous` — the prompt had no `⇧⇥`, and the owner line advertises it.
+  { target: "prompt", key: { name: "tab", shift: true }, action: "focusTranscript" },
+
+  // `page.up` / `page.down`. `pageup`/`pagedown` are already bound at `global`;
+  // these are the design's chords for the same operation, and M5's intercept
+  // table classifies all four as `page-scroll` before the ladder sees them.
+  { target: "global", key: { name: "up", meta: true }, action: "scrollPageUp" },
+  { target: "global", key: { name: "down", meta: true }, action: "scrollPageDown" },
+
+  // **`transcript.top` / `transcript.bottom` keep their base routes only, and
+  // that is a measurement rather than a preference** (§6a, I17). `⌘↑` reaches
+  // this decoder as `CSI 1;9A`, which the legacy arm folds to `{name: "up",
+  // meta: true}` — the same key as `⌥↑`, already `scrollPageUp` above. The
+  // csi-u spelling that *would* carry `super` names the arrow by a functional
+  // code the decoder maps to the empty string, so there is no wire form for the
+  // distinct chord at all. §6's own ruling applies: widening the decoder to
+  // reach one binding is how a table comes to name keys nothing sends, so the
+  // candidate is dropped rather than met. `⌃home` and `⌃end` are the routes.
+
+  // `copy` / `paste`. The base routes are `⌥w` → `copySelection` and `⌃y` →
+  // `yank`, both already bound at `prompt`; these are the enhanced spellings.
+  {
+    target: "prompt",
+    key: { name: "c", ctrl: true, shift: true },
+    action: "copySelection",
+    profile: "enhanced-terminal",
+  },
+  {
+    target: "prompt",
+    key: { name: "v", ctrl: true, shift: true },
+    action: "yank",
+    profile: "enhanced-terminal",
+  },
+
+  // `posture.cycle` — reserved, no effect (I38).
+  { target: "global", key: { name: "p", meta: true }, action: "postureCycle" },
+
+  // The agent strip: eleven reserved chords, each in both profiles (I38).
+  // `⌥,` and `⌥.` replace `⌥⇥`/`⇧⌥⇥`, which the OS window switcher takes on
+  // Windows and most Linux desktops — the compositor never hands them over.
+  { target: "global", key: { name: ",", meta: true }, action: "agentPrevious" },
+  { target: "global", key: { name: ".", meta: true }, action: "agentNext" },
+  {
+    target: "global",
+    key: { name: "tab", ctrl: true },
+    action: "agentNext",
+    profile: "enhanced-terminal",
+  },
+  {
+    target: "global",
+    key: { name: "tab", ctrl: true, shift: true },
+    action: "agentPrevious",
+    profile: "enhanced-terminal",
+  },
+  { target: "global", key: { name: "1", meta: true }, action: "agent1" },
+  {
+    target: "global",
+    key: { name: "1", super: true },
+    action: "agent1",
+    profile: "enhanced-terminal",
+  },
+  { target: "global", key: { name: "2", meta: true }, action: "agent2" },
+  {
+    target: "global",
+    key: { name: "2", super: true },
+    action: "agent2",
+    profile: "enhanced-terminal",
+  },
+  { target: "global", key: { name: "3", meta: true }, action: "agent3" },
+  {
+    target: "global",
+    key: { name: "3", super: true },
+    action: "agent3",
+    profile: "enhanced-terminal",
+  },
+  { target: "global", key: { name: "4", meta: true }, action: "agent4" },
+  {
+    target: "global",
+    key: { name: "4", super: true },
+    action: "agent4",
+    profile: "enhanced-terminal",
+  },
+  { target: "global", key: { name: "5", meta: true }, action: "agent5" },
+  {
+    target: "global",
+    key: { name: "5", super: true },
+    action: "agent5",
+    profile: "enhanced-terminal",
+  },
+  { target: "global", key: { name: "6", meta: true }, action: "agent6" },
+  {
+    target: "global",
+    key: { name: "6", super: true },
+    action: "agent6",
+    profile: "enhanced-terminal",
+  },
+  { target: "global", key: { name: "7", meta: true }, action: "agent7" },
+  {
+    target: "global",
+    key: { name: "7", super: true },
+    action: "agent7",
+    profile: "enhanced-terminal",
+  },
+  { target: "global", key: { name: "8", meta: true }, action: "agent8" },
+  {
+    target: "global",
+    key: { name: "8", super: true },
+    action: "agent8",
+    profile: "enhanced-terminal",
+  },
+  { target: "global", key: { name: "9", meta: true }, action: "agent9" },
+  {
+    target: "global",
+    key: { name: "9", super: true },
+    action: "agent9",
+    profile: "enhanced-terminal",
+  },
+
 ];
 
 /**
@@ -555,6 +712,24 @@ const BUILTIN_ACTIONS: ReadonlySet<string> = new Set(
     viewPop: true,
     enterCopyMode: true,
     exitCopyMode: true,
+    // --- §6a, M6 ------------------------------------------------------------
+    helpKeymap: true,
+    focusTranscript: true,
+    agentNext: true,
+    agentPrevious: true,
+    agent1: true,
+    agent2: true,
+    agent3: true,
+    agent4: true,
+    agent5: true,
+    agent6: true,
+    agent7: true,
+    agent8: true,
+    agent9: true,
+    postureCycle: true,
+    valuesToggle: true,
+    queueDrop: true,
+    enterSemanticSelection: true,
   } satisfies Readonly<Record<KeyAction, true>>),
 );
 
@@ -572,10 +747,23 @@ const BUILTIN_ACTIONS: ReadonlySet<string> = new Set(
  * let a duplicate in the default keymap reach a user's session before anyone
  * heard about it.
  */
-export function createKeymap(bindings: readonly Binding[]): Keymap {
+export function createKeymap(
+  bindings: readonly Binding[],
+  /**
+   * Which terminal this session is (C16 I35, §6a). A binding with no `profile`
+   * is in both; one with a profile resolves only in its own.
+   *
+   * **The filter is here rather than in `resolve`**, so the collision check
+   * below runs over exactly the set that can fire: a base route and an enhanced
+   * route for one action may share a `(target, key)` in principle, and refusing
+   * that globally would forbid the very pairing §6a's table is made of.
+   */
+  profile: KeyProfile = "default-terminal",
+): Keymap {
   const bySlot = new Map<string, Binding>();
+  const inProfile = bindings.filter((b) => b.profile === undefined || b.profile === profile);
 
-  for (const b of bindings) {
+  for (const b of inProfile) {
     const s = slot(b.target, b.key);
     const clash = bySlot.get(s);
     if (clash !== undefined) {
@@ -590,7 +778,7 @@ export function createKeymap(bindings: readonly Binding[]): Keymap {
     bySlot.set(s, b);
   }
 
-  const order: Binding[] = [...bindings];
+  const order: Binding[] = [...inProfile];
   /** Block bindings live apart, so withdrawing them cannot disturb the base table. */
   let block: ReadonlyMap<string, Binding> = new Map();
 

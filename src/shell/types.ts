@@ -494,7 +494,9 @@ export type PipelineDeps = Readonly<{
    * Read rather than restated: a hand-written help text guarantees drift, and
    * a binding shown that C16 does not dispatch is the drift arriving.
    */
-  bindings: () => readonly Readonly<{ keys: string; does: string }>[];
+  bindings: () => readonly Readonly<{ keys: string; does: string; target: string }>[];
+  /** The reader’s rung, so `/help keys` leads with it (R-KEY-005). */
+  currentScope: () => string;
   /** For rewriting `/verb` inside a delegated command (C18 I5). */
   binary: string;
   commandPolicy: CommandPolicy;

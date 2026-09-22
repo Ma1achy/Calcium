@@ -72,11 +72,17 @@ export function tabulate(bindings, order) {
       throw new Error(`duplicate binding for ${b.target} ${text}`);
     }
     row.cells.set(b.target, b.action);
+    if (b.profile !== undefined) row.profile = b.profile;
     byText.set(text, row);
   }
   const rows = [...byText.values()]
     .sort((a, b) => byKey(a.key, b.key))
-    .map((r) => ({ text: keyText(r.key), cells: r.cells, ladder: r.cells.size > 1 }));
+    .map((r) => ({
+      text: keyText(r.key),
+      cells: r.cells,
+      ladder: r.cells.size > 1,
+      profile: r.profile ?? "both",
+    }));
   return {
     rows,
     bindings: bindings.length,
@@ -111,11 +117,27 @@ export function renderKeymapTable(bindings, order) {
       "and are outside this table.",
   );
   out.push("");
-  out.push(`| key | ${order.join(" | ")} |`);
-  out.push(`|---|${order.map(() => "---").join("|")}|`);
+  out.push("");
+  out.push(
+    "**The `profile` column** (C16 \u00a76a, I35). `both` is the ordinary case. `enhanced-terminal` " +
+      "is a route that resolves only where `capabilities.keyboardProtocol === \"kitty\"`; every action " +
+      "with one also has a `both` route, because \u2318, \u21e7\u23ce, \u2303\u21e7-letters and \u2303\u21e5 are " +
+      "byte-identical to their unmodified forms on a terminal without the protocol (I36).",
+  );
+  out.push("");
+  out.push(
+    "**Every `m+` route needs the terminal to send Option as Meta** \u2014 ESC-prefixing rather than " +
+      "composing a character, which on macOS means *Use Option as Meta Key* in Terminal.app and " +
+      "`Esc+` in iTerm2. Not a new assumption: every `m+` row in this table has always required it.",
+  );
+  out.push("");
+  out.push(`| key | profile | ${order.join(" | ")} |`);
+  out.push(`|---|---|${order.map(() => "---").join("|")}|`);
   for (const r of t.rows) {
     const cells = order.map((target) => r.cells.get(target) ?? "");
-    out.push(`| \`${r.text}\`${r.ladder ? ` ${LADDER_MARK}` : ""} | ${cells.join(" | ")} |`);
+    out.push(
+      `| \`${r.text}\`${r.ladder ? ` ${LADDER_MARK}` : ""} | ${r.profile} | ${cells.join(" | ")} |`,
+    );
   }
   out.push("");
   out.push(

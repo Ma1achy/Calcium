@@ -185,7 +185,7 @@ function modifiersOf(param: string | undefined): Pick<Key, "ctrl" | "meta" | "sh
  * xterm at `formatOtherKeys=1` loses a Meta modifier here; its default format is
  * `CSI 27;m;k ~`, which `modifiersOf` keeps.
  */
-function kittyModifiersOf(param: string | undefined): Pick<Key, "ctrl" | "meta" | "shift"> {
+function kittyModifiersOf(param: string | undefined): Pick<Key, "ctrl" | "meta" | "shift" | "super"> {
   const bits = param === undefined || param === "" ? 0 : Math.max(0, Number(param) - 1);
   // Written as `=== bit` rather than `!== 0` so these three lines do not
   // duplicate `modifiersOf`'s: `tools/mutate/runs/c16-modifiers.mjs` anchors on
@@ -195,6 +195,12 @@ function kittyModifiersOf(param: string | undefined): Pick<Key, "ctrl" | "meta" 
     shift: (bits & 1) === 1,
     meta: (bits & 2) === 2 || (bits & 32) === 32,
     ctrl: (bits & 4) === 4,
+    // **Bit 8, which used to fold into nothing** (C16 I34). The reason it was
+    // dropped — *`⌘a` arriving as `Alt-a` is the live-binding class* — is a
+    // statement about the *legacy* arm, and the two arms are distinguished now.
+    // Here the terminal reported the protocol and said `super`, so answering
+    // `meta` would be discarding what it said.
+    super: (bits & 8) === 8,
   };
 }
 
@@ -229,7 +235,7 @@ const KITTY_MODIFIER_KEYS: Readonly<Record<number, string>> = Object.freeze({
 function key(
   name: string,
   sequence: string,
-  mods: Partial<Pick<Key, "ctrl" | "meta" | "shift">> = {},
+  mods: Partial<Pick<Key, "ctrl" | "meta" | "shift" | "super">> = {},
   event?: "press" | "repeat" | "release",
   encoding?: Key["encoding"],
 ): InputEvent {
@@ -238,6 +244,11 @@ function key(
     ctrl: mods.ctrl ?? false,
     meta: mods.meta ?? false,
     shift: mods.shift ?? false,
+    // **Absent rather than `false` when the terminal could not say** (C16 I34).
+    // Only the csi-u arm ever sets it, so *absent* is the legacy record's honest
+    // answer — `⌘a` there genuinely is `Alt-a`, and a `super: false` on every
+    // legacy key would read as *the terminal said no* rather than *it cannot say*.
+    ...(mods.super === true ? { super: true } : {}),
     sequence,
     ...(encoding === undefined ? {} : { encoding }),
   });

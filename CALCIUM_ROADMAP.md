@@ -1975,7 +1975,7 @@ already cost `⌃_`.
   (`:352`) — are parsed but never **requested**: nothing in `escapes.ts` or `lifecycle.ts`
   enables either protocol. They fire only where a terminal volunteers them, which is not a
   base a default binding can stand on.
-- And `keymap.ts:193` already binds `{name: "a", ctrl: true}` → `home` on the prompt.
+- And `keymap.ts:207` already binds `{name: "a", ctrl: true}` → `home` on the prompt.
 
 **So it is not merely a collision — the byte has a meaning.** A `⌃⇧a` row would resolve
 against the same event as line-start and one of the two would silently never run.

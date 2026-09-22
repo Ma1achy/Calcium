@@ -58,6 +58,7 @@ const deps = (
 ): HandlerDeps => ({
   profileCapture: capture,
   manifest: () => null,
+  currentScope: () => "prompt",
   transcript: createTranscriptStore(),
   // The stubs `execution.test.ts` uses: `/profile` reads none of these.
   theme: {

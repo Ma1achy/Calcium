@@ -411,7 +411,15 @@ describe("C22 integration — the frame's viewport", () => {
     // because the thunk agreeing with the keymap is not the claim: the claim is
     // that the help a user reads contains them.
     const stdin = fakeStdin();
-    const { screen } = await buildSession({ stdin: stdin as never }, { columns: 100, rows: 40 });
+    // **160 rows, and the number is the listing's** (M6): the keymap is 119
+    // bindings in eight scope groups since §6a, so a 40-row frame shows one
+    // group's worth of tail and this row would be asserting *where in the
+    // listing a key sits* rather than *that it is rendered from the table* —
+    // the positional control the comment below retired, arriving again through
+    // the terminal's height instead of through the regex. A tall terminal is a
+    // real session; the entry is durable and a short one scrolls to the same
+    // place.
+    const { screen } = await buildSession({ stdin: stdin as never }, { columns: 100, rows: 160 });
 
     // **`/help keys`, not `/help`.** The keymap moved behind an argument when
     // `/help` was measured at thirty verbs: it emitted every binding last, and
@@ -424,7 +432,7 @@ describe("C22 integration — the frame's viewport", () => {
     await Promise.resolve();
 
     const frame = screen().rows;
-    expect(frame, "a frame was written").toHaveLength(40);
+    expect(frame, "a frame was written").toHaveLength(160);
     const text = frame.join("\n");
 
     // The control: help arrived at all. Without it every assertion below is
@@ -443,7 +451,9 @@ describe("C22 integration — the frame's viewport", () => {
     // for whoever added it rather than for whoever wrote this.
     // The keymap is a card's body since C22 I88, so each row arrives under the
     // hook or the bar; the gutter is stripped before the binding shape is read.
-    const bindingRows = frame.filter((r) => /^\S+\s+\w+: \w+/u.test(r.replace(/^\s*[⎿│]\s/u, "").trim())).length;
+    // The row shape lost its `target: ` prefix in M6: the listing is grouped by
+    // scope now, so naming the scope on every row repeated the heading above it.
+    const bindingRows = frame.filter((r) => /^\S+\s+\w+$/u.test(r.replace(/^\s*[⎿│]\s/u, "").trim())).length;
     expect(bindingRows, "the keymap document is on the frame").toBeGreaterThan(10);
 
     for (const shown of ["pageup", "pagedown", "c+home", "c+end"]) {
@@ -1067,7 +1077,12 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
 });
 
 describe("C22 — copy mode, entered and left (C16 §5b, C03 §4a)", () => {
-  it("T4.30 (C16 §5b B1): ⌥v enters, the header says COPY, mouse tracking goes off", async () => {
+  it("T4.30 (C16 §5b B1): ⌥⇧C enters, the header says COPY, mouse tracking goes off", async () => {
+    // **`⌥⇧C`, not `⌥v`, since M6** (C16 §6a): the registry gives `⌥v` to
+    // `values.toggle` and copy mode its own two chords — `⌥⇧C` native handoff,
+    // `⌥⇧V` semantic. Nothing was invented for this; the design supplied both.
+    // The wire form is `ESC C`, which names the capital and sets no shift bit.
+    //
     // **B1 is the row this file owes.** `copyMode` and `exitCopyMode` were both
     // stubs for the length of C26 — routed, ordered, unreachable — and the
     // producer landing alone would have given a mode the ⌃c rung consumes and
@@ -1086,7 +1101,7 @@ describe("C22 — copy mode, entered and left (C16 §5b, C03 §4a)", () => {
     expect(screen().rows[0], "no indicator before entry").not.toContain("COPY");
 
     const before = stdout.output;
-    await type("\u001bv");
+    await type("\u001bC");
 
     expect(screen().rows[0], "the mode is on screen, in the row always drawn").toContain("COPY");
     expect(
@@ -1109,7 +1124,7 @@ describe("C22 — copy mode, entered and left (C16 §5b, C03 §4a)", () => {
       await Promise.resolve();
     };
 
-    await type("\u001bv");
+    await type("\u001bC");
     expect(screen().rows[0]).toContain("COPY");
 
     const before = stdout.output;
@@ -1137,7 +1152,7 @@ describe("C22 — copy mode, entered and left (C16 §5b, C03 §4a)", () => {
     await type("abc");
     expect(screen().rows.join("\n"), "typing normally repaints").not.toBe(base);
 
-    await type("\u001bv");
+    await type("\u001bC");
     const held = stdout.output;
 
     await type("def");
@@ -1174,7 +1189,7 @@ describe("C22 — copy mode: the order inside the exit, and the far side under t
     const { stdout, screen } = await buildSession({ stdin: stdin as never });
     const type = typer(stdin);
 
-    await type("\u001bv");
+    await type("\u001bC");
     expect(screen().rows[0], "in copy mode").toContain("COPY");
 
     const before = stdout.output.length;
@@ -1221,7 +1236,7 @@ describe("C22 — copy mode: the order inside the exit, and the far side under t
     expect(settle, "the verb is in flight").not.toBeNull();
     expect(screen().text.join("\n"), "and has not settled").not.toContain(TEXT);
 
-    await type("\u001bv");
+    await type("\u001bC");
     expect(screen().rows[0]).toContain("COPY");
     const held = stdout.output;
 
@@ -1239,17 +1254,17 @@ describe("C22 — copy mode: the order inside the exit, and the far side under t
     expect(screen().text.join("\n"), "and it carries what settled under the hold").toContain(TEXT);
   });
 
-  it("T4.32c (C16 §5c C5): ⌥v a second time in copy mode writes nothing — one 1002l, not two", async () => {
+  it("T4.32c (C16 §5c C5): ⌥⇧C a second time in copy mode writes nothing — one 1002l, not two", async () => {
     const stdin = fakeStdin();
     const { stdout, screen } = await buildSession({ stdin: stdin as never });
     const type = typer(stdin);
 
-    await type("\u001bv");
+    await type("\u001bC");
     expect(screen().rows[0]).toContain("COPY");
     const once = stdout.output;
     expect(count(once, MOUSE.leave), "the leave pair, once").toBe(1);
 
-    await type("\u001bv");
+    await type("\u001bC");
     expect(stdout.output, "the second press writes nothing at all").toBe(once);
   });
 
@@ -1266,7 +1281,7 @@ describe("C22 — copy mode: the order inside the exit, and the far side under t
     const { stdout, screen, clock } = await buildSession({ stdin: stdin as never });
     const type = typer(stdin);
 
-    await type("\u001bv");
+    await type("\u001bC");
     expect(screen().rows[0]).toContain("COPY");
     const before = stdout.output.length;
 

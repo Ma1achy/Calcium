@@ -12,6 +12,19 @@ export type Key = Readonly<{
   ctrl: boolean;
   meta: boolean;
   shift: boolean;
+  /**
+   * `⌘` on macOS, the Windows key elsewhere — Kitty modifier bit 8 (C16 I34).
+   *
+   * **Optional, and it can only ever be `true` where the protocol said so.**
+   * `modifiersOf`'s legacy arm keeps folding bit 8 into `meta`, deliberately: on
+   * a terminal with no protocol `⌘a` genuinely arrives as `Alt-a`, and a decoder
+   * that guessed otherwise would make one wire form two bindings. So the field is
+   * safe to add — absent is *this terminal cannot tell*, not *not pressed*.
+   *
+   * It exists because `⌘↑` and `↑` were one key: two registry bindings resolved
+   * against the live keymap by accident, which is the measurement §6a is built on.
+   */
+  super?: boolean;
   /** The raw bytes, for diagnostics. */
   sequence: string;
   /** The wire family, when a complete enhanced-keyboard sequence supplied it. */
@@ -429,6 +442,30 @@ export type KeyAction =
   | "toggleSeries9"
   | "blockPageDown"
   | "blockPageUp"
+  // --- §6a, M6: the design’s actions that had no route ---------------------
+  //
+  // **`helpKeymap` and `focusTranscript` do something; the fifteen below do
+  // nothing, on purpose** (I38). §6’s closed set makes an action with no
+  // executor uncompilable, so the alternative to a declared no-op is leaving the
+  // chord unbound — and an unbound chord is one an application takes, so the
+  // feature arrives needing a key that is gone.
+  | "helpKeymap"
+  | "focusTranscript"
+  | "agentNext"
+  | "agentPrevious"
+  | "agent1"
+  | "agent2"
+  | "agent3"
+  | "agent4"
+  | "agent5"
+  | "agent6"
+  | "agent7"
+  | "agent8"
+  | "agent9"
+  | "postureCycle"
+  | "valuesToggle"
+  | "queueDrop"
+  | "enterSemanticSelection"
   // `enter` on a focused row, and the union's gap was the whole of F21: a row
   // could be moved to and not acted on. `actions.ts` implements all five arms
   // and nothing in `src/` reached it, so an app could declare a `view` action,
@@ -498,9 +535,21 @@ export type KeyAction =
 
 export type Binding = Readonly<{
   target: FocusTarget;
-  key: Readonly<{ name: string; ctrl?: boolean; meta?: boolean; shift?: boolean }>;
+  key: Readonly<{ name: string; ctrl?: boolean; meta?: boolean; shift?: boolean; super?: boolean }>;
   action: string;
+  /**
+   * Which terminals this route is for (C16 I35, §6a).
+   *
+   * Absent means **both** — the ordinary case, and the reason the field is a
+   * condition rather than a second table. `enhanced-terminal` resolves only where
+   * `capabilities.keyboardProtocol === "kitty"`; `default-terminal` is the route
+   * an xterm without it can deliver, and I36 requires every action to have one.
+   */
+  profile?: "default-terminal" | "enhanced-terminal";
 }>;
+
+/** A terminal’s profile, resolved from C02’s record (§6a, R-CAP-001). */
+export type KeyProfile = "default-terminal" | "enhanced-terminal";
 
 /** A built-in row: a `Binding` whose action is one L4 implements (I19). */
 export type BuiltinBinding = Binding & Readonly<{ action: KeyAction }>;

@@ -51,8 +51,17 @@ export type HandlerDeps = Readonly<{
    */
   setSuppressBackground: (suppressed: boolean) => void;
   history: () => readonly HistoryEntry[];
-  /** Every binding C16 will dispatch, for `/help` (C23 I26). */
-  bindings: () => readonly Readonly<{ keys: string; does: string }>[];
+  /**
+   * Every binding C16 will dispatch, for `/help` (C23 I26) — **with its target,
+   * so the listing can be grouped by scope** (R-KEY-005, C16 §6a).
+   *
+   * The target used to be folded into `does` as `"prompt: complete"`, which is
+   * a string a renderer would have to take apart again to group by — the
+   * re-parsing SS40 is about, one seam over.
+   */
+  bindings: () => readonly Readonly<{ keys: string; does: string; target: string }>[];
+  /** Which rung the reader is on, so their own scope is listed first (R-KEY-005). */
+  currentScope: () => string;
   stop: (reason: StopReason) => Promise<number>;
   /**
    * C28 §3c's view, for `/profile` (C23 I68) — the way `stop` is for `/exit`.
@@ -397,13 +406,37 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
       const visible = manifest === null ? [] : visibleTools(manifest);
 
       if (argv[0] === "keys") {
-        return doc("/help keys", [
-          block({
-            kind: "keyValue",
-            id: blockId("help-keys"),
-            rows: deps.bindings().map((bnd) => ({ label: bnd.keys, value: bnd.does })),
-          }),
-        ]);
+        // **R-KEY-005: the current scope first, the rest grouped by scope.** A
+        // flat list in registration order was 85 rows and is 119 since M6, and
+        // registration order is the order the *table* was written in — which is
+        // a fact about this repository's history and about nothing the reader is
+        // doing. Grouping makes the entry answer *what do my keys do here*
+        // before it answers anything else.
+        const all = deps.bindings();
+        const here = deps.currentScope();
+        const scopes = [...new Set(all.map((b) => b.target))].sort((a, b) =>
+          a === here ? -1 : b === here ? 1 : a < b ? -1 : a > b ? 1 : 0,
+        );
+        return doc(
+          "/help keys",
+          scopes.flatMap((scope) => [
+            // A labelled rule for the heading, because `keyValue` has no title
+            // and inventing one would widen a public type for a section break.
+            block({
+              kind: "rule",
+              id: blockId(`help-keys-rule-${scope}`),
+              label: scope === here ? `${scope} — where you are` : scope,
+              level: 3 as const,
+            }),
+            block({
+              kind: "keyValue",
+              id: blockId(`help-keys-${scope}`),
+              rows: all
+                .filter((b) => b.target === scope)
+                .map((bnd) => ({ label: bnd.keys, value: bnd.does })),
+            }),
+          ]),
+        );
       }
 
       // **Grouped by C05 §3's partition**, and this is its second consumer.

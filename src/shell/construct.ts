@@ -1404,7 +1404,13 @@ export async function constructGraph(
   // --- 9. the input router --------------------------------------------------
   // Hoisted so the pipeline can read it: `/help` renders from the keymap rather
   // than a maintained list (C23 I26), so both must be the same table.
-  const keymap = createKeymap(defaultKeymap);
+  // **The profile is resolved from C02's record, once** (C16 I35, §6a). A
+  // terminal that reports the Kitty protocol gets the registry's chords; every
+  // other terminal gets the base routes, which is why I36 requires one.
+  const keymap = createKeymap(
+    defaultKeymap,
+    detection.capabilities.keyboardProtocol === "kitty" ? "enhanced-terminal" : "default-terminal",
+  );
 
   // Hoisted rather than inline: the effect table moves focus too, and a store
   // only `createRouter` could see is why `enterLiveBlock` had no caller for four
@@ -1645,7 +1651,11 @@ export async function constructGraph(
       openUrl: config.openUrl ?? defaultOpener(config.platform, runner, session),
 
       bindings: () =>
-        keymap.entries().map((b) => ({ keys: keyText(b.key), does: `${b.target}: ${b.action}` })),
+        keymap
+          .entries()
+          .map((b) => ({ keys: keyText(b.key), does: b.action, target: b.target })),
+      // R-KEY-005 — the reader's own rung, so `/help keys` leads with it.
+      currentScope: () => router.target,
       binary: config.binary,
       commandPolicy: config.commandPolicy,
     });
@@ -2257,6 +2267,14 @@ export async function constructGraph(
   };
 
   const keys = createKeyEffects({
+    // **`?` and `F1` submit the line `/help keys` runs** (R-KEY-005, C16 §6a),
+    // rather than rendering a second listing: help renders from the table
+    // dispatch uses, and a key with its own renderer is that claim undone.
+    submit: (line) => void pipeline?.submit(line),
+    focusTranscript: () => {
+      const id = stores.transcript.liveId ?? stores.transcript.entries.at(-1)?.id ?? null;
+      if (id !== null) focus.enterLiveBlock(id, null);
+    },
     editor: stores.editor,
     completion: built.completion,
     overlays: stores.overlays,

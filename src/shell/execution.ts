@@ -185,6 +185,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       setSuppressBackground: deps.setSuppressBackground,
       history: () => deps.history.entries,
       bindings: () => deps.bindings(),
+      currentScope: () => deps.currentScope(),
       stop: deps.stop,
       // C28 §3c's view, for `/profile` (C23 I68) — the row is in
       // `FRAMEWORK_TOOLS`, so a handler missing here is what `seal()` refuses.

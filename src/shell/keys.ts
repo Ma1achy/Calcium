@@ -74,6 +74,17 @@ export type KeyDeps = Readonly<{
     scrollToBottom(): void;
   }>;
   manifest: Manifest | null;
+  /**
+   * Submit a line, for `?` and `F1` (R-KEY-005, C16 §6a).
+   *
+   * **The same path `/help keys` takes, not a second renderer.** §6's whole
+   * argument is that help renders from the table dispatch uses; a key that built
+   * its own listing would satisfy the letter of *durable transcript entry* and
+   * reintroduce exactly the drift the module note forbids.
+   */
+  submit: (line: string) => void;
+  /** Move focus into the transcript, for `⇧⇥` (`focus.previous`, §6a). */
+  focusTranscript: () => void;
   /** Where the prompt sits, from the composed frame rather than a fresh read. */
   anchor: () => PromptAnchor;
   /** How big a layer may be (C15 `Region`), for the menu's "… n more". */
@@ -564,7 +575,42 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     countRemainder();
   }
 
+  /**
+   * **A reserved chord with an explicit no-op** (C16 I38, §6a).
+   *
+   * Fifteen of these: the nine agent slots, `agent.next`/`agent.previous`,
+   * `posture.cycle`, `values.toggle`, `queue.drop` and `selection.semantic`.
+   * The chord is the design's and the feature is not built, and leaving it
+   * unbound is the worse of the two — an unbound chord is one an application
+   * takes, so the feature arrives needing a key that is gone. §6's closed set
+   * makes an action with no executor uncompilable, so the reservation has to be
+   * written down here rather than by omission.
+   *
+   * It is a named function so a stack or a mutation run can tell a reservation
+   * from an effect that happens to do nothing today.
+   */
+  const reserved = (): void => undefined;
+
   const raw: Readonly<Record<KeyAction, KeyEffect>> = Object.freeze({
+    // --- §6a, M6 ------------------------------------------------------------
+    helpKeymap: () => void deps.submit("/help keys"),
+    focusTranscript: () => void deps.focusTranscript(),
+    agentNext: reserved,
+    agentPrevious: reserved,
+    agent1: reserved,
+    agent2: reserved,
+    agent3: reserved,
+    agent4: reserved,
+    agent5: reserved,
+    agent6: reserved,
+    agent7: reserved,
+    agent8: reserved,
+    agent9: reserved,
+    postureCycle: reserved,
+    valuesToggle: reserved,
+    queueDrop: reserved,
+    enterSemanticSelection: reserved,
+
     // --- C17 ---------------------------------------------------------------
     insertNewline: () => void deps.editor.insert("\n"),
 

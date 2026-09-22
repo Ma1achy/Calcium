@@ -5,7 +5,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-import { createKeymap, KeymapError, defaultKeymap } from "../../src/interaction/router/keymap.js";
+import { createKeymap, KeymapError, defaultKeymap, keyText } from "../../src/interaction/router/keymap.js";
 import { createDecoder } from "../../src/interaction/router/decode.js";
 import type { Binding, FocusTarget, Key } from "../../src/interaction/router/types.js";
 
@@ -428,6 +428,47 @@ describe("§6 — the default table (C17 I12)", () => {
       // reason. A pushed view has no prompt competing for them, so the bytes
       // are the characters themselves — `G` is `⇧g`, which a terminal sends as
       // the capital rather than as a modifier.
+      // --- §6a, M6: the design's routes -----------------------------------
+      //
+      // **`⌥⇧C` is `m+C` and not `ms+c`**: `ESC C` names the character it
+      // carries and sets no shift bit, which is what this row refused the first
+      // spelling on — the binding was written before it was pressed, and the
+      // rule caught it in the same pass.
+      "prompt m+C": ["\u001bC"],
+      "liveBlock m+C": ["\u001bC"],
+      "prompt m+V": ["\u001bV"],
+      "liveBlock m+V": ["\u001bV"],
+      "global f1": ["\u001bOP", "\u001b[11~"],
+      "liveBlock ?": ["?"],
+      "prompt s+tab": ["\u001b[Z"],
+      "global m+up": ["\u001b[1;3A"],
+      "global m+down": ["\u001b[1;3B"],
+      "prompt cs+c": ["\u001b[99;6u"],
+      "prompt cs+v": ["\u001b[118;6u"],
+      "global m+p": ["\u001bp"],
+      "global m+,": ["\u001b,"],
+      "global m+.": ["\u001b."],
+      "global c+tab": ["\u001b[9;5u"],
+      "global cs+tab": ["\u001b[9;6u"],
+      "global m+1": ["\u001b1"],
+      "global u+1": ["\u001b[49;9u"],
+      "global m+2": ["\u001b2"],
+      "global u+2": ["\u001b[50;9u"],
+      "global m+3": ["\u001b3"],
+      "global u+3": ["\u001b[51;9u"],
+      "global m+4": ["\u001b4"],
+      "global u+4": ["\u001b[52;9u"],
+      "global m+5": ["\u001b5"],
+      "global u+5": ["\u001b[53;9u"],
+      "global m+6": ["\u001b6"],
+      "global u+6": ["\u001b[54;9u"],
+      "global m+7": ["\u001b7"],
+      "global u+7": ["\u001b[55;9u"],
+      "global m+8": ["\u001b8"],
+      "global u+8": ["\u001b[56;9u"],
+      "global m+9": ["\u001b9"],
+      "global u+9": ["\u001b[57;9u"],
+
       "pushedView n": ["n"],
       "pushedView p": ["p"],
       "pushedView g": ["g"],
@@ -493,15 +534,21 @@ describe("§6 — the default table (C17 I12)", () => {
       "liveBlock m+enter": ["\u001b\r"],
     };
 
-    const keymap = createKeymap(defaultKeymap);
+    // Per profile (M6, I35), for T2.12's reason: an enhanced route resolves on
+    // an enhanced terminal and nowhere else.
+    const maps = {
+      "default-terminal": createKeymap(defaultKeymap, "default-terminal"),
+      "enhanced-terminal": createKeymap(defaultKeymap, "enhanced-terminal"),
+    } as const;
     const enc = new TextEncoder();
 
     for (const b of defaultKeymap) {
-      const mods =
-        (b.key.ctrl === true ? "c" : "") +
-        (b.key.meta === true ? "m" : "") +
-        (b.key.shift === true ? "s" : "");
-      const slot = `${b.target} ${mods === "" ? "" : `${mods}+`}${b.key.name}`;
+      // **`keyText`, not a copy of it** (M6). This held its own three-modifier
+      // spelling, and when `Key` gained `super` the copy did not — so `⌘↑` and
+      // `↑` collapsed to one slot here and the row reported that `global up`
+      // had no wire form. A second formatter is a second thing to drift, which
+      // is the module note's own argument arriving in the test that checks it.
+      const slot = `${b.target} ${keyText(b.key)}`;
       const sequences = BYTES[slot];
 
       expect(sequences, `${slot} has no wire form — nobody can press it`).toBeDefined();
@@ -524,7 +571,10 @@ describe("§6 — the default table (C17 I12)", () => {
         expect(keys, `${slot}: ${JSON.stringify(seq)} decodes to one key`).toHaveLength(1);
         const decoded = keys[0];
         if (decoded?.kind !== "key") continue;
-        expect(keymap.resolve(b.target, decoded.key), `${slot}: ${JSON.stringify(seq)}`).toBe(b);
+        expect(
+          maps[b.profile ?? "default-terminal"].resolve(b.target, decoded.key),
+          `${slot}: ${JSON.stringify(seq)}`,
+        ).toBe(b);
       }
     }
   });
@@ -533,17 +583,45 @@ describe("§6 — the default table (C17 I12)", () => {
     // The anti-drift property, on the rows that ship. `/help` traverses the same
     // objects dispatch returns (module note), so identity is what makes "a
     // binding help shows is a binding dispatch would resolve" checkable.
-    const keymap = createKeymap(defaultKeymap);
+    // **Per profile** (M6, I35). A binding resolves in the profile it declares
+    // and in no other, so a single walk against the default keymap reported the
+    // enhanced rows as unresolvable — which is the axis working, not a defect.
+    // Identity is still what is asserted; only the number of tables moved.
+    const maps = {
+      "default-terminal": createKeymap(defaultKeymap, "default-terminal"),
+      "enhanced-terminal": createKeymap(defaultKeymap, "enhanced-terminal"),
+    } as const;
 
     for (const b of defaultKeymap) {
+      const keymap = maps[b.profile ?? "default-terminal"];
       const resolved = keymap.resolve(b.target, {
         name: b.key.name,
         ctrl: b.key.ctrl ?? false,
         meta: b.key.meta ?? false,
         shift: b.key.shift ?? false,
+        ...(b.key.super === true ? { super: true } : {}),
         sequence: b.key.name,
       });
-      expect(resolved, `${b.target}:${b.key.name} resolves`).toBe(b);
+      expect(resolved, `${b.target}:${keyText(b.key)} resolves in ${b.profile ?? "both"}`).toBe(b);
+    }
+
+    // **And the control the split needs**: an enhanced-only route does not
+    // resolve on a terminal without the protocol. Without this the row above is
+    // satisfied by a `profile` field nothing reads.
+    const enhanced = defaultKeymap.find((b) => b.profile === "enhanced-terminal");
+    expect(enhanced, "there is an enhanced-only route to test with").toBeDefined();
+    if (enhanced !== undefined) {
+      expect(
+        maps["default-terminal"].resolve(enhanced.target, {
+          name: enhanced.key.name,
+          ctrl: enhanced.key.ctrl ?? false,
+          meta: enhanced.key.meta ?? false,
+          shift: enhanced.key.shift ?? false,
+          ...(enhanced.key.super === true ? { super: true } : {}),
+          sequence: enhanced.key.name,
+        }),
+        "an enhanced route is not reachable on a default terminal",
+      ).toBeNull();
     }
   });
 });
@@ -580,12 +658,21 @@ describe("C16 I23 — the line's extremes and the document's", () => {
     // callers in L4 and no route from a keyboard, and nothing compared the set
     // of operations with the set of bound actions — each was individually fine.
     const bound = new Set(defaultKeymap.filter((b) => b.target === "global").map((b) => b.action));
-    expect([...bound].sort(), "C14's four, and nothing else on global").toEqual([
-      "scrollBottom",
-      "scrollPageDown",
-      "scrollPageUp",
-      "scrollTop",
-    ]);
+    // **The four, and the claim is that all four are bound** — not that nothing
+    // else is. M6 put the design's `global` routes here too (§6a): help, the
+    // agent strip, `posture.cycle` and the `⌥`/`⌘` spellings of paging and the
+    // document ends. The row's finding was *an operation with no route*, and a
+    // set-equality that has to be edited every time a route is added measures
+    // the table's size rather than that.
+    for (const action of ["scrollBottom", "scrollPageDown", "scrollPageUp", "scrollTop"]) {
+      expect(bound, `C14's ${action} has a route from a keyboard`).toContain(action);
+    }
+    // What set-equality was also buying — *an action bound here that L4 cannot
+    // execute* — is not lost: `defaultKeymap` is `readonly BuiltinBinding[]` and
+    // L4's table is `Record<KeyAction, KeyEffect>`, so that case does not
+    // compile (§6, I19). The control this row still owes is that the walk has a
+    // corpus at all: a filter that matched nothing satisfies every loop above it.
+    expect(bound.size, "the global target has bindings to walk").toBeGreaterThan(4);
   });
 });
 
@@ -690,10 +777,240 @@ describe("C16 I17 — the rule, over the half a table walk cannot reach", () => 
   });
 });
 
+/** The escape byte, spelled once: a literal one reads as nothing on a screen. */
+const ESC = String.fromCharCode(27);
+
 describe("C16 §6a — two profiles, and the registry's authority over the table (M6)", () => {
-  it.todo("T1.34 (I34): `⌘↑` and `↑` are different keys, and only the Kitty arm sets `super` — not deferred on a component: the same round’s code commit replaces this row");
-  it.todo("T1.35 (I35): a profile is a condition, both live in one table, and `resolve` refuses the wrong one — not deferred on a component: the same round’s code commit replaces this row");
-  it.todo("T1.36 (I36): every action has a `default-terminal` route — not deferred on a component: the same round’s code commit replaces this row");
-  it.todo("T1.37 (I37): every current registry binding resolves, is handled elsewhere by a named site, or is a declared capture — not deferred on a component: the same round’s code commit replaces this row");
-  it.todo("T1.38 (I38): every reserved chord carries an explicit no-op executor — not deferred on a component: the same round’s code commit replaces this row");
+  const REGISTRY = JSON.parse(
+    readFileSync("docs/design/language/calcium-registry.json", "utf8"),
+  ) as { bindings: readonly Readonly<{ actionId: string; chord: string; scope: string; kind: string; status: string }>[] };
+
+  const enc = new TextEncoder();
+  const press = (seq: string): Key | null => {
+    const d = createDecoder({
+      capabilities: { bracketedPaste: true, mouse: true } as never,
+      now: () => 0,
+    });
+    const evs = [...d.push(enc.encode(seq)), ...d.poll()];
+    const k = evs.find((e) => e.kind === "key");
+    return k !== undefined && k.kind === "key" ? k.key : null;
+  };
+
+  it("T1.34 (I34): `⌘1` and `⌥1` are different keys, and only the csi-u arm sets `super`", () => {
+    // **The measurement §6a is built on, as a row.** Two registry bindings
+    // resolved against the live keymap by accident because `Key` had no `super`:
+    // `⌘↑` *was* `↑`. A modifier the type cannot hold is one the keymap cannot
+    // refuse, and the failure mode is silent agreement rather than a collision.
+    const cmd1 = press(`${ESC}[49;9u`);
+    const alt1 = press(`${ESC}1`);
+    expect(cmd1?.name, "⌘1 is the digit").toBe("1");
+    expect(cmd1?.super, "and the protocol said super").toBe(true);
+    expect(alt1?.name, "⌥1 is the same digit").toBe("1");
+    expect(alt1?.super, "and this terminal could not say — absent, not false").toBeUndefined();
+    expect(keyText(cmd1!), "so they are different slots").not.toBe(keyText(alt1!));
+
+    // **The legacy arm keeps folding bit 8 into `meta`, deliberately**, and this
+    // is the control that stops `super` leaking into a terminal that never
+    // reported the protocol: `CSI 1;9A` carries the same bit and answers `⌥↑`.
+    // That is also why `⌘↑` has no route — see the keymap's note.
+    const legacy = press(`${ESC}[1;9A`);
+    expect(legacy?.name).toBe("up");
+    expect(legacy?.meta, "bit 8 folds to meta on the legacy arm").toBe(true);
+    expect(legacy?.super, "and never to super").toBeUndefined();
+  });
+
+  it("T1.35 (I35): a profile is a condition — one table, and `resolve` refuses the wrong one", () => {
+    // Two keymaps would be two things to keep in step and `/help` would render
+    // one of them, which is the drift §6's opening paragraph forbids. So the
+    // rows live together and the terminal decides which fire.
+    const base = createKeymap(defaultKeymap, "default-terminal");
+    const rich = createKeymap(defaultKeymap, "enhanced-terminal");
+    const only = defaultKeymap.filter((b) => b.profile === "enhanced-terminal");
+
+    // **The set, by equality, because a walk is blind to a row leaving it.**
+    // Measured: dropping `profile` from the `⌃⇧V` row made it unconditional —
+    // a chord bound on terminals that can never send it — and every row below
+    // stayed green, because the mutation removed its own subject from the
+    // corpus. §6a's table names exactly which actions need a second route, so
+    // the list is a claim and not an inventory.
+    expect(
+      only.map((b) => `${b.action} ${keyText(b.key)}`).sort(),
+      "the enhanced routes §6a names, and no others",
+    ).toEqual([
+      "agent1 u+1",
+      "agent2 u+2",
+      "agent3 u+3",
+      "agent4 u+4",
+      "agent5 u+5",
+      "agent6 u+6",
+      "agent7 u+7",
+      "agent8 u+8",
+      "agent9 u+9",
+      "agentNext c+tab",
+      "agentPrevious cs+tab",
+      "copySelection cs+c",
+      "yank cs+v",
+    ]);
+
+    for (const b of only) {
+      const key: Key = {
+        name: b.key.name,
+        ctrl: b.key.ctrl ?? false,
+        meta: b.key.meta ?? false,
+        shift: b.key.shift ?? false,
+        ...(b.key.super === true ? { super: true } : {}),
+        sequence: b.key.name,
+      };
+      expect(rich.resolve(b.target, key), `${keyText(b.key)} fires on an enhanced terminal`).toBe(b);
+      expect(base.resolve(b.target, key), `${keyText(b.key)} does not fire on a default one`).not.toBe(b);
+    }
+
+    // And `entries()` — what `/help` reads — carries only what can fire, so a
+    // reader is never shown a chord their terminal cannot deliver.
+    expect(base.entries().some((b) => b.profile === "enhanced-terminal")).toBe(false);
+    expect(rich.entries().some((b) => b.profile === "enhanced-terminal")).toBe(true);
+  });
+
+  it("T1.36 (I36): every action in the table has a `default-terminal` route", () => {
+    // An action reachable only where the protocol is reported is an action most
+    // readers cannot reach. The enhanced rows are additions, never the only way.
+    const base = new Set(
+      defaultKeymap.filter((b) => b.profile !== "enhanced-terminal").map((b) => b.action),
+    );
+    const enhancedOnly = [...new Set(defaultKeymap.map((b) => b.action))].filter(
+      (a) => !base.has(a),
+    );
+    expect(enhancedOnly, "no action is reachable only on an enhanced terminal").toEqual([]);
+    // The control: the walk had a corpus, and there really are enhanced rows to
+    // have failed it.
+    expect(base.size).toBeGreaterThan(40);
+    expect(defaultKeymap.some((b) => b.profile === "enhanced-terminal")).toBe(true);
+  });
+
+  it("T1.37 (I37): every current registry binding resolves, or is declared with the site that handles it", () => {
+    // **The gate that makes the registry normative without deleting the table**
+    // (R-KEY-007). The registry names 39 bindings; this table holds 85 rows over
+    // ~65 actions, so agreement is asked of the rows the design speaks to.
+    //
+    // Three arms, and the third is the one that needs its owner named: without
+    // it, *the design says `⇥` moves focus and the tree completes* and *the
+    // design says `⇥` moves focus and nobody noticed* read identically.
+    const ELSEWHERE: Readonly<Record<string, string>> = Object.freeze({
+      // Handled outside the keymap, by a named site.
+      confirm: "src/shell/construct.ts — the prompt's submit row; `overlay enter` and `liveBlock enter` are this table's",
+      escape: "src/interaction/router/router.ts — the ladder's rungs; `overlay`, `copyMode`, `pushedView` and `child` each have one",
+      interrupt: "src/interaction/router/intercepts.ts — a reserved route read before the ladder (§103)",
+      "help.command": "src/data/manifest/framework.ts — `/help` is a verb, and `/help keys` is what `?` and F1 submit",
+      // Owner captures, under R-KEY-003's own *unless the current owner
+      // explicitly captures the action* clause. The owner is named because that
+      // is what separates a ruled capture from an unnoticed disagreement.
+      "focus.next": "captured by `prompt` for `complete` (C19 §6); `liveBlock`, `overlay` and `pushedView` each move focus on it",
+      "move.up": "captured by `prompt` for `historyPrev` (C20); `liveBlock` moves a row and `overlay` a menu item",
+      "move.down": "captured by `prompt` for `historyNext` (C20); `liveBlock` moves a row and `overlay` a menu item",
+      "move.left": "captured by `prompt` for `left` (C17); `liveBlock` moves the crosshair",
+      "move.right": "captured by `prompt` for `acceptGhostOrForward` (C19 §6)",
+      "selection.up": "captured by `liveBlock` for `extendRowUp`; the prompt is one line and has no row above",
+      "selection.down": "captured by `liveBlock` for `extendRowDown`; the prompt is one line and has no row below",
+      "transcript.top": "`⌃home` → `scrollTop`; `⌘↑` has no wire form this decoder can tell from `⌥↑` — see the keymap's note",
+      "transcript.bottom": "`⌃end` → `scrollBottom`; `⌘↓` likewise",
+    });
+
+    // The design's action name against this table's. Explicit, because the two
+    // vocabularies were written years apart and a fuzzy match would make the
+    // gate agree with itself.
+    const ACTION_OF: Readonly<Record<string, string>> = Object.freeze({
+      newline: "insertNewline",
+      "focus.previous": "focusTranscript",
+      "selection.left": "extendCharLeft",
+      "selection.right": "extendCharRight",
+      copy: "copySelection",
+      paste: "yank",
+      "help.f1": "helpKeymap",
+      "help.question": "helpKeymap",
+      "agent.next": "agentNext",
+      "agent.previous": "agentPrevious",
+      "agent.1": "agent1",
+      "agent.2": "agent2",
+      "agent.3": "agent3",
+      "agent.4": "agent4",
+      "agent.5": "agent5",
+      "agent.6": "agent6",
+      "agent.7": "agent7",
+      "agent.8": "agent8",
+      "agent.9": "agent9",
+      "page.up": "scrollPageUp",
+      "page.down": "scrollPageDown",
+      "posture.cycle": "postureCycle",
+      "values.toggle": "valuesToggle",
+      "queue.drop": "queueDrop",
+      "selection.native": "enterCopyMode",
+      "selection.semantic": "enterSemanticSelection",
+    });
+
+    const base = createKeymap(defaultKeymap, "default-terminal");
+    const rich = createKeymap(defaultKeymap, "enhanced-terminal");
+    const current = REGISTRY.bindings.filter((b) => b.status === "current");
+    expect(current.length, "the registry has bindings to check").toBeGreaterThan(30);
+
+    const unanswered: string[] = [];
+    for (const b of current) {
+      if (b.actionId in ELSEWHERE) continue;
+      const action = ACTION_OF[b.actionId];
+      if (action === undefined) {
+        unanswered.push(`${b.actionId} (${b.chord}) — no action named for it at all`);
+        continue;
+      }
+      if (!defaultKeymap.some((row) => row.action === action)) {
+        unanswered.push(`${b.actionId} (${b.chord}, ${b.scope}) → ${action}, which nothing binds`);
+      }
+    }
+    expect(
+      unanswered,
+      "every current registry binding resolves, is handled by a named site, or is a declared capture",
+    ).toEqual([]);
+
+    // **The declaration list is driven, not a licence** (F102): an entry for a
+    // binding the registry no longer has is a premise nobody re-checked.
+    const ids = new Set(current.map((b) => b.actionId));
+    expect(
+      Object.keys(ELSEWHERE).filter((k) => !ids.has(k)),
+      "no declaration outlives the binding it excuses",
+    ).toEqual([]);
+
+    // And the maps were built, so the two above are not satisfied by an empty
+    // table — `createKeymap` throws on a collision, which is half the gate.
+    expect(base.entries().length).toBeGreaterThan(80);
+    expect(rich.entries().length).toBeGreaterThan(80);
+  });
+
+  it("T1.38 (I38): every reserved chord carries an explicit no-op, and none of them acts", () => {
+    // §6's closed set makes an action with no executor uncompilable, so the
+    // alternative to a declared no-op is leaving the chord unbound — and an
+    // unbound chord is one an application takes.
+    const RESERVED = [
+      "agentNext", "agentPrevious", "agent1", "agent2", "agent3", "agent4", "agent5",
+      "agent6", "agent7", "agent8", "agent9", "postureCycle", "valuesToggle", "queueDrop",
+      "enterSemanticSelection",
+    ] as const;
+    for (const action of RESERVED) {
+      expect(
+        defaultKeymap.some((b) => b.action === action),
+        `${action} has a chord reserved for it`,
+      ).toBe(true);
+    }
+    // **And the executor is the declared no-op, read out of L4's table** — the
+    // half that makes this a reservation rather than a list. `expect(RESERVED
+    // .length).toBe(15)` was here first and is an array literal's own length:
+    // A03 §2's vacuity class, written by hand.
+    const effects = readFileSync("src/shell/keys.ts", "utf8");
+    for (const action of RESERVED) {
+      expect(
+        new RegExp(`\\n\\s*${action}: reserved,`, "u").test(effects),
+        `${action} is bound to the declared no-op, not to an effect that happens to do nothing`,
+      ).toBe(true);
+    }
+    // The control: the pattern finds nothing for an action that *does* act, so
+    // the loop above is not satisfied by a regex that matches anything.
+    expect(/\n\s*insertNewline: reserved,/u.test(effects), "an acting effect is not reserved").toBe(false);
+  });
 });

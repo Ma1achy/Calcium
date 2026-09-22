@@ -85,6 +85,11 @@ describe("tools/keymap-table.mjs — the ladder as a table", () => {
     const header = liveTable()
       .split("\n")
       .find((l) => l.startsWith("| key |"));
-    expect(header).toBe(`| key | ${FOCUS_ORDER.join(" | ")} |`);
+    // **`profile` sits between the key and the ladder** (M6, §6a). It is a
+    // property of the route rather than of a target, so it cannot be a column in
+    // `FOCUS_ORDER` — and putting it first would read as a ninth rung. The
+    // claim this row makes is unchanged: the target columns are `FOCUS_ORDER`,
+    // in order, so a target added without a column fails here.
+    expect(header).toBe(`| key | profile | ${FOCUS_ORDER.join(" | ")} |`);
   });
 });
