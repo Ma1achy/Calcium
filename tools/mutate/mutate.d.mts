@@ -79,6 +79,12 @@ export type Outcome = Readonly<{
   /** The figures behind `indeterminate`, so the row can say them. */
   tally?: { reported: number; collected: number } | null;
   /**
+   * The rows that failed when the mutation was killed by something other than
+   * the row it named — so `CAUGHT ELSEWHERE` says *by what* rather than leaving
+   * the reader to run it again. Empty when the expected row is among them.
+   */
+  caughtBy?: readonly string[];
+  /**
    * The mutated tree did not type-check — the first `error TS…` line that is not
    * an unused binding. `unbuilt` covers a `to` that does not parse; this covers
    * one that parses and does not type-check, which runs a green suite and reads
@@ -118,6 +124,14 @@ export declare function fsIo(root: string): {
 };
 
 /** How many places an anchor matches — `replace` takes the first (F219, F1037). */
+/**
+ * The row ids on a run's `FAIL` lines — what caught a mutation when the row it
+ * expected did not. Read off the **last** `>` segment: vitest prints
+ * `FAIL <file> > <describe> > <row>`, and a describe opens with a component id,
+ * so reading left to right names the component rather than the row.
+ */
+export declare function failedRows(output: string): string[];
+
 export declare function hitsOf(src: string, from: string): number;
 
 export declare function apply(

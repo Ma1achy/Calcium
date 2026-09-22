@@ -86,8 +86,8 @@ const results = runPass({
       // right and the status is zero.
       name: "a parse error is composed and never gated on",
       file: SWEEP,
-      from: "const problems = [...unparseable, ...malformed, ...splices, ...unresolvable, ...unreachable];",
-      to: "const problems = [...malformed, ...splices, ...unresolvable, ...unreachable];",
+      from: "const problems = [...unparseable, ...malformed,",
+      to: "const problems = [...malformed,",
       expect: "MA8",
     },
     {
@@ -213,6 +213,48 @@ const results = runPass({
       from: "    if (!(t in consts)) return { text: null, why: `names \\`${t}\\`, which is not a literal here` };",
       to: "    if (!(t in consts)) return { text: \"\", why: null };",
       expect: "MA1c",
+    },
+    // --- F1243, F1245: the reach check, the row matcher and the separator ---
+    {
+      // **The separator's newline made mandatory again**, which is the state the
+      // reader was in for four `also:` edits it could not see. A run whose keys
+      // share a line falls out of the corpus entirely — not stale, not
+      // ambiguous: not an anchor.
+      name: "an anchor's file: and from: must sit on separate lines again",
+      file: SWEEP,
+      from: "  const SEP = String.raw`\\s*,\\s*(?:\\n\\s*)?(?:\\/\\/[^\\n]*\\n\\s*)*`;",
+      to: "  const SEP = String.raw`\\s*,\\s*\\n\\s*(?:\\/\\/[^\\n]*\\n\\s*)*`;",
+      expect: "MA1d",
+    },
+    {
+      // **The reach check off.** Every mutation is assumed to reach its own
+      // suite, which is the state the sweep was in when `spans.mjs` mutated a
+      // table under a command that loads none.
+      name: "a module no test file the command runs can import is not reported",
+      file: SWEEP,
+      from: "    if (!unreached.has(run) && reach !== null && !seen) {",
+      to: "    if (false) {",
+      expect: "MA10",
+    },
+    {
+      // **The row id back to a substring.** `T2.13` then matches `T2.133`, which
+      // is exactly how the expectation gate was green on the case it exists for.
+      // The tell is that nothing else moves: every run still passes.
+      name: "a row id matches anywhere in the corpus again",
+      file: SWEEP,
+      from: "  if (!ROW_ID.test(e)) return true;",
+      to: "  if (true) return true;",
+      expect: "MA6c",
+    },
+    {
+      // **The comment skip removed.** An id mentioned in prose then counts as a
+      // row, which is the other half of the same green: `T2.133` lives only in
+      // comments in the file `spans.mjs` named.
+      name: "an id mentioned in a comment counts as a row",
+      file: SWEEP,
+      from: "    if (trimmed.startsWith(\"//\") || trimmed.startsWith(\"*\")) continue;",
+      to: "    if (false) continue;",
+      expect: "MA6c",
     },
   ],
 });

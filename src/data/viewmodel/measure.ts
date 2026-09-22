@@ -138,12 +138,16 @@ export function groupChildWidths(block: Group, width: number): readonly number[]
   const gaps = (n - 1) * childGapOf(block);
   const shares = block.flex ?? block.children.map(() => 1);
 
-  // **One implementation, called rather than restated** (I44, I72). The rule —
-  // fixed `{cells: n}` shares off the budget first, then the weights divide what
-  // remains, because any other order makes a cell count a suggestion — lives in
-  // `divideShares` and serves this and both of the mosaic's axes. The banner's
-  // whale is the case it was written for: 40 cells against `40 : 61` gives 41 at
-  // 105 columns and 47 at 120.
+  // **One rule, two implementations** (I44, I72) — and this comment used to say
+  // one implementation, which is false and is what let a mutation of the group's
+  // arithmetic be filed as the mosaic's (F1244). The rule is the same in both:
+  // fixed `{cells: n}` shares come off the budget first, then the weights divide
+  // what remains, because any other order makes a cell count a suggestion. A
+  // group divides through `divideShares`; both of the mosaic's axes divide
+  // through `gridLines`, which spends its leftover by largest remainder where
+  // this one floors and drops it, and that difference is why there are two.
+  // The banner's whale is the case this one was written for: 40 cells against
+  // `40 : 61` gives 41 at 105 columns and 47 at 120.
   return divideShares(shares, w, gaps);
 }
 

@@ -59,8 +59,9 @@
 // was true. `parseErrorOf` is the one question a text sweep cannot answer for
 // itself, and it is asked first.
 import { spawnSync } from "node:child_process";
-import { readdirSync, readFileSync, existsSync } from "node:fs";
+import { readdirSync, readFileSync, existsSync, statSync } from "node:fs";
 import { stripTypeScriptTypes } from "node:module";
+import { importsOf, resolve as resolveSpec } from "../enforce/module-graph.mjs";
 
 const ROOT = process.cwd();
 
@@ -476,10 +477,20 @@ function anchorsOf(src) {
   // importing the module — importing a run **executes the pass**, which is why
   // this reader is textual in the first place.
   const VALUE = String.raw`[A-Z_][A-Z_0-9]*|(?:(?:${LITERAL})\s*\+?\s*)+`;
+  // **The newline between `file:` and `from:` was required, and that is a fifth
+  // form** (F1245). Every mutation in this tree is written across lines, so the
+  // pattern was built around the shape in front of it — and an `also:` edit,
+  // which is one object inside a one-line array, has its `file:` and its `from:`
+  // on the same line and matched nothing. Not stale, not ambiguous: **not an
+  // anchor**, which is F1117's finding arriving through the separator instead of
+  // through the value. Measured before the widening: four `also:` edits across
+  // four runs, each invisible, and breaking one by hand left the sweep printing
+  // *no run drifted from what the list says*. So the line break is optional.
+  const SEP = String.raw`\s*,\s*(?:\n\s*)?(?:\/\/[^\n]*\n\s*)*`;
   const re = new RegExp(
-    String.raw`file:\s*([A-Z_][A-Z_0-9]*|"[^"]*"|'[^']*')\s*,\s*\n\s*(?:\/\/[^\n]*\n\s*)*from:\s*` +
+    String.raw`file:\s*([A-Z_][A-Z_0-9]*|"[^"]*"|'[^']*')${SEP}from:\s*` +
       String.raw`(${VALUE})` +
-      String.raw`(?:,\s*\n\s*(?:\/\/[^\n]*\n\s*)*to:\s*(${VALUE}))?`,
+      String.raw`(?:${SEP}to:\s*(${VALUE}))?`,
     "g",
   );
   const pieces = new RegExp(LITERAL, "g");
@@ -642,6 +653,228 @@ function testCorpusOf(src, _run) {
   return parts.join("\n");
 }
 
+/**
+ * Does `corpus` contain this expectation **as a row**, rather than as a prefix?
+ *
+ * **The substring test is how F1243 got through a gate built for it.** The
+ * reachability check above has existed since this file did, and it asked
+ * `corpus.includes("T2.13")`. `test/unit/text.test.ts` mentions **T2.133** —
+ * three orders along, in a different component, and in a **comment** — so the
+ * substring was present, the check passed, and a mutation whose suite could not
+ * possibly execute C11 T2.13 was declared reachable. The survivor that followed
+ * read as a finding about the tests.
+ *
+ * Two defects in one predicate, and they are the two this fixes:
+ *
+ * - **A row number has a boundary.** `T2.13` is a prefix of `T2.130`, and the
+ *   repo's own SP5 message already says this about findings — *a number chosen
+ *   by grepping a prefix, `^## F6[0-9]` cannot see F70*. The same arithmetic,
+ *   one gate over.
+ * - **A mention is not a row.** The name must be followed by what a title is
+ *   followed by — a colon, a space, a paren — and preceded by a quote, a space
+ *   or a line start, so `(F969, F978, T2.133)` in prose cannot satisfy a claim
+ *   about which instrument catches a mutation.
+ *
+ * **What it does not reach, stated because an unrecorded limit reads as
+ * strength**: a row's *title* may be present in a file the command names and
+ * still be skipped, filtered out, or inside a `describe` that never runs. This
+ * is a textual reach check and `reachOf` below is the executable one; neither is
+ * the other, and F1037 is why no third is attempted.
+ */
+const ROW_ID = /^[A-Z]{1,4}\d[\w.]*$/u;
+function namesARowIn(corpus, e) {
+  if (!corpus.includes(e)) return false;
+  // **Two forms, and one rule cannot serve both.** An expectation is either a
+  // row **id** — `T2.13`, `SF3`, `MH10` — or a **fragment of a title**, which
+  // several runs use where a row has no number. A fragment has no boundary
+  // semantics and no fixed position, so it keeps the substring test it always
+  // had; an id has both, and it is the id form that the substring test let
+  // through (F1243).
+  if (!ROW_ID.test(e)) return true;
+  const name = e.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  const bounded = new RegExp(`(?<![\\w.])${name}(?![\\w.])`, "u");
+  // **An id names a row when it is inside a title and not inside prose.** The
+  // anchor is not `it(`, which sits on the previous line for every multi-line
+  // title in the tree, and it is not the opening quote either, because a title
+  // may qualify the row first — `it("C10 T2.26 (C10 I33, …)"`. What separates
+  // the two cases is what the line is: a string literal opens on it, and it is
+  // not a comment. Measured against the corpus, that is the line both failures
+  // fall on — `// … wrapped in Ink (T2.133).` and `// **R4.7 stood here**`.
+  //
+  // **Its blind spot, stated**: a title built across two lines, or from a
+  // template with the id in an interpolation, reads as absent and is reported
+  // here rather than passing quietly. That is the safe direction and it is not
+  // the same as being right.
+  for (const line of corpus.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("//") || trimmed.startsWith("*")) continue;
+    if (!line.includes('"') && !line.includes("'") && !line.includes("`")) continue;
+    if (bounded.test(line)) return true;
+  }
+  return false;
+}
+
+/**
+ * Every module a run's test files can reach, transitively.
+ *
+ * **The other half of F1243, and the half the user asked for.** A mutation is
+ * only as good as the command that can execute it: `spans.mjs` mutated
+ * `src/presentation/table/cells.ts` and named five test files, none of which
+ * loads a table. The mutation applied, the anchor sweep said `anchors missed 0`,
+ * the suite was green for the reason it is always green, and the report printed
+ * `SURVIVED` — which in this harness means *a finding about the tests*.
+ *
+ * **This is reach, not correctness.** A run whose files import the mutated
+ * module may still have no assertion that sees the change — that is F277 and
+ * the audit says not to build a mechanism for it. What is mechanical is the
+ * opposite: a module **no** test file in the command can import cannot be
+ * covered by any of them, whatever they assert.
+ *
+ * The walk shares `importsOf` with the layer rules rather than re-reading
+ * imports here, for the reason `inkOn` is shared: a second reader is a second
+ * set of forms to miss.
+ */
+const reachCache = new Map();
+const EXTS = ["", ".ts", ".tsx", ".mts", ".cts", ".mjs", ".cjs", ".js"];
+// **Resolution is a pure function of the tree and is asked the same question
+// thousands of times.** Eight `existsSync` plus a `statSync` per specifier, once
+// per specifier per entry, is most of what the reach walk costs — and the answer
+// cannot change inside one sweep.
+const fileForCache = new Map();
+function fileFor(spec) {
+  const held = fileForCache.get(spec);
+  if (held !== undefined) return held;
+  const found = fileForUncached(spec);
+  fileForCache.set(spec, found);
+  return found;
+}
+function fileForUncached(spec) {
+  for (const ext of EXTS) {
+    const at = `${ROOT}/${spec}${ext}`;
+    if (existsSync(at) && statSync(at).isFile()) return `${spec}${ext}`;
+  }
+  // **A directory specifier is its barrel**, which is most of this tree's edges:
+  // `../table/index.js` arrives here as `src/presentation/table/index`, and a
+  // resolver that only tries extensions on the literal path answers nothing for
+  // `../table`. Half the reach walk was missing on the first measurement and it
+  // presented as fourteen runs unable to see their own subject.
+  for (const ext of EXTS.slice(1)) {
+    const at = `${ROOT}/${spec}/index${ext}`;
+    if (existsSync(at) && statSync(at).isFile()) return `${spec}/index${ext}`;
+  }
+  return null;
+}
+/**
+ * One module's import specifiers, read once.
+ *
+ * **The cache is per file and not per entry, and the difference is the whole
+ * cost.** `reachOf` already caches a closure against the entry that produced it,
+ * which does nothing for two entries that share most of their graph — and in
+ * this tree they nearly all do, because a barrel is on almost every path. Every
+ * entry re-read and re-scanned the same files: measured on 247 runs, the sweep
+ * went 12.6 s → 29.3 s when the reach walk landed, past the 120 s budget MA4 and
+ * MS3 run it under once the suite is loaded. Reading each file once brings it
+ * back.
+ */
+const specsCache = new Map();
+function specsOf(file) {
+  const held = specsCache.get(file);
+  if (held !== undefined) return held;
+  const body = readFileSync(`${ROOT}/${file}`, "utf8");
+  const specs = [
+    ...importsOf(`${ROOT}/${file}`, () => body, true),
+    ...[...body.matchAll(/\bimport\s*\(\s*["'`]([^"'`]+)["'`]/gu)].map((m) => m[1]),
+  ];
+  specsCache.set(file, specs);
+  return specs;
+}
+
+function reachOf(entry) {
+  const held = reachCache.get(entry);
+  if (held !== undefined) return held;
+  const seen = new Set();
+  const stack = [entry];
+  while (stack.length > 0) {
+    const next = fileFor(stack.pop().replace(/\.(m|c)?js$/u, ""));
+    if (next === null || seen.has(next)) continue;
+    seen.add(next);
+    // Type-only edges included on purpose: a module a test reaches only for its
+    // types is still one that file can be asked about, and the safe direction
+    // for a *reach* check is to count more edges rather than fewer.
+    // **A dynamic `import()` is an edge and `importsOf` does not read one**, by
+    // design: it serves the layer rules, where a deferred import is a
+    // deliberately different question (the emulator behind one on the shell
+    // route is a shipped decision). Widening it there would move MG1–MG3. So the
+    // dynamic form is added here, where the question is only *can this file be
+    // loaded from that one* — and it is not an embellishment: it is the edge
+    // `plot-detail-scope.test.ts` uses, `await import(".../plot/definition.js")`,
+    // and without it this gate reported a run whose every mutation is caught.
+    for (const spec of specsOf(next)) {
+      const target = resolveSpec(next, spec);
+      if (target !== null) stack.push(target);
+    }
+  }
+  reachCache.set(entry, seen);
+  return seen;
+}
+
+/** `src/a/b.ts` without its extension, which is what `resolve` answers in. */
+const bare = (p) => p.replace(/\.(m|c)?[jt]sx?$/u, "");
+
+/** Runs already reported unreached, so one run is one line rather than one per anchor. */
+const unreached = new Set();
+const out_unreached = [];
+
+/**
+ * Every module the run's own test files can import, transitively — or `null`
+ * where this reader cannot say.
+ *
+ * **`null` rather than an empty set, because they mean opposite things.** A run
+ * naming a `--dir`, or whose files this reader cannot resolve, has an *unknown*
+ * reach; reporting that as *nothing is reachable* would flag every one of its
+ * mutations, which is a gate firing on a legal construct — the false positive
+ * CLAUDE.md names, and the thing that gets a rule exempted and then unread.
+ */
+const runReach = new Map();
+function reachableIn(src) {
+  const paths = testPathsOf(src);
+  // **A bare directory in the command is an unknown reach, not an empty one.**
+  // `vitest run … test/golden` runs every file under it, and `testPathsOf` keeps
+  // only `*.test.*` tokens — so a run ending in a directory looks like it names
+  // three files when it runs forty. Reporting that as *cannot reach* is a gate
+  // firing on a legal construct, which is how a rule gets an exemption and then
+  // stops being read.
+  const named = [...src.matchAll(/vitest run ([^"`]+)/gu)].flatMap((m) => m[1].trim().split(/\s+/u));
+  // **A corpus that walks the tree has an unknown reach, and unknown is the
+  // answer to give.** `router-focus.test.ts` reads every `.ts` under `src/` and
+  // `public-api.test.ts` globs `src/**/*.ts`; both reach files they name
+  // nowhere, and no reading of this file can say which. **The first draft tried
+  // to enumerate the scan roots** out of the corpus's quoted strings, and it is
+  // the wrong shape — each new form of walk is another clause, and a gate that
+  // grows a clause per false positive is a gate on its way to an exemption list.
+  // Saying nothing about a scanner is the same answer `--dir` already gets, for
+  // the same reason.
+  if (/\breaddirSync\b|\bglobSync\b|\breaddir\b/u.test(testCorpusOf(src)) ) return null;
+  const walksADir =
+    /vitest run --dir/u.test(src) ||
+    named.some((t) => !t.startsWith("-") && !/\.test\./u.test(t) && rootsFor(t).some((q) => existsSync(q) && statSync(q).isDirectory()));
+  if (paths.length === 0 || walksADir) return null;
+  const key = paths.join(" ");
+  const held = runReach.get(key);
+  if (held !== undefined) return held;
+  const all = new Set();
+  let resolvedAny = false;
+  for (const p of paths) {
+    const at = rootsFor(p).find((q) => existsSync(q));
+    if (at === undefined) continue;
+    resolvedAny = true;
+    for (const m of reachOf(at.slice(ROOT.length + 1))) all.add(bare(m));
+  }
+  const answer = resolvedAny ? all : null;
+  runReach.set(key, answer);
+  return answer;
+}
+
 // An absolute `--dir` is used as given; the default is repo-relative.
 const RUNS_AT = DIR.startsWith("/") ? DIR : `${ROOT}/${DIR}`;
 
@@ -760,7 +993,7 @@ for (const run of runs) {
       );
       continue;
     }
-    if (RESERVED_EXPECTS.has(e) || corpus.includes(e)) continue;
+    if (RESERVED_EXPECTS.has(e) || namesARowIn(corpus, e)) continue;
     const known = (OWN ? CROSS_TIER[run] : undefined) ?? [];
     if (known.includes(e)) continue;
     unreachable.push(`${run}: expects "${e}", which no test path it runs contains`);
@@ -781,6 +1014,47 @@ for (const run of runs) {
       continue;
     }
     checked += 1;
+    // **Can any test this run issues actually load the module it mutates?**
+    // (F1243) The anchor check above says the mutation will *apply*; this says
+    // the suite can *see* it. They fail identically from outside: a run whose
+    // command cannot reach the mutated module compiles the mutation, runs a
+    // suite that is green for its usual reasons, and prints `SURVIVED`, which
+    // in this harness means *a finding about the tests*.
+    //
+    // Measured on the case that produced it: `spans.mjs` mutated
+    // `src/presentation/table/cells.ts` and named `spans`, `text` and their
+    // tiers — five files, none of which loads a table.
+    //
+    // **Reach, not coverage.** A run that reaches the module may still have no
+    // assertion that sees the change; that is F277 and
+    // `docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass says not to build a
+    // mechanism for it. What is mechanical is the opposite direction, and only
+    // that is claimed here.
+    // **A test can reach a subject by reading it or by running it**, and both
+    // are real: a source scan opens a file by path, and `enforce`'s own rows
+    // spawn `node tools/enforce/index.mjs`. Neither is an import, and a check
+    // that knew only imports flagged nine runs whose tests do see their subject
+    // — including every one that mutates a markdown spec, which cannot be
+    // imported at all. So the corpus naming the path counts as reach.
+    const reach = reachableIn(src);
+    const seen =
+      reach !== null &&
+      (reach.has(bare(file)) ||
+        // **A path named in the corpus.** A source scan opens a file by path,
+        // and a markdown spec can be reached no other way.
+        corpus.includes(file) ||
+        // **A build the command runs first.** `c24-bundle` mutates the bundler
+        // and asserts against `dist/bundle/index.js`; the edge is the build, and
+        // it is a real one — the mutation changes what the tests import.
+        /npm run build/u.test(src));
+    if (!unreached.has(run) && reach !== null && !seen) {
+      unreached.add(run);
+      out_unreached.push(
+        `${run}: mutates ${file}, which no test file its command runs can import — ` +
+          `the mutation applies, the suite runs green for its own reasons, and the pass ` +
+          `reports SURVIVED, which in this harness is a claim about the tests (F1243)`,
+      );
+    }
     const body = readFileSync(path, "utf8");
     // **Existence is one property and uniqueness is another** (F219).
     //
@@ -872,7 +1146,7 @@ console.log(
 // it asserts nothing *today*, the pass reports it as DID NOT BUILD if anyone
 // runs one, and any repair is strictly better than what is there. An entry here
 // would be an excuse for a five-second fix.
-const problems = [...unparseable, ...malformed, ...splices, ...unresolvable, ...unreachable];
+const problems = [...unparseable, ...malformed, ...splices, ...unresolvable, ...unreachable, ...out_unreached];
 
 // **The silence arm** (F768), on the same equality terms as the others: a tail
 // that says nothing and is not on the list fails; one on the list for a

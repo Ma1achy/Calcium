@@ -342,7 +342,21 @@ function isTypeOnly(clause) {
   return /^type\b/.test(clause.trim());
 }
 
-function importsOf(file, readFile, includeTypeOnly = false) {
+/**
+ * **Exported for the mutation sweep's reach check** (F1243), which is the queued
+ * consumer CLAUDE.md's rule asks for: a mutation run declares a command and a
+ * set of mutated files, and nothing compared the two — a mutation in a module
+ * no test the command loads can import is compiled, run against a suite that
+ * cannot see it, and reported as a **survivor**, which in that harness is a
+ * claim about the tests. `anchors.mjs` walks from each of a run's test files
+ * through this function and asks whether the mutated file is reachable.
+ *
+ * Shared rather than copied for the reason `inkOn` is shared (C10 I46): a second
+ * import reader is a second set of forms to miss — a bare import, an
+ * `export … from`, an inline `import { type X, y }` — and the layer rules
+ * already depend on this one being right.
+ */
+export function importsOf(file, readFile, includeTypeOnly = false) {
   const src = readFile(file);
   const out = [];
 
@@ -359,7 +373,8 @@ function importsOf(file, readFile, includeTypeOnly = false) {
   return out;
 }
 
-function resolve(file, spec) {
+/** Exported beside `importsOf`, for the same consumer: a specifier is only an edge once resolved. */
+export function resolve(file, spec) {
   if (!spec.startsWith(".")) return null;          // external, not our concern
   const dir = file.split("/").slice(0, -1).join("/");
   const parts = (dir + "/" + spec).split("/");

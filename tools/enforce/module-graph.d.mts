@@ -181,3 +181,13 @@ export declare function checkDevEntryIsolation(
   files: readonly string[],
   readFile?: (f: string) => string,
 ): Violation[];
+
+/** Every relative specifier `file` imports, resolved by the caller (F1243). */
+export function importsOf(
+  file: string,
+  readFile: (f: string) => string,
+  includeTypeOnly?: boolean,
+): string[];
+
+/** A relative specifier resolved against `file`'s directory, or `null` when external. */
+export function resolve(file: string, spec: string): string | null;

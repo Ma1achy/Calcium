@@ -236,17 +236,41 @@ export const CORPUS_BUDGET_MS = 60_000;
  * drifted from what the list says*.
  *
  * **A timeout, so it is sized for the slowest regime that runs it** — the
- * taxonomy `DOCUMENT_BUDGET_MS` below is contrasted against. 120 s is a little
- * under 5× the loaded measurement, which is the ratio `SCAN_BUDGET_MS` takes
- * over its worst row, and a hang still surfaces inside two minutes. What this
- * removes is a row whose verdict is a function of how much else the suite is
- * doing.
+ * taxonomy `DOCUMENT_BUDGET_MS` below is contrasted against. What this removes
+ * is a row whose verdict is a function of how much else the suite is doing.
  *
- * **The duplication is recorded and not fixed here**: MA4 and MS3 each pay the
- * full sweep, so the suite runs it twice for two different assertions about the
- * same output. Worth one child process and a shared fixture, in its own change.
+ * **Re-measured when the reach check landed** (F1243), because the ratio above
+ * stopped being true and a justification the next person checks and cannot
+ * reproduce is one they delete:
+ *
+ * | | |
+ * |---|---|
+ * | the sweep alone, before the reach walk | **12.6 s** |
+ * | the sweep alone, with it, uncached | **29.3 s** |
+ * | the sweep alone, imports and path resolution cached once each | **19.7 s** |
+ * | MA4 alone | **27.4 s** |
+ * | MA4 inside a green `make test` | **69.0 s** |
+ * | MS3, same run | **66.4 s** |
+ *
+ * **The sweep now walks the import graph**, so it reads every module a test file
+ * can reach rather than only the runs directory, and that is a 1.56× cost after
+ * the caches and a 2.33× cost before them. Both rows timed out at 122 s against
+ * this budget on the run that landed it.
+ *
+ * **So the old ratio is retired rather than restored.** 120 s was a little under
+ * 5× a 25.1 s loaded measurement; against 69.0 s it is **1.74×**, which is the
+ * figure this file's own opening calls not a margin. Raising it to keep 5× would
+ * mean 345 s and would give up *a hang still surfaces inside two minutes* — a
+ * claim that was true of a 25 s operation and is not available for a 69 s one.
+ * **240 s is 3.5× the loaded measurement**, keeps a hang inside four minutes,
+ * and is stated as the trade rather than as a derivation.
+ *
+ * **The duplication is what would buy the ratio back, and it is still not fixed
+ * here**: MA4 and MS3 each pay the full sweep — 69.0 + 66.4 s of wall time for
+ * two assertions about one output. Worth one child process and a shared fixture,
+ * in its own change.
  */
-export const SWEEP_BUDGET_MS = 120_000;
+export const SWEEP_BUDGET_MS = 240_000;
 
 /**
  * For C06 T5.1 — a real binary emitting a large document, spawned, parsed,

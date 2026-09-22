@@ -53748,6 +53748,101 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1245 — the anchor reader required a line break, so four live edits were invisible ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `anchorsOf` in `tools/mutate/anchors.mjs`. |
+| **Reached for** | Every `file:`/`from:` pair in `tools/mutate/runs/`. |
+| **Verdict** | **Real, and silent in the direction that reads as health.** |
+
+The pattern between the two keys was `,\s*\n\s*` — a comma and **a newline**. Every mutation in
+this tree is written across lines, so the reader was built around the shape in front of it. An
+`also:` edit is not that shape: it is one object inside a one-line array, its `file:` and its `from:`
+share a line, and it matched nothing.
+
+**Four in the tree**, each an edit a run actually applies:
+
+```
+refresh-readout.mjs:89        also: [{ file: FILE, from: "      const since = mono - r.startedAt;", … }]
+c09-halfblock.mjs:157         also: [{ file: CAPS, from: "  ghostty: \"ghostty\",\n", to: "" }]
+c12-svg-right-margin.mjs:59   also: [{ file: SVG,  from: "`${escape(fitLabel(text, columnEdge - at))}</text>`);", … }]
+c12-lines3d.mjs:142           also: [{ file: S,    from: DATA_LOOP, to: `${FRAME_CALL}\n${DATA_LOOP}` }]
+```
+
+**Measured, not argued.** Breaking `refresh-readout`'s by hand in a fabricated runs directory:
+
+```
+mutation anchors — 1 runs · 1 parsed · 6 anchors · … · 0 missing across 0 run(s)
+  0 known stale, and no run drifted from what the list says
+```
+
+— a rotted anchor that would throw at `apply` mid-pass, and the sweep reporting the whole tree
+healthy. With the line break made optional, the same fabrication gives
+`7 anchors · 1 missing across 1 run(s)` and names the line.
+
+**This is F1117's finding through a different key.** There the value was a form the reader could not
+see (`from: GATE`); here it is the *separator*. Both produce the same state and it is the worst one:
+not stale, not ambiguous, **not an anchor** — the row falls out of the corpus and the count that
+reports on it never counted it. And it is F173's shape a second time, a widening that fixed the form
+in front of it and stopped: the reader had already been widened twice, for backticks and for
+concatenations, and both times on the value.
+
+**The count moved 2433 → 2437** across 247 runs, which is the four, and one of them arrives as
+`1 with no readable to:` — `c12-lines3d`'s interpolated replacement, counted by name rather than
+guessed at, which is the disposition F1030 already set.
+
+**Found by** a fixture failing for the wrong reason. MA10's first draft wrote its mutation on one
+line and the sweep passed it; the row was measuring nothing, and the question *why did this fixture
+not fire* is what reached the reader.
+
+---
+
+## F1244 — the mutation was in the other implementation of the rule ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `tools/mutate/runs/c04-mosaic.mjs`, the mutation *the weights divide before the fixed shares are taken*. |
+| **Reached for** | C04 I44 — fixed `{cells: n}` shares come off the budget before the weights divide the rest. |
+| **Verdict** | **Real, and the import-reach gate cannot see it.** |
+
+The row was `from: "  const budget = total - gaps - fixed;"`, which is `divideShares`
+(`src/data/viewmodel/mosaic.ts:190`) — the **group's** share division, and already
+`c04-weights.mjs`'s T3.20 on the same line. The mosaic's own axes do not go through it:
+`mosaicRects` calls `gridLines`, forty lines below, which computes its own `fixed`, its own
+`budget` and spends its leftover by largest remainder where `divideShares` floors and drops it.
+Two implementations of one rule, and the run named for the mosaic was mutating the other one.
+
+**It survived**, and the reason is F1243's reason one level down: none of the four files
+`c04-mosaic`'s command names carries a group's fixed-share row — those are at
+`test/edge/view-model.test.ts:216` and `test/edge/rows.test.ts:91`. So the mutation was applied,
+the covering rows were not run, and the report said `SURVIVED`.
+
+**F1243's gate is blind to it, by construction.** That gate asks whether any test file the command
+runs can *import the mutated module*, and `mosaic.ts` is imported by `mosaic.test.ts` — the reach
+that was missing here is to a **function**, not to a file. This is the effect-reachability class
+F1037 rules unbuildable, and it is the reason the gate is worth having anyway rather than the
+reason it is not: it catches the file-granularity instance cheaply and says nothing about this one,
+which is a known limit rather than a hole.
+
+**What surfaced alongside it**, and is the part with no watcher: `measure.ts:141` says *"One
+implementation, called rather than restated (I44, I72) — the rule … lives in `divideShares` and
+serves this and both of the mosaic's axes."* It does not. The comment is what made the mutation
+look correctly placed, and a comment claiming a shared implementation is exactly the shape that
+survives review — it is true of the rule and false of the code.
+
+**Remedy.** The mutation is re-anchored onto `gridLines`' own budget line, which MS4 asserts
+(*"Fixed shares come off the budget before the weights divide the rest"*, `mosaic.test.ts:154`);
+the `divideShares` copy stays where it is covered, in `c04-weights`. The `measure.ts` comment is
+owed a correction, and so is the question of whether two implementations of I44 should be one —
+both outside this MR's scope, which is the gate.
+
+**Found by** reading `caughtBy` on a survivor. The same pass printed `CAUGHT ELSEWHERE (by C09,
+MS2, MS4)` for the neighbouring mutation, which is what said MS4 runs and is healthy, and therefore
+that the survivor was about reach rather than about the row.
+
+---
+
 ## F1243 — a mutation reaches only as far as its run's command ★★★★★
 
 | | |
@@ -53780,6 +53875,50 @@ names `render-focus` and the three table tiers, and it is caught there. **The ga
 each mutation, the row named in `expect` must be collectable by the run's own command — and it is
 checkable, because `anchors.mjs` already parses both halves: it reads 651 test paths and 2,161
 expectations and never crosses them.
+
+**The gate is built, and it is two checks rather than one.**
+
+*The row named in `expect` must be collectable by the run's own command.* That check existed and was
+green on this case, which is the sharper half of the finding: it tested the expectation as a
+**substring** of the corpus, and `"T2.133".includes("T2.13")` is true — in a **comment**, in
+`test/unit/text.test.ts`, about a row in another component. A row id now matches on its own boundary
+and only on a line that opens a string literal and is not a comment. Fabricated back into
+`spans.mjs`, the sweep says so:
+
+```
+  spans.mjs: expects "T2.13", which no test path it runs contains
+
+1 problems.
+```
+
+*The mutated module must be importable by some test file the command runs*, walked from `importsOf`
+with type-only and dynamic edges included, barrels resolved, and `null` — unknown — for a command
+naming a directory or a corpus that walks the tree.
+
+**This second check does not catch `spans.mjs`, and that is worth stating rather than leaving to be
+discovered.** `test/contract/spans.test.ts` imports the blocks barrel, so
+`src/presentation/table/cells.ts` is inside its import closure: the reach is real and the coverage is
+not, which is F277 and the audit's fourth pass. **How weak the check is, measured** — modules under
+`src/` reachable from one test file, of 396:
+
+| entry | reaches |
+|---|---|
+| `test/unit/text.test.ts` | 3 |
+| `test/unit/mosaic.test.ts` | 180 |
+| `test/contract/spans.test.ts` | 150 |
+| `test/unit/view-model.test.ts` | 179 |
+| `test/unit/render-focus.test.ts` | 355 |
+
+A barrel drags a layer in behind it, so **passing this check is weak evidence and failing it is
+strong**. It is clean across all 247 runs today, which means it lands with no live instance — the
+opposite of the expectation half, and the reason MA10 carries its own control rather than resting on
+the tree. Its one true positive in the tree is a run that already knows: `c26-focus-target`'s
+declared expected survivor mutates `src/shell/keys.ts` under a command that reaches it only through a
+source scan, so the reason it survives is reach rather than a weak row.
+
+**Closed.** MA6c and MA10 are the rows; `mutate-anchors-parse` carries four mutations that put each
+half back, all caught. The function-granularity case — a module reachable and a *function* not —
+stays out of reach on purpose (F1244, F1037).
 
 ---
 

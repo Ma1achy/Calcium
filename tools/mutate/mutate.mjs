@@ -262,6 +262,33 @@ export function apply(src, { file, from, to }) {
  * why no mechanism for it should be built. What it does is stop one of the two
  * dispositions being invisible on the row that reports it.
  */
+/**
+ * The row ids vitest named as failing, in order, deduplicated.
+ *
+ * Read from the `FAIL` lines rather than from the summary, because the summary
+ * is a count and the question is *which*. A row id is how this repo titles a
+ * test — a short prefix and a number — and the first one on a `FAIL` line is
+ * the row, whatever follows it.
+ */
+export function failedRows(output) {
+  const out = [];
+  for (const line of output.split("\n")) {
+    if (!/\bFAIL\b/u.test(line)) continue;
+    // **The row is the last `>` segment, never the first match on the line.**
+    // Vitest prints `FAIL <file> > <describe> > <row>: …` and a describe block
+    // opens with a component id — `C24 I38 — every entry resolves…` — which the
+    // row pattern matches perfectly. Reading left to right returned the
+    // describe's id for every nested row, so `caughtBy` named components rather
+    // than the rows that failed, which is a list that reads as an answer and
+    // is not one.
+    const clean = line.replace(/\u001b\[[0-9;]*m/gu, "");
+    const last = clean.split(">").pop() ?? "";
+    const m = /(?:^|\s)([A-Z]{1,4}\d[\w.]*)[\s(:]/u.exec(last);
+    if (m !== null && !out.includes(m[1])) out.push(m[1]);
+  }
+  return out;
+}
+
 export function hitsOf(src, from) {
   return src.split(from).length - 1;
 }
@@ -536,6 +563,13 @@ export function runPass({
                 expect: m.expect,
                 killed: killed(output),
                 byNamedTest: output.includes(m.expect),
+                // **Who did catch it, when the named row did not** (F1244).
+                // `CAUGHT ELSEWHERE` says the claim is wrong and stops there,
+                // so the reader re-derives the answer from a log they have to
+                // go and find. Four expectations in `c04-mosaic` have been
+                // wrong since it was written, reported on every run, each one
+                // costing that walk. The rows are in the output already.
+                caughtBy: killed(output) && !output.includes(m.expect) ? failedRows(output) : [],
               };
       // **Only a survivor pays for this, and only a failure pays twice**
       // (F1106). The mutated tree is still on disk here — `finally` has not
@@ -600,7 +634,7 @@ export function report(results) {
       : r.killed
         ? r.byNamedTest
           ? "caught          "
-          : "CAUGHT ELSEWHERE"
+          : `CAUGHT ELSEWHERE${(r.caughtBy ?? []).length > 0 ? ` (by ${r.caughtBy.slice(0, 3).join(", ")})` : ""}`
         : "SURVIVED        ";
     // The figures, because *I could not tell* with no number beside it is a
     // verdict the reader has to go and re-derive from the log.
