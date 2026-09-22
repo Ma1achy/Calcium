@@ -51,7 +51,27 @@ export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeou
 /** Captures made by this process so far — part of the display number. */
 let captures = 0;
 
-export type Capture = Readonly<{ a: string; b: string; flags: string }>;
+/**
+ * A capture's two phases, and **whether each ended because the drive finished or
+ * because the clock ran out** (F1039).
+ *
+ * `aTimedOut`/`bTimedOut` exist because the two failures were indistinguishable
+ * and the wrong one took the blame. A phase used to end on a fixed three-second
+ * timer started *before* the harness's own settle, focus and modifier clear — so
+ * on a cold first run the drive was still going when `cat` was killed, and the
+ * capture came back holding the gesture's first two mouse reports and nothing
+ * after. The row then failed as `expected '…' to contain 'k'`, which reads as a
+ * protocol defect in the terminal. It was a truncated capture: the bytes present
+ * were correctly formed, and the sentinel is simply the last thing typed and so
+ * the first thing a short capture loses.
+ */
+export type Capture = Readonly<{
+  a: string;
+  b: string;
+  flags: string;
+  aTimedOut: boolean;
+  bTimedOut: boolean;
+}>;
 
 export type Drive = (
   xdo: (...args: readonly string[]) => void,
@@ -88,9 +108,22 @@ export async function captureFromEmulator(opts: {
   mid?: string;
   leave: string;
   seconds?: number;
+  /**
+   * The last byte the drive types, which ends each phase as soon as it arrives.
+   *
+   * **Opt-in, because a capture with no sentinel would wait out the backstop.**
+   * Where it is given, `seconds` stops being the capture's length and becomes
+   * only the backstop — so the window can be generous without every row paying
+   * for it, and a keystroke that is genuinely lost still cannot hang the run.
+   */
+  sentinel?: string;
   drive: Drive;
 }): Promise<Capture> {
-  const seconds = opts.seconds ?? 3;
+  // **Three seconds was the capture's whole length and is now the backstop**
+  // (F1039). With a sentinel the phase ends when the drive's last byte lands, so
+  // this only bounds a keystroke that never arrives; without one it is the old
+  // fixed window and the old default.
+  const seconds = opts.seconds ?? (opts.sentinel === undefined ? 3 : 30);
   // **One display per capture, never reused.** The pid alone gave every capture
   // in a worker the same display, so a second capture's server raced the first's
   // shutdown for the socket; the counter makes the race impossible rather than
@@ -124,11 +157,38 @@ export async function captureFromEmulator(opts: {
           `printf '%s' "$KITTY_FLAGS" | tr -dc '0-9' > ${join(work, "a.flags")}`,
         ]
       : []),
-    `touch ${join(work, "a.started")}`,
-    `timeout --foreground ${String(seconds)} cat > ${join(work, "a.bin")}`,
-    `printf '${sh(opts.mid ?? "")}'`,
-    `touch ${join(work, "b.started")}`,
-    `timeout --foreground ${String(seconds)} cat > ${join(work, "b.bin")}`,
+    // **A phase ends on the drive's last byte, not on a clock** (F1039).
+    // `read -d <sentinel>` is the idiom this script already uses for the kitty
+    // flag query above, so the capture and the handshake end the same way. `-t`
+    // is the backstop and nothing else: when it fires, a `.timeout` marker is
+    // left beside the bytes, so *the sentinel never arrived* and *the sentinel
+    // arrived and the bytes are wrong* stop being one failure. Bash sets the
+    // variable to the partial read on timeout, so the truncated bytes are kept
+    // rather than discarded — they are the evidence.
+    ...(opts.sentinel === undefined
+      ? [
+          `touch ${join(work, "a.started")}`,
+          `timeout --foreground ${String(seconds)} cat > ${join(work, "a.bin")}`,
+          `printf '${sh(opts.mid ?? "")}'`,
+          `touch ${join(work, "b.started")}`,
+          `timeout --foreground ${String(seconds)} cat > ${join(work, "b.bin")}`,
+        ]
+      : [
+          `capture() {`,
+          `  CAP=""`,
+          `  if IFS= read -r -t ${String(seconds)} -d '${opts.sentinel}' CAP; then`,
+          `    printf '%s${opts.sentinel}' "$CAP" > "$1"`,
+          `  else`,
+          `    printf '%s' "$CAP" > "$1"`,
+          `    touch "$1.timeout"`,
+          `  fi`,
+          `}`,
+          `touch ${join(work, "a.started")}`,
+          `capture ${join(work, "a.bin")}`,
+          `printf '${sh(opts.mid ?? "")}'`,
+          `touch ${join(work, "b.started")}`,
+          `capture ${join(work, "b.bin")}`,
+        ]),
     `printf '${sh(opts.leave)}'`,
     "",
   ].join("\n"));
@@ -242,12 +302,36 @@ export async function captureFromEmulator(opts: {
     // what it must not do any longer is read as the cure.
     await sleep(200);
     for (const mod of ["shift", "ctrl", "alt", "super"]) xdo("keyup", mod);
+    // **The sentinel is the harness's to type, not the drive's** (F1039). It was
+    // the last line of `gesture`, which meant a phase the drive does not touch —
+    // T5.9's phase two, whose `drive` runs only on phase one — never saw one and
+    // sat out the whole backstop. Measured: the file went from 3 s a phase to
+    // 30 s a phase, five rows, before this moved.
+    //
+    // Typing it here also makes its presence a property of the harness rather
+    // than of each row remembering to end with it, which is what a control byte
+    // has to be to mean anything.
+    const endPhase = async (): Promise<void> => {
+      if (opts.sentinel === undefined) return;
+      await sleep(150);
+      xdo("type", opts.sentinel);
+      await sleep(150);
+    };
+
     await opts.drive(xdo, window, 1);
+    await endPhase();
     for (let i = 0; i < 100 && !existsSync(join(work, "b.started")); i += 1) await sleep(100);
     await sleep(200);
     await opts.drive(xdo, window, 2);
+    await endPhase();
     await exited;
-    return { a: read("a.bin"), b: read("b.bin"), flags: read("a.flags") };
+    return {
+      a: read("a.bin"),
+      b: read("b.bin"),
+      flags: read("a.flags"),
+      aTimedOut: existsSync(join(work, "a.bin.timeout")),
+      bTimedOut: existsSync(join(work, "b.bin.timeout")),
+    };
   } finally {
     xvfb.kill();
     // The server's exit is awaited so nothing of this capture outlives the call.

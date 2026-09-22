@@ -21,6 +21,7 @@ import { GUTTER_CELLS } from "../support/table-gutter.js";
 import { createDecoder } from "../../src/interaction/router/decode.js";
 import { MOUSE, MOUSE_ANY } from "../../src/terminal/escapes.js";
 import {
+  type Capture,
   captureFromEmulator,
   type Emulator,
   emulatorMissing,
@@ -252,16 +253,47 @@ const MEASURED: readonly Emulator[] = ["kitty", "xterm"];
 
 describe("C16 §2 / C01 I21 — the mouse modes, answered by two emulators (F808, F1039)", () => {
   // **F808's hand measurement, as a gate**, now on a second emulator (F1039).
-  // Under Xvfb both answer in bytes. Three rests, a drag, a typed `k` as the
-  // control in every capture. Skips by name where the emulator, Xvfb or xdotool
+  // Under Xvfb both answer in bytes. Three rests and a drag; the control byte
+  // is typed by the harness at the end of every phase (F1039), not here — a
+  // phase the drive does not touch has one too, and used to sit out the whole
+  // backstop waiting for a `k` nobody was going to send. Skips by name where the emulator, Xvfb or xdotool
   // is absent.
   const gesture = async (xdo: (...a: readonly string[]) => void, w: string): Promise<void> => {
     for (const x of ["100", "130", "160"]) { xdo("mousemove", "--window", w, x, "100"); await sleep(200); }
     xdo("mousedown", "1"); await sleep(150);
     for (const x of ["200", "240"]) { xdo("mousemove", "--window", w, x, "100"); await sleep(150); }
     xdo("mouseup", "1"); await sleep(250);
-    xdo("type", "k"); await sleep(200);
   };
+  /**
+   * **A phase's bytes, or a failure that says which thing went wrong** (F1039).
+   *
+   * The sentinel `k` is the last byte the drive types, so a capture that ended
+   * early loses it first — and the assertion that then fires is
+   * `expected '…' to contain 'k'`, which reads as the terminal getting the
+   * protocol wrong. It was the harness running out of clock. The two are now
+   * separate failures with separate words, and the timeout arm prints the bytes
+   * that *did* arrive, because a truncated capture's contents are the evidence
+   * for which of the two it was.
+   */
+  const phase = (cap: Capture, which: "a" | "b", program: Emulator): string => {
+    const bytes = which === "a" ? cap.a : cap.b;
+    const timedOut = which === "a" ? cap.aTimedOut : cap.bTimedOut;
+    if (timedOut) {
+      throw new Error(
+        `${program}: harness timeout, sentinel never arrived in phase ${which} — ` +
+          `the drive did not finish inside the backstop. ` +
+          `${String([...bytes].length)} bytes did arrive: ${JSON.stringify(bytes)}`,
+      );
+    }
+    if (!bytes.includes("k")) {
+      throw new Error(
+        `${program}: the capture ended without the sentinel and without timing out in ` +
+          `phase ${which} — the shell closed the read early: ${JSON.stringify(bytes)}`,
+      );
+    }
+    return bytes;
+  };
+
   const count = (s: string, re: RegExp): number => (s.match(re) ?? []).length;
   const REST = /\x1b\[<35;\d+;\d+M/gu;
   const DRAG = /\x1b\[<32;\d+;\d+M/gu;
@@ -286,16 +318,18 @@ describe("C16 §2 / C01 I21 — the mouse modes, answered by two emulators (F808
 
         const only1003 = await captureFromEmulator({
           program, enter: MOUSE_ANY.enter, leave: MOUSE_ANY.leave,
+          sentinel: "k",
           drive: async (xdo, w, phase) => { if (phase === 1) await gesture(xdo, w); },
         });
-        expect(only1003.a, `${program}: the control byte`).toContain("k");
+        phase(only1003, "a", program);
         expect(count(only1003.a, REST), `${program}: rests are reported under 1003 — \`Cb & 3 === 3\`, motion with no button`).toBeGreaterThan(0);
 
         const only1002 = await captureFromEmulator({
           program, enter: MOUSE.enter, leave: MOUSE.leave,
+          sentinel: "k",
           drive: async (xdo, w, phase) => { if (phase === 1) await gesture(xdo, w); },
         });
-        expect(only1002.a, `${program}: the control byte`).toContain("k");
+        phase(only1002, "a", program);
         expect(count(only1002.a, REST), `${program}: 1002 reports no rest`).toBe(0);
 
         // 1002 then 1003, then 1003 released: if the terminal held two modes, 1002 would still
@@ -304,6 +338,7 @@ describe("C16 §2 / C01 I21 — the mouse modes, answered by two emulators (F808
         // are composed from `escapes.ts`, the one owner of every mode literal (C01 T2.8).
         const order = await captureFromEmulator({
           program, enter: MOUSE.enter + MOUSE_ANY.enter, mid: MOUSE_ANY.leave, leave: MOUSE.leave,
+          sentinel: "k",
           drive: async (xdo, w) => { await gesture(xdo, w); },
         });
         expect(count(order.a, REST), `${program}: 1003 in force, the later select wins`).toBeGreaterThan(0);
@@ -349,8 +384,7 @@ describe("C16 §2 / C01 I21 — the mouse modes, answered by two emulators (F808
       const wheel = async (xdo: (...a: readonly string[]) => void, w: string): Promise<void> => {
         xdo("mousemove", "--window", w, "100", "100"); await sleep(250);
         for (const b of ["4", "5", "6", "7"]) { xdo("click", b); await sleep(250); }
-        xdo("type", "k"); await sleep(250);
-      };
+          };
       /** Every SGR report in the capture as `<Cb><final>`, wheel bit set only. */
       const wheelReports = (s: string): string[] =>
         [...s.matchAll(/\x1b\[<(\d+);\d+;\d+([Mm])/gu)]
@@ -361,9 +395,10 @@ describe("C16 §2 / C01 I21 — the mouse modes, answered by two emulators (F808
       for (const program of MEASURED) {
         const cap = await captureFromEmulator({
           program, enter: MOUSE_ANY.enter, leave: MOUSE_ANY.leave, drive: wheel,
+          sentinel: "k",
         });
-        expect(cap.a, `${program}: the control byte in phase a`).toContain("k");
-        expect(cap.b, `${program}: the control byte in phase b`).toContain("k");
+        phase(cap, "a", program);
+        phase(cap, "b", program);
         const a = wheelReports(cap.a);
         expect(wheelReports(cap.b), `${program}: the second run is byte-identical to the first`).toEqual(a);
         seen.set(program, a);
