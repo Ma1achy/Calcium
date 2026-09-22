@@ -292,6 +292,9 @@ describe("C10 §4k — the compositions, as frames", () => {
    * goes red the day one of the blockers lifts.
    */
   it("the four compositions with no subject name the change that would give them one", () => {
+    // Each blocker is an acceptance item of the MR that lifts it, in
+    // `docs/design/language/MILESTONES.md`, so this row going red is scheduled
+    // work rather than a surprise at the end of an unrelated change.
     const owed = [
       "2 · hover beside focus     no producer — mouse mode 1002 sends no motion, so the fact cannot arise (M7)",
       "3 · selection over a diff  both facts ship; `patch` declares no elements and reads ctx.focus nowhere (M9)",

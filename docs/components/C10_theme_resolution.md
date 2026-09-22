@@ -1134,6 +1134,12 @@ does not apply. A table of four would have read as *the list always decides*.
   **not a gate gap**: the band promise is true in the validator and was false on screen, so the high-contrast
   bands painted the wrong inks in every frame they drew. **The third instance of this session's shape** —
   `focusGround` with a gate and no reader, `▸` with no reader at all — and the largest of the three.
+- **Each of the four blockers is an acceptance item of the MR that lifts it**, in
+  `docs/design/language/MILESTONES.md` — hover in M7, `patch`'s addressability in M9, `disabled` and
+  `stale` in M4. T2.48 is what goes red on the day one is lifted, and a failing row whose remedy is
+  written into the MR that caused it is scheduled work; a failing row whose remedy is in nobody's
+  list is a surprise at the end of an unrelated change, and the first thing anyone does with a
+  surprise is widen the assertion.
 - **So the classification above is the ruling for all six, and the golden frames land for the
   compositions a producer can construct** — focused+selected+failed and focus over a heatmap
   today, the other four with the change that gives each a subject. A frame that fakes the state
@@ -1171,6 +1177,28 @@ does not apply. A table of four would have read as *the list always decides*.
   else, which is row 5's gap one level up rather than a second instance of it. **Whether choice
   and disclosure ever contest a ground is unasked**, and it is the same shape as this section's
   own finding: a list read as total because nobody had composed a pair it omits.
+
+  **The five with no rung all carry by something else, and none is without a carrier** — so
+  none of them is an open-set item, and what M11 owes them is the *declaration* rather than a
+  mechanism. Measured from the registry's own `stateTableGroups`, rules and glyph records:
+
+  | axis | carrier instead of a rung | where |
+  |---|---|---|
+  | **lifecycle** | **mark + motion**, falling back to text | `● mark · verb · duration slot · result summary · ⎿ gutter`; motion-off omits the spinner and static `●` plus elapsed carry liveness (R-MOT-002) |
+  | **resolution** | **word** | *question · terminal resolution · answer when one exists* (R-QST-002) |
+  | **choice** | **mark** | `choice-open ○` and `success ✓`; at one bit `›` on the focused choice and `✓` on a chosen answer. The ground on that row is focus's, not choice's |
+  | **disclosure** | **mark, and only one of the two exists** | `▾` is *expanded*; `leaf` is correctly an absence; **`collapsed` is a named carrier with no glyph**, which is M4's |
+  | **freshness** | **weight + text**, the only one of the five spending a weight | §047: *the content dims when it is stale; the chrome does not, because the staleness notice is the one thing that must stay legible*. `updated 4m ago` (R-HON-002), and R-TBL-003 gives `unknown` its dash |
+
+  **Lifecycle's one-bit row is the design's and not the tree's, and the difference is scheduled.**
+  Today the tree draws `●` still with the outcome in bold, and the head mark is a **constant** at
+  every rung. The ruled design makes it a **function of the call's state** at 1-bit and in ASCII —
+  `◌ ◐ ● ○ ⊘` and `. % * o /` — keeping the collapse onto one `●` for the rungs where tone can
+  carry the state, because shape is what is left when tone is gone. So the carrier named above is
+  *mark* on the strength of a ruling, and the mark is one glyph short of distinguishing the states
+  it names. M4 is where that lands and `R-GLY-002` is the scan that says so — **red on HEAD today**,
+  `running` and `step` both resolving to `*`. Recorded in `docs/design/language/MILESTONES.md` as
+  M4's, so the day the scan goes green is a row discharged rather than a surprise.
 
   **An earlier form of this bullet said seven axes of which the list mentions two**, and both
   halves were wrong. The seven came from §091's title — *State tables, seven core facts per
