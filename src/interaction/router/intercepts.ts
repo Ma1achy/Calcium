@@ -25,11 +25,20 @@ export type InterceptId = "interrupt" | "page-scroll" | "wheel";
 /**
  * What one intercept does at one rung.
  *
- * `undefined` for a rung means *this intercept does not apply here* — the ladder
- * runs normally — which is different from `pass` and from `reject`, and the
- * distinction is the reason this is a partial record rather than a total one.
+ * **Total over the ladder, and it was partial** (C16 I39). The first version
+ * declared a row only where §103 named one and let the rest fall through, on the
+ * reading that an absent row means *this intercept does not apply here*. For a
+ * route no rung may claim, *the ladder decides* is exactly the claim the route is
+ * reserved against — so the omission was not a smaller table, it was the hole the
+ * table replaced, restated. It shipped the defect it was built to stop:
+ * `page-scroll` named `copy` and idle, `question` fell through, and a confirm's
+ * answer handler swallowed `⌥↑` — leaving a reader unable to scroll to read the
+ * thing they were being asked to approve.
+ *
+ * So every rung carries a verdict and TypeScript is what enforces it: a seventh
+ * rung is a decision somebody takes rather than a default they inherit.
  */
-export type OwnerApplicability = Partial<Record<OwnerRung, Verdict>> &
+export type OwnerApplicability = Readonly<Record<OwnerRung, Verdict>> &
   Readonly<{
     /** What happens when no rung above `scope` owns the keyboard. */
     idle: Verdict;
@@ -52,13 +61,27 @@ export const INTERCEPTS: Readonly<Record<InterceptId, OwnerApplicability>> = Obj
     child: "handle",
     copy: "reject",
     question: "reject",
+    // **An ordinary running owner handles tool/turn interrupt** (§103), and
+    // `substate` and `inside` are ordinary running owners. They were absent
+    // rather than decided, which read as agreement with `scope` and was not one.
+    substate: "handle",
+    inside: "handle",
     scope: "handle",
     idle: "reject",
     why: "a child owns its own signal; a question and a frozen screen are resolved by their own exits, not by cancelling something else",
   },
   /** §103: *COPY MODE rejects while frozen; otherwise the active viewport handles without moving focus.* */
   "page-scroll": {
+    // **`otherwise` is every other rung, the child included** (C16 I40). A
+    // captured child owns its keys; it does not own the transcript scrolled
+    // behind it, and a reader who cannot page while a child is attached cannot
+    // read what the child just wrote.
+    child: "handle",
     copy: "reject",
+    question: "handle",
+    substate: "handle",
+    inside: "handle",
+    scope: "handle",
     idle: "handle",
     why: "the screen is frozen, so scrolling it would be scrolling a picture; every other rung scrolls the viewport and FOCUS IS NOT MOVED BY IT",
   },
@@ -71,22 +94,27 @@ export const INTERCEPTS: Readonly<Record<InterceptId, OwnerApplicability>> = Obj
    * a frozen screen.
    */
   wheel: {
+    child: "handle",
     copy: "reject",
+    question: "handle",
+    substate: "handle",
+    inside: "handle",
+    scope: "handle",
     idle: "handle",
     why: "tracking-off is a terminal fact and handled before decode; in copy mode the wheel would move a screen that is deliberately still",
   },
 });
 
 /**
- * The verdict an intercept declares at a rung, or `null` where it declares none.
+ * The verdict an intercept declares at a rung. Total, so there is no `null`.
  *
- * `null` is *the ladder runs normally* and is deliberately not `"pass"`: passing
- * is a decision an owner took, and this is the absence of one.
+ * **The return type narrowed with the table** (C16 I39). `Verdict | null` was the
+ * signature that let a caller read *no verdict here* as *carry on down the
+ * ladder*, which is the one answer a reserved route must never give.
  */
-export function interceptVerdict(id: InterceptId, rung: OwnerRung | null): Verdict | null {
+export function interceptVerdict(id: InterceptId, rung: OwnerRung | null): Verdict {
   const table = INTERCEPTS[id];
-  if (rung === null) return table.idle;
-  return table[rung] ?? null;
+  return rung === null ? table.idle : table[rung];
 }
 
 /**

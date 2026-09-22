@@ -10,8 +10,9 @@ import { createFocusStore } from "../../src/interaction/router/focus.js";
 import { createKeymap, defaultKeymap } from "../../src/interaction/router/keymap.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { block, type Plot } from "../../src/data/viewmodel/index.js";
+import { INTERCEPTS, interceptVerdict, type InterceptId } from "../../src/interaction/router/intercepts.js";
 import { createRouter, type Placed, type RouterDeps } from "../../src/interaction/router/router.js";
-import type { InputEvent, Key } from "../../src/interaction/router/types.js";
+import { OWNER_RUNGS, type InputEvent, type Key } from "../../src/interaction/router/types.js";
 import { addr } from "../support/focus.js";
 
 const key = (name: string, mods: Partial<Key> = {}): InputEvent => ({
@@ -237,46 +238,131 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
     expect(calls, "copy mode is untouched and no layer popped").toEqual([]);
   });
 
-  it.todo(
-    "T1.39 (I39): INTERCEPTS is total over OWNER_RUNGS, by equality — not deferred on a component: C16 ships; the table is made total in this MR's code commit",
-  );
-  it.todo(
-    "T1.40 (I40): ⌥↑ with a question open scrolls the transcript and the question stays open and unanswered — not deferred on a component: C16 ships; the handle route lands in this MR's code commit",
-  );
-  it.todo(
-    "T1.40b (I40): ⌥↑ in copy mode is rejected and the frozen screen does not move — not deferred on a component: C16 ships; the handle route lands in this MR's code commit",
-  );
+  it("T1.39 (I39): every intercept declares a verdict at every rung, by equality", () => {
+    // **By equality against `OWNER_RUNGS`, not by a count.** A length check is
+    // passed by a table with the right number of wrong keys, and the rung this
+    // work added is exactly the case that would slip: `question` was the missing
+    // row and there were five others present. The type already refuses a partial
+    // table at compile time — this is the row that still fires when a rung is
+    // added with an `as`, when a table is assembled rather than written, or when
+    // `OWNER_RUNGS` grows and the record is widened with an index signature.
+    for (const id of Object.keys(INTERCEPTS) as InterceptId[]) {
+      const declared = Object.keys(INTERCEPTS[id]).filter((k) => k !== "idle" && k !== "why");
+      expect(declared.sort(), `${id}: every rung, no omissions`).toEqual([...OWNER_RUNGS].sort());
+      for (const rung of OWNER_RUNGS) {
+        expect(interceptVerdict(id, rung), `${id} at ${rung}`).toBeTypeOf("string");
+      }
+    }
+  });
 
-  it("T1.30 (I8): a full-region layer blocks step 3; a one-row dismissable overlay does not", () => {
-    // **The defect this clause closes, and its control.** `PgUp` over a pushed
-    // view fell through to `global` and scrolled the transcript underneath the
-    // thing filling the screen — word for word what §4 says step 3 exists to
-    // prevent. The guard tested `dismissable`, which is modality; a view is
-    // dismissable, because `Esc` pops it.
+  it("T1.40 (I40): ⌥↑ scrolls with a question open, and the question stays open and unanswered", () => {
+    // **Three assertions, because each alone passes a router doing the wrong
+    // thing.** *The transcript scrolled* is passed by one that also answered the
+    // question; *the question is still open* by one that dropped the key on the
+    // floor; *unanswered* by one that popped the layer. The defect this replaces
+    // satisfied the second and the third.
+    const answered: string[] = [];
+    const { router, calls, layer } = harness({
+      overlayAnswerCallback: () => (a: string) => void answered.push(a),
+    });
+    layer.top = { id: "confirm", kind: "overlay", dismissable: false };
+    router.register("global", () => (calls.push("scroll"), true));
+    router.register("overlay", () => (calls.push("overlay"), true));
+
+    expect(router.dispatch(key("up", { meta: true })), "consumed").toBe(true);
+    expect(calls, "the viewport scrolled and the question's handler never ran").toEqual(["scroll"]);
+    expect(answered, "nothing was answered").toEqual([]);
+    expect(layer.top?.id, "the question is still open").toBe("confirm");
+    // **The question's rung is never reached** — the stage names the viewport
+    // the ladder resolved, and `prompt` is the transcript's. A stages read is the
+    // only way to tell that from a handler that declined.
+    expect(router.lastStages).toEqual([
+      "arming",
+      "intercept:page-scroll:question:handle",
+      "intercept:scroll:prompt",
+    ]);
+
+    // **The control, and it is the reason this is not a test of "⌥↑ is special".**
+    // `⌃c` is a reserved route at the same rung with the other verdict, so it
+    // takes the other road: `reject` resolves at the **owning rung**, where
+    // `handle` short-circuits to the viewport. Without this row the assertions
+    // above are equally passed by a router that sends every intercept to the
+    // scroller, which would answer the question by scrolling it.
     //
-    // The control is the row above it in the same table: a completion menu is
-    // dismissable *and* small, and scrolling beneath one costs nothing. Without
-    // the control this passes for a router that skips step 3 whenever any layer
-    // is open, which is the rule §4 spends a paragraph rejecting.
-    const { router, calls, layer } = harness();
-    const globalKey = key("pageup");
-    router.register("global", () => (calls.push("global"), true));
+    // The ladder's own `overlay` handler is what runs, not a test double —
+    // §5's question branch — so the assertion is the destination rather than a
+    // spy: nothing scrolled, and the event was spent at the rung.
+    calls.length = 0;
+    expect(router.dispatch(ctrlC)).toBe(true);
+    expect(router.lastStages, "the owner's road, not the viewport's").toEqual([
+      "arming",
+      "intercept:interrupt:question:reject",
+      "reject",
+    ]);
+    expect(calls, "an interrupt does not scroll").toEqual([]);
+    expect(layer.top?.id, "and it did not dismiss the question either").toBe("confirm");
+  });
 
+  it("T1.40b (I40): ⌥↑ in copy mode is rejected and the frozen screen does not move", () => {
+    const { router, calls } = harness({ copyMode: () => true });
+    router.register("global", () => (calls.push("scroll"), true));
+
+    expect(router.dispatch(key("up", { meta: true })), "consumed, not dropped").toBe(true);
+    expect(calls, "a frozen screen is a picture; scrolling it would scroll the picture").toEqual([]);
+    expect(router.lastStages).toEqual(["arming", "intercept:page-scroll:copy:reject", "reject"]);
+  });
+
+  it("T1.30 (I8, I40): a full-region layer blocks the global keymap; the reserved routes still pass", () => {
+    // **Amended, and the row had been pinning the defect rather than the rule**
+    // (I40). It asserted that `PgUp` under a full-region layer is dropped — and
+    // that is the state in which a reader cannot page the transcript to read
+    // what the layer is asking about. `page-scroll` is one of §103's three
+    // reserved routes; no rung may claim it, so it is read before the ladder and
+    // reaches the viewport whatever is on top.
+    //
+    // **What I8 still holds is the whole of its subject bar those routes**, and
+    // that is what the control is now: an ordinary `global` binding under the
+    // same layer is still dropped. The two keys differ only in being reserved,
+    // so the row distinguishes *the layer is not modal* from *this route is
+    // unclaimable* — which one boolean over one key could not.
+    const { router, calls, layer } = harness();
+    const reserved = key("pageup");
+    const ordinary = key("t", { ctrl: true });
+    router.register("global", (e) => (
+      calls.push(e.kind === "key" ? e.key.name : "mouse"), true
+    ));
+
+    // The row above it in the same table: a completion menu is dismissable *and*
+    // small, and everything reaches past one. Without it this passes for a
+    // router that skips the guard whenever any layer is open.
     layer.top = { id: "menu", kind: "overlay", dismissable: true };
     layer.placed = [box("menu", { top: 4, left: 10, height: 6, width: 30 })];
-    expect(router.dispatch(globalKey)).toBe(true);
-    expect(calls).toEqual(["global"]);
+    expect(router.dispatch(reserved)).toBe(true);
+    expect(router.dispatch(ordinary)).toBe(true);
+    expect(calls).toEqual(["pageup", "t"]);
 
     calls.length = 0;
     layer.top = { id: "dash", kind: "view", dismissable: true };
     layer.placed = [box("dash", { top: 0, left: 0, height: 24, width: 80 })];
+
+    // The reserved route reaches the viewport scroller, ahead of the ladder.
+    expect(router.dispatch(reserved), "consumed").toBe(true);
+    expect(calls, "a reader under a full-region layer can still page").toEqual(["pageup"]);
+    expect(router.lastStages).toEqual([
+      "arming",
+      "intercept:page-scroll:substate:handle",
+      "intercept:scroll:prompt",
+    ]);
+
     // **Consumed, not dropped** (M5, §103, R-OWN-001): a blocking layer REJECTS
-    // the key rather than letting it fall, and a reject spends the event exactly
-    // as a handle does. The invariant this row is about — *nothing reaches past
-    // it* — is the `calls`/spy assertion beside this line and is unchanged; the
-    // boolean was only ever a proxy for it, and the proxy is what moved.
-    expect(router.dispatch(globalKey)).toBe(true);
-    expect(calls).toEqual([]);
+    // an ordinary key rather than letting it fall, and a reject spends the event
+    // exactly as a handle does. The invariant this row is about — *nothing
+    // reaches past it* — is the `calls` assertion beside this line and is
+    // unchanged; the boolean was only ever a proxy for it.
+    calls.length = 0;
+    expect(router.dispatch(ordinary)).toBe(true);
+    expect(calls, "and every other global binding is still held").toEqual([]);
+    expect(layer.top?.id, "the layer is not dismissed by either").toBe("dash");
   });
 
   it("T1.31 (I8): coverage is read from the box, not from the kind", () => {
@@ -456,9 +542,12 @@ describe("C16 §4 — mouse routes by position", () => {
       expect(router.dispatch(click(3, 0, button)), `${button} is consumed by nothing`).toBe(false);
       expect(router.lastStages, `${button} is offered as a wheel, then to the viewport`).toEqual([
         "arming",
-        // Read before the ladder, and declared for nobody at this rung: a
-        // horizontal wheel is still a wheel to the table (M5, W4).
-        "intercept:wheel:scope:none",
+        // Read before the ladder, and **declared `handle` at every rung but
+        // `copy`** (I40): a horizontal wheel is still a wheel to the table (M5,
+        // W4), and `handle` routes it to its pointer-hit owner ahead of the
+        // ladder rather than letting it fall through to the same place.
+        "intercept:wheel:scope:handle",
+        "intercept:wheel",
         "mouse",
         "viewport:row2",
         "viewport:wheel",
@@ -496,7 +585,8 @@ describe("C16 §4 — mouse routes by position", () => {
     seen.length = 0;
     router.dispatch(click(8, 0, "wheelDown"));
     expect(seen).toEqual(["global:wheelDown"]);
-    expect(router.lastStages).toEqual(["arming", "intercept:wheel:scope:none", "mouse", "viewport:wheel"]);
+    expect(router.lastStages).toEqual(["arming", "intercept:wheel:scope:handle",
+        "intercept:wheel", "mouse", "viewport:wheel"]);
 
     // T3.12b's half, kept: a layer covering the point takes it and nothing else sees it.
     seen.length = 0;
@@ -522,12 +612,24 @@ describe("C16 §4 — mouse routes by position", () => {
     ];
 
     expect(router.dispatch(click(3, 0)), "consumed, and nothing happens").toBe(true);
-    expect(router.dispatch(click(3, 0, "wheelDown"))).toBe(true);
     expect(router.dispatch(click(12, 0)), "chrome too").toBe(true);
-    expect(seen).toEqual([]);
+    expect(seen, "a click beside a confirm still reaches nothing beneath it").toEqual([]);
     expect(router.lastStages).toEqual(["arming", "mouse", "modal"]);
 
+    // **The wheel is carved out, and it is the one gesture that is** (I40, §103).
+    // The gate is right about every other: a click moves focus, a drag selects,
+    // a press arms — each changes state under a question nobody has answered.
+    // A wheel changes none, it moves the viewport so the reader can see, and
+    // holding it here is the layer blocking comprehension of its own question.
+    // The click assertion above is the control and is what the row was measured
+    // on; this is the exception it now carries, not a weakening of it.
+    seen.length = 0;
+    expect(router.dispatch(click(3, 0, "wheelDown")), "consumed").toBe(true);
+    expect(seen, "the viewport moves beneath an unanswered confirm").toEqual(["liveBlock"]);
+    expect(layer.top?.id, "and the confirm is neither answered nor dismissed").toBe("confirm");
+
     // On the layer itself the click is the layer's, as before.
+    seen.length = 0;
     router.register("overlay", () => (seen.push("overlay"), true));
     router.dispatch(click(6, 12));
     expect(seen).toEqual(["overlay"]);
@@ -623,7 +725,7 @@ describe("C16 — the dispatch trace, run against the implementation", () => {
       // **The entry under the pointer is offered the wheel first** (§4a row i):
       // a `scroll` block is a second thing a wheel can mean. The harness's
       // `liveBlock` handler binds nothing, so the wheel falls to the viewport.
-      "wheel → intercept:wheel:scope:none,mouse,viewport:row2,viewport:wheel",
+      "wheel → intercept:wheel:scope:handle,intercept:wheel,mouse,viewport:row2,viewport:wheel",
       "f (pushed view) → target:pushedView,global,dropped",
       "ctrl-c (confirm) → intercept:interrupt:scope:handle,target:overlay",
       "t (global, under confirm) → target:overlay,modal-blocked,reject",

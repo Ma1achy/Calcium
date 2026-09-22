@@ -359,7 +359,15 @@ export function createRouter(
     // this table had no gate while the keyboard's had two. Consumed and
     // nothing happens, which is the key path's shape.
     const top = deps.overlayTop();
-    if (top !== null && !top.dismissable) {
+    // **The wheel is carved out, because it is a reserved route** (I40, I8, §103,
+    // §4a row k). The gate is right about every other gesture and was wrong about
+    // this one for the same reason the keyboard path was: a wheel does not move
+    // focus, does not change state and does not answer anything — it moves the
+    // viewport so the reader can see. Holding it under an unanswered confirm
+    // produced the defect I8 exists to prevent, one layer up: the layer blocked
+    // comprehension of its own question. A click beside a confirm is still
+    // consumed and still does nothing, which is what row k was measured on.
+    if (top !== null && !top.dismissable && !wheel) {
       stages.push("modal");
       return true;
     }
@@ -506,6 +514,54 @@ export function createRouter(
         if (owner !== "global") runRung(owner, e);
         stages.push("reject");
         return true;
+      }
+
+      // **`handle` is a destination for two of the three, and only dispatching
+      // on `reject` was the whole defect** (I40, §103). The table said `handle`
+      // at every rung and the code did nothing with it: the event fell to the
+      // ladder, a question's answer handler took `⌥↑`, and **a reader could not
+      // scroll to read the thing they were being asked to approve**. A route no
+      // rung may claim that is nevertheless resolved by the ladder is not
+      // reserved; it is documented.
+      //
+      // §103 names the destination for both — *the active viewport handles* for
+      // page-scroll, *its pointer-hit owner* for the wheel — so each goes there
+      // directly, ahead of the ladder, exactly as `reject` goes to the owner.
+      // The viewport's scroller is `global`: all four paging routes register
+      // there (`keymap.ts`), which is what makes this one call rather than a
+      // second scroller beside the first.
+      //
+      // **`interrupt` is excluded and keeps falling through.** Its `handle`
+      // means *this rung's own cancel* — a different verb at a child, a substate
+      // and a scope — so the ladder is where it resolves, and the branch is on
+      // the intercept rather than on the verdict for that reason.
+      if (declared === "handle" && intercept !== "interrupt") {
+        if (intercept === "wheel") {
+          stages.push("intercept:wheel");
+          return e.kind === "mouse" ? routeMouse(e) : false;
+        }
+        // **"The active viewport" is not always the transcript, and routing
+        // straight to `global` said it was.** A focused `scroll` box is a
+        // viewport, and the tree resolves *which* one through the ladder —
+        // `liveBlock` and `interaction` page the box, `prompt` pages the
+        // transcript through `global`. Skipping the ladder outright broke three
+        // rows that page inside a panel, which is the measurement that corrected
+        // this: unclaimable means **no rung may take it for something else**, not
+        // that no rung may perform it.
+        //
+        // So the ladder runs, over the rungs that are viewports. The three that
+        // are not — a question, a substate layer, a captured child — are the ones
+        // whose handlers would consume the key for something other than
+        // scrolling, and they are exactly what the reserved route is reserved
+        // against. `copy` never arrives here; it is the one `reject`.
+        const viewport = activeTarget({
+          ...inputs(),
+          overlayTop: null,
+          attachedChild: false,
+          copyMode: false,
+        });
+        stages.push(`intercept:scroll:${viewport}`);
+        return run(viewport, e) || run("global", e);
       }
     }
 

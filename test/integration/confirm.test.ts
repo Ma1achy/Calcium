@@ -41,7 +41,7 @@ import { createKeymap, defaultKeymap } from "../../src/interaction/router/keymap
 import { createRouter, type RouterDeps } from "../../src/interaction/router/router.js";
 import { CONFIRM_WIDTH, createConfirmHost } from "../../src/shell/confirm.js";
 import type { InputEvent, Key } from "../../src/interaction/router/types.js";
-import { measureSequence } from "../support/viewport.js";
+import { measureSequence, rowsDoc } from "../support/viewport.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { block } from "../../src/data/viewmodel/construct.js";
 import { createChoiceSelection, defaultStart } from "../../src/shell/choice-selection.js";
@@ -136,9 +136,19 @@ function world(
 
   const router = createRouter({ focus, keymap: createKeymap(defaultKeymap), now: () => 0, deps });
 
-  // A global binding that must not fire while a question is open (C16 I8).
+  // A global binding that must not fire while a question is open (C16 I8) —
+  // **and the viewport's own paging, which now must** (C16 I40). The two live in
+  // one handler because that is where they live in the tree: `page-scroll`'s
+  // route is `target: "global"` in `defaultKeymap`, and `shell/keys.ts` sends it
+  // to `viewport.pageUp/pageDown`. A row asserting the reserved route reached
+  // `global` and stopping there would be asserting the wiring and calling it the
+  // scroll; this calls the same method the shell does, so the assertion is the
+  // transcript's offset and not a spy's length.
   router.register("global", (e) => {
     globalSeen.push(e);
+    if (e.kind !== "key") return false;
+    if (e.key.name === "up" && e.key.meta) return viewport.pageUp(), true;
+    if (e.key.name === "down" && e.key.meta) return viewport.pageDown(), true;
     return false;
   });
 
@@ -202,7 +212,52 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     await expect(answer).resolves.toBe("y");
   });
 
-  it("T4.5 (C16 I8): PgUp does not reach `global` while a question is open", async () => {
+  it("T4.5 (C16 I8, I40): ⌥↑ scrolls the transcript with a question open, and the question is neither answered nor dismissed", async () => {
+    // **This row asserted the defect.** It read *PgUp does not reach `global`
+    // while a question is open* and passed, because the confirm's answer handler
+    // took the key at the ladder's question rung — so a reader asked to approve
+    // something could not scroll back to read what it was. `page-scroll` is one
+    // of §103's three reserved routes; no rung may claim one, and the intercept
+    // table is read before the ladder.
+    //
+    // **Three assertions, because each alone is passed by a router doing the
+    // wrong thing.** *The transcript moved* is passed by one that also answered
+    // the question; *the question is still open* by one that dropped the key;
+    // *unanswered* by one that popped the layer. The old row satisfied the last
+    // two, which is why it read as correct for as long as it did.
+    const w = world();
+    for (let i = 0; i < 12; i += 1) w.store.append(rowsDoc(4, `e${String(i)}`));
+    w.viewport.scrollToBottom();
+
+    const answer = w.confirm.ask({ question: "Stop api-gateway?", choices: YES_NO });
+    expect(w.overlays.top?.id, "the question is up").toBe("confirm");
+
+    const before = w.viewport.scroll.topRow;
+    expect(before, "there is somewhere to scroll from").toBeGreaterThan(0);
+
+    expect(w.router.dispatch(key("up", { meta: true })), "consumed").toBe(true);
+    expect(w.viewport.scroll.topRow, "the transcript moved").toBeLessThan(before);
+    expect(w.overlays.top?.id, "and the question is still up").toBe("confirm");
+
+    // Unanswered: the promise has not settled. `await Promise.resolve()` gives a
+    // resolution a turn to land, which is what tells *not yet* from *never*.
+    let settled = false;
+    void answer.then(() => (settled = true));
+    await Promise.resolve();
+    expect(settled, "nothing was answered by scrolling").toBe(false);
+
+    // **The control, and it is what keeps this a test of the reserved route
+    // rather than of "the question stopped taking keys".** An ordinary key still
+    // goes to the question: `y` answers it.
+    w.router.dispatch(key("y"));
+    await expect(answer).resolves.toBe("y");
+  });
+
+  it("T4.5b (C16 I8): an ordinary global binding is still held under a question", async () => {
+    // **The other half of I8, unchanged and now load-bearing.** T4.5 gives up
+    // exactly the routes that move a viewport without changing state; everything
+    // else I8 ever held, it still holds. Without this row T4.5 is equally passed
+    // by a router that stopped consulting the ladder at all.
     const w = world();
 
     // Control: with nothing open, the binding is reached.
@@ -211,27 +266,9 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     expect(before).toBeGreaterThan(0);
 
     const answer = w.confirm.ask({ question: "Stop api-gateway?", choices: YES_NO });
-    w.router.dispatch(key("pageup"));
-    expect(w.globalSeen.length).toBe(before);
-
-    // **The outcome, and not the mechanism that produced it.** This asserted
-    // `modal-blocked` first and failed: the stages are `arming, target:overlay`,
-    // because the answer handler consumes every key at rung 4 and dispatch never
-    // reaches step 3's guard. Both mechanisms give the right answer and the
-    // assertion named the one that does not run — so it would have gone red on a
-    // correct refactor and stayed green if the handler started declining keys.
-    // C16 I8's guard is the backstop for what the handler declines (mouse), which is
-    // why `dismissable: false` is still load-bearing; see T4.9.
-    // **The intercept is read first and declares nothing here** (M5, §103).
-    // `page-scroll` is one of the three reserved routes, so it is classified
-    // ahead of the ladder on every event; its owner-applicability table names
-    // `copy` and the idle ladder and not `question`, so no verdict is declared
-    // and the question's own handler takes the key exactly as before.
-    expect(w.router.lastStages).toEqual([
-      "arming",
-      "intercept:page-scroll:question:none",
-      "target:overlay",
-    ]);
+    w.router.dispatch(key("q"));
+    expect(w.globalSeen.length, "an unbound key is the question's, not global's").toBe(before);
+    expect(w.router.lastStages).toEqual(["arming", "target:overlay"]);
 
     w.router.dispatch(key("n"));
     await answer;
