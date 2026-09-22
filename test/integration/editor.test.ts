@@ -295,8 +295,11 @@ it("T4.7 (C17 §2, C22 I13): the prompt's rendered height equals displayRows, on
   const paintedRows = (): number => {
     const frame = frameRows();
     const first = frame.findIndex((r, i) => i > 0 && r.trimStart().startsWith("❯"));
-    // Below the prompt: the lower rule and the one-row default footer (C22 I81, §6l.4 E).
-    return first === -1 ? 0 : frame.length - 2 - first;
+    // Below the prompt: the lower rule and the **two**-row default footer (C22
+    // I81, §6l.4 E) — the facts-and-directory row, and M5's owner line beneath
+    // it (R-KEY-004, §103). A live session always has an owner, so the second
+    // row is not conditional here: with nothing raised the owner is `scope`.
+    return first === -1 ? 0 : frame.length - 3 - first;
   };
 
   // **Three heights, because one cannot tell the two readings apart.** A prompt

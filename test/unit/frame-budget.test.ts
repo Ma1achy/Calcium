@@ -57,7 +57,8 @@ function frameAt(rows: number, chrome: Chrome, wanted = 1, columns = 80, session
   return compose({
     chrome,
     session: () => session,
-    copyMode: () => false,
+    owner: () => null,
+    capabilities: () => null,
     now: () => NOW,
     size: () => ({ columns, rows }),
     promptRows: () => wanted,

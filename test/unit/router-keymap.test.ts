@@ -675,8 +675,17 @@ describe("C16 I17 — the rule, over the half a table walk cannot reach", () => 
     expect(scanned, "the scan found the comparisons it exists to read").toBeGreaterThan(2);
     expect(
       [...contributors].sort(),
-      "the two files that hold key-name comparisons, named so the floor cannot drift down alone",
-    ).toEqual(["src/interaction/router/router.ts", "src/shell/construct.ts"]);
+      // **Three now** (M5): `intercepts.ts` classifies the three reserved routes
+      // §103 reads before the ladder, and two of them are keys — `pageup`,
+      // `pagedown`, `up`, `down` and `c`. It is the newest reason a key name is
+      // compared in `src/`, and naming it here is what keeps the floor a
+      // statement about the tree rather than a number that follows it.
+      "the three files that hold key-name comparisons, named so the floor cannot drift down alone",
+    ).toEqual([
+      "src/interaction/router/intercepts.ts",
+      "src/interaction/router/router.ts",
+      "src/shell/construct.ts",
+    ]);
     expect(offenders, "a key nothing can press").toEqual([]);
   });
 });

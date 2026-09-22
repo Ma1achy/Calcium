@@ -140,7 +140,12 @@ describe("C16 §4 — dispatch", () => {
     expect(globalHandler).toHaveBeenCalledTimes(1);
 
     layer.top = { id: "confirm", kind: "overlay", dismissable: false };
-    expect(router.dispatch(key("t"))).toBe(false);
+    // **Consumed, not dropped** (M5, §103, R-OWN-001): a blocking layer REJECTS
+    // the key rather than letting it fall, and a reject spends the event exactly
+    // as a handle does. The invariant this row is about — *nothing reaches past
+    // it* — is the `calls`/spy assertion beside this line and is unchanged; the
+    // boolean was only ever a proxy for it, and the proxy is what moved.
+    expect(router.dispatch(key("t"))).toBe(true);
     expect(globalHandler, "modal: nothing reaches past it").toHaveBeenCalledTimes(1);
     expect(router.lastStages).toContain("modal-blocked");
   });
@@ -255,7 +260,12 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
     calls.length = 0;
     layer.top = { id: "dash", kind: "view", dismissable: true };
     layer.placed = [box("dash", { top: 0, left: 0, height: 24, width: 80 })];
-    expect(router.dispatch(globalKey)).toBe(false);
+    // **Consumed, not dropped** (M5, §103, R-OWN-001): a blocking layer REJECTS
+    // the key rather than letting it fall, and a reject spends the event exactly
+    // as a handle does. The invariant this row is about — *nothing reaches past
+    // it* — is the `calls`/spy assertion beside this line and is unchanged; the
+    // boolean was only ever a proxy for it, and the proxy is what moved.
+    expect(router.dispatch(globalKey)).toBe(true);
     expect(calls).toEqual([]);
   });
 
@@ -269,7 +279,12 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
 
     layer.top = { id: "wide", kind: "overlay", dismissable: true };
     layer.placed = [box("wide", { top: 0, left: 0, height: 24, width: 80 })];
-    expect(router.dispatch(key("pageup"))).toBe(false);
+    // **Consumed, not dropped** (M5, §103, R-OWN-001): a blocking layer REJECTS
+    // the key rather than letting it fall, and a reject spends the event exactly
+    // as a handle does. The invariant this row is about — *nothing reaches past
+    // it* — is the `calls`/spy assertion beside this line and is unchanged; the
+    // boolean was only ever a proxy for it, and the proxy is what moved.
+    expect(router.dispatch(key("pageup"))).toBe(true);
 
     calls.length = 0;
     layer.top = { id: "small-view", kind: "view", dismissable: true };
@@ -431,6 +446,9 @@ describe("C16 §4 — mouse routes by position", () => {
       expect(router.dispatch(click(3, 0, button)), `${button} is consumed by nothing`).toBe(false);
       expect(router.lastStages, `${button} is offered as a wheel, then to the viewport`).toEqual([
         "arming",
+        // Read before the ladder, and declared for nobody at this rung: a
+        // horizontal wheel is still a wheel to the table (M5, W4).
+        "intercept:wheel:scope:none",
         "mouse",
         "viewport:row2",
         "viewport:wheel",
@@ -468,7 +486,7 @@ describe("C16 §4 — mouse routes by position", () => {
     seen.length = 0;
     router.dispatch(click(8, 0, "wheelDown"));
     expect(seen).toEqual(["global:wheelDown"]);
-    expect(router.lastStages).toEqual(["arming", "mouse", "viewport:wheel"]);
+    expect(router.lastStages).toEqual(["arming", "intercept:wheel:scope:none", "mouse", "viewport:wheel"]);
 
     // T3.12b's half, kept: a layer covering the point takes it and nothing else sees it.
     seen.length = 0;
@@ -590,15 +608,15 @@ describe("C16 — the dispatch trace, run against the implementation", () => {
       "down (menu open) → target:overlay,global,dropped",
       "down (menu gone) → target:prompt,global,dropped",
       "s (block keymap) → target:liveBlock,global,dropped",
-      "ctrl-c (live block) → target:liveBlock",
+      "ctrl-c (live block) → intercept:interrupt:scope:handle,target:liveBlock",
       "click row 2 → mouse,viewport:row2",
       // **The entry under the pointer is offered the wheel first** (§4a row i):
       // a `scroll` block is a second thing a wheel can mean. The harness's
       // `liveBlock` handler binds nothing, so the wheel falls to the viewport.
-      "wheel → mouse,viewport:row2,viewport:wheel",
+      "wheel → intercept:wheel:scope:none,mouse,viewport:row2,viewport:wheel",
       "f (pushed view) → target:pushedView,global,dropped",
-      "ctrl-c (confirm) → target:overlay",
-      "t (global, under confirm) → target:overlay,modal-blocked",
+      "ctrl-c (confirm) → intercept:interrupt:scope:handle,target:overlay",
+      "t (global, under confirm) → target:overlay,modal-blocked,reject",
     ]);
 
     // Read the outcomes too, not only the routing.
@@ -822,4 +840,79 @@ describe("C16 §5 — Ctrl-D, and the one thing C16 stores", () => {
   // `T1.3v` in `session-keys.test.ts`, which holds the keymap and the ladder in
   // one place. The id moved too: `T1.3q` was already this file's mouse-modality
   // row above, and §9b row k cites it meaning that one.
+});
+
+describe("C16 §3a — the global-intercept table and the child rung (M5)", () => {
+  /** Put the router in each rung in turn, by the inputs `activeTarget` reads. */
+  const atRung = (rung: string) => {
+    const over: Partial<RouterDeps> =
+      rung === "child"
+        ? { inFlight: () => "shell" }
+        : rung === "copy"
+          ? { copyMode: () => true }
+          : // A question is an overlay *awaiting an answer*, which is the line §5
+            // draws and the target name does not.
+            rung === "question"
+            ? { overlayAnswerCallback: () => () => true }
+            : {};
+    return harness(over);
+  };
+
+  it("T1.32 (R-OWN-001, §103): all three reserved routes are read before the ladder, from inside every rung", () => {
+    // **Three, and the wheel is the one a table gets written without.** §103
+    // names `interrupt · page-scroll · the wheel` together, and the wheel is not
+    // a key — so a classifier reading `InputEvent.key` alone is complete over
+    // two thirds of its subject and green. C16 §3a W4 is the row: the tree had
+    // one intercept, hand-rolled, and no table.
+    const routes: readonly [string, InputEvent][] = [
+      ["interrupt", ctrlC],
+      ["page-scroll", key("up", { meta: true })],
+      ["page-scroll", key("down", { meta: true })],
+      ["page-scroll", key("pageup")],
+      ["wheel", click(3, 0, "wheelUp")],
+    ];
+
+    // **Every rung, including the two that reject.** A rejection is delivery: the
+    // intercept decided, which is the thing being asserted, and a rung that could
+    // *claim* one ahead of the table is what "read before the ladder" forbids.
+    for (const rung of ["child", "copy", "question", "substate", "inside", "scope"]) {
+      for (const [id, event] of routes) {
+        const { router, layer, focus } = atRung(rung);
+        // The rung-specific state each one needs, set here so the row constructs
+        // what it claims rather than asserting against a default prompt.
+        if (rung === "question") layer.top = { id: "confirm", kind: "overlay", dismissable: false };
+        if (rung === "substate") layer.top = { id: "dash", kind: "view", dismissable: true };
+        if (rung === "inside") {
+          focus.enterLiveBlock("e1", addr("r1"));
+          focus.setMode("interact");
+        }
+        router.dispatch(event);
+        const seen = router.lastStages.find((s) => s.startsWith(`intercept:${id}`));
+        expect(seen, `${id} is read at the ${rung} rung — stages were ${router.lastStages.join(",")}`).toBeDefined();
+      }
+    }
+  });
+
+  it("T1.33 (R-OWN-002, §103): a bare esc reaches the child; only ⌥esc detaches", () => {
+    // **The row that decides whether a full-screen program in a child is usable.**
+    // `esc` is how vi leaves insert mode and how every curses application cancels,
+    // so an `esc` the host consumed to pop a rung is one that program can never
+    // receive. §103: the child *takes all but host.detach*.
+    const { router } = harness({ inFlight: () => "shell" });
+    const hostEscape = vi.fn(() => true);
+    router.register("global", hostEscape);
+
+    expect(router.target, "an attached child is the top rung").toBe("child");
+    expect(router.dispatch(key("escape")), "consumed by the child, not by the host").toBe(true);
+    expect(hostEscape, "nothing above the child acted on it").not.toHaveBeenCalled();
+    expect(router.lastStages).toContain("child:esc-to-child");
+
+    // **And the control, which is the half that makes the row a rule rather than
+    // a block on `esc`**: the detach chord is *not* the child's, so it takes the
+    // ordinary path. Without this the assertion above is satisfied by a router
+    // that swallows every escape and can never be left.
+    const detach = harness({ inFlight: () => "shell" });
+    detach.router.dispatch(key("escape", { meta: true }));
+    expect(detach.router.lastStages, "⌥esc is the host's").not.toContain("child:esc-to-child");
+  });
 });

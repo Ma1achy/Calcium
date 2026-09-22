@@ -39,7 +39,8 @@ const frameAt = (columns: number): Composed =>
   compose({
     chrome: CHROME,
     session: () => SESSION,
-    copyMode: () => false,
+    owner: () => null,
+    capabilities: () => null,
     now: () => 0,
     size: () => ({ columns, rows: 24 }),
     promptRows: () => 1,

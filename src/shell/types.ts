@@ -18,6 +18,7 @@ import type { ProcessRunner, PtyFactory } from "../data/process/types.js";
 import type { TransportRouter } from "../data/transport/index.js";
 import type { Action, Block, ViewDocument } from "../data/viewmodel/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
+import type { OwnerRung } from "../interaction/router/types.js";
 import type { DocumentView } from "./document-view.js";
 import type { PatchView } from "./patch-view.js";
 import type { ProfileView } from "./profile-view.js";
@@ -97,7 +98,20 @@ export type ChromeContext = Readonly<{
    * Not on `SessionSnapshot`: that is what a *command* runs against, and this is
    * a property of the frame, like `columns`.
    */
-  copyMode: boolean;
+  owner: OwnerRung | null;
+  /**
+   * C02's resolved record, because **the chrome draws marks and a mark needs a
+   * rung** (A03 SS47, C09 I22). The owner line's chords are `⏎ ⇧ ⇥ ⌃] ←→ ↑↓`,
+   * none of which an ASCII terminal can render, and a framework string carrying
+   * one unresolved is the defect SS47 exists to catch.
+   *
+   * **Optional on the same terms as `lastFrame`, and absent in the same frames
+   * `owner` is null**: `compose` runs before the session graph exists, and a
+   * fabricated record for that case would be a fake supplying the one answer
+   * this field is for. There is no owner before there is a terminal, so the
+   * owner line is never the thing that misses it.
+   */
+  capabilities?: TerminalCapabilities;
   /**
    * C24 I32 — the **previous** frame's cost in milliseconds, and the member's
    * name says which frame it describes.

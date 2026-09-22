@@ -18,6 +18,8 @@ import { block } from "../data/viewmodel/index.js";
 import type { Block, Pills } from "../data/viewmodel/index.js";
 import { cells } from "../presentation/text.js";
 import type { ChromeContext, ChromeFn } from "./types.js";
+import type { TerminalCapabilities } from "../terminal/capabilities.js";
+import type { OwnerRung } from "../interaction/router/types.js";
 
 type Chip = Pills["chips"][number];
 
@@ -91,7 +93,7 @@ const header =
         // saying why has been handed a bug rather than a feature. It sits in
         // the header because the header is the row that is always drawn, and in
         // the left cluster because it is a fact about the session's posture.
-        ...(ctx.copyMode ? [{ label: "COPY", tone: "warn" as const }] : []),
+        ...(ctx.owner === "copy" ? [{ label: "COPY", tone: "warn" as const }] : []),
       ],
       // The clock is the right cluster on its own: it is the fact that changes,
       // and its last cell is the frame's last column (I86).
@@ -148,6 +150,154 @@ export function formatFrameCost(ms: number): string {
   return `last ${figure.padStart(5, " ")}ms`;
 }
 
+/**
+ * §103's last line: **EVERY OWNER SAYS SO, in the footer's last line.**
+ *
+ * **This overturns the paragraph above `footer`, and that paragraph was right
+ * about the thing it was actually afraid of.** *A framework-supplied footer of
+ * keybindings would be wrong the moment an app rebinds anything* — true, and
+ * R-KEY-007 says the same from the other side: *footer hints in retained
+ * specimens are examples, not binding projections.* What it concluded from it
+ * was *verbs and facts, never key names*, and that closes the rung rather than
+ * the hazard. The design's answer is narrower and holds: the line names the
+ * **owner**, and the owner is the framework's own — a question, copy mode, an
+ * attached child and a block's interior are rungs Calcium raises, not actions
+ * an app rebinds. `scope`'s line is the one made of ordinary editing verbs, and
+ * it is the one an app can replace by supplying its own chrome (I82).
+ *
+ * **Which rungs get how much** is §103's own split, and it is not uniform:
+ * *every rung retains owner plus its highest-ranked reachable safe action;
+ * **ordinary** rungs also show primary action, safe exit and help.* A question
+ * is not an ordinary rung — it declares its own actions and the shell does not
+ * know them — so its line is the owner and the safe path, and nothing else.
+ *
+ * `null` is the idle ladder, where the global keymap is all there is and there
+ * is no owner to name; the row is absent rather than empty.
+ */
+type Mark = readonly [unicode: string, ascii: string];
+
+/**
+ * **A pair resolved where the capability is in hand** — SS47's second arm, and
+ * the only one open to a chip label.
+ *
+ * A `Glyph` slot is the usual answer and it does not reach here: a slot is
+ * resolved inside the block renderer for a *mark*, and these are chip **text**,
+ * carrying key names rather than semantics. So the pair is declared beside the
+ * line and resolved once, here, where `ctx.capabilities` is.
+ *
+ * The ASCII rung spells the modifiers rather than dropping them: `S-enter` is
+ * a key a reader can press, where `enter` would be a different one.
+ */
+const mark = (m: Mark, caps: TerminalCapabilities): string =>
+  caps.unicode === "ascii" ? m[1] : m[0];
+
+/**
+ * The gap `pills` puts between chips, so the shed measures what will be drawn
+ * rather than the sum of the labels (`simple.ts` `CHIP_GAP`).
+ */
+const OWNER_GAP = 2;
+
+/**
+ * §103's narrow ladder for the owner line: **every rung retains owner plus its
+ * highest-ranked reachable safe action.**
+ *
+ * **It sheds rather than wraps, and the golden frames are why the distinction
+ * is not academic.** `pills` wraps — it has no shed step, unlike the four kinds
+ * on C09 I81's ladder — so at 60 columns the ASCII line became two rows and the
+ * frame grew by one. A footer that takes a second row on a narrow terminal
+ * spends transcript to say what the keys do, which inverts what the line is for.
+ *
+ * The order is §103's, read literally: the **owner** (chip 0) is kept first, the
+ * **way out** is kept second, and the rest shed from the right — so what goes is
+ * always the lowest-ranked thing still there. `scope` has no owner word and no
+ * escape, so it keeps its primary action, which is the same rule with the same
+ * two survivors identified by the same test.
+ *
+ * Adding a shed step to `pills` itself would be the general answer and is a C09
+ * change affecting every consumer, the header included. §103 legislates this
+ * line, so this line is where the ladder lands until something else asks.
+ */
+export function shedToWidth(
+  line: readonly Chip[],
+  columns: number,
+  caps: TerminalCapabilities,
+): readonly Chip[] {
+  // **The convention is an input, not a default** (C02 I9, A03 SS50), and this
+  // line is the case that makes it matter: `←→` and `↑↓` are
+  // `East_Asian_Width=Ambiguous`, so the `inside` and `copy` rungs measure four
+  // cells wider under `wide` than under `narrow`. Shedding on the narrow reading
+  // would under-measure and wrap on exactly the terminals that need the ladder.
+  const width = (chips: readonly Chip[]): number =>
+    chips.reduce((n, c, i) => n + cells(c.label, caps.ambiguousWidth) + (i > 0 ? OWNER_GAP : 0), 0);
+  if (line.length <= 1 || width(line) <= columns) return line;
+
+  const exit = line.findIndex((c) => c.label.includes("esc") || c.label.includes("host escape"));
+  // The two §103 names. When there is no escape on the line the second survivor
+  // is the primary action, which is the chip that follows the owner.
+  const keep = new Set([0, exit === -1 ? 1 : exit]);
+  const kept = [...line];
+  for (let i = kept.length - 1; i >= 0 && width(kept) > columns; i -= 1) {
+    if (!keep.has(i)) kept.splice(i, 1);
+  }
+  return kept;
+}
+
+export function ownerLine(rung: OwnerRung | null, caps: TerminalCapabilities): readonly Chip[] {
+  switch (rung) {
+    case "child":
+      return [
+        { label: "attached", tone: "warn" },
+        { label: mark(["keys → child", "keys -> child"], caps), tone: "muted" },
+        { label: mark(["⌃] host escape", "C-] host escape"], caps), tone: "muted" },
+      ];
+    case "copy":
+      // The frozen screen is the fact, not a hint: it is why nothing responds.
+      return [
+        { label: "copy", tone: "warn" },
+        { label: mark(["←→↑↓ extend", "arrows extend"], caps), tone: "muted" },
+        { label: mark(["⏎ copy", "enter copy"], caps), tone: "muted" },
+        // **Two chips, not one label with a `·` in it.** The separator is the
+        // cluster's to draw (C09 I49) — a literal one in a string is the head's
+        // unresolved join F828 found, and T2.116 is right to refuse it here too.
+        { label: "esc out", tone: "muted" },
+        { label: "the screen is frozen", tone: "muted" },
+      ];
+    case "question":
+      // Owner plus the safe path. The declared actions are the question's own
+      // and the shell cannot name them without holding a second copy of them.
+      return [
+        { label: "question", tone: "warn" },
+        { label: "declared actions", tone: "muted" },
+        { label: "esc safe path", tone: "muted" },
+      ];
+    case "substate":
+      return [
+        { label: "find", tone: "accent" },
+        { label: mark(["↑↓ hits", "up/down hits"], caps), tone: "muted" },
+        { label: mark(["⏎ open", "enter open"], caps), tone: "muted" },
+        { label: "esc close", tone: "muted" },
+      ];
+    case "inside":
+      return [
+        { label: "inside", tone: "accent" },
+        { label: mark(["←→ orbit", "left/right orbit"], caps), tone: "muted" },
+        { label: mark(["↑↓ tilt", "up/down tilt"], caps), tone: "muted" },
+        { label: "esc out", tone: "muted" },
+      ];
+    case "scope":
+      // No owner word: the scope is the rung a reader is on when nothing has
+      // been raised, so naming it would put a label on the absence of one.
+      return [
+        { label: mark(["⏎ send", "enter send"], caps), tone: "muted" },
+        { label: mark(["⇧⏎ newline", "S-enter newline"], caps), tone: "muted" },
+        { label: mark(["⇥ complete", "tab complete"], caps), tone: "muted" },
+        { label: mark(["⇧⇥ transcript", "S-tab transcript"], caps), tone: "muted" },
+      ];
+    default:
+      return [];
+  }
+}
+
 const footer = (ctx: ChromeContext): readonly Block[] => [
   clusters(
     "chrome.footer",
@@ -166,6 +316,25 @@ const footer = (ctx: ChromeContext): readonly Block[] => [
     ],
     [{ label: foldHome(ctx.session.cwd, ctx.session.env["HOME"]), tone: "muted" }],
   ),
+  // **Last**, which is the whole of where §103 puts it: *in the footer's last
+  // line*. A row above the working directory is a row a reader scans past.
+  // **Both or neither** — there is no owner before there is a terminal, so the
+  // two conditions are one fact and the second arm is unreachable in a session.
+  ...(ctx.owner === null || ctx.capabilities === undefined
+    ? []
+    : [
+        // **One row, not a cluster pair.** `clusters` reserves a right-hand cell
+        // and `clusterCells([])` floors at 1, so an owner line built that way
+        // gets `columns - 1` and wraps on the width where it exactly fits — which
+        // is what the 60-column ASCII golden showed before this line was read.
+        // The owner line has no right-hand half: it is a ladder, read left to
+        // right, and it sheds from the right rather than aligning to it.
+        block<Block>({
+          kind: "pills",
+          id: "chrome.owner",
+          chips: shedToWidth(ownerLine(ctx.owner, ctx.capabilities), ctx.columns, ctx.capabilities),
+        }),
+      ]),
 ];
 
 /**

@@ -18,6 +18,7 @@ import { addr, placed } from "../support/focus.js";
 const base: FocusInputs = {
   overlayTop: null,
   copyMode: false,
+  attachedChild: false,
   liveEntry: { id: "e1" },
   stored: { at: "prompt" },
 };
@@ -26,16 +27,41 @@ const at = (over: Partial<FocusInputs> = {}): FocusTarget =>
   activeTarget({ ...base, ...over });
 
 describe("C16 §3 — activeTarget", () => {
-  it("T1.3 (I15): each of the seven conditions resolves to its documented target", () => {
+  it("T1.3 (I15, R-COR-002): each of the seven conditions resolves to its documented target", () => {
     expect(at({ overlayTop: { kind: "overlay" } })).toBe("overlay");
     expect(at({ copyMode: true })).toBe("copyMode");
     expect(at({ overlayTop: { kind: "view" } })).toBe("pushedView");
     expect(at({ stored: { at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "interact" } })).toBe("interaction");
     expect(at()).toBe("prompt");
     expect(at({ stored: { at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "navigate" } })).toBe("liveBlock");
+    // **`liveBlock` and not `global`, amended in M5** (R-COR-002, C16 §3a W1).
+    // The row read `global`, so with focus stored in the transcript the owner was
+    // `global` while nothing ran and `liveBlock` the moment an entry appeared —
+    // a content arrival moving the keyboard's owner, which is the one thing
+    // R-COR-002 forbids. Standing in the transcript is not a thing that stops
+    // being true because the last command finished.
     expect(
       at({ stored: { at: "liveBlock", entryId: "e1", element: null, anchor: null, mode: "navigate" }, liveEntry: null }),
-    ).toBe("global");
+    ).toBe("liveBlock");
+  });
+
+  it("T1.3g (R-COR-002, C16 §3a W1): an arrival changes the drawing and never the owner", () => {
+    // **The row the ladder had no shape for.** Every assertion above names the
+    // owner for a *state*; this names it across a *transition*, which is the only
+    // way a rule about what an arrival may not do can be checked at all. The two
+    // calls differ on `liveEntry` alone.
+    const inTranscript = { at: "liveBlock", entryId: "e1", element: null, anchor: null, mode: "navigate" } as const;
+    const quiet = at({ stored: inTranscript, liveEntry: null });
+    const arrived = at({ stored: inTranscript, liveEntry: { id: "e2" } });
+    expect(arrived, "content arrived and the owner did not move").toBe(quiet);
+
+    // **And the control, which is the other half of R-COR-002**: a *question*
+    // arriving is an ownership request and must raise the rung, so an arrival
+    // that is one does move the owner. A row asserting only the first half would
+    // pass on an `activeTarget` that ignored its inputs entirely.
+    expect(at({ stored: inTranscript, overlayTop: { kind: "overlay" } }), "a question is an ownership request").toBe(
+      "overlay",
+    );
   });
 
   it("T1.3d (C26 I2): interaction outranks the prompt and yields to every layer", () => {
@@ -91,11 +117,16 @@ describe("C16 §3 — activeTarget", () => {
     // **Freezing is a mode exit nobody signals** (C26 §8a, the live-block
     // freeze). The mode is stored, so it outlives the entry; answering
     // `interaction` here would hand every key to a block the reader cannot act
-    // on and the prompt would stop receiving them. The gate is `liveEntry`, and
-    // it is the same gate the `liveBlock` row already had.
+    // on and the prompt would stop receiving them. The gate is `liveEntry`.
+    //
+    // **It is no longer the same gate the `liveBlock` row had**, and the split is
+    // the point (M5, R-COR-002): being *inside* a block is a thing you cannot be
+    // once it has settled, where *standing in the transcript* is not. So the mode
+    // is refused and the rung is kept — `liveBlock`, one position of `scope`,
+    // rather than a fall to `global`.
     expect(
       at({ stored: { at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "interact" }, liveEntry: null }),
-    ).toBe("global");
+    ).toBe("liveBlock");
   });
 
   it("the priority holds where two conditions are true at once", () => {
@@ -148,7 +179,20 @@ describe("C16 §3 — activeTarget", () => {
     // the union that no input can reach is a rung the ladder registers and never
     // runs — the shape `pushedView` held for four components. The row below has
     // to *produce* it, not name it.
+    //
+    // **`global` is reachable by dispatch and not by `activeTarget`, and M5 is
+    // where those stopped being the same claim.** They were one while the fall
+    // through the bottom of `activeTarget` was how `global` got its turn; now
+    // `dispatch` runs it explicitly below the ladder, and R-COR-002 took the fall
+    // away (W1). The vacuity the row exists to catch is unchanged — a target no
+    // input can reach — so the assertion keeps its shape and names the one member
+    // whose reachability is dispatch's rather than derivation's.
     const reached = new Set<FocusTarget>([
+      // **`child` is produced, not named** — the rule above, applied to the rung
+      // M5 added. An attached child is the top of the ladder, and a member added
+      // to the union without a state that answers it is the vacuity this row
+      // exists to catch.
+      at({ attachedChild: true }),
       at({ overlayTop: { kind: "overlay" } }),
       at({ copyMode: true }),
       at({ overlayTop: { kind: "view" } }),
@@ -157,8 +201,21 @@ describe("C16 §3 — activeTarget", () => {
       at({ stored: { at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "navigate" } }),
       at({ stored: { at: "liveBlock", entryId: "e1", element: null, anchor: null, mode: "navigate" }, liveEntry: null }),
     ]);
-    expect([...FOCUS_ORDER].sort()).toEqual([...reached].sort());
-    expect(FOCUS_ORDER[0], "overlay is highest").toBe("overlay");
+    expect([...FOCUS_ORDER].filter((t) => t !== "global").sort()).toEqual([...reached].sort());
+    expect(reached.has("global"), "no derivation answers `global` any more").toBe(false);
+    // And it is dispatched, which is what stops the line above retiring a rung
+    // rather than re-homing one: `run("global", e)` is in `dispatch`'s tail.
+    expect(
+      readFileSync("src/interaction/router/router.ts", "utf8"),
+      "`global` is run below the ladder, by name",
+    ).toContain('run("global", e)');
+    // **`child` is highest, amended in M5.** §103's ladder reads
+    // `child · copy · question · substate · inside · scope`, and a captured child
+    // sits above the question rung because the keys are not the host's to route:
+    // an overlay the host raised over an attached PTY does not take that PTY's
+    // keyboard. `overlay` keeps its place as the highest *host* rung.
+    expect(FOCUS_ORDER[0], "an attached child is highest (§103)").toBe("child");
+    expect(FOCUS_ORDER[1], "overlay is the highest host rung").toBe("overlay");
     expect(FOCUS_ORDER[FOCUS_ORDER.length - 1], "global is the fallback").toBe("global");
   });
 

@@ -222,7 +222,16 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     // correct refactor and stayed green if the handler started declining keys.
     // C16 I8's guard is the backstop for what the handler declines (mouse), which is
     // why `dismissable: false` is still load-bearing; see T4.9.
-    expect(w.router.lastStages).toEqual(["arming", "target:overlay"]);
+    // **The intercept is read first and declares nothing here** (M5, §103).
+    // `page-scroll` is one of the three reserved routes, so it is classified
+    // ahead of the ladder on every event; its owner-applicability table names
+    // `copy` and the idle ladder and not `question`, so no verdict is declared
+    // and the question's own handler takes the key exactly as before.
+    expect(w.router.lastStages).toEqual([
+      "arming",
+      "intercept:page-scroll:question:none",
+      "target:overlay",
+    ]);
 
     w.router.dispatch(key("n"));
     await answer;
@@ -302,7 +311,15 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
 
     await expect(answer).resolves.toBe("n");
     expect(cancelled(), "the verb must not be cancelled — it was waiting for us").toBe(0);
-    expect(w.router.lastStages).toContain("question");
+    // **The rung that answered is the intercept table's, not §5's** (M5). §103
+    // gives `interrupt` an owner-applicability table where a QUESTION *rejects*
+    // — consume it and let the question resolve, never cancel the verb that is
+    // waiting on the answer — so `⌃c` never reaches §5's cancel rungs and the
+    // stage that records the decision names the route and the rung it was
+    // decided at. The two assertions above are the behaviour; this is the
+    // channel, named so a refactor that reached the same answer by the old path
+    // is visible rather than silent.
+    expect(w.router.lastStages).toEqual(["arming", "intercept:interrupt:question:reject", "reject"]);
   });
 
   it("T4.11 (C16 I25): with no question open, ⌃c still cancels a running verb", async () => {

@@ -27,7 +27,8 @@ import type { Placed } from "../../src/viewport/overlay/index.js";
 import type { ProfileReport } from "../../src/shell/profiling/types.js";
 import { registry as measurer, rows as contentRows } from "../support/overlay.js";
 import { buildSession } from "../support/session.js";
-import { makeDefaultChrome } from "../../src/shell/chrome.js";
+import { makeDefaultChrome, ownerLine, shedToWidth } from "../../src/shell/chrome.js";
+import type { OwnerRung } from "../../src/interaction/router/types.js";
 import { tone } from "../../src/presentation/blocks/paint.js";
 import type { Block, Pills } from "../../src/data/viewmodel/index.js";
 
@@ -71,7 +72,8 @@ function frameAt(columns: number, rows: number, promptRows = 1): Composed {
     chrome: { header: () => [], footer: () => [] },
     measureSequence: MEASURE,
     session: () => SESSION,
-    copyMode: () => false,
+    owner: () => null,
+    capabilities: () => null,
     now: () => 1_700_000_000_000,
     size: () => ({ columns, rows }),
     promptRows: () => promptRows,
@@ -179,7 +181,8 @@ describe("C22 §6 — the paint", () => {
       chrome: { header: () => [], footer: () => [] },
       measureSequence: MEASURE,
       session: () => SESSION,
-      copyMode: () => false,
+      owner: () => null,
+    capabilities: () => null,
       now: () => 1_700_000_000_000,
       size: shrinking,
       promptRows: () => 1,
@@ -844,7 +847,8 @@ describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => 
       } satisfies SessionSnapshot,
       now: 1_700_000_000_000,
       columns: 80,
-      copyMode: true,
+      owner: "copy" as const,
+      capabilities: FULL_CAPS,
       lastFrame: 12.4,
     };
     const out: Pills["chips"][number][] = [];
@@ -880,7 +884,12 @@ describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => 
     // The corpus, before anything is asserted over it: a walk that found nothing
     // satisfies every for-loop below it (`an exit status is the same bit for
     // clean and for did-not-run`).
-    expect(all.map((c) => c.label), "eight chips, with all three conditional ones up").toEqual([
+    // **Thirteen, and the last five are M5's owner line** (R-KEY-004, §103). The
+    // fixture's owner is `copy`, so `COPY` in the header and the owner line in
+    // the footer are one fact stated at both ends — the header says *which* mode
+    // and the last line says *what your keys do in it*, which is the half §103
+    // says a reader fights without.
+    expect(all.map((c) => c.label), "thirteen chips, with all three conditional ones up and an owner raised").toEqual([
       "calcium",
       "/usr/local/bin/prism",
       "COPY",
@@ -889,6 +898,13 @@ describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => 
       "stopping",
       "last  12.4ms",
       "~/work",
+      "copy",
+      "←→↑↓ extend",
+      "⏎ copy",
+      // Two chips: the separator between them is the cluster's to draw, and a
+      // literal `·` inside a label is the unresolved join T2.116 refuses.
+      "esc out",
+      "the screen is frozen",
     ]);
     for (const chip of all) {
       expect(chip.tone, `${chip.label} inherits C09's default instead of naming its own`).toBeDefined();
@@ -914,5 +930,84 @@ describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => 
     expect(tone(all[3]?.tone ?? "muted", DARK_THEME, FULL_CAPS), "the clock and the cwd are both chrome").toEqual(
       tone(all[7]?.tone ?? "muted", DARK_THEME, FULL_CAPS),
     );
+  });
+
+  it("T1.46e (R-KEY-004, R-OWN-001, §103): every raised owner says so, and the idle ladder says nothing", () => {
+    // **§103: *EVERY OWNER SAYS SO, in the footer's last line*, and *AN OWNER
+    // YOU CANNOT SEE IS AN OWNER YOU WILL FIGHT*.** The rule is over the rung
+    // set, not over one rung, which is what the tree had: `copyMode` was the
+    // only owner with a cell, because copy mode is the only one anyone had
+    // followed the argument to the end for.
+    const ALL_RUNGS = ["child", "copy", "question", "substate", "inside", "scope"] as const;
+    const OWNER_WORD: Readonly<Record<Exclude<OwnerRung, "scope">, string>> = {
+      child: "attached",
+      copy: "copy",
+      question: "question",
+      substate: "find",
+      inside: "inside",
+    };
+    for (const [rung, word] of Object.entries(OWNER_WORD)) {
+      const line = ownerLine(rung as OwnerRung, FULL_CAPS);
+      expect(line[0]?.label, `the ${rung} rung leads with its owner`).toBe(word);
+      // *Every rung retains owner plus its highest-ranked reachable safe
+      // action.* Every one of these five is left by an escape of some kind, and
+      // a rung that names an owner and no way out is the fight §103 describes.
+      expect(
+        line.some((c) => c.label.includes("esc") || c.label.includes("⌃]")),
+        `the ${rung} rung shows the way out — the line was ${line.map((c) => c.label).join(" · ")}`,
+      ).toBe(true);
+    }
+
+    // **`scope` carries no owner word, and that is the rule rather than an
+    // omission**: it is the rung a reader is on when nothing has been raised, so
+    // a label on it would name the absence of an owner. It still carries its
+    // primary action, because it is the *ordinary* rung §103's footer clause
+    // gives the full set to.
+    const scope = ownerLine("scope", FULL_CAPS).map((c) => c.label);
+    expect(scope, "the ordinary rung shows its primary action").toContain("⏎ send");
+    expect(Object.values(OWNER_WORD).some((w) => scope.includes(w)), "no owner word on the scope rung").toBe(false);
+
+    // **The idle ladder is the control**, and it is what stops the row being
+    // satisfied by a function that returns a line for anything: `null` is no
+    // owner, and no owner is no row rather than an empty one.
+    expect(ownerLine(null, FULL_CAPS), "nothing owns the keyboard and nothing is claimed").toEqual([]);
+
+    // **The narrow ladder, which is §103’s own sentence and not a tidiness
+    // measure**: *every rung retains owner plus its highest-ranked reachable
+    // safe action.* Read off a golden frame first — `pills` wraps rather than
+    // sheds, so at 60 columns the ASCII line took a second row and the frame
+    // grew by one. A footer that spends a transcript row to say what the keys do
+    // has inverted what the line is for.
+    for (const rung of ALL_RUNGS) {
+      const full = ownerLine(rung, FULL_CAPS);
+      const narrow = shedToWidth(full, 24, FULL_CAPS);
+      expect(narrow.length, `the ${rung} rung sheds at 24 columns`).toBeLessThan(full.length);
+      expect(narrow[0], `the ${rung} rung keeps its owner`).toEqual(full[0]);
+      const exit = full.find((c) => c.label.includes("esc") || c.label.includes("host escape"));
+      // `scope` has no escape: its second survivor is the primary action, which
+      // is the same rule reaching the same place by the same order.
+      expect(narrow, `the ${rung} rung keeps the way out`).toContain(exit ?? full[1]);
+      // And it is a *subsequence*, not a re-ordering — the ladder sheds, so what
+      // survives is still in rank order and a reader’s eye does not have to move.
+      expect(full.filter((c) => narrow.includes(c)), `the ${rung} rung keeps its order`).toEqual(narrow);
+    }
+    // The control: a line that fits is not touched, so the row above is about
+    // shedding rather than about a function that always returns two chips.
+    expect(shedToWidth(ownerLine("inside", FULL_CAPS), 200, FULL_CAPS)).toEqual(ownerLine("inside", FULL_CAPS));
+
+    // **And the ASCII rung, which is A03 SS47 arriving at the owner line.** The
+    // line is the only chrome that draws chords, and `⏎ ⇧ ⇥ ⌃] ←→ ↑↓` are seven
+    // marks an ASCII terminal cannot render — so a reader on one would be told
+    // there is an owner and shown boxes for the way out. The fallback spells the
+    // modifier rather than dropping it: `S-enter` is a key you can press where
+    // `enter` is a different one.
+    for (const rung of ALL_RUNGS) {
+      for (const chip of ownerLine(rung, ASCII_CAPS)) {
+        expect(
+          /^[\x20-\x7e]*$/.test(chip.label),
+          `the ${rung} rung is renderable in ASCII — \`${chip.label}\` is not`,
+        ).toBe(true);
+      }
+    }
   });
 });

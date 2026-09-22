@@ -23,6 +23,19 @@ export type Key = Readonly<{
  * the union that order is exhaustive over.
  */
 export type FocusTarget =
+  /**
+   * An attached child owns the keyboard above everything (§103, R-OWN-002).
+   *
+   * **It was reachable only from inside the Ctrl-C branch** (C16 §3a W5), because
+   * a child was not a target and had nothing to register on — so `⌃c` reached it
+   * and `esc` could not, where R-OWN-002 names both. A rung with no target is a
+   * special case with a ladder drawn around it.
+   *
+   * Its bindings — `⌃]` host escape, `⌥esc` enhanced detach — and its second
+   * subject, `openSurface`, arrive in M9. The target lands here so the rung is
+   * reachable rather than declared, which is the vacuity T2.5 exists to catch.
+   */
+  | "child"
   | "overlay"
   | "copyMode"
   | "pushedView"
@@ -45,6 +58,76 @@ export type FocusTarget =
   | "prompt"
   | "liveBlock"
   | "global";
+
+/**
+ * **Who owns the keyboard** — the design's ladder, one rung per owner (§103,
+ * R-OWN-001).
+ *
+ * `FocusTarget` above is *where* a key goes; this is *who is answering*. They
+ * were one union while the tree had four special cases where the design has one
+ * ladder — a question, copy mode, an attached PTY and a block's interior — and
+ * §103 opens by naming exactly that: *"§15 listed SCOPES and never said what a
+ * scope competes with."*
+ *
+ * **`scope` is one rung over two targets, and that is the design's shape rather
+ * than a compromise.** §103's SCOPE row reads *prompt · transcript*: one owner,
+ * whose *position* is the prompt or the transcript, which is what `stored.at`
+ * has always been. Collapsing the two targets into one handler list would have
+ * run the live block's handler while focus sat at the prompt, and — because
+ * `installLadder` registers `liveBlock` before `prompt` — in the reverse of the
+ * ladder's own order. C16 §3a W3 is that row of the walk; the separation of
+ * *rung* from *target* is what makes it a non-question instead of a hazard.
+ */
+export type OwnerRung =
+  | "child"
+  | "copy"
+  | "question"
+  | "substate"
+  | "inside"
+  | "scope";
+
+/** Every rung, highest first — the order §103 draws (R-OWN-001). */
+export const OWNER_RUNGS: readonly OwnerRung[] = Object.freeze([
+  "child",
+  "copy",
+  "question",
+  "substate",
+  "inside",
+  "scope",
+]);
+
+/**
+ * The rung each target answers for, so the two orders cannot disagree (A02 Seam 3).
+ *
+ * `global` is **not** a rung: §103's ladder is the owners that compete, and the
+ * global keymap is what is left when none of them claimed the key. It is read
+ * below the ladder, exactly as it is dispatched.
+ */
+export const RUNG_OF: Readonly<Record<Exclude<FocusTarget, "global">, OwnerRung>> = Object.freeze({
+  child: "child",
+  overlay: "question",
+  copyMode: "copy",
+  pushedView: "substate",
+  interaction: "inside",
+  prompt: "scope",
+  liveBlock: "scope",
+});
+
+/**
+ * What a rung decides about an action (§103, R-OWN-001).
+ *
+ * **Four, where the tree had a boolean** — and the boolean is why a blocking
+ * question could drop a key in silence and read as correct: `false` meant *pass
+ * downward* and *consume without acting* indistinguishably, so a refusal had no
+ * way to say it was one (C16 §3a W2, W6). R-HON-004 and R-INT-009 both require
+ * it to: *a refusal states its reason*, *a rejected command explains why*.
+ *
+ * - `handle` — this is the one owner that acts.
+ * - `reject` — consume it, and explain where silence would look broken.
+ * - `pass` — continue downward.
+ * - `global-intercept` — take the registry-declared exception.
+ */
+export type Verdict = "handle" | "reject" | "pass" | "global-intercept";
 
 /**
  * Where focus is, as a thing that can be resolved (C26 I10, §8b.7).

@@ -94,16 +94,18 @@ describe("C22 §6f — the style resolves per focus target (C22 I63)", () => {
 
   it("T1.22a (C22 I63, §6f table row 6): every target is a key, including `global`", () => {
     // A `Partial<Record<…>>` invites *which of these are real*, and the answer
-    // is all seven. Driven off `FOCUS_ORDER` rather than a list written here,
+    // is all of them. Driven off `FOCUS_ORDER` rather than a list written here,
     // so a target added to the union without a decision fails this row instead
-    // of silently resolving to the fallback for ever.
+    // of silently resolving to the fallback for ever — **which is what it just
+    // did**: M5 added `child` and this row went red rather than letting an
+    // attached PTY inherit the prompt's caret.
     for (const target of FOCUS_ORDER) {
       expect(
         cursorStyleFor(target, { targets: { [target]: BEAM } }),
         `${target} is a key`,
       ).toEqual(BEAM);
     }
-    expect(FOCUS_ORDER, "and there are seven of them").toHaveLength(7);
+    expect(FOCUS_ORDER, "and there are eight of them").toHaveLength(8);
   });
 
   it("T1.22c (C22 I63): shape and blink are one wire parameter", () => {

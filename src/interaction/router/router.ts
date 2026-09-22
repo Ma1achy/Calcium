@@ -15,7 +15,8 @@ import { NO_SPAN } from "../../data/viewmodel/index.js";
 import type { Probe } from "../../data/viewmodel/index.js";
 import { activeTarget, type FocusInputs, type FocusStore } from "./focus.js";
 import type { Keymap } from "./keymap.js";
-import type { FocusTarget, InputEvent } from "./types.js";
+import { RUNG_OF, type FocusTarget, type InputEvent, type OwnerRung, type Verdict } from "./types.js";
+import { interceptOf, interceptVerdict } from "./intercepts.js";
 
 const EXIT_ARM_MS = 500;
 
@@ -124,7 +125,25 @@ export type RouterDeps = Readonly<{
   cancelNewestStream: () => boolean;
 }>;
 
-export type Handler = (e: InputEvent) => boolean;
+/**
+ * What a handler answers (§103, R-OWN-001, C16 §3a W6).
+ *
+ * **`boolean` could say two of the four things and conflated the other two.**
+ * `true` is `handle`; `false` meant *pass downward* **and** *consume without
+ * acting*, which are different rungs of the design's decision — and that is why
+ * a blocking question could drop a key in silence and read as correct (W2).
+ * `global-intercept` had no representation at all.
+ *
+ * Both forms are accepted because the four-verdict form is only needed where a
+ * handler has something to say beyond *yes* or *not mine*, and 30-odd handlers
+ * in `construct.ts` have not. `true`/`false` normalise to `handle`/`pass`, which
+ * is what they have always meant; a handler that means `reject` now says so.
+ */
+export type Handler = (e: InputEvent) => boolean | Verdict;
+
+/** `true` is `handle` and `false` is `pass` — what the boolean form always meant. */
+const verdictOf = (answer: boolean | Verdict): Verdict =>
+  answer === true ? "handle" : answer === false ? "pass" : answer;
 
 export interface InputRouter {
   register(
@@ -135,6 +154,15 @@ export interface InputRouter {
   dispatch(e: InputEvent): boolean;
   resetFocus(): void;
   readonly target: FocusTarget;
+  /**
+   * Who owns the keyboard, as §103's ladder names it — `null` when no rung does
+   * and the global keymap is all that is left (R-OWN-001, R-KEY-004).
+   *
+   * Exposed because the footer's owner line has to read it: *AN OWNER YOU CANNOT
+   * SEE IS AN OWNER YOU WILL FIGHT.* It is derived, not stored, for the reason
+   * `target` is — a second copy is a second thing to keep in step.
+   */
+  readonly rung: OwnerRung | null;
   /** Which stages the last dispatch consulted, in order. Diagnostics and T2.x. */
   readonly lastStages: readonly string[];
 }
@@ -172,6 +200,7 @@ export function createRouter(
     return {
       overlayTop: deps.overlayTop(),
       copyMode: deps.copyMode(),
+      attachedChild: deps.inFlight() === "shell",
       liveEntry: deps.liveEntry(),
       stored: focus.current,
     };
@@ -374,24 +403,66 @@ export function createRouter(
     return box.top === 0 && box.left === 0 && box.height >= region.height && box.width >= region.width;
   }
 
-  function run(target: FocusTarget, e: InputEvent): boolean {
+  /**
+   * Every handler on a target, until one does not `pass` (R-OWN-001).
+   *
+   * **`reject` stops the walk exactly as `handle` does**, and that is the whole
+   * difference the verdict buys: both mean *this rung decided*, and only the
+   * effect differs. `pass` is the one answer that continues, which is what
+   * `false` meant at the two sites that used it correctly and not at the one
+   * that used it to drop a key.
+   */
+  function runRung(target: FocusTarget, e: InputEvent): Verdict {
     const list = handlers.get(target) ?? [];
     // **Nothing to run is not a span** (C28 I39). `dispatch` calls this up to
     // three times per event and most targets hold no handler, so opening one
     // here unconditionally would make `spans.handler.count` a count of *rungs
     // walked* under a name that says *handlers run*.
-    if (list.length === 0) return false; // graphemes-ok — a count of handlers
+    if (list.length === 0) return "pass"; // graphemes-ok — a count of handlers
     using _s = deps.probe?.span("handler") ?? NO_SPAN;
     for (const h of list) {
       // Contained: a throwing handler leaves the event unconsumed and the
-      // session alive (T3.15).
+      // session alive (T3.15). A throw is `pass` and never `reject`: a handler
+      // that fell over has not decided anything.
       try {
-        if (h(e)) return true;
+        const verdict = verdictOf(h(e));
+        if (verdict !== "pass") return verdict;
       } catch {
         /* treated as not consumed */
       }
     }
-    return false;
+    return "pass";
+  }
+
+  /** The boolean the ladder's own call sites still read: did this rung consume it. */
+  function run(target: FocusTarget, e: InputEvent): boolean {
+    return runRung(target, e) !== "pass";
+  }
+
+  function rungNow(): OwnerRung | null {
+    const target = activeTarget(inputs());
+    return target === "global" ? null : RUNG_OF[target];
+  }
+
+  /**
+   * The rung an intercept is answered at — `rungNow`, except that a **question**
+   * is an overlay *awaiting an answer* and not merely a layer.
+   *
+   * **§5 already drew this line and the ladder's targets do not.** `activeTarget`
+   * answers `overlay` for any top layer, where §103's QUESTION rung is *choice or
+   * text · resolves exactly once by answer · safe exit* — and §5's own Ctrl-C
+   * branch tests `overlayAnswerCallback() !== null` for exactly that reason.
+   * Without this the table rejects an interrupt under a non-dismissable layer
+   * that nobody is waiting on, and a verb in flight never gets cancelled: ruled
+   * behaviour overturned by a rung name being one word coarser than the rule.
+   */
+  function interceptRung(): OwnerRung | null {
+    const rung = rungNow();
+    if (rung !== "question") return rung;
+    if (deps.overlayAnswerCallback() !== null) return "question";
+    // A layer with nothing to answer is not a question; the work beneath it is
+    // the owner, which is the rung §5's cancel branch acts for.
+    return "scope";
   }
 
   function dispatch(e: InputEvent): boolean {
@@ -402,6 +473,40 @@ export function createRouter(
     if (arming === "raise") {
       deps.raiseExitConfirm();
       return true;
+    }
+
+    // **The three reserved routes are read before the ladder and no rung can
+    // claim them** (§103, R-OWN-001, C16 §3a W4). `⌃c`, `⌥↑`/`⌥↓` and the wheel
+    // are *declared overrides, not contradictions in the ladder*, and the table
+    // is consulted first precisely so a rung cannot take one ahead of it — which
+    // is what "unclaimable" means and what a branch further down could not give.
+    //
+    // A `null` verdict is *this intercept does not apply at this rung*, which is
+    // not `pass`: passing is a decision an owner took, and this is the absence of
+    // one. The ladder then runs normally, which is how `interrupt` still reaches
+    // §5's own rungs below.
+    const intercept = interceptOf(e);
+    if (intercept !== null) {
+      const rung = interceptRung();
+      const declared = interceptVerdict(intercept, rung);
+      stages.push(`intercept:${intercept}:${rung ?? "idle"}:${declared ?? "none"}`);
+      // **`reject` means the owner deals with it and it never falls through** —
+      // not that nothing runs. The owning rung is given its turn first, because
+      // the rejection is a thing an owner *does*: a question's `⌃c` is its deny
+      // path (§5 ruling A — declining and cancelling produce the same outcome, and
+      // the one that leaves a record wins), and copy mode's is its own refusal.
+      // Short-circuiting before the rung skipped exactly that, which is a table
+      // overruling the ladder rather than declaring an override for it.
+      //
+      // What the table *does* take away is the fall-through: after a reject the
+      // event is spent, so no lower rung and no global binding can act on a route
+      // it does not own. That is what "unclaimable by any rung" buys.
+      if (declared === "reject") {
+        const owner = activeTarget(inputs());
+        if (owner !== "global") runRung(owner, e);
+        stages.push("reject");
+        return true;
+      }
     }
 
     if (e.kind === "mouse") return routeMouse(e);
@@ -454,15 +559,66 @@ export function createRouter(
 
     const target = activeTarget(inputs());
     stages.push(`target:${target}`);
-    if (run(target, e)) return true;
+
+    // **A bare `esc` belongs to the child, and only `⌥esc` detaches** (§103,
+    // R-OWN-002: *takes all but host.detach*).
+    //
+    // This is the row that decides whether a full-screen program inside a child
+    // is usable at all. `esc` is how vi leaves insert mode, how less closes a
+    // help pane, how every curses application cancels — so an `esc` the host
+    // consumed to pop a rung is an `esc` that program never receives, and the
+    // reader has no way to send one. The child takes **all** keys; the two that
+    // leave are `⌃]` and `⌥esc`, and both are deliberately chords a full-screen
+    // program does not want.
+    //
+    // Written here rather than as a handler on `child` because the rule is about
+    // what the *host* declines to do: a handler that consumed `esc` and forwarded
+    // it would be the same bytes and a second place for the exception to be
+    // forgotten.
+    if (target === "child" && e.kind === "key" && e.key.name === "escape" && !e.key.meta) {
+      stages.push("child:esc-to-child");
+      // **Consumed whether or not a handler took it.** The child owns every key
+      // that is not a detach chord, so an `esc` no handler claimed must still not
+      // fall to `global` — a host binding acting on it is exactly the failure this
+      // row exists to stop. Delivery to the PTY is the child surface's business
+      // and lands with it in M9; what the router owes is that nothing else acts.
+      runRung(target, e);
+      return true;
+    }
+
+    const verdict = runRung(target, e);
+    if (verdict !== "pass") {
+      // **`reject` consumes exactly as `handle` does** (R-OWN-001). The two
+      // differ in what they did, not in whether the event is spent.
+      if (verdict === "reject") stages.push("reject");
+      return true;
+    }
 
     // Step 3 is skipped when the top layer is non-dismissable: a layer that must
     // be answered is modal, and a global shortcut firing beneath one acts on a
     // surface the user cannot see (I8).
     const top = deps.overlayTop();
     if (top !== null && (!top.dismissable || coversRegion(top.id))) {
+      // **This is a REJECT and it used to be a silent drop** (§103, R-HON-004,
+      // R-INT-009, C16 §3a W2). §103: *a blocking question handles its answer
+      // actions and REJECTS unrelated typing; it never passes keys into the held
+      // prompt.* The row returned `false`, which told the caller *nobody wanted
+      // this* — indistinguishable from an unbound key on a quiet prompt, and the
+      // reason the silence was writable at all is W6: `false` meant *pass* and
+      // *consume without acting* at once.
+      //
+      // **Help is not an exception here, and §103 is what settles it.** R-KEY-004
+      // asks that the help route stay reachable at every responsive rung, which
+      // reads as a conflict until §103's footer table: every rung retains *owner
+      // plus its highest-ranked reachable safe action*, and **ordinary** rungs
+      // *also* show primary action, safe exit and help. A question is not an
+      // ordinary rung. Its footer line is `question · declared actions · esc safe
+      // path`, and that line is the explanation R-INT-009 requires — the refusal
+      // states its reason by the owner being visible, rather than by a notice
+      // per keystroke.
       stages.push("modal-blocked");
-      return false;
+      stages.push("reject");
+      return true;
     }
 
     stages.push("global");
@@ -477,6 +633,9 @@ export function createRouter(
   return {
     register,
     dispatch,
+    get rung() {
+      return rungNow();
+    },
     resetFocus: () => focus.reset(),
     get target() {
       return activeTarget(inputs());

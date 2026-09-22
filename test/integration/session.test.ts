@@ -56,8 +56,14 @@ describe("C22 §6b — the write is a difference", () => {
     expect(settled[0]?.trim(), "the header is on the screen").not.toBe("");
     expect(
       settled.findIndex((r) => r.trimStart().startsWith("❯")),
-      "the prompt sits between the two rules, above the footer (C22 I81)",
-    ).toBe(21);
+      // **20, not 21** (M5), and the direction is worth stating because the
+      // obvious prediction is the other one. The footer is two rows now — facts
+      // and directory, then §103's owner line — and the frame is full height, so
+      // the extra row is paid out of the transcript above and everything below
+      // the rule moves **up**. Read off the frame rather than predicted: rows
+      // 19–23 are rule, prompt, rule, `/help … /work`, `⏎ send …`.
+      "the prompt sits between the two rules, above the two-row footer (C22 I81, R-KEY-004)",
+    ).toBe(20);
     const whole = settled.join("\r\n").length;
 
     const before = stdout.chunks.length;
@@ -208,8 +214,8 @@ describe("C22 §6b — the write is a difference", () => {
     expect(screen().drawn, "a frame is on the screen").toBe(true);
     expect(
       screen().rows.findIndex((r) => r.trimStart().startsWith("❯")),
-      "the frame reaches the foot of the terminal — rule, prompt, rule, footer",
-    ).toBe(21);
+      "the frame reaches the foot of the terminal — rule, prompt, rule, footer, owner line",
+    ).toBe(20);
 
     // The next write throws part-way — the screen keeps a prefix of a frame no
     // record describes. `throwOn` is what makes this constructible at all.

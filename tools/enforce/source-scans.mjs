@@ -1296,6 +1296,8 @@ export const MARK_EXEMPTIONS = Object.freeze({
     "the truncation marker resolves against the capability on the line it is written (`ascii ? \"~\" : \"…\"`)",
   "src/presentation/patch/collapse.ts":
     "carries its own `[unicode, ascii]` pair; the marker is a whole row, so the ASCII form's three cells cost nothing",
+  "src/shell/chrome.ts":
+    "§103's owner line carries its own `[unicode, ascii]` pairs through `mark(m, caps)`; its marks are key names (⏎ ⇧ ⇥ ⌃] ←→ ↑↓), which no `Glyph` slot holds because a chip label is text and not a mark — and T1.46e asserts every rung's line is ASCII-renderable, so the premise is re-checked rather than inherited",
   "src/presentation/patch/definition.ts":
     "picks its rule character from the capability in the expression that draws it",
   "src/presentation/plot/ramp.ts":

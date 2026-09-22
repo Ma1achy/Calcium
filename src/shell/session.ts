@@ -1428,7 +1428,11 @@ class Session implements TuiInstance {
       // phase of their own rather than Calcium's.
       ...(graph?.probe === undefined ? {} : { probe: graph.probe }),
       session: () => graph?.session.snapshot ?? emptySnapshot(this.config),
-      copyMode: () => this.#copyMode,
+      // §103's ladder, read from the router rather than re-derived: the owner
+      // line and the dispatch that honours it must not be able to disagree.
+      owner: () => this.#graph?.router.rung ?? null,
+      // A03 SS47 — the owner line draws chords, so the chrome resolves them.
+      capabilities: () => graph?.capabilities ?? null,
       // C24 I32 — read per frame from the recorder rather than kept here. A
       // second copy of the figure is a second place for the tier change to miss
       // it, and the recorder is where the ring reset already clears it.

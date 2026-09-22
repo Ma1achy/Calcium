@@ -40,8 +40,10 @@ import {
   RULE_ROWS,
 } from "./config.js";
 import type { TerminalSize } from "../terminal/lifecycle.js";
+import type { TerminalCapabilities } from "../terminal/capabilities.js";
 import type { Block } from "../data/viewmodel/index.js";
 import type { Chrome, SessionSnapshot } from "./types.js";
+import type { OwnerRung } from "../interaction/router/types.js";
 
 /** What the frame is, before anything paints it. */
 export type Composed = Readonly<{
@@ -88,8 +90,21 @@ export type ComposeDeps = Readonly<{
    */
   probe?: Probe;
   session: () => SessionSnapshot;
-  /** Copy mode, for the chrome. A frame property, like `size` (C16 §5b). */
-  copyMode: () => boolean;
+  /**
+   * Who owns the keyboard, for the chrome's owner line (§103, R-KEY-004). A
+   * frame property, like `size` (C16 §5b).
+   *
+   * **This was `copyMode: () => boolean` and the widening is the ladder
+   * arriving.** That member's own argument — *a reader whose mouse has gone
+   * dead with nothing on screen saying why has been given a bug* — is §103's
+   * *AN OWNER YOU CANNOT SEE IS AN OWNER YOU WILL FIGHT*, stated for one rung
+   * of six. Copy mode was not the special case; it was the only rung anyone
+   * had reached the end of that argument for.
+   */
+  owner: () => OwnerRung | null;
+  /** C02's resolved record, for the chrome's marks (A03 SS47). `null` before
+   * the session graph exists, which is also when there is no owner. */
+  capabilities: () => TerminalCapabilities | null;
   /**
    * C24 I32 — the previous frame's cost, for the chrome.
    *
@@ -133,15 +148,17 @@ export function compose(deps: ComposeDeps): Composed {
   const now = deps.now();
   const session = deps.session();
   const lastFrame = deps.lastFrame?.();
+  const capabilities = deps.capabilities();
   const ctx = {
     session,
     now,
     columns: size.columns,
-    copyMode: deps.copyMode(),
+    owner: deps.owner(),
     // Spread rather than assigned, so `exactOptionalPropertyTypes` sees the
     // member as absent rather than present-and-undefined: a chrome doing
     // `"lastFrame" in ctx` gets the same answer as one doing `!== undefined`.
     ...(lastFrame === undefined ? {} : { lastFrame }),
+    ...(capabilities === null ? {} : { capabilities }),
   };
 
   const { header, footer } = chromeOf(deps, ctx);

@@ -27,6 +27,14 @@ export type FocusInputs = Readonly<{
   /** C15's `top`. `null` when the stack is empty. */
   overlayTop: Readonly<{ kind: "overlay" | "view" }> | null;
   copyMode: boolean;
+  /**
+   * A child process holds the terminal (§103, R-OWN-002).
+   *
+   * Read from the same fact the Ctrl-C ladder reads — `inFlight() === "shell"` —
+   * rather than from a second source, because two answers to *is a child
+   * attached* is the disagreement this component has paid for before.
+   */
+  attachedChild: boolean;
   /** C13's live entry, or `null` when the transcript is empty. */
   liveEntry: Readonly<{ id: string }> | null;
   stored: StoredFocus;
@@ -40,6 +48,11 @@ export type FocusInputs = Readonly<{
  * keymap is a compile-level gap only while these two things are the same thing.
  */
 export const FOCUS_ORDER = Object.freeze([
+  // **The child is the top rung** (§103, R-OWN-002): *the CHILD · an attached PTY
+  // · takes all but host.detach ⌃] · leaves by host escape.* Above a question,
+  // because a child that has the terminal cannot be interrupted by something the
+  // host drew over it.
+  "child",
   "overlay",
   "copyMode",
   "pushedView",
@@ -67,6 +80,7 @@ export const FOCUS_ORDER = Object.freeze([
  * that can disagree with the one beside it.
  */
 export function activeTarget(deps: FocusInputs): FocusTarget {
+  if (deps.attachedChild) return "child";
   if (deps.overlayTop?.kind === "overlay") return "overlay";
   if (deps.copyMode) return "copyMode";
   if (deps.overlayTop?.kind === "view") return "pushedView";
@@ -90,8 +104,23 @@ export function activeTarget(deps: FocusInputs): FocusTarget {
     return "interaction";
   }
   if (deps.stored.at === "prompt") return "prompt";
-  if (deps.liveEntry !== null) return "liveBlock";
-  return "global";
+  // **The transcript is the owner whether or not anything is live** (R-COR-002,
+  // C16 §3a W1). This row read `if (deps.liveEntry !== null) return "liveBlock"`,
+  // and the `null` arm fell through to `global` — so with focus stored in the
+  // transcript the owner was `global` while nothing ran and `liveBlock` the
+  // moment an entry appeared. **A content arrival moved the keyboard's owner**,
+  // which is the one thing R-COR-002 forbids: *a render event may change drawing
+  // but never keyboard ownership.*
+  //
+  // Measured rather than reasoned: the two calls differ on `liveEntry` alone and
+  // return different targets. It was invisible to every existing row because each
+  // asserts the owner for a *state*, and this is a property of a *transition* —
+  // the sequence trace's job, and the ladder had no trace until M5.
+  //
+  // `interaction` above still needs the live entry, and that gate is untouched:
+  // being *inside* a block is a thing you cannot be once it has settled, where
+  // *standing in the transcript* is not. One rung, `scope`, either way.
+  return "liveBlock";
 }
 
 /**
