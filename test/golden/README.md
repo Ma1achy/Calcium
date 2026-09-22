@@ -1,6 +1,6 @@
 # golden
 
-**15 test files — 1 frame, 2 byte corpora, 11 renderings of blocks, 1 census.**
+**16 test files — 1 frame, 2 byte corpora, 12 renderings of blocks, 1 census.**
 
 Those five figures are asserted against the directory by `corpus.test.ts`, and the
 table below is parsed from this file rather than restated in code. **The reason is
@@ -18,6 +18,7 @@ now fails a row.
 |---|---|---|---|
 | `blocks.test.ts` | lines | `ONE_PER_KIND` — one block of every kind, at 4 widths × 4 variants | — |
 | `containment.test.ts` | lines | a refusal is a frame: the fault path at 3 widths | — |
+| `compositions.test.ts` | lines | C10 §4k's compositions at 3 capability rungs — the frame **and** the ground and ink each run took, resolved back to token names | — |
 | `continuation.test.ts` | lines | the continuation mark under a command's first character, at 2 widths | `config.js` `documents.js` `paint.js` |
 | `corpus.test.ts` | census | this table against the directory — the row that fails when the description stops being true | — |
 | `fallback-docker.test.ts` | lines | docker's real JSON through C07's fallback, unadapted | — |

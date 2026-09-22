@@ -53748,6 +53748,73 @@ takes — the same shape as C22 I108 paced at the wrong seam (F1206), where ever
 
 ---
 
+## F1240 — the contrast gate checks an ink the painter never emits ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `src/presentation/theme/resolve.ts`'s `resolve`, and `inkOn` in `contrast.ts`. Found by drawing C10 §4k's composition frames. |
+| **Reached for** | §4k.2 row 1 rules that a focused, selected, failed row keeps its glyph, its word **and its tone**. The frame keeps two of the three. |
+| **Verdict** | **Real, and it is two findings that are one change.** |
+
+**1 · What the frame shows.** A table row carrying `failed` with `tone: "error"`, at four states,
+read from the bytes:
+
+```
+at rest             ESC[38;2;212;212;212m bravo  ESC[38;2;240;90;90m ✗ failed
+focused only        ESC[38;2;232;168;124m ▸ ESC[48;2;46;46;46m bravo … ESC[38;2;232;168;124m ✗ failed
+selected only       ESC[38;2;212;212;212m ESC[48;2;38;64;87m bravo … ESC[38;2;212;212;212m ✗ failed
+focused + selected  ESC[38;2;232;168;124m ▸ ESC[48;2;38;64;87m bravo … ESC[38;2;232;168;124m ✗ failed
+```
+
+`240;90;90` is `tone.error`. At rest the failure has it; under focus or selection the **whole row
+is repainted in one ink** — `accent` when focus holds it, `default` when selection does. The glyph
+survives, the word survives, the tone does not. That is C11 I14's shipped rule, and the design's
+ruling is the other way.
+
+**2 · And the obvious fix is wrong on its own, which is why this is one finding and not two.**
+Dropping I14's rule would put `#f05a5a` — the flat `tone.error` — on the selection ground. The
+theme already says that is the wrong value there: `inkOn(tokens, "tone.error", "selection")` answers
+`#ff9b91` in `dark`, which is the per-surface composed ink the registry ports and the contrast gate
+measures. So the repo's one-ink rule is a **crude substitute** for a per-surface ink it already has.
+
+**3 · The measurement, and it is the finding.** `inkOn` is the single answer to *what ink does this
+slot take on this surface* — its own docblock says so — and it carries the per-theme overrides, the
+three nord selection fixes, and both high-contrast bands (R-THM-003). Grepped for its callers in
+`src/`: **`contrast.ts` and nothing else.** `resolve` takes `(ref, theme, caps)` and has no surface
+parameter at all, so the painter cannot ask the question.
+
+Run over five themes × ten tones × two surfaces:
+
+```
+dark  error on selection:     gate says #ff9b91, painter emits #f05a5a
+dark  error on focusGround:   gate says #fa6464, painter emits #f05a5a
+dark  dim   on selection:     gate says #bdbdbd, painter emits #8a8a8a
+light ok    on selection:     gate says #205c20, painter emits #3c793c
+light warn  on selection:     gate says #704800, painter emits #916301
+…
+74 of 100 tone × surface pairs: the gate checks an ink the painter never emits
+```
+
+**R-THM-003's promise is verified against values the terminal never receives.** *One ink per band at
+≥ 7:1* is true of `inkOn`'s answer and says nothing about the frame, because the band is read by the
+checker and the painter resolves the flat slot. The mutation run `c10-bands` is green and its control
+is real — removing the band stops both high-contrast themes **loading** — so every instrument here is
+working and every one of them is pointed at the validator.
+
+**4 · The shape, which is this session's third instance.** `focusGround` shipped with a contrast gate
+and no reader. `▸` shipped in `GLYPH_TABLE` read by nothing. This is the same thing one level down and
+it is the largest: an entire per-surface ink table, ported from the registry, checked on every commit,
+and applied nowhere. **A gate passing is evidence about the gate's input**, and the question that
+reaches it is *does anything downstream consume what was checked* — which no gate can ask about itself.
+
+**The remedy is one MR and both halves must land in it**: `resolve` gains the surface a run is painted
+on, `inkOn` becomes its composition step, and C11 I14's drop-to-one-ink rule is retired in the same
+change. Every golden with colour moves. It is **not** M3's, and it is not recorded as divergent: §4k.4
+carries it with its MR, and C10 §4k's own golden frames carry the defect in their snapshot text so the
+frame is not read as the ruling being met.
+
+---
+
 ## F1239 — a row asserting one axis of an over-draw reads as covering both ★★★★☆
 
 | | |

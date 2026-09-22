@@ -1117,6 +1117,21 @@ does not apply. A table of four would have read as *the list always decides*.
   elements and reads `ctx.focus` nowhere**, so no patch row can be focused or selected. The
   ground is not missing; the **addressability** is. That is a C25 change and not a C10 one, and
   it is the only one of the three whose remedy does not begin with a new field.
+- **Row 1's third clause is not met, and the frame is what said so** (F1240). *Failure keeps its
+  glyph, its word and its tone* — the frame keeps two. A focused or selected row is repainted in
+  **one ink**, `accent` under focus and `default` under selection alone, which is C11 I14's shipped
+  rule. **And retiring I14 on its own would be wrong**, which is why this is one change and not two:
+  the flat `tone.error` is `#f05a5a` and the theme already says the ink on the selection ground is
+  `#ff9b91`. That answer comes from `inkOn`, which carries the per-theme overrides and both
+  high-contrast bands — **and `inkOn` is called from `contrast.ts` and nowhere else.** `resolve`
+  takes `(ref, theme, caps)` and has no surface parameter, so the painter cannot ask the question:
+  74 of 100 tone × surface pairs across five themes are an ink the gate checks and the painter never
+  emits, and R-THM-003's *one ink per band at ≥ 7:1* is verified against values the terminal never
+  receives. The remedy is `resolve` gaining the surface, `inkOn` becoming its composition step, and
+  I14 retiring in the same commit; every golden with colour moves. It belongs with **M11**, whose
+  subject is the contrast gate, and the composition snapshots carry it in their own text so the frame
+  is not read as the ruling being met. **The third instance of this session's shape** — `focusGround`
+  with a gate and no reader, `▸` with no reader at all — and the largest of the three.
 - **So the classification above is the ruling for all six, and the golden frames land for the
   compositions a producer can construct** — focused+selected+failed and focus over a heatmap
   today, the other four with the change that gives each a subject. A frame that fakes the state
