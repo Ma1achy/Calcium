@@ -53799,6 +53799,97 @@ fabricated finding costs the next reader the same twenty minutes.
 
 ---
 
+## F1249 — a widened gate's first run was 76% wrong about its own subject ★★★★★
+
+| | |
+|---|---|
+| **Surface** | `checkMarkDomains` — SS64, the domain-aware ASCII collision scan. |
+| **Reached for** | The registry's marks, `GLYPH_TABLE` and `GlyphSet`, compared inside domain closures. |
+| **Verdict** | **Real, and it would have been read as 59 defects in the tree.** |
+
+The rule fires when two marks share an ASCII half inside intersecting domains. Its first run
+over the real tree returned **59 findings. Forty-five of them were every box-drawing corner,
+tee and crossing collapsing to `+`, and every edge to `-`.**
+
+That is the ASCII fallback working. ASCII has no box drawing; a frame's junctions *are* all
+`+`, and a reader tells a corner from a tee by where it sits in the figure rather than by the
+character. A rule demanding uniqueness there refuses the fallback itself.
+
+**The correction is an axis on the domain table, not an allow-list.** `border` and `plot` carry
+`figure: true`: in a figure the character is not the signal, its position is. `row-lead`,
+`inline`, `table-header`, `form-row` and `content-row` are mark domains, where the character is
+the whole of it. A pair sharing only figure domains is not a clash. 59 → 8, and the eight were
+the three characters the work was already about.
+
+**Why it is worth a number.** An allow-list of 45 entries would have been *true* — every entry
+correct, every one a real pair — and would have hidden that the rule was asking the wrong
+question of a quarter of its subject. The tell was the ratio: a gate whose exemption list is
+four times its finding list is a gate whose scope is wrong. *Close the class, not the instance*,
+reached by counting rather than by reading the entries.
+
+---
+
+## F1248 — a control's own precondition threw first, so the vacuity check never ran ★★★★★
+
+| | |
+|---|---|
+| **Surface** | The ASCII-collision check in `docs/design/language/build-calcium.mjs`. |
+| **Reached for** | A registry where every glyph defers its ASCII half to the monochrome rung. |
+| **Verdict** | **Real, and it is the vacuity class installed inside the guard against it.** |
+
+The check gained a vacuity control: *no glyph carried an ASCII half* is a violation, because a
+comparison over an empty set passes exactly like a comparison over a clean one. Fabricating it
+— every record given `asciiResolution: "state"` and no character — produced:
+
+```
+TypeError: glyph.ascii is not iterable
+```
+
+The control never ran. Four lines above it, `widths` falls back to `[...glyph.ascii].length`
+when a record carries no `widthByCapability`, and a record with no `ascii` dies there. The guard
+was correct, unreachable, and **green on the real tree for the same reason it would have been
+green on an empty one** — nothing had ever exercised the path.
+
+**Fixed by ordering**: the deferral branch is decided before any width is computed, and a
+deferring record must still declare `widthByCapability`. Both controls now fire:
+
+```
+Error: work-unit: asciiResolution must name the rung that resolves it
+Error: no glyph carried an ASCII half — an empty comparison passes, which is not a check
+```
+
+**The habit this is about is already written down** — *fix the fake, then watch it fail.* What
+is new is the failure mode: the fabrication did not fail to fire, it failed to *arrive*, and a
+`TypeError` in a build script reads like a bad fixture rather than like a dead guard. A
+fabricated violation must be checked for firing **with its own message**, not merely for the
+run going red.
+
+---
+
+## F1247 — two new enforcement rules took numbers the suite already held ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | A03 §4's rule tables; `tools/enforce/source-scans.mjs`. |
+| **Reached for** | `SS58` and `SS59`, written for a glyph width class and a mark-domain scan. |
+| **Verdict** | **Real, and the repository's own row caught it — one run late.** |
+
+`SS58` is a process read (C28 I21) and `SS59` is `performance.mark` (C28 I19). Both are
+inventoried, implemented and cited. Two new rules were written under the same numbers, and A03
+gained a second `SS58` row.
+
+**What made it survivable is that the check existed**: `A03 declares no rule id twice` in
+`enforce-rules.test.ts` reads the rows rather than the id set, precisely because a `Map` keyed
+by id makes a duplicate invisible to every set comparison — which is what `declaredColumn` does,
+and why `SSD1`'s join still found a row for `SS58` and said nothing. The duplicate row was
+silently overwriting the real one in that map for the length of a session.
+
+Renumbered to **SS63** and **SS64**. **What to take from it**: the free number is not
+`max + 1` of the rules you are looking at — it is `max + 1` of `grep -ohE '\bSS[0-9]+\b'` over
+A03 *and* `tools/enforce/`, and SS62 existed in a file neither of the new rules touched.
+
+---
+
 ## F1245 — the anchor reader required a line break, so four live edits were invisible ★★★★☆
 
 | | |

@@ -84,6 +84,23 @@ export function reconcileSectionBlockIdentities({ sectionKey, fragments, priorBl
   });
 }
 
+/**
+ * A mark's domains and every domain that contains them.
+ *
+ * **The containment is data on the registry, not a branch here.** `row-lead` and
+ * `inline` are both inside `content-row` because a row shows its lead and its
+ * separators together; a rule written as *these two names also clash* is a rule
+ * that grows a clause per pair.
+ */
+export function closureOf(registry, domains) {
+  const table = registry.collisionDomains ?? {};
+  const out = new Set(domains ?? []);
+  for (const [name, record] of Object.entries(table)) {
+    for (const inner of record.contains ?? []) if (out.has(inner)) out.add(name);
+  }
+  return out;
+}
+
 export function validateRuleRecords(ruleList) {
   const ids = new Set();
   const legacyIds = new Set();
@@ -504,18 +521,54 @@ export function validateRegistry(registry) {
     }
   }
 
-  const ascii = new Map();
+  const seen = [];
+  const deferred = [];
   for (const glyph of [...registry.glyphs, ...registry.delimiters]) {
     assertCurrentCitations(registry, `glyph ${glyph.id}`, glyph.ruleIds);
+    const deferring = glyph.asciiResolution !== undefined;
+    if (deferring && glyph.widthByCapability === undefined) {
+      throw new Error(`${glyph.id}: a state-resolved ASCII half must still declare widthByCapability`);
+    }
     const widths = glyph.widthByCapability ?? { unicode: 1, ascii: [...glyph.ascii].length };
     const widest = Math.max(...Object.values(widths));
     if (glyph.reservedCells < widest) throw new Error(`${glyph.id} reserves ${glyph.reservedCells} cells but needs ${widest}`);
-    if (ascii.has(glyph.ascii)) throw new Error(`ASCII collision: ${glyph.id} and ${ascii.get(glyph.ascii)} both resolve to ${glyph.ascii}`);
-    ascii.set(glyph.ascii, glyph.id);
+    // **Uniqueness inside a domain, not across the screen.** A global check
+    // spends the ASCII alphabet on marks a reader never meets together: the sort
+    // pair lives on a table's header row, disclosure in a content row's lead, and
+    // both may take `v` because no row shows the two in the same role. What the
+    // domain model does *not* let through is the case that looks the same from
+    // outside — a lead mark and an inline separator are on one row, so `row-lead`
+    // and `inline` are inside `content-row` and a `:` in both is a clash.
+    //
+    // **A mark whose ASCII half is resolved by state holds no character**, so it
+    // is not in the comparison at all — the head mark is one glyph above 1-bit
+    // and a set of them below it, and pinning `o` to the record would spend a
+    // character the monochrome rung does not use. It is *excluded and counted*,
+    // never silently skipped: the exclusion must say which rung resolves it, or
+    // the field is an escape hatch with no reader.
+    if (deferring) {
+      if (glyph.asciiResolution !== 'state') throw new Error(`${glyph.id}: unknown asciiResolution ${glyph.asciiResolution}`);
+      if (typeof glyph.asciiResolutionNote !== 'string' || glyph.asciiResolutionNote === '') {
+        throw new Error(`${glyph.id}: asciiResolution must name the rung that resolves it`);
+      }
+      deferred.push(glyph.id);
+      continue;
+    }
+    const mine = closureOf(registry, glyph.collisionDomains);
+    for (const other of seen) {
+      if (other.ascii !== glyph.ascii) continue;
+      const shared = [...closureOf(registry, other.collisionDomains)].filter(d => mine.has(d));
+      if (shared.length === 0) continue;
+      throw new Error(`ASCII collision: ${glyph.id} and ${other.id} both resolve to ${glyph.ascii} in ${shared.join(", ")}`);
+    }
+    seen.push(glyph);
     const unicodeSolved = widths.unicode + (glyph.reservedCells - widths.unicode);
     const asciiSolved = widths.ascii + (glyph.reservedCells - widths.ascii);
     if (unicodeSolved !== asciiSolved) throw new Error(`${glyph.id} shifts the solved column across capability tiers`);
   }
+  // **The vacuity control.** Every record deferring its ASCII half would leave
+  // the comparison empty and passing, which is the shape A03 §2 is about.
+  if (seen.length === 0) throw new Error('no glyph carried an ASCII half — an empty comparison passes, which is not a check');
   return registry;
 }
 

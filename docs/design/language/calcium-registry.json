@@ -15550,7 +15550,10 @@
       "supersedes": [],
       "supersededBy": null,
       "legacyIds": [],
-      "contentDigest": "032866626cb4698863cd0967e4e2b13ace00ada73934de5ce2a16423c9f6d215"
+      "contentDigest": "032866626cb4698863cd0967e4e2b13ace00ada73934de5ce2a16423c9f6d215",
+      "correctedBy": [
+        "R-BLK-943"
+      ]
     },
     {
       "id": "R-BLK-743",
@@ -18876,6 +18879,24 @@
       "supersededBy": null,
       "legacyIds": [],
       "contentDigest": "48f7a0bdf1587038935c9c2b9b3ccff339288708b1efbcb9c577f017a8831008"
+    },
+    {
+      "id": "R-BLK-943",
+      "title": "Three major rules it broke in its own examples · 1a · the corrected measurement [F1246]",
+      "text": "1a · THE CORRECTED MEASUREMENT  [F1246]\n  R-BLK-742 above stands as the record of the defect. Two of its\n  twelve rows are wrong, measured with cells() against the derived\n  EastAsianWidth-17.0.0 table:\n\n  ●  U+25CF   Ambiguous      ⎿  U+23BF   Narrow\n  ▲  U+25B2   Ambiguous      ⟩  U+27E9   Narrow\n  ○  U+25CB   Ambiguous      ❯  U+276F   Narrow\n  ⋯  U+22EF   Ambiguous      ▸  U+25B8   Ambiguous\n  ▾  U+25BE   Ambiguous      ✓  U+2713   Narrow\n  ✗  U+2717   Narrow         ›  U+203A   Narrow\n\n  ▸ and ▾ were recorded Narrow. Both are ONE cell at narrow and\n  TWO at wide, so the count is SIX AMBIGUOUS, SIX NARROW — not\n  four and eight, which UNDERSTATES the mixed-set hazard the\n  block above argues for. The set is more mixed than it said.\n\n  ▾ is no longer the disclosure mark: disclosure is ▿ U+25BF and\n  ▾ keeps sort descending. §4's glyph table is the live record.",
+      "status": "example",
+      "sectionKey": "three-major-rules-it-broke-in-its-own-examples-093",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [],
+      "supersededBy": null,
+      "legacyIds": [],
+      "corrects": [
+        "R-BLK-742"
+      ],
+      "contentDigest": "388802dddbf8789893644b94a5f770e11dbbe5fb49c67314f5f54bb5d1026607"
     }
   ],
   "sections": [
@@ -21304,6 +21325,7 @@
       "blockIds": [
         "R-BLK-741",
         "R-BLK-742",
+        "R-BLK-943",
         "R-BLK-743",
         "R-BLK-744",
         "R-BLK-745",
@@ -21311,8 +21333,8 @@
         "R-BLK-747",
         "R-BLK-748"
       ],
-      "sourceBlockCount": 8,
-      "sourceDigest": "469e4242a2adcb2b736dd4c0b27436baf1dea71ea27c6f305f9c104302910b9d"
+      "sourceBlockCount": 9,
+      "sourceDigest": "1004918a4a60fc3d28deba0995e959bdb25ca7884edc8cf18ca090e82713d2f0"
     },
     {
       "key": "three-tiers-content-representation-decoration-094",
@@ -28127,7 +28149,6 @@
     {
       "id": "work-unit",
       "unicode": "●",
-      "ascii": "o",
       "semanticRole": "work-unit / state dot",
       "tone": "default",
       "widthByCapability": {
@@ -28136,7 +28157,7 @@
       },
       "reservedCells": 1,
       "collisionDomains": [
-        "full-screen"
+        "row-lead"
       ],
       "accessibleName": "work-unit / state dot",
       "status": "current",
@@ -28144,7 +28165,9 @@
         "R-GLY-001"
       ],
       "canonical": true,
-      "widthClass": "ambiguous"
+      "widthClass": "ambiguous",
+      "asciiResolution": "state",
+      "asciiResolutionNote": "The monochrome rung. Above 1-bit the head mark is one glyph and tone carries the state; at ASCII the state carries itself, so this record holds no character — it names the resolution. Pinning `o` here spent the mark `choice-open`/`queued` needs and claimed a fixed ASCII half the rung does not use."
     },
     {
       "id": "branch",
@@ -28158,7 +28181,7 @@
       },
       "reservedCells": 2,
       "collisionDomains": [
-        "full-screen"
+        "row-lead"
       ],
       "accessibleName": "result branch",
       "status": "current",
@@ -28171,7 +28194,7 @@
     {
       "id": "attention",
       "unicode": "▲",
-      "ascii": "^",
+      "ascii": "!",
       "semanticRole": "attention",
       "tone": "warn",
       "widthByCapability": {
@@ -28180,7 +28203,7 @@
       },
       "reservedCells": 1,
       "collisionDomains": [
-        "full-screen"
+        "row-lead"
       ],
       "accessibleName": "attention",
       "status": "current",
@@ -28188,7 +28211,8 @@
         "R-GLY-001"
       ],
       "canonical": true,
-      "widthClass": "ambiguous"
+      "widthClass": "ambiguous",
+      "asciiNote": "`!` and not `^`. The repository has shipped `▲ → !` in two places since C09 §4 — `GLYPH_TABLE.warn` and `GlyphSet.warning` — so `^` split one mark's ASCII half in two, and `^` is already `GlyphSet.cursorMark` (the plot's axis cursor, also `▲`) and `sort-asc`. Nothing but `▲` holds `!` in the row lead."
     },
     {
       "id": "meter-fill",
@@ -28202,7 +28226,7 @@
       },
       "reservedCells": 1,
       "collisionDomains": [
-        "full-screen"
+        "inline"
       ],
       "accessibleName": "segmented meter fill",
       "status": "current",
@@ -28224,7 +28248,7 @@
       },
       "reservedCells": 1,
       "collisionDomains": [
-        "full-screen"
+        "row-lead"
       ],
       "accessibleName": "success",
       "status": "current",
@@ -28246,7 +28270,7 @@
       },
       "reservedCells": 1,
       "collisionDomains": [
-        "full-screen"
+        "row-lead"
       ],
       "accessibleName": "reader position",
       "status": "current",
@@ -28268,7 +28292,7 @@
       },
       "reservedCells": 1,
       "collisionDomains": [
-        "full-screen"
+        "row-lead"
       ],
       "accessibleName": "focus",
       "status": "current",
@@ -28281,7 +28305,7 @@
     {
       "id": "disclosure-collapsed",
       "unicode": "▹",
-      "ascii": ":",
+      "ascii": "(",
       "semanticRole": "collapsed disclosure",
       "tone": "muted",
       "widthByCapability": {
@@ -28290,7 +28314,7 @@
       },
       "reservedCells": 1,
       "collisionDomains": [
-        "full-screen"
+        "row-lead"
       ],
       "accessibleName": "collapsed disclosure",
       "status": "current",
@@ -28312,7 +28336,7 @@
       },
       "reservedCells": 1,
       "collisionDomains": [
-        "full-screen"
+        "row-lead"
       ],
       "accessibleName": "expanded disclosure",
       "status": "current",
@@ -28334,7 +28358,7 @@
       },
       "reservedCells": 1,
       "collisionDomains": [
-        "full-screen"
+        "row-lead"
       ],
       "accessibleName": "question",
       "status": "current",
@@ -28356,7 +28380,8 @@
       },
       "reservedCells": 1,
       "collisionDomains": [
-        "full-screen"
+        "chooser-row",
+        "tape"
       ],
       "accessibleName": "current item",
       "status": "current",
@@ -28364,11 +28389,56 @@
         "R-GLY-001"
       ],
       "canonical": true,
-      "widthClass": "narrow"
+      "widthClass": "narrow",
+      "domainNote": "Measured over every `›` in the design and not one is a transcript gutter: the agent tape (§095), a question's choice row (§098), a form's button row (§105), the completion menu (§029), history search (§046), the mentions picker (§011), a notification's buttons (§067). `▸` is the row gutter's mark. Recording `row-lead` here spent `*` against the running head mark for a position `›` never occupies."
+    },
+    {
+      "id": "sort-desc",
+      "unicode": "▾",
+      "ascii": "v",
+      "semanticRole": "sort descending",
+      "tone": "muted",
+      "widthByCapability": {
+        "unicode": 1,
+        "ascii": 1
+      },
+      "reservedCells": 1,
+      "collisionDomains": [
+        "table-header"
+      ],
+      "accessibleName": "sorted descending",
+      "status": "current",
+      "ruleIds": [
+        "R-GLY-001"
+      ],
+      "canonical": true,
+      "widthClass": "ambiguous"
+    },
+    {
+      "id": "sort-asc",
+      "unicode": "▴",
+      "ascii": "^",
+      "semanticRole": "sort ascending",
+      "tone": "muted",
+      "widthByCapability": {
+        "unicode": 1,
+        "ascii": 1
+      },
+      "reservedCells": 1,
+      "collisionDomains": [
+        "table-header"
+      ],
+      "accessibleName": "sorted ascending",
+      "status": "current",
+      "ruleIds": [
+        "R-GLY-001"
+      ],
+      "canonical": true,
+      "widthClass": "ambiguous"
     },
     {
       "id": "rule",
-      "unicode": "—",
+      "unicode": "─",
       "ascii": "-",
       "semanticRole": "rule segment",
       "tone": "muted",
@@ -28378,7 +28448,7 @@
       },
       "reservedCells": 1,
       "collisionDomains": [
-        "full-screen"
+        "border"
       ],
       "accessibleName": "rule segment",
       "status": "current",
@@ -28386,7 +28456,8 @@
         "R-GLY-001"
       ],
       "canonical": false,
-      "widthClass": "ambiguous"
+      "widthClass": "ambiguous",
+      "charNote": "`─` U+2500, not `—` U+2014. The design draws its rules with the box-drawing horizontal — 82 rules carry it — and the em dash's 448 occurrences are prose punctuation. Both measure 1 cell narrow and 2 wide, so the width class does not move."
     },
     {
       "id": "ellipsis",
@@ -28400,7 +28471,7 @@
       },
       "reservedCells": 3,
       "collisionDomains": [
-        "full-screen"
+        "inline"
       ],
       "accessibleName": "omitted content",
       "status": "current",
@@ -28426,7 +28497,10 @@
         "R-GLY-001"
       ],
       "canonical": true,
-      "widthClass": "ambiguous"
+      "widthClass": "ambiguous",
+      "collisionDomains": [
+        "row-lead"
+      ]
     },
     {
       "id": "failure",
@@ -28444,7 +28518,10 @@
         "R-GLY-001"
       ],
       "canonical": true,
-      "widthClass": "narrow"
+      "widthClass": "narrow",
+      "collisionDomains": [
+        "row-lead"
+      ]
     }
   ],
   "delimiters": [
@@ -28458,7 +28535,10 @@
       "ruleIds": [
         "R-GLY-001"
       ],
-      "widthClass": "narrow"
+      "widthClass": "narrow",
+      "collisionDomains": [
+        "inline"
+      ]
     },
     {
       "id": "tape-right",
@@ -28470,7 +28550,11 @@
       "ruleIds": [
         "R-GLY-001"
       ],
-      "widthClass": "narrow"
+      "widthClass": "narrow",
+      "collisionDomains": [
+        "inline"
+      ],
+      "secondRoleNote": "**`»` has a second role and this record is not it.** §003, §004 and §007 lead the mode line with `» auto ✦ …` — a chrome row's lead, domain `row-lead` within its own strip, not a shed count. Nothing renders it yet. Its first renderer registers it as its own mark rather than reusing `tape-right`, whose meaning is *n members are off the right end*."
     }
   ],
   "primitives": [
@@ -43409,9 +43493,22 @@
       ]
     },
     {
-      "id": "R-BLK-743",
+      "id": "R-BLK-943",
       "sectionKey": "three-major-rules-it-broke-in-its-own-examples-093",
       "position": 3,
+      "renderHtml": "<span class=\"c-muted bold\">1a · THE CORRECTED MEASUREMENT  [F1246]</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">R-BLK-742 above stands as the record of the defect. Two of its</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">twelve rows are wrong, measured with cells() against the derived</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">EastAsianWidth-17.0.0 table:</span>\n<span class=\"c-default\">  </span>\n<span class=\"c-default\">  </span><span class=\"c-default\">●  U+25CF   </span><span class=\"c-error\">Ambiguous</span><span class=\"c-default\">      </span><span class=\"c-default\">⎿  U+23BF   </span><span class=\"c-ok\">Narrow</span>\n<span class=\"c-default\">  </span><span class=\"c-default\">▲  U+25B2   </span><span class=\"c-error\">Ambiguous</span><span class=\"c-default\">      </span><span class=\"c-default\">⟩  U+27E9   </span><span class=\"c-ok\">Narrow</span>\n<span class=\"c-default\">  </span><span class=\"c-default\">○  U+25CB   </span><span class=\"c-error\">Ambiguous</span><span class=\"c-default\">      </span><span class=\"c-default\">❯  U+276F   </span><span class=\"c-ok\">Narrow</span>\n<span class=\"c-default\">  </span><span class=\"c-default\">⋯  U+22EF   </span><span class=\"c-error\">Ambiguous</span><span class=\"c-default\">      </span><span class=\"c-default\">▸  U+25B8   </span><span class=\"c-warn\">Ambiguous</span>\n<span class=\"c-default\">  </span><span class=\"c-default\">▾  U+25BE   </span><span class=\"c-warn\">Ambiguous</span><span class=\"c-default\">      </span><span class=\"c-default\">✓  U+2713   </span><span class=\"c-ok\">Narrow</span>\n<span class=\"c-default\">  </span><span class=\"c-default\">✗  U+2717   </span><span class=\"c-ok\">Narrow   </span><span class=\"c-default\">      </span><span class=\"c-default\">›  U+203A   </span><span class=\"c-ok\">Narrow</span>\n<span class=\"c-default\">  </span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">▸ and ▾ were recorded Narrow. Both are ONE cell at narrow and</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">TWO at wide, so the count is SIX AMBIGUOUS, SIX NARROW — not</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">four and eight, which UNDERSTATES the mixed-set hazard the</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">block above argues for. The set is more mixed than it said.</span>\n<span class=\"c-default\">  </span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">▾ is no longer the disclosure mark: disclosure is ▿ U+25BF and</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">▾ keeps sort descending. §4&#x27;s glyph table is the live record.</span>\n",
+      "contentDigest": "abc02a20e08378f3c316abfa9b551caf97e897bedff586bc1dfbdab3592cf128",
+      "text": "1a · THE CORRECTED MEASUREMENT  [F1246]\n  R-BLK-742 above stands as the record of the defect. Two of its\n  twelve rows are wrong, measured with cells() against the derived\n  EastAsianWidth-17.0.0 table:\n\n  ●  U+25CF   Ambiguous      ⎿  U+23BF   Narrow\n  ▲  U+25B2   Ambiguous      ⟩  U+27E9   Narrow\n  ○  U+25CB   Ambiguous      ❯  U+276F   Narrow\n  ⋯  U+22EF   Ambiguous      ▸  U+25B8   Ambiguous\n  ▾  U+25BE   Ambiguous      ✓  U+2713   Narrow\n  ✗  U+2717   Narrow         ›  U+203A   Narrow\n\n  ▸ and ▾ were recorded Narrow. Both are ONE cell at narrow and\n  TWO at wide, so the count is SIX AMBIGUOUS, SIX NARROW — not\n  four and eight, which UNDERSTATES the mixed-set hazard the\n  block above argues for. The set is more mixed than it said.\n\n  ▾ is no longer the disclosure mark: disclosure is ▿ U+25BF and\n  ▾ keeps sort descending. §4's glyph table is the live record.",
+      "status": "example",
+      "classificationBasis": "retained registry specimen",
+      "ruleIds": [
+        "R-BLK-943"
+      ]
+    },
+    {
+      "id": "R-BLK-743",
+      "sectionKey": "three-major-rules-it-broke-in-its-own-examples-093",
+      "position": 4,
       "renderHtml": "\n<span class=\"c-muted bold\">2 · THE 800–1600 ms BAND WAS WRONG, NOT THE TABLE</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">measured against the catalogue: </span><span class=\"c-error\">8 of 21 sets passed</span><span class=\"c-muted\">. noise is 300ms,</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">triangle 480, bloom 1680, hex 1760. The rule was unshippable.</span>\n<span class=\"c-default\">  </span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">the property that actually decides whether a thing reads as alive is</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">the INTERVAL: every shipped WORK set is 80–200ms; deliberate WAIT sets may</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">be slower. Cycle length decides</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">VARIETY instead — 4-frame sets repeat every 0.48–0.8s, while a 42-frame</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">one does not repeat for five seconds.</span>\n",
       "contentDigest": "773fb788d18d8fa80462912d8b497c12913ea97c0085633934c13551b6756af4",
       "text": "2 · THE 800–1600 ms BAND WAS WRONG, NOT THE TABLE\n  measured against the catalogue: 8 of 21 sets passed. noise is 300ms,\n  triangle 480, bloom 1680, hex 1760. The rule was unshippable.\n\n  the property that actually decides whether a thing reads as alive is\n  the INTERVAL: every shipped WORK set is 80–200ms; deliberate WAIT sets may\n  be slower. Cycle length decides\n  VARIETY instead — 4-frame sets repeat every 0.48–0.8s, while a 42-frame\n  one does not repeat for five seconds.",
@@ -43424,7 +43521,7 @@
     {
       "id": "R-BLK-744",
       "sectionKey": "three-major-rules-it-broke-in-its-own-examples-093",
-      "position": 4,
+      "position": 5,
       "renderHtml": "\n<span class=\"c-muted bold\">3 · ORBIT&#x27;S 16 ms ARR AGAINST THE 100 ms WINDOW</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">key repeat claims 60fps for a camera. But a camera change is a</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">DOCUMENT change and a document change takes the window — so the</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">stated rate was about six times the real one.</span>\n<span class=\"c-default\">  </span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">the fix is the exemption&#x27;s own test: the split is CAUSATION. A held</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">arrow is a keypress and the reader is watching for it at 16ms, so</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">ORBIT JOINS THE DRAW-NOW SET — alongside echo and focus.</span>\n<span class=\"c-default\">  </span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">draws now   </span><span class=\"c-default\">a keystroke that changes the prompt</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">            </span><span class=\"c-default\">a keystroke that moves focus</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">            </span><span class=\"c-default\">a keystroke that drives a CAMERA or a SLIDER</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">the window  </span><span class=\"c-default\">a stream patch, a tick, an arriving entry</span>\n",
       "contentDigest": "3213baaf7bc2f5868ae11fb38adbba0c5ef79c6c0dec8b4b5d7ef7cf23a643aa",
       "text": "3 · ORBIT'S 16 ms ARR AGAINST THE 100 ms WINDOW\n  key repeat claims 60fps for a camera. But a camera change is a\n  DOCUMENT change and a document change takes the window — so the\n  stated rate was about six times the real one.\n\n  the fix is the exemption's own test: the split is CAUSATION. A held\n  arrow is a keypress and the reader is watching for it at 16ms, so\n  ORBIT JOINS THE DRAW-NOW SET — alongside echo and focus.\n\n  draws now   a keystroke that changes the prompt\n              a keystroke that moves focus\n              a keystroke that drives a CAMERA or a SLIDER\n  the window  a stream patch, a tick, an arriving entry",
@@ -43437,7 +43534,7 @@
     {
       "id": "R-BLK-745",
       "sectionKey": "three-major-rules-it-broke-in-its-own-examples-093",
-      "position": 5,
+      "position": 6,
       "renderHtml": "\n<span class=\"c-muted bold\">and four smaller ones, fixed rather than argued</span>\n",
       "contentDigest": "87c4b2c4d79c068f269657e3e454b808148c2dca9478edd6a6ab4ffe051ca676",
       "text": "and four smaller ones, fixed rather than argued",
@@ -43450,7 +43547,7 @@
     {
       "id": "R-BLK-746",
       "sectionKey": "three-major-rules-it-broke-in-its-own-examples-093",
-      "position": 6,
+      "position": 7,
       "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-muted\">the running dot   </span><span class=\"c-default\">ONE position: white, still, spinner beside it.</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">                  </span><span class=\"c-default\">Four sections disagreed</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">bottom            </span><span class=\"c-default\">⌘↓ everywhere. ⌃↓ is gone</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">copy mode         </span><span class=\"c-default\">⌥⇧C. It was sharing ⌃⇧C with copy, and a</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">                  </span><span class=\"c-default\">terminal cannot tell the case apart</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">the app&#x27;s name    </span><span class=\"c-default\">calcium, in the header, the label and the path</span>\n",
       "contentDigest": "2bbb597e0a6a1b82b38666bf29def7994cd1912178ef363d2dfb5e55ac78de1f",
       "text": "the running dot   ONE position: white, still, spinner beside it.\n                    Four sections disagreed\n  bottom            ⌘↓ everywhere. ⌃↓ is gone\n  copy mode         ⌥⇧C. It was sharing ⌃⇧C with copy, and a\n                    terminal cannot tell the case apart\n  the app's name    calcium, in the header, the label and the path",
@@ -43463,7 +43560,7 @@
     {
       "id": "R-BLK-747",
       "sectionKey": "three-major-rules-it-broke-in-its-own-examples-093",
-      "position": 7,
+      "position": 8,
       "renderHtml": "\n<span class=\"c-muted bold\">★ and the hue order was assigned SPECTRALLY, which is a CVD hazard</span>\n",
       "contentDigest": "f6a95dc575080df4aac1f5ff6287e1bf414f08fe600941d526dae7bd85e16a0a",
       "text": "★ and the hue order was assigned SPECTRALLY, which is a CVD hazard",
@@ -43476,7 +43573,7 @@
     {
       "id": "R-BLK-748",
       "sectionKey": "three-major-rules-it-broke-in-its-own-examples-093",
-      "position": 8,
+      "position": 9,
       "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-muted\">agents 1–5 were red, orange, yellow, lime, green — five identities a</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">deuteranope cannot separate. The order is now by PERCEPTUAL</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">SEPARATION, and the name carries the rest exactly as the 1-bit</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">argument already says it must:</span>\n<span class=\"c-default\">  </span>\n<span class=\"c-default\">  </span><span class=\"c-hi-blue bg-h-blue\"> blue </span><span class=\"c-default\"> </span><span class=\"c-hi-orange bg-h-orange\"> orange </span><span class=\"c-default\"> </span><span class=\"c-hi-cyan bg-h-cyan\"> cyan </span><span class=\"c-default\"> </span><span class=\"c-hi-pink bg-h-pink\"> pink </span><span class=\"c-default\"> </span><span class=\"c-hi-lime bg-h-lime\"> lime </span><span class=\"c-default\"> </span><span class=\"c-hi-violet bg-h-violet\"> violet </span><span class=\"c-default\"> </span><span class=\"c-hi-yellow bg-h-yellow\"> yellow </span><span class=\"c-default\"> </span><span class=\"c-hi-green bg-h-green\"> green </span><span class=\"c-default\"> </span><span class=\"c-hi-red bg-h-red\"> red </span><span class=\"c-default\"> </span><span class=\"c-hi-purple bg-h-purple\"> purple </span>\n<span class=\"c-default\">  </span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">the first four are separable under every common deficiency, which</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">is where a session with three subagents lands.</span></pre>",
       "contentDigest": "640da5ce8fcf5162a8c83e317821870c53180f2e820fa057b2b53a649718621a",
       "text": "agents 1–5 were red, orange, yellow, lime, green — five identities a\n  deuteranope cannot separate. The order is now by PERCEPTUAL\n  SEPARATION, and the name carries the rest exactly as the 1-bit\n  argument already says it must:\n\n   blue   orange   cyan   pink   lime   violet   yellow   green   red   purple\n\n  the first four are separable under every common deficiency, which\n  is where a session with three subagents lands.",
@@ -45990,5 +46087,55 @@
         ]
       }
     ]
+  },
+  "collisionDomains": {
+    "content-row": {
+      "contains": [
+        "row-lead",
+        "inline"
+      ],
+      "note": "a transcript or table body row",
+      "figure": false
+    },
+    "row-lead": {
+      "contains": [],
+      "note": "the gutter and lead cells of a content row",
+      "figure": false
+    },
+    "inline": {
+      "contains": [],
+      "note": "between the fields of a content row",
+      "figure": false
+    },
+    "table-header": {
+      "contains": [],
+      "note": "a table's header row",
+      "figure": false
+    },
+    "border": {
+      "contains": [],
+      "note": "a frame's own rows and columns — a FIGURE domain. ASCII has no box drawing, so every corner, tee and crossing collapses to `+` and every edge to `-`; a reader tells them apart by where they sit in the frame, not by the character. Uniqueness here would refuse the fallback itself.",
+      "figure": true
+    },
+    "plot": {
+      "contains": [],
+      "note": "inside a plot's drawing region — a FIGURE domain, for the same reason as `border`: a mark's meaning comes from its column and row in the figure.",
+      "figure": true
+    },
+    "form-row": {
+      "contains": [],
+      "note": "a form or question row — reserved, its first renderer is M16",
+      "figure": false
+    },
+    "chooser-row": {
+      "contains": [],
+      "figure": false,
+      "note": "a row of a list you move through — a completion menu, history search, the mentions picker, a question's choice row. Not a transcript row: the design draws the two apart, `▸` for a row's gutter and `›` for the one you are on in a chooser (§017, §018)."
+    },
+    "tape": {
+      "contains": [],
+      "figure": false,
+      "note": "a windowed strip of peers that slides rather than sheds (§095) — the agent strip is its first consumer. A chrome row, not a content row, so its marks do not meet a transcript row's lead."
+    }
   }
 }
