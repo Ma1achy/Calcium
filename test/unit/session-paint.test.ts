@@ -1135,11 +1135,3 @@ describe("C22 §6l.11 — the chip's ground in the prompt", () => {
   });
 });
 
-describe("C22 §6l.12 — where a chip previews, owed at the spec commit", () => {
-  it.todo(
-    "T1.69 (C22 I113, §6l.12, §101): a prompt holding a chip puts one panel above the prompt carrying that chip's label and its content, a caret away from every chip leaves no layer at all, and a caret moved from one chip to the other moves the panel's content with it; not deferred on a component: the projection lands in this MR",
-  );
-  it.todo(
-    "T1.70 (C22 I113, §6l.12, C15 §2c): the preview is not pushed onto a stack that already holds a layer, and a layer arriving over a live preview leaves one panel rather than two, asserted over the stack's contents rather than its top; not deferred on a component: the projection lands in this MR",
-  );
-});

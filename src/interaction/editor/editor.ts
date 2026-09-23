@@ -82,6 +82,15 @@ export interface LineEditor {
    * which is the whole of what *one grapheme to the editor* buys.
    */
   insertChip(chip: Chip): void;
+  /**
+   * The chip the caret is on, for §101's preview (I27, §5d).
+   *
+   * The one immediately before the caret, or the one immediately after when
+   * there is none before — `insertChip` leaves the caret past what it
+   * inserted, so backwards is what previews the chip that was just pasted, and
+   * forwards is what gives position 0 an answer at all.
+   */
+  chipAt(): Chip | null;
   deleteBackward(): void;
   deleteForward(): void;
   move(motion: Motion): void;
@@ -198,10 +207,10 @@ class Editor implements LineEditor {
 
   constructor(look: ChipLook = { separator: "\u00b7", painted: true }) {
     this.#look = look;
-    // **An inline reader rather than a published `chipAt`.** §101's preview
-    // needs the chip and not its label, so the table wants a second reader —
-    // and an export nothing consumes yet is what CLAUDE.md refuses. It arrives
-    // with the preview that reads it.
+    // **The label's reader, beside `chipAt`'s.** The table serves two questions
+    // — what a cluster draws as, and which chip the caret is on — and both read
+    // the one map, which is what keeps a preview from disagreeing with the
+    // label drawn beside it (I27).
     this.drawAs = chipText((cluster) => this.#chips.get(cluster), this.#look);
   }
 
@@ -315,6 +324,16 @@ class Editor implements LineEditor {
     // `atomic`, because a chip is its own unit of undo — the argument `undo.ts`
     // makes for a paste, which is what this is.
     this.insert(sentinel, { atomic: true });
+  }
+
+  chipAt(): Chip | null {
+    // Read off the same map `drawAs` resolves through (I27), so a preview
+    // cannot disagree with the label drawn beside it. A chip is one grapheme
+    // (I25), so the two clusters either side of the caret are the whole search
+    // — there is no position inside one to be at.
+    const before = sliceBetween(this.#text, this.#cursor - 1, this.#cursor);
+    const after = sliceBetween(this.#text, this.#cursor, this.#cursor + 1);
+    return this.#chips.get(before) ?? this.#chips.get(after) ?? null;
   }
 
   deleteBackward(): void {

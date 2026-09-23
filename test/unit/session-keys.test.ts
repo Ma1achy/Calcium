@@ -279,6 +279,11 @@ describe("C22 §3 step 11 — the effect table", () => {
       // scan over key bindings cannot see it.
       "resolved",
       "insertChip",
+      // **A reader, and the one a projection asks** (C17 I27, §5d). It answers
+      // which chip the caret is on and edits nothing; its caller is C22's
+      // preview, which is derived from the caret rather than bound to a key —
+      // so a scan over key bindings cannot see it and should not.
+      "chipAt",
       // Construction rather than an edit — it records no undo unit and
       // `createEditor` is its only caller (C17 §5).
       "seed",

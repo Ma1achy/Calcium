@@ -123,8 +123,41 @@ describe("C17 §5c — the chip", () => {
   });
 });
 
-describe("C17 §5d — which chip the caret is on, owed at the spec commit", () => {
-  it.todo(
-    "T1.48 (C17 I27, §5d, §101): chipAt answers the chip before the caret across a buffer holding two chips and text between them, the chip after it at position 0, and null in the middle of the text — the control, without which the reader may answer the last chip minted wherever the caret is — reading the chip's content back rather than its label so the map is the editor's own; not deferred on a component: chipAt lands with C22's preview projection in this MR",
-  );
+describe("C17 §5d — which chip the caret is on", () => {
+  it("T1.48 (C17 I27, §5d, §101): the chip before the caret, the one after it at the head, and null between them", () => {
+    const one = { ordinal: 1, kind: "paste", name: "one", lines: 6, content: "ONE" } as const;
+    const two = { ordinal: 2, kind: "paste", name: "two", lines: 9, content: "TWO" } as const;
+    const e = createEditor({ chips: { separator: "\u00b7", painted: true } });
+    e.insertChip(one);
+    e.insert("xy");
+    e.insertChip(two);
+
+    // **Read back as `content`, not as a label.** The label is composed from
+    // the parts and two chips could share one; the content is what the preview
+    // shows, and asserting it is what says the answer came off the editor's own
+    // map rather than off a lookup that happened to agree.
+    const contentAt = (cursor: number): string | null => {
+      e.move("bufferStart");
+      for (let i = 0; i < cursor; i += 1) e.move("charRight");
+      return e.chipAt()?.content ?? null;
+    };
+
+    // Positions: 0 | chip1 | 1 x | 2 y | 3 chip2 | 4.
+    expect(contentAt(4), "past the second chip, it is the second").toBe("TWO");
+    expect(contentAt(1), "past the first, it is the first").toBe("ONE");
+    // **The forward arm**, which exists because position 0 has nothing before
+    // it — a reader that only looked backwards would answer nothing for the one
+    // position `home` lands on.
+    expect(contentAt(0), "at the head, the chip after it").toBe("ONE");
+    // **The control.** Without it, *the caret is on a chip* is satisfied by a
+    // reader answering the last chip minted wherever the caret is.
+    expect(contentAt(2), "between the two characters, neither").toBe(null);
+    // **The forward arm again, and it is not only position 0's.** Immediately
+    // before the second chip the character behind the caret is `y`, so there is
+    // no chip before and the one after answers — which is what makes the rule
+    // *before, else after* rather than *before at the head and otherwise*. The
+    // first draft asserted `null` here on the assumption that the character
+    // behind wins, and the invariant says the opposite.
+    expect(contentAt(3), "before the second chip, the one after answers").toBe("TWO");
+  });
 });

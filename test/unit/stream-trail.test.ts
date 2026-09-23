@@ -5,8 +5,8 @@
 // is a fixed band whose cost is its width and not the reply's length.
 import { describe, expect, it } from "vitest";
 
-import { block, validateDocument, TRAIL_FORMS } from "../../src/data/viewmodel/index.js";
-import type { Notice, TrailForm } from "../../src/data/viewmodel/index.js";
+import { validateDocument, TRAIL_FORMS } from "../../src/data/viewmodel/index.js";
+import type { Notice } from "../../src/data/viewmodel/index.js";
 import { measurable, visible, FULL_CAPS } from "../support/render.js";
 import { cells } from "../../src/presentation/text.js";
 import { capabilities } from "../support/fake-terminal.js";

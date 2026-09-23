@@ -64,7 +64,8 @@ import { RenderScratchStore } from "./render-scratch.js";
 import type { BoxSpan, DragContainer } from "./drag-selection.js";
 import { ScrollOffsets } from "./scroll-offsets.js";
 import { createOverlayManager, takesInput } from "../viewport/overlay/index.js";
-import { createEditor } from "../interaction/editor/index.js";
+import { chipLabel, createEditor } from "../interaction/editor/index.js";
+import type { Chip, ChipLook } from "../interaction/editor/index.js";
 import {
   createEngine,
   createSourceErrorSink,
@@ -665,6 +666,20 @@ export async function constructGraph(
     detectCapabilities(config.env, config.capabilities),
   );
 
+  /**
+   * **The chip's rung, settled once from capabilities** (C17 I25, §5c).
+   *
+   * Both members are capabilities — the separator is the glyph table's unicode
+   * rung, `painted` is *not 1-bit* — and a capability is read once and handed
+   * down. Hoisted to here because the preview's panel title composes from it
+   * too (I113, §6l.12): the header and the chip in the prompt spelling one chip
+   * two ways is what a second derivation would buy.
+   */
+  const chipLook: ChipLook = {
+    separator: glyphs(detection.capabilities).separator,
+    painted: detection.capabilities.colourDepth > 1,
+  };
+
   // --- 3. registries: blocks, adapters, manifest, completion sources --------
   // **Manifest before completion sources**, within the step: the default
   // sources are manifest-derived (§2), so built first they would answer over an
@@ -1095,16 +1110,7 @@ export async function constructGraph(
     });
     // The later half of C19 I26's seam — see `recency` above.
     historyStore = history;
-    // **The chip's rung, settled once from capabilities** (C17 I25, §5c). Both
-    // members are capabilities — the separator is the glyph table's unicode
-    // rung, `painted` is *not 1-bit* — and a capability is read once and handed
-    // down, so this is the session's answer rather than a per-frame one.
-    const editor = createEditor({
-      chips: {
-        separator: glyphs(detection.capabilities).separator,
-        painted: detection.capabilities.colourDepth > 1,
-      },
-    });
+    const editor = createEditor({ chips: chipLook });
     const themed = loadTheme(config.theme);
     if (!themed.ok) throw new ConstructionError("stores", themed.error);
 
@@ -1969,6 +1975,79 @@ export async function constructGraph(
   stores.viewport.subscribe(() => syncPeek());
 
   /**
+   * The chip under the caret, shown as §101's menu panel (I113, §6l.12).
+   *
+   * **The peek's sibling, and derived for the same reason.** §101 puts a
+   * chip's preview in two places and names focus as what chooses between them
+   * — so the prompt's half is recomputed from the caret exactly as the
+   * transcript's is recomputed from focus, and neither needs a key. The
+   * registry names no binding that opens a preview, and that is the design
+   * answering rather than the design leaving a gap.
+   *
+   * **The completion menu's placement**, because *where completion and find
+   * already are* names one place: anchored at the prompt, `prefer: "above"`,
+   * the whole region's width, `kind: "panel"`, non-blocking, closed by `esc`.
+   *
+   * **Only onto an empty stack.** A question, a menu or a search is something
+   * the reader is in the middle of, and C15's manager dismisses a panel when
+   * another opens — so a projection with no guard here would push itself back
+   * over a menu once a frame rather than losing to it once.
+   *
+   * **The title is C17's label, composed from the chip's parts** (C17 I25) and
+   * with the session's own rung, so the panel's header and the chip in the
+   * prompt cannot spell the same chip two ways.
+   */
+  const CHIP_PREVIEW_ID = "chip-preview";
+  const chipPreviewContent = (chip: Chip): readonly Block[] => [
+    makeBlock({
+      kind: "panel",
+      id: "chip-preview-panel",
+      title: chipLabel(chip, chipLook),
+      // **No scroll box and no declared height**, which is the peek's shape
+      // too: C15 clamps a layer to the room it has, and a row count invented
+      // here would be a number §101 does not give. The box, its keys and its
+      // bar are §021's and arrive with the scrollbar.
+      children: [
+        makeBlock({ kind: "code", id: "chip-preview-content", language: "text", text: chip.content }),
+      ],
+    }),
+  ];
+  let previewed: Chip | null = null;
+  const syncChipPreview = (): void => {
+    const have = stores.overlays.stack.some((l) => l.id === CHIP_PREVIEW_ID);
+    // **Focus, not the router's target**, and the first draft read the target.
+    // A layer raises C16's `panel` rung, so the preview's own presence made
+    // `target` answer `panel` — and the projection then read that as focus
+    // having left the prompt and dismissed itself on the next key. A thing that
+    // asks where focus is must not ask a question its own existence changes.
+    const chip = focus.current.at === "prompt" ? stores.editor.chipAt() : null;
+    // Something else owns the region: the preview neither pushes nor survives.
+    const blocked = stores.overlays.stack.some((l) => l.id !== CHIP_PREVIEW_ID);
+    if (chip === null || blocked) {
+      previewed = null;
+      if (have) stores.overlays.dismiss(CHIP_PREVIEW_ID);
+      return;
+    }
+    if (have && chip === previewed) return;
+    const content = chipPreviewContent(chip);
+    const anchor = deps.frame.promptAnchor();
+    const placement = { kind: "anchored" as const, row: anchor.row, rows: anchor.rows, prefer: "above" as const };
+    if (have) {
+      stores.overlays.update(CHIP_PREVIEW_ID, { content, placement });
+    } else {
+      stores.overlays.push({
+        id: CHIP_PREVIEW_ID,
+        kind: "panel",
+        placement,
+        content,
+        blocking: false,
+        dismissal: "escape",
+      });
+    }
+    previewed = chip;
+  };
+
+  /**
    * The nearest entry in `direction` that declares an element, and its first
    * one (C26 I21, §4g row c and trace 5).
    *
@@ -2671,12 +2750,20 @@ export async function constructGraph(
    *
    * **One definition, two readers.** The router's precedence and the cursor's
    * both ask it, and a second copy of the rule is how a cursor comes to claim
-   * the prompt is inert while the prompt is taking keys. True for exactly one
-   * layer: a completion menu holding no selection, which is a display of what
-   * is available rather than a choice being made (C19 I20).
+   * the prompt is inert while the prompt is taking keys.
+   *
+   * **Two layers, and the second has no condition** (I113, §6l.12). A
+   * completion menu qualifies while it holds no selection — *a display of what
+   * is available rather than a choice being made* (C19 I20) — and a chip
+   * preview qualifies always, because it has no selection to hold. It is also
+   * the one layer that cannot own the keys it would take: the preview is a
+   * projection of the caret, so the motion that closes it is the motion it
+   * would be swallowing. Measured before this clause existed — two characters
+   * typed with a preview up reached no handler at all.
    */
   const promptUnderMenu = (): boolean =>
-    stores.overlays.top?.id === MENU_ID && keys.selected === null;
+    stores.overlays.top?.id === CHIP_PREVIEW_ID ||
+    (stores.overlays.top?.id === MENU_ID && keys.selected === null);
 
   /**
    * Merge the focused block's own keymap, and withdraw the last one (A01 D4,
@@ -3277,8 +3364,9 @@ export async function constructGraph(
       if (events.length > 0) {
         for (const e of events) routed(e);
         // After the keys and before the frame: the peek follows the focus the
-        // keys just moved (C15 §2a).
+        // keys just moved (C15 §2a), and the chip preview the caret (I113).
         syncPeek();
+        syncChipPreview();
         stampInput();
         scheduler.commit("input");
       }

@@ -82,10 +82,14 @@ const results = runPass({
       // C15 §2a's trace, second row: the peek is reconciled after the keys or it
       // is not reconciled at all — the viewport path fires on scroll and content,
       // never on a focus move.
+      // **Re-anchored in M13**: the chip preview's projection landed between
+      // `syncPeek` and `stampInput` (C22 I113), so the old anchor named a pair
+      // that no longer touch. The mutation says the same thing — the peek is
+      // not reconciled after the keys — with the line that now follows it.
       name: "the emitter is not run after the keys, so the peek does not follow focus",
       file: CONSTRUCT,
-      from: "        syncPeek();\n        stampInput();",
-      to: "        stampInput();",
+      from: "        syncPeek();\n        syncChipPreview();",
+      to: "        syncChipPreview();",
       expect: "T4.11",
     },
     {
