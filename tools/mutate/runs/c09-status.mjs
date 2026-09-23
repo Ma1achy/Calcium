@@ -131,8 +131,12 @@ const results = runPass({
       // after.
       name: "the block's spinner set is ignored and the default is always used",
       file: SRC,
-      from: "activityLine(block, spinnerFrames(ctx.capabilities, block.spinner), ctx.tick)",
-      to: "activityLine(block, spinnerFrames(ctx.capabilities), ctx.tick)",
+      // Anchored on the `spinnerFrames` call alone, which is what this mutation
+      // strips the set from. Holding the whole `activityLine` call rotted the
+      // day I99 wrapped the tick in `glyphTick`, for a reason that had nothing
+      // to do with the set — the anchor is on what changes and no more.
+      from: "spinnerFrames(ctx.capabilities, block.spinner)",
+      to: "spinnerFrames(ctx.capabilities)",
       expect: "T3.44",
     },
   ],

@@ -85,6 +85,7 @@ import { createKeyEffects } from "./keys.js";
 import type { FocusTarget, InputEvent, Key, KeyAction } from "../interaction/router/types.js";
 import { openHistory, SEARCH_ID } from "../interaction/history/index.js";
 import { detectCapabilities, type TerminalCapabilities } from "../terminal/capabilities.js";
+import type { Motion } from "../presentation/blocks/index.js";
 import { glyphs, tapeStart } from "../presentation/blocks/index.js";
 import { createFrameScheduler, type CommitReason } from "../terminal/frame-scheduler.js";
 import type { CaptureResult, Profiler, ProfileReport, TraceFn } from "./profiling/types.js";
@@ -487,6 +488,17 @@ export type Graph = Readonly<{
    */
   suppressBackground: () => boolean;
   capabilities: TerminalCapabilities;
+  /**
+   * The reader's motion preference, settled once from `TuiConfig.motion` and
+   * handed to every render (C09 I99, `R-MOT-001`).
+   *
+   * **Beside `capabilities` and not inside it**, which is the whole of I99's
+   * third-axis claim: `R-BLK-702` says *a 1-bit display may animate and a
+   * 24-bit display may be still*, so folding this into the detection record
+   * would make the two answer together at exactly the two points where the
+   * design says they must not.
+   */
+  motion: Motion;
   /**
    * C22 I6a — every component that accumulates a diagnostic, drained at §8
    * step 3 in construction order.
@@ -3674,6 +3686,7 @@ export async function constructGraph(
     toggleOrbit,
     toggleSeries: toggleSeriesBlock,
     capabilities: detection.capabilities,
+    motion: config.motion ?? "full",
     /**
      * C22 I6a — construction, then the session, then what the session contained.
      *

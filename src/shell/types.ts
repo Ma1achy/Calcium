@@ -26,7 +26,7 @@ import type { CursorStyle } from "../terminal/escapes.js";
 import type { LineEditor } from "../interaction/editor/index.js";
 import type { HistoryStore } from "../interaction/history/types.js";
 import type { CommandPolicy } from "../interaction/parser/index.js";
-import type { AnyBlockDefinition, BlockRegistry } from "../presentation/blocks/index.js";
+import type { AnyBlockDefinition, BlockRegistry, Motion } from "../presentation/blocks/index.js";
 import type { ThemeSet, ThemeStore } from "../presentation/theme/index.js";
 import type { FrameScheduler } from "../terminal/frame-scheduler.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
@@ -679,6 +679,24 @@ export type TuiConfig = Readonly<{
    * focused plot set too — C02's rule that the mouse is never the only way.
    */
   hover?: boolean;
+  /**
+   * How much motion this reader wants (C09 I99, `R-MOT-001`, §038). Defaults to
+   * `"full"`; handed to every block through `RenderContext.motion`.
+   *
+   * **Config and not a capability, on `hover`'s own argument above and on the
+   * design's**: `R-BLK-702` names the precedent itself — *mouse: off already
+   * exists; motion joins it as an independent preference*. Nothing in the
+   * environment predicts it, so a C02 detection rule would be a constant; what
+   * differs is what the reader asked for. It is a **third axis**, independent
+   * of colour depth and of the glyph set, which is `R-BLK-702`'s two cases: *a
+   * 1-bit display may animate and a 24-bit display may be still*.
+   *
+   * `"off"` stops every animation — the ramps and the spinners both — and the
+   * state survives on the three carriers that never moved (`R-MOT-002`): the
+   * mark, the label and the elapsed text. `"reduced"` stops the ambient ramps
+   * alone (`glint drift tide`), leaving every group a reader is meant to act on.
+   */
+  motion?: Motion;
   /** The session's starting directory. Defaults to the process's. */
   cwd?: string;
   clock?: () => number;

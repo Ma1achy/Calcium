@@ -18,6 +18,7 @@ import { valueBar } from "../../plot/bar.js";
 import { clampSpans, pad, paint, rows, tone, type Span } from "../paint.js";
 import { naturalSpan, shedRow } from "../shed.js";
 import type { BlockDefinition, RenderContext, Windowed, Rendered } from "../types.js";
+import { glyphTick } from "../ramp.js";
 
 /** §3: the key column is sized to the longest key and capped here. */
 const KEY_COLUMN_CAP = 20;
@@ -939,7 +940,7 @@ export const stepsDefinition: BlockDefinition<Steps> = {
         // never shifts the row it sits on.
         const marker =
           step.state === "active"
-            ? (frames[ctx.tick % frames.length] ?? g.dotted) // cells-ok
+            ? (frames[glyphTick(ctx.tick, ctx.motion) % frames.length] ?? g.dotted) // cells-ok
             : step.state === "done"
               ? g.tick
               : step.state === "failed"

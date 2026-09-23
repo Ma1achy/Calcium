@@ -22,7 +22,15 @@ import { spinnerSetNames } from "../../src/presentation/blocks/glyphs.js";
 import { loadRegistry, spinnerAsciiFrames } from "../../docs/design/language/build-calcium.mjs";
 import type { Registry } from "../../docs/design/language/build-calcium.mjs";
 import { cells, hasEmojiForm } from "../../src/presentation/text.js";
-import { ASCII_CAPS, FULL_CAPS } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, MONO_UNICODE_CAPS, registry } from "../support/render.js";
+// C09 I99's three rows: the preference, the two resolvers it drives, and the
+// union the ambient set partitions.
+import type { Block } from "../../src/data/viewmodel/index.js";
+import { RAMP_ANIMATIONS } from "../../src/data/viewmodel/types.js";
+import type { Motion } from "../../src/presentation/blocks/index.js";
+import { AMBIENT_ANIMATIONS, effectiveAnimation } from "../../src/presentation/blocks/ramp.js";
+import { renderToLines } from "../../src/presentation/render-lines.js";
+import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 
 const WIDE_CAPS = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
 const NAMES = Object.keys(SPINNER_SETS);
@@ -177,12 +185,153 @@ const STATED_CYCLES: Readonly<Record<string, number>> = Object.freeze(
     }
   });
 
-  // **Spec-first: C09 I99's three rows land with the code that makes them green.**
-  // `RenderContext.motion` does not exist yet, so a row asserting the axis is
-  // independent of colour depth would be asserting a knob the tree has one of.
-  it.todo("T2.166 (C09 I99, R-MOT-001): motion × colour depth, the two axes independent — not deferred on a component: `RenderContext.motion` lands with I99 in this same MR");
-  it.todo("T2.167 (C09 I99, R-MOT-002): with motion off a running call keeps its mark and its elapsed text — not deferred on a component: `RenderContext.motion` lands with I99 in this same MR");
-  it.todo("T2.168 (C09 I99, R-MOT-012): the ambient set is the registry's, and reduced stops exactly those three — not deferred on a component: `RenderContext.motion` lands with I99 in this same MR");
+  // **C09 I99's three rows, landed with the code the `it.todo`s named.** Two
+  // subjects, because the axes ride on two different channels: a `status` in
+  // `loading` draws a **spinner** (discrete, a glyph, and what survives 1-bit)
+  // and a ramped span **interpolates a colour** (continuous, and what stops
+  // below 8-bit). One subject could not show independence — a row that moved
+  // the preference on the glyph alone would be green on a tree where the
+  // colour rung had been broken, and the other way about.
+  const LIVE = (over: Record<string, unknown> = {}): Block =>
+    ({
+      kind: "status",
+      id: "st",
+      state: "loading",
+      message: "reindexing",
+      height: 3,
+      elapsedMs: 4000,
+      spinner: "braille",
+      ...over,
+    }) as unknown as Block;
+
+  /** The colour channel's subject: a shimmering span, which needs 8-bit to move. */
+  const RAMPED: Block = {
+    kind: "notice",
+    id: "n",
+    tone: "info",
+    text: "abcdefghij",
+    spans: [{ from: 0, to: 10, ramp: { fill: "gradient", from: "muted", to: "accent", animate: "shimmer" } }],
+  } as unknown as Block;
+
+  /** The block's rows at one tick, on one capability record and one preference. */
+  const frameAtTick = (block: Block, caps: TerminalCapabilities, tick: number, motion?: Motion): readonly string[] =>
+    renderToLines(registry(), block, 40, {
+      theme: DARK_THEME,
+      capabilities: caps,
+      tick,
+      ...(motion === undefined ? {} : { motion }),
+    });
+
+  /** Does anything in this block move across a cycle's worth of ticks? */
+  const moves = (block: Block, caps: TerminalCapabilities, motion?: Motion): boolean => {
+    const first = frameAtTick(block, caps, 0, motion).join("\n");
+    for (let k = 1; k < 12; k += 1) { // cells-ok — a tick count
+      if (frameAtTick(block, caps, k, motion).join("\n") !== first) return true;
+    }
+    return false;
+  };
+
+  it("T2.166 (C09 I99, R-MOT-001, R-BLK-702): motion and colour depth are two axes, and the corners are the four combinations", () => {
+    // **`R-BLK-702` states the independence as two concrete cases** rather than
+    // as a principle — *a 1-bit display may animate and a 24-bit display may be
+    // still* — and before I99 the tree could express neither: depth was the only
+    // axis motion had, so the two named corners were unreachable by construction.
+    // This row is the 2 × 2 and not a pair of assertions about `motion` alone,
+    // because independence is a claim about the **grid** and a row that moved one
+    // knob with the other fixed would be green on a tree where depth still
+    // gated everything.
+    const grid = [
+      { caps: FULL_CAPS, motion: "full" as Motion, expect: true, why: "24-bit, motion full — everything moves" },
+      { caps: MONO_UNICODE_CAPS, motion: "full" as Motion, expect: true, why: "R-BLK-702: a 1-bit display may animate" },
+      { caps: FULL_CAPS, motion: "off" as Motion, expect: false, why: "R-BLK-702: a 24-bit display may be still" },
+      { caps: MONO_UNICODE_CAPS, motion: "off" as Motion, expect: false, why: "1-bit and off — both axes stopped" },
+    ];
+    for (const cell of grid) {
+      expect(moves(LIVE(), cell.caps, cell.motion), cell.why).toBe(cell.expect);
+    }
+    // **And the depth axis still does its own job on the channel it owns**, which
+    // is the half the glyph grid above cannot see: the colour rung is untouched
+    // by I99, and `R-MOT-012`'s *below 8-bit motion stops* still holds for a
+    // ramp at full motion. Without this the grid would be green on a tree where
+    // `effectiveTick`'s depth gate had been deleted.
+    expect(moves(RAMPED, FULL_CAPS, "full"), "24-bit: a ramp interpolates").toBe(true);
+    // **At 4-bit and not at 1-bit, and the difference is the whole of a
+    // survivor.** This assertion's first form asked it at `MONO_UNICODE_CAPS`
+    // and a mutation deleting the depth gate outright **survived**: at 1-bit
+    // `rampStyle` answers with `from`'s *class* for every `t`, so the ramp is
+    // constant whether the gate fires or not — the degenerate rung, green on a
+    // tree where `R-MOT-012` had been removed. The 4-bit rung is a step of two,
+    // `from` below ½ and `to` from ½, which is the shallowest rung whose output
+    // still moves with `t` and therefore the one that can see the gate at all.
+    const ANSI16: TerminalCapabilities = { ...FULL_CAPS, colourDepth: 4 };
+    expect(moves(RAMPED, ANSI16, "full"), "R-MOT-012: below 8-bit a ramp stops, whatever the preference").toBe(false);
+    expect(moves(RAMPED, MONO_UNICODE_CAPS, "full"), "and at 1-bit, where it is constant in t anyway").toBe(false);
+    // **And the corner the first grid cannot reach.** *A 24-bit display may be
+    // still* is a claim about **both** channels, and the grid above carries it
+    // on the glyph alone — `LIVE` has no ramp, so a tree where `off` stopped
+    // spinners and left every ramp running was green over all four cells. The
+    // mutation pass is what said so: a gate deleted from the colour path failed
+    // nothing, and the row was as much the finding as the code was.
+    expect(moves(RAMPED, FULL_CAPS, "off"), "R-BLK-702: a 24-bit display may be still, on the colour channel too").toBe(false);
+    // **And the default is `full`**, which is the arm every existing caller
+    // takes: absent must be the same picture as asking for it, or the field's
+    // arrival would have been a behaviour change to every frame in the tree.
+    expect(frameAtTick(LIVE(), FULL_CAPS, 5)).toEqual(frameAtTick(LIVE(), FULL_CAPS, 5, "full"));
+  });
+
+  it("T2.167 (C09 I99, R-MOT-002): with motion off the state survives on the three carriers that never moved", () => {
+    // **`R-MOT-002`'s argument is that `off` costs nothing to read**: the mark,
+    // the label and the elapsed text carry the state, and none of them was ever
+    // the animation. So the row asserts the frames are identical across ticks
+    // **and** that all three are still on the page — a frozen frame that had
+    // dropped the elapsed counter would pass the first half alone, and the first
+    // half alone is what a stillness assertion naturally reaches for.
+    // Height 5, so the box affords the message row as well as the activity
+    // line: at 3 the border spends two of the three and R-MOT-002's second
+    // carrier is simply not on the page, which would make the assertion below
+    // a statement about the height ladder rather than about motion.
+    const still = frameAtTick(LIVE({ height: 5 }), FULL_CAPS, 0, "off");
+    for (let k = 1; k < 12; k += 1) { // cells-ok — a tick count
+      expect(frameAtTick(LIVE({ height: 5 }), FULL_CAPS, k, "off"), `tick ${String(k)} moved under motion off`).toEqual(still);
+    }
+    const page = still.join("\n");
+    expect(page, "the label").toContain("reindexing");
+    expect(page, "the elapsed text — the honest answer for liveness").toContain("4s");
+    // **The mark, and it is a spinner frame and not merely ink.** `off` holds
+    // frame 0 rather than emptying the cell, which is the difference between a
+    // still figure and a dropped one — and the dropped one would satisfy every
+    // assertion above.
+    expect(page, "the mark — frame 0, held").toContain(spinnerFrames(FULL_CAPS, "braille")[0] ?? "");
+  });
+
+  it("T2.168 (C09 I99, R-MOT-003, R-MOT-012): the ambient set is the registry's, and reduced stops exactly those three", () => {
+    // **By equality in both directions, as I94 and I98 are** (the bar alphabets
+    // and the spinner sets): a membership written twice drifts, and a subset
+    // check would let a fourth arrive in `rampPolicy` with the tree never
+    // noticing. The registry is read through its own loader for the reason
+    // T2.163 gives.
+    const policy = (REGISTRY as unknown as { rampPolicy: { attentionGroups: Record<string, readonly string[]> } })
+      .rampPolicy.attentionGroups;
+    // **A premise, not an assumption.** If the loader ever hands back a
+    // registry without this group the two `toEqual`s below compare `[]` with
+    // `[]` and pass, which is the vacuity a missing field reads as.
+    const AMBIENT: readonly string[] = policy["ambient"] ?? [];
+    expect(AMBIENT.length, "rampPolicy.attentionGroups.ambient — the row is vacuous without it").toBe(3);
+    expect([...AMBIENT_ANIMATIONS].sort()).toEqual([...AMBIENT].sort());
+
+    // **And the behaviour over the whole union, not over the three.** A row
+    // asking only about `glint drift tide` is answered by an implementation that
+    // stops everything, which is `off`'s job and not `reduced`'s — so the
+    // partition is the assertion: exactly the ambient three fall to `none` and
+    // every other effect is handed back untouched.
+    const stopped = RAMP_ANIMATIONS.filter((a) => effectiveAnimation(a, "reduced") === "none" && a !== "none");
+    expect([...stopped].sort()).toEqual([...AMBIENT].sort());
+    for (const a of RAMP_ANIMATIONS) {
+      if (AMBIENT_ANIMATIONS.has(a)) continue;
+      expect(effectiveAnimation(a, "reduced"), `${a} is not ambient and reduced must leave it alone`).toBe(a);
+      expect(effectiveAnimation(a, "off"), `${a} under motion off`).toBe("none");
+    }
+  });
 
   it("T2.163 (C09 I98, R-MOT-010): SPINNER_SETS against the registry, by equality and field by field", () => {
     // **The row commitment 78 said already existed.** That commitment cites the

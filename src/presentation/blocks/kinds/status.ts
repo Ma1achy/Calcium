@@ -20,6 +20,7 @@ import { glyphs, spinnerFrames } from "../glyphs.js";
 import { background, fit, paint, rows, slot as surface, tone, withBackground, type Span } from "../paint.js";
 import type { BlockDefinition, RenderContext, Rendered } from "../types.js";
 import type { Style } from "../../theme/index.js";
+import { glyphTick } from "../ramp.js";
 
 /**
  * The word, in a gap in the rule — `─── ERROR ───`.
@@ -522,7 +523,7 @@ export const statusDefinition: BlockDefinition<Status> = {
     // that will not start because a set was misspelt is worse than one that
     // spins the wrong way. The interval is `spinnerIntervalMs(block.spinner)`
     // and belongs to whoever schedules the tick, which is not this layer.
-    const line = activityLine(block, spinnerFrames(ctx.capabilities, block.spinner), ctx.tick);
+    const line = activityLine(block, spinnerFrames(ctx.capabilities, block.spinner), glyphTick(ctx.tick, ctx.motion));
 
     // **The interior is the remainder and the group is centred inside it.** The
     // height ladder says which furniture it can afford and the width ladder

@@ -16,11 +16,12 @@ import type { ColourRef, ColourValue, ResolvedTheme } from "../theme/index.js";
 import { COLORMAPS, continuousColour } from "../theme/colormap.js";
 import type { ColormapName, Tone } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
+import type { Motion } from "./types.js";
 import { cells, truncate } from "../text.js";
 import type { Run, SpanAttrs } from "../runs.js";
 import { graphemes } from "../text.js";
 import { rampStyle } from "../theme/ramp.js";
-import { animateT, effectiveTick, extentT } from "./ramp.js";
+import { animateT, effectiveAnimation, effectiveTick, extentT } from "./ramp.js";
 
 /** A run of text and the style it carries. Width is the text's, never the run's. */
 export type Span = Readonly<{ text: string; style?: Style }>;
@@ -51,6 +52,8 @@ export type RunContext = Readonly<{
   colormap?: ColormapName;
   /** C03's spinner counter, for a ramp that moves (C09 I53); absent is the static frame. */
   tick?: number;
+  /** The reader's motion preference (C09 I99); absent is `"full"`, and structural like the rest. */
+  motion?: Motion;
   /**
    * **The ground these runs are painted on** (C10 I48) — a surface name, absent
    * being the page. A run's tone resolves *against* it, so a `tone.error` cell
@@ -126,7 +129,7 @@ export function paintRuns(runs: readonly Run[], style: Style, ctx: RunContext): 
     const tick = effectiveTick(ctx.tick, ctx.capabilities);
     clusters.forEach((cluster, i) => {
       const index = at + i;
-      const t = animateT(ramp.animate, extentT(index, of), tick, of, index, ramp.since);
+      const t = animateT(effectiveAnimation(ramp.animate, ctx.motion), extentT(index, of), tick, of, index, ramp.since);
       // A palette cycles identities, and on text the identity is the span
       // (C04 §3am.2): the ordinal, not the cluster — per cluster is confetti.
       const sampled = rampStyle(ramp, t, ramp.fill === "palette" ? ordinal : index, ctx.theme, ctx.capabilities);

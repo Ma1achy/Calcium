@@ -31,6 +31,7 @@ import { clampSpans, paint, rows, tone } from "../paint.js";
 import { composeRow, fitRow, placeRows, rowCells, type Placed } from "../../rows.js";
 import { layout, measure as solveHeight, type Box, type Size } from "../../layout/index.js";
 import type { BlockDefinition, Rendered, RenderContext, Windowed } from "../types.js";
+import { glyphTick } from "../ramp.js";
 
 // **`rowsOfAll` stood here and is gone with the arm it gated.** It answered
 // `null` when any child returned an element, and every container branched on
@@ -135,7 +136,7 @@ export const panelDefinition: BlockDefinition<Panel> = {
     const frames = spinnerFrames(ctx.capabilities);
     const titlePart = railPart(
       block.live === true
-        ? `${frames[ctx.tick % frames.length] ?? g.dotted} ${stripControl(block.title)}`.trimEnd() // cells-ok — a frame index
+        ? `${frames[glyphTick(ctx.tick, ctx.motion) % frames.length] ?? g.dotted} ${stripControl(block.title)}`.trimEnd() // cells-ok — a frame index
         : block.title,
     );
     const fill = Math.max(0, inner - cells(titlePart, ctx.capabilities.ambiguousWidth));

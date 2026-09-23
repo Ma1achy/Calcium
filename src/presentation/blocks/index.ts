@@ -51,6 +51,7 @@ export type {
   MeasureMemo,
   FocusState,
   NavElement,
+  Motion,
   RenderContext,
   Rendered,
   RenderContextInput,

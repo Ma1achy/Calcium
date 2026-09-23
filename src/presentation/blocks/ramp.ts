@@ -9,6 +9,7 @@
  */
 import type { Block, BlockKind, KnownBlockKind, Progress, Ramp, RampAnimation, TextSpan } from "../../data/viewmodel/index.js";
 import { spinnerIntervalMs } from "./glyphs.js";
+import type { Motion } from "./types.js";
 
 /**
  * What a ramp varies over, per kind (I50). **A record and never a `Set`**, for
@@ -331,13 +332,78 @@ export function animateT(
 }
 
 /**
- * The tick an effect sees at this depth (C10 I36's rung, applied here because
- * C10 has no tick to read): below 8-bit motion resolves to `none`, so the frame
- * is `tick = 0` — three colours moving is a flicker, and a flicker is worse than
- * a static tone. The cadence is still declared (I54); the frame is stable.
+ * **The ambient attention group** — `rampPolicy.attentionGroups.ambient` (C09
+ * I99, `R-MOT-003`, `R-MOT-012`). The three the design calls decorative, and
+ * the three `reduced` stops.
+ *
+ * Held here as a table and compared against the registry **by equality** in
+ * T2.168, as the bar alphabets and the spinner sets are (I94, I98): a
+ * membership written twice drifts, and a subset check would let a fourth
+ * arrive in the registry with this set never noticing. The other four groups —
+ * `working`, `waiting`, `attention`, `terminal` — each say something a reader
+ * is meant to act on, so `reduced` keeps them; `off` is what stops those.
+ */
+export const AMBIENT_ANIMATIONS: ReadonlySet<RampAnimation> = new Set<RampAnimation>(["glint", "drift", "tide"]);
+
+/**
+ * The effect a ramp actually runs under this reader's preference (C09 I99,
+ * `R-MOT-001`, `R-MOT-003`).
+ *
+ * **`none` and not a frozen tick, which is the whole of the choice here.**
+ * `animateT(undefined | "none", t, …)` returns `t` — the ramp drawn flat along
+ * its extent, which is the still picture. Pinning the tick to zero instead
+ * would return frame 0 of a moving thing: `shimmer`'s band parked at the
+ * inline-start edge, a stripe that reads as a paused animation rather than as a
+ * ramp. The state survives either way on `R-MOT-002`'s three carriers — the
+ * mark, the label and the elapsed text — so nothing is lost by drawing the
+ * honest still figure.
+ *
+ * `off` stops every effect; `reduced` stops `AMBIENT_ANIMATIONS` alone.
+ */
+export function effectiveAnimation(effect: RampAnimation | undefined, motion: Motion = "full"): RampAnimation | undefined {
+  if (motion === "off") return "none";
+  if (motion === "reduced" && effect !== undefined && AMBIENT_ANIMATIONS.has(effect)) return "none";
+  return effect;
+}
+
+/**
+ * The tick a **colour** effect sees — **the depth axis and only that** (C10 I36's
+ * rung, applied here because C10 has no tick to read): below 8-bit motion
+ * resolves to `none`, so the frame is `tick = 0` — three colours moving is a
+ * flicker, and a flicker is worse than a static tone. The cadence is still
+ * declared (I54); the frame is stable.
+ *
+ * **Two axes, one owner each, and the second gate this function briefly had was
+ * dead** (C09 I99). Depth is the terminal's and motion is the reader's, and a
+ * reader's `off` reaches a ramp through `effectiveAnimation` — which both call
+ * sites apply to the effect before handing it the tick, so an `if (motion ===
+ * "off") return 0` here was byte-identical for every input the type admits. The
+ * mutation pass found it: deleting the branch failed nothing, and the finding
+ * was about the code rather than about a missing row. A ramp's stillness has
+ * one owner and it is the effect, not the clock.
+ *
+ * The pair to this is `glyphTick`, below, and it is §038's own split — *below
+ * 8-bit colour interpolation stops; discrete glyph motion remains*. Both halves
+ * were true in this tree before I99 and lived in two files with nothing naming
+ * them together; they are two functions now so a reader meeting one finds the
+ * other.
  */
 export function effectiveTick(tick: number | undefined, caps: Readonly<{ colourDepth: number }>): number {
   return caps.colourDepth >= 8 ? (tick ?? 0) : 0;
+}
+
+/**
+ * The tick a **discrete glyph** effect sees — a spinner frame, a rotating
+ * container mark (C09 I99, `R-BLK-702`).
+ *
+ * **No depth gate, deliberately.** A frame index selects a character and a
+ * character costs no colours, so *a 1-bit display may animate* holds here where
+ * it cannot hold for a ramp. Motion is the only axis that reaches this, and a
+ * frozen tick **is** the right answer for a glyph where it was the wrong one for
+ * a ramp: frame 0 of a spinner is a mark, not a paused stripe.
+ */
+export function glyphTick(tick: number | undefined, motion: Motion = "full"): number {
+  return motion === "off" ? 0 : (tick ?? 0);
 }
 
 /** A ramp that moves: an `animate` other than `none` (I54). */

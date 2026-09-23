@@ -1272,6 +1272,7 @@ class Session implements TuiInstance {
       renderSequenceToLines(graph.blocks, blocks, w, {
         theme: graph.theme.current,
         capabilities: graph.capabilities,
+        motion: graph.motion,
       });
     return graph.chrome.layer(layer.content, width, graph.theme.current.name, render);
   }
@@ -1289,6 +1290,7 @@ class Session implements TuiInstance {
       registry: graph.blocks,
       theme: graph.theme.current,
       capabilities: graph.capabilities,
+      motion: graph.motion,
       ...(graph.probe === undefined ? {} : { probe: graph.probe }),
       // **The layer host, and it is the one `/live` draws into** (C12 I107).
       chrome: graph.chrome,
@@ -2148,6 +2150,7 @@ function visibleRows(
             renderEntryPieces(graph.blocks, pieces, {
         theme: graph.theme.current,
         capabilities: graph.capabilities,
+        motion: graph.motion,
         ...(graph.probe === undefined ? {} : { probe: graph.probe }),
         // **The third field, and the context was shipped with two** (C16 §3).
         // Focus was stored, derived and routed, and a focused row rendered

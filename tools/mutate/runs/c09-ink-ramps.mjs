@@ -65,8 +65,12 @@ const results = runPass({
       // C09 I52 (T2.119, T6.96) — the brief's other answer: the ramp compresses as the bar shortens.
       name: "the bar's extent is its filled length",
       file: SIMPLE,
-      from: "            const t = animateT(animation, extentT(i, barWidth), effectiveTick(ctx.tick, ctx.capabilities), barWidth, i);",
-      to: "            const t = animateT(block.ramp?.animate, extentT(i, filled), effectiveTick(ctx.tick, ctx.capabilities), filled, i);",
+      // Anchored on the two `barWidth` arguments alone, which is what this
+      // mutation exchanges. The call was one line and became six when I99
+      // threaded `ctx.motion` through it; an anchor holding the whole call
+      // rotted for a reason that had nothing to do with the extent.
+      from: "              extentT(i, barWidth),",
+      to: "              extentT(i, filled),",
       expect: "T2.119",
     },
     {

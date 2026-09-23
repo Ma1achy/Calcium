@@ -30,7 +30,7 @@
  */
 
 import { renderSequenceToLines } from "../presentation/render-lines.js";
-import type { RenderScratch } from "../presentation/blocks/types.js";
+import type { Motion, RenderScratch } from "../presentation/blocks/types.js";
 import { cells, hardWrapCells, sliceCells } from "../presentation/text.js";
 import {
   background,
@@ -63,6 +63,8 @@ export type PaintDeps = Readonly<{
   registry: BlockRegistry;
   theme: ResolvedTheme;
   capabilities: TerminalCapabilities;
+  /** The reader's motion preference (C09 I99); absent is `"full"`. */
+  motion?: Motion;
   /** C22 I102 — the session's chrome cache; absent in a harness that paints once. */
   chrome?: ChromeCache;
   /**
@@ -295,6 +297,7 @@ function region(
     renderSequenceToLines(deps.registry, b, w, {
       theme: deps.theme,
       capabilities: deps.capabilities,
+      ...(deps.motion === undefined ? {} : { motion: deps.motion }),
       ...(deps.probe === undefined ? {} : { probe: deps.probe }),
     });
   // **Once per content** (C22 I102): the chrome's blocks are rebuilt every

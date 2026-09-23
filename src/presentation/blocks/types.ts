@@ -114,10 +114,37 @@ export type RenderScratch = Readonly<{
   set: (owner: object, key: string, value: unknown) => void;
 }>;
 
+/**
+ * How much motion this reader wants (C09 I99, `R-MOT-001`, §038).
+ *
+ * **A preference and never a capability**, which is `R-BLK-702`'s own framing —
+ * *mouse: off already exists; motion joins it as an independent preference* —
+ * and is why it is here rather than on `TerminalCapabilities`. C02 detects what
+ * a terminal can do; this is what a person asked for, and the two are
+ * independent: *a 1-bit display may animate and a 24-bit display may be still*.
+ */
+export type Motion = "full" | "reduced" | "off";
+
 export type RenderContext = Readonly<{
   width: number;
   theme: ResolvedTheme;
   capabilities: TerminalCapabilities;
+  /**
+   * The reader's motion preference (C09 I99, `R-MOT-001`). Absent is `"full"`.
+   *
+   * **`off` costs nothing to read**, because the three carriers `R-MOT-002`
+   * names — the mark, the label and the elapsed text — never moved: *the mark's
+   * job is one bit and a static mark still carries it*. **`reduced` stops the
+   * ambient ramps alone** — `glint drift tide`, the registry's own
+   * `rampPolicy.attentionGroups.ambient` — and leaves every group a reader is
+   * meant to act on.
+   *
+   * Optional and not required, on `scrollOffsets`' precedent: a preference
+   * absent from a context is the default rather than a missing argument, and
+   * making it required would move every construction site in the tree for a
+   * field almost all of them would pass the default to.
+   */
+  motion?: Motion;
   /**
    * Where a renderer reports what it spent time on (C28 I30).
    *

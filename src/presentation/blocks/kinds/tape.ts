@@ -11,6 +11,7 @@ import { CALL_STATE_GLYPH, glyphFor, glyphs, spinnerFrames } from "../glyphs.js"
 import { clampSpans, focusStyle, paint, rows, selectionStyle, tone, type Span } from "../paint.js";
 import { tapeWindow, type TapeMarks } from "../tape-window.js";
 import type { BlockDefinition, NavElement, RenderContext, Rendered } from "../types.js";
+import { glyphTick } from "../ramp.js";
 
 /**
  * Two spaces between members, as `pills` uses between chips — one is too close
@@ -44,7 +45,7 @@ function frameAt(frames: readonly string[], tick: number): string {
 function memberText(
   member: Member,
   detail: boolean,
-  ctx: Pick<RenderContext, "capabilities" | "tick">,
+  ctx: Pick<RenderContext, "capabilities" | "tick" | "motion">,
 ): string {
   const label = stripControl(member.label);
   // **A state this build does not know carries no mark, and does not throw.**
@@ -59,7 +60,7 @@ function memberText(
     slot === undefined
       ? ""
       : running
-        ? frameAt(spinnerFrames(ctx.capabilities, TAPE_SPINNER), ctx.tick)
+        ? frameAt(spinnerFrames(ctx.capabilities, TAPE_SPINNER), glyphTick(ctx.tick, ctx.motion))
         : glyphFor(slot, ctx.capabilities);
   const shown = detail ? stripControl(member.detail ?? "") : "";
   const tail = running ? [mark, shown] : [shown, mark];
@@ -71,7 +72,7 @@ function memberText(
 function texts(
   block: Tape,
   detail: boolean,
-  ctx: Pick<RenderContext, "capabilities" | "tick">,
+  ctx: Pick<RenderContext, "capabilities" | "tick" | "motion">,
 ): readonly string[] {
   return block.members.map((m) => memberText(m, detail, ctx));
 }
@@ -96,7 +97,7 @@ function widthsOf(
 function layout(
   block: Tape,
   width: number,
-  ctx: Pick<RenderContext, "capabilities" | "tick">,
+  ctx: Pick<RenderContext, "capabilities" | "tick" | "motion">,
   held: number,
 ) {
   const room = normaliseWidth(width);

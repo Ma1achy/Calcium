@@ -25,6 +25,7 @@ import type { BlockRegistry, RenderContext, RenderContextInput, Rendered } from 
 import { normaliseRow } from "./rows.js";
 import type { ResolvedTheme } from "./theme/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
+import type { Motion } from "./blocks/index.js";
 
 /**
  * Everything a render needs that is not the registry or the block. Defaulted
@@ -33,6 +34,8 @@ import type { TerminalCapabilities } from "../terminal/capabilities.js";
 export type RenderOptions = Readonly<{
   theme: ResolvedTheme;
   capabilities: TerminalCapabilities;
+  /** The reader's motion preference (C09 I99); absent is `"full"`. */
+  motion?: Motion;
   tick?: number;
   focus?: RenderContext["focus"];
   /** Per-container scroll offsets, in rows (C04 I48). Absent is none. */
@@ -79,6 +82,7 @@ export function renderToLines(
     width,
     theme: options.theme,
     capabilities: options.capabilities,
+    ...(options.motion === undefined ? {} : { motion: options.motion }),
     focus: options.focus ?? null,
     ...(options.scrollOffsets === undefined ? {} : { scrollOffsets: options.scrollOffsets }),
     ...(options.cursorPositions === undefined ? {} : { cursorPositions: options.cursorPositions }),
@@ -133,6 +137,7 @@ export function renderSequenceToLines(
     width,
     theme: options.theme,
     capabilities: options.capabilities,
+    ...(options.motion === undefined ? {} : { motion: options.motion }),
     focus: options.focus ?? null,
     ...(options.scrollOffsets === undefined ? {} : { scrollOffsets: options.scrollOffsets }),
     ...(options.cursorPositions === undefined ? {} : { cursorPositions: options.cursorPositions }),

@@ -13,7 +13,7 @@ import { cells, stripControl, truncate, truncateParts, wrapCells } from "../../t
 import type { Run } from "../../runs.js";
 import { runLines, runsOf, runsText, sliceRuns, wrapRuns } from "../../runs.js";
 import { NO_STYLE, rampStyle } from "../../theme/index.js";
-import { animateT, effectiveTick, extentT } from "../ramp.js";
+import { animateT, effectiveAnimation, effectiveTick, extentT } from "../ramp.js";
 import { barStyle, glyphFor, glyphCells, glyphs, headMark } from "../glyphs.js";
 import { background, clampSpans, focusStyle, pad, paint, paintRuns, rows, selectionStyle, tone, withBackground, type Span } from "../paint.js";
 import type { BlockDefinition, NavElement, RenderContext, Windowed, Rendered } from "../types.js";
@@ -471,7 +471,7 @@ export const noticeDefinition: BlockDefinition<Notice> = {
     ctx.probe?.gauge("notice.spans", block.spans?.length ?? 0); // cells-ok — a count of runs
     // The block's colormap reaches the painter by name; a valued run reads it
     // there and nowhere else (C04 I90).
-    const paintCtx = { theme: ctx.theme, capabilities: ctx.capabilities, tick: ctx.tick, ...(block.colormap === undefined ? {} : { colormap: block.colormap }) };
+    const paintCtx = { theme: ctx.theme, capabilities: ctx.capabilities, tick: ctx.tick, ...(ctx.motion === undefined ? {} : { motion: ctx.motion }), ...(block.colormap === undefined ? {} : { colormap: block.colormap }) };
 
     // A hanging indent: the glyph sits on the first row and the continuation
     // aligns under the text rather than under the glyph. That alignment is why
@@ -650,7 +650,13 @@ export const progressDefinition: BlockDefinition<Progress> = {
       ramp === undefined
         ? [{ text: onGlyph.repeat(filled), style: onInk }]
         : Array.from({ length: filled }, (_, i) => {
-            const t = animateT(animation, extentT(i, barWidth), effectiveTick(ctx.tick, ctx.capabilities), barWidth, i);
+            const t = animateT(
+              effectiveAnimation(animation, ctx.motion),
+              extentT(i, barWidth),
+              effectiveTick(ctx.tick, ctx.capabilities),
+              barWidth,
+              i,
+            );
             const sampled = ramp === undefined ? undefined : rampStyle(ramp, t, i, ctx.theme, ctx.capabilities);
             // **The ramp survives the rung and I52 is untouched**: the ink still
             // varies along the axis and still takes the `on` cells only. What
@@ -934,7 +940,7 @@ export const rawDefinition: BlockDefinition<Raw> = {
     // marker outside every span (C04 I86); `raw` carries no tone, so the pieces
     // differ only where a span says so and a plain line is the bytes it was.
     const lines = runLines(runsOf(block.text, block.spans));
-    const paintCtx = { theme: ctx.theme, capabilities: ctx.capabilities, tick: ctx.tick, ...(block.colormap === undefined ? {} : { colormap: block.colormap }) };
+    const paintCtx = { theme: ctx.theme, capabilities: ctx.capabilities, tick: ctx.tick, ...(ctx.motion === undefined ? {} : { motion: ctx.motion }), ...(block.colormap === undefined ? {} : { colormap: block.colormap }) };
     return rows(
       rawLines(block).map((line, i) => {
         const { kept, suffix } = truncateParts(line, width, ctx.capabilities);

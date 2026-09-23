@@ -21,6 +21,13 @@ import { createRecording, recordStdin } from "./profiling/record.js";
 import { DEFAULT_TIER } from "./profiling/recorder.js";
 import { ConfigError, type FileSystem, type TuiConfig } from "./types.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
+import type { Motion } from "../presentation/blocks/index.js";
+
+/**
+ * The three `TuiConfig.motion` admits (C09 I99, `R-MOT-001`). A set rather
+ * than an array because the only reader is a membership test.
+ */
+const MOTIONS: ReadonlySet<string> = new Set<Motion>(["full", "reduced", "off"]);
 
 /**
  * Below this the layout engine cannot produce a sane answer, so the size gate
@@ -192,6 +199,14 @@ export function validateConfig(config: TuiConfig): void {
   // an app that wrote `hover: "false"`, which is the wrong direction to fail in.
   if (config.hover !== undefined && typeof config.hover !== "boolean") {
     throw new ConfigError("hover", `must be a boolean, got ${String(config.hover)}`);
+  }
+  // C09 I99 — one of three, or absent. **Checked and not narrowed by the type
+  // alone**, on `hover`'s own argument one line up: a value the union does not
+  // admit arrives from JSON and from a settings file, and an unrecognised
+  // string falling through to the `?? "full"` default below would silently
+  // ignore a reader who asked for `off` and misspelled it.
+  if (config.motion !== undefined && !MOTIONS.has(config.motion)) {
+    throw new ConfigError("motion", `must be one of full, reduced, off — got ${String(config.motion)}`);
   }
   // C22 I94 — **the same path, not both fields.** The rule was written as *set
   // together*, and building the apparatus falsified it: a replay is compared to
@@ -388,6 +403,9 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     // C01 I21 — off unless asked for; resolved here so C22 hands C01 a boolean
     // and the default lives with the other defaults.
     hover: config.hover ?? false,
+    // C09 I99 — the reader's motion preference, defaulted here beside `hover`
+    // for the reason `hover` is: it is a preference, not a capability.
+    motion: config.motion ?? "full",
     cwd: config.cwd ?? ambient.cwd,
     clock: ((c) => (recording === null ? c : recording.wall(c)))(config.clock ?? ambient.clock),
     schedule: ambient.schedule,
