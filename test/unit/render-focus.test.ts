@@ -504,6 +504,7 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
     const caps = capabilities({ colourDepth: 24 });
     const accent = params(tone("accent", theme, caps));
     const dim = params(tone("dim", theme, caps));
+    const muted = params(tone("muted", theme, caps));
     const none = scrollAt(6, null);
     // A scroll's elements are its children, so a focus inside it names a child.
     const focused = scrollAt(6, { blockId: "s", rowId: "n3" });
@@ -512,12 +513,34 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
     expect(residueRow, "the fixture has a residue row, and it is the last").toBe(3);
     const diff = styleDiff(none, focused, 40);
     expect(diff.length, "exactly the residue text's cells").toBeGreaterThan(0);
-    expect(new Set(diff.map((d) => d.row)), "and only on the residue row").toEqual(new Set([residueRow]));
+    // **The box's chrome, which is now two things** (C26 §7, C09 I92, §021).
+    // The residue row was the only chrome a scroll reserved; a box that
+    // overflows also spends its last column on a bar, and §021 gives it the
+    // same rule in the same words — *the thumb takes the ACCENT when its
+    // container has focus, the same rule the focused-container border takes*.
+    // So *and nothing else* still holds and its subject widened.
+    expect(
+      new Set(diff.map((d) => d.row)),
+      "the residue row and the bar's column, and no other row",
+    ).toEqual(new Set([0, 1, 2, residueRow]));
     for (const d of diff) {
-      expect(d.was.fg).toBe(dim);
+      // **`dim` on the residue row and `muted` on the bar**, and both go to
+      // `accent`: the residue's tone is C26 §7's and the bar's is §021's, and
+      // they were not the same word to begin with.
+      expect(d.was.fg, "the chrome's resting ink").toBe(d.row === residueRow ? dim : muted);
       expect(d.now.fg).toBe(accent);
     }
-    expect(diff.map((d) => d.ch).join("").trim(), "the whole residue text and nothing beside it").toBe("⋯ 2 above, 1 below");
+    const onResidue = diff.filter((d) => d.row === residueRow);
+    expect(onResidue.map((d) => d.ch).join("").trim(), "the whole residue text and nothing beside it").toBe(
+      "⋯ 2 above, 1 below",
+    );
+    // **One cell per interior row and it is the last**, which is what says the
+    // bar is a column rather than a wash over the rows it sits beside.
+    for (const row of [0, 1, 2]) {
+      const cellsAt = diff.filter((d) => d.row === row);
+      expect(cellsAt.length, `one cell on row ${String(row)}`).toBe(1);
+      expect(cellsAt[0]?.col, "and it is the last column").toBe(39);
+    }
 
     // **The consequence, said rather than absorbed**: three children in a
     // three-row box have no residue row, so focus paints nothing there.
@@ -526,7 +549,9 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
     expect(scrollAt(6, { blockId: "t", rowId: "n3" })).toEqual(none);
     // 1-bit: dim to bold on the residue row.
     const monoDiff = styleDiff(scrollAt(6, null, 1), scrollAt(6, { blockId: "s", rowId: "n3" }, 1), 40);
-    expect(new Set(monoDiff.map((d) => d.row))).toEqual(new Set([residueRow]));
+    // The bar is glyphs and not colour, so it is there at 1-bit too and takes
+    // the same weight change the residue row takes.
+    expect(new Set(monoDiff.map((d) => d.row))).toEqual(new Set([0, 1, 2, residueRow]));
     for (const d of monoDiff) {
       expect(d.was.attrs).toContain(2);
       expect(d.now.attrs).toContain(1);

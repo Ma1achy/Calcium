@@ -17,8 +17,11 @@ import { b } from "../../src/shell/builders/index.js";
 import { liveParts } from "../../src/testing/live-parts.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS } from "../support/render.js";
+import { tone } from "../../src/presentation/blocks/paint.js";
+import { sgr } from "../../src/terminal/escapes.js";
 import { CORPUS } from "../support/blocks.js";
 import type { Block, Scroll, ViewDocument } from "../../src/data/viewmodel/index.js";
+import type { FocusState } from "../../src/presentation/blocks/index.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
 
 const registry = createBlockRegistry({ defaults: true });
@@ -58,6 +61,20 @@ const wrapping = (id: string, text: string): Block => ({
 
 const scroll = (height: number, children: readonly Block[], id = "s"): Scroll =>
   ({ kind: "scroll", id, height, children }) as Scroll;
+
+/**
+ * A row of the box's interior, with the bar's cell at the far right.
+ *
+ * **Composed rather than stripped**, because these rows are frame-reads and a
+ * helper that dropped the bar would leave them reading a frame nobody draws.
+ * A box that overflows spends its last column on a bar (C09 I92, §7f), so an
+ * interior row is its text, a pad, and one track or thumb glyph.
+ */
+const params = (style: ReturnType<typeof tone>): string =>
+  sgr(style).replace(/^\u001b\[/u, "").replace(/m$/u, "");
+
+const barred = (text: string, glyph: string, width = 40): string =>
+  `${text}${" ".repeat(width - text.length - 1)}${glyph}`; // cells-ok — an ASCII fixture
 
 describe("C04 §3c cell 1 — the composition, not the result", () => {
   it("T2.20 (C04 I47): the box measures its declared height plus the residue row, at every offset", () => {
@@ -195,9 +212,11 @@ describe("C04 §3c — the frame, read", () => {
     // have.
     const block = scroll(2, [flat("a"), flat("b"), flat("c"), flat("d")]);
 
+    // At offset 0 the thumb is at the top of a two-row gutter over four rows of
+    // content, which is the bar saying the same thing the residue row says.
     expect(frame(block), "two children and the residue, and nothing else at all").toEqual([
-      "a",
-      "b",
+      barred("a", "\u2503"),
+      barred("b", "\u2502"),
       "⋯ 0 above, 2 below",
     ]);
   });
@@ -215,8 +234,8 @@ describe("C04 §3c — the frame, read", () => {
     const block = scroll(2, [flat("a"), flat("b"), flat("c"), flat("d")]);
 
     expect(frame(block, 40, { s: 99 }), "the last two children, not nothing").toEqual([
-      "c",
-      "d",
+      barred("c", "\u2502"),
+      barred("d", "\u2503"),
       "⋯ 2 above, 0 below",
     ]);
   });
@@ -562,15 +581,50 @@ describe("C09 §6b — the second caller, and the bound it applies", () => {
 
     expect(registry.measure(box, 40)).toBe(7);
     expect(drawn.length, "and the paint agrees — C09 I1 through a child taller than the box").toBe(7); // cells-ok
+    // Six rows of a thirty-row child: twelve positions, a thumb of two, and a
+    // start of ten — so the thumb is the last row whole, which is the same fact
+    // `follow` states and the residue row counts. Read off the frame rather
+    // than guessed: the first draft put a half-row form on row four.
     expect(drawn.slice(0, 6)).toEqual([
-      "build step 24 of 30",
-      "build step 25 of 30",
-      "build step 26 of 30",
-      "build step 27 of 30",
-      "build step 28 of 30",
-      "build step 29 of 30",
+      barred("build step 24 of 30", "\u2502"),
+      barred("build step 25 of 30", "\u2502"),
+      barred("build step 26 of 30", "\u2502"),
+      barred("build step 27 of 30", "\u2502"),
+      barred("build step 28 of 30", "\u2502"),
+      barred("build step 29 of 30", "\u2503"),
     ]);
     expect(drawn[6], "and the residue counts the window that was applied").toBe("⋯ 24 above, 0 below");
+  });
+
+  it("T2.157 (C09 I92, §7f, C26 §7): the bar takes accent under focus and muted without it", () => {
+    // **Read in colour, and against the other state rather than against
+    // itself.** A row asserting only that the focused bar is `accent` is
+    // satisfied by a renderer that paints every column `accent`, which is the
+    // one defect the clause exists to forbid — so both frames are taken and the
+    // two parameter strings are asserted to differ.
+    const box = scroll(2, [flat("one"), flat("two"), flat("three")], "sb");
+    const colour = (focus: FocusState | null): readonly string[] =>
+      renderSequenceToLines(registry, [box], 40, {
+        theme: DARK_THEME,
+        capabilities: FULL_CAPS,
+        focus,
+        scrollOffsets: {},
+      });
+
+    const held = colour({ blockId: "sb", rowId: null } as unknown as FocusState);
+    const loose = colour(null);
+    const accent = params(tone("accent", DARK_THEME, FULL_CAPS));
+    const muted = params(tone("muted", DARK_THEME, FULL_CAPS));
+
+    expect(accent, "a row comparing a tone with itself would pass against one colour everywhere").not.toBe(muted);
+    // The bar's cell is the last painted span on an interior row, so its
+    // parameters are the last SGR before the glyph.
+    expect(held[0] ?? "", "the focused box's bar").toContain(`\u001b[${accent}m\u2503`);
+    expect(loose[0] ?? "", "and the same box unfocused").toContain(`\u001b[${muted}m\u2503`);
+    // And nothing else moved: stripped, the two frames are the same picture.
+    const strip = (rows: readonly string[]): readonly string[] =>
+      rows.map((r) => r.replace(/\u001b\[[0-9;]*m/gu, "").trimEnd());
+    expect(strip(held), "the tone is the only difference").toEqual(strip(loose));
   });
 
   it("T3.76 (C09 I59, §6b): an atomic child taller than the box still over-draws — the recorded limit, with its number", () => {

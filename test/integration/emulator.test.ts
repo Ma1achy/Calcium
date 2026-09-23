@@ -42,6 +42,16 @@ const render = (block: Block, caps: typeof FULL_CAPS, width = 60): readonly stri
 
 const strip = (s: string): string => s.replace(/\u001b\[[0-9;]*m/gu, "");
 
+/**
+ * An interior row of a scroll, with the bar's cell at the far right.
+ *
+ * **Composed rather than stripped** (C09 I92, §7f, §021): a box that overflows
+ * spends its last column on a bar, and a helper that dropped it would leave
+ * these frame-reads reading a frame nobody draws.
+ */
+const barred = (text: string, glyph: string, width = 60): string =>
+  `${text}${" ".repeat(width - text.length - 1)}${glyph}`; // cells-ok — an ASCII fixture
+
 const wrapped = (doc: unknown): { ok: boolean; error?: readonly string[] } =>
   validateDocument({
     schema: "tui.view/1",
@@ -64,8 +74,15 @@ describe("C27 terminal emulator — tier 4", () => {
     // area is still six. A row asserting `toHaveLength(6)` would be asserting
     // that the residue is missing.
     expect(rows, "six content rows and the residue").toHaveLength(7);
+    // Six rows over forty-two of content puts the thumb at the foot, where the
+    // residue row's `36 above, 0 below` says the same thing in words.
     expect(rows.slice(0, 6).map(strip), "the tail, not the head").toEqual([
-      "line 36", "line 37", "line 38", "line 39", "FAILED tests/test_x.py", " ",
+      barred("line 36", "\u2502"),
+      barred("line 37", "\u2502"),
+      barred("line 38", "\u2502"),
+      barred("line 39", "\u2502"),
+      barred("FAILED tests/test_x.py", "\u2502"),
+      barred(" ", "\u257d"),
     ]);
     expect(rows[4], "the child's colour reaches the frame unchanged at 24-bit").toContain(
       "\u001b[38;2;220;50;47m",
@@ -171,9 +188,24 @@ describe("C09 · C10 — the terminal block at the arms, spec-first rows", () =>
     // **Read as pictures.** Every arm draws the same characters in the same
     // places; only the SGR and the residue glyph move. A row comparing bytes
     // would fail on the arm axis it is meant to be indifferent to.
+    // **The bar's column moves with `unicode`, exactly as the residue mark
+    // does** (C09 I93, §7f), so it is carved out of the picture and asserted on
+    // its own below — the same treatment, and for the same reason, that the
+    // residue glyph has always had here. Dropping the last cell is what makes
+    // the comparison about the *picture* rather than about the rung.
+    const body = (rows: readonly string[] | undefined): readonly string[] =>
+      (rows ?? []).slice(0, 6).map((r) => r.slice(0, -1)); // cells-ok — the bar's one cell
     for (const [i, [name]] of ARMS.entries()) {
-      expect(pictures[i]?.slice(0, 6), `${name}: the tail`).toEqual(pictures[0]?.slice(0, 6));
+      expect(body(pictures[i]), `${name}: the tail`).toEqual(body(pictures[0]));
     }
+    // And the column itself: one family at the Unicode rungs, the ASCII pair
+    // where there are no half-rows to draw.
+    const column = (rows: readonly string[] | undefined): string =>
+      (rows ?? []).slice(0, 6).map((r) => r.slice(-1)).join(""); // cells-ok — the bar's one cell
+    expect(column(pictures[0]), "the unicode arms draw the box-drawing set").toMatch(
+      /^[\u2502\u2503\u257d\u257f]+$/u,
+    );
+    expect(column(pictures[4]), "and the ascii arm its own pair").toMatch(/^[|#]+$/u);
     expect(pictures[0]?.[2], "the rewritten progress line, not both halves").toContain("collected 128 items");
     expect(pictures[0]?.[4], "and the verdict").toContain("FAILED tests/test_api.py::test_auth");
 

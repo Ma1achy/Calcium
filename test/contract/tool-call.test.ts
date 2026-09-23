@@ -13,7 +13,7 @@ import { createBlockRegistry, glyphs } from "../../src/presentation/blocks/index
 import { GLYPH_TOKENS, glyphCells, glyphFor, headMark } from "../../src/presentation/blocks/glyphs.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import { toolCallDoc, toolCallHeader } from "../../src/shell/documents.js";
-import { spinnerFrames } from "../../src/presentation/blocks/glyphs.js";
+import { scrollbarSet, spinnerFrames } from "../../src/presentation/blocks/glyphs.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, visible } from "../support/render.js";
 import { cells } from "../../src/presentation/text.js";
 
@@ -197,8 +197,19 @@ describe("§9c — the header, the body, and the row the body already has", () =
 
       const r = frame(running, width, ascii);
       expect(r[0], "running: the spinner in the duration slot (C23 I58)").toBe(`${run} run_command(npm test) ${sep} ${spin} 4s`);
+      // **The body's box overflows, so it spends its last column on a bar**
+      // (C09 I92, §7f, §021) — and the bar is glyphs rather than colour, so it
+      // is there at both rungs and takes each rung's own set. Three rows over
+      // twelve puts the thumb at the foot: a half-row form where the set has
+      // one, a whole row where it has not.
+      const bar = scrollbarSet(ascii ? ASCII_CAPS : FULL_CAPS);
+      const at = (text: string, glyph: string): string =>
+        `${text}${" ".repeat(width - text.length - 1)}${glyph}`; // cells-ok — an ASCII fixture
       expect(r.slice(1), "the streamed body shows its tail, the hidden rows above").toEqual([
-        "line 10", "line 11", "line 12", `${more} 9 above, 0 below`,
+        at("line 10", bar.track),
+        at("line 11", bar.track),
+        at("line 12", bar.half ? bar.thumbStart : bar.thumb),
+        `${more} 9 above, 0 below`,
       ]);
 
       const s = frame(settled, width, ascii);

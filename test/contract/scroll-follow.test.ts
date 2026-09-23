@@ -63,6 +63,16 @@ const docWith = (block: unknown): ViewDocument =>
     },
   }) as unknown as ViewDocument;
 
+/**
+ * An interior row with the bar's cell at the far right (C09 I92, §7f, §021).
+ *
+ * **Composed rather than stripped**: these are frame-reads, and a helper that
+ * dropped the bar would leave them reading a frame nobody draws. A box that
+ * overflows spends its last column on one.
+ */
+const barred = (text: string, glyph: string, width = 40): string =>
+  `${text}${" ".repeat(width - text.length - 1)}${glyph}`; // cells-ok — an ASCII fixture
+
 describe("shell/tail — one comparison, written once", () => {
   it("T1.30 (C04 I97): `atTail` is `>=`, and `followTail` moves only a reader who had the bottom", () => {
     expect(atTail(3, 3), "at the last offset is the tail").toBe(true);
@@ -77,11 +87,11 @@ describe("shell/tail — one comparison, written once", () => {
 describe("C04 I97 — the field says *start following*", () => {
   it("T2.37 (C04 I97, §3c T6): a follow box nobody touched opens at its tail, and the residue is above", () => {
     const following = lines([box(rows(5), { follow: true })], 40);
-    expect(following).toEqual(["r4", "r5", "⋯ 3 above, 0 below"]);
+    expect(following).toEqual([barred("r4", "\u2502"), barred("r5", "\u257d"), "⋯ 3 above, 0 below"]);
 
     // The control: without the field the same box opens at its head.
     const plain = lines([box(rows(5))], 40);
-    expect(plain).toEqual(["r1", "r2", "⋯ 0 above, 3 below"]);
+    expect(plain).toEqual([barred("r1", "\u257f"), barred("r2", "\u2502"), "⋯ 0 above, 3 below"]);
   });
 
   it("T2.38 (C04 I97, §3c T1): live output does not move the rows above the box, and nothing is written", () => {
@@ -92,7 +102,7 @@ describe("C04 I97 — the field says *start following*", () => {
     expect(first.indexOf("before"), "the row above the box").toBe(0);
     expect(second.indexOf("before"), "is where it was").toBe(0);
     expect(second.length, "and the frame is the same height").toBe(first.length);
-    expect(second.slice(1), "while the box shows the new tail").toEqual(["r7", "r8", "⋯ 6 above, 0 below"]);
+    expect(second.slice(1), "while the box shows the new tail").toEqual([barred("r7", "\u2502"), barred("r8", "\u257d"), "⋯ 6 above, 0 below"]);
     // `measure` never saw `follow`: the box is `height` (+ residue) either way.
     expect(scrollDefinition.measure(box(rows(5), { follow: true }), 40, measureChild)).toBe(3);
     expect(scrollDefinition.measure(box(rows(8), { follow: true }), 40, measureChild)).toBe(3);
@@ -115,22 +125,22 @@ describe("C04 I97 — the field says *start following*", () => {
     // the tail the field implies, not at the `0` an absent entry reads as.
     store.nudge("e", "s", -1, { ceiling: ceiling(five), follow: true });
     expect(store.get("e", "s")).toBe(2);
-    expect(lines([five], 40, store.forEntry("e"))).toEqual(["r3", "r4", "⋯ 2 above, 1 below"]);
+    expect(lines([five], 40, store.forEntry("e"))).toEqual([barred("r3", "\u2502"), barred("r4", "\u257f"), "⋯ 2 above, 1 below"]);
 
     // A child arrives. The reader is reading, and the window does not move.
     const six = box(rows(6), { follow: true });
-    expect(lines([six], 40, store.forEntry("e"))).toEqual(["r3", "r4", "⋯ 2 above, 2 below"]);
+    expect(lines([six], 40, store.forEntry("e"))).toEqual([barred("r3", "\u257d"), barred("r4", "\u2502"), "⋯ 2 above, 2 below"]);
 
     // ⇟ past the end lands at the bottom, so the box follows again — derived
     // from where it ended up (C14 I5), and written as `TAIL`.
     store.nudge("e", "s", 5, { ceiling: ceiling(six), follow: true });
     expect(store.get("e", "s")).toBe(TAIL);
-    expect(lines([six], 40, store.forEntry("e"))).toEqual(["r5", "r6", "⋯ 4 above, 0 below"]);
+    expect(lines([six], 40, store.forEntry("e"))).toEqual([barred("r5", "\u2502"), barred("r6", "\u257d"), "⋯ 4 above, 0 below"]);
 
     // And the next child arrives with **nothing written**: the clamp at read
     // is the follow.
     const seven = box(rows(7), { follow: true });
-    expect(lines([seven], 40, store.forEntry("e"))).toEqual(["r6", "r7", "⋯ 5 above, 0 below"]);
+    expect(lines([seven], 40, store.forEntry("e"))).toEqual([barred("r6", "\u2502"), barred("r7", "\u257d"), "⋯ 5 above, 0 below"]);
     expect(store.get("e", "s")).toBe(TAIL);
     // §3c T8, recorded: the key carries it as a non-zero.
     expect(store.key("e")).toBe("s=Infinity");
@@ -179,10 +189,18 @@ describe("C04 I98 — the collapsed form is the residue row and nothing else", (
       collapsed: true,
     });
     expect(lines([tall], 40, { s: 1 })).toEqual(["⋯ +5 more"]);
+    // **The width where the reservation would be observable**, and it is the
+    // only one: the residue row is clamped at the content's width, so a column
+    // taken from a collapsed box costs a cell of *⋯ +5 more* rather than
+    // drawing anything. At 40 the text is 9 cells and a lost column changes
+    // nothing — which is how the guard's first mutation survived a row that
+    // asserted this box at 80, 40 and ASCII and never at its own width.
+    expect(lines([folded], 9), "a collapsed box spends no column on a bar").toEqual(["⋯ +5 more"]);
+
     // Expanded again it is an ordinary follow box.
     const open = box(rows(5), { follow: true, collapsed: false });
     expect(scrollDefinition.measure(open, 40, measureChild)).toBe(3);
-    expect(lines([open], 40)).toEqual(["r4", "r5", "⋯ 3 above, 0 below"]);
+    expect(lines([open], 40)).toEqual([barred("r4", "\u2502"), barred("r5", "\u257d"), "⋯ 3 above, 0 below"]);
   });
 
   it("T2.43 (C04 I98, §3c S3): every element of a declared fold carries the toggle; an undeclared one carries none", () => {

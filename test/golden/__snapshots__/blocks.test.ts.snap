@@ -61,8 +61,8 @@ A                          B
 D             C
 
 ── scroll · measured 3 · rendered 3
-one
-two
+one                                    [38;2;140;140;140m#[39m
+two                                    [38;2;140;140;140m|[39m
 [38;2;138;138;138m... 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                right
@@ -132,8 +132,8 @@ A                                       B
 D                   C
 
 ── scroll · measured 3 · rendered 3
-one
-two
+one                                                        [38;2;140;140;140m#[39m
+two                                                        [38;2;140;140;140m|[39m
 [38;2;138;138;138m... 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                          right
@@ -203,8 +203,8 @@ A                                                     B
 D                          C
 
 ── scroll · measured 3 · rendered 3
-one
-two
+one                                                                            [38;2;140;140;140m#[39m
+two                                                                            [38;2;140;140;140m|[39m
 [38;2;138;138;138m... 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                                    right
@@ -274,8 +274,8 @@ A                                                                               
 D                                       C
 
 ── scroll · measured 3 · rendered 3
-one
-two
+one                                                                                                                    [38;2;140;140;140m#[39m
+two                                                                                                                    [38;2;140;140;140m|[39m
 [38;2;138;138;138m... 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                                                        right
@@ -345,8 +345,8 @@ A                          B
 D             C
 
 ── scroll · measured 3 · rendered 3
-one
-two
+one                                    [38;2;140;140;140m┃[39m
+two                                    [38;2;140;140;140m│[39m
 [38;2;138;138;138m⋯ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                right
@@ -416,8 +416,8 @@ A                                       B
 D                   C
 
 ── scroll · measured 3 · rendered 3
-one
-two
+one                                                        [38;2;140;140;140m┃[39m
+two                                                        [38;2;140;140;140m│[39m
 [38;2;138;138;138m⋯ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                          right
@@ -487,8 +487,8 @@ A                                                     B
 D                          C
 
 ── scroll · measured 3 · rendered 3
-one
-two
+one                                                                            [38;2;140;140;140m┃[39m
+two                                                                            [38;2;140;140;140m│[39m
 [38;2;138;138;138m⋯ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                                    right
@@ -558,8 +558,8 @@ A                                                                               
 D                                       C
 
 ── scroll · measured 3 · rendered 3
-one
-two
+one                                                                                                                    [38;2;140;140;140m┃[39m
+two                                                                                                                    [38;2;140;140;140m│[39m
 [38;2;138;138;138m⋯ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                                                        right
@@ -629,8 +629,8 @@ A                          B
 D             C
 
 ── scroll · measured 3 · rendered 3
-one
-two
+one                                    [38;2;110;111;118m#[39m
+two                                    [38;2;110;111;118m|[39m
 [38;2;105;108;119m... 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                right
@@ -700,8 +700,8 @@ A                                       B
 D                   C
 
 ── scroll · measured 3 · rendered 3
-one
-two
+one                                                        [38;2;110;111;118m#[39m
+two                                                        [38;2;110;111;118m|[39m
 [38;2;105;108;119m... 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                          right
@@ -771,8 +771,8 @@ A                                                     B
 D                          C
 
 ── scroll · measured 3 · rendered 3
-one
-two
+one                                                                            [38;2;110;111;118m#[39m
+two                                                                            [38;2;110;111;118m|[39m
 [38;2;105;108;119m... 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                                    right
@@ -842,8 +842,8 @@ A                                                                               
 D                                       C
 
 ── scroll · measured 3 · rendered 3
-one
-two
+one                                                                                                                    [38;2;110;111;118m#[39m
+two                                                                                                                    [38;2;110;111;118m|[39m
 [38;2;105;108;119m... 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                                                        right
@@ -913,8 +913,8 @@ A                          B
 D             C
 
 ── scroll · measured 3 · rendered 3
-one
-two
+one                                    [38;2;110;111;118m┃[39m
+two                                    [38;2;110;111;118m│[39m
 [38;2;105;108;119m⋯ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                right
@@ -984,8 +984,8 @@ A                                       B
 D                   C
 
 ── scroll · measured 3 · rendered 3
-one
-two
+one                                                        [38;2;110;111;118m┃[39m
+two                                                        [38;2;110;111;118m│[39m
 [38;2;105;108;119m⋯ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                          right
@@ -1055,8 +1055,8 @@ A                                                     B
 D                          C
 
 ── scroll · measured 3 · rendered 3
-one
-two
+one                                                                            [38;2;110;111;118m┃[39m
+two                                                                            [38;2;110;111;118m│[39m
 [38;2;105;108;119m⋯ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                                    right
@@ -1126,8 +1126,8 @@ A                                                                               
 D                                       C
 
 ── scroll · measured 3 · rendered 3
-one
-two
+one                                                                                                                    [38;2;110;111;118m┃[39m
+two                                                                                                                    [38;2;110;111;118m│[39m
 [38;2;105;108;119m⋯ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                                                        right

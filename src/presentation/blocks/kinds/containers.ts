@@ -25,9 +25,10 @@ import type { Block, CopyFn, Group, MeasureFn, Mosaic, MosaicRect, Panel, Scroll
 import { axesOf, groupPlacements, mosaicRects, parseAreas } from "../../../data/viewmodel/index.js";
 import type { NavElement } from "../types.js";
 import { cells, sliceCells, stripControl, truncate } from "../../text.js";
-import { SPINNER_CELLS, glyphs, spinnerFrames } from "../glyphs.js";
+import { SPINNER_CELLS, glyphs, scrollbarSet, spinnerFrames } from "../glyphs.js";
+import { scrollbarColumn } from "../scrollbar.js";
 import { clampSpans, paint, rows, tone } from "../paint.js";
-import { composeRow, fitRow, placeRows, type Placed } from "../../rows.js";
+import { composeRow, fitRow, placeRows, rowCells, type Placed } from "../../rows.js";
 import { layout, measure as solveHeight, type Box, type Size } from "../../layout/index.js";
 import type { BlockDefinition, Rendered, RenderContext, Windowed } from "../types.js";
 
@@ -313,6 +314,44 @@ function contentHeight(block: Scroll, width: number, measureChild: MeasureFn): n
 }
 
 /**
+ * Whether this box spends a column on a bar, and the width its content gets
+ * (C09 I93, §7f, §021).
+ *
+ * **Measured at the full width, and re-measured one cell narrower only if it
+ * overflowed.** The circularity to avoid is obvious once stated: a bar takes a
+ * column, a narrower content can be taller, and taller content is what decides
+ * whether there is a bar. Narrowing never *shortens* content, so overflow at
+ * the full width implies overflow at the narrower one and the question is
+ * settled in one step rather than at a fixed point nobody can read.
+ *
+ * **`measure` is unchanged by this** and that is deliberate: its answer turns
+ * on `content > interior` at the full width, which is the same test that puts
+ * the bar there. The re-measure can only grow the content, so the residue row
+ * it decides does not move either.
+ */
+function barOf(
+  block: Scroll,
+  width: number,
+  measureChild: MeasureFn,
+): Readonly<{ contentWidth: number; content: number; bar: boolean }> {
+  const interior = interiorOf(block);
+  const full = contentHeight(block, width, measureChild);
+  if (full <= interior) return { contentWidth: width, content: full, bar: false };
+  // **A collapsed box has no interior for a bar to sit in**, and it draws the
+  // residue row alone (C04 I98). Reserving the column there would narrow that
+  // row's text for a bar that `scrollbarColumn` answers `null` for anyway.
+  if (interior === 0) return { contentWidth: width, content: full, bar: false };
+  // **A bar needs a column and something to sit beside it.** At a width of one
+  // there is no room for both, and `max(1, width - 1)` drew a two-cell row at a
+  // width of one — the overrun that wraps the alternate screen (C09 I1, F1211).
+  // It is *a bar that cannot move is decoration* on the other axis: where the
+  // column cannot be spent, nothing is drawn and the content keeps the width.
+  if (width <= 1) return { contentWidth: width, content: full, bar: false };
+  const narrow = width - 1; // cells-ok — a width less its bar
+  return { contentWidth: narrow, content: contentHeight(block, narrow, measureChild), bar: true };
+}
+
+/**
  * The offset, clamped at read (C04 I48, §3c cell 4).
  *
  * **Never corrected at write.** A store fixed up on every patch is one that
@@ -467,9 +506,11 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
     // The child count, which is what a container's cost is proportional to and
     // what no duration states. Each child is its own node; this is how many.
     ctx.probe?.gauge("scroll.children", block.children.length); // cells-ok — a count of items, not a display width
-    const width = normaliseWidth(ctx.width);
+    const full = normaliseWidth(ctx.width);
     const interior = interiorOf(block);
-    const content = contentHeight(block, width, ctx.measureChild);
+    // **The column is decided before anything is laid out**, because it is the
+    // width every child is measured and drawn at (§7f).
+    const { contentWidth: width, content, bar } = barOf(block, full, ctx.measureChild);
     const offset = offsetOf(block, ctx, content);
 
     const ranges = childRanges(block, width, ctx.measureChild);
@@ -572,6 +613,29 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
       // paint time where nothing could see it.
       for (const rows of pieceRows) for (const row of rows) lines.push(fitRow(row, width));
       for (let i = 0; i < padCount; i += 1) lines.push(""); // cells-ok — a row count
+      // **The bar runs beside the interior and not beside the residue row**
+      // (§7f). They answer different questions — *where* against *how far* —
+      // and §021 draws both on one box, so the residue row keeps the full
+      // width and the bar keeps the rows it describes.
+      if (bar) {
+        const column = scrollbarColumn(interior, content, offset, scrollbarSet(ctx.capabilities));
+        if (column !== null) {
+          // **`accent` while focus is inside the box, `muted` otherwise**
+          // (§021, C26 §7) — the same rule the focused container's border
+          // takes, and the tone is the whole column's: §021 draws the two
+          // states as the same glyphs at two tones.
+          const held = ctx.focus !== null && ctx.focus.blockId === block.id;
+          const ink = tone(held ? "accent" : "muted", ctx.theme, ctx.capabilities);
+          for (let i = 0; i < interior; i += 1) { // cells-ok — a row count
+            const row = lines[i] ?? "";
+            // **`rowCells`, not `cells`** (C09 I73): a rendered row carries
+            // SGR, and a plain measure counts the escape bytes as cells — the
+            // pad then comes out zero and the bar sits against the text.
+            const pad = " ".repeat(Math.max(0, width - rowCells(row)));
+            lines[i] = row + pad + paint([{ text: column[i] ?? "", style: ink }]);
+          }
+        }
+      }
       if (residueRow !== null) lines.push(residueRow);
       return lines;
     }

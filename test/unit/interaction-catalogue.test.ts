@@ -131,6 +131,7 @@ describe("interaction-catalogue — the corpus renders", () => {
     const c = capsNamed("24bit");
     const accent = params(tone("accent", theme, c));
     const dim = params(tone("dim", theme, c));
+    const muted = params(tone("muted", theme, c));
     const none = frameFor(scene("scroll-midstream"), c);
     const focused = frameFor({ ...scene("scroll-midstream"), focus: { blockId: "s", rowId: "n4" } }, c);
     const plain = (lines: readonly string[]) => lines.map((l) => l.replace(/\u001b\[[0-9;]*m/gu, ""));
@@ -146,10 +147,21 @@ describe("interaction-catalogue — the corpus renders", () => {
       }
     }
     expect(moved.length).toBeGreaterThan(0);
-    expect(new Set(moved.map((m) => m.row)), "the residue row and no other").toEqual(new Set([3]));
-    expect(moved.map((m) => m.ch).join("").trim()).toBe("⋯ 2 above, 1 below");
+    // **The box's chrome is two things now** (C26 §7, C09 I92, §021): the
+    // residue row and the bar's column, both reserved whether or not a reader
+    // is in the box, and §021 gives the bar the same rule in the same words —
+    // *the thumb takes the ACCENT when its container has focus*.
+    expect(
+      new Set(moved.map((m) => m.row)),
+      "the residue row and the bar's column, and no other row",
+    ).toEqual(new Set([0, 1, 2, 3]));
+    expect(
+      moved.filter((m) => m.row === 3).map((m) => m.ch).join("").trim(),
+    ).toBe("⋯ 2 above, 1 below");
     for (const m of moved) {
-      expect(m.was).toBe(dim);
+      // `dim` is the residue row's resting ink and `muted` is the bar's; they
+      // were never the same word, and both go to `accent`.
+      expect(m.was).toBe(m.row === 3 ? dim : muted);
       expect(m.now).toBe(accent);
     }
 

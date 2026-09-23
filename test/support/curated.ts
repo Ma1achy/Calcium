@@ -141,6 +141,10 @@ export const DERIVED: Readonly<Record<string, string>> = {
   DARK: "the ink oracle's frozen palette — `test/support/ink-oracle.ts` pins it at 1 913 captures",
   LIGHT: "a lender for the 4-bit rung; the shipped light theme is the registry's",
   HIGH_CONTRAST: "the same, and T2.39a pins its 4-bit map by reference",
+  SCROLLBAR_UNICODE:
+    "the scrollbar set's own four members, listed for the width check that runs on the set "
+    + "(C09 I93) — a pin would be a second record of `SCROLLBAR_UNICODE_SET`, and the check is what "
+    + "asserts them",
 };
 
 /** The modules the driver scans, so a table added to one of them cannot go unpinned. */

@@ -45,6 +45,8 @@ import { RenderScratchStore } from "../../src/shell/render-scratch.js";
 import { rows as inkRows } from "../../src/presentation/blocks/paint.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/types.js";
 import { cells } from "../../src/presentation/text.js";
+import { scrollbarColumn } from "../../src/presentation/blocks/scrollbar.js";
+import { scrollbarSet, SCROLLBAR_UNICODE } from "../../src/presentation/blocks/glyphs.js";
 
 /** One sample per default grammar, ASCII throughout (T3.32, T1.45). */
 const SAMPLES: Readonly<Record<string, string>> = {
@@ -1259,14 +1261,101 @@ describe("C09 I76 — the window seam takes the caller's scratch, and the form i
   });
 });
 
-describe("C09 §7f — the scrollbar, owed at the spec commit", () => {
-  it.todo(
-    "T1.59 (C09 I92, §7f, §021): §021's four figure rows are drawn back glyph for glyph — twelve rows, a viewport of 12 in a content of 40, at offsets 0, 5, 14 and 28; not deferred on a component: the column lands in this MR",
-  );
-  it.todo(
-    "T1.60 (C09 I92, §7f, §021): content that fits draws nothing and one row more draws a bar, then the properties over a sweep — the column is the gutter's height, the thumb is never empty, never leaves the track, and reaches its end exactly at the maximum offset; not deferred on a component: the column lands in this MR",
-  );
-  it.todo(
-    "T1.61 (C09 I93, §7f, C02 I9): the set at wide is the ASCII set with no half-row form, and the width check run on one glyph rather than the set is the fabricated violation; not deferred on a component: the set lands in this MR",
-  );
+describe("C09 §7f — the scrollbar", () => {
+  // §021's own figure: a twelve-row gutter, a viewport of 12 and a maximum
+  // offset of 28 — so the content is 40 — with the four offsets it works.
+  const FIGURE = [
+    [0, "\u2503\u2503\u2503\u257f\u2502\u2502\u2502\u2502\u2502\u2502\u2502\u2502"],
+    [5, "\u2502\u257d\u2503\u2503\u2503\u2502\u2502\u2502\u2502\u2502\u2502\u2502"],
+    [14, "\u2502\u2502\u2502\u2502\u2503\u2503\u2503\u257f\u2502\u2502\u2502\u2502"],
+    [28, "\u2502\u2502\u2502\u2502\u2502\u2502\u2502\u2502\u257d\u2503\u2503\u2503"],
+  ] as const;
+
+  const UNI = scrollbarSet({ unicode: "full", ambiguousWidth: "narrow" } as never);
+  const draw = (rows: number, content: number, offset: number, set = UNI): string | null => {
+    const col = scrollbarColumn(rows, content, offset, set);
+    return col === null ? null : col.join("");
+  };
+
+  it("T1.59 (C09 I92, §7f, §021): §021's four rows are drawn back, glyph for glyph", () => {
+    // **The design's figure is the fixture.** A rounding that is arithmetically
+    // self-consistent and different passes every property below and draws
+    // another picture; only the figure itself can tell them apart.
+    for (const [offset, expected] of FIGURE) {
+      expect(draw(12, 40, offset), `offset ${String(offset)}`).toBe(expected);
+    }
+  });
+
+  it("T1.60 (C09 I92, §7f, §021): nothing where a bar could not move, and the properties everywhere else", () => {
+    // **The boundary from both sides.** *A bar that cannot move is decoration*
+    // is satisfied exactly by a renderer that draws none at all, so the row one
+    // taller has to draw one.
+    for (const rows of [1, 4, 12, 30]) {
+      expect(draw(rows, rows, 0), `content of exactly ${String(rows)} fits`).toBe(null);
+      expect(draw(rows, rows - 1, 0), "and less than the viewport fits too").toBe(null);
+      expect(draw(rows, rows + 1, 0), "one row more is a bar").not.toBe(null);
+    }
+
+    for (const rows of [1, 2, 3, 12, 31]) {
+      for (const content of [rows + 1, rows + 7, rows * 3, rows * 100 + 1]) {
+        const maxOffset = content - rows;
+        for (const offset of [0, 1, Math.floor(maxOffset / 3), maxOffset - 1, maxOffset]) {
+          if (offset < 0) continue;
+          const col = scrollbarColumn(rows, content, offset, UNI);
+          const at = `${String(rows)}/${String(content)}@${String(offset)}`;
+          expect(col, at).not.toBe(null);
+          const glyphs = col ?? [];
+          expect(glyphs.length, `the column is the gutter's height at ${at}`).toBe(rows);
+          // **The thumb is never empty.** A very long document over a short
+          // gutter rounds the proportion to nothing, and the floor on the ratio
+          // is what keeps the mark on the screen.
+          expect(
+            glyphs.some((g) => g !== UNI.track),
+            `the thumb is somewhere at ${at}`,
+          ).toBe(true);
+          // And it is one run, not scattered — the half-row forms only ever
+          // appear at its two ends.
+          const marked = glyphs.flatMap((g, i) => (g === UNI.track ? [] : [i]));
+          const first = marked[0] ?? 0;
+          const last = marked[marked.length - 1] ?? 0;
+          expect(marked.length, `one contiguous run at ${at}`).toBe(last - first + 1);
+        }
+        // **It reaches the end exactly at the maximum offset**, which is the
+        // clause the floor is chosen for: 28 of 28 lands at 17 of 17 rather
+        // than being clamped there, and a clamp would hide a rounding that
+        // stalls one position short everywhere else.
+        const top = scrollbarColumn(rows, content, 0, UNI) ?? [];
+        const bottom = scrollbarColumn(rows, content, maxOffset, UNI) ?? [];
+        expect(top[0], `the thumb starts at the top at ${String(rows)}/${String(content)}`).not.toBe(UNI.track);
+        expect(
+          bottom[bottom.length - 1],
+          `and ends at the bottom at ${String(rows)}/${String(content)}`,
+        ).not.toBe(UNI.track);
+      }
+    }
+  });
+
+  it("T1.61 (C09 I93, §7f, C02 I9): the set degrades whole, and the check is on the set", () => {
+    const wide = scrollbarSet({ unicode: "full", ambiguousWidth: "wide" } as never);
+    const ascii = scrollbarSet({ unicode: "ascii", ambiguousWidth: "narrow" } as never);
+    expect(wide, "a set of mixed widths cannot ship, so it takes ascii").toEqual(ascii);
+    expect(wide.half, "and the ascii rung has no half-row form").toBe(false);
+    // Twelve positions rather than twenty-four: the thumb is three rows and
+    // starts at one, where the Unicode rung draws seven half-rows from three.
+    expect(draw(12, 40, 5, wide), "so it draws at whole-row resolution").toBe("|###||||||||");
+
+    // **The premise, measured rather than assumed, and it is not the design's.**
+    // §021 argues the set degrades whole because `│` and `┃` are Ambiguous
+    // where `╽` and `╿` are Narrow — true of the property, and false here:
+    // `DRAWN_AS_GEOMETRY` widens the box-drawing block entire, a deliberate
+    // one-directional deviation (F665). So the four are two cells *together* at
+    // `wide`, and a two-cell glyph in a one-column bar is not a one-column bar.
+    //
+    // Asserted so that a change to that table fails here and is read rather
+    // than absorbed — the ruling is the same either way, and the reason is not.
+    const at = (w: "narrow" | "wide"): readonly number[] =>
+      SCROLLBAR_UNICODE.map((g: string) => cells(g, w));
+    expect(at("narrow"), "one cell each at narrow").toEqual([1, 1, 1, 1]);
+    expect(at("wide"), "and two each at wide, which is this tree and not the property").toEqual([2, 2, 2, 2]);
+  });
 });

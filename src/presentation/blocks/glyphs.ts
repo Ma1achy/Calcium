@@ -954,6 +954,70 @@ export function barStyle(
 /** The style names, for the catalogue's own row and for a consumer listing them (C24 §6). */
 export const barStyleNames = (): readonly string[] => Object.freeze(Object.keys(BAR_STYLES));
 
+/**
+ * The scrollbar's four glyphs, and whether this rung has half-row forms at all
+ * (C09 §7f, I93, §021).
+ *
+ * **A set rather than four `GlyphSet` slots**, on `BAR_STYLES`' own precedent.
+ * The ASCII rung has no half-row form, so slots would carry a duplicate `#` —
+ * three Unicode characters against one ASCII one, which is exactly the 1:1
+ * property T2.5 asserts over `SUBSTITUTIONS`. A set can say *this rung has
+ * none*; a pair cannot say it without lying.
+ *
+ * Here rather than in `blocks/scrollbar.ts` beside the arithmetic, because this
+ * file is where a mark the framework draws lives (C09 I22, SS47) — and because
+ * the thing it is modelled on is twenty lines above it.
+ */
+export type ScrollbarSet = Readonly<{
+  track: string;
+  thumb: string;
+  /** The thumb's lower half — *starts mid-row*. Never drawn where `half` is false. */
+  thumbStart: string;
+  /** The thumb's upper half — *ends mid-row*. */
+  thumbEnd: string;
+  /** Whether a row is two positions or one. */
+  half: boolean;
+}>;
+
+const SCROLLBAR_UNICODE_SET: ScrollbarSet = Object.freeze({
+  track: "\u2502",
+  thumb: "\u2503",
+  thumbStart: "\u257d",
+  thumbEnd: "\u257f",
+  half: true,
+});
+
+const SCROLLBAR_ASCII_SET: ScrollbarSet = Object.freeze({
+  track: "|",
+  thumb: "#",
+  thumbStart: "#",
+  thumbEnd: "#",
+  half: false,
+});
+
+/** Every member of the Unicode rung, for the check that runs on the set (C09 I93). */
+export const SCROLLBAR_UNICODE: readonly string[] = Object.freeze([
+  SCROLLBAR_UNICODE_SET.track,
+  SCROLLBAR_UNICODE_SET.thumb,
+  SCROLLBAR_UNICODE_SET.thumbStart,
+  SCROLLBAR_UNICODE_SET.thumbEnd,
+]);
+
+/**
+ * The set for a rung, degrading whole (C09 I93, C02 I9).
+ *
+ * Every member is two cells at `ambiguousWidth: "wide"` here — `DRAWN_AS_GEOMETRY`
+ * widens the box-drawing block entire, a deliberate one-directional deviation
+ * from the property (F665) and a superset of §021's own reason. A two-cell glyph
+ * in a one-column bar is not a one-column bar, so the whole set takes ASCII.
+ */
+export function scrollbarSet(
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+): ScrollbarSet {
+  if (caps.unicode === "ascii") return SCROLLBAR_ASCII_SET;
+  return caps.ambiguousWidth === "wide" ? SCROLLBAR_ASCII_SET : SCROLLBAR_UNICODE_SET;
+}
+
 /** The set names, in catalogue order — what `Status.spinner` may name (C24 §6). */
 export const spinnerSetNames = (): readonly string[] => Object.freeze(Object.keys(SPINNER_SETS));
 
