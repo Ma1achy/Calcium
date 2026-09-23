@@ -10,6 +10,7 @@ import { curveRows } from "../../src/presentation/plot/curve.js";
 import { seriesRange, FACING_DEFAULT } from "../../src/presentation/plot/scale.js";
 import { sparkline } from "../../src/presentation/plot/sparkline.js";
 import { PLOT_CORPUS, lossCurve } from "../support/blocks.js";
+import { ONE_PER_FORM } from "../support/plot-forms.js";
 import { CORPUS_BUDGET_MS } from "../support/budget.js";
 import { ASCII_CAPS, FULL_CAPS, MONO_CAPS, measurable, visible } from "../support/render.js";
 import { checkAsciiParity, checkMeasurement, uncoveredKinds } from "../../src/testing/measurement-conformance.js";
@@ -221,5 +222,80 @@ describe("C12 tier 2 — state", () => {
     expect(a).not.toBe(b);
     expect(a).toContain("train");
     expect(a).toContain("val");
+  });
+
+  it("T2.130 (C12 I142, §017, R-FOC-004): every framed form answers focus, and only in its SGR", () => {
+    // **The rule had one implementation and two ways in, and a matrix took
+    // neither.** `frameTone` has always answered `accent` for a focused frame;
+    // `Layout.focused` is set in `reserving`, which `heatmapFormRows` never
+    // reaches because it builds its own layout. So the whole of C12 §3's
+    // paragraph about a focused frame was true of a line plot and false of
+    // every matrix form, and the golden that draws the composition recorded
+    // the two frames byte-identical under the ruling. A row over the forms is
+    // what stops the next form joining them.
+    const kit = (focus: boolean) =>
+      measurable({
+        capabilities: FULL_CAPS,
+        definitions: [plotDefinition],
+        ...(focus ? { focus: { blockId: "FOCUSED", rowId: "FOCUSED" } } : {}),
+      });
+
+    const answered: string[] = [];
+    const silent: string[] = [];
+    for (const [form, sample] of Object.entries(ONE_PER_FORM)) {
+      const b = { ...sample, id: "FOCUSED" } as Plot;
+      let rest: readonly string[];
+      let lit: readonly string[];
+      try {
+        rest = kit(false).renderToLines(b as never, 60);
+        lit = kit(true).renderToLines(b as never, 60);
+      } catch {
+        // A form whose representative cannot render at this width says nothing
+        // about focus; it is neither an answer nor a silence.
+        continue;
+      }
+      // **Whatever moved, no glyph and no width moved** — the measurement
+      // invariant, and the half of R-FOC-004 that holds for every form whether
+      // or not it has a treatment.
+      expect(lit.map(visible), `${form} — focus changes no glyph and no width`).toEqual(
+        rest.map(visible),
+      );
+      (JSON.stringify(lit) === JSON.stringify(rest) ? silent : answered).push(form);
+    }
+
+    // **The partition is declared and compared both ways**, which is what makes
+    // it a driven exemption rather than a shortfall nobody counts: a form that
+    // gains a treatment fails here, and so does one that silently loses it or
+    // a new form that joins the silent side.
+    //
+    // **The silent set is measured, and it is not homogeneous.** Seven of the
+    // eleven draw no box glyph at all at 60 columns — `sparkline`, `waffle`,
+    // `sankey`, `treemap`, `pie`, `radar`, `horizon` — so there is no enclosure
+    // for a tone to move and their silence is the rule holding rather than
+    // failing. **Four do draw one and still do not answer**: `graph` and `tree`
+    // draw connectors (`├`, `│`) which are structure and not an enclosure, and
+    // `smallmultiples` and `pairplot` draw sub-panel frames, which are. Those
+    // last two are a real gap in §017's *a FRAME takes its border*, recorded
+    // here with their measurement rather than left for the next reader to
+    // rediscover; whether a sub-panel's border is the block's enclosure is a
+    // question the design does not answer in as many words.
+    const SILENT: readonly string[] = [
+      "sparkline", "waffle", "sankey", "graph", "tree", "treemap",
+      "smallmultiples", "pairplot", "pie", "radar", "horizon",
+    ];
+    expect([...silent].sort(), "forms that do not answer focus").toEqual([...SILENT].sort());
+    expect(answered.length, "and the rest do").toBeGreaterThan(0);
+
+    // The control: the null focus form paints nothing, on F802's ruling, so a
+    // treatment leaking onto it fails here rather than being absorbed.
+    const heat = { ...(ONE_PER_FORM as Record<string, Plot>)["heatmap"], id: "FOCUSED" } as never;
+    const nulled = measurable({
+      capabilities: FULL_CAPS,
+      definitions: [plotDefinition],
+      focus: { blockId: "FOCUSED", rowId: null },
+    });
+    expect(nulled.renderToLines(heat, 60), "the null form paints nothing (F802)").toEqual(
+      kit(false).renderToLines(heat, 60),
+    );
   });
 });

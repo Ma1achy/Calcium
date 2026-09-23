@@ -97,9 +97,9 @@ exports[`C10 §4k — the compositions, as frames > case 4 — focus over a heat
   dim/-:"1 ⠄⠔⠖⠶⠷⠿⡿⣿ 16"
 
 -- focused, run by run
-  dim/-:"  one ┤" page/-:"⠄⠄⠄⠄⠄⠄⠄⠄⠄⠔⠔⠔⠔⠔⠔⠔⠔⠷⠷⠷⠷⠷⠷⠷⠷⣿⣿⣿⣿⣿⣿⣿⣿"
-  dim/-:"  two ┤" page/-:"⣿⣿⣿⣿⣿⣿⣿⣿⣿⠷⠷⠷⠷⠷⠷⠷⠷⠔⠔⠔⠔⠔⠔⠔⠔⠄⠄⠄⠄⠄⠄⠄⠄"
-  dim/-:"three ┤" page/-:"⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷"
+  dim/-:"  one " bold/-:"┤" page/-:"⠄⠄⠄⠄⠄⠄⠄⠄⠄⠔⠔⠔⠔⠔⠔⠔⠔⠷⠷⠷⠷⠷⠷⠷⠷⣿⣿⣿⣿⣿⣿⣿⣿"
+  dim/-:"  two " bold/-:"┤" page/-:"⣿⣿⣿⣿⣿⣿⣿⣿⣿⠷⠷⠷⠷⠷⠷⠷⠷⠔⠔⠔⠔⠔⠔⠔⠔⠄⠄⠄⠄⠄⠄⠄⠄"
+  dim/-:"three " bold/-:"┤" page/-:"⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷"
   (blank)
   dim/-:"1 ⠄⠔⠖⠶⠷⠿⡿⣿ 16"
 
@@ -123,9 +123,9 @@ exports[`C10 §4k — the compositions, as frames > case 4 — focus over a heat
   page/muted:"1 " page/muted:" 16"
 
 -- focused, run by run
-  page/muted:"  one ┤"
-  page/muted:"  two ┤"
-  page/muted:"three ┤"
+  page/muted:"  one " page/accent:"┤"
+  page/muted:"  two " page/accent:"┤"
+  page/muted:"three " page/accent:"┤"
   (blank)
   page/muted:"1 " page/muted:" 16"
 
@@ -149,9 +149,9 @@ exports[`C10 §4k — the compositions, as frames > case 4 — focus over a heat
   page/muted:"1 " page/muted:" 16"
 
 -- focused, run by run
-  page/muted:"  one +"
-  page/muted:"  two +"
-  page/muted:"three +"
+  page/muted:"  one " page/accent:"+"
+  page/muted:"  two " page/accent:"+"
+  page/muted:"three " page/accent:"+"
   (blank)
   page/muted:"1 " page/muted:" 16"
 

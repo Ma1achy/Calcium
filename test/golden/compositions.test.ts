@@ -257,7 +257,16 @@ describe("C10 §4k — the compositions, as frames", () => {
         measurable({
           capabilities: rung.capabilities,
           definitions: [plotDefinition],
-          ...(focus ? { focus: { blockId: "h", rowId: null } } : {}),
+          // **`rowId: "h"` and not `null`, and the row asserted nothing until
+          // this** (F802). A plot reads `rowId === block.id` — *the block as
+          // its own element* — because the null form is one the type admits
+          // and no session produces, so it paints nothing deliberately. This
+          // case focused in the null form for as long as it has existed: the
+          // two frames it composed were byte-identical, and the snapshot
+          // recorded them side by side under a ruling that says *the border
+          // and the axes take the focus*. Every assertion held, because both
+          // of them are true of two identical frames.
+          ...(focus ? { focus: { blockId: "h", rowId: "h" } } : {}),
         }).renderToLines(HEAT as never, 40);
       const lit = at(true);
       const rest = at(false);
@@ -265,6 +274,11 @@ describe("C10 §4k — the compositions, as frames", () => {
       // Stripped of SGR the two frames are the same picture; what moved is the
       // frame's ink, and the report below is where it shows.
       expect(lit.map(visible), "focus changes no glyph and no width").toEqual(rest.map(visible));
+      // **And something moved**, which is the half that was missing. *The data
+      // keeps its reading* is satisfied by a frame where focus did nothing at
+      // all, so the two assertions have to be made together or the first one
+      // is the whole row.
+      expect(lit, "the frame's ink answers focus").not.toEqual(rest);
       expect(
         [
           "-- the frame, focused",

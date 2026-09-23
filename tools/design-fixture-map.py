@@ -22,8 +22,8 @@ M = {
  14:("frame","session-frame.test.ts","away, and what the frame says while you are"),
  15:("prose","—","four interaction principles"),
  16:("prose","—","scopes, as an ownership table"),
- 17:("owed","M3","the focus treatment follows the shape — `focusGround`"),
- 18:("owed","M3","focus on things that are not rows"),
+ 17:("owed","M3","the focus treatment follows the shape — measured over `ONE_PER_KIND`: `scroll` and `plot` answer block focus and the other thirty-four do not, so the RUN, the BOX and the FRAME rows are all unbuilt"),
+ 18:("owed","M3","focus on things that are not rows — its three cases are a button, a slider and a checkbox, and none is a block kind"),
  19:("owed","M6","the keys — `docs/KEYS.md`, generated from the registry"),
  20:("prose","—","DAS and ARR as figures"),
  21:("frame","design-surfaces.test.ts","the scrollbar — the set degrading whole, and the bar beside a box that overflows"),
@@ -122,7 +122,7 @@ PROBE = {
  3:"overlayRegion", 4:"spinning|SPINNER_SETS", 5:"spinning|SPINNER_SETS",
  6:"GLYPH_TABLE", 7:"descendants", 8:"questionNotice", 9:"CALL_STATE_GLYPH",
  10:"emptySnapshot", 11:"insertChip", 12:"questionNotice", 13:"CALL_STATE_GLYPH",
- 14:"emptySnapshot", 17:"focusGround", 18:"focusGround", 19:"keyboardProtocol",
+ 14:"emptySnapshot", 17:None, 18:None, 19:"keyboardProtocol",
  21:"scrollbar", 22:"R-KEY-005", 23:"displayRows", 24:"CALL_STATE_GLYPH",
  26:"hotEdge|hot-edge", 27:"barCells|BAR_STYLES", 28:"promptReplaced",
  29:"menuWindow", 30:"headMark", 31:"SPINNER_SETS", 33:"BAR_STYLES",
@@ -280,11 +280,16 @@ than inferred from a suite staying green.
     of the surfaces: built {built_n} · unbuilt {len(surfaces) - built_n} · framed {framed_n}
 
 **`framed` is the figure this MR moves, and `built` is the one that went backwards.**
-Five surface rows carry no probe now, not two. §054 and §055 want OSC 8 hyperlinks
+Seven surface rows carry no probe now, not two. §054 and §055 want OSC 8 hyperlinks
 nothing in the tree emits, and they were the only absence the first sweep found; §035
 and §036 join them because their probe answered from `Intl.Segmenter`'s options rather
-than from `Progress`, which has no member for either axis; and §076 because its probe
-named the theme registry for a fixture about valued spans. Raising `built` is not the
+than from `Progress`, which has no member for either axis; §076 because its probe
+named the theme registry for a fixture about valued spans; and §017 and §018 because
+theirs named `focusGround`, a surface slot that resolves in all ten themes — it is in
+`theme-tokens.test.ts`'s table — for two fixtures about **treatments**. A slot existing
+is not a treatment reaching a renderer, and `focus-shapes.test.ts` measures the
+difference: `scroll` and `plot` answer block focus and the other thirty-four kinds draw
+a focused block byte for byte as they draw an unfocused one. Raising `built` is not the
 work — a probe says a subject exists and not that it matches the design. Raising
 `framed` is.
 """)

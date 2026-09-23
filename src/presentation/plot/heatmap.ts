@@ -22,7 +22,7 @@ import { formatValue } from "./axes.js";
 import { tone } from "../blocks/paint.js";
 import { plotAreaRows, AXIS_GUTTER } from "./height.js";
 import { xLabelRow } from "./axes.js";
-import { labelColumnWidth, line, plotRow, rightGutterWidth, yAxisSides, type Layout } from "./furniture.js";
+import { focusedOn, labelColumnWidth, line, plotRow, rightGutterWidth, yAxisSides, type Layout } from "./furniture.js";
 import { IS_FIELD_FORM } from "../../data/viewmodel/index.js";
 import { calendarCaptions } from "./calendar.js";
 import { drawnBlock, fieldIsMagnitude, magnitudeSeries } from "./derive.js";
@@ -458,6 +458,16 @@ function matrixFurniture(
   ctx: RenderContext,
   matrixLayout: MatrixLayout,
 ): readonly string[] {
+  // **This stays `muted` and the first fix moved it, wrongly** (C12 I142).
+  // The reasoning was that a matrix composes its own furniture and had its own
+  // copy of the frame's ink — true — and the remedy was to point it at
+  // `frameTone`. The frame refused it: what this ink paints is the **captions
+  // and the legend**, which are the scale, and C12 §3 says in as many words
+  // that *the y-labels keep `muted` — the enclosure lights up, not the scale*.
+  // The axis ticks come from `line`, in `furniture.ts`, which already asks
+  // `frameTone`; all they ever needed was `Layout.focused` to be set, and for a
+  // matrix it never was. One gap, not two, and only reading the frame told the
+  // two apart — both diagnoses produce a difference where there was none.
   const muted = tone("muted", ctx.theme, ctx.capabilities);
   // **The matrix's captions come through here and not `xRowFor`**, which is a
   // third caption builder and the reason a surviving mutation was right about a
@@ -685,7 +695,13 @@ export function heatmapFormRows(
   // this family, `tiles` and `nodes` each got wrong separately — but the ramp
   // still has a domain, and it is this one, shared with the second arm.
   const range = matrixFigure(block).extent;
-  const layout = layoutFor(block, width, ctx.capabilities);
+  // **The focus flag, which a matrix never received** (C12 I142). `reserving`
+  // sets it on the axed path from `ctx.focus`, and this file builds its own
+  // layout — so the flag and the ink were both missing and fixing either alone
+  // moved nothing. The predicate is shared rather than repeated: a second copy
+  // of `rowId === block.id` is how the first one got out of step.
+  const bare = layoutFor(block, width, ctx.capabilities);
+  const layout = bare === null ? null : { ...bare, focused: focusedOn(block.id, ctx) };
 
   if (layout === null) {
     const flat: Layout = {
