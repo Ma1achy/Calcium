@@ -56,20 +56,18 @@ export type FocusTarget =
    * R-BLK-109, R-BLK-866).
    *
    * **A ninth target at a rung that already had one, which is M5's point made
-   * concrete**: targets are not rungs, and the map is many-to-one. A panel and a
-   * view are both `substate` — *FIND and COMPLETION are PROMPT SUBSTATES, the
-   * prompt relabelled* — and they are two targets rather than one because they
-   * bind the same chords to different verbs: `escape` is `dismiss` on a panel
-   * and `viewPop` on a view, which is R-KEY-003's *unless the current owner
-   * explicitly captures the action* and is a collision on one target.
+   * concrete**: targets are not rungs, and the map is many-to-one. `substate` is
+   * the rung — *FIND and COMPLETION are PROMPT SUBSTATES, the prompt relabelled*
+   * — and a panel is what occupies it.
    *
-   * Above `pushedView` because a panel opens over a live prompt while a view
-   * replaces the region, and `push` refuses a view onto a non-empty stack, so
-   * the two never coexist and the order between them is a formality that still
-   * has to be written down.
+   * **It shared the rung with `pushedView`, and that is how M5's claim was
+   * demonstrated** (R-EXA-082, F1254): two targets at one rung, separate because
+   * they bound the same chords to different verbs — `escape` was `dismiss` on a
+   * panel and `viewPop` on a view, R-KEY-003's *unless the current owner
+   * explicitly captures the action*. The view is gone and the rung still is not
+   * the target, which is the claim standing without its first illustration.
    */
   | "panel"
-  | "pushedView"
   /**
    * C26 I2 — interaction mode, and it is **a target rather than a flag**.
    *
@@ -139,7 +137,6 @@ export const RUNG_OF: Readonly<Record<Exclude<FocusTarget, "global">, OwnerRung>
   overlay: "question",
   copyMode: "copy",
   panel: "substate",
-  pushedView: "substate",
   interaction: "inside",
   prompt: "scope",
   liveBlock: "scope",
@@ -514,34 +511,16 @@ export type KeyAction =
   | "scrollPageDown"
   | "scrollTop"
   | "scrollBottom"
-  // --- the pushed view (I24) -----------------------------------------------
+  // **The pushed view's nine actions are gone with its three surfaces** (C22
+  // §13a, C25 §3b, C28 §3c, R-EXA-082, F1254). `pushedView` had been in
+  // `FocusTarget` since C16 was written with no binding anywhere — vacuous for as
+  // long as nothing pushed a view — then carried eleven rows for three producers,
+  // and is vacuous again with no producer. This time the target goes too.
   //
-  // `pushedView` has been in `FocusTarget` since C16 was written and had no
-  // binding anywhere: `activeTarget` resolved to a target with an empty handler
-  // set and every key fell through to step 3. Vacuous only for as long as
-  // nothing pushed a view, which is the same shape as `frameworkSources` and as
-  // the editing bindings above.
-  //
-  // `viewPop` is `Esc`, and it is **not** §5's Ctrl-C rung under another name:
-  // that rung is cancellation and this is the view's own dismissal (A01 D7).
-  //
-  | "viewNextHunk"
-  | "viewPrevHunk"
-  | "viewTop"
-  | "viewBottom"
-  | "viewPageUp"
-  | "viewPageDown"
-  // **The section gesture, and it is one row per key rather than one per owner**
-  // (I33, added 2026-09-12). `n`/`p` move the view's own unit — a hunk, a block,
-  // a card — and these move its *section*: a file, a heading, a group. The
-  // ruling that nothing would be added to this target held while the profiler
-  // had four panes and is withdrawn at thirty-seven cards (C28 §3c). The member
-  // is required on every owner rather than optional, because an owner that
-  // answers nothing is indistinguishable from a view with one section, and a
-  // reader who learns the key does nothing here stops pressing it everywhere.
-  | "viewNextSection"
-  | "viewPrevSection"
-  | "viewPop"
+  // I33's section gesture retires with them and its reasoning is kept: *a member
+  // required on every owner rather than optional, because an owner that answers
+  // nothing is indistinguishable from a view with one section.* That is a rule
+  // about interfaces with several implementers, and it applies to the next one.
   // --- copy mode (C16 §5b) -------------------------------------------------
   //
   // **Entry and exit, and the exit is the target's own dismissal** (C16 §5c,

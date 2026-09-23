@@ -45,7 +45,7 @@ export type Layer = Readonly<{
    * move, `⏎` went to the layer, and `Esc` dismissed it instead of leaving the
    * block. A layer that is never `top` cannot reach the ladder at all.
    */
-  kind: "overlay" | "view" | "peek" | "panel";
+  kind: "overlay" | "peek" | "panel";
   placement: Placement;
   /**
    * `Block[]`, never React (I4) — so a layer is themed, degrades to ASCII and
@@ -116,11 +116,11 @@ export type Layer = Readonly<{
 /**
  * A layer C16 can route to — what `top` answers (I21).
  *
- * Typed rather than documented: `RouterDeps.overlayTop` narrows `kind` to
- * `"overlay" | "view"`, so a `top` that could answer a peek would not compile
- * at the one seam that matters.
+ * Typed rather than documented: `RouterDeps.overlayTop` narrows `kind` to the
+ * keyed ones, so a `top` that could answer a peek would not compile at the one
+ * seam that matters. (`"view"` was a third until R-EXA-082 retired it — F1254.)
  */
-export type KeyedLayer = Layer & Readonly<{ kind: "overlay" | "view" | "panel" }>;
+export type KeyedLayer = Layer & Readonly<{ kind: "overlay" | "panel" }>;
 
 /**
  * A placed layer that takes input — the ones C16 hit-tests a click against (I21).
@@ -177,7 +177,7 @@ export type LayerUpdate = Partial<Pick<Layer, "content" | "placement" | "width" 
 export type OverlayChange =
   | Readonly<{ kind: "push"; id: string; layerKind: Layer["kind"] }>
   /** A peek is never popped (I21), so `pop` names only the keyed kinds. */
-  | Readonly<{ kind: "pop"; id: string; layerKind: "overlay" | "view" | "panel" }>
+  | Readonly<{ kind: "pop"; id: string; layerKind: "overlay" | "panel" }>
   | Readonly<{ kind: "content"; id: string }>
   | Readonly<{ kind: "dismiss"; id: string; reason: DismissReason }>;
 
@@ -209,7 +209,6 @@ export interface OverlayManager {
   readonly stack: readonly Layer[];
   /** The topmost layer that takes keys — never a peek (I21). */
   readonly top: KeyedLayer | null;
-  readonly hasView: boolean;
 }
 
 export type OverlayOptions = Readonly<{ registry: BlockRegistryLike }>;

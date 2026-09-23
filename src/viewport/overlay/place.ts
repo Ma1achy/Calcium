@@ -33,11 +33,14 @@ const DEFAULT_MAX_HEIGHT_FRACTION = 0.5;
  * sit above the completion menu it was raised over.
  */
 export function sortLayers(stack: readonly Layer[]): readonly Layer[] {
-  const views = stack.filter((l) => l.kind === "view");
+  // **Three partitions, and there were four** (R-EXA-082, F1254). A view sorted
+  // to the bottom because it covered the region and everything else was drawn
+  // over it; with no view the bottom of the stack is a peek, which is the layer
+  // that opens beneath whatever is already up.
   const peeks = stack.filter((l) => l.kind === "peek");
   const panels = stack.filter((l) => l.kind === "panel");
   const overlays = stack.filter((l) => l.kind === "overlay");
-  return Object.freeze([...views, ...peeks, ...panels, ...overlays]);
+  return Object.freeze([...peeks, ...panels, ...overlays]);
 }
 
 /** Step 1: the width an overlay actually gets. Never wider than the region (I16). */
@@ -117,7 +120,7 @@ export function place(
   const out: Placed[] = [];
 
   for (const layer of sortLayers(stack)) {
-    if (layer.placement.kind === "fill" || layer.kind === "view") {
+    if (layer.placement.kind === "fill") {
       const measured = registry.measureSequence(layer.content, region.width);
       out.push(
         Object.freeze({

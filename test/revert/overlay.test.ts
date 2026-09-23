@@ -2,15 +2,16 @@
 //
 // The form is "removing X → T fails", and it is worth stating why the form
 // matters here in particular: T6.2 arrived in the spec naming two tests that
-// could not have failed. `push(view)` is rejected onto any non-empty stack, so
-// I2 holds by construction and a sort removed entirely is a sort nothing
-// notices — a fail-on-revert test that cannot fire, which is A03's vacuity
-// class one level up from the rules it was written for.
+// could not have failed. A view was rejected onto any non-empty stack, so
+// *overlays sort above views* held by construction and a sort removed entirely
+// was a sort nothing noticed — a fail-on-revert test that cannot fire, which is
+// A03's vacuity class one level up from the rules it was written for. That rule
+// is retired with the kind (R-EXA-082, F1254); the aim it argued for is not.
 import { describe, expect, it } from "vitest";
 
 import { createOverlayManager, place, sortLayers } from "../../src/viewport/overlay/index.js";
 import type { Layer, Region } from "../../src/viewport/overlay/index.js";
-import { REGION, anchored, centred, placeIn, registry, rowsOf, view } from "../support/overlay.js";
+import { REGION, anchored, centred, panel, peek, placeIn, registry, rowsOf } from "../support/overlay.js";
 
 describe("C15 revert — the placement rules", () => {
   it("T6.1 (I7): clamping to the room before flipping → T3.5 fails", () => {
@@ -22,17 +23,22 @@ describe("C15 revert — the placement rules", () => {
     expect(p!.top).toBeLessThan(12);
   });
 
-  it("T6.2 (I2): removing the sort → T2.8 fails, and only T2.8", () => {
-    // Not T1.4 or T5.3, which was this test's original claim. Neither can
-    // construct a stack in the wrong order, so both pass under push order
-    // alone. The revert is detectable only against a hand-built stack.
-    const wrong: readonly Layer[] = [centred("confirm", 3), view("dash")];
-    expect(sortLayers(wrong).map((l) => l.id)).toEqual(["dash", "confirm"]);
+  it("T6.2 (I23): removing the sort → T2.8 fails, and only T2.8", () => {
+    // **Re-aimed off the retired overlays-above-views rule** (R-EXA-082,
+    // F1254). The original argument was that
+    // `push(view)` is rejected onto any non-empty stack, so nothing reached
+    // through `push` could construct a mis-ordered stack and the revert was
+    // detectable only against a hand-built one. The kind is gone; the aim is
+    // unchanged for the reason one band up — `push` sorts on the way in.
+    const wrong: readonly Layer[] = [centred("confirm", 3), peek("beside", 2, { row: 5, prefer: "below" })];
+    expect(sortLayers(wrong).map((l) => l.id)).toEqual(["beside", "confirm"]);
 
-    // And the demonstration that push cannot reach it.
+    // And the demonstration that `push` cannot reach it: the same two layers
+    // in the same order come back sorted.
     const m = createOverlayManager({ registry });
     m.push(centred("confirm", 3));
-    expect(() => m.push(view("dash"))).toThrow();
+    m.push(peek("beside", 2, { row: 5, prefer: "below" }));
+    expect(m.stack.map((l) => l.id)).toEqual(["beside", "confirm"]);
   });
 
   it("T6.7 (I6): an off-by-one in clamping → T2.2 fails", () => {
@@ -90,12 +96,9 @@ describe("C15 revert — the placement rules", () => {
 });
 
 describe("C15 revert — the stack rules", () => {
-  it("T6.3 (I1): allowing nested views → T3.3 fails", () => {
-    const m = createOverlayManager({ registry });
-    m.push(view("dash"));
-    expect(() => m.push(view("logs"))).toThrow();
-    expect(m.stack.filter((l) => l.kind === "view")).toHaveLength(1);
-  });
+  // **T6.3 is struck with the at-most-one-view rule** (R-EXA-082, F1254):
+  // *allowing nested views* is a revert of a rule whose subject no longer
+  // exists.
 
   it("T6.4 (I3): letting Esc dismiss a confirm → T1.9 fails", () => {
     const m = createOverlayManager({ registry });
@@ -129,11 +132,11 @@ describe("C15 revert — the stack rules", () => {
     const changes: string[] = [];
     m.subscribe((c) => changes.push(`${c.kind}:${c.id}`));
 
-    m.push(view("logs"));
+    m.push(panel("logs", 3, { row: 20, prefer: "above" }));
     m.pop();
 
     // What L4 composes the one-line trace from (A01 D7). The manager has no
-    // idea what a logs view was showing, which is the reason the trace is not
+    // idea what the layer was showing, which is the reason the trace is not
     // its job.
     expect(changes).toEqual(["push:logs", "pop:logs"]);
   });

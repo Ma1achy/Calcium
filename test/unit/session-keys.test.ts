@@ -55,24 +55,6 @@ function recordingViewport(): {
 }
 
 /** A dismissable layer, so `activeTarget` resolves to `overlay` (C16 §3). */
-/**
- * A pushed view, so `activeTarget` resolves to `pushedView` (C16 I24).
- *
- * Pushed directly rather than through a `view` action: this suite is about the
- * effect table being total, and driving an action would make the row depend on
- * C23's dispatch as well. The view's own file drives it the real way.
- */
-function openView(graph: Graph): void {
-  graph.overlays.push({
-    id: "probe-view",
-    kind: "view",
-    placement: { kind: "fill" },
-    content: [],
-    blocking: false,
-    dismissal: "escape",
-  });
-}
-
 function openOverlay(graph: Graph): void {
   graph.overlays.push({
     id: "probe",
@@ -91,7 +73,7 @@ function openOverlay(graph: Graph): void {
  *
  * **Nothing is cleared first, and that is the measurement C22 I110 bought.**
  * Until the child's blocks became an entry the attach pushed a `kind: "view"`
- * layer, C15 I1 refused a view onto a non-empty stack, and a peek left by an
+ * layer, C15 refused a view onto a non-empty stack, and a peek left by an
  * earlier binding in this walk made the attach throw — so the helper opened by
  * emptying the stack. The entry route touches no layer at all.
  */
@@ -226,12 +208,6 @@ describe("C22 §3 step 11 — the effect table", () => {
       // `liveBlock` needs both halves of what `activeTarget` reads: a live
       // entry in C13 and focus stored there (C16 §3).
       if (b.target === "liveBlock") enterLive(graph);
-      // **The target that had no way to be reached from here** (C16 I24). Until
-      // this line, `pushedView`'s rows would have been dispatched with no view
-      // open — `activeTarget` would answer `prompt`, `n` would be typed into
-      // the editor, and the row would have failed for a reason that has nothing
-      // to do with whether its effect exists.
-      if (b.target === "pushedView") openView(graph);
       const consumed = graph.router.dispatch(press(b.key));
       expect(consumed, `${b.target}:${b.key.name} -> ${b.action} reached no handler`).toBe(true);
       if (b.target === "overlay") graph.overlays.dismiss("probe");
@@ -326,8 +302,6 @@ describe("C22 §3 step 11 — the effect table", () => {
       // silent, because this harness is the one that walks every action.
       detachChild: () => undefined,
       editor: spy,
-      // The third owner of `pushedView`, as the root wires it (C28 §3c).
-      profileView: graph.profileView,
       pageBlock: graph.pageBlock,
       orbitBlock: graph.orbitBlock,
       tiltBlock: graph.tiltBlock,
@@ -1052,119 +1026,22 @@ describe("C26 §5c — the transcript's selection and semantic copy", () => {
   });
 });
 
-describe("C16 I33 — the section gesture, at one target and one owner", () => {
-  /**
-   * The owner as a double, counting what it was asked.
-   *
-   * `section` is the state the ladder reads, so it is built rather than
-   * defaulted: a double reporting no view open would let the row pass while
-   * asserting nothing.
-   *
-   * **There were three owners and there is one** (R-EXA-082). The patch view
-   * went with M9b and the document view with M9c — a run's detail expands in
-   * place and a verb's result is an entry, so both are scrolled the way the
-   * transcript is scrolled. The profiler's cards are the last, and M9d takes
-   * them.
-   */
-  const owners = (up: "profile" | "none") => {
-    const calls: string[] = [];
-    const answer = (who: string, verdict: boolean) => () => {
-      calls.push(who);
-      return verdict;
-    };
-    const deps = {
-      editor: {},
-      completion: {},
-      overlays: {},
-      history: { entries: [], append: () => undefined },
-      profileView: {
-        section: up === "profile" ? "app" : null,
-        nextCard: () => false,
-        move: () => false,
-        pop: () => false,
-        // **`true` here and `false` at the other two**, so a ladder that ran
-        // every owner would be caught by the count as well as by the answer.
-        sectionNext: answer("profile:next", true),
-        sectionPrev: answer("profile:prev", true),
-      },
-      visibilityChanged: () => undefined,
-      resized: () => undefined,
-      manifest: null,
-      viewport: recordingViewport().viewport,
-      anchor: () => ({ row: 10, rows: 1 }),
-      overlayRegion: () => ({ width: 80, height: 24 }),
-      redraw: () => undefined,
-      focus: createFocusStore(),
-      liveElements: () => [],
-      liveEntryId: () => null,
-      focusedElements: () => [],
-      focusedEntryId: () => null,
-      neighbourEntry: () => null,
-      cursorBlock: () => undefined,
-      rerunEntry: () => undefined,
-      onAction: () => undefined,
-      schedule: (fn: () => void) => {
-        fn();
-        return { [Symbol.dispose]: () => undefined };
-      },
-    } as unknown as Parameters<typeof createKeyEffects>[0];
-    return { effects: createKeyEffects(deps), calls };
-  };
-
-  it("T1.3v (C16 I33): `tab` is one binding at `pushedView`, a different one at `liveBlock`, and the section gesture reaches whichever owner is up", () => {
-    // **The keymap half — one table, two targets.** The ladder is what
-    // separates them, so a second table for the profiler would satisfy every
-    // assertion about the view and be the thing C16 I24 exists to refuse.
-    const row = (target: string, shift: boolean): string | undefined =>
-      defaultKeymap.find(
-        (b) => b.target === target && b.key.name === "tab" && (b.key.shift ?? false) === shift,
-      )?.action;
-
-    expect(row("pushedView", false)).toBe("viewNextSection");
-    expect(row("pushedView", true)).toBe("viewPrevSection");
-    expect(row("liveBlock", false), "the same key one target over").toBe("entryNext");
-    expect(row("liveBlock", true)).toBe("entryPrev");
-    expect(row("prompt", false), "and `complete` at the prompt, which never meets them").toBe(
-      "complete",
-    );
-
-    // **The ladder half — the owner, and only that owner.** The profile view
-    // answers when a section is open. Asserted as the *set* of calls, because
-    // an effect that asked every owner and returned the first `true` would
-    // answer correctly and for the wrong reason.
-    //
-    // **There were two more rungs**, the patch view's (C25 §3b) and the
-    // document view's (C22 §13a) — both deleted by R-EXA-082, and the ladder's
-    // bottom is now *nobody*, which the row below asserts rather than leaving
-    // as a fall-through.
-    for (const [up, next, prev] of [["profile", "profile:next", "profile:prev"]] as const) {
-      const { effects, calls } = owners(up);
-      effects.table["viewNextSection"]?.();
-      effects.table["viewPrevSection"]?.();
-      expect(calls, `${up} is the owner, alone`).toEqual([next, prev]);
-    }
-
-    // **The member is required rather than optional, and this is the reading
-    // that says why.** An owner with one section and an owner at its last
-    // section both answer `false`, so the return value cannot tell *no further
-    // section* from *no sections at all* — and an optional member would add a
-    // third silence indistinguishable from both. Nothing in the return
-    // separates a refusal from an absence, which is the whole of C16 I33's
-    // argument.
-    //
-    // What is assertable here is the consequence: the effect discards the
-    // verdict, so **a refusal is not retried at another owner**, and with no
-    // owner up the gesture reaches nobody rather than walking the ladder
-    // looking for one that says yes. The patch view used to be that bottom
-    // rung and refused every time, which made the row read as *the last owner
-    // declines*; with both it and the document view deleted the row reads what
-    // it always meant.
-    const refusing = owners("none");
-    refusing.effects.table["viewNextSection"]?.();
-    refusing.effects.table["viewNextSection"]?.();
-    expect(refusing.calls, "asked twice, and no owner was consulted").toEqual([]);
-  });
-});
+// **T1.3v is struck with the target and its nine actions** (R-EXA-082, F1254).
+//
+// It was C16 I33's measured instance: `tab` is one binding at `pushedView` and
+// a different one at `liveBlock`, and the section gesture reaches whichever
+// owner is up. There were three owners — the patch view, the document view and
+// the profiler's deck — and the row's whole value was that a shared target with
+// several owners is where a *silence* is indistinguishable from a refusal. All
+// three are gone: a run's detail expands in place, a verb's result is an entry,
+// and the profiler's deck is an entry.
+//
+// **I33 is amended rather than retired** (C16 I33): its live subject is
+// `panel`, whose owners are a completion menu, a reverse search and a command
+// palette, and the rule is the same one — an owner that cannot answer says so
+// rather than doing nothing. The row that would assert it is M15's, where the
+// second panel owner lands; there is one today, so writing it now would be a
+// row about a union with one member.
 
 describe("C26 §5c — the call's head under ⏎ and y, owed at the spec commit", () => {
   it.todo(

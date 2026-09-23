@@ -17,8 +17,9 @@ import { describe, expect, it } from "vitest";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
 import type { CaptureResult, CommitReason, ProfileReport, Profiler, Tier } from "../../src/shell/profiling/types.js";
+import * as api from "../../src/index.js";
 import {
-  CARDS, DRAWN_CARD_IDS, REGISTERED_CARD_IDS, SECTIONS, cardsOf, profileCard,
+  CARDS, DRAWN_CARD_IDS, REGISTERED_CARD_IDS, SECTIONS, cardsOf, deckOf, profileCard,
 } from "../../src/shell/profiling/panes/index.js";
 import { frameSamples } from "../../src/shell/profiling/panes/kit.js";
 import { UNATTRIBUTED, foldCpuProfile } from "../../src/shell/profiling/stacks.js";
@@ -136,6 +137,36 @@ const linesOf = (blocks: readonly Block[], width: number): readonly string[] => 
   return blocks.flatMap((blk) => renderToLines(blk, width));
 };
 
+/**
+ * A registry with **no** `plot` and no `table` — the harness's default.
+ *
+ * Through it a card holding a figure measures as the wrapped JSON of that
+ * figure rather than as the figure, which is where F947's 26 rows against 40
+ * came from. T1.100 keeps it as the instrument that demonstrates the
+ * difference, so the reason this file registers both definitions is asserted
+ * rather than written in a comment.
+ */
+const bareRegistry = measurable({ capabilities: FULL_CAPS }).registry;
+
+const fullRegistry = measurable({
+  definitions: [plotDefinition, tableDefinition] as never[],
+}).registry;
+
+const measure = (blocks: readonly Block[], width: number): number =>
+  fullRegistry.measureSequence(blocks, width);
+
+/**
+ * The verdict card's measured height at 80 columns, per fixture — §3c's table.
+ *
+ * **The card's own rows, with no header** (F1254): it was measured through a
+ * pushed view that put a one-row rule above it, and there is no view. A figure
+ * asserted only as a bound says the budget held and never that a card grew four
+ * rows inside it.
+ */
+const VERDICT_ROWS: Readonly<Record<string, number>> = {
+  empty: 10, counters: 10, sparse: 15, full: 15,
+};
+
 const WIDTHS = [80, 120] as const;
 const REGIONS = [
   { w: 80, rows: 24 },
@@ -249,6 +280,99 @@ describe("C28 §3c — the deck, every card", () => {
     for (const name of Object.keys(FIXTURES)) {
       const lines = linesOf(profileCard(reportOf(name), "verdict", REGIONS[0], ASCII_CAPS), 80);
       expect(lines.length, `the verdict on the ${name} report`).toBeLessThanOrEqual(23);
+    }
+  });
+
+  it("T1.100 (C28 I52, C28 §3c): the verdict card is within its bound on every report at both widths, and the four measured heights are recorded beside it", () => {
+    // **The bound is the rule and the measurement is beside it** (F935). A row
+    // asserting only `<= 23` says the budget held and never that a card grew
+    // four rows inside the slack it leaves.
+    //
+    // **The bound's reason changed with the view** (I52, R-EXA-082, F1254): it
+    // was a 24-row region minus a one-row header, and a pushed card that did
+    // not fit could not be scrolled. The card is an entry now and the
+    // transcript scrolls it, so what is kept is a measured property of the
+    // card's closed parts — `checkBudget`'s six rows, a two-row `kv` of the
+    // regime and a one-line hint — which is what makes it checkable at all.
+    const measured: Record<string, number> = {};
+    for (const name of Object.keys(FIXTURES)) {
+      const card = profileCard(reportOf(name), "verdict", REGIONS[0], FULL_CAPS);
+      for (const width of WIDTHS) {
+        expect(measure(card, width), `${name} at ${String(width)}`).toBeLessThanOrEqual(23);
+      }
+      measured[name] = measure(card, 80);
+    }
+    expect(measured, "the four walked figures at 80").toEqual(VERDICT_ROWS);
+
+    // **The harness's registry has no `plot`** (F959) — the instrument F947's
+    // number came from, kept because it is the only thing that says why this
+    // file registers `plotDefinition` and `tableDefinition` at all.
+    const withPlot = profileCard(reportOf("full"), cardsOf("app")[0]?.id ?? "", REGIONS[0], FULL_CAPS);
+    expect(JSON.stringify(withPlot), "the fixture responds: this card holds a plot").toContain(
+      '"kind":"plot"',
+    );
+    expect(
+      bareRegistry.measureSequence(withPlot, 80),
+      "a plot measured as its JSON is not the plot's height",
+    ).not.toBe(measure(withPlot, 80));
+  });
+
+  it("T1.115b (C28 §3c, C28 I58): a section's deck holds one entry per retained frame, so it is longer than its card count and each entry names its own seq", () => {
+    // **What survives of the view's navigation row** (R-EXA-082, F1254). It
+    // drove `n` across a group boundary and `tab` across the groups, and both
+    // keys are gone with the layer they moved a cursor on. The claim underneath
+    // them is the deck's own and is what `/profile <section>` now composes an
+    // entry from: the address is `(section, card, seq)` and a per-frame card
+    // expands to one entry per retained frame.
+    const report = reportOf("full");
+    expect(report.worst.length, "the fixture responds: frames are retained").toBeGreaterThan(1);
+
+    const deck = deckOf(report, "app");
+    expect(deck.length, "so the section is longer than its card count").toBeGreaterThan(
+      cardsOf("app").length,
+    );
+    // **Every entry of a per-frame card carries a `seq`, and no entry of any
+    // other does** (C28 I58) — the position is recomputed on every `report()` and
+    // the seq is not, so an entry addressed by position names a different frame
+    // at the next tick.
+    for (const entry of deck) {
+      if (entry.spec.perFrame === true) expect(entry.seq, entry.spec.id).toBeTypeOf("number");
+      else expect(entry.seq, entry.spec.id).toBeUndefined();
+    }
+    const perFrame = deck.filter((e) => e.spec.perFrame === true);
+    expect(new Set(perFrame.map((e) => `${e.spec.id}/${String(e.seq)}`)).size, "each addressed once").toBe(
+      perFrame.length,
+    );
+
+    // **A section with no per-frame card is one entry per card**, which is the
+    // control: a `deckOf` that expanded everything would pass the length
+    // assertion above and fail here.
+    expect(deckOf(report, "verdict").map((e) => e.spec.id)).toEqual(
+      cardsOf("verdict").map((c) => c.id),
+    );
+  });
+
+  it("T1.11 (C24 I33): nothing that opened the deck is published, and every registered card draws through the exports that are", () => {
+    const published = Object.keys(api);
+    expect(published, "no constructor").not.toContain("createProfileView");
+    expect(published, "no layer id").not.toContain("PROFILE_VIEW_ID");
+    expect(published, "no refresh cadence").not.toContain("VIEW_REFRESH_MS");
+    expect(published.filter((k) => /profile.?view/iu.test(k)), "nothing named for the view").toEqual([]);
+
+    const report = reportOf("full");
+    expect(api.SECTIONS).toEqual(SECTIONS);
+    // **`CARDS` is published because a card's id is its address**, so a consumer
+    // drawing its own deck needs it; and every id it names has to be drawable
+    // through the published function, or the register is a menu of dead ends.
+    expect(api.CARDS.map((c) => c.id)).toEqual(CARDS.map((c) => c.id));
+    for (const card of api.CARDS) {
+      expect(api.profileCard(report, card.id, REGIONS[0]).length, card.id).toBeGreaterThan(0);
+    }
+    // And the section seam, which is what `/profile <section>` composes with —
+    // published for a consumer with its own navigation, which is the whole of
+    // why it exists (C28 §3c).
+    for (const section of api.SECTIONS) {
+      expect(api.profileDeck(report, section, 0, REGIONS[0], FULL_CAPS).length, section).toBeGreaterThan(0);
     }
   });
 

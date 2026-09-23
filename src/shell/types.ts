@@ -19,7 +19,6 @@ import type { TransportRouter } from "../data/transport/index.js";
 import type { Action, Block, ViewDocument } from "../data/viewmodel/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
 import type { OwnerRung } from "../interaction/router/types.js";
-import type { ProfileView } from "./profile-view.js";
 import type { RefreshHost } from "./refresh.js";
 import type { CompletionSource } from "../interaction/completion/index.js";
 import type { FocusTarget } from "../interaction/router/types.js";
@@ -415,15 +414,6 @@ export type PipelineDeps = Readonly<{
    */
   profileCapture?: (ms: number) => Promise<CaptureResult>;
   /**
-   * C28 §3c's view, for `/profile`'s handler (C23 I68).
-   *
-   * **Supplied by the root, always** — a session built without `TuiConfig.profile`
-   * still gets a view, whose `open` refuses naming that option (C28 T1.97). The
-   * row is in `FRAMEWORK_TOOLS`, `execution.ts` hands this to `shippedHandlers`,
-   * and C23 I27 refuses the pair in either half's absence (T4.66, T4.67).
-   */
-  profileView: ProfileView;
-  /**
    * One async bracket for C23's local verb route (C28 I36).
    *
    * **The registry is built in here**, so there is no object the composition
@@ -516,10 +506,12 @@ export type TuiConfig = Readonly<{
    * The cursor's shape, per focus target (C22 I63, §6f, roadmap entry 45).
    *
    * **Keyed on the focus target and not on the layer**, and that is a check
-   * rather than a preference: `FOCUS_ORDER` has seven members and exactly two —
-   * `overlay` and `pushedView` — are layers, so a style on `Layer` would cover
-   * two-sevenths of its subject while reading as total, and the prompt, which is
-   * the case that motivates the feature, is not a layer at all.
+   * rather than a preference: `FOCUS_ORDER` has eight members and exactly two —
+   * `overlay` and `panel` — are layers, so a style on `Layer` would cover a
+   * quarter of its subject while reading as total, and the prompt, which is the
+   * case that motivates the feature, is not a layer at all. (The pair was
+   * `overlay` and `pushedView`; the second retired with its layer kind and the
+   * `panel` target took the rung — R-EXA-082.)
    *
    * A target with no entry takes `fallback`; a `fallback` of `null`, or absent,
    * means **the terminal's own** — Calcium writes nothing and the user's own

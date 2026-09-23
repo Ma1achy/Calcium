@@ -6,18 +6,17 @@ import { describe, expect, it } from "vitest";
 
 import { createOverlayManager } from "../../src/viewport/overlay/index.js";
 import type { Layer, OverlayChange } from "../../src/viewport/overlay/index.js";
-import { REGION, anchored, centred, panel, peek, placeIn, registry, rows, view } from "../support/overlay.js";
+import { REGION, anchored, centred, filling, panel, peek, placeIn, registry, rows } from "../support/overlay.js";
 import { OverlayError } from "../../src/viewport/overlay/index.js";
 
 const manager = () => createOverlayManager({ registry });
 
 describe("C15 unit — the stack", () => {
-  it("T1.1: push(overlay) on empty → one layer, it is top, no view", () => {
+  it("T1.1: push(overlay) on empty → one layer, and it is top", () => {
     const m = manager();
     m.push(centred("a", 3));
     expect(m.stack.map((l) => l.id)).toEqual(["a"]);
     expect(m.top?.id).toBe("a");
-    expect(m.hasView).toBe(false);
   });
 
   it("T1.23 (I21): a peek on empty → one layer and top is null; two peeks, still null", () => {
@@ -28,13 +27,16 @@ describe("C15 unit — the stack", () => {
     m.push(peek("p2", 2, { row: 8, prefer: "below" }));
     expect(m.stack.map((l) => l.id)).toEqual(["p1", "p2"]);
     expect(m.top).toBeNull();
-    expect(m.hasView).toBe(false);
   });
 
-  it("T1.24 (I21, I23): a peek pushed after an overlay sits beneath it; after a view, above it; between the two, between them", () => {
+  it("T1.24 (I21, I23): a peek pushed after an overlay sits beneath it; after a panel, beneath that; between the two, beneath both", () => {
     // Through `push`, in the order a real session produces: the confirm is up,
-    // then focus moves and the peek opens. I2's sort was unreachable through
-    // `push` (T2.8's reason); I23's is not, and that is why this row exists.
+    // then focus moves and the peek opens.
+    //
+    // **The view arms are gone and the peek keeps its floor** (R-EXA-082,
+    // F1254). A peek used to sit *above* the view and below everything else,
+    // which made it the middle band of four; with the view band deleted the
+    // peek is the bottom of three and every arm here reads the same way.
     const m = manager();
     m.push(anchored("confirm", 2, { row: 10, prefer: "above" }));
     m.push(peek("p", 2, { row: 5, prefer: "below" }));
@@ -43,14 +45,14 @@ describe("C15 unit — the stack", () => {
     expect(m.layout(REGION).map((p) => p.layer.id), "placed bottom-first, peek beneath").toEqual(["p", "confirm"]);
 
     const v = manager();
-    v.push(view("dash"));
+    v.push(panel("menu", 3, { row: 20, prefer: "above" }));
     v.push(peek("p", 2, { row: 5, prefer: "below" }));
-    expect(v.top?.id, "the view is still top").toBe("dash");
-    expect(v.layout(REGION).map((p) => p.layer.id)).toEqual(["dash", "p"]);
+    expect(v.top?.id, "the panel takes keys, so it is still top").toBe("menu");
+    expect(v.layout(REGION).map((p) => p.layer.id), "peek beneath the panel").toEqual(["p", "menu"]);
 
-    v.push(anchored("menu", 2, { row: 10, prefer: "above" }));
-    expect(v.layout(REGION).map((p) => p.layer.id), "view, peek, overlay").toEqual(["dash", "p", "menu"]);
-    expect(v.top?.id).toBe("menu");
+    v.push(anchored("advisory", 2, { row: 10, prefer: "above" }));
+    expect(v.layout(REGION).map((p) => p.layer.id), "peek, panel, overlay").toEqual(["p", "menu", "advisory"]);
+    expect(v.top?.id).toBe("advisory");
   });
 
   it("T1.25 (I21, I3): pop never removes a peek; dismiss does, and emits dismiss rather than pop", () => {
@@ -89,11 +91,15 @@ describe("C15 unit — the stack", () => {
     expect(o.update("a", { placement: { kind: "fill" } })).toBe(true);
   });
 
-  it("T1.2: push(view) on empty → hasView", () => {
+  it("T1.2: a fill-placed overlay on empty → one layer, it is top, and it takes the whole region", () => {
+    // **Re-aimed off `hasView`** (R-EXA-082, F1254). The member went with the
+    // kind; what is left to assert about a region-filling layer is the
+    // placement, which `fill` still names and nothing in `src/` produces.
     const m = manager();
-    m.push(view("dash"));
-    expect(m.hasView).toBe(true);
+    m.push(filling("dash"));
+    expect(m.stack.map((l) => l.id)).toEqual(["dash"]);
     expect(m.top?.id).toBe("dash");
+    expect(m.layout(REGION)[0]).toMatchObject({ top: 0, left: 0, height: REGION.height, width: REGION.width });
   });
 
   it("T1.3: two overlays → LIFO, the second is top", () => {
@@ -104,11 +110,12 @@ describe("C15 unit — the stack", () => {
     expect(m.top?.id).toBe("b");
   });
 
-  it("T1.4 (I2): an overlay over a view is top", () => {
+  it("T1.4 (I23): an overlay over a panel is top, and the panel stays beneath it", () => {
     const m = manager();
-    m.push(view("dash"));
+    m.push(panel("menu", 3, { row: 20, prefer: "above" }));
     m.push(centred("confirm", 3));
     expect(m.top?.id).toBe("confirm");
+    expect(m.layout(REGION).map((p) => p.layer.id), "bottom-first").toEqual(["menu", "confirm"]);
   });
 
   it("T1.5: pop with two overlays removes the top one only", () => {
@@ -119,12 +126,11 @@ describe("C15 unit — the stack", () => {
     expect(m.stack.map((l) => l.id)).toEqual(["a"]);
   });
 
-  it("T1.6: pop with only a view → empty", () => {
+  it("T1.6: pop with only a fill-placed overlay → empty", () => {
     const m = manager();
-    m.push(view("dash"));
+    m.push(filling("dash"));
     expect(m.pop()?.id).toBe("dash");
     expect(m.stack).toEqual([]);
-    expect(m.hasView).toBe(false);
   });
 
   it("T1.7 (I13): dismiss removes a layer at any depth, and so does the disposable", () => {
@@ -140,12 +146,12 @@ describe("C15 unit — the stack", () => {
     expect(m.stack.map((l) => l.id)).toEqual(["c"]);
   });
 
-  it("T1.8 (I2): pop with a view plus an overlay takes the overlay first", () => {
+  it("T1.8 (I23): pop with a panel plus an overlay takes the overlay first", () => {
     const m = manager();
-    m.push(view("dash"));
+    m.push(panel("menu", 3, { row: 20, prefer: "above" }));
     m.push(centred("confirm", 3));
     expect(m.pop()?.id).toBe("confirm");
-    expect(m.pop()?.id).toBe("dash");
+    expect(m.pop()?.id).toBe("menu");
   });
 
   it("T1.9 (I3): pop on a non-dismissable top → null, stack unchanged", () => {
@@ -178,14 +184,14 @@ describe("C15 unit — the stack", () => {
 });
 
 describe("C15 unit — one layer's geometry", () => {
-  it("T1.11: a view fills the region", () => {
-    const [p] = placeIn([view("dash")]);
+  it("T1.11: a fill-placed layer takes the whole region", () => {
+    const [p] = placeIn([filling("dash")]);
     expect(p).toMatchObject({ top: 0, left: 0, height: REGION.height, width: REGION.width });
   });
 
   it("T1.12 (I14): update changes a layer and nothing about the stack", () => {
     const m = manager();
-    m.push(view("dash"));
+    m.push(panel("menu", 3, { row: 20, prefer: "above" }));
     m.push(centred("a", 3));
     m.push(centred("b", 3));
 
@@ -197,7 +203,6 @@ describe("C15 unit — one layer's geometry", () => {
 
     expect(m.stack.map((l) => l.id)).toEqual(before);
     expect(m.top?.id).toBe("b");
-    expect(m.hasView).toBe(true);
     expect(changes).toEqual([{ kind: "content", id: "a" }]);
   });
 
@@ -429,13 +434,54 @@ describe("C15 §2c — blocking and dismissal are two fields (M8)", () => {
     expect(m.stack.map((l) => l.id)).toEqual(["beside", "menu2", "advisory"]);
   });
 
-  it("T1.33 (I23, R-BLK-779): view · peek · panel · overlay, bottom-first, from every push order", () => {
+  it("T1.28 (I25): every removal emits one change with the layer's id before the call returns, and a removal of nothing emits nothing", () => {
+    // **Moved off C28's pushed view** (R-EXA-082, F1254). It was written there
+    // because that owner's state was a raised profiler tier and a running
+    // timer — the two things a stale owner costs the most — and there is no
+    // such owner. What the row is about survives the move: the change arrives
+    // **before the call returns**, so an owner that tears down from the stream
+    // is already torn down when the non-owner who popped it reads the stack.
+    //
+    // The owner here keeps a flag and nothing else. A richer one would be a
+    // better story and a worse row: the claim is about the ordering of an
+    // emission against a return, and state that takes work to build invites
+    // asserting the work instead.
+    const m = manager();
+    const changes: OverlayChange[] = [];
+    let open = false;
+    m.subscribe((c) => {
+      changes.push(c);
+      if ((c.kind === "pop" || c.kind === "dismiss") && c.id === "owned") open = false;
+    });
+
+    // A non-owner's `pop()`.
+    m.push(centred("owned", 3));
+    open = true;
+    const n = changes.length;
+    expect(m.pop()?.id).toBe("owned");
+    expect(changes.slice(n)).toEqual([{ kind: "pop", id: "owned", layerKind: "overlay" }]);
+    expect(open, "the owner had already torn down when `pop()` returned").toBe(false);
+
+    // `dismiss(id)` on the same layer: one `dismiss`, with its reason.
+    m.push(centred("owned", 3));
+    open = true;
+    const k = changes.length;
+    m.dismiss("owned");
+    expect(changes.slice(k)).toEqual([{ kind: "dismiss", id: "owned", reason: "explicit" }]);
+    expect(open).toBe(false);
+
+    // An id not on the stack: nothing at all.
+    const j = changes.length;
+    m.dismiss("never-pushed");
+    expect(changes.slice(j)).toEqual([]);
+  });
+
+  it("T1.33 (I23, R-BLK-779): peek · panel · overlay, bottom-first, from every push order", () => {
     // *overlay › panel › peek › base*, read from the other end. Asserted as the
     // whole sequence rather than as a pair, because a partition that puts one
     // band in the right place and another in the wrong one satisfies every
     // pairwise check written about the band that moved.
     const build = (): readonly Layer[] => [
-      view("dash", 3),
       peek("beside", 2, { row: 5, prefer: "below" }),
       panel("menu", 3, { row: 20, prefer: "above" }),
       // **Non-blocking, because I28 makes the other pair unconstructible.** A
@@ -445,20 +491,19 @@ describe("C15 §2c — blocking and dismissal are two fields (M8)", () => {
       // four. The overlay band is exercised by an escapable advisory instead.
       centred("advisory", 3),
     ];
+    // **Every permutation, because nothing is pinned to first any more.** The
+    // view was, because `push` refused one onto a non-empty stack — so the old
+    // sequences all began `0` and the sort was exercised over three free
+    // members of four. With the kind gone (R-EXA-082, F1254) the three bands
+    // arrive in any order a session produces, so the row walks all six.
     const order: readonly (readonly number[])[] = [
-      [0, 1, 2, 3],
-      [0, 3, 2, 1],
-      [0, 2, 1, 3],
-      [0, 1, 3, 2],
+      [0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0],
     ];
     for (const seq of order) {
       const m = manager();
       const layers = build();
-      // The view is first in every sequence because `push` refuses one onto a
-      // non-empty stack (I1) — a constraint on the fixture, not on the sort.
       for (const i of seq) m.push(layers[i] as Layer);
       expect(m.stack.map((l) => l.id), `pushed ${seq.join("")}`).toEqual([
-        "dash",
         "beside",
         "menu",
         "advisory",

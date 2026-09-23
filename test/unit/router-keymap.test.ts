@@ -256,7 +256,6 @@ describe("§6 — the default table (C17 I12)", () => {
     // as coverage.
     const TARGETS: readonly FocusTarget[] = [
       "overlay",
-      "pushedView",
       "prompt",
       "liveBlock",
       "global",
@@ -268,21 +267,14 @@ describe("§6 — the default table (C17 I12)", () => {
     expect(bound.has("copyMode"), "copyMode binds exactly its own dismissal, `Esc` (C16 §5c, I24)").toBe(true);
   });
 
-  it("T1.33 (I24): the pushed view's seven keys resolve, and Esc is viewPop", () => {
-    const at = (name: string): string | undefined =>
-      defaultKeymap.find((b) => b.target === "pushedView" && b.key.name === name)?.action;
-
-    expect(at("n")).toBe("viewNextHunk");
-    expect(at("p")).toBe("viewPrevHunk");
-    expect(at("g")).toBe("viewTop");
-    expect(at("G")).toBe("viewBottom");
-    expect(at("pageup")).toBe("viewPageUp");
-    expect(at("pagedown")).toBe("viewPageDown");
-    // **`viewPop`, not `dismiss`.** `dismiss` pops whatever is on top; this one
-    // knows it is closing *its* view and drops the offset with it. And it is
-    // not §5's Ctrl-C rung under another name — that rung is cancellation.
-    expect(at("escape")).toBe("viewPop");
-  });
+  // **T1.33 is struck with the target** (R-EXA-082, F1254). It resolved the
+  // pushed view's seven keys — `n`, `p`, `g`, `G`, `pageup`, `pagedown` — and
+  // `Esc` to `viewPop`, and made the point that `viewPop` is not `dismiss`
+  // under another name: it knew it was closing *its* view and dropped the
+  // offset with it. There is no such target, no such actions and no offset for
+  // anything to drop. What the row was an instance of is I24 itself — a target
+  // with no vocabulary is a defect — and the row above this one is where that
+  // is asserted over the targets that exist.
 
   it("T2.13 (I17): every default binding is a key the decoder can actually produce", () => {
     // **T2.12 constructs the Key from the binding, which is the shape that
@@ -890,7 +882,7 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
   });
 
   it("T1.97 (I42): the table is the rows it was — generation moved where a chord is written and nothing else", () => {
-    // **The row that makes M6 a refactor rather than a change.** 122 rows,
+    // **The row that makes M6 a refactor rather than a change.** The rows,
     // compared as a set of `(target, key, action, profile)`; 59 of them take
     // their chord from the registry through `chordOf`. If generation had altered
     // one chord, one target or one profile, this is where it shows.
@@ -901,14 +893,19 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     // **124 from M9**: the captured child's `host.detach`, once per profile.
     // They are the only two rows at `child`, because the child's handler
     // consumes what it does not bind and there is nothing else to list.
+    // **113 from M9d** (R-EXA-082, F1254): the eleven `pushedView` rows went
+    // with the target — `n`, `p`, `g`, `G`, `pageup`, `pagedown`, `tab`,
+    // `⇧tab` and `escape`, plus the two that were written once per profile.
+    // The nine `view*` members left `KeyAction` with them, so a row that tried
+    // to come back would not compile.
     //
     // The count is pinned as well as the set: a table that lost a row *and*
     // gained an equal one would satisfy a set comparison alone.
     const rows = defaultKeymap
       .map((b) => `${b.target}\t${keyText(b.key)}\t${b.action}\t${b.profile ?? "both"}`)
       .sort();
-    expect(rows).toHaveLength(124);
-    expect(new Set(rows).size, "no two rows are identical").toBe(124);
+    expect(rows).toHaveLength(113);
+    expect(new Set(rows).size, "no two rows are identical").toBe(113);
 
     // Every row whose chord the registry names resolves to the registry's key —
     // the join asserted from the table's side, so a `chordOf` call that silently
@@ -918,13 +915,18 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     const fromRegistry = defaultKeymap.filter((b) => registryChords.has(keyText(b.key)));
     expect(
       fromRegistry.length,
-      // 60 and not 61: `host.detach` has two registry bindings, and the set
-      // this counts against is a set of **chord texts** — `⌥esc` is already in
-      // it as the `escape` action's own enhanced spelling, so the second row
-      // joins an entry rather than adding one. Counting bindings would give 61
-      // and would be counting a different thing.
+      // 60 and not 61 before M9d: `host.detach` has two registry bindings, and
+      // the set this counts against is a set of **chord texts** — `⌥esc` is
+      // already in it as the `escape` action's own enhanced spelling, so the
+      // second row joins an entry rather than adding one. Counting bindings
+      // would give 61 and would be counting a different thing.
+      //
+      // **55 from M9d** (R-EXA-082, F1254): five of the eleven `pushedView`
+      // rows spelled chords the registry also names — `escape`, `tab`, `⇧tab`,
+      // `pageup`, `pagedown` — so they were in this count, and the other six
+      // (`n`, `p`, `g`, `G` and the two per-profile pairs) never were.
       "the rows the registry supplies a chord for",
-    ).toBe(60);
+    ).toBe(55);
   });
 
   it("T1.94 (I41): ⌘↑ and ⌥↑ are two actions under the enhanced profile and one under the base", () => {

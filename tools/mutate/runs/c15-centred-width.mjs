@@ -23,11 +23,16 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CMD =
   "npx vitest run test/unit/overlay.test.ts test/integration/confirm.test.ts " +
-  "test/integration/history.test.ts test/unit/profile-view.test.ts " +
-  // **`test/integration/router.test.ts` for M8's C15 I28 mutation**, whose subject
-  // is a view surviving a question — a fact about the stack that only a row
-  // holding both a view and a confirm can see, and C15's own file holds no
-  // view under a question because `push` refuses to build one that way.
+  "test/integration/history.test.ts " +
+  // **`test/integration/router.test.ts` for M8's C15 I28 mutation**, whose
+  // subject is a layer surviving a question — a fact about the stack that only
+  // a row holding both a keyed layer and a confirm can see, and C15's own file
+  // holds none because I28 dismisses a panel on the arrival.
+  //
+  // **`test/unit/profile-view.test.ts` was in this list and is deleted**
+  // (R-EXA-082, F1254): vitest drops a path that does not exist without a word,
+  // so a run naming one is quietly executing less than it says. The rows it
+  // contributed were the pushed view's, which is the same change.
   "test/integration/router.test.ts " +
   "test/unit/layout-engine.test.ts";
 const MANAGER = "src/viewport/overlay/manager.ts";

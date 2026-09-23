@@ -355,12 +355,16 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
     expect(calls).toEqual(["up", "pageup"]);
 
     calls.length = 0;
-    // **`blocking: true`, declared** (M8, C15 I26). A view owns the region and
-    // owns input, and under the old predicate the box said so on its behalf —
-    // the three shipped views were corrected to declare it in the same MR. A
+    // **`blocking: true`, declared** (M8, C15 I26). A full-region layer owns
+    // input, and under the old predicate the box said so on its behalf. A
     // fixture left at `false` is a full-region layer that blocks nothing, which
     // is now a thing the type can say and this row does not mean.
-    layer.top = { id: "dash", kind: "view", blocking: true, dismissal: "escape" };
+    //
+    // **The kind was `view` and is `overlay`** (R-EXA-082, F1254): what this row
+    // is about is a layer whose *box* covers the region, which is a placement
+    // and never was a kind — the whole of why `coversRegion` was replaced by a
+    // declared `blocking`.
+    layer.top = { id: "dash", kind: "overlay", blocking: true, dismissal: "escape" };
     layer.placed = [box("dash", { top: 0, left: 0, height: 24, width: 80 })];
 
     // The reserved route reaches the viewport scroller, ahead of the ladder.
@@ -368,7 +372,13 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
     expect(calls, "a reader under a full-region layer can still page").toEqual(["up"]);
     expect(router.lastStages).toEqual([
       "arming",
-      "intercept:page-scroll:substate:handle",
+      // **`scope`, where it was `substate`** (R-EXA-082, F1254). The rung named
+      // here is the one the page-scroll intercept resolved at, and it used to be
+      // the pushed view's own paging; with `viewPageUp` and its eight siblings
+      // deleted there is nothing registered at `substate` for this key, so it
+      // falls to the transcript's — which is the reader still being able to
+      // page, stated one rung lower.
+      "intercept:page-scroll:scope:handle",
       "intercept:scroll:transcript",
     ]);
 
@@ -418,7 +428,7 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
     router.dispatch(ctrlC);
     expect(calls).toEqual(["pop"]);
 
-    layer.top = { id: "dash", kind: "view", blocking: false, dismissal: "escape" };
+    layer.top = { id: "dash", kind: "panel", blocking: false, dismissal: "escape" };
     router.dispatch(ctrlC);
     expect(calls).toEqual(["pop", "pop"]);
   });
@@ -744,8 +754,8 @@ describe("C16 — the dispatch trace, run against the implementation", () => {
     step("ctrl-c (live block)", ctrlC);
     step("click row 2", click(3));
     step("wheel", click(3, 0, "wheelUp"));
-    layer.top = { id: "dash", kind: "view", blocking: false, dismissal: "escape" };
-    step("f (pushed view)", key("f"));
+    layer.top = { id: "dash", kind: "panel", blocking: false, dismissal: "escape" };
+    step("f (panel)", key("f"));
     layer.top = { id: "confirm", kind: "overlay", blocking: true, dismissal: "answer" };
     step("ctrl-c (confirm)", ctrlC);
     step("t (global, under confirm)", key("t"));
@@ -763,7 +773,7 @@ describe("C16 — the dispatch trace, run against the implementation", () => {
       // a `scroll` block is a second thing a wheel can mean. The harness's
       // `liveBlock` handler binds nothing, so the wheel falls to the viewport.
       "wheel → intercept:wheel:scope:handle,intercept:wheel,mouse,viewport:row2,viewport:wheel",
-      "f (pushed view) → target:pushedView,global,dropped",
+      "f (panel) → target:panel,global,dropped",
       "ctrl-c (confirm) → intercept:interrupt:scope:handle,target:overlay",
       "t (global, under confirm) → target:overlay,modal-blocked,reject",
     ]);
@@ -1030,7 +1040,7 @@ describe("C16 §3a — the global-intercept table and the child rung (M5)", () =
         // The rung-specific state each one needs, set here so the row constructs
         // what it claims rather than asserting against a default prompt.
         if (rung === "question") layer.top = { id: "confirm", kind: "overlay", blocking: true, dismissal: "answer" };
-        if (rung === "substate") layer.top = { id: "dash", kind: "view", blocking: false, dismissal: "escape" };
+        if (rung === "substate") layer.top = { id: "dash", kind: "panel", blocking: false, dismissal: "escape" };
         if (rung === "inside") {
           focus.enterLiveBlock("e1", addr("r1"));
           focus.setMode("interact");

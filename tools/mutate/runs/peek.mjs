@@ -62,18 +62,20 @@ const results = runPass({
       file: PLACE,
       // **Re-anchored in M8**: `panel` joined the partition between the peeks
       // and the overlays (C15 I23, R-BLK-779), so the return line gained a
-      // band. The mutation is unchanged in what it says — the peek band
-      // collapses — and the panels stay where they are, which keeps the kill
+      // band. **Re-anchored again in M9d** (R-EXA-082, F1254): the `views`
+      // partition went with the kind, so the return line lost one. The mutation
+      // is unchanged in what it says — the peek band collapses into the
+      // overlays — and the panels stay where they are, which keeps the kill
       // attributable to the peek rather than to the reorder.
       from:
         '  const peeks = stack.filter((l) => l.kind === "peek");\n' +
         '  const panels = stack.filter((l) => l.kind === "panel");\n' +
         '  const overlays = stack.filter((l) => l.kind === "overlay");\n' +
-        "  return Object.freeze([...views, ...peeks, ...panels, ...overlays]);",
+        "  return Object.freeze([...peeks, ...panels, ...overlays]);",
       to:
         '  const panels = stack.filter((l) => l.kind === "panel");\n' +
         '  const overlays = stack.filter((l) => l.kind === "peek" || l.kind === "overlay");\n' +
-        "  return Object.freeze([...views, ...panels, ...overlays]);",
+        "  return Object.freeze([...panels, ...overlays]);",
       expect: "T1.24",
     },
     {

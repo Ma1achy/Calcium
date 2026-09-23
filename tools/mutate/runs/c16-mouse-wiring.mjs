@@ -131,10 +131,14 @@ const results = runPass({
       // I48 — a panel routed to `overlay` by the pointer while the keyboard
       // reaches it at `panel`: one seam answering two ways, which is what the
       // layer order being the scroll order rules out.
+      //
+      // **Re-anchored in M9d** (R-EXA-082, F1254): the arm was a three-way
+      // conditional while `kind: "view"` existed and is a ternary now, so the
+      // anchor is one line rather than three. What it says is unchanged.
       name: "a covering panel routes to the overlay target, as it did before the kind existed",
       file: "src/interaction/router/router.ts",
-      from: '          : covering.layer.kind === "panel"\n            ? "panel"\n            : "overlay",',
-      to: '          : "overlay",',
+      from: '      return run(covering.layer.kind === "panel" ? "panel" : "overlay", e);',
+      to: '      return run("overlay", e);',
       expect: "T1.104",
     },
     {

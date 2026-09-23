@@ -23,12 +23,11 @@ import type { GlyphCaps } from "../../presentation/blocks/index.js";
 import type { ThemeStore } from "../../presentation/theme/index.js";
 import { b } from "../builders/index.js";
 import { blockId, compose, warnNotice } from "../documents.js";
-import { CARDS, SECTIONS, profileCard } from "../profiling/panes/index.js";
+import { CARDS, SECTIONS, deckOf, profileCard } from "../profiling/panes/index.js";
 import { ms } from "../profiling/panes/kit.js";
 import type { ProfileSection } from "../profiling/panes/index.js";
 import { TIER_RANK } from "../profiling/types.js";
 import type { CaptureResult, ProfileReport } from "../profiling/types.js";
-import type { ProfileView } from "../profile-view.js";
 import type { LocalHandler } from "./registry.js";
 import type { StopReason } from "../types.js";
 
@@ -64,28 +63,20 @@ export type HandlerDeps = Readonly<{
   currentScope: () => string;
   stop: (reason: StopReason) => Promise<number>;
   /**
-   * C28 §3c's view, for `/profile` (C23 I68) — the way `stop` is for `/exit`.
+   * The report, for every arm of `/profile` (C23 I68, I69, amended).
    *
-   * **Required, because the row is.** `FRAMEWORK_TOOLS` declares seven verbs
-   * and C23 I27 refuses a row without a handler at every startup, so the view
-   * has to arrive whether or not a profiler does: the root always builds one,
-   * and a view with no recorder behind it refuses through the route rather than
-   * vanishing (T4.67). This was optional, with the handler included only when a
-   * view was handed in, while the row and `execution.ts`'s call site were
-   * outside the round that wrote it (T1.64's second arm watched that).
-   */
-  profileView: ProfileView;
-  /**
-   * The report, for `/profile snapshot` and `/profile live` (C23 I69, amended).
+   * **A reader and not a profiler.** Every arm puts blocks in the transcript
+   * and none may raise the tier — an entry has no close, so a raise would pin
+   * the tier for the session and reset the ring doing it (C28 I18). Handing
+   * over `() => ProfileReport | null` rather than the recorder is what makes
+   * `setTier` unreachable from here rather than merely unused.
    *
-   * **A reader and not a profiler.** The two verbs put a card in the transcript
-   * and neither may raise the tier — a transcript part has no close, so a raise
-   * would pin the tier for the session and reset the ring doing it (C28 I50,
-   * I18). Handing over `() => ProfileReport | null` rather than the recorder is
-   * what makes `setTier` unreachable from here rather than merely unused.
+   * **This used to be true of two verbs and is now true of the whole route**
+   * (R-EXA-082, F1254): the section arm raised a layer that held the tier for
+   * its lifetime and restored it at the pop, and there is no layer.
    *
    * `null` when the session was built without `TuiConfig.profile`, which is the
-   * same state `profileView.open` refuses on.
+   * state every arm answers with a `warn` notice naming that option.
    */
   profileReport: () => ProfileReport | null;
   /**
@@ -203,7 +194,7 @@ const CAPTURE_MIN = 50;
 const CAPTURE_MAX = 10_000;
 
 const profileHandler =
-  (view: ProfileView, report: () => ProfileReport | null,
+  (report: () => ProfileReport | null,
    take: ((ms: number) => Promise<CaptureResult>) | null): LocalHandler =>
   async (argv, ctx) => {
   const wanted = ctx.args["section"];
@@ -311,9 +302,9 @@ const profileHandler =
           if (TIER_RANK[now.regime.tier] < TIER_RANK.spans) {
             return b.notice(
               "warn",
-              `the tier is \`${now.regime.tier}\` and a live card never raises it — ` +
-                "open `/profile` to watch the deck, which raises to `spans` while it is open " +
-                "and restores the tier on close (C28 I50)",
+              `the tier is \`${now.regime.tier}\` and nothing in a running session raises it — ` +
+                "set `profile: { tier: \"spans\" }` and restart; raising it from here would reset " +
+                "the ring every figure is drawn from (C28 I18)",
               undefined,
               { id: `${blockId("profile-live")}-tier` },
             );
@@ -339,13 +330,39 @@ const profileHandler =
       ),
     ]);
   }
-  const refused = view.open(section);
-  if (refused !== null) {
-    return doc("/profile", [warnNotice(refused, blockId("profile-refused"))]);
+  // **The section is an entry, and it always was three quarters of one**
+  // (C28 §3c, R-EXA-082, F1254). This arm raised a `kind: "view"` layer over the
+  // transcript, walked its deck with `n`/`p` and restored the profiler's tier at
+  // the pop; the design's test for anything wanting a frame of its own is *does
+  // it have its own prompt and its own context*, and a reading of the profiler
+  // has neither. So the section's cards go where `/profile snapshot`'s one card
+  // already went: `profileCard` is the seam §3c already published *for a
+  // consumer with its own navigation*, and the transcript is that consumer.
+  //
+  // **Stamped, for `snapshot`'s reason** — the document is a reading taken at a
+  // moment and says which moment on its own title. Currency is `/profile live`'s
+  // question and it is answered there, by a part that refetches; a stamp beside
+  // a refetch would be two claims about one fact.
+  //
+  // **The no-profiler arm is the deck's own**, not the snapshot branch's: this
+  // path never reached `report()` before, because `view.open` answered the state
+  // with a refusal string. Same sentence, one branch over.
+  const deck = report();
+  if (deck === null) {
+    return doc(`/profile ${section}`, [
+      warnNotice(
+        "no profiler to show — this session was built without `TuiConfig.profile`",
+        blockId("profile-refused"),
+      ),
+    ]);
   }
-  return doc("/profile", [
-    b.notice("muted", `profiler: ${section}`, undefined, { id: blockId("profile") }),
-  ]);
+  return doc(`/profile ${section}`, deckOf(deck, section).map((entry) =>
+    b.panel(
+      stampOf(deck, entry.spec.id, ctx.capabilities),
+      [...profileCard(deck, entry.spec.id, { w: ctx.width, rows: SNAPSHOT_ROWS }, ctx.capabilities, entry.seq)],
+      { id: blockId(`profile-${entry.spec.id}${entry.seq === undefined ? "" : `-${String(entry.seq)}`}`) },
+    ),
+  ));
 };
 
 /**
@@ -621,6 +638,6 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
     },
 
     // The seventh (C23 §2, I68).
-    profile: profileHandler(deps.profileView, deps.profileReport, deps.profileCapture),
+    profile: profileHandler(deps.profileReport, deps.profileCapture),
   };
 }

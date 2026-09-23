@@ -75,8 +75,6 @@ import { createRouter, type RouterDeps } from "../interaction/router/router.js";
 import { createConfirmHost, type ConfirmHost } from "./confirm.js";
 import { createDecoder } from "../interaction/router/decode.js";
 import { createKeyEffects } from "./keys.js";
-import { createProfileView } from "./profile-view.js";
-import type { ProfileView } from "./profile-view.js";
 import type { FocusTarget, InputEvent, Key, KeyAction } from "../interaction/router/types.js";
 import { openHistory, SEARCH_ID } from "../interaction/history/index.js";
 import { detectCapabilities, type TerminalCapabilities } from "../terminal/capabilities.js";
@@ -175,40 +173,12 @@ function suspendAware<T extends { suspend(): void; resume(): void }>(
   return view;
 }
 
-/**
- * C28 §3c — the profiler view's timer is disposed when the terminal is released.
- *
- * **The same decoration as `suspendAware`, one method over.** `stop()` calls
- * `graph.lifecycle.release()` after the report is taken and the profiler
- * disposed (C28 I38, `session.ts`), and that is the moment the view's timer
- * must stop: the scheduler drops a commit while unacquired (C03 I1), so a tick
- * after release draws nothing — what it would do is hold the process open for
- * up to `VIEW_REFRESH_MS` and call `report()` on a disposed recorder. A signal
- * exit takes C01's `releaseInternal` and then `process.exit`, which takes the
- * timer with it.
- *
- * `dispose` is read at release rather than captured, because the lifecycle is
- * built at step 7 and the view at step 10: the root hands the wrapper a thunk
- * over a slot it fills later, which is `lastInputAt`'s pattern for a value one
- * step writes and an earlier step's closure reads.
- *
- * Gated on the profiler as `suspendAware` is: without one the view never arms a
- * timer — `open` refuses — and *off is free* (C22 I92) includes a wrapper the
- * unprofiled session would otherwise carry.
- */
-function disposingOnRelease<T extends { release(): void }>(
-  lifecycle: T,
-  profiler: Profiler | undefined,
-  dispose: () => void,
-): T {
-  if (profiler === undefined) return lifecycle;
-  const view = Object.create(lifecycle) as T;
-  view.release = (): void => {
-    dispose();
-    lifecycle.release();
-  };
-  return view;
-}
+// **`disposingOnRelease` retires with the view it disposed** (C28 §3c, §9b S5,
+// R-EXA-082, F1254). It wrapped the lifecycle so the profiler view's 1 Hz timer
+// stopped before the terminal was released — a timer that outlived its terminal
+// would redraw into a released one. The deck is an entry composed once per
+// invocation and arms nothing, so there is nothing left to stop.
+
 
 export function themePath(stateDir: string): string {
   return `${stateDir}/theme`;
@@ -508,7 +478,6 @@ export type Graph = Readonly<{
    * the view before that lands, and they need it on a real graph — the commit
    * seam under test is this file's (C28 T4.4, T4.6–T4.9).
    */
-  profileView: ProfileView;
   history: Awaited<ReturnType<typeof openHistory>>;
   editor: ReturnType<typeof createEditor>;
   theme: ThemeStore;
@@ -1227,11 +1196,8 @@ export async function constructGraph(
   // the terminal belongs to somebody else whatever asked for it, and a second
   // caller learning to suspend without learning to tell the profiler is exactly
   // how F903 happened the first time.
-  // The profiler view is built at step 10 and its timer must stop at release
-  // (C28 §3c, §9b S5); the slot is filled there and read by the wrapper below.
-  let profileViewRef: ProfileView | null = null;
   const lifecycle = at("lifecycle", () =>
-    frameRecording(disposingOnRelease(suspendAware(createTerminalLifecycle({
+    frameRecording(suspendAware(createTerminalLifecycle({
       stdout: config.stdout,
       stdin: config.stdin,
       capabilities: detection.capabilities,
@@ -1241,7 +1207,7 @@ export async function constructGraph(
       onFatal: deps.onFatal,
       beforeRelease: makeBeforeRelease(runner, stores.history, [stores.transcriptWriter]),
       ...(deps.debug === undefined ? {} : { debug: deps.debug }),
-    }), deps.profiler), deps.profiler, () => profileViewRef?.dispose()), config.recording),
+    }), deps.profiler), config.recording),
   );
 
   // --- 8. the frame scheduler -----------------------------------------------
@@ -1474,35 +1440,12 @@ export async function constructGraph(
   // transcript entry, which is the scroll container it was already — the design's own
   // words for the case: *logs → a block with follow; it needed no frame*.
 
-  /**
-   * The profiler's view — C28 §3c, and the third owner of a `kind: "view"` layer.
-   *
-   * Built beside the other two and for their reason: `/profile`'s handler is
-   * registered inside the pipeline and closes over this. **Always built, and
-   * given `null` when there is no profiler**, so the verb exists in every
-   * session and refuses in a document rather than vanishing (C23 I68); without
-   * a profiler it arms no timer and pushes no layer, so *off is free* holds.
-   *
-   * **The commit is the decorated `scheduler`'s and the bracket is the view's**
-   * (C28 I49). The seam eight steps up passes `false` for what it knows; the
-   * view wraps `update` and this call in `profiler.own`, and the seam reads the
-   * bracket. Nothing about the seam changed for this — which was the point of
-   * writing it that way.
-   *
-   * `detection.capabilities` whole (C09 I49, F828): `profileCard`'s ASCII
-   * default is for a caller with no terminal, and this one has the resolved
-   * record — after C22 I49's overrides, as every other consumer here takes it.
-   */
-  const profileView = createProfileView({
-    overlays: stores.overlays,
-    profiler: deps.profiler ?? null,
-    capabilities: detection.capabilities,
-    measureSequence: (blocks, width) => built.blocks.measureSequence(blocks, width),
-    region: deps.frame.overlayRegion,
-    schedule: config.schedule,
-    redraw: (reason) => void scheduler.commit(reason),
-  });
-  profileViewRef = profileView;
+  // **The profiler's deck is an entry** (C28 §3c, R-EXA-082, F1254). It was the
+  // third and last producer of a `kind: "view"` layer, and the kind retires with
+  // it. `/profile <section>` composes its cards through `profileCard` — the seam
+  // §3c had already published *for a consumer with its own navigation* — and the
+  // transcript is that consumer.
+
 
   /**
    * `--no-bg`, for as long as the invocation that set it is the last `/theme`
@@ -1580,7 +1523,6 @@ export async function constructGraph(
       // Read by `execution.ts` when it hands `shippedHandlers` the view; until
       // then `shippedHandlers` includes no `profile` handler, so the manifest's
       // six and the registry's six still reconcile (C23 I27, T1.64).
-      profileView,
       /**
        * C23 I46 — whether anyone is looking at a live part's host.
        *
@@ -1595,9 +1537,7 @@ export async function constructGraph(
        * consequence is recorded rather than left to be found — the pause reaches
        * transcript-hosted parts and does not reach a drill-in at all.
        */
-      visible: (host) =>
-        host.kind === "view" ||
-        visibleIds.of(stores.viewport.visible()).has(host.id), // C22 I106
+      visible: (host) => visibleIds.of(stores.viewport.visible()).has(host.id), // C22 I106
       confirm,
       theme: stores.theme,
       // **On the change, not at exit** (I40). Fire-and-forget for the same
@@ -2317,7 +2257,6 @@ export async function constructGraph(
     schedule: config.schedule,
     anchor: deps.frame.promptAnchor,
     overlayRegion: deps.frame.overlayRegion,
-    profileView,
     focus,
     // The entry half of B1's pair; the exit is already on the `⌃c` rung below.
     enterCopyMode: deps.frame.enterCopyMode,
@@ -2848,23 +2787,20 @@ export async function constructGraph(
       return true;
     });
 
-    // **The target that had a name and no vocabulary** (C16 I24). `pushedView`
-    // has been in the focus union since C16 was written; `activeTarget` resolved
-    // to it and there was neither a binding nor a handler, so every key fell
-    // through to step 3 — which is also why a `PgUp` over a view scrolled the
-    // transcript underneath it. Vacuous only while nothing pushed a view.
-    router.register("pushedView", (e) => {
-      const effect = bound("pushedView", e);
-      if (effect === null) return false;
-      effect();
-      return true;
-    });
+    // **`pushedView`'s registration retires with the target** (R-EXA-082,
+    // F1254). It was C16 I24's measured case twice over: a target in the focus
+    // union since C16 was written with neither a binding nor a handler, so every
+    // key fell through to step 3 and a `PgUp` over a view scrolled the
+    // transcript underneath it — vacuous while nothing pushed a view, answered
+    // when three surfaces did, and vacuous again with none. The rule it leaves
+    // is `copyMode`'s below: **a target's table row is bound and never consulted
+    // unless something registers the handler that reads it.**
     // **Copy mode's keys resolve through the keymap too** (C16 §5c, I24). The
     // router registers its own `copyMode` rung for `⌃c`; this handler is the
     // target's table row — today exactly one, `Esc → exitCopyMode` — and without
     // it the row is bound and never consulted: `run("copyMode")` walked the
     // rung alone, declined, and a lone `Esc` was dropped on a frozen screen
-    // (F765). `pushedView` above has had the same pair all along.
+    // (F765). `pushedView` had the same pair for as long as it existed.
     router.register("copyMode", (e) => {
       const effect = bound("copyMode", e);
       if (effect === null) return false;
@@ -3163,7 +3099,6 @@ export async function constructGraph(
     manifest: built.manifest,
     completion: built.completion,
     ...stores,
-    profileView,
     runner,
     lifecycle,
     scheduler,
@@ -3232,7 +3167,7 @@ function routerDeps(
   /** The `child` rung's second source, late because the host is built after the router (C16 I49). */
   childAttached: () => boolean,
 ): RouterDeps {
-  const top = (): Readonly<{ id: string; kind: "overlay" | "view" | "panel"; blocking: boolean; dismissal: "escape" | "focus" | "answer" }> | null => {
+  const top = (): Readonly<{ id: string; kind: "overlay" | "panel"; blocking: boolean; dismissal: "escape" | "focus" | "answer" }> | null => {
     const layer = stores.overlays.top;
     return layer === null
       ? null

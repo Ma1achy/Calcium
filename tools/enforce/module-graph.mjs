@@ -2204,9 +2204,18 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "C17 diagnostics — the undo stack's depth, so T2.x can assert `UNDO_LIMIT` without " +
     "reaching into the buffer. Sibling of `killBuffer` above",
   "LineEditor.redoDepth": "C17 diagnostics — the redo half of `undoDepth`, same disposal",
-  "OverlayManager.hasView":
-    "C15 diagnostics — whether a pushed view is on the stack. `src/shell` asks the overlay " +
-    "for its `Placed` and never for this; the tests use it to assert push/pop pairing",
+  "Delta.before":
+    "C08's fixture diff — the value a corpus entry held before, rendered by the formatter in " +
+    "the same file and asserted by the fixture suites. `after` is read across the seam and " +
+    "this one is not, which is the pair being asymmetric rather than the field being dead",
+  "Profiler.setTier":
+    "C28 — the tier control, and **it has no caller in `src/` since the profiler's deck became " +
+    "a transcript entry** (C28 I50 retired, R-EXA-082, F1254). The deck was the one seam that " +
+    "moved a tier at run time, raising to `spans` for a layer's lifetime and restoring at the " +
+    "pop; an entry has no close to restore from, so the verb refuses in words instead. The " +
+    "recorder keeps the operation because a tier is a property of a live recording and " +
+    "`TuiConfig.profile.tier` is the only thing that sets one today — the blocker to watch is " +
+    "a second seam that can both raise a tier and be told when to put it back",
   "TranscriptStore.payloadOf":
     "C13 — an entry's payload by id, for tests asserting what a patch actually wrote. The " +
     "viewport reads entries through the view, not the store",

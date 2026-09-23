@@ -1,13 +1,17 @@
 // C23 — `/profile [section]`, the seventh shipped local verb
 // (docs/components/C23_execution_pipeline.md §2, §10), tier 1.
 //
-// **Driven through `shippedHandlers` with a view handed in, and through a real
-// pipeline over the framework's rows.** `HandlerDeps.profileView` is required:
-// the `profile` row is in `FRAMEWORK_TOOLS` and C23 I27 refuses a row without a
-// handler at every startup, so the view arrives whether or not a recorder does
-// and refuses through the route when none does (T4.67). T1.64's second arm
-// watched the transitional conditional that preceded this; it now asserts the
-// handler is present whatever the view answers.
+// **Driven through `shippedHandlers` and through a real pipeline over the
+// framework's rows.** The `profile` row is in `FRAMEWORK_TOOLS` and C23 I27
+// refuses a row without a handler at every startup, so the handler exists
+// whether or not a recorder does and says so in a notice when none does (T4.67).
+//
+// **`HandlerDeps.profileView` is gone with the pushed view** (C28 §3c,
+// R-EXA-082, F1254). Every arm of the verb now composes a document: the section
+// arm draws its cards through `profileCard`, the seam §3c had already published
+// *for a consumer with its own navigation*, and the transcript is that consumer.
+// A fake view stood at the top of this file recording what it was asked to open;
+// what these rows read instead is the document, which is the artefact.
 import { describe, expect, it } from "vitest";
 
 import { FRAMEWORK_TOOLS } from "../../src/data/manifest/framework.js";
@@ -15,44 +19,18 @@ import type { Block, LocalDocument, Notice } from "../../src/data/viewmodel/inde
 import { shippedHandlers } from "../../src/shell/local/handlers.js";
 import type { HandlerDeps } from "../../src/shell/local/handlers.js";
 import type { LocalContext } from "../../src/shell/local/registry.js";
-import type { ProfileView } from "../../src/shell/profile-view.js";
-import { SECTIONS } from "../../src/shell/profiling/panes/index.js";
-import type { ProfileSection } from "../../src/shell/profiling/panes/index.js";
+import { SECTIONS, cardsOf } from "../../src/shell/profiling/panes/index.js";
 import { liveDeclarations } from "../../src/shell/builders/live.js";
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
 import { TIER_RANK } from "../../src/shell/profiling/types.js";
 import type { ProfileReport, Profiler, Tier } from "../../src/shell/profiling/types.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { pipelineHarness, settled } from "../support/execution.js";
-import { producerContext } from "../support/producer-context.js";
-
-/** A view that records what it was asked to open, and answers as told. */
-const fakeView = (
-  refuse: string | null = null,
-): { view: ProfileView; opened: (ProfileSection | undefined)[] } => {
-  const opened: (ProfileSection | undefined)[] = [];
-  const view: ProfileView = {
-    open: (section) => {
-      opened.push(section);
-      return refuse;
-    },
-    nextCard: () => false,
-    sectionNext: () => false,
-    sectionPrev: () => false,
-    move: () => false,
-    pop: () => false,
-    dispose: () => undefined,
-    // Open on the last section asked for, unless every open was refused — the
-    // shape the real view has, reduced to what these rows read.
-    get section(): ProfileSection | null {
-      return refuse === null ? ((opened.at(-1) ?? null) as ProfileSection | null) : null;
-    },
-  };
-  return { view, opened };
-};
+import { FULL_CAPABILITIES, producerContext } from "../support/producer-context.js";
+import type { ProducerContext } from "../../src/data/adapters/types.js";
+import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 
 const deps = (
-  view: ProfileView = fakeView().view,
   report: () => ProfileReport | null = () => null,
   capture: HandlerDeps["profileCapture"] = null,
 ): HandlerDeps => ({
@@ -70,14 +48,16 @@ const deps = (
   history: () => [],
   bindings: () => [],
   stop: () => Promise.resolve(0),
-  profileView: view,
   // `null` by default — the state a session built without `TuiConfig.profile`
   // is in, and the one every row above this round was written against.
   profileReport: report,
 });
 
-const ctx = (args: Readonly<Record<string, unknown>> = {}): LocalContext => ({
-  ...producerContext(),
+const ctx = (
+  args: Readonly<Record<string, unknown>> = {},
+  over: Partial<ProducerContext> = {},
+): LocalContext => ({
+  ...producerContext(over),
   command: "/profile",
   ask: () => Promise.resolve(""),
   args,
@@ -93,14 +73,38 @@ const run = async (
   handlers: Readonly<Record<string, (argv: readonly string[], c: LocalContext) => LocalDocument | Promise<LocalDocument>>>,
   argv: readonly string[],
   args: Readonly<Record<string, unknown>> = {},
+  over: Partial<ProducerContext> = {},
 ): Promise<LocalDocument> => {
   const handler = handlers["profile"];
   if (handler === undefined) throw new Error("no `profile` handler in the map");
-  return handler(argv, ctx(args));
+  return handler(argv, ctx(args, over));
 };
 
 const notices = (blocks: readonly Block[]): readonly Notice[] =>
   blocks.filter((x): x is Notice => x.kind === "notice");
+
+/**
+ * The top-level panels the section arm composes, in the order it wrote them,
+ * with `blockId`'s uniqueness counter stripped.
+ *
+ * **The counter is process-global** (`documents.ts:38`) — block ids are
+ * addressed by `ViewPatch`, so every id carries a `-<n>` that depends on how
+ * many documents the file has already composed. A row asserting the whole id
+ * asserts the order its own file runs in.
+ */
+const panelIds = (blocks: readonly Block[]): readonly string[] =>
+  blocks.filter((x) => x.kind === "panel").map((x) => (x.id ?? "").replace(/-\d+$/u, ""));
+
+/**
+ * A section's expected panel ids, from the **register**.
+ *
+ * Only for a section with no `perFrame` card — `verdict` and `framework` — where
+ * one card is one panel. `app`'s deck expands a per-frame card per retained
+ * frame, and a row that wanted its ids would have to ask `deckOf`, which is the
+ * function under test.
+ */
+const idsOf = (section: "verdict" | "framework"): readonly string[] =>
+  cardsOf(section).map((c) => `profile-${c.id}`);
 
 /** Every `{ kind, id }` in a block tree, whatever nests what. */
 const walk = (node: unknown, out: { kind: string; id?: string }[] = []): { kind: string; id?: string }[] => {
@@ -147,76 +151,121 @@ const spiedProfiler = (tier: Tier): { profiler: Profiler; setTierCalls: Tier[] }
 };
 
 describe("C23 — /profile, the local route", () => {
-  it("T1.64 (C23 I68, C23 I27): a refusal from the view is a `warn` notice on the route, and the handler is one of seven whatever the view answers", async () => {
-    // Arm 1: the view refuses naming `TuiConfig.profile` (C28 T1.97's string)
-    // and the verb answers in a document rather than throwing.
-    const { view, opened } = fakeView(NO_PROFILER);
-    const handlers = shippedHandlers(deps(view));
+  it("T1.64 (C23 I68, C23 I27): with no recorder the section arm is a `warn` notice of the verb's own, and the handler is one of seven either way", async () => {
+    // **The refusal is the verb's, not a view's** (C28 §3c, R-EXA-082, F1254).
+    // It used to be a string `view.open` returned and the route wrapped; the
+    // reader is `() => ProfileReport | null` now, so the arm that answers `null`
+    // is the handler's own and the sentence is written where it is read.
+    const handlers = shippedHandlers(deps());
     expect(Object.keys(handlers).sort()).toEqual(SEVEN);
 
     const doc = await run(handlers, []);
     const found = notices(doc.blocks);
     expect(found).toHaveLength(1);
     expect(found[0]?.tone).toBe("warn");
-    expect(found[0]?.text).toMatch(/TuiConfig\.profile/u);
-    expect(opened, "the view was asked once, for the default section").toEqual(["verdict"]);
+    expect(found[0]?.text).toBe(NO_PROFILER);
+    expect(doc.command, "the default section, named on the entry's command").toBe("/profile verdict");
 
-    // **Arm 2: the handler does not depend on the view's answer.** A view that
-    // accepts yields the same seven keys — the row is in `FRAMEWORK_TOOLS`, so a
-    // map that dropped `profile` on any condition is what C23 I27 refuses at
-    // startup. (This arm watched the transitional conditional until the row
-    // landed; the six-without-`profile` shape is now unconstructible.)
-    const accepting = shippedHandlers(deps(fakeView().view));
+    // **Arm 2: the handler does not depend on what the reader answers.** A
+    // session that has a profiler yields the same seven keys — the row is in
+    // `FRAMEWORK_TOOLS`, so a map that dropped `profile` on any condition is
+    // what C23 I27 refuses at startup.
+    const accepting = shippedHandlers(deps(() => spiedProfiler("spans").profiler.report()));
     expect(Object.keys(accepting).sort()).toEqual(SEVEN);
     expect(accepting).toHaveProperty("profile");
   });
 
   it("T1.65 (C23 I68, C22 I66): the section comes from `args`, and a token that is not a section gets a usage notice", async () => {
-    const { view, opened } = fakeView();
-    const handlers = shippedHandlers(deps(view));
+    const { profiler } = spiedProfiler("spans");
+    const handlers = shippedHandlers(deps(() => profiler.report()));
 
-    // `/profile app`, as C05 hands it over: parsed into `args`.
-    const ok = await run(handlers, ["app"], { section: "app" });
-    expect(opened).toEqual(["app"]);
-    expect(notices(ok.blocks).map((n) => n.text)).toEqual(["profiler: app"]);
+    // `/profile framework`, as C05 hands it over: parsed into `args`. **What
+    // the row reads is the document**, which is the artefact — the entry's
+    // command and the cards it carries — rather than a spy on a seam that is
+    // gone.
+    //
+    // **`framework` and `verdict` rather than `app`**: neither holds a
+    // `perFrame` card, so the expected ids are `cardsOf` and not `deckOf`, and
+    // the row does not assert the handler against the function the handler
+    // calls.
+    const ok = await run(handlers, ["framework"], { section: "framework" });
+    expect(ok.command).toBe("/profile framework");
+    expect(panelIds(ok.blocks)).toEqual(idsOf("framework"));
 
     // `/profile foo`: validation failed, so `args` is empty and `argv` carries
     // the token. Usage names all three sections and quotes what was typed.
     const bad = await run(handlers, ["foo"]);
-    expect(opened, "the view was not asked").toEqual(["app"]);
     const usage = notices(bad.blocks);
     expect(usage).toHaveLength(1);
     expect(usage[0]?.tone).toBe("warn");
     for (const section of SECTIONS) expect(usage[0]?.text).toContain(section);
     expect(usage[0]?.text).toContain("`foo`");
+    expect(panelIds(bad.blocks), "and no deck was drawn").toEqual([]);
 
     // **The section is asserted to come from `args`**: `argv[0]` says one thing
-    // and `args.section` another, and a handler reading `argv` would open the
-    // wrong section while passing both arms above.
-    await run(handlers, ["framework"], { section: "app" });
-    expect(opened.at(-1)).toBe("app");
+    // and `args.section` another, and a handler reading `argv` would draw the
+    // wrong section's cards while passing both arms above.
+    const crossed = await run(handlers, ["verdict"], { section: "framework" });
+    expect(crossed.command).toBe("/profile framework");
+    expect(panelIds(crossed.blocks)).toEqual(idsOf("framework"));
   });
 
-  it("T1.66 (C23 I69): the document names the section and carries none of it", async () => {
-    const { view } = fakeView();
-    const doc = await run(shippedHandlers(deps(view)), ["framework"], { section: "framework" });
+  it("T1.66 (C23 I69, C28 §3c): the document names the section and carries the whole of it", async () => {
+    // **The row is inverted, and that is the change** (R-EXA-082, F1254). It
+    // asserted *no plot anywhere in the tree* and *no block of any card's*,
+    // because the section's deck lived behind a pushed view and the entry was a
+    // one-line receipt for having opened it. There is no view, so the entry is
+    // the deck: one panel per deck entry, in deck order, each carrying its
+    // card's own blocks.
+    const { profiler } = spiedProfiler("spans");
+    const doc = await run(shippedHandlers(deps(() => profiler.report())), ["framework"], {
+      section: "framework",
+    });
 
-    const tree = walk(doc.blocks);
-    expect(tree.filter((n) => n.kind === "notice"), "one notice").toHaveLength(1);
-    expect(tree.filter((n) => n.kind === "plot"), "no plot anywhere in the tree").toEqual([]);
+    expect(doc.command).toBe("/profile framework");
+    expect(notices(doc.blocks), "no receipt notice — the cards are the answer").toEqual([]);
+    expect(panelIds(doc.blocks)).toEqual(idsOf("framework"));
+
     // **Every card's own id**, from the register rather than a prefix an id
     // convention happens to share: `card-<id>` is what the deck frames with, and
     // a regex over four two-letter prefixes was a guess that outlived the panes
     // it was written for.
+    const tree = walk(doc.blocks);
     const cardIds = tree.filter((n) => n.id !== undefined && n.id.startsWith("card-"));
-    expect(cardIds, "no block of any card's").toEqual([]);
-    expect(notices(doc.blocks)[0]?.text).toBe("profiler: framework");
+    expect(cardIds.length, "and every card framed one").toBe(cardsOf("framework").length);
+  });
+
+  it("T1.96 (C23 I69, C09 I49): the cards are drawn with the context's capabilities, never the deck's ASCII default", async () => {
+    // **The view handed `detection.capabilities` whole and the handler does
+    // now** (R-EXA-082, F1254). The seam moved and the claim did not: the deck
+    // takes an ASCII fallback for a caller with no terminal, and a verb running
+    // inside a session has one, so a card that took the default would read
+    // `frame-site spans : …` on a unicode terminal with nothing else on screen
+    // different.
+    //
+    // **The slot is the card's generated footer** (C28 I57), which is where the
+    // deck joins its population and its exclusions — not a string the card
+    // chose to spell either way.
+    const { profiler } = spiedProfiler("spans");
+    const handlers = shippedHandlers(deps(() => profiler.report()));
+    const ascii: TerminalCapabilities = { ...FULL_CAPABILITIES, unicode: "ascii" };
+
+    const under = async (capabilities: TerminalCapabilities): Promise<string> =>
+      JSON.stringify((await run(handlers, ["framework"], { section: "framework" }, { capabilities })).blocks);
+
+    const drawnAscii = await under(ascii);
+    expect(drawnAscii, "the ASCII arm's separator").toContain("frame-site spans : ");
+    expect(drawnAscii, "and not the ambiguous-width one").not.toContain("·");
+
+    const drawnFull = await under(FULL_CAPABILITIES);
+    expect(drawnFull, "the unicode arm's — the one the default would never draw").toContain(
+      "frame-site spans · ",
+    );
   });
 
   it("T1.66b (C23 I69): `snapshot` appends a stamped panel and no live part; `live` appends a cadence and no stamp", async () => {
-    const { view, opened } = fakeView();
     const { profiler } = spiedProfiler("spans");
-    const handlers = shippedHandlers(deps(view, () => profiler.report()));
+    const handlers = shippedHandlers(deps(() => profiler.report()));
 
     // --- the snapshot arm -----------------------------------------------------
     const snap = await run(handlers, ["snapshot"], { section: "snapshot" });
@@ -238,7 +287,6 @@ describe("C23 — /profile, the local route", () => {
     // **And it is one-shot**: a stamp and a cadence on one block would be two
     // claims about the same fact, disagreeing between ticks.
     expect(liveDeclarations(snap.blocks), "no live part on a snapshot").toEqual([]);
-    expect(opened, "neither verb opens the view").toEqual([]);
 
     // --- the live arm ---------------------------------------------------------
     const live = await run(handlers, ["live"], { section: "live" });
@@ -250,7 +298,6 @@ describe("C23 — /profile, the local route", () => {
     // The stamp's fields, absent — a live part is current because it refetches.
     expect(liveTitle, "no frame range").not.toMatch(/\d+ frames/u);
     expect(liveTitle, "no elapsed time").not.toMatch(/captured/u);
-    expect(opened, "and still no view opened").toEqual([]);
 
     // The card is the one named, when one is named — `cardFor` falls to the
     // verdict and a row asserting only the default cannot tell the two apart.
@@ -260,7 +307,7 @@ describe("C23 — /profile, the local route", () => {
     );
   });
 
-  it("T1.66c (C23 I69, C28 I50, C28 I18): a live card calls `setTier` zero times at every tier, and below `spans` draws the raise notice rather than a figure", async () => {
+  it("T1.66c (C23 I69, C28 I18): a live card calls `setTier` zero times at every tier, and below `spans` draws the raise notice rather than a figure", async () => {
     // **The count and the notice together**, because the count alone is
     // satisfied by a verb that raises nothing and draws nothing. The second
     // half is what makes the first worth asserting.
@@ -269,7 +316,7 @@ describe("C23 — /profile, the local route", () => {
     // someone remembers this row.
     for (const tier of Object.keys(TIER_RANK) as readonly Tier[]) {
       const { profiler, setTierCalls } = spiedProfiler(tier);
-      const handlers = shippedHandlers(deps(fakeView().view, () => profiler.report()));
+      const handlers = shippedHandlers(deps(() => profiler.report()));
       const doc = await run(handlers, ["live"], { section: "live" });
       const spec = liveDeclarations(doc.blocks)[0]?.spec;
       expect(spec, `a live part at ${tier}`).toBeDefined();
@@ -283,7 +330,13 @@ describe("C23 — /profile, the local route", () => {
         expect(drawn.kind, `at ${tier} the first render is the notice`).toBe("notice");
         const text = (drawn as { text?: string }).text ?? "";
         expect(text, "naming the tier it found").toContain(`\`${tier}\``);
-        expect(text, "and saying who does raise it").toContain("/profile");
+        // **It names the change to make, not another surface to open**
+        // (R-EXA-082, F1254). The sentence used to point at `/profile`, which
+        // raised to `spans` while its layer was up and restored the tier at the
+        // pop; nothing in a running session raises a tier now, so the only
+        // honest instruction is the config and a restart.
+        expect(text, "naming the config that would change it").toContain("profile: { tier:");
+        expect(text, "and why it is not done from here").toContain("ring");
       } else {
         expect(drawn.kind, `at ${tier} it is a figure`).not.toBe("notice");
       }
@@ -308,8 +361,8 @@ describe("C23 — /profile, the local route", () => {
       ["card", "string", false],
     ]);
     // **The three sections and the three verbs, in that order.** The enum is
-    // one argument holding two kinds of value — a section opens the view,
-    // `snapshot` and `live` append a document (C23 I69, amended), `capture`
+    // one argument holding two kinds of value — a section appends its whole
+    // deck, `snapshot` and `live` append one card (C23 I69, amended), `capture`
     // takes a CPU profile (C28 I64) — and the row holds every half rather than
     // the sections alone, because an equality against `SECTIONS` would have
     // gone green the day a verb was dropped from the enum and left the
@@ -318,37 +371,40 @@ describe("C23 — /profile, the local route", () => {
     expect(FRAMEWORK_TOOLS.map((t) => t.name).sort()).toEqual(SEVEN);
   });
 
-  it("T4.66 (C23 I68, C23 I27): a real pipeline over the framework's rows — `/profile app` opens the view on `app`, appends one notice and nothing of the deck, and `seal()` accepted the seven", async () => {
-    const { view, opened } = fakeView();
+  it("T4.66 (C23 I68, C23 I27): a real pipeline over the framework's rows — `/profile framework` appends the section's deck as one entry, and `seal()` accepted the seven", async () => {
     // Constructing the harness is the I27 assertion: `seal()` runs inside it
     // and refuses a row without a handler or a handler without a row.
-    const h = pipelineHarness({ profileView: view });
-    h.pipeline.submit("/profile app");
+    //
+    // **The harness hands a report, not a view** (R-EXA-082, F1254): `/profile`
+    // reads `() => ProfileReport | null` and there is nothing left to push.
+    const { profiler } = spiedProfiler("spans");
+    const h = pipelineHarness({ profile: () => profiler.report() });
+    h.pipeline.submit("/profile framework");
     await settled(h.pipeline);
 
-    expect(opened, "the section C05 parsed, not `argv[0]` re-read").toEqual(["app"]);
-    expect(view.section).toBe("app");
     expect(h.transcript.entries).toHaveLength(1);
     const blocks = h.transcript.entries[0]?.doc.blocks ?? [];
     // The route's own `step-2` echo of the verb sits above the handler's
-    // document (C23 §4), so the handler's notice is the one carrying its id.
-    const own = notices(blocks).filter((n) => n.id?.startsWith("profile") === true);
-    expect(own, "one notice of the handler's").toHaveLength(1);
-    expect(own[0]?.text).toBe("profiler: app");
+    // document (C23 §4), so the deck's panels are what carry the `profile-` ids.
+    expect(panelIds(blocks), "the section C05 parsed, not `argv[0]` re-read").toEqual(
+      idsOf("framework"),
+    );
     const tree = walk(blocks);
-    expect(tree.filter((n) => n.id !== undefined && n.id.startsWith("card-")), "none of the deck").toEqual([]);
-    expect(tree.filter((n) => n.kind === "plot"), "no plot anywhere in the entry").toEqual([]);
+    expect(
+      tree.filter((n) => n.id !== undefined && n.id.startsWith("card-")).length,
+      "and the deck reached the transcript, framed card by card",
+    ).toBe(cardsOf("framework").length);
   });
 
-  it("T4.67 (C23 I68): the same pipeline from a session with no profiler → `/profile` appends the refusal naming `TuiConfig.profile`, and nothing is open", async () => {
-    const { view, opened } = fakeView(NO_PROFILER);
-    const h = pipelineHarness({ profileView: view });
+  it("T4.67 (C23 I68): the same pipeline from a session with no profiler → `/profile` appends the refusal naming `TuiConfig.profile`, and no deck", async () => {
+    // No `profile` on the script, which is a session built without
+    // `TuiConfig.profile` — the reader folds to `() => null` in `execution.ts`.
+    const h = pipelineHarness();
     h.pipeline.submit("/profile");
     await settled(h.pipeline);
 
-    expect(opened, "asked, for the default section, and refused").toEqual(["verdict"]);
-    expect(view.section).toBeNull();
     expect(h.transcript.entries).toHaveLength(1);
+    expect(panelIds(h.transcript.entries[0]?.doc.blocks ?? []), "no deck").toEqual([]);
     const found = notices(h.transcript.entries[0]?.doc.blocks ?? []).filter(
       (n) => n.id?.startsWith("profile") === true,
     );
@@ -365,7 +421,7 @@ describe("C28 I64 — the capture verb", () => {
       const { profiler, setTierCalls } = spiedProfiler(tier);
       let taken = 0;
       const handlers = shippedHandlers(
-        deps(fakeView().view, () => profiler.report(), async (ms) => {
+        deps(() => profiler.report(), async (ms) => {
           taken += 1;
           return Promise.resolve({
             kind: "cpu" as const, path: "/x.cpuprofile", bytes: 1, truncated: false,
@@ -389,7 +445,7 @@ describe("C28 I64 — the capture verb", () => {
     const { profiler, setTierCalls } = spiedProfiler("deep");
     const windows: number[] = [];
     const handlers = shippedHandlers(
-      deps(fakeView().view, () => profiler.report(), async (ms) => {
+      deps(() => profiler.report(), async (ms) => {
         windows.push(ms);
         return Promise.resolve({
           kind: "cpu" as const, path: "/tmp/t.cpuprofile", bytes: 9, truncated: false,

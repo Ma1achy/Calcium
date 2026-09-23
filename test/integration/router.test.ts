@@ -105,15 +105,22 @@ describe("C16 integration", () => {
     expect(router.target).toBe("overlay");
   });
 
-  it("T4.2 (with C15): a confirm over a view takes keys; Ctrl-C is a no-op", () => {
+  it("T4.2 (with C15): a confirm over a panel takes keys; Ctrl-C is a no-op", () => {
     const { overlays, router } = world();
+    // **It was a `fill`-placed view and is a non-blocking overlay** (R-EXA-082,
+    // F1254). The row needs a layer beneath the confirm that takes keys and
+    // **survives the confirm's arrival**, and a panel is the obvious
+    // replacement and the wrong one: C15 I28 closes every open panel when a
+    // blocking layer arrives, so the state this row is about is one the stack
+    // will not hold with a panel in it.
     overlays.push({
       id: "dash",
-      kind: "view",
-      placement: { kind: "fill" },
+      kind: "overlay",
+      placement: { kind: "centred" },
       content: rows(4, "d"),
       blocking: false,
       dismissal: "escape",
+      width: 40,
     });
     overlays.push({
       id: "confirm",
@@ -129,13 +136,18 @@ describe("C16 integration", () => {
 
     expect(router.target).toBe("overlay");
     expect(router.dispatch(ctrlC), "consumed").toBe(true);
-    expect(overlays.stack.map((l) => l.id), "the dashboard is still beneath it").toEqual([
+    expect(overlays.stack.map((l) => l.id), "the panel is still beneath it").toEqual([
       "dash",
       "confirm",
     ]);
 
     overlays.dismiss("confirm");
-    expect(router.target, "and the view is reachable once it is answered").toBe("pushedView");
+    // **The id, not the target.** Both layers resolve to `overlay`, so the
+    // target alone cannot tell *the confirm was answered and the layer beneath
+    // is back* from *nothing changed* — which is what the `view` kind used to
+    // do for free and is now the row's to say.
+    expect(router.target, "still a keyed layer").toBe("overlay");
+    expect(overlays.top?.id, "and it is the one beneath, reachable again").toBe("dash");
   });
 
   it("T4.5 (with C13): focus enters the live block and an append returns it", () => {

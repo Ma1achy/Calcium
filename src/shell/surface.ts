@@ -319,14 +319,15 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
 
     // **The `child` rung, and the handler consumes what it does not bind** (C16
     // I49, R-BLK-838: *takes all but host.detach*). `onInput` answers `false`
-    // for an unbound key, and at `pushedView` that was right — a view is a
-    // substate and a key it does not want belongs to the rung below. A captured
+    // for an unbound key, and at `pushedView` that was right — a view was a
+    // substate and a key it did not want belonged to the rung below (the target
+    // has since retired with its layer kind, R-EXA-082). A captured
     // child is not a substate: a key that fell through would be the host typing
     // into a prompt the reader cannot see while a PTY holds the terminal. So the
     // fall-through is closed here rather than inside `onInput`, which keeps
     // `onInput` a statement about the child's own bindings.
     // **Registered ordinarily, and `first: true` is what had to go** (C16 I49,
-    // R-BLK-908). At `pushedView` it was right: the target carried eleven view
+    // R-BLK-908). At `pushedView` it was right: that target carried eleven view
     // rows and a surface had to beat them. At `child` the target carries two,
     // both `host.detach`, and the composition root registers their handler when
     // the graph is built — so an ordinary registration puts this **behind** it,

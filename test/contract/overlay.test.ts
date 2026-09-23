@@ -10,7 +10,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
 import { createOverlayManager, place, sortLayers } from "../../src/viewport/overlay/index.js";
 import type { Layer, Region } from "../../src/viewport/overlay/index.js";
-import { REGION, anchored, centred, peek, placeIn, registry, rows, view } from "../support/overlay.js";
+import { REGION, anchored, centred, filling, panel, peek, placeIn, registry, rows } from "../support/overlay.js";
 
 const manager = () => createOverlayManager({ registry });
 
@@ -26,7 +26,7 @@ function lcg(seed: number): () => number {
 describe("C15 contract — placement is a function", () => {
   it("T2.1 (I5): a hundred calls on one stack and region are deeply equal", () => {
     const m = manager();
-    m.push(view("dash"));
+    m.push(filling("dash"));
     m.push(anchored("menu", 5, { row: 10, prefer: "below" }));
     m.push(centred("confirm", 3, { width: 30 }));
 
@@ -77,7 +77,7 @@ describe("C15 contract — placement is a function", () => {
         height: 1 + Math.floor(rand() * 200),
       };
       const stack: Layer[] = [];
-      if (rand() < 0.4) stack.push(view("dash"));
+      if (rand() < 0.4) stack.push(filling("dash"));
       const count = Math.floor(rand() * 4);
       for (let i = 0; i < count; i += 1) {
         const height = 1 + Math.floor(rand() * 30);
@@ -106,14 +106,17 @@ describe("C15 contract — placement is a function", () => {
     expect(checked).toBeGreaterThan(300);
   });
 
-  it("T2.8 (I2): a hand-built stack with an overlay beneath a view is sorted", () => {
-    // Unreachable through `push` — a view onto a non-empty stack is rejected —
-    // which is why the sort is otherwise a piece of code nobody would notice
-    // removing. Placement being pure over a stack it is handed is what makes
-    // this constructible at all.
-    const stack: readonly Layer[] = [centred("confirm", 3), view("dash")];
-    expect(sortLayers(stack).map((l) => l.id)).toEqual(["dash", "confirm"]);
-    expect(placeIn(stack).map((p) => p.layer.id)).toEqual(["dash", "confirm"]);
+  it("T2.8 (I23): a hand-built stack with an overlay beneath a peek is sorted", () => {
+    // **Re-aimed off the view band** (R-EXA-082, F1254). The argument was that
+    // a view onto a non-empty stack is rejected, so this stack was
+    // unreachable through `push` and the sort was otherwise a piece of code
+    // nobody would notice removing. The kind is gone and the argument holds
+    // one band up: `push` sorts on the way in, so a stack in the wrong order
+    // is only ever built by hand, and placement being pure over a stack it is
+    // handed is what makes that constructible at all.
+    const stack: readonly Layer[] = [centred("confirm", 3), peek("beside", 2, { row: 5, prefer: "below" })];
+    expect(sortLayers(stack).map((l) => l.id)).toEqual(["beside", "confirm"]);
+    expect(placeIn(stack).map((p) => p.layer.id)).toEqual(["beside", "confirm"]);
   });
 
   it("T2.9 (I17): an overlay never covers its anchor's own rows", () => {
@@ -211,14 +214,14 @@ describe("C15 contract — the stack over a history", () => {
         } else if (roll < 0.5) {
           m.push(peek(`p${(seq += 1)}`, 1 + Math.floor(rand() * 3), { row: Math.floor(rand() * REGION.height), prefer: rand() < 0.5 ? "above" : "below" }));
         } else if (roll < 0.58) {
-          m.push(view(`v${(seq += 1)}`));
+          m.push(panel(`n${(seq += 1)}`, 1 + Math.floor(rand() * 3), { row: Math.floor(rand() * REGION.height), prefer: "above" }));
         } else if (roll < 0.75) {
           m.pop();
         } else if (ids.length > 0) {
           m.dismiss(ids[Math.floor(rand() * ids.length)]!);
         }
       } catch {
-        // a rejected push(view) — legitimate, and the invariants must hold across it
+        // a rejected push — legitimate, and the invariants must hold across it
       }
 
       const kinds = m.stack.map((l) => l.kind);
@@ -227,8 +230,10 @@ describe("C15 contract — the stack over a history", () => {
       expect(m.top?.kind ?? "none").not.toBe("peek");
       const lastKeyed = [...m.stack].reverse().find((l) => l.kind !== "peek") ?? null;
       expect(m.top?.id ?? null).toBe(lastKeyed?.id ?? null);
-      // I23 — bands: views, then peeks, then overlays, in both the stack and the layout.
-      const band = (k: string) => (k === "view" ? 0 : k === "peek" ? 1 : 2);
+      // I23 — bands: peeks, then panels, then overlays, in both the stack and
+      // the layout. **The view band is gone** (R-EXA-082, F1254) and the peek
+      // is the floor.
+      const band = (k: string) => (k === "peek" ? 0 : k === "panel" ? 1 : 2);
       const placedKinds = m.layout(REGION).map((p) => p.layer.kind);
       for (const list of [kinds, placedKinds]) {
         for (let i = 1; i < list.length; i += 1) expect(band(list[i]!)).toBeGreaterThanOrEqual(band(list[i - 1]!));
@@ -238,7 +243,7 @@ describe("C15 contract — the stack over a history", () => {
     expect(peeksSeen).toBeGreaterThan(200); // cells-ok — a step count
   });
 
-  it("T2.4 (I1, I2, I14): a thousand random operations, asserted after every step", () => {
+  it("T2.4 (I14, I23): a thousand random operations, asserted after every step", () => {
     const rand = lcg(15);
     const m = manager();
     let seq = 0;
@@ -251,7 +256,7 @@ describe("C15 contract — the stack over a history", () => {
         if (roll < 0.35) {
           m.push(centred(`o${(seq += 1)}`, 1 + Math.floor(rand() * 6)));
         } else if (roll < 0.45) {
-          m.push(view(`v${(seq += 1)}`));
+          m.push(panel(`n${(seq += 1)}`, 1 + Math.floor(rand() * 3), { row: 10, prefer: "above" }));
         } else if (roll < 0.65) {
           m.pop();
         } else if (roll < 0.8 && ids.length > 0) {
@@ -262,21 +267,22 @@ describe("C15 contract — the stack over a history", () => {
           });
         }
       } catch {
-        // A rejected `push(view)` is a legitimate outcome, not a failure — and
-        // the invariants below must hold across it, which is the point of
+        // A rejected push is a legitimate outcome, not a failure — and the
+        // invariants below must hold across it, which is the point of
         // asserting inside the loop rather than after it.
       }
 
-      const views = m.stack.filter((l) => l.kind === "view");
-      expect(views.length, `step ${step}`).toBeLessThanOrEqual(1);
-
+      // **Both view rules are retired and the corpus is what is left of them**
+      // (R-EXA-082, F1254). It asserted *at most one view* and *every overlay
+      // after every view*; there is no view kind, so the rule this sweep now
+      // carries is I23's band order over the kinds that exist, and the panel
+      // is what arrives onto an occupied stack the way a view never could.
       const firstOverlay = m.stack.findIndex((l) => l.kind === "overlay");
-      const lastView = m.stack.map((l) => l.kind).lastIndexOf("view");
-      if (firstOverlay !== -1 && lastView !== -1) expect(lastView).toBeLessThan(firstOverlay);
+      const lastPanel = m.stack.map((l) => l.kind).lastIndexOf("panel");
+      if (firstOverlay !== -1 && lastPanel !== -1) expect(lastPanel).toBeLessThan(firstOverlay);
 
       expect(new Set(m.stack.map((l) => l.id)).size).toBe(m.stack.length);
       expect(m.top).toBe(m.stack.at(-1) ?? null);
-      expect(m.hasView).toBe(views.length > 0);
     }
   });
 

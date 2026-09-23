@@ -59,7 +59,6 @@ const keyOfHost = (host: { kind: string; id: string }): string => `${host.kind}:
 function harness() {
   const transcript = createTranscriptStore();
   const commits: string[] = [];
-  const views = new Map<string, Block[]>();
   let now = 0;
   /** The monotonic clock: advanced with `now` by `tick`, left behind by `skew` (F973). */
   let mono = 0;
@@ -97,31 +96,20 @@ function harness() {
     append: () => undefined,
     fault: (stage, cause) => void faults.push(`${stage}: ${String(cause)}`),
     stopping: () => false,
-    updateView: (id, blockId, next) => {
-      const content = views.get(id);
-      if (content === undefined) return false;
-      views.set(
-        id,
-        content.map((b) => (b.id === blockId ? next : b)),
-      );
-      return true;
-    },
-    // **This double reproduced the defect it was standing in for** (F22). It
-    // returned the panel's child, exactly as production did, so no row here
-    // could have seen that the view arm was rebuilding the panel and losing
-    // `gapBefore` — a fake narrower than the interface cannot fail on the
-    // difference, and this one was not narrower, it was wrong in the same way.
-    viewPanel: (id, blockId) => {
-      const found = views.get(id)?.find((b) => b.id === blockId);
-      return found !== undefined && found.kind === "panel" ? found : null;
-    },
+    // **`updateView` and `viewPanel` are gone with the host kind** (R-EXA-082,
+    // F1254). They were the layer arm of a two-armed seam, and `viewPanel` is
+    // worth a sentence on the way out: it was a double that **reproduced the
+    // defect it stood in for** (F22), returning the panel's child exactly as
+    // production did, so neither half of the suite could see the view arm
+    // rebuilding the panel and losing `gapBefore`. A fake that is wrong in the
+    // same way as the code cannot fail on the difference. One arm is left and
+    // it reads the real block.
   });
 
   return {
     driver,
     transcript,
     commits,
-    views,
     hidden,
     faults,
     /**
@@ -601,69 +589,44 @@ describe("C23 §3b — part refresh", () => {
     expect(order).toEqual(["a", "b", "c"]);
   });
 
-  it("T4.21b (C24 I12, F22): the view arm carries gapBefore, as the entry arm does", async () => {
-    // **T1.35b's property, on the arm that could not hold it.** That row asserts
-    // a refresh keeps the declared block's `gapBefore` and it drives a
-    // *transcript entry*, where `currentPanel` reads the real block. The view
-    // arm reconstructed the panel through `livePanel`, which sets no gap — so
-    // `existing?.padding?.t === 1` was structurally false here and only here,
-    // and C24 I12 says `b.live` behaves identically in both.
-    //
-    // **Neither half of the suite could see it**: this file's `viewPanel` double
-    // and `document-view.test.ts`'s both returned the panel's child, reproducing
-    // the production defect rather than standing in for the interface. A fake
-    // that is wrong in the same way as the code cannot fail on the difference.
+  // **T4.21 and T4.21b are struck with the view host** (R-EXA-082, F1254).
+  //
+  // T4.21 drove `{ kind: "view" }` directly and proved C24 I12's *one loop, two
+  // hosts, no second code path*; there is one host, so the claim is a statement
+  // about a union with one member. T4.21b was its `gapBefore` half — T1.35b's
+  // property on the arm that could not hold it, because the view arm rebuilt the
+  // panel through `livePanel` and the entry arm reads the real block. The arm
+  // that could be wrong is the one that went; T1.35b is the row that holds the
+  // property and it drives an entry.
+  //
+  // **`release` stopping a host is not struck with them** — T2.20 below drives
+  // it, and I33's release-on-a-gone-host is T3.67's.
+
+  it("T4.21 (C24 I12): `release` stops a host's parts, and a second host is untouched", async () => {
+    // What survives of the view row: the loop releases the host it is told to
+    // and nothing else. Two entries, because *stopped* asserted over one host is
+    // indistinguishable from *stopped everything*.
+    let a = 0;
+    let b = 0;
     const h = harness();
-    const declared = { ...panel("p", "panel", raw("p-c", "…")), padding: { t: 1 } } as Block;
-    h.views.set("dash", [declared]);
+    const ida = h.transcript.append(docWith([panel("a", "a", raw("a-c", "…"))]), { streaming: true });
+    const idb = h.transcript.append(docWith([panel("b", "b", raw("b-c", "…"))]), { streaming: true });
+    const host: RefreshHost = { kind: "entry", id: ida };
 
-    h.driver.declare({ kind: "view", id: "dash" }, [part({ id: "p" })]);
-    await h.tick();
-
-    const after = h.views.get("dash")?.find((b) => b.id === "p");
-    // The control first: a refresh that did not happen satisfies the claim below
-    // by leaving the declared block in place, gap and all.
-    expect(
-      after?.kind === "panel" && after.children[0]?.kind === "raw" && after.children[0].text,
-      "the control: it really did refresh",
-    ).toBe("ok");
-    expect(after?.padding?.t, "and the rhythm survived the replacement").toBe(1);
-  });
-
-  it("T4.21 (C24 I12): a pushed view is driven by the same loop, and release stops it", async () => {
-    // **The host arm with no shell-level producer.** Nothing in the tree pushes
-    // an app-supplied view yet — that is C22 §13's undecided ruling, which C25
-    // narrowed and did not close — so this drives the seam directly rather than
-    // through a route that does not exist. What it proves is C24 I12's half that
-    // is provable today: one loop, two hosts, no second code path.
-    let calls = 0;
-    const h = harness();
-    h.views.set("dash", [panel("p", "panel", raw("p-c", "…"))]);
-    const host: RefreshHost = { kind: "view", id: "dash" };
-
-    h.driver.declare(host, [
-      part({
-        id: "p",
-        fetch: () => {
-          calls += 1;
-          return Promise.resolve("live");
-        },
-      }),
+    h.driver.declare(host, [part({ id: "a", fetch: () => { a += 1; return Promise.resolve("live"); } })]);
+    h.driver.declare({ kind: "entry", id: idb }, [
+      part({ id: "b", fetch: () => { b += 1; return Promise.resolve("live"); } }),
     ]);
 
     await h.tick();
-    const shownInView = h.views.get("dash")?.[0];
-    expect(
-      shownInView?.kind === "panel" && shownInView.children[0]?.kind === "raw"
-        ? shownInView.children[0].text
-        : null,
-      "the view's part was patched through C15's seam",
-    ).toBe("live");
+    expect(shown(h, ida, "a"), "the control: it really did refresh").toBe("live");
+    expect([a, b], "and both ran").toEqual([1, 1]);
 
     h.driver.release(host);
-    const at = calls;
+    const at = a;
     for (let i = 0; i < 3; i += 1) await h.tick(60_000);
-    expect(calls, "and the pop stopped it").toBe(at);
+    expect(a, "released").toBe(at);
+    expect(b, "and the other host kept going").toBeGreaterThan(1);
   });
 
   it("T2.20 (I32): dispose stops every host, whatever state it was in", async () => {
@@ -672,7 +635,12 @@ describe("C23 §3b — part refresh", () => {
     const id = h.transcript.append(docWith([panel("a", "a", raw("a-c", "…"))]), {
       streaming: true,
     });
-    h.views.set("v", [panel("p", "p", raw("p-c", "…"))]);
+    // **Two entries, where it was an entry and a view** (R-EXA-082, F1254).
+    // *Every host* has to mean more than one host or the row is T1.x under
+    // another name; the second kind is gone and a second entry is what is left.
+    const id2 = h.transcript.append(docWith([panel("p", "p", raw("p-c", "…"))]), {
+      streaming: true,
+    });
 
     const counting = (pid: string) =>
       part({
@@ -683,7 +651,7 @@ describe("C23 §3b — part refresh", () => {
         },
       });
     h.driver.declare({ kind: "entry", id }, [counting("a")]);
-    h.driver.declare({ kind: "view", id: "v" }, [counting("p")]);
+    h.driver.declare({ kind: "entry", id: id2 }, [counting("p")]);
 
     await h.tick();
     expect(calls, "the control: both ran").toBe(2);
@@ -1799,24 +1767,38 @@ describe("C23 I70 — a refused patch stops the part, not the host", () => {
   });
 
   it("T3.67 (I70, §8h H2): a host that has gone still takes the whole host down", async () => {
-    // **The control for the ruling**, and the view arm is where it can be
-    // constructed: C15 answers one boolean, so `false` means the layer is gone
-    // and there is no second reading of it. Both parts must stop — a fix that
-    // simply stopped releasing would pass every row above and fail this one.
+    // **The control for the ruling.** It was written on the view arm, where
+    // C15 answered one boolean and `false` meant the layer was gone with no
+    // second reading of it; the entry arm reaches the same state through C13
+    // dropping the entry (R-EXA-082, F1254), which is `clear()` here and an
+    // eviction in a session. Both parts must stop — a fix that simply stopped
+    // releasing would pass every row above and fail this one.
     const h = harness();
     let a = 0;
     let b = 0;
-    h.views.set("v", [panel("a", "a", raw("a-c", "…")), panel("b", "b", raw("b-c", "…"))]);
-    h.driver.declare({ kind: "view", id: "v" }, [
+    const id = h.transcript.append(
+      docWith([panel("a", "a", raw("a-c", "…")), panel("b", "b", raw("b-c", "…"))]),
+      { streaming: true },
+    );
+    h.driver.declare({ kind: "entry", id }, [
       part({ id: "a", intervalMs: 1_000, fetch: () => { a += 1; return Promise.resolve("x"); } }),
       part({ id: "b", intervalMs: 1_000, fetch: () => { b += 1; return Promise.resolve("y"); } }),
     ]);
     await h.tick(1_000);
     expect([a, b], "the control: both ran").toEqual([1, 1]);
 
-    h.views.delete("v");
+    h.transcript.clear();
     for (let i = 0; i < 4; i += 1) await h.tick(1_000);
-    expect([a, b], "the layer went and both parts went with it").toEqual([2, 2]);
+    // **Four due ticks and neither part ran** — the figure was `[2, 2]` on the
+    // view arm, where the layer's disappearance was noticed one tick late; C13
+    // drops the entry synchronously, so the release lands before the next fetch.
+    //
+    // **And it is a release rather than a pause**, which is the distinction the
+    // row is about: `visible` here reads `hidden`, `clear()` does not touch it,
+    // so the host is still *visible* and stopped anyway. A paused part would be
+    // waiting to resume; this one is gone.
+    expect(h.hidden.has(`entry:${id}`), "not paused — the host was never hidden").toBe(false);
+    expect([a, b], "the entry went and both parts went with it").toEqual([1, 1]);
     expect(h.faults, "a host that is gone is not a defect and is not reported").toEqual([]);
   });
 

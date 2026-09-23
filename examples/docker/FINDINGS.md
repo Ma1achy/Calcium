@@ -56092,3 +56092,47 @@ available of what the declaration was doing.
 **The design reaches this by a shorter path than the obligation table.** It asks
 one question of anything that wants a frame — *does it have its own prompt and
 its own context?* — and a verb's result has neither.
+
+---
+
+## F1254 — a target that is vacuous, then answered, then vacuous again ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `pushedView` — a `FocusTarget`, a layer `kind`, eleven keymap rows and three producers. |
+| **Reached for** | `R-EXA-082`, retiring the last of the three. |
+| **Verdict** | **The union member outlived two different reasons for existing, and nothing was watching either.** |
+
+`pushedView` was in `FocusTarget` from the day C16 was written and had no
+binding anywhere: `activeTarget` resolved to it, the handler set was empty, and
+every key fell through to step 3 — which is why a `PgUp` over a view scrolled
+the transcript underneath it. C16 I24 records that as vacuous *only for as long
+as nothing pushed a view*, which was true and was the wrong thing to watch.
+
+Three surfaces then pushed one — the patch view, the document view, the
+profiler's deck — and the target acquired eleven rows and three owners sharing
+them. `R-EXA-082` deletes all three, and the target is vacuous again.
+
+**The two vacancies are not the same and only one of them is a defect.** The
+first was a name with no vocabulary: a rule with nothing to be wrong about,
+A03 §2's class. The second is a vocabulary with no subject, which is honest
+while it lasts and rots into the first the moment someone reaches for the name.
+The tell that distinguishes them is not the member — it is **whether anything
+would fail if the member were deleted today**, and for a `FocusTarget` the
+answer is a compile error in exactly one direction.
+
+**What the interval bought, which is the reason to record this rather than just
+delete it.** The target's second life is what demonstrated M5's *targets are not
+rungs*: `panel` and `pushedView` were two targets at one rung, separate only
+because their `escape` rows disagreed — `dismiss` at a panel, `viewPop` in a
+view. That claim is now carried by nothing but `prompt` and `liveBlock` sharing
+`scope`, which is a weaker illustration of a rule that is still right. **An
+illustration retiring is not the rule retiring**, and the place that goes wrong
+is a spec sentence that argued for the rule *from* the illustration.
+
+**Counted:** one `FocusTarget` member, one `Layer` kind across four types, nine
+`KeyAction`s, eleven keymap rows, two router registrations, a `sortLayers`
+partition, a `hasView` accessor, an overlay push refusal, a `RefreshHost` arm
+with its two driver seams, `disposingOnRelease`, and 491 lines of owner. Six
+invariants retire (C15 I1's nesting clause, C16 I33, C28 I49–I51) and C28 I52
+keeps its figure with a different reason.

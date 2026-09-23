@@ -27,10 +27,13 @@ const at = (over: Partial<FocusInputs> = {}): FocusTarget =>
   activeTarget({ ...base, ...over });
 
 describe("C16 §3 — activeTarget", () => {
-  it("T1.3 (I15, R-COR-002): each of the seven conditions resolves to its documented target", () => {
+  it("T1.3 (I15, R-COR-002): each condition resolves to its documented target", () => {
     expect(at({ overlayTop: { kind: "overlay" } })).toBe("overlay");
     expect(at({ copyMode: true })).toBe("copyMode");
-    expect(at({ overlayTop: { kind: "view" } })).toBe("pushedView");
+    // **The `pushedView` row is gone with the target** (R-EXA-082, F1254);
+    // `panel` is the only other layer kind that takes keys and it holds
+    // `substate` alone.
+    expect(at({ overlayTop: { kind: "panel" } })).toBe("panel");
     expect(at({ stored: { at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "interact" } })).toBe("interaction");
     expect(at()).toBe("prompt");
     expect(at({ stored: { at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "navigate" } })).toBe("liveBlock");
@@ -76,9 +79,9 @@ describe("C16 §3 — activeTarget", () => {
     ).toBe("overlay");
     expect(at({ stored: interacting, copyMode: true }), "under copy mode").toBe("copyMode");
     expect(
-      at({ stored: interacting, overlayTop: { kind: "view" } }),
-      "under a view, which covers the region",
-    ).toBe("pushedView");
+      at({ stored: interacting, overlayTop: { kind: "panel" } }),
+      "under a panel, which is the prompt's substate",
+    ).toBe("panel");
   });
 
   it("T1.3f (C26 I14): moving between rows leaves interaction", () => {
@@ -137,13 +140,13 @@ describe("C16 §3 — activeTarget", () => {
       "overlay",
     );
     expect(
-      at({ copyMode: true, overlayTop: { kind: "view" } }),
-      "copy mode over a pushed view",
+      at({ copyMode: true, overlayTop: { kind: "panel" } }),
+      "copy mode over a panel",
     ).toBe("copyMode");
     expect(
-      at({ overlayTop: { kind: "view" }, stored: { at: "prompt" } }),
-      "a pushed view over the prompt",
-    ).toBe("pushedView");
+      at({ overlayTop: { kind: "panel" }, stored: { at: "prompt" } }),
+      "a panel over the prompt",
+    ).toBe("panel");
   });
 
   it("a confirm over copy mode resolves to the overlay, not to copy mode", () => {
@@ -196,7 +199,6 @@ describe("C16 §3 — activeTarget", () => {
       at({ overlayTop: { kind: "overlay" } }),
       at({ copyMode: true }),
       at({ overlayTop: { kind: "panel" } }),
-      at({ overlayTop: { kind: "view" } }),
       at({ stored: { at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "interact" } }),
       at(),
       at({ stored: { at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "navigate" } }),
@@ -220,13 +222,18 @@ describe("C16 §3 — activeTarget", () => {
     expect(FOCUS_ORDER[FOCUS_ORDER.length - 1], "global is the fallback").toBe("global");
   });
 
-  it("pushedView needs no separate hasView input", () => {
-    // Overlays always sit above views (C15 I2), so a view is the top exactly
+  it("the substate rung needs no second input beside `overlayTop`", () => {
+    // Overlays always sit above panels (C15 I23), so a panel is the top exactly
     // when no overlay is open. Asserted because the obvious reading is that
     // `activeTarget` is missing an input, and a second input could disagree
     // with the one beside it.
-    expect(at({ overlayTop: { kind: "overlay" } }), "view beneath is irrelevant").toBe("overlay");
-    expect(at({ overlayTop: { kind: "view" } })).toBe("pushedView");
+    //
+    // **It was `hasView` and there is no view** (R-EXA-082, F1254). The member
+    // is gone from `OverlayManager`; what the row was about is that the stack's
+    // own ordering already answers the question, which is as true of the band
+    // that replaced it.
+    expect(at({ overlayTop: { kind: "overlay" } }), "the panel beneath is irrelevant").toBe("overlay");
+    expect(at({ overlayTop: { kind: "panel" } })).toBe("panel");
   });
 });
 

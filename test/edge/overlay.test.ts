@@ -8,9 +8,8 @@
 import { describe, expect, it } from "vitest";
 
 import { createOverlayManager } from "../../src/viewport/overlay/index.js";
-import { OverlayError } from "../../src/viewport/overlay/index.js";
 import type { OverlayChange, Region } from "../../src/viewport/overlay/index.js";
-import { REGION, anchored, centred, frame, placeIn, registry, rowsOf, view, peek } from "../support/overlay.js";
+import { REGION, anchored, centred, frame, placeIn, registry, rowsOf } from "../support/overlay.js";
 
 const manager = () => createOverlayManager({ registry });
 
@@ -26,27 +25,13 @@ describe("C15 edge — the stack's refusals", () => {
     expect(m.stack.map((l) => l.id)).toEqual(["a"]);
   });
 
-  it("T3.3 (I1): push(view) while a view exists → rejected, stack unchanged", () => {
-    const m = manager();
-    m.push(view("dash"));
-    expect(() => m.push(view("logs"))).toThrow(OverlayError);
-    expect(m.stack.map((l) => l.id)).toEqual(["dash"]);
-  });
-
-  it("T3.4 (I1): push(view) while overlays exist → rejected", () => {
-    const m = manager();
-    m.push(centred("confirm", 3));
-    expect(() => m.push(view("dash"))).toThrow(OverlayError);
-    expect(m.hasView).toBe(false);
-  });
-
-  it("T3.4b (I1, §2a): push(view) while only a peek exists → rejected, as onto any non-empty stack", () => {
-    const m = manager();
-    m.push(peek("p", 1, { row: 5, prefer: "below" }));
-    expect(() => m.push(view("dash"))).toThrow(OverlayError);
-    expect(m.hasView).toBe(false);
-    expect(m.stack.map((l) => l.id)).toEqual(["p"]);
-  });
+  // **T3.3, T3.4 and T3.4b are struck with the at-most-one-view rule**
+  // (R-EXA-082, F1254). Three
+  // rejections of `push(view)` onto a non-empty stack, in the three shapes a
+  // stack can have. There is no `push(view)`, and the rule they enforced —
+  // *at most one view* — has no subject. What outlived them is that every
+  // remaining kind arrives onto occupied stacks, which is why T1.33 now walks
+  // all six permutations rather than pinning one member to first.
 
   it("T3.14: twenty nested overlays keep LIFO order", () => {
     const m = manager();

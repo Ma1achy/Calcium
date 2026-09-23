@@ -70,16 +70,18 @@ describe("C22 §6f — the blink machine subtracts (C22 I64)", () => {
 describe("C22 §6f — the style resolves per focus target (C22 I63)", () => {
   it("T1.22 (C22 I63, §6f table row 1): a target's own style, the fallback, and a declared null", () => {
     // **The entry's own example, and the row that refuses a style on `Layer`**:
-    // a beam in the prompt and a block in a pushed view. The prompt has no
+    // a beam in the prompt and a block everywhere else. The prompt has no
     // `Placed`, so a design keyed on the layer cannot express the case that
-    // motivated the feature.
+    // motivated the feature. **The fallback arm was `pushedView`** (R-EXA-082,
+    // F1254) and is `panel`, which is a target the fallback still has to reach
+    // and the config deliberately does not name.
     const config = {
       fallback: BLOCK,
       targets: { prompt: BEAM, overlay: null },
     } as const;
 
     expect(cursorStyleFor("prompt", config), "its own").toEqual(BEAM);
-    expect(cursorStyleFor("pushedView", config), "the fallback").toEqual(BLOCK);
+    expect(cursorStyleFor("panel", config), "the fallback").toEqual(BLOCK);
 
     // **A declared `null` is an answer, not an absence.** `overlay: null` says
     // *leave the terminal's cursor alone here* and must not fall through to a
@@ -105,7 +107,10 @@ describe("C22 §6f — the style resolves per focus target (C22 I63)", () => {
         `${target} is a key`,
       ).toEqual(BEAM);
     }
-    expect(FOCUS_ORDER, "and there are nine of them").toHaveLength(9);
+    // **Eight, where it was nine** (R-EXA-082, F1254): `pushedView` left the
+    // union with the kind. The figure is here for the reason it always was —
+    // the loop above is satisfied by a `FOCUS_ORDER` that lost a member.
+    expect(FOCUS_ORDER, "and there are eight of them").toHaveLength(8);
   });
 
   it("T1.22c (C22 I63): shape and blink are one wire parameter", () => {

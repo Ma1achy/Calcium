@@ -282,28 +282,13 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // view has no prompt competing for them. `pageup`/`pagedown` appear at two
   // targets deliberately — that is one key at two targets resolved by the
   // ladder, not the duplicate `(target, key)` the conflict rule refuses.
-  { target: "pushedView", key: { name: "n" }, action: "viewNextHunk" },
-  { target: "pushedView", key: { name: "p" }, action: "viewPrevHunk" },
-  { target: "pushedView", key: { name: "g" }, action: "viewTop" },
-  // **`G`, not `{name: "g", shift: true}`** (I17). The decoder gives a plain
-  // printable its own character as its name and never sets `shift` — a capital
-  // arrives as `G`, so the modifier form is a row nothing can produce. T2.13
-  // caught it, which is the third time that check has found an unreachable
-  // binding and the first where the binding looked more correct than the fix.
-  { target: "pushedView", key: { name: "G" }, action: "viewBottom" },
-  { target: "pushedView", key: { name: "pageup" }, action: "viewPageUp" },
-  { target: "pushedView", key: { name: "pagedown" }, action: "viewPageDown" },
-  { target: "pushedView", key: chordOf("move.up"), action: "viewPageUp" },
-  { target: "pushedView", key: chordOf("move.down"), action: "viewPageDown" },
-  // **`tab` at a third target** (I33). The prompt's `tab` is `complete` and
-  // `liveBlock`'s is `entryNext`; the three never meet, because the ladder
-  // resolves one target per event and the prompt takes no keys while a view is
-  // top. `⇧tab`'s wire form is `CSI Z`, which the decoder already answers with
-  // `{name: "tab", shift: true}` — proven at `liveBlock` before this row was
-  // written, rather than assumed from the modifier convention.
-  { target: "pushedView", key: chordOf("focus.next"), action: "viewNextSection" },
-  { target: "pushedView", key: chordOf("focus.previous"), action: "viewPrevSection" },
-  { target: "pushedView", key: chordOf("escape"), action: "viewPop" },
+  // **Eleven rows went with the `pushedView` target** (C22 §13a, C25 §3b,
+  // C28 §3c, R-EXA-082, F1254): `n`/`p`, `g`/`G`, the two page keys and their
+  // `⌥`-arrow pairs, `tab`/`⇧tab` and `escape`. Three surfaces shared the target
+  // and every one is a transcript entry now, so the keys that scroll them are the
+  // transcript's — which is `R-EXA-082`'s point restated at the keymap: *it was
+  // already a scroll container; it needed no frame*, and a frame is what a second
+  // set of scroll bindings is.
 
   // --- selection (C17 §5b, entry 15 step 2) --------------------------------
   //
@@ -802,15 +787,6 @@ const BUILTIN_ACTIONS: ReadonlySet<string> = new Set(
     scrollPageDown: true,
     scrollTop: true,
     scrollBottom: true,
-    viewNextHunk: true,
-    viewPrevHunk: true,
-    viewTop: true,
-    viewBottom: true,
-    viewPageUp: true,
-    viewPageDown: true,
-    viewNextSection: true,
-    viewPrevSection: true,
-    viewPop: true,
     enterCopyMode: true,
     exitCopyMode: true,
     // --- §6a, M6 ------------------------------------------------------------

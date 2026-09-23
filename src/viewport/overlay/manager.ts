@@ -62,30 +62,21 @@ class Manager implements OverlayManager {
     return null;
   }
 
-  get hasView(): boolean {
-    return this.#stack.some((l) => l.kind === "view");
-  }
-
   push(layer: Layer): Disposable {
-    if (layer.kind === "view" && this.#stack.length > 0) {
-      // Rejected rather than reordered. A view raised while anything is open
-      // means the caller opened it from inside a modal, and views do not nest
-      // (I1) — the drill-in from the dashboard appends to the transcript
-      // instead (A01 D7), so there is no legitimate path here to accommodate.
-      throw new OverlayError(
-        `cannot push view ${layer.id}: ${this.#stack.length} layer(s) are already open`,
-      );
-    }
+    // **The one-view-at-a-time refusal retired with the kind** (C15 I1,
+    // R-EXA-082, F1254). A view raised over a non-empty stack was rejected rather
+    // than reordered, because it meant the caller had opened one from inside a
+    // modal and views did not nest. Nothing raises a view; a drill-in appends to
+    // the transcript, which is what the refusal already pointed at (A01 D7).
     if (this.#stack.some((l) => l.id === layer.id)) {
       throw new OverlayError(`layer ${layer.id} is already on the stack`);
     }
     assertPlaceable(layer);
 
     // **Sorted on the way in** (I2, I23), so `top` and `layout` read the same
-    // order. Views and overlays already arrived sorted by construction — a view
-    // is only ever pushed onto an empty stack — and a peek is the kind that
-    // does not: it opens while a confirm or a menu may already be up, and it
-    // belongs beneath them however late it arrives.
+    // order. Overlays already arrive sorted by construction, and a peek is the
+    // kind that does not: it opens while a confirm or a menu may already be up,
+    // and it belongs beneath them however late it arrives.
     // **I28 — the panels close first, and the arriving layer is what closes
     // them** (R-BLK-873). *A panel is a thing you opened; a question is a thing
     // that arrived.* The arriving one cannot silently sit under something the

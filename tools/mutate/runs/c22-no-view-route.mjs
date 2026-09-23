@@ -25,9 +25,11 @@ import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const CMD = "npx vitest run test/unit/execution.test.ts test/unit/session-keys.test.ts";
+const CMD =
+  "npx vitest run test/unit/execution.test.ts test/unit/session-keys.test.ts " +
+  "test/unit/local-profile.test.ts";
 const EXEC = "src/shell/execution.ts";
-const KEYS = "src/shell/keys.ts";
+const HANDLERS = "src/shell/local/handlers.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -77,15 +79,22 @@ const results = runPass({
       expect: "T1.46"
     },
     {
-      // **The section gesture walks the ladder looking for a yes.** With one
-      // owner left this reads as tidying and is the defect the ladder's bottom
-      // exists to refuse: a refusal retried elsewhere is a gesture that lands
-      // somewhere the reader did not aim it.
-      name: "the section gesture asks the owner whether or not one is up",
-      file: KEYS,
-      from: "    if (owner === undefined || owner.section === null) return false;",
-      to: "    if (owner === undefined) return false;",
-      expect: "T1.3v"
+      // **The deck's first card, where the section's whole deck belongs**
+      // (C28 §3c, R-EXA-082). This is the shape the pushed view left behind: it
+      // showed one card at a time and `n` walked them, so an entry that draws
+      // the first and stops is a faithful port of a surface nobody has any
+      // more — and it is right about every card it does draw, which is why a
+      // row asserting one panel's contents would pass.
+      //
+      // **It replaces the section gesture's mutation**, which named
+      // `keys.ts`'s ladder bottom and expected T1.3v. Both are deleted with the
+      // target (F1254), and a mutation whose subject is gone is an anchor that
+      // rots rather than a control that holds.
+      name: "the section arm draws the deck's first card and stops",
+      file: HANDLERS,
+      from: "  return doc(`/profile ${section}`, deckOf(deck, section).map((entry) =>",
+      to: "  return doc(`/profile ${section}`, deckOf(deck, section).slice(0, 1).map((entry) =>",
+      expect: "T1.66"
     },
   ],
 });

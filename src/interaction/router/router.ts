@@ -4,7 +4,7 @@
  * C16 §4, §5, §7 — see spec.
  *
  * **The ladder is not a list here.** Rungs 3 to 7 are handlers registered on
- * `overlay`, `copyMode`, `pushedView` and `liveBlock`, so their order *is*
+ * `overlay`, `copyMode`, `panel` and `liveBlock`, so their order *is*
  * `FOCUS_ORDER`'s and the two cannot disagree. Only rungs 1 and 2 sit outside
  * dispatch, because a verb in flight and a shell child are not focus targets and
  * have no target to register on. C16 §5's table documents what falls out of this;
@@ -28,7 +28,7 @@ const EXIT_ARM_MS = 500;
 
 
 export type Placed = Readonly<{
-  layer: Readonly<{ id: string; kind: "overlay" | "view" | "panel"; blocking: boolean; dismissal: "escape" | "focus" | "answer" }>;
+  layer: Readonly<{ id: string; kind: "overlay" | "panel"; blocking: boolean; dismissal: "escape" | "focus" | "answer" }>;
   top: number;
   left: number;
   height: number;
@@ -59,7 +59,7 @@ export type RouterDeps = Readonly<{
    * `handler`/`local` ruling, one layer up.
    */
   probe?: Probe;
-  overlayTop: () => Readonly<{ id: string; kind: "overlay" | "view" | "panel"; blocking: boolean; dismissal: "escape" | "focus" | "answer" }> | null;
+  overlayTop: () => Readonly<{ id: string; kind: "overlay" | "panel"; blocking: boolean; dismissal: "escape" | "focus" | "answer" }> | null;
   /**
    * The top layer's answer handler, or null — I25.
    *
@@ -403,11 +403,6 @@ export function createRouter(
       deps.popLayer();
       return true;
     });
-    register("pushedView", (e) => {
-      if (!isCtrlC(e)) return false;
-      deps.popLayer();
-      return true;
-    });
     // **The new rung is this registration and nothing else** (C26 I2). Its
     // position in the ladder is `FOCUS_ORDER`'s, so there was no order to
     // choose and no second artefact to keep in step — which is the whole
@@ -481,20 +476,13 @@ export function createRouter(
     const wheel = e.button.startsWith("wheel");
     if (covering !== undefined) {
       stages.push(`layer:${covering.layer.id}`);
-      // **Three kinds, three targets** (I48, C15 I23, R-BLK-779). *The layer
-      // order is the scroll order*, so a mouse event over a panel is the
-      // panel's exactly as a key is — and while a panel routed to `overlay`
-      // here, the handlers registered at `panel` were unreachable by the
-      // pointer while reachable by the keyboard, which is one seam answering
-      // two ways.
-      return run(
-        covering.layer.kind === "view"
-          ? "pushedView"
-          : covering.layer.kind === "panel"
-            ? "panel"
-            : "overlay",
-        e,
-      );
+      // **Two kinds, two targets** (I48, C15 I23, R-BLK-779). *The layer order
+      // is the scroll order*, so a mouse event over a panel is the panel's
+      // exactly as a key is — and while a panel routed to `overlay` here, the
+      // handlers registered at `panel` were unreachable by the pointer while
+      // reachable by the keyboard, which is one seam answering two ways. It was
+      // three until `kind: "view"` retired (R-EXA-082, F1254).
+      return run(covering.layer.kind === "panel" ? "panel" : "overlay", e);
     }
 
     // **The click that dismisses does not also act** (I47, R-BLK-854,

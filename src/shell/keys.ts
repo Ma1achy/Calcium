@@ -47,7 +47,6 @@ import type { EntryId } from "../viewport/transcript/index.js";
 import type { Manifest } from "../data/manifest/index.js";
 import type { OverlayManager } from "../viewport/overlay/index.js";
 import type { FocusStore } from "../interaction/router/focus.js";
-import type { ProfileView, ProfileViewMotion } from "./profile-view.js";
 
 /** The prompt's own extent, for anchoring (C19 §6, C20 §5). */
 export type PromptAnchor = Readonly<{ row: number; rows: number }>;
@@ -114,30 +113,6 @@ export type KeyDeps = Readonly<{
    */
   enterCopyMode: () => void;
   exitCopyMode: () => void;
-  /**
-   * The fullscreen patch view (C25 §3b, C22 I41).
-   *
-   * Named here rather than reached through `overlays`, because the motions are
-   * the view's own arithmetic over one offset and C16 executes no action itself
-   * (I19). The seven `view*` entries below are what makes `pushedView` a target
-   * with a vocabulary rather than a name in a union.
-   */
-  /**
-   * C28 §3c's view — the third owner of the one `pushedView` target.
-   *
-   * Its unit is the pane: `n`/`p` switch panes where a patch moves by hunk and
-   * a document by block, and the four page keys and `g`/`G` move its window.
-   * No binding is added for it, so `/help keys` is unchanged (C23 I26).
-   *
-   * **Optional for the harness that builds these deps by hand and required in
-   * effect**: the root always supplies it (`construct.ts`), and a deps literal
-   * without it exercises the two older owners exactly as before this one
-   * existed. `session-keys.test.ts` is that harness: its graph-backed literal
-   * passes it, and its three stub literals (`editor: {}`) do not — so this stays
-   * optional until those three grow a stub view, which is what making it
-   * required costs and not one line.
-   */
-  profileView?: ProfileView;
   /**
    * Every navigable element in the live entry, addressed and in reading order,
    * or empty (C16 I22, C26 §5).
@@ -987,44 +962,13 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     scrollBottom: () => void deps.viewport.scrollToBottom(),
 
     // --- the pushed view (C16 I24) -----------------------------------------
-    //
-    // Every one is the same call with a different motion, which is the point:
-    // the view holds one offset and computes each destination from it, so there
-    // is no per-motion state here to fall out of step (C22 I41).
-    // **One target, two owners** (C22 §13a). C15 I1 permits one view at a time,
-    // so `onView` asks which is open rather than the keymap growing a second
-    // `pushedView` target — a target per producer would put the same seven keys
-    // in two tables, and the day they disagreed nothing would say so.
-    //
-    // `n`/`p` are the hunk motions on a patch and one block on a document,
-    // which is S3's footer read literally: *n/p scroll*. The two are the same
-    // gesture over each view's own unit, which is what makes one binding right
-    // rather than a compromise.
-    viewNextHunk: () => void onView(1),
-    viewPrevHunk: () => void onView(-1),
-    viewTop: () => void onView("top"),
-    viewBottom: () => void onView("bottom"),
-    viewPageUp: () => void onView("pageUp"),
-    viewPageDown: () => void onView("pageDown"),
-    // **The section gesture, and it is one call to whichever owner is up**
-    // (C16 I33). `n`/`p` above move the view's own *unit*; these move its
-    // *section* — a file on a patch, a heading on a document, a group on the
-    // profiler's deck. The member is required on all three interfaces, so this
-    // needs no `undefined` arm and an owner that has one section answers
-    // `false` in its own words rather than by omission.
-    viewNextSection: () => void onSection(1),
-    viewPrevSection: () => void onSection(-1),
-    // `Esc` is the view's own dismissal and deliberately not `dismiss`, which
-    // pops whatever layer is on top: this one knows it is closing *its* view and
-    // drops its offset with it (A01 D7).
-    viewPop: () => {
-      // **The profiler view first** (C28 §3c). Its `pop` restores the tier it
-      // raised; sending its `Esc` to another owner would leave that tier up.
-      if (deps.profileView !== undefined && deps.profileView.section !== null) {
-        void deps.profileView.pop();
-        return;
-      }
-    },
+    // **The `view*` effects are gone with the last owner of `pushedView`**
+    // (C22 §13a, C25 §3b, C28 §3c, R-EXA-082, F1254). Eight of them — `n`/`p`,
+    // `g`/`G`, the two pages and the two section steps — plus `viewPop`, over a
+    // target three surfaces shared. Each surface is a transcript entry now, and an
+    // entry is scrolled the way every entry is: C14's viewport, C26's focus, and
+    // `⏎` to expand in place. The target retires with them, which is why this is a
+    // deletion and not a re-pointing.
 
     reverseSearch: () => {
       deps.history.searchOpen(deps.editor.text);
@@ -1181,47 +1125,6 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     },
     exitCopyMode: () => void deps.exitCopyMode(),
   });
-
-  /**
-   * Send a motion to whichever view is open (C22 §13a).
-   *
-   * Two motions per binding because the vocabularies differ where the units
-   * differ: a document moves by block, the profiler by card. Anything they
-   * share — `top`, `bottom`, the pages — passes the same name twice, and that
-   * repetition is deliberate: it keeps the mapping visible at the call site
-   * rather than hidden in a table that would have to be read to know whether a
-   * key does the same thing in both.
-   *
-   * **There were three and a patch was the first.** A patch moved by hunk, and
-   * `n`/`p` were the one motion a diff has that a list does not — reachable
-   * only at the `pushedView` target, over a surface the design deletes (C25
-   * §3b, R-EXA-082). An expanded patch is scrolled the way everything else in
-   * the transcript is scrolled.
-   */
-  const onView = (
-    // The profiler view's reading of the key: a card step for `n`/`p`, a window
-    // motion for the rest (C28 §3c). **The only reading left** — the document
-    // view was the other owner of this target and its subject is a transcript
-    // entry now (C22 §13a, R-EXA-082), scrolled the way every entry is.
-    profile: ProfileViewMotion | 1 | -1,
-  ): boolean => {
-    const profileView = deps.profileView;
-    if (profileView === undefined || profileView.section === null) return false;
-    return typeof profile === "number" ? profileView.nextCard(profile) : profileView.move(profile);
-  };
-
-  /**
-   * `tab`/`⇧tab` to whichever view is open (C16 I33).
-   *
-   * **The same ladder as `onView` and deliberately not a second one**: two
-   * copies of *which owner is up* is how they come to disagree, and the one
-   * above has already been wrong once (F944). One gesture, one resolution.
-   */
-  const onSection = (direction: 1 | -1): boolean => {
-    const owner = deps.profileView;
-    if (owner === undefined || owner.section === null) return false;
-    return direction === 1 ? owner.sectionNext() : owner.sectionPrev();
-  };
 
   /**
    * The actions after which the as-you-type menu is recomputed (C19 §6a).

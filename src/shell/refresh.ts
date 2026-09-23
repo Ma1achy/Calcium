@@ -154,11 +154,16 @@ export type ViewRefresh = Readonly<{
  * staggered across members with no shared lifetime — and `release(host)` is what
  * makes I33's five triggers one call rather than five sites agreeing.
  */
-export type RefreshHost =
-  | Readonly<{ kind: "entry"; id: EntryId }>
-  | Readonly<{ kind: "view"; id: string }>;
+/**
+ * **One kind, and it was two** (R-EXA-082, F1254). `{ kind: "view"; id }` named a
+ * pushed layer's parts; the three surfaces that pushed one are transcript
+ * entries now, so an entry is the only host. The discriminant stays — a union of
+ * one is what a second host kind is added to, and `keyOf` below is already
+ * written for it.
+ */
+export type RefreshHost = Readonly<{ kind: "entry"; id: EntryId }>;
 
-/** The key a host is held under. Two kinds share one map; the kind disambiguates. */
+/** The key a host is held under. The kind disambiguates when there is more than one. */
 const keyOf = (host: RefreshHost): string => `${host.kind}:${String(host.id)}`;
 
 /**
@@ -340,27 +345,7 @@ export type RefreshDeps = Readonly<{
    */
   fault: (stage: string, cause: unknown) => void;
   stopping: () => boolean;
-  /**
-   * Replaces a part's block on a pushed view (C15 §2's `update`).
-   *
-   * A second seam because the two hosts are different components: a transcript
-   * entry is patched through C13 and a layer through C15, and C23 §3b commits
-   * that both are driven by *the same code*, not that they are the same store.
-   * Returns whether the layer was still there.
-   */
-  updateView: (id: string, blockId: string, next: Block) => boolean;
   /** The block a pushed view currently shows for a part, so staleness can retitle. */
-  /**
-   * The part's **panel** as the view currently holds it (F22).
-   *
-   * It returned the panel's child, so `currentPanel` had to rebuild the panel
-   * through `livePanel` — which sets no `gapBefore`, making `existing?.gapBefore
-   * === true` structurally false on this arm and only this arm. The entry arm
-   * reads the real block and carries the gap; C24 I12 says `b.live` behaves
-   * identically in a transcript entry and in a pushed view, and here it could
-   * not. Returning the panel makes both arms one code path with one answer.
-   */
-  viewPanel: (id: string, blockId: string) => Panel | null;
   /**
    * Whether anyone is looking at this host (C23 I46).
    *
@@ -689,13 +674,6 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     const base = livePanel(part.spec.id, titleOf(part), child);
     const panel: Block =
       existing?.padding === undefined ? base : ({ ...base, padding: existing.padding } as Block);
-    // **One boolean and one meaning on this arm** (§8h): C15 answers whether the
-    // layer is still there, and a view that cannot take a well-formed block is a
-    // state this seam cannot report — stated as the limit it is.
-    if (host.kind === "view") {
-      return deps.updateView(host.id, part.spec.id, panel) ? { kind: "ok" } : { kind: "hostGone" };
-    }
-
     const outcome = deps.transcript.patch(
       host.id,
       { op: "replace", blockId: part.spec.id, block: panel },
@@ -1163,11 +1141,10 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
   };
 
   const currentPanel = (host: RefreshHost, part: Part): Panel | null => {
-    // **The real block on both arms** (F22). This reconstructed on the view arm
-    // and read on the entry arm, so every field the reconstruction did not set
-    // was invisible here — `gapBefore` measurably, and anything added to `Panel`
-    // later by construction.
-    if (host.kind === "view") return deps.viewPanel(host.id, part.spec.id);
+    // **The real block, read rather than reconstructed** (F22). There were two
+    // arms and the view's reconstructed, so every field the reconstruction did
+    // not set was invisible here — `gapBefore` measurably, and anything added to
+    // `Panel` later by construction. One arm now, and it is the reading one.
     const entry = deps.transcript.entries.find((e) => e.id === host.id);
     const found = entry === undefined ? null : findBlock(entry.doc.blocks, part.spec.id);
     return found !== null && found.kind === "panel" ? found : null;

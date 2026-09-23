@@ -30,7 +30,7 @@ import { doc, localDoc } from "./blocks.js";
 import { result } from "./transport.js";
 import type { RefreshHost } from "../../src/shell/refresh.js";
 import type { ConfirmHost } from "../../src/shell/confirm.js";
-import type { ProfileView } from "../../src/shell/profile-view.js";
+import type { ProfileReport } from "../../src/shell/profiling/types.js";
 import type { Pipeline, PipelineDeps } from "../../src/shell/types.js";
 import type { RawPatch, RawResult } from "../../src/data/transport/index.js";
 import type { ViewDocument, ViewPatch } from "../../src/data/viewmodel/index.js";
@@ -78,12 +78,16 @@ export type PipelineScript = Readonly<{
   /** The region the body is measured against, for the resize rows (C23 I65). */
   region?: () => Readonly<{ width: number; height: number }>;
   /**
-   * C28 §3c's view, for `/profile` (C23 I68). Defaults to a view with no
-   * recorder behind it — the one every session built without `TuiConfig.profile`
-   * gets — whose `open` refuses naming that option, so a row that wants the
-   * accepting arm hands its own in (C23 T4.66).
+   * C28's reader, for `/profile` (C23 I68). Absent by default — the state every
+   * session built without `TuiConfig.profile` is in, and the one whose every
+   * arm answers in a warn notice naming that option, so a row that wants the
+   * accepting arm hands its own report in (C23 T4.66).
+   *
+   * **The reader and not a view** (C28 §3c, R-EXA-082, F1254). There is no
+   * pushed view to hand over: the section's cards are a transcript entry, so
+   * the seam the harness fills is the one `PipelineDeps` actually has.
    */
-  profileView?: ProfileView;
+  profile?: () => ProfileReport;
 }>;
 
 export type PipelineHarness = Readonly<{
@@ -167,24 +171,6 @@ export const settled = async (p?: { readonly inFlight: unknown }): Promise<void>
   await turn();
   await turn();
 };
-
-/**
- * The view a session with no profiler gets: `open` refuses with C28 T1.97's
- * string and nothing is ever open. What `construct.ts` builds when
- * `TuiConfig.profile` is absent, reduced to the seam `/profile` reaches.
- */
-const refusingProfileView = (): ProfileView => ({
-  open: () => "no profiler to show — this session was built without `TuiConfig.profile`",
-  nextCard: () => false,
-  sectionNext: () => false,
-  sectionPrev: () => false,
-  move: () => false,
-  pop: () => false,
-  dispose: () => undefined,
-  get section() {
-    return null;
-  },
-});
 
 export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
   const transcript = createTranscriptStore();
@@ -403,8 +389,11 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
     setSuppressBackground: (next: boolean) => void suppressed.push(next),
     binary: "widget",
     commandPolicy: slashPolicy,
-    // Required since the seventh row landed: C23 I27 refuses `profile` without a handler.
-    profileView: script.profileView ?? refusingProfileView(),
+    // Required since the seventh row landed: C23 I27 refuses `profile` without a
+    // handler. **Omitted rather than stubbed** where a script names no profiler:
+    // `profile?` is optional on `PipelineDeps` and `execution.ts` folds an absent
+    // one to `() => null`, which is the state the refusal arm reads.
+    ...(script.profile === undefined ? {} : { profile: script.profile }),
   } as unknown as PipelineDeps;
 
   const pipeline = createExecutionPipeline(deps);

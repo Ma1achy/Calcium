@@ -188,7 +188,6 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       stop: deps.stop,
       // C28 §3c's view, for `/profile` (C23 I68) — the row is in
       // `FRAMEWORK_TOOLS`, so a handler missing here is what `seal()` refuses.
-      profileView: deps.profileView,
       // C23 I69's amended pair — `/profile snapshot` and `/profile live` read
       // the same reader `LocalContext.profile` carries, and `null` where that
       // is absent. **The reader, never the recorder**: the two verbs put a card
@@ -1963,32 +1962,11 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     // refusing on every tick says it once.
     fault: contain,
     stopping: () => deps.session().stopping,
-    // **A second seam, because the two hosts are different components.** §3b
-    // commits that an entry and a pushed view are driven by *the same code*,
-    // not that they are the same store: C13 patches, C15 updates, and the
-    // driver holds one loop over both.
-    // **The document view is asked, not the layer** (C22 §13a, C22 I46). Its layer
-    // holds a *window* of the document, so a part scrolled out of view is absent
-    // from `layer.content` while being perfectly alive — patching the layer
-    // directly would report that as a vanished host and release the parts, and
-    // the reader would come back from a scroll to a dead panel.
-    //
-    // The owner holds the whole document, so it answers for blocks the window
-    // does not currently show. `putBlock` is total (§13a): the reprojection
-    // happens into a local and nothing is assigned unless it succeeds.
-    updateView: (id, blockId, next) => {
-      const layer = deps.overlays.stack.find((l) => l.id === id);
-      if (layer === undefined) return false;
-      const content = layer.content.map((b) => (b.id === blockId ? next : b));
-      return deps.overlays.update(id, { content });
-    },
-    // Returns the panel itself, not its child (F22). The caller wants the block
-    // as the view holds it, and handing back a child forced a reconstruction
-    // that silently dropped every field it did not know to set.
-    viewPanel: (id, blockId) => {
-      const found = deps.overlays.stack.find((l) => l.id === id)?.content.find((b) => b.id === blockId);
-      return found !== undefined && found !== null && found.kind === "panel" ? found : null;
-    },
+    // **The second seam is gone with the second host** (C22 §13a, C28 §3c,
+    // R-EXA-082, F1254). §3b committed that an entry and a pushed view are driven
+    // by *the same code*, not that they are the same store: C13 patched one and
+    // C15 updated the other, and the driver held one loop over both. There is one
+    // store now, and the commitment reads as a description of what is left.
     // C23 I46 — C22 answers, because the answer is C14's for an entry and C15's
     // for a layer (A02 Seam 4).
     visible: deps.visible,
