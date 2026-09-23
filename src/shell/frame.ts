@@ -104,6 +104,15 @@ export type ComposeDeps = Readonly<{
   owner: () => OwnerRung | null;
   /** C16 I44 — whether that owner is still refusing its first activation. */
   ownerArmed: () => boolean;
+  /**
+   * Entries held out of the frame by copy mode (C14 I34).
+   *
+   * **Optional, and absent is *nothing held*** — the same terms `ChromeContext`
+   * states it on. A composition with no session graph behind it has no hold to
+   * report, and a required member here would make every harness that composes a
+   * frame declare a zero it cannot be wrong about.
+   */
+  bufferedEntries?: () => number;
   /** C02's resolved record, for the chrome's marks (A03 SS47). `null` before
    * the session graph exists, which is also when there is no owner. */
   capabilities: () => TerminalCapabilities | null;
@@ -157,6 +166,7 @@ export function compose(deps: ComposeDeps): Composed {
     columns: size.columns,
     owner: deps.owner(),
     ownerArmed: deps.ownerArmed(),
+    bufferedEntries: deps.bufferedEntries?.() ?? 0,
     // Spread rather than assigned, so `exactOptionalPropertyTypes` sees the
     // member as absent rather than present-and-undefined: a chrome doing
     // `"lastFrame" in ctx` gets the same answer as one doing `!== undefined`.

@@ -49,8 +49,9 @@ import { cursorable, legendHitAt, plotDefinition, sampleIndexAt } from "../prese
 import { patchDefinition } from "../presentation/patch/index.js";
 import { loadTheme, type ThemeStore } from "../presentation/theme/index.js";
 import { createTranscriptStore } from "../viewport/transcript/index.js";
-import type { EntryId } from "../viewport/transcript/index.js";
+import type { EntryId, TranscriptEntry, TranscriptView } from "../viewport/transcript/index.js";
 import { createViewport } from "../viewport/viewport/index.js";
+import type { ViewportOptions } from "../viewport/viewport/index.js";
 import { RenderCache } from "./render-cache.js";
 import { ChromeCache } from "./chrome-cache.js";
 import { Cameras } from "./cameras.js";
@@ -470,7 +471,31 @@ export type Graph = Readonly<{
   manifest: ReturnType<typeof createManifestStore>;
   completion: ReturnType<typeof createEngine>;
   transcript: ReturnType<typeof createTranscriptStore>;
+  /**
+   * The viewport the frame reads — the held one while semantic copy mode is up
+   * (C14 I31, I32, §6b).
+   */
   viewport: ReturnType<typeof createViewport>;
+  /**
+   * The held document, or `null` when nothing is held (C14 I31).
+   *
+   * §6b's table sends exactly two readers to the view — the frame's own loop
+   * and `y` — and everything else to `transcript`, which never stops taking
+   * writes. The buffer is the difference between the two and not a queue.
+   */
+  /**
+   * The document the frame is drawing — the held one, or the record (C14 I31).
+   *
+   * The three readers §6b's table sends to the view all read this, so the
+   * choice has one site and a mutation on it has somewhere to be seen.
+   */
+  documentEntries: readonly TranscriptEntry[];
+  /** Entries the record has and the view does not (C14 I34). */
+  bufferedEntries: number;
+  /** Freeze the view at the record's current state, at the frame's size (I31). */
+  freezeView: (size: Readonly<{ width: number; height: number }>) => void;
+  /** Drop the hold; the caller commits (I34). */
+  thawView: () => void;
   /**
    * An entry's rendered lines (C22 I58, §6c).
    *
@@ -841,7 +866,15 @@ export async function constructGraph(
     );
     // The store *is* the view (C13 §2, `TranscriptStore extends TranscriptView`)
     // — C14 takes the reader half, and passing the store satisfies it.
-    const viewport = createViewport(transcript, {
+    /**
+     * Hoisted so the **held** viewport is built from the same options (C14 I31).
+     *
+     * §6b's hold is a second viewport over a frozen view of the record — one
+     * measurer, one chrome function, one width — because a held document
+     * measured by anything else is a document nobody is looking at, which is
+     * the drift this component exists to make impossible.
+     */
+    const viewportOptions: ViewportOptions = {
       // **The region's width, not the terminal's** (C22 I109, C14 I22). The
       // same rule as the height below, on the axis that acquired it later: the
       // first `#render` overwrites this from the composed frame, and an initial
@@ -896,7 +929,22 @@ export async function constructGraph(
       // function that draws it**, or the two arithmetics part company and the
       // viewport describes a document it is not showing.
       chromeRows: chromeRowsOf,
-    });
+    };
+    const viewport = createViewport(transcript, viewportOptions);
+
+    /**
+     * The held view and the viewport over it, while semantic copy mode is up
+     * (C14 I31, §6b).
+     *
+     * **Null is the ordinary state and the getter is why this is one line at
+     * every reader.** Fifteen sites read `viewport`; making it a getter over a
+     * swappable slot means the hold reaches all of them without a flag any of
+     * them has to remember, and the record — `transcript` — is deliberately
+     * *not* swapped, because §6b's table says only the frame and `y` read the
+     * view (A6) and every other reader is the far side writing into it.
+     */
+    let heldView: TranscriptView | null = null;
+    let heldViewport: ReturnType<typeof createViewport> | null = null;
 
     // **The render cache's two C13 arms, beside C14's** (I58, §6c trace rows 8
     // and 9). `rev`, width, focus and theme are all *in the key*, so `append`,
@@ -1188,7 +1236,76 @@ export async function constructGraph(
 
     return {
       transcript,
-      viewport,
+      /**
+       * The viewport the frame reads — the held one while copy mode is up
+       * (C14 I31, I32).
+       *
+       * A getter and not a field: `scrollBy`, `pageUp`, `entryAtRow` and the
+       * twelve other readers are all correct under the hold without knowing it
+       * exists, which is I32's *scroll moves and the document does not* falling
+       * out of the wiring rather than being asserted at fifteen call sites.
+       */
+      get viewport() {
+        return heldViewport ?? viewport;
+      },
+      /**
+       * **The document the frame is drawing** — the held one, or the record
+       * (C14 I31, I33, §6b).
+       *
+       * One owner for the question, rather than a `?? transcript.entries` in
+       * each of the three readers §6b's table sends to the view. The repetition
+       * was not a style complaint: a mutation on any one of the three copies
+       * cannot be seen by a test that computes the same expression itself, so
+       * the choice had no observation point at all — which is A03 §2's vacuity
+       * class arriving through duplication rather than through wording.
+       */
+      get documentEntries(): readonly TranscriptEntry[] {
+        return heldView?.entries ?? transcript.entries;
+      },
+      /**
+       * Entries the record has and the view does not (C14 I34).
+       *
+       * **The only subject that reads both sides**, and the hold's only
+       * observable: without it a held view and a render that has stopped
+       * working are the same picture.
+       */
+      get bufferedEntries(): number {
+        if (heldView === null) return 0;
+        return Math.max(0, transcript.entries.length - heldView.entries.length);
+      },
+      /**
+       * Freeze the view at the record's current state (C14 I31).
+       *
+       * The held viewport starts where the live one is, because the reader's
+       * scroll position is theirs and entering a mode is not a scroll.
+       */
+      freezeView(size: Readonly<{ width: number; height: number }>): void {
+        if (heldView !== null) return;
+        const entries = transcript.entries;
+        const liveId = transcript.liveId;
+        const blockCount = transcript.blockCount;
+        const overCap = transcript.overCap;
+        heldView = Object.freeze({
+          // Nothing will ever call this — the view cannot change — and it is
+          // required by the interface the viewport takes. C14's `#unsubscribe`
+          // disposes it on `clear`, so it answers a `Disposable` rather than
+          // throwing.
+          subscribe: () => ({ [Symbol.dispose]: () => undefined }),
+          entries,
+          liveId,
+          blockCount,
+          overCap,
+        });
+        const live = viewport.scroll;
+        heldViewport = createViewport(heldView, viewportOptions);
+        heldViewport.resize(size);
+        heldViewport.scrollBy(live.topRow - heldViewport.scroll.topRow);
+      },
+      /** Drop the hold; the caller commits (C14 I34). */
+      thawView(): void {
+        heldView = null;
+        heldViewport = null;
+      },
       rendered,
       chrome,
       scrollOffsets,
@@ -2293,7 +2410,12 @@ export async function constructGraph(
     overlays: stores.overlays,
     history: stores.history,
     manifest: built.manifest.manifest,
-    viewport: stores.viewport,
+    // A getter for the same reason the graph's is (C14 I32): `scrollTop`,
+    // `pageUp` and the rest must reach the **held** viewport while the mode is
+    // up, and a field captured here would scroll the one nobody is looking at.
+    get viewport() {
+      return stores.viewport;
+    },
     schedule: config.schedule,
     anchor: deps.frame.promptAnchor,
     overlayRegion: deps.frame.overlayRegion,
@@ -3157,6 +3279,20 @@ export async function constructGraph(
     manifest: built.manifest,
     completion: built.completion,
     ...stores,
+    // **A spread evaluates a getter once**, so the four members that move with
+    // the hold are re-declared here as getters over `stores` (C14 I31). Without
+    // this the graph would carry the live viewport and an empty held document
+    // for the life of the session, and every row about the freeze would pass
+    // against a hold that never reached the frame.
+    get viewport() {
+      return stores.viewport;
+    },
+    get documentEntries() {
+      return stores.documentEntries;
+    },
+    get bufferedEntries() {
+      return stores.bufferedEntries;
+    },
     runner,
     lifecycle,
     scheduler,

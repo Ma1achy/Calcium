@@ -114,6 +114,18 @@ export type ChromeContext = Readonly<{
    */
   ownerArmed?: boolean;
   /**
+   * Entries the record holds and the frame is not showing (C14 I34, `R-SEL-010`).
+   *
+   * **The hold's only observable**, and the one subject that reads both the
+   * record and the view: without it a held view and a render that has stopped
+   * working are the same picture. Zero whenever nothing is held, which is every
+   * frame outside semantic copy mode.
+   *
+   * Optional on the same terms as `owner` — `compose` runs before the session
+   * graph exists, and absent is *nothing held*.
+   */
+  bufferedEntries?: number;
+  /**
    * C02's resolved record, because **the chrome draws marks and a mark needs a
    * rung** (A03 SS47, C09 I22). The owner line's chords are `⏎ ⇧ ⇥ ⌃] ←→ ↑↓`,
    * none of which an ASCII terminal can render, and a framework string carrying

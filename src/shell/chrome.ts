@@ -275,8 +275,9 @@ export function ownerLine(
   rung: OwnerRung | null,
   caps: TerminalCapabilities,
   armed = false,
+  buffered = 0,
 ): readonly Chip[] {
-  const chips = ownerChips(rung, caps);
+  const chips = ownerChips(rung, caps, buffered);
   // **The armed mark, and it is a chip rather than a decoration** (C16 I44,
   // C22 §6, R-INT-008). A newly raised owner refuses one activation so a key
   // already in flight cannot answer a question that arrived under it, and a
@@ -290,7 +291,11 @@ export function ownerLine(
   return [...chips, { label: "ready in a moment", tone: "muted" }];
 }
 
-function ownerChips(rung: OwnerRung | null, caps: TerminalCapabilities): readonly Chip[] {
+function ownerChips(
+  rung: OwnerRung | null,
+  caps: TerminalCapabilities,
+  buffered: number,
+): readonly Chip[] {
   switch (rung) {
     case "child":
       return [
@@ -309,6 +314,14 @@ function ownerChips(rung: OwnerRung | null, caps: TerminalCapabilities): readonl
         // unresolved join F828 found, and T2.116 is right to refuse it here too.
         { label: "esc out", tone: "muted" },
         { label: "the screen is frozen", tone: "muted" },
+        // **`R-SEL-010`'s half of the freeze** (C14 I34): the rule says the
+        // footer says so *while it is still frozen*, so the chip is on the line
+        // that is already saying the screen does not move. Absent at zero — a
+        // `0 waiting` chip is a row that says nothing on the frames that are
+        // most of them.
+        ...(buffered > 0
+          ? [{ label: `${String(buffered)} waiting`, tone: "muted" as const }]
+          : []),
       ];
     case "question":
       // Owner plus the safe path. The declared actions are the question's own
@@ -381,7 +394,12 @@ const footer = (ctx: ChromeContext): readonly Block[] => [
           kind: "pills",
           id: "chrome.owner",
           chips: shedToWidth(
-            ownerLine(ctx.owner, ctx.capabilities, ctx.ownerArmed === true),
+            ownerLine(
+              ctx.owner,
+              ctx.capabilities,
+              ctx.ownerArmed === true,
+              ctx.bufferedEntries ?? 0,
+            ),
             ctx.columns,
             ctx.capabilities,
           ),

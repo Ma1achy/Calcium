@@ -1203,6 +1203,13 @@ class Session implements TuiInstance {
   #animate(): void {
     const graph = this.#graph;
     if (graph === null) return;
+    // **The one clause of the freeze the hold cannot reach** (C14 I35,
+    // `R-SEL-009`). Elapsed counts are content and freeze with the view; the
+    // spinner's frame index is a counter on this object that no document
+    // carries, so a perfectly held document still draws a turning spinner. The
+    // wake is dropped whole — tick, orbits and image frames — and the ticker
+    // re-arms out of the next render, which is the frame the exit commits.
+    if (this.#semantic !== null) return;
     const now = this.config.clock();
     const { spinnerMs, orbits, frames } = this.#animation;
 
@@ -1396,6 +1403,10 @@ class Session implements TuiInstance {
     const caret =
       stored.at === "liveBlock" ? stored.entryId : (graph.transcript.entries.at(-1)?.id ?? null);
     this.#semantic = semantic.enter(this.#semantic, caret);
+    // **The hold, and it is the view rather than the record** (C14 I31, §6b).
+    // Taken at the width and height the last frame composed, because a held
+    // document measured at anything else describes rows nobody is looking at.
+    graph.freezeView(this.#composed().region);
     graph.scheduler.commit("input");
   }
 
@@ -1409,6 +1420,9 @@ class Session implements TuiInstance {
   #escapeSemanticSelection(): void {
     if (this.#semantic === null) return;
     this.#semantic = semantic.escape(this.#semantic);
+    // Only the press that *leaves* drops the hold — a clear is state within the
+    // rung and the frame stays held (C14 I34, `R-SEL-005`).
+    if (this.#semantic === null) this.#graph?.thawView();
     this.#graph?.scheduler.commit("input");
   }
 
@@ -1416,6 +1430,9 @@ class Session implements TuiInstance {
   #exitSemanticSelection(): void {
     if (this.#semantic === null) return;
     this.#semantic = null;
+    // One ordinary commit draws the record, and never a repaint: nothing on the
+    // terminal became unknown while the view was held (C14 I34, C03 I14).
+    this.#graph?.thawView();
     this.#graph?.scheduler.commit("input");
   }
 
@@ -1431,7 +1448,14 @@ class Session implements TuiInstance {
     if (graph === null || this.#semantic === null) return;
     this.#semantic =
       which === "all"
-        ? semantic.selectAll(this.#semantic, graph.transcript.entries.map((e) => e.id))
+        ? semantic.selectAll(
+            this.#semantic,
+            // **The view, not the record** (C14 I33, `R-SEL-008`): *the window
+            // is not the record* is the rule's own sentence, and `A` selecting
+            // an entry that arrived after the freeze selects one the reader
+            // cannot see.
+            graph.documentEntries.map((e) => e.id),
+          )
         : semantic.selectCaret(this.#semantic);
     graph.scheduler.commit("input");
   }
@@ -1466,7 +1490,11 @@ class Session implements TuiInstance {
     if (graph === null || this.#semantic === null) return;
     const text = semantic.copyTextOf(
       this.#semantic,
-      graph.transcript.entries.map((e) => ({ id: e.id, blocks: e.doc.blocks })),
+      // **The held blocks, not the record's** (C14 I33, §6b A6). This is the
+      // row a paint-path freeze cannot satisfy: the screen would be right and
+      // the clipboard would carry text that was never on it, with nothing
+      // telling the reader it happened.
+      graph.documentEntries.map((e) => ({ id: e.id, blocks: e.doc.blocks })),
       graph.blocks.copySequence,
     );
     if (text === "") return;
@@ -1554,6 +1582,9 @@ class Session implements TuiInstance {
       // line and the dispatch that honours it must not be able to disagree.
       owner: () => this.#graph?.router.rung ?? null,
       ownerArmed: () => this.#graph?.router.ownerArmed ?? false,
+      // C14 I34 — the hold's only observable, read per frame from the graph
+      // where the subtraction lives. Zero on every frame outside the mode.
+      bufferedEntries: () => this.#graph?.bufferedEntries ?? 0,
       // A03 SS47 — the owner line draws chords, so the chrome resolves them.
       capabilities: () => graph?.capabilities ?? null,
       // C24 I32 — read per frame from the recorder rather than kept here. A
@@ -1650,8 +1681,13 @@ function visibleRows(
   // it at. On the halfblock and dither arms each frame is a text frame, which
   // is the orbit's own cost and no more.
   const frames: { entryId: string; blockId: string; delays: readonly number[] }[] = [];
+  // **The view, not the record** (C14 I31, §6b). `graph.viewport` is already
+  // the held one through its getter; these are the entries it was measured
+  // over, and reading the record here would draw a document whose heights the
+  // index does not have.
+  const document = graph.documentEntries;
   for (const ve of graph.viewport.visible().entries) {
-    const entry = entryById(graph.transcript.entries, ve.id);
+    const entry = entryById(document, ve.id);
     if (entry === undefined) continue;
     // **Whose work the elements below belong to** (C28 I42). A block id is
     // unique within its own document (C04 I14) and a transcript holds many, so

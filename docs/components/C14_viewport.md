@@ -736,9 +736,10 @@ Fake heights, no rendering.
 - **T1.30** (I31, §6b A1, A2): the mode is entered over three entries; a fourth is appended and the live one is patched twice → the held entries are the three, by identity, and the held heights are the heights measured before the patches. The record answers four the whole time, so the row is the **difference** and not a store that stopped working.
 - **T1.31** (I31, §6b A4): a resize while the mode is up → the held document re-measures at the new width and is still the same three entries. Width invalidates the held index and the arriving fourth entry still does not appear, which is the pair that says the hold is over content and not over geometry.
 - **T1.32** (I32, §6b A3): with the mode up and the caret moved to an entry above the window, `visible()` moves and the held entry list does not. Asserted as a scroll that happened **and** a document that did not, because either alone is satisfied by the mode doing nothing.
-- **T1.33** (I33, §6b A6): an entry is selected, then patched with new blocks, then `y` → the clipboard carries the blocks the entry had when the mode was entered. The control is the same sequence with no mode up, where the copy takes the patched blocks.
+- **T1.33** (I33, §6b A6): an entry is appended, held, then patched with different blocks → `copyTextOf` over the **held** entries and over the **record** give different text, through the real `copySequence`. That is the expression `#copySelectedEntries` evaluates, with the registry the session uses.
+  **The row was unreachable until the code moved, and the mutation pass is what said so.** The choice began as a `?? transcript.entries` repeated in the three readers, and a mutation on any one copy could not be seen by a row that computed the same expression itself — A03 §2's vacuity class arriving through duplication rather than through wording. It has one owner now, `Graph.documentEntries`, which is the seam this row reads and the line the mutation changes. **And the row must read it after the patch**: C13 rebuilds the entries array on every write, so a reference captured at freeze time holds the old blocks whichever document it came from, and the first draft could not tell the two apart. Anchor in `tools/mutate/runs/c14-freeze.mjs`.
+  **What no harness here can still do**: drive a far-side patch through a *real* session — `LocalHandler` returns one document and never streams — so the session's own call to `documentEntries` is covered by T4.34's wiring and by this row's seam rather than end to end.
 - **T1.34** (I34): content arrives while the mode is up → the buffered count is the number of entries the record has and the view does not, and it is zero before anything arrives. On exit the hold is dropped, the record's entries draw, and the count is zero again.
-- **T1.35** (I35): the mode is entered with a spinner and an orbiting plot on screen → `tick` does not advance across three ticker wakes and the orbit's angle is unchanged, and both resume on exit. Elapsed counts are asserted in the same row as the **contrast**: they freeze with no code stopping them, because they are content.
 
 ### Tier 2 — contract / interface
 
@@ -797,6 +798,7 @@ Fake heights, no rendering.
 
 ### Tier 4 — integration
 
+- **T4.34** (I35): the mode is entered with a spinner on screen → its cell is the same glyph across every wake while the mode is up, and it moves again after the exit. Sampled past the set's own cadence, as T4.35 is, so the row is about the ticker being stopped rather than about two cadences aliasing.
 - **T4.1** (with C09): summed measured heights of a visible range equal the rows actually rendered, at seven widths. **The drift test.**
 - **T4.2** (with C09, C11): expanding a table row shifts subsequent entries by exactly the measured delta.
 - **T4.3** (with C13): each `Change` variant produces exactly the documented invalidation, asserted by cache-size deltas.
