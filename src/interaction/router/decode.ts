@@ -190,7 +190,7 @@ function modifiersOf(
     meta: (bits & 2) !== 0 || (eight && !isSuper),
     ctrl: (bits & 4) !== 0,
     // Absent rather than false, as the csi-u arm emits it — a `super: false` on
-    // every key would make `keyText` and the collision check see a field that is
+    // every key would make `keySlot` and the collision check see a field that is
     // there for the two chords that use it and nowhere else (I34).
     ...(isSuper ? { super: true } : {}),
   };

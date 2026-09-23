@@ -1,6 +1,6 @@
 import type { ProducerContext } from "../data/adapters/index.js";
 import type { Block } from "../data/viewmodel/index.js";
-import { keyText } from "../interaction/router/keymap.js";
+import { keySlot } from "../interaction/router/keymap.js";
 import type { InputRouter } from "../interaction/router/router.js";
 import type { InputEvent, Key } from "../interaction/router/types.js";
 import type { TerminalLifecycle } from "../terminal/lifecycle.js";
@@ -194,10 +194,10 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
       // **Named in the reader's spelling, not the join key's.** `chordKey` is an
       // index — `c--:]` — and the application's remedy is to choose another
       // chord, which it takes from `/help` and the border's legend. Those are
-      // written by `keyText`, so the refusal says `c+]` and the three agree.
+      // written by `keySlot`, so the refusal says `c+]` and the three agree.
       throw new SurfaceError(
         "reserved_chord",
-        `surface ${surface.id} binds ${keyText(chord)}, which is the host escape and is never ` +
+        `surface ${surface.id} binds ${keySlot(chord)}, which is the host escape and is never ` +
           `delivered to a child`,
       );
     }

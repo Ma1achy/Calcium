@@ -28,7 +28,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { defaultKeymap, keyText } from "../src/interaction/router/keymap.js";
+import { chordText, defaultKeymap, keySlot } from "../src/interaction/router/keymap.js";
 import { FOCUS_ORDER } from "../src/interaction/router/focus.js";
 
 export const KEYS_DOC = "docs/KEYS.md";
@@ -45,8 +45,8 @@ export const LADDER_MARK = "†";
  */
 function byKey(a, b) {
   if (a.name !== b.name) return a.name < b.name ? -1 : 1;
-  const ta = keyText(a);
-  const tb = keyText(b);
+  const ta = keySlot(a);
+  const tb = keySlot(b);
   return ta < tb ? -1 : ta > tb ? 1 : 0;
 }
 
@@ -62,9 +62,9 @@ export function tabulate(bindings, order) {
   const byText = new Map();
   for (const b of bindings) {
     if (!order.includes(b.target)) {
-      throw new Error(`binding ${b.target}:${keyText(b.key)} names a target outside FOCUS_ORDER`);
+      throw new Error(`binding ${b.target}:${keySlot(b.key)} names a target outside FOCUS_ORDER`);
     }
-    const text = keyText(b.key);
+    const text = chordText(b.key);
     const row = byText.get(text) ?? { key: b.key, cells: new Map() };
     if (row.cells.has(b.target)) {
       // `createKeymap` refuses this at construction; the generator refuses it
@@ -78,7 +78,7 @@ export function tabulate(bindings, order) {
   const rows = [...byText.values()]
     .sort((a, b) => byKey(a.key, b.key))
     .map((r) => ({
-      text: keyText(r.key),
+      text: chordText(r.key),
       cells: r.cells,
       ladder: r.cells.size > 1,
       profile: r.profile ?? "both",
@@ -126,9 +126,10 @@ export function renderKeymapTable(bindings, order) {
   );
   out.push("");
   out.push(
-    "**Every `m+` route needs the terminal to send Option as Meta** \u2014 ESC-prefixing rather than " +
+    "**Every `\u2325` route needs the terminal to send Option as Meta** \u2014 ESC-prefixing rather than " +
       "composing a character, which on macOS means *Use Option as Meta Key* in Terminal.app and " +
-      "`Esc+` in iTerm2. Not a new assumption: every `m+` row in this table has always required it.",
+      "`Esc+` in iTerm2. Not a new assumption: every `\u2325` row in this table has always required " +
+      "it \u2014 they were spelled `m+` until the key column moved to the design's notation (C16 \u00a76a clause 6).",
   );
   out.push("");
   out.push(`| key | profile | ${order.join(" | ")} |`);

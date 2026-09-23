@@ -33,13 +33,22 @@ export class KeymapError extends Error {
  * widening the rule, and it removed the separator this file was splitting on.
  */
 /**
- * A key as `c+p`, `ms+enter`, `enter`.
+ * A chord as **one comparable string** — the identity, never the display
+ * (C16 §6a clause 6, I34).
  *
- * Exported for `/help` (C23 I26): help renders from this table rather than a
- * maintained list, so the formatting a binding is *shown* with has to be the one
- * the keymap itself uses. A second formatter is a second thing to drift.
+ * `slot` compares this for the duplicate check, and `describe` prints it in the
+ * construction errors, where `surface.ts`'s refusal deliberately agrees with it
+ * so a developer reading three messages reads one spelling. **It was also what
+ * `/help keys` and `docs/KEYS.md` showed a reader**, which is how one function
+ * came to hold two jobs the design governs only half of — `chordText` below is
+ * the other half, and moving the display without this split would have moved
+ * collision detection with it.
+ *
+ * The `u`-for-super spelling is a property of this function alone, which is what
+ * it was always for: a letter that collided would make two different chords one
+ * slot.
  */
-export function keyText(key: Binding["key"]): string {
+export function keySlot(key: Binding["key"]): string {
   const mods =
     (key.ctrl === true ? "c" : "") +
     (key.meta === true ? "m" : "") +
@@ -52,13 +61,74 @@ export function keyText(key: Binding["key"]): string {
   return mods === "" ? key.name : `${mods}+${key.name}`;
 }
 
+/**
+ * A chord in **the design's notation** — `⇧⏎`, `⌥⇧C`, `⌃⇧C`, `⌘1` (§019,
+ * `R-KEY-005`, C16 §6a clause 6). The display, never compared.
+ *
+ * **Checked against the registry rather than transcribed from it.** T1.x asserts
+ * that for every one of the registry's `default-terminal` bindings, this
+ * function's answer for the key the tree binds to that action equals the
+ * registry's own `chord` string — so the notation is the design's by equality
+ * and not by a table someone kept in step.
+ *
+ * **Shift arrives two ways and both are the same chord.** The tree carries it as
+ * a `shift` flag on named keys (`s+enter`) and as a capital in the name on
+ * letters (`m+C`), because a terminal sends the capital and there is no separate
+ * bit. Both render `⇧`, which is why the letter arm tests the name rather than
+ * the flag.
+ *
+ * **The ASCII rung is parked** (C16 §6a clause 6): the design draws eleven chord
+ * glyphs and registers none of them, so none has a declared fallback. Below the
+ * Unicode rung this answers `keySlot`'s shorthand — the behaviour that already
+ * shipped, held as the arm to revisit rather than eleven spellings chosen here.
+ */
+const CHORD_KEYS: Readonly<Record<string, string>> = Object.freeze({
+  enter: "⏎",
+  tab: "⇥",
+  up: "↑",
+  down: "↓",
+  left: "←",
+  right: "→",
+  backspace: "⌫",
+  // **Abbreviated, and the design is what says so** — `esc` throughout §019 and
+  // the binding registry, where every other named key is a glyph. It is the one
+  // key the design spells in letters, which is why it is a row here rather than
+  // a rule about names.
+  escape: "esc",
+  f1: "F1",
+});
+
+export function chordText(key: Binding["key"], unicode = true): string {
+  if (!unicode) return keySlot(key);
+  // A single capital carries the shift on the letters — see the doc comment.
+  // A key *name* is an identifier from the decoder's fixed vocabulary (`enter`,
+  // `c`, `f1`), never reader text, so "is this one letter" is a unit count and
+  // correct — a cursor never enters this string.
+  const capital = key.name.length === 1 && key.name !== key.name.toLowerCase(); // graphemes-ok
+  const shift = key.shift === true || capital;
+  const mods =
+    (key.ctrl === true ? "⌃" : "") +
+    (key.meta === true ? "⌥" : "") +
+    (shift ? "⇧" : "") +
+    (key.super === true ? "⌘" : "");
+  // **A letter is capitalised under `⌃` or `⇧` and not under `⌥` alone**, which
+  // is the design's own spelling and not a convention imported from elsewhere:
+  // the registry writes `⌃C`, `⌃⇧V` and `⌥⇧C`, and writes `⌥p` for the posture
+  // cycle. Control chords have been written with a capital since long before
+  // this design and the registry keeps that; a meta chord names the character
+  // the key actually bears.
+  const name =
+    key.name.length === 1 && (key.ctrl === true || shift) ? key.name.toUpperCase() : key.name; // graphemes-ok
+  return `${mods}${CHORD_KEYS[key.name] ?? name}`;
+}
+
 /** `(target, key)` as one comparable string. */
 function slot(target: FocusTarget, key: Binding["key"]): string {
-  return `${target} ${keyText(key)}`;
+  return `${target} ${keySlot(key)}`;
 }
 
 function describe(b: Binding): string {
-  return `${b.target}:${keyText(b.key)} -> ${b.action}`;
+  return `${b.target}:${keySlot(b.key)} -> ${b.action}`;
 }
 
 export interface Keymap {

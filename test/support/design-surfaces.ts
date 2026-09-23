@@ -17,7 +17,7 @@
 // `STATES` chose, for its reason: adding one is three lines and the frame comes
 // free, so the cost of covering a surface never argues against covering it.
 import { block } from "../../src/data/viewmodel/index.js";
-import { defaultKeymap, keyText, scopesInReadingOrder } from "../../src/interaction/router/keymap.js";
+import { chordText, defaultKeymap, scopesInReadingOrder } from "../../src/interaction/router/keymap.js";
 import {
   CALL_STATE_GLYPH,
   GLYPH_TOKENS,
@@ -586,7 +586,7 @@ const WELL = block({
  * match. `prompt` is the rung because it is where a session opens.
  */
 const keymapCensus = (width: number, caps: TerminalCapabilities, theme: ResolvedTheme): readonly string[] => {
-  const all = defaultKeymap.map((b) => ({ keys: keyText(b.key), does: b.action, target: b.target }));
+  const all = defaultKeymap.map((b) => ({ keys: chordText(b.key, caps.unicode !== "ascii"), does: b.action, target: b.target }));
   const here = "prompt";
   const m = measurable({ theme, capabilities: caps });
   return scopesInReadingOrder(all, here).flatMap((scope) => [

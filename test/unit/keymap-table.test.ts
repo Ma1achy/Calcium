@@ -18,7 +18,7 @@ import {
   renderKeymapTable,
   tabulate,
 } from "../../tools/keymap-table.mjs";
-import { defaultKeymap, keyText } from "../../src/interaction/router/keymap.js";
+import { chordText, defaultKeymap } from "../../src/interaction/router/keymap.js";
 import { FOCUS_ORDER } from "../../src/interaction/router/focus.js";
 import type { BuiltinBinding } from "../../src/interaction/router/types.js";
 
@@ -59,9 +59,15 @@ describe("tools/keymap-table.mjs — the ladder as a table", () => {
   });
 
   it("KT4: the marked keys are exactly those bound at two or more targets", () => {
+    // **Keyed by the chord, because the table's key column is the chord** (C16
+    // §6a clause 6). `keySlot` is the identity used for the duplicate check and
+    // `chordText` is what a reader sees, and this row compares *what is
+    // rendered* — so it groups the way the table groups. The two spellings are
+    // 1:1 over this keymap, so the set is the same; keying by the slot here
+    // would compare a slot list against a chord column and report all twenty.
     const targetsOf = new Map<string, Set<string>>();
     for (const b of defaultKeymap) {
-      const k = keyText(b.key);
+      const k = chordText(b.key);
       targetsOf.set(k, (targetsOf.get(k) ?? new Set()).add(b.target));
     }
     const expected = [...targetsOf.entries()]
@@ -78,7 +84,10 @@ describe("tools/keymap-table.mjs — the ladder as a table", () => {
     expect(rendered).toEqual(expected);
     // **The set is not empty**, or the row is vacuous: C16 §6 names three
     // collisions the ladder resolves and the table must hold at least those.
-    expect(expected).toEqual(expect.arrayContaining(["pageup", "pagedown", "tab", "m+v"]));
+    // Named in the chord, because that is what the column holds now — `⇥` was
+    // `tab` and `⌥v` was `m+v` until the key column moved to the design's
+    // notation (C16 §6a clause 6).
+    expect(expected).toEqual(expect.arrayContaining(["pageup", "pagedown", "⇥", "⌥v"]));
   });
 
   it("KT5: the columns are FOCUS_ORDER, in order", () => {

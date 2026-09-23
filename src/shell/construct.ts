@@ -77,7 +77,7 @@ import {
   MENU_ID,
 } from "../interaction/completion/index.js";
 import { createFocusStore, resolveFocus } from "../interaction/router/focus.js";
-import { createKeymap, defaultKeymap, keyText } from "../interaction/router/keymap.js";
+import { chordText, createKeymap, defaultKeymap } from "../interaction/router/keymap.js";
 import { createRouter, type RouterDeps } from "../interaction/router/router.js";
 import { createConfirmHost, type ConfirmHost } from "./confirm.js";
 import { createDecoder } from "../interaction/router/decode.js";
@@ -1812,7 +1812,9 @@ export async function constructGraph(
       bindings: () =>
         keymap
           .entries()
-          .map((b) => ({ keys: keyText(b.key), does: b.action, target: b.target })),
+          // **The design's notation, not the slot's** (C16 §6a clause 6, §019).
+          // `keySlot` stays the identity and `chordText` is what a reader sees.
+          .map((b) => ({ keys: chordText(b.key, detection.capabilities.unicode !== "ascii"), does: b.action, target: b.target })),
       // R-KEY-005 — the reader's own rung, so `/help keys` leads with it.
       currentScope: () => router.target,
       binary: config.binary,

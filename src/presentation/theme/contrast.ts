@@ -134,7 +134,7 @@ export const BAND_VS_BAND = 3;
  *
  * **Exported because three checks in this file and four test rows all need it**,
  * and the alternative is five copies of one lookup. That is the same argument
- * `keyText` makes in `keymap.ts`: a second formatter is a second thing to drift —
+ * `keySlot` makes in `keymap.ts`: a second formatter is a second thing to drift —
  * and it was measured here, in the direction the argument predicts. The three
  * checks were patched one at a time because each was found only when the previous
  * one went green, and the tests reimplement the ratio loop rather than call

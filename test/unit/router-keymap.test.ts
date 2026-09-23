@@ -10,7 +10,7 @@ import { join } from "node:path";
 const ROOT = new URL("../..", import.meta.url).pathname;
 import { describe, expect, it } from "vitest";
 
-import { createKeymap, KeymapError, defaultKeymap, keyText } from "../../src/interaction/router/keymap.js";
+import { chordText, createKeymap, KeymapError, defaultKeymap, keySlot } from "../../src/interaction/router/keymap.js";
 import { createDecoder } from "../../src/interaction/router/decode.js";
 import { REGISTRY_BINDINGS } from "../../src/interaction/router/registry-bindings.js";
 import type { Binding, FocusTarget, Key } from "../../src/interaction/router/types.js";
@@ -582,12 +582,12 @@ describe("§6 — the default table (C17 I12)", () => {
     const enc = new TextEncoder();
 
     for (const b of defaultKeymap) {
-      // **`keyText`, not a copy of it** (M6). This held its own three-modifier
+      // **`keySlot`, not a copy of it** (M6). This held its own three-modifier
       // spelling, and when `Key` gained `super` the copy did not — so `⌘↑` and
       // `↑` collapsed to one slot here and the row reported that `global up`
       // had no wire form. A second formatter is a second thing to drift, which
       // is the module note's own argument arriving in the test that checks it.
-      const slot = `${b.target} ${keyText(b.key)}`;
+      const slot = `${b.target} ${keySlot(b.key)}`;
       const sequences = BYTES[slot];
 
       expect(sequences, `${slot} has no wire form — nobody can press it`).toBeDefined();
@@ -651,7 +651,7 @@ describe("§6 — the default table (C17 I12)", () => {
         ...(b.key.super === true ? { super: true } : {}),
         sequence: b.key.name,
       });
-      expect(resolved, `${b.target}:${keyText(b.key)} resolves in ${b.profile ?? "both"}`).toBe(b);
+      expect(resolved, `${b.target}:${keySlot(b.key)} resolves in ${b.profile ?? "both"}`).toBe(b);
     }
 
     // **And the control the split needs**: an enhanced-only route does not
@@ -678,7 +678,7 @@ describe("§6 — the default table (C17 I12)", () => {
 describe("C16 I23 — the line's extremes and the document's", () => {
   it("T2.16 (I23): Home and ⌃Home are different slots, on different targets", () => {
     // **The claim is the discrimination, not the presence.** Both keys exist in
-    // the table and a row asserting each resolves would pass with `keyText`
+    // the table and a row asserting each resolves would pass with `keySlot`
     // ignoring modifiers entirely — which is the one edit that breaks this, and
     // it is one line. So the two are asserted against each other.
     const map = createKeymap(defaultKeymap);
@@ -896,6 +896,111 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     ).toContain("throw new Error(`no registry binding for ${actionId}`)");
   });
 
+  it("T1.98 (C16 §6a clause 6, R-KEY-005, §019): a chord renders in the design's notation, by equality against the registry", () => {
+    // **The notation is the design's by equality and not by transcription.**
+    // `chordText` reads like a table someone kept in step with §019 — eleven
+    // glyphs and four modifiers, written out by hand — and a table kept in step
+    // drifts the first time the design moves. `REGISTRY_BINDINGS` carries both
+    // halves of the join: the `id` the registry record is found by, and the
+    // `key` the tree actually binds. So every row is checked against the
+    // design's own `chord` string.
+    //
+    // **The display and the identity are two functions and only one is checked
+    // here** (clause 6). `keySlot` is compared by `slot` for the duplicate
+    // check, and nothing in the design governs how it spells a chord — which is
+    // why moving the display was safe only once they were split.
+    const registry = JSON.parse(readFileSync("docs/design/language/calcium-registry.json", "utf8")) as {
+      bindings: readonly Readonly<{ id: string; chord: string }>[];
+    };
+    const chordById = new Map(registry.bindings.map((b) => [b.id, b.chord]));
+    // The premise, measured: a reader that found nothing would make every
+    // comparison below vacuous, and an empty registry reads exactly like a
+    // passing row.
+    expect(chordById.size, "the registry's bindings — the row is vacuous without them").toBeGreaterThan(35);
+
+    const disagreements: string[] = [];
+    for (const b of REGISTRY_BINDINGS) {
+      const want = chordById.get(b.id);
+      if (want === undefined) {
+        disagreements.push(`${b.id} (${b.actionId}) is in the tree and not in the registry`);
+        continue;
+      }
+      const got = chordText(b.key);
+      if (got !== want) disagreements.push(`${b.id} ${b.actionId}: registry ${want}, chordText ${got}`);
+    }
+    expect(disagreements).toEqual([]);
+
+    // **And the shorthand is still the shorthand**, so the split did what it
+    // says: the same key answers two different strings, and the slot's is the
+    // one that never changed.
+    expect(chordText({ name: "enter", shift: true })).toBe("⇧⏎");
+    expect(keySlot({ name: "enter", shift: true })).toBe("s+enter");
+    // Shift arrives as a capital on the letters, because a terminal sends the
+    // capital and there is no separate bit — both spellings render `⇧`.
+    expect(chordText({ name: "C", meta: true })).toBe("⌥⇧C");
+    expect(chordText({ name: "v", meta: true })).toBe("⌥v");
+    // The parked arm (clause 6): below Unicode this is the shorthand, because
+    // the design registers none of its eleven chord glyphs and so declares no
+    // fallback.
+    expect(chordText({ name: "enter", shift: true }, false)).toBe("s+enter");
+
+    // **The premise `MARK_EXEMPTIONS` rests on, re-checked here rather than
+    // inherited** — `chrome.ts`'s T1.46e is the precedent and the same subject.
+    // The exemption says the eleven chord glyphs resolve against the capability;
+    // the way that is false is a binding whose ASCII rung still carries one, so
+    // the check is over every binding and not over a sample.
+    const ASCII_ONLY = /^[\x20-\x7e]*$/u;
+    const unrenderable = defaultKeymap
+      .map((b) => chordText(b.key, false))
+      .filter((t) => !ASCII_ONLY.test(t));
+    expect(unrenderable, "every ASCII rung is ASCII-renderable").toEqual([]);
+    // And the Unicode arm does carry them, so the row above is not green by the
+    // glyphs having quietly gone missing from both arms.
+    expect(defaultKeymap.some((b) => !ASCII_ONLY.test(chordText(b.key)))).toBe(true);
+  });
+
+  it("T1.99 (C16 §6a clause 6, I34): two keys that render one chord are still two slots", () => {
+    // **The row a mutation asked for, and the tree could not answer.** Swapping
+    // `slot` from `keySlot` to `chordText` survived a pass: both are injective
+    // over the keymap that ships, so the duplicate check gives the same answer
+    // and nothing observable moves. That is a rule correct about a class its
+    // corpus has no member of — so the member is constructed here rather than
+    // waited for.
+    //
+    // **Shift arrives two ways and the chord cannot tell them apart**, by
+    // design: `{name: "C", meta: true}` is the capital a terminal sends, and
+    // `{name: "c", meta: true, shift: true}` is the flag, and both are `⌥⇧C` to
+    // a reader because a reader presses one thing. They are different keys to
+    // the decoder, so a slot that compared the chord would make them one — and
+    // the duplicate check would refuse the second binding as a construction
+    // error, naming a clash between a binding and itself.
+    const capital = { name: "C", meta: true } as const;
+    const flagged = { name: "c", meta: true, shift: true } as const;
+
+    expect(chordText(capital), "one chord to a reader").toBe("⌥⇧C");
+    expect(chordText(flagged), "and the same one").toBe("⌥⇧C");
+    expect(keySlot(capital)).not.toBe(keySlot(flagged));
+
+    // The claim itself: two slots, so the keymap takes both without the
+    // duplicate check firing. Built through `createKeymap`, because `slot` is
+    // private and the construction error is the observable.
+    expect(() =>
+      createKeymap([
+        { target: "prompt", key: capital, action: "copySelection" },
+        { target: "prompt", key: flagged, action: "yank" },
+      ]),
+    ).not.toThrow();
+
+    // And the control, so the row is not green by `createKeymap` accepting
+    // anything: the same key twice is still the construction error it was.
+    expect(() =>
+      createKeymap([
+        { target: "prompt", key: capital, action: "copySelection" },
+        { target: "prompt", key: capital, action: "yank" },
+      ]),
+    ).toThrow(/duplicate binding/u);
+  });
+
   it("T1.97 (I42): the table is the rows it was — generation moved where a chord is written and nothing else", () => {
     // **The row that makes M6 a refactor rather than a change.** The rows,
     // compared as a set of `(target, key, action, profile)`; 59 of them take
@@ -922,7 +1027,7 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     // The count is pinned as well as the set: a table that lost a row *and*
     // gained an equal one would satisfy a set comparison alone.
     const rows = defaultKeymap
-      .map((b) => `${b.target}\t${keyText(b.key)}\t${b.action}\t${b.profile ?? "both"}`)
+      .map((b) => `${b.target}\t${keySlot(b.key)}\t${b.action}\t${b.profile ?? "both"}`)
       .sort();
     expect(rows).toHaveLength(121);
     expect(new Set(rows).size, "no two rows are identical").toBe(121);
@@ -930,9 +1035,9 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     // Every row whose chord the registry names resolves to the registry's key —
     // the join asserted from the table's side, so a `chordOf` call that silently
     // fell back to a literal would fail here.
-    const byAction = new Map(REGISTRY_BINDINGS.map((b) => [b.actionId, keyText(b.key)]));
+    const byAction = new Map(REGISTRY_BINDINGS.map((b) => [b.actionId, keySlot(b.key)]));
     const registryChords = new Set(byAction.values());
-    const fromRegistry = defaultKeymap.filter((b) => registryChords.has(keyText(b.key)));
+    const fromRegistry = defaultKeymap.filter((b) => registryChords.has(keySlot(b.key)));
     expect(
       fromRegistry.length,
       // 60 and not 61 before M9d: `host.detach` has two registry bindings, and
@@ -1002,7 +1107,7 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     expect(cmd1?.super, "and the protocol said super").toBe(true);
     expect(alt1?.name, "⌥1 is the same digit").toBe("1");
     expect(alt1?.super, "and this terminal could not say — absent, not false").toBeUndefined();
-    expect(keyText(cmd1!), "so they are different slots").not.toBe(keyText(alt1!));
+    expect(keySlot(cmd1!), "so they are different slots").not.toBe(keySlot(alt1!));
 
     // **The legacy arm keeps folding bit 8 into `meta`, deliberately**, and this
     // is the control that stops `super` leaking into a terminal that never
@@ -1029,7 +1134,7 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     // corpus. §6a's table names exactly which actions need a second route, so
     // the list is a claim and not an inventory.
     expect(
-      only.map((b) => `${b.action} ${keyText(b.key)}`).sort(),
+      only.map((b) => `${b.action} ${keySlot(b.key)}`).sort(),
       "the enhanced routes §6a names, and no others",
     ).toEqual([
       "agent1 u+1",
@@ -1068,8 +1173,8 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
         ...(b.key.super === true ? { super: true } : {}),
         sequence: b.key.name,
       };
-      expect(rich.resolve(b.target, key), `${keyText(b.key)} fires on an enhanced terminal`).toBe(b);
-      expect(base.resolve(b.target, key), `${keyText(b.key)} does not fire on a default one`).not.toBe(b);
+      expect(rich.resolve(b.target, key), `${keySlot(b.key)} fires on an enhanced terminal`).toBe(b);
+      expect(base.resolve(b.target, key), `${keySlot(b.key)} does not fire on a default one`).not.toBe(b);
     }
 
     // And `entries()` — what `/help` reads — carries only what can fire, so a

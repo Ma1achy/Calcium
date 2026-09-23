@@ -456,7 +456,12 @@ describe("C22 integration — the frame's viewport", () => {
     const bindingRows = frame.filter((r) => /^\S+\s+\w+$/u.test(r.replace(/^\s*[⎿│]\s/u, "").trim())).length;
     expect(bindingRows, "the keymap document is on the frame").toBeGreaterThan(10);
 
-    for (const shown of ["pageup", "pagedown", "c+home", "c+end"]) {
+    // **The chords, because that is what a reader sees** (C16 §6a clause 6).
+    // `c+home` and `c+end` were the slot spelling; the listing renders
+    // `chordText` now, and the slot is the identity `slot` compares and nothing
+    // shows. The two scroll keys with no modifier are unchanged, which is what
+    // keeps this row about arrival rather than about notation.
+    for (const shown of ["pageup", "pagedown", "⌃home", "⌃end"]) {
       expect(text, `/help shows ${shown}`).toContain(shown);
     }
   });
