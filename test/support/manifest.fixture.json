@@ -62,8 +62,7 @@
         {
           "name": "watch",
           "type": "bool",
-          "view": true,
-          "summary": "follow in a pushed view \u2014 C05 I20, C22 \u00a713a"
+          "summary": "follow the stream into its entry"
         }
       ]
     },
@@ -163,8 +162,7 @@
         {
           "name": "screen",
           "type": "bool",
-          "view": true,
-          "summary": "follow into a pushed view rather than the transcript"
+          "summary": "follow the stream"
         }
       ]
     },

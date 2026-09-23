@@ -164,47 +164,42 @@ describe("C15 e2e — layers under real input", () => {
     expect(router.target, "the menu is still there, and still has the keys").toBe("panel");
     expect(store.searchState).toBeNull();
   });
-  // **T5.3 and T5.5 were deferred on a premise that was false when it was
-  // written down.** Both said *nothing in the tree pushes a `kind: "view"`
-  // layer* and cited C22 §13 as an open ruling. C22 §13a took the ruling,
-  // `document-view.ts` pushes exactly that layer, `construct.ts` registers the
-  // `pushedView` handler, and the fixture manifest declares `ps --watch` and
-  // `tail --screen` as view flags — all before this row was re-read. The todo
-  // survived because nothing re-reads a deferral that is not failing.
+  // **T5.3 and T5.5 were written about a push and outlive it** (C22 §13a,
+  // R-EXA-082, F1253). They asserted that a view verb covered the transcript and
+  // took the keys, and that `esc` popped the layer leaving nothing behind — the
+  // ruling C22 §13a took, and the ruling the design overturns: a verb's result
+  // has no prompt and no context of its own, so it is an entry.
   //
-  // The confirm half of the original title — *a confirm inside the dashboard,
-  // esc does nothing, n resolves it* — is not constructible from this fixture:
-  // the only confirm the shell raises is the exit confirm, and C16 §5's ladder
-  // puts *a pushed view → pop it* above *prompt empty → arm the exit confirm*,
-  // so Ctrl-C over a view pops the view and never reaches the confirm. The
-  // routing half of that claim is T4.2 in test/integration/router.test.ts; what
-  // this row asserts is the half that needed a session.
-  it("T5.3 (C22 §13a, C15 I1, A01 D4): a view verb pushes a `kind: \"view\"` layer over the transcript, and the layer owns the keys", async () => {
+  // **Re-aimed rather than struck, and they are stronger for it.** The old pair
+  // asserted an absence — the transcript is *not* on screen, nothing was
+  // appended — and an absence is what a broken session also produces. The pair
+  // below asserts what is there: both entries at once, and a prompt that still
+  // has the keys.
+  it("T5.3 (C22 §13a, R-EXA-082): a streaming verb lands in the transcript beside the entry before it, and the prompt keeps the keys", async () => {
     const pty = interactivePty("node test/support/fixture.mjs session", { cols: 80, rows: 20 });
     try {
       await pty.waitFor(PROMPT, 15_000);
-      // Something in the transcript first, so "drawn over it" has a referent.
+      // Something in the transcript first, so "beside it" has a referent.
       pty.type("/ps --mine\r");
       await pty.waitFor(/a3f9b21/, 15_000);
       expect(pty.frame.join("\n")).toContain("/ps --mine");
 
       pty.type("/ps --watch\r");
       await pty.waitForFrame((f) => f.join("\n").includes("watching"), 15_000);
-      // **The view covers the region** (`placement: fill`): the entry that was
-      // on screen is not, and no pending entry was appended for the view verb —
-      // C22 §13a's *there is no source entry*.
-      const over = pty.frame.join("\n");
-      expect(over, "the transcript is underneath the view").not.toContain("/ps --mine");
-      expect(over, "no entry was appended for the view verb").not.toContain("❯ /ps --watch");
 
-      // **Input ownership is what makes it a view rather than an overlay**
-      // (A01 D4, C22 §13a): a printable does not reach the prompt while the
-      // view is up. The prompt row is read after a frame the keystroke could
-      // have changed has had time to arrive; T5.5 is the positive control that
-      // the same keystroke reaches the prompt once the view has popped.
-      pty.type("x");
-      await new Promise((r) => setTimeout(r, 400));
-      expect(promptRow(pty.frame).trim(), "the view took the key").toBe("❯");
+      // **Both, at once** — the claim the old row made in reverse. The record is
+      // the product, so the work that used to take the screen is an entry under
+      // the work before it.
+      const both = pty.frame.join("\n");
+      expect(both, "the entry before it is still on screen").toContain("/ps --mine");
+      expect(both, "and the new one is its own entry, with its command echoed").toContain("--watch");
+
+      // **The prompt keeps the keys**, which is what *no frame of its own* means
+      // at the keyboard: a printable reaches the prompt while the stream runs.
+      // The old row asserted the opposite and used T5.5 as its control; there is
+      // one claim now and it needs none.
+      pty.type("still-here");
+      await pty.waitForFrame((f) => promptRow(f).includes("still-here"), 15_000);
     } finally {
       pty.kill();
     }
@@ -259,12 +254,7 @@ describe("C15 e2e — layers under real input", () => {
   // draft had C23 write `logs a3f9b21 — 1,284 lines … (esc 14:24:08)` and it
   // could not be built — the trace is an entry, an entry freezes its
   // predecessor, and the frozen block is the one A01 D7 returns focus to.
-  // C23 §4's pop row is the ruling, so the row asserts what remains true.
-  //
-  // The deferral above it read "waits on C24 — a PTY needs a binary to drive",
-  // then "nothing pushes a `kind: \"view\"` layer"; the first was expired by
-  // TD2 and the second was false when written — see T5.3.
-  it("T5.5 (C23 §4, C22 §13a, B03 §2): esc from a pushed view — the view pops, nothing is appended, and the prompt has the keys again", async () => {
+  it("T5.5 (C23 §4, C22 §13a, B03 §2): esc over a streaming entry takes nothing away, because there is nothing to pop", async () => {
     const pty = interactivePty("node test/support/fixture.mjs session", { cols: 80, rows: 20 });
     try {
       await pty.waitFor(PROMPT, 15_000);
@@ -274,15 +264,21 @@ describe("C15 e2e — layers under real input", () => {
       await pty.waitForFrame((f) => f.join("\n").includes("watching"), 15_000);
 
       pty.type("\u001b");
-      // The transcript is back, exactly as it was: the entry underneath, and no
-      // trace of the view verb — not an entry, not a notice.
-      await pty.waitForFrame((f) => f.join("\n").includes("/ps --mine"), 15_000);
-      const after = pty.frame.join("\n");
-      expect(after, "the view is gone").not.toContain("watching");
-      expect(after, "nothing was appended on the way out").not.toContain("--watch");
+      await new Promise((r) => setTimeout(r, 400));
 
-      // **And the keys are the prompt's again** — the control for T5.3's
-      // "the view took the key": the same printable, now on the prompt row.
+      // **B03 §2, with the premise gone.** The old row asserted that `esc`
+      // removed a layer and left the transcript exactly as it had been; there is
+      // no layer, so what it asserts now is that `esc` is inert over the
+      // transcript — both entries still there afterwards. That is the half of
+      // B03 §2 that survives a world with no push, and it is the half that says
+      // a reader cannot lose the record by pressing the key that used to.
+      const after = pty.frame.join("\n");
+      expect(after, "the entry before it").toContain("/ps --mine");
+      expect(after, "and the streaming one").toContain("watching");
+
+      // And the prompt still has the keys — the control that the session is
+      // live rather than wedged, which an assertion about what is on screen
+      // cannot supply on its own.
       pty.type("still-here");
       await pty.waitForFrame((f) => promptRow(f).includes("still-here"), 15_000);
     } finally {

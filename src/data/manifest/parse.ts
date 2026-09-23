@@ -282,7 +282,6 @@ function parseFlag(raw: unknown, e: Errors, at: string): FlagDef | null {
   const repeatable = takeOptionalBoolean(raw, "repeatable", e, at);
   const requires = takeStringArray(raw, "requires", e, at);
   const conflicts = takeStringArray(raw, "conflicts", e, at);
-  const view = takeOptionalBoolean(raw, "view", e, at);
   const shellOnly = takeOptionalBoolean(raw, "shellOnly", e, at);
   const interactive = takeOptionalBoolean(raw, "interactive", e, at);
 
@@ -294,7 +293,6 @@ function parseFlag(raw: unknown, e: Errors, at: string): FlagDef | null {
     ...(repeatable === undefined ? {} : { repeatable }),
     ...(requires === undefined ? {} : { requires }),
     ...(conflicts === undefined ? {} : { conflicts }),
-    ...(view === undefined ? {} : { view }),
     ...(shellOnly === undefined ? {} : { shellOnly }),
     ...(interactive === undefined ? {} : { interactive }),
     summary,
@@ -507,7 +505,6 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
   const hidden = takeOptionalBoolean(raw, "hidden", e, at);
   const persist = takeOptionalBoolean(raw, "persist", e, at);
   const interactive = takeOptionalBoolean(raw, "interactive", e, at);
-  const view = takeOptionalBoolean(raw, "view", e, at);
   const jsonFlag = takeJsonFlag(raw, e, at);
 
   // **I23 — a flag's arm must differ from the tool's default.** An arm that
@@ -559,81 +556,11 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
     }
   }
 
-  // I20 — `view` is the tier, and its three refusals are I19's shape. `streams`
-  // is deliberately absent from them: S12's logs view is a streaming source
-  // rendered into a pushed view, so refusing that pair would refuse the surface
-  // C22 §13a was ruled for.
-  //
-  // I24 again, and this is where the rule was found missing: I20's own sentence
-  // says `view` is declarable on a flag, and this refusal read the tool's field
-  // only. Both sides now read every declaration.
-  //
-  // **Conservative on purpose, and the limit is recorded rather than
-  // discovered.** A verb declared interactive whose arm resolves to `false`
-  // beside a `view` flag would be legal, and this refuses it. No app declares
-  // one; the first that wants to is the argument for narrowing this.
-  const viewAnywhere = view === true || flags.some((f) => f.view === true);
-  if (viewAnywhere) {
-    if (interactiveAnywhere) {
-      fail(
-        e,
-        `${at}.view`,
-        `"${name}" declares both view and interactive — on the tool or on a flag, ` +
-          `and either way both hand input ownership away, the view to the shell's ` +
-          `own keymap and the handoff to a child; drop whichever one the verb does not do`,
-      );
-    }
-    if (oneShot === true) {
-      fail(
-        e,
-        `${at}.view`,
-        `"${name}" declares both view and oneShot — a one-shot writes one frame ` +
-          `and exits without a terminal, and a view is a claim on one that stays`,
-      );
-    }
-    // **`view` with `local`, the third refusal, and it is inert for a reason
-    // neither of the other two has** (F1022, closing F23 and F129).
-    //
-    // The other two describe a verb that cannot exist. This one describes a
-    // verb the *route* ignores: C18 classifies on `tool.local` first, and
-    // `isViewInvocation` is read on the `app` route and nowhere else, so the
-    // pair parsed, sealed, validated, ran, and appended an ordinary transcript
-    // entry — no view, no refusal, and nothing anywhere saying so.
-    //
-    // **The declaration buys nothing on this route, and the forcing argument
-    // for having one is absent here.** C22 §13a's whole case for putting the
-    // tier on the manifest is C23 I3: the pending entry is appended before the
-    // transport is invoked and C13 has no delete, so an adapter-side decision
-    // could only produce a view *and* an entry that nothing can withdraw. The
-    // local route has no transport and appends nothing in advance — `runLocal`
-    // appends once, after the handler has returned — so a local verb may decide
-    // on seeing its own result. `/profile` is the shipped instance: its handler
-    // calls `view.open(pane)` and returns a transcript notice as the record.
-    //
-    // **Refused rather than routed, on this repo's own precedent.** `view` with
-    // `streams` was a declarable pair with no route; §13a reserved the route,
-    // refused the pair *loudly*, and built it when S9's `/logs` forced it. The
-    // defect F23 and F129 name is that this pair is refused **silently**. Parse
-    // rather than run time, because I19's argument is that the author should
-    // learn at declaration and I20's other two refusals are already here.
-    //
-    // What it forecloses was measured rather than assumed: F23 refused this arm
-    // on the ground that `/dashboard` is local and S6/S7 would want views.
-    // `DOCKER_TUI_SURFACES.md` S1 rules `/dashboard` explicitly **not** a pushed
-    // view, and draws S6 `/compare` and S7 `/drift` as transcript entries under
-    // a prompt echo, with no letter keys — so none of the three named consumers
-    // can take the mark, and no manifest in the tree declares the pair.
-    if (local) {
-      fail(
-        e,
-        `${at}.view`,
-        `"${name}" is local and declares view — a local verb is handled ` +
-          `in-process and never reaches the route that opens one, so the ` +
-          `declaration is inert; a local verb that wants a view pushes it from ` +
-          `its handler, as \`/profile\` does`,
-      );
-    }
-  }
+  // **`view` retired with the pushed view** (C05 I20, C22 §13a, R-EXA-082, F1253). Three
+  // refusals stood here — with `interactive`, with `oneShot` and with `local` — and each
+  // closed a real defect. What they refused was a *tier*, and there is one tier now: a
+  // verb's result is a transcript entry. A manifest still carrying the key parses, because
+  // unknown keys are dropped rather than rejected.
 
   // **I26 — a declaration that cannot take effect.** A local verb is never
   // spawned, so its JSON tokens would be appended to nothing; the refusal is
@@ -660,7 +587,6 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
     ...(hidden === undefined ? {} : { hidden }),
     ...(persist === undefined ? {} : { persist }),
     ...(interactive === undefined ? {} : { interactive }),
-    ...(view === undefined ? {} : { view }),
   };
 }
 

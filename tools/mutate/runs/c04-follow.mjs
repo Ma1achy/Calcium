@@ -14,10 +14,9 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CMD =
   "npx vitest run test/contract/scroll-follow.test.ts test/contract/tool-call.test.ts " +
-  "test/unit/actions-expand.test.ts test/contract/document-view.test.ts";
+  "test/unit/actions-expand.test.ts";
 const CONTAINERS = "src/presentation/blocks/kinds/containers.ts";
 const OFFSETS = "src/shell/scroll-offsets.ts";
-const VIEW = "src/shell/document-view.ts";
 const ACTIONS = "src/shell/actions.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
@@ -31,16 +30,13 @@ const run = () => {
 };
 
 const MUTATIONS = [
-  {
-    // **`wasAtBottom` against the new list** — the brief's own mutation. Asked
-    // of the grown document, every reader is at the bottom of the old one, so
-    // the window moves under a reader who had scrolled up.
-    name: "the document view asks were-we-at-the-bottom of the new list",
-    file: VIEW,
-    from: "        offset: followTail(at.offset, lastOffset(at), lastOffset(grown)),",
-    to: "        offset: followTail(at.offset, lastOffset(grown), lastOffset(grown)),",
-    expect: "T4.83",
-  },
+  // **Dropped with the document view** (C22 §13a, R-EXA-082, F1253). The brief's
+  // own mutation asked `wasAtBottom` of the *grown* list, where every reader is
+  // at the bottom, so the window moved under a reader who had scrolled up. It was
+  // the view owner's call into `followTail`, and the owner is deleted — which is
+  // also the finding: the second route's distinguishing rule was a call to the
+  // function the first route already called. The store's three mutations below
+  // are `followTail`'s remaining subject and are the same defect in its home.
   {
     // The store's copy of the same defect: the snap decided from where the
     // reader *was* rather than where they *ended up*. A page up from the tail

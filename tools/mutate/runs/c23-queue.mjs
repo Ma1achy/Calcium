@@ -82,13 +82,13 @@ const results = runPass({
       to: "    if (true) {\n      pendingId = deps.transcript.append(",
       expect: "T3.17",
     },
-    {
-      name: "a queued VIEW invocation never settles the entry it was given",
-      file: FILE,
-      from: "      if (settle.into !== null) {",
-      to: "      if (false && settle.into !== null) {",
-      expect: "T3.21",
-    },
+    // **Dropped with the view route** (C22 §13a, R-EXA-082, F1253). It disabled
+    // `runIntoView`'s settlement of an entry the queue had already appended —
+    // §13a's *it pops rather than settling* stopped covering a **deferred** view
+    // the day the queue landed, and without the settlement that entry streamed
+    // for ever, marked *queued behind* something long finished. There is no view
+    // route and no second settlement seam; a queued verb settles its entry
+    // through `runApp`, which the row above mutates.
     {
       name: "a queued submission's history is written when it is typed, not when it runs",
       file: FILE,

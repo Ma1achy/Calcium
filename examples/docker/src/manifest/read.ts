@@ -51,7 +51,7 @@ const dashboard: ToolDef = {
 /**
  * S3's drill-in — the surface C22 §13a was ruled for.
  *
- * **`view: true` on the tool, and the name is the ruling twice over.** S02 drew
+ * **~~`view: true`~~ on the tool — retired with the pushed view (C22 §13a); the name is the ruling twice over.** S02 drew
  * this as `ps <uuid> --watch` and it cannot be spawned: `docker ps` takes no
  * positional, `--watch` is not a docker flag, and C06 I4 sends argv to the far
  * side verbatim. `docker container stats` is real and takes the id.
@@ -68,7 +68,6 @@ const dashboard: ToolDef = {
 const containerStats: ToolDef = {
   name: "container stats",
   local: false,
-  view: true,
   summary: "One container, live — CPU over time, memory, network",
   args: [
     {
@@ -84,7 +83,7 @@ const containerStats: ToolDef = {
 /**
  * S5's fullscreen view — the first surface with more content than region.
  *
- * **`view: true` and `local: false`.** One call, so an adapter fits, and the
+ * **~~`view: true`~~ and `local: false`.** The tier retired (C22 §13a); one call, so an adapter fits, and the
  * adapter route is the only one that carries `width` (FINDINGS F14) — which
  * `--raw` needs, because a wrapped code block's height depends on it.
  *
@@ -96,7 +95,6 @@ const containerStats: ToolDef = {
 const inspect: ToolDef = {
   name: "inspect",
   local: false,
-  view: true,
   summary: "One container in full — structured, or the raw JSON",
   args: [
     { name: "container", type: "string", required: true, summary: "Container id or name" },
@@ -175,7 +173,7 @@ const config: ToolDef = {
 /**
  * S9's pushed streaming view — **the surface that forced C22 I48**.
  *
- * `view: true` **and** `streams: true`, which C05 I20 has permitted since it was
+ * ~~`view: true`~~ **and** `streams: true` — the first retired (C22 §13a); the pair was what C05 I20 had permitted since it was
  * written and no route could run until now: the pair fell to the non-streaming
  * path, blocked until the process exited and held the submission guard for the
  * whole of it, so C23 refused it loudly instead. `docker logs -f` has no natural
@@ -188,7 +186,6 @@ const config: ToolDef = {
 const logs: ToolDef = {
   name: "logs",
   local: false,
-  view: true,
   streams: true,
   summary: "Follow a container's output",
   args: [{ name: "container", type: "string", required: true, summary: "Container id or name" }],

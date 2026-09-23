@@ -505,13 +505,13 @@ export function questionNotice(text: string, id: string): Block {
   return warnBlock(text, id);
 }
 
-/** A document view's rows past the screen (C22 §6h): the count, and why `n`/`p` cannot reach them. */
-export function hiddenRowsNotice(hidden: number, id: string): Block {
-  return warnBlock(
-    `${String(hidden)} more rows — this block is taller than the screen, and n/p move by block so they cannot reach them`,
-    id,
-  );
-}
+// **`hiddenRowsNotice` went with the pushed view** (C22 §13a, R-EXA-082, F1253). It
+// stated a block's rows past the screen and why `n`/`p` could not reach them, which was
+// C22 I47's half of a pair: a window that emitted at least one block whatever its height
+// left a tall block shown, cut, and with no second offset to move to. An entry is as tall
+// as it is and C14 scrolls past it by row, so there is nothing to report. The class the
+// notice guarded — content stopping mid-object reads as content ending — is C04 I49's
+// residue row, which is built.
 
 /** The two answers every approval offers (C23 I60); a caller may widen them — `always allow` is a row like any other. */
 const APPROVAL_CHOICES: readonly Choice[] = Object.freeze([

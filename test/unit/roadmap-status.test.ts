@@ -497,19 +497,25 @@ describe("roadmap-status — the Order column's verifier", () => {
     // The violation is fabricated rather than anchored on either, for RS8/RS10's
     // reason: this session is rewriting both sentences. It is spliced onto the
     // end of the confirmed-OPEN paragraph, and the symbol is one that certainly
-    // exists in the scope the gate names — `documentView` has an implementation
-    // file of its own under `src/shell/`.
+    // exists in the scope the gate names — `liveDeclarations` is the walk that finds a
+    // document's live parts, written in four files including `src/shell/execution.ts`.
+    //
+    // **It was `documentView`, and the symbol went to zero when the pushed view
+    // did** (C22 §13a, R-EXA-082, F1253) — which is this row's own subject
+    // arriving at its fixture: a fabricated violation whose symbol has left the
+    // tree is a rule with nothing to be wrong about, and the failure is the
+    // instrument working. The replacement is chosen for the property the row
+    // needs and nothing else: it occurs in `src/`, and `execution.ts` writes it.
     const { at, body } = openParagraph(ROADMAP);
-    const gate = " **Gate**: `documentView` occurs zero times in `src/`.";
+    const gate = " **Gate**: `liveDeclarations` occurs zero times in `src/`.";
     const r = run(ROADMAP.slice(0, at + body.length) + gate + ROADMAP.slice(at + body.length));
     expect(r.ok, "a symbol declared absent and present in the tree").toBe(false);
-    expect(r.out).toMatch(/a gate says `documentView` occurs zero times/u);
-    // **The set is asserted, not the first file.** The first draft pinned
-    // `document-view.ts` and went red because the arm named `construct.ts` —
-    // which is where the walk happened to arrive first, an ordering the rule
-    // never promised. The arm now reports every writer, sorted, so the row
-    // asserts a member of the set (`execution.ts` calls `documentView.open`)
-    // and survives any reorder of the tree.
+    expect(r.out).toMatch(/a gate says `liveDeclarations` occurs zero times/u);
+    // **The set is asserted, not the first file.** The first draft pinned one
+    // file and went red because the arm named another — which is where the walk
+    // happened to arrive first, an ordering the rule never promised. The arm
+    // reports every writer, sorted, so the row asserts a member of the set and
+    // survives any reorder of the tree.
     expect(r.out).toMatch(/\d+ files write it \(/u);
     expect(r.out).toContain("src/shell/execution.ts");
   });

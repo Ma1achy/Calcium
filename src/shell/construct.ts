@@ -75,7 +75,6 @@ import { createRouter, type RouterDeps } from "../interaction/router/router.js";
 import { createConfirmHost, type ConfirmHost } from "./confirm.js";
 import { createDecoder } from "../interaction/router/decode.js";
 import { createKeyEffects } from "./keys.js";
-import { createDocumentView } from "./document-view.js";
 import { createProfileView } from "./profile-view.js";
 import type { ProfileView } from "./profile-view.js";
 import type { FocusTarget, InputEvent, Key, KeyAction } from "../interaction/router/types.js";
@@ -1469,31 +1468,11 @@ export async function constructGraph(
   // --- 10. the execution pipeline -------------------------------------------
   // Takes the router, because C23's submit row ends `resetFocus()` (Seam 4).
   // Seals its own registry here, which is I3's fifth.
-  /**
-   * The document view — C22 §13a's producer.
-   *
-   * **It had a sibling built two lines above it**, the fullscreen patch view,
-   * which was the first producer of a `kind: "view"` layer in the tree. The
-   * design deletes that surface (C25 §3b, R-EXA-082) and M9b deleted the file:
-   * a run's detail expands in place, and a patch's hunks are all in the block
-   * already, so the view showed what the transcript shows and took the
-   * transcript away to do it.
-   *
-   * Built here for the same reason and one line later: C23 raises it when a
-   * verb's declaration says its result is a view (C05 I20), so it must exist
-   * before the pipeline that closes over it.
-   *
-   * `measure` comes from the sealed registry rather than from a second
-   * measurer, because the window it computes has to agree with the one C15 uses
-   * to place what it is handed — a window measured by anything else is C09 I1's
-   * divergence with a whole view behind it.
-   */
-  const documentView = createDocumentView({
-    overlays: stores.overlays,
-    measureSequence: (blocks, width) => built.blocks.measureSequence(blocks, width),
-    region: deps.frame.overlayRegion,
-    redraw: () => void scheduler.commit("input"),
-  });
+  // **The document view is gone with the pushed view** (C22 §13a, R-EXA-082, F1253).
+  // Two producers of a `kind: "view"` layer stood here, the fullscreen patch view and
+  // this one; M9b deleted the first and this deletes the second. A verb's result is a
+  // transcript entry, which is the scroll container it was already — the design's own
+  // words for the case: *logs → a block with follow; it needed no frame*.
 
   /**
    * The profiler's view — C28 §3c, and the third owner of a `kind: "view"` layer.
@@ -1593,11 +1572,10 @@ export async function constructGraph(
       // C07 I19 — the **resolved** record, which is what `detection` holds after
       // C22 I49's overrides. Deriving it again anywhere else is F124.
       capabilities: detection.capabilities,
-      // C07 I18 — the same region `documentView` reads, not a second one.
+      // C07 I18 — the width a body wraps at; no route reads its height (C23 I41).
       region: deps.frame.overlayRegion,
       editor: stores.editor,
       overlays: stores.overlays,
-      documentView,
       // C28 §3c — for `/profile`'s handler, the way `stop` reaches `/exit`.
       // Read by `execution.ts` when it hands `shippedHandlers` the view; until
       // then `shippedHandlers` includes no `profile` handler, so the manifest's
@@ -2339,9 +2317,7 @@ export async function constructGraph(
     schedule: config.schedule,
     anchor: deps.frame.promptAnchor,
     overlayRegion: deps.frame.overlayRegion,
-    documentView,
     profileView,
-    releaseView: () => void pipeline.releaseView(),
     focus,
     // The entry half of B1's pair; the exit is already on the `⌃c` rung below.
     enterCopyMode: deps.frame.enterCopyMode,

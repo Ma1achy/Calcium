@@ -115,10 +115,3 @@ export function jsonFlagFor(manifest: Manifest, tool: ToolDef): readonly string[
   return tool.jsonFlag ?? manifest.jsonFlag;
 }
 
-export function isViewInvocation(
-  tool: ToolDef,
-  args: Readonly<Record<string, unknown>>,
-): boolean {
-  if (tool.view === true) return true;
-  return tool.flags.some((f) => f.view === true && Object.hasOwn(args, f.name));
-}

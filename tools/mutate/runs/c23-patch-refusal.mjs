@@ -16,7 +16,6 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const SUITE = [
   "test/contract/refresh.test.ts",
-  "test/contract/document-view.test.ts",
   "test/integration/refresh-refusal.test.ts",
 ].join(" ");
 

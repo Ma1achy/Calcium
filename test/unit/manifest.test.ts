@@ -504,7 +504,7 @@ describe("C05 validate", () => {
     if (accepted.ok) expect(accepted.args["since"]).toBe("-1h");
   });
 
-  it("T1.19b (I23, I24): a flag arm decides, an arm equal to the default is refused, and I19/I20 read both homes", () => {
+  it("T1.19b (I23, I24): a flag arm decides, an arm equal to the default is refused, and I19 reads both homes", () => {
     const findEdit = (source: Record<string, unknown>): Record<string, unknown> =>
       (source["tools"] as Record<string, unknown>[]).find((t) => t["name"] === "edit")!;
     const flagsOf = (source: Record<string, unknown>): Record<string, unknown>[] =>
@@ -571,16 +571,14 @@ describe("C05 validate", () => {
       "and the local refusal likewise",
     ).toBe(true);
 
-    // **The row that fails at HEAD before I24** (F118). I20 says `view` is
-    // declarable on a flag *and* that it is refused with `interactive`; both
-    // halves shipped and they did not meet, so the pair parsed when written this
-    // way and was refused when written the other.
-    const flagView = raw();
-    flagsOf(flagView)[0]!["view"] = true;
-    expect(
-      errorsOf(parseManifest(flagView)).some((m) => m.includes("declares both view and interactive")),
-      "a flag's view against the tool's interactive is the same pair I20 forbids",
-    ).toBe(true);
+    // **The arm that failed at HEAD before I24 was `view`'s** (F118): the tier
+    // was declarable on a flag *and* refused with `interactive`, both halves
+    // shipped, and they did not meet — so the pair parsed written one way and
+    // was refused written the other. The tier retired with the pushed view
+    // (C22 §13a, R-EXA-082, F1253) and I24's rule did not; the three arms above
+    // are what exercise it now, and they were always the stronger half, because
+    // each re-creates a verb that cannot exist rather than a presentation
+    // choice.
   });
 
   it("T1.19 (I19): interactive is refused with streams and with local, and accepted alone", () => {
@@ -617,128 +615,14 @@ describe("C05 validate", () => {
     expect(clean.value.tools.find((t) => t.name === "ps")?.interactive).toBeUndefined();
   });
 
-  it("T1.20 (I20): view is refused with interactive and with oneShot, permitted with streams, and readable from a flag", () => {
-    // **The `streams` arm is the one that stops this being a copy of I19.** A
-    // rule that refused every combination would satisfy the two negative
-    // assertions exactly, and S12's logs view — a streaming source rendered into
-    // a pushed view — would be undeclarable while both of them agreed the field
-    // worked. That surface is the reason C22 §13a was ruled at all.
-    const findEdit = (source: Record<string, unknown>): Record<string, unknown> =>
-      (source["tools"] as Record<string, unknown>[]).find((t) => t["name"] === "edit")!;
-
-    const withInteractive = raw();
-    findEdit(withInteractive)["view"] = true;
-    expect(errorsOf(parseManifest(withInteractive))).toContain(
-      'tools[6].view: "edit" declares both view and interactive — on the tool or on a ' +
-        "flag, and either way both hand input ownership away, the view to the shell's own " +
-        "keymap and the handoff to a child; drop whichever one the verb does not do",
-    );
-
-    // **`edit` carries an `interactive: false` arm on `--background` (I23), so
-    // dropping the tool's declaration orphans it.** An arm equal to the default
-    // decides nothing and is refused, which is the rule doing its job on a
-    // fixture edited to say something else — so these rows drop both.
-    const withOneShot = raw();
-    const e1 = findEdit(withOneShot);
-    delete e1["interactive"];
-    e1["flags"] = [];
-    e1["view"] = true;
-    e1["oneShot"] = true;
-    expect(errorsOf(parseManifest(withOneShot))).toContain(
-      'tools[6].view: "edit" declares both view and oneShot — a one-shot writes one ' +
-        "frame and exits without a terminal, and a view is a claim on one that stays",
-    );
-
-    // Permitted with `streams`, deliberately — this is S12's shape.
-    const withStreams = raw();
-    const e2 = findEdit(withStreams);
-    delete e2["interactive"];
-    e2["flags"] = [];
-    e2["view"] = true;
-    e2["streams"] = true;
-    const streamed = parseManifest(withStreams);
-    expect(streamed.ok, errorsOf(streamed).join("\n")).toBe(true);
-
-    // And the field survives onto both declaration sites, which is what C23
-    // reads. Asserted rather than assumed: a `takeOptionalBoolean` that was
-    // never added drops the key silently under I3's leniency and looks
-    // identical from outside.
-    const viewTool = raw();
-    const e3 = findEdit(viewTool);
-    delete e3["interactive"];
-    e3["flags"] = [];
-    e3["view"] = true;
-    const parsed = parseManifest(viewTool);
-    expect(parsed.ok, errorsOf(parsed).join("\n")).toBe(true);
-    if (!parsed.ok) return;
-    expect(parsed.value.tools.find((t) => t.name === "edit")?.view).toBe(true);
-    expect(parsed.value.tools.find((t) => t.name === "ps")?.view).toBeUndefined();
-  });
-
-  it("T1.23 (I20, I24): view is refused with local, on the tool and on a flag, and the two controls say which field the refusal reads", () => {
-    // **The defect this closes was invisible to every other row in this file**
-    // (F1022, closing F23 and F129). `view` with `interactive` and `view` with
-    // `oneShot` both fail at parse, so a suite indexed by *does an inert
-    // declaration fail* tested the two arms that had a refusal and agreed. The
-    // pair below parsed, sealed, validated and ran, and the only symptom was a
-    // transcript entry where a view had been declared — C18 classifies on
-    // `tool.local` first and `isViewInvocation` is read on the `app` route and
-    // nowhere else, so nothing between the manifest and the frame said so.
-    const findGuide = (source: Record<string, unknown>): Record<string, unknown> =>
-      (source["tools"] as Record<string, unknown>[]).find((t) => t["name"] === "guide")!;
-
-    const REFUSAL =
-      'tools[7].view: "guide" is local and declares view — a local verb is handled ' +
-      "in-process and never reaches the route that opens one, so the declaration is " +
-      "inert; a local verb that wants a view pushes it from its handler, as `/profile` does";
-
-    // The tool-level pair — F23's form.
-    const toolView = raw();
-    findGuide(toolView)["view"] = true;
-    expect(errorsOf(parseManifest(toolView))).toContain(REFUSAL);
-
-    // The flag-level pair — F129's form, and I24's rule: a cross-field refusal
-    // reads *every* declaration of each field it names. A rule that read only
-    // `tool.view` would pass the row above and repeat F118 here.
-    const flagView = raw();
-    findGuide(flagView)["flags"] = [
-      { name: "wide", type: "bool", view: true, summary: "open it as a view" },
-    ];
-    expect(errorsOf(parseManifest(flagView))).toContain(REFUSAL);
-
-    // **Control 1 — the same declaration on a spawned tool parses.** Without it
-    // the two rows above pass against a parser that refuses every `view`, which
-    // is the state T1.20's `streams` arm exists to prevent one axis over.
-    const spawned = raw();
-    const tools = spawned["tools"] as Record<string, unknown>[];
-    const edit = tools.find((t) => t["name"] === "edit")!;
-    delete edit["interactive"];
-    edit["flags"] = [];
-    edit["view"] = true;
-    const okSpawned = parseManifest(spawned);
-    expect(okSpawned.ok, errorsOf(okSpawned).join("\n")).toBe(true);
-    if (okSpawned.ok) {
-      expect(okSpawned.value.tools.find((t) => t.name === "edit")?.view).toBe(true);
-    }
-
-    // **Control 2 — the untouched fixture draws no such error**, so the corpus
-    // the rule resolves against is non-empty and `guide` is a `local` tool
-    // whether or not this row edits it. A fabricated violation whose control is
-    // missing cannot tell a firing rule from an empty corpus.
-    expect(errorsOf(parseManifest(raw())).filter((m) => m.includes("is local and declares view"))).toHaveLength(0);
-
-    // **Control 3 — the axes are independent, and this is the row that makes
-    // the rule about the tier rather than about flags on local verbs.** A
-    // `shellOnly` switch on the same local tool parses: I21 is transmission and
-    // I20 is the tier, and a refusal reading the wrong field would fail here
-    // while passing everything above it (§8a row 18).
-    const shellOnly = raw();
-    findGuide(shellOnly)["flags"] = [
-      { name: "wide", type: "bool", shellOnly: true, summary: "widen the output" },
-    ];
-    const okShellOnly = parseManifest(shellOnly);
-    expect(okShellOnly.ok, errorsOf(okShellOnly).join("\n")).toBe(true);
-  });
+  // ~~**T1.20**, **T1.23**~~ — **struck with the tier they declared** (C22 §13a,
+  // R-EXA-082, F1253). They asserted the three parse refusals — with `interactive`, with
+  // `oneShot`, with `local` — the permitted `streams` pair, the flag-level read that
+  // F118 measured, and three controls. **Every one of them was right**, and what they
+  // refused was a *tier*: a verb's result is a transcript entry now, so there is
+  // nothing to declare and nothing to refuse. F1022's finding reads cleanest from
+  // here — the `local` pair parsed, sealed, validated, ran and appended an ordinary
+  // entry, and an ordinary entry is the correct outcome.
 
   it("T1.18 (I17): a conflict is reported once, whichever side declares it", () => {
     // One-directional is how an app ordinarily writes it, and deduplicating by

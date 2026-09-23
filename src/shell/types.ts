@@ -19,7 +19,6 @@ import type { TransportRouter } from "../data/transport/index.js";
 import type { Action, Block, ViewDocument } from "../data/viewmodel/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
 import type { OwnerRung } from "../interaction/router/types.js";
-import type { DocumentView } from "./document-view.js";
 import type { ProfileView } from "./profile-view.js";
 import type { RefreshHost } from "./refresh.js";
 import type { CompletionSource } from "../interaction/completion/index.js";
@@ -245,15 +244,6 @@ export interface Pipeline {
    */
   onAction(action: Action, from?: EntryId | null): void;
   /**
-   * The document view was popped — stop its parts now (C22 I46).
-   *
-   * **At the pop, not a tick later.** Without this the driver only discovers a
-   * gone host when a fetch resolves into it and `putBlock` returns false, so one
-   * more request runs against a view nobody is looking at. That lazy path stays
-   * as the backstop it was; this is the trigger C23 I33's set was missing.
-   */
-  releaseView(): void;
-  /**
    * Something moved on screen, so which hosts are visible may have changed
    * (C23 I46).
    *
@@ -385,25 +375,15 @@ export type PipelineDeps = Readonly<{
    */
   capabilities: TerminalCapabilities;
   /**
-   * The region a view fills (C15 §4) — for `ProducerContext.height` on the one
-   * route where a bound exists (C07 I18).
+   * The region, for the width a body wraps at (C07 I18).
    *
-   * The same source `documentView` reads, rather than a second computation of
-   * it: two answers to *how big is the region* is how a producer splits against
-   * an axis the frame does not use.
+   * **No route reads its height any more** (C23 I41, C22 §13a): a verb's result
+   * is a transcript entry and an entry is as tall as its blocks, so
+   * `ProducerContext.height` is `null` everywhere and there is no bound to state.
    */
   region: () => Readonly<{ width: number; height: number }>;
   editor: LineEditor;
   overlays: OverlayManager;
-  /**
-   * The fullscreen patch view (C25 §3b), for the `view` action's arm.
-   *
-   * On the pipeline's deps rather than reached through `overlays`, because the
-   * refusal it returns is C23's to patch into the source entry and the stack
-   * check that produces it is the view owner's (C23 I31).
-   */
-  /** C22 §13a — raised when a verb's declaration says its result is a view. */
-  documentView: DocumentView;
   /**
    * Whether anyone is looking at a live part's host (C23 I46).
    *

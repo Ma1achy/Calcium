@@ -567,11 +567,13 @@ describe("A03 SP9 — every invariant is named by at least one test row", () => 
     expect(r.declared, "and it is still declared — SP1 and SP2 read the whole list").toBe(2);
     // The real tree: C09's width pair and C24's launcher hooks, retired by F1209
     // when Ink went; C25's three offset-and-snap rules, retired by F1251 when the pushed
-    // patch view went. The count is what moves when a sixth lands.
+    // patch view went; C22's six and C05's one, retired by F1253 when the pushed
+    // *document* view went with the route and the manifest tier that selected it.
+    // The count is what moves when a thirteenth lands.
     expect(
       checkInvariantCoverage(specFiles(), walkTests()).retired,
-      "five: two of F1209's, three of F1251's",
-    ).toBe(5);
+      "twelve: two of F1209's, three of F1251's, seven of F1253's",
+    ).toBe(12);
   });
 
   it("SP9: the exemption list is compared by equality, both ways", () => {

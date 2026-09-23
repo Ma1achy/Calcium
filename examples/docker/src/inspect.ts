@@ -19,15 +19,16 @@ import { str, type Row } from "./ndjson.ts";
 /**
  * The row budget a raw block is split down to **when no region is given**.
  *
- * **The walk ruled *the region*, the code could not reach one, and it can now.**
- * `ProducerContext.height` is `number | null` — non-null **iff** the document
- * is bound by a region, which is a view invocation and nothing else, decided by
- * C23 before the producer runs. `inspect` is declared `view: true`, so every
- * `/inspect --raw` gets a real region and `splitRaw` is called with it.
+ * **The walk ruled *the region*, the code reached one for a while, and it no
+ * longer can.** `ProducerContext.height` is `number | null`, and it is `null` on
+ * every route since the pushed view retired (C23 I41, C22 §13a, R-EXA-082): a
+ * verb's result is a transcript entry and an entry is as tall as its blocks, so
+ * nothing bounds it. `/inspect --raw` is a long entry you scroll, which is what
+ * the design means by *the record is the product*.
  *
- * **This constant is the fallback, and it is still needed** — a transcript entry
- * has no bound, so the ruling has no answer there and the declared floor is what
- * is left. The asymmetry is what makes it defensible rather than the fixed
+ * **So this constant is no longer the fallback — it is the answer**, and it is
+ * the declared floor rather than a measured one. The asymmetry is what made it
+ * defensible rather than the fixed
  * constant the walk rejected: over-splitting costs granularity, under-splitting
  * strands rows a reader cannot reach. A floor is correct at every region above
  * it and honest below, where I47's indicator carries the residue.
@@ -210,11 +211,12 @@ export function createInspectAdapter(): Adapter {
           failure !== "" || inspected === null
             ? [b.notice.error(failure)]
             : raw
-              // **The region where there is one, the declared floor where there
-              // is not** (F37's ruling, reachable since `ProducerContext.height`).
-              // `inspect` is `view: true`, so this is non-null on every real
-              // invocation and `SPLIT_FLOOR` is what a context without a bound
-              // falls back to rather than the ordinary case.
+              // **The declared floor, because no route states a bound** (C23
+              // I41, C22 §13a). F37's ruling asked for the region and the view
+              // route was the one that supplied it; with the route gone the
+              // `??` arm is the only arm, and it is kept in that form because
+              // the field is still `number | null` and a producer that is handed
+              // a bound should use it.
               ? splitRaw(inspected, ctx.width, ctx.measure, ctx.height ?? SPLIT_FLOOR)
               : structuredBlocks(inspected),
         meta: { adapter: "inspect", truncated: false },

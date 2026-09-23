@@ -47,7 +47,6 @@ import type { EntryId } from "../viewport/transcript/index.js";
 import type { Manifest } from "../data/manifest/index.js";
 import type { OverlayManager } from "../viewport/overlay/index.js";
 import type { FocusStore } from "../interaction/router/focus.js";
-import type { DocumentView, DocumentViewMotion } from "./document-view.js";
 import type { ProfileView, ProfileViewMotion } from "./profile-view.js";
 
 /** The prompt's own extent, for anchoring (C19 §6, C20 §5). */
@@ -124,11 +123,6 @@ export type KeyDeps = Readonly<{
    * with a vocabulary rather than a name in a union.
    */
   /**
-   * C22 §13a's view. One target, two owners — C15 I1 allows one view at a time,
-   * so at most one of these is open and the keymap needs no third target.
-   */
-  documentView: DocumentView;
-  /**
    * C28 §3c's view — the third owner of the one `pushedView` target.
    *
    * Its unit is the pane: `n`/`p` switch panes where a patch moves by hunk and
@@ -144,8 +138,6 @@ export type KeyDeps = Readonly<{
    * required costs and not one line.
    */
   profileView?: ProfileView;
-  /** C22 I46 — the pop releases the view's parts, rather than a later fetch doing it. */
-  releaseView: () => void;
   /**
    * Every navigable element in the live entry, addressed and in reading order,
    * or empty (C16 I22, C26 §5).
@@ -1008,12 +1000,12 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // which is S3's footer read literally: *n/p scroll*. The two are the same
     // gesture over each view's own unit, which is what makes one binding right
     // rather than a compromise.
-    viewNextHunk: () => void onView("down", 1),
-    viewPrevHunk: () => void onView("up", -1),
-    viewTop: () => void onView("top", "top"),
-    viewBottom: () => void onView("bottom", "bottom"),
-    viewPageUp: () => void onView("pageUp", "pageUp"),
-    viewPageDown: () => void onView("pageDown", "pageDown"),
+    viewNextHunk: () => void onView(1),
+    viewPrevHunk: () => void onView(-1),
+    viewTop: () => void onView("top"),
+    viewBottom: () => void onView("bottom"),
+    viewPageUp: () => void onView("pageUp"),
+    viewPageDown: () => void onView("pageDown"),
     // **The section gesture, and it is one call to whichever owner is up**
     // (C16 I33). `n`/`p` above move the view's own *unit*; these move its
     // *section* — a file on a patch, a heading on a document, a group on the
@@ -1030,14 +1022,6 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       // raised; sending its `Esc` to another owner would leave that tier up.
       if (deps.profileView !== undefined && deps.profileView.section !== null) {
         void deps.profileView.pop();
-        return;
-      }
-      // **Released here, which is the trigger C23 I33's set did not have** (I46).
-      // The order matters: release first, so a fetch that resolves during the
-      // pop finds no registration rather than a half-dismissed view.
-      if (deps.documentView.openFor !== null) {
-        deps.releaseView();
-        void deps.documentView.pop();
         return;
       }
     },
@@ -1215,18 +1199,15 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
    * the transcript is scrolled.
    */
   const onView = (
-    document: DocumentViewMotion,
-    // The profiler view's reading of the same key: a card step for `n`/`p`,
-    // a window motion for the rest (C28 §3c).
+    // The profiler view's reading of the key: a card step for `n`/`p`, a window
+    // motion for the rest (C28 §3c). **The only reading left** — the document
+    // view was the other owner of this target and its subject is a transcript
+    // entry now (C22 §13a, R-EXA-082), scrolled the way every entry is.
     profile: ProfileViewMotion | 1 | -1,
   ): boolean => {
     const profileView = deps.profileView;
-    if (profileView !== undefined && profileView.section !== null) {
-      return typeof profile === "number"
-        ? profileView.nextCard(profile)
-        : profileView.move(profile);
-    }
-    return deps.documentView.openFor !== null ? deps.documentView.move(document) : false;
+    if (profileView === undefined || profileView.section === null) return false;
+    return typeof profile === "number" ? profileView.nextCard(profile) : profileView.move(profile);
   };
 
   /**
@@ -1237,14 +1218,8 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
    * above has already been wrong once (F944). One gesture, one resolution.
    */
   const onSection = (direction: 1 | -1): boolean => {
-    const profileView = deps.profileView;
-    const owner =
-      profileView !== undefined && profileView.section !== null
-        ? profileView
-        : deps.documentView.openFor !== null
-          ? deps.documentView
-          : null;
-    if (owner === null) return false;
+    const owner = deps.profileView;
+    if (owner === undefined || owner.section === null) return false;
     return direction === 1 ? owner.sectionNext() : owner.sectionPrev();
   };
 

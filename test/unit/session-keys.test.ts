@@ -338,25 +338,6 @@ describe("C22 §3 step 11 — the effect table", () => {
       completion: graph.completion,
       overlays: graph.overlays,
       history: graph.history,
-      // The same stand-in reason, and `openFor: null` is load-bearing rather
-      // than filler: it is what `onView` reads to decide which view owns a
-      // motion, so a double reporting a view open would silently route this
-      // suite's bindings to the wrong one.
-      documentView: {
-        open: () => null,
-        fill: () => false,
-        putBlock: () => false,
-        // C22 I48's seam. A stub, because this file drives the keymap rather than
-        // the view — but present, because the type is what says the two agree.
-        patch: () => ({ ok: false, reason: "closed" }) as const,
-        blockAt: () => null,
-        move: () => false,
-        sectionNext: () => false,
-        sectionPrev: () => false,
-        pop: () => false,
-        openFor: null,
-      },
-      releaseView: () => undefined,
     enterCopyMode: () => undefined,
     exitCopyMode: () => undefined,
       manifest: null,
@@ -679,7 +660,6 @@ describe("C22 §3 step 11 — the effect table", () => {
         register: () => undefined,
         onAction: () => undefined,
         identityNotice: () => undefined,
-        releaseView: () => undefined,
         visibilityChanged: () => undefined,
       resized: () => undefined,
         producerContext: () => producerContext(),
@@ -740,66 +720,11 @@ describe("C22 §3 step 12 — the read loop", () => {
     expect(graph.editor.resolved.split("\n"), "and all of them arrived").toHaveLength(200);
   });
 
-  it("T1.4h4 (C22 I46): Esc on a document view releases its parts, and before the dismiss", () => {
-    // **The wiring, not the mechanism.** T4.74 asserts that `release` stops a
-    // view's parts, by calling `release`. Removing `deps.releaseView()` from
-    // `viewPop` leaves that row green — the mechanism still works and nothing
-    // reaches it, which is the third instance in this branch of a test that
-    // verifies a thing and not its connection.
-    //
-    // Order matters and is asserted: release first, so a fetch resolving during
-    // the pop finds no registration rather than a half-dismissed view.
-    const order: string[] = [];
-    const effects = createKeyEffects({
-      // Stubs, and named as such: `viewPop` touches none of these four, and a
-      // real editor here would be scenery the row does not use.
-      editor: {},
-      completion: {},
-      overlays: {},
-      history: { entries: [], append: () => undefined },
-      documentView: {
-        open: () => null,
-        fill: () => false,
-        putBlock: () => false,
-        blockAt: () => null,
-        move: () => false,
-        sectionNext: () => false,
-        sectionPrev: () => false,
-        pop: () => {
-          order.push("dismiss");
-          return true;
-        },
-        // Open, which is the state the branch under test needs. A double
-        // reporting `null` here routes to the patch view and the row passes
-        // while asserting nothing — the state the test claims must be built.
-        openFor: "/ps --watch",
-      },
-      releaseView: () => void order.push("release"),
-      visibilityChanged: () => undefined,
-      resized: () => undefined,
-      manifest: null,
-      viewport: recordingViewport().viewport,
-      anchor: () => ({ row: 10, rows: 1 }),
-      overlayRegion: () => ({ width: 80, height: 24 }),
-      redraw: () => undefined,
-      focus: createFocusStore(),
-      liveElements: () => [],
-      liveEntryId: () => null,
-      focusedElements: () => [],
-      focusedEntryId: () => null,
-      neighbourEntry: () => null,
-      cursorBlock: () => undefined,
-      rerunEntry: () => undefined,
-      onAction: () => undefined,
-      schedule: (fn: () => void) => {
-        fn();
-        return { [Symbol.dispose]: () => undefined };
-      },
-    } as unknown as Parameters<typeof createKeyEffects>[0]);
-
-    effects.table["viewPop"]?.();
-    expect(order, "released at the pop, and before it").toEqual(["release", "dismiss"]);
-  });
+  // ~~**T1.4h4**~~ — **struck with the document view** (C22 §13a, R-EXA-082, F1253). It
+  // asserted that `viewPop` released the view's parts *before* dismissing it — the wiring
+  // rather than the mechanism, which is a distinction worth keeping even though this
+  // instance of it has gone. There is no pushed view to pop and no parts registered
+  // against one; a run's parts are its entry's, and C13 evicts them with the entry.
 
   it("T1.14 (C22 I32): a lone Esc reaches the router without a second keystroke", async () => {
     // **The empty batch is the one that needs a wake.** `Esc` is held for
@@ -884,18 +809,6 @@ describe("C26 §8b.6/§8b.7 — focus is an address, through the key effects", (
       completion: {},
       overlays: {},
       history: { entries: [], append: () => undefined, next: () => null },
-      documentView: {
-        open: () => null,
-        fill: () => false,
-        putBlock: () => false,
-        blockAt: () => null,
-        move: () => false,
-        sectionNext: () => false,
-        sectionPrev: () => false,
-        pop: () => false,
-        openFor: null,
-      },
-      releaseView: () => undefined,
       visibilityChanged: () => undefined,
       resized: () => undefined,
       manifest: null,
@@ -1042,18 +955,6 @@ describe("C26 §5c — the transcript's selection and semantic copy", () => {
       completion: {},
       overlays: {},
       history: { entries: [], append: () => undefined, next: () => null },
-      documentView: {
-        open: () => null,
-        fill: () => false,
-        putBlock: () => false,
-        blockAt: () => null,
-        move: () => false,
-        sectionNext: () => false,
-        sectionPrev: () => false,
-        pop: () => false,
-        openFor: null,
-      },
-      releaseView: () => undefined,
       visibilityChanged: () => undefined,
       resized: () => undefined,
       manifest: null,
@@ -1151,15 +1052,21 @@ describe("C26 §5c — the transcript's selection and semantic copy", () => {
   });
 });
 
-describe("C16 I33 — the section gesture, at one target and three owners", () => {
+describe("C16 I33 — the section gesture, at one target and one owner", () => {
   /**
-   * The three owners as doubles, each counting what it was asked.
+   * The owner as a double, counting what it was asked.
    *
-   * `openFor` and `section` are the state the ladder reads, so they are built
-   * rather than defaulted: a double reporting no view open routes the gesture
-   * to the patch view and the row passes while asserting nothing.
+   * `section` is the state the ladder reads, so it is built rather than
+   * defaulted: a double reporting no view open would let the row pass while
+   * asserting nothing.
+   *
+   * **There were three owners and there is one** (R-EXA-082). The patch view
+   * went with M9b and the document view with M9c — a run's detail expands in
+   * place and a verb's result is an entry, so both are scrolled the way the
+   * transcript is scrolled. The profiler's cards are the last, and M9d takes
+   * them.
    */
-  const owners = (up: "profile" | "document" | "none") => {
+  const owners = (up: "profile" | "none") => {
     const calls: string[] = [];
     const answer = (who: string, verdict: boolean) => () => {
       calls.push(who);
@@ -1180,18 +1087,6 @@ describe("C16 I33 — the section gesture, at one target and three owners", () =
         sectionNext: answer("profile:next", true),
         sectionPrev: answer("profile:prev", true),
       },
-      documentView: {
-        open: () => null,
-        fill: () => false,
-        putBlock: () => false,
-        blockAt: () => null,
-        move: () => false,
-        pop: () => false,
-        sectionNext: answer("document:next", false),
-        sectionPrev: answer("document:prev", false),
-        openFor: up === "document" ? "/ps --watch" : null,
-      },
-      releaseView: () => undefined,
       visibilityChanged: () => undefined,
       resized: () => undefined,
       manifest: null,
@@ -1233,19 +1128,16 @@ describe("C16 I33 — the section gesture, at one target and three owners", () =
       "complete",
     );
 
-    // **The ladder half — each owner, and only that owner.** The profile view
-    // wins when a section is open; the document view when it has an `openFor`.
-    // Asserted as the *set* of calls, because an effect that asked every owner
-    // and returned the first `true` would answer correctly for the profiler and
-    // wrongly for the other.
+    // **The ladder half — the owner, and only that owner.** The profile view
+    // answers when a section is open. Asserted as the *set* of calls, because
+    // an effect that asked every owner and returned the first `true` would
+    // answer correctly and for the wrong reason.
     //
-    // **There was a third rung and it was the patch view's** (C25 §3b,
-    // R-EXA-082). It is deleted, and the ladder's bottom is now *nobody*, which
-    // the row below asserts rather than leaving as a fall-through.
-    for (const [up, next, prev] of [
-      ["profile", "profile:next", "profile:prev"],
-      ["document", "document:next", "document:prev"],
-    ] as const) {
+    // **There were two more rungs**, the patch view's (C25 §3b) and the
+    // document view's (C22 §13a) — both deleted by R-EXA-082, and the ladder's
+    // bottom is now *nobody*, which the row below asserts rather than leaving
+    // as a fall-through.
+    for (const [up, next, prev] of [["profile", "profile:next", "profile:prev"]] as const) {
       const { effects, calls } = owners(up);
       effects.table["viewNextSection"]?.();
       effects.table["viewPrevSection"]?.();
@@ -1265,7 +1157,8 @@ describe("C16 I33 — the section gesture, at one target and three owners", () =
     // owner up the gesture reaches nobody rather than walking the ladder
     // looking for one that says yes. The patch view used to be that bottom
     // rung and refused every time, which made the row read as *the last owner
-    // declines*; with it deleted the row reads what it always meant.
+    // declines*; with both it and the document view deleted the row reads what
+    // it always meant.
     const refusing = owners("none");
     refusing.effects.table["viewNextSection"]?.();
     refusing.effects.table["viewNextSection"]?.();
