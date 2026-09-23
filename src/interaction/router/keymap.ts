@@ -974,3 +974,32 @@ export function createKeymap(
     },
   };
 }
+
+/**
+ * The scopes a keymap listing is read in — **the current rung first, the rest
+ * alphabetical** (`R-KEY-005`, C16 §6a clause 4).
+ *
+ * **Here and not in the verb that draws it.** The ordering *is* the rule, and it
+ * was written inside `/help keys`, which made it a property of one arm of one
+ * command. §019's census draws the same listing, and a second renderer restating
+ * the order is the drift this seam removes — the blocks stay the verb's, because
+ * a labelled rule per scope with a `keyValue` beneath it is a presentation
+ * choice where the order is the rule itself.
+ *
+ * **Alphabetical for the remainder, and the alternative was measured.** A flat
+ * list in registration order was 85 rows and is 119 since the keymap became
+ * generated, and registration order is the order the *table* was written in —
+ * a fact about this repository's history and about nothing the reader is doing.
+ *
+ * Takes the bindings rather than a `Keymap` so it is a pure function of what
+ * the listing already holds, which is what lets a census call it with no
+ * session.
+ */
+export function scopesInReadingOrder(
+  bindings: readonly Readonly<{ target: string }>[],
+  here: string,
+): readonly string[] {
+  return [...new Set(bindings.map((b) => b.target))].sort((a, b) =>
+    a === here ? -1 : b === here ? 1 : a < b ? -1 : a > b ? 1 : 0,
+  );
+}

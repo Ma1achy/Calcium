@@ -17,6 +17,7 @@
 // `STATES` chose, for its reason: adding one is three lines and the frame comes
 // free, so the cost of covering a surface never argues against covering it.
 import { block } from "../../src/data/viewmodel/index.js";
+import { defaultKeymap, keyText, scopesInReadingOrder } from "../../src/interaction/router/keymap.js";
 import {
   CALL_STATE_GLYPH,
   GLYPH_TOKENS,
@@ -566,6 +567,49 @@ const WELL = block({
   children: [block({ kind: "raw", id: "w1", text: "4.0 ─ 0.0" })],
 });
 
+
+/**
+ * §019 — the resolved keymap, the reader's own rung first (`R-KEY-005`).
+ *
+ * **Drawn through the blocks `/help keys` draws, and ordered by the rule's own
+ * owner.** `scopesInReadingOrder` is C16 §6a clause 4's seam, moved out of the
+ * `help` arm so this census and that verb cannot disagree about what the rule
+ * says; the `rule` and `keyValue` blocks below are the verb's presentation and
+ * are restated here deliberately, because a presentation choice is what a
+ * census is *for* comparing.
+ *
+ * **121 bindings and not the fixture's 39.** §019 pictures the registry's own
+ * bindings; the tree's resolved keymap is the registry's plus the routes and
+ * the block rungs, which is the thing a reader actually presses. The census
+ * draws what ships, so the two numbers are expected to differ — the check is
+ * that the *grouping* and the *order* are the design's, not that the totals
+ * match. `prompt` is the rung because it is where a session opens.
+ */
+const keymapCensus = (width: number, caps: TerminalCapabilities, theme: ResolvedTheme): readonly string[] => {
+  const all = defaultKeymap.map((b) => ({ keys: keyText(b.key), does: b.action, target: b.target }));
+  const here = "prompt";
+  const m = measurable({ theme, capabilities: caps });
+  return scopesInReadingOrder(all, here).flatMap((scope) => [
+    ...m.renderToLines(
+      block({
+        kind: "rule",
+        id: `keys-rule-${scope}`,
+        label: scope === here ? `${scope} — where you are` : scope,
+        level: 3 as const,
+      }),
+      width,
+    ),
+    ...m.renderToLines(
+      block({
+        kind: "keyValue",
+        id: `keys-${scope}`,
+        rows: all.filter((b) => b.target === scope).map((b) => ({ label: b.keys, value: b.does })),
+      }),
+      width,
+    ),
+  ]);
+};
+
 export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 95, name: "a tape, where a row of peers would shed", rows: draw(TAPE) },
   { section: 42, name: "widgets — a row of peers that sheds", rows: draw(PILLS) },
@@ -586,6 +630,7 @@ export const SURFACES: readonly Surface[] = Object.freeze([
     { name: "a posture, ex. 3 — TEXT, never a ground", block: POSTURES },
     { name: "a well — structural, never semantic", block: WELL },
   ]) },
+  { section: 19, name: "the resolved keymap, the reader's own rung first", rows: keymapCensus },
   { section: 21, name: "the scrollbar — the set, and the bar beside a box", rows: (w, c, t) => [
     ...scrollbarCensus(w, c),
     ...draw(SCROLLED)(w, c, t),

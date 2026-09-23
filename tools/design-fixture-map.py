@@ -24,7 +24,7 @@ M = {
  16:("prose","—","scopes, as an ownership table"),
  17:("owed","M3","the focus treatment follows the shape — measured over `ONE_PER_KIND`: `scroll` and `plot` answer block focus and the other thirty-four do not, so the RUN, the BOX and the FRAME rows are all unbuilt"),
  18:("owed","M3","focus on things that are not rows — its three cases are a button, a slider and a checkbox, and none is a block kind"),
- 19:("owed","M6","the keys — `docs/KEYS.md`, generated from the registry"),
+ 19:("frame","design-surfaces.test.ts","the resolved keymap, the reader's own rung first — 121 bindings across eight scopes, drawn through the `rule` + `keyValue` pair `/help keys` draws and ordered by `scopesInReadingOrder`, which is `R-KEY-005`'s own seam (C16 §6a clause 4). The census draws what ships rather than the registry's 39, because the resolved keymap is the registry's bindings plus the routes and the block rungs — the check is that the grouping and the order are the design's"),
  20:("prose","—","DAS and ARR as figures"),
  21:("frame","design-surfaces.test.ts","the scrollbar — the set degrading whole, and the bar beside a box that overflows"),
  22:("owed","M9","the help view, which becomes a transcript entry"),

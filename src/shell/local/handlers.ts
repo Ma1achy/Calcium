@@ -30,6 +30,7 @@ import { TIER_RANK } from "../profiling/types.js";
 import type { CaptureResult, ProfileReport } from "../profiling/types.js";
 import type { LocalHandler } from "./registry.js";
 import type { StopReason } from "../types.js";
+import { scopesInReadingOrder } from "../../interaction/router/keymap.js";
 
 export type HandlerDeps = Readonly<{
   manifest: () => Manifest | null;
@@ -431,9 +432,9 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
         // before it answers anything else.
         const all = deps.bindings();
         const here = deps.currentScope();
-        const scopes = [...new Set(all.map((b) => b.target))].sort((a, b) =>
-          a === here ? -1 : b === here ? 1 : a < b ? -1 : a > b ? 1 : 0,
-        );
+        // The order is `R-KEY-005` and lives with the keymap (C16 §6a clause
+        // 4); the blocks below are this verb's.
+        const scopes = scopesInReadingOrder(all, here);
         return doc(
           "/help keys",
           scopes.flatMap((scope) => [
