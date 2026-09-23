@@ -128,6 +128,15 @@ export type KeyDeps = Readonly<{
   selectEntryUnderCaret: () => void;
   selectAllLoadedEntries: () => void;
   /**
+   * `y` — the selected entries to the clipboard (`R-SEL-004`, `R-SEL-011`).
+   *
+   * **Not `editor.copyText` from here**, though that is where the text lands.
+   * The join needs the transcript's document order and C09's `copySequence`,
+   * neither of which this table has, and the refusal `R-SEL-011` requires when
+   * a copy cannot leave the process is the mode's statement rather than a key's.
+   */
+  copySelectedEntries: () => void;
+  /**
    * Every navigable element in the live entry, addressed and in reading order,
    * or empty (C16 I22, C26 §5).
    *
@@ -621,6 +630,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // different verb, not a second spelling of the same one.
     selectEntryUnderCaret: () => void deps.selectEntryUnderCaret(),
     selectAllLoadedEntries: () => void deps.selectAllLoadedEntries(),
+    copySelectedEntries: () => void deps.copySelectedEntries(),
 
     // --- C17 ---------------------------------------------------------------
     insertNewline: () => void deps.editor.insert("\n"),

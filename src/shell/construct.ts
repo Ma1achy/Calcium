@@ -337,6 +337,8 @@ export type FrameQueries = Readonly<{
   /** `a` and `A` (`R-SEL-008`). `A` says what it did, because the window is not the record. */
   selectEntryUnderCaret: () => void;
   selectAllLoadedEntries: () => void;
+  /** `y` — the selection to the clipboard, with `R-SEL-011`'s refusal when it cannot leave the process. */
+  copySelectedEntries: () => void;
   /**
    * Where the transcript sits, for mouse routing (C16 `RouterDeps.region`).
    *
@@ -2302,6 +2304,7 @@ export async function constructGraph(
     escapeSemanticSelection: deps.frame.escapeSemanticSelection,
     selectEntryUnderCaret: deps.frame.selectEntryUnderCaret,
     selectAllLoadedEntries: deps.frame.selectAllLoadedEntries,
+    copySelectedEntries: deps.frame.copySelectedEntries,
     exitNativeSelection: deps.frame.exitNativeSelection,
     // **One walk, and it is the registry's** (C26 §5, §8b.4). This asked C11
     // directly and tested `block.kind === "table"`, which was one of *three*

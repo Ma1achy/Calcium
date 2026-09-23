@@ -458,6 +458,12 @@ export function statusRowsFor(
 export const statusDefinition: BlockDefinition<Status> = {
   kind: "status",
 
+  // §7a — the message and the detail, which are the two parts that are text
+  // (I86, C09 I84). The frame, the spinner, the attempt count and the residue
+  // row are rendering; the detail is the part that truncates on screen and is
+  // whole here, which is the seam's own argument.
+  copy: (block) => (block.detail === undefined ? block.message : `${block.message}\n${block.detail}`),
+
   /**
    * The declared height and nothing else (C09 I31).
    *

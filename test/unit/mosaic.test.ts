@@ -304,7 +304,7 @@ describe("MG — the mosaic's grid", () => {
     expect(lines, "and one row is drawn").toHaveLength(1);
     expect(plain(lines[0] ?? ""), "holding the only cell there is room for").toBe("A");
 
-    const elements = mosaicDefinition.elements?.(block, 1, () => 1) ?? [];
+    const elements = mosaicDefinition.elements?.(block, 1, () => 1, () => null) ?? [];
     expect(
       elements.map((e) => e.id),
       "a cell with no room is no target, which is what the frame already said",
@@ -324,7 +324,7 @@ describe("MG — the mosaic's grid", () => {
     ).toEqual([1, 1, 1]);
 
     const tall = b.mosaic({ height: 1, areas: "a/b/c", children: [b.raw("A"), b.raw("B"), b.raw("C")] });
-    const tallElements = mosaicDefinition.elements?.(tall, 4, () => 1) ?? [];
+    const tallElements = mosaicDefinition.elements?.(tall, 4, () => 1, () => null) ?? [];
     expect(
       tallElements.map((e) => e.id),
       "and only the row the box has room for is a target",

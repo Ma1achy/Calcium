@@ -39,6 +39,7 @@ export type {
   KeyValue,
   Logs,
   Measure,
+  CopyFn,
   MeasureFn,
   MergeRow,
   Notice,

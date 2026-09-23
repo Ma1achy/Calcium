@@ -142,6 +142,25 @@ function bodyWidth(width: number): number {
 export const tableDefinition: BlockDefinition<Table> = {
   kind: "table",
 
+  // §7a — *a table as TSV with its header* (C09 I86, `R-SEL-004`).
+  //
+  // **Built from `rowCopyText`, which is what stops this being a second
+  // source.** The private `copyTextOf` this seam replaces said `table` was
+  // *deliberately absent, because C11 already declares a richer `copy` per row
+  // and a second answer here would be two sources for one fact* — a correct
+  // argument about sources and the wrong conclusion about granularity. A row's
+  // copy and the block's are one source at two sizes, and the block having none
+  // is why a `scroll` holding a table copied blank.
+  //
+  // Every **declared** column, including the ones a width dropped — the whole
+  // point of taking the source. The sort, the marker column and the residue row
+  // are this component's and do not appear.
+  copy: (block) =>
+    [
+      block.columns.map((c) => c.label).join("\t"),
+      ...block.rows.map((r) => rowCopyText(block, r)),
+    ].join("\n"),
+
   elements: tableElements,
 
   /**

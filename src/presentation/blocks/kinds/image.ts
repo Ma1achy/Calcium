@@ -229,6 +229,14 @@ function faultStatus(block: Image, fault: string, height: number): Status {
 export const imageDefinition: BlockDefinition<Image> = {
   kind: "image",
 
+  // §7a — *an image as its alt text and its path* (I86, `R-SEL-004`), and
+  // **there is no path here**. `Image` carries base64 `data` and a `digest`; it
+  // is not file-backed, so the rule's second half names a field this data model
+  // does not have and a copy cannot honestly invent one. A digest is not a path
+  // and pasting one would be worse than pasting nothing. So the alt text, which
+  // is the half that exists, and this comment rather than a fabricated second.
+  copy: (block) => block.alt,
+
   /** The clamped row count — never the declared one when the width bites. */
   measure(block: Image, width: number, _measureChild: MeasureFn, probe?: Probe): number {
     return imageCells(block, width, probe).rows;

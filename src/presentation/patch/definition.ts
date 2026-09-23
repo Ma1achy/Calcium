@@ -171,6 +171,21 @@ function hunkLines(hunk: Hunk, block: Patch, layout: PatchLayout, ctx: RenderCon
 export const patchDefinition: BlockDefinition<Patch> = {
   kind: "patch",
 
+  // §7a — *a patch as unified diff rather than the rendered two-column view*
+  // (C09 I86, `R-SEL-004`). The rule names the hazard exactly: `layout: "split"`
+  // is a rendering, and a copy taken from it is two half-lines per line and
+  // pastes as nothing anyone can apply. So the hunks, in their own form, with
+  // the marker each line already is.
+  copy: (block) =>
+    [
+      `--- a/${block.path}`,
+      `+++ b/${block.path}`,
+      ...block.hunks.flatMap((h) => [
+        h.header,
+        ...h.lines.map((l) => `${l.kind === "add" ? "+" : l.kind === "remove" ? "-" : " "}${l.text}`),
+      ]),
+    ].join("\n"),
+
   // Exact at every width, constant within a layout, and it never tokenises (I3).
   // `collapsedBefore` is a field, so measuring a collapsed region reads it rather
   // than deriving anything — which is what keeps this cheap enough for C14 to call

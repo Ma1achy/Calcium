@@ -1436,6 +1436,45 @@ class Session implements TuiInstance {
     graph.scheduler.commit("input");
   }
 
+  /**
+   * `y` — the selected entries to the clipboard (`R-SEL-004`, `R-SEL-011`).
+   *
+   * **Document order is the transcript's**, and C09's `copySequence` is what
+   * turns each entry's blocks into its source. Neither is reachable from the
+   * key table, which is why this is a frame query rather than an effect.
+   *
+   * **`R-SEL-011`'s refusal is owed and is not here**, and it is blocked on the
+   * same parked word the mode label is (C14 §6a). The rule says *if neither is
+   * available the mode states it and offers a file instead*, because *a copy
+   * that appears to work and does not is the worst outcome available here* —
+   * and neither mechanism is built, so the condition holds on every copy this
+   * takes. What the rule asks for is *the mode* stating it, and the mode's
+   * statement surface is the footer label; a notice block on every `y` is the
+   * other reading and is noise on the key a reader presses most.
+   *
+   * So the refusal lands with the label, and until then the text reaches the
+   * kill buffer and nothing claims it reached the system clipboard. That is the
+   * honest half: `⌃y` yanks it back, which is a true statement about where it
+   * went, and no part of this says otherwise.
+   *
+   * A copy of nothing is not a refusal and says nothing: the count is on screen,
+   * and a notice that fired on an empty selection would be noise on the one key
+   * a reader presses repeatedly.
+   */
+  #copySelectedEntries(): void {
+    const graph = this.#graph;
+    if (graph === null || this.#semantic === null) return;
+    const text = semantic.copyTextOf(
+      this.#semantic,
+      graph.transcript.entries.map((e) => ({ id: e.id, blocks: e.doc.blocks })),
+      graph.blocks.copySequence,
+    );
+    if (text === "") return;
+
+    graph.editor.copyText(text);
+    graph.scheduler.commit("input");
+  }
+
   #frameQueries(): FrameQueries {
     return {
       nativeSelection: () => this.#nativeSelection,
@@ -1446,6 +1485,7 @@ class Session implements TuiInstance {
       exitSemanticSelection: () => this.#exitSemanticSelection(),
       selectEntryUnderCaret: () => this.#selectEntries("caret"),
       selectAllLoadedEntries: () => this.#selectEntries("all"),
+      copySelectedEntries: () => this.#copySelectedEntries(),
       enterNativeSelection: () => this.#setNativeSelection(true),
       exitNativeSelection: () => this.#setNativeSelection(false),
       region: () => this.#composed().region,

@@ -3636,6 +3636,23 @@ const SERIES_KEYS = 9;
 
 export const plotDefinition: BlockDefinition<Plot> = {
   kind: "plot",
+
+  // §7a — *a plot as its data view* (C09 I86, `R-SEL-004`). The braille cells,
+  // the axes and the colours are the whole of what this component makes, and
+  // none of them is data; what a reader copies a chart for is the numbers.
+  //
+  // One row per series, label first where there is one, `null` written as the
+  // empty cell it is — a gap in a series is a fact and `0` is a different one.
+  // Hidden series are dropped: hidden is the reader's own decision about what
+  // this plot is showing, which is the one rendering decision that is also a
+  // statement about the data.
+  copy: (block) =>
+    block.series
+      .filter((s) => s.hidden !== true)
+      .map((s) =>
+        [s.label ?? "", ...s.values.map((v) => (v === null ? "" : String(v)))].join("\t"),
+      )
+      .join("\n"),
   measure,
   render,
   elements,

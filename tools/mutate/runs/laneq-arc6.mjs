@@ -46,8 +46,8 @@ const results = runPass({
     {
       name: "SCROLL-DETAIL: a scroll's element carries a detail, the state SCROLL_PEEK was closed as uninhabited",
       file: "src/presentation/blocks/kinds/containers.ts",
-      from: "          copy: copyTextOf(r.child),\n        }),\n      ),\n    );\n  },\n\n  /**\n   * **No `window`, and the sweep is what said so**",
-      to: "          copy: copyTextOf(r.child),\n          detail: r.child,\n        }),\n      ),\n    );\n  },\n\n  /**\n   * **No `window`, and the sweep is what said so**",
+      from: "          ...copyOrNothing(copyChild(r.child)),\n        }),\n      ),\n    );\n  },\n\n  /**\n   * **No `window`, and the sweep is what said so**",
+      to: "          ...copyOrNothing(copyChild(r.child)),\n          detail: r.child,\n        }),\n      ),\n    );\n  },\n\n  /**\n   * **No `window`, and the sweep is what said so**",
       expect: "T4.13",
     },
     {

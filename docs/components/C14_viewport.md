@@ -498,9 +498,12 @@ from the other side. The system clipboard and OSC 52 are the rule's two mechanis
 and neither is built; what **is** owed here is the rule's last sentence — *if
 neither is available the mode states it and offers a file instead*, because *a copy
 that appears to work and does not is the worst outcome available here.* So the
-refusal is the part that ships with the copy, not after it: the kill buffer always
-succeeds, so the statement is about the **system** clipboard and it is made once,
-when a copy is taken and cannot leave the process.
+refusal is **owed and blocked on the same parked word the label is**: the rule asks
+for *the mode* to state it, the mode's statement surface is the footer label, and a
+notice block on every `y` is the other reading and is noise on the key a reader
+presses most. Until then the text reaches the kill buffer and nothing claims it
+reached the system clipboard — `⌃y` yanks it back, which is a true statement
+about where it went.
 
 ### The label is parked on a word the design does not supply
 

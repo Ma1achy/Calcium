@@ -3721,6 +3721,22 @@ export type Result<T, E> = Readonly<{ ok: true; value: T }> | Readonly<{ ok: fal
 export type MeasureFn = (block: Block, width: number) => number;
 
 /**
+ * A child's copy text, or `null` when that kind declines (C09 §7a, C09 I86,
+ * `R-SEL-004`).
+ *
+ * Beside `MeasureFn` because it is the same kind of thing: a seam the registry
+ * supplies so a kind answering for its children cannot reach for its own table.
+ * The one that existed was a private switch in `kinds/containers.ts` over six
+ * kinds, and five of the seven `R-SEL-004` names copied blank through it.
+ *
+ * **`null` rather than `""`, and the difference is one blank line.** A blank
+ * line is `R-SEL-004`'s **entry** separator, so a container has to tell *this
+ * child has nothing to say* from *this child is blank* — only the first may be
+ * dropped, and joining the second forges an entry boundary inside an entry.
+ */
+export type CopyFn = (child: Block) => string | null;
+
+/**
  * The registry's `width`, as a container receives it (C09 §2c, I42): the columns
  * a block's content occupies at `width`, in `[1, width]`. A kind that declares
  * no `width` answers `width` through this — the second kind of answer, not a

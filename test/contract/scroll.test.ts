@@ -23,6 +23,10 @@ import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
 
 const registry = createBlockRegistry({ defaults: true });
 const measureChild = (block: Block, width: number): number => registry.measure(block, width);
+// The registry's own answer, as the production seam supplies it (C09 §7a).
+// A stub returning `null` would make every child's `copy` absent and the rows
+// that read one would pass for the wrong reason.
+const copyChild = (block: Block): string | null => registry.copyOf(block);
 
 /**
  * A child that is one row at every width, so the arithmetic below is about the
@@ -108,7 +112,7 @@ describe("C04 §3c — the residue row, and the two rows the mutation pass asked
     // content row 3 of a box of one is outside `[0, measure)` and is still an
     // element, because clipping the list would make it depend on view state.
     const block = scroll(1, [flat("a"), flat("b"), flat("c"), flat("d")]);
-    const elements = scrollDefinition.elements?.(block, 40, measureChild) ?? [];
+    const elements = scrollDefinition.elements?.(block, 40, measureChild, copyChild) ?? [];
 
     expect(elements.map((e) => e.id), "all four, not the one that fits").toEqual([
       "a",
@@ -137,8 +141,8 @@ describe("C04 §3c trace 4 — the offset is rows, and only a resize can tell", 
     const long = "wide enough to need two lines once the terminal is narrow indeed";
     const block = scroll(4, [wrapping("w", long), flat("tail")]);
 
-    const wide = scrollDefinition.elements?.(block, 120, measureChild) ?? [];
-    const narrow = scrollDefinition.elements?.(block, 24, measureChild) ?? [];
+    const wide = scrollDefinition.elements?.(block, 120, measureChild, copyChild) ?? [];
+    const narrow = scrollDefinition.elements?.(block, 24, measureChild, copyChild) ?? [];
 
     expect(wide.length, "the same two children at both widths").toBe(2);
     expect(narrow.length).toBe(2);
@@ -436,18 +440,24 @@ describe("C04 §3c — the boundary, and what a copy carries across it", () => {
     expect(copies(scroll(2, [flat("a"), inner]))).toEqual(["a", "x\ny"]);
   });
 
-  it("T2.36 (C04 I50): a kind with no expressible source contributes nothing", () => {
+  it("T2.36 (C04 I50, C09 I86): a kind with no expressible source contributes nothing — absent, not empty", () => {
     // **Nothing rather than its painted rows** — a `rule` draws a line and has
     // no data behind it, so joining what it renders would put a row of dashes in
-    // a paste. The empty string is what `copyElement` filters out.
+    // a paste.
+    //
+    // **It was `""` and it is `undefined` now** (C09 I86, M10c), which is what
+    // this row's own prose always said. The two differ by one blank line, and a
+    // blank line is `R-SEL-004`'s **entry** separator — so a kind joining as the
+    // empty string forges an entry boundary in the middle of an entry. Absent is
+    // the only answer a container can drop without inventing a separator.
     const withRule = scroll(2, [flat("a"), { kind: "rule", id: "r" } as Block, flat("b")]);
 
-    expect(copies(withRule), "the rule contributes an empty source").toEqual(["a", "", "b"]);
+    expect(copies(withRule), "the rule declares no source at all").toEqual(["a", undefined, "b"]);
     expect(
       copies(scroll(1, [{ kind: "rule", id: "r" } as Block])),
       "and a container of nothing but those carries no source at all — which is " +
         "the state `y` returned early on, saying nothing",
-    ).toEqual([""]);
+    ).toEqual([undefined]);
   });
 });
 
@@ -664,7 +674,7 @@ describe("C29 1.5 — what the content column declares", () => {
     expect(rows(padded).at(-1), "and two once the child carries its own row").toContain("2 below");
 
     const ends = (box: Scroll): readonly number[] =>
-      (scrollDefinition.elements?.(box, 40, measureChild) ?? []).map((e) => e.rows.to); // cells-ok — row indices
+      (scrollDefinition.elements?.(box, 40, measureChild, copyChild) ?? []).map((e) => e.rows.to); // cells-ok — row indices
     expect(ends(padded), "the padded child ends one row lower").toEqual(
       (ends(plain)[0] === undefined ? [] : [ends(plain)[0]!, ends(plain)[1]! + 1]),
     );

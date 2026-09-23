@@ -21,7 +21,7 @@ import {
   placeable,
   sequenceHeight,
 } from "../../../data/viewmodel/index.js";
-import type { Block, Group, MeasureFn, Mosaic, MosaicRect, Panel, Scroll, WidthFn } from "../../../data/viewmodel/index.js";
+import type { Block, CopyFn, Group, MeasureFn, Mosaic, MosaicRect, Panel, Scroll, WidthFn } from "../../../data/viewmodel/index.js";
 import { axesOf, groupPlacements, mosaicRects, parseAreas } from "../../../data/viewmodel/index.js";
 import type { NavElement } from "../types.js";
 import { cells, sliceCells, stripControl, truncate } from "../../text.js";
@@ -49,6 +49,16 @@ import type { BlockDefinition, Rendered, RenderContext, Windowed } from "../type
 
 export const panelDefinition: BlockDefinition<Panel> = {
   kind: "panel",
+
+  // §7a — the title, then the children (I86). The title is text a producer
+  // wrote and the border is not, so the frame goes and the words stay. The
+  // footer is dropped: it is where this component puts counts and hints it
+  // computed, which is rendering by the same test the border fails.
+  copy: (block, copyChild) =>
+    [
+      block.title,
+      joinChildren(block.children, copyChild),
+    ].filter((t) => t !== "").join("\n"),
 
   measure(block: Panel, width: number, measureChild: MeasureFn): number {
     // **The engine's** (C29 I12). A panel's children are a sequence, so
@@ -325,36 +335,46 @@ function offsetOf(block: Scroll, ctx: RenderContext, content: number): number {
 }
 
 /**
- * A child's source text, for C26 I17's semantic copy.
+ * A child's source text — **the registry's answer, not this file's** (§7a, I86).
  *
- * **The source and never the rendering**: no width is consulted, so a truncated
- * cell and a dropped column cannot reach it and the text is the same at every
- * terminal size. A kind whose source this cannot express contributes nothing
- * rather than its painted rows, which is the invariant's own direction — and
- * `table` is deliberately absent, because C11 already declares a richer `copy`
- * per row and a second answer here would be two sources for one fact.
+ * **It was a private switch here and it was wrong in a way that read as
+ * deliberate.** The comment said *the source and never the rendering*, which is
+ * true, and *a kind whose source this cannot express contributes nothing rather
+ * than its painted rows*, which is the right direction — and it answered six
+ * kinds and `""` for every other, so five of the seven kinds `R-SEL-004` names
+ * copied blank. `table` was *deliberately absent, because C11 already declares a
+ * richer `copy` per row and a second answer here would be two sources for one
+ * fact*: a correct argument about sources and the wrong conclusion about
+ * granularity. A row's copy and a table's are one source at two sizes.
+ *
+ * `null` is a kind that declines and is dropped; `""` would be a blank line, and
+ * a blank line is the entry separator.
  */
-function copyTextOf(child: Block): string {
-  switch (child.kind) {
-    case "raw":
-    case "notice":
-    case "tip":
-    case "code":
-      return child.text;
-    case "logs":
-      return child.lines.map((l) => l.message).join("\n");
-    case "scroll":
-      return child.children
-        .map(copyTextOf)
-        .filter((t) => t !== "")
-        .join("\n");
-    default:
-      return "";
-  }
+/**
+ * A child's `copy` as a spreadable member, or nothing (§7a, I86).
+ *
+ * `exactOptionalPropertyTypes` is what makes this a function rather than
+ * `?? undefined`: the type says `copy?: string`, and *present and undefined* is
+ * a third state it does not have. A declining child contributes no member.
+ */
+const copyOrNothing = (text: string | null): Readonly<{ copy?: string }> =>
+  text === null || text === "" ? {} : { copy: text };
+
+function joinChildren(children: readonly Block[], copyChild: CopyFn): string {
+  return children
+    .map(copyChild)
+    .filter((t): t is string => t !== null && t !== "")
+    .join("\n");
 }
 
 export const scrollDefinition: BlockDefinition<Scroll> = {
   kind: "scroll",
+
+  // §7a — the children that answered, one newline apart (I86). **Not two**:
+  // two is `R-SEL-004`'s entry separator and this is inside one entry. A child
+  // that declines is dropped rather than joined as empty, which is the whole of
+  // the omission ruling.
+  copy: (block, copyChild) => joinChildren(block.children, copyChild),
 
   /**
    * `height`, plus the residue row where the content cannot fit (C04 I47, C04 I49).
@@ -374,7 +394,7 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
   },
 
   /** One per child, at block level — which is what makes C04 I47's refusal expressible. */
-  elements(block: Scroll, width: number, measureChild: MeasureFn): readonly NavElement[] {
+  elements(block: Scroll, width: number, measureChild: MeasureFn, copyChild: CopyFn): readonly NavElement[] {
     const w = normaliseWidth(width);
     // **A block declaring a collapsed form carries the toggle on every element**
     // (C04 I98). Declared by presence: a scroll without the field has no fold
@@ -404,7 +424,7 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
           // key that did nothing and said nothing — the empty-block class. `y`
           // on a container has an obvious meaning and it was unimplemented
           // rather than refused.
-          copy: copyTextOf(r.child),
+          ...copyOrNothing(copyChild(r.child)),
         }),
       ),
     );
@@ -604,6 +624,12 @@ function mosaicRoom(
 export const mosaicDefinition: BlockDefinition<Mosaic> = {
   kind: "mosaic",
 
+  // §7a — the children that answered, one newline apart (I86). **Not two**:
+  // two is `R-SEL-004`'s entry separator and this is inside one entry. A child
+  // that declines is dropped rather than joined as empty, which is the whole of
+  // the omission ruling.
+  copy: (block, copyChild) => joinChildren(block.children, copyChild),
+
   /**
    * `height`, at every width (C04 I71).
    *
@@ -623,7 +649,7 @@ export const mosaicDefinition: BlockDefinition<Mosaic> = {
    * neighbouring cell — which is the whole difference between a grid and a
    * sequence.
    */
-  elements(block: Mosaic, width: number): readonly NavElement[] {
+  elements(block: Mosaic, width: number, _measureChild: MeasureFn, copyChild: CopyFn): readonly NavElement[] {
     const parsed = parseAreas(block.areas);
     if (!parsed.ok) return Object.freeze([]);
     const w = normaliseWidth(width);
@@ -646,7 +672,7 @@ export const mosaicDefinition: BlockDefinition<Mosaic> = {
             level: "block" as const,
             rows: Object.freeze({ from: rect.top, to: rect.top + room.height }),
             cols: Object.freeze({ from: rect.left, to: rect.left + room.width }),
-            copy: copyTextOf(child),
+            ...copyOrNothing(copyChild(child)),
           }),
         ];
       }),
@@ -894,6 +920,12 @@ function groupHeight(block: Group, width: number, measureChild: MeasureFn): numb
 
 export const groupDefinition: BlockDefinition<Group> = {
   kind: "group",
+
+  // §7a — the children that answered, one newline apart (I86). **Not two**:
+  // two is `R-SEL-004`'s entry separator and this is inside one entry. A child
+  // that declines is dropped rather than joined as empty, which is the whole of
+  // the omission ruling.
+  copy: (block, copyChild) => joinChildren(block.children, copyChild),
 
   measure(block: Group, width: number, measureChild: MeasureFn): number {
     // **`groupHeight`, the one computation** (C09 I69): a column is a sequence

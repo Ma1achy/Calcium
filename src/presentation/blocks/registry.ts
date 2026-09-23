@@ -446,7 +446,7 @@ class Registry implements BlockRegistry {
       // block, so a focus ring sat `t` rows above and `l` columns left of the
       // thing it was ringing.
       const pad = paddingOf(block);
-      const elements = declared(form.block, contentWidth(block, width), this.#measureChild);
+      const elements = declared(form.block, contentWidth(block, width), this.#measureChild, this.copyOf);
       if (pad.l === 0 && pad.t === 0) return { elements, owned: true };
       return {
         elements: elements.map((e) => ({
@@ -697,6 +697,41 @@ class Registry implements BlockRegistry {
    */
   elementsOf = (block: Block, width: number): readonly NavElement[] =>
     this.#scoped(() => this.#elements(block, normaliseWidth(width)).elements);
+
+  /**
+   * What a block copies as, or `null` when its kind declines (§7a, I86,
+   * `R-SEL-004`).
+   *
+   * **`null` and not `""`, which is the whole of the ruling.** A blank line is
+   * `R-SEL-004`'s *entry* separator, so a kind contributing an empty string
+   * forges an entry boundary inside an entry — a rendering decision leaking
+   * into a source copy, which is the class `NavElement.copy` exists against.
+   * The caller drops a `null` and joins the rest.
+   *
+   * **No width, unlike `elementsOf`.** A copy is the source and the source does
+   * not have a width; the columns a width dropped are exactly what this is for.
+   * An unregistered kind falls to `raw`'s definition as everything else does,
+   * which is right here: `raw` carries its text verbatim.
+   */
+  copyOf = (block: Block): string | null =>
+    this.#scoped(() => {
+      const { definition, block: resolved } = this.#resolve(block);
+      return definition.copy?.(resolved, (child: Block) => this.copyOf(child)) ?? null;
+    });
+
+  /**
+   * A sequence's copy text — the blocks that answered, newline-joined (§7a).
+   *
+   * **One newline between blocks and never two**, because two is the entry
+   * separator and this is inside one entry (C14 §6a). The kinds that decline
+   * are dropped rather than joined as empty, which is the same sentence from
+   * the caller's side.
+   */
+  copySequence = (blocks: readonly Block[]): string =>
+    blocks
+      .map((b) => this.copyOf(b))
+      .filter((t): t is string => t !== null && t !== "")
+      .join("\n");
 
   /**
    * Every element in a **sequence**, block-local rows lifted into

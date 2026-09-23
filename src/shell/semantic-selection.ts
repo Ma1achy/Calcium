@@ -17,6 +17,8 @@
  * entries selected — has no representation here rather than a guard against it.
  */
 
+import type { Block } from "../data/viewmodel/index.js";
+
 /** The caret, and the entries a copy would take (`R-SEL-015`). */
 export type SemanticSelection = Readonly<{
   /** An entry id. `null` when the transcript is empty. */
@@ -83,3 +85,34 @@ export function selectAll(mode: SemanticMode, loaded: readonly string[]): Semant
  * motions landing later cannot quietly change what the number means.
  */
 export const count = (mode: SemanticMode): number => mode?.entries.size ?? 0;
+
+/**
+ * What `y` takes — the selected entries, in document order, one blank line
+ * apart (C14 §6a, `R-SEL-004`).
+ *
+ * **Document order is the transcript's, not the selection's.** `entries` is a
+ * set and a set has no order; taking the order from the transcript is what makes
+ * a copy of three entries paste as the session read, whichever order the reader
+ * selected them in.
+ *
+ * **One blank line is the entry separator and nothing inside an entry may
+ * produce one** (C09 I86). That is why a block declining contributes no line at
+ * all rather than an empty one, and why this joins on `"\n\n"` over entries
+ * while `copySequence` joins on `"\n"` within one.
+ *
+ * An entry whose blocks all decline is dropped rather than contributing a blank
+ * paragraph — the same rule one level up, and the case a selection of a
+ * `rule`-only entry produces.
+ */
+export function copyTextOf(
+  mode: SemanticMode,
+  loaded: readonly Readonly<{ id: string; blocks: readonly Block[] }>[],
+  copySequence: (blocks: readonly Block[]) => string,
+): string {
+  if (mode === null) return "";
+  return loaded
+    .filter((e) => mode.entries.has(e.id))
+    .map((e) => copySequence(e.blocks))
+    .filter((t) => t !== "")
+    .join("\n\n");
+}

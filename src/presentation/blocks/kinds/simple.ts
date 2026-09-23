@@ -308,6 +308,10 @@ function noticeElements(block: Notice, width: number): readonly NavElement[] {
 export const noticeDefinition: BlockDefinition<Notice> = {
   kind: "notice",
 
+  // §7a — prose copies as its text (I86, `R-SEL-004`). The tone is a
+  // rendering and the wrap is the frame's; neither reaches the source.
+  copy: (block) => block.text,
+
   measure: (block: Notice, width: number): number => atLeastOne(noticeRows(block, width).length), // cells-ok
 
   // C09 §2c — the hanging indent plus the longest wrapped row. Every row still
@@ -403,6 +407,9 @@ function tipText(block: Tip): string {
 
 export const tipDefinition: BlockDefinition<Tip> = {
   kind: "tip",
+
+  // §7a — as `notice` (I86).
+  copy: (block) => block.text,
 
   measure: (block: Tip, width: number): number =>
     atLeastOne(wrapCells(tipText(block), normaliseWidth(width)).length), // cells-ok
@@ -597,6 +604,10 @@ function pillsElements(block: Pills, width: number): readonly NavElement[] {
 export const pillsDefinition: BlockDefinition<Pills> = {
   kind: "pills",
 
+  // §7a — the labels, space-joined (I86). A row of peers is a row of words;
+  // the shedding, the active mark and the tones are all this component's.
+  copy: (block) => block.chips.map((c) => c.label).join(" "),
+
   measure: (block: Pills, width: number): number =>
     atLeastOne(chipRows(block, width).length), // cells-ok
 
@@ -694,6 +705,11 @@ function rawLines(block: Raw): readonly string[] {
 
 export const rawDefinition: BlockDefinition<Raw> = {
   kind: "raw",
+
+  // §7a — verbatim, which is what `raw` means (I86). This is also the
+  // fallback every unregistered kind resolves through, and carrying the JSON
+  // is the honest degradation there for the reason §6's fallback gives.
+  copy: (block) => block.text,
 
   measure: (block: Raw): number => atLeastOne(rawLines(block).length), // cells-ok
 

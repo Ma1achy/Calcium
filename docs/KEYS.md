@@ -99,10 +99,10 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `c+w` | both |  |  |  |  |  |  | killWordLeft |  |  |
 | `m+w` | both |  |  |  |  |  |  | copySelection |  |  |
 | `c+y` | both |  |  |  |  |  |  | yank |  |  |
-| `y` | both |  |  |  |  |  |  |  | copyElement |  |
+| `y` † | both |  |  |  | copySelectedEntries |  |  |  | copyElement |  |
 | `c+z` | both |  |  |  |  |  |  | undo |  |  |
 | `m+z` | both |  |  |  |  |  |  | redo |  |  |
 | `{` | both |  |  |  |  |  |  |  | tiltDown |  |
 | `}` | both |  |  |  |  |  |  |  | tiltUp |  |
 
-116 bindings · 93 keys · 17 resolved by the ladder (†).
+117 bindings · 93 keys · 18 resolved by the ladder (†).

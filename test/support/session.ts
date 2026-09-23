@@ -180,6 +180,7 @@ export const FRAME: FrameQueries = {
   exitSemanticSelection: () => undefined,
   selectEntryUnderCaret: () => undefined,
   selectAllLoadedEntries: () => undefined,
+  copySelectedEntries: () => undefined,
   enterNativeSelection: () => undefined,
   exitNativeSelection: () => undefined,
   region: () => ({ top: 1, height: 20 }),

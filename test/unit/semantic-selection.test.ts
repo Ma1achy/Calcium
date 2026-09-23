@@ -7,7 +7,12 @@
 // by scheduling rather than by wording.
 import { describe, expect, it } from "vitest";
 
+import { measurable, FULL_CAPS } from "../support/render.js";
+import { tableDefinition } from "../../src/presentation/table/index.js";
+import { plotDefinition } from "../../src/presentation/plot/index.js";
+import { patchDefinition } from "../../src/presentation/patch/index.js";
 import {
+  copyTextOf,
   count,
   enter,
   escape,
@@ -86,10 +91,106 @@ describe("C14 §6a — the selection verbs", () => {
 });
 
 describe("C09 §7a — a kind declares its copy text (M10c)", () => {
-  it.todo(
-    "T1.41h (C09 I86, §7a, R-SEL-004): every registered kind either declares `copy` or is absent from the join, and none joins as the empty string — the five kinds R-SEL-004 names that copied blank before the seam (table as TSV with its header, patch as unified diff, plot as its data view, keyValue, image as alt text and path) each answer their source, and a `scroll` holding a table copies the table rather than nothing — not deferred on a component: the seam lands with the copy in this MR",
-  );
-  it.todo(
-    "T1.41i (C14 §6a, R-SEL-004): `y` over a three-entry selection yields the entries in document order separated by one blank line each, with no block inside an entry producing a blank line of its own — the property the omission default exists for — not deferred on a component: the join lands with the copy in this MR",
-  );
+  it("T1.41h (C09 I86, §7a, R-SEL-004): the five kinds that copied blank answer their source, and a scroll reaches them", () => {
+    const registry = measurable({
+      capabilities: FULL_CAPS,
+      definitions: [tableDefinition, plotDefinition, patchDefinition],
+    }).registry;
+
+    // **The control, and it is the finding.** Before the seam, `copyTextOf`
+    // answered six kinds and `""` for the rest — so each of these copied blank
+    // through a container that called itself *the source and never the
+    // rendering*. Asserted as non-empty first, because the rows below are all
+    // satisfied by a stub that returns something.
+    const table = {
+      kind: "table" as const,
+      id: "t",
+      columns: [
+        { key: "a", label: "Name", align: "left" as const, priority: 1, minWidth: 4, sortable: false },
+        { key: "b", label: "State", align: "left" as const, priority: 2, minWidth: 4, sortable: false },
+      ],
+      rows: [{ id: "r1", cells: { a: { text: "web" }, b: { text: "up" } } }],
+    };
+    expect(registry.copyOf(table)).toBe("Name\tState\nweb\tup");
+
+    const patch = {
+      kind: "patch" as const,
+      id: "p",
+      path: "src/a.ts",
+      language: "ts",
+      hunks: [
+        {
+          header: "@@ -1 +1 @@",
+          lines: [
+            { kind: "remove" as const, text: "old" },
+            { kind: "add" as const, text: "new" },
+          ],
+        },
+      ],
+    };
+    // Unified diff, never the two-column view — the rule's own hazard, and a
+    // copy taken from a split rendering pastes as something nobody can apply.
+    expect(registry.copyOf(patch)).toBe("--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1 @@\n-old\n+new");
+
+    const plot = {
+      kind: "plot" as const,
+      id: "g",
+      form: "line" as const,
+      series: [
+        { values: [1, null, 3], label: "cpu" },
+        { values: [9], label: "hidden", hidden: true },
+      ],
+    };
+    // A gap is a fact and `0` is a different one, so `null` is the empty cell.
+    // The hidden series is dropped: hiding is the one rendering decision that
+    // is also a statement about the data.
+    expect(registry.copyOf(plot)).toBe("cpu\t1\t\t3");
+
+    expect(registry.copyOf({ kind: "image" as const, id: "i", data: "", height: 2, alt: "a chart", digest: "d" }))
+      .toBe("a chart");
+    expect(registry.copyOf({ kind: "keyValue", id: "k", rows: [{ label: "host", value: "a" }] }))
+      .toBe("host\ta");
+
+    // **The case that shows the shape**: a container recursing into a child
+    // that answered nothing produced a copy that *succeeded* and was blank.
+    expect(registry.copyOf({ kind: "scroll", id: "s", height: 4, children: [table] }))
+      .toBe("Name\tState\nweb\tup");
+
+    // A kind that declines is `null`, never `""` — the difference is one blank
+    // line, and a blank line is R-SEL-004's entry separator.
+    expect(registry.copyOf({ kind: "rule" as const, id: "r", label: "" })).toBeNull();
+  });
+
+  it("T1.41i (C14 §6a, R-SEL-004): the join is document order, one blank line between entries and none inside one", () => {
+    const registry = measurable({ capabilities: FULL_CAPS }).registry;
+    const entry = (id: string, ...texts: string[]) => ({
+      id,
+      blocks: texts.map((t, i) => ({ kind: "raw" as const, id: `${id}-${String(i)}`, text: t })),
+    });
+    // A `rule` between two blocks: it declines, so it contributes no line at
+    // all. Joined as `""` it would be a blank line, and a blank line inside an
+    // entry forges an entry boundary — which is the whole of the omission rule.
+    const loaded = [
+      { id: "e1", blocks: [...entry("e1", "one").blocks, { kind: "rule" as const, id: "e1-r", label: "" }, ...entry("e1b", "two").blocks] },
+      entry("e2", "three"),
+      entry("e3", "four"),
+    ];
+
+    // Chosen back-to-front on purpose: `entries` is insertion-ordered, so a
+    // join that walks the selection rather than the document pastes `four`
+    // first. Given in document order the row is satisfied by either.
+    const mode = selectAll(enter(null, "e1"), ["e3", "e1"]);
+    const text = copyTextOf(mode, loaded, registry.copySequence);
+
+    // **Document order, not selection order** — `entries` is a set and a set has
+    // none, so a copy pastes as the session read whichever way it was chosen.
+    expect(text).toBe("one\ntwo\n\nfour");
+
+    // Two entries, one blank line. Stated as a count because the string above
+    // is satisfied by a join that happens to agree on three blocks.
+    expect(text.split("\n\n")).toHaveLength(2);
+
+    // The control: outside the mode there is nothing to copy.
+    expect(copyTextOf(null, loaded, registry.copySequence)).toBe("");
+  });
 });

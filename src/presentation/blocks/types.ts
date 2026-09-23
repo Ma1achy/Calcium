@@ -15,7 +15,7 @@
  * block, so a rows block beside an element block pays nothing for its neighbour.
  */
 export type Rendered = readonly string[];
-import type { Action, Block, BlockKind, Camera, Measure, MeasureFn, Probe, WidthFn } from "../../data/viewmodel/index.js";
+import type { Action, Block, BlockKind, Camera, CopyFn, Measure, MeasureFn, Probe, WidthFn } from "../../data/viewmodel/index.js";
 import type { ResolvedTheme } from "../theme/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
@@ -552,7 +552,21 @@ export interface BlockDefinition<B extends Block = Block> {
    * `rev` moving and C14's cache could not invalidate it. Focus is not a
    * parameter here, so the violation is unrepresentable rather than forbidden.
    */
-  elements?: (block: B, width: number, measureChild: MeasureFn) => readonly NavElement[];
+  /**
+   * **`copyChild`, on the same argument and for the same reason as
+   * `measureChild`** (§7a, I86). A container fills its child elements' `copy`,
+   * and the only other way to answer that is a switch over kinds inside the
+   * container — which is what `containers.ts` held, and it answered six kinds
+   * and `""` for the rest while calling itself *the source and never the
+   * rendering*. The registry supplies this so a kind cannot reach for its own,
+   * which is the sentence `measureChild` already carries.
+   */
+  elements?: (
+    block: B,
+    width: number,
+    measureChild: MeasureFn,
+    copyChild: CopyFn,
+  ) => readonly NavElement[];
   /**
    * The keys this block binds while focus is on it (A01 D4, C16 I27, C22 I78).
    *
@@ -576,7 +590,31 @@ export interface BlockDefinition<B extends Block = Block> {
    */
   width?: (block: B, width: number, widthChild: WidthFn) => number;
   keymap?: (block: B) => readonly BlockKeyBinding[];
+  /**
+   * §7a — what this kind copies as, **source and never rendering** (I86,
+   * `R-SEL-004`).
+   *
+   * The block-level pair of `NavElement.copy` above, carrying the same rule one
+   * level up: *a table as TSV with its header, a patch as unified diff rather
+   * than the rendered two-column view, an image as its alt text and its path.*
+   * Pure in the block, as `measure` is — no width and no context, because a
+   * copy that varied with the frame would be one a reader could not predict, and
+   * the columns a width dropped are exactly what this exists to keep.
+   *
+   * **`copyChild`, for the containers.** A `scroll` and a `steps` copy as their
+   * children do, and a container reaching for its own switch is how five kinds
+   * came to copy blank: the private `copyTextOf` answered six and `""` for the
+   * rest. Same shape `measure` and `elements` take, supplied by the registry.
+   *
+   * **Optional, and an absent member means *omit me from the join*, not
+   * *contribute nothing*.** The two differ by exactly one blank line, and a
+   * blank line is `R-SEL-004`'s **entry** separator — so a kind answering `""`
+   * forges an entry boundary inside an entry. A `rule` and a `spacer` are
+   * genuinely uncopyable and declare nothing.
+   */
+  copy?: (block: B, copyChild: CopyFn) => string;
 }
+
 
 /**
  * A measure memo a caller owns and the registry reads and writes as its own
@@ -611,6 +649,10 @@ export interface BlockRegistry {
    * (C26 §5). `measureChild` is supplied here, never by the caller.
    */
   elementsOf(block: Block, width: number): readonly NavElement[];
+  /** §7a — a block's copy text, or `null` when its kind declines (I86, `R-SEL-004`). No width: a copy is the source. */
+  copyOf(block: Block): string | null;
+  /** §7a — a sequence's copy text, the blocks that answered joined by **one** newline (I86). Two is the entry separator. */
+  copySequence(blocks: readonly Block[]): string;
   /**
    * Every element in a sequence, with block-local rows lifted into
    * sequence-local ones and **children walked** (C26 §5, §8b.5).

@@ -572,7 +572,12 @@ export type KeyAction =
   // that silently produces a clipboard of megabytes is a trap.*
   | "escapeSemanticSelection"
   | "selectEntryUnderCaret"
-  | "selectAllLoadedEntries";
+  | "selectAllLoadedEntries"
+  // `y` — the same keycap as the transcript's element copy, over whole entries
+  // (`R-SEL-004`, C14 §6a). **Its own action and not `copySelection`**, which
+  // is the prompt's `⌥w`: an effect is resolved per action rather than per
+  // target, so sharing the name would give this key the editor's region copy.
+  | "copySelectedEntries";
 
 export type Binding = Readonly<{
   target: FocusTarget;

@@ -134,6 +134,11 @@ function keyColumn(block: KeyValue, width: number): number {
 export const keyValueDefinition: BlockDefinition<KeyValue> = {
   kind: "keyValue",
 
+  // §7a — label and value, tab-separated (I86). Two columns is a table of two
+  // columns, so it takes the same separator `table` does rather than the
+  // colon-and-padding the renderer draws, which is alignment.
+  copy: (block) => block.rows.map((r) => `${r.label}\t${r.value}`).join("\n"),
+
   measure: (block: KeyValue): number => atLeastOne(block.rows.length), // cells-ok
 
   // C09 §2c — the key column, the gap and the longest value; a row carrying a
@@ -302,6 +307,12 @@ const LEVEL_WIDTH = 5;
 export const logsDefinition: BlockDefinition<Logs> = {
   kind: "logs",
 
+  // §7a — the timestamp, the level and the message (I86). The private switch
+  // this replaces took the **message alone**, which is a copy that loses when a
+  // line happened and how bad it was — the two facts a reader pastes a log to
+  // keep. Tab-separated, as every other multi-column source here is.
+  copy: (block) => block.lines.map((l) => `${l.ts}\t${l.level}\t${l.message}`).join("\n"),
+
   measure: (block: Logs): number => atLeastOne(block.lines.length), // cells-ok
 
   /**
@@ -392,6 +403,9 @@ function shortTime(ts: string): string {
 
 export const eventsDefinition: BlockDefinition<Events> = {
   kind: "events",
+
+  // §7a — as `logs` (I86), with `type` where the level is.
+  copy: (block) => block.events.map((e) => `${e.ts}\t${e.type}\t${e.message}`).join("\n"),
 
   measure: (block: Events): number => atLeastOne(block.events.length), // cells-ok
 
@@ -610,6 +624,15 @@ function markFor(
 
 export const comparisonDefinition: BlockDefinition<Comparison> = {
   kind: "comparison",
+
+  // §7a — the field and both sides, with the labels as a header row when the
+  // block declares them (I86). The verdict and the change are marks this
+  // component draws from the same two values, so carrying them would be the
+  // rendering copied beside its source.
+  copy: (block) => {
+    const header = block.labels === undefined ? [] : [`\t${block.labels[0]}\t${block.labels[1]}`];
+    return [...header, ...block.rows.map((r) => `${r.field}\t${r.a}\t${r.b}`)].join("\n");
+  },
 
   // Rows plus the header (§3). The header is not optional here, so the `+ 1` is
   // unconditional — and `atLeastOne` never fires, which is correct: a comparison
@@ -840,6 +863,11 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
 
 export const stepsDefinition: BlockDefinition<Steps> = {
   kind: "steps",
+
+  // §7a — the label and the detail (I86). The state is a glyph and a tone;
+  // what a reader pastes a step list for is what the steps *are*.
+  copy: (block) =>
+    block.steps.map((s) => (s.detail === undefined ? s.label : `${s.label}\t${s.detail}`)).join("\n"),
 
   measure: (block: Steps): number => atLeastOne(block.steps.length), // cells-ok
 

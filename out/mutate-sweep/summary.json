@@ -1,15 +1,15 @@
 {
   "label": "all",
-  "only": "c14-semantic-selection",
+  "only": "c09-block-copy",
   "rows": [
     {
-      "run": "c14-semantic-selection.mjs",
+      "run": "c09-block-copy.mjs",
       "exit": 0,
-      "seconds": 16,
+      "seconds": 12,
       "state": "green",
       "restored": 0,
-      "caught": 5,
-      "elsewhere": 0,
+      "caught": 4,
+      "elsewhere": 1,
       "survived": 0,
       "anchorMissed": 0,
       "unbuilt": 0,

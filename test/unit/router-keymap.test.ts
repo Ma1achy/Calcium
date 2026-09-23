@@ -521,6 +521,7 @@ describe("§6 — the default table (C17 I12)", () => {
       "semanticSelection escape": ["\u001b"],
       "semanticSelection a": ["a"],
       "semanticSelection A": ["A"],
+      "semanticSelection y": ["y"],
 
       // Scrolling (I23). **This is the check the ruling asked for**, and it
       // came out positive: `⌃Home` and `⌃End` reach the decoder in both of the
@@ -919,8 +920,8 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     const rows = defaultKeymap
       .map((b) => `${b.target}\t${keyText(b.key)}\t${b.action}\t${b.profile ?? "both"}`)
       .sort();
-    expect(rows).toHaveLength(116);
-    expect(new Set(rows).size, "no two rows are identical").toBe(116);
+    expect(rows).toHaveLength(117);
+    expect(new Set(rows).size, "no two rows are identical").toBe(117);
 
     // Every row whose chord the registry names resolves to the registry's key —
     // the join asserted from the table's side, so a `chordOf` call that silently

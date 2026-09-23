@@ -394,6 +394,12 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // the export path writes a file instead.
   { target: "semanticSelection", key: { name: "a" }, action: "selectEntryUnderCaret" },
   { target: "semanticSelection", key: { name: "A" }, action: "selectAllLoadedEntries" },
+  // `y`, as at `liveBlock` — the same keycap at a coarser grain (`R-SEL-004`),
+  // and **a different action**, which is the thing worth saying. `copySelection`
+  // already exists and is the prompt's `⌥w`: effects resolve per action rather
+  // than per target, so reusing the name would give this key the editor's
+  // region copy and a mode that selects entries would paste the prompt.
+  { target: "semanticSelection", key: { name: "y" }, action: "copySelectedEntries" },
 
   { target: "global", key: { name: "pageup" }, action: "scrollPageUp" },
   { target: "global", key: { name: "pagedown" }, action: "scrollPageDown" },
@@ -832,6 +838,7 @@ const BUILTIN_ACTIONS: ReadonlySet<string> = new Set(
     escapeSemanticSelection: true,
     selectEntryUnderCaret: true,
     selectAllLoadedEntries: true,
+    copySelectedEntries: true,
   } satisfies Readonly<Record<KeyAction, true>>),
 );
 
