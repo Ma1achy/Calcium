@@ -30,7 +30,7 @@ import {
 } from "../../src/presentation/blocks/glyphs.js";
 import { measurable } from "./render.js";
 import type { ResolvedTheme } from "../../src/presentation/theme/index.js";
-import type { TerminalCapabilities } from "../../src/terminal/index.js";
+import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 import type { Block, CallState } from "../../src/data/viewmodel/types.js";
 
 export type Surface = Readonly<{
@@ -58,8 +58,8 @@ const TAPE = block({
   kind: "tape",
   id: "tape",
   members: [
-    { id: "a", label: "scout", detail: "4s", state: "ok" as const },
-    { id: "b", label: "planner", detail: "1m12s", state: "ok" as const },
+    { id: "a", label: "scout", detail: "4s", state: "succeeded" as const },
+    { id: "b", label: "planner", detail: "1m12s", state: "succeeded" as const },
     { id: "c", label: "builder", detail: "8s", state: "running" as const },
     { id: "d", label: "critic", detail: "2s", state: "queued" as const },
     { id: "e", label: "scribe", detail: "0s", state: "queued" as const },

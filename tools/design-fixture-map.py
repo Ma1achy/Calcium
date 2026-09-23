@@ -77,12 +77,12 @@ M = {
  71:("prose","—","the five permission postures"),
  72:("owed","M3","the background as a second channel"),
  73:("owed","M3","painted chrome — buttons, titles, widgets, headers"),
- 74:("owed","M3","weight, and why it is not free"),
+ 74:("frame","theme-tokens.test.ts","weight, and why it is not free — the 1-bit rung of the same table, where `identifier` was off the ladder"),
  75:("frame","blocks.test.ts","/config, and where a value came from"),
- 76:("owed","M2","per-token values"),
+ 76:("owed","M13","per-token values — a VALUED span over the model's own output, which the fixture itself calls reserved; not a theme token, and the probe said otherwise"),
  77:("frame","blocks.test.ts","syntax highlighting"),
  78:("frame","table.test.ts","tables"),
- 79:("owed","M2","tones and surfaces, across ten themes"),
+ 79:("frame","theme-tokens.test.ts","tones and surfaces, across ten themes — the corpus's first frame of colour"),
  80:("app","examples/","Prism — the rework in one sentence"),
  81:("app","examples/","Prism — /ps"),
  82:("owed","M9","no pushed views"),
@@ -133,7 +133,7 @@ PROBE = {
  54:None, 55:None, 58:"nativeSelection", 59:"searchOpen",
  60:"refreshAnchors", 66:"FAILURE_WORDS", 67:"viewport", 68:"degradesTo1Bit",
  69:"labelSpansOf", 70:"REGISTRY_THEMES", 72:"resolveBackground",
- 73:"bgElev", 74:"weight", 75:"kind: \"table\"", 76:"REGISTRY_THEMES",
+ 73:"bgElev", 74:"weight", 75:"kind: \"table\"", 76:None,
  77:"registerGrammar", 78:"kind: \"table\"", 79:"REGISTRY_THEMES",
  82:"R-EXA-082", 95:"tapeStart", 96:"MESSAGE_LINE_CAP|widthRung", 97:"kind: \"panel\"",
  99:"chipSpans", 100:"kind: \"table\"", 101:"routingFor",
@@ -184,6 +184,17 @@ exactly what `dismissable` was doing before M8 split it, and the fix is the same
 name is in the tree*; it does not say the subject matches the design. That is what the
 **target** column is for, and it is why raising `built` is not the remaining work of
 this MR — raising `target` is.
+
+**A third probe answered from the wrong subject entirely.** §076 is *per-token
+values* — a shaded run over the model's own output, whose own fixture says *the
+symbol is reserved* and *it is the SAME mechanism spans needed*. It is a valued
+span, not a theme token, and its probe was `REGISTRY_THEMES`: a symbol that
+resolves in abundance and has nothing to do with the fixture. A probe can be
+wrong by naming a spelling that does not exist (§069's was), by naming a word
+that occurs for unrelated reasons (§035's), or by naming a real symbol belonging
+to a different subject — and only the third reads as *built* while being about
+something else altogether. Its row is `no` and its MR is M13, where the valued
+span belongs.
 
 **`granularity` was the example that sentence used, and it turned out to be an
 instance rather than an illustration.** §035 and §036 both probed it, and the probe
@@ -269,10 +280,11 @@ than inferred from a suite staying green.
     of the surfaces: built {built_n} · unbuilt {len(surfaces) - built_n} · framed {framed_n}
 
 **`framed` is the figure this MR moves, and `built` is the one that went backwards.**
-Four surface rows carry no probe now, not two. §054 and §055 want OSC 8 hyperlinks
+Five surface rows carry no probe now, not two. §054 and §055 want OSC 8 hyperlinks
 nothing in the tree emits, and they were the only absence the first sweep found; §035
 and §036 join them because their probe answered from `Intl.Segmenter`'s options rather
-than from `Progress`, which has no member for either axis. Raising `built` is not the
+than from `Progress`, which has no member for either axis; and §076 because its probe
+named the theme registry for a fixture about valued spans. Raising `built` is not the
 work — a probe says a subject exists and not that it matches the design. Raising
 `framed` is.
 """)

@@ -111,7 +111,13 @@ export const DARK: ThemeTokens = Object.freeze({
         info: "normal",
         accent: "emphasised",
         meta: "normal",
-        identifier: "normal",
+        // **Emphasised, on §074's own line** (C10 I50, `R-BLK-590`): *ok ·
+        // warn · error · accent · identifier → bold at 1-bit*. It read
+        // `normal` here from the day the tone landed, which put it in a class
+        // with `default`, `info` and `meta` at exactly the rung where the
+        // colour is gone — so the tone that names *a thing you can type* had
+        // no carrier left.
+        identifier: "emphasised",
       }),
     }),
 

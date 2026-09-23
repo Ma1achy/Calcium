@@ -1341,4 +1341,45 @@ describe("C10 I48 — the ink a slot takes on the ground it lands on", () => {
     // what the loss was.
     expect(composed, "pairs where the ground moves the ink").toBe(178);
   });
+
+  it("T2.50 (I50, §074, R-BLK-590): the weight ladder is the design's, over every theme", () => {
+    // **`classes` has existed since I15 and nothing compared it to anything.**
+    // Three source tables declare ten entries each by hand and `classesOf`
+    // lends them to all ten themes; the only check refuses a *missing* table,
+    // which a wrong one satisfies exactly. §079's table drawn at one bit is
+    // nothing but this column, and reading it is what found `identifier`.
+    const LADDER: Readonly<Record<string, readonly string[]>> = {
+      emphasised: ["ok", "warn", "error", "accent", "identifier"],
+      normal: ["default", "info", "meta"],
+      deemphasised: ["dim", "muted"],
+    };
+
+    for (const name of Object.keys(defaultTheme)) {
+      const tone = defaultTheme[name]?.palettes["tone"];
+      const classes = tone?.classes;
+      expect(classes, `${name} declares tone classes`).toBeDefined();
+
+      // **Equality both ways, per class.** A containment check is satisfied by
+      // the failure this exists to catch — a tone missing from `emphasised`
+      // reads as covered by the two it is not in.
+      const grouped: Record<string, string[]> = { emphasised: [], normal: [], deemphasised: [] };
+      for (const [slot, cls] of Object.entries(classes ?? {})) grouped[cls]?.push(slot);
+      for (const cls of Object.keys(LADDER)) {
+        expect([...(grouped[cls] ?? [])].sort(), `${name} · ${cls}`).toEqual(
+          [...(LADDER[cls] ?? [])].sort(),
+        );
+      }
+    }
+
+    // **The syntax palette is asserted separately and never merged**, on §074's
+    // own sentence: *syntax roles resolve first — `syntax.keyword` → bold;
+    // every other syntax slot → plain*. Folding the two tables together would
+    // let a generic alias answer for a syntax slot, which is the thing that
+    // sentence forbids.
+    for (const name of Object.keys(defaultTheme)) {
+      const classes = defaultTheme[name]?.palettes["syntax"]?.classes ?? {};
+      const bold = Object.entries(classes).filter(([, c]) => c === "emphasised").map(([k]) => k);
+      expect(bold.sort(), `${name} · syntax, bold`).toEqual(["keyword"]);
+    }
+  });
 });

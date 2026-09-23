@@ -74,7 +74,16 @@ describe("C04 §3am — spans, the contract", () => {
 });
 
 describe("C04 §3am.1 — tone and value, the rendering half", () => {
-  const toned = block({ kind: "notice", id: "n", tone: "ok", text: "let x = 1", spans: [{ from: 4, to: 5, tone: "identifier" }] });
+  // **`meta` and not `identifier`, and the swap is what keeps the 1-bit arm a
+  // measurement** (C10 I50, §074). The rows below distinguish *a span's tone
+  // replaces the block's* from *it composes with it*, and at one bit a tone is
+  // its typographic class and nothing else — so the two tones have to sit in
+  // different classes or every reading agrees. `identifier` was in a different
+  // class from `ok` until I50 put it on §074's ladder where the design has it,
+  // beside `ok`; `meta` is `normal`, so `ok` block · `meta` span is still bold ·
+  // plain · bold and the row still has something to be wrong about. A fixture
+  // must be shown to respond to the thing under test.
+  const toned = block({ kind: "notice", id: "n", tone: "ok", text: "let x = 1", spans: [{ from: 4, to: 5, tone: "meta" }] });
 
   it("C04 T2.35 (C04 I89): a span's tone paints the run in the tone's SGR and the rest in the block's; at 1-bit the run is the tone's collapse and nothing else", () => {
     const theme = store().current;
@@ -82,13 +91,13 @@ describe("C04 §3am.1 — tone and value, the rendering half", () => {
     // At 24-bit a tone's style is its colour and nothing else, so the whole
     // style is the `38` the row carries.
     const ok = sgr(resolveTone("ok", theme, FULL_CAPS));
-    const identifier = sgr(resolveTone("identifier", theme, FULL_CAPS));
+    const meta = sgr(resolveTone("meta", theme, FULL_CAPS));
     expect(ok).toMatch(/^\x1b\[38;2;/u);
-    expect(identifier).not.toBe(ok);
+    expect(meta).not.toBe(ok);
     // Ink re-encodes a colour change as the next `38` with no reset between.
-    expect(row).toBe(`${ok}let ${identifier}x${ok} = 1\x1b[39m`);
+    expect(row).toBe(`${ok}let ${meta}x${ok} = 1\x1b[39m`);
 
-    // 1-bit: `ok` is the emphasised class and `identifier` the normal one, so
+    // 1-bit: `ok` is the emphasised class and `meta` the normal one, so
     // the run is the one *without* SGR 1 — the collapse, uncompensated.
     const mono = measurable({ capabilities: MONO_CAPS });
     expect(mono.renderToLines(toned, 20)).toEqual(["\x1b[1mlet \x1b[22mx\x1b[1m = 1\x1b[22m"]);
@@ -130,7 +139,7 @@ describe("C04 §3am.1 — tone and value, the rendering half", () => {
     expect(measurable({ capabilities: at(8) }).renderToLines(valued(), 40), "and the fixture responds at 8-bit").not.toEqual(measurable({ capabilities: at(8) }).renderToLines(plain, 40));
   });
 
-  it("C10 T2.26 (C10 I33, C10 I31, C04 I89, C04 I90): the depths — no SGR 1 on the identifier run at 1-bit, no 48 at 4-bit, `continuousColour`'s index at 8, `sample`'s hex at 24", () => {
+  it("C10 T2.26 (C10 I33, C10 I31, C04 I89, C04 I90): the depths — no SGR 1 on the `meta` run at 1-bit, no 48 at 4-bit, `continuousColour`'s index at 8, `sample`'s hex at 24", () => {
     const map = COLORMAPS["magma"];
     if (map === undefined) throw new Error("magma is a colormap");
     const [mono] = measurable({ capabilities: MONO_CAPS }).renderToLines(toned, 20);

@@ -1,6 +1,6 @@
 # golden
 
-**18 test files — 1 frame, 2 byte corpora, 13 renderings of blocks, 2 censuses.**
+**19 test files — 1 frame, 2 byte corpora, 14 renderings of blocks, 2 censuses.**
 
 Those five figures are asserted against the directory by `corpus.test.ts`, and the
 table below is parsed from this file rather than restated in code. **The reason is
@@ -22,6 +22,7 @@ now fails a row.
 | `continuation.test.ts` | lines | the continuation mark under a command's first character, at 2 widths | `config.js` `documents.js` `paint.js` |
 | `corpus.test.ts` | census | this table against the directory — the row that fails when the description stops being true | — |
 | `design-surfaces.test.ts` | lines | one frame per **design fixture** — the third axis, indexed by the design's sections rather than by kind or state, at 2 widths × **3 rungs**: `mono-unicode` is where §030's head mark moves while the alphabet does not, and neither of the other two can show it | — |
+| `theme-tokens.test.ts` | lines | §079 and §074 — every tone and every surface, ten themes × four colour depths, recorded as **values**. The corpus's first frame of colour, and the only form §079 can be compared in: every other frame here strips SGR, and a table of tones with the values stripped is twenty-one identical rows | — |
 | `design-fixtures.test.ts` | census | `DESIGN_FIXTURES.md` against the design's 109 fixtures — M16's map, and the row that fails when a fixture is added and nobody classifies it | — |
 | `fallback-docker.test.ts` | lines | docker's real JSON through C07's fallback, unadapted | — |
 | `padding.test.ts` | lines | a block's own padding — alone, inset, in a row group and in a sequence, at 3 widths × 3 variants | `builders/index.js` |

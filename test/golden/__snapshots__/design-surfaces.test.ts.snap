@@ -2,7 +2,7 @@
 
 exports[`golden frames — one per design fixture > dark-ascii at 40 1`] = `
 "── §95 · a tape, where a row of peers would shed
-scout  planner  * builder .  2]
+scout +  planner +  * builder .  2]
 ── §42 · widgets — a row of peers that sheds
 auto  plan  manual  accept edits
 ── §34 · active progress bars
@@ -107,7 +107,7 @@ line 6                                 |
 
 exports[`golden frames — one per design fixture > dark-ascii at 80 1`] = `
 "── §95 · a tape, where a row of peers would shed
-scout 4s  planner 1m12s  * builder . 8s  critic 2s o  scribe 0s o
+scout 4s +  planner 1m12s +  * builder . 8s  critic 2s o  scribe 0s o
 ── §42 · widgets — a row of peers that sheds
 auto  plan  manual  accept edits
 ── §34 · active progress bars
@@ -212,7 +212,7 @@ line 6                                                                         |
 
 exports[`golden frames — one per design fixture > dark-mono-unicode at 40 1`] = `
 "── §95 · a tape, where a row of peers would shed
-scout  planner  › builder ⋅  2»
+scout ✓  planner ✓  › builder ⋅  2»
 ── §42 · widgets — a row of peers that sheds
 auto  plan  manual  accept edits
 ── §34 · active progress bars
@@ -317,7 +317,7 @@ line 6                                 │
 
 exports[`golden frames — one per design fixture > dark-mono-unicode at 80 1`] = `
 "── §95 · a tape, where a row of peers would shed
-scout 4s  planner 1m12s  › builder ⋅ 8s  critic 2s ○  scribe 0s ○
+scout 4s ✓  planner 1m12s ✓  › builder ⋅ 8s  critic 2s ○  scribe 0s ○
 ── §42 · widgets — a row of peers that sheds
 auto  plan  manual  accept edits
 ── §34 · active progress bars
@@ -422,7 +422,7 @@ line 6                                                                         �
 
 exports[`golden frames — one per design fixture > dark-unicode at 40 1`] = `
 "── §95 · a tape, where a row of peers would shed
-scout  planner  › builder ⋅  2»
+scout ✓  planner ✓  › builder ⋅  2»
 ── §42 · widgets — a row of peers that sheds
 auto  plan  manual  accept edits
 ── §34 · active progress bars
@@ -527,7 +527,7 @@ line 6                                 │
 
 exports[`golden frames — one per design fixture > dark-unicode at 80 1`] = `
 "── §95 · a tape, where a row of peers would shed
-scout 4s  planner 1m12s  › builder ⋅ 8s  critic 2s ○  scribe 0s ○
+scout 4s ✓  planner 1m12s ✓  › builder ⋅ 8s  critic 2s ○  scribe 0s ○
 ── §42 · widgets — a row of peers that sheds
 auto  plan  manual  accept edits
 ── §34 · active progress bars

@@ -37,6 +37,17 @@ name is in the tree*; it does not say the subject matches the design. That is wh
 **target** column is for, and it is why raising `built` is not the remaining work of
 this MR — raising `target` is.
 
+**A third probe answered from the wrong subject entirely.** §076 is *per-token
+values* — a shaded run over the model's own output, whose own fixture says *the
+symbol is reserved* and *it is the SAME mechanism spans needed*. It is a valued
+span, not a theme token, and its probe was `REGISTRY_THEMES`: a symbol that
+resolves in abundance and has nothing to do with the fixture. A probe can be
+wrong by naming a spelling that does not exist (§069's was), by naming a word
+that occurs for unrelated reasons (§035's), or by naming a real symbol belonging
+to a different subject — and only the third reads as *built* while being about
+something else altogether. Its row is `no` and its MR is M13, where the valued
+span belongs.
+
 **`granularity` was the example that sentence used, and it turned out to be an
 instance rather than an illustration.** §035 and §036 both probed it, and the probe
 resolved: eight times in `src/`, five of them inside `new Intl.Segmenter(undefined, {
@@ -152,12 +163,12 @@ most-drawn line in the application.
 | 71 | prose | — | — | the five permission postures |
 | 72 | surface | `resolveBackground` | — | the background as a second channel |
 | 73 | surface | `bgElev` | — | painted chrome — buttons, titles, widgets, headers |
-| 74 | surface | `weight` | — | weight, and why it is not free |
+| 74 | surface | `weight` | `theme-tokens.test.ts` | weight, and why it is not free — the 1-bit rung of the same table, where `identifier` was off the ladder |
 | 75 | surface | `kind: "table"` | `blocks.test.ts` | /config, and where a value came from |
-| 76 | surface | `REGISTRY_THEMES` | — | per-token values |
+| 76 | surface | no | — | per-token values — a VALUED span over the model's own output, which the fixture itself calls reserved; not a theme token, and the probe said otherwise |
 | 77 | surface | `registerGrammar` | `blocks.test.ts` | syntax highlighting |
 | 78 | surface | `kind: "table"` | `table.test.ts` | tables |
-| 79 | surface | `REGISTRY_THEMES` | — | tones and surfaces, across ten themes |
+| 79 | surface | `REGISTRY_THEMES` | `theme-tokens.test.ts` | tones and surfaces, across ten themes — the corpus's first frame of colour |
 | 80 | app | — | `examples/` | Prism — the rework in one sentence |
 | 81 | app | — | `examples/` | Prism — /ps |
 | 82 | surface | `R-EXA-082` | — | no pushed views |
@@ -206,12 +217,13 @@ that is the reconciliation working, and it should be visible as a number moving 
 than inferred from a suite staying green.
 
     surface 66 · prose 37 · app 6 · total 109
-    of the surfaces: built 62 · unbuilt 4 · framed 45
+    of the surfaces: built 61 · unbuilt 5 · framed 47
 
 **`framed` is the figure this MR moves, and `built` is the one that went backwards.**
-Four surface rows carry no probe now, not two. §054 and §055 want OSC 8 hyperlinks
+Five surface rows carry no probe now, not two. §054 and §055 want OSC 8 hyperlinks
 nothing in the tree emits, and they were the only absence the first sweep found; §035
 and §036 join them because their probe answered from `Intl.Segmenter`'s options rather
-than from `Progress`, which has no member for either axis. Raising `built` is not the
+than from `Progress`, which has no member for either axis; and §076 because its probe
+named the theme registry for a fixture about valued spans. Raising `built` is not the
 work — a probe says a subject exists and not that it matches the design. Raising
 `framed` is.

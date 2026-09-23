@@ -143,14 +143,17 @@ describe("C10 resolution", () => {
     const deemphasised = styleOf("dim");
 
     expect(new Set([emphasised, normal, deemphasised]).size).toBe(3);
-    expect(["ok", "warn", "error", "accent"].map((t) => styleOf(t as never))).toEqual([
+    // **`identifier` is emphasised, on §074's own line** (C10 I50): *ok · warn ·
+    // error · accent · identifier → bold at 1-bit*. It sat in `normal` here,
+    // and in all three source tables, from the day the tone landed.
+    expect(["ok", "warn", "error", "accent", "identifier"].map((t) => styleOf(t as never))).toEqual([
+      emphasised,
       emphasised,
       emphasised,
       emphasised,
       emphasised,
     ]);
-    expect(["default", "info", "meta", "identifier"].map((t) => styleOf(t as never))).toEqual([
-      normal,
+    expect(["default", "info", "meta"].map((t) => styleOf(t as never))).toEqual([
       normal,
       normal,
       normal,

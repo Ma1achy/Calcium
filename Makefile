@@ -100,7 +100,19 @@ design-check:       ## the registry ↔ HTML projection, and released-rule immut
 design:             ## regenerate the HTML and KEYS.md from the registry
 	node docs/design/language/build-calcium.mjs
 
-enforce: design-check  ## A03 — module graph, source scans, supply chain
+# **The types are a gate, and they were not one.** `make enforce` ran 402 files
+# of source scans, the suite ran 6 416 rows, golden 528, tier 5 136 and three
+# examples — all green over a `test/support/` file with a module path that
+# resolves to nothing and two tape members whose `state` is not a `CallState`.
+# Nothing in the chain compiles the tests: vitest strips types rather than
+# checking them, and `npm run check` was a command a person remembered. The
+# tape's two members drew **no mark at all**, which is what an unset optional
+# field looks like from a frame — a defect the golden recorded and could not
+# report, because an absent mark is a legible picture.
+typecheck:          ## tsc over src and test — vitest strips types, it does not check them
+	npx tsc --noEmit
+
+enforce: design-check typecheck  ## A03 — module graph, source scans, supply chain
 	npm run enforce
 
 # **A gate that reads a generated artefact has to generate it** — the `check`
