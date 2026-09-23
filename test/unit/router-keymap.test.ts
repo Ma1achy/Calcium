@@ -10,7 +10,7 @@ import { join } from "node:path";
 const ROOT = new URL("../..", import.meta.url).pathname;
 import { describe, expect, it } from "vitest";
 
-import { chordText, createKeymap, KeymapError, defaultKeymap, keySlot } from "../../src/interaction/router/keymap.js";
+import { chordText, createKeymap, KeymapError, defaultKeymap, keySlot, scopesInReadingOrder } from "../../src/interaction/router/keymap.js";
 import { createDecoder } from "../../src/interaction/router/decode.js";
 import { REGISTRY_BINDINGS } from "../../src/interaction/router/registry-bindings.js";
 import type { Binding, FocusTarget, Key } from "../../src/interaction/router/types.js";
@@ -999,6 +999,52 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
         { target: "prompt", key: capital, action: "yank" },
       ]),
     ).toThrow(/duplicate binding/u);
+  });
+
+  it("T1.100 (C16 §6a clause 4, R-KEY-005, §022): the listing's order is the registry's, then FOCUS_ORDER — never alphabetical", () => {
+    // **The row the first implementation would have passed.** It sorted the
+    // remainder alphabetically, and §022's own picture agreed with that by
+    // coincidence: it draws `global` before `transcript`, and `g` precedes `t`.
+    // The fixture could not discriminate, so the check has to be the prose's
+    // claim — *preserves registry order for the remaining scopes* — tested on
+    // scopes where the two answers differ.
+    const registry = JSON.parse(readFileSync("docs/design/language/calcium-registry.json", "utf8")) as {
+      bindings: readonly Readonly<{ scope: string }>[];
+    };
+    const registryOrder: string[] = [];
+    for (const b of registry.bindings) if (!registryOrder.includes(b.scope)) registryOrder.push(b.scope);
+    expect(registryOrder.length, "the registry's scopes — the row is vacuous without them").toBeGreaterThan(2);
+
+    // **By equality and in order**, as the ambient ramps and the bar alphabets
+    // are. `REGISTRY_BINDINGS` is generated from the registry and carries the
+    // key and the action but not the scope, so the tree's copy cannot be read
+    // off it — which is exactly when a second record drifts.
+    // **Asked from a rung outside the registry's three**, which the control on
+    // this row's mutation pass is what forced. With `here` set to `prompt` the
+    // current scope is pulled to the front whatever the table says, so
+    // `prompt`'s own position in it is unobservable — exchanging two of the
+    // three survived, and the assertion read as an equality while testing two
+    // entries of three. `child` is a rung the registry does not name, so all
+    // three order among themselves.
+    const order = scopesInReadingOrder(
+      [...registryOrder, "child"].map((scope) => ({ target: scope })),
+      "child",
+    );
+    expect(order).toEqual(["child", ...registryOrder]);
+
+    // **And the discriminating case**, which the fixture has no member of: the
+    // tree's own scopes, where alphabetical and FOCUS_ORDER disagree. `child`
+    // sorts first alphabetically and `liveBlock` sorts before `overlay`; the
+    // ladder puts `child` first too but `overlay` before `liveBlock`, so the
+    // pair is what tells the two rules apart.
+    const tree = ["liveBlock", "overlay", "panel"].map((scope) => ({ target: scope }));
+    expect(scopesInReadingOrder(tree, "prompt")).toEqual(["overlay", "panel", "liveBlock"]);
+    expect(scopesInReadingOrder(tree, "prompt")).not.toEqual(["liveBlock", "overlay", "panel"]);
+
+    // The registry's three come before anything the registry does not name,
+    // whatever the ladder says about them — the design's order first.
+    const mixed = ["liveBlock", "global", "overlay"].map((scope) => ({ target: scope }));
+    expect(scopesInReadingOrder(mixed, "prompt")[0]).toBe("global");
   });
 
   it("T1.97 (I42): the table is the rows it was — generation moved where a chord is written and nothing else", () => {

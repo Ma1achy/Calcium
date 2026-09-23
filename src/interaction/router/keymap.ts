@@ -16,6 +16,7 @@
 
 import { REGISTRY_BINDINGS } from "./registry-bindings.js";
 import type { Binding, BlockKeymap, BuiltinBinding, FocusTarget, Key, KeyAction, KeyProfile } from "./types.js";
+import { FOCUS_ORDER } from "./focus.js";
 
 export class KeymapError extends Error {
   override readonly name = "KeymapError";
@@ -1046,6 +1047,20 @@ export function createKeymap(
 }
 
 /**
+ * The scopes the **registry** names, in the order it names them (§022,
+ * `R-KEY-005`). Three of the tree's eight, which is why `FOCUS_ORDER` carries
+ * the rest in `scopesInReadingOrder` below.
+ *
+ * **Held here and compared against the registry by equality** in T1.100, as the
+ * ambient ramps and the bar alphabets are: `REGISTRY_BINDINGS` is generated
+ * from the registry and carries the key and the action, not the scope, so this
+ * cannot be read off it. A subset check would let a fourth scope arrive in the
+ * registry with this list never noticing, and the listing would put it last
+ * with everything the design does not name.
+ */
+const REGISTRY_SCOPE_ORDER: readonly string[] = Object.freeze(["global", "prompt", "transcript"]);
+
+/**
  * The scopes a keymap listing is read in — **the current rung first, the rest
  * alphabetical** (`R-KEY-005`, C16 §6a clause 4).
  *
@@ -1069,7 +1084,17 @@ export function scopesInReadingOrder(
   bindings: readonly Readonly<{ target: string }>[],
   here: string,
 ): readonly string[] {
+  const rank = (t: string): number => {
+    const reg = REGISTRY_SCOPE_ORDER.indexOf(t);
+    if (reg !== -1) return reg;
+    const focus = FOCUS_ORDER.indexOf(t as (typeof FOCUS_ORDER)[number]);
+    // A scope in neither list sorts last and among its own kind stably, which
+    // is `Array.prototype.sort`'s guarantee — never alphabetically, because an
+    // ordering of spellings is what this function exists not to be.
+    return REGISTRY_SCOPE_ORDER.length + (focus === -1 ? FOCUS_ORDER.length : focus); // graphemes-ok — array lengths, not text
+  };
   return [...new Set(bindings.map((b) => b.target))].sort((a, b) =>
-    a === here ? -1 : b === here ? 1 : a < b ? -1 : a > b ? 1 : 0,
+    a === here ? -1 : b === here ? 1 : rank(a) - rank(b),
   );
 }
+

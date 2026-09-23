@@ -113,7 +113,7 @@ most-drawn line in the application.
 | 19 | surface | `keyboardProtocol` | `design-surfaces.test.ts` | the resolved keymap, the reader's own rung first — 121 bindings across eight scopes, drawn through the `rule` + `keyValue` pair `/help keys` draws and ordered by `scopesInReadingOrder`, which is `R-KEY-005`'s own seam (C16 §6a clause 4). The census draws what ships rather than the registry's 39, because the resolved keymap is the registry's bindings plus the routes and the block rungs — the check is that the grouping and the order are the design's |
 | 20 | prose | — | — | DAS and ARR as figures |
 | 21 | surface | `scrollbar` | `design-surfaces.test.ts` | the scrollbar — the set degrading whole, and the bar beside a box that overflows |
-| 22 | surface | `R-KEY-005` | — | the help view, which becomes a transcript entry |
+| 22 | surface | `R-KEY-005` | `design-surfaces.test.ts` | the help view as an entry — the same listing §019 frames, and the section that settles its order: *the active scope is rendered first, then preserves registry order for the remaining scopes*, which the tree had as alphabetical and §022's own picture could not discriminate (`global` before `transcript` satisfies both). C16 §6a clause 4, T1.100 |
 | 23 | surface | `displayRows` | `blocks.test.ts` | at 40 columns |
 | 24 | surface | `CALL_STATE_GLYPH` | `states.test.ts` | reasoning |
 | 26 | surface | `hotEdge\|hot-edge` | — | the trail and the mark at the head — §025's live specimen |
@@ -217,7 +217,7 @@ that is the reconciliation working, and it should be visible as a number moving 
 than inferred from a suite staying green.
 
     surface 66 · prose 37 · app 6 · total 109
-    of the surfaces: built 60 · unbuilt 6 · framed 52
+    of the surfaces: built 60 · unbuilt 6 · framed 53
 
 **`framed` is the figure this MR moves, and `built` is the one that went backwards.**
 Seven surface rows carry no probe now, not two. §054 and §055 want OSC 8 hyperlinks

@@ -27,7 +27,7 @@ M = {
  19:("frame","design-surfaces.test.ts","the resolved keymap, the reader's own rung first — 121 bindings across eight scopes, drawn through the `rule` + `keyValue` pair `/help keys` draws and ordered by `scopesInReadingOrder`, which is `R-KEY-005`'s own seam (C16 §6a clause 4). The census draws what ships rather than the registry's 39, because the resolved keymap is the registry's bindings plus the routes and the block rungs — the check is that the grouping and the order are the design's"),
  20:("prose","—","DAS and ARR as figures"),
  21:("frame","design-surfaces.test.ts","the scrollbar — the set degrading whole, and the bar beside a box that overflows"),
- 22:("owed","M9","the help view, which becomes a transcript entry"),
+ 22:("frame","design-surfaces.test.ts","the help view as an entry — the same listing §019 frames, and the section that settles its order: *the active scope is rendered first, then preserves registry order for the remaining scopes*, which the tree had as alphabetical and §022's own picture could not discriminate (`global` before `transcript` satisfies both). C16 §6a clause 4, T1.100"),
  23:("frame","blocks.test.ts","at 40 columns"),
  24:("frame","states.test.ts","reasoning"),
  26:("owed","M13","the trail and the mark at the head — §025's live specimen"),
