@@ -33,6 +33,8 @@ import { patchDefinition } from "../../src/presentation/patch/index.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { patchOf } from "./blocks.js";
 import { measurable, registry } from "./render.js";
+import { ALL_KINDS, ONE_PER_KIND } from "./blocks.js";
+import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { styledScreenFrom } from "./styled-screen.js";
 import type { ResolvedTheme } from "../../src/presentation/theme/index.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
@@ -801,6 +803,75 @@ const expansionGrounds = (
   ];
 };
 
+/**
+ * §017 — **focus treatment follows the shape**, as a census of what each kind
+ * publishes against what it draws.
+ *
+ * `R-COL-005` is the rule — *focus intensifies by shape: an unpainted run or box
+ * inverts, a frame takes its border or axes, a control washes, and a painted
+ * identity chip bolds and marks* — and the only checkable form of *follows the
+ * shape* is a table of shape against treatment. A row asserting one kind states
+ * the rule about itself; the set is what says which shapes have no treatment.
+ *
+ * **Each kind is asked for its own elements and then focused on each of them.**
+ * That is the whole method, and three earlier forms of it were wrong in three
+ * ways worth keeping, because each reads as a correct answer:
+ *
+ * - focusing `{blockId, rowId: null}`, a shape **no session writes**. `plot`
+ *   tests `rowId === block.id` and its own comment records the same defect — it
+ *   tested `null` for three weeks and painted nothing in a session.
+ * - rendering `table`, `plot` and `patch` through a registry that does not have
+ *   them. An unregistered kind still renders, as `raw`, and still produces rows,
+ *   so three kinds reported *no focus treatment* while never being themselves.
+ * - wrapping the call that finds the targets in a `try`/`catch`. `elementsOf` is
+ *   the registry's and not the harness's, so a broken call read as *this kind has
+ *   no elements* for all twenty-three at once.
+ *
+ * Each agreed with the map row it was meant to check (*`scroll` and `plot`
+ * answer block focus*), which is why none of them looked wrong. The census
+ * corroborates instead against rows that already pass — `table` at r1/r2 is
+ * T1.29's subject and `pills` at its chips is T1.24's.
+ */
+const focusByShape = (width: number, capabilities: TerminalCapabilities, theme: ResolvedTheme): readonly string[] => {
+  const defs = [tableDefinition, plotDefinition, patchDefinition] as never;
+  const reg = registry(defs);
+  const kit = measurable({ theme, capabilities, definitions: defs });
+  const rows: string[] = [
+    "kind         elements  focus is drawn for",
+    "─".repeat(Math.min(width, 62)),
+  ];
+  let publishes = 0;
+  let draws = 0;
+  for (const kind of ALL_KINDS) {
+    const b = ONE_PER_KIND[kind];
+    if (b === undefined) continue;
+    const id = (b as Readonly<{ id?: string }>).id ?? "";
+    // **No catch here** — see the third defect above. A kind that cannot answer
+    // its elements is a fault, not a kind with none.
+    const els = reg.elementsOf(b, width).map((e) => e.id);
+    const base = kit.renderToLines(b, width).join("\n");
+    const lit = [...new Set([id, ...els])].filter((t) => {
+      const one = measurable({ theme, capabilities, definitions: defs, focus: { blockId: id, rowId: t } });
+      return one.renderToLines(b, width).join("\n") !== base;
+    });
+    if (els.length > 0) publishes += 1;
+    if (lit.length > 0) draws += 1;
+    const verdict =
+      els.length === 0
+        ? "— atomic: nothing to focus"
+        : lit.length === 0
+          ? `** ${String(els.length)} focusable, NONE drawn **`
+          : lit.join(" ");
+    rows.push(`${kind.padEnd(12)}${String(els.length).padStart(5)}     ${verdict}`);
+  }
+  rows.push(
+    "",
+    `· ${String(ALL_KINDS.length)} kinds · ${String(publishes)} publish a focusable element · ${String(draws)} draw a treatment`,
+    "· the atomic kinds are not a missing treatment — a session cannot put focus on them at all",
+  );
+  return rows;
+};
+
 export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 95, name: "a tape, where a row of peers would shed", rows: draw(TAPE) },
   { section: 42, name: "widgets — a row of peers that sheds", rows: draw(PILLS) },
@@ -824,6 +895,7 @@ export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 44, name: "two selections, one clipboard — the four grounds R-SEL-006 names", rows: selectionGrounds },
   { section: 58, name: "what copy takes — the source beside the rendering", rows: copyCensus },
   { section: 82, name: "no pushed views — a row expanded in place, and the rows below carrying on", rows: expansionGrounds },
+  { section: 17, name: "focus treatment follows the shape — what each kind publishes against what it draws", rows: focusByShape },
   { section: 19, name: "the resolved keymap, the reader's own rung first", rows: keymapCensus },
   { section: 21, name: "the scrollbar — the set, and the bar beside a box", rows: (w, c, t) => [
     ...scrollbarCensus(w, c),

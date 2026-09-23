@@ -304,6 +304,35 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
 ........................................   7c2d4e1  decoder-zoom      succeeded
   A = bg 48;2;34;34;34
 
+── §17 · focus treatment follows the shape — what each kind publishes against what it draws
+kind         elements  focus is drawn for
+────────────────────────────────────────
+rule            0     — atomic: nothing to focus
+notice          0     — atomic: nothing to focus
+terminal        0     — atomic: nothing to focus
+keyValue        0     — atomic: nothing to focus
+table           2     r1 r2
+steps           0     — atomic: nothing to focus
+logs            0     — atomic: nothing to focus
+events          0     — atomic: nothing to focus
+plot            1     plot-1
+progress        0     — atomic: nothing to focus
+code            0     — atomic: nothing to focus
+comparison      0     — atomic: nothing to focus
+patch           0     — atomic: nothing to focus
+pills           2     chip-0 chip-1
+tape            5     seams arm count probe
+tip             0     — atomic: nothing to focus
+panel           0     — atomic: nothing to focus
+status          0     — atomic: nothing to focus
+image           0     — atomic: nothing to focus
+mosaic          4     mos-a mos-b mos-d mos-c
+scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
+group           0     — atomic: nothing to focus
+raw             0     — atomic: nothing to focus
+
+· 23 kinds · 6 publish a focusable element · 6 draw a treatment
+· the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §19 · the resolved keymap, the reader's own rung first
 -- prompt — where you are               
 s+enter      insertNewline
@@ -751,6 +780,35 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 ................................................................................      7c2d4e1  decoder-zoom      succeeded
   A = bg 48;2;34;34;34
 
+── §17 · focus treatment follows the shape — what each kind publishes against what it draws
+kind         elements  focus is drawn for
+──────────────────────────────────────────────────────────────
+rule            0     — atomic: nothing to focus
+notice          0     — atomic: nothing to focus
+terminal        0     — atomic: nothing to focus
+keyValue        0     — atomic: nothing to focus
+table           2     r1 r2
+steps           0     — atomic: nothing to focus
+logs            0     — atomic: nothing to focus
+events          0     — atomic: nothing to focus
+plot            1     plot-1
+progress        0     — atomic: nothing to focus
+code            0     — atomic: nothing to focus
+comparison      0     — atomic: nothing to focus
+patch           0     — atomic: nothing to focus
+pills           2     chip-0 chip-1
+tape            5     seams arm count probe trace
+tip             0     — atomic: nothing to focus
+panel           0     — atomic: nothing to focus
+status          0     — atomic: nothing to focus
+image           0     — atomic: nothing to focus
+mosaic          4     mos-a mos-b mos-d mos-c
+scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
+group           0     — atomic: nothing to focus
+raw             0     — atomic: nothing to focus
+
+· 23 kinds · 6 publish a focusable element · 6 draw a treatment
+· the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §19 · the resolved keymap, the reader's own rung first
 -- prompt — where you are                                                       
 s+enter      insertNewline
@@ -1186,6 +1244,35 @@ a rule — no source, so it declines
 ........................................     mr    !1248  auto-merged
 ........................................   7c2d4e1  decoder-zoom      succeeded
 
+── §17 · focus treatment follows the shape — what each kind publishes against what it draws
+kind         elements  focus is drawn for
+────────────────────────────────────────
+rule            0     — atomic: nothing to focus
+notice          0     — atomic: nothing to focus
+terminal        0     — atomic: nothing to focus
+keyValue        0     — atomic: nothing to focus
+table           2     r1 r2
+steps           0     — atomic: nothing to focus
+logs            0     — atomic: nothing to focus
+events          0     — atomic: nothing to focus
+plot            1     plot-1
+progress        0     — atomic: nothing to focus
+code            0     — atomic: nothing to focus
+comparison      0     — atomic: nothing to focus
+patch           0     — atomic: nothing to focus
+pills           2     chip-1
+tape            5     seams arm probe
+tip             0     — atomic: nothing to focus
+panel           0     — atomic: nothing to focus
+status          0     — atomic: nothing to focus
+image           0     — atomic: nothing to focus
+mosaic          4     ** 4 focusable, NONE drawn **
+scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
+group           0     — atomic: nothing to focus
+raw             0     — atomic: nothing to focus
+
+· 23 kinds · 6 publish a focusable element · 5 draw a treatment
+· the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §19 · the resolved keymap, the reader's own rung first
 ── prompt — where you are               
 ⇧⏎      insertNewline
@@ -1619,6 +1706,35 @@ a rule — no source, so it declines
 ................................................................................     mr    !1248  auto-merged
 ................................................................................      7c2d4e1  decoder-zoom      succeeded
 
+── §17 · focus treatment follows the shape — what each kind publishes against what it draws
+kind         elements  focus is drawn for
+──────────────────────────────────────────────────────────────
+rule            0     — atomic: nothing to focus
+notice          0     — atomic: nothing to focus
+terminal        0     — atomic: nothing to focus
+keyValue        0     — atomic: nothing to focus
+table           2     r1 r2
+steps           0     — atomic: nothing to focus
+logs            0     — atomic: nothing to focus
+events          0     — atomic: nothing to focus
+plot            1     plot-1
+progress        0     — atomic: nothing to focus
+code            0     — atomic: nothing to focus
+comparison      0     — atomic: nothing to focus
+patch           0     — atomic: nothing to focus
+pills           2     chip-1
+tape            5     seams arm probe trace
+tip             0     — atomic: nothing to focus
+panel           0     — atomic: nothing to focus
+status          0     — atomic: nothing to focus
+image           0     — atomic: nothing to focus
+mosaic          4     ** 4 focusable, NONE drawn **
+scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
+group           0     — atomic: nothing to focus
+raw             0     — atomic: nothing to focus
+
+· 23 kinds · 6 publish a focusable element · 5 draw a treatment
+· the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §19 · the resolved keymap, the reader's own rung first
 ── prompt — where you are                                                       
 ⇧⏎      insertNewline
@@ -2068,6 +2184,35 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
 ........................................   7c2d4e1  decoder-zoom      succeeded
   A = bg 48;2;34;34;34
 
+── §17 · focus treatment follows the shape — what each kind publishes against what it draws
+kind         elements  focus is drawn for
+────────────────────────────────────────
+rule            0     — atomic: nothing to focus
+notice          0     — atomic: nothing to focus
+terminal        0     — atomic: nothing to focus
+keyValue        0     — atomic: nothing to focus
+table           2     r1 r2
+steps           0     — atomic: nothing to focus
+logs            0     — atomic: nothing to focus
+events          0     — atomic: nothing to focus
+plot            1     plot-1
+progress        0     — atomic: nothing to focus
+code            0     — atomic: nothing to focus
+comparison      0     — atomic: nothing to focus
+patch           0     — atomic: nothing to focus
+pills           2     chip-0 chip-1
+tape            5     seams arm count probe
+tip             0     — atomic: nothing to focus
+panel           0     — atomic: nothing to focus
+status          0     — atomic: nothing to focus
+image           0     — atomic: nothing to focus
+mosaic          4     mos-a mos-b mos-d mos-c
+scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
+group           0     — atomic: nothing to focus
+raw             0     — atomic: nothing to focus
+
+· 23 kinds · 6 publish a focusable element · 6 draw a treatment
+· the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §19 · the resolved keymap, the reader's own rung first
 ── prompt — where you are               
 ⇧⏎      insertNewline
@@ -2515,6 +2660,35 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 ................................................................................      7c2d4e1  decoder-zoom      succeeded
   A = bg 48;2;34;34;34
 
+── §17 · focus treatment follows the shape — what each kind publishes against what it draws
+kind         elements  focus is drawn for
+──────────────────────────────────────────────────────────────
+rule            0     — atomic: nothing to focus
+notice          0     — atomic: nothing to focus
+terminal        0     — atomic: nothing to focus
+keyValue        0     — atomic: nothing to focus
+table           2     r1 r2
+steps           0     — atomic: nothing to focus
+logs            0     — atomic: nothing to focus
+events          0     — atomic: nothing to focus
+plot            1     plot-1
+progress        0     — atomic: nothing to focus
+code            0     — atomic: nothing to focus
+comparison      0     — atomic: nothing to focus
+patch           0     — atomic: nothing to focus
+pills           2     chip-0 chip-1
+tape            5     seams arm count probe trace
+tip             0     — atomic: nothing to focus
+panel           0     — atomic: nothing to focus
+status          0     — atomic: nothing to focus
+image           0     — atomic: nothing to focus
+mosaic          4     mos-a mos-b mos-d mos-c
+scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
+group           0     — atomic: nothing to focus
+raw             0     — atomic: nothing to focus
+
+· 23 kinds · 6 publish a focusable element · 6 draw a treatment
+· the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §19 · the resolved keymap, the reader's own rung first
 ── prompt — where you are                                                       
 ⇧⏎      insertNewline

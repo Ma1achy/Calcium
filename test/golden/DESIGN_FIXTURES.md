@@ -108,7 +108,7 @@ most-drawn line in the application.
 | 14 | surface | `emptySnapshot` | `session-frame.test.ts` | away, and what the frame says while you are |
 | 15 | prose | — | — | four interaction principles |
 | 16 | prose | — | — | scopes, as an ownership table |
-| 17 | surface | no | — | the focus treatment follows the shape — measured over `ONE_PER_KIND`: `scroll` and `plot` answer block focus and the other thirty-four do not, so the RUN, the BOX and the FRAME rows are all unbuilt |
+| 17 | surface | no | `design-surfaces.test.ts` | focus treatment follows the shape — `design-surfaces` §017, a census of what each kind publishes against what it draws, because *follows the shape* is checkable only as a table of shape against treatment. **The old row here was wrong three ways and is corrected by measurement**: it said *`scroll` and `plot` answer block focus and the other thirty-four do not* — there are **23** kinds in `ONE_PER_KIND`, not 36; `table`, `pills` and `tape` answer as well; and the cause is not a missing treatment but that **17 kinds publish no focusable element at all**, so §017's RUN and FRAME rungs have no subject in this tree rather than an unbuilt one. Six kinds publish elements and five draw a treatment. **`mosaic` was the sixth** — four focusable elements, nothing drawn for any of them — closed by C09 I100: a pane is a *region* in §017's own vocabulary and takes `focusGround`, painted by the container because a child's own predicate tests the child's block id, which a mosaic-scoped focus never matches |
 | 18 | surface | no | — | focus on things that are not rows — its three cases are a button, a slider and a checkbox, and none is a block kind |
 | 19 | surface | `keyboardProtocol` | `design-surfaces.test.ts` | the resolved keymap, the reader's own rung first — 121 bindings across eight scopes, drawn through the `rule` + `keyValue` pair `/help keys` draws and ordered by `scopesInReadingOrder`, which is `R-KEY-005`'s own seam (C16 §6a clause 4). The census draws what ships rather than the registry's 39, because the resolved keymap is the registry's bindings plus the routes and the block rungs — the check is that the grouping and the order are the design's |
 | 20 | prose | — | — | DAS and ARR as figures |
@@ -159,7 +159,7 @@ most-drawn line in the application.
 | 67 | surface | `viewport` | `session-frame.test.ts` | scrolled back while a turn runs |
 | 68 | surface | `degradesTo1Bit` | `compositions.test.ts` | one exchange at three capability rungs |
 | 69 | surface | `labelSpansOf` | `session-frame.test.ts` | the prompt's upper rule, labelled — three scenes, and the 1-bit one needed a capability override because no environment reaches the rung |
-| 70 | surface | `REGISTRY_THEMES` | — | /colour, tinting the chrome |
+| 70 | surface | `REGISTRY_THEMES` | — | /colour and /label, tinting the chrome — **parked, not merely unbuilt**. The mechanism is specified in detail (chrome only, per directory in `.calcium/config.toml`, a name resolved per theme against a hex taken literally, the hex gated by a choice-only contrast question, animation an explicit decoration exception suppressed under reduced and off) and the **ten hues have no values**: named and described as VIVID, with no palette anywhere in the registry. Ten vivid colour values is the ask list's own example. Held whole — the hex arm needs no new values, but a verb that refuses three of the six forms its help lists is not a smaller version of this |
 | 71 | prose | — | — | the five permission postures |
 | 72 | surface | `resolveBackground` | `design-surfaces.test.ts` | the background as a second channel — a ground census, one mask character per cell, because a stripped read calls a washed row and a bare one the same picture; three kinds paint and `meterFill` has no reader |
 | 73 | surface | `bgElev` | — | painted chrome — the table header is built and framed (C11 I24); buttons, titles and widgets want kinds the tree has none of: no `button`, `slider`, `toggle`, `checkbox` or `radio` among the thirty-six |
@@ -171,7 +171,7 @@ most-drawn line in the application.
 | 79 | surface | `REGISTRY_THEMES` | `theme-tokens.test.ts` | tones and surfaces, across ten themes — the corpus's first frame of colour |
 | 80 | app | — | `examples/` | Prism — the rework in one sentence |
 | 81 | app | — | `examples/` | Prism — /ps |
-| 82 | surface | `R-EXA-082` | — | no pushed views |
+| 82 | surface | `R-EXA-082` | `design-surfaces.test.ts` | no pushed views — a row expanded in place, `design-surfaces` §082, two passes. The section's argument is architectural and its picture is one table; what it settles that the tree did not hold is a ground's **extent** — `R-BLK-941` opens the focused row's ground under the `▸` and puts the detail on `bgElev`, where the tree painted the gutter on the page and the detail on nothing. C11 §5c and I25. The second pass expands a row nothing is focused on, which is what says the detail's ground follows expansion rather than the head's spilling downward |
 | 83 | app | — | `examples/` | Prism — submit |
 | 84 | app | — | `examples/` | Prism — logs, as a block |
 | 85 | app | — | `examples/` | Prism — the six-hour run |
@@ -217,7 +217,7 @@ that is the reconciliation working, and it should be visible as a number moving 
 than inferred from a suite staying green.
 
     surface 66 · prose 37 · app 6 · total 109
-    of the surfaces: built 60 · unbuilt 6 · framed 55
+    of the surfaces: built 60 · unbuilt 6 · framed 57
 
 **`framed` is the figure this MR moves, and `built` is the one that went backwards.**
 Seven surface rows carry no probe now, not two. §054 and §055 want OSC 8 hyperlinks

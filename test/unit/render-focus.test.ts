@@ -658,14 +658,32 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
     return out;
   };
 
-  it("T1.28 (C26 §7, C04 I71): a focused mosaic is byte-identical — and every non-blank cell lies inside a child's rectangle, so there is no furniture to tone", () => {
+  it("T1.28 (C26 §7, C04 I71, C09 I100): a focused mosaic pane takes the region's ground — and every non-blank cell still lies inside a child's rectangle, so the ground is the whole of the treatment", () => {
     const none = mosaicAt(null);
+    // **This row asserted *byte-identical* and the premise it rested on was
+    // true** — which is why it survived being read. *No cell of the mosaic's
+    // own to tone* is measured below and still holds; the rule it served was
+    // *a tone on furniture the data draws*, and §017's focus model is
+    // **grounds**, which need no furniture. C26 §7 is amended and C09 I100 is
+    // the rule: a pane is a *region*, so it takes `focusGround`.
+    //
     // A mosaic's elements are its children (C26 §4b cell 3), so a focus inside it names one.
-    expect(mosaicAt({ blockId: "m", rowId: "b" }), "focus on a cell moves nothing").toEqual(none);
-    expect(mosaicAt({ blockId: "m", rowId: "d" })).toEqual(none);
-    // **The ruling's premise, pinned from the structural side.** The row goes
+    const litB = mosaicAt({ blockId: "m", rowId: "b" });
+    expect(litB, "focus on a cell is no longer invisible").not.toEqual(none);
+    const ground = sgr(focusStyle(theme, capabilities({ colourDepth: 24 })));
+    expect(litB.join("\n"), "the pane takes the region's ground").toContain(ground);
+    // **And the ground is all of it** (`R-FOC-004`, *rather than painting its
+    // data*): strip it and the frame is what the unfocused one drew.
+    expect(
+      litB.map((l) => l.replaceAll(ground, "").replace(/\u001b\[49m/gu, "").trimEnd()),
+      "inside untouched",
+    ).toEqual(none.map((l) => l.trimEnd()));
+    // **A different pane, so the row cannot pass on a container that grounds
+    // every cell**: `d`'s frame is not `b`'s.
+    expect(mosaicAt({ blockId: "m", rowId: "d" }), "each pane is its own").not.toEqual(litB);
+    // **The structural half, which was always the sound one.** The row goes
     // red the day the mosaic draws a gap, a rail or a border of its own — which
-    // is the day the residue-row precedent applies and this ruling expires.
+    // is the day the residue-row precedent applies as well.
     const parsed = parseAreas("ab/cd");
     if (!parsed.ok) throw new Error(parsed.fault);
     const rects = mosaicRects(parsed.grid, 60, 4, undefined, undefined);

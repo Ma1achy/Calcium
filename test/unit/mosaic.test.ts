@@ -13,7 +13,10 @@ import { mosaicDefinition } from "../../src/presentation/blocks/kinds/containers
 import { validateDocument } from "../../src/data/viewmodel/validate.js";
 import { b } from "../../src/shell/builders/index.js";
 import { cells } from "../../src/presentation/text.js";
-import { measurable, FULL_CAPS } from "../support/render.js";
+import { measurable, FULL_CAPS, DARK_THEME } from "../support/render.js";
+import { focusStyle } from "../../src/presentation/blocks/paint.js";
+import { styledScreenFrom } from "../support/styled-screen.js";
+import { sgr } from "../../src/terminal/escapes.js";
 
 const kit = measurable({ capabilities: FULL_CAPS });
 
@@ -183,7 +186,51 @@ describe("MG — the mosaic's grid", () => {
     expect(lines[5], "down to its last").toMatch(/six/u);
   });
 
-  it.todo("T1.62 (C09 I100, §017 R-COL-005): a focused pane takes the region's ground, and no other pane does — not deferred on a component; the spec landed this commit and the renderer follows in the next");
+  it("T1.62 (C09 I100, §017 R-COL-005): a focused pane takes the region's ground, and no other pane does", () => {
+    // **The one kind that published focusable elements and drew nothing for
+    // any of them** — four of them, which the §017 census is the measurement of.
+    const left = b.raw("left");
+    const right = b.raw("right");
+    const block = b.mosaic({ height: 2, areas: "AB", children: [left, right] });
+    const ground = sgr(focusStyle(DARK_THEME, FULL_CAPS));
+    expect(ground, "focusGround is a real ground at 24-bit").toMatch(/^\u001b\[48;/u);
+
+    const lit = measurable({
+      theme: DARK_THEME,
+      capabilities: FULL_CAPS,
+      focus: { blockId: block.id, rowId: left.id },
+    }).renderToLines(block, 40);
+    const joined = lit.join("\n");
+    expect(joined, "the focused pane is grounded").toContain(ground);
+
+    // **No other pane carries one**, and this is the assertion rather than the
+    // line above: a container that grounded every pane — ignoring *which*
+    // element is focused — satisfies the first half exactly. Read **by cell**,
+    // because a string test for "the ground before the right pane's text" is
+    // satisfied by any line that has the ground anywhere: the first draft
+    // sliced from the word "right" and asked whether the slice *began* with an
+    // escape, which it never can.
+    const grid = styledScreenFrom([joined], { columns: 40, rows: lit.length });
+    const bgAt = (row: number, col: number): string => grid[row]?.[col]?.style.bg ?? "";
+    const groundBg = ground.replace(/^\u001b\[/u, "").replace(/m$/u, "");
+    expect(bgAt(0, 0), "the left pane's first cell is grounded").toBe(groundBg);
+    const rightStart = (grid[0] ?? []).map((c) => c.ch).join("").indexOf("right");
+    expect(rightStart, "the right pane was found").toBeGreaterThan(0);
+    for (let r = 0; r < grid.length; r += 1) {
+      for (let c = rightStart; c < 40; c += 1) {
+        expect(bgAt(r, c), `right pane cell ${String(r)},${String(c)} is bare`).toBe("");
+      }
+    }
+
+    // **The control**: with no focus, nothing anywhere carries the ground.
+    const rest = measurable({ theme: DARK_THEME, capabilities: FULL_CAPS }).renderToLines(block, 40);
+    expect(rest.join("\n"), "no focus, no ground").not.toContain(ground);
+
+    // **Inside untouched** (R-FOC-004): strip the ground and the pane's own
+    // lines are what the unfocused render drew.
+    expect(lit.map((l) => l.replaceAll(ground, "").replace(/\u001b\[49m/gu, "").trimEnd()))
+      .toEqual(rest.map((l) => l.trimEnd()));
+  });
 
   it("MS6 (C09 I35, C25 I1): a cell bounds an over-tall child, and F239 does not transfer", () => {
     // `scroll` draws an over-tall child whole — `measure=4 rendered=8` (F239) —

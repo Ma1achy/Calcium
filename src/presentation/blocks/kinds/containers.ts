@@ -27,7 +27,7 @@ import type { NavElement } from "../types.js";
 import { cells, sliceCells, stripControl, truncate } from "../../text.js";
 import { SPINNER_CELLS, glyphs, scrollbarSet, spinnerFrames } from "../glyphs.js";
 import { scrollbarColumn } from "../scrollbar.js";
-import { clampSpans, paint, rows, tone } from "../paint.js";
+import { based, clampSpans, groundSequence, paint, rows, tone } from "../paint.js";
 import { composeRow, fitRow, placeRows, rowCells, type Placed } from "../../rows.js";
 import { layout, measure as solveHeight, type Box, type Size } from "../../layout/index.js";
 import type { BlockDefinition, Rendered, RenderContext, Windowed } from "../types.js";
@@ -781,12 +781,38 @@ export const mosaicDefinition: BlockDefinition<Mosaic> = {
     // cuts an over-wide row (F1211). A cell whose grid position leaves it no
     // room is not drawn, which is what it has always been; what changed is that
     // the rect no longer says it is zero cells wide.
+    // **A focused pane takes the region's ground** (I100, §017 `R-COL-005`,
+    // `R-FOC-004`). A pane is a *region* in §017's vocabulary — more than one
+    // row, holding a child rather than being one — so it takes `focusGround`
+    // and not the item's accent and not a border it has not got.
+    //
+    // **The container paints it because the child cannot.** A pane's element id
+    // is the child's id and the focus names `(mosaic.id, child.id)`; a child's
+    // own predicate tests its **own** block id — `plot`'s `focusedOn` is
+    // `blockId === id && rowId === id` — which a mosaic-scoped focus never
+    // matches, so a focused pane holding a plot could not light it however the
+    // plot were written.
+    //
+    // **`based` and not a span pass**: the child has already painted its lines,
+    // so the ground has to survive every reset inside them (C11 I25). Each row
+    // is padded to the rect's width first — a ground needs cells to paint, and
+    // the rect is the pane's whole extent whatever its child chose to fill.
+    const focus = ctx.focus ?? null;
+    const litPane =
+      focus !== null && focus.blockId === block.id && focus.rowId !== null ? focus.rowId : null;
+    const paneGround = litPane === null ? "" : groundSequence("surface.focusGround", ctx.theme, ctx.capabilities);
     const drawable = block.children.flatMap((child, i) => {
       const rect = rects[i];
       if (rect === undefined) return [];
       const room = mosaicRoom(rect, width, height);
       if (room === null) return [];
-      return [{ child, rect, room, drawn: ctx.renderChild(child, room.width) }];
+      const drawn = ctx.renderChild(child, room.width);
+      if (child.id !== litPane || paneGround === "") return [{ child, rect, room, drawn }];
+      // **Inside untouched** (`R-FOC-004`): the child's own lines are unchanged
+      // and a ground is put behind them. Stripping it gives back what the
+      // unfocused pane drew, byte for byte.
+      const padded = drawn.map((line) => `${line}${" ".repeat(Math.max(0, room.width - rowCells(line)))}`); // cells-ok — the pane's own residue
+      return [{ child, rect, room, drawn: based(padded, paneGround) }];
     });
 
     const childRows = drawable.map(({ drawn }) => drawn);
