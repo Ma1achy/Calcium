@@ -177,6 +177,13 @@ const STATED_CYCLES: Readonly<Record<string, number>> = Object.freeze(
     }
   });
 
+  // **Spec-first: C09 I99's three rows land with the code that makes them green.**
+  // `RenderContext.motion` does not exist yet, so a row asserting the axis is
+  // independent of colour depth would be asserting a knob the tree has one of.
+  it.todo("T2.166 (C09 I99, R-MOT-001): motion × colour depth, the two axes independent — not deferred on a component: `RenderContext.motion` lands with I99 in this same MR");
+  it.todo("T2.167 (C09 I99, R-MOT-002): with motion off a running call keeps its mark and its elapsed text — not deferred on a component: `RenderContext.motion` lands with I99 in this same MR");
+  it.todo("T2.168 (C09 I99, R-MOT-012): the ambient set is the registry's, and reduced stops exactly those three — not deferred on a component: `RenderContext.motion` lands with I99 in this same MR");
+
   it("T2.163 (C09 I98, R-MOT-010): SPINNER_SETS against the registry, by equality and field by field", () => {
     // **The row commitment 78 said already existed.** That commitment cites the
     // spinner catalogue as the remedy the bars lacked — *registry against tree,

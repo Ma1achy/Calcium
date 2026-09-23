@@ -87,6 +87,28 @@ const at =
   (file: string): string =>
     file === self ? source : readFileSync(file, "utf8");
 
+/**
+ * **An invariant id C09 cannot reach**, for the two fabrications that need one.
+ *
+ * Both read `C09 I99` and both were disarmed the day C09 declared an I99 — the
+ * gate went on working and the rows failed, which is the right way round and
+ * still a morning spent. `C09_DECLARES` is read from the spec so the premise is
+ * measured rather than remembered, and each row asserts it before fabricating.
+ */
+const UNREACHABLE = "I9999";
+/**
+ * **And the premise check needs a premise.** A regex that matched nothing would
+ * leave this empty, `not.toContain` would be trivially true, and the guard
+ * against a disarmed fabrication would itself be disarmed — one turn of the same
+ * screw. Asserted at module scope so it cannot be skipped by a row not running.
+ */
+const C09_DECLARES: readonly string[] = [
+  ...readFileSync("docs/components/C09_block_library.md", "utf8").matchAll(/^- \*\*(I\d+[a-z]?)\*\*/gmu),
+].map((m) => m[1] as string);
+if (C09_DECLARES.length < 50) {
+  throw new Error(`C09_DECLARES read ${String(C09_DECLARES.length)} invariants — the reader is broken, so the fabrications below are unguarded`);
+}
+
 describe("A03 SP1 — commitment/invariant pairing", () => {
   it("SP1: the real corpus is clean, and it is a corpus", () => {
     // Both halves. The first is the rule; the second is what stops it passing
@@ -165,9 +187,15 @@ describe("A03 SP1 — commitment/invariant pairing", () => {
   });
 
   it("SP1: a cross-reference that does not resolve fails", () => {
-    // "the overclaim it was meant to replace, one indirection on" — C09 has no
-    // I99, so pointing at it is the same unbacked claim wearing a citation.
-    const source = spec([["I1", "one."]], ["Someone else's rule (→ C09 I99)."]);
+    // **The number is unreachable by construction, and the row checks that.**
+    // This read `C09 I99` above a comment saying *C09 has no I99* — true when it
+    // was written, and false the day C09 declared one. The fabrication then
+    // resolved, the gate correctly reported no violation, and this row failed
+    // with nothing wrong in the enforcer: a fabrication disarmed from two
+    // components away. The remedy is not a higher number that will also be
+    // reached one day, it is a premise the row asserts for itself.
+    expect(C09_DECLARES, `C09 declares ${UNREACHABLE} now — this fabrication is disarmed`).not.toContain(UNREACHABLE);
+    const source = spec([["I1", "one."]], [`Someone else's rule (→ C09 ${UNREACHABLE}).`]);
     const violations = checkCommitments(["docs/components/C99_x.md"], at(source));
 
     expect(violations).toHaveLength(1);
@@ -1313,12 +1341,20 @@ describe("A03 SP3 — invariant references resolve outside the specs too", () =>
   });
 
   it("SP3: a qualified reference to an invariant that does not exist fails", () => {
-    const read = at("// C09 I99 says so.\n", "src/fake.ts");
+    // **The number is unreachable by construction, and the row checks that.**
+    // This read `C09 I99` above a comment saying *C09 has no I99* — true when it
+    // was written, and false the day C09 declared one. The fabrication then
+    // resolved, the gate correctly reported no violation, and this row failed
+    // with nothing wrong in the enforcer: a fabrication disarmed from two
+    // components away. The remedy is not a higher number that will also be
+    // reached one day, it is a premise the row asserts for itself.
+    expect(C09_DECLARES, `C09 declares ${UNREACHABLE} now — this fabrication is disarmed`).not.toContain(UNREACHABLE);
+    const read = at(`// C09 ${UNREACHABLE} says so.\n`, "src/fake.ts");
     const { violations } = checkReferences(["src/fake.ts"], read, {});
 
     expect(violations).toHaveLength(1);
     expect(violations[0]?.rule).toBe("SP3");
-    expect(violations[0]?.message).toContain("cites C09 I99");
+    expect(violations[0]?.message).toContain(`cites C09 ${UNREACHABLE}`);
   });
 
   it("SP3 fires: the C02 test citing C01's invariants, restored", () => {
