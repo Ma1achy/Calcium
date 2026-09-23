@@ -2858,9 +2858,30 @@ export async function constructGraph(
    * would be swallowing. Measured before this clause existed — two characters
    * typed with a preview up reached no handler at all.
    */
-  const promptUnderMenu = (): boolean =>
-    stores.overlays.top?.id === CHIP_PREVIEW_ID ||
-    (stores.overlays.top?.id === MENU_ID && keys.selected === null);
+  const promptUnderMenu = (): boolean => {
+    // **A question that replaces the prompt has no prompt underneath it** (C23
+    // I73, I74, §7f) — the arm the two ids had no answer for, and the only one
+    // §101's table settles here.
+    if (confirm.replacing !== null) return false;
+    // **The rest is key ownership and it is NOT §101's axis**, which an earlier
+    // draft of this claimed and T1.4h3a refuted in one run. §101 asks *does the
+    // answer need the prompt* — a placement question, and a reverse search
+    // answers yes to it: it floats above a live prompt. But a search is
+    // composing **its own query**, so the keystrokes are its, and a predicate
+    // derived from placement handed them to the editor and left the search
+    // permanently empty.
+    //
+    // What this asks is narrower: *is the prompt the thing composing text right
+    // now*. A chip preview composes nothing and is a projection of the caret; a
+    // completion menu composes nothing **while it holds no selection** (C19
+    // I20). Both are layers over a prompt that is still being typed into, and
+    // they are named rather than derived because no field distinguishes them
+    // from a search — which is a gap worth closing and not a rule to guess at.
+    return (
+      stores.overlays.top?.id === CHIP_PREVIEW_ID ||
+      (stores.overlays.top?.id === MENU_ID && keys.selected === null)
+    );
+  };
 
   /**
    * Merge the focused block's own keymap, and withdraw the last one (A01 D4,

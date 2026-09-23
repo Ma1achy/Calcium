@@ -26,6 +26,7 @@ import type { InputEvent } from "../interaction/router/types.js";
 import type { Layer, OverlayManager, Placement } from "../viewport/overlay/index.js";
 import type { AskOptions, Choice } from "./local/registry.js";
 import { questionNotice } from "./documents.js";
+import { questionConsumer, routingFor } from "./question-routing.js";
 import { cells } from "../presentation/text.js";
 import { createChoiceSelection, defaultStart } from "./choice-selection.js";
 
@@ -94,6 +95,23 @@ export interface ConfirmHost {
   resolvesHandler(): ((e: InputEvent) => boolean) | null;
   /** Whether a question is open — C22 refuses a submission while one is. */
   readonly open: boolean;
+  /**
+   * The open question's layer while it **replaces** the prompt, else `null`
+   * (C23 I73, I74, §7f, §101).
+   *
+   * **A getter and not a field on `Layer`.** C15 I14 says `blocking` and
+   * `dismissal` never change, for a reason that holds: a layer whose ownership
+   * moved mid-life makes C16's ladder depend on when it looked. Replacing is
+   * the opposite — it is exactly what changes when `reply…` is chosen, on the
+   * same question with the same id and the same handler awaiting — so it is
+   * derived here, per frame, from the question's state rather than declared
+   * once on the layer.
+   *
+   * The layer stays on the stack while it replaces: C16's ownership ladder
+   * reads the stack, and a question that left it to be drawn elsewhere would
+   * be a question nothing routed keys to. What changes is where it is *drawn*.
+   */
+  readonly replacing: Layer | null;
 }
 
 /**
@@ -268,10 +286,19 @@ type Meaning = "resolve" | "move" | "none";
 export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
   let handler: ((e: InputEvent) => boolean) | null = null;
   let meaning: ((e: InputEvent) => Meaning) | null = null;
+  // **The question's state, which is what the routing is derived from** (I73).
+  // `null` when nothing is open; the consumer otherwise, so the table is asked
+  // rather than a boolean being kept beside it.
+  let consumer: ReturnType<typeof questionConsumer> | null = null;
 
   return {
     get open() {
       return handler !== null;
+    },
+
+    get replacing() {
+      if (consumer === null || !routingFor(consumer).replaces) return null;
+      return deps.overlays.stack.find((l) => l.id === CONFIRM_LAYER_ID) ?? null;
     },
 
     answerHandler() {
@@ -300,13 +327,20 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
       const selection = createChoiceSelection(opts.choices.length, defaultStart(opts.choices));
       const selected = (): number => selection.at ?? 0;
 
+      // **§101's table, asked rather than restated** (I73, §7f). Both fields
+      // were literals here and both are the table's answer for a question that
+      // is not yet taking a typed reply; writing them out again is how the two
+      // records come to disagree the day the third state lands.
+      consumer = questionConsumer(opts.choices, false);
+      const routing = routingFor(consumer);
+
       const layer: Layer = {
         id: CONFIRM_LAYER_ID,
         kind: "overlay",
         ...placementOf(opts, deps),
         content: render(opts, selected()),
-        blocking: true,
-        dismissal: "answer",
+        blocking: routing.blocking,
+        dismissal: routing.dismissal,
         // **A question is not an advisory overlay, so the default fraction is
         // the wrong one** (C15 I18). Half the region is right for a peek, which
         // a reader dismisses; a confirm that does not fit loses its *answers*,
@@ -331,6 +365,7 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
         const settle = (key: string): boolean => {
           handler = null;
           meaning = null;
+          consumer = null;
           disposable[Symbol.dispose]();
           deps.invalidate();
           resolve(key);

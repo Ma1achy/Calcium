@@ -1225,11 +1225,22 @@ between the two rows of the table rather than two kinds of question, and it is
 why `replaces` is derived from the question's state rather than declared by its
 caller.
 
-**`promptUnderMenu` is this rule with one consumer** (I51, C19 I20). It asks
-*is the prompt still answering keys under the top layer*, which is *does the
-top layer need the prompt* with the answer hardcoded to two layer ids. A
-question that replaces the prompt is the case it has no arm for, and a question
-that floats is the case it answers by name.
+**`promptUnderMenu` is not this rule, and reading it as this rule is a
+measured defect** (I51, C19 I20). It looks like the same question — *is the
+prompt still answering keys under the top layer* against *does the top layer
+need the prompt* — and it is not. §101's axis is **placement**: a reverse search
+floats above a live prompt and answers *yes, the prompt is needed*. But a search
+is composing **its own query**, so the keystrokes are its; a predicate derived
+from placement hands them to the editor and leaves the search permanently empty,
+which is what C20 T1.4h3a reports the first time it runs.
+
+What that predicate asks is narrower: *is the prompt the thing composing text
+right now*. A chip preview composes nothing and is a projection of the caret; a
+completion menu composes nothing while it holds no selection. What §101 does
+settle there is the one arm the two hardcoded ids had no answer for — **a
+question that replaces the prompt has no prompt underneath it** — and the rest
+stays named rather than derived, because no field today separates a search from
+a menu and guessing one is how the two were conflated in the first place.
 
 
 ## 8. Commitments
@@ -2435,6 +2446,7 @@ Fake transport, fake stores.
 ---
 
 - **T1.68** (I73, §7f, §101): the routing is a function of the question and it is total — an approval and a choice replace and block, a typed reply floats and blocks, and a peek, a completion and a search float and do not block. Asserted as the table rather than as six cases, because *blocking and replacing are independent* is a claim about the product of two axes and a build that tied them would satisfy any four of the six cells.
+- **T1.68b** (I73, §7f): a question's row is read off its state — two choices is an approval, more is a choice, and the same question answers `reply` once the reader has picked `reply…`, so the placement follows the state and a caller could not have declared it when the question opened.
 - **T1.69** (I73, §7f): choosing `reply…` moves the same question from replacing to floating, with its id and its owner unchanged. The discriminator is the **identity**: a build that closed one layer and opened another would pass every assertion about what is on the screen and drop the handler that is awaiting the answer.
 - **T4.70** (I74, → C22 I80, §7f): a replacing question in a session leaves the region's height and the transcript's rows exactly where they were — read off two frames, because *the question is drawn* is satisfied by a build that pushed the transcript up to make room for it.
 

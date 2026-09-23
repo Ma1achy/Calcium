@@ -21,7 +21,22 @@ import type { Manifest } from "../../data/manifest/index.js";
 import type { Block, LocalDocument } from "../../data/viewmodel/index.js";
 import type { ProducerContext } from "../../data/adapters/types.js";
 
-export type Choice = Readonly<{ key: string; label: string; default?: true }>;
+export type Choice = Readonly<{
+  key: string;
+  label: string;
+  default?: true;
+  /**
+   * This choice opens a **typed reply** (C23 I73, §101).
+   *
+   * §101 draws it as a third peer — `approve  deny  reply…` — rather than as a
+   * field beside the choices, because it is one of the things the reader picks
+   * and picking it is what changes the question's state. Choosing it moves the
+   * question from replacing the prompt to floating above a live one, with the
+   * same id and the same handler still awaiting: the answer resolves with this
+   * choice's `key` and the text the reader composed.
+   */
+  reply?: true;
+}>;
 
 /**
  * C23 §2's question — a choice list, never a yes/no box.

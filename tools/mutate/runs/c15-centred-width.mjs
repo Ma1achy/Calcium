@@ -163,13 +163,15 @@ const MUTATIONS = [
     name: "an anchored question becomes dismissable",
     file: CONFIRM,
     //
-    // **Re-anchored twice.** F1118: `selected` became a thunk read at render
-    // time, so the line above gained a call. M8: `dismissable` split into
-    // `blocking` and `dismissal` (C15 I26), and escapability is the second of
-    // the two — which is the field this mutation moves, unchanged in what it
-    // means.
-    from: "        content: render(opts, selected()),\n        blocking: true,\n        dismissal: \"answer\",",
-    to: "        content: render(opts, selected()),\n        blocking: true,\n        dismissal: opts.placement === \"anchored\" ? \"escape\" : \"answer\",",
+    // **Re-anchored three times.** F1118: `selected` became a thunk read at
+    // render time, so the line above gained a call. M8: `dismissable` split
+    // into `blocking` and `dismissal` (C15 I26), and escapability is the second
+    // of the two — which is the field this mutation moves, unchanged in what it
+    // means. M15: both fields stopped being literals and became §101's table's
+    // answer (C23 I73), so the mutation moves what the table said rather than
+    // what the file said — the same fact, one indirection on.
+    from: "        blocking: routing.blocking,\n        dismissal: routing.dismissal,",
+    to: "        blocking: routing.blocking,\n        dismissal: opts.placement === \"anchored\" ? \"escape\" : routing.dismissal,",
     expect: "T4.18",
   },
   {

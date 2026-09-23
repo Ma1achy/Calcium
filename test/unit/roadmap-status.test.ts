@@ -313,11 +313,16 @@ describe("roadmap-status — the Order column's verifier", () => {
     // the signal cannot exercise it** — which is itself the signal's stated
     // limit: a citation whose cell names no single-word symbol is unmeasured
     // here, and reads in the report exactly like one that has none adrift.
-    const anchoredCite = "`src/shell/confirm.ts:101`";
-    // Line 200 — inside the file (354 lines) and non-blank, so the *gate* has
+    // **Re-anchored when `confirm.ts` grew C23 §7f's routing**, and the move is
+    // the reason the row is written against a named line rather than a number:
+    // `choiceBlock` went from 101 to 155, line 101 became a doc comment, and
+    // the fabrication's target had to move with it or the control would be
+    // measuring two drifted citations against each other.
+    const anchoredCite = "`src/shell/confirm.ts:155`";
+    // Line 210 — inside the file, non-blank, and nine lines clear of the nearest and non-blank, so the *gate* has
     // nothing to say about it. A line past the end or on a blank one fails for
     // the gate's own reasons and would prove the wrong thing.
-    const drifted = run(mutate(anchoredCite, "`src/shell/confirm.ts:200`"));
+    const drifted = run(mutate(anchoredCite, "`src/shell/confirm.ts:210`"));
     expect(drifted.ok, "the run still passes — this is a signal, not a gate").toBe(true);
     const d = /citation anchorage · (\d+)\/(\d+) line citations/u.exec(drifted.out);
     expect(Number(d?.[2]), "the population is unchanged").toBe(total);
@@ -329,7 +334,7 @@ describe("roadmap-status — the Order column's verifier", () => {
     // The control in the other direction: the same cell pointed back at a line
     // that does carry the symbol restores the count, so the counter is reading
     // the citation rather than the edit.
-    const back = run(mutate(anchoredCite, "`src/shell/confirm.ts:102`"));
+    const back = run(mutate(anchoredCite, "`src/shell/confirm.ts:156`"));
     expect(Number(/citation anchorage · (\d+)\//u.exec(back.out)?.[1]), "the control").toBe(anchored);
   });
 
