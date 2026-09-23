@@ -15,6 +15,7 @@
  * Pure, and nothing here knows about a layer, a frame or a store. The shell
  * asks it what a consumer is and pushes what it answers.
  */
+import type { Choice } from "./local/registry.js";
 
 /**
  * §101's six rows. `approval` and `choice` route identically and are kept
@@ -71,10 +72,7 @@ export function routingFor(consumer: QuestionConsumer): QuestionRouting {
  * naming and not a branch: both answer the same routing, and a reader looking
  * for where the difference matters should find that it does not.
  */
-export function questionConsumer(
-  choices: readonly Readonly<{ reply?: true }>[],
-  replying: boolean,
-): QuestionConsumer {
+export function questionConsumer(choices: readonly Choice[], replying: boolean): QuestionConsumer {
   if (replying) return "reply";
   return choices.length <= 2 ? "approval" : "choice"; // cells-ok — a choice count
 }

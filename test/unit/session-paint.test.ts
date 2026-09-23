@@ -60,7 +60,8 @@ function deps(over: Partial<PaintDeps> = {}): PaintDeps {
     // C22 I50 — the ghost is a paint-time read like the spinner beside it.
     ghost: () => null,
     overlays: () => [],
-    promptCursor: () => ({ row: 0, col: 2 }),
+    promptReplaced: () => false,
+  promptCursor: () => ({ row: 0, col: 2 }),
     promptSelection: () => [],
     promptChips: () => [],
     suppressBackground: () => false,

@@ -74,6 +74,18 @@ export type PaintDeps = Readonly<{
   /** C17's display rows, already wrapped and gutter-aware (C17 §2, I18). */
   promptRows: () => readonly string[];
   /**
+   * Are the prompt's rows a **replacing question's** rather than the editor's
+   * (C23 I73, I74, §7f, §101)?
+   *
+   * **The gutter is the whole of what this changes here.** `❯ ` and its
+   * continuation spaces are the editor's mark, and a question drawn under them
+   * is a box indented two cells with a prompt character on its top border —
+   * which is what shipped for one run of T4.70. The spinner and the ghost go
+   * with it for the same reason: both are appearance written into the
+   * **editor's** row, and there is no editor row here.
+   */
+  promptReplaced: () => boolean;
+  /**
    * C15's boxes, placed against the frame's own `overlayRegion` (C22 I28).
    *
    * A function rather than a value for the same reason the two above are, and
@@ -613,6 +625,7 @@ function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly
   // reader has a specific question about and no span could answer.
   using _s = deps.probe?.span("prompt") ?? NO_SPAN;
   const cap = frame.promptRows;
+  const replaced = deps.promptReplaced();
   const cursor = deps.promptCursor();
   const window = promptWindow(frame, deps.promptRows(), cursor.row, deps.capabilities);
   const windowed = window.rows;
@@ -649,7 +662,11 @@ function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly
   const out: string[] = [];
   for (let i = 0; i < cap; i += 1) {
     const body = windowed[i] ?? "";
-    const gutter = i === 0 ? promptFor(deps.capabilities) : " ".repeat(PROMPT_GUTTER.cont);
+    const gutter = replaced
+      ? ""
+      : i === 0
+        ? promptFor(deps.capabilities)
+        : " ".repeat(PROMPT_GUTTER.cont); // cells-ok — the gutter's own width
     const squared = exact(gutter + body, width);
     const span = spans.get(i);
     const onRow = chips.get(i);
@@ -686,7 +703,9 @@ function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly
     ? cursor.row - window.first + window.offset
     : out.length - 1;
   const row = out[last];
-  if (row !== undefined && deps.spinning()) {
+  // **Not over a question** (C23 I74): the spinner marks the token being
+  // completed at the caret, and there is no caret while the prompt is replaced.
+  if (row !== undefined && !replaced && deps.spinning()) {
     const at = cells(row.trimEnd(), deps.capabilities.ambiguousWidth);
     if (at + 1 <= width) out[last] = exact(`${sliceCells(row, 0, at)}${spinnerGlyph(deps.capabilities)}`, width);
     return out;

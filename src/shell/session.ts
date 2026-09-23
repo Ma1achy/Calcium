@@ -53,6 +53,7 @@ import type { RenderScratch } from "../presentation/blocks/types.js";
 import { contextAt } from "../interaction/completion/index.js";
 import { chipSpans, selectionSpans, type CellSpan } from "../interaction/editor/index.js";
 import { extentOf } from "../interaction/router/focus.js";
+import { renderSequenceToLines } from "../presentation/render-lines.js";
 import { PROMPT_GUTTER, regionWidth } from "./config.js";
 import { cursorStyleFor, steadyWhileTyping } from "./cursor-style.js";
 import { autoscrollFor, beginDrag, type Drag } from "./drag-selection.js";
@@ -1250,6 +1251,31 @@ class Session implements TuiInstance {
     graph.scheduler.commit(orbits.length > 0 || frames.length > 0 ? "stream" : "spinner");
   }
 
+  /**
+   * A replacing question's rows, or `null` — **one record, two readers**
+   * (C23 I74, C22 I80, §7f, §101).
+   *
+   * §101's approval and choice take the prompt's rows because the prompt has no
+   * job while they are up. That is one number, and C22 T6.30 is what two
+   * records of it cost the last time: the frame reserved one row while the
+   * paint was handed the editor's real rows, and a wrapped prompt drew as a
+   * lone elision marker. So the measurer and the painter both come here.
+   *
+   * **Cached on the content's identity**, which is `chrome.layer`'s own key: the
+   * confirm host replaces the array when the selection moves, so the identity is
+   * exactly when the rows change.
+   */
+  #questionRows(graph: Graph, width: number): readonly string[] | null {
+    const layer = graph.confirm.replacing;
+    if (layer === null || layer.content.length === 0) return null;
+    const render = (blocks: readonly Block[], w: number): readonly string[] =>
+      renderSequenceToLines(graph.blocks, blocks, w, {
+        theme: graph.theme.current,
+        capabilities: graph.capabilities,
+      });
+    return graph.chrome.layer(layer.content, width, graph.theme.current.name, render);
+  }
+
   #paintDeps(graph: Graph, frame: Composed): PaintDeps {
     // **The region's width, and every dep below draws content** (I109, §6l.9
     // rows 3–4). The transcript's rows, the prompt's rows, its cursor and its
@@ -1293,8 +1319,17 @@ class Session implements TuiInstance {
             ? null
             : { blocks: this.#semantic.blocks, spans: this.#selectionSpans(width) },
         ),
-      promptRows: () => graph.editor.layout(width, PROMPT_GUTTER),
-      promptCursor: () => graph.editor.cursorCell(width, PROMPT_GUTTER),
+      // **The question's rows when one replaces the prompt** (C23 I74, §7f).
+      promptRows: () => this.#questionRows(graph, width) ?? graph.editor.layout(width, PROMPT_GUTTER),
+      // **No caret in a replaced prompt.** §101 draws the `▌` only once the
+      // reader has chosen `reply…` and the prompt has come live beneath the
+      // question; a caret left at the editor's position would sit inside the
+      // question's box, on a row the editor did not write.
+      promptCursor: () =>
+        this.#questionRows(graph, width) === null
+          ? graph.editor.cursorCell(width, PROMPT_GUTTER)
+          : { row: 0, col: 0 },
+      promptReplaced: () => this.#questionRows(graph, width) !== null,
       // **The wash, mapped through the same walk the rows came from** (C17 I18,
       // roadmap entry 23). `selection` is read here rather than a
       // `selectionSpans` method being added to `LineEditor`, because the guard
@@ -1304,6 +1339,11 @@ class Session implements TuiInstance {
       // Empty when there is no region, which is the common case and costs one
       // frozen array.
       promptSelection: () => {
+        // **Nothing is selected in a prompt that is not there** (C23 I74). The
+        // spans are cell ranges into the editor's rows, and the rows on screen
+        // are the question's — so a live region would wash cells of a box it
+        // has no coordinates in.
+        if (this.#questionRows(graph, width) !== null) return EMPTY_SPANS;
         const sel = graph.editor.selection;
         if (sel === null) return EMPTY_SPANS;
         return selectionSpans(
@@ -1362,7 +1402,15 @@ class Session implements TuiInstance {
       // computation here is the two-records defect S01 §3 already produced once
       // — with the added property that the router would then be hit-testing
       // against boxes the screen never drew.
-      overlays: () => graph.overlays.layout(frame.overlayRegion),
+      // **A replacing question is drawn in the prompt's slot, not here** (C23
+      // I74, §7f). It stays on the stack — C16's ladder reads the stack, and a
+      // question nothing routes keys to is not a question — so what changes is
+      // where it is painted and nothing else.
+      overlays: () => {
+        const replacing = graph.confirm.replacing;
+        const placed = graph.overlays.layout(frame.overlayRegion);
+        return replacing === null ? placed : placed.filter((p) => p.layer !== replacing);
+      },
     };
   }
 
@@ -1796,8 +1844,14 @@ class Session implements TuiInstance {
       // composed frame against itself, and 1 + 1 + region + 1 is consistent at
       // every width. Two records of one number, and T1.5c is the only thing
       // comparing them.
+      // **The same number the paint reads, through the same function** (C22
+      // I80, C23 I74). A replacing question owns the prompt's rows, so the
+      // count the frame reserves is the question's — and it is asked here
+      // rather than computed, because this is the pair T6.30 records.
       promptRows: (width, gutter) =>
-        graph?.editor.layout(width, gutter).length ?? 1,
+        (graph === undefined || graph === null ? undefined : this.#questionRows(graph, width)?.length) ??
+        graph?.editor.layout(width, gutter).length ??
+        1,
       // **The footer's height, from the same measurer C14 uses** (C22 I82).
       // Before the graph exists nothing has a footer to measure; one row is the
       // guess `initialRegionHeight` makes and the first frame corrects it.
