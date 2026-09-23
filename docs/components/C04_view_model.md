@@ -3102,19 +3102,34 @@ push the current straight back out. It settles to a fixed point.*
 |---|---|---|---|---|
 | S1 | `[0,3)`, no marks | to 3 | `[1,4)` — and a `«1` appears, costing cells the window was spending on a member, so `[2,4)` | the star, reproduced: the first move off the head costs a mark and the window loses a member on top of the one it slid past |
 | S2 | `[2,4)`, both marks | to 4 | `[2,5)`; `1»` **disappears**, so the window ends up *wider* than the move asked for | the mark vanishing at the end is a cell the window gets back, and it is what makes the cost non-monotone — D1 |
-| S3 | `[3,5)`, `«3` | back to 0 | `[0,k)` — `«3` disappears too | the same fact at the other end, and the reason D1 is one rule rather than two |
+| S3 | `[3,5)`, `«3` | back to 0 | `[0,k)` — `«3` disappears too | the mark vanishing at the left end as well; **the start is still a distance and not an extremum**, and reading S2 and S3 as one rule is what the implementation falsified |
 | S4 | `[9,13)`, `«9` | to 13 | `«10` is a cell wider than `«9`, so crossing ten hidden members costs the window a cell | the mark's own width is a function of what it counts, which is the star rule at a second scale |
 | S5 | any window, the current already inside | anywhere inside | unchanged | *the window moves ONLY when the current leaves it* — the clause that separates a tape from a cursor dragging the row along |
 
 **D1, and it is the walk's finding.** The cost of a window is **not monotone in its
-bounds**, because the residue mark disappears when the run reaches an end. So the
+end**, because the residue mark disappears when the run reaches the last member. So the
 obvious implementation of *grow while it fits* stops short: measured over 200,000
-random tapes, a greedy loop drew fewer members than fit in **233** of them at the right
-end and **447** at the left, and the cases are not exotic — members of `[5,7,3,8,1]` at
-a width of 20 from index 2 draw **one** member greedily where **three** fit, because the
-last member's arrival removes a `1»` worth more than the member costs. Each bound is
-therefore a **maximum (or minimum) over the candidates**, never a loop that stops at the
-first failure. Both ends, one cause, one rule.
+random tapes, a greedy loop drew fewer members than fit in **233** of them, and the
+cases are not exotic — members of `[5,7,3,8,1]` at a width of 20 reaching index 4 hold
+**three** where a greedy loop draws one, because the last member's arrival removes a
+`1»` worth more than the member costs. The end is therefore a **maximum over the
+candidates**, never a loop that stops at the first failure.
+
+**And the start is a different question, which the walk got wrong and the
+implementation corrected.** This section first read *both ends, one cause, one rule*,
+with a second measurement of 447 beside the 233 — and that figure was taken over
+*scanning down from the current to the globally smallest start that fits*, which is not
+a question the window ever asks. The start is the **minimum move**: the first start at
+or after the one the window already has. A smaller start than the held one exists in
+most tapes, and taking it would drag the window backwards to reach something ahead of
+it, which is the cursor-dragging behaviour §095 separates a tape from in its own first
+paragraph. The two bounds read as one rule because both are about a mark that vanishes,
+and they are not: one is an extremum and the other is a distance.
+
+**The symmetry was the tell and it was read as corroboration.** Two measurements of the
+same shape at two ends is exactly what a real law looks like, which is why the second
+one was not checked against what the code would ask. *Two instances fitting a rule is
+not evidence for the rule* — here the second instance was an artefact of the probe.
 
 **D2 — the fixed point is reached by construction, not by iteration.** Asking *which
 `lo` is smallest such that the window from `lo` to the current fits* prices the mark in
@@ -3701,7 +3716,7 @@ band from, and it is asserted rather than left to follow.
 - **I122** — *(§5c, §025, §026, `R-MOT-005`, `R-MOT-012`)* **A block says it is streaming; it never says which cells are in the trail.** `streaming?: boolean` is the fact and `trail?: TrailForm` is the form, defaulting to `hotEdge`; C09 derives the band. The band's offsets depend on the terminal's width and a producer cannot see one, so a producer writing the span would be writing a number it cannot compute — `Panel.live`'s precedent (C09 I38), applied to the one other place a block was about to be handed an appearance.
 - **I123** — *(§5c, §026, `R-BLK-194`, `R-BLK-196`)* **A trail's target is the run's own ink, never a fixed colour.** `hotEdge` and `fade` cool to the ink the run already has; `hue` cools to the block's body tone, and that is the whole difference between it and `hotEdge`. A trail whose target is fixed repaints a dim run to white, which is a defect that reads as a styling choice. `trail` with no `streaming` draws nothing — the band is what streaming means, and a settled block has no head.
 - **I124** — *(§3ao, §095, `R-BLK-792`)* **A tape slides its window; it never sheds a member.** Every member keeps its place and its element id, and the window is the run of them that is drawn — so `«n` and `n»` count what is offscreen rather than what was lost, and a focus inside a tape is never orphaned. That is the property `pills` does not have and does not need: a row of peers nobody walks can shed, because nothing is pointing at what went. The window's start is **state, not a field** — *the window moves only when the current leaves it* is a statement about the previous window — and it is one integer held where a scroll box's offset is held, for the same reason and one axis over.
-- **I125** — *(§3ao, §095)* **The window moves by the minimum that brings the current back into view, and the mark it costs is priced into that move.** Moving the window raises a residue mark, and the mark spends cells the window was spending on members, so a move of one can cost two. Asking *which start is least such that the window reaching the current fits* prices the mark in and is a fixed point the first time it is asked; an implementation that moves and then re-prices is iterating towards the same number. **The cost is not monotone in the window's bounds** — a mark disappears when the run reaches an end, so arriving at the last member can be worth more than it costs — and each bound is therefore a maximum or a minimum over the candidates, never a loop that stops at the first failure. Measured over 200,000 random tapes the greedy form drew fewer members than fit in 233 at the right end and 447 at the left.
+- **I125** — *(§3ao, §095)* **The window moves by the minimum that brings the current back into view, and the mark it costs is priced into that move.** Moving the window raises a residue mark, and the mark spends cells the window was spending on members, so a move of one can cost two. Pricing the mark into the test makes the answer a fixed point the first time it is asked; an implementation that moves and then re-prices is iterating towards the same number. **The two bounds are two questions.** The **end** is the longest run from the start that fits, taken as a maximum over the candidates, because the cost is not monotone there: a mark disappears when the run reaches the last member, so arriving can be worth more than it costs — measured over 200,000 random tapes, a greedy loop drew fewer members than fit in 233 of them. The **start** is the minimum *move*: the first start at or after the held one that reaches the current. A smaller start exists in most tapes and taking it would drag the window backwards to reach something ahead of it, which is what §095 separates a tape from.
 - **I126** — *(§3ao, §095)* **An all-or-nothing group is shed before any single member goes offscreen, and it does not come back.** Every member's detail goes together or none does — a row with three clocks and two blanks says the blanks are still running — and once the window has slid, the details stay gone even where the few visible members would fit with them. Bringing them back trades a member for a clock, which is what rule 1 forbids and what keeps the ladder monotonic. The current is never shed: a member wider than the whole width **truncates**, because a tape with nothing in it says less than a tape with one truncated name.
 
 
@@ -3824,7 +3839,7 @@ band from, and it is asserted rather than left to follow.
 
 109. **A stated blind spot has two halves and reading checks only one of them** (I118, F1085). MG31 named the two escapes a textual parse has, which is right, and then asserted the corpus reached neither. `xFormat?: Plot["yFormat"]` had been in the file for twenty-five days — not stale, **false when written** — and the assertion is what stopped anyone looking, because it converts a stated gap into a stated non-issue. Naming a limit is a claim about the rule and review can check it; claiming the corpus does not reach the limit is a claim about the corpus, and only a measurement can. It is *a negative claim inverts a resolver's verdict* one level up: **there is no such member** reads most convincingly the day it stops being true, because the gate is green either way. One grep over the body the rule already brace-matches.
 110. **A tape slides and a row of peers sheds, and the two are different kinds rather than two widths of one** (I124, §3ao, §095). The distinction is whether anything points into the row: a focus, a current, a key that walks it. `pills` keeps shedding on that rule and `steps`' refusal — *dropping a row orphans a C26 focus* — is **satisfied** by this kind rather than overturned by it.
-111. **The window's arithmetic is derived from §095's figure and its non-monotonicity was measured before it was written down** (I125, §3ao). A residue mark that disappears at the end makes *grow while it fits* draw fewer members than fit, in cases with no exotic shape to them, and the remedy is stated as one rule for both ends because it has one cause.
+111. **The window's arithmetic is derived from §095's figure, and the one thing the walk got wrong was a symmetry it read as corroboration** (I125, §3ao). A residue mark that disappears at the end makes *grow while it fits* draw fewer members than fit — 233 cases in 200,000, with no exotic shape to them. The walk then measured the same thing at the left end, got 447, and wrote both down as one rule; the second figure was taken over a question the window never asks, and the implementation is what found it. The start is a **distance** and the end is an **extremum**, and they look alike because both turn on a mark that vanishes.
 112. **A tape's ladder is monotonic, which is a statement about what it does NOT do** (I126, §3ao, §095). The clocks do not come back when the window slides, and that clause exists because the natural implementation re-measures the visible members and puts them back — two correct rules disagreeing exactly once, which is the cell a classification table is for.
 
 
@@ -3839,7 +3854,7 @@ Six tiers. No state machine, so no transition table.
 - **T1.46** (I122, §5c): `streaming` and `trail` survive the round trip and the key gate; a ninth member on a block carrying them is still refused, so the two fields were added to the gate's list and not around it.
 - **T1.47** (I123, §5c): `trail` with no `streaming` validates and means nothing — a settled block has no head — and an unknown `trail` name is refused rather than defaulted, because a misspelled form drawn as `hotEdge` is a silent disagreement between the document and the screen.
 - **T1.48** (I124, §3ao, §095): a tape round-trips with its members, their details and its `current`; a `current` naming no member validates and draws no mark, because a tape nobody is in is still a tape; and the members' ids are asserted to survive every window the arithmetic produces — nothing is lost, only offscreen, is a claim about ids and not about pixels.
-- **T1.49** (I125, §3ao, §095): §095's own moves, reproduced — the window sliding by the minimum, the `«n` that appears costing it a member on top of the one it slid past, and the mark that disappears at an end giving a cell back. Then the property that the walk's measurement is about: over a sweep of member widths, widths and currents, the window is the **maximum** run from its start that fits and its start is the **minimum** that reaches the current, compared against an exhaustive scan — which is the assertion a greedy implementation fails and every self-consistent one passes.
+- **T1.49** (I125, §3ao, §095): §095's own moves, reproduced — the window sliding by the minimum, the `«n` that appears costing it a member on top of the one it slid past, and the mark that disappears at an end giving a cell back. Then the property, over a sweep of member widths, widths, currents **and held starts**: the end is the maximum run that fits and the start is the first at or after the held one that reaches the current, against a reference that asks the same question exhaustively. **The held start is its own axis** — the first draft passed it equal to the current, so the current was inside the window in every case and two of the three branches were never taken: 700 assertions exercising one arm, which is A03 §2's vacuity class wearing a sweep.
 - **T1.50** (I126, §3ao, §095): the ladder, asserted as a ladder. Every detail present or none; once the window has slid the details stay gone even at a width where the visible members would fit with them; and a single member wider than the whole width truncates rather than vanishing. The middle arm is the one a re-measuring implementation fails, and it is the cell the classification table found.
 
 - **T1.1** (I1): every constructor returns a frozen value; mutation attempts do not change it, at every nesting depth.
