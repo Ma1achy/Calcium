@@ -2122,6 +2122,47 @@ I22): one value, computed in `compose`, read by everything that draws content. A
 
 ---
 
+### 6l.10 — the label on the prompt's rule (§069, `R-COL-003`)
+
+**The rules already exist, so a label in one costs no rows.** That is the
+design's whole argument for the slot and it is the reason this is a change to
+`rule()` rather than a row anywhere: the prompt's upper rule is drawn on every
+frame, full width, and its glyphs are the least load-bearing cells on the
+screen.
+
+**What it carries and what it is.** The content is the application's identity —
+the fixture's ladder is *the app*, *the app and the branch*, *and the dirty
+count*, *or a warning you cannot miss* — and it is **identity**, so it does not
+change during a turn. That is what earns it a permanent slot rather than a
+region. The framework owns the placement and the drop; the string is the
+application's, and nothing here parses it.
+
+| the decision | the ruling | where it comes from |
+|---|---|---|
+| which rule | the **prompt's upper** rule alone | *one label per prompt — two rules with two labels is a header, and the header already exists* |
+| the header's rule, and the prompt's lower one | **bare**, unchanged | the same sentence |
+| alignment | inline-end, **one trailing glyph** of rule after it | *inline-end aligned with one trailing dash* |
+| painted as | a **ground**, not a tone | `R-COL-003` — *a ground is for an extent; a tone is for a mark. Things take a ground* |
+| which ground | `bgElev` | the design's rest-ground for a thing (`R-BLK-490`, *at rest it is bgElev, like every other button*). The fixture does not name a token for this element; this is the pattern it names for the class |
+| when it drops | **first**, below 60 columns | *at 60 columns the label drops before anything else, because it is the least load-bearing thing on the screen* — and `R-BLK-175` ranks it 1 of 4 in the frame's whole degradation order |
+| when it drops for width | when it cannot fit leaving at least one rule glyph | derived rather than chosen: a label that filled the row would have stopped being a label |
+
+**`I81`'s *never configurable* is amended rather than exempted.** It was right
+about the geometry and is being read as covering the content: *two rule rows
+bound the prompt on every frame* is untouched — same rows, same count, same
+width, same tone for the rule's own glyphs — and what becomes configurable is a
+span inside the upper one. A frame with no label is the frame that shipped,
+glyph for glyph, which is the test that says the amendment is a widening and not
+a change.
+
+**The drop is a property of the frame, not of the caller.** An application that
+supplies a label gets no say in whether it is drawn: at 59 columns it is gone,
+and the frame still works. That is the design's sentence read as a mechanism —
+*the least load-bearing thing* is a statement about what the frame sheds first,
+and a slot the caller could pin would not be sheddable.
+
+---
+
 ## 7. Health and identity
 
 **Identity comes from the app, through `config.identity`.** C22 owns the cadence
@@ -2362,7 +2403,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I78** — **A series' visibility is view state in `SeriesVisibility`, overriding `Series.hidden` per entry and block; its writer is the plot's own `BlockKeymap` of digits, merged at `liveBlock` when focus lands on the plot and withdrawn when it leaves; and it is the render key's ninth axis with every override in it — landed together, on I71's rule.** The store is `CursorPositions`' shape keyed `(entryId, blockId)`, holding an explicit boolean per series index rather than a set of hidden indices, because the override has to be able to say *shown* over a producer's *hidden* (C04 I99); `forEntry` carries the entry's record into the context and `key` carries every override sorted, because absent is the block's own default and `false` is not absent. `toggleSeriesBlock` reads the effective state — override, else the member, else shown — and writes its negation; it clamps nothing beyond *the index exists*, which is `dollyBlock`'s seam (I75). The keymap is the plot's (`plotDefinition.keymap(block)`, C12 I116): `syncBlockKeymap` compares the focused block to the last merged one before every key is resolved and merges or withdraws through `Keymap.mergeBlock` (C16 I27) — a pull, because focus has none of its own to subscribe to. **This is `mergeBlock`'s first production caller and `BlockKeymap`'s first producer** (C26 T2.6a, inverted). An override for an index the block no longer has is kept and inert (C23 I47), and named as the residue. The store joins `rendered`'s eviction subscription as the fifth entry (→ C04 I99, C12 I116, C16 I27, I71, I76).
 - **I79** — *Retired 2026-09-05 (§6l).* It read: the footer's row budget is declared once per session and never returned by a `ChromeFn`. The footer's height is now what its blocks measure (I82); the reasoning that produced I79 is kept in §6k.
 - **I80** — **`heightsSum` asserts `HEADER_ROWS + HEADER_RULE_ROWS + region.height + RULE_ROWS + promptRows + footerRows === rows` with the footer height the frame was composed with, and the footer occupies exactly that many rows above the bottom edge, the lower rule directly above it.** `MAX_FOOTER_ROWS = MIN_ROWS − HEADER_ROWS − HEADER_RULE_ROWS − RULE_ROWS − ⌊MIN_ROWS/2⌋ − 1` — 3 today, 4 before the header's rule (§6l.7) — is derived, not chosen, and T1.35 asserts the derivation (→ §6l.2 row 7, §6l.4 C).
-- **I81** — **Two rule rows bound the prompt on every frame the gate accepts** — one directly above the prompt's first row, one directly below its last — full width, the glyph table's `horizontal` at the terminal's unicode tier, muted tone, plain at 1-bit; drawn whether the footer has rows or none, and never configurable (→ §6l.2 rows 1–3, §6l.4 A, F).
+- **I81** — **Two rule rows bound the prompt on every frame the gate accepts** — one directly above the prompt's first row, one directly below its last — full width, the glyph table's `horizontal` at the terminal's unicode tier, muted tone, plain at 1-bit; drawn whether the footer has rows or none, and **their geometry is never configurable** (→ §6l.2 rows 1–3, §6l.4 A, F). **The clause used to read *never configurable* and it was about the rows** (§6l.10, `R-COL-003`): the upper rule carries an inline-end label when the application supplies one, which changes no row, no width and no tone of the rule's own glyphs. The header's rule and the prompt's lower rule stay bare, because two rules with two labels is a header and the header already exists.
 - **I82** — **The footer's height is the measured height of the blocks its `ChromeFn` returns, clamped to `[0, MAX_FOOTER_ROWS]`, measured per frame through the same `measureSequence` that renders it.** `[]` is zero rows; content past the cap is truncated top-down. No config field sets it (→ §6l.2 rows 4–6, 8; §6l.3 rows 1–3; §6l.4 B).
 - **I83** — **A document whose first block is a `step` notice lays out its remaining blocks four cells narrower under a hook, and the viewport's measurer and the frame's renderer reach that layout through one function.** `entryLayout(blocks, width)`: block 0 at `width`, blocks 1… at `width − 4` prefixed two blanks and `⎿ ` on the body's first row and four blanks after, the hook muted; a `step` header with no body draws no hook; any other first block leaves the document as it was. Two cells and the hook at column 0 until §6l.6 (→ §6l.2 rows 11–15, §6l.3 row 4, §6l.4 D, §6l.6 row 16).
 - **I84** — **One indentation unit, two cells, and a subordinate mark sits at its parent row's text column.** A level-0 mark is at column 0 and its text at column 2 (`PROMPT_GUTTER.first`); a mark under a row sits at that row's text column and its own text one unit further in. So the card's hook is at column 2 and its body at column 4, and the `continuation` mark drawn by C09 in a notice and drawn by the shell as a card's gutter are the same column on one screen (→ §6l.6 rows 16–17, G).
@@ -2404,6 +2445,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I109** — **The region has a width, and it is the terminal's less the content margin.** `compose` answers `region.width = max(1, size.columns - CONTENT_MARGIN_R)` with `CONTENT_MARGIN_R = 1`, and it is the width the transcript is resized to, the width the prompt's body is laid out in and the width an overlay's box is placed against — `APPEARANCE.md` §15 rule 8, *content stops one column before the right edge*. **Three composers keep the terminal's width and each exemption is an invariant already written**: the three rule rows by I81 and I87 (*full width … never configurable*), the header's and footer's clusters by I86 (*the clock at the right edge*), and the too-small fallback, which is drawn where no region exists. So the gutter a rule crosses is the declared shape rather than a ragged edge (§6l.9 rows 1–2, 6). Never configurable, for I81's reason: a margin an app can switch off is a second frame shape to specify. The paint still pads every row to `size.columns` — the frame is the terminal's width and the *document* is narrower, which is the one distinction a composer can read the wrong side of, and why the value is computed once here rather than spelled `size.columns - 1` at each site (→ §6l.9, C14 I22, F1227).
 
 - **I110** — **A child surface is an entry the host keeps writing, not a layer it pushes** (C16 I49, C24 §, R-BLK-645, R-BLK-711, R-BLK-312, R-BLK-314). `openSurface` appends the surface's blocks as an ordinary transcript entry and replaces its document on every invalidation and resize; it pushes no layer and takes no region. *A CAPTURED CHILD OWNER over its block. The border says your keys go to the child; the transcript stays* — so the three things a pushed view cost are all returned at once: the reader can scroll, what settled while the child was attached is in the record (R-BLK-314), and the entry is still there after the detach rather than being a hole where the work was.
+- **I111** — *(§6l.10, §069, `R-COL-003`, `R-BLK-175`)* **The prompt's upper rule carries the application's label inline-end, painted as a ground, and it is the first thing the frame sheds.** One trailing rule glyph after it; `bgElev`, because a name is a thing and things take a ground; the header's rule and the prompt's lower rule stay bare. **Dropped below 60 columns and whenever it cannot fit leaving at least one rule glyph**, and the drop is the frame's rather than the caller's — an application supplies the string and has no say in whether it is drawn, which is what *the least load-bearing thing on the screen* means as a mechanism. With no label supplied the frame is the one that shipped, glyph for glyph.
 
   **The composition root owns both halves and they are separate.** *Where the blocks go* is this invariant; *who has the keyboard* is C16 I49, and the root wires the second by answering `attachedChild` from the attachment as well as from `inFlight() === "shell"`. Keeping them apart is what makes the child's ownership independent of where its output landed — which is the distinction the single `kind: "view"` flag could not hold, since a layer that filled the region carried both claims in one field and neither was declared.
 
@@ -2517,6 +2559,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 79. **Windows lie end to end on the clock** (I108, F1207). C03 arms each window when the last timer fires and Node fires about a millisecond late, so a 16 ms window drew 58 to 59 frames a second and nothing in C03 could recover it without a clock. The composed schedule dates the next window from the deadline the firing belongs to and floors it at the budget, which pins the rate at sixty rather than leaving it a second under with an occasional second over.
 80. **The region owns the width the way it owns the height** (I109, F1227). One value from `compose` — the terminal's less one column — read by the transcript's resize, the prompt's body and the overlay placement; the three rule rows, the chrome's clusters and the fallback keep the terminal's, each by an invariant already written (I81, I86, I87).
 81. **A child surface is an entry, not a layer** (I110, R-BLK-645). Its blocks are appended and replaced in place, the transcript stays scrollable beneath the capture, and what settled while it was attached survives the detach. The keyboard half is C16 I49's and is wired separately, which is what the one `kind: "view"` flag could not express.
+82. **A label in a rule costs no rows** (I111, §6l.10, §069). The prompt's rules are drawn on every frame and their glyphs are the least load-bearing cells on the screen, so the design puts the application's identity in one rather than spending a region on it. Painted as a ground and not as text (`R-COL-003`), inline-end with one trailing glyph, on the upper rule alone, and shed first — `R-BLK-175` ranks it 1 of 4 in the frame's whole degradation order. I81's *never configurable* is amended to name the geometry it was always about.
 
 ---
 
@@ -2850,6 +2893,8 @@ PTY harness.
 - **T1.50** (I90, §6l.8 row 26): `elementsOfEntry` with `command: "/ps --all"` yields a head element whose `copy` is `/ps --all` and body elements whose `copy` is each block's own; `copyElement` over the whole card yields the command first.
 - **T1.43** (§6l.4 E): the default footer is one `pills` row naming `/help` and the snapshot's `cwd` with `$HOME` folded to `~`, gaining `stopping` when the snapshot says so and carrying no key name.
 - **T2.40** (SS56): the source scan finds no hand-composed `kind: "notice"` under `src/` outside the sixteen files the rule excuses by name — two are the family (`documents.ts`, `builders/`), two the kind's declaration and definition, eight below L4 where the family is unreachable (A02), four L4 surfaces **owed** a migration and allowed so SS53 retires each entry when its last literal goes. The rule is imported from the enforcement tool, not restated (C01 T2.10's shape), and its fabricated violation is a notice literal in `src/shell/keys.ts`.
+- **T1.65** (I111, §6l.10): the label sits inline-end on the **upper** rule with one trailing glyph, painted as a ground; the header's rule and the lower rule are byte-identical to the no-label frame. The control is that frame: with no label supplied every row matches what shipped, glyph for glyph, so the row cannot pass by drawing nothing anywhere.
+- **T1.66** (I111, §6l.10, `R-BLK-175`): the label is gone below 60 columns and gone whenever it would leave no rule glyph, at every width across the boundary — and the frame still composes to the same height, since a label costs no rows.
 - **T2.100** (I91): a `TuiConfig.pty` reaches `createProcessRunner`'s deps identically — asserted by object identity across `resolveConfig`, and by the consumer's own `spawn` being the one the graph's runner calls — and a source scan finds `config.pty` read at **two** sites in `src/shell/`, each of them the same spread with nothing between.
   The row said *exactly one site* and the scan gives two: `config.ts` copies the consumer's field onto the resolved config, `construct.ts` hands the resolved one to the runner. Both comments say *the one site* and both are right about their own `config` object; the number is only wrong read as a grep, which is what a scan is (F923). What C22 I91 forbids is a read that is **not** a forward, so the row asserts that instead of a count.
 - **T3.38** (I80, §6k.4 F): **frame read.** At 24 rows with `footerRows: 2` and a footer returning three one-row blocks, rows 22 and 23 carry the first two blocks and the third is on no row; the region is 20 and the prompt is on row 21. With one block, row 23 is blank. And the default — `footerRows` omitted — paints byte-for-byte the frame that `footerRows: 1` paints, which is the frame HEAD painted: the golden claim, asserted here rather than by regenerating anything.
