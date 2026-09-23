@@ -723,6 +723,83 @@ nothing added: **neither fact rests on colour alone.**
 
 ---
 
+## 6e. The rectangle — cells, clipped to the block it started in
+
+`R-SEL-007`: *A rectangular selection copies cells, not source, and says so in
+the mode label. It is the single exception to copy taking the source, and it is
+explicit rather than silent. A rectangular selection never crosses a block
+boundary; it clips to the region it started in.*
+
+### Two clauses land here and the third is parked, on a seam that is already parked
+
+The rule has three claims and they do not have the same standing in the registry.
+
+| The claim | What the design supplies | Here |
+|---|---|---|
+| it copies **cells**, not source | the mechanism, completely | built |
+| it **never crosses a block boundary** and clips to where it started | the mechanism, completely | built |
+| it **says so in the mode label** | the requirement, and no words | **parked**, with §6a's |
+| the **way in** — a chord, a verb, a binding | **nothing.** The registry names no rectangular action and no rectangular binding | **parked** |
+
+**The label is not a second parked question.** §6a already records that there is
+no mode-label seam at all — `ChromeContext.owner` is the *rung*, both copy modes
+map to `copy`, and the header draws `COPY` from that rather than from anything a
+mode supplies. So *say so in the mode label* is blocked on the surface rather than
+on the wording, and it lands the day that surface does, with the handoff's word.
+
+**And the chord being absent is a fact about the registry, not an omission here.**
+`R-SEL-008` gives `a` and `A` in prose; `R-SEL-007` gives nothing of the kind, and
+neither the actions nor the bindings hold a rectangular row. Inventing one is
+exactly what the goal parks.
+
+**What that leaves is not a fragment.** The two clauses that land are the whole of
+the rule's *mechanism*, and they are the half a chord cannot decide: a rectangle
+that crossed a block would still cross it whichever key opened it. So the model is
+built and tested now, and the verb is one line when the chord arrives — which is
+why `CellRect`, `rectBetween` and `cellTextOf` are named in `UNCONSUMED_MEMBERS`
+against that MR rather than held back until it.
+
+### The clip is to the block the **anchor** is in, and that is what makes it a rule
+
+*Clips to the region it started in* names the anchor's block and no other. The
+head is free to travel — into the block above, into the next entry, past the end
+of the transcript — and the rectangle does not follow it; the head's row is
+clamped into the anchor's block's rows before a rectangle exists.
+
+**A containment test would read as this and is not this.** *Both ends inside one
+block* is satisfiable by refusing: a head that has left gives no rectangle, so the
+selection disappears as the reader extends and comes back when they return. The
+rule says the opposite — the rectangle **clips**, so extending past the block's
+last row selects to the last row and stays there. The two differ on every extend
+that leaves, and the difference is visible in the count.
+
+The head can also be in another **entry**, and then its row is not a coordinate in
+the anchor's space at all. The direction is taken from the transcript's order —
+an entry later in the document clamps to the block's last row, an earlier one to
+its first. An order that resolves neither entry clamps to the anchor's own row,
+which is *clips to where it started* taken to its limit and is never a rectangle
+somewhere the reader was not.
+
+### Cells are what the frame drew, and the copy carries none of the ink
+
+*Copies cells* is the rendered line, windowed by column — `sliceCells`, which is
+the same walk `paint` uses to window a row, so a cluster straddling either edge is
+blanked rather than halved and a copy is never a row one cell wide.
+
+**And the SGR comes off.** The frame's line carries the ink that painted it, and a
+clipboard is text: a paste into an editor of `\x1b[38;5;203m` is the rendering
+arriving where the content was asked for. So the slice is taken with its style —
+because `sliceCells` has to carry a style forward to know what a cut leaves — and
+the style is stripped from the result. Taking the unstyled line first would be the
+wrong order: the widths would be measured over text the frame never drew.
+
+**This is the single exception `R-SEL-004` names.** Every other copy takes the
+source — prose unwrapped, code with its own indentation, a patch as a unified diff
+— and this one takes the picture, which is why the rule requires it to be said out
+loud rather than left for the reader to discover in a paste.
+
+---
+
 ## 7. State machine
 
 | From ↓ / call → | scroll up | scroll to bottom / `End` | `enterCopy` | `exitCopy` |
@@ -790,6 +867,9 @@ than stranding the user.
 - **I40** — **Nothing selection-dependent is ever written into a render-cache slot.** The cache keys on nine axes and the selection is none of them; a wash baked into the stored lines would serve a selected frame to a later unselected read, which is C22 I71's *correct frame, previous state* — the symptom whose report says *it froze*. A tenth axis would be correct and would bust an entry's whole slot on every keystroke in the mode, one rung coarser than the cost C22 I103 split `tick` out to avoid. So the wash is a transformation of the finished lines, applied to the copy that goes on screen and never to the copy that is stored.
 - **I41** — **`R-SEL-006`'s precedence is the order of two operations, not a case in a table.** The mark is already in the rendered text and the wash changes the ground under it, so *selection wins the ground while focus keeps its mark* is true by construction — including over a diff ground, where `patch`'s own inks are what the wash lands on and the `+`/`−` marks carry the diff. At 1-bit `selectionStyle` answers `inverse` and the focus mark survives, so neither fact rests on colour alone and no new rung is added.
 
+- **I42** — **A rectangular selection is a cell rectangle inside one block, and the block is the anchor's.** `R-SEL-007`'s *never crosses a block boundary* is enforced by **clipping the head**, not by refusing when the head has left: a containment test reads as the same rule and behaves as its opposite, making the selection vanish while the reader extends and reappear when they come back. The head's row is clamped into the anchor's block before a rectangle exists, and a head in another entry takes its direction from the transcript's order rather than from a row that means nothing in the anchor's space.
+- **I43** — **A rectangular copy is the rendered cells with the ink taken off.** It is the single exception `R-SEL-004` names to copy taking the source, so the window is `sliceCells` over the frame's own line — a straddling cluster blanked rather than halved (C09 I9) — and the SGR is stripped **after** the slice, because a slice measured over unstyled text would be measured over a line the frame never drew. The clipboard is text: an escape sequence in it is the rendering arriving where the content was asked for.
+
 ---
 
 ## 9. Commitments
@@ -835,6 +915,9 @@ than stranding the user.
 35. **A rule about where a ground goes belongs to whoever knows the geometry** (I39). The shell holds every block's rows already; delegating the third clause to the kinds would be the same rule written twenty-six times.
 36. **A cache may not hold anything its key cannot express** (I40). The wash is applied to the frame and never to the stored lines, so no slot can serve a state it was not keyed for.
 37. **Precedence expressed as an order needs no table** (I41). Painting the ground under text that already carries the mark makes *selection wins the ground, focus keeps its mark* true by construction, at every colour depth.
+
+38. **A boundary rule is kept by clipping, not by refusing** (I42, §6e). *Never crosses a block* and *both ends inside one block* read as one sentence and differ on every extend that leaves: one selects to the edge and stays, the other empties and comes back.
+39. **The one copy that takes the picture says so** (I43, §6e). Cells rather than source is `R-SEL-004`'s single exception, and the rule requires it to be explicit — so the mechanism lands here and the words land with the mode-label seam §6a parks.
 
 ---
 
@@ -889,6 +972,9 @@ Fake heights, no rendering.
   **Why here and not at the session** (I40's own limit): the harness's screen model replays the frame into a grid and drops every SGR, so a read one layer up can see a row *move* and cannot see a *ground* — which is the same reason `session-paint.test.ts` reads `paint()`'s return rather than the modelled screen. The arithmetic is therefore a pure function beside `washRow`, and both halves are artefacts.
 - **T1.40c** (I40): the wash returns a new array and leaves the one it was given byte-for-byte unchanged, and an empty selection is the identity. **That is I40's whole claim at the mechanism**: the caller has already written those lines into the cache, so *the copy that goes on screen is not the copy that is stored* is a property of the function rather than a discipline at the call site.
 - **T1.40b** (I41): `washRow` over a row already carrying a mark → the mark is still in the text and the ground is the selection's, which is *selection wins the ground while focus keeps its mark* as the order of two operations. At 1-bit the same call emits SGR 7 rather than a background, so neither fact rests on colour alone.
+
+- **T1.42** (I42, §6e): an anchor inside a three-row block and a head two rows past its last → the rectangle's rows end at the block's last row and the rectangle still exists. Extending further changes nothing, and bringing the head back inside gives the smaller rectangle again — asserted as a **clip**, since a containment test answers `null` for the same two heads and every assertion about the returned rows would be vacuous. The head in a later entry clamps to the last row, in an earlier entry to the first; an anchor in no block at all is `null`, which is the one refusal.
+- **T1.43** (I43, §6e): a rectangle over rendered lines carrying SGR → the text is the windowed cells, has no escape byte in it, and a double-width cluster straddling the right edge is a blank rather than half a glyph. **The vacuity control is in the row**: the same window over the *unstyled* lines gives different text, so the fixture can tell a slice taken over the frame's line from one taken over its content.
 
 ### Tier 2 — contract / interface
 
