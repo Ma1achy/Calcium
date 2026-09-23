@@ -1092,6 +1092,40 @@ notice here.
 
 ---
 
+## 7a. Focus pulls the viewport, by the minimum — and scrolling never moves focus (§021, §095)
+
+**One sentence, two axes, and the design says so itself.** §021 states it of a scroll
+box's rows — *FOCUS PULLS THE VIEWPORT, BY THE MINIMUM, one row for one row* — and
+§095's rule 2 states it of a tape's members in the same words: *the window moves by the
+minimum that brings the current back into view — the same sentence as FOCUS PULLS THE
+VIEWPORT, BY THE MINIMUM, one axis over.* So it is one mechanism with two callers, and
+writing it twice would be two chances to round differently.
+
+**The pull is the minimum, and the minimum is a distance.** A target span `[from, to)`
+must end up inside a window of `n` starting at the held offset. If it begins before the
+window, the window starts where it begins; if it ends after, the window ends where it
+ends; otherwise nothing moves. A span taller than the window shows its **head**, which
+is what applying the end rule and then the start rule gives — and the order is the
+ruling, not an accident of the code.
+
+**And the converse is the half that is a refusal.** *Scrolling never moves focus*: a
+reader who scrolls away from the focused element keeps it focused, and the next key
+that moves focus pulls the viewport back. A viewport that dragged focus along would
+make scrolling a navigation gesture, and the two would fight over one piece of state.
+
+**The tape's offset is a member index and the scroll box's is a row index, in one
+store** (C04 I48). `ScrollOffsets` is view state per container and it already says it
+cannot clamp, because it does not know the width — which is exactly why a tape can
+share it: the unit is *how far this container is scrolled*, and the container is what
+knows what its unit means. The renderer clamps at read on both axes.
+
+**The tape's pull is not a separate calculation.** `tapeWindow` already moves by the
+minimum, because its mark is priced into the move (C04 I125) — what the shell owes is
+to **persist** its answer, so the window stays where it was put. Without that the held
+start is always zero, every frame recomputes from the head, and the window snaps back
+the moment the current comes near the start: a cursor dragging the row along, which is
+the behaviour §095's first paragraph exists to separate a tape from.
+
 ## 8. Invariants
 
 - **I1** — The scope stack is at most four deep, and a level exists only where §5's
@@ -1212,6 +1246,8 @@ notice here.
   The fall is to the live entry's **first** element — I10's block-went clause one scope up —
   because nothing about an evicted entry's position survives to name a nearer neighbour.
 - **I23** — **A call's head is an element whose `⏎` toggles its body's fold and never re-runs the
+- **I24** — *(§7a, §021, §095, `R-NAV-004`)* **Focus pulls the viewport by the minimum, and scrolling never moves focus.** A move that puts the focused element outside its container's window moves the window the least distance that brings it back — the window's start where the element begins if it begins before, its end where the element ends if it ends after, and nothing otherwise. **A target larger than the window shows its head**, which is the end rule applied before the start rule and is a ruling rather than an order the code fell into. The converse binds equally: a reader who scrolls away keeps the focused element focused, and a viewport that dragged focus with it would make scrolling a navigation gesture and give two mechanisms one piece of state.
+- **I25** — *(§7a, C04 I48, C04 I124)* **One store holds how far a container is scrolled, and the container is what knows the unit.** A scroll box's offset is rows and a tape's is members, and neither is clamped where it is stored — `ScrollOffsets` does not know the width, so the renderer clamps at read on both axes. The shell **persists** the window a tape computed rather than recomputing it: `tapeWindow` already moves by the minimum, and a held start that is always zero makes every frame recompute from the head, which snaps the window back whenever the current comes near the start.
   entry, whose `y` copies the invocation, and `⇧⏎`/`⌥⏎` remain the only re-run** (§5c, →
   C09 I47, C22 I90, C23 I18). A head with no body has no `activate` and `⏎` is silent there; a
   subagent's head pushes a view rather than expanding (→ C15 §2b).
@@ -1549,6 +1585,8 @@ is the shape a spec commit should have.
 15. **Focus reaches every entry, not only the live one** — the stored location carries the entry, `tab`/`⇧tab` move between entries and the sequence stays the entry's (I21, §4g).
 16. **An evicted entry's focus falls to the live entry**, through the one pull the render side and the key side share (I22, §4g).
 17. **`⏎` on a head is a toggle and `y` on it is the invocation** — re-run stays on its own key, because a key with two meanings by count is an arming machine (I23, §5c).
+18. **Focus pulls the viewport and scrolling does not move focus, as one mechanism with two callers** (I24, §7a, §021, §095). The design states the sentence twice — once of a box's rows and once of a tape's members — and writing it twice in the tree would be two chances to round differently. What the two share is a distance; what differs is the unit, and the unit belongs to the container.
+19. **A tape's window is persisted, not recomputed from the head** (I25, → C04 I124). *The window moves only when the current leaves it* is a statement about the previous window, so there has to be one; without it the arithmetic is still correct and the behaviour is a cursor dragging the row along.
 
 **The four-kind validation of §4 is not here, and SP1 is why.** *If it is none of those, it
 is a § detail rather than a commitment* — it is a step the implementation takes, and no
@@ -1572,6 +1610,9 @@ Named against the invariants; the tiers are the six.
 - **T1.42, T1.43** (I17, §5c) — an element's `copy` carries **every declared column**, including the ones the width dropped, is the same text at 60 columns and at 200, and is untruncated. The control is `planColumns(...).dropped` being non-empty at that width: without it the row passes for a table that drops nothing. The expand column contributes its **cell**, not the marker a renderer puts there.
 - **T1.44, T1.45, T1.46** (I16, §5c) — `⇧↓` twice leaves the anchor where it was and `y` copies the range newline-joined; an unshifted motion collapses, so `y` afterwards copies one row; and `⇧↑` at the first element stays in the block, where unshifted `↑` leaves. **Two extensions in the first, because one passes whichever end moved** — C17 T1.23's argument one level up.
 - **T1.47** (I23, §5c h1–h4) — `⏎` on a running card's head toggles the body scroll's `collapsed` and leaves `doc.command` unsubmitted; a second `⏎` toggles back and submits nothing; `y` on the head yields the command and `⌃a y` yields the command followed by the body's sources; `⇧⏎` on the running entry is refused by the guard and on the settled one re-runs.
+- **T1.48** (I24, §7a, §021): the pull as a distance, from both sides and at the boundary — a target already inside moves nothing, one before the window moves it exactly to the target's start, one after moves it exactly to the target's end, and a target taller than the window shows its **head** rather than its tail. The last is the arm that separates the two orderings, and both orderings are self-consistent.
+- **T1.49** (I24, §7a): scrolling does not move focus — the focused element survives a scroll that puts it off-screen, and the next focus move pulls the viewport back to it. Asserted as a pair, because *focus is unchanged* is satisfied by a build where scrolling does nothing at all.
+- **T1.50** (I25, §7a, C04 I124): a tape's window is held between frames — walking to the far end and back again leaves the window where the walk put it, where a recomputed one snaps to the head. The second half is the assertion: the frame after the current returns near the start is compared against the frame that a from-the-head computation would draw, and they differ.
 - **T2.29, T2.30, T2.31** (I4, I5, I6; C09 §2) — **the lifted list, in sequence form.** Two 39-wide tables in an 80-column `row` group: the second's elements sit at cols `[40, 79)` and the frame's second header begins at column 40 — the gutter is measured through `childWidths`, not assumed. Containment, disjointness and stability hold of the lifted list **across** blocks and order within each, **and a fabricated old walk — rows lifted, columns not — fails disjointness**, which is what shows the sweep is live. A `panel`'s children start one row and one column in, a `column` group's follow one another, and an unplaced child holds nothing. Three rows because the two lifts fail separately: F756 was the column, F757 the origin.
 - **T2.32** (I1): `NavElement.level` is exactly `"block" | "row" | "cell"` — read from the declaration and compared by equality, because three levels plus the entry *is* the four-deep stack and a fourth value makes it five. And **a level exists only where a declaration reports one**, measured over the shipped registry rather than argued: `pills` reports two `cell` elements and no `row` above them, `table` reports `row` and no `cell` below, and six kinds — `logs`, `notice`, `keyValue`, `steps`, `tip`, `rule` — report none at all and are therefore atomic. **`block` has no inhabitant** and the row says so, which is §5's own record (block-level focus is unbuilt) turned into something that fails when it changes.
 - **T2.33** (I8): `elementsOfEntry` has **one call site**, and both routes reach it through the same closure — the keyboard through `focusedElements`/`liveElements` and the pointer through `elementAt`. *There is no second source* is an absence claim about the tree, which no assertion about a keystroke or a click can see: two resolvers agreeing on every case in the suite is exactly what a second source looks like until the day they part.
